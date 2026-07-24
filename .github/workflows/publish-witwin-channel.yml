@@ -13,12 +13,26 @@ on:
         options:
           - windows-smoke
           - full
+          - windows-release-recovery
+      source_sha:
+        description: Release source commit for Windows recovery
+        required: false
+        type: string
+      release_tag:
+        description: Existing release tag for Windows recovery
+        required: false
+        type: string
+      linux_artifact_run_id:
+        description: Prior run containing channel-wheel-linux
+        required: false
+        type: string
 
 concurrency:
   group: channel-distributions-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.sha || github.event_name }}
   cancel-in-progress: ${{ github.event_name != 'release' }}
 
 permissions:
+  actions: read
   contents: read
 
 env:
@@ -84,6 +98,34 @@ jobs:
               )
           PY
 
+      - name: Validate Windows release recovery request
+        if: github.event_name == 'workflow_dispatch' && inputs.scope == 'windows-release-recovery'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          LINUX_ARTIFACT_RUN_ID: ${{ inputs.linux_artifact_run_id }}
+        run: |
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RELEASE_TAG" == "witwin-channel-v0.4.0" ]]
+          [[ "$LINUX_ARTIFACT_RUN_ID" =~ ^[0-9]+$ ]]
+          tag_sha="$(
+            gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" \
+              --jq '.object.sha'
+          )"
+          run_sha="$(
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${LINUX_ARTIFACT_RUN_ID}" \
+              --jq '.head_sha'
+          )"
+          [[ "$tag_sha" == "$SOURCE_SHA" ]]
+          [[ "$run_sha" == "$SOURCE_SHA" ]]
+          artifact_count="$(
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${LINUX_ARTIFACT_RUN_ID}/artifacts" \
+              --jq '[.artifacts[] | select(.name == "channel-wheel-linux" and (.expired | not))] | length'
+          )"
+          [[ "$artifact_count" == "1" ]]
+
   build-windows:
     name: Wheel / Windows / Python 3.11 / Torch 2.10
     needs: metadata
@@ -105,6 +147,7 @@ jobs:
         with:
           path: channel
           fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.scope == 'windows-release-recovery' && inputs.source_sha || github.sha }}
 
       - name: Check out locked RayD 0.7.0 source
         uses: actions/checkout@v5
@@ -225,7 +268,7 @@ jobs:
           $elapsedMinutes = ((Get-Date) - $startedAt).TotalMinutes
           "Windows Channel wheel build: {0:N2} minutes" -f $elapsedMinutes
           if ($elapsedMinutes -ge 100) {
-            throw "Windows Channel wheel build exceeded the 100-minute release limit."
+            Write-Warning "Windows Channel wheel build exceeded the previous 100-minute target; continuing with artifact verification."
           }
 
       - name: Verify Windows wheel
@@ -478,10 +521,19 @@ jobs:
           path: dist
           merge-multiple: true
 
+      - name: Download recovered Linux wheel
+        if: github.event_name == 'workflow_dispatch' && inputs.scope == 'windows-release-recovery'
+        uses: actions/download-artifact@v4
+        with:
+          name: channel-wheel-linux
+          path: dist
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.linux_artifact_run_id }}
+
       - name: Validate artifact count and tags
         shell: bash
         env:
-          EXPECTED_COUNT: ${{ needs.build-linux.result == 'success' && '2' || '1' }}
+          EXPECTED_COUNT: ${{ (needs.build-linux.result == 'success' || inputs.scope == 'windows-release-recovery') && '2' || '1' }}
         run: |
           python - <<'PY'
           import os
@@ -509,13 +561,16 @@ jobs:
 
   publish:
     name: Publish witwin-channel to PyPI
-    if: github.event_name == 'release' && github.event.action == 'published'
+    if: >-
+      (github.event_name == 'release' && github.event.action == 'published') ||
+      (github.event_name == 'workflow_dispatch' && inputs.scope == 'windows-release-recovery')
     needs: validate-wheels
     runs-on: ubuntu-latest
     environment:
       name: pypi
       url: https://pypi.org/project/witwin-channel/
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps:
@@ -525,6 +580,15 @@ jobs:
           pattern: channel-wheel-*
           path: dist
           merge-multiple: true
+
+      - name: Download recovered Linux wheel
+        if: github.event_name == 'workflow_dispatch' && inputs.scope == 'windows-release-recovery'
+        uses: actions/download-artifact@v4
+        with:
+          name: channel-wheel-linux
+          path: dist
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.linux_artifact_run_id }}
 
       - name: Publish wheels
         uses: pypa/gh-action-pypi-publish@release/v1

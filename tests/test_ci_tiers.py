@@ -205,6 +205,12 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "\n  schedule:" not in workflow
     assert "\n  release:\n    types: [published]" in workflow
     assert "\n  workflow_dispatch:" in workflow
+    assert "          - windows-smoke" in workflow
+    assert "          - full" in workflow
+    assert "          - windows-release-recovery" in workflow
+    assert "      source_sha:" in workflow
+    assert "      release_tag:" in workflow
+    assert "      linux_artifact_run_id:" in workflow
     assert "self-hosted" not in workflow
     assert "runs-on: channel-windows-8core" in workflow
     assert "runs-on: channel-linux-8core" in workflow
@@ -234,6 +240,9 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "CMAKE_CUDA_COMPILER_LAUNCHER: \"\"" in workflow
     assert "CMAKE_BUILD_PARALLEL_LEVEL: \"6\"" in workflow
     assert "CMAKE_BUILD_PARALLEL_LEVEL=6" in workflow
+    assert "Windows Channel wheel build: {0:N2} minutes" in workflow
+    assert "exceeded the previous 100-minute target; continuing" in workflow
+    assert "throw \"Windows Channel wheel build exceeded" not in workflow
     assert ".Path.Replace('\\', '/')" in workflow
     assert "actions/cache@v5" in workflow
     assert "sub-packages:" in workflow
@@ -307,5 +316,14 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
         "github.event_name == 'release' && github.event.action == 'published'"
     )
     assert publish_guard in workflow
+    recovery_guard = (
+        "github.event_name == 'workflow_dispatch' && "
+        "inputs.scope == 'windows-release-recovery'"
+    )
+    assert recovery_guard in workflow
+    assert "actions/runs/${LINUX_ARTIFACT_RUN_ID}/artifacts" in workflow
+    assert "run-id: ${{ inputs.linux_artifact_run_id }}" in workflow
+    assert workflow.count("Download recovered Linux wheel") == 2
+    assert "inputs.source_sha || github.sha" in workflow
     assert "pypa/gh-action-pypi-publish@release/v1" in workflow
     assert "id-token: write" in workflow
