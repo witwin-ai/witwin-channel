@@ -13,10 +13,15 @@ def test_transmission_and_scattering_are_zero_contribution_plumbing():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for the deterministic solver")
 
-    baseline = solve(empty_space_los_scene(), Config(components={"los"}))
+    baseline = solve(
+        empty_space_los_scene(),
+        Config(components={"los"}),
+        reference_frequency_hz=3.0e9,
+    )
     result = solve(
         empty_space_los_scene(),
         Config(components={"los", "transmission", "scattering"}),
+        reference_frequency_hz=3.0e9,
     )
 
     # (a) requesting the new components validates and (b) they carry zeros, so
@@ -42,8 +47,14 @@ def test_single_component_power_matches_total_for_reflection_only():
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native reflection is not built")
 
-    result = solve(same_side_wall_reflection_scene(), Config(components={"reflection"}, coherent=False))
+    result = solve(
+        same_side_wall_reflection_scene(),
+        Config(components={"reflection"}, coherent=False),
+        reference_frequency_hz=3.0e9,
+    )
 
-    torch.testing.assert_close(result.component_power["reflection"], result.path_gain, rtol=5.0e-4, atol=1.0e-8)
+    torch.testing.assert_close(
+        result.component_power["reflection"], result.path_gain, rtol=5.0e-4, atol=1.0e-8
+    )
     assert torch.count_nonzero(result.component_power["los"]) == 0
     assert torch.count_nonzero(result.component_power["diffraction"]) == 0

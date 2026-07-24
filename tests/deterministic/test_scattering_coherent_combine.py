@@ -13,9 +13,10 @@ import pytest
 import torch
 
 from tests.support.scenes import rough_wall_structure
-from witwin.channel import ReceiverPoint, Scene, Transmitter
+from witwin.core import Scene
+from tests.support.core_world import make_receiver, make_transmitter
 from witwin.channel.core.kernels.extension import build_info
-from witwin.channel.core.materials import PhaseScreen, Roughness
+from witwin.core import PhaseScreen, SurfaceRoughness
 from witwin.channel.deterministic import Config, solve
 from witwin.channel.scattering import (
     generate_gaussian_realization,
@@ -37,7 +38,9 @@ def _require_rayd() -> None:
 
 
 def _screen(realization_id: int) -> PhaseScreen:
-    rough = Roughness(rms_height_m=0.008, corr_length_x_m=0.15, corr_length_y_m=0.15)
+    rough = SurfaceRoughness(
+        rms_height_m=0.008, correlation_length_x_m=0.15, correlation_length_y_m=0.15
+    )
     height = generate_gaussian_realization(
         rough,
         extent_m=2.0,
@@ -69,9 +72,10 @@ def _wall(x_m: float, *, realization_id: int, surface_id: int, name: str):
 def _scene(structures) -> Scene:
     return Scene(
         structures=structures,
-        transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.0]))],
-        frequency=_FREQUENCY_HZ,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, -1.0, 0.0])),
+            make_receiver(position=torch.tensor([0.0, 1.0, 0.0])),
+        ],
     )
 
 
@@ -115,8 +119,10 @@ def test_default_flag_absent_matches_explicit_false():
 
     _require_rayd()
     scene = _scene([_wall(2.5, realization_id=1, surface_id=1, name="w1")])
-    absent = solve(scene, _config())
-    explicit = solve(scene, _config(scattering_coherent=False))
+    absent = solve(scene, _config(), reference_frequency_hz=_FREQUENCY_HZ)
+    explicit = solve(
+        scene, _config(scattering_coherent=False), reference_frequency_hz=_FREQUENCY_HZ
+    )
     assert torch.equal(
         absent.component_power["scattering"],
         explicit.component_power["scattering"],
@@ -135,8 +141,10 @@ def test_single_row_coherent_equals_incoherent():
 
     _require_rayd()
     scene = _scene([_wall(2.5, realization_id=1, surface_id=1, name="w1")])
-    incoherent = solve(scene, _config())
-    coherent = solve(scene, _config(scattering_coherent=True))
+    incoherent = solve(scene, _config(), reference_frequency_hz=_FREQUENCY_HZ)
+    coherent = solve(
+        scene, _config(scattering_coherent=True), reference_frequency_hz=_FREQUENCY_HZ
+    )
     # A single realization structure emits exactly one scattering row per
     # (tx, rx), so the coherent |sum|^2 collapses to the single-row power.
     assert incoherent.metadata["scattering"]["path_count"] == 1
@@ -162,9 +170,19 @@ def test_multi_row_coherent_differs_and_is_reproducible():
         _wall(2.5, realization_id=1, surface_id=1, name="w1"),
         _wall(-2.5, realization_id=2, surface_id=2, name="w2"),
     ]
-    incoherent = solve(_scene(structures), _config())
-    coherent_a = solve(_scene(structures), _config(scattering_coherent=True))
-    coherent_b = solve(_scene(structures), _config(scattering_coherent=True))
+    incoherent = solve(
+        _scene(structures), _config(), reference_frequency_hz=_FREQUENCY_HZ
+    )
+    coherent_a = solve(
+        _scene(structures),
+        _config(scattering_coherent=True),
+        reference_frequency_hz=_FREQUENCY_HZ,
+    )
+    coherent_b = solve(
+        _scene(structures),
+        _config(scattering_coherent=True),
+        reference_frequency_hz=_FREQUENCY_HZ,
+    )
     assert incoherent.metadata["scattering"]["path_count"] == 2
     # Interference: the coherent |sum|^2 is not the incoherent power sum.
     assert not torch.equal(
@@ -194,7 +212,11 @@ def test_pipeline_refuses_ensemble_only_scene():
     )
     scene = _scene([ensemble_wall])
     with pytest.raises(RuntimeError, match="ensemble scattering surfaces"):
-        solve(scene, _config(scattering_coherent=True))
+        solve(
+            scene,
+            _config(scattering_coherent=True),
+            reference_frequency_hz=_FREQUENCY_HZ,
+        )
 
 
 @_needs_cuda
@@ -208,4 +230,8 @@ def test_pipeline_refuses_scene_without_scattering_surfaces():
     )
     scene = _scene([smooth_wall])
     with pytest.raises(RuntimeError, match="realization_coherent phase-screen"):
-        solve(scene, _config(scattering_coherent=True))
+        solve(
+            scene,
+            _config(scattering_coherent=True),
+            reference_frequency_hz=_FREQUENCY_HZ,
+        )

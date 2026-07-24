@@ -165,12 +165,22 @@ def measure_cold_import(
 
     repo_root = Path(__file__).resolve().parents[1]
     env = dict(os.environ)
-    source_paths = [str(repo_root / "src"), str(repo_root)]
+    core_root = repo_root.parent / "core-radar-architecture-stage1"
+    source_paths = [str(core_root), str(repo_root / "src"), str(repo_root)]
     inherited = env.get("PYTHONPATH")
     if inherited:
         source_paths.append(inherited)
     env["PYTHONPATH"] = os.pathsep.join(source_paths)
-    command = [sys.executable, "-c", f"import {module}"]
+    command = [
+        sys.executable,
+        "-c",
+        (
+            "import sys; "
+            "sys.meta_path=[finder for finder in sys.meta_path "
+            "if '_witwin_channel_editable' not in type(finder).__module__]; "
+            f"import {module}"
+        ),
+    ]
     started = time.perf_counter()
     completed = subprocess.run(
         command,

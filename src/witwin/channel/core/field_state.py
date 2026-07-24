@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import torch
 
-from witwin.channel.scene.models import ReceiverGrid, ReceiverPoint
+from witwin.channel.scene.endpoints import ReceiverGrid, ReceiverPoint
 
 
 PHASE_CONVENTION = {

@@ -21,7 +21,11 @@ def test_bdpt_diffraction_errors_when_capability_missing(monkeypatch):
     )
 
     with pytest.raises(RuntimeError, match="diffraction.*RayD"):
-        solve(wedge_diffraction_scene(), Config(components={"diffraction"}))
+        solve(
+            wedge_diffraction_scene(),
+            Config(components={"diffraction"}),
+            reference_frequency_hz=3.0e9,
+        )
 
 
 def test_bdpt_los_only_skips_diffraction_capability(monkeypatch):
@@ -38,7 +42,11 @@ def test_bdpt_los_only_skips_diffraction_capability(monkeypatch):
         },
     )
 
-    result = solve(wedge_diffraction_scene(), Config(components={"los"}))
+    result = solve(
+        wedge_diffraction_scene(),
+        Config(components={"los"}),
+        reference_frequency_hz=3.0e9,
+    )
 
     assert result.metadata["components"]["diffraction"] == "not_requested"
 
@@ -47,8 +55,11 @@ def test_bdpt_diffraction_errors_when_order_disabled():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT diffraction capability")
 
-    with pytest.raises(RuntimeError, match="diffraction requires max_diffraction_order"):
+    with pytest.raises(
+        RuntimeError, match="diffraction requires max_diffraction_order"
+    ):
         solve(
             wedge_diffraction_scene(),
             Config(components={"diffraction"}, max_diffraction_order=0),
+            reference_frequency_hz=3.0e9,
         )

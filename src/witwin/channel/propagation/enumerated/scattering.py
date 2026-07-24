@@ -74,14 +74,15 @@ from witwin.channel.propagation.models.fields import PathFields
 from witwin.channel.propagation.models.geometry import PathGeometry
 from witwin.channel.propagation.models.topology import PathTopology
 from witwin.channel.propagation.topology.export import EvaluatedPathSidecars
-from witwin.channel.materials.models import PhaseScreen
+from witwin.core import PhaseScreen
 from witwin.channel.physics.conventions import C0
 from witwin.channel.scene.scattering_resources import (
     realization_phase_screens,
 )
+from witwin.channel.scene.endpoints import require_compiled
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+    from witwin.channel.scene.endpoints import SolverScene as Scene
 
 __all__ = ["append_scattering_evaluated_paths"]
 
@@ -953,7 +954,7 @@ def _collect_scattering_rows(
     info: dict[str, Any],
     ad_mode: str = "none",
 ) -> tuple[dict[str, torch.Tensor] | None, int, int, int]:
-    compiled = scene.compile()
+    compiled = require_compiled(scene)
     screens = realization_phase_screens(compiled.materials, compiled.assignments)
     face_material = compiled.assignments.face_material_id.to(
         device=device, dtype=torch.int64
@@ -965,8 +966,9 @@ def _collect_scattering_rows(
         device=device, dtype=torch.int64
     )
     realization_face = torch.zeros_like(scatter_face)
-    for index in screens:
-        realization_face |= face_structure == index
+    for structure_index in screens:
+        structure_id = int(compiled.assignments.structure_id[structure_index])
+        realization_face |= face_structure == structure_id
     ensemble_faces = torch.nonzero(
         scatter_face & ~realization_face, as_tuple=False
     ).reshape(-1)

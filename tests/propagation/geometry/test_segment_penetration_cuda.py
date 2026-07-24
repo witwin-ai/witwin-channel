@@ -3,8 +3,10 @@ from __future__ import annotations
 import pytest
 import torch
 
-from witwin.channel import Scene, Structure
-from witwin.channel.core.materials import Dielectric
+from tests.support.core_world import make_mesh_structure
+from witwin.core import Scene
+from witwin.channel.scene import compile as compile_scene
+from witwin.core import PhysicalMaterial
 from witwin.channel.core.kernels.extension import build_info
 from witwin.channel.propagation.geometry.kernels import bridge
 from witwin.channel.propagation.models.penetration import (
@@ -56,17 +58,14 @@ def _scene() -> tuple[object, torch.Tensor]:
         pytest.skip("native extension is not built")
     scene = Scene(
         structures=[
-            Structure(
+            make_mesh_structure(
                 vertices=torch.tensor(_WALL_VERTICES, dtype=torch.float32),
                 faces=torch.tensor(_WALL_FACES, dtype=torch.int32),
-                material=Dielectric(eps_r=2.0),
+                material=PhysicalMaterial(eps_r=2.0),
             )
         ],
-        transmitters=[],
-        receivers=[],
-        frequency=3.5e9,
     )
-    rayd = scene.rayd_scene()
+    rayd = compile_scene(scene, reference_frequency_hz=3.5e9).rayd
     return rayd, rayd.mesh_tensors[0][0]
 
 

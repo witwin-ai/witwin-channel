@@ -17,7 +17,8 @@ import pytest
 import torch
 
 from tests.support.scenes import wedge_diffraction_scene
-from witwin.channel import ReceiverGrid, Scene
+from witwin.core import ReceiverGrid, Scene
+from tests.support.core_world import make_receiver_grid
 from witwin.channel.core.kernels.extension import build_info
 from witwin.channel.deterministic import Config as DeterministicConfig
 from witwin.channel.deterministic import solve as deterministic_solve
@@ -30,7 +31,7 @@ _GATE_HIGH = 2.0
 
 
 def _grid() -> ReceiverGrid:
-    return ReceiverGrid(
+    return make_receiver_grid(
         origin=torch.tensor([3.0, -1.0, -0.5]),
         x_axis=torch.tensor([0.0, 1.0, 0.0]),
         y_axis=torch.tensor([0.0, 0.0, 1.0]),
@@ -40,12 +41,8 @@ def _grid() -> ReceiverGrid:
 
 
 def _with_grid(base: Scene, grid: ReceiverGrid) -> Scene:
-    return Scene(
-        structures=base.structures,
-        transmitters=base.transmitters,
-        receivers=[grid],
-        frequency=base.frequency,
-        metadata=base.metadata,
+    return base.with_endpoints(
+        (*tuple(endpoint for endpoint in base.endpoints if endpoint.role == "tx"), grid)
     )
 
 
@@ -110,7 +107,10 @@ def test_default_off_is_bit_identical_to_incoherent():
     reference = _diffraction(
         deterministic_solve(
             scene,
-            DeterministicConfig(components={"diffraction"}, max_depth=1, coherent=False),
+            DeterministicConfig(
+                components={"diffraction"}, max_depth=1, coherent=False
+            ),
+            reference_frequency_hz=3.0e9,
         )
     )
     off_a = _diffraction(
@@ -122,6 +122,7 @@ def test_default_off_is_bit_identical_to_incoherent():
                 seed=7,
                 receiver_strategy="point_sphere",
             ),
+            reference_frequency_hz=3.0e9,
         )
     )
     off_b = _diffraction(
@@ -133,6 +134,7 @@ def test_default_off_is_bit_identical_to_incoherent():
                 seed=7,
                 receiver_strategy="point_sphere",
             ),
+            reference_frequency_hz=3.0e9,
         )
     )
 
@@ -153,6 +155,7 @@ def test_coherent_converges_to_deterministic_coherent():
                 DeterministicConfig(
                     components={"diffraction"}, max_depth=1, coherent=True
                 ),
+                reference_frequency_hz=3.0e9,
             )
         ).sum()
     )
@@ -167,6 +170,7 @@ def test_coherent_converges_to_deterministic_coherent():
                     coherent=True,
                     receiver_strategy="point_sphere",
                 ),
+                reference_frequency_hz=3.0e9,
             )
         ).sum()
     )
@@ -195,6 +199,7 @@ def test_coherent_is_below_incoherent_here():
                     coherent=True,
                     receiver_strategy="point_sphere",
                 ),
+                reference_frequency_hz=3.0e9,
             )
         ).sum()
     )
@@ -208,6 +213,7 @@ def test_coherent_is_below_incoherent_here():
                     seed=7,
                     receiver_strategy="point_sphere",
                 ),
+                reference_frequency_hz=3.0e9,
             )
         ).sum()
     )
@@ -232,6 +238,7 @@ def test_three_mis_modes_consistent_under_coherent():
                     mis=mis,
                     receiver_strategy="point_sphere",
                 ),
+                reference_frequency_hz=3.0e9,
             )
         )
 
@@ -244,10 +251,15 @@ def test_metadata_records_combine_domain():
     _skip_unless_native()
     scene = wedge_diffraction_scene()
 
-    off = bdpt_solve(scene, BDPTConfig(components={"diffraction"}, samples=256, seed=1))
+    off = bdpt_solve(
+        scene,
+        BDPTConfig(components={"diffraction"}, samples=256, seed=1),
+        reference_frequency_hz=3.0e9,
+    )
     on = bdpt_solve(
         scene,
         BDPTConfig(components={"diffraction"}, samples=256, seed=1, coherent=True),
+        reference_frequency_hz=3.0e9,
     )
     assert off.metadata["combine_domain"] == "power"
     assert on.metadata["combine_domain"] == "coherent"

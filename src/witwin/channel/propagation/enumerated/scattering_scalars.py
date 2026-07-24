@@ -17,7 +17,7 @@ import torch
 from witwin.channel.physics.conventions import C0
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+    from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
 def frequency_tensor(scene: Scene, device: torch.device) -> torch.Tensor:

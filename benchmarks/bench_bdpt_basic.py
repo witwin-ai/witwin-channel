@@ -6,17 +6,27 @@ import time
 
 import torch
 
-from witwin.channel import ReceiverGrid, Scene, Transmitter
 from witwin.channel.montecarlo import basic
 from witwin.channel.montecarlo import bdpt
+from witwin.core import AntennaState, ReceiverGrid, Scene
+from witwin.core.identity import new_antenna_id
+
+
+REFERENCE_FREQUENCY_HZ = 3.0e9
 
 
 def _grid_scene(grid_size: int) -> Scene:
     return Scene(
         structures=[],
-        transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 1.0]), power_w=1.0)],
-        receivers=[
+        endpoints=[
+            AntennaState(
+                new_antenna_id(),
+                "tx",
+                torch.tensor([0.0, 0.0, 1.0]),
+                power_w=1.0,
+            ),
             ReceiverGrid(
+                new_antenna_id(),
                 origin=torch.tensor([5.0, -1.0, 0.0]),
                 x_axis=torch.tensor([0.0, 1.0, 0.0]),
                 y_axis=torch.tensor([0.0, 0.0, 1.0]),
@@ -24,7 +34,6 @@ def _grid_scene(grid_size: int) -> Scene:
                 spacing=(2.0 / max(1, grid_size - 1), 2.0 / max(1, grid_size - 1)),
             )
         ],
-        frequency=3.0e9,
     )
 
 
@@ -45,11 +54,31 @@ def run_benchmark(*, samples: int = 4096, grid_size: int = 32) -> dict[str, floa
     scene = _grid_scene(grid_size)
     basic_config = basic.Config(samples=samples, seed=11, components={"los"})
     bdpt_config = bdpt.Config(samples=samples, seed=11, components={"los"})
-    basic.solve(scene, basic_config)
-    bdpt_result = bdpt.solve(scene, bdpt_config)
+    basic.solve(
+        scene,
+        basic_config,
+        reference_frequency_hz=REFERENCE_FREQUENCY_HZ,
+    )
+    bdpt_result = bdpt.solve(
+        scene,
+        bdpt_config,
+        reference_frequency_hz=REFERENCE_FREQUENCY_HZ,
+    )
 
-    basic_seconds = _elapsed_seconds(lambda: basic.solve(scene, basic_config))
-    bdpt_seconds = _elapsed_seconds(lambda: bdpt.solve(scene, bdpt_config))
+    basic_seconds = _elapsed_seconds(
+        lambda: basic.solve(
+            scene,
+            basic_config,
+            reference_frequency_hz=REFERENCE_FREQUENCY_HZ,
+        )
+    )
+    bdpt_seconds = _elapsed_seconds(
+        lambda: bdpt.solve(
+            scene,
+            bdpt_config,
+            reference_frequency_hz=REFERENCE_FREQUENCY_HZ,
+        )
+    )
     return {
         "bdpt_seconds": bdpt_seconds,
         "mc_basic_seconds": basic_seconds,

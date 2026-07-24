@@ -1,5 +1,31 @@
 # Channel migration and runtime-dependency boundary
 
+## Stage-I Phase 2: Core world owner switch
+
+Channel now consumes the `witwin.core==0.4.0` world contract directly.
+`witwin.channel.Scene`, `Structure`, `PhysicalMaterial`, `ReceiverGrid`, and
+the other retained logical root names are the exact Core objects, not adapters
+or subclasses. The former Channel logical implementations, loader ownership,
+pickle rewrites, and `witwin.channel.core.*` compatibility facades are removed.
+
+Construct endpoints with Core `AntennaState` / `ReceiverGrid`, place them in
+`Scene(endpoints=...)`, and pass a Core `Scene` or `SceneSnapshot` to one of the
+four solvers. Every solver now requires
+`reference_frequency_hz=...`. The sole lower-level boundary is:
+
+```python
+from witwin.channel.scene import compile
+
+compiled = compile(core_scene, reference_frequency_hz=3.5e9)
+```
+
+Channel owns the bounded registry and four-domain resource invalidation. Stable
+Core IDs are retained as `int64` maps while native runtime rows remain dense
+`int32`. A request/reference-frequency mismatch fails before native work.
+RayD `Auto` may choose its full-result pure-CUDA tracer when OptiX is
+unavailable; this remains a native GPU implementation choice, not a CPU/Torch
+fallback.
+
 ## Current decision
 
 `witwin.channel` is the native entrypoint for the capabilities it

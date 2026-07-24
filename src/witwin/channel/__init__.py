@@ -3,35 +3,37 @@
 from .core.kernels.extension import build_info
 from .deployment import pipeline_cache_key, runtime_diagnostics
 from .capabilities import capabilities
-from .core.antenna import AntennaArray, AntennaPattern
-from .scene.models import ReceiverGrid, ReceiverPoint, Structure, Transmitter
-from .core.field_state import Complex3State, JonesState
-from .core.scene import Scene
-from .materials.models import (
-    Dielectric,
-    DispersiveMaterial,
-    ITUMaterial,
-    LossyDielectric,
-    PerfectConductor,
+from witwin.core import (
+    AntennaPattern,
+    AntennaState,
+    Material,
+    MaterialLayer,
+    PhaseScreen,
+    PhysicalMaterial,
+    ReceiverGrid,
+    Scene,
+    SceneSnapshot,
+    Structure,
+    SurfaceRoughness,
 )
+from .core.field_state import Complex3State, JonesState
 
 __all__ = [
-    "AntennaArray",
     "AntennaPattern",
+    "AntennaState",
+    "Material",
+    "MaterialLayer",
+    "PhaseScreen",
+    "PhysicalMaterial",
     "ReceiverGrid",
-    "ReceiverPoint",
     "Scene",
+    "SceneSnapshot",
     "Structure",
-    "Transmitter",
+    "SurfaceRoughness",
     "Complex3State",
     "JonesState",
     "build_info",
     "pipeline_cache_key",
     "runtime_diagnostics",
     "capabilities",
-    "Dielectric",
-    "DispersiveMaterial",
-    "ITUMaterial",
-    "LossyDielectric",
-    "PerfectConductor",
 ]

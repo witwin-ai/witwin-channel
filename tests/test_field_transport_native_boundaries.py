@@ -15,7 +15,7 @@ INVENTORY_PATH = (
     REPOSITORY_ROOT / "docs/dev/audit/phase9-native-owner-inventory.json"
 )
 RAYD_ROOT = Path(
-    os.environ.get("RAYD_SOURCE_DIR", REPOSITORY_ROOT.parent.parent / "RayDi")
+    os.environ.get("RAYD_SOURCE_DIR", REPOSITORY_ROOT.parent.parent / "RayD")
 )
 RAYD_FIELD_TRANSPORT_AD = (
     RAYD_ROOT

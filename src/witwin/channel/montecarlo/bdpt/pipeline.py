@@ -18,7 +18,7 @@ from witwin.channel.core.receiver_geometry import (
 )
 from witwin.channel.materials.encoding import face_material_field_bundle
 from witwin.channel.runtime.autograd_contracts import _ad_geometry_live
-from witwin.channel.scene.models import ReceiverGrid, Scene
+from witwin.channel.scene.endpoints import ReceiverGrid, SolverScene as Scene, require_compiled
 from witwin.channel.montecarlo.events.transmission import scene_diagonal_m
 from witwin.channel.propagation import EvaluatedPaths, evaluate_enumerated_paths
 from witwin.channel.montecarlo.bdpt.autograd_accumulate import (
@@ -68,11 +68,17 @@ _CONNECTION_BYTES_PER_ROW = 57
 _VISIBILITY_BYTES_PER_ROW = 25
 
 
+def _host_frequency(scene: Scene) -> float:
+    value = scene.frequency
+    return float(value.detach()) if isinstance(value, torch.Tensor) else float(value)
+
+
 @dataclass(frozen=True, slots=True)
 class _BDPTTopologyOptions:
     max_depth: int
     components: frozenset[str]
     max_paths: int | None = None
+    _detach_field_tx_power: bool = True
     max_paths_scope: str = "per_pair"
     ad_mode: str = "none"
     coupled_paths: bool = False
@@ -584,7 +590,7 @@ def _prepare_workspace_and_capabilities(
         raise RuntimeError("witwin.channel.montecarlo.bdpt requires CUDA")
 
     info = build_info_fn()
-    rayd = scene.rayd_scene()
+    rayd = require_compiled(scene).rayd
     rayd_available = bool(info["uses_rayd_native"]) and rayd.available
     reflection_available = rayd_available
     diffraction_available = rayd_available and config.max_diffraction_order > 0
@@ -692,17 +698,13 @@ def _collect_connection_samples(
                     los_light_state,
                     endpoint_subpaths["sensor"],
                     scene_has_structures=bool(scene.structures),
-                    frequency_hz=scene.frequency if ad else float(scene.frequency),
+                    frequency_hz=scene.frequency if ad else _host_frequency(scene),
                     mis=config.mis,
                     beta=config.power_heuristic_beta,
                     strategy_count=1,
                     ad=ad,
                     tx_power=enumerated_tx_power,
-                    frequency_value=(
-                        float(scene.frequency.detach())
-                        if isinstance(scene.frequency, torch.Tensor)
-                        else float(scene.frequency)
-                    ),
+                    frequency_value=_host_frequency(scene),
                     ledger=ledger,
                 )
             )
@@ -759,7 +761,7 @@ def _collect_connection_samples(
         if scattering_requested:
             # Kirchhoff tables per rough material (scatter_model_id == 1);
             # raises kirchhoff_domain_exceeded for out-of-domain roughness.
-            scattering_runtimes = rough_material_runtimes(scene.compile())
+            scattering_runtimes = rough_material_runtimes(require_compiled(scene))
         sampler_requested = transmission_requested or bool(scattering_runtimes)
         if sampler_requested:
             material_bundle = face_material_field_bundle(
@@ -794,7 +796,7 @@ def _collect_connection_samples(
                 # ADR-015 Part A / ADR-022: under AD the carrier stays a live
                 # tensor so lambda/frequency chains carry a gradient; the primal
                 # reads the detached host scalar and is bitwise unchanged.
-                frequency_hz=scene.frequency if ad else float(scene.frequency),
+                frequency_hz=scene.frequency if ad else _host_frequency(scene),
                 samples=native_samples,
                 max_depth=native_max_depth,
                 seed=int(config.seed),
@@ -961,7 +963,7 @@ def _export_paths(
             exported_endpoint_samples = bdpt_endpoint_connection_samples(
                 los_light_state,
                 endpoint_subpaths["sensor"],
-                frequency_hz=float(scene.frequency),
+                frequency_hz=_host_frequency(scene),
                 samples_per_tx=1,
                 max_paths=config.max_exported_paths,
                 mis=config.mis,

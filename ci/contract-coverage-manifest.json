@@ -123,7 +123,7 @@
     "public-capabilities": "tests/test_capabilities.py::test_capability_manifest_is_versioned_serializable_and_defensive",
     "public-core": "tests/core/test_public_scene.py::test_public_scene_objects_capture_structured_inputs",
     "public-deployment": "tests/performance/test_deployment_contract.py::test_pipeline_cache_key_is_stable_and_invalidates_all_contract_inputs",
-    "public-materials": "tests/core/test_public_scene.py::test_materials_compile_scalar_parameters",
+    "public-materials": "tests/core/test_public_scene.py::test_materials_expose_canonical_samples",
     "scene-native": "tests/scene/test_rayd_scene_kernels.py::test_rayd_scene_builder_preserves_native_order_flags_uv_and_keepalive",
     "deterministic-rough-reflection-ad": "tests/ad/test_solver_rough_reflection_ad.py::test_rough_reflection_frequency_grad_matches_fd",
     "deterministic-scattering-ensemble": "tests/deterministic/test_scattering.py::test_rough_wall_energy_budget_and_smooth_limit",
@@ -139,7 +139,7 @@
   },
   "public_exports": [
     [
-      "witwin.channel.AntennaArray",
+      "witwin.channel.AntennaState",
       "public-api-snapshot",
       [
         "public-core"
@@ -160,7 +160,7 @@
       ]
     ],
     [
-      "witwin.channel.ReceiverPoint",
+      "witwin.channel.Material",
       "public-api-snapshot",
       [
         "public-core"
@@ -181,7 +181,7 @@
       ]
     ],
     [
-      "witwin.channel.Transmitter",
+      "witwin.channel.MaterialLayer",
       "public-api-snapshot",
       [
         "public-core"
@@ -230,35 +230,28 @@
       ]
     ],
     [
-      "witwin.channel.Dielectric",
+      "witwin.channel.PhaseScreen",
       "public-api-snapshot",
       [
         "public-materials"
       ]
     ],
     [
-      "witwin.channel.DispersiveMaterial",
+      "witwin.channel.PhysicalMaterial",
       "public-api-snapshot",
       [
         "public-materials"
       ]
     ],
     [
-      "witwin.channel.ITUMaterial",
+      "witwin.channel.SceneSnapshot",
       "public-api-snapshot",
       [
         "public-materials"
       ]
     ],
     [
-      "witwin.channel.LossyDielectric",
-      "public-api-snapshot",
-      [
-        "public-materials"
-      ]
-    ],
-    [
-      "witwin.channel.PerfectConductor",
+      "witwin.channel.SurfaceRoughness",
       "public-api-snapshot",
       [
         "public-materials"
@@ -297,27 +290,6 @@
       "public-api-snapshot",
       [
         "path-los"
-      ]
-    ],
-    [
-      "witwin.channel.path.pack_synthetic_arrays",
-      "public-api-snapshot",
-      [
-        "path-reflection"
-      ]
-    ],
-    [
-      "witwin.channel.path.explicit_array_scene",
-      "public-api-snapshot",
-      [
-        "path-reflection"
-      ]
-    ],
-    [
-      "witwin.channel.path.pack_explicit_arrays",
-      "public-api-snapshot",
-      [
-        "path-reflection"
       ]
     ],
     [

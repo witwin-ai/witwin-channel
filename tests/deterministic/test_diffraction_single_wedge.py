@@ -1,5 +1,6 @@
 import pytest
 import torch
+from witwin.core import Scene
 
 from tests.support.scenes import wedge_diffraction_scene
 from witwin.channel.core.kernels.extension import build_info
@@ -15,12 +16,25 @@ def test_single_wedge_diffraction_matches_path_reference():
         pytest.skip("RayD native diffraction is not built")
 
     scene = wedge_diffraction_scene()
-    result = solve(scene, Config(components={"diffraction"}, coherent=False, export_paths=True, return_field=False))
-    reference = solve_paths(scene, PathConfig(components={"diffraction"}))
+    result = solve(
+        scene,
+        Config(
+            components={"diffraction"},
+            coherent=False,
+            export_paths=True,
+            return_field=False,
+        ),
+        reference_frequency_hz=3.0e9,
+    )
+    reference = solve_paths(
+        scene, PathConfig(components={"diffraction"}), reference_frequency_hz=3.0e9
+    )
 
     assert result.paths is not None
     assert result.paths.valid.numel() == reference.valid.numel()
-    torch.testing.assert_close(result.paths.edge_id, reference.primitive_id[reference.valid, 0])
+    torch.testing.assert_close(
+        result.paths.edge_id, reference.primitive_id[reference.valid, 0]
+    )
     # Real UTD paths (audit DF-1): one merged record for the shared wedge
     # edge (audit D-6), Keller stationary-point delays, and K-P amplitudes.
     # F2 admitted the weak horizontal edge 4 after the 5 cm gate removal, but
@@ -30,7 +44,9 @@ def test_single_wedge_diffraction_matches_path_reference():
     # the deterministic and path solvers still agree edge-for-edge.
     torch.testing.assert_close(
         result.paths.edge_id,
-        torch.tensor([0, 1, 2, 5], device=result.paths.edge_id.device, dtype=torch.int32),
+        torch.tensor(
+            [0, 1, 2, 5], device=result.paths.edge_id.device, dtype=torch.int32
+        ),
     )
     expected_length = torch.tensor(
         [
@@ -56,8 +72,12 @@ def test_single_wedge_diffraction_matches_path_reference():
         device=result.paths.path_gain.device,
         dtype=torch.float32,
     )
-    torch.testing.assert_close(result.paths.path_length_m, expected_length, rtol=1.0e-5, atol=1.0e-6)
-    torch.testing.assert_close(result.paths.path_gain, expected_gain, rtol=5.0e-3, atol=1.0e-8)
+    torch.testing.assert_close(
+        result.paths.path_length_m, expected_length, rtol=1.0e-5, atol=1.0e-6
+    )
+    torch.testing.assert_close(
+        result.paths.path_gain, expected_gain, rtol=5.0e-3, atol=1.0e-8
+    )
     torch.testing.assert_close(
         result.path_gain.reshape(-1).sum(),
         reference.a[reference.valid].abs().square().sum(),
@@ -76,10 +96,29 @@ def test_vertical_only_edge_policy_filters_horizontal_edges():
 
     from witwin.channel.core.edge_policy import EdgePolicy
 
-    scene = wedge_diffraction_scene()
-    scene.metadata["sionna_import_edge_policy"] = EdgePolicy(edge_selection_mode="vertical_only")
+    base_scene = wedge_diffraction_scene()
+    scene = Scene(
+        structures=base_scene.structures,
+        endpoints=base_scene.endpoints,
+        versions=base_scene.versions,
+        metadata={
+            **base_scene.metadata,
+            "sionna_import_edge_policy": EdgePolicy(
+                edge_selection_mode="vertical_only"
+            ),
+        },
+    )
 
-    result = solve(scene, Config(components={"diffraction"}, coherent=False, export_paths=True, return_field=False))
+    result = solve(
+        scene,
+        Config(
+            components={"diffraction"},
+            coherent=False,
+            export_paths=True,
+            return_field=False,
+        ),
+        reference_frequency_hz=3.0e9,
+    )
 
     assert result.paths is not None
     # The horizontal outline edges (|dz|/length = 0) must not produce paths;
@@ -88,7 +127,13 @@ def test_vertical_only_edge_policy_filters_horizontal_edges():
     assert int(result.paths.valid.numel()) == 3
     baseline = solve(
         wedge_diffraction_scene(),
-        Config(components={"diffraction"}, coherent=False, export_paths=True, return_field=False),
+        Config(
+            components={"diffraction"},
+            coherent=False,
+            export_paths=True,
+            return_field=False,
+        ),
+        reference_frequency_hz=3.0e9,
     )
     # F5e/F5f (utd-continuity-fix-design): the finite-edge truncation pushes
     # the weak horizontal edge that F2 had admitted back below the existence
@@ -103,16 +148,30 @@ def test_diffraction_path_field_export_uses_native_complex_fields():
         pytest.skip("RayD native diffraction is not built")
 
     scene = wedge_diffraction_scene()
-    result = solve(scene, Config(components={"diffraction"}, coherent=True, export_paths=True))
-    reference = solve_paths(scene, PathConfig(components={"diffraction"}))
+    result = solve(
+        scene,
+        Config(components={"diffraction"}, coherent=True, export_paths=True),
+        reference_frequency_hz=3.0e9,
+    )
+    reference = solve_paths(
+        scene, PathConfig(components={"diffraction"}), reference_frequency_hz=3.0e9
+    )
 
     assert result.paths is not None
     path_field = torch.complex(result.paths.field_real, result.paths.field_imag)
     expected_phase = torch.remainder(-torch.angle(path_field), 2.0 * torch.pi)
     expected_field = reference.a[..., 0][reference.valid]
     assert torch.all(result.paths.valid)
-    assert torch.count_nonzero(path_field.abs() > 0.0).item() == result.paths.valid.numel()
+    assert (
+        torch.count_nonzero(path_field.abs() > 0.0).item() == result.paths.valid.numel()
+    )
     torch.testing.assert_close(path_field, expected_field, rtol=5.0e-4, atol=1.0e-7)
-    torch.testing.assert_close(result.paths.path_gain, path_field.abs().square(), rtol=2.0e-4, atol=1.0e-10)
-    torch.testing.assert_close(result.paths.phase_rad, expected_phase, rtol=2.0e-4, atol=1.0e-6)
-    torch.testing.assert_close(result.path_gain, result.field.abs().square(), rtol=2.0e-4, atol=1.0e-10)
+    torch.testing.assert_close(
+        result.paths.path_gain, path_field.abs().square(), rtol=2.0e-4, atol=1.0e-10
+    )
+    torch.testing.assert_close(
+        result.paths.phase_rad, expected_phase, rtol=2.0e-4, atol=1.0e-6
+    )
+    torch.testing.assert_close(
+        result.path_gain, result.field.abs().square(), rtol=2.0e-4, atol=1.0e-10
+    )

@@ -70,7 +70,7 @@ from witwin.channel.propagation.topology.kernels import (
 from witwin.channel.runtime import autograd_contracts as ops
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+    from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
 def _los_taper_frequency(
@@ -151,8 +151,9 @@ def _rough_scale_inputs(
         realization_face = torch.zeros(
             (int(face_structure.numel()),), device=device, dtype=torch.bool
         )
-        for index in realization_ids:
-            realization_face |= face_structure == index
+        for structure_index in realization_ids:
+            structure_id = int(compiled.assignments.structure_id[structure_index])
+            realization_face |= face_structure == structure_id
         replaced = realization_face[face_id[:, 0]].contiguous()
     return sigma_b, rough_b, replaced
 

@@ -12,6 +12,7 @@ from witwin.channel.propagation.models.penetration import (
     SegmentPenetrationPolicy,
 )
 from witwin.channel.runtime.capacity import CapacityFailureState
+from witwin.channel.scene.endpoints import SolverScene
 
 
 def _failure_state() -> CapacityFailureState:
@@ -139,10 +140,13 @@ def test_transmission_component_map_flattens_pair_major_and_shares_state(
     scaled_power = torch.arange(6, dtype=torch.float32) + 10.0
     state = _failure_state()
     compiled = SimpleNamespace(montecarlo_penetration_scene_diagonal_m=8.5)
-    scene = SimpleNamespace(
-        structures=[object()],
+    scene = SolverScene(
+        compiled=compiled,
+        structures=(object(),),
+        transmitters=(),
+        receivers=(),
         frequency=3.5e9,
-        compile=lambda: compiled,
+        metadata={},
     )
     grid = SimpleNamespace(shape=(1, 3))
     rayd = SimpleNamespace(available=True)

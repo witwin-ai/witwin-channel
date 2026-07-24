@@ -22,7 +22,7 @@ from witwin.channel.core.field_state import (
     transmitter_polarizations,
 )
 from witwin.channel.core.kernels.metadata import AdLaunchLedger
-from witwin.channel.scene.models import ReceiverGrid, Scene
+from witwin.channel.scene.endpoints import ReceiverGrid, SolverScene as Scene
 from witwin.channel.montecarlo.bdpt.autograd import (
     bdpt_endpoint_connection_samples_ad,
 )
@@ -187,9 +187,10 @@ def _build_endpoint_subpaths(
         scene
         if grid is None
         else Scene(
+            compiled=scene.compiled,
             structures=scene.structures,
             transmitters=scene.transmitters,
-            receivers=[grid],
+            receivers=(grid,),
             frequency=scene.frequency,
             metadata=scene.metadata,
         )

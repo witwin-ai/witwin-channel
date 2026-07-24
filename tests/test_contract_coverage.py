@@ -179,6 +179,6 @@ def test_contract_coverage_cli_passes_with_repository_defaults(capsys):
     native_binding_count = len(_manifest()["native_bindings"])
     assert coverage.main(["--repository-root", str(REPOSITORY_ROOT)]) == 0
     assert (
-        f"37 public exports, {native_binding_count} native bindings"
+        f"33 public exports, {native_binding_count} native bindings"
         in capsys.readouterr().out
     )

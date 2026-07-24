@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 KERNELS = ROOT / "native/channel/kernels"
 BINDING = ROOT / "native/channel/binding/materials.cpp"
-RAYD_ROOT = Path(os.environ.get("RAYD_SOURCE_DIR", ROOT.parent.parent / "RayDi"))
+RAYD_ROOT = Path(os.environ.get("RAYD_SOURCE_DIR", ROOT.parent.parent / "RayD"))
 
 MOVED_TUS = {
     "scattering_chain_ensemble.cu",

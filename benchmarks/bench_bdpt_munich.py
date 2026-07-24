@@ -7,14 +7,54 @@ from pathlib import Path
 
 import torch
 
-from witwin.channel import ReceiverGrid, Scene, Structure, Transmitter
-from witwin.channel.core.materials import Dielectric, PerfectConductor
 from witwin.channel.montecarlo.bdpt import Config, solve
+from witwin.core import (
+    AntennaState,
+    Mesh,
+    PhysicalMaterial,
+    ReceiverGrid,
+    Scene,
+    Structure,
+)
+from witwin.core.identity import (
+    new_antenna_id,
+    new_assignment_id,
+    new_material_id,
+    new_structure_id,
+)
+
+
+REFERENCE_FREQUENCY_HZ = 2.4e9
+
+
+def _mesh_structure(
+    vertices: torch.Tensor,
+    faces: torch.Tensor,
+    material: PhysicalMaterial,
+    *,
+    name: str,
+    surface_id: int,
+) -> Structure:
+    return Structure(
+        Mesh(
+            vertices,
+            faces,
+            recenter=False,
+            fill_mode="surface",
+            topology_diagnostics=False,
+        ),
+        material,
+        name=name,
+        structure_id=new_structure_id(),
+        material_id=new_material_id(),
+        assignment_id=new_assignment_id(),
+        surface_id=surface_id,
+    )
 
 
 def _reduced_scene(grid_size: int) -> Scene:
-    wall = Structure(
-        vertices=torch.tensor(
+    wall = _mesh_structure(
+        torch.tensor(
             [
                 [20.0, -70.0, 0.0],
                 [20.0, 90.0, 0.0],
@@ -22,42 +62,48 @@ def _reduced_scene(grid_size: int) -> Scene:
                 [20.0, 90.0, 45.0],
             ]
         ),
-        faces=torch.tensor([[0, 1, 2], [1, 3, 2]]),
-        material=Dielectric(eps_r=5.0, sigma_e=0.02),
+        torch.tensor([[0, 1, 2], [1, 3, 2]]),
+        PhysicalMaterial(eps_r=5.0, sigma_e=0.02),
         name="reduced-munich-wall",
         surface_id=101,
     )
-    wedge_a = Structure(
-        vertices=torch.tensor(
+    wedge_a = _mesh_structure(
+        torch.tensor(
             [
                 [-35.0, -20.0, 0.0],
                 [-35.0, -20.0, 35.0],
                 [-35.0, 55.0, 0.0],
             ]
         ),
-        faces=torch.tensor([[0, 1, 2]]),
-        material=PerfectConductor(),
+        torch.tensor([[0, 1, 2]]),
+        PhysicalMaterial.perfect_conductor(),
         name="reduced-munich-wedge-a",
         surface_id=102,
     )
-    wedge_b = Structure(
-        vertices=torch.tensor(
+    wedge_b = _mesh_structure(
+        torch.tensor(
             [
                 [-35.0, -20.0, 0.0],
                 [-35.0, -20.0, 35.0],
                 [40.0, -20.0, 0.0],
             ]
         ),
-        faces=torch.tensor([[0, 2, 1]]),
-        material=PerfectConductor(),
+        torch.tensor([[0, 2, 1]]),
+        PhysicalMaterial.perfect_conductor(),
         name="reduced-munich-wedge-b",
         surface_id=103,
     )
     return Scene(
         structures=[wall, wedge_a, wedge_b],
-        transmitters=[Transmitter(position=torch.tensor([8.5, 21.0, 27.0]), power_w=1.0)],
-        receivers=[
+        endpoints=[
+            AntennaState(
+                new_antenna_id(),
+                "tx",
+                torch.tensor([8.5, 21.0, 27.0]),
+                power_w=1.0,
+            ),
             ReceiverGrid(
+                new_antenna_id(),
                 origin=torch.tensor([-120.0, -120.0, 1.5]),
                 x_axis=torch.tensor([1.0, 0.0, 0.0]),
                 y_axis=torch.tensor([0.0, 1.0, 0.0]),
@@ -65,7 +111,6 @@ def _reduced_scene(grid_size: int) -> Scene:
                 spacing=(240.0 / max(1, grid_size - 1), 260.0 / max(1, grid_size - 1)),
             )
         ],
-        frequency=2.4e9,
     )
 
 
@@ -88,7 +133,11 @@ def run_benchmark(
         components={"los", "reflection", "diffraction"},
     )
     for _ in range(max(0, int(warmup_runs))):
-        solve(scene, config)
+        solve(
+            scene,
+            config,
+            reference_frequency_hz=REFERENCE_FREQUENCY_HZ,
+        )
         torch.cuda.synchronize()
 
     timings: list[float] = []
@@ -96,7 +145,11 @@ def run_benchmark(
     for _ in range(max(1, int(repeats))):
         torch.cuda.synchronize()
         start = time.perf_counter()
-        result = solve(scene, config)
+        result = solve(
+            scene,
+            config,
+            reference_frequency_hz=REFERENCE_FREQUENCY_HZ,
+        )
         torch.cuda.synchronize()
         timings.append(time.perf_counter() - start)
     assert result is not None

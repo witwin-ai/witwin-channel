@@ -33,12 +33,14 @@ def _adapter(name: str) -> SolverAdapter:
 
 
 def _ratio(adapter: SolverAdapter, *, transformed: bool):
-    wall = transmission_scene(_FREQUENCY_HZ)
-    empty = transmission_scene(_FREQUENCY_HZ, empty=True)
+    wall = transmission_scene()
+    empty = transmission_scene(empty=True)
     if transformed:
         wall = rigid_transform(wall)
         empty = rigid_transform(empty)
-    return adapter.transmission(wall) / adapter.transmission(empty)
+    return adapter.transmission(wall, _FREQUENCY_HZ) / adapter.transmission(
+        empty, _FREQUENCY_HZ
+    )
 
 
 def _relative_gap(left: float, right: float) -> float:
@@ -50,8 +52,18 @@ def _relative_gap(left: float, right: float) -> float:
 def test_rigid_transform_fixture_preserves_relative_geometry() -> None:
     scene = rough_scene()
     transformed = rigid_transform(scene)
-    original_vertices = scene.structures[0].vertices
-    transformed_vertices = transformed.structures[0].vertices
+    transmitter = next(
+        endpoint for endpoint in scene.endpoints if endpoint.role == "tx"
+    )
+    receiver = next(endpoint for endpoint in scene.endpoints if endpoint.role == "rx")
+    transformed_transmitter = next(
+        endpoint for endpoint in transformed.endpoints if endpoint.role == "tx"
+    )
+    transformed_receiver = next(
+        endpoint for endpoint in transformed.endpoints if endpoint.role == "rx"
+    )
+    original_vertices = scene.structures[0].geometry.vertices
+    transformed_vertices = transformed.structures[0].geometry.vertices
 
     torch.testing.assert_close(
         torch.cdist(original_vertices, original_vertices),
@@ -59,10 +71,8 @@ def test_rigid_transform_fixture_preserves_relative_geometry() -> None:
         rtol=2.0e-6,
         atol=2.0e-6,
     )
-    original_delta = scene.receivers[0].origin - scene.transmitters[0].position
-    transformed_delta = (
-        transformed.receivers[0].origin - transformed.transmitters[0].position
-    )
+    original_delta = receiver.origin - transmitter.position
+    transformed_delta = transformed_receiver.origin - transformed_transmitter.position
     torch.testing.assert_close(
         torch.linalg.vector_norm(original_delta),
         torch.linalg.vector_norm(transformed_delta),
@@ -70,8 +80,8 @@ def test_rigid_transform_fixture_preserves_relative_geometry() -> None:
         atol=1.0e-6,
     )
     torch.testing.assert_close(
-        torch.dot(scene.receivers[0].polarization, original_delta),
-        torch.dot(transformed.receivers[0].polarization, transformed_delta),
+        torch.dot(receiver.polarization, original_delta),
+        torch.dot(transformed_receiver.polarization, transformed_delta),
         rtol=1.0e-6,
         atol=1.0e-6,
     )
@@ -94,8 +104,8 @@ def test_field_solver_scattering_power_is_rigid_transform_invariant(
 ) -> None:
     _require_native()
     adapter = _adapter(solver_name)
-    baseline = adapter.scattering(rough_scene(), 0)
-    transformed = adapter.scattering(rigid_transform(rough_scene()), 0)
+    baseline = adapter.scattering(rough_scene(), 0, _FREQUENCY_HZ)
+    transformed = adapter.scattering(rigid_transform(rough_scene()), 0, _FREQUENCY_HZ)
 
     assert math.isfinite(baseline) and baseline > 0.0
     assert math.isfinite(transformed) and transformed > 0.0
@@ -119,9 +129,13 @@ def test_power_solver_scattering_is_statistically_rigid_transform_invariant(
 ) -> None:
     _require_native()
     adapter = _adapter(solver_name)
-    baseline = [adapter.scattering(rough_scene(), seed) for seed in _SEEDS]
+    baseline = [
+        adapter.scattering(rough_scene(), seed, _FREQUENCY_HZ) for seed in _SEEDS
+    ]
     transformed_scene = rigid_transform(rough_scene())
-    transformed = [adapter.scattering(transformed_scene, seed) for seed in _SEEDS]
+    transformed = [
+        adapter.scattering(transformed_scene, seed, _FREQUENCY_HZ) for seed in _SEEDS
+    ]
 
     assert all(math.isfinite(value) and value > 0.0 for value in baseline + transformed)
     assert _relative_gap(float(np.mean(baseline)), float(np.mean(transformed))) <= 0.30

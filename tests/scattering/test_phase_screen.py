@@ -10,7 +10,7 @@ import math
 import numpy as np
 import torch
 
-from witwin.channel.core.materials import PhaseScreen, Roughness
+from witwin.core import PhaseScreen, SurfaceRoughness
 from witwin.channel.physics.oracle import (
     C0,
     phase_screen_patch_integral as oracle_patch_integral,
@@ -149,7 +149,7 @@ def test_realization_rms_matches_sigma():
     """Spectral synthesis reproduces sigma_h within 5% (spatial average)."""
 
     sigma_h = 2e-3
-    rough = Roughness(rms_height_m=sigma_h, corr_length_x_m=0.02, corr_length_y_m=0.02)
+    rough = SurfaceRoughness(rms_height_m=sigma_h, correlation_length_x_m=0.02, correlation_length_y_m=0.02)
     stds = []
     for realization_id in range(3):
         seed = realization_seed(2024, 7, realization_id)
@@ -161,7 +161,7 @@ def test_realization_rms_matches_sigma():
 
 
 def test_realization_seed_reproducible_and_decorrelated():
-    rough = Roughness(rms_height_m=1e-3, corr_length_x_m=0.02, corr_length_y_m=0.02)
+    rough = SurfaceRoughness(rms_height_m=1e-3, correlation_length_x_m=0.02, correlation_length_y_m=0.02)
     seed_a = realization_seed(11, 3, 0)
     field_a = generate_gaussian_realization(rough, 0.64, 256, seed_a, device=DEVICE)
     field_a_again = generate_gaussian_realization(rough, 0.64, 256, seed_a, device=DEVICE)

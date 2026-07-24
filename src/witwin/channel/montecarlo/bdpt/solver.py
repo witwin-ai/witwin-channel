@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import torch as torch
+from witwin.core import Scene, SceneSnapshot
 
 from witwin.channel import build_info
 from witwin.channel.montecarlo.bdpt.kernels.maps import (
@@ -11,7 +12,14 @@ from witwin.channel.montecarlo.bdpt.kernels.sampling import (
     bdpt_reflection_launch_inputs as bdpt_reflection_launch_inputs,
     bdpt_sample_directions as bdpt_sample_directions,
 )
-from witwin.channel.scene.models import Scene
+from witwin.channel.scene.compiler import compile as compile_scene
+from witwin.channel.core.antenna import validate_scalar_endpoint_features
+from witwin.channel.scene.endpoints import (
+    ReceiverGrid,
+    _endpoint_views,
+    _validate_scalar_endpoint_boundary,
+    bind_solver_scene,
+)
 
 from .config import Config
 from .endpoints import transmitter_tensors as transmitter_tensors
@@ -23,11 +31,33 @@ from .pipeline import (
 from .result import Result
 
 
-def solve(scene: Scene, config: Config) -> Result:
+def solve(
+    scene: Scene | SceneSnapshot,
+    config: Config,
+    *,
+    reference_frequency_hz,
+) -> Result:
     """Run the native CUDA/OptiX BDPT pipeline."""
 
+    endpoint_views = _endpoint_views(scene)
+    if (
+        any(isinstance(view, ReceiverGrid) for view in endpoint_views)
+        and config.receiver_strategy != "grid_area"
+    ):
+        raise RuntimeError(
+            "receiver_strategy='point_sphere' requires point receivers"
+        )
+    _validate_scalar_endpoint_boundary(endpoint_views)
+    validate_scalar_endpoint_features(
+        tuple(view for view in endpoint_views if view.source.role == "tx"),
+        tuple(view for view in endpoint_views if view.source.role == "rx"),
+        solver="BDPT",
+    )
+    compiled = compile_scene(
+        scene, reference_frequency_hz=reference_frequency_hz
+    )
     return _solve_pipeline(
-        scene,
+        bind_solver_scene(compiled),
         config,
         build_info_fn=build_info,
         transmitter_tensors_fn=transmitter_tensors,

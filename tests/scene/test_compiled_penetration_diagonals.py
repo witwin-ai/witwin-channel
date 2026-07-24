@@ -4,8 +4,13 @@ from types import SimpleNamespace
 
 import pytest
 import torch
+from witwin.core import PhysicalMaterial
 
-from witwin.channel.scene.compile import _compile_penetration_scene_diagonals
+from witwin.channel.scene.compiler import (
+    _compile_materials,
+    _compile_penetration_scene_diagonals,
+    _unique_materials,
+)
 
 
 class _RayDRecords:
@@ -48,6 +53,21 @@ def test_empty_scene_has_zero_penetration_diagonals_without_rayd_read() -> None:
             raise AssertionError("empty scene must not query RayD records")
 
     assert _compile_penetration_scene_diagonals((), rayd=_NoRead()) == (0.0, 0.0)  # type: ignore[arg-type]
+
+
+def test_material_store_uses_core_structure_material_ids() -> None:
+    logical = _unique_materials(  # type: ignore[arg-type]
+        (
+            SimpleNamespace(
+                material_id=977,
+                material=PhysicalMaterial(eps_r=4.0),
+            ),
+        )
+    )
+
+    store = _compile_materials(logical, 2.4e9, 0)
+
+    assert store.material_id.tolist() == [977]
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")

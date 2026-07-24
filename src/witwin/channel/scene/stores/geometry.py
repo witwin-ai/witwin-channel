@@ -17,6 +17,7 @@ class GeometryStore:
     edge_param_range: torch.Tensor
     face_structure_id: torch.Tensor
     face_surface_id: torch.Tensor
+    face_primitive_id: torch.Tensor
     structure_uv_presence: tuple[tuple[bool, bool], ...]
     version: int
 
@@ -37,14 +38,17 @@ class GeometryStore:
             ndim=2,
             trailing_shape=(2,),
         )
-        require_tensor("face_structure_id", self.face_structure_id, dtype=torch.int32, ndim=1)
-        require_tensor("face_surface_id", self.face_surface_id, dtype=torch.int32, ndim=1)
+        require_tensor("face_structure_id", self.face_structure_id, dtype=torch.int64, ndim=1)
+        require_tensor("face_surface_id", self.face_surface_id, dtype=torch.int64, ndim=1)
+        require_tensor("face_primitive_id", self.face_primitive_id, dtype=torch.int64, ndim=1)
         if self.faces.shape[0] != self.face_normals.shape[0]:
             raise ValueError("face_normals length must match faces")
         if self.faces.shape[0] != self.face_structure_id.shape[0]:
             raise ValueError("face_structure_id length must match faces")
         if self.faces.shape[0] != self.face_surface_id.shape[0]:
             raise ValueError("face_surface_id length must match faces")
+        if self.faces.shape[0] != self.face_primitive_id.shape[0]:
+            raise ValueError("face_primitive_id length must match faces")
         if self.edges.shape[0] != self.edge_adj_faces.shape[0]:
             raise ValueError("edge_adj_faces length must match edges")
         if self.edges.shape[0] != self.edge_param_range.shape[0]:
@@ -54,6 +58,3 @@ class GeometryStore:
             for uv_present, face_uv_present in self.structure_uv_presence
         ):
             raise ValueError("structure_uv_presence entries must contain bool values")
-
-
-GeometryStore.__module__ = "witwin.channel.core.runtime.geometry"

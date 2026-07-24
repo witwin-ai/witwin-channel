@@ -1,29 +1,38 @@
 import pytest
 import torch
 
-from witwin.channel import Scene, Structure
+from witwin.core import Mesh, Scene, Structure
+from witwin.channel.scene import compile as compile_scene
 from witwin.channel.propagation.geometry.kernels import bridge as ops
-from witwin.channel.core.materials import PerfectConductor
+from witwin.core import PhysicalMaterial
 from witwin.channel.runtime import symbols
 
 
 def _native_single_triangle_scene():
     symbols.native_extension()
     scene = Scene(
-        structures=[Structure(
-            vertices=torch.tensor(
-            [[-1.0, -1.0, 0.0], [1.0, -1.0, 0.0], [-1.0, 1.0, 0.0]],
-            dtype=torch.float32,
+        structures=[
+            Structure(
+                Mesh(
+                    torch.tensor(
+                        [
+                            [-1.0, -1.0, 0.0],
+                            [1.0, -1.0, 0.0],
+                            [-1.0, 1.0, 0.0],
+                        ],
+                        dtype=torch.float32,
+                    ),
+                    torch.tensor([[0, 1, 2]], dtype=torch.int32),
+                    recenter=False,
+                    fill_mode="surface",
+                    topology_diagnostics=False,
+                ),
+                PhysicalMaterial.perfect_conductor(),
+                surface_id=2,
             ),
-            faces=torch.tensor([[0, 1, 2]], dtype=torch.int32),
-            material=PerfectConductor(),
-            surface_id=2,
-        )],
-        transmitters=[],
-        receivers=[],
-        frequency=3.0e9,
+        ],
     )
-    return scene.rayd_scene()
+    return compile_scene(scene, reference_frequency_hz=3.0e9).rayd
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")

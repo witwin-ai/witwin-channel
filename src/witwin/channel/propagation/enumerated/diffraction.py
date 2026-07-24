@@ -42,7 +42,7 @@ from witwin.channel.runtime.profiling import (
 )
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+    from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
 def _deterministic_diffraction_states(

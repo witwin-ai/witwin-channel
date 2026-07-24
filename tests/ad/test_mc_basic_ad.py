@@ -48,15 +48,16 @@ from tests.ad._tolerances import (
     REL_TOL_GENERAL,
 )
 from tests.support.scenes import transmission_wall_structure
-from witwin.channel import (
-    ReceiverGrid,
-    ReceiverPoint,
-    Scene,
-    Structure,
-    Transmitter,
+from witwin.core import ReceiverGrid, Scene, Structure
+from tests.support.core_world import (
+    make_mesh_structure,
+    make_receiver,
+    make_receiver_grid,
+    make_transmitter,
 )
-from witwin.channel.core.materials import Dielectric, Layer, PhysicalSurface
+from witwin.core import MaterialLayer, PhysicalMaterial
 from witwin.channel.montecarlo.basic import Config, solve
+from witwin.channel.scene import compile as compile_scene
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for solver AD"
@@ -66,10 +67,11 @@ _FREQUENCY_HZ = 3.0e9
 _SAMPLES = 4096
 _SEED = 7
 _TX = (0.0, -1.0, 0.5)
+_FREQUENCY_METADATA_KEY = "test_reference_frequency_hz"
 
 
 def _grid() -> ReceiverGrid:
-    return ReceiverGrid(
+    return make_receiver_grid(
         origin=torch.tensor([1.0, -1.0, -0.5]),
         x_axis=torch.tensor([0.0, 1.0, 0.0]),
         y_axis=torch.tensor([0.0, 0.0, 1.0]),
@@ -79,7 +81,7 @@ def _grid() -> ReceiverGrid:
 
 
 def _wall() -> Structure:
-    return Structure(
+    return make_mesh_structure(
         vertices=torch.tensor(
             [
                 [2.5, -3.0, -1.0],
@@ -89,7 +91,7 @@ def _wall() -> Structure:
             ]
         ),
         faces=torch.tensor([[0, 1, 2], [1, 3, 2]]),
-        material=Dielectric(eps_r=4.0, sigma_e=0.02),
+        material=PhysicalMaterial(eps_r=4.0, sigma_e=0.02),
         name="ad-mc-wall",
         surface_id=1,
     )
@@ -102,9 +104,8 @@ def _reflection_scene(
     position = torch.tensor(_TX) if tx is None else tx
     return Scene(
         structures=[_wall()],
-        transmitters=[Transmitter(position=position)],
-        receivers=[_grid()],
-        frequency=frequency,
+        endpoints=[make_transmitter(position=position), _grid()],
+        metadata={_FREQUENCY_METADATA_KEY: frequency},
     )
 
 
@@ -112,19 +113,19 @@ def _transmission_scene(
     frequency: float | torch.Tensor = _FREQUENCY_HZ,
     tx: torch.Tensor | None = None,
 ) -> Scene:
-    material = PhysicalSurface(
+    material = PhysicalMaterial(
         layers=(
-            Layer(thickness_m=0.06, eps_r=4.0, sigma_e=0.02),
-            Layer(thickness_m=0.09, eps_r=2.5, sigma_e=0.01),
+            MaterialLayer(thickness_m=0.06, eps_r=4.0, sigma_e=0.02),
+            MaterialLayer(thickness_m=0.09, eps_r=2.5, sigma_e=0.01),
         ),
         name="ad-mc-sheet",
     )
     position = torch.tensor([0.0, 0.0, 0.0]) if tx is None else tx
     return Scene(
         structures=[transmission_wall_structure(3.0, material)],
-        transmitters=[Transmitter(position=position)],
-        receivers=[
-            ReceiverGrid(
+        endpoints=[
+            make_transmitter(position=position),
+            make_receiver_grid(
                 origin=torch.tensor([6.0, -1.0, -0.5]),
                 x_axis=torch.tensor([0.0, 1.0, 0.0]),
                 y_axis=torch.tensor([0.0, 0.0, 1.0]),
@@ -132,7 +133,7 @@ def _transmission_scene(
                 spacing=(0.5, 0.25),
             )
         ],
-        frequency=frequency,
+        metadata={_FREQUENCY_METADATA_KEY: frequency},
     )
 
 
@@ -143,13 +144,26 @@ def _los_scene(
 ) -> Scene:
     return Scene(
         structures=[],
-        transmitters=[Transmitter(position=torch.tensor(_TX) if tx is None else tx)],
-        receivers=[
-            ReceiverPoint(
+        endpoints=[
+            make_transmitter(
+                position=torch.tensor(_TX) if tx is None else tx
+            ),
+            make_receiver(
                 position=torch.tensor([0.0, 1.0, 0.5]) if rx is None else rx
             )
         ],
-        frequency=frequency,
+        metadata={_FREQUENCY_METADATA_KEY: frequency},
+    )
+
+
+def _reference_frequency(scene: Scene):
+    return scene.metadata[_FREQUENCY_METADATA_KEY]
+
+
+def _compile(scene: Scene):
+    return compile_scene(
+        scene,
+        reference_frequency_hz=_reference_frequency(scene),
     )
 
 
@@ -163,6 +177,7 @@ def _solve(scene: Scene, components: frozenset[str], ad_mode: str):
             max_depth=1,
             ad_mode=ad_mode,
         ),
+        reference_frequency_hz=_reference_frequency(scene),
     )
 
 
@@ -171,7 +186,7 @@ def _loss(result) -> torch.Tensor:
 
 
 def _material_leaf(scene: Scene, name: str) -> torch.Tensor:
-    return getattr(scene.compile().materials, name)
+    return getattr(_compile(scene).materials, name)
 
 
 _MATERIAL_STEPS = {
@@ -353,13 +368,13 @@ def test_forward_mode_material_dual_matches_reverse():
 
     with torch.autograd.forward_ad.dual_level():
         dual = torch.autograd.forward_ad.make_dual(leaf.detach(), tangent)
-        object.__setattr__(scene.compile().materials, "eps_r", dual)
+        object.__setattr__(_compile(scene).materials, "eps_r", dual)
         try:
             jvp = torch.autograd.forward_ad.unpack_dual(
                 _loss(_solve(scene, components, "jvp"))
             ).tangent
         finally:
-            object.__setattr__(scene.compile().materials, "eps_r", leaf)
+            object.__setattr__(_compile(scene).materials, "eps_r", leaf)
     assert jvp is not None
 
     leaf.requires_grad_(True)
@@ -383,13 +398,13 @@ def test_transmission_forward_mode_layer_dual_matches_reverse():
 
     with torch.autograd.forward_ad.dual_level():
         dual = torch.autograd.forward_ad.make_dual(leaf.detach(), tangent)
-        object.__setattr__(scene.compile().materials, "layer_eps_r", dual)
+        object.__setattr__(_compile(scene).materials, "layer_eps_r", dual)
         try:
             jvp = torch.autograd.forward_ad.unpack_dual(
                 _loss(_solve(scene, components, "jvp"))
             ).tangent
         finally:
-            object.__setattr__(scene.compile().materials, "layer_eps_r", leaf)
+            object.__setattr__(_compile(scene).materials, "layer_eps_r", leaf)
     assert jvp is not None
 
     leaf.requires_grad_(True)
@@ -427,6 +442,7 @@ def test_gradient_is_stable_across_seeds():
                     max_depth=1,
                     ad_mode="vjp",
                 ),
+                reference_frequency_hz=_reference_frequency(scene),
             )
             _loss(result).backward()
             gradients.append(leaf.grad.detach().clone())
@@ -460,17 +476,24 @@ def _diffraction_scene(
 ) -> Scene:
     from tests.support.scenes import wedge_diffraction_scene
 
-    scene = wedge_diffraction_scene(
-        Dielectric(eps_r=4.0, sigma_e=0.02), tx=tx, frequency=frequency
+    base = wedge_diffraction_scene(
+        PhysicalMaterial(eps_r=4.0, sigma_e=0.02),
+        tx=tx,
     )
-    return scene.add(
-        ReceiverGrid(
+    transmitter = next(
+        endpoint for endpoint in base.endpoints if endpoint.role == "tx"
+    )
+    grid = make_receiver_grid(
             origin=torch.tensor([3.0, -1.0, -0.5]),
             x_axis=torch.tensor([0.0, 1.0, 0.0]),
             y_axis=torch.tensor([0.0, 0.0, 1.0]),
             shape=(4, 4),
             spacing=(2.0 / 3.0, 1.0 / 3.0),
-        )
+    )
+    return Scene(
+        structures=base.structures,
+        endpoints=[transmitter, grid],
+        metadata={_FREQUENCY_METADATA_KEY: frequency},
     )
 
 
@@ -484,6 +507,7 @@ def _solve_diffraction(scene: Scene, ad_mode: str, seed: int = _SEED):
             max_depth=1,
             ad_mode=ad_mode,
         ),
+        reference_frequency_hz=_reference_frequency(scene),
     )
 
 
@@ -747,13 +771,13 @@ def test_diffraction_forward_mode_material_dual_matches_reverse():
 
     with torch.autograd.forward_ad.dual_level():
         dual = torch.autograd.forward_ad.make_dual(leaf.detach(), tangent)
-        object.__setattr__(scene.compile().materials, "eps_r", dual)
+        object.__setattr__(_compile(scene).materials, "eps_r", dual)
         try:
             jvp = torch.autograd.forward_ad.unpack_dual(
                 _loss(_solve_diffraction(scene, "jvp"))
             ).tangent
         finally:
-            object.__setattr__(scene.compile().materials, "eps_r", leaf)
+            object.__setattr__(_compile(scene).materials, "eps_r", leaf)
     assert jvp is not None
 
     leaf.requires_grad_(True)

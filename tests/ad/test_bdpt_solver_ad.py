@@ -59,12 +59,18 @@ from tests.support.scenes import (
     transmission_wall_structure,
     wedge_diffraction_scene,
 )
-from witwin.channel import ReceiverPoint, Scene, Structure, Transmitter
+from witwin.core import Scene
+from tests.support.core_world import (
+    make_mesh_structure,
+    make_receiver,
+    make_transmitter,
+)
 from witwin.channel.core.kernels.extension import build_info
-from witwin.channel.core.materials import Layer, PhysicalSurface
+from witwin.core import MaterialLayer, PhysicalMaterial
 from witwin.channel.montecarlo.bdpt import Config as BDPTConfig
 from witwin.channel.montecarlo.bdpt import solve as bdpt_solve
 from witwin.channel.montecarlo.events.scattering import rough_material_runtimes
+from witwin.channel.scene import compile as compile_scene
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for BDPT solver AD"
@@ -73,6 +79,7 @@ pytestmark = pytest.mark.skipif(
 _FREQ = 3.0e9
 _SEED = 7
 _SAMPLES = 8192
+_FREQUENCY_METADATA_KEY = "test_reference_frequency_hz"
 
 
 def _require_native() -> None:
@@ -92,25 +99,26 @@ def _reflection_scene(frequency: float | torch.Tensor = _FREQ) -> Scene:
     base = same_side_wall_reflection_scene()
     return Scene(
         structures=base.structures,
-        transmitters=base.transmitters,
-        receivers=base.receivers,
-        frequency=frequency,
+        endpoints=base.endpoints,
+        metadata={_FREQUENCY_METADATA_KEY: frequency},
     )
 
 
 def _transmission_scene(frequency: float | torch.Tensor = _FREQ) -> Scene:
-    material = PhysicalSurface(
+    material = PhysicalMaterial(
         layers=(
-            Layer(thickness_m=0.06, eps_r=4.0, sigma_e=0.02),
-            Layer(thickness_m=0.09, eps_r=2.5, sigma_e=0.01),
+            MaterialLayer(thickness_m=0.06, eps_r=4.0, sigma_e=0.02),
+            MaterialLayer(thickness_m=0.09, eps_r=2.5, sigma_e=0.01),
         ),
         name="bdpt-thin-sheet",
     )
     return Scene(
         structures=[transmission_wall_structure(3.0, material)],
-        transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 0.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([6.0, 0.4, 0.2]))],
-        frequency=frequency,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, 0.0, 0.0])),
+            make_receiver(position=torch.tensor([6.0, 0.4, 0.2])),
+        ],
+        metadata={_FREQUENCY_METADATA_KEY: frequency},
     )
 
 
@@ -125,17 +133,22 @@ def _scattering_scene(frequency: float | torch.Tensor = _FREQ) -> Scene:
     )
     return Scene(
         structures=[wall],
-        transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.0]))],
-        frequency=frequency,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, -1.0, 0.0])),
+            make_receiver(position=torch.tensor([0.0, 1.0, 0.0])),
+        ],
+        metadata={_FREQUENCY_METADATA_KEY: frequency},
     )
 
 
 def _coherent_scene(frequency: float | torch.Tensor = _FREQ) -> Scene:
-    from witwin.channel.core.materials import Dielectric
-
-    return wedge_diffraction_scene(
-        material=Dielectric(eps_r=5.0, sigma_e=0.02), frequency=frequency
+    base = wedge_diffraction_scene(
+        material=PhysicalMaterial(eps_r=5.0, sigma_e=0.02)
+    )
+    return Scene(
+        structures=base.structures,
+        endpoints=base.endpoints,
+        metadata={_FREQUENCY_METADATA_KEY: frequency},
     )
 
 
@@ -146,9 +159,11 @@ def _los_scene(frequency: float | torch.Tensor = _FREQ) -> Scene:
     wall = same_side_wall_reflection_scene().structures[0]
     return Scene(
         structures=[wall],
-        transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.5]))],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.5]))],
-        frequency=frequency,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, -1.0, 0.5])),
+            make_receiver(position=torch.tensor([0.0, 1.0, 0.5])),
+        ],
+        metadata={_FREQUENCY_METADATA_KEY: frequency},
     )
 
 
@@ -172,9 +187,28 @@ def _config(components, ad_mode, *, coherent=False, max_depth=1, seed=_SEED):
     )
 
 
+def _reference_frequency(scene: Scene):
+    return scene.metadata[_FREQUENCY_METADATA_KEY]
+
+
+def _compile(scene: Scene):
+    return compile_scene(
+        scene,
+        reference_frequency_hz=_reference_frequency(scene),
+    )
+
+
 def _solve(scene, components, ad_mode, *, coherent=False, max_depth=1, seed=_SEED):
     return bdpt_solve(
-        scene, _config(components, ad_mode, coherent=coherent, max_depth=max_depth, seed=seed)
+        scene,
+        _config(
+            components,
+            ad_mode,
+            coherent=coherent,
+            max_depth=max_depth,
+            seed=seed,
+        ),
+        reference_frequency_hz=_reference_frequency(scene),
     )
 
 
@@ -200,7 +234,7 @@ def test_ad_mode_none_is_seed_deterministic_and_reports_none():
 def test_primal_under_ad_equals_none_bitwise():
     _require_native()
     scene = _reflection_scene()
-    compiled = scene.compile()
+    compiled = _compile(scene)
     compiled.materials.eps_r.requires_grad_(True)
     try:
         none = _solve(scene, _COMPONENTS["reflection"], "none")
@@ -238,7 +272,7 @@ def _fd_via_store(scene, components, leaf, step, *, coherent=False):
 
 
 def _material_leaf(scene, name):
-    return getattr(scene.compile().materials, name)
+    return getattr(_compile(scene).materials, name)
 
 
 def _assert_leaf_grad_matches_fd(scene, components, leaf, step, *, coherent=False):
@@ -285,7 +319,7 @@ def test_shooting_transmission_layer_grad_matches_fd(param, step):
 def test_scattering_nee_table_grad_matches_fd():
     _require_native()
     scene = _scattering_scene()
-    runtimes = rough_material_runtimes(scene.compile())
+    runtimes = rough_material_runtimes(_compile(scene))
     assert runtimes, "the scattering fixture must have a rough material"
     f_te = next(iter(runtimes.values())).table.f_te
 
@@ -377,11 +411,18 @@ def _tx_power_scattering_scene(power: torch.Tensor) -> Scene:
     )
     return Scene(
         structures=[wall],
-        transmitters=[
-            Transmitter(position=torch.tensor([0.0, -1.0, 0.0]), power_w=power)
+        endpoints=[
+            make_transmitter(
+                position=torch.tensor(
+                    [0.0, -1.0, 0.0], device=power.device
+                ),
+                power_w=power,
+            ),
+            make_receiver(
+                position=torch.tensor([0.0, 1.0, 0.0], device=power.device)
+            ),
         ],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.0]))],
-        frequency=_FREQ,
+        metadata={_FREQUENCY_METADATA_KEY: _FREQ},
     )
 
 
@@ -393,11 +434,18 @@ def _tx_power_same_side_scene(power: torch.Tensor) -> Scene:
     wall = same_side_wall_reflection_scene().structures[0]
     return Scene(
         structures=[wall],
-        transmitters=[
-            Transmitter(position=torch.tensor([0.0, -1.0, 0.5]), power_w=power)
+        endpoints=[
+            make_transmitter(
+                position=torch.tensor(
+                    [0.0, -1.0, 0.5], device=power.device
+                ),
+                power_w=power,
+            ),
+            make_receiver(
+                position=torch.tensor([0.0, 1.0, 0.5], device=power.device)
+            ),
         ],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.5]))],
-        frequency=_FREQ,
+        metadata={_FREQUENCY_METADATA_KEY: _FREQ},
     )
 
 
@@ -406,11 +454,18 @@ def _tx_power_endpoint_only_scene(power: torch.Tensor) -> Scene:
     # (_build_endpoint_subpaths), which also threads tx_power natively under ad.
     return Scene(
         structures=[],
-        transmitters=[
-            Transmitter(position=torch.tensor([0.0, 0.0, 0.0]), power_w=power)
+        endpoints=[
+            make_transmitter(
+                position=torch.tensor(
+                    [0.0, 0.0, 0.0], device=power.device
+                ),
+                power_w=power,
+            ),
+            make_receiver(
+                position=torch.tensor([5.0, 0.0, 0.0], device=power.device)
+            ),
         ],
-        receivers=[ReceiverPoint(position=torch.tensor([5.0, 0.0, 0.0]))],
-        frequency=_FREQ,
+        metadata={_FREQUENCY_METADATA_KEY: _FREQ},
     )
 
 
@@ -508,17 +563,26 @@ def test_shooting_geometry_gradient_is_refused_loudly():
     # the output on the graph so the refusal, not a "does not require grad" error,
     # is what raises; the refusal may fire at solve time or at backward.
     def _geom_scene() -> tuple[Scene, torch.Tensor]:
-        vertex_leaf = (
-            transmission_wall_structure(3.0, PhysicalSurface(
-                layers=(Layer(thickness_m=0.08, eps_r=4.0, sigma_e=0.02),),
+        base_wall = transmission_wall_structure(
+            3.0,
+            PhysicalMaterial(
+                layers=(MaterialLayer(thickness_m=0.08, eps_r=4.0, sigma_e=0.02),),
                 name="bdpt-geom-wall",
-            )).vertices.clone().to("cuda").requires_grad_(True)
+            ),
         )
-        wall = Structure(
+        vertex_leaf = (
+            base_wall.geometry.to_mesh()[0]
+            .clone()
+            .to("cuda")
+            .requires_grad_(True)
+        )
+        wall = make_mesh_structure(
             vertices=vertex_leaf,
-            faces=torch.tensor([[0, 1, 2], [1, 3, 2]]),
-            material=PhysicalSurface(
-                layers=(Layer(thickness_m=0.08, eps_r=4.0, sigma_e=0.02),),
+            faces=torch.tensor(
+                [[0, 1, 2], [1, 3, 2]], device=vertex_leaf.device
+            ),
+            material=PhysicalMaterial(
+                layers=(MaterialLayer(thickness_m=0.08, eps_r=4.0, sigma_e=0.02),),
                 name="bdpt-geom-wall",
             ),
             name="bdpt-geom-wall",
@@ -526,15 +590,17 @@ def test_shooting_geometry_gradient_is_refused_loudly():
         )
         scene = Scene(
             structures=[wall],
-            transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 0.0]))],
-            receivers=[ReceiverPoint(position=torch.tensor([6.0, 0.4, 0.2]))],
-            frequency=_FREQ,
+            endpoints=[
+                make_transmitter(position=torch.tensor([0.0, 0.0, 0.0])),
+                make_receiver(position=torch.tensor([6.0, 0.4, 0.2])),
+            ],
+            metadata={_FREQUENCY_METADATA_KEY: _FREQ},
         )
         return scene, vertex_leaf
 
     with pytest.raises((RuntimeError, NotImplementedError)):
         scene, vertex_leaf = _geom_scene()
-        scene.compile().materials.layer_eps_r.requires_grad_(True)
+        _compile(scene).materials.layer_eps_r.requires_grad_(True)
         result = _solve(scene, _COMPONENTS["transmission"], "vjp")
         _loss(result).backward()
 
@@ -548,7 +614,7 @@ def test_jvp_vs_vjp_material_consistency():
     _require_native()
     scene = _reflection_scene()
     components = _COMPONENTS["reflection"]
-    compiled = scene.compile()
+    compiled = _compile(scene)
     base = compiled.materials.eps_r
     tangent = torch.ones_like(base)
 

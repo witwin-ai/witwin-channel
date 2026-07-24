@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import torch
+from witwin.channel.scene.endpoints import require_compiled
 
 from witwin.channel import build_info
 from witwin.channel.core.antenna import validate_scalar_endpoint_features
@@ -31,7 +32,7 @@ from witwin.channel.runtime.capacity import (
     SolveCapacityTransaction,
     create_solve_capacity_transaction,
 )
-from witwin.channel.scene.models import ReceiverGrid
+from witwin.channel.scene.endpoints import ReceiverGrid
 
 from .backend import apply_point_los_visibility, los_path_gain
 from .config import Config
@@ -48,7 +49,7 @@ from .result import Result
 from .sampling import make_cuda_generator
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+    from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
 def _validate_ad_config(config: Config) -> None:
@@ -95,7 +96,7 @@ def _face_material_tensors(
     """Per-face material tensors from the compiled material store.
 
     One material source for both ad_mode="none" and the AD modes (plan 07
-    AD-3): the store leaves (``scene.compile().materials``) are the values the
+    AD-3): the compiled store leaves (``scene.compiled.materials``) are the values the
     kernels see, so a finite difference taken on the store measures the same
     function the AD modes differentiate. The primal path reads under no_grad
     so it never builds a graph.
@@ -189,7 +190,9 @@ def _initial_los_state(
 
     tx_count = len(scene.transmitters)
     rx_count = sum(
-        receiver.points().shape[0] if hasattr(receiver, "points") else 1
+        int(receiver.shape[0]) * int(receiver.shape[1])
+        if isinstance(receiver, ReceiverGrid)
+        else 1
         for receiver in scene.receivers
     )
     reference = torch.empty((1, 1), device=device, dtype=torch.float32)
@@ -218,7 +221,7 @@ def solve_pipeline(
     ad = config.ad_mode != "none"
     if ad:
         require_frequency_ad_constant_materials_fn(
-            scene, scene.compile(), ad_mode=config.ad_mode
+            scene, require_compiled(scene), ad_mode=config.ad_mode
         )
 
     info = build_info_fn()
@@ -236,7 +239,7 @@ def solve_pipeline(
 
     device = torch.device("cuda")
     make_cuda_generator_fn(config.seed)
-    rayd = scene.rayd_scene()
+    rayd = require_compiled(scene).rayd
     grid = first_receiver_grid(scene)
     ledger = AdLaunchLedger()
     los, path_count, contribution_capacity = _initial_los_state(

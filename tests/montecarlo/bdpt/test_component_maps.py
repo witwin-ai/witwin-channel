@@ -1,14 +1,15 @@
 import pytest
 import torch
 
+from witwin.core import ReceiverGrid, Scene
 from tests.support.scenes import single_wall_reflection_scene
-from witwin.channel import ReceiverGrid
+from tests.support.core_world import make_receiver_grid
 from witwin.channel.core.kernels.extension import build_info
 from witwin.channel.montecarlo.bdpt import Config, solve
 
 
 def _grid() -> ReceiverGrid:
-    return ReceiverGrid(
+    return make_receiver_grid(
         origin=torch.tensor([5.0, -1.0, -0.5]),
         x_axis=torch.tensor([0.0, 1.0, 0.0]),
         y_axis=torch.tensor([0.0, 0.0, 1.0]),
@@ -17,16 +18,33 @@ def _grid() -> ReceiverGrid:
     )
 
 
+def _with_grid(scene: Scene) -> Scene:
+    return scene.with_endpoints(
+        (
+            *tuple(endpoint for endpoint in scene.endpoints if endpoint.role == "tx"),
+            _grid(),
+        )
+    )
+
+
 def test_bdpt_component_maps_include_all_components_and_total():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT component maps")
 
-    scene = single_wall_reflection_scene().add(_grid())
-    result = solve(scene, Config(samples=512, seed=5, components={"los", "reflection", "diffraction"}))
+    scene = _with_grid(single_wall_reflection_scene())
+    result = solve(
+        scene,
+        Config(samples=512, seed=5, components={"los", "reflection", "diffraction"}),
+        reference_frequency_hz=3.0e9,
+    )
 
     assert result.component_maps is not None
     assert set(result.component_maps) == {"los", "reflection", "diffraction"}
-    total = result.component_maps["los"] + result.component_maps["reflection"] + result.component_maps["diffraction"]
+    total = (
+        result.component_maps["los"]
+        + result.component_maps["reflection"]
+        + result.component_maps["diffraction"]
+    )
     assert result.path_gain.shape == (1, 4, 4)
     torch.testing.assert_close(result.path_gain, total, rtol=1.0e-5, atol=1.0e-8)
     if build_info()["uses_rayd_native"]:
@@ -39,9 +57,13 @@ def test_bdpt_component_maps_include_transmission_and_zero_scattering():
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native transmission is not built")
 
-    scene = single_wall_reflection_scene().add(_grid())
+    scene = _with_grid(single_wall_reflection_scene())
     components = {"los", "reflection", "diffraction", "transmission", "scattering"}
-    result = solve(scene, Config(samples=512, seed=5, components=components))
+    result = solve(
+        scene,
+        Config(samples=512, seed=5, components=components),
+        reference_frequency_hz=3.0e9,
+    )
 
     # (a) validates and every requested component is present in the maps.
     assert result.component_maps is not None

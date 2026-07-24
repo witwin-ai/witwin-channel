@@ -5,16 +5,21 @@ import math
 import pytest
 import torch
 
-from witwin.channel import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel.core.materials import (
-    Dielectric,
-    Layer,
+from witwin.core import (
+    MaterialLayer,
     PhaseScreen,
-    PhysicalSurface,
-    Roughness,
-    SurfaceAssignment,
+    PhysicalMaterial,
+    Mesh,
+    Scene,
+    Structure,
+    SurfaceRoughness,
 )
-from witwin.channel.core.objects import planar_uv
+from witwin.channel.scene import compile as compile_scene
+from tests.support.core_world import (
+    make_receiver,
+    make_transmitter,
+    planar_uv,
+)
 
 
 def _source_linked_rayd_available() -> bool:
@@ -55,9 +60,14 @@ def _wall_structure(with_uv: bool) -> Structure:
         )
         kwargs = {"uv": uv, "face_uv": faces.clone()}
     return Structure(
-        vertices=vertices,
-        faces=faces,
-        material=Dielectric(eps_r=4.0, sigma_e=0.01),
+        Mesh(
+            vertices,
+            faces,
+            recenter=False,
+            fill_mode="surface",
+            topology_diagnostics=False,
+        ),
+        PhysicalMaterial(eps_r=4.0, sigma_e=0.01),
         name="uv-wall",
         surface_id=1,
         **kwargs,
@@ -86,6 +96,8 @@ def test_planar_uv_defaults_to_world_origin():
         vertices,
         axis_u=torch.tensor([1.0, 0.0, 0.0]),
         axis_v=torch.tensor([0.0, 1.0, 0.0]),
+        origin=torch.zeros(3),
+        scale=1.0,
     )
     torch.testing.assert_close(uv, torch.tensor([[1.0, 2.0]]))
 
@@ -93,50 +105,48 @@ def test_planar_uv_defaults_to_world_origin():
 def test_structure_uv_validation():
     vertices = _wall_vertices()
     faces = _wall_faces()
-    material = Dielectric(eps_r=2.0)
+    material = PhysicalMaterial(eps_r=2.0)
+    geometry = Mesh(
+        vertices,
+        faces,
+        recenter=False,
+        fill_mode="surface",
+        topology_diagnostics=False,
+    )
     uv = torch.zeros((4, 2))
     with pytest.raises(ValueError, match="together"):
-        Structure(vertices=vertices, faces=faces, material=material, uv=uv)
-    with pytest.raises(ValueError, match=r"uv must have shape \(V, 2\)"):
+        Structure(geometry, material, uv=uv)
+    with pytest.raises(ValueError, match=r"uv must have shape \(T, 2\)"):
         Structure(
-            vertices=vertices,
-            faces=faces,
-            material=material,
+            geometry,
+            material,
             uv=torch.zeros((4, 3)),
             face_uv=faces.clone(),
         )
-    with pytest.raises(ValueError, match="one row per face"):
+    with pytest.raises(ValueError, match="one row per mesh face"):
         Structure(
-            vertices=vertices,
-            faces=faces,
-            material=material,
+            geometry,
+            material,
             uv=uv,
             face_uv=faces[:1].clone(),
         )
-    with pytest.raises(ValueError, match=r"in \[0, uv rows\)"):
-        Structure(
-            vertices=vertices,
-            faces=faces,
-            material=material,
-            uv=uv[:2],
-            face_uv=faces.clone(),
-        )
     structure = Structure(
-        vertices=vertices, faces=faces, material=material, uv=uv, face_uv=faces.clone()
+        geometry, material, uv=uv, face_uv=faces.clone()
     )
     assert structure.uv.dtype == torch.float32
     assert structure.face_uv.dtype == torch.int32
     # Structures without UV keep None fields (empty per-mesh UV in RayD).
-    bare = Structure(vertices=vertices, faces=faces, material=material)
+    bare = Structure(geometry, material)
     assert bare.uv is None and bare.face_uv is None
 
 
 def _uv_scene(with_uv: bool) -> Scene:
     return Scene(
         structures=[_wall_structure(with_uv)],
-        transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 0.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([5.0, 0.0, 0.0]))],
-        frequency=3.0e9,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, 0.0, 0.0])),
+            make_receiver(position=torch.tensor([5.0, 0.0, 0.0])),
+        ],
     )
 
 
@@ -152,7 +162,8 @@ def test_scene_with_uv_builds_and_traces(with_uv):
     )
 
     scene = _uv_scene(with_uv)
-    rayd = scene.rayd_scene()
+    compiled = compile_scene(scene, reference_frequency_hz=3.0e9)
+    rayd = compiled.rayd
     assert rayd.available
     ray_o = torch.tensor([[0.0, 0.0, 0.0]], dtype=torch.float32, device="cuda")
     ray_d = torch.tensor([[1.0, 0.0, 0.0]], dtype=torch.float32, device="cuda")
@@ -163,7 +174,6 @@ def test_scene_with_uv_builds_and_traces(with_uv):
         hit["t"].cpu(), torch.tensor([2.5], dtype=torch.float32)
     )
     # Scene compile keeps working on top of the UV-carrying RayD scene.
-    compiled = scene.compile()
     assert compiled.rayd is rayd
 
 
@@ -175,10 +185,18 @@ def test_compiled_scene_lazy_scattering_caches():
 
     frequency = 6.0e9
     sigma_e = 0.1 * 2.0 * math.pi * frequency * 8.8541878128e-12
-    material = PhysicalSurface(
-        layers=(Layer(thickness_m=0.5, eps_r=4.0, sigma_e=sigma_e),),
-        roughness_front=Roughness(
-            rms_height_m=1e-3, corr_length_x_m=0.1, corr_length_y_m=0.1
+    material = PhysicalMaterial(
+        layers=(
+            MaterialLayer(
+                thickness_m=0.5,
+                eps_r=4.0,
+                sigma_e=sigma_e,
+            ),
+        ),
+        roughness_front=SurfaceRoughness(
+            rms_height_m=1e-3,
+            correlation_length_x_m=0.1,
+            correlation_length_y_m=0.1,
         ),
         name="rough-wall",
     )
@@ -187,18 +205,19 @@ def test_compiled_scene_lazy_scattering_caches():
     scene = Scene(
         structures=[
             Structure(
-                vertices=structure.vertices,
-                faces=structure.faces,
-                material=SurfaceAssignment(material=material, phase_screen=screen),
+                structure.geometry,
+                material,
+                phase_screen=screen,
                 uv=structure.uv,
                 face_uv=structure.face_uv,
             )
         ],
-        transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 0.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([5.0, 0.0, 0.0]))],
-        frequency=frequency,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, 0.0, 0.0])),
+            make_receiver(position=torch.tensor([5.0, 0.0, 0.0])),
+        ],
     )
-    compiled = scene.compile()
+    compiled = compile_scene(scene, reference_frequency_hz=frequency)
     assert int(compiled.materials.scatter_model_id[0]) == 1
 
     tables = compiled.kirchhoff_tables

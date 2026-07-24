@@ -54,4 +54,4 @@ def test_basic_ad_solve_rejects_reflection_depth_over_ad_cap(ad_mode, monkeypatc
         ad_mode=ad_mode,
     )
     with pytest.raises(RuntimeError, match="reflection AD depth cap"):
-        solve(scene, config)
+        solve(scene, config, reference_frequency_hz=3.0e9)

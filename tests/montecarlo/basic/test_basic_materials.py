@@ -1,65 +1,54 @@
 from __future__ import annotations
 
-import importlib
-
 import pytest
 import torch
 
 from tests.support.scenes import single_wall_reflection_scene
-from witwin.channel import ITUMaterial, Scene
-from witwin.channel.core.scene_loader import itu_material_parameters
+from witwin.core import PhysicalMaterial
+from witwin.channel.scene import compile as compile_scene
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA required")
-def test_store_material_tensors_evaluate_itu_material_at_scene_frequency() -> None:
-    # Plan 07 AD-3: the solver reads per-face materials from the compiled
-    # material store (one source for the primal and the AD modes), so the
-    # store must carry the ITU law evaluated at the scene frequency.
-    solver = importlib.import_module("witwin.channel.montecarlo.basic.solver")
+def test_compile_evaluates_core_material_at_reference_frequency() -> None:
     original = single_wall_reflection_scene()
-    scene = Scene(
-        structures=[
-            original.structures[0].with_material(ITUMaterial(name="concrete"))
-        ],
-        transmitters=original.transmitters,
-        receivers=original.receivers,
-        frequency=28.0e9,
+    material_id = int(original.structures[0].material_id)
+    material = PhysicalMaterial(
+        eps_r=5.3,
+        sigma_e=0.12,
+        material_id=material_id,
+        name="concrete-at-28ghz",
     )
+    scene = original.with_material(material_id, material)
 
-    tensors = solver._face_material_tensors(
-        scene, device=torch.device("cuda"), ad=False
-    )
-    eps_r, sigma_e = tensors[0], tensors[1]
+    compiled = compile_scene(scene, reference_frequency_hz=28.0e9)
 
-    expected_eps_r, expected_sigma_e = itu_material_parameters("concrete", 28.0e9)
-    face_count = int(scene.structures[0].faces.shape[0])
-    assert eps_r.shape == (face_count,)
+    assert compiled.materials.frequency_hz == 28.0e9
     torch.testing.assert_close(
-        eps_r,
-        torch.full((face_count,), float(expected_eps_r), device=eps_r.device),
+        compiled.materials.eps_r,
+        torch.full_like(compiled.materials.eps_r, 5.3),
     )
     torch.testing.assert_close(
-        sigma_e,
-        torch.full((face_count,), float(expected_sigma_e), device=sigma_e.device),
+        compiled.materials.sigma_e,
+        torch.full_like(compiled.materials.sigma_e, 0.12),
     )
-    assert not eps_r.requires_grad
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA required")
-def test_store_material_tensors_keep_the_store_graph_in_ad_mode() -> None:
-    solver = importlib.import_module("witwin.channel.montecarlo.basic.solver")
-    scene = single_wall_reflection_scene()
-    leaf = scene.compile().materials.eps_r
-    leaf.requires_grad_(True)
-    try:
-        tensors = solver._face_material_tensors(
-            scene, device=torch.device("cuda"), ad=True
-        )
-        assert tensors[0].requires_grad
-        primal = solver._face_material_tensors(
-            scene, device=torch.device("cuda"), ad=False
-        )
-        assert not primal[0].requires_grad
-        torch.testing.assert_close(tensors[0].detach(), primal[0], rtol=0.0, atol=0.0)
-    finally:
-        leaf.requires_grad_(False)
+def test_compile_preserves_core_material_tensor_graph() -> None:
+    original = single_wall_reflection_scene()
+    material_id = int(original.structures[0].material_id)
+    eps_r = torch.tensor(4.0, device="cuda", requires_grad=True)
+    scene = original.with_material(
+        material_id,
+        PhysicalMaterial(
+            eps_r=eps_r,
+            sigma_e=0.02,
+            material_id=material_id,
+        ),
+    )
+
+    compiled = compile_scene(scene, reference_frequency_hz=3.0e9)
+
+    assert compiled.materials.eps_r.requires_grad
+    compiled.materials.eps_r.sum().backward()
+    torch.testing.assert_close(eps_r.grad, torch.ones_like(eps_r))

@@ -4,7 +4,6 @@ from __future__ import annotations
 import pytest
 import torch
 import witwin.channel.materials as public_materials
-from witwin.channel.core import materials as core_materials
 from witwin.channel.materials import kernels
 from witwin.channel.materials.kernels import autograd, contracts, functional
 from witwin.channel.runtime import (
@@ -127,22 +126,13 @@ def test_mc_face_material_facade_rejects_mismatched_sigma_shape():
         )
 
 
-def test_materials_package_preserves_public_object_identity():
-    expected_exports = (
-        "DebyeModel",
+def test_materials_package_exports_only_the_channel_kernel_contract():
+    assert tuple(public_materials.__all__) == ("validate_layer_csr",)
+    for name in (
         "Dielectric",
-        "DispersiveMaterial",
-        "ITUMaterial",
         "Layer",
-        "LossyDielectric",
-        "PerfectConductor",
         "PhaseScreen",
         "PhysicalSurface",
-        "Roughness",
         "SurfaceAssignment",
-        "TabulatedPermittivity",
-    )
-
-    assert tuple(public_materials.__all__) == expected_exports
-    for name in expected_exports:
-        assert getattr(public_materials, name) is getattr(core_materials, name)
+    ):
+        assert not hasattr(public_materials, name)

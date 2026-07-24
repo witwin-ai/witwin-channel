@@ -12,15 +12,15 @@ import pytest
 import torch
 from scipy.stats import chi2
 
-from witwin.channel import (
-    ReceiverGrid,
-    ReceiverPoint,
-    Scene,
-    Structure,
-    Transmitter,
+from witwin.core import Scene, Structure
+from tests.support.core_world import (
+    make_mesh_structure,
+    make_receiver,
+    make_receiver_grid,
+    make_transmitter,
 )
 from witwin.channel.core.kernels.extension import build_info
-from witwin.channel.core.materials import Layer, PhysicalSurface, Roughness
+from witwin.core import MaterialLayer, PhysicalMaterial, SurfaceRoughness
 from witwin.channel.montecarlo.bdpt import Config, solve
 from witwin.channel.montecarlo.events.scattering import (
     sample_scatter_directions,
@@ -55,22 +55,24 @@ def _require_native() -> None:
         pytest.skip("RayD native scattering is not built")
 
 
-def _roughness(sigma_h: float = _SIGMA_H) -> Roughness:
-    return Roughness(
-        rms_height_m=sigma_h, corr_length_x_m=_CORR, corr_length_y_m=_CORR
+def _roughness(sigma_h: float = _SIGMA_H) -> SurfaceRoughness:
+    return SurfaceRoughness(
+        rms_height_m=sigma_h, correlation_length_x_m=_CORR, correlation_length_y_m=_CORR
     )
 
 
-def _material(roughness: Roughness | None) -> PhysicalSurface:
-    return PhysicalSurface(
-        layers=(Layer(thickness_m=_THICKNESS, eps_r=_EPS_R, sigma_e=_SIGMA_E),),
+def _material(
+    roughness: SurfaceRoughness | None,
+) -> PhysicalMaterial:
+    return PhysicalMaterial(
+        layers=(MaterialLayer(thickness_m=_THICKNESS, eps_r=_EPS_R, sigma_e=_SIGMA_E),),
         roughness_front=roughness,
         name="wall-material",
     )
 
 
-def _wall(material: PhysicalSurface, *, x: float = 2.5) -> Structure:
-    return Structure(
+def _wall(material: PhysicalMaterial, *, x: float = 2.5) -> Structure:
+    return make_mesh_structure(
         vertices=torch.tensor(
             [[x, -4.0, -4.0], [x, 4.0, -4.0], [x, -4.0, 4.0], [x, 4.0, 4.0]]
         ),
@@ -81,12 +83,13 @@ def _wall(material: PhysicalSurface, *, x: float = 2.5) -> Structure:
     )
 
 
-def _point_scene(material: PhysicalSurface) -> Scene:
+def _point_scene(material: PhysicalMaterial) -> Scene:
     return Scene(
         structures=[_wall(material)],
-        transmitters=[Transmitter(position=_TX)],
-        receivers=[ReceiverPoint(position=_RX)],
-        frequency=_FREQUENCY,
+        endpoints=[
+            make_transmitter(position=_TX),
+            make_receiver(position=_RX),
+        ],
     )
 
 
@@ -101,7 +104,9 @@ def _quadrature_reference(*, polarized: bool) -> float:
     """
 
     device = torch.device("cuda")
-    table = build_kirchhoff_table(_roughness(), list(_LAYERS), _FREQUENCY, device=device)
+    table = build_kirchhoff_table(
+        _roughness(), list(_LAYERS), _FREQUENCY, device=device
+    )
     n = torch.tensor([-1.0, 0.0, 0.0], device=device)
     res = 640
     axis = torch.linspace(-4.0, 4.0, res, device=device)
@@ -120,7 +125,8 @@ def _quadrature_reference(*, polarized: bool) -> float:
     cos_i = (wi * n).sum(-1)
     cos_o = (wo * n).sum(-1)
     t1 = torch.linalg.cross(
-        torch.tensor([0.0, 0.0, 1.0], device=device).expand_as(points), n.expand_as(points)
+        torch.tensor([0.0, 0.0, 1.0], device=device).expand_as(points),
+        n.expand_as(points),
     )
     t1 = t1 / t1.norm(dim=-1, keepdim=True)
     t2 = torch.linalg.cross(n.expand_as(points), t1)
@@ -143,7 +149,10 @@ def _quadrature_reference(*, polarized: bool) -> float:
         kernel = 0.5 * (f_te + f_tm)
     amplitude_sq = (_LIGHT_SPEED / _FREQUENCY / (4.0 * math.pi)) ** 2
     integrand = (
-        kernel * cos_i.clamp_min(0.0) * cos_o.clamp_min(0.0) * amplitude_sq
+        kernel
+        * cos_i.clamp_min(0.0)
+        * cos_o.clamp_min(0.0)
+        * amplitude_sq
         / (r1**2 * r2**2)
     )
     return float(integrand.sum() * step * step)
@@ -155,6 +164,7 @@ def test_bdpt_scattering_matches_area_quadrature_reference():
     result = solve(
         _point_scene(_material(_roughness())),
         Config(samples=262_144, seed=7, max_depth=2, components={"scattering"}),
+        reference_frequency_hz=_FREQUENCY,
     )
     value = float(result.component_power["scattering"])
     assert value > 0.0
@@ -177,6 +187,7 @@ def test_bdpt_scattering_variance_decreases_like_one_over_n():
             components={"scattering"},
             diagnostics=True,
         ),
+        reference_frequency_hz=_FREQUENCY,
     )
     large = solve(
         scene,
@@ -187,6 +198,7 @@ def test_bdpt_scattering_variance_decreases_like_one_over_n():
             components={"scattering"},
             diagnostics=True,
         ),
+        reference_frequency_hz=_FREQUENCY,
     )
     ratio = float(small.variance.sum() / large.variance.sum().clamp_min(1.0e-30))
     # 4x samples -> ~4x lower variance of the mean (allow estimator noise).
@@ -214,13 +226,17 @@ def test_bdpt_smooth_limit_and_energy_bound():
         samples=4096, seed=7, max_depth=2, components={"reflection"}
     )
     smooth_reflection = float(
-        solve(_point_scene(_material(None)), reflection_config).component_power[
-            "reflection"
-        ]
+        solve(
+            _point_scene(_material(None)),
+            reflection_config,
+            reference_frequency_hz=_FREQUENCY,
+        ).component_power["reflection"]
     )
     rough_reflection = float(
         solve(
-            _point_scene(_material(_roughness())), reflection_config
+            _point_scene(_material(_roughness())),
+            reflection_config,
+            reference_frequency_hz=_FREQUENCY,
         ).component_power["reflection"]
     )
     scattering_config = Config(
@@ -228,12 +244,16 @@ def test_bdpt_smooth_limit_and_energy_bound():
     )
     rough_scattering = float(
         solve(
-            _point_scene(_material(_roughness())), scattering_config
+            _point_scene(_material(_roughness())),
+            scattering_config,
+            reference_frequency_hz=_FREQUENCY,
         ).component_power["scattering"]
     )
     tiny_scattering = float(
         solve(
-            _point_scene(_material(_roughness(sigma_h=1.0e-6))), scattering_config
+            _point_scene(_material(_roughness(sigma_h=1.0e-6))),
+            scattering_config,
+            reference_frequency_hz=_FREQUENCY,
         ).component_power["scattering"]
     )
 
@@ -252,15 +272,17 @@ def test_bdpt_scattering_is_seed_reproducible():
     _require_native()
     scene = _point_scene(_material(_roughness()))
     config = Config(samples=8192, seed=11, max_depth=2, components={"scattering"})
-    first = solve(scene, config)
-    second = solve(scene, config)
+    first = solve(scene, config, reference_frequency_hz=_FREQUENCY)
+    second = solve(scene, config, reference_frequency_hz=_FREQUENCY)
     torch.testing.assert_close(first.path_gain, second.path_gain, rtol=0.0, atol=0.0)
     assert (
         first.metadata["scattering"]["event_counts"]
         == second.metadata["scattering"]["event_counts"]
     )
     other = solve(
-        scene, Config(samples=8192, seed=12, max_depth=2, components={"scattering"})
+        scene,
+        Config(samples=8192, seed=12, max_depth=2, components={"scattering"}),
+        reference_frequency_hz=_FREQUENCY,
     )
     assert not torch.equal(first.path_gain, other.path_gain)
 
@@ -277,14 +299,18 @@ def test_bdpt_results_unchanged_when_scattering_not_requested():
     _require_native()
     base_components = {"los", "reflection", "transmission"}
     config = Config(samples=4096, seed=7, max_depth=3, components=base_components)
-    smooth_first = solve(_point_scene(_material(None)), config)
-    smooth_second = solve(_point_scene(_material(None)), config)
+    smooth_first = solve(
+        _point_scene(_material(None)), config, reference_frequency_hz=_FREQUENCY
+    )
+    smooth_second = solve(
+        _point_scene(_material(None)), config, reference_frequency_hz=_FREQUENCY
+    )
     torch.testing.assert_close(
         smooth_first.path_gain, smooth_second.path_gain, rtol=0.0, atol=0.0
     )
 
     rough_scene = _point_scene(_material(_roughness()))
-    rough_without = solve(rough_scene, config)
+    rough_without = solve(rough_scene, config, reference_frequency_hz=_FREQUENCY)
     rough_with = solve(
         rough_scene,
         Config(
@@ -293,6 +319,7 @@ def test_bdpt_results_unchanged_when_scattering_not_requested():
             max_depth=3,
             components=base_components | {"scattering"},
         ),
+        reference_frequency_hz=_FREQUENCY,
     )
     for component in ("los", "reflection", "transmission"):
         torch.testing.assert_close(
@@ -305,7 +332,9 @@ def test_bdpt_results_unchanged_when_scattering_not_requested():
 
     # The rough wall's coherent specular reflection is C_r-attenuated
     # relative to the smooth wall even when scattering is not requested.
-    smooth_run = solve(_point_scene(_material(None)), config)
+    smooth_run = solve(
+        _point_scene(_material(None)), config, reference_frequency_hz=_FREQUENCY
+    )
     rough_reflection = float(rough_without.component_power["reflection"].sum())
     smooth_reflection = float(smooth_run.component_power["reflection"].sum())
     assert rough_reflection < smooth_reflection
@@ -314,7 +343,7 @@ def test_bdpt_results_unchanged_when_scattering_not_requested():
 
 def test_bdpt_grid_scattering_component_map_matches_power():
     _require_native()
-    grid = ReceiverGrid(
+    grid = make_receiver_grid(
         origin=torch.tensor([0.5, -1.0, -0.5]),
         x_axis=torch.tensor([0.0, 1.0, 0.0]),
         y_axis=torch.tensor([0.0, 0.0, 1.0]),
@@ -323,12 +352,12 @@ def test_bdpt_grid_scattering_component_map_matches_power():
     )
     scene = Scene(
         structures=[_wall(_material(_roughness()))],
-        transmitters=[Transmitter(position=_TX)],
-        receivers=[grid],
-        frequency=_FREQUENCY,
+        endpoints=[make_transmitter(position=_TX), grid],
     )
     result = solve(
-        scene, Config(samples=16_384, seed=5, max_depth=2, components={"scattering"})
+        scene,
+        Config(samples=16_384, seed=5, max_depth=2, components={"scattering"}),
+        reference_frequency_hz=_FREQUENCY,
     )
     assert result.component_maps is not None
     scattering = result.component_maps["scattering"]
@@ -348,12 +377,19 @@ def test_scatter_direction_sampler_matches_table_pdf():
     because the seeded stream draws fewer samples)."""
 
     device = torch.device("cuda")
-    table = build_kirchhoff_table(_roughness(), list(_LAYERS), _FREQUENCY, device=device)
+    table = build_kirchhoff_table(
+        _roughness(), list(_LAYERS), _FREQUENCY, device=device
+    )
     runtimes = {
         0: type(
             "Runtime",
             (),
-            {"material_index": 0, "table": table, "layers": _LAYERS, "roughness": _roughness()},
+            {
+                "material_index": 0,
+                "table": table,
+                "layers": _LAYERS,
+                "roughness": _roughness(),
+            },
         )()
     }
     n = 60_000
@@ -361,9 +397,7 @@ def test_scatter_direction_sampler_matches_table_pdf():
     sin_i = math.sqrt(1.0 - cos_i * cos_i)
     wi = torch.tensor([[sin_i, 0.0, cos_i]], device=device).expand(n, 3).contiguous()
     material_id = torch.zeros((n,), device=device, dtype=torch.int32)
-    uniforms = scatter_direction_uniforms(
-        n, seed=3, tx_index=0, depth=0, device=device
-    )
+    uniforms = scatter_direction_uniforms(n, seed=3, tx_index=0, depth=0, device=device)
     sampled = sample_scatter_directions(
         torch.ones_like(material_id, dtype=torch.bool),
         material_id,

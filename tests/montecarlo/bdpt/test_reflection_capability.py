@@ -21,7 +21,11 @@ def test_bdpt_reflection_errors_when_capability_missing(monkeypatch):
     )
 
     with pytest.raises(RuntimeError, match="reflection.*RayD"):
-        solve(single_wall_reflection_scene(), Config(components={"reflection"}))
+        solve(
+            single_wall_reflection_scene(),
+            Config(components={"reflection"}),
+            reference_frequency_hz=3.0e9,
+        )
 
 
 def test_bdpt_los_only_skips_reflection_capability(monkeypatch):
@@ -38,6 +42,10 @@ def test_bdpt_los_only_skips_reflection_capability(monkeypatch):
         },
     )
 
-    result = solve(single_wall_reflection_scene(), Config(components={"los"}))
+    result = solve(
+        single_wall_reflection_scene(),
+        Config(components={"los"}),
+        reference_frequency_hz=3.0e9,
+    )
 
     assert result.metadata["components"]["reflection"] == "not_requested"

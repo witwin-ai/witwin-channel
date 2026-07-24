@@ -1,10 +1,11 @@
+import importlib
 from dataclasses import fields
-from types import SimpleNamespace
 
 import pytest
 import torch
 
-from witwin.channel import ReceiverGrid
+from tests.support.core_world import make_receiver_grid
+from witwin.core import Scene
 from witwin.channel.deterministic import Config as DeterministicConfig
 from witwin.channel.deterministic.solver import (
     _metadata as deterministic_metadata,
@@ -87,7 +88,7 @@ def test_bdpt_rejects_disabled_diffraction_and_accepts_single_strategy_without_m
 
 
 def test_bdpt_rejects_grid_receiver_strategy_before_scene_build(monkeypatch):
-    grid = ReceiverGrid(
+    grid = make_receiver_grid(
         origin=torch.zeros(3),
         x_axis=torch.tensor([1.0, 0.0, 0.0]),
         y_axis=torch.tensor([0.0, 1.0, 0.0]),
@@ -98,13 +99,22 @@ def test_bdpt_rejects_grid_receiver_strategy_before_scene_build(monkeypatch):
     def fail_scene_build():
         raise AssertionError("rayd_scene must not run for invalid receiver config")
 
-    scene = SimpleNamespace(receivers=[grid], rayd_scene=fail_scene_build)
+    scene = Scene(endpoints=[grid])
+    bdpt_solver_module = importlib.import_module(
+        "witwin.channel.montecarlo.bdpt.solver"
+    )
+    monkeypatch.setattr(
+        bdpt_solver_module,
+        "compile_scene",
+        lambda *args, **kwargs: fail_scene_build(),
+    )
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
 
     with pytest.raises(RuntimeError, match="requires point receivers"):
         bdpt_solve(
             scene,
             BdptConfig(components={"los"}, receiver_strategy="point_sphere"),
+            reference_frequency_hz=3.0e9,
         )
 
 

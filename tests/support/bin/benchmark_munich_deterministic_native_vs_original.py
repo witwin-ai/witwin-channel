@@ -18,7 +18,11 @@ sys.path.insert(0, str(_REPO_ROOT / "src"))
 sys.path.insert(0, str(_REPO_ROOT))
 
 # Local source must resolve from this checkout before importing the benchmark target.
-from witwin.channel import ReceiverGrid, Scene, Transmitter  # noqa: E402
+from witwin.core import Scene  # noqa: E402
+from tests.support.core_world import (  # noqa: E402
+    make_receiver_grid,
+    make_transmitter,
+)
 from witwin.channel.deterministic import Config, solve  # noqa: E402
 
 
@@ -75,7 +79,7 @@ def _load_scene(args: argparse.Namespace) -> Scene:
     grid_size = int(args.grid_size)
     spacing_x = (xmax - xmin) / float(grid_size)
     spacing_y = (ymax - ymin) / float(grid_size)
-    grid = ReceiverGrid(
+    grid = make_receiver_grid(
         origin=torch.tensor([xmin + 0.5 * spacing_x, ymin + 0.5 * spacing_y, float(args.plane_z)], dtype=torch.float32),
         x_axis=torch.tensor([1.0, 0.0, 0.0], dtype=torch.float32),
         y_axis=torch.tensor([0.0, 1.0, 0.0], dtype=torch.float32),
@@ -84,7 +88,7 @@ def _load_scene(args: argparse.Namespace) -> Scene:
     )
     return Scene(
         structures=base.structures,
-        transmitters=[Transmitter(position=torch.tensor(args.tx, dtype=torch.float32), power_w=1.0)],
+        transmitters=[make_transmitter(position=torch.tensor(args.tx, dtype=torch.float32), power_w=1.0)],
         receivers=[grid],
         frequency=base.frequency,
         metadata=base.metadata,
@@ -141,9 +145,9 @@ def main() -> None:
         frequency=float(args.frequency),
         source_root=pathlib.Path(args.sionna_root),
     )
-    scene.add(Transmitter("tx", tuple(float(v) for v in args.tx)))
+    scene.add(make_transmitter("tx", tuple(float(v) for v in args.tx)))
     scene.add(
-        ReceiverGrid(
+        make_receiver_grid(
             "rm",
             axis="z",
             position=float(args.plane_z),

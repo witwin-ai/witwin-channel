@@ -28,8 +28,11 @@ def test_single_plane_reflection_matches_path_reference():
             export_paths=True,
             return_field=False,
         ),
+        reference_frequency_hz=3.0e9,
     )
-    reference = solve_paths(scene, PathConfig(components={"reflection"}))
+    reference = solve_paths(
+        scene, PathConfig(components={"reflection"}), reference_frequency_hz=3.0e9
+    )
 
     assert result.paths is not None
     assert result.paths.valid.numel() == reference.valid.numel()
@@ -64,6 +67,7 @@ def test_reflection_path_field_export_uses_native_complex_fields():
     result = solve(
         same_side_wall_reflection_scene(),
         Config(components={"reflection"}, coherent=True, export_paths=True),
+        reference_frequency_hz=3.0e9,
     )
 
     assert result.paths is not None
@@ -112,6 +116,7 @@ def test_reflection_solver_uses_native_field_kernel_when_available(monkeypatch):
     result = solve(
         same_side_wall_reflection_scene(),
         Config(components={"reflection"}, coherent=True, export_paths=True),
+        reference_frequency_hz=3.0e9,
     )
 
     assert result.paths is not None
@@ -133,6 +138,7 @@ def test_single_plane_reflection_does_not_use_python_triangle_fallback():
     result = solve(
         same_side_wall_reflection_scene(),
         Config(components={"reflection"}, coherent=True, export_paths=True),
+        reference_frequency_hz=3.0e9,
     )
 
     assert result.paths is not None
@@ -159,4 +165,5 @@ def test_reflection_solver_requires_native_field_kernel(monkeypatch):
         solve(
             same_side_wall_reflection_scene(),
             Config(components={"reflection"}, coherent=True, export_paths=True),
+            reference_frequency_hz=3.0e9,
         )

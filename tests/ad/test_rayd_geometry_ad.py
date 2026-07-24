@@ -23,10 +23,10 @@ from tests.ad._tolerances import (
     REL_TOL_GENERAL,
     REL_TOL_PATH,
 )
-from witwin.channel import Scene, Structure
+from witwin.core import Mesh, PhysicalMaterial, Scene, Structure
 from witwin.channel.propagation.geometry.kernels import autograd as ops
 from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
-from witwin.channel.core.materials import Dielectric
+from witwin.channel.scene import compile as compile_scene
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for RayD geometry AD"
@@ -63,18 +63,25 @@ def _build_rayd_scene(vertices: torch.Tensor, faces) -> tuple[object, torch.Tens
     if not _source_linked_rayd_available():
         pytest.skip("RayD native extension is not built")
     scene = Scene(
-        structures=[
+        structures=(
             Structure(
-                vertices=vertices.detach().cpu().to(torch.float32),
-                faces=torch.tensor(faces, dtype=torch.int32),
-                material=Dielectric(eps_r=2.0),
-            )
-        ],
-        transmitters=[],
-        receivers=[],
-        frequency=3.5e9,
+                Mesh(
+                    vertices.detach().cpu().to(torch.float32),
+                    torch.tensor(faces, dtype=torch.int32),
+                    recenter=False,
+                    fill_mode="surface",
+                    topology_diagnostics=False,
+                ),
+                PhysicalMaterial(eps_r=2.0),
+            ),
+        ),
+        endpoints=(),
     )
-    rayd = scene.rayd_scene()
+    compiled = compile_scene(
+        scene,
+        reference_frequency_hz=3.5e9,
+    )
+    rayd = compiled.rayd
     return rayd, rayd.mesh_tensors[0][0]
 
 

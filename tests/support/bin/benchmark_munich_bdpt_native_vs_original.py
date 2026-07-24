@@ -17,21 +17,25 @@ _REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 sys.path.insert(0, str(_REPO_ROOT))
 
-from witwin.channel import ReceiverGrid, Scene, Structure, Transmitter  # noqa: E402
-from witwin.channel.core.materials import Dielectric, PerfectConductor  # noqa: E402
+from witwin.core import PhysicalMaterial, Scene  # noqa: E402
+from tests.support.core_world import (  # noqa: E402
+    make_mesh_structure,
+    make_receiver_grid,
+    make_transmitter,
+)
 from witwin.channel.montecarlo.bdpt import Config, solve  # noqa: E402
 
 
 DEFAULT_SIONNA_ROOT = pathlib.Path(
-    "E:/Code/witwin-platform/channel/reference/sionna-rt-reference-2.0.1/src"
+    "E:/Code/witwin-platform/archive/channel/reference/sionna-rt-reference-2.0.1/src"
 )
 DEFAULT_MUNICH_XML = DEFAULT_SIONNA_ROOT / "sionna" / "rt" / "scenes" / "munich" / "munich.xml"
-DEFAULT_CHANNEL_ROOT = pathlib.Path("E:/Code/witwin-platform/channel")
+DEFAULT_CHANNEL_ROOT = pathlib.Path("E:/Code/witwin-platform/archive/channel")
 COMPONENTS = ("los", "reflection", "diffraction")
 
 
 def _synthetic_reduced_native_scene(grid_size: int) -> Scene:
-    wall = Structure(
+    wall = make_mesh_structure(
         vertices=torch.tensor(
             [
                 [20.0, -70.0, 0.0],
@@ -42,11 +46,11 @@ def _synthetic_reduced_native_scene(grid_size: int) -> Scene:
             dtype=torch.float32,
         ),
         faces=torch.tensor([[0, 1, 2], [1, 3, 2]], dtype=torch.int32),
-        material=Dielectric(eps_r=5.0, sigma_e=0.02),
+        material=PhysicalMaterial(eps_r=5.0, sigma_e=0.02),
         name="reduced-munich-wall",
         surface_id=101,
     )
-    wedge_a = Structure(
+    wedge_a = make_mesh_structure(
         vertices=torch.tensor(
             [
                 [-35.0, -20.0, 0.0],
@@ -56,11 +60,11 @@ def _synthetic_reduced_native_scene(grid_size: int) -> Scene:
             dtype=torch.float32,
         ),
         faces=torch.tensor([[0, 1, 2]], dtype=torch.int32),
-        material=PerfectConductor(),
+        material=PhysicalMaterial.perfect_conductor(),
         name="reduced-munich-wedge-a",
         surface_id=102,
     )
-    wedge_b = Structure(
+    wedge_b = make_mesh_structure(
         vertices=torch.tensor(
             [
                 [-35.0, -20.0, 0.0],
@@ -70,15 +74,20 @@ def _synthetic_reduced_native_scene(grid_size: int) -> Scene:
             dtype=torch.float32,
         ),
         faces=torch.tensor([[0, 2, 1]], dtype=torch.int32),
-        material=PerfectConductor(),
+        material=PhysicalMaterial.perfect_conductor(),
         name="reduced-munich-wedge-b",
         surface_id=103,
     )
     return Scene(
         structures=[wall, wedge_a, wedge_b],
-        transmitters=[Transmitter(position=torch.tensor([8.5, 21.0, 27.0], dtype=torch.float32), power_w=1.0)],
-        receivers=[
-            ReceiverGrid(
+        endpoints=[
+            make_transmitter(
+                position=torch.tensor(
+                    [8.5, 21.0, 27.0], dtype=torch.float32
+                ),
+                power_w=1.0,
+            ),
+            make_receiver_grid(
                 origin=torch.tensor(
                     [
                         -120.0 + 0.5 * (240.0 / float(grid_size)),
@@ -91,9 +100,8 @@ def _synthetic_reduced_native_scene(grid_size: int) -> Scene:
                 y_axis=torch.tensor([0.0, 1.0, 0.0], dtype=torch.float32),
                 shape=(grid_size, grid_size),
                 spacing=(240.0 / float(grid_size), 260.0 / float(grid_size)),
-            )
+            ),
         ],
-        frequency=2.4e9,
     )
 
 
@@ -145,7 +153,7 @@ def _load_native_scene(args: argparse.Namespace) -> Scene:
     grid_size = int(args.grid_size)
     spacing_x = (xmax - xmin) / float(grid_size)
     spacing_y = (ymax - ymin) / float(grid_size)
-    grid = ReceiverGrid(
+    grid = make_receiver_grid(
         origin=torch.tensor([xmin + 0.5 * spacing_x, ymin + 0.5 * spacing_y, float(args.plane_z)]),
         x_axis=torch.tensor([1.0, 0.0, 0.0]),
         y_axis=torch.tensor([0.0, 1.0, 0.0]),
@@ -154,7 +162,7 @@ def _load_native_scene(args: argparse.Namespace) -> Scene:
     )
     return Scene(
         structures=base.structures,
-        transmitters=[Transmitter(position=torch.tensor(args.tx, dtype=torch.float32), power_w=1.0)],
+        transmitters=[make_transmitter(position=torch.tensor(args.tx, dtype=torch.float32), power_w=1.0)],
         receivers=[grid],
         frequency=base.frequency,
         metadata=base.metadata,
@@ -168,6 +176,7 @@ from __future__ import annotations
 import argparse
 import inspect
 import json
+import os
 import pathlib
 import sys
 import time
@@ -201,6 +210,13 @@ def main() -> None:
 
     sys.path.insert(0, str(pathlib.Path(args.channel_root)))
     sys.path.insert(0, str(pathlib.Path(args.sionna_root)))
+    sys.meta_path = [
+        finder
+        for finder in sys.meta_path
+        if "_witwin_channel_editable" not in type(finder).__module__
+    ]
+    os.environ["WITWIN_MC_RADIOMAP_NATIVE_PROBE"] = "1"
+    os.environ["WITWIN_CHANNEL_UTILS_NATIVE_PROBE"] = "1"
 
     import drjit as dr
     from witwin.channel.core.scene import Mesh, ReceiverGrid, Scene, Transmitter
@@ -259,7 +275,13 @@ def main() -> None:
                     material=metal,
                 ),
             ],
-            transmitters=[Transmitter("tx", tuple(float(v) for v in args.tx), power=1.0)],
+            transmitters=[
+                Transmitter(
+                    "tx",
+                    tuple(float(v) for v in args.tx),
+                    power=1.0,
+                )
+            ],
             receivers=[
                 ReceiverGrid(
                     "rm",
@@ -283,7 +305,13 @@ def main() -> None:
             frequency=float(args.frequency),
             source_root=pathlib.Path(args.sionna_root),
         )
-        scene.add(Transmitter("tx", tuple(float(v) for v in args.tx), power=1.0))
+        scene.add(
+            Transmitter(
+                "tx",
+                tuple(float(v) for v in args.tx),
+                power=1.0,
+            )
+        )
         scene.add(
             ReceiverGrid(
                 "rm",
@@ -526,11 +554,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         diagnostics=True,
     )
     for _ in range(max(0, int(args.warmup_runs))):
-        solve(scene, config)
+        solve(scene, config, reference_frequency_hz=float(args.frequency))
         torch.cuda.synchronize()
 
     start = time.perf_counter()
-    result = solve(scene, config)
+    result = solve(scene, config, reference_frequency_hz=float(args.frequency))
     torch.cuda.synchronize()
     native_solve_time_ms = (time.perf_counter() - start) * 1000.0
     if result.component_maps is None:

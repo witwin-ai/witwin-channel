@@ -24,11 +24,15 @@ from tests.support.native_ext import inject_native_paths  # noqa: E402
 inject_native_paths()
 
 from tests.support.scenes import same_side_wall_reflection_scene  # noqa: E402
-from witwin.channel import ReceiverPoint, Scene, Transmitter  # noqa: E402
 from witwin.channel.core.memory_budget import (  # noqa: E402
     MemoryBudgetError,
     estimate_monte_carlo_memory,
 )
+from witwin.core import AntennaState, Scene  # noqa: E402
+from witwin.core.identity import new_antenna_id  # noqa: E402
+
+
+REFERENCE_FREQUENCY_HZ = 3.0e9
 
 
 def _ints(value: str) -> tuple[int, ...]:
@@ -39,15 +43,24 @@ def _expanded_scene(tx_count: int, rx_count: int) -> Scene:
     base = same_side_wall_reflection_scene()
     return Scene(
         structures=base.structures,
-        transmitters=[
-            Transmitter(position=torch.tensor([0.0, -1.0 + 0.05 * i, 0.5]))
-            for i in range(tx_count)
+        endpoints=[
+            *[
+                AntennaState(
+                    new_antenna_id(),
+                    "tx",
+                    torch.tensor([0.0, -1.0 + 0.05 * i, 0.5]),
+                )
+                for i in range(tx_count)
+            ],
+            *[
+                AntennaState(
+                    new_antenna_id(),
+                    "rx",
+                    torch.tensor([0.0, 1.0 + 0.05 * i, 0.5]),
+                )
+                for i in range(rx_count)
+            ],
         ],
-        receivers=[
-            ReceiverPoint(position=torch.tensor([0.0, 1.0 + 0.05 * i, 0.5]))
-            for i in range(rx_count)
-        ],
-        frequency=base.frequency,
     )
 
 
@@ -64,12 +77,20 @@ def _operation(
         from witwin.channel.path import Config, solve
 
         config = Config(max_depth=depth, components=components)
-        return lambda: solve(scene, config)
+        return lambda: solve(
+            scene,
+            config,
+            reference_frequency_hz=REFERENCE_FREQUENCY_HZ,
+        )
     if solver == "deterministic":
         from witwin.channel.deterministic import Config, solve
 
         config = Config(max_depth=depth, components=components)
-        return lambda: solve(scene, config)
+        return lambda: solve(
+            scene,
+            config,
+            reference_frequency_hz=REFERENCE_FREQUENCY_HZ,
+        )
     if solver == "basic":
         from witwin.channel.montecarlo.basic import Config, solve
 
@@ -79,7 +100,11 @@ def _operation(
             components=components,
             workspace_limit_bytes=workspace_limit_bytes,
         )
-        return lambda: solve(scene, config)
+        return lambda: solve(
+            scene,
+            config,
+            reference_frequency_hz=REFERENCE_FREQUENCY_HZ,
+        )
     if solver == "bdpt":
         from witwin.channel.montecarlo.bdpt import Config, solve
 
@@ -89,7 +114,11 @@ def _operation(
             components=components,
             workspace_limit_bytes=workspace_limit_bytes,
         )
-        return lambda: solve(scene, config)
+        return lambda: solve(
+            scene,
+            config,
+            reference_frequency_hz=REFERENCE_FREQUENCY_HZ,
+        )
     raise ValueError(f"unknown solver: {solver}")
 
 

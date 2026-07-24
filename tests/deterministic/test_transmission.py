@@ -14,17 +14,14 @@ import textwrap
 
 import pytest
 import torch
+import witwin.core as core_package
 
 from tests.support.scenes import transmission_wall_structure
-from witwin.channel import ReceiverPoint, Scene, Transmitter
+from tests.support.core_world import make_receiver, make_transmitter
 from witwin.channel.materials.kernels import functional as ops
 from witwin.channel.core.kernels.extension import build_info
-from witwin.channel.core.materials import (
-    Layer,
-    PerfectConductor,
-    PhysicalSurface,
-)
 from witwin.channel.deterministic import Config, solve
+from witwin.core import MaterialLayer, PhysicalMaterial, Scene
 
 _FREQUENCY_HZ = 3.0e9
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -42,21 +39,22 @@ def _require_rayd() -> None:
 def _scene(structures: list, rx_position: list[float]) -> Scene:
     return Scene(
         structures=structures,
-        transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 0.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor(rx_position))],
-        frequency=_FREQUENCY_HZ,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, 0.0, 0.0])),
+            make_receiver(position=torch.tensor(rx_position)),
+        ],
     )
 
 
-def _vacuum_wall(thickness_m: float = 0.3) -> PhysicalSurface:
-    return PhysicalSurface(
-        layers=(Layer(thickness_m=thickness_m, eps_r=1.0),), name="vacuum-wall"
+def _vacuum_wall(thickness_m: float = 0.3) -> PhysicalMaterial:
+    return PhysicalMaterial(
+        layers=(MaterialLayer(thickness_m=thickness_m, eps_r=1.0),), name="vacuum-wall"
     )
 
 
-def _lossy_wall(name: str = "lossy-wall") -> PhysicalSurface:
-    return PhysicalSurface(
-        layers=(Layer(thickness_m=0.1, eps_r=4.0, sigma_e=0.05),), name=name
+def _lossy_wall(name: str = "lossy-wall") -> PhysicalMaterial:
+    return PhysicalMaterial(
+        layers=(MaterialLayer(thickness_m=0.1, eps_r=4.0, sigma_e=0.05),), name=name
     )
 
 
@@ -64,7 +62,7 @@ _TRANSMISSION = Config(components={"transmission"}, max_depth=1)
 _LOS = Config(components={"los"})
 
 
-def _stack_t_te(material: PhysicalSurface, cos_theta: float) -> complex:
+def _stack_t_te(material: PhysicalMaterial, cos_theta: float) -> complex:
     layer = material.layers[0]
     stack = ops.em_layer_stack_eval(
         torch.tensor([cos_theta], device="cuda", dtype=torch.float32),
@@ -95,8 +93,9 @@ def test_vacuum_wall_transmission_equals_empty_scene_los(rx_position):
     wall = solve(
         _scene([transmission_wall_structure(2.5, _vacuum_wall())], rx_position),
         _TRANSMISSION,
+        reference_frequency_hz=_FREQUENCY_HZ,
     )
-    empty = solve(_scene([], rx_position), _LOS)
+    empty = solve(_scene([], rx_position), _LOS, reference_frequency_hz=_FREQUENCY_HZ)
 
     ratio = wall.component_fields["transmission"] / empty.component_fields["los"]
     assert torch.abs(ratio - 1.0).max().item() <= 1.0e-4
@@ -128,8 +127,9 @@ def test_lossy_wall_matches_layer_stack_transmission(rx_position, cos_theta):
     wall = solve(
         _scene([transmission_wall_structure(2.5, material)], rx_position),
         _TRANSMISSION,
+        reference_frequency_hz=_FREQUENCY_HZ,
     )
-    empty = solve(_scene([], rx_position), _LOS)
+    empty = solve(_scene([], rx_position), _LOS, reference_frequency_hz=_FREQUENCY_HZ)
     expected = abs(_stack_t_te(material, cos_theta))
     assert expected < 0.999  # the wall really attenuates
 
@@ -154,14 +154,23 @@ def test_two_walls_transmission_is_the_product_of_single_wall_stacks():
     wall_b = transmission_wall_structure(
         3.0, _vacuum_wall(), name="wall-b", surface_id=2
     )
-    empty = solve(_scene([], rx_position), _LOS)
+    empty = solve(_scene([], rx_position), _LOS, reference_frequency_hz=_FREQUENCY_HZ)
     los_field = empty.component_fields["los"]
 
-    single_a = solve(_scene([wall_a], rx_position), _TRANSMISSION)
-    single_b = solve(_scene([wall_b], rx_position), _TRANSMISSION)
+    single_a = solve(
+        _scene([wall_a], rx_position),
+        _TRANSMISSION,
+        reference_frequency_hz=_FREQUENCY_HZ,
+    )
+    single_b = solve(
+        _scene([wall_b], rx_position),
+        _TRANSMISSION,
+        reference_frequency_hz=_FREQUENCY_HZ,
+    )
     both = solve(
         _scene([wall_a, wall_b], rx_position),
         Config(components={"transmission"}, max_depth=2),
+        reference_frequency_hz=_FREQUENCY_HZ,
     )
 
     # Each wall multiplies the LoS field by its stack ratio; a depth-2 chain
@@ -177,9 +186,17 @@ def test_max_depth_overflow_is_fail_loud_for_two_walls():
     _require_rayd()
     code = textwrap.dedent(
         """
+        import sys
         import torch
 
+        sys.meta_path[:] = [
+            finder
+            for finder in sys.meta_path
+            if type(finder).__module__ != "_witwin_channel_editable"
+        ]
+
         from tests.deterministic.test_transmission import (
+            _FREQUENCY_HZ,
             _TRANSMISSION,
             _scene,
             _vacuum_wall,
@@ -195,7 +212,11 @@ def test_max_depth_overflow_is_fail_loud_for_two_walls():
                 3.0, _vacuum_wall(), name="wall-b", surface_id=2
             ),
         ]
-        solve(_scene(structures, [5.0, 0.0, 0.0]), _TRANSMISSION)
+        solve(
+            _scene(structures, [5.0, 0.0, 0.0]),
+            _TRANSMISSION,
+            reference_frequency_hz=_FREQUENCY_HZ,
+        )
         print("TERMINAL_ENQUEUED", flush=True)
         try:
             torch.cuda.synchronize()
@@ -207,9 +228,8 @@ def test_max_depth_overflow_is_fail_loud_for_two_walls():
     )
     environment = os.environ.copy()
     source_root = str(_REPOSITORY_ROOT / "src")
-    environment["PYTHONPATH"] = os.pathsep.join(
-        value for value in (source_root, environment.get("PYTHONPATH")) if value
-    )
+    core_source_root = str(Path(core_package.__file__).resolve().parents[2])
+    environment["PYTHONPATH"] = os.pathsep.join((source_root, core_source_root))
     completed = subprocess.run(
         [sys.executable, "-c", code],
         cwd=_REPOSITORY_ROOT,
@@ -232,7 +252,9 @@ def test_los_transmission_exclusivity():
     config = Config(components={"los", "transmission"}, max_depth=1, coherent=False)
 
     blocked = solve(
-        _scene([transmission_wall_structure(2.5, _lossy_wall())], rx_position), config
+        _scene([transmission_wall_structure(2.5, _lossy_wall())], rx_position),
+        config,
+        reference_frequency_hz=_FREQUENCY_HZ,
     )
     assert torch.count_nonzero(blocked.component_power["los"]) == 0
     assert bool((blocked.component_power["transmission"] > 0).all())
@@ -240,7 +262,7 @@ def test_los_transmission_exclusivity():
         blocked.path_gain, blocked.component_power["transmission"]
     )
 
-    empty = solve(_scene([], rx_position), config)
+    empty = solve(_scene([], rx_position), config, reference_frequency_hz=_FREQUENCY_HZ)
     assert torch.count_nonzero(empty.component_power["transmission"]) == 0
     assert bool((empty.component_power["los"] > 0).all())
 
@@ -250,10 +272,14 @@ def test_pec_wall_transmission_is_negligible():
 
     rx_position = [5.0, 0.0, 0.0]
     wall = solve(
-        _scene([transmission_wall_structure(2.5, PerfectConductor())], rx_position),
+        _scene(
+            [transmission_wall_structure(2.5, PhysicalMaterial.perfect_conductor())],
+            rx_position,
+        ),
         _TRANSMISSION,
+        reference_frequency_hz=_FREQUENCY_HZ,
     )
-    empty = solve(_scene([], rx_position), _LOS)
+    empty = solve(_scene([], rx_position), _LOS, reference_frequency_hz=_FREQUENCY_HZ)
 
     ratio = (wall.component_power["transmission"] / empty.component_power["los"]).max()
     assert ratio.item() <= 1.0e-10  # below -100 dB

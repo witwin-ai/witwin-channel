@@ -13,7 +13,7 @@ from witwin.channel.runtime.autograd_contracts import (
 )
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+    from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
 @dataclass(frozen=True)
@@ -166,7 +166,7 @@ def _require_frequency_ad_constant_materials(
 ) -> None:
     """Explicit-failure contract for frequency AD over dispersive materials.
 
-    ``Scene.compile()`` freezes material records at the primal frequency, so
+    Channel ``scene.compile()`` freezes material records at the primal frequency, so
     a frequency gradient through a scene with frequency-dependent material
     laws would silently miss d(material)/d(frequency) (plan 07 section 7:
     never return misleading gradients). Fail before any launch instead.

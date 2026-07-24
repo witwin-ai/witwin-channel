@@ -5,10 +5,10 @@ import math
 import pytest
 import torch
 
+from tests.support.core_world import make_receiver, make_transmitter
 from tests.support.scenes import transmission_wall_structure
-from witwin.channel import ReceiverPoint, Scene, Transmitter
+from witwin.core import MaterialLayer, PhysicalMaterial, Scene
 from witwin.channel.core.kernels.extension import build_info
-from witwin.channel.core.materials import Layer, PhysicalSurface
 from witwin.channel.path import Config, InteractionType, solve
 
 _FREQUENCY_HZ = 3.0e9
@@ -27,21 +27,24 @@ def _require_rayd() -> None:
 def _scene(structures: list, rx_position: list[float]) -> Scene:
     return Scene(
         structures=structures,
-        transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 0.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor(rx_position))],
-        frequency=_FREQUENCY_HZ,
+        endpoints=[
+            make_transmitter(torch.tensor([0.0, 0.0, 0.0])),
+            make_receiver(torch.tensor(rx_position)),
+        ],
     )
 
 
-def _vacuum_wall() -> PhysicalSurface:
-    return PhysicalSurface(
-        layers=(Layer(thickness_m=0.3, eps_r=1.0),), name="vacuum-wall"
+def _vacuum_wall() -> PhysicalMaterial:
+    return PhysicalMaterial(
+        layers=(MaterialLayer(thickness_m=0.3, eps_r=1.0),),
+        name="vacuum-wall",
     )
 
 
-def _lossy_wall() -> PhysicalSurface:
-    return PhysicalSurface(
-        layers=(Layer(thickness_m=0.1, eps_r=4.0, sigma_e=0.05),), name="lossy-wall"
+def _lossy_wall() -> PhysicalMaterial:
+    return PhysicalMaterial(
+        layers=(MaterialLayer(thickness_m=0.1, eps_r=4.0, sigma_e=0.05),),
+        name="lossy-wall",
     )
 
 
@@ -52,6 +55,7 @@ def test_transmission_path_result_events_and_delay():
     result = solve(
         _scene([transmission_wall_structure(2.5, _lossy_wall())], rx_position),
         Config(components={"transmission"}, max_depth=1),
+        reference_frequency_hz=_FREQUENCY_HZ,
     )
 
     assert result.max_num_paths == 1
@@ -66,9 +70,7 @@ def test_transmission_path_result_events_and_delay():
     assert result.tau[0, 0, 0, 0, 0].item() == pytest.approx(expected_tau, rel=1.0e-6)
     assert torch.abs(result.a[0, 0, 0, 0, 0, 0]).item() > 0.0
     # The penetration event sits on the wall plane x = 2.5.
-    assert result.position[0, 0, 0, 0, 0, 0, 0].item() == pytest.approx(
-        2.5, abs=1.0e-4
-    )
+    assert result.position[0, 0, 0, 0, 0, 0, 0].item() == pytest.approx(2.5, abs=1.0e-4)
     assert result.metadata["components"]["transmission"] == "enabled"
     assert result.metadata["transmission"] == {
         "thin_sheet_straight_path_approximation": True,
@@ -83,8 +85,13 @@ def test_transmission_complex_a_matches_empty_scene_los_for_vacuum_wall():
     wall = solve(
         _scene([transmission_wall_structure(2.5, _vacuum_wall())], rx_position),
         Config(components={"transmission"}, max_depth=1),
+        reference_frequency_hz=_FREQUENCY_HZ,
     )
-    empty = solve(_scene([], rx_position), Config(components={"los"}))
+    empty = solve(
+        _scene([], rx_position),
+        Config(components={"los"}),
+        reference_frequency_hz=_FREQUENCY_HZ,
+    )
 
     ratio = wall.a[0, 0, 0, 0, 0, 0] / empty.a[0, 0, 0, 0, 0, 0]
     assert torch.abs(ratio - 1.0).item() <= 1.0e-4
@@ -104,6 +111,7 @@ def test_transmission_depth2_sequence_and_type_filter():
     result = solve(
         _scene(structures, rx_position),
         Config(components={"transmission"}, max_depth=2),
+        reference_frequency_hz=_FREQUENCY_HZ,
     )
 
     assert result.max_num_paths == 1
@@ -128,9 +136,12 @@ def test_transmission_solver_exports_complex_path():
     result = solve(
         _scene([transmission_wall_structure(2.5, _lossy_wall())], rx_position),
         Config(components={"los", "transmission"}, max_depth=1),
+        reference_frequency_hz=_FREQUENCY_HZ,
     )
 
     assert int(result.num_paths.sum()) == 1
-    assert result.interaction_type[result.valid].tolist() == [[int(InteractionType.TRANSMISSION)]]
+    assert result.interaction_type[result.valid].tolist() == [
+        [int(InteractionType.TRANSMISSION)]
+    ]
     assert bool((result.a[result.valid].abs() > 0).all())
     assert result.metadata["components"]["transmission"] == "enabled"

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel import ReceiverGrid, ReceiverPoint, Scene
+from witwin.core import AntennaState, ReceiverGrid, Scene
 
 
 _LIGHT_SPEED_M_PER_S = 299_792_458.0
@@ -13,31 +13,49 @@ def _receiver_blocks(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     positions = []
     polarizations = []
-    for receiver in scene.receivers:
-        if isinstance(receiver, ReceiverPoint):
-            points = receiver.position.reshape(-1, 3)
-        elif isinstance(receiver, ReceiverGrid):
+    receivers = tuple(endpoint for endpoint in scene.endpoints if endpoint.role == "rx")
+    for receiver in receivers:
+        if isinstance(receiver, ReceiverGrid):
             points = receiver.points().reshape(-1, 3)
+        elif isinstance(receiver, AntennaState):
+            points = receiver.position.reshape(-1, 3)
         else:
             raise TypeError(f"unsupported receiver type: {type(receiver).__name__}")
         points = points.to(device=device, dtype=torch.float32, non_blocking=True)
-        polarization = receiver.polarization.to(
-            device=device, dtype=torch.float32
-        ).reshape(3)
+        polarization = receiver.polarization
+        if polarization is None:
+            polarization = receiver.position.new_tensor((0.0, 0.0, 1.0))
+        polarization = polarization.to(device=device, dtype=torch.float32).reshape(3)
         positions.append(points)
         polarizations.append(polarization.expand(points.shape[0], 3))
     return torch.vstack(positions), torch.vstack(polarizations)
 
 
-def los_path_gain_reference(scene: Scene, *, device: torch.device) -> torch.Tensor:
-    tx_positions = torch.stack([tx.position for tx in scene.transmitters], dim=0).to(
+def los_path_gain_reference(
+    scene: Scene,
+    *,
+    device: torch.device,
+    reference_frequency_hz: float,
+) -> torch.Tensor:
+    transmitters = tuple(
+        endpoint for endpoint in scene.endpoints if endpoint.role == "tx"
+    )
+    tx_positions = torch.stack([tx.position for tx in transmitters], dim=0).to(
         device=device, dtype=torch.float32, non_blocking=True
     )
     tx_polarizations = torch.stack(
-        [tx.polarization for tx in scene.transmitters], dim=0
+        [
+            (
+                tx.polarization
+                if tx.polarization is not None
+                else tx.position.new_tensor((0.0, 0.0, 1.0))
+            )
+            for tx in transmitters
+        ],
+        dim=0,
     ).to(device=device, dtype=torch.float32)
     tx_power = torch.tensor(
-        [tx.power_w for tx in scene.transmitters],
+        [1.0 if tx.power_w is None else tx.power_w for tx in transmitters],
         device=device,
         dtype=torch.float32,
     )
@@ -47,7 +65,7 @@ def los_path_gain_reference(scene: Scene, *, device: torch.device) -> torch.Tens
         torch.finfo(torch.float32).eps
     )
     khat = delta / distances[..., None]
-    wavelength = _LIGHT_SPEED_M_PER_S / float(scene.frequency)
+    wavelength = _LIGHT_SPEED_M_PER_S / float(reference_frequency_hz)
     free_space_gain = (wavelength / (4.0 * torch.pi * distances)).square()
     # F1/R5 (utd-continuity-fix-design): the LoS field carries the short-dipole
     # sin(theta) pattern of the transmit polarization (unnormalized transverse

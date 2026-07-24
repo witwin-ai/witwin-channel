@@ -1,6 +1,6 @@
 {
   "schema": {
-    "name": "witwin.channel_native.sm-support",
+    "name": "witwin.channel.sm-support",
     "version": "1.0.0"
   },
   "build_architectures": [

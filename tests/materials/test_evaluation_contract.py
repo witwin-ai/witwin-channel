@@ -21,7 +21,7 @@ _FUNCTION_DIGESTS = {
         "2f734599df63cffb659b87efbca9aca37afe31925d9bfaefa7ae085ec73470d9"
     ),
     "_require_frequency_ad_constant_materials": (
-        "292024c82d87886d1b04ca514269de011e7085f304e99db151d3e346357bff12"
+        "6fcb1f433cd7f4be0912081266731dd84eb810be54f64feff6a68243915b79d4"
     ),
 }
 
@@ -113,16 +113,12 @@ def test_material_guard_rejects_dependent_materials_for_forward_mode_frequency()
 
 
 def test_mc_frequency_material_guard_runs_before_build_info_and_native(monkeypatch):
+    from witwin.core import Scene
+    from witwin.channel.montecarlo.basic import pipeline as mc_pipeline
+
     events: list[str] = []
     compiled = object()
-
-    class Scene:
-        transmitters: list[object] = []
-        receivers: list[object] = []
-
-        def compile(self):
-            events.append("compile")
-            return compiled
+    bound = SimpleNamespace(transmitters=(), receivers=(), frequency=3.0e9)
 
     config = SimpleNamespace(
         workspace_limit_bytes=None,
@@ -132,7 +128,7 @@ def test_mc_frequency_material_guard_runs_before_build_info_and_native(monkeypat
     )
 
     def guard(scene, actual_compiled, *, ad_mode: str):
-        assert isinstance(scene, Scene)
+        assert scene is bound
         assert actual_compiled is compiled
         assert ad_mode == "vjp"
         events.append("guard")
@@ -148,12 +144,23 @@ def test_mc_frequency_material_guard_runs_before_build_info_and_native(monkeypat
     monkeypatch.setattr(
         mc_solver, "validate_scalar_endpoint_features", lambda *a, **k: None
     )
+    monkeypatch.setattr(mc_solver, "_endpoint_views", lambda scene: ())
+    monkeypatch.setattr(
+        mc_solver, "_validate_scalar_endpoint_boundary", lambda views: None
+    )
+    monkeypatch.setattr(
+        mc_solver,
+        "compile_scene",
+        lambda *args, **kwargs: events.append("compile") or compiled,
+    )
+    monkeypatch.setattr(mc_solver, "bind_solver_scene", lambda value: bound)
+    monkeypatch.setattr(mc_pipeline, "require_compiled", lambda scene: compiled)
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(mc_solver, "_require_frequency_ad_constant_materials", guard)
     monkeypatch.setattr(mc_solver, "build_info", forbidden("build_info"))
     monkeypatch.setattr(mc_solver, "make_cuda_generator", forbidden("native"))
 
     with pytest.raises(NotImplementedError, match="frequency material guard"):
-        mc_solver.solve(Scene(), config)
+        mc_solver.solve(Scene(), config, reference_frequency_hz=3.0e9)
 
     assert events == ["compile", "guard"]

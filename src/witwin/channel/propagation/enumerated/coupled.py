@@ -43,7 +43,7 @@ from witwin.channel.propagation.topology.kernels import (
 )
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+    from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
 @dataclass(frozen=True, slots=True)

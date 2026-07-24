@@ -7,7 +7,7 @@ import math
 
 import torch
 
-from witwin.channel.materials.models import PhaseScreen, Roughness
+from witwin.core import PhaseScreen, SurfaceRoughness
 from witwin.channel.scattering.phase_screen import PhaseScreenRuntime
 from witwin.channel.scattering.tables import KirchhoffTable, MAX_RMS_SLOPE
 from witwin.channel.scene.kernels.rayd_scene import RayDSceneResource
@@ -58,7 +58,7 @@ class RoughMaterialRuntime:
     material_index: int
     table: KirchhoffTable
     layers: tuple[tuple[float, float, float, float], ...]
-    roughness: Roughness
+    roughness: SurfaceRoughness
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,10 +215,10 @@ def build_kirchhoff_resources(
             )
             for row in range(offset, offset + count)
         )
-        roughness = Roughness(
+        roughness = SurfaceRoughness(
             rms_height_m=float(store.rough_sigma_h_m[index]),
-            corr_length_x_m=float(store.rough_corr_x_m[index]),
-            corr_length_y_m=float(store.rough_corr_y_m[index]),
+            correlation_length_x_m=float(store.rough_corr_x_m[index]),
+            correlation_length_y_m=float(store.rough_corr_y_m[index]),
             principal_axis_rad=float(store.rough_axis_rad[index]),
         )
         # The float64 numpy build runs unchanged (host float() reads are the
@@ -526,9 +526,3 @@ def _phase_screen_rms_slope(
             "as a pure phase screen"
         )
     return rms_slope
-
-
-# Preserve the import/pickle owner exposed by the MC events module.
-RoughMaterialRuntime.__module__ = (
-    "witwin.channel.montecarlo.events.scattering"
-)

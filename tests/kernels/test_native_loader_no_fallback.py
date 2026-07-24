@@ -272,7 +272,7 @@ def test_mc_basic_solver_uses_native_scene_and_store_material_paths():
     # Plan 07 AD-3: materials come from the compiled store in BOTH
     # ad_mode="none" and the AD modes (one source, same values); the old
     # host-float flattening cannot carry a gradient and is gone.
-    assert "scene.rayd_scene()" in solve_source
+    assert "require_compiled(scene).rayd" in solve_source
     assert "_host_material_tensors" not in module_source
     assert "bdpt_face_material_tensors_from_host" not in module_source
     assert "face_material_field_bundle" in module_source

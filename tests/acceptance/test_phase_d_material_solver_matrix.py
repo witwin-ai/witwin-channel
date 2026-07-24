@@ -20,6 +20,8 @@ from witwin.channel.core.kernels.extension import build_info
 from witwin.channel.physics.oracle import layer_stack_rt
 
 _FREQUENCIES_HZ = (2.0e9, 12.0e9)
+_SCATTERING_FREQUENCY_HZ = 3.0e9
+_VACUUM_PERMITTIVITY = 8.854_187_812_8e-12
 _SEEDS = (3, 7, 11)
 
 
@@ -36,15 +38,17 @@ def _adapter(name: str) -> SolverAdapter:
 
 @lru_cache
 def _transmission_ratio(adapter: SolverAdapter, frequency_hz: float, *, reverse=False):
-    wall = adapter.transmission(transmission_scene(frequency_hz, reverse=reverse))
-    empty = adapter.transmission(transmission_scene(frequency_hz, empty=True))
+    wall = adapter.transmission(transmission_scene(reverse=reverse), frequency_hz)
+    empty = adapter.transmission(transmission_scene(empty=True), frequency_hz)
     assert abs(empty) > 0.0
     return wall / empty
 
 
 @lru_cache
 def _scattering(solver_name: str, reverse: bool, seed: int) -> float:
-    return _adapter(solver_name).scattering(rough_scene(reverse=reverse), seed)
+    return _adapter(solver_name).scattering(
+        rough_scene(reverse=reverse), seed, _SCATTERING_FREQUENCY_HZ
+    )
 
 
 def _relative_gap(left: float, right: float) -> float:
@@ -53,12 +57,29 @@ def _relative_gap(left: float, right: float) -> float:
     )
 
 
+def _layer_parameters(material, frequency_hz: float) -> tuple[tuple, ...]:
+    omega = 2.0 * math.pi * frequency_hz
+    rows = []
+    for layer in material.layers:
+        sample = layer.evaluate_at_frequency(frequency_hz)
+        eps_r = complex(sample.eps_r)
+        rows.append(
+            (
+                float(layer.thickness_m),
+                eps_r.real,
+                -eps_r.imag * omega * _VACUUM_PERMITTIVITY,
+                float(sample.mu_r),
+            )
+        )
+    return tuple(rows)
+
+
 def test_dispersive_multilayer_oracle_changes_and_is_passive() -> None:
     """The test material itself has a large, physical two-frequency signal."""
 
     material = dispersive_multilayer()
     coefficients = [
-        layer_stack_rt(material.layer_parameters(frequency), 1.0, frequency)
+        layer_stack_rt(_layer_parameters(material, frequency), 1.0, frequency)
         for frequency in _FREQUENCIES_HZ
     ]
     for coefficient in coefficients:
@@ -89,7 +110,9 @@ def test_multilayer_transmission_is_finite_passive_and_matches_oracle(
         abs(ratio) ** 2 if adapter.field_domain == "complex" else float(ratio)
     )
     oracle = layer_stack_rt(
-        dispersive_multilayer().layer_parameters(frequency_hz), 1.0, frequency_hz
+        _layer_parameters(dispersive_multilayer(), frequency_hz),
+        1.0,
+        frequency_hz,
     )
 
     assert math.isfinite(observed_power)

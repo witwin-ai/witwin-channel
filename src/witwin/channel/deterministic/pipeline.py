@@ -15,7 +15,7 @@ from witwin.channel.capabilities import (
 from witwin.channel import build_info
 from witwin.channel.core.kernels.metadata import make_metadata
 from witwin.channel.core.field_state import PHASE_CONVENTION
-from witwin.channel.scene.models import ReceiverGrid
+from witwin.channel.scene.endpoints import ReceiverGrid
 from witwin.channel.scene.tensors import _frequency_scalar
 from witwin.channel.propagation.geometry.endpoints import (
     apply_receiver_layout,
@@ -45,7 +45,7 @@ from .config import Config
 from .result import Result
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+    from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
 def _validate_requested_components(config: Config) -> None:
@@ -368,7 +368,7 @@ def solve(scene: Scene, config: Config) -> Result:
     _, layout = receiver_positions_and_layout(scene, device=device)
     # One host read of a tensor frequency for the whole solve: topology
     # export, field evaluation, accumulation and path export share it
-    # (audit M3). Scene.compile() keeps its own read: the material cache
+        # (audit M3). Channel scene.compile() keeps its own read: the material cache
     # token must see the live value to stay correct under in-place
     # frequency mutation.
     frequency_hz = _frequency_scalar(scene)

@@ -14,6 +14,7 @@ from witwin.channel.propagation.topology.export import (
     PathExecutionStats,
 )
 from witwin.channel.runtime.capacity import CapacityFailureState
+from witwin.channel.scene.endpoints import SolverScene
 
 
 def _unchecked_failure_state() -> CapacityFailureState:
@@ -281,10 +282,13 @@ def test_engine_observes_shared_failure_once_after_field_sanitization(
     )
     tx = torch.tensor([[0.0, 0.0, 0.0]])
     rx = torch.tensor([[1.0, 0.0, 0.0]])
-    scene = SimpleNamespace(
-        structures=[object()],
-        transmitters=[object()],
-        compile=lambda: object(),
+    scene = SolverScene(
+        compiled=object(),  # type: ignore[arg-type]
+        structures=(object(),),
+        transmitters=(object(),),  # type: ignore[arg-type]
+        receivers=(),
+        frequency=1.0,
+        metadata={},
     )
     config = SimpleNamespace(
         components={"transmission"},

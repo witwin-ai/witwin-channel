@@ -14,7 +14,8 @@ import torch
 from tests.ad._fd import central_difference_gradient, relative_error
 from tests.ad._tolerances import ABS_TOL, FD_REL_STEP_FREQUENCY, REL_TOL_GENERAL
 from tests.support.scenes import rough_wall_structure
-from witwin.channel import ReceiverPoint, Scene, Transmitter
+from witwin.core import Scene
+from tests.support.core_world import make_receiver, make_transmitter
 from witwin.channel.deterministic import Config as DeterministicConfig
 from witwin.channel.deterministic import solve as deterministic_solve
 from witwin.channel.path import Config as PathConfig
@@ -29,23 +30,31 @@ _FREQUENCY_HZ = 3.0e9
 _COMPONENTS = frozenset({"reflection"})
 
 
-def _rough_scene(frequency: float | torch.Tensor = _FREQUENCY_HZ) -> Scene:
+def _rough_scene() -> Scene:
     wall = rough_wall_structure(
         2.5, rms_height_m=0.015, corr_length_m=0.15, half_size=2.0
     )
     return Scene(
         structures=[wall],
-        transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.0]))],
-        frequency=frequency,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, -1.0, 0.0])),
+            make_receiver(position=torch.tensor([0.0, 1.0, 0.0])),
+        ],
     )
 
 
-def _solve(scene: Scene, solver: str, ad_mode: str):
+def _solve(
+    scene: Scene,
+    solver: str,
+    ad_mode: str,
+    *,
+    reference_frequency_hz: float | torch.Tensor = _FREQUENCY_HZ,
+):
     if solver == "path":
         return path_solve(
             scene,
             PathConfig(max_depth=1, components=_COMPONENTS, ad_mode=ad_mode),
+            reference_frequency_hz=reference_frequency_hz,
         )
     return deterministic_solve(
         scene,
@@ -55,6 +64,7 @@ def _solve(scene: Scene, solver: str, ad_mode: str):
             export_paths=True,
             ad_mode=ad_mode,
         ),
+        reference_frequency_hz=reference_frequency_hz,
     )
 
 
@@ -74,16 +84,21 @@ def test_rough_reflection_frequency_grad_matches_fd(solver):
     frequency = torch.tensor(
         _FREQUENCY_HZ, dtype=torch.float64, device="cuda", requires_grad=True
     )
-    scene = _rough_scene(frequency)
-    result = _solve(scene, solver, "vjp")
+    scene = _rough_scene()
+    result = _solve(scene, solver, "vjp", reference_frequency_hz=frequency)
     _loss(result, solver).backward()
     assert frequency.grad is not None
     grad = frequency.grad.detach()
     assert float(grad.abs()) > 0.0
 
     def evaluate(value: torch.Tensor) -> torch.Tensor:
-        fd_scene = _rough_scene(float(value))
-        fd_result = _solve(fd_scene, solver, "none")
+        fd_scene = _rough_scene()
+        fd_result = _solve(
+            fd_scene,
+            solver,
+            "none",
+            reference_frequency_hz=float(value),
+        )
         return _loss(fd_result, solver).detach()
 
     fd_grad = central_difference_gradient(
@@ -100,8 +115,8 @@ def test_rough_reflection_frequency_jvp_matches_vjp(solver):
     frequency = torch.tensor(
         _FREQUENCY_HZ, dtype=torch.float64, device="cuda", requires_grad=True
     )
-    scene = _rough_scene(frequency)
-    result = _solve(scene, solver, "vjp")
+    scene = _rough_scene()
+    result = _solve(scene, solver, "vjp", reference_frequency_hz=frequency)
     _loss(result, solver).backward()
     vjp_grad = float(frequency.grad.detach())
 
@@ -111,8 +126,13 @@ def test_rough_reflection_frequency_jvp_matches_vjp(solver):
         dual = torch.autograd.forward_ad.make_dual(
             primal.clone(), torch.ones_like(primal)
         )
-        dual_scene = _rough_scene(dual)
-        dual_result = _solve(dual_scene, solver, "jvp")
+        dual_scene = _rough_scene()
+        dual_result = _solve(
+            dual_scene,
+            solver,
+            "jvp",
+            reference_frequency_hz=dual,
+        )
         coefficient = _coefficients(dual_result, solver)
         tangent = torch.autograd.forward_ad.unpack_dual(coefficient).tangent
     assert tangent is not None

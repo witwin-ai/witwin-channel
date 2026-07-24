@@ -25,7 +25,7 @@ from tests.ad._tolerances import (
     REL_TOL_GENERAL,
     REL_TOL_PATH,
 )
-from witwin.channel import Scene, Structure
+from witwin.core import Mesh, Scene, Structure
 from witwin.channel.propagation.geometry.kernels import autograd as ops
 from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
 from witwin.channel.propagation.geometry.kernels import (
@@ -34,7 +34,8 @@ from witwin.channel.propagation.geometry.kernels import (
 from witwin.channel.propagation.topology.kernels import (
     construction as topology_construction,
 )
-from witwin.channel.core.materials import Dielectric
+from witwin.channel.scene import compile as compile_scene
+from witwin.core import PhysicalMaterial
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for RayD geometry AD"
@@ -72,16 +73,19 @@ def _build_rayd_scene(vertices: torch.Tensor, faces) -> object:
     scene = Scene(
         structures=[
             Structure(
-                vertices=vertices.detach().cpu().to(torch.float32),
-                faces=torch.tensor(faces, dtype=torch.int32),
-                material=Dielectric(eps_r=2.0),
+                geometry=Mesh(
+                    vertices.detach().cpu().to(torch.float32),
+                    torch.tensor(faces, dtype=torch.int32),
+                    recenter=False,
+                    fill_mode="surface",
+                    topology_diagnostics=False,
+                ),
+                material=PhysicalMaterial(eps_r=2.0),
             )
         ],
-        transmitters=[],
-        receivers=[],
-        frequency=3.5e9,
+        endpoints=[],
     )
-    return scene.rayd_scene()
+    return compile_scene(scene, reference_frequency_hz=3.5e9).rayd
 
 
 def _plane_inputs(
@@ -306,9 +310,9 @@ def test_epc_paths_backward_matches_fd_wrt_vertices(case_builder):
 
     generator = torch.Generator(device="cpu").manual_seed(107)
     for _ in range(3):
-        direction = torch.randn(
-            case["base_vertices"].shape, generator=generator
-        ).to("cuda")
+        direction = torch.randn(case["base_vertices"].shape, generator=generator).to(
+            "cuda"
+        )
         fd_value = central_difference_directional(
             rebuild_loss, case["base_vertices"].cuda(), direction, FD_STEP_GEOMETRY
         )
@@ -364,9 +368,7 @@ def test_epc_paths_jvp_matches_fd_wrt_vertices():
     _out, plane_points, plane_normals, valid, bounce_count = _frozen_winner(case)
 
     generator = torch.Generator(device="cpu").manual_seed(113)
-    direction = torch.randn(case["base_vertices"].shape, generator=generator).to(
-        "cuda"
-    )
+    direction = torch.randn(case["base_vertices"].shape, generator=generator).to("cuda")
     tangents = ops.rayd_reflection_epc_paths_jvp(
         case["rayd"],
         case["source"],

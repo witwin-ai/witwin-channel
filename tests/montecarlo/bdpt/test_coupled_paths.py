@@ -22,6 +22,7 @@ def test_bdpt_exports_coupled_paths_with_bidirectional_discrete_mass():
             export_paths=True,
             components={"reflection", "diffraction"},
         ),
+        reference_frequency_hz=3.0e9,
     )
 
     assert result.path_samples is not None
@@ -29,7 +30,9 @@ def test_bdpt_exports_coupled_paths_with_bidirectional_discrete_mass():
     coupled = samples.valid & (samples.component_id == 2) & (samples.light_depth == 2)
     assert bool(coupled.any())
     assert bool(torch.isfinite(samples.contribution[coupled]).all())
-    torch.testing.assert_close(samples.pdf[coupled], torch.ones_like(samples.pdf[coupled]))
+    torch.testing.assert_close(
+        samples.pdf[coupled], torch.ones_like(samples.pdf[coupled])
+    )
     torch.testing.assert_close(
         samples.mis_weight[coupled], torch.ones_like(samples.mis_weight[coupled])
     )

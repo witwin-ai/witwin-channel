@@ -21,14 +21,17 @@ from tests.support.bin.benchmark_munich_deterministic_native_vs_original import 
     _load_scene,
     _parser,
 )
-from witwin.channel import Scene, Transmitter
+from witwin.core import Scene
+from tests.support.core_world import make_transmitter
 from witwin.channel.deterministic import Config, solve
+from witwin.channel.scene import compile as compile_scene
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for Munich AD smoke"
 )
 
 _GRID_SIZE = 16
+_FREQUENCY_HZ = 2.4e9
 
 
 def _munich_scene() -> Scene:
@@ -57,10 +60,17 @@ def test_munich_material_backward_is_finite_and_nonzero():
     if not DEFAULT_MUNICH_XML.exists():
         pytest.skip("Munich reference scene is not available")
     scene = _munich_scene()
-    leaf = scene.compile().materials.eps_r
+    leaf = compile_scene(
+        scene,
+        reference_frequency_hz=_FREQUENCY_HZ,
+    ).materials.eps_r
     leaf.requires_grad_(True)
     try:
-        result = solve(scene, _config())
+        result = solve(
+            scene,
+            _config(),
+            reference_frequency_hz=_FREQUENCY_HZ,
+        )
         result.path_gain.sum().backward()
         _assert_live_gradient(leaf.grad)
     finally:
@@ -72,7 +82,7 @@ def test_munich_transmitter_backward_is_finite_and_nonzero():
     if not DEFAULT_MUNICH_XML.exists():
         pytest.skip("Munich reference scene is not available")
     base = _munich_scene()
-    transmitter = base.transmitters[0]
+    transmitter = next(endpoint for endpoint in base.endpoints if endpoint.role == "tx")
     leaf = (
         transmitter.position.detach()
         .to(device="cuda", dtype=torch.float32)
@@ -81,13 +91,16 @@ def test_munich_transmitter_backward_is_finite_and_nonzero():
     )
     scene = Scene(
         structures=list(base.structures),
-        transmitters=[
-            Transmitter(position=leaf, power_w=float(transmitter.power_w))
+        endpoints=[
+            make_transmitter(position=leaf, power_w=float(transmitter.power_w)),
+            *[endpoint for endpoint in base.endpoints if endpoint.role == "rx"],
         ],
-        receivers=list(base.receivers),
-        frequency=base.frequency,
         metadata=base.metadata,
     )
-    result = solve(scene, _config())
+    result = solve(
+        scene,
+        _config(),
+        reference_frequency_hz=_FREQUENCY_HZ,
+    )
     result.path_gain.sum().backward()
     _assert_live_gradient(leaf.grad)

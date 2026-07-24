@@ -9,7 +9,11 @@ def test_path_result_exports_topology_and_field_tensors():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for path solver")
 
-    result = solve(empty_space_los_scene(), Config(components={"los"}))
+    result = solve(
+        empty_space_los_scene(),
+        Config(components={"los"}),
+        reference_frequency_hz=3.0e9,
+    )
     for tensor in (
         result.valid,
         result.tx_id,

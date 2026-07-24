@@ -11,7 +11,11 @@ def test_path_solver_metadata_reports_counts_and_capabilities():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for path solver")
 
-    result = solve(empty_space_los_scene(), Config(components={"los"}))
+    result = solve(
+        empty_space_los_scene(),
+        Config(components={"los"}),
+        reference_frequency_hz=3.0e9,
+    )
 
     validate_metadata(result.metadata["kernel"])
     assert result.metadata["path_count"] == 4

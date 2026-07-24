@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from collections.abc import Sequence
 
 import torch
 
+from witwin.core import AntennaPattern as _CoreAntennaPattern
+
 
 _C0 = 299_792_458.0
-_PATTERN_KINDS = frozenset({"isotropic", "vertical", "horizontal", "custom"})
 
 
 def _vector3(name: str, value: torch.Tensor) -> torch.Tensor:
@@ -27,6 +27,10 @@ def orientation_matrix(orientation: torch.Tensor) -> torch.Tensor:
     intrinsic Z-Y-X convention.
     """
 
+    if orientation.shape == (4,):
+        from witwin.core.math import quat_to_rotation_matrix
+
+        return quat_to_rotation_matrix(orientation).to(dtype=torch.float32)
     yaw, pitch, roll = _vector3("orientation", orientation).unbind()
     cy, sy = torch.cos(yaw), torch.sin(yaw)
     cp, sp = torch.cos(pitch), torch.sin(pitch)
@@ -40,116 +44,41 @@ def orientation_matrix(orientation: torch.Tensor) -> torch.Tensor:
     ).to(dtype=torch.float32)
 
 
-@dataclass(frozen=True, slots=True)
-class AntennaPattern:
-    """Scalar field pattern evaluated in the endpoint's local frame."""
+def pattern_field_response(
+    pattern: _CoreAntennaPattern,
+    local_direction: torch.Tensor,
+) -> torch.Tensor:
+    """Evaluate one canonical Core antenna pattern in the endpoint-local frame."""
 
-    kind: str = "isotropic"
-    custom: Callable[[torch.Tensor], torch.Tensor] | None = None
-
-    def __post_init__(self) -> None:
-        if self.kind not in _PATTERN_KINDS:
-            raise ValueError(f"pattern kind must be one of {sorted(_PATTERN_KINDS)}")
-        if (self.kind == "custom") != (self.custom is not None):
-            raise ValueError("custom pattern requires exactly one custom callable")
-
-    def field_response(self, local_direction: torch.Tensor) -> torch.Tensor:
-        if local_direction.shape[-1] != 3:
-            raise ValueError("local_direction must have a vec3 tail")
-        direction = local_direction.to(dtype=torch.float32)
-        direction = direction / torch.linalg.vector_norm(
-            direction, dim=-1, keepdim=True
-        ).clamp_min(torch.finfo(torch.float32).tiny)
-        if self.kind == "custom":
-            assert self.custom is not None
-            response = self.custom(direction)
-            if response.shape != direction.shape[:-1]:
-                raise ValueError("custom pattern response must match direction batch shape")
-            return response.to(device=direction.device, dtype=torch.complex64)
-        if self.kind == "vertical":
-            response = torch.sqrt(torch.clamp(1.0 - direction[..., 2].square(), min=0.0))
-        elif self.kind == "horizontal":
-            response = torch.sqrt(torch.clamp(1.0 - direction[..., 0].square(), min=0.0))
-        else:
-            response = torch.ones(direction.shape[:-1], device=direction.device)
-        return response.to(dtype=torch.complex64)
-
-
-@dataclass(frozen=True, slots=True)
-class AntennaArray:
-    """Antenna element positions in endpoint-local coordinates, in metres."""
-
-    positions: torch.Tensor
-
-    def __post_init__(self) -> None:
-        positions = self.positions
-        if positions.ndim != 2 or positions.shape[1] != 3 or positions.shape[0] == 0:
-            raise ValueError("array positions must have shape (antenna, 3) with antenna > 0")
-        positions = positions.to(dtype=torch.float32).contiguous()
-        if not bool(torch.isfinite(positions).all()):
-            raise ValueError("array positions must be finite")
-        object.__setattr__(self, "positions", positions)
-
-    @property
-    def num_antennas(self) -> int:
-        return int(self.positions.shape[0])
-
-    @classmethod
-    def single(cls) -> AntennaArray:
-        return cls(torch.zeros((1, 3), dtype=torch.float32))
-
-    @classmethod
-    def ula(
-        cls,
-        num_antennas: int,
-        spacing_m: float,
-        *,
-        axis: str = "x",
-    ) -> AntennaArray:
-        if num_antennas <= 0:
-            raise ValueError("num_antennas must be positive")
-        if spacing_m <= 0.0:
-            raise ValueError("spacing_m must be positive")
-        axes = {"x": 0, "y": 1, "z": 2}
-        if axis not in axes:
-            raise ValueError("ULA axis must be 'x', 'y', or 'z'")
-        positions = torch.zeros((num_antennas, 3), dtype=torch.float32)
-        offset = torch.arange(num_antennas, dtype=torch.float32) - 0.5 * (num_antennas - 1)
-        positions[:, axes[axis]] = offset * float(spacing_m)
-        return cls(positions)
-
-    @classmethod
-    def ura(
-        cls,
-        rows: int,
-        columns: int,
-        spacing_m: tuple[float, float],
-        *,
-        axes: tuple[str, str] = ("x", "y"),
-    ) -> AntennaArray:
-        if rows <= 0 or columns <= 0:
-            raise ValueError("URA rows and columns must be positive")
-        if spacing_m[0] <= 0.0 or spacing_m[1] <= 0.0:
-            raise ValueError("URA spacing must be positive")
-        axis_ids = {"x": 0, "y": 1, "z": 2}
-        if axes[0] not in axis_ids or axes[1] not in axis_ids or axes[0] == axes[1]:
-            raise ValueError("URA axes must be two different values from 'x', 'y', and 'z'")
-        positions = torch.zeros((rows * columns, 3), dtype=torch.float32)
-        row_offset = torch.arange(rows, dtype=torch.float32) - 0.5 * (rows - 1)
-        column_offset = torch.arange(columns, dtype=torch.float32) - 0.5 * (columns - 1)
-        row_grid, column_grid = torch.meshgrid(row_offset, column_offset, indexing="ij")
-        positions[:, axis_ids[axes[0]]] = row_grid.reshape(-1) * float(spacing_m[0])
-        positions[:, axis_ids[axes[1]]] = column_grid.reshape(-1) * float(spacing_m[1])
-        return cls(positions)
-
-    def world_positions(self, origin: torch.Tensor, orientation: torch.Tensor) -> torch.Tensor:
-        origin = _vector3("origin", origin)
-        rotation = orientation_matrix(orientation).to(device=self.positions.device)
-        return origin.to(device=self.positions.device) + self.positions @ rotation.T
+    if not isinstance(pattern, _CoreAntennaPattern):
+        raise TypeError("pattern must be a witwin.core.AntennaPattern")
+    if local_direction.shape[-1] != 3:
+        raise ValueError("local_direction must have a vec3 tail")
+    direction = local_direction.to(dtype=torch.float32)
+    direction = direction / torch.linalg.vector_norm(
+        direction, dim=-1, keepdim=True
+    ).clamp_min(torch.finfo(torch.float32).tiny)
+    if pattern.kind == "custom":
+        assert pattern.custom is not None
+        response = pattern.custom(direction)
+        if response.shape != direction.shape[:-1]:
+            raise ValueError("custom pattern response must match direction batch shape")
+        return response.to(device=direction.device, dtype=torch.complex64)
+    if pattern.kind == "vertical":
+        response = torch.sqrt(
+            torch.clamp(1.0 - direction[..., 2].square(), min=0.0)
+        )
+    elif pattern.kind == "horizontal":
+        response = torch.sqrt(
+            torch.clamp(1.0 - direction[..., 0].square(), min=0.0)
+        )
+    else:
+        response = torch.ones(direction.shape[:-1], device=direction.device)
+    return response.to(dtype=torch.complex64)
 
 
 def steering_vector(
-    array: AntennaArray,
+    array: object,
     direction: torch.Tensor,
     *,
     frequency_hz: float,
@@ -256,11 +185,10 @@ def validate_scalar_endpoint_features(
 
 
 __all__ = [
-    "AntennaArray",
-    "AntennaPattern",
     "apply_endpoint_weights",
     "apply_precoding_combining",
     "orientation_matrix",
+    "pattern_field_response",
     "steering_vector",
     "validate_scalar_endpoint_features",
 ]

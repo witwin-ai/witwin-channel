@@ -354,7 +354,7 @@ def build_kirchhoff_table(
 ) -> KirchhoffTable:
     """Precompute the Kirchhoff ensemble BSDF table for one material.
 
-    ``roughness`` is a :class:`witwin.channel.core.materials.Roughness`
+    ``roughness`` is a :class:`witwin.core.SurfaceRoughness`
     (or any object with the same fields); ``layers`` is the oracle layer
     list ``[(thickness_m, eps_r, sigma_e, mu_r), ...]`` in incidence order.
     Raises when the surface is outside the Kirchhoff applicability domain
@@ -364,8 +364,8 @@ def build_kirchhoff_table(
 
     frequency_hz = float(frequency_hz)
     sigma_h = float(roughness.rms_height_m)
-    lx = float(roughness.corr_length_x_m)
-    ly = float(roughness.corr_length_y_m)
+    lx = float(roughness.correlation_length_x_m)
+    ly = float(roughness.correlation_length_y_m)
     axis_rad = float(roughness.principal_axis_rad)
     k0 = 2.0 * math.pi * frequency_hz / C0
 

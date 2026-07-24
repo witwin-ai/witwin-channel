@@ -18,8 +18,8 @@
     {
       "name": "analytic",
       "mode": "generated",
-      "generator_revision": 1,
-      "source_sha256": "03919ae566a64b7ed30093ed1c90ac15a38fb7808e98db8fda906b60c913ce16",
+      "generator_revision": 2,
+      "source_sha256": "f2fc36c4f0f01054fbf3453419721fdaf42305524bdd2fd9241aac2ce25ef7b6",
       "expected_triangle_count": 2,
       "frequency_hz": 3000000000.0,
       "default_tx_count": 1,
@@ -28,8 +28,8 @@
     {
       "name": "three_cube",
       "mode": "generated",
-      "generator_revision": 1,
-      "source_sha256": "4ffb9d14c6760f286c2de7c0b7a4edee6523a91f4a1c862d77311e31208b5ab9",
+      "generator_revision": 2,
+      "source_sha256": "9fe4cc28882e744ba09643c524f00ccedddc9a1d6daecc7564203ce65bbb0bd2",
       "expected_triangle_count": 36,
       "frequency_hz": 3000000000.0,
       "default_tx_count": 1,
@@ -38,8 +38,8 @@
     {
       "name": "terrain",
       "mode": "generated",
-      "generator_revision": 1,
-      "source_sha256": "b3b39f30438645592cdb21c42239d29b79806855362830ddcd67fe024d130a20",
+      "generator_revision": 2,
+      "source_sha256": "6257b4691dd080403ade0e15062a063ac767e5fe158a7893cc555bf2cd1155c7",
       "expected_triangle_count": 128,
       "frequency_hz": 3500000000.0,
       "default_tx_count": 1,

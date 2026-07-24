@@ -20,6 +20,7 @@ def _estimates(*, samples: int, mis: str) -> list[float]:
                     receiver_strategy="point_sphere",
                     mis=mis,
                 ),
+                reference_frequency_hz=3.0e9,
             ).path_gain.sum()
         )
         for seed in range(6)

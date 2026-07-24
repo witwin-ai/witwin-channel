@@ -11,14 +11,20 @@ import xml.etree.ElementTree as ET
 
 import torch
 
-from witwin.channel import (
+from witwin.core import (
+    AntennaState,
+    Mesh,
+    PhysicalMaterial,
     ReceiverGrid,
-    ReceiverPoint,
     Scene,
     Structure,
-    Transmitter,
 )
-from witwin.channel.core.materials import Dielectric
+from witwin.core.identity import (
+    new_antenna_id,
+    new_assignment_id,
+    new_material_id,
+    new_structure_id,
+)
 
 
 SCENARIO_MANIFEST_PATH = (
@@ -29,6 +35,47 @@ SCENE_ROOT_ENV = "WITWIN_CHANNEL_SCENE_ROOT"
 
 class FullScenarioAssetError(RuntimeError):
     """Raised when a required full city asset cannot be resolved."""
+
+
+def _transmitter(position: torch.Tensor) -> AntennaState:
+    return AntennaState(new_antenna_id(), "tx", position)
+
+
+def _receiver(position: torch.Tensor) -> AntennaState:
+    return AntennaState(new_antenna_id(), "rx", position)
+
+
+def _mesh_structure(
+    vertices: torch.Tensor,
+    faces: torch.Tensor,
+    material: PhysicalMaterial,
+    *,
+    name: str,
+    surface_id: int,
+) -> Structure:
+    return Structure(
+        Mesh(
+            vertices,
+            faces,
+            recenter=False,
+            fill_mode="surface",
+            topology_diagnostics=False,
+        ),
+        material,
+        name=name,
+        structure_id=new_structure_id(),
+        material_id=new_material_id(),
+        assignment_id=new_assignment_id(),
+        surface_id=surface_id,
+    )
+
+
+def _transmitters(scene: Scene) -> tuple[AntennaState, ...]:
+    return tuple(endpoint for endpoint in scene.endpoints if endpoint.role == "tx")
+
+
+def _receivers(scene: Scene) -> tuple[AntennaState, ...]:
+    return tuple(endpoint for endpoint in scene.endpoints if endpoint.role == "rx")
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,12 +118,12 @@ def _scenario_spec(name: str) -> dict[str, Any]:
 
 def _point_endpoints(
     *, tx_count: int, receiver_count: int, tx_origin: tuple[float, float, float]
-) -> tuple[list[Transmitter], list[ReceiverPoint]]:
+) -> tuple[list[AntennaState], list[AntennaState]]:
     if tx_count <= 0 or receiver_count <= 0:
         raise ValueError("tx_count and receiver_count must be positive")
     tx = [
-        Transmitter(
-            position=torch.tensor(
+        _transmitter(
+            torch.tensor(
                 [tx_origin[0], tx_origin[1] + 0.25 * index, tx_origin[2]],
                 dtype=torch.float32,
             )
@@ -84,8 +131,8 @@ def _point_endpoints(
         for index in range(tx_count)
     ]
     rx = [
-        ReceiverPoint(
-            position=torch.tensor(
+        _receiver(
+            torch.tensor(
                 [8.0, -2.0 + 4.0 * (index + 0.5) / receiver_count, 1.5],
                 dtype=torch.float32,
             )
@@ -96,13 +143,13 @@ def _point_endpoints(
 
 
 def _analytic_scene(*, tx_count: int, receiver_count: int) -> Scene:
-    wall = Structure(
-        vertices=torch.tensor(
+    wall = _mesh_structure(
+        torch.tensor(
             [[2.0, -4.0, 0.0], [2.0, 4.0, 0.0], [2.0, -4.0, 5.0], [2.0, 4.0, 5.0]],
             dtype=torch.float32,
         ),
-        faces=torch.tensor([[0, 1, 2], [1, 3, 2]], dtype=torch.int32),
-        material=Dielectric(eps_r=4.0, sigma_e=0.01),
+        torch.tensor([[0, 1, 2], [1, 3, 2]], dtype=torch.int32),
+        PhysicalMaterial(eps_r=4.0, sigma_e=0.01),
         name="analytic-wall",
         surface_id=1,
     )
@@ -111,10 +158,11 @@ def _analytic_scene(*, tx_count: int, receiver_count: int) -> Scene:
     )
     return Scene(
         structures=[wall],
-        transmitters=transmitters,
-        receivers=receivers,
-        frequency=3.0e9,
-        metadata={"phase_e_scenario": "analytic"},
+        endpoints=[*transmitters, *receivers],
+        metadata={
+            "phase_e_scenario": "analytic",
+            "reference_frequency_hz": 3.0e9,
+        },
     )
 
 
@@ -140,10 +188,10 @@ def _cube(center: tuple[float, float, float], *, index: int) -> Structure:
         ],
         dtype=torch.int32,
     )
-    return Structure(
-        vertices=vertices,
-        faces=faces,
-        material=Dielectric(eps_r=3.5 + 0.5 * index, sigma_e=0.01),
+    return _mesh_structure(
+        vertices,
+        faces,
+        PhysicalMaterial(eps_r=3.5 + 0.5 * index, sigma_e=0.01),
         name=f"cube-{index}",
         surface_id=index,
     )
@@ -160,10 +208,11 @@ def _three_cube_scene(*, tx_count: int, receiver_count: int) -> Scene:
     )
     return Scene(
         structures=structures,
-        transmitters=transmitters,
-        receivers=receivers,
-        frequency=3.0e9,
-        metadata={"phase_e_scenario": "three_cube"},
+        endpoints=[*transmitters, *receivers],
+        metadata={
+            "phase_e_scenario": "three_cube",
+            "reference_frequency_hz": 3.0e9,
+        },
     )
 
 
@@ -180,10 +229,10 @@ def _terrain_mesh(size: int = 9) -> Structure:
         for x in range(size - 1):
             a = y * size + x
             faces.extend(([a, a + 1, a + size], [a + 1, a + size + 1, a + size]))
-    return Structure(
-        vertices=torch.tensor(vertices, dtype=torch.float32),
-        faces=torch.tensor(faces, dtype=torch.int32),
-        material=Dielectric(eps_r=5.0, sigma_e=0.02),
+    return _mesh_structure(
+        torch.tensor(vertices, dtype=torch.float32),
+        torch.tensor(faces, dtype=torch.int32),
+        PhysicalMaterial(eps_r=5.0, sigma_e=0.02),
         name="generated-terrain",
         surface_id=1,
     )
@@ -202,6 +251,7 @@ def _receiver_grid(
     spacing_x = (bounds_x[1] - bounds_x[0]) / rows
     spacing_y = (bounds_y[1] - bounds_y[0]) / cols
     return ReceiverGrid(
+        new_antenna_id(),
         origin=torch.tensor(
             [bounds_x[0] + 0.5 * spacing_x, bounds_y[0] + 0.5 * spacing_y, z],
             dtype=torch.float32,
@@ -215,21 +265,23 @@ def _receiver_grid(
 
 def _terrain_scene(*, tx_count: int, grid_shape: tuple[int, int]) -> Scene:
     transmitters = [
-        Transmitter(
-            position=torch.tensor([-15.0, -10.0 + 0.5 * index, 8.0], dtype=torch.float32)
+        _transmitter(
+            torch.tensor([-15.0, -10.0 + 0.5 * index, 8.0], dtype=torch.float32)
         )
         for index in range(tx_count)
     ]
     return Scene(
         structures=[_terrain_mesh()],
-        transmitters=transmitters,
-        receivers=[
+        endpoints=[
+            *transmitters,
             _receiver_grid(
                 grid_shape, bounds_x=(-18.0, 18.0), bounds_y=(-18.0, 18.0), z=1.5
             )
         ],
-        frequency=3.5e9,
-        metadata={"phase_e_scenario": "terrain"},
+        metadata={
+            "phase_e_scenario": "terrain",
+            "reference_frequency_hz": 3.5e9,
+        },
     )
 
 
@@ -312,39 +364,11 @@ def _city_scene(
 ) -> tuple[Scene, str, Path]:
     spec = _scenario_spec(name)
     root = _asset_root(asset_root)
-    scene_xml = _resolve_city_xml(root, str(spec["asset_name"]))
-    base = Scene.load_mitsuba(
-        scene_xml,
-        source_root=root,
-        merge_shapes=True,
-        frequency=float(spec["frequency_hz"]),
-        edge_selection_mode="all_edges",
-        boundary_edge_policy="half_plane",
+    _resolve_city_xml(root, str(spec["asset_name"]))
+    raise FullScenarioAssetError(
+        "full city XML assets require a Core-owned scene importer; "
+        "Channel no longer owns Scene.load_mitsuba"
     )
-    tx_origin = tuple(float(value) for value in spec["transmitter"])
-    transmitters = [
-        Transmitter(
-            position=torch.tensor(
-                [tx_origin[0], tx_origin[1] + 0.5 * index, tx_origin[2]],
-                dtype=torch.float32,
-            )
-        )
-        for index in range(tx_count)
-    ]
-    grid = _receiver_grid(
-        grid_shape,
-        bounds_x=tuple(float(value) for value in spec["bounds_x"]),
-        bounds_y=tuple(float(value) for value in spec["bounds_y"]),
-        z=float(spec["plane_z"]),
-    )
-    scene = Scene(
-        structures=base.structures,
-        transmitters=transmitters,
-        receivers=[grid],
-        frequency=base.frequency,
-        metadata={**base.metadata, "phase_e_scenario": name, "scenario_mode": "full"},
-    )
-    return scene, _files_sha256(scene_xml), scene_xml
 
 
 def _update_tensor(digest: Any, tensor: torch.Tensor) -> None:
@@ -354,44 +378,44 @@ def _update_tensor(digest: Any, tensor: torch.Tensor) -> None:
     digest.update(value.numpy().tobytes())
 
 
-def _generated_source_sha256(scene: Scene) -> str:
+def _generated_source_sha256(scene: Scene, frequency_hz: float) -> str:
     digest = hashlib.sha256()
-    digest.update(str(scene.frequency).encode("ascii"))
+    digest.update(str(frequency_hz).encode("ascii"))
     for structure in scene.structures:
         digest.update((structure.name or "").encode("utf-8"))
         digest.update(str(structure.surface_id).encode("ascii"))
-        _update_tensor(digest, structure.vertices)
-        _update_tensor(digest, structure.faces)
-        digest.update(
-            json.dumps(
-                structure.material.parameters(scene.frequency),
-                sort_keys=True,
-                separators=(",", ":"),
-            ).encode("utf-8")
-        )
+        vertices, faces = structure.geometry.to_mesh()
+        _update_tensor(digest, vertices)
+        _update_tensor(digest, faces)
+        sample = structure.material.evaluate_at_frequency(frequency_hz)
+        for value in (sample.eps_r, sample.mu_r, sample.sigma_e):
+            _update_tensor(digest, torch.as_tensor(value))
     return digest.hexdigest()
 
 
 def _scene_sha256(scene: Scene, source_sha256: str) -> str:
     digest = hashlib.sha256(source_sha256.encode("ascii"))
-    for transmitter in scene.transmitters:
+    for transmitter in _transmitters(scene):
         _update_tensor(digest, transmitter.position)
-    for receiver in scene.receivers:
-        _update_tensor(digest, receiver.origin if isinstance(receiver, ReceiverGrid) else receiver.position)
+    for receiver in _receivers(scene):
+        _update_tensor(digest, receiver.position)
         if isinstance(receiver, ReceiverGrid):
             _update_tensor(digest, receiver.x_axis)
             _update_tensor(digest, receiver.y_axis)
-            digest.update(json.dumps([*receiver.shape, *receiver.spacing]).encode("ascii"))
+            digest.update(json.dumps(receiver.shape).encode("ascii"))
+            _update_tensor(digest, receiver.spacing)
     return digest.hexdigest()
 
 
 def _receiver_scale(scene: Scene) -> tuple[int, int]:
     grid_cells = sum(
         int(receiver.shape[0]) * int(receiver.shape[1])
-        for receiver in scene.receivers
+        for receiver in _receivers(scene)
         if isinstance(receiver, ReceiverGrid)
     )
-    points = sum(isinstance(receiver, ReceiverPoint) for receiver in scene.receivers)
+    points = sum(
+        not isinstance(receiver, ReceiverGrid) for receiver in _receivers(scene)
+    )
     return points + grid_cells, grid_cells
 
 
@@ -434,7 +458,9 @@ def build_scenario(
             scene = _terrain_scene(tx_count=tx, grid_shape=(int(shape[0]), int(shape[1])))
         else:
             raise AssertionError(f"unhandled generated scenario: {name}")
-        source_sha256 = _generated_source_sha256(scene)
+        source_sha256 = _generated_source_sha256(
+            scene, float(spec["frequency_hz"])
+        )
     elif mode == "full_external":
         if receiver_count is not None:
             raise ValueError(f"{name} uses a receiver grid; receiver_count is not accepted")
@@ -449,16 +475,19 @@ def build_scenario(
         raise ValueError(f"unsupported Phase E scenario mode: {mode!r}")
 
     receiver_total, grid_cells = _receiver_scale(scene)
-    triangles = sum(int(structure.faces.shape[0]) for structure in scene.structures)
+    triangles = sum(
+        int(structure.geometry.to_mesh()[1].shape[0])
+        for structure in scene.structures
+    )
     record = ScenarioRecord(
         name=name,
         mode=mode,
         source_sha256=source_sha256,
         scene_sha256=_scene_sha256(scene, source_sha256),
         triangle_count=triangles,
-        transmitter_count=len(scene.transmitters),
+        transmitter_count=len(_transmitters(scene)),
         receiver_count=receiver_total,
-        receiver_container_count=len(scene.receivers),
+        receiver_container_count=len(_receivers(scene)),
         receiver_grid_cells=grid_cells,
         source_path=str(source_path) if source_path is not None else None,
     )

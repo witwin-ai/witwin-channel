@@ -95,36 +95,43 @@ deterministic solver:
 ```python
 import torch
 
-from witwin.channel import ReceiverPoint, Scene, Transmitter
+from witwin.core import AntennaState, Scene
 from witwin.channel.deterministic import Config, solve
 
 scene = Scene(
     structures=[],
-    transmitters=[
-        Transmitter(
-            position=torch.tensor([0.0, 0.0, 1.5]),
+    endpoints=[
+        AntennaState(
+            1,
+            "tx",
+            torch.tensor([0.0, 0.0, 1.5]),
             power_w=1.0,
-        )
+        ),
+        AntennaState(
+            2,
+            "rx",
+            torch.tensor([10.0, 0.0, 1.5]),
+        ),
     ],
-    receivers=[
-        ReceiverPoint(position=torch.tensor([10.0, 0.0, 1.5]))
-    ],
-    frequency=3.5e9,
 )
 
 result = solve(
     scene,
     Config(max_depth=0, components={"los"}),
+    reference_frequency_hz=3.5e9,
 )
 
 print(result.path_gain)  # CUDA tensor with shape (1, 1)
 print(result.field)      # complex64 coherent field
 ```
 
-Structures use triangle meshes and material objects such as `Dielectric`,
-`LossyDielectric`, `DispersiveMaterial`, `ITUMaterial`, and
-`PerfectConductor`. Replace `ReceiverPoint` with `ReceiverGrid` for radiomap
-solves, or select `witwin.channel.path` when the individual path coefficients,
+Logical scenes, structures, materials, stable IDs, endpoints, and snapshots are
+owned by `witwin.core`. Channel compiles them with
+`witwin.channel.scene.compile(scene, reference_frequency_hz=...)`; the four
+solver entry points perform that same explicit compilation boundary. Use Core
+`Mesh`, `PhysicalMaterial`, `MaterialLayer`, and
+`PhysicalMaterial.perfect_conductor()`. Use Core `ReceiverGrid` for radiomap
+solves, or select `witwin.channel.path` when individual path coefficients,
 delays, angles, and interactions are required.
 
 ## Differentiation contract

@@ -4,7 +4,8 @@ import torch
 from typing import TYPE_CHECKING, Any
 
 from .kernels.functional import mc_face_material_tensors
-from .models import PEC_EFFECTIVE_SIGMA_E, PEC_MODEL_ID
+from .abi import PEC_EFFECTIVE_SIGMA_E, PEC_MODEL_ID
+from witwin.channel.scene.endpoints import require_compiled
 
 if TYPE_CHECKING:
     Scene = CompiledScene = Any
@@ -15,11 +16,7 @@ def face_material_tensors(
     *,
     device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    compiled = (
-        scene_or_compiled
-        if hasattr(scene_or_compiled, "materials")
-        else scene_or_compiled.compile()
-    )
+    compiled = require_compiled(scene_or_compiled)
     materials = compiled.materials
     assignments = compiled.assignments
     material_eps_r = materials.eps_r.to(device=device, dtype=torch.float32).contiguous()
@@ -57,11 +54,7 @@ def face_material_thickness(
 ) -> torch.Tensor:
     """Expand Sionna/ITU slab thickness to the global face layout."""
 
-    compiled = (
-        scene_or_compiled
-        if hasattr(scene_or_compiled, "materials")
-        else scene_or_compiled.compile()
-    )
+    compiled = require_compiled(scene_or_compiled)
     material_thickness = compiled.materials.thickness_m.to(
         device=device,
         dtype=torch.float32,
@@ -77,11 +70,7 @@ def face_material_field_bundle(
 ) -> dict[str, torch.Tensor]:
     """Return the complete per-face finite-slab field operator inputs."""
 
-    compiled = (
-        scene_or_compiled
-        if hasattr(scene_or_compiled, "materials")
-        else scene_or_compiled.compile()
-    )
+    compiled = require_compiled(scene_or_compiled)
     materials = compiled.materials
     material_id = compiled.assignments.face_material_id.to(
         device=device, dtype=torch.int64

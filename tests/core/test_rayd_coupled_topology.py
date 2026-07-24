@@ -4,14 +4,18 @@ import pytest
 import torch
 
 from tests.support.scenes import coupled_wall_wedge_scene
-from witwin.channel import Scene, Structure
+from tests.support.core_world import make_mesh_structure
+from witwin.core import Scene
+from witwin.channel.scene import compile as compile_scene
 from witwin.channel.propagation.geometry.kernels import bridge as ops
-from witwin.channel.core.materials import PerfectConductor
+from witwin.core import PhysicalMaterial
 from witwin.channel.runtime import symbols
 
 
 def _wall_and_wedge_scene():
-    return coupled_wall_wedge_scene().rayd_scene()
+    return compile_scene(
+        coupled_wall_wedge_scene(), reference_frequency_hz=3.0e9
+    ).rayd
 
 
 def _coupled_inputs(*, edge_id: int, reverse_endpoints: bool = False):
@@ -150,21 +154,20 @@ def test_coupled_geometry_rejects_stationary_point_outside_edge_bounds():
 def test_coupled_geometry_rejects_blocked_secondary_segment():
     symbols.native_extension()
     base = coupled_wall_wedge_scene()
-    blocker = Structure(
+    blocker = make_mesh_structure(
         vertices=torch.tensor(
             [[0.0, 1.0, 2.5], [2.0, 1.0, 2.5], [0.0, 1.0, 4.5], [2.0, 1.0, 4.5]]
         ),
         faces=torch.tensor([[0, 1, 2], [1, 3, 2]]),
-        material=PerfectConductor(),
+        material=PhysicalMaterial.perfect_conductor(),
         name="secondary-segment-blocker",
         surface_id=99,
     )
     scene = Scene(
         structures=[*base.structures, blocker],
-        transmitters=base.transmitters,
-        receivers=base.receivers,
-        frequency=base.frequency,
-    ).rayd_scene()
+        endpoints=base.endpoints,
+    )
+    scene = compile_scene(scene, reference_frequency_hz=3.0e9).rayd
     records = scene.edge_records()
     axis = ((records.edge_v0 == 4) & (records.edge_v1 == 5)) | (
         (records.edge_v0 == 5) & (records.edge_v1 == 4)

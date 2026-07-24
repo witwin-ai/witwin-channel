@@ -6,14 +6,24 @@ from witwin.channel.deterministic import Config, solve
 from witwin.channel.path import Config as PathConfig
 from witwin.channel.path import solve as solve_paths
 
+_REFERENCE_FREQUENCY_HZ = 3.0e9
+
 
 def test_export_paths_preserves_path_table_columns_and_field_values():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic path export")
 
     scene = empty_space_los_scene()
-    result = solve(scene, Config(max_depth=0, components={"los"}, export_paths=True))
-    reference = solve_paths(scene, PathConfig(max_depth=0, components={"los"}))
+    result = solve(
+        scene,
+        Config(max_depth=0, components={"los"}, export_paths=True),
+        reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
+    )
+    reference = solve_paths(
+        scene,
+        PathConfig(max_depth=0, components={"los"}),
+        reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
+    )
     valid = reference.valid
     path_count = int(valid.sum())
 
@@ -25,12 +35,17 @@ def test_export_paths_preserves_path_table_columns_and_field_values():
     assert torch.all(result.paths.component_id == 0)
     assert torch.all(result.paths.primitive_id == -1)
     assert torch.all(result.paths.edge_id == -1)
-    torch.testing.assert_close(result.paths.path_length_m, reference.path_length_m[valid])
+    torch.testing.assert_close(
+        result.paths.path_length_m, reference.path_length_m[valid]
+    )
     torch.testing.assert_close(result.paths.delay_s, reference.tau[valid])
     reference_coefficient = reference.a[..., 0][valid]
     torch.testing.assert_close(result.paths.coefficient, reference_coefficient)
+    transmitters = tuple(
+        endpoint for endpoint in scene.endpoints if endpoint.role == "tx"
+    )
     tx_power = torch.tensor(
-        [transmitter.power_w for transmitter in scene.transmitters],
+        [transmitter.power_w for transmitter in transmitters],
         device=reference.a.device,
         dtype=torch.float32,
     )

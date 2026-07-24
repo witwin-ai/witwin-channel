@@ -12,8 +12,16 @@ def test_basic_solver_matches_empty_space_los_reference():
         pytest.skip("CUDA is required for MC basic parity")
 
     scene = empty_space_los_scene()
-    result = solve(scene, Config(samples=256, seed=11, components={"los"}))
-    expected = los_path_gain_reference(scene, device=torch.device("cuda"))
+    result = solve(
+        scene,
+        Config(samples=256, seed=11, components={"los"}),
+        reference_frequency_hz=3.0e9,
+    )
+    expected = los_path_gain_reference(
+        scene,
+        device=torch.device("cuda"),
+        reference_frequency_hz=3.0e9,
+    )
 
     torch.testing.assert_close(result.path_gain, expected, rtol=1e-5, atol=1e-8)
 
@@ -24,11 +32,21 @@ def test_single_wall_reflection_scene_is_capability_gated():
 
     scene = single_wall_reflection_scene()
     if not build_info()["uses_rayd_native"]:
-        with pytest.raises(RuntimeError, match="reflection requires RayD native capability"):
-            solve(scene, Config(samples=256, seed=11, components={"reflection"}))
+        with pytest.raises(
+            RuntimeError, match="reflection requires RayD native capability"
+        ):
+            solve(
+                scene,
+                Config(samples=256, seed=11, components={"reflection"}),
+                reference_frequency_hz=3.0e9,
+            )
         return
 
-    result = solve(scene, Config(samples=256, seed=11, components={"reflection"}))
+    result = solve(
+        scene,
+        Config(samples=256, seed=11, components={"reflection"}),
+        reference_frequency_hz=3.0e9,
+    )
     status = result.metadata["components"]["reflection"]
 
     assert status == "enabled"

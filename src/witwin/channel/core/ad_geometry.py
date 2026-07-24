@@ -69,7 +69,7 @@ def receiver_positions_ad(
     mark requires_grad, so nothing is silently zeroed here.
     """
 
-    from witwin.channel.scene.models import ReceiverPoint
+    from witwin.channel.scene.endpoints import ReceiverPoint
 
     if not scene.receivers or not all(
         isinstance(receiver, ReceiverPoint) for receiver in scene.receivers

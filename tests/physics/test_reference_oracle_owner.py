@@ -83,6 +83,12 @@ def test_reference_oracle_identity_is_import_order_independent(
     order: tuple[str, str],
 ) -> None:
     code = f"""
+import sys
+sys.meta_path = [
+    finder
+    for finder in sys.meta_path
+    if "_witwin_channel_editable" not in type(finder).__module__
+]
 import importlib
 for name in {order!r}:
     importlib.import_module(name)
@@ -94,8 +100,11 @@ for name in {_PUBLIC!r}:
 """
     environment = os.environ.copy()
     source_root = str(REPOSITORY_ROOT / "src")
+    core_root = str(REPOSITORY_ROOT.parent / "core-radar-architecture-stage1")
     environment["PYTHONPATH"] = os.pathsep.join(
-        value for value in (source_root, environment.get("PYTHONPATH")) if value
+        value
+        for value in (core_root, source_root, environment.get("PYTHONPATH"))
+        if value
     )
     subprocess.run(
         [sys.executable, "-c", code],

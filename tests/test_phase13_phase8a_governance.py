@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 AUDIT = ROOT / "docs/dev/audit"
-RAYD_ROOT = Path(os.environ.get("RAYD_SOURCE_DIR", ROOT.parent.parent / "RayDi"))
+RAYD_ROOT = Path(os.environ.get("RAYD_SOURCE_DIR", ROOT.parent.parent / "RayD"))
 RAYD_COMMIT = "11e72526cdddf669678975c8921a9d44c6504e20"
 INTEGRATION_SHA256 = (
     "7a2b68f459e7e981a23735271eff2844fe0483d119cf514d59d2032d11be5aef"

@@ -13,7 +13,8 @@ import pytest
 import torch
 
 from tests.support.scenes import wedge_diffraction_scene
-from witwin.channel import ReceiverGrid, Scene
+from witwin.core import ReceiverGrid, Scene
+from tests.support.core_world import make_receiver_grid
 from witwin.channel.core.kernels.extension import build_info
 from witwin.channel.deterministic import Config as DeterministicConfig
 from witwin.channel.deterministic import solve as deterministic_solve
@@ -26,7 +27,7 @@ _GATE_HIGH = 2.0
 
 
 def _grid() -> ReceiverGrid:
-    return ReceiverGrid(
+    return make_receiver_grid(
         origin=torch.tensor([3.0, -1.0, -0.5]),
         x_axis=torch.tensor([0.0, 1.0, 0.0]),
         y_axis=torch.tensor([0.0, 0.0, 1.0]),
@@ -36,12 +37,8 @@ def _grid() -> ReceiverGrid:
 
 
 def _with_grid(base: Scene, grid: ReceiverGrid) -> Scene:
-    return Scene(
-        structures=base.structures,
-        transmitters=base.transmitters,
-        receivers=[grid],
-        frequency=base.frequency,
-        metadata=base.metadata,
+    return base.with_endpoints(
+        (*tuple(endpoint for endpoint in base.endpoints if endpoint.role == "tx"), grid)
     )
 
 
@@ -63,17 +60,26 @@ def test_bdpt_grid_diffraction_within_2x_of_deterministic():
     reference = _diffraction_power(
         deterministic_solve(
             scene,
-            DeterministicConfig(components={"diffraction"}, max_depth=1, coherent=False),
+            DeterministicConfig(
+                components={"diffraction"}, max_depth=1, coherent=False
+            ),
+            reference_frequency_hz=3.0e9,
         )
     )
     observed = _diffraction_power(
-        bdpt_solve(scene, BDPTConfig(components={"diffraction"}, samples=512, seed=7))
+        bdpt_solve(
+            scene,
+            BDPTConfig(components={"diffraction"}, samples=512, seed=7),
+            reference_frequency_hz=3.0e9,
+        )
     )
 
     assert reference > 0.0
     assert observed > 0.0
     ratio = observed / reference
-    assert _GATE_LOW <= ratio <= _GATE_HIGH, f"grid diffraction ratio {ratio} outside [0.5, 2]"
+    assert _GATE_LOW <= ratio <= _GATE_HIGH, (
+        f"grid diffraction ratio {ratio} outside [0.5, 2]"
+    )
 
 
 def test_bdpt_point_diffraction_within_2x_of_deterministic():
@@ -83,7 +89,10 @@ def test_bdpt_point_diffraction_within_2x_of_deterministic():
     reference = _diffraction_power(
         deterministic_solve(
             scene,
-            DeterministicConfig(components={"diffraction"}, max_depth=1, coherent=False),
+            DeterministicConfig(
+                components={"diffraction"}, max_depth=1, coherent=False
+            ),
+            reference_frequency_hz=3.0e9,
         )
     )
     observed = _diffraction_power(
@@ -95,10 +104,13 @@ def test_bdpt_point_diffraction_within_2x_of_deterministic():
                 seed=7,
                 receiver_strategy="point_sphere",
             ),
+            reference_frequency_hz=3.0e9,
         )
     )
 
     assert reference > 0.0
     assert observed > 0.0
     ratio = observed / reference
-    assert _GATE_LOW <= ratio <= _GATE_HIGH, f"point diffraction ratio {ratio} outside [0.5, 2]"
+    assert _GATE_LOW <= ratio <= _GATE_HIGH, (
+        f"point diffraction ratio {ratio} outside [0.5, 2]"
+    )

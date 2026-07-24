@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import math
 from typing import TYPE_CHECKING
 
@@ -51,7 +51,7 @@ from witwin.channel.propagation.topology.kernels.primitives import (
 )
 from witwin.channel.runtime.capacity import CapacityFailureState
 from witwin.channel.scene.kernels.rayd_scene import RayDSceneResource
-from witwin.channel.scene.models import ReceiverGrid
+from witwin.channel.scene.endpoints import ReceiverGrid, require_compiled
 from witwin.channel.scene.tensors import transmitter_polarizations
 
 from .backend import (
@@ -62,7 +62,7 @@ from .backend import (
 )
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+    from witwin.channel.scene.endpoints import SolverScene as Scene
 
 __all__ = ["_diffraction_edge_geometry"]
 
@@ -116,17 +116,9 @@ def _grid_los_matrix(
     ad: bool = False,
     ledger: object | None = None,
 ) -> torch.Tensor:
-    from witwin.channel.scene.models import Scene
-
     if los is not None and len(scene.receivers) == 1 and scene.receivers[0] is grid:
         return los
-    grid_scene = Scene(
-        structures=scene.structures,
-        transmitters=scene.transmitters,
-        receivers=[grid],
-        frequency=scene.frequency,
-        metadata=scene.metadata,
-    )
+    grid_scene = replace(scene, receivers=(grid,))
     return los_path_gain(grid_scene, device=device, ad=ad, ledger=ledger)
 
 
@@ -252,7 +244,7 @@ def transmission_component_map(
     else:
         with torch.no_grad():
             bundle = face_material_field_bundle(scene, device=device)
-    compiled = scene.compile()
+    compiled = require_compiled(scene)
     rx_count = int(rx_pos.shape[0])
     tx_count = int(tx_pos.shape[0])
     origins = tx_march.repeat_interleave(rx_count, dim=0)

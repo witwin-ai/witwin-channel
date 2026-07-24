@@ -75,7 +75,7 @@
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
     "src/witwin/channel/montecarlo/bdpt/pipeline.py::_collect_connection_samples": {
-      "ceiling": 37,
+      "ceiling": 36,
       "expires_on": "2027-01-31",
       "owner": "montecarlo/bdpt maintainers",
       "reason": "Per-strategy connection-sample orchestration extracted verbatim from the former solve() monolith; each component branch stays inside this single stage."
@@ -111,10 +111,10 @@
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
     "src/witwin/channel/propagation/enumerated/engine.py::evaluate_enumerated_paths": {
-      "ceiling": 23,
+      "ceiling": 24,
       "expires_on": "2027-01-31",
       "owner": "propagation maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+      "reason": "Existing control-flow debt plus the Phase-2 internal fixed-tx-power field seam is frozen pending focused decomposition."
     },
     "src/witwin/channel/propagation/fields/evaluation.py::_evaluate_coupled_fields": {
       "ceiling": 17,
@@ -182,23 +182,17 @@
       "owner": "runtime maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
-    "src/witwin/channel/scene/loader.py::_load_mitsuba_native_ply": {
-      "ceiling": 16,
+    "src/witwin/channel/scene/compiler.py::_runtime_structures": {
+      "ceiling": 25,
       "expires_on": "2027-01-31",
       "owner": "scene maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+      "reason": "Core-world runtime structure projection is frozen at the Phase-2 compiler boundary pending focused decomposition."
     },
-    "src/witwin/channel/scene/loader.py::_load_ply_mesh": {
-      "ceiling": 16,
+    "src/witwin/channel/scene/compiler.py::compile": {
+      "ceiling": 33,
       "expires_on": "2027-01-31",
       "owner": "scene maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
-    },
-    "src/witwin/channel/scene/loader.py::_read_ply_header": {
-      "ceiling": 23,
-      "expires_on": "2027-01-31",
-      "owner": "scene maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+      "reason": "Single Core Scene compiler orchestration is frozen at the Phase-2 owner switch pending focused decomposition."
     }
   },
   "limits": {

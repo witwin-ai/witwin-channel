@@ -193,7 +193,16 @@ def _metadata_identity(
 def _checked_in_package_members() -> frozenset[str]:
     repository_root = Path(__file__).resolve().parents[1]
     result = subprocess.run(
-        ["git", "ls-files", "-z", "--", "src/witwin"],
+        [
+            "git",
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "--",
+            "src/witwin",
+        ],
         cwd=repository_root,
         capture_output=True,
         check=False,
@@ -201,7 +210,11 @@ def _checked_in_package_members() -> frozenset[str]:
     if result.returncode != 0:
         detail = result.stderr.decode("utf-8", errors="replace").strip()
         raise ValueError(f"cannot read checked-in src/witwin member list: {detail}")
-    paths = [path for path in result.stdout.decode("utf-8").split("\0") if path]
+    paths = [
+        path
+        for path in result.stdout.decode("utf-8").split("\0")
+        if path and (repository_root / path).is_file()
+    ]
     prefix = "src/"
     if not paths or any(not path.startswith(prefix) for path in paths):
         raise ValueError("checked-in src/witwin member list is malformed or empty")

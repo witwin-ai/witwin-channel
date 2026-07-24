@@ -12,8 +12,8 @@ def test_basic_solver_fixed_seed_is_stable_for_counts_and_outputs():
     scene = empty_space_los_scene()
     config = Config(samples=512, seed=2026)
 
-    first = solve(scene, config)
-    second = solve(scene, config)
+    first = solve(scene, config, reference_frequency_hz=3.0e9)
+    second = solve(scene, config, reference_frequency_hz=3.0e9)
 
     assert first.metadata["path_count"] == second.metadata["path_count"]
     assert (
@@ -27,6 +27,10 @@ def test_basic_solver_seed_is_reported_in_metadata():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic seed stability")
 
-    result = solve(empty_space_los_scene(), Config(samples=64, seed=99))
+    result = solve(
+        empty_space_los_scene(),
+        Config(samples=64, seed=99),
+        reference_frequency_hz=3.0e9,
+    )
 
     assert result.metadata["seed"] == 99

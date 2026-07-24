@@ -10,6 +10,12 @@ from typing import Any
 import torch
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.meta_path = [
+    finder
+    for finder in sys.meta_path
+    if "_witwin_channel_editable" not in type(finder).__module__
+]
+sys.path.insert(0, str(_REPO_ROOT.parent / "core-radar-architecture-stage1"))
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 sys.path.insert(0, str(_REPO_ROOT))
 
@@ -38,7 +44,7 @@ def run_benchmark(*, scene_name: str, samples: int) -> dict[str, Any]:
     config = Config(samples=samples, seed=0)
     torch.cuda.synchronize()
     started = time.perf_counter()
-    result = solve(scene, config)
+    result = solve(scene, config, reference_frequency_hz=3.5e9)
     torch.cuda.synchronize()
     elapsed_ms = (time.perf_counter() - started) * 1000.0
     kernel = result.metadata["kernel"]

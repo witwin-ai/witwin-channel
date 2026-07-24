@@ -18,7 +18,7 @@ MIGRATION_DELTA_PATH = (
     REPOSITORY_ROOT / "docs/dev/audit/phase13-migration-delta.json"
 )
 RAYD_ROOT = Path(
-    os.environ.get("RAYD_SOURCE_DIR", REPOSITORY_ROOT.parent.parent / "RayDi")
+    os.environ.get("RAYD_SOURCE_DIR", REPOSITORY_ROOT.parent.parent / "RayD")
 )
 RAYD_WEDGE_SOURCE = (
     RAYD_ROOT / "backends/torch/src/torch_ext/rf/diffraction_wedge.cu"

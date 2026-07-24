@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import torch
+from witwin.channel.scene.endpoints import require_compiled
 
 from witwin.channel.materials.evaluation import (
     _require_frequency_ad_constant_materials,
@@ -58,7 +59,7 @@ from witwin.channel.scene.tensors import (
 )
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+    from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
 def _path_components(config: TopologyConfig) -> set[str]:
@@ -162,9 +163,14 @@ def evaluate_enumerated_paths(
     _require_defer_capacity_terminal(defer_capacity_terminal)
     device = torch.device("cuda")
     tx_positions, tx_power = transmitter_tensors(scene, device=device)
+    field_tx_power = (
+        tx_power.detach()
+        if bool(getattr(config, "_detach_field_tx_power", False))
+        else tx_power
+    )
     tx_polarizations = transmitter_polarizations(scene, device=device)
     rx_positions, _ = receiver_positions_and_layout(scene, device=device)
-    compiled = scene.compile()
+    compiled = require_compiled(scene)
     # One host read of a tensor frequency for the whole export: discovery and
     # the field seam below share this detached scalar (audit M3). Callers
     # that already read it (the solver seams) pass it in.
@@ -315,7 +321,7 @@ def evaluate_enumerated_paths(
             evaluated,
             sidecars.execution,
             tx_positions,
-            tx_power,
+            field_tx_power,
             rx_positions,
             components=components,
             ad_mode=ad_mode,
@@ -369,7 +375,7 @@ def evaluate_enumerated_paths(
         evaluated,
         sidecars.execution,
         tx_positions,
-        tx_power,
+        field_tx_power,
         rx_positions,
         components=components,
         ad_mode=ad_mode,

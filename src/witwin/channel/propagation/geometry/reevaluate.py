@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel.scene.models import ReceiverPoint
+from witwin.channel.scene.endpoints import ReceiverPoint
 from witwin.channel.propagation.geometry.kernels import (
     autograd as geometry_autograd,
 )
@@ -16,7 +16,7 @@ from witwin.channel.propagation.topology.kernels import (
 )
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+    from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
 _PLANE_GROUP_QUANTIZATION = 1.0e-4

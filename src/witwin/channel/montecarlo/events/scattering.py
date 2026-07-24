@@ -91,10 +91,11 @@ from witwin.channel.scattering.kernels.functional import (
     scattering_event_probabilities,
     scattering_table_sample,
 )
-from witwin.channel.materials.models import Roughness  # noqa: F401
+from witwin.core import SurfaceRoughness  # noqa: F401
 from witwin.channel.scattering import tables as kirchhoff_tables
 from witwin.channel.scattering.tables import KirchhoffTable  # noqa: F401
 from witwin.channel.scene.scattering_resources import RoughMaterialRuntime
+from witwin.channel.scene.endpoints import require_compiled
 
 from witwin.channel.materials.encoding import face_material_field_bundle
 from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
@@ -748,7 +749,7 @@ def scattering_map_matrix(
         "tx_visible_samples": 0,
         "deposited_rows": 0,
     }
-    runtimes = rough_material_runtimes(scene.compile())
+    runtimes = rough_material_runtimes(require_compiled(scene))
     if not runtimes:
         return matrix, stats
 

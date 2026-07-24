@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.scene.models import ReceiverGrid, ReceiverPoint
+from witwin.channel.scene.endpoints import ReceiverGrid, ReceiverPoint
 from witwin.channel.montecarlo.bdpt.kernels.maps import (
     bdpt_host_vec3_tensor,
     bdpt_receiver_grid_points,
     bdpt_transmitter_tensors,
 )
-from witwin.channel.scene.models import Scene
+from witwin.channel.scene.endpoints import SolverScene as Scene
 from witwin.channel.core.receiver_geometry import (
     vector3_tuple as _vector3_tuple,
 )

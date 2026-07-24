@@ -6,7 +6,7 @@ import pytest
 import torch
 from scipy.stats import chi2
 
-from witwin.channel.core.materials import Roughness
+from witwin.core import SurfaceRoughness
 from witwin.channel.scattering import (
     build_kirchhoff_table,
     pdf,
@@ -23,7 +23,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 def table():
     frequency_hz = 60e9
     sigma_e = 0.1 * 2.0 * math.pi * frequency_hz * _EPS0
-    rough = Roughness(rms_height_m=1e-3, corr_length_x_m=10e-3, corr_length_y_m=10e-3)
+    rough = SurfaceRoughness(rms_height_m=1e-3, correlation_length_x_m=10e-3, correlation_length_y_m=10e-3)
     return build_kirchhoff_table(
         rough, [(0.1, 4.0, sigma_e, 1.0)], frequency_hz, device=DEVICE
     )

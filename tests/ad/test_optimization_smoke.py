@@ -18,7 +18,8 @@ from __future__ import annotations
 import pytest
 import torch
 
-from witwin.channel import ReceiverPoint, Scene, Transmitter
+from witwin.core import Scene
+from tests.support.core_world import make_receiver, make_transmitter
 from witwin.channel.deterministic import Config, solve
 
 pytestmark = pytest.mark.skipif(
@@ -41,12 +42,13 @@ _POSITION_TOLERANCE_M = 1.0e-2
 def _scene(tx: torch.Tensor) -> Scene:
     return Scene(
         structures=[],
-        transmitters=[Transmitter(position=tx)],
-        receivers=[
-            ReceiverPoint(position=torch.tensor(position))
-            for position in _RX_POSITIONS
+        endpoints=[
+            make_transmitter(position=tx),
+            *[
+                make_receiver(position=torch.tensor(position))
+                for position in _RX_POSITIONS
+            ],
         ],
-        frequency=_FREQUENCY_HZ,
     )
 
 
@@ -59,6 +61,7 @@ def _delays(tx: torch.Tensor, ad_mode: str) -> torch.Tensor:
             export_paths=True,
             ad_mode=ad_mode,
         ),
+        reference_frequency_hz=_FREQUENCY_HZ,
     )
     delays = result.paths.delay_s
     assert int(delays.shape[0]) == len(_RX_POSITIONS)
@@ -71,8 +74,10 @@ def test_adam_recovers_transmitter_position():
         target = _delays(tx_true, "none").detach()
 
     tx = (
-        tx_true + torch.tensor(_TX_START_OFFSET, device="cuda")
-    ).clone().requires_grad_(True)
+        (tx_true + torch.tensor(_TX_START_OFFSET, device="cuda"))
+        .clone()
+        .requires_grad_(True)
+    )
     start_error = float((tx.detach() - tx_true).norm())
     optimizer = torch.optim.Adam([tx], lr=2.0e-2)
     # Delays are ~1e-8 s; scale the residual so Adam sees O(1) losses.

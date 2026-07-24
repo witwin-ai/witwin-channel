@@ -12,7 +12,7 @@ version = "0.4.0"
 description = "GPU-accelerated differentiable wireless propagation simulation for RF digital twins."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
-dependencies = ["torch==2.10.0"]
+dependencies = ["torch==2.10.0", "witwin==0.4.0"]
 
 [tool.scikit-build]
 wheel.packages = ["src/witwin"]

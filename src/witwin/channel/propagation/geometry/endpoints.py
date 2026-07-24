@@ -5,14 +5,14 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel.scene.models import ReceiverGrid
+from witwin.channel.scene.endpoints import ReceiverGrid
 from witwin.channel.scene.tensors import (
     receiver_positions as _native_receiver_positions,
     transmitter_positions as _native_transmitter_positions,
 )
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+    from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
 @dataclass(frozen=True, slots=True)
