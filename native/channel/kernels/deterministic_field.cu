@@ -528,8 +528,8 @@ pybind11::dict channel_deterministic_los_field(
     at::Tensor path_gain_input,
     at::Tensor path_length_m,
     double frequency_hz) {
-    check_tensor(path_gain_input, "path_gain", at::kFloat32, 1);
-    check_tensor(path_length_m, "path_length_m", at::kFloat32, 1);
+    check_tensor(path_gain_input, "path_gain", at::kFloat, 1);
+    check_tensor(path_length_m, "path_length_m", at::kFloat, 1);
     TORCH_CHECK(path_length_m.sizes() == path_gain_input.sizes(), "path_length_m must match path_gain");
     TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
 
@@ -565,12 +565,12 @@ pybind11::dict channel_deterministic_diffraction_vector_field(
     at::Tensor y_im,
     at::Tensor z_re,
     at::Tensor z_im) {
-    check_tensor(x_re, "x_re", at::kFloat32, 1);
-    check_tensor(x_im, "x_im", at::kFloat32, 1);
-    check_tensor(y_re, "y_re", at::kFloat32, 1);
-    check_tensor(y_im, "y_im", at::kFloat32, 1);
-    check_tensor(z_re, "z_re", at::kFloat32, 1);
-    check_tensor(z_im, "z_im", at::kFloat32, 1);
+    check_tensor(x_re, "x_re", at::kFloat, 1);
+    check_tensor(x_im, "x_im", at::kFloat, 1);
+    check_tensor(y_re, "y_re", at::kFloat, 1);
+    check_tensor(y_im, "y_im", at::kFloat, 1);
+    check_tensor(z_re, "z_re", at::kFloat, 1);
+    check_tensor(z_im, "z_im", at::kFloat, 1);
     TORCH_CHECK(x_im.sizes() == x_re.sizes(), "x_im must match x_re");
     TORCH_CHECK(y_re.sizes() == x_re.sizes(), "y_re must match x_re");
     TORCH_CHECK(y_im.sizes() == x_re.sizes(), "y_im must match x_re");
@@ -616,15 +616,15 @@ pybind11::dict channel_deterministic_reflection_field(
     at::Tensor mu_r,
     at::Tensor gain,
     double frequency_hz) {
-    check_tensor(tx_position, "tx_position", at::kFloat32, 2);
-    check_tensor(rx_position, "rx_position", at::kFloat32, 2);
-    check_tensor(hit_position, "hit_position", at::kFloat32, 2);
-    check_tensor(normal, "normal", at::kFloat32, 2);
-    check_tensor(tx_power, "tx_power", at::kFloat32, 1);
-    check_tensor(eps_r, "eps_r", at::kFloat32, 1);
-    check_tensor(sigma_e, "sigma_e", at::kFloat32, 1);
-    check_tensor(mu_r, "mu_r", at::kFloat32, 1);
-    check_tensor(gain, "gain", at::kFloat32, 1);
+    check_tensor(tx_position, "tx_position", at::kFloat, 2);
+    check_tensor(rx_position, "rx_position", at::kFloat, 2);
+    check_tensor(hit_position, "hit_position", at::kFloat, 2);
+    check_tensor(normal, "normal", at::kFloat, 2);
+    check_tensor(tx_power, "tx_power", at::kFloat, 1);
+    check_tensor(eps_r, "eps_r", at::kFloat, 1);
+    check_tensor(sigma_e, "sigma_e", at::kFloat, 1);
+    check_tensor(mu_r, "mu_r", at::kFloat, 1);
+    check_tensor(gain, "gain", at::kFloat, 1);
     TORCH_CHECK(tx_position.size(1) == 3, "tx_position must have shape (N, 3)");
     TORCH_CHECK(rx_position.sizes() == tx_position.sizes(), "rx_position must match tx_position");
     TORCH_CHECK(hit_position.sizes() == tx_position.sizes(), "hit_position must match tx_position");
@@ -685,15 +685,15 @@ pybind11::dict channel_deterministic_reflection_sequence_field(
     at::Tensor mu_r,
     at::Tensor gain,
     double frequency_hz) {
-    check_tensor(tx_position, "tx_position", at::kFloat32, 2);
-    check_tensor(rx_position, "rx_position", at::kFloat32, 2);
-    check_tensor(hit_positions, "hit_positions", at::kFloat32, 3);
-    check_tensor(normals, "normals", at::kFloat32, 3);
-    check_tensor(tx_power, "tx_power", at::kFloat32, 1);
-    check_tensor(eps_r, "eps_r", at::kFloat32, 2);
-    check_tensor(sigma_e, "sigma_e", at::kFloat32, 2);
-    check_tensor(mu_r, "mu_r", at::kFloat32, 2);
-    check_tensor(gain, "gain", at::kFloat32, 2);
+    check_tensor(tx_position, "tx_position", at::kFloat, 2);
+    check_tensor(rx_position, "rx_position", at::kFloat, 2);
+    check_tensor(hit_positions, "hit_positions", at::kFloat, 3);
+    check_tensor(normals, "normals", at::kFloat, 3);
+    check_tensor(tx_power, "tx_power", at::kFloat, 1);
+    check_tensor(eps_r, "eps_r", at::kFloat, 2);
+    check_tensor(sigma_e, "sigma_e", at::kFloat, 2);
+    check_tensor(mu_r, "mu_r", at::kFloat, 2);
+    check_tensor(gain, "gain", at::kFloat, 2);
     TORCH_CHECK(tx_position.size(1) == 3, "tx_position must have shape (N, 3)");
     TORCH_CHECK(rx_position.sizes() == tx_position.sizes(), "rx_position must match tx_position");
     TORCH_CHECK(hit_positions.size(0) == tx_position.size(0), "hit_positions must match path count");
@@ -748,7 +748,7 @@ pybind11::dict channel_deterministic_reflection_sequence_field(
 }
 
 at::Tensor channel_deterministic_delay_to_path_length(at::Tensor delay_s) {
-    check_tensor(delay_s, "delay_s", at::kFloat32, 1);
+    check_tensor(delay_s, "delay_s", at::kFloat, 1);
     auto path_length = at::empty_like(delay_s);
     const int64_t count = delay_s.size(0);
     if (count > 0) {
@@ -764,8 +764,8 @@ at::Tensor channel_deterministic_delay_to_path_length(at::Tensor delay_s) {
 }
 
 at::Tensor channel_deterministic_pack_complex(at::Tensor field_real, at::Tensor field_imag) {
-    check_tensor(field_real, "field_real", at::kFloat32, 1);
-    check_tensor(field_imag, "field_imag", at::kFloat32, 1);
+    check_tensor(field_real, "field_real", at::kFloat, 1);
+    check_tensor(field_imag, "field_imag", at::kFloat, 1);
     TORCH_CHECK(field_imag.sizes() == field_real.sizes(), "field_imag must match field_real");
     auto complex_options = field_real.options().dtype(at::kComplexFloat);
     auto field = at::empty({field_real.size(0)}, complex_options);
@@ -784,8 +784,8 @@ at::Tensor channel_deterministic_pack_complex(at::Tensor field_real, at::Tensor 
 }
 
 at::Tensor channel_deterministic_phase_from_field(at::Tensor field_real, at::Tensor field_imag) {
-    check_tensor(field_real, "field_real", at::kFloat32, 1);
-    check_tensor(field_imag, "field_imag", at::kFloat32, 1);
+    check_tensor(field_real, "field_real", at::kFloat, 1);
+    check_tensor(field_imag, "field_imag", at::kFloat, 1);
     TORCH_CHECK(field_imag.sizes() == field_real.sizes(), "field_imag must match field_real");
     auto phase = at::empty_like(field_real);
     const int64_t count = field_real.size(0);
@@ -803,7 +803,7 @@ at::Tensor channel_deterministic_phase_from_field(at::Tensor field_real, at::Ten
 }
 
 pybind11::dict channel_deterministic_zero_field_phase(at::Tensor reference) {
-    check_tensor(reference, "reference", at::kFloat32, 1);
+    check_tensor(reference, "reference", at::kFloat, 1);
     auto complex_options = reference.options().dtype(at::kComplexFloat);
     auto path_field = at::empty({reference.size(0)}, complex_options);
     auto phase = at::empty_like(reference);
@@ -828,7 +828,7 @@ pybind11::dict channel_deterministic_zero_field_phase(at::Tensor reference) {
 }
 
 at::Tensor channel_deterministic_phase_from_length(at::Tensor path_length_m, double frequency_hz) {
-    check_tensor(path_length_m, "path_length_m", at::kFloat32, 1);
+    check_tensor(path_length_m, "path_length_m", at::kFloat, 1);
     TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
     auto phase = at::empty_like(path_length_m);
     const int64_t count = path_length_m.size(0);
@@ -846,8 +846,8 @@ at::Tensor channel_deterministic_phase_from_length(at::Tensor path_length_m, dou
 }
 
 pybind11::dict channel_deterministic_field_from_power_phase(at::Tensor path_gain, at::Tensor phase_rad) {
-    check_tensor(path_gain, "path_gain", at::kFloat32, 1);
-    check_tensor(phase_rad, "phase_rad", at::kFloat32, 1);
+    check_tensor(path_gain, "path_gain", at::kFloat, 1);
+    check_tensor(phase_rad, "phase_rad", at::kFloat, 1);
     TORCH_CHECK(phase_rad.sizes() == path_gain.sizes(), "phase_rad must match path_gain");
     auto field_real = at::empty_like(path_gain);
     auto field_imag = at::empty_like(path_gain);

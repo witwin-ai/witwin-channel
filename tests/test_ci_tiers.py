@@ -283,6 +283,10 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
         not re.search(r"(?<!rayd::)torch::", path.read_text(encoding="utf-8"))
         for path in cuda_sources
     )
+    assert all(
+        "at::kFloat32" not in path.read_text(encoding="utf-8")
+        for path in cuda_sources
+    )
     raw_typed_range = re.compile(
         r"for\s*\([^)]*:\s*\{(?P<items>.*?)\}\)\s*\{",
         re.DOTALL,
