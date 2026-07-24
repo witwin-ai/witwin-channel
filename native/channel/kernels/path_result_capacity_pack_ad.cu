@@ -675,10 +675,11 @@ void check_primal(
         "pair_count * path_capacity_per_pair overflows int64");
     const int64_t rows = pair_count * path_capacity_per_pair;
     TORCH_CHECK(valid.numel() == rows, "valid has wrong capacity shape");
-    for (const auto& named : {
-             std::pair<const char *, at::Tensor>{"tx_id", tx_id},
-             {"rx_id", rx_id},
-             {"depth", depth}}) {
+    const std::pair<const char *, at::Tensor> index_tensors[] = {
+        {"tx_id", tx_id},
+        {"rx_id", rx_id},
+        {"depth", depth}};
+    for (const auto& named : index_tensors) {
         check_tensor(named.second, named.first, at::kInt, 1);
         TORCH_CHECK(named.second.numel() == rows, named.first, " has wrong shape");
         check_same_device(named.second, valid, named.first);
@@ -689,10 +690,10 @@ void check_primal(
         interaction_type.sizes() == at::IntArrayRef({rows, width}),
         "interaction_type has wrong shape");
     check_same_device(interaction_type, valid, "interaction_type");
-    for (const auto& named : {
-             std::pair<const char *, at::Tensor>{
-                 "interaction_positions", interaction_positions},
-             {"interaction_normals", interaction_normals}}) {
+    const std::pair<const char *, at::Tensor> interaction_tensors[] = {
+        {"interaction_positions", interaction_positions},
+        {"interaction_normals", interaction_normals}};
+    for (const auto& named : interaction_tensors) {
         check_tensor(named.second, named.first, at::kFloat, 3);
         TORCH_CHECK(
             named.second.sizes() == at::IntArrayRef({rows, width, 3}),
@@ -700,10 +701,10 @@ void check_primal(
             " has wrong shape");
         check_same_device(named.second, valid, named.first);
     }
-    for (const auto& named : {
-             std::tuple<const char *, at::Tensor, int64_t>{
-                 "tx_positions", tx_positions, num_tx},
-             {"rx_positions", rx_positions, num_rx}}) {
+    const std::tuple<const char *, at::Tensor, int64_t> endpoint_tensors[] = {
+        {"tx_positions", tx_positions, num_tx},
+        {"rx_positions", rx_positions, num_rx}};
+    for (const auto& named : endpoint_tensors) {
         const char *name = std::get<0>(named);
         const at::Tensor& tensor = std::get<1>(named);
         const int64_t count = std::get<2>(named);

@@ -206,7 +206,8 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "\n  release:\n    types: [published]" in workflow
     assert "\n  workflow_dispatch:" in workflow
     assert "self-hosted" not in workflow
-    assert "runs-on: windows-2022" in workflow
+    assert "runs-on: channel-windows-8core" in workflow
+    assert "runs-on: channel-linux-8core" in workflow
     assert "runs-on: ubuntu-22.04" in workflow
     assert "manylinux_2_28" in workflow
 
@@ -231,7 +232,8 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "CHANNEL_CUDA_GENCODE_FLAGS=" in workflow
     assert "RAYD_TORCH_CUDA_GENCODE_FLAGS=" in workflow
     assert "CMAKE_CUDA_COMPILER_LAUNCHER: \"\"" in workflow
-    assert "CMAKE_BUILD_PARALLEL_LEVEL: \"3\"" in workflow
+    assert "CMAKE_BUILD_PARALLEL_LEVEL: \"6\"" in workflow
+    assert "CMAKE_BUILD_PARALLEL_LEVEL=6" in workflow
     assert ".Path.Replace('\\', '/')" in workflow
     assert "actions/cache@v5" in workflow
     assert "sub-packages:" in workflow
@@ -281,6 +283,21 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
         not re.search(r"(?<!rayd::)torch::", path.read_text(encoding="utf-8"))
         for path in cuda_sources
     )
+    raw_typed_range = re.compile(
+        r"for\s*\([^)]*:\s*\{(?P<items>.*?)\}\)\s*\{",
+        re.DOTALL,
+    )
+    ambiguous_ranges = []
+    for path in cuda_sources:
+        text = path.read_text(encoding="utf-8")
+        for match in raw_typed_range.finditer(text):
+            items = match.group("items")
+            if (
+                ("std::pair" in items or "std::tuple" in items)
+                and re.search(r'^\s*\{"', items, re.MULTILINE)
+            ):
+                ambiguous_ranges.append(path)
+    assert ambiguous_ranges == []
 
     publish_guard = (
         "github.event_name == 'release' && github.event.action == 'published'"

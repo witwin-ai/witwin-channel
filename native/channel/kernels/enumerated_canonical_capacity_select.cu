@@ -470,13 +470,14 @@ pybind11::dict channel_enumerated_canonical_capacity_select(
     int64_t max_paths,
     int64_t max_paths_scope) {
     check_tensor(valid, "valid", at::kBool, 1);
-    for (const auto& item : {
-             std::pair<const char*, at::Tensor>{"tx_id", tx_id},
-             {"rx_id", rx_id},
-             {"depth", depth},
-             {"component_id", component_id},
-             {"primitive_id", primitive_id},
-             {"edge_id", edge_id}}) {
+    const std::pair<const char*, at::Tensor> index_tensors[] = {
+        {"tx_id", tx_id},
+        {"rx_id", rx_id},
+        {"depth", depth},
+        {"component_id", component_id},
+        {"primitive_id", primitive_id},
+        {"edge_id", edge_id}};
+    for (const auto& item : index_tensors) {
         check_tensor(item.second, item.first, at::kInt, 1);
         TORCH_CHECK(item.second.sizes() == valid.sizes(), item.first, " must match valid");
         TORCH_CHECK(item.second.get_device() == valid.get_device(), item.first, " must share valid device");

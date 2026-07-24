@@ -323,12 +323,13 @@ pybind11::dict channel_path_result_capacity_pack(
     TORCH_CHECK(valid.numel() == row_capacity, "valid has wrong capacity shape");
     TORCH_CHECK(num_paths.numel() == pair_count, "num_paths has wrong pair shape");
 
-    for (const auto& named : {
-             std::pair<const char *, at::Tensor>{"tx_id", tx_id},
-             {"rx_id", rx_id},
-             {"depth", depth},
-             {"component_id", component_id},
-             {"edge_id", edge_id}}) {
+    const std::pair<const char *, at::Tensor> index_tensors[] = {
+        {"tx_id", tx_id},
+        {"rx_id", rx_id},
+        {"depth", depth},
+        {"component_id", component_id},
+        {"edge_id", edge_id}};
+    for (const auto& named : index_tensors) {
         check_tensor(named.second, named.first, at::kInt, 1);
         TORCH_CHECK(named.second.numel() == row_capacity, named.first, " has wrong shape");
         check_same_device(named.second, failure_state, named.first);
