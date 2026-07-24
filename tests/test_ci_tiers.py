@@ -229,6 +229,7 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "RAYD_TORCH_CUDA_GENCODE_FLAGS=" in workflow
     assert "CMAKE_CUDA_COMPILER_LAUNCHER: \"\"" in workflow
     assert "CMAKE_BUILD_PARALLEL_LEVEL: \"2\"" in workflow
+    assert ".Path.Replace('\\', '/')" in workflow
     assert "actions/cache@v5" in workflow
     assert "sub-packages:" in workflow
     assert "safe.directory /project/channel" in workflow

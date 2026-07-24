@@ -201,8 +201,8 @@ jobs:
           "RAYD_TORCH_CUDA_GENCODE_FLAGS=$gencode" >> $env:GITHUB_ENV
           "EXPECTED_SASS=$expectedSass" >> $env:GITHUB_ENV
           "EXPECTED_PTX=$env:FULL_EXPECTED_PTX" >> $env:GITHUB_ENV
-          $rayd = (Resolve-Path -LiteralPath rayd).Path
-          $optix = (Resolve-Path -LiteralPath optix/include).Path
+          $rayd = (Resolve-Path -LiteralPath rayd).Path.Replace('\', '/')
+          $optix = (Resolve-Path -LiteralPath optix/include).Path.Replace('\', '/')
           "CMAKE_ARGS=-DRAYD_SOURCE_DIR=$rayd -DOPTIX_INCLUDE_DIR=$optix -DCMAKE_CUDA_ARCHITECTURES=$arches -DCHANNEL_RELEASE_BUILD=ON" >> $env:GITHUB_ENV
 
       - name: Install build dependencies
