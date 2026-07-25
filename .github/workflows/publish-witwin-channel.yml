@@ -295,7 +295,7 @@ jobs:
       - name: Build Windows wheel
         shell: pwsh
         run: |
-          python -m build core --wheel --no-isolation --outdir core/dist
+          python -m build core --wheel --outdir core/dist
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $startedAt = Get-Date
           python -m build channel --wheel --no-isolation --outdir channel/dist `
