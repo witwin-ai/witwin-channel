@@ -234,12 +234,27 @@ def test_consumer_vocabulary_has_one_source_of_truth() -> None:
 
 
 def test_consumer_v1_declares_no_unimplemented_frequency_offsets() -> None:
-    """A field that is always rejected is not part of a frozen contract."""
+    """The contract states the shift law without claiming to perform it.
+
+    A request field that is always rejected is not part of a frozen contract,
+    so there is no frequency-offset input and no capability flag. The narrowband
+    law itself stays on the convention: its sign follows the frozen phasor, and
+    ``delay_s`` is published per row so a caller can apply it.
+    """
 
     contracts = (CONSUMER_ROOT / "contracts.py").read_text(encoding="utf-8")
     assert "frequency_offsets_hz" not in contracts
-    assert "frequency_offset_law" not in contracts
     assert "supports_frequency_offsets" not in contracts
+
+    from witwin.channel.constants import NARROWBAND_FREQUENCY_OFFSET_LAW
+    from witwin.channel.propagation.consumer import PropagationConvention
+
+    convention = PropagationConvention()
+    assert (
+        convention.narrowband_frequency_offset_law
+        == NARROWBAND_FREQUENCY_OFFSET_LAW
+    )
+    assert "delay_s" in convention.narrowband_frequency_offset_law
 
 
 def test_consumer_geometry_has_no_duplicate_first_interaction_fields() -> None:

@@ -80,6 +80,28 @@ layout, units, phasor, time dependence, coefficient reference, Complex3 basis,
 and Jones mapping. Its phasor and time-dependence strings come from
 `witwin.channel.constants`, which is the package-wide owner of that convention.
 
-Frequency offsets are not part of contract version 1. When they are
-implemented, they arrive with a `CONTRACT_VERSION` bump rather than as a field
-that exists but is always rejected.
+## Frequency offsets
+
+There is no frequency-offset input, and a coefficient is always reported at the
+compiled reference frequency. Shifting off that frequency under the narrowband
+approximation is a post-multiply the caller owns:
+
+```python
+# convention.narrowband_frequency_offset_law
+#   H(f_ref+df) = C(f_ref)*exp(-j*2*pi*df*delay_s)
+shifted = coefficient * torch.exp(
+    -2j * torch.pi * offset_hz * paths.geometry.delay_s
+)
+```
+
+`delay_s` is published per row for exactly this, and
+`coefficient_reference` confirms the coefficient already carries the
+reference-frequency phase. The law is stated on `PropagationConvention` rather
+than left implicit because its sign follows the frozen phasor and
+time-dependence, which is easy to get wrong when rederived.
+
+This holds only while the coefficient is constant across the offset.
+Re-evaluating dispersive material response per frequency point is a different
+operation - N field evaluations rather than a post-multiply - and would arrive
+as its own capability with a `CONTRACT_VERSION` bump, not as a parameter on
+this one.

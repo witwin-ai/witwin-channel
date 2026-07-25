@@ -245,7 +245,7 @@
           "name": "PropagationConvention",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.contracts.PropagationConvention",
-          "contract_sha256": "79ef4127728d1e4e4243c26060ceb1089528866ca2d7978ae0ace50b93a2fa32"
+          "contract_sha256": "a88cc306843b205bbd5d0cafa0d6643b11f5d2c80bb80ea3feca5a5b88135232"
         },
         {
           "name": "PropagationDiagnostics",

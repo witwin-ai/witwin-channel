@@ -15,7 +15,11 @@ from typing import Literal, TypeAlias, get_args
 
 import torch
 
-from witwin.channel.constants import PHASOR, TIME_DEPENDENCE
+from witwin.channel.constants import (
+    NARROWBAND_FREQUENCY_OFFSET_LAW,
+    PHASOR,
+    TIME_DEPENDENCE,
+)
 
 
 CONTRACT_VERSION = 1
@@ -472,6 +476,10 @@ class PropagationConvention:
     phasor: str = PHASOR
     time_dependence: str = TIME_DEPENDENCE
     coefficient_reference: str = "includes_reference_frequency_phase"
+    # Stated so a caller can shift off the reference frequency with the correct
+    # sign. This contract does not apply it and has no frequency-offset input;
+    # `PropagationGeometry.delay_s` is published per row for exactly this use.
+    narrowband_frequency_offset_law: str = NARROWBAND_FREQUENCY_OFFSET_LAW
     complex3_basis: str = "world_cartesian"
     jones_mapping: str = "source_transverse_basis_to_sink_transverse_basis"
 

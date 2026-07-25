@@ -32,12 +32,28 @@ PHASE_CONVENTION = {
     "polarization": POLARIZATION,
 }
 
+# Narrowband law for shifting an evaluated coefficient off the reference
+# frequency. Nothing in this package applies it: a coefficient is always
+# reported at the compiled reference frequency, and `delay_s` is published per
+# row precisely so a caller can apply this itself. The sign follows the frozen
+# phasor and time-dependence above, so it is stated here rather than left for
+# each caller to rederive.
+#
+# It holds only while the coefficient may be treated as constant across the
+# offset. Re-evaluating dispersive material response per frequency point is a
+# different operation - N field evaluations rather than a post-multiply - and
+# is not what this law describes.
+NARROWBAND_FREQUENCY_OFFSET_LAW = (
+    "H(f_ref+df) = C(f_ref)*exp(-j*2*pi*df*delay_s)"
+)
+
 __all__ = [
     "C0",
     "EPS0",
     "ETA0",
     "FREE_SPACE_AMPLITUDE",
     "MU0",
+    "NARROWBAND_FREQUENCY_OFFSET_LAW",
     "PHASE_CONVENTION",
     "PHASOR",
     "POLARIZATION",
