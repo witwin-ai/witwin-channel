@@ -57,6 +57,16 @@ an atomic consumer update. Channel does not preserve both versions or add a
 fallback adapter. Radar adoption is a later Stage-II change; Phase 3 does not
 change Radar production source or dependencies.
 
+### Python matrix decision
+
+The runtime matrix follows RayD. `rayd-torch` 0.7.0 declares
+`>=3.10,<3.15` with `torch>=2.10,<2.12`, and Core's only extension is the
+Stable ABI mesh-SDF module, so `witwin` (Core) now declares `>=3.10,<3.15` to
+match. Channel remains `>=3.11,<3.12`: `_channel` is a versioned
+pybind11/LibTorch extension, and widening it honestly means either per-version
+wheels or a Stable ABI migration - a packaging capability, not a metadata
+edit. The narrow row therefore lives only where the constraint actually is.
+
 The supported Stage-I release row is CPython 3.11 and Torch 2.10.0. `_channel`
 uses the versioned LibTorch/Python extension ABI and is not a LibTorch Stable
 ABI artifact. Release wheels are built for Windows x64 and real

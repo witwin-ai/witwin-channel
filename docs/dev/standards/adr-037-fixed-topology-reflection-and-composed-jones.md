@@ -1,6 +1,6 @@
 # ADR-037: Fixed-topology reflection reevaluation with per-row geometric validity, and composed source-to-sink Jones transport
 
-- **Status:** Draft
+- **Status:** Accepted (2026-07-24, merged to main by owner decision)
 - **Date:** 2026-07-24
 - **Kind:** Consumer contract, result schema, and AD-boundary decision
 - **Related:** ADR-003, ADR-007, ADR-024, ADR-026, ADR-032, ADR-034, ADR-036
