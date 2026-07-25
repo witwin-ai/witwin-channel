@@ -128,7 +128,7 @@ def main() -> None:
 
     from witwin.channel.core.scene import Mesh, ReceiverGrid, Scene, Transmitter
     from witwin.channel.montecarlo import Config, IntegratorOptions, Tuning, solve
-    from witwin.core import Material, Structure
+    from witwin.core import PhysicalMaterial as Material, Structure
 
     scene = Scene(
         structures=[
