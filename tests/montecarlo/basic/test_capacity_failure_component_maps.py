@@ -44,6 +44,12 @@ def test_component_map_sanitizer_success_is_exact_on_current_stream() -> None:
     state = create_capacity_failure_state(values[0])
     bits_pointer = state.bits.data_ptr()
     stream = torch.cuda.Stream()
+    # The op launches on the caller's current stream; input readiness is the
+    # caller's responsibility. The maps and the failure state were produced on
+    # the default stream, so a correct caller orders the side stream behind it
+    # before launching - without this the kernel raced its own inputs and the
+    # test failed roughly once per thousand full-suite runs.
+    stream.wait_stream(torch.cuda.current_stream())
 
     with torch.cuda.stream(stream):
         output = mc_capacity_failure_component_maps_sanitize(
