@@ -29,13 +29,13 @@ priority `scattering > diffraction > transmission > reflection > los`.
 
 ## Solver-neutral propagation consumer
 
-- `witwin.channel.propagation.consumer` contract version 1 is a stable public
+- `witwin.channel.propagation.consumer` contract version 2 is a stable public
   module; it is not duplicated at the package root and does not expose
   `EvaluatedPaths` or a solver result.
 - Typed endpoint/request/convention/capability/evaluation contracts publish
   exact compact `K` rows, native-produced `pair_index`/`pair_offsets`, and
   scalar, Complex3, or complete 2x2 Jones transport according to capability.
-- Contract version 1 supports `los`, `reflection`, `transmission`, and
+- The contract supports `los`, `reflection`, `transmission`, and
   `diffraction`. It rejects `scattering` before compute because the current
   scattering rows are incoherent power-domain output without the required
   coherent transport and canonical pair-major row semantics.
@@ -45,6 +45,28 @@ priority `scattering > diffraction > transmission > reflection > los`.
 - Fixed-topology reevaluation supports only advertised continuous inputs with
   fixed row identity, winners, and pair segmentation. Unsupported response,
   frequency-offset, topology-tangent, and AD cells fail before partial output.
+- `prepare_fixed_topology` partitions a frozen topology by component and
+  interaction depth once, on the host, and is the enforcement point for
+  `fixed_topology_components`. `reevaluate` accepts the resulting handle and
+  replays reflection rows through the same fixed-winner stationary-point owner
+  discovery used, reproducing `evaluate` exactly at unchanged endpoints.
+- A frozen reflection row that stops existing at new endpoint positions is
+  published through `FixedTopologyEvaluation.row_valid` with exact-zero payload
+  and exact-zero derivative contribution. It is a complete answer, not a
+  failure: the surviving rows are unaffected and nothing raises. The mask is
+  the sole authority on row validity for the components it covers, and it
+  covers `capabilities().fixed_topology_row_validity_components` only. A frozen
+  line-of-sight row is replayed as free space and is never re-tested for
+  visibility, so blockage on the direct path still requires rediscovery.
+- `polarimetric_transport` publishes the complete complex 2x2 operator through
+  reflection paths under fixed topology, composed from the native transport and
+  endpoint-basis owners, and supports `jvp` and `vjp`. Both transverse bases,
+  the endpoint polarizations, and transmit power are primal-only by native
+  contract and are rejected by name at both entry points.
+- Forward mode on the prepared fixed-topology route requires endpoint positions
+  carrying `requires_grad` in addition to a forward tangent. Without it the
+  shared native field companions publish `path_length_m` and `delay_s` with no
+  tangent, so the route raises instead of returning a partial derivative.
 - The consumer reuses the ADR-032 owning count observation. Its count D2H and
   stream-synchronization delta relative to the same internal evaluation is
   zero. Failure state, raw bits, handles, resources, caches, and tapes do not

@@ -200,16 +200,22 @@
           "contract_sha256": "4750752121684732660cfbb503bd1c9cb4d64ac20aa9acca7286645add744179"
         },
         {
+          "name": "FixedTopologyBucket",
+          "kind": "class",
+          "target": "witwin.channel.propagation.consumer.contracts.FixedTopologyBucket",
+          "contract_sha256": "05b7881b39f1534c1eaebe8797c2ad7994d130952d15c8953fd9ccb0c2614883"
+        },
+        {
           "name": "FixedTopologyEvaluation",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.contracts.FixedTopologyEvaluation",
-          "contract_sha256": "cf0ec9265f4a8e47b5fd9787be0daced87d5ee458a320a5b3e3df27c9a09a692"
+          "contract_sha256": "673416d87f3ef3d818fafd0ca79a3e9c20416bb2f1b3f0ec6fc30aff8d275e79"
         },
         {
           "name": "FixedTopologyRequest",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.contracts.FixedTopologyRequest",
-          "contract_sha256": "baed68a795be3cb925b4cdfa2fd95ab43e8ebaf44966631bbca54ee480f79341"
+          "contract_sha256": "21c18b43364609edfdc08c837f0b51dd2f416f0a1900de2f98b1dc12807487ba"
         },
         {
           "name": "JonesTransport",
@@ -224,6 +230,12 @@
           "contract_sha256": "b967197ec307cbe0193d87f451ba13515c9813687116f579317b158c3e8d00aa"
         },
         {
+          "name": "PreparedFixedTopology",
+          "kind": "class",
+          "target": "witwin.channel.propagation.consumer.contracts.PreparedFixedTopology",
+          "contract_sha256": "b6b8c74af3eeca005679358c764f328222d90c0ffaddb4656f20456632d89911"
+        },
+        {
           "name": "PropagationAdMode",
           "kind": "unresolved",
           "target": "witwin.channel.propagation.consumer.contracts.PropagationAdMode",
@@ -233,7 +245,7 @@
           "name": "PropagationCapabilities",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.contracts.PropagationCapabilities",
-          "contract_sha256": "9ba63c67c638ae11be5842af5fb894fb2321ec7e05bfccf9c0b9cd15e48c772c"
+          "contract_sha256": "4a5a28621cd2649456c926d6aeea5ccb38590262528f04df4010bb3d7783ef7f"
         },
         {
           "name": "PropagationComponent",
@@ -326,6 +338,13 @@
           "target": "witwin.channel.propagation.consumer.service.evaluate",
           "contract_sha256": "4c1201a20a2a25ff9ff7818d56990830b20c0583da22f82e7c7bed7068f7c402",
           "signature": "(compiled_scene: CompiledScene, request: PropagationRequest)"
+        },
+        {
+          "name": "prepare_fixed_topology",
+          "kind": "function",
+          "target": "witwin.channel.propagation.consumer.contracts.prepare_fixed_topology",
+          "contract_sha256": "2ca36f0fc646a02c62e1813601e6897bbf572dc7eb4917d8d268bc16a3f8e649",
+          "signature": "(topology: PropagationTopology)"
         },
         {
           "name": "reevaluate",

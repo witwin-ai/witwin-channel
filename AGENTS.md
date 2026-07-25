@@ -135,7 +135,14 @@ Organize code by RF domain capability, with a single owner for each operation:
 - `propagation.models`: the typed internal row contracts those stages exchange.
 - `propagation.consumer`: the stable solver-neutral public propagation
   contract, its vocabulary, and its capability record. It owns no physics, adds
-  no second compaction, and must never import a solver.
+  no second compaction, and must never import a solver. Under ADR-037 a frozen
+  topology that carries interactions must be partitioned once by
+  `prepare_fixed_topology` before reevaluation, and a reflection row that stops
+  existing at new endpoint positions is published through the `row_valid` mask
+  as a complete answer, never as a failure that voids the batch. The composed
+  source-to-sink Jones operator is structural packing over already-owned native
+  transport and basis operators; it must not restate a direction, a transverse
+  basis, or a projection in Torch.
 - `path`, `deterministic`, `montecarlo.basic`, and `montecarlo.bdpt`: thin
   solver-owned configuration, orchestration, accumulation, result, and metadata
   layers. Solvers must never import another solver.
@@ -381,6 +388,7 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-034-stage-i-world-and-propagation-boundary.md`
 - `docs/dev/standards/adr-035-rayd-native-trace-backend-selection.md`
 - `docs/dev/standards/adr-036-channel-public-surface-and-module-ownership.md`
+- `docs/dev/standards/adr-037-fixed-topology-reflection-and-composed-jones.md`
 
 ADR-029 is Superseded, ADR-030 is Dormant, and ADR-031 is Rejected. They are
 historical records rather than implementation or release requirements; ADR-032

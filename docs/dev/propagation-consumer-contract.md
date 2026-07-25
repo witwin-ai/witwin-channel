@@ -6,7 +6,7 @@ waveform, target, RCS, IQ, ADC, detection, or processing policy.
 
 ## Version and compatibility
 
-- `CONTRACT_VERSION == 1`.
+- `CONTRACT_VERSION == 2`.
 - The module's `__all__` is the complete stable public surface. Consumer names
   are not duplicated at `witwin.channel`.
 - A breaking schema or semantic change increments the version and atomically
@@ -121,6 +121,20 @@ host frequency value is reused, so reevaluation does not add a frequency D2H
 observation. A nonempty frozen-row request performs one 4-byte validation D2H
 and one current-stream synchronization; an empty request performs neither.
 The versioned capability object is the source of truth for supported cells.
+
+Forward mode on the prepared route requires endpoint positions carrying
+`requires_grad` in addition to their forward tangent. `Function.apply` unpacks
+a dual before `setup_context` runs, so the shared native field companions
+cannot observe a forward-only tangent and publish `path_length_m` and `delay_s`
+without one; the prepared route rejects that call rather than publishing a
+partially differentiated answer (ADR-037 section 8). The raw zero-interaction
+route keeps its version-1 acceptance rules.
+
+Row validity applies to
+`capabilities().fixed_topology_row_validity_components` only. A frozen
+line-of-sight row is replayed as free-space transport and is never re-tested
+for visibility, so an occluded direct path still reports a valid full-strength
+row and requires rediscovery to detect.
 
 ## Release boundary
 

@@ -122,15 +122,15 @@ def _opposite_vertex_ids(
     return faces.gather(1, opposite_slot[:, None])[:, 0]
 
 
-def _reflection_geometry_ad(
+def reflection_epc_paths(
     compiled: object,
     vertices: torch.Tensor,
     source: torch.Tensor,
     target: torch.Tensor,
     face_id: torch.Tensor,
     depth: int,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Differentiable reflection hit geometry from RayD under the frozen winner.
+) -> dict[str, torch.Tensor]:
+    """Frozen-winner reflection EPC re-solve, published with its validity.
 
     Re-launches the native EPC discovery (direct-plane mode) on the winner
     face sequence, so the primal hit points and normals ARE the discovery
@@ -139,6 +139,11 @@ def _reflection_geometry_ad(
     RayD are pure gathers of the same anchor/normal tables the discovery
     consumed; RayD chains the plane cotangents to the winner triangle's
     vertices itself, so nothing geometric is re-derived here.
+
+    This is the single implementation of the re-solve. What a caller does with
+    ``valid`` is the caller's policy: the enumerated fixed-winner path below
+    requires every row to survive, while fixed-topology reevaluation publishes
+    the mask per row.
     """
 
     rayd = compiled.rayd
@@ -171,6 +176,26 @@ def _reflection_geometry_ad(
         depth,
         1,
     )
+    return epc
+
+
+def _reflection_geometry_ad(
+    compiled: object,
+    vertices: torch.Tensor,
+    source: torch.Tensor,
+    target: torch.Tensor,
+    face_id: torch.Tensor,
+    depth: int,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """All-or-nothing fixed-winner reflection hit geometry.
+
+    The enumerated path evaluates a winner it has just discovered under the
+    same scene tensors, so a row that stops reproducing is a contract failure,
+    not an answer. Reevaluation at NEW endpoint positions is a different
+    operation with a different contract and lives in the consumer.
+    """
+
+    epc = reflection_epc_paths(compiled, vertices, source, target, face_id, depth)
     if not bool(epc["valid"].all()):
         raise RuntimeError(
             "fixed-winner EPC re-solve no longer reproduces the discovered "

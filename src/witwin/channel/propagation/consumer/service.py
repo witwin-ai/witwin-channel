@@ -13,6 +13,7 @@ from .contracts import (
     FixedTopologyEvaluation,
     FixedTopologyRequest,
     JonesTransport,
+    PreparedFixedTopology,
     PropagationConvention,
     PropagationDiagnostics,
     PropagationEvaluation,
@@ -70,20 +71,71 @@ def _has_forward_tangent(value: torch.Tensor) -> bool:
     return torch.autograd.forward_ad.unpack_dual(value).tangent is not None
 
 
+def _carries_ad(value: torch.Tensor | None) -> bool:
+    return value is not None and (
+        value.requires_grad or _has_forward_tangent(value)
+    )
+
+
 def _require_fixed_los_ad_inputs(request: FixedTopologyRequest) -> None:
+    """Reject AD on inputs the native field companions treat as constants.
+
+    Transmit power, endpoint polarizations, and the polarization reference
+    vectors are rejected by the native forward/backward/JVP contracts, so a
+    differentiable request carrying one of them fails here rather than
+    producing a silently incomplete derivative.
+    """
+
     if request.ad_mode == "none":
         return
     fixed_inputs = (
         ("sources.powers_w", request.sources.powers_w),
         ("sources.polarizations", request.sources.polarizations),
         ("sinks.polarizations", request.sinks.polarizations),
+        ("sources.polarization_basis", request.sources.polarization_basis),
+        ("sinks.polarization_basis", request.sinks.polarization_basis),
     )
     for name, value in fixed_inputs:
-        assert value is not None
-        if value.requires_grad or _has_forward_tangent(value):
+        if _carries_ad(value):
             raise NotImplementedError(
                 f"fixed LoS {name} is primal-only; only endpoint positions "
                 "and reference_frequency_hz support AD"
+            )
+
+
+def _require_prepared_forward_mode_convention(
+    request: FixedTopologyRequest,
+) -> None:
+    """Reject a forward-mode request whose geometry tangents would vanish.
+
+    ``torch.autograd.Function.apply`` unpacks a dual before ``setup_context``
+    runs, so the shared native field companions cannot see a forward-only
+    tangent and mark ``path_length_m`` and ``delay_s`` non-differentiable. The
+    result would then be partially dual: the transport carries a tangent and
+    the two geometry outputs silently do not, which is exactly the derivative
+    a Doppler consumer reads. Marking the endpoint positions ``requires_grad``
+    in addition to making them dual makes the same companions publish both, so
+    this route demands that convention instead of answering with an incomplete
+    derivative.
+
+    The check is scoped to the prepared route. The raw zero-interaction route
+    is contract-version-1 surface with shipped callers, and widening its
+    acceptance rules is a separate decision.
+    """
+
+    if request.ad_mode != "jvp":
+        return
+    for name, value in (
+        ("sources.positions_m", request.sources.positions_m),
+        ("sinks.positions_m", request.sinks.positions_m),
+    ):
+        if _has_forward_tangent(value) and not value.requires_grad:
+            raise NotImplementedError(
+                f"prepared fixed-topology ad_mode='jvp' requires {name} to "
+                "carry requires_grad in addition to its forward tangent; "
+                "without it the native field companions publish path_length_m "
+                "and delay_s without a tangent and the answer would be only "
+                "partially differentiated"
             )
 
 
@@ -117,34 +169,70 @@ def _preflight_evaluate(
             f"{unsupported_ad}"
         )
     if request.response == "polarimetric_transport":
-        if (
-            request.sources.polarization_basis is None
-            or request.sinks.polarization_basis is None
-        ):
-            raise ValueError(
-                "polarimetric_transport requires source and sink "
-                "polarization_basis tensors"
-            )
-        if isinstance(request.reference_frequency_hz, torch.Tensor):
-            raise NotImplementedError(
-                "polarimetric_transport requires a scalar compiled frequency"
-            )
-        polarimetric_inputs = (
-            request.sources.positions_m,
-            request.sinks.positions_m,
-            request.sources.polarization_basis,
-            request.sinks.polarization_basis,
-        )
-        if any(
-            value.requires_grad or _has_forward_tangent(value)
-            for value in polarimetric_inputs
-            if value is not None
-        ):
-            raise NotImplementedError(
-                "polarimetric_transport is primal-only in contract version 1"
-            )
+        _require_polarimetric_inputs(request)
     compiled.require_reference_frequency(request.reference_frequency_hz)
     return compiled, request
+
+
+def _require_polarimetric_inputs(request: PropagationRequest) -> None:
+    """Enforce the polarization-basis contract before any native work.
+
+    The two transverse bases are structurally frozen: they reach the native
+    field companions as the transmit and receive polarization, and those
+    companions reject gradients on both. The primal-only fused LoS operator
+    additionally rejects a differentiable endpoint or a tensor frequency, so
+    a caller that wants derivatives asks for an AD mode and gets the composed
+    operator instead.
+    """
+
+    if (
+        request.sources.polarization_basis is None
+        or request.sinks.polarization_basis is None
+    ):
+        raise ValueError(
+            "polarimetric_transport requires source and sink "
+            "polarization_basis tensors"
+        )
+    for name, value in (
+        ("sources.polarization_basis", request.sources.polarization_basis),
+        ("sinks.polarization_basis", request.sinks.polarization_basis),
+    ):
+        if _carries_ad(value):
+            raise NotImplementedError(
+                f"polarimetric_transport {name} is primal-only; the operator "
+                "is published in a frozen world-referenced transverse basis"
+            )
+    # The capability record declares tx_power and the endpoint polarizations
+    # frozen too, and a declaration nobody enforces is the ADR-036 pattern.
+    # The composed operator excites the transport with the two basis vectors,
+    # so an endpoint polarization never reaches it at all and a gradient on one
+    # could only ever come back empty; tx_power reaches a companion that does
+    # not differentiate it. Refuse instead of returning a partial derivative.
+    for name, value in (
+        ("sources.powers_w", request.sources.powers_w),
+        ("sources.polarizations", request.sources.polarizations),
+        ("sinks.polarizations", request.sinks.polarizations),
+    ):
+        if _carries_ad(value):
+            raise NotImplementedError(
+                f"polarimetric_transport {name} is primal-only; the operator "
+                "is excited by the two transverse basis vectors and carries no "
+                "derivative with respect to it"
+            )
+    if request.ad_mode != "none":
+        return
+    if isinstance(request.reference_frequency_hz, torch.Tensor):
+        raise NotImplementedError(
+            "polarimetric_transport requires a scalar compiled frequency"
+        )
+    if _carries_ad(request.sources.positions_m) or _carries_ad(
+        request.sinks.positions_m
+    ):
+        raise NotImplementedError(
+            "polarimetric_transport with ad_mode='none' is primal-only; "
+            "request ad_mode='jvp' or ad_mode='vjp' for a differentiable "
+            "operator"
+        )
 
 
 def _solver_scene(
@@ -204,6 +292,93 @@ def _compact(
     )
 
 
+def _fused_los_jones(
+    compact: _ConsumerRows,
+    *,
+    sources: EndpointBatch,
+    sinks: EndpointBatch,
+    reference_frequency_hz: float | torch.Tensor,
+) -> JonesTransport:
+    """Primal-only fused operator: one native launch for the whole batch."""
+
+    from ._native import consumer_los_jones
+
+    assert sources.polarization_basis is not None
+    assert sinks.polarization_basis is not None
+    jones = consumer_los_jones(
+        pair_index=compact.pair_index,
+        source_positions=sources.positions_m,
+        sink_positions=sinks.positions_m,
+        source_reference_basis=sources.polarization_basis,
+        sink_reference_basis=sinks.polarization_basis,
+        frequency_hz=float(reference_frequency_hz),
+    )
+    return JonesTransport(
+        matrix=jones.matrix,
+        source_basis=jones.source_basis,
+        sink_basis=jones.sink_basis,
+    )
+
+
+def _composed_los_jones(
+    compact: _ConsumerRows,
+    *,
+    sources: EndpointBatch,
+    sinks: EndpointBatch,
+    frequency: float | torch.Tensor,
+    frequency_value: float,
+) -> JonesTransport:
+    """Differentiable operator composed from the native free-space owner.
+
+    Discovery restricts this response to line-of-sight rows, so every row has
+    the same single leg and one excitation pair covers the whole batch. The
+    fused primal operator above evaluates the identical native expressions in
+    one launch, and both routes are held to bit-identical agreement by test.
+    """
+
+    from witwin.channel.propagation.fields.kernels import (
+        autograd as field_autograd,
+    )
+
+    from ._jones import compose_jones, transverse_basis
+    from ._rows import select_rows
+
+    assert sources.polarization_basis is not None
+    assert sinks.polarization_basis is not None
+    assert sources.powers_w is not None
+    topology = compact.evaluated.topology
+    source_rows = topology.tx_id.to(dtype=torch.int64)
+    sink_rows = topology.rx_id.to(dtype=torch.int64)
+    source = select_rows(sources.positions_m, source_rows)
+    target = select_rows(sinks.positions_m, sink_rows)
+    power = select_rows(sources.powers_w, source_rows)
+    source_basis = transverse_basis(
+        select_rows(sources.polarization_basis, source_rows),
+        source,
+        target,
+        frequency_hz=frequency_value,
+    )
+    matrix, sink_basis, _ = compose_jones(
+        lambda polarization: field_autograd.field_free_space_ad(
+            source,
+            target,
+            power,
+            polarization,
+            polarization,
+            frequency=frequency,
+            frequency_value=frequency_value,
+        ),
+        source_basis=source_basis,
+        sink_reference_basis=select_rows(sinks.polarization_basis, sink_rows),
+        arrival_origin=source,
+        arrival_target=target,
+        frequency_hz=frequency_value,
+    )
+    return JonesTransport(
+        matrix=matrix, source_basis=source_basis, sink_basis=sink_basis
+    )
+
+
 def _transport(
     response: str,
     compact: _ConsumerRows,
@@ -211,6 +386,8 @@ def _transport(
     sources: EndpointBatch,
     sinks: EndpointBatch,
     reference_frequency_hz: float | torch.Tensor,
+    ad_mode: str,
+    frequency_value: float,
 ) -> ScalarTransport | Complex3Transport | JonesTransport:
     fields = compact.evaluated.fields
     geometry = compact.evaluated.geometry
@@ -222,22 +399,19 @@ def _transport(
             direction=geometry.field_direction,
         )
     if response == "polarimetric_transport":
-        from ._native import consumer_los_jones
-
-        assert sources.polarization_basis is not None
-        assert sinks.polarization_basis is not None
-        jones = consumer_los_jones(
-            pair_index=compact.pair_index,
-            source_positions=sources.positions_m,
-            sink_positions=sinks.positions_m,
-            source_reference_basis=sources.polarization_basis,
-            sink_reference_basis=sinks.polarization_basis,
-            frequency_hz=float(reference_frequency_hz),
-        )
-        return JonesTransport(
-            matrix=jones.matrix,
-            source_basis=jones.source_basis,
-            sink_basis=jones.sink_basis,
+        if ad_mode == "none":
+            return _fused_los_jones(
+                compact,
+                sources=sources,
+                sinks=sinks,
+                reference_frequency_hz=reference_frequency_hz,
+            )
+        return _composed_los_jones(
+            compact,
+            sources=sources,
+            sinks=sinks,
+            frequency=reference_frequency_hz,
+            frequency_value=frequency_value,
         )
     raise AssertionError("response was not preflighted")
 
@@ -250,6 +424,8 @@ def _path_batch(
     sources: EndpointBatch,
     sinks: EndpointBatch,
     reference_frequency_hz: float | torch.Tensor,
+    ad_mode: str,
+    frequency_value: float,
 ) -> PropagationPathBatch:
     evaluated = compact.evaluated
     source = evaluated.topology
@@ -282,6 +458,8 @@ def _path_batch(
         sources=sources,
         sinks=sinks,
         reference_frequency_hz=reference_frequency_hz,
+        ad_mode=ad_mode,
+        frequency_value=frequency_value,
     )
     return PropagationPathBatch(
         pair_count=pair_count,
@@ -349,6 +527,8 @@ def evaluate(
         sources=request.sources,
         sinks=request.sinks,
         reference_frequency_hz=request.reference_frequency_hz,
+        ad_mode=request.ad_mode,
+        frequency_value=compiled.materials.frequency_hz,
     )
     return PropagationEvaluation(
         paths=paths,
@@ -367,19 +547,131 @@ def _preflight_reevaluate(
         raise TypeError("reevaluate requires a CompiledScene")
     if not isinstance(request, FixedTopologyRequest):
         raise TypeError("request must be a FixedTopologyRequest")
-    if request.topology.device != request.sources.device:
+    if request.frozen_topology.device != request.sources.device:
         raise ValueError("fixed topology and endpoint batches must share a device")
     compiled.require_reference_frequency(request.reference_frequency_hz)
     if not _CAPABILITIES.supports_fixed_topology:
         raise NotImplementedError(
             "fixed-topology reevaluation is unavailable in this build"
         )
-    if request.topology.primitive_sequence.shape[1] != 0:
+    if (
+        isinstance(request.topology, PropagationTopology)
+        and request.topology.primitive_sequence.shape[1] != 0
+    ):
         raise NotImplementedError(
-            "fixed LoS reevaluation requires zero-width interaction sequences"
+            "fixed LoS reevaluation requires zero-width interaction sequences; "
+            "call prepare_fixed_topology first to reevaluate a topology that "
+            "carries interactions"
         )
+    if request.response == "polarimetric_transport":
+        if (
+            request.sources.polarization_basis is None
+            or request.sinks.polarization_basis is None
+        ):
+            raise ValueError(
+                "polarimetric_transport requires source and sink "
+                "polarization_basis tensors"
+            )
+        if isinstance(request.topology, PropagationTopology):
+            raise NotImplementedError(
+                "fixed-topology polarimetric_transport requires a "
+                "PreparedFixedTopology; the raw-topology form is the "
+                "zero-interaction scalar and complex3 fast path"
+            )
     _require_fixed_los_ad_inputs(request)
+    if isinstance(request.topology, PreparedFixedTopology):
+        _require_prepared_forward_mode_convention(request)
     return compiled, request
+
+
+def _fixed_transport(
+    response: str, outputs: object
+) -> ScalarTransport | Complex3Transport | JonesTransport:
+    if response == "scalar_transport":
+        return ScalarTransport(coefficient=outputs.coefficient)
+    if response == "complex3_transport":
+        return Complex3Transport(
+            field=outputs.field_vector, direction=outputs.direction
+        )
+    assert outputs.matrix is not None
+    return JonesTransport(
+        matrix=outputs.matrix,
+        source_basis=outputs.source_basis,
+        sink_basis=outputs.sink_basis,
+    )
+
+
+def _reevaluate_prepared(
+    compiled: CompiledScene, request: FixedTopologyRequest
+) -> FixedTopologyEvaluation:
+    """Replay a prepared frozen topology bucket by bucket."""
+
+    from ._fixed_reflection import (
+        evaluate_prepared,
+        require_smooth_reflection_scene,
+    )
+    from ._rows import prepared_row_gather, select_rows
+
+    prepared = request.topology
+    assert isinstance(prepared, PreparedFixedTopology)
+    validity = _CAPABILITIES.fixed_topology_row_validity_components
+    if any(bucket.component in validity for bucket in prepared.buckets):
+        require_smooth_reflection_scene(compiled)
+    rows = prepared_row_gather(prepared.topology, request.sources, request.sinks)
+    bases = (
+        (
+            select_rows(request.sources.polarization_basis, rows.source_row_index),
+            select_rows(request.sinks.polarization_basis, rows.sink_row_index),
+        )
+        if request.response == "polarimetric_transport"
+        else (None, None)
+    )
+    outputs = evaluate_prepared(
+        compiled,
+        prepared,
+        rows,
+        response=request.response,
+        ad_mode=request.ad_mode,
+        frequency=request.reference_frequency_hz,
+        frequency_value=compiled.materials.frequency_hz,
+        source_reference_basis=bases[0],
+        sink_reference_basis=bases[1],
+        publish_row_validity=any(
+            bucket.component in validity for bucket in prepared.buckets
+        ),
+    )
+    paths = PropagationPathBatch(
+        pair_count=request.sources.count * request.sinks.count,
+        path_count=rows.row_count,
+        pair_index=rows.pair_index,
+        pair_offsets=rows.pair_offsets,
+        topology=prepared.topology,
+        geometry=PropagationGeometry(
+            path_length_m=outputs.path_length_m,
+            delay_s=outputs.delay_s,
+            field_direction=outputs.direction,
+            interaction_positions_m=outputs.interaction_positions,
+            interaction_normals=outputs.interaction_normals,
+        ),
+        transport=_fixed_transport(request.response, outputs),
+    )
+    return FixedTopologyEvaluation(
+        paths=paths,
+        convention=_CONVENTION,
+        capabilities=_CAPABILITIES,
+        diagnostics=PropagationDiagnostics(
+            discovery_launch_count=0,
+            candidate_count=0,
+            visibility_rejection_count=0,
+            compact_count_d2h_copies=0,
+            compact_count_d2h_bytes=0,
+            compact_sync_count=0,
+            validation_d2h_copies=rows.validation_d2h_copies,
+            validation_d2h_bytes=rows.validation_d2h_bytes,
+            validation_sync_count=rows.validation_synchronizations,
+        ),
+        row_valid=outputs.row_valid,
+    )
 
 
 def reevaluate(
@@ -397,6 +689,8 @@ def reevaluate(
     from ._fixed_los import fixed_los_gather
 
     compiled, request = _preflight_reevaluate(compiled_scene, request)
+    if isinstance(request.topology, PreparedFixedTopology):
+        return _reevaluate_prepared(compiled, request)
     rows = fixed_los_gather(request.topology, request.sources, request.sinks)
     frequency = request.reference_frequency_hz
     frequency_value = compiled.materials.frequency_hz

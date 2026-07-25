@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "contract_version": 1,
+  "contract_version": 2,
   "status": "binding names finalized with implementation; measured acceptance pending",
   "new_bindings": [
     "enumerated_canonical_compact",
@@ -99,5 +99,35 @@
     "pure_cuda": "accepted full-result native implementation",
     "independent_evidence_required": true,
     "fallback_claim": false
-  }
+  },
+  "adr_037_added_owners": [
+    {
+      "operation_family": "frozen topology partition by component and depth",
+      "abi_owner": "none; host-side structural partition",
+      "python_owner": "witwin.channel.propagation.consumer.contracts",
+      "entry_point": "prepare_fixed_topology",
+      "observation": "host-visible, recorded on the returned handle"
+    },
+    {
+      "operation_family": "frozen-row endpoint binding and pair segmentation",
+      "abi_owner": "none; structural index_select and integer segmentation",
+      "python_owner": "witwin.channel.propagation.consumer._rows",
+      "validation": "one int32 contract bitmask, 1 copy / 4 bytes / 1 sync"
+    },
+    {
+      "operation_family": "fixed-winner reflection stationary-point re-solve",
+      "abi_owner": "RayD via rayd_reflection_epc_paths",
+      "python_owner": "witwin.channel.propagation.geometry.reevaluate.reflection_epc_paths",
+      "policy_owners": [
+        "propagation.enumerated: every row must reproduce",
+        "propagation.consumer: per-row validity mask"
+      ]
+    },
+    {
+      "operation_family": "source-to-sink complex 2x2 transport",
+      "abi_owner": "Channel _channel field_reflection_sequence, field_free_space, field_project_complex3, consumer_los_jones",
+      "python_owner": "witwin.channel.propagation.consumer._jones",
+      "role": "structural composition only; no new native symbol"
+    }
+  ]
 }

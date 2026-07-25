@@ -40,13 +40,13 @@ from witwin.channel.propagation.consumer import (
 )
 ```
 
-Version 1 replaces any direct dependency on internal `EvaluatedPaths`,
+The contract replaces any direct dependency on internal `EvaluatedPaths`,
 `propagation.enumerated`, solver results, or native extension helpers. It
 publishes actual compact rows and native pair segmentation. There is no
 capacity-shaped compatibility result and no public `path_capacity_per_pair`,
 `diffraction_state_capacity`, or `Qr`.
 
-The version-1 component set is `los`, `reflection`, `transmission`, and
+The component set is `los`, `reflection`, `transmission`, and
 `diffraction`. Scattering remains outside this consumer boundary: its current
 enumerated representation is incoherent power-domain output and does not meet
 the coherent transport or canonical pair-major row contracts. A consumer
@@ -765,10 +765,10 @@ Note: Core's `VACUUM_PERMITTIVITY` and Channel's derived `EPS0` still differ in
 the ninth significant digit. That is a numerical question and needs its own
 ADR; this pass did not touch either value.
 
-### Propagation consumer contract
+### Propagation consumer contract, version 1
 
-Still contract version 1; the changes are removals of things that were never
-implemented plus additions that are purely descriptive.
+The changes below are removals of things that were never implemented plus
+additions that are purely descriptive.
 
 - `capabilities()` is exported. Query supported components, responses, topology
   modes, and AD modes before building a request.
@@ -785,6 +785,57 @@ implemented plus additions that are purely descriptive.
   arrive with a `CONTRACT_VERSION` bump.
 - `PropagationCapabilities` drops `supports_frequency_offsets` and gains
   `components_for`, `ad_modes_for`, and `ad_modes_for_component`.
+
+### Propagation consumer contract, version 2
+
+ADR-037 adds two capabilities to the fixed-topology route. Nothing that
+existed in version 1 is relaxed: the raw-`PropagationTopology` line-of-sight
+route keeps its fused native gather, its all-or-nothing validation, and its
+one-copy/four-byte/one-synchronization budget.
+
+- `prepare_fixed_topology`, `PreparedFixedTopology`, and `FixedTopologyBucket`
+  are exported. A frozen topology that carries interactions must be prepared
+  once before `reevaluate` accepts it; a raw topology with a non-zero
+  interaction width now fails naming this function. Preparation synchronizes,
+  so call it once per frozen topology, not once per frame - its host cost is
+  recorded on the handle rather than on the per-call diagnostics.
+- `reevaluate` supports the `reflection` component. Each frozen row's
+  stationary point is resolved again at the new endpoint positions by the same
+  fixed-winner owner discovery used, so an unchanged endpoint reproduces
+  `evaluate` exactly.
+- `FixedTopologyEvaluation` gains `row_valid`. It is `None` when every row is
+  valid by construction, and otherwise a device-resident `bool[K]` mask in
+  frozen row order. A frozen reflection path that stops existing at new
+  endpoints is published through this mask as a complete answer, with exact
+  zeros in every payload field and exactly zero derivative contribution - it
+  does not raise and does not void the surviving rows. The mask is the sole
+  authority for the components it covers; a valid row may legitimately carry a
+  zero coefficient. It covers `fixed_topology_row_validity_components` only,
+  today `{"reflection"}`: a frozen line-of-sight row is replayed as free space
+  and is never re-tested for visibility, so a sink that moves behind a wall
+  still reports a valid, full-strength row where fresh discovery would drop it.
+  Rediscover if you need blockage on the direct path.
+- Forward mode on the prepared route requires endpoint positions that carry
+  `requires_grad` in addition to their forward tangent. `Function.apply`
+  unpacks a dual before `setup_context` runs, so the shared native field
+  companions cannot see a forward-only tangent and publish `path_length_m` and
+  `delay_s` without one. The prepared route raises rather than returning a
+  partially differentiated answer; the raw route keeps its version-1 rules.
+  Reverse mode is unaffected.
+- `polarimetric_transport` joins `fixed_topology_responses` and gains full AD
+  support. Reflection Jones is available through the prepared fixed-topology
+  route; `evaluate` still restricts this response to line-of-sight rows.
+  Endpoint positions, interaction geometry, materials, and frequency are
+  differentiable; `tx_power`, `mu_r`, the endpoint polarizations, and both
+  polarization bases are primal-only and are rejected before any native work.
+  `evaluate` previously enforced only the two bases and silently accepted a
+  differentiable `powers_w` or endpoint polarization; it now rejects every
+  declared frozen input by name, matching `reevaluate`.
+- `PropagationCapabilities` gains `fixed_topology_row_validity_components` and
+  `polarimetric_frozen_ad_inputs`.
+- The fixed-topology reflection route requires a smooth scene. Rough-surface
+  coherent attenuation and realization phase screens stay with the discovery
+  field loop and are rejected here rather than silently omitted.
 
 ### Capability manifests
 

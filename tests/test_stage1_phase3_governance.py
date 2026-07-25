@@ -44,10 +44,12 @@ def test_consumer_contract_is_versioned_and_snapshot_frozen() -> None:
         "CONTRACT_VERSION",
         "Complex3Transport",
         "EndpointBatch",
+        "FixedTopologyBucket",
         "FixedTopologyEvaluation",
         "FixedTopologyRequest",
         "JonesTransport",
         "MAX_DEPTH",
+        "PreparedFixedTopology",
         "PropagationAdMode",
         "PropagationCapabilities",
         "PropagationComponent",
@@ -65,10 +67,14 @@ def test_consumer_contract_is_versioned_and_snapshot_frozen() -> None:
         "TOPOLOGY_MODES",
         "capabilities",
         "evaluate",
+        "prepare_fixed_topology",
         "reevaluate",
     ]
     contracts = (CONSUMER_ROOT / "contracts.py").read_text(encoding="utf-8")
-    assert "CONTRACT_VERSION = 1" in contracts
+    # Version 2 (ADR-037): the result schema grew ``row_valid``, the capability
+    # record grew two fields, the package grew three exports, and the
+    # documented "polarimetric_transport is primal-only" limit was lifted.
+    assert "CONTRACT_VERSION = 2" in contracts
 
     snapshot = json.loads(
         (ROOT / "ci" / "public-api-snapshot.json").read_text(encoding="utf-8")

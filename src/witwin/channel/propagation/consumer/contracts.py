@@ -22,7 +22,7 @@ from witwin.channel.constants import (
 )
 
 
-CONTRACT_VERSION = 1
+CONTRACT_VERSION = 2
 
 
 PropagationComponent: TypeAlias = Literal[
@@ -40,6 +40,14 @@ TOPOLOGY_MODES: frozenset[str] = frozenset(get_args(PropagationTopologyMode))
 AD_MODES: frozenset[str] = frozenset(get_args(PropagationAdMode))
 
 MAX_DEPTH = 5
+
+# Native component identifiers a frozen topology may carry into reevaluation.
+# The names are the contract vocabulary above; the integers are the discovery
+# owner's encoding, which the consumer reads but does not define.
+_FIXED_TOPOLOGY_COMPONENT_IDS: tuple[tuple[str, int], ...] = (
+    ("los", 0),
+    ("reflection", 1),
+)
 
 
 def _require_tensor(
@@ -498,6 +506,14 @@ class PropagationCapabilities:
     fixed_topology_responses: frozenset[str]
     supports_fixed_topology: bool
     supports_los_jones: bool
+    # Components whose fixed-topology rows can stop existing at new endpoint
+    # positions and are therefore published with a per-row validity mask
+    # instead of failing the whole batch (ADR-037).
+    fixed_topology_row_validity_components: frozenset[str]
+    # Inputs the composed Jones operator consumes as primal-only constants.
+    # The native field companions reject gradients on them by contract, so a
+    # differentiable request carrying one of these fails before native work.
+    polarimetric_frozen_ad_inputs: tuple[str, ...]
 
     def components_for(self, response: str) -> frozenset[str]:
         return dict(self.response_components)[response]
@@ -523,13 +539,25 @@ _CAPABILITIES = PropagationCapabilities(
     response_ad_modes=(
         ("scalar_transport", AD_MODES),
         ("complex3_transport", AD_MODES),
-        ("polarimetric_transport", frozenset({"none"})),
+        ("polarimetric_transport", AD_MODES),
     ),
     component_ad_modes=tuple((component, AD_MODES) for component in sorted(COMPONENTS)),
-    fixed_topology_components=frozenset({"los"}),
-    fixed_topology_responses=frozenset({"scalar_transport", "complex3_transport"}),
+    fixed_topology_components=frozenset(
+        name for name, _ in _FIXED_TOPOLOGY_COMPONENT_IDS
+    ),
+    fixed_topology_responses=frozenset(
+        {"scalar_transport", "complex3_transport", "polarimetric_transport"}
+    ),
     supports_fixed_topology=True,
     supports_los_jones=True,
+    fixed_topology_row_validity_components=frozenset({"reflection"}),
+    polarimetric_frozen_ad_inputs=(
+        "tx_power",
+        "mu_r",
+        "source_basis",
+        "sink_basis",
+        "endpoint_polarizations",
+    ),
 )
 
 
@@ -565,25 +593,181 @@ class PropagationEvaluation:
     diagnostics: PropagationDiagnostics
 
 
+@dataclass(frozen=True, slots=True, eq=False)
+class FixedTopologyBucket:
+    """One host-known ``(component, depth)`` partition of a frozen topology.
+
+    ``rows`` holds ascending indices into the frozen ``K`` rows, so a bucket
+    preserves frozen row order. The component name and the depth are host
+    integers determined once, at freeze time.
+    """
+
+    component: str
+    depth: int
+    rows: torch.Tensor
+
+    def __post_init__(self) -> None:
+        _require_vocabulary("component", self.component, COMPONENTS)
+        if type(self.depth) is not int or not 0 <= self.depth <= MAX_DEPTH:
+            raise ValueError(f"depth must be an int in [0, {MAX_DEPTH}]")
+        _require_tensor("rows", self.rows, dtype=torch.int64, ndim=1)
+
+    @property
+    def row_count(self) -> int:
+        return int(self.rows.shape[0])
+
+
+@dataclass(frozen=True, slots=True, eq=False)
+class PreparedFixedTopology:
+    """A frozen topology partitioned once for repeated reevaluation.
+
+    Reflection field transport takes one uniform interaction depth per native
+    launch, so a mixed-depth frozen batch has to be partitioned before it can
+    be reevaluated. That partition is a property of the frozen topology alone,
+    so it is computed once here and reused by every later call.
+
+    The recorded host-observation counters describe THIS construction, not a
+    later :func:`witwin.channel.propagation.consumer.reevaluate` call. They are
+    deliberately not folded into per-call diagnostics: preparing the handle
+    once per frozen topology is the contract, and preparing it per frame gives
+    up the whole point of the capability.
+    """
+
+    topology: PropagationTopology
+    buckets: tuple[FixedTopologyBucket, ...]
+    prepare_d2h_copies: int
+    prepare_d2h_bytes: int
+    prepare_synchronizations: int
+
+    @property
+    def row_count(self) -> int:
+        return self.topology.row_count
+
+    @property
+    def device(self) -> torch.device:
+        return self.topology.device
+
+
+def _fixed_topology_component_name(component_id: int) -> str:
+    for name, value in _FIXED_TOPOLOGY_COMPONENT_IDS:
+        if value == component_id:
+            return name
+    raise NotImplementedError(
+        f"fixed-topology reevaluation does not support component id "
+        f"{component_id}; supported components are "
+        f"{sorted(_CAPABILITIES.fixed_topology_components)}"
+    )
+
+
+def _require_bucket_depth(component: str, depth: int) -> None:
+    if component == "los" and depth != 0:
+        raise ValueError("a los row must have depth 0")
+    if component == "reflection" and depth < 1:
+        raise ValueError("a reflection row must have depth >= 1")
+
+
+def _malformed_rows(topology: PropagationTopology, width: int) -> torch.Tensor:
+    """Rows whose depth or interaction padding contradicts the contract."""
+
+    depth = topology.depth.to(dtype=torch.int64)
+    slots = torch.arange(
+        width, device=topology.device, dtype=torch.int64
+    ).reshape(1, -1)
+    active = slots < depth.reshape(-1, 1)
+    sequence = topology.primitive_sequence.to(dtype=torch.int64)
+    return (
+        (depth < 0)
+        | (depth > width)
+        | ((sequence < 0) & active).any(dim=1)
+        | ((sequence != -1) & ~active).any(dim=1)
+    )
+
+
+def prepare_fixed_topology(
+    topology: PropagationTopology,
+) -> PreparedFixedTopology:
+    """Partition a frozen topology by component and interaction depth.
+
+    This is the one place the consumer looks at a frozen topology on the host.
+    It validates the depth/interaction padding of every row, rejects any
+    component outside ``capabilities().fixed_topology_components``, and returns
+    the ascending ``(component, depth)`` buckets that
+    :func:`witwin.channel.propagation.consumer.reevaluate` replays.
+
+    Call it once per frozen topology and reuse the handle. It synchronizes; a
+    per-frame call would reintroduce exactly the host observation the fixed
+    topology capability exists to avoid.
+    """
+
+    if not isinstance(topology, PropagationTopology):
+        raise TypeError("topology must be a PropagationTopology")
+    if topology.row_count == 0:
+        return PreparedFixedTopology(
+            topology=topology,
+            buckets=(),
+            prepare_d2h_copies=0,
+            prepare_d2h_bytes=0,
+            prepare_synchronizations=0,
+        )
+    width = int(topology.primitive_sequence.shape[1])
+    if bool(_malformed_rows(topology, width).any().item()):
+        raise ValueError(
+            "frozen topology rows disagree with their interaction sequence "
+            "padding; depth must be in [0, sequence width] and unused slots "
+            "must hold -1"
+        )
+    key = topology.component_id.to(dtype=torch.int64) * (width + 1) + (
+        topology.depth.to(dtype=torch.int64)
+    )
+    distinct = torch.unique(key).tolist()
+    buckets = []
+    for value in distinct:
+        component_id, depth = divmod(int(value), width + 1)
+        component = _fixed_topology_component_name(component_id)
+        _require_bucket_depth(component, depth)
+        buckets.append(
+            FixedTopologyBucket(
+                component=component,
+                depth=depth,
+                rows=torch.nonzero(key == value, as_tuple=False).reshape(-1),
+            )
+        )
+    return PreparedFixedTopology(
+        topology=topology,
+        buckets=tuple(buckets),
+        prepare_d2h_copies=2 + len(buckets),
+        prepare_d2h_bytes=1 + 8 * (len(distinct) + len(buckets)),
+        prepare_synchronizations=2 + len(buckets),
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class FixedTopologyRequest:
     """A reevaluation request against an already-discovered topology.
 
-    Structural validity is enforced here; scene-dependent capability checks
-    belong to :func:`witwin.channel.propagation.consumer.reevaluate`.
+    ``topology`` is a raw :class:`PropagationTopology` for the zero-interaction
+    LoS route, or a :class:`PreparedFixedTopology` for any route that carries
+    interactions. Structural validity is enforced here; scene-dependent
+    capability checks belong to
+    :func:`witwin.channel.propagation.consumer.reevaluate`.
     """
 
     sources: EndpointBatch
     sinks: EndpointBatch
     reference_frequency_hz: float | torch.Tensor
-    topology: PropagationTopology
+    topology: PropagationTopology | PreparedFixedTopology
     response: PropagationResponse
     ad_mode: PropagationAdMode
 
     def __post_init__(self) -> None:
         _require_endpoints(self.sources, self.sinks)
-        if not isinstance(self.topology, PropagationTopology):
-            raise TypeError("topology must be a PropagationTopology")
+        if not isinstance(
+            self.topology, PropagationTopology | PreparedFixedTopology
+        ):
+            raise TypeError(
+                "topology must be a PropagationTopology or a "
+                "PreparedFixedTopology"
+            )
         response = _require_vocabulary("response", self.response, RESPONSES)
         _require_vocabulary("ad_mode", self.ad_mode, AD_MODES)
         if response not in _CAPABILITIES.fixed_topology_responses:
@@ -593,13 +777,50 @@ class FixedTopologyRequest:
                 f"{sorted(_CAPABILITIES.fixed_topology_responses)}"
             )
 
+    @property
+    def frozen_topology(self) -> PropagationTopology:
+        """The frozen rows, whether or not the request carries a handle."""
+
+        if isinstance(self.topology, PreparedFixedTopology):
+            return self.topology.topology
+        return self.topology
+
 
 @dataclass(frozen=True, slots=True, eq=False)
 class FixedTopologyEvaluation:
+    """A reevaluated batch of frozen rows.
+
+    ``row_valid`` is ``None`` when every published row is valid by
+    construction, which is the case for a route whose rows cannot stop
+    existing. When it is present it is a CUDA ``bool`` mask over the frozen
+    rows in frozen row order and it is the SOLE authority on whether a row's
+    payload means anything: a geometrically valid row may legitimately carry a
+    zero coefficient, so validity can never be inferred from the payload.
+
+    It covers exactly ``fixed_topology_row_validity_components``. A frozen
+    line-of-sight row is replayed as pure free-space transport and is never
+    re-tested for visibility, so a sink that moves behind a wall still reports
+    ``True`` and a full-strength field while fresh discovery would drop the
+    row. A row also keeps its ORIGINAL ``primitive_sequence`` label when the
+    stationary point slides onto a coplanar twin triangle; the numbers are
+    exact, the discrete label is stale. Both are recorded in ADR-037.
+    """
+
     paths: PropagationPathBatch
     convention: PropagationConvention
     capabilities: PropagationCapabilities
     diagnostics: PropagationDiagnostics
+    row_valid: torch.Tensor | None = None
+
+    def __post_init__(self) -> None:
+        if self.row_valid is None:
+            return
+        _require_tensor(
+            "row_valid",
+            self.row_valid,
+            dtype=torch.bool,
+            shape=(self.paths.path_count,),
+        )
 
 
 __all__ = [
@@ -608,10 +829,12 @@ __all__ = [
     "CONTRACT_VERSION",
     "Complex3Transport",
     "EndpointBatch",
+    "FixedTopologyBucket",
     "FixedTopologyEvaluation",
     "FixedTopologyRequest",
     "JonesTransport",
     "MAX_DEPTH",
+    "PreparedFixedTopology",
     "PropagationAdMode",
     "PropagationCapabilities",
     "PropagationComponent",
@@ -628,4 +851,5 @@ __all__ = [
     "ScalarTransport",
     "TOPOLOGY_MODES",
     "capabilities",
+    "prepare_fixed_topology",
 ]

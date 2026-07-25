@@ -361,9 +361,19 @@ def test_reevaluate_reuses_frozen_topology_without_discovery(
 def test_unsupported_fixed_response_fails_at_request_construction(
     monkeypatch,
 ) -> None:
-    """A response with no fixed-topology provider is rejected at construction."""
+    """A response with no fixed-topology provider is rejected at construction.
 
-    from witwin.channel.propagation.consumer import FixedTopologyRequest
+    Contract version 2 gives every declared response a fixed-topology
+    provider, so ``polarimetric_transport`` is no longer the example: the
+    former limit was deliberately lifted by ADR-037. The enforcement point
+    itself is unchanged and is exercised here with a response that is outside
+    the vocabulary entirely, which is the only way the check can now fire.
+    """
+
+    from witwin.channel.propagation.consumer import (
+        FixedTopologyRequest,
+        capabilities,
+    )
     from witwin.channel.propagation.consumer import _fixed_los
 
     sources, sinks = _endpoints()
@@ -372,18 +382,54 @@ def test_unsupported_fixed_response_fails_at_request_construction(
         raise AssertionError("fixed gather must not run")
 
     monkeypatch.setattr(_fixed_los, "fixed_los_gather", forbidden)
+    assert "polarimetric_transport" in capabilities().fixed_topology_responses
 
-    with pytest.raises(
-        NotImplementedError, match="does not support 'polarimetric_transport'"
-    ):
+    with pytest.raises(NotImplementedError, match="unsupported response"):
         FixedTopologyRequest(
             sources=sources,
             sinks=sinks,
             reference_frequency_hz=77.0e9,
             topology=_fixed_topology(),
-            response="polarimetric_transport",
+            response="matrix_transport",
             ad_mode="none",
         )
+
+
+def test_unsupported_fixed_component_fails_at_preparation() -> None:
+    """A frozen component with no fixed-topology owner is rejected at freeze.
+
+    ``fixed_topology_components`` used to be advisory: the real gate was the
+    zero-width interaction check in the service layer. Preparation is now the
+    enforcement point, and it names the capability field so a caller can
+    discover the supported set without a failed solve.
+    """
+
+    from witwin.channel.propagation.consumer import (
+        PropagationTopology,
+        prepare_fixed_topology,
+    )
+
+    device = torch.device("cuda")
+    sequence = torch.tensor([[4]], device=device, dtype=torch.int32)
+    diffraction = PropagationTopology(
+        source_index=torch.zeros((1,), device=device, dtype=torch.int32),
+        sink_index=torch.zeros((1,), device=device, dtype=torch.int32),
+        source_id=torch.tensor([101], device=device, dtype=torch.int64),
+        sink_id=torch.tensor([707], device=device, dtype=torch.int64),
+        depth=torch.ones((1,), device=device, dtype=torch.int32),
+        component_id=torch.full((1,), 2, device=device, dtype=torch.int32),
+        primitive_id=torch.full((1,), -1, device=device, dtype=torch.int32),
+        edge_id=torch.zeros((1,), device=device, dtype=torch.int32),
+        material_id=torch.full((1,), -1, device=device, dtype=torch.int32),
+        primitive_sequence=sequence,
+        material_sequence=sequence,
+        interaction_type=sequence,
+    )
+
+    with pytest.raises(
+        NotImplementedError, match="supported components are .*reflection"
+    ):
+        prepare_fixed_topology(diffraction)
 
 
 def test_fixed_primal_only_endpoint_ad_fails_before_gather(monkeypatch) -> None:

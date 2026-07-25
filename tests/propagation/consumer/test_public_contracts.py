@@ -25,7 +25,7 @@ forbidden = (
     "witwin.channel.propagation.enumerated",
     "witwin.channel.propagation.models",
 )
-assert consumer.CONTRACT_VERSION == 1
+assert consumer.CONTRACT_VERSION == 2
 assert not any(name.startswith(forbidden) for name in sys.modules)
 """
     completed = subprocess.run(
@@ -45,7 +45,7 @@ def test_consumer_import_is_solver_neutral() -> None:
     before = set(sys.modules)
     consumer = importlib.import_module("witwin.channel.propagation.consumer")
     loaded = set(sys.modules) - before
-    assert consumer.CONTRACT_VERSION == 1
+    assert consumer.CONTRACT_VERSION == 2
     assert not any(
         name.startswith(
             (

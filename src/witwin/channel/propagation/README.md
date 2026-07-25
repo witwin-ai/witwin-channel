@@ -208,6 +208,15 @@ boundary. Continuous endpoint, vertex, material, frequency, and field leaves
 use explicit native backward/JVP companions. Unsupported tangents and
 higher-order derivatives fail before returning a partial result.
 
+`geometry/reevaluate.py::reflection_epc_paths` is the single fixed-winner
+reflection re-solve, and it publishes RayD's per-row validity rather than
+deciding what to do with it. The enumerated fixed-winner path requires every
+row to reproduce and raises otherwise, because it re-solves a winner it just
+discovered under the same scene tensors. Reevaluation at NEW endpoint positions
+is a different question, and under ADR-037 the consumer publishes the mask per
+row: a stationary point that leaves its facet is a complete answer, not a
+failure. One implementation, two policies - do not fork it.
+
 ## Forbidden fallback
 
 Propagation code must fail loudly when a required native capability or contract

@@ -16,9 +16,11 @@ from .contracts import (
     TOPOLOGY_MODES,
     Complex3Transport,
     EndpointBatch,
+    FixedTopologyBucket,
     FixedTopologyEvaluation,
     FixedTopologyRequest,
     JonesTransport,
+    PreparedFixedTopology,
     PropagationAdMode,
     PropagationCapabilities,
     PropagationComponent,
@@ -33,6 +35,7 @@ from .contracts import (
     PropagationTopologyMode,
     ScalarTransport,
     capabilities,
+    prepare_fixed_topology,
 )
 from .service import evaluate, reevaluate
 
@@ -42,10 +45,12 @@ __all__ = [
     "CONTRACT_VERSION",
     "Complex3Transport",
     "EndpointBatch",
+    "FixedTopologyBucket",
     "FixedTopologyEvaluation",
     "FixedTopologyRequest",
     "JonesTransport",
     "MAX_DEPTH",
+    "PreparedFixedTopology",
     "PropagationAdMode",
     "PropagationCapabilities",
     "PropagationComponent",
@@ -63,5 +68,6 @@ __all__ = [
     "TOPOLOGY_MODES",
     "capabilities",
     "evaluate",
+    "prepare_fixed_topology",
     "reevaluate",
 ]

@@ -776,7 +776,7 @@ if build_info.get(\"uses_dr_jit\") is not False:
     raise RuntimeError(\"wheel native extension must report uses_dr_jit=false\")
 if build_info.get(\"uses_rayd_native\") is not True:
     raise RuntimeError(\"wheel native extension must report uses_rayd_native=true\")
-if consumer.CONTRACT_VERSION != 1:
+if consumer.CONTRACT_VERSION != 2:
     raise RuntimeError(
         f\"unexpected propagation consumer contract: {{consumer.CONTRACT_VERSION!r}}\"
     )

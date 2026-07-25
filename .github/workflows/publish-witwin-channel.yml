@@ -521,7 +521,7 @@ jobs:
           assert Path(native.__file__).resolve().is_relative_to(target)
           assert Path(core.__file__).resolve().is_relative_to(target)
           assert channel.build_info()["backend"] == "channel"
-          assert consumer.CONTRACT_VERSION == 1
+          assert consumer.CONTRACT_VERSION == 2
           required = {{
               "enumerated_canonical_compact",
               "enumerated_exact_pair_metadata",

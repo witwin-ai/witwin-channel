@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "contract_version": 1,
+  "contract_version": 2,
   "status": "implementation-bound; runtime evidence pending concentrated Stage-I acceptance",
   "public_owner": "witwin.channel.propagation.consumer",
   "native_owner": "Channel _channel ADR-032 canonical compact producer",
@@ -98,5 +98,40 @@
     "ADR-029": "Superseded; caller-free",
     "ADR-030": "Dormant; caller-free",
     "ADR-031": "Rejected; caller-free"
+  },
+  "adr_037_fixed_topology": {
+    "decision": "ADR-037",
+    "prepared_handle": "prepare_fixed_topology partitions frozen rows by component and interaction depth once, on the host, and enforces fixed_topology_components",
+    "prepare_observation": "host-visible; recorded on PreparedFixedTopology, deliberately excluded from PropagationDiagnostics",
+    "per_call_validation": {
+      "d2h_copies": 1,
+      "d2h_bytes": 4,
+      "current_stream_synchronizations": 1,
+      "control_record": "int32 contract bitmask over every frozen row"
+    },
+    "row_validity": {
+      "field": "FixedTopologyEvaluation.row_valid",
+      "dtype": "bool",
+      "resident": "device",
+      "host_read": false,
+      "compaction": false,
+      "invalid_row_payload": "exact zero in transport, path length, delay, direction, and interaction tables",
+      "invalid_row_derivative": "exact zero",
+      "sole_authority": true
+    },
+    "failure_channel_unchanged": "capacity, ABI, contract, and device failure remain all-or-nothing and raise before a result exists",
+    "new_native_symbols": [],
+    "composed_jones": {
+      "physics_owner": "native field transport and endpoint-basis operators",
+      "python_role": "excitation choice, dispatch, and stacking",
+      "launches_per_bucket": 9,
+      "frozen_ad_inputs": [
+        "tx_power",
+        "mu_r",
+        "source_basis",
+        "sink_basis",
+        "endpoint_polarizations"
+      ]
+    }
   }
 }
