@@ -13,6 +13,12 @@ import torch
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.meta_path = [
+    finder
+    for finder in sys.meta_path
+    if "_witwin_channel_editable" not in type(finder).__module__
+]
+sys.path.insert(0, str(REPO_ROOT.parent / "core-radar-architecture-stage1"))
 sys.path.insert(0, str(REPO_ROOT / "src"))
 sys.path.insert(0, str(REPO_ROOT))
 
@@ -22,7 +28,7 @@ from benchmarks.harness import (  # noqa: E402
     tensor_bytes,
 )
 from tests.support.native_ext import inject_native_paths  # noqa: E402
-from witwin.channel.core.memory_budget import (  # noqa: E402
+from witwin.channel.runtime.memory_budget import (  # noqa: E402
     MemoryBudgetError,
     MemoryEstimate,
     enforce_memory_budget,
@@ -190,16 +196,25 @@ def profile_cases(profile: str) -> tuple[CaseSpec, ...]:
 
 def _solver_operation(scene: Any, spec: CaseSpec):
     components = {"los"} if spec.depth == 0 else {"los", "reflection"}
+    reference_frequency_hz = scene.metadata["reference_frequency_hz"]
     if spec.solver == "path":
         from witwin.channel.path import Config, solve
 
         config = Config(max_depth=spec.depth, components=components)
-        return lambda: solve(scene, config)
+        return lambda: solve(
+            scene,
+            config,
+            reference_frequency_hz=reference_frequency_hz,
+        )
     if spec.solver == "deterministic":
         from witwin.channel.deterministic import Config, solve
 
         config = Config(max_depth=spec.depth, components=components)
-        return lambda: solve(scene, config)
+        return lambda: solve(
+            scene,
+            config,
+            reference_frequency_hz=reference_frequency_hz,
+        )
     if spec.solver == "basic":
         from witwin.channel.montecarlo.basic import Config, solve
 
@@ -209,7 +224,11 @@ def _solver_operation(scene: Any, spec: CaseSpec):
             components=components,
             workspace_limit_bytes=15 << 30,
         )
-        return lambda: solve(scene, config)
+        return lambda: solve(
+            scene,
+            config,
+            reference_frequency_hz=reference_frequency_hz,
+        )
     if spec.solver == "bdpt":
         from witwin.channel.montecarlo.bdpt import Config, solve
 
@@ -219,7 +238,11 @@ def _solver_operation(scene: Any, spec: CaseSpec):
             components=components,
             workspace_limit_bytes=15 << 30,
         )
-        return lambda: solve(scene, config)
+        return lambda: solve(
+            scene,
+            config,
+            reference_frequency_hz=reference_frequency_hz,
+        )
     raise ValueError(f"unknown solver: {spec.solver}")
 
 
@@ -299,18 +322,26 @@ def run_case(
     bundle = _load_case_scene(spec, asset_root)
     scene_load_ms = (time.perf_counter() - scene_load_started) * 1_000.0
     scene = bundle.scene
+    reference_frequency_hz = scene.metadata["reference_frequency_hz"]
+    from witwin.channel.scene import compile as compile_scene
 
     torch.cuda.synchronize()
     scene_torch_before = _torch_memory_snapshot()
     scene_device_before = _device_memory()
     optix_started = time.perf_counter()
-    scene.rayd_scene()
+    compile_scene(
+        scene,
+        reference_frequency_hz=reference_frequency_hz,
+    )
     torch.cuda.synchronize()
     optix_scene_build_ms = (time.perf_counter() - optix_started) * 1_000.0
     optix_device_after = _device_memory()
     torch.cuda.reset_peak_memory_stats()
     scene_compile_started = time.perf_counter()
-    scene.compile()
+    compile_scene(
+        scene,
+        reference_frequency_hz=reference_frequency_hz,
+    )
     torch.cuda.synchronize()
     scene_compile_ms = (time.perf_counter() - scene_compile_started) * 1_000.0
     scene_torch_after = _torch_memory_snapshot()

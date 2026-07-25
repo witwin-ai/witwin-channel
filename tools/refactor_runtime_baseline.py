@@ -73,10 +73,38 @@ _VOLATILE_METADATA_FIELDS = frozenset(
         "solve_time_ms",
     }
 )
+_REFERENCE_FREQUENCY_HZ = 3.0e9
+_REFERENCE_FREQUENCY_METADATA_KEY = "runtime_baseline_reference_frequency_hz"
 
 
 class RuntimeBaselineError(RuntimeError):
     """Raised when a runtime baseline would be incomplete or ambiguous."""
+
+
+def _reference_frequency(scene: object):
+    metadata = getattr(scene, "metadata", None)
+    if isinstance(metadata, Mapping):
+        return metadata.get(
+            _REFERENCE_FREQUENCY_METADATA_KEY, _REFERENCE_FREQUENCY_HZ
+        )
+    return _REFERENCE_FREQUENCY_HZ
+
+
+def _solve_scene(solve: Any, scene: object, config: object) -> object:
+    return solve(
+        scene,
+        config,
+        reference_frequency_hz=_reference_frequency(scene),
+    )
+
+
+def _compile_scene(scene: object):
+    from witwin.channel.scene import compile as compile_channel_scene
+
+    return compile_channel_scene(
+        scene,
+        reference_frequency_hz=_reference_frequency(scene),
+    )
 
 
 def _canonical_bytes(value: object) -> bytes:
@@ -518,7 +546,7 @@ def run_child(
     scene_input = value_manifest(scene)
 
     def operation() -> object:
-        return solve(scene, config)
+        return _solve_scene(solve, scene, config)
 
     result, measurement = benchmark_operation(
         operation,
@@ -743,7 +771,7 @@ def collect_reduced(
 # ---------------------------------------------------------------------------
 
 EXTENDED_PROFILE_NAME = "extended"
-_EXTENDED_FREQUENCY_HZ = 3.0e9
+_EXTENDED_FREQUENCY_HZ = _REFERENCE_FREQUENCY_HZ
 
 # Forward (ad_mode=none) scenario -> solvers that carry the component. Cells
 # for solvers that reject a component (capabilities.py) are declared in
@@ -884,9 +912,9 @@ class _GradientCapture:
 def _extended_receiver_grid(origin, u_axis, v_axis, shape, spacing):
     import torch
 
-    from witwin.channel import ReceiverGrid
+    from tests.support.core_world import make_receiver_grid
 
-    return ReceiverGrid(
+    return make_receiver_grid(
         origin=torch.tensor(origin),
         x_axis=torch.tensor(u_axis),
         y_axis=torch.tensor(v_axis),
@@ -896,12 +924,12 @@ def _extended_receiver_grid(origin, u_axis, v_axis, shape, spacing):
 
 
 def _extended_transmission_material():
-    from witwin.channel.core.materials import Layer, PhysicalSurface
+    from witwin.core import MaterialLayer, PhysicalMaterial
 
-    return PhysicalSurface(
+    return PhysicalMaterial(
         layers=(
-            Layer(thickness_m=0.06, eps_r=4.0, sigma_e=0.02),
-            Layer(thickness_m=0.09, eps_r=2.5, sigma_e=0.01),
+            MaterialLayer(thickness_m=0.06, eps_r=4.0, sigma_e=0.02),
+            MaterialLayer(thickness_m=0.09, eps_r=2.5, sigma_e=0.01),
         ),
         name="extended-thin-sheet",
     )
@@ -918,15 +946,15 @@ def _extended_scene_and_config(solver: str, scenario: str):
         transmission_wall_structure,
         wedge_diffraction_scene,
     )
-    from witwin.channel import (
-        ReceiverPoint,
-        Scene,
-        Transmitter,
+    from tests.support.core_world import (
+        make_receiver,
+        make_transmitter,
     )
-    from witwin.channel.core.materials import (
-        Dielectric,
+    from witwin.core import (
         PhaseScreen,
-        Roughness,
+        PhysicalMaterial,
+        Scene,
+        SurfaceRoughness,
     )
 
     seed = _EXTENDED_MC_SEEDS.get(scenario, 0)
@@ -985,22 +1013,22 @@ def _extended_scene_and_config(solver: str, scenario: str):
     if scenario == "thin-wall-transmission":
         material = _extended_transmission_material()
         wall = transmission_wall_structure(3.0, material)
-        tx = Transmitter(position=torch.tensor([0.0, 0.0, 0.0]))
+        tx = make_transmitter(position=torch.tensor([0.0, 0.0, 0.0]))
         components = {"transmission"}
         if solver == "montecarlo-basic":
             grid = _extended_receiver_grid(
                 [6.0, -0.5, -0.5], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], (2, 2), (0.5, 0.5)
             )
             scene = Scene(
-                structures=[wall], transmitters=[tx], receivers=[grid],
-                frequency=_EXTENDED_FREQUENCY_HZ,
+                structures=[wall],
+                endpoints=[tx, grid],
             )
             config, solve = _mc_basic(components, max_depth=1, samples=1024)
             return scene, config, solve
-        rx = ReceiverPoint(position=torch.tensor([6.0, 0.4, 0.2]))
+        rx = make_receiver(position=torch.tensor([6.0, 0.4, 0.2]))
         scene = Scene(
-            structures=[wall], transmitters=[tx], receivers=[rx],
-            frequency=_EXTENDED_FREQUENCY_HZ,
+            structures=[wall],
+            endpoints=[tx, rx],
         )
         if solver == "path":
             config, solve = _path(components, max_depth=1)
@@ -1013,7 +1041,9 @@ def _extended_scene_and_config(solver: str, scenario: str):
         return scene, config, solve
 
     if scenario == "single-wedge-diffraction":
-        base = wedge_diffraction_scene(Dielectric(eps_r=4.0, sigma_e=0.02))
+        base = wedge_diffraction_scene(
+            PhysicalMaterial(eps_r=4.0, sigma_e=0.02)
+        )
         components = {"diffraction"}
         if solver in _EXTENDED_MC_SOLVERS:
             grid = _extended_receiver_grid(
@@ -1021,9 +1051,14 @@ def _extended_scene_and_config(solver: str, scenario: str):
             )
             scene = Scene(
                 structures=list(base.structures),
-                transmitters=list(base.transmitters),
-                receivers=[grid],
-                frequency=base.frequency,
+                endpoints=[
+                    *(
+                        endpoint
+                        for endpoint in base.endpoints
+                        if endpoint.role == "tx"
+                    ),
+                    grid,
+                ],
             )
             if solver == "montecarlo-basic":
                 config, solve = _mc_basic(components, max_depth=1, samples=1024)
@@ -1086,21 +1121,21 @@ def _extended_scene_and_config(solver: str, scenario: str):
         wall = rough_wall_structure(
             2.5, rms_height_m=0.015, corr_length_m=0.15, half_size=2.0
         )
-        tx = Transmitter(position=torch.tensor([0.0, -1.0, 0.0]))
+        tx = make_transmitter(position=torch.tensor([0.0, -1.0, 0.0]))
         if solver == "montecarlo-basic":
             grid = _extended_receiver_grid(
                 [0.0, 0.5, -0.5], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], (2, 2), (0.5, 0.5)
             )
             scene = Scene(
-                structures=[wall], transmitters=[tx], receivers=[grid],
-                frequency=_EXTENDED_FREQUENCY_HZ,
+                structures=[wall],
+                endpoints=[tx, grid],
             )
             config, solve = _mc_basic({"scattering"}, max_depth=1, samples=4096)
             return scene, config, solve
-        rx = ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.0]))
+        rx = make_receiver(position=torch.tensor([0.0, 1.0, 0.0]))
         scene = Scene(
-            structures=[wall], transmitters=[tx], receivers=[rx],
-            frequency=_EXTENDED_FREQUENCY_HZ,
+            structures=[wall],
+            endpoints=[tx, rx],
         )
         if solver == "path":
             config, solve = _path(
@@ -1128,7 +1163,11 @@ def _extended_scene_and_config(solver: str, scenario: str):
         )
 
         height = generate_gaussian_realization(
-            Roughness(rms_height_m=0.008, corr_length_x_m=0.15, corr_length_y_m=0.15),
+            SurfaceRoughness(
+                rms_height_m=0.008,
+                correlation_length_x_m=0.15,
+                correlation_length_y_m=0.15,
+            ),
             extent_m=2.0,
             resolution=128,
             seed=realization_seed(0, 1, 1),
@@ -1150,9 +1189,10 @@ def _extended_scene_and_config(solver: str, scenario: str):
         )
         scene = Scene(
             structures=[wall],
-            transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.0]))],
-            receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.0]))],
-            frequency=_EXTENDED_FREQUENCY_HZ,
+            endpoints=[
+                make_transmitter(position=torch.tensor([0.0, -1.0, 0.0])),
+                make_receiver(position=torch.tensor([0.0, 1.0, 0.0])),
+            ],
         )
         config, solve = _deterministic(
             {"reflection", "scattering"}, max_depth=1, scattering_samples_per_m2=32.0
@@ -1163,22 +1203,22 @@ def _extended_scene_and_config(solver: str, scenario: str):
         wall = rough_wall_structure(
             2.5, rms_height_m=0.015, corr_length_m=0.15, half_size=2.0
         )
-        tx = Transmitter(position=torch.tensor([0.0, -1.0, 0.0]))
+        tx = make_transmitter(position=torch.tensor([0.0, -1.0, 0.0]))
         components = {"reflection"}
         if solver == "montecarlo-basic":
             grid = _extended_receiver_grid(
                 [0.0, 0.5, -0.5], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], (2, 2), (0.5, 0.5)
             )
             scene = Scene(
-                structures=[wall], transmitters=[tx], receivers=[grid],
-                frequency=_EXTENDED_FREQUENCY_HZ,
+                structures=[wall],
+                endpoints=[tx, grid],
             )
             config, solve = _mc_basic(components, max_depth=1, samples=2048)
             return scene, config, solve
-        rx = ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.0]))
+        rx = make_receiver(position=torch.tensor([0.0, 1.0, 0.0]))
         scene = Scene(
-            structures=[wall], transmitters=[tx], receivers=[rx],
-            frequency=_EXTENDED_FREQUENCY_HZ,
+            structures=[wall],
+            endpoints=[tx, rx],
         )
         if solver == "path":
             config, solve = _path(components, max_depth=1)
@@ -1210,8 +1250,8 @@ def _extended_ad_scene_config(solver: str, scenario: str, ad_mode: str):
         transmission_wall_structure,
         wedge_diffraction_scene,
     )
-    from witwin.channel import ReceiverPoint, Scene, Transmitter
-    from witwin.channel.core.materials import Dielectric
+    from tests.support.core_world import make_receiver, make_transmitter
+    from witwin.core import PhysicalMaterial, Scene
 
     seed = _EXTENDED_AD_SEEDS[(scenario, ad_mode)]
 
@@ -1232,14 +1272,17 @@ def _extended_ad_scene_config(solver: str, scenario: str, ad_mode: str):
     elif scenario == "thin-wall-transmission":
         scene = Scene(
             structures=[transmission_wall_structure(3.0, _extended_transmission_material())],
-            transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 0.0]))],
-            receivers=[ReceiverPoint(position=torch.tensor([6.0, 0.4, 0.2]))],
-            frequency=_EXTENDED_FREQUENCY_HZ,
+            endpoints=[
+                make_transmitter(position=torch.tensor([0.0, 0.0, 0.0])),
+                make_receiver(position=torch.tensor([6.0, 0.4, 0.2])),
+            ],
         )
         components = {"transmission"}
         max_depth = 1
     elif scenario == "single-wedge-diffraction":
-        scene = wedge_diffraction_scene(Dielectric(eps_r=4.0, sigma_e=0.02))
+        scene = wedge_diffraction_scene(
+            PhysicalMaterial(eps_r=4.0, sigma_e=0.02)
+        )
         components = {"diffraction"}
         max_depth = 1
     elif scenario == "rough-reflection-cr":
@@ -1249,9 +1292,11 @@ def _extended_ad_scene_config(solver: str, scenario: str, ad_mode: str):
         )
         scene = Scene(
             structures=[wall],
-            transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.0]))],
-            receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.0]))],
-            frequency=frequency,
+            endpoints=[
+                make_transmitter(position=torch.tensor([0.0, -1.0, 0.0])),
+                make_receiver(position=torch.tensor([0.0, 1.0, 0.0])),
+            ],
+            metadata={_REFERENCE_FREQUENCY_METADATA_KEY: frequency},
         )
         components = {"reflection"}
         max_depth = 1
@@ -1259,7 +1304,7 @@ def _extended_ad_scene_config(solver: str, scenario: str, ad_mode: str):
         raise RuntimeBaselineError(f"unknown extended AD scenario: {scenario}")
 
     if seed == "frequency" and scenario != "rough-reflection-cr":
-        # Frequency leaves need a requires_grad scene frequency; only the
+        # Frequency leaves need a requires_grad metadata leaf; only the
         # rough-reflection cell uses this seed.
         raise RuntimeBaselineError("frequency AD seed is only wired for rough-reflection-cr")
 
@@ -1289,14 +1334,14 @@ def _extended_ad_operation(solver, scene, config, solve, seed, ad_mode):
         return coefficient.real.sum() + 0.5 * coefficient.imag.sum()
 
     if seed == "frequency":
-        leaf = scene.frequency
+        leaf = _reference_frequency(scene)
 
         if ad_mode == "vjp":
 
             def operation():
                 if leaf.grad is not None:
                     leaf.grad = None
-                result = solve(scene, config)
+                result = _solve_scene(solve, scene, config)
                 _loss(result).backward()
                 grad = leaf.grad.detach().clone()
                 return _GradientCapture(
@@ -1317,15 +1362,21 @@ def _extended_ad_operation(solver, scene, config, solve, seed, ad_mode):
                 dual = torch.autograd.forward_ad.make_dual(
                     primal.clone(), frequency_tangent
                 )
-                object.__setattr__(scene, "frequency", dual)
-                try:
-                    result = solve(scene, config)
-                    coefficient = _extended_ad_coefficient(result, solver)
-                    tangent_out = torch.autograd.forward_ad.unpack_dual(
-                        coefficient
-                    ).tangent
-                finally:
-                    object.__setattr__(scene, "frequency", leaf)
+                from witwin.core import Scene
+
+                dual_scene = Scene(
+                    structures=scene.structures,
+                    endpoints=scene.endpoints,
+                    metadata={
+                        **scene.metadata,
+                        _REFERENCE_FREQUENCY_METADATA_KEY: dual,
+                    },
+                )
+                result = _solve_scene(solve, dual_scene, config)
+                coefficient = _extended_ad_coefficient(result, solver)
+                tangent_out = torch.autograd.forward_ad.unpack_dual(
+                    coefficient
+                ).tangent
             grad = tangent_out.detach().clone()
             return _GradientCapture(
                 mode=ad_mode,
@@ -1338,7 +1389,7 @@ def _extended_ad_operation(solver, scene, config, solve, seed, ad_mode):
         return operation
 
     leaf_attr = "eps_r" if seed == "material_eps_r" else "layer_eps_r"
-    compiled = scene.compile()
+    compiled = _compile_scene(scene)
     base = getattr(compiled.materials, leaf_attr)
 
     if ad_mode == "vjp":
@@ -1347,7 +1398,7 @@ def _extended_ad_operation(solver, scene, config, solve, seed, ad_mode):
         def operation():
             if base.grad is not None:
                 base.grad = None
-            result = solve(scene, config)
+            result = _solve_scene(solve, scene, config)
             _loss(result).backward()
             grad = base.grad.detach().clone()
             return _GradientCapture(
@@ -1367,7 +1418,7 @@ def _extended_ad_operation(solver, scene, config, solve, seed, ad_mode):
             dual = torch.autograd.forward_ad.make_dual(base.detach().clone(), tangent)
             object.__setattr__(compiled.materials, leaf_attr, dual)
             try:
-                result = solve(scene, config)
+                result = _solve_scene(solve, scene, config)
                 coefficient = _extended_ad_coefficient(result, solver)
                 tangent_out = torch.autograd.forward_ad.unpack_dual(coefficient).tangent
             finally:
@@ -1393,7 +1444,7 @@ def _load_extended_case(solver: str, scenario: str, ad_mode: str):
         scene, config, solve = _extended_scene_and_config(solver, scenario)
 
         def operation():
-            return solve(scene, config)
+            return _solve_scene(solve, scene, config)
 
         return scene, config, operation, None
     if ad_mode not in _EXTENDED_AD_MODES:

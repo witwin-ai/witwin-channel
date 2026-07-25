@@ -44,7 +44,7 @@ class MaterialStore:
     frequency_dependent: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        require_tensor("material_id", self.material_id, dtype=torch.int32, ndim=1)
+        require_tensor("material_id", self.material_id, dtype=torch.int64, ndim=1)
         require_tensor("eps_r", self.eps_r, dtype=torch.float32, ndim=1)
         require_tensor("mu_r", self.mu_r, dtype=torch.float32, ndim=1)
         require_tensor("sigma_e", self.sigma_e, dtype=torch.float32, ndim=1)
@@ -131,14 +131,9 @@ class MaterialStore:
             raise ValueError("frequency_hz must be positive")
         if self.abi_version != 3:
             raise ValueError("MaterialStore requires material ABI version 3")
-        if self.material_id.numel() and not torch.equal(
-            self.material_id, torch.arange(self.material_id.numel(), dtype=torch.int32)
-        ):
-            raise ValueError(
-                "material_id must be dense and stable in [0, material_count)"
-            )
+        if self.material_id.numel() and bool((self.material_id < 0).any()):
+            raise ValueError("material_id must be non-negative")
+        if torch.unique(self.material_id).numel() != self.material_id.numel():
+            raise ValueError("material_id must be unique")
         if len(set(self.material_keys)) != len(self.material_keys):
             raise ValueError("material_keys must be unique")
-
-
-MaterialStore.__module__ = "witwin.channel.core.runtime.material_store"

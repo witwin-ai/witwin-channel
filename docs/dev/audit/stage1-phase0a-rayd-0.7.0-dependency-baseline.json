@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "phase": "Stage I Phase 0A",
+  "status": "dependency and static compatibility accepted",
+  "recorded_at": "2026-07-23",
+  "decision": {
+    "adr": "docs/dev/standards/adr-035-rayd-native-trace-backend-selection.md",
+    "adr_sha256": "b58d9af5b6f89e6f79e4c55543e52d907c3aa25a4b7c0767eb39194947876664",
+    "trace_backend_policy": "RayD TraceBackend::Auto prefers RayD-owned OptiX and may select RayD-owned full-result pure-CUDA tracing when OptiX is unavailable",
+    "forbidden_fallbacks": [
+      "Torch production compute",
+      "CPU or NumPy production compute",
+      "Dr.Jit production dispatch",
+      "retry after a failed native operation",
+      "reduced physics or reduced result",
+      "empty or zero success substitution",
+      "partial result",
+      "second extension, dispatcher, scene, or numerical owner"
+    ],
+    "unsupported_operation": "typed capability validation fails before that operation launches numerical work or exposes output"
+  },
+  "rayd_release": {
+    "tag": "v0.7.0",
+    "tag_kind": "lightweight",
+    "commit": "49c58c4cb8212f6babb920cc88fb937509826cc5",
+    "repository_url": "https://github.com/Asixa/RayD.git",
+    "commit_subject": "release: prepare RayD 0.7.0 [skip ci]",
+    "distributions": {
+      "rayd": "0.7.0",
+      "rayd-drjit": "0.7.0",
+      "rayd-torch": "0.7.0"
+    },
+    "source_bundle": {
+      "generation_source": "clean git archive of v0.7.0",
+      "generator": "backends/torch/scripts/generate_source_bundle.py from v0.7.0",
+      "dirty": false,
+      "manifest_sha256": "e2eb1a7577f906b3ab52e6345b039837228771c8f1582c9f821d0f2bb07d41b4"
+    },
+    "integration_abi": {
+      "kind": "source-header-sha256",
+      "path": "backends/torch/include/rayd/torch/integration.h",
+      "sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
+      "api_version": 6,
+      "identity": "rayd.torch.integration"
+    }
+  },
+  "channel_lock": {
+    "path": "dependencies/rayd.lock.json",
+    "sha256": "ca2479b0c9a5011509f82a051955e1f361a38c9218ae95c67b423ed8552fde94",
+    "workflow_pins": {
+      ".github/workflows/cuda-pr.yml": "4653f4d31d3902da94d979f7c35d309f5ac12b407e9f81e650875adbaa87ffe2",
+      ".github/workflows/nightly.yml": "4de9675842bd20ce23aebb29fc138a0c49202b2eae91cbbc0970a528b105e36a",
+      ".github/workflows/release.yml": "640f88f64174ee84d2b25baca0a4d07e0a4d6e9391726c65ff1e1a6733092895"
+    },
+    "fingerprint_contract": "CMake binds Channel git state, compiler, CUDA compiler/runtime, Torch, C++ ABI, CUDA architectures, RayD commit/repository/dirty state, integration ABI, source kind, and source-manifest SHA; a concrete clean wheel fingerprint is deferred to the Stage-I release checkpoint"
+  },
+  "product_identity": {
+    "distribution": "witwin-channel",
+    "package": "witwin.channel",
+    "extension": "_channel",
+    "pyproject_sha256": "5f709bfa1558dc280378e4be621794b50a8594bdc64ad7e96b293fa93af87de5"
+  },
+  "owner_continuity": {
+    "rayd": "sole generic native scene, acceleration-structure, intersection, visibility, and trace implementation owner",
+    "channel": "sole Channel RF, solver policy, topology, compact assembly, reduction, and Channel-fused operation owner",
+    "compact_owner": "native/channel/kernels/path_compaction.cu",
+    "compact_owner_sha256": "e552da5a1f7d71ee2571c32ff98f0c24a8526562a45462912792a76500d3a00c",
+    "compact_contract": "ADR-032 stable O(K) rows and the existing controlled count observation are unchanged",
+    "native_binding_manifest_sha256": "d50615b31bf0c22de9fdc36c18fc699f3c832725980584a9947e55c4da5dd745",
+    "contract_coverage_manifest_sha256": "2eb678f3d7bd328914d6de860b48c82c932507b4d7f0e32085ce3255702b7310",
+    "public_api_snapshot_sha256": "274da3e7f0065dfb127ae0c2b6d12bdb5291f7c8b77ba904fc4d3502e618a1e9"
+  },
+  "implementation_delta_from_previous_lock": {
+    "previous_commit": "402262d3b0c07dffb9d51d1852abb97ab2280f2f",
+    "packaging_only": false,
+    "integration_header_changed": false,
+    "accepted_delta": [
+      "RayD-owned automatic OptiX or pure-CUDA trace selection",
+      "RayD-owned CUDA visibility, reflection, diffraction, and multipath implementations",
+      "RayD geometry and adjoint fixes recorded by the 0.7.0 release"
+    ],
+    "owner_change": false,
+    "channel_public_solver_schema_change": false,
+    "adr032_compact_change": false
+  },
+  "targeted_gates": {
+    "result": "passed",
+    "pytest": {
+      "passed": 18,
+      "failed": 0,
+      "scope": [
+        "exact RayD lock schema and values",
+        "configure-only acceptance of a clean detached locked checkout",
+        "package source discovery, RECORD, metadata, and full source-manifest validation",
+        "three workflow pins",
+        "wheel lock-identity negative contracts"
+      ],
+      "not_run": [
+        "tests/kernels/test_build_info.py requires an extension rebuilt against the new lock; the concrete build and fingerprint gate is deferred to the Stage-I release checkpoint"
+      ]
+    },
+    "agents_claude_byte_compare": "passed",
+    "json_parse": "passed",
+    "diff_check": "passed",
+    "live_legacy_identity_scan": "passed"
+  },
+  "deferred_large_checkpoint_gates": {
+    "phase2": [
+      "four-solver native operation capability matrix for both selected trace paths",
+      "numerical and row identity/order evidence",
+      "primal, JVP, and VJP evidence",
+      "launch, stream, transfer, synchronization, and peak-memory evidence"
+    ],
+    "phase3": [
+      "end-to-end latency and throughput for OptiX and pure CUDA",
+      "clean Channel build and import",
+      "wheel and concrete build fingerprint",
+      "supported platform, Python, Torch, CUDA, and SM release rows",
+      "complete four-solver Stage-I release acceptance"
+    ]
+  },
+  "historical_evidence_policy": "Plan 13 P-to-E and E-to-M comparative reports remain archived and are not Stage-I implementation, test, manifest, or release requirements"
+}

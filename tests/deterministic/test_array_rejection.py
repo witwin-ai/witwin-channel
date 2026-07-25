@@ -3,22 +3,27 @@ from __future__ import annotations
 import pytest
 import torch
 
-from witwin.channel import AntennaArray, ReceiverPoint, Scene, Transmitter
+from tests.support.core_world import make_receiver, make_transmitter
 from witwin.channel.deterministic import Config
 from witwin.channel.deterministic import solver
+from witwin.core import Scene
 
 
 def test_array_fails_before_cuda() -> None:
     scene = Scene(
         structures=[],
-        transmitters=[
-            Transmitter(
-                position=torch.zeros(3), array=AntennaArray.ula(2, 0.1)
-            )
+        endpoints=[
+            make_transmitter(
+                position=torch.zeros(3),
+                element_positions=torch.tensor([[-0.05, 0.0, 0.0], [0.05, 0.0, 0.0]]),
+            ),
+            make_receiver(position=torch.tensor([1.0, 0.0, 0.0])),
         ],
-        receivers=[ReceiverPoint(position=torch.tensor([1.0, 0.0, 0.0]))],
-        frequency=1.0e9,
     )
 
     with pytest.raises(ValueError, match="does not support antenna arrays"):
-        solver.solve(scene, Config(components={"los"}))
+        solver.solve(
+            scene,
+            Config(components={"los"}),
+            reference_frequency_hz=1.0e9,
+        )

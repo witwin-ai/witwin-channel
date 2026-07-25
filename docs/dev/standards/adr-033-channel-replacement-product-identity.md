@@ -1,7 +1,7 @@
 # ADR-033: Channel replacement product identity
 
 - **Status:** Accepted by owner direction (2026-07-22); product-identity and
-  repository-history migration complete, consumer rollout pending
+  repository-history migration complete, version-1 consumer surface activated
 - **Kind:** Breaking package, module, native-extension, build-identity, and
   operational-name migration
 - **Related:** ADR-003 (public/internal API), ADR-006 (developer override),
@@ -59,6 +59,12 @@ the existing `0.3.0` distribution and therefore supports an ordinary package
 upgrade. Repository-owned consumers must select `witwin-channel>=0.4,<0.5`
 atomically with their API migration. External consumer rollout remains a
 separate release action and does not authorize a compatibility shim.
+
+Stage-I Phase 3 publishes the solver-neutral consumer only at
+`witwin.channel.propagation.consumer`. It does not introduce a second
+distribution, top-level package, extension, or package-root alias. Radar
+adoption remains a later consumer rollout and is not claimed by the Channel
+release.
 
 ## Compatibility and migration consequences
 

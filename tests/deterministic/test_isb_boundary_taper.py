@@ -15,9 +15,15 @@ import dataclasses
 import pytest
 import torch
 
-from witwin.channel import ReceiverGrid, Scene, Structure, Transmitter
-from witwin.channel.core.materials import PerfectConductor
+from tests.support.core_world import (
+    make_mesh_structure,
+    make_receiver_grid,
+    make_transmitter,
+)
 from witwin.channel.deterministic import Config, solve
+from witwin.core import PhysicalMaterial, Scene, Structure
+
+_REFERENCE_FREQUENCY_HZ = 5.0e9
 
 
 def _metal_box(center: tuple[float, float, float], half: float, name: str) -> Structure:
@@ -39,17 +45,26 @@ def _metal_box(center: tuple[float, float, float], half: float, name: str) -> St
     )
     faces = torch.tensor(
         [
-            [0, 2, 1], [0, 3, 2],  # bottom
-            [4, 5, 6], [4, 6, 7],  # top
-            [0, 1, 5], [0, 5, 4],  # -y
-            [1, 2, 6], [1, 6, 5],  # +x
-            [2, 3, 7], [2, 7, 6],  # +y
-            [3, 0, 4], [3, 4, 7],  # -x
+            [0, 2, 1],
+            [0, 3, 2],  # bottom
+            [4, 5, 6],
+            [4, 6, 7],  # top
+            [0, 1, 5],
+            [0, 5, 4],  # -y
+            [1, 2, 6],
+            [1, 6, 5],  # +x
+            [2, 3, 7],
+            [2, 7, 6],  # +y
+            [3, 0, 4],
+            [3, 4, 7],  # -x
         ],
         dtype=torch.int32,
     )
-    return Structure(
-        vertices=vertices, faces=faces, material=PerfectConductor(), name=name
+    return make_mesh_structure(
+        vertices=vertices,
+        faces=faces,
+        material=PhysicalMaterial.perfect_conductor(),
+        name=name,
     )
 
 
@@ -61,7 +76,7 @@ def _two_cube_grid_scene() -> Scene:
         _metal_box((-0.12, 0.0, 0.3), 0.1, "cube-a"),
         _metal_box((0.16, 0.0, 0.3), 0.1, "cube-b"),
     ]
-    grid = ReceiverGrid(
+    grid = make_receiver_grid(
         origin=torch.tensor([-0.45, 0.0, 0.0]),
         x_axis=torch.tensor([1.0, 0.0, 0.0]),
         y_axis=torch.tensor([0.0, 1.0, 0.0]),
@@ -70,9 +85,10 @@ def _two_cube_grid_scene() -> Scene:
     )
     return Scene(
         structures=boxes,
-        transmitters=[Transmitter(position=torch.tensor([-0.02, 0.0, 0.7]))],
-        receivers=[grid],
-        frequency=5.0e9,
+        endpoints=[
+            make_transmitter(position=torch.tensor([-0.02, 0.0, 0.7])),
+            grid,
+        ],
     )
 
 
@@ -98,9 +114,15 @@ def test_isb_boundary_taper_off_is_bit_identical():
     # delta to the documented 5e-10 band, rather than over-fitting to a
     # nondeterministic atomic sum (the old torch.equal on the total field / total
     # path_gain flaked on exactly this noise despite a perfect OFF no-op).
-    default_result = solve(scene, Config(components=components, export_paths=True))
+    default_result = solve(
+        scene,
+        Config(components=components, export_paths=True),
+        reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
+    )
     explicit_off = solve(
-        scene, Config(components=components, isb_boundary_taper=False, export_paths=True)
+        scene,
+        Config(components=components, isb_boundary_taper=False, export_paths=True),
+        reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
     )
 
     # (a) The exported path-table row arrays are the deterministic per-row
@@ -141,7 +163,11 @@ def test_isb_boundary_taper_on_softens_los_shadow_boundary():
     _require_cuda()
     scene = _two_cube_grid_scene()
     components = {"los", "reflection", "diffraction"}
-    off = solve(scene, Config(components=components, isb_boundary_taper=False))
+    off = solve(
+        scene,
+        Config(components=components, isb_boundary_taper=False),
+        reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
+    )
     on = solve(
         scene,
         Config(
@@ -149,6 +175,7 @@ def test_isb_boundary_taper_on_softens_los_shadow_boundary():
             isb_boundary_taper=True,
             isb_boundary_taper_width=0.5,
         ),
+        reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
     )
 
     los_off = off.component_power["los"].reshape(-1)

@@ -21,10 +21,10 @@ def test_path_public_api_is_single_versionless_contract():
         "PathResult",
         "RaggedPathSoA",
         "solve",
-        "pack_synthetic_arrays",
-        "explicit_array_scene",
-        "pack_explicit_arrays",
     }
+    assert not hasattr(path_api, "pack_synthetic_arrays")
+    assert not hasattr(path_api, "explicit_array_scene")
+    assert not hasattr(path_api, "pack_explicit_arrays")
 
 
 def _ragged(
@@ -135,7 +135,11 @@ def test_path_result_validates_shape_contract():
 def test_solve_los_shape_ids_lengths_and_per_pair_count():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for path solve")
-    result = solve(empty_space_los_scene(), Config(max_depth=0, components={"los"}))
+    result = solve(
+        empty_space_los_scene(),
+        Config(max_depth=0, components={"los"}),
+        reference_frequency_hz=3.0e9,
+    )
 
     assert result.a.shape == (2, 1, 2, 1, 1, 1)
     assert torch.all(result.num_paths == 1)

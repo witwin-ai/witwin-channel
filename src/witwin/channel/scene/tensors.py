@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel.scene.models import ReceiverGrid, ReceiverPoint
-from witwin.channel.core.receiver_geometry import vector3_tuple
+from witwin.channel.scene.endpoints import ReceiverGrid, ReceiverPoint
+from witwin.channel.scene.receiver_geometry import vector3_tuple
 from witwin.channel.propagation.topology.kernels import (
     primitives as topology_primitives,
 )
@@ -15,7 +15,7 @@ from witwin.channel.runtime.native_buffers import (
 )
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+    from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
 LIGHT_SPEED_M_PER_S = 299_792_458.0
@@ -59,7 +59,6 @@ def receiver_positions(
     device: torch.device,
     reference: torch.Tensor | None = None,
 ) -> torch.Tensor:
-    del device
     if (
         len(scene.receivers) == 1
         and isinstance(scene.receivers[0], ReceiverGrid)
@@ -67,30 +66,20 @@ def receiver_positions(
     ):
         return receiver_grid_points(scene.receivers[0], reference=reference)
     blocks: list[torch.Tensor] = []
-    point_positions: list[float] = []
     grid_reference = reference
-
-    def flush_points() -> None:
-        nonlocal point_positions, grid_reference
-        if not point_positions:
-            return
-        block = host_vec3_tensor(tuple(point_positions))
-        blocks.append(block)
-        if grid_reference is None:
-            grid_reference = block
-        point_positions = []
 
     for receiver in scene.receivers:
         if isinstance(receiver, ReceiverPoint):
-            point_positions.extend(vector3_tuple(receiver.position))
+            block = receiver.position.reshape(1, 3).to(device=device)
+            blocks.append(block)
+            if grid_reference is None:
+                grid_reference = block
         elif isinstance(receiver, ReceiverGrid):
-            flush_points()
             if grid_reference is None:
                 grid_reference = host_vec3_tensor(())
             blocks.append(receiver_grid_points(receiver, reference=grid_reference))
         else:
             raise TypeError(f"receiver type is not accepted: {type(receiver)!r}")
-    flush_points()
     if not blocks:
         return host_vec3_tensor(())
     if len(blocks) == 1:
@@ -101,18 +90,21 @@ def receiver_positions(
 def transmitter_positions(
     scene: object, *, device: torch.device
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    del device
     if not scene.transmitters:
         exported = mc_transmitter_tensors((), ())
         return exported["positions"], exported["power"]
-    flat_positions = tuple(
-        component
-        for transmitter in scene.transmitters
-        for component in vector3_tuple(transmitter.position)
-    )
-    powers = tuple(float(transmitter.power_w) for transmitter in scene.transmitters)
-    exported = mc_transmitter_tensors(flat_positions, powers)
-    return exported["positions"], exported["power"]
+    positions = torch.stack(
+        tuple(transmitter.position for transmitter in scene.transmitters)
+    ).to(device=device, dtype=torch.float32)
+    powers = torch.stack(
+        tuple(
+            power.reshape(())
+            if isinstance((power := transmitter.power_w), torch.Tensor)
+            else positions.new_tensor(float(power))
+            for transmitter in scene.transmitters
+        )
+    ).to(device=device, dtype=torch.float32)
+    return positions, powers
 
 
 def transmitter_polarizations(
@@ -127,22 +119,14 @@ def transmitter_polarizations(
     through the endpoint geometry, not through the polarization itself).
     """
 
-    del device
     if not scene.transmitters:
         return host_vec3_tensor(())
-    flat = tuple(
-        component
-        for transmitter in scene.transmitters
-        for component in vector3_tuple(transmitter.polarization)
+    return torch.stack(
+        tuple(transmitter.polarization for transmitter in scene.transmitters)
+    ).to(
+        device=device
     )
-    return host_vec3_tensor(flat)
 
 
 # Keep the long-standing compatibility and pickle paths stable while this
 # module becomes the canonical implementation owner.
-_frequency_scalar.__module__ = "witwin.channel.core.scene_tensors"
-receiver_grid_points.__module__ = "witwin.channel.core.scene_tensors"
-host_vec3_tensor.__module__ = "witwin.channel.core.scene_tensors"
-receiver_positions.__module__ = "witwin.channel.core.scene_tensors"
-transmitter_positions.__module__ = "witwin.channel.core.scene_tensors"
-transmitter_polarizations.__module__ = "witwin.channel.core.scene_tensors"

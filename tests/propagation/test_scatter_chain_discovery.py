@@ -14,6 +14,15 @@ import math
 import pytest
 import torch
 
+from witwin.core import PhysicalMaterial, Scene
+from tests.support.core_world import (
+    make_mesh_structure,
+    make_receiver,
+    make_transmitter,
+)
+from witwin.channel.scene import compile as compile_scene
+from witwin.channel.scene.endpoints import bind_solver_scene
+from tests.support.scenes import rough_wall_structure
 from witwin.channel.propagation.enumerated import scattering as scattering_mod
 from witwin.channel.propagation.enumerated import scattering_chain as sc
 
@@ -220,7 +229,7 @@ _FREQUENCY_HZ = 3.0e9
 def _require_cuda_rayd() -> None:
     if not torch.cuda.is_available():
         pytest.skip("CUDA torch is required")
-    from witwin.channel.core.kernels.extension import build_info
+    from witwin.channel.deployment import build_info
 
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native scene capability is not built")
@@ -233,15 +242,10 @@ def _two_wall_scene():
     TX -> floor reflection -> rough-wall vertex -> RX.
     """
 
-    from witwin.channel import ReceiverPoint, Scene, Transmitter
-    from witwin.channel.core.materials import Dielectric
-    from witwin.channel import Structure
-    from tests.support.scenes import rough_wall_structure
-
     rough = rough_wall_structure(
         2.5, rms_height_m=0.01, corr_length_m=0.15, half_size=2.0, surface_id=1
     )
-    floor = Structure(
+    floor = make_mesh_structure(
         vertices=torch.tensor(
             [
                 [0.0, -2.0, -1.0],
@@ -251,15 +255,16 @@ def _two_wall_scene():
             ]
         ),
         faces=torch.tensor([[0, 1, 2], [1, 3, 2]], dtype=torch.int32),
-        material=Dielectric(eps_r=4.0, sigma_e=0.01),
+        material=PhysicalMaterial(eps_r=4.0, sigma_e=0.01),
         name="floor",
         surface_id=2,
     )
     return Scene(
         structures=[rough, floor],
-        transmitters=[Transmitter(position=torch.tensor([0.5, -1.0, 0.5]))],
-        receivers=[ReceiverPoint(position=torch.tensor([1.5, 1.0, 0.5]))],
-        frequency=_FREQUENCY_HZ,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.5, -1.0, 0.5])),
+            make_receiver(position=torch.tensor([1.5, 1.0, 0.5])),
+        ],
     )
 
 
@@ -270,7 +275,10 @@ def _run_discovery(scene, config):
     )
 
     device = torch.device("cuda")
-    compiled = scene.compile()
+    compiled = compile_scene(
+        scene, reference_frequency_hz=_FREQUENCY_HZ
+    )
+    solver_scene = bind_solver_scene(compiled)
     screens = scattering_mod.realization_phase_screens(
         compiled.materials, compiled.assignments
     )
@@ -280,8 +288,10 @@ def _run_discovery(scene, config):
     samples = sc.build_chain_samples(compiled, config, ensemble_faces, device=device)
     if samples is None:
         return None
-    tx_positions, _ = transmitter_tensors(scene, device=device)
-    rx_positions, _ = receiver_positions_and_layout(scene, device=device)
+    tx_positions, _ = transmitter_tensors(solver_scene, device=device)
+    rx_positions, _ = receiver_positions_and_layout(
+        solver_scene, device=device
+    )
     records = compiled.rayd.edge_records()
     vertices = records.vertices
     diag = (vertices.max(dim=0).values - vertices.min(dim=0).values).norm()
@@ -371,7 +381,7 @@ def test_solver_default_off_appends_no_chain_rows():
         components=["los", "reflection", "scattering"],
         scattering_samples_per_m2=16.0,
     )
-    result = solve(scene, config)
+    result = solve(scene, config, reference_frequency_hz=3.0e9)
     # Default-off: no component_id=6 chain rows beyond single-bounce scattering,
     # and the solve completes with finite power.
     assert math.isfinite(float(result.component_power["scattering"]))
@@ -402,7 +412,7 @@ def test_solver_chain_enabled_end_to_end():
         scattering_chain_samples_per_m2=8.0,
         export_paths=True,
     )
-    result = solve(scene, config)
+    result = solve(scene, config, reference_frequency_hz=3.0e9)
     scatter_meta = result.metadata["scattering"]
     assert scatter_meta["chain_row_count"] >= 0
     assert math.isfinite(float(result.component_power["scattering"]))
@@ -431,4 +441,4 @@ def test_solver_chain_ad_mode_requires_companion():
         ad_mode="jvp",
     )
     with pytest.raises(RuntimeError, match="scattering_chain_ensemble_eval"):
-        solve(scene, config)
+        solve(scene, config, reference_frequency_hz=3.0e9)

@@ -20,6 +20,12 @@ def test_coherent_reflection_uses_complex_fields():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic runtime validation")
 
-    result = solve(same_side_wall_reflection_scene(), Config(components={"reflection"}, coherent=True))
+    result = solve(
+        same_side_wall_reflection_scene(),
+        Config(components={"reflection"}, coherent=True),
+        reference_frequency_hz=3.0e9,
+    )
 
-    torch.testing.assert_close(result.path_gain, result.field.abs().square(), rtol=2.0e-4, atol=1.0e-10)
+    torch.testing.assert_close(
+        result.path_gain, result.field.abs().square(), rtol=2.0e-4, atol=1.0e-10
+    )

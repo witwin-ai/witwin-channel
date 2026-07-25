@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "phase": "stage1-phase0",
+  "channel_base_commit": "fc1680f",
+  "activation_gate": "accepted RayD/rayd-torch 0.7.0 Phase-0A baseline",
+  "current_dependency_observation": {
+    "authoritative": true,
+    "rayd_commit": "49c58c4cb8212f6babb920cc88fb937509826cc5",
+    "distribution": "rayd-torch",
+    "distribution_version": "0.7.0",
+    "integration_api": 6,
+    "integration_identity": "rayd.torch.integration",
+    "integration_header_sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
+    "source_manifest_sha256": "e2eb1a7577f906b3ab52e6345b039837228771c8f1582c9f821d0f2bb07d41b4",
+    "trace_backend_policy": "ADR-035 RayD-owned Auto selection between preferred OptiX and full-result pure CUDA"
+  },
+  "public_api": {
+    "manifest": "ci/public-api-snapshot.json",
+    "stable_modules": [
+      "witwin.channel",
+      "witwin.channel.path",
+      "witwin.channel.deterministic",
+      "witwin.channel.montecarlo.basic",
+      "witwin.channel.montecarlo.bdpt"
+    ],
+    "current_scene_owner": "witwin.channel.core.scene.Scene",
+    "target_scene_owner": "witwin.core.Scene",
+    "consumer_module": "witwin.channel.propagation.consumer",
+    "consumer_activation_phase": 3
+  },
+  "runtime_owners": {
+    "compile": "src/witwin/channel/scene/compile.py",
+    "compiled_scene": "src/witwin/channel/scene/compiled.py",
+    "rayd_scene_resource": "src/witwin/channel/scene/kernels/rayd_scene.py",
+    "geometry_store": "src/witwin/channel/scene/stores/geometry.py",
+    "material_store": "src/witwin/channel/scene/stores/materials.py",
+    "assignment_store": "src/witwin/channel/scene/stores/assignments.py",
+    "material_abi": "src/witwin/channel/materials",
+    "native_compact": "native/channel/kernels/path_compaction.cu",
+    "internal_evaluated_paths": "src/witwin/channel/propagation/models/evaluated.py"
+  },
+  "production_callers": [
+    "src/witwin/channel/propagation/enumerated/engine.py",
+    "src/witwin/channel/path/pipeline.py",
+    "src/witwin/channel/deterministic/pipeline.py",
+    "src/witwin/channel/montecarlo/basic/pipeline.py",
+    "src/witwin/channel/montecarlo/basic/rayd_components.py",
+    "src/witwin/channel/montecarlo/bdpt/pipeline.py"
+  ],
+  "logical_owner_debt": [
+    "src/witwin/channel/scene/models.py",
+    "src/witwin/channel/core/scene.py",
+    "src/witwin/channel/core/scene_loader.py",
+    "src/witwin/channel/core/runtime/compiled_scene.py",
+    "src/witwin/channel/core/objects.py",
+    "src/witwin/channel/core/materials.py"
+  ],
+  "known_contract_gaps": [
+    "no Core Scene or SceneSnapshot",
+    "no topology version",
+    "no stable object/primitive/material/assignment IDs",
+    "frequency is owned and observed by mutable Channel Scene",
+    "runtime caches are written into the logical Scene",
+    "front roughness is encoded but distinct back roughness is not",
+    "legacy Path projection performs Torch compaction",
+    "no native pair_index/pair_offsets producer",
+    "current JonesState is not a 2x2 transport operator"
+  ],
+  "accepted_baseline_references": [
+    "docs/dev/standards/adr-023-direct-rayd-typed-integration.md",
+    "docs/dev/standards/adr-024-shared-rf-transmission-ownership.md",
+    "docs/dev/standards/adr-025-diffraction-operation-family-ownership.md",
+    "docs/dev/standards/adr-026-rayd-generic-scattering-runtime-ownership.md",
+    "docs/dev/standards/adr-027-batched-segment-penetration.md",
+    "docs/dev/standards/adr-028-device-resident-diffraction-state-selection.md",
+    "docs/dev/standards/adr-032-controlled-compact-cardinality-boundary.md",
+    "docs/dev/standards/adr-034-stage-i-world-and-propagation-boundary.md",
+    "docs/dev/standards/adr-035-rayd-native-trace-backend-selection.md",
+    "docs/dev/audit/stage1-phase0a-rayd-0.7.0-dependency-baseline.json",
+    "docs/dev/audit/phase13-adr032-stable-recovery-final-report.md",
+    "ci/public-api-snapshot.json",
+    "ci/check_import_graph.py",
+    "ci/support-matrix.toml"
+  ],
+  "runtime_matrix": {
+    "torch": "2.10.0",
+    "verified_python": [
+      "3.11"
+    ],
+    "candidate_python": [
+      "3.10",
+      "3.12",
+      "3.13",
+      "3.14"
+    ],
+    "candidate_policy": "Phase 0A dependency/static baseline accepted; hold matrix expansion until the Phase 3 clean build/import/native-load/wheel gate",
+    "linux_wheel": "manylinux_2_28",
+    "required_native_sass": [
+      "sm_87"
+    ]
+  },
+  "phase_validation_checkpoints": {
+    "1": "Core world-contract adversarial and native-isolation acceptance",
+    "2": "Channel compiler, four-solver, AD, performance, and wheel acceptance",
+    "3": "Consumer contract, compact/AD, package, and Stage-I release acceptance"
+  }
+}

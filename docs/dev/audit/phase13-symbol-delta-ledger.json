@@ -4,9 +4,9 @@
   "applied_count_delta": -9,
   "projected_final_count": 202,
   "projected_count_formula": "211 - 9 bindings proven dead by all four Phase 4 reachability checks = 202",
-  "live_binding_count": 241,
-  "live_count_delta_from_plan13_baseline": 30,
-  "live_count_formula": "211 - 9 Phase 4 dead bindings + 1 Phase 8B planner + 26 ADR-027/029/030 capacity-foundation bindings + 5 Phase 6C Phase P bindings + 4 Phase 6C Phase E bindings + 3 Phase 6C Phase M bindings = 241",
+  "live_binding_count": 250,
+  "live_count_delta_from_plan13_baseline": 39,
+  "live_count_formula": "211 - 9 Phase 4 dead bindings + 1 Phase 8B planner + 26 ADR-027/029/030 capacity-foundation bindings + 5 Phase 6C Phase P bindings + 4 Phase 6C Phase E bindings + 3 Phase 6C Phase M bindings + 9 Stage-I Phase 3 consumer bindings = 250",
   "phase6c_phase_p_delta": {
     "before": 229,
     "added": 5,
@@ -21,6 +21,11 @@
     "before": 238,
     "added": 3,
     "after": 241
+  },
+  "stage1_phase3_consumer_delta": {
+    "before": 241,
+    "added": 9,
+    "after": 250
   },
   "actions": [
     {
@@ -782,6 +787,78 @@
       "count_delta": 1,
       "status": "implemented as Phase E transition; removed by ADR-029 Phase D",
       "reason": "failure-first complex diffraction-vector sidecar sanitizer"
+    },
+    {
+      "symbol": "enumerated_canonical_compact",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "live in Stage-I Phase 3",
+      "reason": "single native canonical exact-row, limit, gather, and pair-segmentation owner"
+    },
+    {
+      "symbol": "enumerated_exact_pair_metadata",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "live in Stage-I Phase 3",
+      "reason": "zero-count-observation pair metadata for already-exact LoS rows"
+    },
+    {
+      "symbol": "evaluated_paths_compact_finalize",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "live in Stage-I Phase 3",
+      "reason": "legacy scattering-only final stable pair-major reorder"
+    },
+    {
+      "symbol": "evaluated_paths_compact_finalize_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "live in Stage-I Phase 3",
+      "reason": "shared continuous-row compact VJP companion"
+    },
+    {
+      "symbol": "evaluated_paths_compact_finalize_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "live in Stage-I Phase 3",
+      "reason": "shared continuous-row compact JVP companion"
+    },
+    {
+      "symbol": "consumer_los_jones",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "live in Stage-I Phase 3",
+      "reason": "complete source-basis to sink-basis LoS Jones transport"
+    },
+    {
+      "symbol": "consumer_fixed_los_gather",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "live in Stage-I Phase 3",
+      "reason": "fixed-topology LoS endpoint validation and row gather"
+    },
+    {
+      "symbol": "consumer_fixed_los_gather_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "live in Stage-I Phase 3",
+      "reason": "fixed-topology LoS endpoint gather VJP"
+    },
+    {
+      "symbol": "consumer_fixed_los_gather_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "live in Stage-I Phase 3",
+      "reason": "fixed-topology LoS endpoint gather JVP"
     }
   ]
 }

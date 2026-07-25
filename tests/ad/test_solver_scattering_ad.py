@@ -33,13 +33,15 @@ from tests.ad._tolerances import (
     REL_TOL_GENERAL,
 )
 from tests.support.scenes import rough_wall_structure
-from witwin.channel import ReceiverPoint, Scene, Transmitter
-from witwin.channel.core.kernels.extension import build_info
-from witwin.channel.core.materials import PhaseScreen
+from witwin.core import Scene
+from tests.support.core_world import make_receiver, make_transmitter
+from witwin.channel.deployment import build_info
+from witwin.core import PhaseScreen
 from witwin.channel.deterministic import Config as DeterministicConfig
 from witwin.channel.deterministic import solve as deterministic_solve
 from witwin.channel.path import Config as PathConfig
 from witwin.channel.path import solve as path_solve
+from witwin.channel.scene import compile as compile_scene
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for solver AD"
@@ -62,15 +64,16 @@ def _require_rayd() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _ensemble_scene(frequency: float | torch.Tensor = _FREQUENCY_HZ) -> Scene:
+def _ensemble_scene() -> Scene:
     wall = rough_wall_structure(
         2.5, rms_height_m=0.015, corr_length_m=0.15, half_size=1.0
     )
     return Scene(
         structures=[wall],
-        transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.0]))],
-        frequency=frequency,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, -1.0, 0.0])),
+            make_receiver(position=torch.tensor([0.0, 1.0, 0.0])),
+        ],
     )
 
 
@@ -83,9 +86,7 @@ def _realization_screen(heights: torch.Tensor) -> PhaseScreen:
     )
 
 
-def _realization_scene(
-    heights: torch.Tensor, frequency: float | torch.Tensor = _FREQUENCY_HZ
-) -> Scene:
+def _realization_scene(heights: torch.Tensor) -> Scene:
     # Smooth material (scatter_model 0) + realization-coherent phase screen: the
     # screen replaces the specular lobe and drives scattering, so no Kirchhoff
     # ensemble table is built.
@@ -99,9 +100,10 @@ def _realization_scene(
     )
     return Scene(
         structures=[wall],
-        transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.0]))],
-        frequency=frequency,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, -1.0, 0.0])),
+            make_receiver(position=torch.tensor([0.0, 1.0, 0.0])),
+        ],
     )
 
 
@@ -110,7 +112,13 @@ def _heights(seed: int = 5, size: int = 16) -> torch.Tensor:
     return (1.0e-3 * torch.randn(size, size, generator=generator)).to("cuda")
 
 
-def _solve(scene: Scene, solver: str, ad_mode: str):
+def _solve(
+    scene: Scene,
+    solver: str,
+    ad_mode: str,
+    *,
+    reference_frequency_hz: float | torch.Tensor = _FREQUENCY_HZ,
+):
     components = frozenset({"scattering"})
     if solver == "path":
         return path_solve(
@@ -121,6 +129,7 @@ def _solve(scene: Scene, solver: str, ad_mode: str):
                 ad_mode=ad_mode,
                 scattering_samples_per_m2=32.0,
             ),
+            reference_frequency_hz=reference_frequency_hz,
         )
     return deterministic_solve(
         scene,
@@ -130,6 +139,7 @@ def _solve(scene: Scene, solver: str, ad_mode: str):
             ad_mode=ad_mode,
             scattering_samples_per_m2=32.0,
         ),
+        reference_frequency_hz=reference_frequency_hz,
     )
 
 
@@ -153,15 +163,20 @@ def test_ensemble_frequency_grad_matches_fd(solver):
     frequency = torch.tensor(
         _FREQUENCY_HZ, dtype=torch.float64, device="cuda", requires_grad=True
     )
-    scene = _ensemble_scene(frequency)
-    result = _solve(scene, solver, "vjp")
+    scene = _ensemble_scene()
+    result = _solve(scene, solver, "vjp", reference_frequency_hz=frequency)
     _loss(result).backward()
     assert frequency.grad is not None
     grad = frequency.grad.detach()
     assert float(grad.abs()) > 0.0
 
     def evaluate(value: torch.Tensor) -> torch.Tensor:
-        fd_result = _solve(_ensemble_scene(float(value)), solver, "none")
+        fd_result = _solve(
+            _ensemble_scene(),
+            solver,
+            "none",
+            reference_frequency_hz=float(value),
+        )
         return _loss(fd_result).detach()
 
     fd_grad = central_difference_gradient(
@@ -174,8 +189,8 @@ def test_ensemble_frequency_grad_matches_fd(solver):
 
 def test_ensemble_table_value_grad_is_nonzero_and_fd_consistent():
     _require_rayd()
-    scene = _ensemble_scene(_FREQUENCY_HZ)
-    compiled = scene.compile()
+    scene = _ensemble_scene()
+    compiled = compile_scene(scene, reference_frequency_hz=_FREQUENCY_HZ)
     stack = compiled.kirchhoff_resources.stack
     stack.f_te_flat.requires_grad_(True)
     baseline_f_te = stack.f_te_flat.detach().clone()
@@ -190,13 +205,14 @@ def test_ensemble_table_value_grad_is_nonzero_and_fd_consistent():
     # Directional FD of the resident-table gradient on a fresh scene (the table
     # is a deterministic compile output, so the baseline point matches).
     generator = torch.Generator(device="cuda").manual_seed(7)
-    direction = torch.randn(
-        baseline_f_te.shape, generator=generator, device="cuda"
-    )
+    direction = torch.randn(baseline_f_te.shape, generator=generator, device="cuda")
 
     def loss_with_table(table_te: torch.Tensor) -> torch.Tensor:
-        fd_scene = _ensemble_scene(_FREQUENCY_HZ)
-        fd_stack = fd_scene.compile().kirchhoff_resources.stack
+        fd_scene = _ensemble_scene()
+        fd_stack = compile_scene(
+            fd_scene,
+            reference_frequency_hz=_FREQUENCY_HZ,
+        ).kirchhoff_resources.stack
         with torch.no_grad():
             fd_stack.f_te_flat.copy_(table_te)
         return _loss(_solve(fd_scene, "deterministic", "none")).detach()
@@ -223,7 +239,7 @@ def test_realization_runtime_preserves_height_graph():
     _require_rayd()
     heights = _heights().requires_grad_(True)
     scene = _realization_scene(heights)
-    compiled = scene.compile()
+    compiled = compile_scene(scene, reference_frequency_hz=_FREQUENCY_HZ)
     resources = compiled.phase_screen_resources.structures
     assert resources, "expected a compiled phase-screen resource"
     runtime = resources[min(resources)].runtime
@@ -264,16 +280,28 @@ def test_realization_frequency_grad_matches_fd():
     frequency = torch.tensor(
         _FREQUENCY_HZ, dtype=torch.float64, device="cuda", requires_grad=True
     )
-    scene = _realization_scene(heights, frequency)
-    result = _solve(scene, "deterministic", "vjp")
+    scene = _realization_scene(heights)
+    result = _solve(
+        scene,
+        "deterministic",
+        "vjp",
+        reference_frequency_hz=frequency,
+    )
     _loss(result).backward()
     assert frequency.grad is not None
     grad = frequency.grad.detach()
     assert float(grad.abs()) > 0.0
 
     def evaluate(value: torch.Tensor) -> torch.Tensor:
-        fd_scene = _realization_scene(heights, float(value))
-        return _loss(_solve(fd_scene, "deterministic", "none")).detach()
+        fd_scene = _realization_scene(heights)
+        return _loss(
+            _solve(
+                fd_scene,
+                "deterministic",
+                "none",
+                reference_frequency_hz=float(value),
+            )
+        ).detach()
 
     fd_grad = central_difference_gradient(
         evaluate,
@@ -301,7 +329,10 @@ _MATERIAL_FD_STEPS = {
 
 
 def _material_leaf(scene: Scene, name: str) -> torch.Tensor:
-    return getattr(scene.compile().materials, name)
+    return getattr(
+        compile_scene(scene, reference_frequency_hz=_FREQUENCY_HZ).materials,
+        name,
+    )
 
 
 def _fd_material_gradient(
@@ -321,9 +352,7 @@ def _fd_material_gradient(
     return central_difference_gradient(evaluate, base, step)
 
 
-@pytest.mark.parametrize(
-    "param", ("layer_eps_r", "layer_sigma_e", "layer_thickness_m")
-)
+@pytest.mark.parametrize("param", ("layer_eps_r", "layer_sigma_e", "layer_thickness_m"))
 def test_realization_material_grad_is_nonzero_and_fd_consistent(param):
     _require_rayd()
     scene = _realization_scene(_heights())
@@ -339,9 +368,7 @@ def test_realization_material_grad_is_nonzero_and_fd_consistent(param):
         assert leaf.grad is not None
         assert float(leaf.grad.abs().sum()) > 0.0
         assert torch.isfinite(leaf.grad).all()
-        assert (
-            relative_error(leaf.grad, expected, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
-        )
+        assert relative_error(leaf.grad, expected, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
     finally:
         leaf.requires_grad_(False)
         leaf.grad = None
@@ -359,13 +386,14 @@ def test_realization_material_jvp_matches_vjp():
 
     with torch.autograd.forward_ad.dual_level():
         dual = torch.autograd.forward_ad.make_dual(leaf.detach(), tangent)
-        object.__setattr__(scene.compile().materials, "layer_eps_r", dual)
+        compiled = compile_scene(scene, reference_frequency_hz=_FREQUENCY_HZ)
+        object.__setattr__(compiled.materials, "layer_eps_r", dual)
         try:
             jvp = torch.autograd.forward_ad.unpack_dual(
                 _loss(_solve(scene, "deterministic", "jvp"))
             ).tangent
         finally:
-            object.__setattr__(scene.compile().materials, "layer_eps_r", leaf)
+            object.__setattr__(compiled.materials, "layer_eps_r", leaf)
     assert jvp is not None
 
     leaf.requires_grad_(True)
@@ -404,15 +432,20 @@ def test_scattering_frequency_jvp_matches_vjp(scene_kind):
     _require_rayd()
     heights = _heights()
 
-    def build(freq):
+    def build():
         if scene_kind == "ensemble":
-            return _ensemble_scene(freq)
-        return _realization_scene(heights, freq)
+            return _ensemble_scene()
+        return _realization_scene(heights)
 
     frequency = torch.tensor(
         _FREQUENCY_HZ, dtype=torch.float64, device="cuda", requires_grad=True
     )
-    result = _solve(build(frequency), "deterministic", "vjp")
+    result = _solve(
+        build(),
+        "deterministic",
+        "vjp",
+        reference_frequency_hz=frequency,
+    )
     _loss(result).backward()
     vjp_grad = float(frequency.grad.detach())
 
@@ -421,7 +454,12 @@ def test_scattering_frequency_jvp_matches_vjp(scene_kind):
         dual = torch.autograd.forward_ad.make_dual(
             primal.clone(), torch.ones_like(primal)
         )
-        dual_result = _solve(build(dual), "deterministic", "jvp")
+        dual_result = _solve(
+            build(),
+            "deterministic",
+            "jvp",
+            reference_frequency_hz=dual,
+        )
         tangent = torch.autograd.forward_ad.unpack_dual(
             dual_result.component_power["scattering"]
         ).tangent
@@ -462,17 +500,30 @@ def test_ensemble_wrapper_rejects_fixed_receiver_polarization():
     generator = torch.Generator(device=device).manual_seed(404)
 
     def randn(*shape):
-        return torch.randn(*shape, generator=generator, device=device, dtype=torch.float32)
+        return torch.randn(
+            *shape, generator=generator, device=device, dtype=torch.float32
+        )
 
     samples, rows, num_rx = 4, 6, 2
     n_o = torch.nn.functional.normalize(randn(samples, 3), dim=-1)
-    t1r = torch.nn.functional.normalize(torch.cross(n_o, randn(samples, 3), dim=-1), dim=-1)
+    t1r = torch.nn.functional.normalize(
+        torch.cross(n_o, randn(samples, 3), dim=-1), dim=-1
+    )
     t2r = torch.cross(n_o, t1r, dim=-1)
-    wi_local = torch.stack((randn(samples), randn(samples), 0.5 + 0.3 * torch.rand(samples, generator=generator, device=device)), dim=-1)
-    rx_pol = torch.nn.functional.normalize(randn(num_rx, 3), dim=-1).requires_grad_(True)
+    wi_local = torch.stack(
+        (
+            randn(samples),
+            randn(samples),
+            0.5 + 0.3 * torch.rand(samples, generator=generator, device=device),
+        ),
+        dim=-1,
+    )
+    rx_pol = torch.nn.functional.normalize(randn(num_rx, 3), dim=-1).requires_grad_(
+        True
+    )
     nti = nto = npo = 8
-    f_te = (0.2 + torch.rand(nti, 1, nto, npo, generator=generator, device=device))
-    f_tm = (0.2 + torch.rand(nti, 1, nto, npo, generator=generator, device=device))
+    f_te = 0.2 + torch.rand(nti, 1, nto, npo, generator=generator, device=device)
+    f_tm = 0.2 + torch.rand(nti, 1, nto, npo, generator=generator, device=device)
     coef = torch.tensor(0.3, dtype=torch.float32, device=device)
 
     out = scattering_autograd.scattering_ensemble_eval_ad(
@@ -480,7 +531,10 @@ def test_ensemble_wrapper_rejects_fixed_receiver_polarization():
         torch.nn.functional.normalize(randn(rows, 3), dim=-1),  # wo_rows
         0.5 + torch.rand(rows, generator=generator, device=device),  # r2_rows
         0.3 + 0.5 * torch.rand(rows, generator=generator, device=device),  # cos_o_rows
-        n_o, t1r, t2r, wi_local,
+        n_o,
+        t1r,
+        t2r,
+        wi_local,
         0.3 + 0.5 * torch.rand(samples, generator=generator, device=device),  # cos_i
         0.5 + torch.rand(samples, generator=generator, device=device),  # r1
         0.2 + torch.rand(samples, generator=generator, device=device),  # a_te2
@@ -489,12 +543,18 @@ def test_ensemble_wrapper_rejects_fixed_receiver_polarization():
         torch.zeros(samples, dtype=torch.int32, device=device),  # material_id
         t1r,  # backup_axis
         rx_pol,
-        torch.randint(0, num_rx, (rows,), generator=generator, device=device, dtype=torch.int64),  # rc_idx
-        torch.randint(0, samples, (rows,), generator=generator, device=device, dtype=torch.int64),  # sc_idx
+        torch.randint(
+            0, num_rx, (rows,), generator=generator, device=device, dtype=torch.int64
+        ),  # rc_idx
+        torch.randint(
+            0, samples, (rows,), generator=generator, device=device, dtype=torch.int64
+        ),  # sc_idx
         f_te.reshape(-1).contiguous(),
         f_tm.reshape(-1).contiguous(),
         torch.zeros(1, dtype=torch.int64, device=device),  # table_offset
-        torch.tensor([[nti, 1, nto, npo]], dtype=torch.int32, device=device),  # table_dims
+        torch.tensor(
+            [[nti, 1, nto, npo]], dtype=torch.int32, device=device
+        ),  # table_dims
         torch.zeros(1, dtype=torch.int32, device=device),  # material_slot
         coef=coef,
         threshold=-1.0,

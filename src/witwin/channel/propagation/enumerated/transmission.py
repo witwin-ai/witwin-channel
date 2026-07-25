@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel.core import ad_geometry
+from witwin.channel.scene import ad_geometry
 from witwin.channel.propagation.geometry.kernels import (
     rayd_segment_penetration_ad,
     rayd_segment_penetration_forward,
@@ -27,7 +27,7 @@ from witwin.channel.runtime.profiling import (
 )
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+    from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
 def _pair_major_endpoints(

@@ -4,21 +4,17 @@ event-selected shooting sampler for mixed reflection+transmission chains."""
 import pytest
 import torch
 
-from witwin.channel import (
-    ReceiverGrid,
-    ReceiverPoint,
-    Scene,
-    Structure,
-    Transmitter,
+from witwin.core import ReceiverGrid, Scene, Structure
+from tests.support.core_world import (
+    make_mesh_structure,
+    make_receiver,
+    make_receiver_grid,
+    make_transmitter,
 )
-from witwin.channel.core.kernels.extension import build_info
-from witwin.channel.core.materials import (
-    Layer,
-    PerfectConductor,
-    PhysicalSurface,
-)
+from witwin.channel.deployment import build_info
+from witwin.core import MaterialLayer, PhysicalMaterial
 from witwin.channel.montecarlo.bdpt import Config, solve
-from witwin.channel.physics.oracle import layer_stack_rt
+from tests.reference.em_oracle import layer_stack_rt
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA torch is required"
@@ -33,7 +29,7 @@ def _require_native() -> None:
 
 
 def _wall(material, *, x: float = 2.5, surface_id: int = 1) -> Structure:
-    return Structure(
+    return make_mesh_structure(
         vertices=torch.tensor(
             [
                 [x, -4.0, -4.0],
@@ -52,14 +48,15 @@ def _wall(material, *, x: float = 2.5, surface_id: int = 1) -> Structure:
 def _point_scene(structures) -> Scene:
     return Scene(
         structures=structures,
-        transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 0.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([5.0, 0.0, 0.0]))],
-        frequency=_FREQUENCY,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, 0.0, 0.0])),
+            make_receiver(position=torch.tensor([5.0, 0.0, 0.0])),
+        ],
     )
 
 
 def _grid() -> ReceiverGrid:
-    return ReceiverGrid(
+    return make_receiver_grid(
         origin=torch.tensor([5.0, -1.0, -0.5]),
         x_axis=torch.tensor([0.0, 1.0, 0.0]),
         y_axis=torch.tensor([0.0, 0.0, 1.0]),
@@ -68,15 +65,15 @@ def _grid() -> ReceiverGrid:
     )
 
 
-def _vacuum() -> PhysicalSurface:
-    return PhysicalSurface(
-        layers=(Layer(thickness_m=0.2, eps_r=1.0),), name="vacuum-wall"
+def _vacuum() -> PhysicalMaterial:
+    return PhysicalMaterial(
+        layers=(MaterialLayer(thickness_m=0.2, eps_r=1.0),), name="vacuum-wall"
     )
 
 
-def _lossy() -> PhysicalSurface:
-    return PhysicalSurface(
-        layers=(Layer(thickness_m=0.1, eps_r=4.0, sigma_e=0.05),),
+def _lossy() -> PhysicalMaterial:
+    return PhysicalMaterial(
+        layers=(MaterialLayer(thickness_m=0.1, eps_r=4.0, sigma_e=0.05),),
         name="lossy-wall",
     )
 
@@ -84,8 +81,14 @@ def _lossy() -> PhysicalSurface:
 def test_bdpt_vacuum_wall_transmission_recovers_empty_scene_los():
     _require_native()
     config = Config(samples=1024, seed=5, components={"los", "transmission"})
-    walled = solve(_point_scene([_wall(_vacuum())]), config)
-    empty = solve(_point_scene([]), Config(samples=1024, seed=5, components={"los"}))
+    walled = solve(
+        _point_scene([_wall(_vacuum())]), config, reference_frequency_hz=_FREQUENCY
+    )
+    empty = solve(
+        _point_scene([]),
+        Config(samples=1024, seed=5, components={"los"}),
+        reference_frequency_hz=_FREQUENCY,
+    )
 
     # The wall blocks the direct segment: the exclusive los class is zero.
     assert float(walled.component_power["los"]) == pytest.approx(0.0, abs=1.0e-20)
@@ -108,8 +111,14 @@ def test_bdpt_vacuum_wall_transmission_recovers_empty_scene_los():
 def test_bdpt_lossy_wall_transmission_power_ratio_matches_stack():
     _require_native()
     config = Config(samples=1024, seed=5, components={"transmission"})
-    walled = solve(_point_scene([_wall(_lossy())]), config)
-    empty = solve(_point_scene([]), Config(samples=1024, seed=5, components={"los"}))
+    walled = solve(
+        _point_scene([_wall(_lossy())]), config, reference_frequency_hz=_FREQUENCY
+    )
+    empty = solve(
+        _point_scene([]),
+        Config(samples=1024, seed=5, components={"los"}),
+        reference_frequency_hz=_FREQUENCY,
+    )
 
     oracle = layer_stack_rt([(0.1, 4.0, 0.05, 1.0)], 1.0, _FREQUENCY)
     # ADR-020: the transmission component is the full-Jones layer-stack field
@@ -128,7 +137,11 @@ def test_bdpt_lossy_wall_transmission_power_ratio_matches_stack():
 def test_bdpt_pec_wall_transmits_nothing():
     _require_native()
     config = Config(samples=512, seed=5, components={"transmission"})
-    result = solve(_point_scene([_wall(PerfectConductor())]), config)
+    result = solve(
+        _point_scene([_wall(PhysicalMaterial.perfect_conductor())]),
+        config,
+        reference_frequency_hz=_FREQUENCY,
+    )
     assert float(result.component_power["transmission"]) < 1.0e-20
 
 
@@ -140,12 +153,12 @@ def test_bdpt_transmission_is_seed_reproducible_with_mixed_chains():
     scene = _point_scene(
         [
             _wall(_lossy(), x=2.5, surface_id=1),
-            _wall(PerfectConductor(), x=6.0, surface_id=2),
+            _wall(PhysicalMaterial.perfect_conductor(), x=6.0, surface_id=2),
         ]
     )
     config = Config(samples=2048, seed=11, max_depth=3, components={"transmission"})
-    first = solve(scene, config)
-    second = solve(scene, config)
+    first = solve(scene, config, reference_frequency_hz=_FREQUENCY)
+    second = solve(scene, config, reference_frequency_hz=_FREQUENCY)
 
     torch.testing.assert_close(
         first.component_power["transmission"],
@@ -167,10 +180,15 @@ def test_bdpt_results_unchanged_when_transmission_not_requested():
 
     _require_native()
     scene = _point_scene([_wall(_lossy())])
-    base = solve(scene, Config(samples=512, seed=7, components={"los", "reflection"}))
+    base = solve(
+        scene,
+        Config(samples=512, seed=7, components={"los", "reflection"}),
+        reference_frequency_hz=_FREQUENCY,
+    )
     with_t = solve(
         scene,
         Config(samples=512, seed=7, components={"los", "reflection", "transmission"}),
+        reference_frequency_hz=_FREQUENCY,
     )
 
     for component in ("los", "reflection"):
@@ -182,7 +200,11 @@ def test_bdpt_results_unchanged_when_transmission_not_requested():
         )
     assert "transmission" not in base.component_power
     # Determinism of the untouched configuration (bit-identical rerun).
-    rerun = solve(scene, Config(samples=512, seed=7, components={"los", "reflection"}))
+    rerun = solve(
+        scene,
+        Config(samples=512, seed=7, components={"los", "reflection"}),
+        reference_frequency_hz=_FREQUENCY,
+    )
     torch.testing.assert_close(base.path_gain, rerun.path_gain, rtol=0.0, atol=0.0)
 
 
@@ -190,11 +212,16 @@ def test_bdpt_grid_transmission_component_map_matches_power():
     _require_native()
     scene = Scene(
         structures=[_wall(_vacuum())],
-        transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 0.0]))],
-        receivers=[_grid()],
-        frequency=_FREQUENCY,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, 0.0, 0.0])),
+            _grid(),
+        ],
     )
-    result = solve(scene, Config(samples=512, seed=5, components={"transmission"}))
+    result = solve(
+        scene,
+        Config(samples=512, seed=5, components={"transmission"}),
+        reference_frequency_hz=_FREQUENCY,
+    )
 
     assert result.component_maps is not None
     transmission = result.component_maps["transmission"]

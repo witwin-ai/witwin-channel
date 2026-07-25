@@ -24,7 +24,8 @@ else:
 
 
 _DISTRIBUTION = "witwin-channel"
-_DIST_INFO_FILES = frozenset({"METADATA", "RECORD", "WHEEL"})
+_DIST_INFO_LICENSE = "licenses/LICENSE"
+_DIST_INFO_FILES = frozenset({"METADATA", "RECORD", "WHEEL", _DIST_INFO_LICENSE})
 _NATIVE_MEMBER = "witwin/channel/_channel.cp311-win_amd64.pyd"
 _REQUIRED_RUNTIME_MEMBERS = {
     "witwin/channel/runtime/_channel.build-fingerprint",
@@ -193,7 +194,16 @@ def _metadata_identity(
 def _checked_in_package_members() -> frozenset[str]:
     repository_root = Path(__file__).resolve().parents[1]
     result = subprocess.run(
-        ["git", "ls-files", "-z", "--", "src/witwin"],
+        [
+            "git",
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "--",
+            "src/witwin",
+        ],
         cwd=repository_root,
         capture_output=True,
         check=False,
@@ -201,7 +211,11 @@ def _checked_in_package_members() -> frozenset[str]:
     if result.returncode != 0:
         detail = result.stderr.decode("utf-8", errors="replace").strip()
         raise ValueError(f"cannot read checked-in src/witwin member list: {detail}")
-    paths = [path for path in result.stdout.decode("utf-8").split("\0") if path]
+    paths = [
+        path
+        for path in result.stdout.decode("utf-8").split("\0")
+        if path and (repository_root / path).is_file()
+    ]
     prefix = "src/"
     if not paths or any(not path.startswith(prefix) for path in paths):
         raise ValueError("checked-in src/witwin member list is malformed or empty")
@@ -450,7 +464,14 @@ def _audit_wheel_contents(path: Path) -> str:
         dist_info_members = {name for name in names if name.startswith(f"{dist_info}/")}
         if dist_info_members != allowed_dist_info:
             raise ValueError(
-                "wheel dist-info must contain exactly METADATA, WHEEL, and RECORD"
+                "wheel dist-info must contain exactly METADATA, WHEEL, RECORD, "
+                "and licenses/LICENSE"
+            )
+        license_member = f"{dist_info}/{_DIST_INFO_LICENSE}"
+        repository_license = Path(__file__).resolve().parents[1] / "LICENSE"
+        if archive.read(license_member) != repository_license.read_bytes():
+            raise ValueError(
+                "wheel dist-info license bytes differ from the repository LICENSE"
             )
         _audit_record(archive, names, dist_info=dist_info)
         _runtime_identity_from_archive(archive)
@@ -716,12 +737,26 @@ if distribution.metadata[\"Name\"] != {expected_name!r}:
 if distribution.version != {expected_version!r}:
     raise RuntimeError(f\"unexpected distribution version: {{distribution.version!r}}\")
 
+core_distribution = importlib.metadata.distribution("witwin")
+core_distribution_root = Path(core_distribution.locate_file("")).resolve()
+if not core_distribution_root.is_relative_to(target):
+    raise RuntimeError(
+        f\"Core distribution resolved outside isolated target: {{core_distribution_root}}\"
+    )
+
 package_spec = importlib.util.find_spec(\"witwin.channel\")
 if package_spec is None or package_spec.origin is None:
     raise RuntimeError(\"witwin.channel has no import origin\")
 package_origin = Path(package_spec.origin).resolve()
 if not package_origin.is_relative_to(target):
     raise RuntimeError(f\"package resolved outside isolated target: {{package_origin}}\")
+
+core_spec = importlib.util.find_spec(\"witwin.core\")
+if core_spec is None or core_spec.origin is None:
+    raise RuntimeError(\"witwin.core has no import origin\")
+core_origin = Path(core_spec.origin).resolve()
+if not core_origin.is_relative_to(target):
+    raise RuntimeError(f\"Core resolved outside isolated target: {{core_origin}}\")
 
 native_spec = importlib.util.find_spec(\"witwin.channel._channel\")
 if native_spec is None or native_spec.origin is None:
@@ -731,6 +766,8 @@ if not native_origin.is_relative_to(target):
     raise RuntimeError(f\"native extension resolved outside isolated target: {{native_origin}}\")
 
 import witwin.channel as channel
+import witwin.channel._channel as native
+from witwin.channel.propagation import consumer
 
 build_info = channel.build_info()
 if build_info.get(\"backend\") != \"channel\":
@@ -739,6 +776,23 @@ if build_info.get(\"uses_dr_jit\") is not False:
     raise RuntimeError(\"wheel native extension must report uses_dr_jit=false\")
 if build_info.get(\"uses_rayd_native\") is not True:
     raise RuntimeError(\"wheel native extension must report uses_rayd_native=true\")
+if consumer.CONTRACT_VERSION != 2:
+    raise RuntimeError(
+        f\"unexpected propagation consumer contract: {{consumer.CONTRACT_VERSION!r}}\"
+    )
+for symbol in (
+    \"enumerated_canonical_compact\",
+    \"enumerated_exact_pair_metadata\",
+    \"evaluated_paths_compact_finalize\",
+    \"evaluated_paths_compact_finalize_backward\",
+    \"evaluated_paths_compact_finalize_jvp\",
+    \"consumer_los_jones\",
+    \"consumer_fixed_los_gather\",
+    \"consumer_fixed_los_gather_backward\",
+    \"consumer_fixed_los_gather_jvp\",
+):
+    if not hasattr(native, symbol):
+        raise RuntimeError(f\"packaged native extension is missing {{symbol!r}}\")
 
 print(json.dumps({{
     \"wheel_smoke\": True,
@@ -760,11 +814,18 @@ def main() -> int:
         description="Install a built wheel into an isolated target and smoke its native ABI."
     )
     parser.add_argument("wheel", type=Path)
+    parser.add_argument(
+        "--core-wheel",
+        type=Path,
+        required=True,
+        help="Locked witwin-core wheel installed into the same isolated target.",
+    )
     parser.add_argument("--dumpbin", default="dumpbin")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     try:
         wheel = _resolve_wheel(args.wheel)
+        core_wheel = _resolve_wheel(args.core_wheel)
         expected_name, expected_version = _wheel_identity(wheel)
         native_member = _audit_wheel_contents(wheel)
         expected_build_identity = _wheel_runtime_identity(wheel)
@@ -790,6 +851,7 @@ def main() -> int:
                 "--no-deps",
                 "--target",
                 str(target),
+                str(core_wheel),
                 str(wheel),
             ],
             capture_output=True,

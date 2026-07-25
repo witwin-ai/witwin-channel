@@ -27,10 +27,13 @@ from tests.ad import _tolerances
 from tests.support.scenes import same_side_wall_reflection_scene
 from witwin.channel.deterministic import Config as DeterministicConfig
 from witwin.channel.deterministic import solve as deterministic_solve
+from witwin.channel.scene import compile as compile_scene
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for AD budgets"
 )
+
+_FREQUENCY_HZ = 3.0e9
 
 
 def test_gradient_tolerances_are_pinned():
@@ -75,14 +78,21 @@ def _config(ad_mode: str) -> DeterministicConfig:
 def _timed_solve(scene, ad_mode: str):
     torch.cuda.synchronize()
     start = perf_counter()
-    result = deterministic_solve(scene, _config(ad_mode))
+    result = deterministic_solve(
+        scene,
+        _config(ad_mode),
+        reference_frequency_hz=_FREQUENCY_HZ,
+    )
     torch.cuda.synchronize()
     return result, (perf_counter() - start) * 1.0e3
 
 
 def test_ad_time_memory_and_tape_budgets():
     scene = same_side_wall_reflection_scene()
-    leaf = scene.compile().materials.eps_r
+    leaf = compile_scene(
+        scene,
+        reference_frequency_hz=_FREQUENCY_HZ,
+    ).materials.eps_r
     # Warm up caches and the CUDA context before measuring.
     _timed_solve(scene, "none")
 
@@ -124,11 +134,19 @@ def test_ad_time_memory_and_tape_budgets():
         # Peak-memory high-water mark of one AD solve vs one primal solve.
         torch.cuda.synchronize()
         torch.cuda.reset_peak_memory_stats()
-        deterministic_solve(scene, _config("none"))
+        deterministic_solve(
+            scene,
+            _config("none"),
+            reference_frequency_hz=_FREQUENCY_HZ,
+        )
         torch.cuda.synchronize()
         primal_peak = torch.cuda.max_memory_allocated()
         torch.cuda.reset_peak_memory_stats()
-        result = deterministic_solve(scene, _config("vjp"))
+        result = deterministic_solve(
+            scene,
+            _config("vjp"),
+            reference_frequency_hz=_FREQUENCY_HZ,
+        )
         result.paths.coefficient.real.sum().backward()
         torch.cuda.synchronize()
         ad_peak = torch.cuda.max_memory_allocated()
@@ -145,15 +163,26 @@ def test_metadata_reports_solve_timing():
     scene = same_side_wall_reflection_scene()
     # none-mode is not AD-instrumented: no timing synchronize, reported as
     # exactly zero (part of the zero-overhead primal contract).
-    none_kernel = deterministic_solve(scene, _config("none")).metadata["kernel"]
+    none_kernel = deterministic_solve(
+        scene,
+        _config("none"),
+        reference_frequency_hz=_FREQUENCY_HZ,
+    ).metadata["kernel"]
     assert none_kernel["forward_time_ms"] == 0.0
     assert none_kernel["peak_memory_bytes"] == 0
 
     # An AD solve is instrumented and reports a positive wall time.
-    leaf = scene.compile().materials.eps_r
+    leaf = compile_scene(
+        scene,
+        reference_frequency_hz=_FREQUENCY_HZ,
+    ).materials.eps_r
     leaf.requires_grad_(True)
     try:
-        ad_kernel = deterministic_solve(scene, _config("vjp")).metadata["kernel"]
+        ad_kernel = deterministic_solve(
+            scene,
+            _config("vjp"),
+            reference_frequency_hz=_FREQUENCY_HZ,
+        ).metadata["kernel"]
     finally:
         leaf.requires_grad_(False)
     assert ad_kernel["forward_time_ms"] > 0.0

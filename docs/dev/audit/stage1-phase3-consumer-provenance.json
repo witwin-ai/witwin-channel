@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "contract_version": 2,
+  "status": "implementation-bound; runtime evidence pending concentrated Stage-I acceptance",
+  "public_owner": "witwin.channel.propagation.consumer",
+  "native_owner": "Channel _channel ADR-032 canonical compact producer",
+  "failure_owner": {
+    "owner": "Channel propagation consumer boundary",
+    "contract": "all validation and internal failure observation complete before public result construction",
+    "public_failure_state": false,
+    "partial_result": false
+  },
+  "compact_boundary": {
+    "decision": "ADR-032",
+    "rows": "exact K in owning native stable pair-major order",
+    "native_symbol": "enumerated_canonical_compact",
+    "path_count": "host K from one 8-byte int64 control record read by the owning boundary",
+    "nonempty_candidate_boundary": {
+      "d2h_copies": 1,
+      "d2h_bytes": 8,
+      "current_stream_synchronizations": 1,
+      "control_record": "K or a negative contract-error code"
+    },
+    "zero_candidate_boundary": {
+      "d2h_copies": 0,
+      "d2h_bytes": 0,
+      "current_stream_synchronizations": 0
+    },
+    "replaced_phase2_owner": "Torch canonical selection, nonzero, Boolean indexing, and hidden cardinality observation",
+    "count_d2h_delta_from_phase2": 0,
+    "stream_sync_delta_from_phase2": 0,
+    "python_torch_compaction": false,
+    "capacity_shaped_public_result": false
+  },
+  "consumer_exact_row_projection": {
+    "path_count": "K from exact input tensor shape",
+    "d2h_copies": 0,
+    "current_stream_synchronizations": 0,
+    "pair_segmentation": "aliases pair_index and pair_offsets already published by the source-pipeline owner",
+    "payload": "aliases canonical compact rows without copy"
+  },
+  "los_fast_path": {
+    "native_symbol": "enumerated_exact_pair_metadata",
+    "path_count": "K from the existing exact LoS result shape",
+    "d2h_copies": 0,
+    "current_stream_synchronizations": 0,
+    "pair_segmentation": "O(K + P) device histogram and inclusive scan"
+  },
+  "legacy_path_scattering": {
+    "native_symbol": "evaluated_paths_compact_finalize",
+    "reachability": "conditional Path solver route only; consumer contract version 1 rejects scattering before compute",
+    "reason": "legacy incoherent scattering rows are appended after coherent canonical rows and require stable pair-major reorder",
+    "nonempty_boundary": {
+      "d2h_copies": 1,
+      "d2h_bytes": 8,
+      "current_stream_synchronizations": 1
+    }
+  },
+  "fixed_los_reevaluation": {
+    "topology": "caller-frozen exact rows",
+    "endpoint_gather": "consumer_fixed_los_gather native producer",
+    "field_owner": "RayD-owned field_free_space family",
+    "frequency_value": "compiled host scalar reused without solve-time D2H",
+    "nonempty_validation": {
+      "d2h_copies": 1,
+      "d2h_bytes": 4,
+      "current_stream_synchronizations": 1
+    },
+    "zero_row_validation": {
+      "d2h_copies": 0,
+      "d2h_bytes": 0,
+      "current_stream_synchronizations": 0
+    }
+  },
+  "field_provenance": {
+    "pair_index": "owning native compact producer",
+    "pair_offsets": "owning native compact producer",
+    "topology": "owning native compact producer",
+    "geometry": "owning native compact producer",
+    "scalar_transport": "owning native field producer",
+    "complex3_transport": "owning native field producer",
+    "jones_transport": "consumer_los_jones native complete source-basis-to-sink-basis producer",
+    "consumer_adapter": "metadata validation and immutable typed assembly only"
+  },
+  "forbidden_public_payload": [
+    "EvaluatedPaths",
+    "internal row identity",
+    "CapacityFailureState",
+    "raw failure bit",
+    "terminal observer",
+    "native handle",
+    "RayD resource",
+    "CompiledScene",
+    "cache",
+    "solver tape"
+  ],
+  "historical_experiments": {
+    "ADR-029": "Superseded; caller-free",
+    "ADR-030": "Dormant; caller-free",
+    "ADR-031": "Rejected; caller-free"
+  },
+  "adr_037_fixed_topology": {
+    "decision": "ADR-037",
+    "prepared_handle": "prepare_fixed_topology partitions frozen rows by component and interaction depth once, on the host, and enforces fixed_topology_components",
+    "prepare_observation": "host-visible; recorded on PreparedFixedTopology, deliberately excluded from PropagationDiagnostics",
+    "per_call_validation": {
+      "d2h_copies": 1,
+      "d2h_bytes": 4,
+      "current_stream_synchronizations": 1,
+      "control_record": "int32 contract bitmask over every frozen row"
+    },
+    "row_validity": {
+      "field": "FixedTopologyEvaluation.row_valid",
+      "dtype": "bool",
+      "resident": "device",
+      "host_read": false,
+      "compaction": false,
+      "invalid_row_payload": "exact zero in transport, path length, delay, direction, and interaction tables",
+      "invalid_row_derivative": "exact zero",
+      "sole_authority": true
+    },
+    "failure_channel_unchanged": "capacity, ABI, contract, and device failure remain all-or-nothing and raise before a result exists",
+    "new_native_symbols": [],
+    "composed_jones": {
+      "physics_owner": "native field transport and endpoint-basis operators",
+      "python_role": "excitation choice, dispatch, and stacking",
+      "launches_per_bucket": 9,
+      "frozen_ad_inputs": [
+        "tx_power",
+        "mu_r",
+        "source_basis",
+        "sink_basis",
+        "endpoint_polarizations"
+      ]
+    }
+  }
+}

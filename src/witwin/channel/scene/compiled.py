@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-
 import torch
+from witwin.core import Scene, SceneSnapshot
 
 from witwin.channel.scattering.tables import KirchhoffTable
 from witwin.channel.scene.kernels.rayd_scene import RayDSceneResource
@@ -23,10 +23,15 @@ from witwin.channel.scene.stores.materials import MaterialStore
 
 @dataclass(slots=True)
 class CompiledScene:
+    source: Scene | SceneSnapshot
+    structures: tuple[object, ...]
     geometry: GeometryStore
     materials: MaterialStore
     assignments: AssignmentStore
     rayd: RayDSceneResource
+    reference_frequency_hz: float | torch.Tensor
+    reference_frequency_revision: int | None
+    topology_version: int
     geometry_version: int
     material_version: int
     assignment_version: int
@@ -44,6 +49,22 @@ class CompiledScene:
     )
 
     def __post_init__(self) -> None:
+        if not isinstance(self.source, (Scene, SceneSnapshot)):
+            raise TypeError("source must be a witwin.core Scene or SceneSnapshot")
+        frequency = self.reference_frequency_hz
+        if isinstance(frequency, torch.Tensor):
+            if frequency.ndim != 0 or not frequency.dtype.is_floating_point:
+                raise TypeError(
+                    "reference_frequency_hz must be a scalar floating-point tensor"
+                )
+            if self.reference_frequency_revision is None:
+                raise TypeError(
+                    "tensor reference frequency requires a mutation revision"
+                )
+        elif not isinstance(frequency, float):
+            raise TypeError("reference_frequency_hz must be a float or tensor")
+        elif self.reference_frequency_revision is not None:
+            raise TypeError("scalar reference frequency has no mutation revision")
         for name in (
             "enumerated_penetration_scene_diagonal_m",
             "montecarlo_penetration_scene_diagonal_m",
@@ -53,6 +74,32 @@ class CompiledScene:
                 raise TypeError(f"{name} must be a float")
             if not math.isfinite(value) or value < 0.0:
                 raise ValueError(f"{name} must be finite and non-negative")
+
+    def require_reference_frequency(
+        self, reference_frequency_hz: float | torch.Tensor
+    ) -> None:
+        """Reject a request/compile frequency mismatch before native work."""
+
+        compiled = self.reference_frequency_hz
+        if isinstance(compiled, torch.Tensor):
+            if reference_frequency_hz is not compiled:
+                raise ValueError(
+                    "reference_frequency_hz does not match the compiled tensor "
+                    "identity"
+                )
+            if int(reference_frequency_hz._version) != self.reference_frequency_revision:
+                raise ValueError(
+                    "reference_frequency_hz changed after scene compilation"
+                )
+            return
+        if isinstance(reference_frequency_hz, torch.Tensor):
+            raise ValueError(
+                "reference_frequency_hz tensor does not match the compiled scalar"
+            )
+        if float(reference_frequency_hz).hex() != compiled.hex():
+            raise ValueError(
+                "reference_frequency_hz does not exactly match CompiledScene"
+            )
 
     @property
     def kirchhoff_resources(self) -> KirchhoffRuntimeResources:
@@ -146,6 +193,3 @@ class CompiledScene:
                 )
             tokens.append((structure_index, id(screen), *height_token))
         return tuple(tokens)
-
-
-CompiledScene.__module__ = "witwin.channel.core.runtime.compiled_scene"

@@ -23,8 +23,9 @@ from tests.ad._tolerances import (
     REL_TOL_GENERAL,
 )
 from tests.support.scenes import transmission_wall_structure
-from witwin.channel import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel.core.materials import Dielectric, Layer, PhysicalSurface
+from witwin.core import Mesh, Scene, Structure
+from tests.support.core_world import make_receiver, make_transmitter
+from witwin.core import MaterialLayer, PhysicalMaterial
 from witwin.channel.deterministic import Config as DeterministicConfig
 from witwin.channel.deterministic import solve as deterministic_solve
 from witwin.channel.path import Config as PathConfig
@@ -67,18 +68,29 @@ def _reflection_scene(
     rx: torch.Tensor | None = None,
     vertices: torch.Tensor | None = None,
 ) -> Scene:
+    wall_vertices = (
+        torch.tensor(_WALL_VERTICES) if vertices is None else vertices
+    )
     wall = Structure(
-        vertices=torch.tensor(_WALL_VERTICES) if vertices is None else vertices,
-        faces=torch.tensor([[0, 1, 2], [1, 3, 2]]),
-        material=Dielectric(eps_r=4.0, sigma_e=0.02),
+        Mesh(
+            wall_vertices,
+            torch.tensor(
+                [[0, 1, 2], [1, 3, 2]], device=wall_vertices.device
+            ),
+            recenter=False,
+            fill_mode="surface",
+            topology_diagnostics=False,
+        ),
+        PhysicalMaterial(eps_r=4.0, sigma_e=0.02),
         name="ad-open-wall",
         surface_id=1,
     )
     return Scene(
         structures=[wall],
-        transmitters=[Transmitter(position=_vec(_TX) if tx is None else tx)],
-        receivers=[ReceiverPoint(position=_vec(_RX) if rx is None else rx)],
-        frequency=_FREQUENCY_HZ,
+        endpoints=[
+            make_transmitter(position=_vec(_TX) if tx is None else tx),
+            make_receiver(position=_vec(_RX) if rx is None else rx),
+        ],
     )
 
 
@@ -95,10 +107,10 @@ def _transmission_scene(
     rx: torch.Tensor | None = None,
     vertices: torch.Tensor | None = None,
 ) -> Scene:
-    material = PhysicalSurface(
+    material = PhysicalMaterial(
         layers=(
-            Layer(thickness_m=0.06, eps_r=4.0, sigma_e=0.02),
-            Layer(thickness_m=0.09, eps_r=2.5, sigma_e=0.01),
+            MaterialLayer(thickness_m=0.06, eps_r=4.0, sigma_e=0.02),
+            MaterialLayer(thickness_m=0.09, eps_r=2.5, sigma_e=0.01),
         ),
         name="ad-thin-sheet",
     )
@@ -106,19 +118,29 @@ def _transmission_scene(
         wall = transmission_wall_structure(3.0, material)
     else:
         wall = Structure(
-            vertices=vertices,
-            faces=torch.tensor([[0, 1, 2], [1, 3, 2]]),
-            material=material,
+            Mesh(
+                vertices,
+                torch.tensor(
+                    [[0, 1, 2], [1, 3, 2]], device=vertices.device
+                ),
+                recenter=False,
+                fill_mode="surface",
+                topology_diagnostics=False,
+            ),
+            material,
             name="wall",
             surface_id=1,
         )
     return Scene(
         structures=[wall],
-        transmitters=[
-            Transmitter(position=_vec(_TRANSMISSION_TX) if tx is None else tx)
+        endpoints=[
+            make_transmitter(
+                position=_vec(_TRANSMISSION_TX) if tx is None else tx
+            ),
+            make_receiver(
+                position=_vec(_TRANSMISSION_RX) if rx is None else rx
+            ),
         ],
-        receivers=[ReceiverPoint(position=_vec(_TRANSMISSION_RX) if rx is None else rx)],
-        frequency=_FREQUENCY_HZ,
     )
 
 
@@ -127,9 +149,10 @@ def _los_scene(
 ) -> Scene:
     return Scene(
         structures=[],
-        transmitters=[Transmitter(position=_vec(_TX) if tx is None else tx)],
-        receivers=[ReceiverPoint(position=_vec(_RX) if rx is None else rx)],
-        frequency=_FREQUENCY_HZ,
+        endpoints=[
+            make_transmitter(position=_vec(_TX) if tx is None else tx),
+            make_receiver(position=_vec(_RX) if rx is None else rx),
+        ],
     )
 
 
@@ -143,7 +166,9 @@ _SCENES = {
 def _solve(scene: Scene, solver: str, components: frozenset[str], ad_mode: str):
     if solver == "path":
         return path_solve(
-            scene, PathConfig(max_depth=1, components=components, ad_mode=ad_mode)
+            scene,
+            PathConfig(max_depth=1, components=components, ad_mode=ad_mode),
+            reference_frequency_hz=_FREQUENCY_HZ,
         )
     return deterministic_solve(
         scene,
@@ -153,6 +178,7 @@ def _solve(scene: Scene, solver: str, components: frozenset[str], ad_mode: str):
             export_paths=True,
             ad_mode=ad_mode,
         ),
+        reference_frequency_hz=_FREQUENCY_HZ,
     )
 
 
@@ -317,23 +343,35 @@ def test_mesh_vertex_los_grad_is_structurally_zero(solver):
 
 
 def _coupled_scene_with_vertices(leaf: torch.Tensor) -> Scene:
-    from witwin.channel.core.materials import PerfectConductor
-
     return Scene(
         structures=[
             Structure(
-                vertices=leaf,
-                faces=torch.tensor(
-                    [[0, 1, 2], [0, 2, 3], [4, 6, 7], [4, 7, 5], [4, 5, 9], [4, 9, 8]],
-                    dtype=torch.int32,
+                Mesh(
+                    leaf,
+                    torch.tensor(
+                        [
+                            [0, 1, 2],
+                            [0, 2, 3],
+                            [4, 6, 7],
+                            [4, 7, 5],
+                            [4, 5, 9],
+                            [4, 9, 8],
+                        ],
+                        dtype=torch.int32,
+                        device=leaf.device,
+                    ),
+                    recenter=False,
+                    fill_mode="surface",
+                    topology_diagnostics=False,
                 ),
-                material=PerfectConductor(),
+                PhysicalMaterial.perfect_conductor(),
                 surface_id=0,
             )
         ],
-        transmitters=[Transmitter(position=torch.tensor([0.4, -2.2, 1.15]))],
-        receivers=[ReceiverPoint(position=torch.tensor([0.55, 2.3, 4.8]))],
-        frequency=_FREQUENCY_HZ,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.4, -2.2, 1.15])),
+            make_receiver(position=torch.tensor([0.55, 2.3, 4.8])),
+        ],
     )
 
 
@@ -375,6 +413,7 @@ def test_mesh_vertex_coupled_grad_exists():
             coupled_paths=True,
             ad_mode="vjp",
         ),
+        reference_frequency_hz=_FREQUENCY_HZ,
     )
     loss = result.a.real.sum() + 0.5 * result.a.imag.sum()
     loss.backward()
@@ -399,4 +438,5 @@ def test_mesh_vertex_coupled_fails_loudly():
                 coupled_paths=True,
                 ad_mode="vjp",
             ),
+            reference_frequency_hz=_FREQUENCY_HZ,
         )

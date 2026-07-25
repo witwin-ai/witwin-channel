@@ -4,7 +4,7 @@ from functools import partial
 
 import torch
 
-from witwin.channel.core.kernels.metadata import AdLaunchLedger
+from witwin.channel.runtime.kernel_metadata import AdLaunchLedger
 from witwin.channel.propagation.fields.kernels import (
     autograd as field_autograd,
 )

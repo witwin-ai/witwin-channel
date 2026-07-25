@@ -2,7 +2,9 @@
 
 - **Status:** Accepted (2026-07-19); typed switch, legacy retirement, and stable
   integration naming implemented; validated package-source discovery amendment
-  accepted 2026-07-22; new-lock multi-architecture publication delegated to CI
+  accepted 2026-07-22; RayD native trace backend selection amendment accepted
+  by ADR-035 on 2026-07-23; new-lock multi-architecture publication delegated
+  to the Stage-I release checkpoint
 - **Date:** 2026-07-19
 - **Kind:** Native integration boundary and lifecycle ownership. This ADR does
   not change physics, numerical order, fusion, launch configuration, solver
@@ -12,7 +14,8 @@
   (public/internal API), ADR-004 (numerical duplication), ADR-006 (developer
   override), ADR-007 (propagation ownership), ADR-009 (native fusion
   ownership), ADR-012/013 (coupled diffraction), and ADR-020/021/022 (current
-  transmission, scattering, and AD contracts).
+  transmission, scattering, and AD contracts), ADR-032 (compact cardinality),
+  and ADR-035 (RayD native trace backend selection).
 
 ## Context
 
@@ -27,7 +30,7 @@ tensors less protection than they have at the Python boundary.
 The desired direct integration is not a Python import of `rayd.torch`, a second
 extension, a second dispatcher, or a second scene registry. It is a source-level
 C++ API used inside the one `_channel` extension. RayD remains the owner
-of generic scene, acceleration-structure, OptiX trace, intersection,
+of generic scene, acceleration structures, native tracing, intersection,
 visibility, and generic path-geometry primitives. Channel remains the owner of
 RF contracts, solver policy, topology, reductions, and Channel-fused
 operations.
@@ -42,7 +45,7 @@ RayD primitive participates in it.
 ### 1. One typed source-level integration API
 
 RayD provides a versioned C++ integration API in `namespace rayd::torch`.
-Its numeric API version is 2; the source header and identity use stable,
+Its numeric API version is 6; the source header and identity use stable,
 capability-neutral names.
 The public integration header exposes typed resource, config, operation, and
 result contracts. Its version and header identity participate in Channel's
@@ -126,7 +129,7 @@ and gradient semantics. Empty handling must match the old entry exactly, must
 not manufacture a successful empty result for an invalid contract, and must
 not hide a missing capability, ABI mismatch, stale resource, or device error.
 
-Invalid shape/dtype/device/resource/ABI state and CUDA/OptiX failures fail
+Invalid shape/dtype/device/resource/ABI state and native CUDA/OptiX failures fail
 loudly before partial computation is reported as success. RayD raises a typed
 C++/c10 exception with operation and contract context; `_channel`
 translates it once at the pybind boundary. Channel must not catch it to return
@@ -198,10 +201,26 @@ dual path. The audit covered declarations, definitions, link references,
 tests, examples, packages, downstream build files, and current documentation.
 
 The live typed boundary now uses `rayd/torch/integration.h` and identity
-`rayd.torch.integration`. Numeric API version 2 remains a separately validated
+`rayd.torch.integration`. Numeric API version 6 remains a separately validated
 contract value; it is not encoded in a WIP filename, target, or identity. The
 final Channel lock advances through later accepted RayD additions without
 reintroducing the retired surface.
+
+### 7. RayD-owned native trace selection
+
+ADR-035 amends the original OptiX-only assumption without changing the typed
+boundary or creating another owner. RayD 0.7.0 `TraceBackend::Auto` may select
+RayD-owned OptiX or RayD-owned pure-CUDA tracing during scene construction.
+OptiX remains the preferred performance path. Missing OptiX alone is no longer
+a Channel capability failure, but an operation unsupported by the selected
+RayD backend must fail typed capability validation before that operation
+launches or exposes output. Channel never retries a failed operation on the
+other backend and never substitutes Torch, CPU, Dr.Jit, reduced physics, or a
+partial result.
+
+Phase 0A freezes only dependency/static compatibility. Both native trace paths
+retain separate numerical, AD, capability, launch/resource, and performance
+evidence obligations at the Phase 2 and Phase 3 large-module checkpoints.
 
 ## Required migration and acceptance evidence
 

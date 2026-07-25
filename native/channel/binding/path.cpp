@@ -420,6 +420,24 @@ pybind11::dict channel_enumerated_canonical_capacity_select(
     int64_t num_rx,
     int64_t max_paths,
     int64_t max_paths_scope);
+pybind11::dict channel_enumerated_canonical_compact(
+    pybind11::dict block,
+    int64_t pair_count,
+    int64_t num_tx,
+    int64_t num_rx,
+    int64_t max_paths,
+    int64_t max_paths_scope,
+    int64_t sequence_width,
+    std::optional<torch::Tensor> source_stable_ids,
+    std::optional<torch::Tensor> sink_stable_ids);
+pybind11::dict channel_enumerated_exact_pair_metadata(
+    torch::Tensor tx_id,
+    torch::Tensor rx_id,
+    int64_t pair_count,
+    int64_t num_tx,
+    int64_t num_rx,
+    std::optional<torch::Tensor> source_stable_ids,
+    std::optional<torch::Tensor> sink_stable_ids);
 pybind11::dict channel_deterministic_capacity_finalize(
     torch::Tensor failure_state,
     torch::Tensor valid,
@@ -521,6 +539,32 @@ pybind11::dict channel_evaluated_paths_capacity_pack(
     int64_t num_tx,
     int64_t num_rx,
     int64_t path_capacity_per_pair);
+pybind11::dict channel_evaluated_paths_compact_finalize(
+    torch::Tensor valid,
+    torch::Tensor tx_id,
+    torch::Tensor rx_id,
+    torch::Tensor depth,
+    torch::Tensor component_id,
+    torch::Tensor primitive_id,
+    torch::Tensor edge_id,
+    torch::Tensor material_id,
+    torch::Tensor primitive_sequence,
+    torch::Tensor material_sequence,
+    torch::Tensor interaction_type,
+    torch::Tensor path_length_m,
+    torch::Tensor delay_s,
+    torch::Tensor field_direction,
+    torch::Tensor interaction_position,
+    torch::Tensor interaction_normal,
+    torch::Tensor interaction_positions,
+    torch::Tensor interaction_normals,
+    torch::Tensor path_gain,
+    torch::Tensor path_field,
+    torch::Tensor field_xyz,
+    torch::Tensor coefficient,
+    torch::Tensor source_stable_ids,
+    torch::Tensor sink_stable_ids,
+    bool rows_are_compact);
 pybind11::dict channel_evaluated_paths_capacity_pack_backward(
     torch::Tensor valid,
     torch::Tensor selected_row_index,
@@ -553,6 +597,51 @@ pybind11::dict channel_evaluated_paths_capacity_pack_jvp(
     std::optional<torch::Tensor> tangent_coefficient,
     int64_t candidate_count,
     int64_t sequence_width);
+decltype(channel_evaluated_paths_capacity_pack_backward)
+    channel_evaluated_paths_compact_finalize_backward;
+decltype(channel_evaluated_paths_capacity_pack_jvp)
+    channel_evaluated_paths_compact_finalize_jvp;
+pybind11::dict channel_consumer_los_jones(
+    torch::Tensor pair_index,
+    torch::Tensor source_positions,
+    torch::Tensor sink_positions,
+    torch::Tensor source_reference_basis,
+    torch::Tensor sink_reference_basis,
+    double frequency_hz);
+pybind11::dict channel_consumer_fixed_los_gather(
+    torch::Tensor source_index,
+    torch::Tensor sink_index,
+    torch::Tensor source_id,
+    torch::Tensor sink_id,
+    torch::Tensor depth,
+    torch::Tensor component_id,
+    torch::Tensor source_positions,
+    torch::Tensor sink_positions,
+    torch::Tensor source_powers,
+    torch::Tensor source_polarizations,
+    torch::Tensor sink_polarizations,
+    torch::Tensor source_stable_ids,
+    torch::Tensor sink_stable_ids);
+pybind11::dict channel_consumer_fixed_los_gather_backward(
+    torch::Tensor source_index,
+    torch::Tensor sink_index,
+    std::optional<torch::Tensor> grad_source,
+    std::optional<torch::Tensor> grad_target,
+    std::optional<torch::Tensor> grad_tx_power,
+    std::optional<torch::Tensor> grad_tx_polarization,
+    std::optional<torch::Tensor> grad_rx_polarization,
+    int64_t source_count,
+    int64_t sink_count);
+pybind11::dict channel_consumer_fixed_los_gather_jvp(
+    torch::Tensor source_index,
+    torch::Tensor sink_index,
+    std::optional<torch::Tensor> tangent_source_positions,
+    std::optional<torch::Tensor> tangent_sink_positions,
+    std::optional<torch::Tensor> tangent_source_powers,
+    std::optional<torch::Tensor> tangent_source_polarizations,
+    std::optional<torch::Tensor> tangent_sink_polarizations,
+    int64_t source_count,
+    int64_t sink_count);
 pybind11::dict channel_deterministic_path_table_capacity_pack(
     torch::Tensor failure_state,
     torch::Tensor valid,
@@ -1107,6 +1196,30 @@ void register_path_deterministic(pybind11::module_ &module) {
         pybind11::arg("max_paths"),
         pybind11::arg("max_paths_scope"));
     module.def(
+        "enumerated_canonical_compact",
+        &channel_enumerated_canonical_compact,
+        "Select and gather exact canonical rows with ADR-032 pair metadata.",
+        pybind11::arg("block"),
+        pybind11::arg("pair_count"),
+        pybind11::arg("num_tx"),
+        pybind11::arg("num_rx"),
+        pybind11::arg("max_paths"),
+        pybind11::arg("max_paths_scope"),
+        pybind11::arg("sequence_width"),
+        pybind11::arg("source_stable_ids") = std::nullopt,
+        pybind11::arg("sink_stable_ids") = std::nullopt);
+    module.def(
+        "enumerated_exact_pair_metadata",
+        &channel_enumerated_exact_pair_metadata,
+        "Attach sink-major/source-minor metadata to trusted exact rows.",
+        pybind11::arg("tx_id"),
+        pybind11::arg("rx_id"),
+        pybind11::arg("pair_count"),
+        pybind11::arg("num_tx"),
+        pybind11::arg("num_rx"),
+        pybind11::arg("source_stable_ids") = std::nullopt,
+        pybind11::arg("sink_stable_ids") = std::nullopt);
+    module.def(
         "deterministic_capacity_finalize",
         &channel_deterministic_capacity_finalize,
         "Stably finalize deterministic rows into pair-major fixed CUDA capacity.",
@@ -1159,6 +1272,34 @@ void register_path_deterministic(pybind11::module_ &module) {
         "evaluated_paths_canonical_capacity_gather_jvp",
         &channel_evaluated_paths_canonical_capacity_gather_jvp,
         "Gather evaluated-path tangents into canonical compact-prefix capacity.");
+    module.def(
+        "evaluated_paths_compact_finalize",
+        &channel_evaluated_paths_compact_finalize,
+        "Finalize valid evaluated paths into exact pair-major CUDA rows.");
+    module.def(
+        "evaluated_paths_compact_finalize_backward",
+        &channel_evaluated_paths_compact_finalize_backward,
+        "Scatter exact compact evaluated-path cotangents to source rows.");
+    module.def(
+        "evaluated_paths_compact_finalize_jvp",
+        &channel_evaluated_paths_compact_finalize_jvp,
+        "Gather evaluated-path tangents into exact compact rows.");
+    module.def(
+        "consumer_los_jones",
+        &channel_consumer_los_jones,
+        "Evaluate a true source-basis to sink-basis LoS Jones operator.");
+    module.def(
+        "consumer_fixed_los_gather",
+        &channel_consumer_fixed_los_gather,
+        "Validate and gather exact endpoint rows for frozen LoS topology.");
+    module.def(
+        "consumer_fixed_los_gather_backward",
+        &channel_consumer_fixed_los_gather_backward,
+        "Scatter frozen LoS row cotangents back to endpoint batches.");
+    module.def(
+        "consumer_fixed_los_gather_jvp",
+        &channel_consumer_fixed_los_gather_jvp,
+        "Gather endpoint tangents for frozen LoS rows.");
     module.def(
         "evaluated_paths_capacity_pack",
         &channel_evaluated_paths_capacity_pack,

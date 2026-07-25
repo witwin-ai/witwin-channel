@@ -161,10 +161,18 @@ policy.
 
 ## Public entry points
 
-There are no root public API exports. The internal package export surface is
-`PathTopology`, `PathGeometry`, `PathFields`, and `EvaluatedPaths`.
+`propagation.consumer` is the one public surface in this package: the stable,
+solver-neutral contract that packages outside Channel use to obtain propagation
+paths. See `consumer/README.md` for its vocabulary, capability record,
+validation split, and result shape. It is a façade only — it owns no physics,
+adds no second compaction, and never imports a solver.
+
+Everything else here is internal. The internal package export surface is
+`PathTopology`, `PathGeometry`, `PathFields`, and `EvaluatedPaths`, and
+`propagation.models` holds the typed row contracts behind them.
 `propagation.enumerated` owns shared component stages; solver-specific result
-conversion stays outside.
+conversion stays outside. Path and Deterministic keep using the internal
+contracts directly rather than routing through the consumer façade.
 
 ## Dependency rules
 
@@ -199,6 +207,15 @@ Fixed-topology reevaluation cannot change winner selection or conceal a detach
 boundary. Continuous endpoint, vertex, material, frequency, and field leaves
 use explicit native backward/JVP companions. Unsupported tangents and
 higher-order derivatives fail before returning a partial result.
+
+`geometry/reevaluate.py::reflection_epc_paths` is the single fixed-winner
+reflection re-solve, and it publishes RayD's per-row validity rather than
+deciding what to do with it. The enumerated fixed-winner path requires every
+row to reproduce and raises otherwise, because it re-solves a winner it just
+discovered under the same scene tensors. Reevaluation at NEW endpoint positions
+is a different question, and under ADR-037 the consumer publishes the mask per
+row: a stationary point that leaves its facet is a complete answer, not a
+failure. One implementation, two policies - do not fork it.
 
 ## Forbidden fallback
 

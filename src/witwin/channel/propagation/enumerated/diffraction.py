@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel.core.field_state import transmitter_polarizations
+from witwin.channel.field_state import transmitter_polarizations
 from witwin.channel.materials.encoding import face_material_tensors
 from witwin.channel.scene.tensors import (
     LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,
@@ -42,7 +42,7 @@ from witwin.channel.runtime.profiling import (
 )
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+    from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
 def _deterministic_diffraction_states(

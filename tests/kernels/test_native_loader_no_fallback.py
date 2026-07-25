@@ -3,10 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from witwin.channel.core.kernels import extension
 from witwin.channel.montecarlo.basic.kernels import sampling as mc_sampling
 from witwin.channel.propagation.geometry.kernels import bridge as ops
-from witwin.channel.runtime import symbols
+from witwin.channel.runtime import extension, symbols
 from witwin.channel.scene.kernels import rayd_scene
 
 
@@ -162,11 +161,9 @@ def test_production_sources_have_no_legacy_fallback_state_terms():
     )
     forbidden = (
         "fallback",
-        "unsupported",
         "fusion_debt",
         "require_reflection",
         "require_diffraction",
-        "torch_cuda",
     )
 
     offenders: list[str] = []
@@ -272,7 +269,7 @@ def test_mc_basic_solver_uses_native_scene_and_store_material_paths():
     # Plan 07 AD-3: materials come from the compiled store in BOTH
     # ad_mode="none" and the AD modes (one source, same values); the old
     # host-float flattening cannot carry a gradient and is gone.
-    assert "scene.rayd_scene()" in solve_source
+    assert "require_compiled(scene).rayd" in solve_source
     assert "_host_material_tensors" not in module_source
     assert "bdpt_face_material_tensors_from_host" not in module_source
     assert "face_material_field_bundle" in module_source

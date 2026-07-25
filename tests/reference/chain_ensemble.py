@@ -28,7 +28,7 @@ mirrors so the lockstep companion stays honest):
   imported unchanged from ``tests/reference/kirchhoff_ensemble.py`` so the table
   interpolation is a single source of truth (ADR-014 cell-centered clamp /
   relative-azimuth conventions).
-* ``PHASE_CONVENTION`` (``src/witwin/channel/core/field_state.py``):
+* ``PHASE_CONVENTION`` (``src/witwin/channel/field_state.py``):
   world-Cartesian complex field, receiver projection by transverse dot. The
   ensemble object is a coherency diagonal, not a field, so no carrier appears
   here (zero-phase power rows, ADR-021 section 2.3).

@@ -30,12 +30,14 @@ from tests.ad._tolerances import (
     FD_STEP_VERTEX,
     REL_TOL_GENERAL,
 )
-from witwin.channel import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel.core.materials import Dielectric
+from witwin.core import Mesh, Scene, Structure
+from tests.support.core_world import make_receiver, make_transmitter
+from witwin.core import PhysicalMaterial
 from witwin.channel.deterministic import Config as DeterministicConfig
 from witwin.channel.deterministic import solve as deterministic_solve
 from witwin.channel.path import Config as PathConfig
 from witwin.channel.path import solve as path_solve
+from witwin.channel.scene import compile as compile_scene
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for solver AD"
@@ -66,38 +68,79 @@ def _vec(values: tuple[float, float, float]) -> torch.Tensor:
 
 
 def _scene(
-    frequency: float | torch.Tensor = _FREQUENCY_HZ,
     tx: torch.Tensor | None = None,
     rx: torch.Tensor | None = None,
     vertices_a: torch.Tensor | None = None,
     vertices_b: torch.Tensor | None = None,
 ) -> Scene:
+    common_device = (
+        vertices_a.device
+        if vertices_a is not None
+        else vertices_b.device
+        if vertices_b is not None
+        else torch.device("cpu")
+    )
+    resolved_vertices_a = (
+        torch.tensor(_WALL_A_VERTICES, device=common_device)
+        if vertices_a is None
+        else vertices_a
+    )
+    resolved_vertices_b = (
+        torch.tensor(_WALL_B_VERTICES, device=common_device)
+        if vertices_b is None
+        else vertices_b
+    )
     wall_a = Structure(
-        vertices=torch.tensor(_WALL_A_VERTICES) if vertices_a is None else vertices_a,
-        faces=torch.tensor([[0, 1, 2], [1, 3, 2]]),
-        material=Dielectric(eps_r=4.0, sigma_e=0.02),
+        geometry=Mesh(
+            resolved_vertices_a,
+            torch.tensor(
+                [[0, 1, 2], [1, 3, 2]],
+                device=resolved_vertices_a.device,
+            ),
+            recenter=False,
+            fill_mode="surface",
+            topology_diagnostics=False,
+        ),
+        material=PhysicalMaterial(eps_r=4.0, sigma_e=0.02),
         name="ad-wall-a",
         surface_id=1,
     )
     wall_b = Structure(
-        vertices=torch.tensor(_WALL_B_VERTICES) if vertices_b is None else vertices_b,
-        faces=torch.tensor([[0, 1, 2], [1, 3, 2]]),
-        material=Dielectric(eps_r=3.0, sigma_e=0.05),
+        geometry=Mesh(
+            resolved_vertices_b,
+            torch.tensor(
+                [[0, 1, 2], [1, 3, 2]],
+                device=resolved_vertices_b.device,
+            ),
+            recenter=False,
+            fill_mode="surface",
+            topology_diagnostics=False,
+        ),
+        material=PhysicalMaterial(eps_r=3.0, sigma_e=0.05),
         name="ad-wall-b",
         surface_id=2,
     )
     return Scene(
         structures=[wall_a, wall_b],
-        transmitters=[Transmitter(position=_vec(_TX) if tx is None else tx)],
-        receivers=[ReceiverPoint(position=_vec(_RX) if rx is None else rx)],
-        frequency=frequency,
+        endpoints=[
+            make_transmitter(position=_vec(_TX) if tx is None else tx),
+            make_receiver(position=_vec(_RX) if rx is None else rx),
+        ],
     )
 
 
-def _solve(scene: Scene, solver: str, ad_mode: str):
+def _solve(
+    scene: Scene,
+    solver: str,
+    ad_mode: str,
+    *,
+    reference_frequency_hz: float | torch.Tensor = _FREQUENCY_HZ,
+):
     if solver == "path":
         return path_solve(
-            scene, PathConfig(max_depth=2, components=_COMPONENTS, ad_mode=ad_mode)
+            scene,
+            PathConfig(max_depth=2, components=_COMPONENTS, ad_mode=ad_mode),
+            reference_frequency_hz=reference_frequency_hz,
         )
     return deterministic_solve(
         scene,
@@ -107,6 +150,7 @@ def _solve(scene: Scene, solver: str, ad_mode: str):
             export_paths=True,
             ad_mode=ad_mode,
         ),
+        reference_frequency_hz=reference_frequency_hz,
     )
 
 
@@ -136,7 +180,7 @@ _MATERIAL_STEPS = {"eps_r": FD_STEP_EPS_R, "sigma_e": FD_STEP_SIGMA_E}
 @pytest.mark.parametrize("param", ("eps_r", "sigma_e"))
 def test_multibounce_material_grad_matches_fd(solver, param):
     scene = _scene()
-    compiled = scene.compile()
+    compiled = compile_scene(scene, reference_frequency_hz=_FREQUENCY_HZ)
     leaf = getattr(compiled.materials, param)
     leaf.requires_grad_(True)
     try:
@@ -168,15 +212,26 @@ def test_multibounce_frequency_grad_matches_fd(solver):
     frequency = torch.tensor(
         _FREQUENCY_HZ, dtype=torch.float64, device="cuda", requires_grad=True
     )
-    scene = _scene(frequency)
-    _depth2_loss(_solve(scene, solver, "vjp"), solver).backward()
+    scene = _scene()
+    _depth2_loss(
+        _solve(scene, solver, "vjp", reference_frequency_hz=frequency),
+        solver,
+    ).backward()
     assert frequency.grad is not None
     grad = frequency.grad.detach()
     assert float(grad.abs()) > 0.0
 
     def evaluate(value: torch.Tensor) -> torch.Tensor:
-        fd_scene = _scene(float(value))
-        return _depth2_loss(_solve(fd_scene, solver, "none"), solver).detach()
+        fd_scene = _scene()
+        return _depth2_loss(
+            _solve(
+                fd_scene,
+                solver,
+                "none",
+                reference_frequency_hz=float(value),
+            ),
+            solver,
+        ).detach()
 
     fd_grad = central_difference_gradient(
         evaluate,
@@ -224,7 +279,7 @@ def test_multibounce_forward_mode_matches_reverse():
     """JVP-vs-VJP inner-product duality through the depth-2 rows (eps_r seed)."""
 
     scene = _scene()
-    compiled = scene.compile()
+    compiled = compile_scene(scene, reference_frequency_hz=_FREQUENCY_HZ)
     base = compiled.materials.eps_r
     tangent = torch.ones_like(base)
     with torch.autograd.forward_ad.dual_level():
@@ -239,9 +294,7 @@ def test_multibounce_forward_mode_matches_reverse():
 
     base.requires_grad_(True)
     try:
-        _depth2_loss(
-            _solve(scene, "deterministic", "vjp"), "deterministic"
-        ).backward()
+        _depth2_loss(_solve(scene, "deterministic", "vjp"), "deterministic").backward()
         vjp = (base.grad * tangent).sum()
     finally:
         base.requires_grad_(False)

@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "environment": {
+    "python": "3.11.14",
+    "torch": "2.10.0",
+    "cuda_runtime": "12.8",
+    "device": "NVIDIA GeForce RTX 5080",
+    "compute_capability": "12.0"
+  },
+  "workload": {
+    "source_count": 32,
+    "sink_count": 32,
+    "path_count": 1024,
+    "warmup": 10,
+    "repeats": 50,
+    "timing": "CUDA events with end-event synchronization per measured repeat"
+  },
+  "discover": {
+    "label": "general-discover-32x32",
+    "components": [
+      "los",
+      "reflection"
+    ],
+    "max_depth": 1,
+    "median_ms": 3.533344030380249,
+    "p95_ms": 3.8374719619750977,
+    "throughput_paths_per_s": 289810.4433634219,
+    "peak_allocated_bytes": 1147392,
+    "diagnostics": {
+      "discovery_launch_count": 2,
+      "compact_count_d2h_copies": 1,
+      "compact_count_d2h_bytes": 8,
+      "compact_sync_count": 1,
+      "validation_d2h_copies": 0,
+      "validation_d2h_bytes": 0,
+      "validation_sync_count": 0
+    }
+  },
+  "fixed": {
+    "label": "fixed-los-reevaluate-32x32",
+    "components": [
+      "los"
+    ],
+    "max_depth": 0,
+    "median_ms": 0.7476959824562073,
+    "p95_ms": 0.8682559728622437,
+    "throughput_paths_per_s": 1369540.5940742444,
+    "peak_allocated_bytes": 476672,
+    "diagnostics": {
+      "discovery_launch_count": 0,
+      "compact_count_d2h_copies": 0,
+      "compact_count_d2h_bytes": 0,
+      "compact_sync_count": 0,
+      "validation_d2h_copies": 1,
+      "validation_d2h_bytes": 4,
+      "validation_sync_count": 1
+    }
+  }
+}

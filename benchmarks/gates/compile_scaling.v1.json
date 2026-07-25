@@ -1,0 +1,59 @@
+{
+  "name": "channel-compile-scaling",
+  "version": "1.0.0",
+  "measures": "witwin.channel.scene.compile on a warm cache, against structure count",
+  "rationale": "compile reads all four Core version properties before consulting its cache, so a cache hit still walks the whole world model and every solve pays it again. Solver benchmarks cannot see this: they compile one scene once, outside the timing loop.",
+  "protocol": {
+    "sizes": [
+      256,
+      1024
+    ],
+    "warmup": 3,
+    "repeats": 21,
+    "statistic": "minimum sample",
+    "statistic_rationale": "For host-bound work the best sample is the cleanest estimate of real cost. Medians drift with unrelated machine load; across four consecutive runs the minimum held scaling_ratio to 4.058-4.076 and version_share to 1.009-1.012."
+  },
+  "budgets": {
+    "scaling_ratio": {
+      "max": 6.0,
+      "gating": "always",
+      "reference": 4.06,
+      "meaning": "compile time at 1024 structures divided by compile time at 256. Linear is 4.0 and quadratic is 16.0.",
+      "catches": "an algorithmic regression in the traversal or the cache key",
+      "does_not_catch": "a constant-factor regression, which stays linear",
+      "observed_range": "4.047-4.078 across five consecutive runs"
+    },
+    "calibrated_per_structure": {
+      "max": 0.025,
+      "gating": "always",
+      "reference": 0.0128,
+      "meaning": "per-structure microseconds divided by a fixed Python workload timed in the same process, so host CPU speed divides out.",
+      "catches": "a constant-factor regression, including the O(1)-to-O(N) version-property change this gate was written for. Restoring the pre-optimization traversal measures 0.0432 on this scene, which fails by 1.7x while the current implementation passes with 2x headroom.",
+      "does_not_catch": "a uniform slowdown of both compile and the calibration workload",
+      "observed_range": "0.0124-0.0131 across five consecutive runs"
+    },
+    "version_share": {
+      "max": 1.35,
+      "gating": "always",
+      "reference": 1.01,
+      "meaning": "warm compile time divided by the cost of reading the four version properties alone.",
+      "catches": "a second O(N) pass added to compile",
+      "does_not_catch": "the version walk itself becoming slower, which calibrated_per_structure covers",
+      "observed_range": "1.002-1.012 across five consecutive runs"
+    },
+    "max_per_structure_us": {
+      "gating": "never",
+      "reference": 15.7,
+      "meaning": "raw per-structure microseconds. Depends on host CPU and Python build, so it is recorded for trend reading rather than gated.",
+      "regression_reference": "54.7 with the pre-optimization traversal on this scene"
+    }
+  },
+  "reference_environment": {
+    "python": "3.11.14",
+    "torch": "2.10.0",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "processor": "AMD64 Family 26 Model 68 Stepping 0, AuthenticAMD",
+    "note": "Only max_per_structure_us is environment-sensitive. The three gating budgets are ratios and hold on other hosts."
+  },
+  "open": "This gate bounds the constant factor; it does not require the walk to leave the cache-hit path. Removing it there changes the ADR-034 invalidation contract, not just its cost."
+}

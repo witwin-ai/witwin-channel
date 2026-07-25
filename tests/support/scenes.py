@@ -2,16 +2,20 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel.core.materials import (
-    Dielectric,
-    Layer,
-    PerfectConductor,
-    PhysicalSurface,
-    Roughness,
-    SurfaceAssignment,
+from witwin.core import (
+    MaterialLayer,
+    PhysicalMaterial,
+    Scene,
+    Structure,
+    SurfaceRoughness,
 )
-from witwin.channel.core.objects import planar_uv
+
+from tests.support.core_world import (
+    make_mesh_structure,
+    make_receiver,
+    make_transmitter,
+    planar_uv,
+)
 
 
 def rough_wall_structure(
@@ -48,19 +52,23 @@ def rough_wall_structure(
     roughness = (
         None
         if rms_height_m <= 0.0
-        else Roughness(
+        else SurfaceRoughness(
             rms_height_m=rms_height_m,
-            corr_length_x_m=corr_length_m,
-            corr_length_y_m=corr_length_m,
+            correlation_length_x_m=corr_length_m,
+            correlation_length_y_m=corr_length_m,
         )
     )
-    material: object = PhysicalSurface(
-        layers=(Layer(thickness_m=thickness_m, eps_r=eps_r, sigma_e=sigma_e),),
+    material = PhysicalMaterial(
+        layers=(
+            MaterialLayer(
+                thickness_m=thickness_m,
+                eps_r=eps_r,
+                sigma_e=sigma_e,
+            ),
+        ),
         roughness_front=roughness,
         name=name,
     )
-    if phase_screen is not None:
-        material = SurfaceAssignment(material=material, phase_screen=phase_screen)
     kwargs = {}
     if with_uv:
         kwargs = {
@@ -73,12 +81,13 @@ def rough_wall_structure(
             ),
             "face_uv": faces.clone(),
         }
-    return Structure(
+    return make_mesh_structure(
         vertices=vertices,
         faces=faces,
         material=material,
         name=name,
         surface_id=surface_id,
+        phase_screen=phase_screen,
         **kwargs,
     )
 
@@ -86,20 +95,17 @@ def rough_wall_structure(
 def empty_space_los_scene() -> Scene:
     return Scene(
         structures=[],
-        transmitters=[
-            Transmitter(position=torch.tensor([0.0, 0.0, 0.0]), power_w=2.0),
-            Transmitter(position=torch.tensor([0.0, 2.0, 0.0]), power_w=0.5),
+        endpoints=[
+            make_transmitter(torch.tensor([0.0, 0.0, 0.0]), power_w=2.0),
+            make_transmitter(torch.tensor([0.0, 2.0, 0.0]), power_w=0.5),
+            make_receiver(torch.tensor([3.0, 4.0, 0.0])),
+            make_receiver(torch.tensor([6.0, 8.0, 0.0])),
         ],
-        receivers=[
-            ReceiverPoint(position=torch.tensor([3.0, 4.0, 0.0])),
-            ReceiverPoint(position=torch.tensor([6.0, 8.0, 0.0])),
-        ],
-        frequency=3.0e9,
     )
 
 
 def single_wall_reflection_scene() -> Scene:
-    wall = Structure(
+    wall = make_mesh_structure(
         vertices=torch.tensor(
             [
                 [2.5, -2.0, -1.0],
@@ -109,20 +115,21 @@ def single_wall_reflection_scene() -> Scene:
             ]
         ),
         faces=torch.tensor([[0, 1, 2], [1, 3, 2]]),
-        material=Dielectric(eps_r=4.0, sigma_e=0.01),
+        material=PhysicalMaterial(eps_r=4.0, sigma_e=0.01),
         name="single-wall",
         surface_id=1,
     )
     return Scene(
         structures=[wall],
-        transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 0.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([5.0, 0.0, 0.0]))],
-        frequency=3.0e9,
+        endpoints=[
+            make_transmitter(torch.tensor([0.0, 0.0, 0.0])),
+            make_receiver(torch.tensor([5.0, 0.0, 0.0])),
+        ],
     )
 
 
 def same_side_wall_reflection_scene() -> Scene:
-    wall = Structure(
+    wall = make_mesh_structure(
         vertices=torch.tensor(
             [
                 [2.5, -3.0, -1.0],
@@ -132,15 +139,16 @@ def same_side_wall_reflection_scene() -> Scene:
             ]
         ),
         faces=torch.tensor([[0, 1, 2], [1, 3, 2]]),
-        material=Dielectric(eps_r=4.0, sigma_e=0.01),
+        material=PhysicalMaterial(eps_r=4.0, sigma_e=0.01),
         name="same-side-wall",
         surface_id=4,
     )
     return Scene(
         structures=[wall],
-        transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.5]))],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.5]))],
-        frequency=3.0e9,
+        endpoints=[
+            make_transmitter(torch.tensor([0.0, -1.0, 0.5])),
+            make_receiver(torch.tensor([0.0, 1.0, 0.5])),
+        ],
     )
 
 
@@ -154,7 +162,7 @@ def transmission_wall_structure(
 ) -> Structure:
     """Axis-aligned thin-sheet wall in the x = ``x_m`` plane (normal +x)."""
 
-    return Structure(
+    return make_mesh_structure(
         vertices=torch.tensor(
             [
                 [x_m, -half_size, -half_size],
@@ -177,8 +185,10 @@ def wedge_diffraction_scene(
     rx: torch.Tensor | None = None,
     frequency: float | torch.Tensor = 3.0e9,
 ) -> Scene:
-    wedge_material = PerfectConductor() if material is None else material
-    face_a = Structure(
+    wedge_material = (
+        PhysicalMaterial.perfect_conductor() if material is None else material
+    )
+    face_a = make_mesh_structure(
         vertices=torch.tensor(
             [
                 [2.0, 0.0, -1.0],
@@ -191,7 +201,7 @@ def wedge_diffraction_scene(
         name="wedge-a",
         surface_id=2,
     )
-    face_b = Structure(
+    face_b = make_mesh_structure(
         vertices=torch.tensor(
             [
                 [2.0, 0.0, -1.0],
@@ -206,17 +216,14 @@ def wedge_diffraction_scene(
     )
     return Scene(
         structures=[face_a, face_b],
-        transmitters=[
-            Transmitter(
-                position=torch.tensor([0.0, -1.0, 0.5]) if tx is None else tx
-            )
+        endpoints=[
+            make_transmitter(
+                torch.tensor([0.0, -1.0, 0.5]) if tx is None else tx
+            ),
+            make_receiver(
+                torch.tensor([3.0, 1.0, 0.5]) if rx is None else rx
+            ),
         ],
-        receivers=[
-            ReceiverPoint(
-                position=torch.tensor([3.0, 1.0, 0.5]) if rx is None else rx
-            )
-        ],
-        frequency=frequency,
     )
 
 
@@ -250,22 +257,23 @@ def coupled_wall_wedge_scene(
     )
     return Scene(
         structures=[
-            Structure(
+            make_mesh_structure(
                 vertices=vertices,
                 faces=faces,
-                material=PerfectConductor() if material is None else material,
+                material=(
+                    PhysicalMaterial.perfect_conductor()
+                    if material is None
+                    else material
+                ),
                 surface_id=0,
             )
         ],
-        transmitters=[
-            Transmitter(
-                position=torch.tensor([0.0, -2.0, 1.0]) if tx is None else tx
-            )
+        endpoints=[
+            make_transmitter(
+                torch.tensor([0.0, -2.0, 1.0]) if tx is None else tx
+            ),
+            make_receiver(
+                torch.tensor([0.0, 2.0, 5.0]) if rx is None else rx
+            ),
         ],
-        receivers=[
-            ReceiverPoint(
-                position=torch.tensor([0.0, 2.0, 5.0]) if rx is None else rx
-            )
-        ],
-        frequency=frequency,
     )

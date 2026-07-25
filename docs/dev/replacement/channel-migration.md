@@ -1,5 +1,78 @@
 # Channel migration and runtime-dependency boundary
 
+## Stage-I Phase 2: Core world owner switch
+
+Channel now consumes the `witwin.core==0.4.0` world contract directly.
+`witwin.channel.Scene`, `Structure`, `PhysicalMaterial`, `ReceiverGrid`, and
+the other retained logical root names are the exact Core objects, not adapters
+or subclasses. The former Channel logical implementations, loader ownership,
+pickle rewrites, and `witwin.channel.core.*` compatibility facades are removed.
+
+Construct endpoints with Core `AntennaState` / `ReceiverGrid`, place them in
+`Scene(endpoints=...)`, and pass a Core `Scene` or `SceneSnapshot` to one of the
+four solvers. Every solver now requires
+`reference_frequency_hz=...`. The sole lower-level boundary is:
+
+```python
+from witwin.channel.scene import compile
+
+compiled = compile(core_scene, reference_frequency_hz=3.5e9)
+```
+
+Channel owns the bounded registry and four-domain resource invalidation. Stable
+Core IDs are retained as `int64` maps while native runtime rows remain dense
+`int32`. A request/reference-frequency mismatch fails before native work.
+RayD `Auto` may choose its full-result pure-CUDA tracer when OptiX is
+unavailable; this remains a native GPU implementation choice, not a CPU/Torch
+fallback.
+
+## Stage-I Phase 3: propagation consumer contract
+
+External consumers must import the stable versioned module:
+
+```python
+from witwin.channel.propagation.consumer import (
+    CONTRACT_VERSION,
+    EndpointBatch,
+    PropagationRequest,
+    evaluate,
+    reevaluate,
+)
+```
+
+The contract replaces any direct dependency on internal `EvaluatedPaths`,
+`propagation.enumerated`, solver results, or native extension helpers. It
+publishes actual compact rows and native pair segmentation. There is no
+capacity-shaped compatibility result and no public `path_capacity_per_pair`,
+`diffraction_state_capacity`, or `Qr`.
+
+The component set is `los`, `reflection`, `transmission`, and
+`diffraction`. Scattering remains outside this consumer boundary: its current
+enumerated representation is incoherent power-domain output and does not meet
+the coherent transport or canonical pair-major row contracts. A consumer
+request containing `scattering` fails during preflight before compute.
+
+Breaking consumer schema or semantics increment `CONTRACT_VERSION` and require
+an atomic consumer update. Channel does not preserve both versions or add a
+fallback adapter. Radar adoption is a later Stage-II change; Phase 3 does not
+change Radar production source or dependencies.
+
+### Python matrix decision
+
+The runtime matrix follows RayD. `rayd-torch` 0.7.0 declares
+`>=3.10,<3.15` with `torch>=2.10,<2.12`, and Core's only extension is the
+Stable ABI mesh-SDF module, so `witwin` (Core) now declares `>=3.10,<3.15` to
+match. Channel remains `>=3.11,<3.12`: `_channel` is a versioned
+pybind11/LibTorch extension, and widening it honestly means either per-version
+wheels or a Stable ABI migration - a packaging capability, not a metadata
+edit. The narrow row therefore lives only where the constraint actually is.
+
+The supported Stage-I release row is CPython 3.11 and Torch 2.10.0. `_channel`
+uses the versioned LibTorch/Python extension ABI and is not a LibTorch Stable
+ABI artifact. Release wheels are built for Windows x64 and real
+`manylinux_2_28_x86_64`, contain native SM87 SASS as part of the full release
+architecture set, and retain compute_120 PTX.
+
 ## Current decision
 
 `witwin.channel` is the native entrypoint for the capabilities it
@@ -603,3 +676,181 @@ is `docs/dev/audit/phase13-rayd-package-source-discovery-acceptance.json`.
 The package-source SM120 configure resolved successfully, but its native build
 did not produce a wheel within the bounded local run and is not claimed as
 accepted; that publication build remains a GitHub Actions gate.
+
+### 2026-07-23: RayD 0.7.0 Stage-I dependency candidate
+
+The Stage-I candidate lock now identifies the formal lightweight tag `v0.7.0`
+at `49c58c4cb8212f6babb920cc88fb937509826cc5` and
+`rayd-torch==0.7.0`. A clean tag archive reproduces integration API 6,
+identity `rayd.torch.integration`, header SHA-256
+`57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14`,
+and source-manifest SHA-256
+`e2eb1a7577f906b3ab52e6345b039837228771c8f1582c9f821d0f2bb07d41b4`.
+
+ADR-035 accepts this immutable dependency baseline while recording that it is
+not a packaging-only delta. RayD owns `TraceBackend::Auto`: OptiX is preferred,
+and RayD may select its full-result pure-CUDA native implementation when OptiX
+is unavailable. This selection is not a Torch, CPU, Dr.Jit, retry,
+reduced-result, or second-owner fallback. An operation unsupported by the
+selected backend must fail its typed capability validation before that
+operation launches or exposes output.
+
+Phase 0A accepts the final dependency, header, source-manifest, workflow-pin,
+product-identity, and compact-owner static baseline. It does not inherit
+OptiX evidence for pure CUDA or claim complete numerical certification. The
+Phase 2 and Phase 3 large-module checkpoints retain the separate capability,
+numerical, AD, launch/resource, performance, wheel, and fingerprint gates for
+both RayD-owned native trace paths.
+Historical Plan 13 P-to-E and E-to-M comparative reports remain archived and
+are not reactivated by this dependency review.
+
+## Stage-I module and public-API standardization
+
+This pass is structural only: no physics, numerical order, launch
+configuration, reduction order, or result schema changed.
+
+### Package root no longer re-exports the Core world model
+
+`witwin.channel` exports only what Channel owns:
+
+```python
+from witwin.channel import (
+    Complex3State, JonesState, build_info, capabilities,
+    pipeline_cache_key, runtime_diagnostics,
+)
+```
+
+`Scene`, `SceneSnapshot`, `Structure`, `PhysicalMaterial`, `MaterialLayer`,
+`PhaseScreen`, `SurfaceRoughness`, `AntennaPattern`, `AntennaState`, and
+`ReceiverGrid` are removed from the Channel root. Import them from
+`witwin.core`, which is their owner. Each world type now has exactly one import
+path.
+
+```python
+# before
+from witwin.channel import Scene, Structure, PhysicalMaterial
+# after
+from witwin.core import Scene, Structure, PhysicalMaterial
+```
+
+Core also drops its `Material` alias; `PhysicalMaterial` is the only public
+name. `Structure` and `MaterialAssignment` moved to `witwin.core.structure`,
+though both stay exported from `witwin.core`.
+
+### `witwin.channel.core` is dissolved
+
+The package collided with `witwin.core` and was not a domain owner. Every
+module moved to its real owner:
+
+| Before | After |
+|---|---|
+| `core.kernels.extension` | deleted; `build_info` comes from `deployment` |
+| `core.kernels.metadata` | `runtime.kernel_metadata` |
+| `core.memory_budget` | `runtime.memory_budget` |
+| `core.edge_policy` | `scene.edge_policy` |
+| `core.edge_selection` | `scene.edge_selection` |
+| `core.ad_geometry` | `scene.ad_geometry` |
+| `core.antenna` | `scene.antenna` |
+| `core.receiver_geometry` | `scene.receiver_geometry` |
+| `core.diffraction_geometry` | `propagation.geometry.edge_state` |
+| `core.components` | `components` |
+| `core.field_state` | `field_state` |
+| `core.tensor_math` | `tensor_math` |
+
+`core.kernels.extension` described itself as a compatibility facade and was the
+package root's only route to `build_info`. Deleting it repays the
+`boundary-001` import-graph debt; `runtime` is now the sole owner of extension
+loading and `deployment` the sole public reporting facade.
+
+### `witwin.channel.physics` is dissolved
+
+`physics.conventions` became the package-root `witwin.channel.constants`, which
+also owns the phase convention that solver metadata and the consumer contract
+quote. `physics.oracle` was a compatibility facade that re-exported private
+names and rewrote `__module__` to impersonate itself; it is deleted. The NumPy
+CPU reference oracle moved to `tests/reference/em_oracle.py`, where CLAUDE.md
+requires reference implementations to live, and no longer ships in the wheel.
+
+Note: Core's `VACUUM_PERMITTIVITY` and Channel's derived `EPS0` still differ in
+the ninth significant digit. That is a numerical question and needs its own
+ADR; this pass did not touch either value.
+
+### Propagation consumer contract, version 1
+
+The changes below are removals of things that were never implemented plus
+additions that are purely descriptive.
+
+- `capabilities()` is exported. Query supported components, responses, topology
+  modes, and AD modes before building a request.
+- `PropagationComponent`, `PropagationResponse`, `PropagationTopologyMode`, and
+  `PropagationAdMode` are `Literal` aliases, with `COMPONENTS`, `RESPONSES`,
+  `TOPOLOGY_MODES`, `AD_MODES`, and `MAX_DEPTH` exported alongside them.
+- `PropagationRequest` and `FixedTopologyRequest` validate their structure at
+  construction instead of only inside `evaluate` / `reevaluate`.
+- `PropagationGeometry.interaction_position_m` and `.interaction_normal` are
+  removed. They were column 0 of `interaction_positions_m` and
+  `interaction_normals`; slice those instead.
+- `frequency_offsets_hz` and `PropagationConvention.frequency_offset_law` are
+  removed. They were declared but always rejected. Frequency offsets will
+  arrive with a `CONTRACT_VERSION` bump.
+- `PropagationCapabilities` drops `supports_frequency_offsets` and gains
+  `components_for`, `ad_modes_for`, and `ad_modes_for_component`.
+
+### Propagation consumer contract, version 2
+
+ADR-037 adds two capabilities to the fixed-topology route. Nothing that
+existed in version 1 is relaxed: the raw-`PropagationTopology` line-of-sight
+route keeps its fused native gather, its all-or-nothing validation, and its
+one-copy/four-byte/one-synchronization budget.
+
+- `prepare_fixed_topology`, `PreparedFixedTopology`, and `FixedTopologyBucket`
+  are exported. A frozen topology that carries interactions must be prepared
+  once before `reevaluate` accepts it; a raw topology with a non-zero
+  interaction width now fails naming this function. Preparation synchronizes,
+  so call it once per frozen topology, not once per frame - its host cost is
+  recorded on the handle rather than on the per-call diagnostics.
+- `reevaluate` supports the `reflection` component. Each frozen row's
+  stationary point is resolved again at the new endpoint positions by the same
+  fixed-winner owner discovery used, so an unchanged endpoint reproduces
+  `evaluate` exactly.
+- `FixedTopologyEvaluation` gains `row_valid`. It is `None` when every row is
+  valid by construction, and otherwise a device-resident `bool[K]` mask in
+  frozen row order. A frozen reflection path that stops existing at new
+  endpoints is published through this mask as a complete answer, with exact
+  zeros in every payload field and exactly zero derivative contribution - it
+  does not raise and does not void the surviving rows. The mask is the sole
+  authority for the components it covers; a valid row may legitimately carry a
+  zero coefficient. It covers `fixed_topology_row_validity_components` only,
+  today `{"reflection"}`: a frozen line-of-sight row is replayed as free space
+  and is never re-tested for visibility, so a sink that moves behind a wall
+  still reports a valid, full-strength row where fresh discovery would drop it.
+  Rediscover if you need blockage on the direct path.
+- Forward mode on the prepared route requires endpoint positions that carry
+  `requires_grad` in addition to their forward tangent. `Function.apply`
+  unpacks a dual before `setup_context` runs, so the shared native field
+  companions cannot see a forward-only tangent and publish `path_length_m` and
+  `delay_s` without one. The prepared route raises rather than returning a
+  partially differentiated answer; the raw route keeps its version-1 rules.
+  Reverse mode is unaffected.
+- `polarimetric_transport` joins `fixed_topology_responses` and gains full AD
+  support. Reflection Jones is available through the prepared fixed-topology
+  route; `evaluate` still restricts this response to line-of-sight rows.
+  Endpoint positions, interaction geometry, materials, and frequency are
+  differentiable; `tx_power`, `mu_r`, the endpoint polarizations, and both
+  polarization bases are primal-only and are rejected before any native work.
+  `evaluate` previously enforced only the two bases and silently accepted a
+  differentiable `powers_w` or endpoint polarization; it now rejects every
+  declared frozen input by name, matching `reevaluate`.
+- `PropagationCapabilities` gains `fixed_topology_row_validity_components` and
+  `polarimetric_frozen_ad_inputs`.
+- The fixed-topology reflection route requires a smooth scene. Rough-surface
+  coherent attenuation and realization phase screens stay with the discovery
+  field loop and are rejected here rather than silently omitted.
+
+### Capability manifests
+
+`witwin.channel.capabilities()` stays the solver-level manifest and keeps
+`scattering` in its component list. It now embeds the consumer contract record
+under `propagation_consumer`, generated from
+`witwin.channel.propagation.consumer.capabilities()` rather than restated, so
+the two cannot drift.

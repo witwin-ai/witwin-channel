@@ -1,3 +1,17 @@
+"""Solver-level capability manifest for :mod:`witwin.channel`.
+
+This describes what the four Channel solvers can do and is the manifest that
+solver metadata quotes. It is deliberately broader than the cross-package
+propagation contract: the solver ``components`` list includes ``scattering``,
+which the consumer contract does not expose because it is incoherent power
+under a non-canonical append rather than field transport.
+
+The narrower cross-package contract is owned by
+:func:`witwin.channel.propagation.consumer.capabilities`. This manifest embeds
+that record under ``propagation_consumer`` rather than restating it, so the two
+cannot drift apart.
+"""
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -199,10 +213,53 @@ _CAPABILITIES: dict[str, Any] = {
 }
 
 
-def capabilities() -> dict[str, Any]:
-    """Return the versioned semantic capability manifest."""
+def _propagation_consumer_capabilities() -> dict[str, Any]:
+    """Project the consumer contract record into this manifest's shape.
 
-    return deepcopy(_CAPABILITIES)
+    The values are read from the consumer contract rather than restated, so the
+    solver manifest and the cross-package contract cannot drift apart. The
+    import is deferred to keep this module free of a package-level dependency
+    on ``propagation``.
+    """
+
+    from witwin.channel.propagation.consumer import capabilities as consumer
+
+    record = consumer()
+    return {
+        "contract_version": record.contract_version,
+        "components": sorted(record.components),
+        "responses": sorted(record.responses),
+        "topology_modes": sorted(record.topology_modes),
+        "ad_modes": sorted(record.ad_modes),
+        "response_components": {
+            response: sorted(components)
+            for response, components in record.response_components
+        },
+        "response_ad_modes": {
+            response: sorted(modes) for response, modes in record.response_ad_modes
+        },
+        "component_ad_modes": {
+            component: sorted(modes) for component, modes in record.component_ad_modes
+        },
+        "fixed_topology_components": sorted(record.fixed_topology_components),
+        "fixed_topology_responses": sorted(record.fixed_topology_responses),
+        "supports_fixed_topology": record.supports_fixed_topology,
+        "supports_los_jones": record.supports_los_jones,
+    }
+
+
+def capabilities() -> dict[str, Any]:
+    """Return the versioned semantic solver capability manifest.
+
+    ``components`` here is the solver-level set and includes ``scattering``.
+    The narrower cross-package field-transport contract is reported under
+    ``propagation_consumer`` and is owned by
+    :func:`witwin.channel.propagation.consumer.capabilities`.
+    """
+
+    manifest = deepcopy(_CAPABILITIES)
+    manifest["propagation_consumer"] = _propagation_consumer_capabilities()
+    return manifest
 
 
 def config_metadata(

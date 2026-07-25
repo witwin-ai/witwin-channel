@@ -5,9 +5,10 @@ import importlib
 import pytest
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel.core.memory_budget import MemoryBudgetError
+from witwin.channel.runtime.memory_budget import MemoryBudgetError
 from witwin.channel.montecarlo.basic import Config as BasicConfig
 from witwin.channel.montecarlo.bdpt import Config as BDPTConfig
+from witwin.channel.scene.compiler import compile as compile_scene
 
 
 @pytest.mark.parametrize(
@@ -27,6 +28,12 @@ def test_budget_failure_precedes_cuda_native_and_tensor_work(
     monkeypatch: pytest.MonkeyPatch, module_name: str, config: object
 ) -> None:
     solver = importlib.import_module(module_name)
+    scene = empty_space_los_scene()
+    reference_frequency_hz = 3.5e9
+    compiled = compile_scene(
+        scene,
+        reference_frequency_hz=reference_frequency_hz,
+    )
     calls = {"cuda": 0, "native": 0, "allocation": 0}
 
     def unexpected(kind: str):
@@ -38,12 +45,17 @@ def test_budget_failure_precedes_cuda_native_and_tensor_work(
 
     monkeypatch.setattr(solver.torch.cuda, "is_available", unexpected("cuda"))
     monkeypatch.setattr(solver, "build_info", unexpected("native"))
+    monkeypatch.setattr(solver, "compile_scene", lambda *_args, **_kwargs: compiled)
     if module_name.endswith("basic.solver"):
         monkeypatch.setattr(solver, "make_cuda_generator", unexpected("allocation"))
     else:
         monkeypatch.setattr(solver, "transmitter_tensors", unexpected("allocation"))
 
     with pytest.raises(MemoryBudgetError, match="before launch"):
-        solver.solve(empty_space_los_scene(), config)
+        solver.solve(
+            scene,
+            config,
+            reference_frequency_hz=reference_frequency_hz,
+        )
 
     assert calls == {"cuda": 0, "native": 0, "allocation": 0}

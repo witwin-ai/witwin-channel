@@ -1,9 +1,12 @@
 import pytest
 import torch
 
-from witwin.channel import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel.core.kernels.extension import build_info
-from witwin.channel.core.materials import Dielectric
+from tests.support.core_world import (
+    make_mesh_structure,
+    make_receiver,
+    make_transmitter,
+)
+from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
 from witwin.channel.propagation.fields.kernels import (
     deterministic as deterministic_fields,
@@ -13,6 +16,9 @@ from witwin.channel.propagation.geometry import reevaluate as topology_geometry
 from witwin.channel.propagation.topology.export import evaluated_paths_from_block
 from witwin.channel.path import Config as PathConfig
 from witwin.channel.path import solve as solve_paths
+from witwin.core import PhysicalMaterial, Scene
+
+_REFERENCE_FREQUENCY_HZ = 3.0e9
 
 
 def test_multibounce_sort_order_uses_full_primitive_sequence():
@@ -60,6 +66,7 @@ def test_multibounce_sort_order_uses_full_primitive_sequence():
         max_paths=None,
         max_paths_scope="global",
         tx_count=1,
+        rx_count=1,
         max_depth=2,
         launch_count=0,
     )
@@ -116,7 +123,7 @@ def test_multibounce_grouping_splits_non_coplanar_faces_with_same_surface_id():
 
 
 def two_wall_multibounce_scene() -> Scene:
-    wall_x = Structure(
+    wall_x = make_mesh_structure(
         vertices=torch.tensor(
             [
                 [2.0, -1.0, 0.0],
@@ -126,11 +133,11 @@ def two_wall_multibounce_scene() -> Scene:
             ]
         ),
         faces=torch.tensor([[0, 1, 2], [1, 3, 2]]),
-        material=Dielectric(eps_r=3.0, sigma_e=0.005),
+        material=PhysicalMaterial(eps_r=3.0, sigma_e=0.005),
         name="wall-x",
         surface_id=10,
     )
-    wall_y = Structure(
+    wall_y = make_mesh_structure(
         vertices=torch.tensor(
             [
                 [0.0, 2.0, 0.0],
@@ -140,15 +147,16 @@ def two_wall_multibounce_scene() -> Scene:
             ]
         ),
         faces=torch.tensor([[0, 2, 1], [1, 2, 3]]),
-        material=Dielectric(eps_r=4.0, sigma_e=0.01),
+        material=PhysicalMaterial(eps_r=4.0, sigma_e=0.01),
         name="wall-y",
         surface_id=11,
     )
     return Scene(
         structures=[wall_x, wall_y],
-        transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 1.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 1.0]))],
-        frequency=3.0e9,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, 0.0, 1.0])),
+            make_receiver(position=torch.tensor([0.0, 1.0, 1.0])),
+        ],
     )
 
 
@@ -164,9 +172,12 @@ def test_two_bounce_reflection_exports_depth_two_fields():
         Config(
             components={"reflection"}, max_depth=2, coherent=True, export_paths=True
         ),
+        reference_frequency_hz=3.0e9,
     )
     reference = solve_paths(
-        scene, PathConfig(components={"reflection"}, max_depth=2)
+        scene,
+        PathConfig(components={"reflection"}, max_depth=2),
+        reference_frequency_hz=3.0e9,
     )
 
     assert result.paths is not None
@@ -233,7 +244,7 @@ def test_two_bounce_reflection_exports_depth_two_fields():
 
 
 def parallel_wall_corridor_scene() -> Scene:
-    wall_left = Structure(
+    wall_left = make_mesh_structure(
         vertices=torch.tensor(
             [
                 [-2.0, -3.0, 0.0],
@@ -243,11 +254,11 @@ def parallel_wall_corridor_scene() -> Scene:
             ]
         ),
         faces=torch.tensor([[0, 1, 2], [1, 3, 2]]),
-        material=Dielectric(eps_r=3.0, sigma_e=0.005),
+        material=PhysicalMaterial(eps_r=3.0, sigma_e=0.005),
         name="corridor-left",
         surface_id=20,
     )
-    wall_right = Structure(
+    wall_right = make_mesh_structure(
         vertices=torch.tensor(
             [
                 [2.0, -3.0, 0.0],
@@ -257,15 +268,16 @@ def parallel_wall_corridor_scene() -> Scene:
             ]
         ),
         faces=torch.tensor([[0, 2, 1], [1, 2, 3]]),
-        material=Dielectric(eps_r=4.0, sigma_e=0.01),
+        material=PhysicalMaterial(eps_r=4.0, sigma_e=0.01),
         name="corridor-right",
         surface_id=21,
     )
     return Scene(
         structures=[wall_left, wall_right],
-        transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 1.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([0.5, 0.5, 1.0]))],
-        frequency=3.0e9,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, 0.0, 1.0])),
+            make_receiver(position=torch.tensor([0.5, 0.5, 1.0])),
+        ],
     )
 
 
@@ -280,6 +292,7 @@ def test_three_bounce_reflection_mixes_depth_two_and_three_blocks():
         Config(
             components={"reflection"}, max_depth=3, coherent=True, export_paths=True
         ),
+        reference_frequency_hz=3.0e9,
     )
 
     assert result.paths is not None
@@ -331,6 +344,7 @@ def test_two_bounce_reflection_uses_native_sequence_field(monkeypatch):
         Config(
             components={"reflection"}, max_depth=2, coherent=True, export_paths=True
         ),
+        reference_frequency_hz=3.0e9,
     )
 
     assert result.paths is not None
@@ -350,6 +364,7 @@ def test_two_bounce_reflection_does_not_use_python_product():
         Config(
             components={"reflection"}, max_depth=2, coherent=True, export_paths=True
         ),
+        reference_frequency_hz=3.0e9,
     )
 
     assert result.paths is not None
@@ -373,14 +388,13 @@ def test_two_bounce_reflection_uses_rayd_epc_path_export(monkeypatch):
         calls["count"] += 1
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(
-        geometry_bridge, "rayd_reflection_epc_paths_forward", counted
-    )
+    monkeypatch.setattr(geometry_bridge, "rayd_reflection_epc_paths_forward", counted)
     result = solve(
         two_wall_multibounce_scene(),
         Config(
             components={"reflection"}, max_depth=2, coherent=True, export_paths=True
         ),
+        reference_frequency_hz=3.0e9,
     )
 
     assert result.paths is not None
@@ -411,17 +425,18 @@ def test_two_bounce_reflection_respects_max_paths_before_candidate_guardrail():
     faces = torch.arange(face_count * 3, dtype=torch.int64).reshape(face_count, 3)
     scene = Scene(
         structures=[
-            Structure(
+            make_mesh_structure(
                 vertices=vertices,
                 faces=faces,
-                material=Dielectric(eps_r=3.0, sigma_e=0.005),
+                material=PhysicalMaterial(eps_r=3.0, sigma_e=0.005),
                 name="many-faces",
                 surface_id=12,
             )
         ],
-        transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 1.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([1.0, 1.0, 1.0]))],
-        frequency=3.0e9,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, 0.0, 1.0])),
+            make_receiver(position=torch.tensor([1.0, 1.0, 1.0])),
+        ],
     )
 
     result = solve(
@@ -434,6 +449,7 @@ def test_two_bounce_reflection_respects_max_paths_before_candidate_guardrail():
             max_paths=1,
             diagnostics=True,
         ),
+        reference_frequency_hz=3.0e9,
     )
 
     assert result.paths is not None
@@ -467,17 +483,18 @@ def test_two_bounce_reflection_plans_by_surface_groups_before_face_guardrail():
     faces = torch.arange(face_count * 3, dtype=torch.int64).reshape(face_count, 3)
     scene = Scene(
         structures=[
-            Structure(
+            make_mesh_structure(
                 vertices=vertices,
                 faces=faces,
-                material=Dielectric(eps_r=3.0, sigma_e=0.005),
+                material=PhysicalMaterial(eps_r=3.0, sigma_e=0.005),
                 name="many-faces",
                 surface_id=12,
             )
         ],
-        transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 1.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([1.0, 1.0, 1.0]))],
-        frequency=3.0e9,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, 0.0, 1.0])),
+            make_receiver(position=torch.tensor([1.0, 1.0, 1.0])),
+        ],
     )
 
     result = solve(
@@ -485,6 +502,7 @@ def test_two_bounce_reflection_plans_by_surface_groups_before_face_guardrail():
         Config(
             components={"reflection"}, max_depth=2, coherent=True, export_paths=True
         ),
+        reference_frequency_hz=3.0e9,
     )
 
     assert result.paths is not None

@@ -161,6 +161,7 @@ def test_reduced_munich_native_depth_one_through_three_exports_reflection_paths(
             export_paths=True,
             diagnostics=True,
         ),
+        reference_frequency_hz=float(args.frequency),
     )
 
     assert result.paths is not None

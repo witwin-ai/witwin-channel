@@ -86,7 +86,7 @@ def test_phase11a_manifest_delta_is_location_only_and_invariants_are_non_numeric
 
     assert manifest == binding_manifest(ROOT)
     current_symbols = {row["name"]: row["path"] for row in manifest["symbols"]}
-    assert len(current_symbols) == 241
+    assert len(current_symbols) == 250
     assert 234 - PHASE_P_PRE_SYMBOL_COUNT == len(PHASE_P_SYMBOL_PATHS)
     assert {
         name: current_symbols[name] for name in PHASE_P_SYMBOL_PATHS

@@ -2,26 +2,31 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import torch
 
-from witwin.channel import ReceiverGrid, Scene
-from witwin.channel.core.components import (
+from witwin.core import ReceiverGrid
+from tests.support.core_world import make_receiver_grid
+from witwin.channel.components import (
     DEFAULT_COMPONENTS,
     component_availability_status,
     validated_components,
 )
-from witwin.channel.core.receiver_geometry import (
+from witwin.channel.scene.receiver_geometry import (
     axis_aligned_grid_spec,
     component_grid_shape,
     first_receiver_grid,
 )
-from witwin.channel.core.tensor_math import normalize_vec3
+from witwin.channel.tensor_math import normalize_vec3
+from witwin.channel.scene.endpoints import (
+    ReceiverGrid as RuntimeReceiverGrid,
+)
 
 
 def _grid() -> ReceiverGrid:
-    return ReceiverGrid(
+    return make_receiver_grid(
         origin=torch.tensor([2.0, -1.0, 3.0]),
         x_axis=torch.tensor([0.0, 1.0, 0.0]),
         y_axis=torch.tensor([0.0, 0.0, 1.0]),
@@ -49,11 +54,11 @@ def test_axis_aligned_grid_spec_preserves_native_layout_contract():
 
 def test_first_receiver_grid_and_component_validation_are_shared():
     grid = _grid()
-    scene = Scene(
-        structures=[], transmitters=[], receivers=[grid], frequency=3.0e9
-    )
+    runtime_grid = RuntimeReceiverGrid(source=grid)
+    scene = SimpleNamespace(receivers=[runtime_grid])
 
-    assert first_receiver_grid(scene) is grid
+    assert first_receiver_grid(scene) is runtime_grid
+    assert runtime_grid.source is grid
     assert validated_components(
         DEFAULT_COMPONENTS, error_message="bad {valid}"
     ) == DEFAULT_COMPONENTS

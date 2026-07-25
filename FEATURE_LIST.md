@@ -11,6 +11,69 @@ Defaults remain `{los, reflection, diffraction}`; transmission and scattering
 are opt-in. Component power reporting uses an exclusive path class with
 priority `scattering > diffraction > transmission > reflection > los`.
 
+## Core world contract and compilation
+
+- `witwin.core` is the only logical owner of `Scene`, `SceneSnapshot`,
+  `Structure`, physical materials, stable world IDs, antenna state, receiver
+  grids, dynamics, and the topology/geometry/material/assignment versions.
+- `witwin.channel.scene.compile(core_scene_or_snapshot,
+  reference_frequency_hz=...)` is the only production compilation path.
+  Channel owns its bounded compiled-resource registry, RayD scene, dense
+  runtime stores, frequency gate, and material ABI. Solvers require the same
+  explicit reference frequency and never implicitly recompile on mismatch.
+- Stable Core IDs remain signed 64-bit external mappings. Native-facing
+  material/structure rows are dense `int32` indices. The four Core version
+  domains invalidate only their dependent Channel resources.
+- RayD `TraceBackend::Auto` remains GPU-only: it prefers OptiX and may select
+  RayD's full-result pure-CUDA tracer. It is not a Torch or CPU fallback.
+
+## Solver-neutral propagation consumer
+
+- `witwin.channel.propagation.consumer` contract version 2 is a stable public
+  module; it is not duplicated at the package root and does not expose
+  `EvaluatedPaths` or a solver result.
+- Typed endpoint/request/convention/capability/evaluation contracts publish
+  exact compact `K` rows, native-produced `pair_index`/`pair_offsets`, and
+  scalar, Complex3, or complete 2x2 Jones transport according to capability.
+- The contract supports `los`, `reflection`, `transmission`, and
+  `diffraction`. It rejects `scattering` before compute because the current
+  scattering rows are incoherent power-domain output without the required
+  coherent transport and canonical pair-major row semantics.
+- Equivalent compact fields preserve exact object/storage/stride/device/grad
+  identity. Consumer-only fields have one native producer; no Python/Torch
+  gather, compaction, or physics reconstruction is used.
+- Fixed-topology reevaluation supports only advertised continuous inputs with
+  fixed row identity, winners, and pair segmentation. Unsupported response,
+  frequency-offset, topology-tangent, and AD cells fail before partial output.
+- `prepare_fixed_topology` partitions a frozen topology by component and
+  interaction depth once, on the host, and is the enforcement point for
+  `fixed_topology_components`. `reevaluate` accepts the resulting handle and
+  replays reflection rows through the same fixed-winner stationary-point owner
+  discovery used, reproducing `evaluate` exactly at unchanged endpoints.
+- A frozen reflection row that stops existing at new endpoint positions is
+  published through `FixedTopologyEvaluation.row_valid` with exact-zero payload
+  and exact-zero derivative contribution. It is a complete answer, not a
+  failure: the surviving rows are unaffected and nothing raises. The mask is
+  the sole authority on row validity for the components it covers, and it
+  covers `capabilities().fixed_topology_row_validity_components` only. A frozen
+  line-of-sight row is replayed as free space and is never re-tested for
+  visibility, so blockage on the direct path still requires rediscovery.
+- `polarimetric_transport` publishes the complete complex 2x2 operator through
+  reflection paths under fixed topology, composed from the native transport and
+  endpoint-basis owners, and supports `jvp` and `vjp`. Both transverse bases,
+  the endpoint polarizations, and transmit power are primal-only by native
+  contract and are rejected by name at both entry points.
+- Forward mode on the prepared fixed-topology route requires endpoint positions
+  carrying `requires_grad` in addition to a forward tangent. Without it the
+  shared native field companions publish `path_length_m` and `delay_s` with no
+  tangent, so the route raises instead of returning a partial derivative.
+- The consumer reuses the ADR-032 owning count observation. Its count D2H and
+  stream-synchronization delta relative to the same internal evaluation is
+  zero. Failure state, raw bits, handles, resources, caches, and tapes do not
+  cross the boundary.
+- The API is propagation-only and has no Radar waveform, target/RCS, IQ, ADC,
+  detection, or processing fields.
+
 ## Native runtime boundary
 
 - `_channel` is the single production extension. It source-links RayD
@@ -34,6 +97,12 @@ priority `scattering > diffraction > transmission > reflection > los`.
   and identity
   `rayd.torch.integration`. The numeric API version is 6 and is validated
   independently from this stable, capability-neutral source name.
+- Under ADR-035, RayD owns native trace selection behind that typed boundary.
+  `TraceBackend::Auto` prefers OptiX and may select RayD's full-result
+  pure-CUDA path when OptiX is unavailable. This is not a Torch, CPU, Dr.Jit,
+  retry, reduced-result, or second-owner fallback. Operations unsupported by
+  the selected RayD backend fail typed capability validation before the
+  operation launches or exposes output.
 - ADR-027 exposes the complete RayD fixed-capacity straight-segment
   penetration primal/tape/VJP/JVP family, Channel named facades, shared
   capacity-failure wiring, compile-frozen policy diagonals, component-5
@@ -121,18 +190,20 @@ priority `scattering > diffraction > transmission > reflection > los`.
 
 ## Materials (ABI v3)
 
-- `Dielectric`, `LossyDielectric`, `DispersiveMaterial`, `ITUMaterial`,
-  `PerfectConductor` - pre-existing, unchanged behavior (compile as 1-layer
-  stacks).
-- `PhysicalSurface(layers=(Layer, ...), geometry_mode, roughness_front)`:
+- Core `PhysicalMaterial` and `MaterialLayer` are the logical contracts;
+  Channel converts them once into its resident material ABI. Explicit PEC uses
+  `PhysicalMaterial.perfect_conductor()` and is never inferred from a
+  conductivity threshold.
+- `PhysicalMaterial(layers=(MaterialLayer, ...), geometry_mode,
+  roughness_front)`:
   multilayer walls with per-layer thickness/permittivity/conductivity/
   permeability; CSR-packed in `MaterialStore`.
-- Dispersion models: constant, power-law (ITU), `DebyeModel`,
-  `TabulatedPermittivity`.
-- `Roughness` statistics and `PhaseScreen` height-map assignments
-  (`SurfaceAssignment`) per structure.
-- `geometry_mode="closed_volume"` is declared but rejected in v1 (thin_sheet
-  only).
+- Core dispersion follows the explicit `DispersionSpec` capability; Channel
+  does not probe nearby frequencies to infer dispersion.
+- Core `SurfaceRoughness` and `PhaseScreen` are attached directly to a Core
+  material/structure. Channel owns only their compiled resident resources.
+- `geometry_mode="volumetric"` is represented in Core; unsupported Channel
+  operations fail their typed capability gate.
 
 ## Geometry
 
@@ -156,9 +227,9 @@ priority `scattering > diffraction > transmission > reflection > los`.
   `max_num_paths` report actual rows, and exact complete `O(K)` results are
   returned in stable order. `path_capacity_per_pair`,
   `diffraction_state_capacity`, capacity-shaped public results, and ADR-031
-  `Qr` are absent from production configuration and public API. Retained
-  ADR-029/030 capacity operations are caller-free internal experiments guarded
-  by direct contracts and production caller-zero checks.
+  `Qr` are absent from production configuration and public API. Historical
+  ADR-029/030 implementation artifacts are caller-free and unsupported; they
+  do not define public API, feature, test, or release requirements.
 - `PathResult` per-event `InteractionType` includes `TRANSMISSION` and
   `SCATTERING`; scattering paths are exported as incoherent power paths
   (`scattering_paths_incoherent: true` metadata).
@@ -223,15 +294,18 @@ priority `scattering > diffraction > transmission > reflection > los`.
   requesting its gradient fails with `NotImplementedError` instead of
   returning silent zeros, and path birth/death discontinuities remain out
   of contract (fixed-winner gradients only).
-- Reverse mode: set `requires_grad_(True)` on the compiled material store
-  tensors (`scene.compile().materials.eps_r` etc.) and call `.backward()` on
+- Reverse mode: set `requires_grad_(True)` on Core tensor leaves or the
+  compiled material store tensors
+  (`witwin.channel.scene.compile(scene,
+  reference_frequency_hz=f0).materials.eps_r` etc.) and call `.backward()` on
   a loss built from the result's complex coefficients / `path_gain`.
   Forward mode: `torch.func.jvp` through the field Functions, or
   `torch.autograd.forward_ad.dual_level` through a full solve.
-- Frequency as a first-class differentiable input: `Scene(...,
-  frequency=torch.tensor(f0, device="cuda", requires_grad=True))` accepts a
-  0-d tensor; the scalar is read once per solve (one host sync), dispersive
-  material records stay frozen at the primal frequency.
+- Frequency as a first-class differentiable input:
+  `compile(scene, reference_frequency_hz=torch.tensor(f0, device="cuda",
+  requires_grad=True))` accepts a 0-d tensor. The exact tensor identity and
+  mutation revision are part of the compile/request gate; dispersive material
+  records are frozen at that primal reference frequency.
 - Implementation: native CUDA backward/jvp companion kernels for
   `field_free_space` / `field_reflection_sequence`, plus the typed RayD native
   `field_transmission_sequence` family, wrapped in thin

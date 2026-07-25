@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from tests.support.scenes import wedge_diffraction_scene
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.montecarlo.bdpt import Config, solve
 
 
@@ -20,6 +20,7 @@ def _estimates(*, samples: int, mis: str) -> list[float]:
                     receiver_strategy="point_sphere",
                     mis=mis,
                 ),
+                reference_frequency_hz=3.0e9,
             ).path_gain.sum()
         )
         for seed in range(6)

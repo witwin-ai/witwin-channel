@@ -5,9 +5,10 @@ import hashlib
 import inspect
 from types import SimpleNamespace
 
+import importlib.util
+
 import pytest
 
-from witwin.channel.core.kernels import extension as compatibility_extension
 from witwin.channel.runtime import extension, symbols
 
 
@@ -30,9 +31,11 @@ def _isolated_loader_state():
     extension._clear_loader_caches()
 
 
-def test_compatibility_exports_share_the_runtime_symbol_owner():
-    assert compatibility_extension.native_extension is symbols.native_extension
+def test_runtime_owns_the_only_native_symbol_accessor():
+    """No compatibility facade re-exports the loader outside ``runtime``."""
+
     assert extension.native_extension is symbols.native_extension
+    assert importlib.util.find_spec("witwin.channel.core") is None
 
 
 def test_required_native_op_has_one_body_preserving_runtime_owner():

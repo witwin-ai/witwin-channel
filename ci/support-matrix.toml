@@ -11,4 +11,7 @@ constraints = "constraints/ci-py311-cu128.txt"
 verified_sm = [120]
 declared_unverified_sm = [70, 75, 80, 86, 87, 89, 90, 100, 101]
 ptx_forward_compatibility_sm = 120
+binary_abi = "versioned-libtorch-python-extension"
+libtorch_stable_abi = false
+stable_abi_floor_for_eligible_artifacts = "2.10"
 evidence = "docs/dev/baselines/0892d855b27ee851521a181f5158b0bf41091eda/static/environment.json"

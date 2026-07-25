@@ -1,13 +1,13 @@
+import importlib.util
 import inspect
 from dataclasses import replace
 
 import pytest
 import torch
 
-from witwin.channel.core.runtime import _validation as legacy_validation
-from witwin.channel.core.runtime.assignments import AssignmentStore
-from witwin.channel.core.runtime.geometry import GeometryStore
-from witwin.channel.core.runtime.material_store import MaterialStore
+from witwin.channel.scene.stores.assignments import AssignmentStore
+from witwin.channel.scene.stores.geometry import GeometryStore
+from witwin.channel.scene.stores.materials import MaterialStore
 from witwin.channel.scene.stores import _validation as canonical_validation
 from witwin.channel.scene.stores.assignments import (
     AssignmentStore as CanonicalAssignmentStore,
@@ -42,7 +42,7 @@ _REQUIRE_TENSOR_SOURCE = '''def require_tensor(
 
 
 def test_runtime_tensor_validation_owner_and_body_are_exact():
-    assert legacy_validation.require_tensor is canonical_validation.require_tensor
+    assert importlib.util.find_spec("witwin.channel.core") is None
     assert inspect.getsource(canonical_validation.require_tensor) == _REQUIRE_TENSOR_SOURCE
 
 
@@ -82,8 +82,9 @@ def test_geometry_store_canonical_owner_preserves_input_storage():
         "edges": torch.zeros((3, 2), dtype=torch.int32),
         "edge_adj_faces": torch.zeros((3, 2), dtype=torch.int32),
         "edge_param_range": torch.zeros((3, 2), dtype=torch.float32),
-        "face_structure_id": torch.zeros((1,), dtype=torch.int32),
-        "face_surface_id": torch.zeros((1,), dtype=torch.int32),
+        "face_structure_id": torch.tensor([101], dtype=torch.int64),
+        "face_surface_id": torch.tensor([201], dtype=torch.int64),
+        "face_primitive_id": torch.tensor([301], dtype=torch.int64),
     }
     store = CanonicalGeometryStore(
         **tensors, structure_uv_presence=((True, True),), version=0
@@ -105,8 +106,9 @@ def test_geometry_store_rejects_wrong_vertex_shape():
             edges=torch.zeros((3, 2), dtype=torch.int32),
             edge_adj_faces=torch.zeros((3, 2), dtype=torch.int32),
             edge_param_range=torch.zeros((3, 2), dtype=torch.float32),
-            face_structure_id=torch.zeros((1,), dtype=torch.int32),
-            face_surface_id=torch.zeros((1,), dtype=torch.int32),
+            face_structure_id=torch.tensor([101], dtype=torch.int64),
+            face_surface_id=torch.tensor([201], dtype=torch.int64),
+            face_primitive_id=torch.tensor([301], dtype=torch.int64),
             structure_uv_presence=((False, False),),
             version=0,
         )
@@ -115,7 +117,7 @@ def test_geometry_store_rejects_wrong_vertex_shape():
 def test_material_store_rejects_per_face_parameter_expansion():
     with pytest.raises(ValueError, match="same length"):
         MaterialStore(
-            material_id=torch.arange(1, dtype=torch.int32),
+            material_id=torch.tensor([101], dtype=torch.int64),
             eps_r=torch.ones((2,), dtype=torch.float32),
             mu_r=torch.ones((1,), dtype=torch.float32),
             sigma_e=torch.zeros((1,), dtype=torch.float32),
@@ -146,7 +148,7 @@ def test_material_store_rejects_per_face_parameter_expansion():
 
 def _material_store_kwargs() -> dict[str, object]:
     return {
-        "material_id": torch.arange(2, dtype=torch.int32),
+        "material_id": torch.tensor([101, 305], dtype=torch.int64),
         "eps_r": torch.tensor([2.0, 3.0], dtype=torch.float32),
         "mu_r": torch.ones((2,), dtype=torch.float32),
         "sigma_e": torch.zeros((2,), dtype=torch.float32),
@@ -242,16 +244,20 @@ def test_material_store_canonical_owner_preserves_input_storage_and_scalar_view(
         (
             {
                 "abi_version": 2,
-                "material_id": torch.tensor([1, 0], dtype=torch.int32),
+                "material_id": torch.tensor([305, 101], dtype=torch.int64),
             },
             "MaterialStore requires material ABI version 3",
         ),
         (
             {
-                "material_id": torch.tensor([1, 0], dtype=torch.int32),
+                "material_id": torch.tensor([101, 101], dtype=torch.int64),
                 "material_keys": ("same", "same"),
             },
-            "material_id must be dense and stable",
+            "material_id must be unique",
+        ),
+        (
+            {"material_id": torch.tensor([101, -1], dtype=torch.int64)},
+            "material_id must be non-negative",
         ),
         ({"material_keys": ("same", "same")}, "material_keys must be unique"),
     ),
@@ -264,6 +270,10 @@ def test_material_store_csr_and_abi_validation_order_is_exact(changes, message):
 def test_assignment_store_validates_face_material_length():
     with pytest.raises(ValueError, match="face_material_id"):
         AssignmentStore(
+            assignment_id=torch.tensor([701], dtype=torch.int64),
+            material_id=torch.tensor([101], dtype=torch.int64),
+            structure_id=torch.tensor([201], dtype=torch.int64),
+            surface_id=torch.tensor([301], dtype=torch.int64),
             face_material_id=torch.zeros((2,), dtype=torch.int32),
             edge_material_id0=torch.zeros((3,), dtype=torch.int32),
             edge_material_id1=torch.zeros((3,), dtype=torch.int32),
@@ -277,6 +287,10 @@ def test_assignment_store_validates_face_material_length():
 
 def _assignment_store_kwargs() -> dict[str, object]:
     return {
+        "assignment_id": torch.tensor([701], dtype=torch.int64),
+        "material_id": torch.tensor([101], dtype=torch.int64),
+        "structure_id": torch.tensor([201], dtype=torch.int64),
+        "surface_id": torch.tensor([301], dtype=torch.int64),
         "face_material_id": torch.zeros((1,), dtype=torch.int32),
         "edge_material_id0": torch.zeros((3,), dtype=torch.int32),
         "edge_material_id1": torch.zeros((3,), dtype=torch.int32),

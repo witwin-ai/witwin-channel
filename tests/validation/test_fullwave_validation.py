@@ -24,8 +24,7 @@ from benchmarks.fullwave_validation.scenarios import (
     load_manifest,
     observation_valid_mask,
 )
-from witwin.channel import PerfectConductor
-from witwin.channel.core.materials import PhysicalSurface
+from witwin.core import PhysicalMaterial, ReceiverGrid
 
 
 def _map(field, *, components=None, backend="test") -> FieldMap:
@@ -139,11 +138,22 @@ def test_channel_scene_matches_case_geometry_and_material(
 
     assert len(scene.structures) == cube_count
     assert scene.metadata["fullwave_validation_fingerprint"] == spec.fingerprint
-    assert scene.receivers[0].shape == (spec.x.size, spec.y.size)
-    expected_type = PerfectConductor if material == "metal" else PhysicalSurface
-    assert all(
-        isinstance(structure.material, expected_type) for structure in scene.structures
+    receivers = tuple(
+        endpoint for endpoint in scene.endpoints if endpoint.role == "rx"
     )
+    assert isinstance(receivers[0], ReceiverGrid)
+    assert receivers[0].shape == (spec.x.size, spec.y.size)
+    assert all(
+        isinstance(structure.material, PhysicalMaterial)
+        for structure in scene.structures
+    )
+    if material == "metal":
+        assert all(
+            structure.material.conductor_model == "perfect"
+            for structure in scene.structures
+        )
+    else:
+        assert all(structure.material.layers for structure in scene.structures)
 
 
 def test_tidy3d_scene_uses_true_pec_and_dielectric_volumes():

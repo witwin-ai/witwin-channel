@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import torch
 
 from witwin.channel.path import pipeline as path_pipeline
@@ -175,10 +177,12 @@ def test_solver_passes_typed_rows_and_only_execution_ad_sidecars(monkeypatch):
         assert sidecars is appended_sidecars
         return evaluated, sidecars
 
-    def fake_compact(evaluated):
+    def fake_compact(evaluated, *, source_stable_ids, sink_stable_ids):
         calls.append("compact")
         assert evaluated is appended
-        return evaluated
+        assert source_stable_ids.tolist() == [101]
+        assert sink_stable_ids.tolist() == [201]
+        return SimpleNamespace(evaluated=evaluated)
 
     def fake_pack(paths, **kwargs):
         calls.append("pack")
@@ -194,8 +198,16 @@ def test_solver_passes_typed_rows_and_only_execution_ad_sidecars(monkeypatch):
     )
     monkeypatch.setattr(
         path_pipeline,
-        "_compact_valid_evaluated_paths_for_legacy_result",
+        "compact_evaluated_paths",
         fake_compact,
+    )
+    monkeypatch.setattr(
+        path_pipeline,
+        "_stable_endpoint_id_lookups",
+        lambda _scene, *, device: (
+            torch.tensor([101], device=device, dtype=torch.int64),
+            torch.tensor([201], device=device, dtype=torch.int64),
+        ),
     )
     monkeypatch.setattr(path_solver, "_metadata", fake_metadata)
     monkeypatch.setattr(path_solver, "from_evaluated_paths", fake_pack)

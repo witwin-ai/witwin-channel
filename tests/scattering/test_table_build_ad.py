@@ -17,7 +17,10 @@ import math
 import pytest
 import torch
 
+from witwin.core import Scene, SurfaceRoughness
+from tests.support.core_world import make_receiver, make_transmitter
 from witwin.channel.runtime.symbols import has_symbol
+from witwin.channel.scene import compile as compile_scene
 from tests.reference.kirchhoff_table_build import (
     build_n_terms,
     phi_centers,
@@ -29,9 +32,12 @@ pytestmark = pytest.mark.skipif(
 )
 
 _C0 = 299792458.0
-_HAS_NATIVE = has_symbol("kirchhoff_table_build_backward") and has_symbol(
-    "kirchhoff_table_build_jvp"
-)
+try:
+    _HAS_NATIVE = has_symbol(
+        "kirchhoff_table_build_backward"
+    ) and has_symbol("kirchhoff_table_build_jvp")
+except ImportError:
+    _HAS_NATIVE = False
 _require_native = pytest.mark.skipif(
     not _HAS_NATIVE, reason="native kirchhoff_table_build_* not built"
 )
@@ -108,7 +114,8 @@ def _oracle(iso: bool, sigma_h, lx, ly, thickness, eps, sigma, frequency, grids,
         )
     ).reshape(1, 4)
     n_terms = build_n_terms(
-        float(2.0 * math.pi * float(frequency) / _C0), float(sigma_h)
+        float(2.0 * math.pi * float(frequency.detach()) / _C0),
+        float(sigma_h.detach()),
     )
     return torch_build_table(
         sigma_h.reshape(()),
@@ -151,10 +158,10 @@ def _native_backward(out, grids, sigma_h, lx, ly, thickness, eps, sigma, frequen
         _to_native(eps),
         _to_native(sigma),
         _to_native(torch.ones_like(thickness)),
-        sigma_h=float(sigma_h),
-        corr_x=float(lx),
-        corr_y=float(ly),
-        frequency_hz=float(frequency),
+        sigma_h=float(sigma_h.detach()),
+        corr_x=float(lx.detach()),
+        corr_y=float(ly.detach()),
+        frequency_hz=float(frequency.detach()),
         grad_f_te=_to_native(grad_f_te),
         grad_f_tm=_to_native(grad_f_tm),
         need_grad_rough=rough,
@@ -269,8 +276,10 @@ def test_jvp_vs_vjp_inner_product(iso):
         _to_native(grids["cos_o"]), _to_native(grids["phi_o"]),
         _to_native(thickness), _to_native(eps), _to_native(sigma),
         _to_native(torch.ones_like(thickness)),
-        sigma_h=float(sigma_h), corr_x=float(lx), corr_y=float(ly),
-        frequency_hz=float(frequency),
+        sigma_h=float(sigma_h.detach()),
+        corr_x=float(lx.detach()),
+        corr_y=float(ly.detach()),
+        frequency_hz=float(frequency.detach()),
         t_layer_thickness_m=_to_native(t_thickness),
         t_layer_eps_r=_to_native(t_eps),
         t_layer_sigma_e=_to_native(t_sigma),
@@ -387,12 +396,11 @@ def test_primal_bitwise_pre_balance_lobe_exported():
     # The numpy build is unchanged; it now also exports the pre-balance lobes,
     # and f_te == a S a bit-for-bit on the table's own grid (the AD wiring never
     # alters the resident primal values).
-    from witwin.channel.core.materials import Roughness
     from witwin.channel.scattering import build_kirchhoff_table
 
     device = "cuda"
     sigma_e = 0.1 * 2.0 * math.pi * 60e9 * 8.8541878128e-12
-    rough = Roughness(rms_height_m=1e-3, corr_length_x_m=10e-3, corr_length_y_m=10e-3)
+    rough = SurfaceRoughness(rms_height_m=1e-3, correlation_length_x_m=10e-3, correlation_length_y_m=10e-3)
     table = build_kirchhoff_table(rough, [(0.1, 4.0, sigma_e, 1.0)], 60e9, device=device)
     assert table.pre_balance_lobe_te is not None
     a = table.normalization_applied[..., 0]  # TE factor [Nti, Npi]
@@ -404,12 +412,11 @@ def test_primal_bitwise_pre_balance_lobe_exported():
 
 @_require_native
 def test_end_to_end_roughness_gradient_is_nonzero():
-    from witwin.channel.core.kernels.extension import build_info
+    from witwin.channel.deployment import build_info
 
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native scene capability is not built")
     from tests.support.scenes import rough_wall_structure
-    from witwin.channel import ReceiverPoint, Scene, Transmitter
     from witwin.channel.deterministic import Config as DeterministicConfig
     from witwin.channel.deterministic import solve as deterministic_solve
 
@@ -419,13 +426,18 @@ def test_end_to_end_roughness_gradient_is_nonzero():
         )
         return Scene(
             structures=[wall],
-            transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.0]))],
-            receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.0]))],
-            frequency=3.0e9,
+            endpoints=[
+                make_transmitter(
+                    position=torch.tensor([0.0, -1.0, 0.0])
+                ),
+                make_receiver(
+                    position=torch.tensor([0.0, 1.0, 0.0])
+                ),
+            ],
         )
 
     scene = make_scene()
-    compiled = scene.compile()
+    compiled = compile_scene(scene, reference_frequency_hz=3.0e9)
     # Route the table build through AD by making the roughness store leaf live
     # BEFORE the lazy Kirchhoff resources are first built.
     compiled.materials.rough_sigma_h_m.requires_grad_(True)
@@ -433,7 +445,9 @@ def test_end_to_end_roughness_gradient_is_nonzero():
         max_depth=1, components=frozenset({"scattering"}), ad_mode="vjp",
         scattering_samples_per_m2=32.0,
     )
-    result = deterministic_solve(scene, config)
+    result = deterministic_solve(
+        scene, config, reference_frequency_hz=3.0e9
+    )
     result.component_power["scattering"].sum().backward()
     grad = compiled.materials.rough_sigma_h_m.grad
     assert grad is not None

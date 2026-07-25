@@ -12,6 +12,7 @@ def test_metadata_reports_deterministic_solver_decisions():
     result = solve(
         empty_space_los_scene(),
         Config(max_depth=0, components={"los"}, diagnostics=True),
+        reference_frequency_hz=3.0e9,
     )
     metadata = result.metadata
 
@@ -45,6 +46,7 @@ def test_metadata_rejects_requested_components_that_depth_would_skip():
                 components={"los", "reflection", "diffraction"},
                 coherent=False,
             ),
+            reference_frequency_hz=3.0e9,
         )
 
 
@@ -55,6 +57,7 @@ def test_diagnostics_report_native_launches_and_path_planning():
     result = solve(
         empty_space_los_scene(),
         Config(max_depth=0, components={"los"}, diagnostics=True),
+        reference_frequency_hz=3.0e9,
     )
 
     assert result.diagnostics is not None

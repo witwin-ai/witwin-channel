@@ -14,16 +14,22 @@ import textwrap
 import pytest
 import torch
 
-from witwin.channel import ReceiverGrid, Scene, Structure, Transmitter
-from witwin.channel.core.kernels.extension import build_info
-from witwin.channel.core.materials import (
-    Layer,
-    PerfectConductor,
-    PhysicalSurface,
+from tests.support.core_world import (
+    make_mesh_structure,
+    make_receiver_grid,
+    make_transmitter,
 )
-from witwin.channel.montecarlo.basic import Config, solve
+from witwin.core import (
+    MaterialLayer,
+    PhysicalMaterial,
+    ReceiverGrid,
+    Scene,
+    Structure,
+)
+from witwin.channel.deployment import build_info
+from witwin.channel.montecarlo.basic import Config, solve as solve_basic
 from witwin.channel.montecarlo.basic import pipeline as basic_pipeline
-from witwin.channel.physics.oracle import layer_stack_rt
+from tests.reference.em_oracle import layer_stack_rt
 from witwin.channel.runtime.capacity import (
     CapacityFailureBit,
     SolveCapacityTransaction,
@@ -38,13 +44,17 @@ _ROOT = Path(__file__).resolve().parents[3]
 _FREQUENCY = 3.0e9
 
 
+def _solve_basic(scene: Scene, config: Config):
+    return solve_basic(scene, config, reference_frequency_hz=_FREQUENCY)
+
+
 def _require_native() -> None:
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native transmission is not built")
 
 
 def _wall(material, *, x: float = 2.5) -> Structure:
-    return Structure(
+    return make_mesh_structure(
         vertices=torch.tensor(
             [
                 [x, -4.0, -4.0],
@@ -62,14 +72,14 @@ def _wall(material, *, x: float = 2.5) -> Structure:
 
 def _grid(shape: tuple[int, int] = (4, 4)) -> ReceiverGrid:
     if shape == (1, 1):
-        return ReceiverGrid(
+        return make_receiver_grid(
             origin=torch.tensor([5.0, 0.0, 0.0]),
             x_axis=torch.tensor([0.0, 1.0, 0.0]),
             y_axis=torch.tensor([0.0, 0.0, 1.0]),
             shape=(1, 1),
             spacing=(1.0, 1.0),
         )
-    return ReceiverGrid(
+    return make_receiver_grid(
         origin=torch.tensor([5.0, -1.0, -0.5]),
         x_axis=torch.tensor([0.0, 1.0, 0.0]),
         y_axis=torch.tensor([0.0, 0.0, 1.0]),
@@ -81,14 +91,15 @@ def _grid(shape: tuple[int, int] = (4, 4)) -> ReceiverGrid:
 def _scene(structures, *, grid_shape: tuple[int, int] = (4, 4)) -> Scene:
     return Scene(
         structures=structures,
-        transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 0.0]))],
-        receivers=[_grid(grid_shape)],
-        frequency=_FREQUENCY,
+        endpoints=[
+            make_transmitter(torch.tensor([0.0, 0.0, 0.0])),
+            _grid(grid_shape),
+        ],
     )
 
 
 def _solve(scene: Scene, components, *, max_depth: int = 2):
-    return solve(
+    return _solve_basic(
         scene,
         Config(samples=64, seed=3, max_depth=max_depth, components=components),
     )
@@ -96,8 +107,9 @@ def _solve(scene: Scene, components, *, max_depth: int = 2):
 
 def test_vacuum_wall_transmission_map_equals_unobstructed_los_map():
     _require_native()
-    vacuum = PhysicalSurface(
-        layers=(Layer(thickness_m=0.2, eps_r=1.0),), name="vacuum-wall"
+    vacuum = PhysicalMaterial(
+        layers=(MaterialLayer(thickness_m=0.2, eps_r=1.0),),
+        name="vacuum-wall",
     )
     walled = _solve(_scene([_wall(vacuum)]), {"los", "transmission"})
     empty = _solve(_scene([]), {"los"})
@@ -124,8 +136,14 @@ def test_vacuum_wall_transmission_map_equals_unobstructed_los_map():
 def test_lossy_wall_attenuates_by_stack_power_transmittance():
     _require_native()
     thickness, eps_r, sigma_e = 0.1, 4.0, 0.05
-    lossy = PhysicalSurface(
-        layers=(Layer(thickness_m=thickness, eps_r=eps_r, sigma_e=sigma_e),),
+    lossy = PhysicalMaterial(
+        layers=(
+            MaterialLayer(
+                thickness_m=thickness,
+                eps_r=eps_r,
+                sigma_e=sigma_e,
+            ),
+        ),
         name="lossy-wall",
     )
     # 1x1 grid straight behind the wall: exact normal incidence.
@@ -150,7 +168,10 @@ def test_lossy_wall_attenuates_by_stack_power_transmittance():
 
 def test_pec_wall_transmits_nothing():
     _require_native()
-    walled = _solve(_scene([_wall(PerfectConductor())]), {"transmission"})
+    walled = _solve(
+        _scene([_wall(PhysicalMaterial.perfect_conductor())]),
+        {"transmission"},
+    )
     assert float(walled.component_maps["transmission"].abs().max()) < 1.0e-20
     assert float(walled.component_power["transmission"]) < 1.0e-20
     assert walled.metadata["contribution_capacity"] == 16
@@ -158,8 +179,9 @@ def test_pec_wall_transmits_nothing():
 
 def test_transmission_exact_capacity_recovers_unobstructed_map():
     _require_native()
-    vacuum = PhysicalSurface(
-        layers=(Layer(thickness_m=0.2, eps_r=1.0),), name="vacuum-wall"
+    vacuum = PhysicalMaterial(
+        layers=(MaterialLayer(thickness_m=0.2, eps_r=1.0),),
+        name="vacuum-wall",
     )
     scene = _scene([_wall(vacuum, x=2.0), _wall(vacuum, x=3.0)])
     empty = _solve(_scene([]), {"los"})
@@ -179,6 +201,12 @@ def test_transmission_d_plus_one_capacity_failure_is_loud_in_subprocess():
     _require_native()
     code = textwrap.dedent(
         """
+        import sys
+        sys.meta_path = [
+            finder
+            for finder in sys.meta_path
+            if "_witwin_channel_editable" not in type(finder).__module__
+        ]
         import torch
 
         from tests.montecarlo.basic.test_basic_transmission import (
@@ -186,10 +214,11 @@ def test_transmission_d_plus_one_capacity_failure_is_loud_in_subprocess():
             _solve,
             _wall,
         )
-        from witwin.channel.core.materials import Layer, PhysicalSurface
+        from witwin.core import MaterialLayer, PhysicalMaterial
 
-        vacuum = PhysicalSurface(
-            layers=(Layer(thickness_m=0.2, eps_r=1.0),), name="vacuum-wall"
+        vacuum = PhysicalMaterial(
+            layers=(MaterialLayer(thickness_m=0.2, eps_r=1.0),),
+            name="vacuum-wall",
         )
         scene = _scene([_wall(vacuum, x=2.0), _wall(vacuum, x=3.0)])
         result = _solve(scene, {"transmission"}, max_depth=1)
@@ -205,9 +234,15 @@ def test_transmission_d_plus_one_capacity_failure_is_loud_in_subprocess():
     )
     environment = os.environ.copy()
     source_root = str(_ROOT / "src")
+    core_root = str(_ROOT.parent / "core-radar-architecture-stage1")
     environment["PYTHONPATH"] = os.pathsep.join(
         value
-        for value in (str(_ROOT), source_root, environment.get("PYTHONPATH"))
+        for value in (
+            core_root,
+            str(_ROOT),
+            source_root,
+            environment.get("PYTHONPATH"),
+        )
         if value
     )
     completed = subprocess.run(
@@ -235,8 +270,9 @@ def test_transmission_d_plus_one_sanitizes_complete_result_before_terminal(
         observed.append(transaction.failure_state)
 
     monkeypatch.setattr(SolveCapacityTransaction, "terminal_check", observe)
-    vacuum = PhysicalSurface(
-        layers=(Layer(thickness_m=0.2, eps_r=1.0),), name="vacuum-wall"
+    vacuum = PhysicalMaterial(
+        layers=(MaterialLayer(thickness_m=0.2, eps_r=1.0),),
+        name="vacuum-wall",
     )
     scene = _scene([_wall(vacuum, x=2.0), _wall(vacuum, x=3.0)])
     result = _solve(
@@ -293,8 +329,9 @@ def test_transmission_solve_shares_exact_failure_state_through_final_terminal(
         sanitize,
     )
     monkeypatch.setattr(SolveCapacityTransaction, "terminal_check", terminal)
-    vacuum = PhysicalSurface(
-        layers=(Layer(thickness_m=0.2, eps_r=1.0),), name="vacuum-wall"
+    vacuum = PhysicalMaterial(
+        layers=(MaterialLayer(thickness_m=0.2, eps_r=1.0),),
+        name="vacuum-wall",
     )
     result = _solve(
         _scene([_wall(vacuum)], grid_shape=(1, 1)),

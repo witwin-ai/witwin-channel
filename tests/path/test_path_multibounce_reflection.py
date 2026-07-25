@@ -5,10 +5,14 @@ from tests.deterministic.test_reflection_multibounce import (
     parallel_wall_corridor_scene,
     two_wall_multibounce_scene,
 )
-from witwin.channel import ReceiverPoint, Scene, Structure, Transmitter
+from tests.support.core_world import (
+    make_mesh_structure,
+    make_receiver,
+    make_transmitter,
+)
+from witwin.core import PhysicalMaterial, Scene, Structure
 from witwin.channel.propagation.topology.export import evaluated_paths_from_block
-from witwin.channel.core.kernels.extension import build_info
-from witwin.channel.core.materials import Dielectric
+from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config as DeterministicConfig
 from witwin.channel.deterministic import solve as solve_deterministic
 from witwin.channel.path import Config, solve
@@ -53,10 +57,10 @@ def _cube(center: tuple[float, float, float], *, surface_id: int) -> Structure:
         ],
         dtype=torch.int64,
     )
-    return Structure(
+    return make_mesh_structure(
         vertices=vertices,
         faces=faces,
-        material=Dielectric(eps_r=4.0, sigma_e=0.01),
+        material=PhysicalMaterial(eps_r=4.0, sigma_e=0.01),
         name=f"cube-{surface_id}",
         surface_id=surface_id,
     )
@@ -69,9 +73,10 @@ def _three_cube_scene() -> Scene:
             _cube((0.0, -2.0, 1.0), surface_id=32),
             _cube((2.0, 2.0, 1.0), surface_id=33),
         ],
-        transmitters=[Transmitter(position=torch.tensor([-3.0, 0.0, 1.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([3.0, 0.0, 1.0]))],
-        frequency=3.0e9,
+        endpoints=[
+            make_transmitter(torch.tensor([-3.0, 0.0, 1.0])),
+            make_receiver(torch.tensor([3.0, 0.0, 1.0])),
+        ],
     )
 
 
@@ -80,10 +85,11 @@ def test_path_and_deterministic_share_two_wall_canonical_sequences():
     scene = two_wall_multibounce_scene()
     config = Config(components={"reflection"}, max_depth=2)
 
-    paths = solve(scene, config)
+    paths = solve(scene, config, reference_frequency_hz=3.0e9)
     deterministic = solve_deterministic(
         scene,
         DeterministicConfig(components={"reflection"}, max_depth=2, export_paths=True),
+        reference_frequency_hz=3.0e9,
     )
 
     assert deterministic.paths is not None
@@ -110,10 +116,15 @@ def test_path_and_deterministic_share_two_wall_canonical_sequences():
 def test_path_and_deterministic_match_three_cube_depth_three_topology():
     _require_native()
     scene = _three_cube_scene()
-    path = solve(scene, Config(components={"reflection"}, max_depth=3))
+    path = solve(
+        scene,
+        Config(components={"reflection"}, max_depth=3),
+        reference_frequency_hz=3.0e9,
+    )
     deterministic = solve_deterministic(
         scene,
         DeterministicConfig(components={"reflection"}, max_depth=3, export_paths=True),
+        reference_frequency_hz=3.0e9,
     )
 
     assert deterministic.paths is not None
@@ -143,6 +154,7 @@ def test_path_reflection_depth_one_through_five_is_effective(max_depth):
     result = solve(
         parallel_wall_corridor_scene(),
         Config(components={"reflection"}, max_depth=max_depth),
+        reference_frequency_hz=3.0e9,
     )
 
     depth = (result.interaction_type[result.valid] != 0).sum(dim=-1)
@@ -186,6 +198,7 @@ def test_shared_topology_deduplicates_canonical_sequences_and_caps_each_pair():
         max_paths=1,
         max_paths_scope="per_pair",
         tx_count=1,
+        rx_count=2,
         max_depth=1,
         launch_count=0,
     )

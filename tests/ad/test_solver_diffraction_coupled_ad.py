@@ -24,12 +24,14 @@ from tests.ad._tolerances import (
     REL_TOL_GENERAL,
 )
 from tests.support.scenes import coupled_wall_wedge_scene, wedge_diffraction_scene
-from witwin.channel import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel.core.materials import Dielectric
+from witwin.core import Mesh, Scene, Structure
+from tests.support.core_world import make_receiver, make_transmitter
+from witwin.core import PhysicalMaterial
 from witwin.channel.deterministic import Config as DeterministicConfig
 from witwin.channel.deterministic import solve as deterministic_solve
 from witwin.channel.path import Config as PathConfig
 from witwin.channel.path import solve as path_solve
+from witwin.channel.scene import compile as compile_scene
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for solver AD"
@@ -62,38 +64,42 @@ _COUPLED_COMPONENTS = frozenset({"reflection", "diffraction"})
 
 
 def _wedge_scene(
-    frequency: float | torch.Tensor = _FREQUENCY_HZ,
     tx: torch.Tensor | None = None,
     rx: torch.Tensor | None = None,
 ) -> Scene:
     # Route through the module TX/RX (perturbed off the y = 0 mirror plane, see
     # _WEDGE_RX) rather than the shared scenes.py defaults, which are still on it.
     return wedge_diffraction_scene(
-        Dielectric(**_WEDGE_MATERIAL),
+        PhysicalMaterial(**_WEDGE_MATERIAL),
         tx=torch.tensor(_WEDGE_TX) if tx is None else tx,
         rx=torch.tensor(_WEDGE_RX) if rx is None else rx,
-        frequency=frequency,
     )
 
 
 def _coupled_scene(
-    frequency: float | torch.Tensor = _FREQUENCY_HZ,
     tx: torch.Tensor | None = None,
     rx: torch.Tensor | None = None,
 ) -> Scene:
     return coupled_wall_wedge_scene(
-        Dielectric(**_WEDGE_MATERIAL),
+        PhysicalMaterial(**_WEDGE_MATERIAL),
         tx=torch.tensor(_COUPLED_TX) if tx is None else tx,
         rx=torch.tensor(_COUPLED_RX) if rx is None else rx,
-        frequency=frequency,
     )
 
 
-def _solve_wedge(scene: Scene, solver: str, ad_mode: str):
+def _solve_wedge(
+    scene: Scene,
+    solver: str,
+    ad_mode: str,
+    *,
+    reference_frequency_hz: float | torch.Tensor = _FREQUENCY_HZ,
+):
     components = frozenset({"diffraction"})
     if solver == "path":
         return path_solve(
-            scene, PathConfig(max_depth=1, components=components, ad_mode=ad_mode)
+            scene,
+            PathConfig(max_depth=1, components=components, ad_mode=ad_mode),
+            reference_frequency_hz=reference_frequency_hz,
         )
     return deterministic_solve(
         scene,
@@ -103,10 +109,16 @@ def _solve_wedge(scene: Scene, solver: str, ad_mode: str):
             export_paths=True,
             ad_mode=ad_mode,
         ),
+        reference_frequency_hz=reference_frequency_hz,
     )
 
 
-def _solve_coupled(scene: Scene, ad_mode: str):
+def _solve_coupled(
+    scene: Scene,
+    ad_mode: str,
+    *,
+    reference_frequency_hz: float | torch.Tensor = _FREQUENCY_HZ,
+):
     return path_solve(
         scene,
         PathConfig(
@@ -115,6 +127,7 @@ def _solve_coupled(scene: Scene, ad_mode: str):
             coupled_paths=True,
             ad_mode=ad_mode,
         ),
+        reference_frequency_hz=reference_frequency_hz,
     )
 
 
@@ -221,7 +234,7 @@ _MATERIAL_STEPS = {"eps_r": FD_STEP_EPS_R, "sigma_e": FD_STEP_SIGMA_E}
 @pytest.mark.parametrize("param", ("eps_r", "sigma_e"))
 def test_wedge_material_grad_matches_fd(solver, param):
     scene = _wedge_scene()
-    compiled = scene.compile()
+    compiled = compile_scene(scene, reference_frequency_hz=_FREQUENCY_HZ)
     leaf = getattr(compiled.materials, param)
     leaf.requires_grad_(True)
     try:
@@ -244,16 +257,29 @@ def test_wedge_frequency_grad_matches_fd(solver):
     frequency = torch.tensor(
         _FREQUENCY_HZ, dtype=torch.float64, device="cuda", requires_grad=True
     )
-    scene = _wedge_scene(frequency)
-    result = _solve_wedge(scene, solver, "vjp")
+    scene = _wedge_scene()
+    result = _solve_wedge(
+        scene,
+        solver,
+        "vjp",
+        reference_frequency_hz=frequency,
+    )
     _loss(result, solver).backward()
     assert frequency.grad is not None
     grad = frequency.grad.detach()
     assert float(grad.abs()) > 0.0
 
     def evaluate(value: torch.Tensor) -> torch.Tensor:
-        fd_scene = _wedge_scene(float(value))
-        return _loss(_solve_wedge(fd_scene, solver, "none"), solver).detach()
+        fd_scene = _wedge_scene()
+        return _loss(
+            _solve_wedge(
+                fd_scene,
+                solver,
+                "none",
+                reference_frequency_hz=float(value),
+            ),
+            solver,
+        ).detach()
 
     fd_grad = central_difference_gradient(
         evaluate,
@@ -299,20 +325,30 @@ _WELDED_WEDGE_VERTICES = (
 
 
 def _welded_wedge_scene(vertices: torch.Tensor | None = None) -> Scene:
+    resolved_vertices = (
+        torch.tensor(_WELDED_WEDGE_VERTICES) if vertices is None else vertices
+    )
     wedge = Structure(
-        vertices=(
-            torch.tensor(_WELDED_WEDGE_VERTICES) if vertices is None else vertices
+        geometry=Mesh(
+            resolved_vertices,
+            torch.tensor(
+                [[0, 1, 2], [0, 3, 1]],
+                device=resolved_vertices.device,
+            ),
+            recenter=False,
+            fill_mode="surface",
+            topology_diagnostics=False,
         ),
-        faces=torch.tensor([[0, 1, 2], [0, 3, 1]]),
-        material=Dielectric(**_WEDGE_MATERIAL),
+        material=PhysicalMaterial(**_WEDGE_MATERIAL),
         name="welded-wedge",
         surface_id=2,
     )
     return Scene(
         structures=[wedge],
-        transmitters=[Transmitter(position=torch.tensor(_WEDGE_TX))],
-        receivers=[ReceiverPoint(position=torch.tensor(_WEDGE_RX))],
-        frequency=_FREQUENCY_HZ,
+        endpoints=[
+            make_transmitter(position=torch.tensor(_WEDGE_TX)),
+            make_receiver(position=torch.tensor(_WEDGE_RX)),
+        ],
     )
 
 
@@ -373,7 +409,7 @@ def test_wedge_forward_mode_matches_reverse():
     """JVP-vs-VJP inner-product duality on the wedge eps_r seed."""
 
     scene = _wedge_scene()
-    compiled = scene.compile()
+    compiled = compile_scene(scene, reference_frequency_hz=_FREQUENCY_HZ)
     base = compiled.materials.eps_r
     tangent = torch.ones_like(base)
     with torch.autograd.forward_ad.dual_level():
@@ -414,7 +450,7 @@ def _assert_coupled_rows(result) -> None:
 @pytest.mark.parametrize("param", ("eps_r", "sigma_e"))
 def test_coupled_material_grad_matches_fd(param):
     scene = _coupled_scene()
-    compiled = scene.compile()
+    compiled = compile_scene(scene, reference_frequency_hz=_FREQUENCY_HZ)
     leaf = getattr(compiled.materials, param)
     leaf.requires_grad_(True)
     try:
@@ -437,8 +473,12 @@ def test_coupled_frequency_grad_matches_fd():
     frequency = torch.tensor(
         _FREQUENCY_HZ, dtype=torch.float64, device="cuda", requires_grad=True
     )
-    scene = _coupled_scene(frequency)
-    result = _solve_coupled(scene, "vjp")
+    scene = _coupled_scene()
+    result = _solve_coupled(
+        scene,
+        "vjp",
+        reference_frequency_hz=frequency,
+    )
     _assert_coupled_rows(result)
     _loss(result, "path").backward()
     assert frequency.grad is not None
@@ -446,8 +486,15 @@ def test_coupled_frequency_grad_matches_fd():
     assert float(grad.abs()) > 0.0
 
     def evaluate(value: torch.Tensor) -> torch.Tensor:
-        fd_scene = _coupled_scene(float(value))
-        return _loss(_solve_coupled(fd_scene, "none"), "path").detach()
+        fd_scene = _coupled_scene()
+        return _loss(
+            _solve_coupled(
+                fd_scene,
+                "none",
+                reference_frequency_hz=float(value),
+            ),
+            "path",
+        ).detach()
 
     fd_grad = central_difference_gradient(
         evaluate,
@@ -494,9 +541,9 @@ def _dd_mask(result) -> torch.Tensor:
 
 
 def _assert_dd_rows(result) -> None:
-    assert bool(
-        _dd_mask(result).any()
-    ), "the coupled fixture no longer produces double-diffraction (cid 7) paths"
+    assert bool(_dd_mask(result).any()), (
+        "the coupled fixture no longer produces double-diffraction (cid 7) paths"
+    )
 
 
 def _dd_loss(result) -> torch.Tensor:
@@ -533,16 +580,26 @@ _COUPLED_FACES = (
 
 def _coupled_vertex_scene(vertices: torch.Tensor) -> Scene:
     structure = Structure(
-        vertices=vertices,
-        faces=torch.tensor(_COUPLED_FACES, dtype=torch.int32),
-        material=Dielectric(**_WEDGE_MATERIAL),
+        geometry=Mesh(
+            vertices,
+            torch.tensor(
+                _COUPLED_FACES,
+                dtype=torch.int32,
+                device=vertices.device,
+            ),
+            recenter=False,
+            fill_mode="surface",
+            topology_diagnostics=False,
+        ),
+        material=PhysicalMaterial(**_WEDGE_MATERIAL),
         surface_id=0,
     )
     return Scene(
         structures=[structure],
-        transmitters=[Transmitter(position=torch.tensor(_COUPLED_TX))],
-        receivers=[ReceiverPoint(position=torch.tensor(_COUPLED_RX))],
-        frequency=_FREQUENCY_HZ,
+        endpoints=[
+            make_transmitter(position=torch.tensor(_COUPLED_TX)),
+            make_receiver(position=torch.tensor(_COUPLED_RX)),
+        ],
     )
 
 
@@ -591,7 +648,7 @@ def test_coupled_dd_forward_mode_matches_reverse():
     """
 
     scene = _coupled_scene()
-    compiled = scene.compile()
+    compiled = compile_scene(scene, reference_frequency_hz=_FREQUENCY_HZ)
     base = compiled.materials.eps_r
     tangent = torch.ones_like(base)
     with torch.autograd.forward_ad.dual_level():
@@ -601,9 +658,7 @@ def test_coupled_dd_forward_mode_matches_reverse():
             result = _solve_coupled(scene, "jvp")
             _assert_dd_rows(result)
             mask = _dd_mask(result)
-            tangent_a = torch.autograd.forward_ad.unpack_dual(
-                result.a[..., 0]
-            ).tangent
+            tangent_a = torch.autograd.forward_ad.unpack_dual(result.a[..., 0]).tangent
         finally:
             object.__setattr__(compiled.materials, "eps_r", base)
     assert tangent_a is not None
@@ -631,9 +686,7 @@ def test_coupled_dd_mesh_vertex_grad_raises_loudly():
     """
 
     vertices = (
-        torch.tensor(_COUPLED_VERTICES, dtype=torch.float32)
-        .cuda()
-        .requires_grad_(True)
+        torch.tensor(_COUPLED_VERTICES, dtype=torch.float32).cuda().requires_grad_(True)
     )
     scene = _coupled_vertex_scene(vertices)
     with pytest.raises(NotImplementedError, match="double-diffraction"):

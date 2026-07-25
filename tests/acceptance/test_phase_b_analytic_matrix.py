@@ -8,10 +8,9 @@ from tests.support.scenes import (
     transmission_wall_structure,
     wedge_diffraction_scene,
 )
-from witwin.channel import ReceiverGrid, ReceiverPoint, Scene, Transmitter
+from tests.support.core_world import make_receiver, make_receiver_grid, make_transmitter
 from witwin.channel.capabilities import capabilities
-from witwin.channel.core.kernels.extension import build_info
-from witwin.channel.core.materials import Layer, PhysicalSurface
+from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config as DeterministicConfig
 from witwin.channel.deterministic import solve as solve_deterministic
 from witwin.channel.montecarlo.basic import Config as BasicConfig
@@ -20,37 +19,48 @@ from witwin.channel.montecarlo.bdpt import Config as BdptConfig
 from witwin.channel.montecarlo.bdpt import solve as solve_bdpt
 from witwin.channel.path import Config as PathConfig
 from witwin.channel.path import solve as solve_paths
+from witwin.core import AntennaState, MaterialLayer, PhysicalMaterial, Scene
+
+_REFERENCE_FREQUENCY_HZ = 3.0e9
 
 
 def _transmission_scene() -> Scene:
-    surface = PhysicalSurface(
-        layers=(Layer(thickness_m=0.1, eps_r=4.0, sigma_e=0.05),),
+    surface = PhysicalMaterial(
+        layers=(MaterialLayer(thickness_m=0.1, eps_r=4.0, sigma_e=0.05),),
         name="phase-b-lossy-wall",
     )
     return Scene(
         structures=[transmission_wall_structure(2.5, surface)],
-        transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 0.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([5.0, 0.0, 0.0]))],
-        frequency=3.0e9,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, 0.0, 0.0])),
+            make_receiver(position=torch.tensor([5.0, 0.0, 0.0])),
+        ],
     )
 
 
 def _single_point_scene(scene: Scene) -> Scene:
-    receiver = scene.receivers[0]
-    assert isinstance(receiver, ReceiverPoint)
+    transmitter = next(
+        endpoint for endpoint in scene.endpoints if endpoint.role == "tx"
+    )
+    receiver = next(endpoint for endpoint in scene.endpoints if endpoint.role == "rx")
+    assert isinstance(receiver, AntennaState)
     return Scene(
         structures=scene.structures,
-        transmitters=[scene.transmitters[0]],
-        receivers=[receiver],
-        frequency=scene.frequency,
+        endpoints=[transmitter, receiver],
         metadata=scene.metadata,
     )
 
 
 def _single_cell_grid_scene(scene: Scene) -> Scene:
     point_scene = _single_point_scene(scene)
-    position = point_scene.receivers[0].position
-    grid = ReceiverGrid(
+    transmitter = next(
+        endpoint for endpoint in point_scene.endpoints if endpoint.role == "tx"
+    )
+    receiver = next(
+        endpoint for endpoint in point_scene.endpoints if endpoint.role == "rx"
+    )
+    position = receiver.position
+    grid = make_receiver_grid(
         origin=position,
         x_axis=torch.tensor([0.0, 1.0, 0.0]),
         y_axis=torch.tensor([0.0, 0.0, 1.0]),
@@ -59,16 +69,19 @@ def _single_cell_grid_scene(scene: Scene) -> Scene:
     )
     return Scene(
         structures=point_scene.structures,
-        transmitters=point_scene.transmitters,
-        receivers=[grid],
-        frequency=point_scene.frequency,
+        endpoints=[transmitter, grid],
         metadata=point_scene.metadata,
     )
 
 
 _CASES = (
     ("los", empty_space_los_scene, frozenset({"los"}), 0),
-    ("single_reflection", same_side_wall_reflection_scene, frozenset({"reflection"}), 1),
+    (
+        "single_reflection",
+        same_side_wall_reflection_scene,
+        frozenset({"reflection"}),
+        1,
+    ),
     ("double_reflection", two_wall_multibounce_scene, frozenset({"reflection"}), 2),
     ("single_transmission", _transmission_scene, frozenset({"transmission"}), 1),
     ("single_diffraction", wedge_diffraction_scene, frozenset({"diffraction"}), 1),
@@ -85,7 +98,11 @@ def test_path_and_deterministic_share_complex_field_geometry_and_delay(
         pytest.skip(f"RayD native capability is required for {name}")
 
     scene = scene_factory()
-    path = solve_paths(scene, PathConfig(components=components, max_depth=max_depth))
+    path = solve_paths(
+        scene,
+        PathConfig(components=components, max_depth=max_depth),
+        reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
+    )
     deterministic = solve_deterministic(
         scene,
         DeterministicConfig(
@@ -95,6 +112,7 @@ def test_path_and_deterministic_share_complex_field_geometry_and_delay(
             return_field=True,
             export_paths=True,
         ),
+        reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
     )
     assert deterministic.paths is not None
     valid = path.valid
@@ -109,7 +127,10 @@ def test_path_and_deterministic_share_complex_field_geometry_and_delay(
         coefficient * deterministic.paths.coefficient.conj()
     )
     torch.testing.assert_close(
-        wrapped_phase_error, torch.zeros_like(wrapped_phase_error), atol=5.0e-5, rtol=0.0
+        wrapped_phase_error,
+        torch.zeros_like(wrapped_phase_error),
+        atol=5.0e-5,
+        rtol=0.0,
     )
     torch.testing.assert_close(
         field_xyz, deterministic.paths.field_xyz, rtol=5.0e-4, atol=1.0e-7
@@ -125,10 +146,16 @@ def test_path_and_deterministic_share_complex_field_geometry_and_delay(
         path.material_id[valid], deterministic.paths.material_sequence
     )
     torch.testing.assert_close(
-        path.position[valid], deterministic.paths.interaction_positions, atol=1.0e-5, rtol=0.0
+        path.position[valid],
+        deterministic.paths.interaction_positions,
+        atol=1.0e-5,
+        rtol=0.0,
     )
     torch.testing.assert_close(
-        path.normal[valid], deterministic.paths.interaction_normals, atol=1.0e-5, rtol=0.0
+        path.normal[valid],
+        deterministic.paths.interaction_normals,
+        atol=1.0e-5,
+        rtol=0.0,
     )
 
 
@@ -169,13 +196,18 @@ def test_monte_carlo_los_common_power_is_finite_and_converged(solver, config_typ
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for Phase B Monte Carlo acceptance")
     scene = empty_space_los_scene()
-    reference = solve_paths(scene, PathConfig(max_depth=0, components={"los"}))
+    reference = solve_paths(
+        scene,
+        PathConfig(max_depth=0, components={"los"}),
+        reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
+    )
     reference_power = reference.a[reference.valid].abs().square().sum()
     errors = []
     for samples in (128, 512):
         result = solver(
             scene,
             config_type(samples=samples, max_depth=0, components={"los"}, seed=17),
+            reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
         )
         observed = result.path_gain.sum()
         assert torch.isfinite(observed)
@@ -203,7 +235,9 @@ def test_monte_carlo_supported_scenarios_are_finite_and_reference_bounded(
     point_scene = _single_point_scene(scene_factory())
     solve_scene = _single_cell_grid_scene(point_scene) if use_grid else point_scene
     reference = solve_paths(
-        point_scene, PathConfig(components=components, max_depth=max_depth)
+        point_scene,
+        PathConfig(components=components, max_depth=max_depth),
+        reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
     )
     reference_power = reference.a[reference.valid].abs().square().sum()
     assert torch.isfinite(reference_power)
@@ -217,6 +251,7 @@ def test_monte_carlo_supported_scenarios_are_finite_and_reference_bounded(
             components=components,
             seed=23,
         ),
+        reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
     )
     observed = result.path_gain.sum()
     assert torch.isfinite(observed)

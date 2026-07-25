@@ -41,6 +41,7 @@ permissions:
   contents: read
 
 env:
+  CORE_COMMIT: 7791ce21a23d471bf4306b21d6919000ef97bccc
   RAYD_COMMIT: 49c58c4cb8212f6babb920cc88fb937509826cc5
   RAYD_REPOSITORY_URL: https://github.com/Asixa/RayD.git
   FULL_CUDA_ARCHITECTURES: 70-real;75-real;80-real;86-real;87-real;89-real;90-real;100-real;101-real;120-real;120-virtual
@@ -173,6 +174,14 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.scope == 'windows-release-recovery' && inputs.source_sha || github.sha }}
 
+      - name: Check out locked Stage-I Core
+        uses: actions/checkout@v5
+        with:
+          repository: witwin-ai/witwin-core
+          ref: ${{ env.CORE_COMMIT }}
+          path: core
+          persist-credentials: false
+
       - name: Check out locked RayD 0.7.0 source
         uses: actions/checkout@v5
         with:
@@ -281,10 +290,13 @@ jobs:
             "ninja>=1.13,<1.14" `
             "scikit-build-core>=0.12,<0.13"
           python -m pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cu128
+          python -m pip install --no-deps ./core
 
       - name: Build Windows wheel
         shell: pwsh
         run: |
+          python -m build core --wheel --no-isolation --outdir core/dist
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $startedAt = Get-Date
           python -m build channel --wheel --no-isolation --outdir channel/dist `
             -Cbuild-dir="$env:RUNNER_TEMP/channel-skbuild"
@@ -306,6 +318,10 @@ jobs:
             $wheel
           python -m twine check $wheel
           python -c "import sys,zipfile; n=zipfile.ZipFile(sys.argv[1]).namelist(); e=[x for x in n if '/_channel' in x and x.endswith('.pyd')]; assert len(e)==1,e; assert not any(x.startswith('rayd/') for x in n), 'RayD Python package leaked into Channel wheel'" $wheel
+          $coreWheel = (Get-ChildItem core/dist/*.whl -File -ErrorAction Stop).FullName
+          python channel/ci/wheel_smoke.py $wheel `
+            --core-wheel $coreWheel `
+            --output channel/dist/windows-wheel-smoke.json
           sccache --show-stats
 
       - name: Upload Windows wheel
@@ -331,6 +347,14 @@ jobs:
         with:
           path: channel
           fetch-depth: 0
+
+      - name: Check out locked Stage-I Core
+        uses: actions/checkout@v5
+        with:
+          repository: witwin-ai/witwin-core
+          ref: ${{ env.CORE_COMMIT }}
+          path: core
+          persist-credentials: false
 
       - name: Check out locked RayD 0.7.0 source
         uses: actions/checkout@v5
@@ -500,17 +524,26 @@ jobs:
           output-dir: channel/dist
 
       - name: Verify Linux wheel metadata
-        working-directory: channel
         shell: bash
         run: |
-          python -m pip install twine
-          python -m twine check dist/*.whl
+          python -m pip install build twine
+          python -m pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cu128
+          python -m pip install --no-deps ./core
+          python -m build core --wheel --outdir core/dist
+          python -m twine check channel/dist/*.whl
           python - <<'PY'
+          import importlib.metadata
+          import importlib.util
+          import subprocess
+          import sys
+          import tempfile
           import zipfile
           from pathlib import Path
 
-          wheels = list(Path("dist").glob("*.whl"))
+          wheels = list(Path("channel/dist").glob("*.whl"))
           assert len(wheels) == 1, wheels
+          core_wheels = list(Path("core/dist").glob("*.whl"))
+          assert len(core_wheels) == 1, core_wheels
           names = zipfile.ZipFile(wheels[0]).namelist()
           extensions = [
               name
@@ -520,6 +553,57 @@ jobs:
           assert len(extensions) == 1, extensions
           assert not any(name.startswith("rayd/") for name in names)
           assert "manylinux_2_28_x86_64" in wheels[0].name, wheels[0]
+          with tempfile.TemporaryDirectory(prefix="channel-linux-wheel-smoke-") as raw:
+              target = Path(raw) / "site-packages"
+              subprocess.run(
+                  [
+                      sys.executable,
+                      "-m",
+                      "pip",
+                      "install",
+                      "--disable-pip-version-check",
+                      "--no-deps",
+                      "--target",
+                      str(target),
+                      str(core_wheels[0]),
+                      str(wheels[0]),
+                  ],
+                  check=True,
+              )
+              code = f"""
+          import importlib.util
+          from pathlib import Path
+          import sys
+          target = Path({str(target)!r}).resolve()
+          sys.path.insert(0, str(target))
+          sys.meta_path[:] = [
+              finder for finder in sys.meta_path
+              if finder.__class__.__module__ != "_witwin_channel_editable"
+          ]
+          import witwin.channel as channel
+          import witwin.channel._channel as native
+          import witwin.core as core
+          from witwin.channel.propagation import consumer
+          assert Path(channel.__file__).resolve().is_relative_to(target)
+          assert Path(native.__file__).resolve().is_relative_to(target)
+          assert Path(core.__file__).resolve().is_relative_to(target)
+          assert channel.build_info()["backend"] == "channel"
+          assert consumer.CONTRACT_VERSION == 2
+          required = {{
+              "enumerated_canonical_compact",
+              "enumerated_exact_pair_metadata",
+              "evaluated_paths_compact_finalize",
+              "evaluated_paths_compact_finalize_backward",
+              "evaluated_paths_compact_finalize_jvp",
+              "consumer_los_jones",
+              "consumer_fixed_los_gather",
+              "consumer_fixed_los_gather_backward",
+              "consumer_fixed_los_gather_jvp",
+          }}
+          missing = sorted(name for name in required if not hasattr(native, name))
+          assert not missing, missing
+          """
+              subprocess.run([sys.executable, "-I", "-c", code], check=True)
           PY
 
       - name: Upload Linux wheel

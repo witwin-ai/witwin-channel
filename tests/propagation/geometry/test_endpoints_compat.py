@@ -5,10 +5,11 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from witwin.channel.core.objects import ReceiverGrid
+from tests.support.core_world import make_receiver_grid
 from witwin.channel.deterministic import accumulation, solver
 from witwin.channel.propagation.enumerated import scattering as enumerated
 from witwin.channel.propagation.geometry import endpoints
+from witwin.channel.scene.endpoints import ReceiverGrid as ReceiverGridView
 
 
 _ENDPOINT_NAMES = (
@@ -100,14 +101,14 @@ def test_endpoint_helpers_delegate_to_raw_scene_tensor_owners(monkeypatch):
     assert point_positions is rx_positions
     assert point_layout == endpoints.ReceiverLayout("point", 6)
 
-    grid = ReceiverGrid(
+    grid = make_receiver_grid(
         origin=torch.zeros(3),
         x_axis=torch.tensor((1.0, 0.0, 0.0)),
         y_axis=torch.tensor((0.0, 1.0, 0.0)),
         shape=(2, 3),
         spacing=(1.0, 1.0),
     )
-    grid_scene = SimpleNamespace(receivers=[grid])
+    grid_scene = SimpleNamespace(receivers=[ReceiverGridView(grid)])
     grid_positions, grid_layout = endpoints.receiver_positions_and_layout(
         grid_scene, device=device
     )

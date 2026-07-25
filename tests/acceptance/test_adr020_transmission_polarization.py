@@ -19,11 +19,11 @@ import math
 import pytest
 import torch
 
+from tests.support.core_world import make_receiver_grid, make_transmitter
 from tests.support.scenes import transmission_wall_structure
-from witwin.channel import ReceiverGrid, Scene, Transmitter
-from witwin.channel.core.kernels.extension import build_info
-from witwin.channel.core.materials import Layer, PhysicalSurface
-from witwin.channel.physics.oracle import layer_stack_rt
+from witwin.channel.deployment import build_info
+from tests.reference.em_oracle import layer_stack_rt
+from witwin.core import MaterialLayer, PhysicalMaterial, ReceiverGrid, Scene
 
 from witwin.channel.deterministic import Config as DetConfig, solve as det_solve
 from witwin.channel.montecarlo.basic import Config as McConfig, solve as mc_solve
@@ -52,8 +52,14 @@ def _require_native() -> None:
 def _wall() -> object:
     return transmission_wall_structure(
         _WALL_X,
-        PhysicalSurface(
-            layers=(Layer(thickness_m=_LAYER[0], eps_r=_LAYER[1], sigma_e=_LAYER[2]),),
+        PhysicalMaterial(
+            layers=(
+                MaterialLayer(
+                    thickness_m=_LAYER[0],
+                    eps_r=_LAYER[1],
+                    sigma_e=_LAYER[2],
+                ),
+            ),
             name="adr020-lossy",
         ),
     )
@@ -61,7 +67,7 @@ def _wall() -> object:
 
 def _grid() -> ReceiverGrid:
     # Single cell centered at _RX -> exact 45 degree oblique incidence.
-    return ReceiverGrid(
+    return make_receiver_grid(
         origin=torch.tensor(_RX),
         x_axis=torch.tensor([0.0, 1.0, 0.0]),
         y_axis=torch.tensor([0.0, 0.0, 1.0]),
@@ -73,14 +79,13 @@ def _grid() -> ReceiverGrid:
 def _scene(structures, *, polarization) -> Scene:
     return Scene(
         structures=structures,
-        transmitters=[
-            Transmitter(
+        endpoints=[
+            make_transmitter(
                 position=torch.tensor([0.0, 0.0, 0.0]),
                 polarization=torch.tensor(polarization),
-            )
+            ),
+            _grid(),
         ],
-        receivers=[_grid()],
-        frequency=_FREQUENCY,
     )
 
 
@@ -112,18 +117,27 @@ def test_pure_te_oblique_all_solvers_match_polarized_te_not_mean():
     det = det_solve(
         _scene([_wall()], polarization=pol),
         DetConfig(components={"transmission"}, max_depth=1),
+        reference_frequency_hz=_FREQUENCY,
     )
-    det_los = det_solve(_scene([], polarization=pol), DetConfig(components={"los"}))
+    det_los = det_solve(
+        _scene([], polarization=pol),
+        DetConfig(components={"los"}),
+        reference_frequency_hz=_FREQUENCY,
+    )
     mc = mc_solve(
         _scene([_wall()], polarization=pol),
         McConfig(samples=64, seed=3, max_depth=1, components={"transmission"}),
+        reference_frequency_hz=_FREQUENCY,
     )
     mc_los = mc_solve(
-        _scene([], polarization=pol), McConfig(samples=64, seed=3, components={"los"})
+        _scene([], polarization=pol),
+        McConfig(samples=64, seed=3, components={"los"}),
+        reference_frequency_hz=_FREQUENCY,
     )
     bd = bdpt_solve(
         _scene([_wall()], polarization=pol),
         BdptConfig(samples=1024, seed=5, max_depth=1, components={"transmission"}),
+        reference_frequency_hz=_FREQUENCY,
     )
 
     # Intra-solver transmission/LoS ratio isolates the transmittance model from
@@ -153,17 +167,22 @@ def test_mixed_polarization_bdpt_matches_deterministic_mc_is_incident_projected(
     det = det_solve(
         _scene([_wall()], polarization=pol),
         DetConfig(components={"transmission"}, max_depth=1),
+        reference_frequency_hz=_FREQUENCY,
     )
     mc = mc_solve(
         _scene([_wall()], polarization=pol),
         McConfig(samples=64, seed=3, max_depth=1, components={"transmission"}),
+        reference_frequency_hz=_FREQUENCY,
     )
     mc_los = mc_solve(
-        _scene([], polarization=pol), McConfig(samples=64, seed=3, components={"los"})
+        _scene([], polarization=pol),
+        McConfig(samples=64, seed=3, components={"los"}),
+        reference_frequency_hz=_FREQUENCY,
     )
     bd = bdpt_solve(
         _scene([_wall()], polarization=pol),
         BdptConfig(samples=1024, seed=5, max_depth=1, components={"transmission"}),
+        reference_frequency_hz=_FREQUENCY,
     )
 
     # BDPT reproduces the deterministic component power (both receiver-projected

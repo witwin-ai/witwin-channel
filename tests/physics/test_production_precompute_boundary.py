@@ -9,10 +9,10 @@ import pytest
 from witwin.channel.materials.evaluation import (
     layer_stack_rt as production_layer_stack_rt,
 )
-from witwin.channel.physics.oracle import (
+from tests.reference.em_oracle import (
     kirchhoff_diffuse_lobe_series as reference_kirchhoff_series,
 )
-from witwin.channel.physics.oracle import (
+from tests.reference.em_oracle import (
     layer_stack_rt as reference_layer_stack_rt,
 )
 from witwin.channel.scattering.tables import (
@@ -93,7 +93,7 @@ def _imports(path: Path) -> set[str]:
 def test_production_and_reference_precompute_have_static_zero_dependency() -> None:
     root = Path(__file__).parents[2] / "src" / "witwin" / "channel"
     production_paths = (
-        root / "physics" / "conventions.py",
+        root / "constants.py",
         root / "materials" / "evaluation.py",
         root / "scattering" / "tables.py",
         root / "scattering" / "energy.py",
@@ -101,11 +101,16 @@ def test_production_and_reference_precompute_have_static_zero_dependency() -> No
         root / "propagation" / "enumerated" / "scattering.py",
     )
     for path in production_paths:
-        assert "witwin.channel.physics.oracle" not in _imports(path), path
+        assert "tests.reference.em_oracle" not in _imports(path), path
 
-    oracle_imports = _imports(root / "physics" / "oracle.py")
+    # The oracle left the shipped package; it may only reach the constants owner.
+    assert not (root / "physics").exists()
+    oracle_imports = _imports(
+        Path(__file__).parents[1] / "reference" / "em_oracle.py"
+    )
     assert not any(
         name.startswith("witwin.channel.materials")
         or name.startswith("witwin.channel.scattering")
+        or name.startswith("witwin.channel.propagation")
         for name in oracle_imports
     )

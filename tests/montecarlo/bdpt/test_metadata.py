@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel.core.kernels.metadata import validate_metadata
+from witwin.channel.runtime.kernel_metadata import validate_metadata
 from witwin.channel.montecarlo.bdpt import Config, solve
 
 
@@ -10,8 +10,10 @@ def test_bdpt_metadata_reports_contract_fields():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT metadata")
 
-    config = Config(samples=32, seed=123, sample_streams=2, components={"los"}, diagnostics=True)
-    result = solve(empty_space_los_scene(), config)
+    config = Config(
+        samples=32, seed=123, sample_streams=2, components={"los"}, diagnostics=True
+    )
+    result = solve(empty_space_los_scene(), config, reference_frequency_hz=3.0e9)
 
     assert result.metadata["samples"] == 32
     assert result.metadata["seed"] == 123
@@ -25,13 +27,20 @@ def test_bdpt_metadata_reports_contract_fields():
         "scattering": "incoherent_power_only_no_complex_field",
         "sensor_depth": "receiver_endpoint_only_always_zero",
     }
-    assert result.metadata["pdf_domain"] == "proposal_density_excludes_geometry_jacobian"
+    assert (
+        result.metadata["pdf_domain"] == "proposal_density_excludes_geometry_jacobian"
+    )
     assert (
         result.metadata["sampled_delta_mass"]
         == "event_selection_probability_in_forward_reverse_pdf"
     )
     assert result.metadata["event_classification"]["delta_specular_reflection"] == 1
-    assert result.metadata["mis_capabilities"]["reflection_diffraction_coupled_bidirectional_pdf"] is True
+    assert (
+        result.metadata["mis_capabilities"][
+            "reflection_diffraction_coupled_bidirectional_pdf"
+        ]
+        is True
+    )
     assert (
         result.metadata["mis_capabilities"]["coupled_pdf_domain"]
         == "enumerated_bidirectional_discrete_mass"

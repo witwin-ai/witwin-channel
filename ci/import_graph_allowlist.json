@@ -3,28 +3,114 @@
   "debts": {
     "existing_boundary": {
       "baseline": [
-        {"id": "boundary-001", "path": "src/witwin/channel/__init__.py", "line": 3, "column": 0, "rule": "public_init_internal", "source": "witwin.channel", "target": "witwin.channel.core.kernels.extension"},
-        {"id": "boundary-002", "path": "src/witwin/channel/core/kernels/extension.py", "line": 3, "column": 0, "rule": "relative_cross_domain", "source": "witwin.channel.core.kernels.extension", "target": "witwin.channel.runtime.extension"},
-        {"id": "boundary-003", "path": "src/witwin/channel/deployment.py", "line": 87, "column": 4, "rule": "relative_cross_domain", "source": "witwin.channel.deployment", "target": "witwin.channel.runtime.extension"},
-        {"id": "boundary-004", "path": "src/witwin/channel/deterministic/solver.py", "line": 15, "column": 0, "rule": "solver_raw_extension", "source": "witwin.channel.deterministic.solver", "target": "witwin.channel.core.kernels.extension"},
-        {"id": "boundary-005", "path": "src/witwin/channel/materials.py", "line": 1, "column": 0, "rule": "relative_cross_domain", "source": "witwin.channel.materials", "target": "witwin.channel.core.materials"},
-        {"id": "boundary-006", "path": "src/witwin/channel/montecarlo/basic/solver.py", "line": 10, "column": 0, "rule": "solver_raw_extension", "source": "witwin.channel.montecarlo.basic.solver", "target": "witwin.channel.core.kernels.extension"},
-        {"id": "boundary-007", "path": "src/witwin/channel/montecarlo/bdpt/solver.py", "line": 16, "column": 0, "rule": "solver_raw_extension", "source": "witwin.channel.montecarlo.bdpt.solver", "target": "witwin.channel.core.kernels.extension"},
-        {"id": "boundary-008", "path": "src/witwin/channel/path/solver.py", "line": 9, "column": 0, "rule": "solver_raw_extension", "source": "witwin.channel.path.solver", "target": "witwin.channel.core.kernels.extension"}
+        {
+          "id": "boundary-001",
+          "path": "src/witwin/channel/__init__.py",
+          "line": 3,
+          "column": 0,
+          "rule": "public_init_internal",
+          "source": "witwin.channel",
+          "target": "witwin.channel.core.kernels.extension"
+        },
+        {
+          "id": "boundary-002",
+          "path": "src/witwin/channel/core/kernels/extension.py",
+          "line": 3,
+          "column": 0,
+          "rule": "relative_cross_domain",
+          "source": "witwin.channel.core.kernels.extension",
+          "target": "witwin.channel.runtime.extension"
+        },
+        {
+          "id": "boundary-003",
+          "path": "src/witwin/channel/deployment.py",
+          "line": 87,
+          "column": 4,
+          "rule": "relative_cross_domain",
+          "source": "witwin.channel.deployment",
+          "target": "witwin.channel.runtime.extension"
+        },
+        {
+          "id": "boundary-004",
+          "path": "src/witwin/channel/deterministic/solver.py",
+          "line": 15,
+          "column": 0,
+          "rule": "solver_raw_extension",
+          "source": "witwin.channel.deterministic.solver",
+          "target": "witwin.channel.core.kernels.extension"
+        },
+        {
+          "id": "boundary-005",
+          "path": "src/witwin/channel/materials.py",
+          "line": 1,
+          "column": 0,
+          "rule": "relative_cross_domain",
+          "source": "witwin.channel.materials",
+          "target": "witwin.channel.core.materials"
+        },
+        {
+          "id": "boundary-006",
+          "path": "src/witwin/channel/montecarlo/basic/solver.py",
+          "line": 10,
+          "column": 0,
+          "rule": "solver_raw_extension",
+          "source": "witwin.channel.montecarlo.basic.solver",
+          "target": "witwin.channel.core.kernels.extension"
+        },
+        {
+          "id": "boundary-007",
+          "path": "src/witwin/channel/montecarlo/bdpt/solver.py",
+          "line": 16,
+          "column": 0,
+          "rule": "solver_raw_extension",
+          "source": "witwin.channel.montecarlo.bdpt.solver",
+          "target": "witwin.channel.core.kernels.extension"
+        },
+        {
+          "id": "boundary-008",
+          "path": "src/witwin/channel/path/solver.py",
+          "line": 9,
+          "column": 0,
+          "rule": "solver_raw_extension",
+          "source": "witwin.channel.path.solver",
+          "target": "witwin.channel.core.kernels.extension"
+        }
       ],
-      "allowed": ["boundary-001", "boundary-003"]
+      "allowed": [
+        "boundary-003"
+      ]
     },
     "solver_to_solver": {
       "baseline": [
-        {"id": "solver-001", "path": "src/witwin/channel/montecarlo/bdpt/solver.py", "line": 27, "column": 0, "rule": "solver_to_solver", "source": "witwin.channel.montecarlo.bdpt.solver", "target": "witwin.channel.path"}
+        {
+          "id": "solver-001",
+          "path": "src/witwin/channel/montecarlo/bdpt/solver.py",
+          "line": 27,
+          "column": 0,
+          "rule": "solver_to_solver",
+          "source": "witwin.channel.montecarlo.bdpt.solver",
+          "target": "witwin.channel.path"
+        }
       ],
       "allowed": []
     },
     "mc_enumerated_dependency": {
       "baseline": [
-        {"id": "mc-enum-001", "path": "src/witwin/channel/montecarlo/bdpt/pipeline.py", "line": 23, "column": 0, "rule": "mc_enumerated_dependency", "source": "witwin.channel.montecarlo.bdpt.pipeline", "target": "witwin.channel.propagation.enumerated.engine", "adr": "ADR-008", "justification": "BDPT hybrid estimator consumes evaluate_enumerated_paths read-only as a black-box discrete-path oracle for delta-specular and coupled discrete connection samples; see docs/dev/standards/adr-008-enumerated-propagation.md. montecarlo.basic stays at zero enumerated dependency."}
+        {
+          "id": "mc-enum-001",
+          "path": "src/witwin/channel/montecarlo/bdpt/pipeline.py",
+          "line": 23,
+          "column": 0,
+          "rule": "mc_enumerated_dependency",
+          "source": "witwin.channel.montecarlo.bdpt.pipeline",
+          "target": "witwin.channel.propagation.enumerated.engine",
+          "adr": "ADR-008",
+          "justification": "BDPT hybrid estimator consumes evaluate_enumerated_paths read-only as a black-box discrete-path oracle for delta-specular and coupled discrete connection samples; see docs/dev/standards/adr-008-enumerated-propagation.md. montecarlo.basic stays at zero enumerated dependency."
+        }
       ],
-      "allowed": ["mc-enum-001"]
+      "allowed": [
+        "mc-enum-001"
+      ]
     }
   }
 }

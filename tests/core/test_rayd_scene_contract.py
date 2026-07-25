@@ -4,12 +4,18 @@ import pytest
 import torch
 
 from witwin.channel.runtime import symbols
-from witwin.channel import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel.core.materials import Dielectric
+from witwin.channel.scene import compile as compile_scene
+from witwin.core import Scene
+from tests.support.core_world import (
+    make_mesh_structure,
+    make_receiver,
+    make_transmitter,
+)
+from witwin.core import PhysicalMaterial
 
 
 def _source_linked_rayd_available() -> bool:
-    from witwin.channel.core.kernels.extension import build_info
+    from witwin.channel.deployment import build_info
 
     try:
         return build_info()["rayd_integration"] == "source-linked"
@@ -52,21 +58,22 @@ def test_compile_builds_rayd_scene_handle_when_backend_available():
 
     scene = Scene(
         structures=[
-            Structure(
+            make_mesh_structure(
                 vertices=torch.tensor(
                     [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
                     dtype=torch.float32,
                 ),
                 faces=torch.tensor([[0, 1, 2]], dtype=torch.int32),
-                material=Dielectric(eps_r=2.0),
+                material=PhysicalMaterial(eps_r=2.0),
             )
         ],
-        transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 1.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([1.0, 0.0, 1.0]))],
-        frequency=3.5e9,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, 0.0, 1.0])),
+            make_receiver(position=torch.tensor([1.0, 0.0, 1.0])),
+        ],
     )
 
-    compiled = scene.compile()
+    compiled = compile_scene(scene, reference_frequency_hz=3.5e9)
 
     assert compiled.rayd.available
     assert compiled.rayd.require_resource() is not None
@@ -82,26 +89,26 @@ def test_scene_reuses_cached_rayd_scene_handle_when_backend_available():
 
     scene = Scene(
         structures=[
-            Structure(
+            make_mesh_structure(
                 vertices=torch.tensor(
                     [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
                     dtype=torch.float32,
                 ),
                 faces=torch.tensor([[0, 1, 2]], dtype=torch.int32),
-                material=Dielectric(eps_r=2.0),
+                material=PhysicalMaterial(eps_r=2.0),
             )
         ],
-        transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 1.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([1.0, 0.0, 1.0]))],
-        frequency=3.5e9,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, 0.0, 1.0])),
+            make_receiver(position=torch.tensor([1.0, 0.0, 1.0])),
+        ],
     )
 
-    first = scene.rayd_scene()
-    second = scene.rayd_scene()
-    compiled = scene.compile()
+    first = compile_scene(scene, reference_frequency_hz=3.5e9)
+    second = compile_scene(scene, reference_frequency_hz=3.5e9)
 
     assert first is second
-    assert compiled.rayd is first
+    assert first.rayd is second.rayd
 
 
 def test_rayd_scene_exports_non_manifold_edge_records_when_backend_available():
@@ -113,7 +120,7 @@ def test_rayd_scene_exports_non_manifold_edge_records_when_backend_available():
 
     scene = Scene(
         structures=[
-            Structure(
+            make_mesh_structure(
                 vertices=torch.tensor(
                     [
                         [0.0, 0.0, 0.0],
@@ -132,15 +139,14 @@ def test_rayd_scene_exports_non_manifold_edge_records_when_backend_available():
                     ],
                     dtype=torch.int32,
                 ),
-                material=Dielectric(eps_r=2.0),
+                material=PhysicalMaterial(eps_r=2.0),
             )
         ],
-        transmitters=[],
-        receivers=[],
-        frequency=3.5e9,
     )
 
-    records = scene.compile().rayd.edge_records()
+    records = compile_scene(
+        scene, reference_frequency_hz=3.5e9
+    ).rayd.edge_records()
 
     assert records.edge_v0.is_cuda
     assert records.edge_v0.dtype == torch.int32
@@ -163,20 +169,17 @@ def test_rayd_intersect_forward_uses_native_rayd_scene_bridge_when_available():
 
     scene = Scene(
         structures=[
-            Structure(
+            make_mesh_structure(
                 vertices=torch.tensor(
                     [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
                     dtype=torch.float32,
                 ),
                 faces=torch.tensor([[0, 1, 2]], dtype=torch.int32),
-                material=Dielectric(eps_r=2.0),
+                material=PhysicalMaterial(eps_r=2.0),
             )
         ],
-        transmitters=[],
-        receivers=[],
-        frequency=3.5e9,
     )
-    rayd = scene.rayd_scene()
+    rayd = compile_scene(scene, reference_frequency_hz=3.5e9).rayd
     ray_o = torch.tensor([[0.25, 0.25, 1.0]], dtype=torch.float32, device="cuda")
     ray_d = torch.tensor([[0.0, 0.0, -1.0]], dtype=torch.float32, device="cuda")
     ray_tmax = torch.tensor([10.0], dtype=torch.float32, device="cuda")

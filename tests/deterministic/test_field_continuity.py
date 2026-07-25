@@ -29,15 +29,14 @@ import numpy as np
 import pytest
 import torch
 
-from witwin.channel import (
-    PerfectConductor,
-    ReceiverGrid,
-    Scene,
-    Structure,
-    Transmitter,
+from tests.support.core_world import (
+    make_mesh_structure,
+    make_receiver_grid,
+    make_transmitter,
 )
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
+from witwin.core import PhysicalMaterial, Scene
 
 
 _FREQUENCY_HZ = 5.0e9
@@ -76,9 +75,18 @@ def _cube_mesh() -> tuple[torch.Tensor, torch.Tensor]:
     )
     faces = torch.tensor(
         [
-            [0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7],
-            [0, 1, 5], [0, 5, 4], [1, 2, 6], [1, 6, 5],
-            [2, 3, 7], [2, 7, 6], [3, 0, 4], [3, 4, 7],
+            [0, 2, 1],
+            [0, 3, 2],
+            [4, 5, 6],
+            [4, 6, 7],
+            [0, 1, 5],
+            [0, 5, 4],
+            [1, 2, 6],
+            [1, 6, 5],
+            [2, 3, 7],
+            [2, 7, 6],
+            [3, 0, 4],
+            [3, 4, 7],
         ],
         dtype=torch.int32,
     )
@@ -95,16 +103,16 @@ def _build_scene(x_values: np.ndarray, y_values: np.ndarray) -> Scene:
     x = np.asarray(x_values, dtype=np.float64)
     y = np.asarray(y_values, dtype=np.float64)
     vertices, faces = _cube_mesh()
-    structure = Structure(
+    structure = make_mesh_structure(
         vertices=vertices,
         faces=faces,
-        material=PerfectConductor(name="pec"),
+        material=PhysicalMaterial.perfect_conductor(name="pec"),
         name="cube-1",
         surface_id=1,
     )
     dx = float(x[1] - x[0]) if x.size > 1 else 1.0
     dy = float(y[1] - y[0]) if y.size > 1 else 1.0
-    grid = ReceiverGrid(
+    grid = make_receiver_grid(
         origin=torch.tensor([float(x[0]), float(y[0]), _PLANE_Z]),
         x_axis=torch.tensor([1.0, 0.0, 0.0]),
         y_axis=torch.tensor([0.0, 1.0, 0.0]),
@@ -114,14 +122,13 @@ def _build_scene(x_values: np.ndarray, y_values: np.ndarray) -> Scene:
     )
     return Scene(
         structures=[structure],
-        transmitters=[
-            Transmitter(
+        endpoints=[
+            make_transmitter(
                 position=torch.tensor(list(_TX_POSITION)),
                 polarization=torch.tensor(list(_TX_POLARIZATION)),
-            )
+            ),
+            grid,
         ],
-        receivers=[grid],
-        frequency=_FREQUENCY_HZ,
         metadata={"fullwave_validation_case": "single_cube-metal"},
     )
 
@@ -150,6 +157,7 @@ def _solve_maps(
             export_paths=True,
             diagnostics=True,
         ),
+        reference_frequency_hz=_FREQUENCY_HZ,
     )
     field = result.field.detach().cpu().numpy()[0]
     component = {

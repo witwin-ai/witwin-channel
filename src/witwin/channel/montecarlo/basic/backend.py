@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 
 from typing import TYPE_CHECKING
-from witwin.channel.core.ad_geometry import (
+from witwin.channel.scene.ad_geometry import (
     receiver_positions_ad,
     transmitter_positions_ad,
 )
@@ -24,7 +24,7 @@ from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridg
 from witwin.channel.propagation.topology.kernels.blocks import path_los_export
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+    from witwin.channel.scene.endpoints import SolverScene as Scene
 
 __all__ = [
     "_LIGHT_SPEED_M_PER_S",

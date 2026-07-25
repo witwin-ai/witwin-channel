@@ -12,16 +12,22 @@ import math
 import pytest
 import torch
 
-from witwin.channel import (
+from tests.support.core_world import (
+    make_mesh_structure,
+    make_receiver,
+    make_receiver_grid,
+    make_transmitter,
+)
+from witwin.core import (
+    MaterialLayer,
+    PhysicalMaterial,
     ReceiverGrid,
-    ReceiverPoint,
     Scene,
     Structure,
-    Transmitter,
+    SurfaceRoughness,
 )
-from witwin.channel.core.kernels.extension import build_info
-from witwin.channel.core.materials import Layer, PhysicalSurface, Roughness
-from witwin.channel.montecarlo.basic import Config, solve
+from witwin.channel.deployment import build_info
+from witwin.channel.montecarlo.basic import Config, solve as solve_basic
 from witwin.channel.scattering import build_kirchhoff_table, eval_bsdf
 
 pytestmark = pytest.mark.skipif(
@@ -41,27 +47,41 @@ _TX = torch.tensor([0.0, 0.0, 0.0])
 _RX = torch.tensor([0.5, 1.0, 0.3])
 
 
+def _solve(scene: Scene, config: Config):
+    return solve_basic(scene, config, reference_frequency_hz=_FREQUENCY)
+
+
 def _require_native() -> None:
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native scattering is not built")
 
 
-def _roughness(sigma_h: float = _SIGMA_H) -> Roughness:
-    return Roughness(rms_height_m=sigma_h, corr_length_x_m=_CORR, corr_length_y_m=_CORR)
+def _roughness(sigma_h: float = _SIGMA_H) -> SurfaceRoughness:
+    return SurfaceRoughness(
+        rms_height_m=sigma_h,
+        correlation_length_x_m=_CORR,
+        correlation_length_y_m=_CORR,
+    )
 
 
-def _material(roughness: Roughness | None) -> PhysicalSurface:
-    return PhysicalSurface(
-        layers=(Layer(thickness_m=_THICKNESS, eps_r=_EPS_R, sigma_e=_SIGMA_E),),
+def _material(roughness: SurfaceRoughness | None) -> PhysicalMaterial:
+    return PhysicalMaterial(
+        layers=(
+            MaterialLayer(
+                thickness_m=_THICKNESS,
+                eps_r=_EPS_R,
+                sigma_e=_SIGMA_E,
+            ),
+        ),
         roughness_front=roughness,
         name="wall-material",
     )
 
 
 def _wall(
-    material: PhysicalSurface, *, x: float = 2.5, surface_id: int = 1
+    material: PhysicalMaterial, *, x: float = 2.5, surface_id: int = 1
 ) -> Structure:
-    return Structure(
+    return make_mesh_structure(
         vertices=torch.tensor(
             [[x, -4.0, -4.0], [x, 4.0, -4.0], [x, -4.0, 4.0], [x, 4.0, 4.0]]
         ),
@@ -73,7 +93,7 @@ def _wall(
 
 
 def _single_cell_grid() -> ReceiverGrid:
-    return ReceiverGrid(
+    return make_receiver_grid(
         origin=_RX,
         x_axis=torch.tensor([0.0, 1.0, 0.0]),
         y_axis=torch.tensor([0.0, 0.0, 1.0]),
@@ -85,9 +105,10 @@ def _single_cell_grid() -> ReceiverGrid:
 def _grid_scene(structures, grid: ReceiverGrid | None = None) -> Scene:
     return Scene(
         structures=structures,
-        transmitters=[Transmitter(position=_TX)],
-        receivers=[grid if grid is not None else _single_cell_grid()],
-        frequency=_FREQUENCY,
+        endpoints=[
+            make_transmitter(_TX),
+            grid if grid is not None else _single_cell_grid(),
+        ],
     )
 
 
@@ -140,7 +161,7 @@ def _quadrature_reference_unpolarized() -> float:
 def test_basic_scattering_map_matches_area_quadrature_reference():
     _require_native()
     reference = _quadrature_reference_unpolarized()
-    result = solve(
+    result = _solve(
         _grid_scene([_wall(_material(_roughness()))]),
         Config(samples=65_536, seed=5, components={"scattering"}),
     )
@@ -174,24 +195,24 @@ def test_basic_smooth_limit_and_energy_bound():
     _require_native()
     scattering_config = Config(samples=32_768, seed=5, components={"scattering"})
     rough_scattering = float(
-        solve(
+        _solve(
             _grid_scene([_wall(_material(_roughness()))]), scattering_config
         ).component_power["scattering"]
     )
     tiny_scattering = float(
-        solve(
+        _solve(
             _grid_scene([_wall(_material(_roughness(sigma_h=1.0e-6)))]),
             scattering_config,
         ).component_power["scattering"]
     )
     reflection_config = Config(samples=16_384, seed=5, components={"reflection"})
     smooth_reflection = float(
-        solve(_grid_scene([_wall(_material(None))]), reflection_config).component_power[
-            "reflection"
-        ]
+        _solve(
+            _grid_scene([_wall(_material(None))]), reflection_config
+        ).component_power["reflection"]
     )
     rough_reflection = float(
-        solve(
+        _solve(
             _grid_scene([_wall(_material(_roughness()))]), reflection_config
         ).component_power["reflection"]
     )
@@ -209,15 +230,15 @@ def test_basic_scattering_is_seed_reproducible():
     _require_native()
     scene = _grid_scene([_wall(_material(_roughness()))])
     config = Config(samples=8192, seed=11, components={"scattering"})
-    first = solve(scene, config)
-    second = solve(scene, config)
+    first = _solve(scene, config)
+    second = _solve(scene, config)
     torch.testing.assert_close(
         first.component_maps["scattering"],
         second.component_maps["scattering"],
         rtol=0.0,
         atol=0.0,
     )
-    other = solve(scene, Config(samples=8192, seed=12, components={"scattering"}))
+    other = _solve(scene, Config(samples=8192, seed=12, components={"scattering"}))
     assert not torch.equal(
         first.component_maps["scattering"], other.component_maps["scattering"]
     )
@@ -231,7 +252,7 @@ def test_basic_results_unchanged_when_scattering_not_requested():
     because its atomic accumulation order varies with the BVH build."""
 
     _require_native()
-    grid = ReceiverGrid(
+    grid = make_receiver_grid(
         origin=torch.tensor([0.5, -1.0, -0.5]),
         x_axis=torch.tensor([0.0, 1.0, 0.0]),
         y_axis=torch.tensor([0.0, 0.0, 1.0]),
@@ -240,12 +261,12 @@ def test_basic_results_unchanged_when_scattering_not_requested():
     )
     config = Config(samples=4096, seed=7, max_depth=2, components={"los", "reflection"})
     rough_scene = _grid_scene([_wall(_material(_roughness()))], grid)
-    rough_run = solve(rough_scene, config)
-    rough_rerun = solve(rough_scene, config)
+    rough_run = _solve(rough_scene, config)
+    rough_rerun = _solve(rough_scene, config)
     torch.testing.assert_close(
         rough_run.path_gain, rough_rerun.path_gain, rtol=0.0, atol=0.0
     )
-    smooth_run = solve(_grid_scene([_wall(_material(None))], grid), config)
+    smooth_run = _solve(_grid_scene([_wall(_material(None))], grid), config)
     torch.testing.assert_close(
         rough_run.path_gain, smooth_run.path_gain, rtol=1.0e-6, atol=1.0e-15
     )
@@ -265,10 +286,12 @@ def test_basic_scattering_requires_unobstructed_incident_segment():
     through-wall incident paths)."""
 
     _require_native()
-    from witwin.channel.core.materials import PerfectConductor
-
-    blocker = _wall(PerfectConductor(), x=1.5, surface_id=2)
-    result = solve(
+    blocker = _wall(
+        PhysicalMaterial.perfect_conductor(),
+        x=1.5,
+        surface_id=2,
+    )
+    result = _solve(
         _grid_scene([_wall(_material(_roughness())), blocker]),
         Config(samples=8192, seed=5, components={"scattering"}),
     )
@@ -281,11 +304,9 @@ def test_basic_point_receivers_report_zero_scattering_power():
     _require_native()
     scene = Scene(
         structures=[_wall(_material(_roughness()))],
-        transmitters=[Transmitter(position=_TX)],
-        receivers=[ReceiverPoint(position=_RX)],
-        frequency=_FREQUENCY,
+        endpoints=[make_transmitter(_TX), make_receiver(_RX)],
     )
-    result = solve(
+    result = _solve(
         scene, Config(samples=1024, seed=5, components={"los", "scattering"})
     )
     # MC basic carries scattering on grid maps only; point receivers report

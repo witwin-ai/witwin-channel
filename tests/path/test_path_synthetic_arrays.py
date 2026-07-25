@@ -3,23 +3,52 @@ import math
 import pytest
 import torch
 
-from witwin.channel import (
-    AntennaArray,
-    AntennaPattern,
-    ReceiverPoint,
-    Scene,
-    Transmitter,
-    capabilities,
-)
+from tests.support.core_world import make_receiver, make_transmitter
+from witwin.channel import capabilities
 from witwin.channel.path import (
     Config,
     PathResult,
     RaggedPathSoA,
-    pack_synthetic_arrays,
     solve,
 )
+from witwin.channel.path.arrays import pack_synthetic_arrays
 from witwin.channel.path import solver as path_solver
-from witwin.channel.core.antenna import apply_endpoint_weights
+from witwin.channel.scene.antenna import apply_endpoint_weights
+from witwin.channel.scene.endpoints import _ReceiverPointView, _TransmitterView
+from witwin.core import AntennaPattern, Scene
+
+
+def _ula(num_antennas: int, spacing_m: float, *, axis: str = "x") -> torch.Tensor:
+    positions = torch.zeros((num_antennas, 3), dtype=torch.float32)
+    offsets = torch.arange(num_antennas, dtype=torch.float32)
+    offsets -= 0.5 * (num_antennas - 1)
+    positions[:, {"x": 0, "y": 1, "z": 2}[axis]] = offsets * spacing_m
+    return positions
+
+
+def _ura(
+    rows: int,
+    columns: int,
+    spacing_m: tuple[float, float],
+    *,
+    axes: tuple[str, str] = ("x", "y"),
+) -> torch.Tensor:
+    positions = torch.zeros((rows * columns, 3), dtype=torch.float32)
+    row = torch.arange(rows, dtype=torch.float32) - 0.5 * (rows - 1)
+    column = torch.arange(columns, dtype=torch.float32) - 0.5 * (columns - 1)
+    row_grid, column_grid = torch.meshgrid(row, column, indexing="ij")
+    axis_ids = {"x": 0, "y": 1, "z": 2}
+    positions[:, axis_ids[axes[0]]] = row_grid.reshape(-1) * spacing_m[0]
+    positions[:, axis_ids[axes[1]]] = column_grid.reshape(-1) * spacing_m[1]
+    return positions
+
+
+def _solver_transmitter(position, **kwargs) -> _TransmitterView:
+    return _TransmitterView(make_transmitter(position, **kwargs))
+
+
+def _solver_receiver(position, **kwargs) -> _ReceiverPointView:
+    return _ReceiverPointView(make_receiver(position, **kwargs))
 
 
 def _centre_result() -> PathResult:
@@ -50,12 +79,12 @@ def test_synthetic_array_packing_preserves_paths_and_adds_steering_phase():
         _centre_result(),
         frequency_hz=299_792_458.0,
         transmitters=[
-            Transmitter(
-                position=torch.zeros(3),
-                array=AntennaArray.ula(2, 0.5),
+            _solver_transmitter(
+                torch.zeros(3),
+                element_positions=_ula(2, 0.5),
             )
         ],
-        receivers=[ReceiverPoint(position=torch.ones(3))],
+        receivers=[_solver_receiver(torch.ones(3))],
     )
 
     assert result.a.shape == (1, 1, 1, 2, 1, 1)
@@ -74,12 +103,12 @@ def test_synthetic_ura_is_row_major_and_uses_both_local_axes():
         _centre_result(),
         frequency_hz=299_792_458.0,
         transmitters=[
-            Transmitter(
-                position=torch.zeros(3),
-                array=AntennaArray.ura(2, 2, (0.5, 0.5)),
+            _solver_transmitter(
+                torch.zeros(3),
+                element_positions=_ura(2, 2, (0.5, 0.5)),
             )
         ],
-        receivers=[ReceiverPoint(position=torch.ones(3))],
+        receivers=[_solver_receiver(torch.ones(3))],
     )
 
     torch.testing.assert_close(
@@ -95,24 +124,24 @@ def test_rotated_directional_pattern_is_evaluated_in_endpoint_local_frame():
         _centre_result(),
         frequency_hz=1.0e9,
         transmitters=[
-            Transmitter(
-                position=torch.zeros(3),
+            _solver_transmitter(
+                torch.zeros(3),
                 pattern=AntennaPattern("horizontal"),
             )
         ],
-        receivers=[ReceiverPoint(position=torch.ones(3))],
+        receivers=[_solver_receiver(torch.ones(3))],
     )
     rotated = pack_synthetic_arrays(
         _centre_result(),
         frequency_hz=1.0e9,
         transmitters=[
-            Transmitter(
-                position=torch.zeros(3),
+            _solver_transmitter(
+                torch.zeros(3),
                 orientation=torch.tensor([math.pi / 2.0, 0.0, 0.0]),
                 pattern=AntennaPattern("horizontal"),
             )
         ],
-        receivers=[ReceiverPoint(position=torch.ones(3))],
+        receivers=[_solver_receiver(torch.ones(3))],
     )
 
     torch.testing.assert_close(unrotated.a, torch.zeros_like(unrotated.a))
@@ -134,26 +163,25 @@ def test_multi_endpoint_weights_beamform_cir_cfr_and_taps_without_mutating_raw_h
     )
     scene = Scene(
         structures=[],
-        transmitters=[
-            Transmitter(
-                position=torch.tensor([0.0, float(index), 0.0]),
-                array=AntennaArray.ula(2, 0.05, axis="y"),
-                precoding=tx_weights[index],
+        endpoints=[
+            make_transmitter(
+                torch.tensor([0.0, float(index), 0.0]),
+                element_positions=_ula(2, 0.05, axis="y"),
+                weights=tx_weights[index],
+            )
+            for index in range(2)
+        ]
+        + [
+            make_receiver(
+                torch.tensor([20.0, float(index), 0.0]),
+                element_positions=_ura(1, 2, (0.05, 0.05), axes=("y", "z")),
+                weights=rx_weights[index],
             )
             for index in range(2)
         ],
-        receivers=[
-            ReceiverPoint(
-                position=torch.tensor([20.0, float(index), 0.0]),
-                array=AntennaArray.ura(1, 2, (0.05, 0.05), axes=("y", "z")),
-                combining=rx_weights[index],
-            )
-            for index in range(2)
-        ],
-        frequency=1.0e9,
     )
 
-    result = solve(scene, Config(components={"los"}))
+    result = solve(scene, Config(components={"los"}), reference_frequency_hz=1.0e9)
     raw = result.a.clone()
     beamformed = result.beamform()
     frequencies = torch.tensor([0.0, 1.0e6], device=result.a.device)
@@ -184,24 +212,21 @@ def test_explicit_array_traces_exact_per_element_free_space_distance():
         pytest.skip("CUDA is required for explicit path topology")
     scene = Scene(
         structures=[],
-        transmitters=[
-            Transmitter(
-                position=torch.zeros(3),
-                array=AntennaArray.ula(2, 0.5),
+        endpoints=[
+            make_transmitter(
+                torch.zeros(3),
+                element_positions=_ula(2, 0.5),
                 synthetic_array=False,
-            )
-        ],
-        receivers=[
-            ReceiverPoint(
-                position=torch.tensor([0.0, 2.0, 0.0]),
-                array=AntennaArray.ula(2, 0.5),
+            ),
+            make_receiver(
+                torch.tensor([0.0, 2.0, 0.0]),
+                element_positions=_ula(2, 0.5),
                 synthetic_array=False,
-            )
+            ),
         ],
-        frequency=1.0e9,
     )
 
-    result = solve(scene, Config(components={"los"}))
+    result = solve(scene, Config(components={"los"}), reference_frequency_hz=1.0e9)
 
     assert result.a.shape == (1, 2, 1, 2, 1, 1)
     expected_distance = torch.tensor(
@@ -221,25 +246,23 @@ def test_explicit_array_traces_exact_per_element_free_space_distance():
 def test_synthetic_and_explicit_arrays_converge_in_the_far_field():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for explicit path topology")
-    array = AntennaArray.ula(2, 0.01, axis="y")
+    element_positions = _ula(2, 0.01, axis="y")
 
     def solve_mode(synthetic: bool) -> PathResult:
         return solve(
             Scene(
                 structures=[],
-                transmitters=[
-                    Transmitter(
-                        position=torch.zeros(3),
-                        array=array,
+                endpoints=[
+                    make_transmitter(
+                        torch.zeros(3),
+                        element_positions=element_positions,
                         synthetic_array=synthetic,
-                    )
+                    ),
+                    make_receiver(torch.tensor([1000.0, 100.0, 0.0])),
                 ],
-                receivers=[
-                    ReceiverPoint(position=torch.tensor([1000.0, 100.0, 0.0]))
-                ],
-                frequency=1.0e9,
             ),
             Config(components={"los"}),
+            reference_frequency_hz=1.0e9,
         )
 
     synthetic = solve_mode(True)
@@ -253,24 +276,29 @@ def test_synthetic_and_explicit_arrays_converge_in_the_far_field():
 def test_unsupported_synthetic_layout_fails_before_native_solve(monkeypatch):
     scene = Scene(
         structures=[],
-        transmitters=[
-            Transmitter(position=torch.zeros(3), array=AntennaArray.single()),
-            Transmitter(
-                position=torch.ones(3),
-                array=AntennaArray.ula(2, 0.5),
+        endpoints=[
+            make_transmitter(torch.zeros(3), element_positions=torch.zeros((1, 3))),
+            make_transmitter(
+                torch.ones(3),
+                element_positions=_ula(2, 0.5),
             ),
+            make_receiver(torch.tensor([0.0, 2.0, 0.0])),
         ],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 2.0, 0.0]))],
-        frequency=1.0e9,
     )
     monkeypatch.setattr(
         path_solver,
         "_solve_base",
-        lambda *_args, **_kwargs: pytest.fail("native solve ran before array preflight"),
+        lambda *_args, **_kwargs: pytest.fail(
+            "native solve ran before array preflight"
+        ),
     )
 
     with pytest.raises(ValueError, match="same antenna count"):
-        solve(scene, Config(components={"los"}))
+        solve(
+            scene,
+            Config(components={"los"}),
+            reference_frequency_hz=1.0e9,
+        )
 
 
 @pytest.mark.parametrize("synthetic_array", [True, False])
@@ -279,27 +307,32 @@ def test_partial_endpoint_weights_fail_before_native_solve(
 ):
     scene = Scene(
         structures=[],
-        transmitters=[
-            Transmitter(
-                position=torch.zeros(3),
-                array=AntennaArray.ula(2, 0.5),
+        endpoints=[
+            make_transmitter(
+                torch.zeros(3),
+                element_positions=_ula(2, 0.5),
                 synthetic_array=synthetic_array,
-                precoding=torch.ones(2, dtype=torch.complex64),
+                weights=torch.ones(2, dtype=torch.complex64),
             ),
-            Transmitter(
-                position=torch.ones(3),
-                array=AntennaArray.ula(2, 0.5),
+            make_transmitter(
+                torch.ones(3),
+                element_positions=_ula(2, 0.5),
                 synthetic_array=synthetic_array,
             ),
+            make_receiver(torch.tensor([0.0, 2.0, 0.0])),
         ],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 2.0, 0.0]))],
-        frequency=1.0e9,
     )
     monkeypatch.setattr(
         path_solver,
         "_solve_base",
-        lambda *_args, **_kwargs: pytest.fail("native solve ran before weight preflight"),
+        lambda *_args, **_kwargs: pytest.fail(
+            "native solve ran before weight preflight"
+        ),
     )
 
     with pytest.raises(ValueError, match="precoding must be configured on every"):
-        solve(scene, Config(components={"los"}))
+        solve(
+            scene,
+            Config(components={"los"}),
+            reference_frequency_hz=1.0e9,
+        )

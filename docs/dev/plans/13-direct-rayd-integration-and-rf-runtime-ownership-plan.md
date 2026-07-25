@@ -1,16 +1,16 @@
 # Plan 13 — 直接 RayD 集成、RayDN 退役与 RF runtime 所有权迁移
 
-**状态：** STABLE RECOVERY ACCEPTANCE COMPLETE / OVERALL EVIDENCE CLOSURE PARTIAL
-（2026-07-22）；ADR-032 已接受并选择恢复
+**状态：** PRODUCTION ARCHITECTURE COMPLETE（2026-07-23）；ADR-032 已接受并选择恢复
 `e7d82d2` 的 `O(K)` compact production boundary。ADR-029 已因 Munich E2E/显存/吞吐
-回归被 production supersede，仅保留 caller-free 实验；ADR-031 为 Proposed 且不进入公开
-API/production caller；ADR-030 reducer 保持 dormant，live activation deferred。Phase 8B、
+回归被 Superseded；ADR-031 已 Rejected；ADR-030 reducer 保持 Dormant。三者均不构成
+implementation、test、manifest 或 release 要求。Phase 8B、
 Phase 10A/10B、Phase 11A/11B、RayD legacy extern-C 删除和稳定 integration 命名保持完成，
 不回退已接受的 owner migration。Phase 12 已完成最小稳定恢复、nightly/release、
 wheel/PE/fingerprint 与 compact-baseline 性能验收；最终事实见
 `docs/dev/audit/phase13-adr032-stable-recovery-final-report.md`，未开发新的大功能。Plan 13
-仍不能整体标记完成：Phase 6C 原始 P→E 与 E→M 独立 comparative E2E/resource gate 尚无
-可审计证据；这项开放项不得由 Phase 12 compact 恢复数据替代或通过放宽阈值关闭。
+production architecture 已完成。Phase 6C 原始 P→E 与 E→M comparative reports 保留为
+archived historical evidence，不再是 implementation、test、manifest、release 或后续 Stage-I
+gate，也不触发 Plan 13 重验收。
 
 2026-07-22 packaging follow-up 将当前 RayD lock 前进到非数值打包提交
 `402262d3b0c07dffb9d51d1852abb97ab2280f2f`。显式 `RAYD_SOURCE_DIR` 仍具有最高优先级；
@@ -20,6 +20,21 @@ wheel/PE/fingerprint 与 compact-baseline 性能验收；最终事实见
 GitHub Actions 承担 publication gate。验收事实见
 `docs/dev/audit/phase13-rayd-package-source-discovery-acceptance.json`；这不修改或替代绑定 RayD
 `474c122` 的历史 Munich 数值证据。
+
+2026-07-23 Stage-I Phase 0A 将 dependency candidate 前进到正式轻量 tag `v0.7.0`
+（`49c58c4cb8212f6babb920cc88fb937509826cc5`，`rayd-torch==0.7.0`）。稳定
+`rayd/torch/integration.h` 仍为 API 6、identity `rayd.torch.integration` 和 SHA-256
+`57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14`；clean tag
+生成的完整 source manifest SHA-256 为
+`e2eb1a7577f906b3ab52e6345b039837228771c8f1582c9f821d0f2bb07d41b4`。
+该 tag 同时加入 automatic pure-CUDA tracing 和新的 CUDA fused
+visibility/reflection/diffraction/multipath implementations；这不是 packaging-only delta。
+ADR-035 已接受 RayD `TraceBackend::Auto` 在 RayD-owned OptiX 与 pure-CUDA native tracing
+之间选择：OptiX 是首选性能路径，missing OptiX 本身不再是 Channel capability failure；
+这不允许 Torch/CPU/Dr.Jit、retry、reduced-result 或 second-owner fallback。Phase 0A 只验收
+dependency/static compatibility；两条 native trace path 的完整 capability、数值、AD、launch/
+resource、性能和 wheel/fingerprint evidence 集中在 Phase 2/3 大模块 checkpoint。详见
+`docs/dev/audit/stage1-phase0a-rayd-0.7.0-dependency-baseline.json`。
 
 **计划日期：** 2026-07-18
 
@@ -863,8 +878,8 @@ wheel 留给已更新 GitHub Actions，不回写历史 release evidence。完整
 
 **实现状态：STABLE RECOVERY COMPLETE（2026-07-21）。** Phase 12 不再以“绝对无
 D2H”为目标。ADR-032 接受唯一新增、明确且可审计的 compact count D2H/sync boundary，恢复
-`e7d82d2` 的 `O(K)` production caller；ADR-029 已 production superseded，ADR-031 保持
-Proposed 且无公开 API/caller，ADR-030 reducer 保持 dormant。禁止在本阶段开发 GPU tiled
+`e7d82d2` 的 `O(K)` production caller；ADR-029 已 Superseded，ADR-031 已 Rejected，
+ADR-030 reducer 保持 Dormant。禁止在本阶段开发 GPU tiled
 EPC、incremental canonical merge、完整 exporter AD、CUDA Graph 或其他大功能。
 
 冻结的 Munich A/B/C 使用同一 RayD `474c122`、integration header SHA-256
@@ -934,11 +949,11 @@ P→E、E→M comparative gate。因此 stable recovery 可接受，但本计划
 | 20 | RayD | 经所有 consumer审计删除旧 extern-C API | 否 |
 | 21 | RayD | ADR-027 dormant batched penetration forward/tape/VJP/JVP | 否（边界/launch改变） |
 | 22 | Channel | ADR-027 enumerated与MC atomic switch/delete + native MC estimator | 否（边界/launch改变） |
-| 23 | Channel docs | ADR-030 dormant source-lane/pair-serial 设计与 direct-test 契约 | 是（dormant 决策） |
+| 23 | Channel docs | ADR-030 dormant source-lane/pair-serial 历史设计 | 是（历史决策） |
 | 24 | RayD | dormant `SourceLane` typed exporter layout + direct tests；compact 默认保持 | 否 |
 | 25 | Channel | dormant `deterministic_diffraction_pair_reduce` primal/VJP/JVP + manifests/tests | 否（caller-free） |
 | 26 | Channel experiment | ADR-029/031 A/B/C production candidate 与 measurement；B/C 失败，不作为 stable lineage | 是（失败实验） |
-| R1 | Channel docs | 接受 ADR-032；ADR-029 superseded、ADR-031 Proposed、ADR-030 live deferred | 否（治理恢复） |
+| R1 | Channel docs | 接受 ADR-032；ADR-029 Superseded、ADR-031 Rejected、ADR-030 Dormant | 否（治理恢复） |
 | R2 | Channel | 从 `e7d82d2` 原子恢复 `O(K)` compact caller 与 compact public schema；不删 dormant owners | 否（恢复已冻结行为） |
 | R3 | Channel | manifests/public snapshot/migration/caller inventory/no-partial-result 治理同步 | 否 |
 | R4 | 两仓 | compact exactness、Nsight、quick/cuda/nightly/release、wheel/fingerprint 最终证据 | 否 |
@@ -1092,8 +1107,8 @@ ADR-032 stable recovery 不回滚 RayD owner migration，也不删除已完成�
     ADR-029 capacity-shaped result 与 ADR-031 `Qr` 不在正式公开 API/production caller。
 12. compact owner 的 D2H/sync 完全显式且受 6 次/24 bytes Munich budget 约束；成功 reflection
     capacity/active=1，失败/overflow 不返回 partial 或 silent-truncated result。
-13. ADR-029/030/031 retained native operations caller-free；ADR-030 SourceLane/reducer 不分配
-    production `O(P*M)` workspace，不删除稳定 compact route。任何 live reconsideration 需独立 ADR。
+13. ADR-029/030/031 历史 native artifacts 不进入 production；它们不构成保留、测试、manifest
+    或 release 要求。任何 live reconsideration 需新的独立 ADR。
 14. Munich `<=76 ms` median、`>=13.8 solve/s`、`<=1.25 GiB` peak allocated、`>=1 GiB`
     physical headroom 和 24 logical PathTable fields bitwise exact 全部满足；不得只用局部 no-D2H
     或 stage timing 代替 E2E 验收。

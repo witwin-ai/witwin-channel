@@ -40,6 +40,21 @@ discrete-path oracle, under the following restrictions:
 - `montecarlo.basic` retains zero enumerated dependency. This exception is bound
   to `montecarlo.bdpt.pipeline` alone.
 
+ADR-034 adds one separate, named general-service caller:
+`propagation.consumer.service` may call the public
+`evaluate_enumerated_paths` entry to obtain an internal evaluated batch before
+the owning native consumer projection. It is subject to the same read-only,
+black-box restrictions as BDPT and may not add consumer or Radar policy to the
+enumerated engine. This is a Channel-owned solver-neutral service, not a Radar
+exception.
+
+Importing the public consumer module does not eagerly import or re-export
+`evaluate_enumerated_paths`, `EvaluatedPaths`, or any
+`propagation.enumerated.*` defining module; the service resolves its internal
+provider only when evaluation is requested. Path and Deterministic keep their
+existing internal route, and the single named BDPT exception above is
+unchanged.
+
 ## Rationale
 
 Duplicating the enumerated evaluation inside BDPT would create a parallel
@@ -60,6 +75,11 @@ module before classification, so the BDPT edge is scored as
 records this ADR as its justification. The allowlist keeps the monotonic-decrease
 shape: the entry can only be removed when the dependency is resolved, and no
 other source may inherit it.
+
+The consumer edge is governed as an accepted positive boundary, not inherited
+allowlist debt. A static contract fixes its exact source and target and rejects
+solver imports, public re-export of internal contracts, or any additional
+consumer-to-enumerated caller.
 
 ## Revisit condition
 

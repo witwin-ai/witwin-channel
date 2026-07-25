@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 from tools.refactor_baseline import python_body_hashes
-from witwin.channel.core import scene_tensors
+from witwin.channel.scene import tensors as scene_tensors
 from witwin.channel.propagation.fields import evaluation
 from witwin.channel.propagation.geometry import reevaluate
 from witwin.channel.runtime import autograd_contracts

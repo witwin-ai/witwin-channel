@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from witwin.channel.core.kernels.metadata import AdLaunchLedger, make_metadata
+from witwin.channel.runtime.kernel_metadata import AdLaunchLedger, make_metadata
 from witwin.channel.capabilities import (
     capabilities,
     config_metadata,
     serialize_config,
 )
-from witwin.channel.core.components import component_availability_status
+from witwin.channel.components import component_availability_status
 
 from .config import Config
 

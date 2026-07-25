@@ -60,6 +60,7 @@ def test_engine_signature_ownership_and_dependency_boundary():
         "frequency_value",
         "coupled_rx_streaming",
         "defer_capacity_terminal",
+        "endpoint_tensors",
     ]
     assert (
         signature.parameters["frequency_value"].kind is inspect.Parameter.KEYWORD_ONLY
@@ -108,15 +109,13 @@ def test_engine_preserves_component_order_los_fast_path_and_field_calls():
     assert calls["evaluated_paths_from_result"][0] < calls["concatenate_path_blocks"][0]
 
 
-def test_typed_block_constructor_preserves_select_gather_result_order():
+def test_typed_block_constructor_uses_single_canonical_compact_owner():
     definition = _function(export, "evaluated_paths_from_block")
     calls = _named_call_lines(definition)
 
     assert (
-        calls["_canonical_selection_order"][0]
-        < calls["deterministic_gather_topology_block"][0]
-    )
-    assert (
-        calls["deterministic_gather_topology_block"][0]
+        calls["enumerated_canonical_compact"][0]
         < calls["evaluated_paths_from_result"][0]
     )
+    assert "_canonical_selection_order" not in calls
+    assert "deterministic_gather_topology_block" not in calls

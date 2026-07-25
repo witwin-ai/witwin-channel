@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel.core.diffraction_geometry import (
+from witwin.channel.propagation.geometry.edge_state import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
     diffraction_edge_geometry as _diffraction_edge_geometry,
 )
@@ -43,7 +43,7 @@ from witwin.channel.propagation.topology.kernels import (
 )
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+    from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
 @dataclass(frozen=True, slots=True)

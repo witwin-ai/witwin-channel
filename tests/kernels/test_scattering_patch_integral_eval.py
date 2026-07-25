@@ -5,8 +5,8 @@ import math
 import pytest
 import torch
 
-from witwin.channel.core.materials import PhaseScreen
-from witwin.channel.physics.conventions import C0
+from witwin.core import PhaseScreen
+from witwin.channel.constants import C0
 from witwin.channel.scattering import PhaseScreenRuntime
 from witwin.channel.scattering.kernels import functional as ops
 from witwin.channel.runtime import symbols

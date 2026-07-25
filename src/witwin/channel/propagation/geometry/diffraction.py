@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import torch
 
-from witwin.channel.core.diffraction_geometry import (
+from witwin.channel.propagation.geometry.edge_state import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
     diffraction_edge_geometry as _diffraction_edge_geometry,
 )

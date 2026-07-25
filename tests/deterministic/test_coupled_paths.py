@@ -12,7 +12,7 @@ import pytest
 import torch
 
 from tests.support.scenes import coupled_wall_wedge_scene
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
 from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
 
@@ -41,6 +41,7 @@ def test_coupled_off_is_deterministic_and_omits_coupled():
     default_result = solve(
         scene,
         Config(components=_BASE_COMPONENTS, max_depth=2, export_paths=True),
+        reference_frequency_hz=3.0e9,
     )
     explicit_off = solve(
         scene,
@@ -50,6 +51,7 @@ def test_coupled_off_is_deterministic_and_omits_coupled():
             coupled_paths=False,
             export_paths=True,
         ),
+        reference_frequency_hz=3.0e9,
     )
 
     torch.testing.assert_close(
@@ -94,11 +96,11 @@ def test_coupled_on_exports_finite_nonzero_coupled_component():
             coupled_paths=True,
             export_paths=True,
         ),
+        reference_frequency_hz=3.0e9,
     )
 
     assert (
-        result.metadata["coupled_paths"]["geometry"]
-        == "native_1r1d_reciprocal_plus_dd"
+        result.metadata["coupled_paths"]["geometry"] == "native_1r1d_reciprocal_plus_dd"
     )
     assert result.metadata["coupled_paths"]["coefficient"] == "unified_complex3_jones"
     assert result.metadata["counts"]["components"].get("coupled", 0) > 0
@@ -144,6 +146,7 @@ def test_coupled_on_runs_under_ad_modes(ad_mode):
             coupled_paths=True,
             ad_mode=ad_mode,
         ),
+        reference_frequency_hz=3.0e9,
     )
     assert "coupled" in result.component_fields
     assert torch.isfinite(result.field.real).all()
@@ -173,7 +176,7 @@ def test_coupled_candidate_budget_fails_loudly_before_launch(monkeypatch):
         coupled_candidate_limit=1,
     )
     with pytest.raises(RuntimeError, match="exceeding coupled_candidate_limit=1"):
-        solve(coupled_wall_wedge_scene(), config)
+        solve(coupled_wall_wedge_scene(), config, reference_frequency_hz=3.0e9)
 
 
 def test_coupled_dd_candidate_budget_fails_loudly_before_launch(monkeypatch):
@@ -208,7 +211,7 @@ def test_coupled_dd_candidate_budget_fails_loudly_before_launch(monkeypatch):
         coupled_candidate_limit=1,
     )
     with pytest.raises(RuntimeError, match="exceeding coupled_candidate_limit=1"):
-        solve(coupled_wall_wedge_scene(), config)
+        solve(coupled_wall_wedge_scene(), config, reference_frequency_hz=3.0e9)
 
 
 def test_coupled_on_double_diffraction_keeps_coupled_component_finite_nonzero():
@@ -231,6 +234,7 @@ def test_coupled_on_double_diffraction_keeps_coupled_component_finite_nonzero():
             coupled_paths=True,
             export_paths=True,
         ),
+        reference_frequency_hz=3.0e9,
     )
 
     assert "coupled" in result.component_fields

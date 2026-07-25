@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import torch
+from witwin.core import Scene, SceneSnapshot
 
 from witwin.channel import build_info
-from witwin.channel.core.antenna import validate_scalar_endpoint_features
+from witwin.channel.scene.antenna import validate_scalar_endpoint_features
 from witwin.channel.materials.evaluation import (
     _require_frequency_ad_constant_materials,
 )
@@ -20,9 +19,12 @@ from .pipeline import (
 )
 from .result import Result
 from .sampling import make_cuda_generator
-
-if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+from witwin.channel.scene.compiler import compile as compile_scene
+from witwin.channel.scene.endpoints import (
+    _endpoint_views,
+    _validate_scalar_endpoint_boundary,
+    bind_solver_scene,
+)
 
 __all__ = [
     "_enforce_workspace_budget",
@@ -38,11 +40,26 @@ __all__ = [
 ]
 
 
-def solve(scene: Scene, config: Config) -> Result:
+def solve(
+    scene: Scene | SceneSnapshot,
+    config: Config,
+    *,
+    reference_frequency_hz,
+) -> Result:
     """Run the Monte Carlo Basic solver pipeline."""
 
+    endpoint_views = _endpoint_views(scene)
+    _validate_scalar_endpoint_boundary(endpoint_views)
+    validate_scalar_endpoint_features(
+        tuple(view for view in endpoint_views if view.source.role == "tx"),
+        tuple(view for view in endpoint_views if view.source.role == "rx"),
+        solver="Monte Carlo basic",
+    )
+    compiled = compile_scene(
+        scene, reference_frequency_hz=reference_frequency_hz
+    )
     return solve_pipeline(
-        scene,
+        bind_solver_scene(compiled),
         config,
         build_info_fn=build_info,
         make_cuda_generator_fn=make_cuda_generator,

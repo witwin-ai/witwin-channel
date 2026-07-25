@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from witwin.channel.core.field_state import PHASE_CONVENTION
-from witwin.channel.core.kernels.metadata import make_metadata
+from witwin.channel.constants import PHASE_CONVENTION
+from witwin.channel.runtime.kernel_metadata import make_metadata
 
 from .config import Config
 

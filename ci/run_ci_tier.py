@@ -230,6 +230,19 @@ RELEASE_GATES = (
             "artifacts/release/solver-scaling.v1.json",
         ),
     ),
+    # Host-side compile cost against scene size. The solver benchmarks above
+    # compile one scene once, outside their timing loops, so none of them can
+    # see what a per-solve compile costs on a large scene.
+    Gate(
+        "release.compile-scaling",
+        (
+            "benchmarks/bench_compile_scaling.py",
+            "--sizes",
+            "256,1024",
+            "--output",
+            "artifacts/release/compile-scaling.v1.json",
+        ),
+    ),
     Gate(
         "release.fresh-checkout-wheel-build",
         (

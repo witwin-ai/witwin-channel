@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import torch
+from witwin.channel.scene.endpoints import require_compiled
 
 from witwin.channel.materials.evaluation import (
     _require_frequency_ad_constant_materials,
@@ -48,6 +49,9 @@ from witwin.channel.propagation.topology.export import (
 from witwin.channel.propagation.topology.kernels import (
     primitives as topology_primitives,
 )
+from witwin.channel.propagation.topology.kernels.canonical_compact import (
+    enumerated_exact_pair_metadata,
+)
 from witwin.channel.runtime.capacity import (
     SolveCapacityTransaction,
     create_solve_capacity_transaction,
@@ -58,7 +62,67 @@ from witwin.channel.scene.tensors import (
 )
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+    from witwin.channel.scene.endpoints import SolverScene as Scene
+
+
+@dataclass(frozen=True, slots=True)
+class EnumeratedEndpointTensors:
+    """Explicit batch seam for solver-neutral propagation consumers."""
+
+    tx_positions: torch.Tensor
+    tx_power: torch.Tensor
+    tx_polarizations: torch.Tensor
+    rx_positions: torch.Tensor
+    rx_polarizations: torch.Tensor
+    tx_stable_ids: torch.Tensor | None = None
+    rx_stable_ids: torch.Tensor | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.tx_positions, torch.Tensor):
+            raise TypeError("tx_positions must be a torch.Tensor")
+        device = self.tx_positions.device
+        entries = (
+            ("tx_positions", self.tx_positions, 2, (3,)),
+            ("tx_power", self.tx_power, 1, ()),
+            ("tx_polarizations", self.tx_polarizations, 2, (3,)),
+            ("rx_positions", self.rx_positions, 2, (3,)),
+            ("rx_polarizations", self.rx_polarizations, 2, (3,)),
+        )
+        for name, value, ndim, trailing_shape in entries:
+            if not isinstance(value, torch.Tensor):
+                raise TypeError(f"{name} must be a torch.Tensor")
+            if value.device != device or device.type != "cuda":
+                raise ValueError("endpoint tensors must share one CUDA device")
+            if value.dtype != torch.float32 or value.ndim != ndim:
+                raise TypeError(f"{name} must be a rank-{ndim} float32 tensor")
+            if trailing_shape and tuple(value.shape[1:]) != trailing_shape:
+                raise ValueError(f"{name} has an invalid trailing shape")
+        tx_count = int(self.tx_positions.shape[0])
+        rx_count = int(self.rx_positions.shape[0])
+        if self.tx_power.shape != (tx_count,):
+            raise ValueError("tx_power must have shape (num_sources,)")
+        if self.tx_polarizations.shape != (tx_count, 3):
+            raise ValueError("tx_polarizations must match tx_positions")
+        if self.rx_polarizations.shape != (rx_count, 3):
+            raise ValueError("rx_polarizations must match rx_positions")
+        if (self.tx_stable_ids is None) != (self.rx_stable_ids is None):
+            raise ValueError("endpoint stable IDs must be provided together")
+        if self.tx_stable_ids is not None:
+            assert self.rx_stable_ids is not None
+            for name, value, count in (
+                ("tx_stable_ids", self.tx_stable_ids, tx_count),
+                ("rx_stable_ids", self.rx_stable_ids, rx_count),
+            ):
+                if (
+                    value.device != device
+                    or value.dtype != torch.int64
+                    or value.ndim != 1
+                    or value.shape != (count,)
+                    or not value.is_contiguous()
+                ):
+                    raise ValueError(
+                        f"{name} must be contiguous CUDA int64 with shape ({count},)"
+                    )
 
 
 def _path_components(config: TopologyConfig) -> set[str]:
@@ -144,6 +208,7 @@ def evaluate_enumerated_paths(
     frequency_value: float | None = None,
     coupled_rx_streaming: bool = False,
     defer_capacity_terminal: bool = False,
+    endpoint_tensors: EnumeratedEndpointTensors | None = None,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     """Discover, select, and evaluate canonical enumerated propagation rows.
 
@@ -161,10 +226,23 @@ def evaluate_enumerated_paths(
 
     _require_defer_capacity_terminal(defer_capacity_terminal)
     device = torch.device("cuda")
-    tx_positions, tx_power = transmitter_tensors(scene, device=device)
-    tx_polarizations = transmitter_polarizations(scene, device=device)
-    rx_positions, _ = receiver_positions_and_layout(scene, device=device)
-    compiled = scene.compile()
+    if endpoint_tensors is None:
+        tx_positions, tx_power = transmitter_tensors(scene, device=device)
+        tx_polarizations = transmitter_polarizations(scene, device=device)
+        rx_positions, _ = receiver_positions_and_layout(scene, device=device)
+        rx_polarizations = None
+    else:
+        tx_positions = endpoint_tensors.tx_positions
+        tx_power = endpoint_tensors.tx_power
+        tx_polarizations = endpoint_tensors.tx_polarizations
+        rx_positions = endpoint_tensors.rx_positions
+        rx_polarizations = endpoint_tensors.rx_polarizations
+    field_tx_power = (
+        tx_power.detach()
+        if bool(getattr(config, "_detach_field_tx_power", False))
+        else tx_power
+    )
+    compiled = require_compiled(scene)
     # One host read of a tensor frequency for the whole export: discovery and
     # the field seam below share this detached scalar (audit M3). Callers
     # that already read it (the solver seams) pass it in.
@@ -315,18 +393,40 @@ def evaluate_enumerated_paths(
             evaluated,
             sidecars.execution,
             tx_positions,
-            tx_power,
+            field_tx_power,
             rx_positions,
             components=components,
             ad_mode=ad_mode,
             frequency_value=frequency_hz,
             isb_boundary_taper_width=isb_boundary_taper_width,
+            endpoint_tx_polarizations=(
+                tx_polarizations if endpoint_tensors is not None else None
+            ),
+            endpoint_rx_polarizations=rx_polarizations,
+            explicit_endpoint_geometry=endpoint_tensors is not None,
         )
         sidecars = replace(
             sidecars,
             execution=execution,
             capacity_execution=capacity_execution,
             capacity_transaction=capacity_transaction,
+            compact_metadata=enumerated_exact_pair_metadata(
+                evaluated.topology.tx_id,
+                evaluated.topology.rx_id,
+                pair_count=int(tx_positions.shape[0]) * int(rx_positions.shape[0]),
+                num_tx=int(tx_positions.shape[0]),
+                num_rx=int(rx_positions.shape[0]),
+                source_stable_ids=(
+                    endpoint_tensors.tx_stable_ids
+                    if endpoint_tensors is not None
+                    else None
+                ),
+                sink_stable_ids=(
+                    endpoint_tensors.rx_stable_ids
+                    if endpoint_tensors is not None
+                    else None
+                ),
+            ),
         )
         return _finish_capacity_boundary(
             evaluated,
@@ -349,13 +449,20 @@ def evaluate_enumerated_paths(
         paths,
         max_paths=config.max_paths,
         max_paths_scope=str(getattr(config, "max_paths_scope", "global")),
-        tx_count=len(scene.transmitters),
-        max_depth=config.max_depth,
+        tx_count=int(tx_positions.shape[0]),
+        rx_count=int(rx_positions.shape[0]),
+        max_depth=sequence_width,
         launch_count=launch_count,
         visibility_rejection_count=visibility_rejection_count,
         selected_edge_count=selected_edge_count,
         candidate_count=candidate_count,
         guardrail_count=guardrail_count,
+        source_stable_ids=(
+            endpoint_tensors.tx_stable_ids if endpoint_tensors is not None else None
+        ),
+        sink_stable_ids=(
+            endpoint_tensors.rx_stable_ids if endpoint_tensors is not None else None
+        ),
     )
     sidecars = replace(
         sidecars,
@@ -369,12 +476,17 @@ def evaluate_enumerated_paths(
         evaluated,
         sidecars.execution,
         tx_positions,
-        tx_power,
+        field_tx_power,
         rx_positions,
         components=components,
         ad_mode=ad_mode,
         frequency_value=frequency_hz,
         isb_boundary_taper_width=isb_boundary_taper_width,
+        endpoint_tx_polarizations=(
+            tx_polarizations if endpoint_tensors is not None else None
+        ),
+        endpoint_rx_polarizations=rx_polarizations,
+        explicit_endpoint_geometry=endpoint_tensors is not None,
     )
     sidecars = replace(sidecars, execution=execution)
     return _finish_capacity_boundary(

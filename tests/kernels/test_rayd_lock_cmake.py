@@ -30,7 +30,8 @@ def _run(
 
 def _rayd_source() -> Path:
     configured = os.environ.get("RAYD_SOURCE_DIR")
-    source = Path(configured) if configured else ROOT.parent.parent / "RayDi"
+    platform_root = ROOT.parent.parent if ROOT.parent.name == ".worktrees" else ROOT.parent
+    source = Path(configured) if configured else platform_root / "RayD"
     assert (source / ".git").exists(), f"locked RayD checkout is missing: {source}"
     return source
 

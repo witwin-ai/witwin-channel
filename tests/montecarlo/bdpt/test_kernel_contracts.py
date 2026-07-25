@@ -7,7 +7,7 @@ import sys
 
 import pytest
 
-from witwin.channel.core import scene as core_scene
+from witwin.core import scene as core_scene
 from witwin.channel.materials.kernels import contracts as material_contracts
 from witwin.channel.montecarlo.bdpt import endpoints
 from witwin.channel.montecarlo.bdpt import kernels
@@ -106,7 +106,7 @@ def test_bdpt_zero_matrix_has_one_neutral_owner():
 
     assert owner.__module__ == native_buffers.__name__
     assert maps.bdpt_zero_matrix is owner
-    assert core_scene.bdpt_zero_matrix is owner
+    assert not hasattr(core_scene, "bdpt_zero_matrix")
 
 
 @pytest.mark.parametrize("name", _SAMPLING_OWNER_NAMES)
@@ -151,6 +151,8 @@ def test_bdpt_callers_use_canonical_map_owners():
 def test_bdpt_public_solve_lazy_import_preserves_identity_and_pickle():
     code = (
         "import importlib, pickle, sys; "
+        "sys.meta_path=[finder for finder in sys.meta_path "
+        "if '_witwin_channel_editable' not in type(finder).__module__]; "
         "package=importlib.import_module('witwin.channel.montecarlo.bdpt'); "
         "assert 'witwin.channel.montecarlo.bdpt.solver' not in sys.modules; "
         "from witwin.channel.montecarlo.bdpt import solve; "
@@ -161,9 +163,10 @@ def test_bdpt_public_solve_lazy_import_preserves_identity_and_pickle():
     )
     environment = os.environ.copy()
     source_root = str(REPOSITORY_ROOT / "src")
+    core_root = str(REPOSITORY_ROOT.parent / "core-radar-architecture-stage1")
     environment["PYTHONPATH"] = os.pathsep.join(
         value
-        for value in (source_root, environment.get("PYTHONPATH"))
+        for value in (core_root, source_root, environment.get("PYTHONPATH"))
         if value
     )
 

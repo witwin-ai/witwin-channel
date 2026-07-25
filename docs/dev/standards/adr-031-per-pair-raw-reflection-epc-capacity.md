@@ -1,7 +1,7 @@
 # ADR-031: Per-pair raw reflection EPC capacity
 
-- **Status:** Proposed (2026-07-21); measured production candidate rejected by
-  ADR-032
+- **Status:** Rejected (2026-07-21); ADR-032 is authoritative, retained for
+  historical evidence only
 - **Date:** 2026-07-21
 - **Kind:** Experimental planning-capacity, device-cardinality, enumerated
   reflection, cross-solver, and failure-transaction proposal.
@@ -13,8 +13,9 @@
 
 ## Proposal boundary
 
-This record preserves the ADR-031 design reviewed at commit `4fcd9b6` for audit
-and possible future research. It is not accepted production architecture. The
+This record preserves the ADR-031 design reviewed at commit `4fcd9b6` for
+historical audit. It is not accepted production architecture and creates no
+implementation, test, manifest, release, or preservation requirement. The
 public field `reflection_candidate_capacity_per_pair` (`Qr`) must not appear in
 the formal public API, production Config, capability manifest, solver planning,
 or ADR-008 BDPT adapter. No production caller may reach the per-pair capacity

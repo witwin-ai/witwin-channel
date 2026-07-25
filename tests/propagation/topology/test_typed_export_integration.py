@@ -102,10 +102,10 @@ def test_capacity_sanitize_and_terminal_boundaries_follow_outer_result_work():
     )
     assert _call_line(
         path_base, "sanitize_enumerated_capacity_transaction"
-    ) < _call_line(path_base, "_compact_valid_evaluated_paths_for_legacy_result")
-    assert _call_line(
-        path_base, "_compact_valid_evaluated_paths_for_legacy_result"
-    ) < _call_line(path_base, "pack_evaluated_paths")
+    ) < _call_line(path_base, "compact_evaluated_paths")
+    assert _call_line(path_base, "compact_evaluated_paths") < _call_line(
+        path_base, "pack_evaluated_paths"
+    )
 
     path_solve = _function(path_pipeline, "solve")
     path_calls = sorted(

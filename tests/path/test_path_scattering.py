@@ -9,9 +9,10 @@ from the tx->patch->rx geometric length, and the metadata flag
 import pytest
 import torch
 
+from tests.support.core_world import make_receiver, make_transmitter
 from tests.support.scenes import rough_wall_structure
-from witwin.channel import ReceiverPoint, Scene, Transmitter
-from witwin.channel.core.kernels.extension import build_info
+from witwin.core import Scene
+from witwin.channel.deployment import build_info
 from witwin.channel.path import Config, InteractionType, solve
 
 _FREQUENCY_HZ = 3.0e9
@@ -33,9 +34,10 @@ def _scene(rms_height_m: float = 0.015) -> Scene:
     )
     return Scene(
         structures=[wall],
-        transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.0]))],
-        frequency=_FREQUENCY_HZ,
+        endpoints=[
+            make_transmitter(torch.tensor([0.0, -1.0, 0.0])),
+            make_receiver(torch.tensor([0.0, 1.0, 0.0])),
+        ],
     )
 
 
@@ -55,9 +57,13 @@ def _scattering_mask(result):
     ).any(dim=-1)
 
 
+def _solve(scene: Scene, config: Config):
+    return solve(scene, config, reference_frequency_hz=_FREQUENCY_HZ)
+
+
 def test_scattering_paths_export_result():
     _require_rayd()
-    result = solve(_scene(), _config())
+    result = _solve(_scene(), _config())
     scattering = _scattering_mask(result)
     count = int(scattering.sum())
     assert count > 0
@@ -74,7 +80,7 @@ def test_scattering_paths_export_result():
 def test_scattering_paths_export_contract():
     _require_rayd()
     scene = _scene()
-    result = solve(scene, _config())
+    result = _solve(scene, _config())
     types = result.interaction_type
     scattering_paths = result.valid & (types == int(InteractionType.SCATTERING)).any(
         dim=-1
@@ -108,8 +114,8 @@ def test_scattering_paths_export_contract():
 
 def test_scattering_path_cap_keeps_strongest():
     _require_rayd()
-    full = solve(_scene(), _config())
-    capped = solve(_scene(), _config(scattering_max_paths_per_pair=8))
+    full = _solve(_scene(), _config())
+    capped = _solve(_scene(), _config(scattering_max_paths_per_pair=8))
     full_rows = _scattering_mask(full)
     full_count = int(full_rows.sum())
     assert full_count > 8
@@ -124,11 +130,11 @@ def test_scattering_path_cap_keeps_strongest():
 
 def test_scattering_power_threshold_filters_rows():
     _require_rayd()
-    full = solve(_scene(), _config())
+    full = _solve(_scene(), _config())
     full_rows = _scattering_mask(full)
     gains = full.a[full_rows, 0].abs().square()
     cutoff = float(gains.median())
-    filtered = solve(_scene(), _config(scattering_power_threshold=cutoff))
+    filtered = _solve(_scene(), _config(scattering_power_threshold=cutoff))
     filtered_rows = _scattering_mask(filtered)
     kept = filtered.a[filtered_rows, 0].abs().square()
     assert int(kept.numel()) < int(gains.numel())
@@ -137,7 +143,7 @@ def test_scattering_power_threshold_filters_rows():
 
 def test_smooth_scene_reports_no_scattering_paths():
     _require_rayd()
-    result = solve(_scene(0.0), _config())
+    result = _solve(_scene(0.0), _config())
     assert int(_scattering_mask(result).sum()) == 0
     assert result.metadata["components"]["scattering"] == "enabled_no_paths"
 
@@ -149,9 +155,10 @@ def test_out_of_domain_roughness_raises():
     )
     scene = Scene(
         structures=[wall],
-        transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.0]))],
-        frequency=_FREQUENCY_HZ,
+        endpoints=[
+            make_transmitter(torch.tensor([0.0, -1.0, 0.0])),
+            make_receiver(torch.tensor([0.0, 1.0, 0.0])),
+        ],
     )
     with pytest.raises((RuntimeError, ValueError), match="kirchhoff_domain_exceeded"):
-        solve(scene, _config())
+        _solve(scene, _config())

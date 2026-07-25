@@ -40,16 +40,13 @@ _PUBLIC_INIT_MODULES = frozenset({PACKAGE, *_SOLVER_PREFIXES})
 _RAW_EXTENSION_MODULES = frozenset(
     {
         f"{PACKAGE}._channel",
-        f"{PACKAGE}.core.kernels.extension",
         f"{PACKAGE}.runtime.extension",
     }
 )
-_COMPILED_SCENE_MODULES = frozenset(
-    {
-        f"{PACKAGE}.scene.compiled",
-        f"{PACKAGE}.core.runtime.compiled_scene",
-    }
-)
+_COMPILED_SCENE_MODULES = frozenset({f"{PACKAGE}.scene.compiled"})
+# The `core` grab-bag was dissolved into its real domain owners. Nothing may
+# recreate that namespace or import through it.
+_DISSOLVED_PREFIXES = (f"{PACKAGE}.core",)
 
 
 @dataclass(frozen=True, order=True, slots=True)
@@ -233,6 +230,85 @@ def build_reexport_map(package_root: Path) -> dict[tuple[str, str], str]:
                 reexports[(module, exposed)] = _target_module(
                     base, alias.name, known_modules
                 )
+        for function in (
+            node
+            for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name == "__getattr__"
+        ):
+            for branch in (node for node in ast.walk(function) if isinstance(node, ast.If)):
+                names: set[str] = set()
+                if (
+                    isinstance(branch.test, ast.Compare)
+                    and isinstance(branch.test.left, ast.Name)
+                    and branch.test.left.id == "name"
+                    and len(branch.test.ops) == 1
+                    and len(branch.test.comparators) == 1
+                ):
+                    comparator = branch.test.comparators[0]
+                    if (
+                        isinstance(branch.test.ops[0], ast.Eq)
+                        and isinstance(comparator, ast.Constant)
+                        and isinstance(comparator.value, str)
+                    ):
+                        names.add(comparator.value)
+                    elif isinstance(branch.test.ops[0], ast.In) and isinstance(
+                        comparator, (ast.Set, ast.Tuple, ast.List)
+                    ):
+                        names.update(
+                            item.value
+                            for item in comparator.elts
+                            if isinstance(item, ast.Constant)
+                            and isinstance(item.value, str)
+                        )
+                for assignment in (
+                    node
+                    for node in branch.body
+                    if isinstance(node, ast.Assign)
+                    and any(
+                        isinstance(target, ast.Name) and target.id == "value"
+                        for target in node.targets
+                    )
+                ):
+                    value = assignment.value
+                    imported_module: str | None = None
+                    imported_name: str | None = None
+                    if (
+                        isinstance(value, ast.Attribute)
+                        and isinstance(value.value, ast.Call)
+                        and isinstance(value.value.func, ast.Name)
+                        and value.value.func.id == "import_module"
+                        and value.value.args
+                        and isinstance(value.value.args[0], ast.Constant)
+                        and isinstance(value.value.args[0].value, str)
+                    ):
+                        imported_module = value.value.args[0].value
+                        imported_name = value.attr
+                    elif (
+                        isinstance(value, ast.Call)
+                        and isinstance(value.func, ast.Name)
+                        and value.func.id == "getattr"
+                        and len(value.args) == 2
+                        and isinstance(value.args[0], ast.Call)
+                        and isinstance(value.args[0].func, ast.Name)
+                        and value.args[0].func.id == "import_module"
+                        and value.args[0].args
+                        and isinstance(value.args[0].args[0], ast.Constant)
+                        and isinstance(value.args[0].args[0].value, str)
+                        and isinstance(value.args[1], ast.Name)
+                        and value.args[1].id == "name"
+                    ):
+                        imported_module = value.args[0].args[0].value
+                    if imported_module is None or not _matches(
+                        imported_module, PACKAGE
+                    ):
+                        continue
+                    for exposed in names:
+                        reexports[(module, exposed)] = _target_module(
+                            imported_module,
+                            imported_name or exposed,
+                            known_modules,
+                        )
     return reexports
 
 
@@ -286,15 +362,13 @@ def _is_solver_result(module: str) -> bool:
 def _kernel_owner(module: str) -> str | None:
     marker = ".kernels"
     index = module.find(marker, len(PACKAGE))
-    if index < 0 or _matches(module, f"{PACKAGE}.core.kernels"):
+    if index < 0:
         return None
     return module[:index]
 
 
 def _is_kernels_module(module: str) -> bool:
-    return (
-        _matches(module, f"{PACKAGE}.core.kernels") or _kernel_owner(module) is not None
-    )
+    return _kernel_owner(module) is not None
 
 
 def _violation(edge: ImportEdge, rule: str) -> Violation:
@@ -325,6 +399,8 @@ def _basic_boundary_violations(edge: ImportEdge) -> list[Violation]:
         f"{PACKAGE}.core.kernels.ops",
         f"{PACKAGE}.core.path_topology",
     }
+    if any(_matches(target, prefix) for prefix in _DISSOLVED_PREFIXES):
+        violations.append(_violation(edge, "dissolved_module_dependency"))
     imported_target = (
         f"{target}.{edge.imported_name}"
         if edge.kind == "from" and edge.imported_name not in {"", "*"}
@@ -351,7 +427,7 @@ def _solver_boundary_violations(edge: ImportEdge) -> list[Violation]:
     if source_solver is not None and (
         edge.target in _RAW_EXTENSION_MODULES
         or (
-            edge.target in {f"{PACKAGE}.core.kernels", f"{PACKAGE}.runtime"}
+            edge.target == f"{PACKAGE}.runtime"
             and edge.imported_name == "native_extension"
         )
     ):
@@ -388,7 +464,6 @@ def _propagation_boundary_violations(edge: ImportEdge) -> list[Violation]:
         or _matches(target, f"{PACKAGE}.propagation.fields")
         or target_solver is not None
         or _matches(target, f"{PACKAGE}.scene")
-        or _matches(target, f"{PACKAGE}.core.scene")
         or target in _COMPILED_SCENE_MODULES
     ):
         violations.append(_violation(edge, "topology_forbidden_dependency"))
@@ -401,7 +476,6 @@ def _propagation_boundary_violations(edge: ImportEdge) -> list[Violation]:
             _matches(source, f"{PACKAGE}.propagation.geometry.kernels")
             and (
                 _matches(target, f"{PACKAGE}.scene")
-                or _matches(target, f"{PACKAGE}.core.scene")
                 or target in _COMPILED_SCENE_MODULES
             )
         )
@@ -433,23 +507,9 @@ def _runtime_oracle_violations(edge: ImportEdge) -> list[Violation]:
     ):
         violations.append(_violation(edge, "runtime_forbidden_dependency"))
 
-    if (
-        source == f"{PACKAGE}.physics.oracle"
-        or _matches(source, f"{PACKAGE}.physics.reference")
-    ) and any(
-        _matches(target, prefix)
-        for prefix in (
-            "torch",
-            f"{PACKAGE}.core.kernels",
-            f"{PACKAGE}.runtime",
-            f"{PACKAGE}.scene",
-            f"{PACKAGE}.materials",
-            f"{PACKAGE}.propagation",
-            f"{PACKAGE}.scattering",
-            *_SOLVER_PREFIXES,
-        )
-    ):
-        violations.append(_violation(edge, "oracle_production_dependency"))
+    # The NumPy reference oracle now lives in ``tests/reference/em_oracle.py``.
+    # Its isolation from production is structural: this checker only walks the
+    # shipped package, so a production module cannot reach it at all.
     return violations
 
 

@@ -602,6 +602,9 @@ Python_add_library(
     native/channel/kernels/evaluated_paths_canonical_capacity_gather_ad.cu
     native/channel/kernels/evaluated_paths_capacity_pack.cu
     native/channel/kernels/evaluated_paths_capacity_pack_ad.cu
+    native/channel/kernels/evaluated_paths_compact_finalize.cu
+    native/channel/kernels/consumer_los_jones.cu
+    native/channel/kernels/consumer_fixed_los_gather.cu
     native/channel/kernels/deterministic_path_table_capacity_pack.cu
     native/channel/kernels/deterministic_diffraction_pair_reduce.cu
     native/channel/kernels/path_result_capacity_pack.cu

@@ -29,6 +29,9 @@ def _write_wheel(path: Path, *, name: str, version: str) -> bytes:
         {
             f"{dist_info}/METADATA": metadata.as_bytes(),
             f"{dist_info}/WHEEL": b"Wheel-Version: 1.0\nGenerator: tests\nRoot-Is-Purelib: false\nTag: cp311-cp311-win_amd64\n",
+            f"{dist_info}/licenses/LICENSE": (
+                repository_root / "LICENSE"
+            ).read_bytes(),
             "witwin/channel/_channel.cp311-win_amd64.pyd": b"native",
             "witwin/channel/runtime/_channel.build-fingerprint": b"f" * 64
             + b"\n",
@@ -123,6 +126,17 @@ def test_wheel_content_audit_accepts_owned_runtime_files(tmp_path: Path):
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
 
     assert wheel_smoke._audit_wheel_contents(wheel).endswith("win_amd64.pyd")
+
+
+def test_wheel_content_audit_rejects_tampered_license(tmp_path: Path):
+    wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
+    _write_wheel(wheel, name="witwin-channel", version="0.1.0")
+    license_member = "witwin_channel-0.1.0.dist-info/licenses/LICENSE"
+    _replace_member(wheel, license_member, b"tampered")
+    _refresh_record(wheel)
+
+    with pytest.raises(ValueError, match="license bytes differ"):
+        wheel_smoke._audit_wheel_contents(wheel)
 
 
 def test_wheel_content_audit_rejects_missing_checked_in_init(tmp_path: Path):
@@ -311,6 +325,8 @@ def test_smoke_program_contains_strict_isolation_and_native_checks(tmp_path: Pat
     compile(code, "<wheel-smoke>", "exec")
     assert "is_relative_to(target)" in code
     assert 'finder.__class__.__module__ != "_witwin_channel_editable"' in code
+    assert 'importlib.metadata.distribution("witwin")' in code
+    assert 'find_spec("witwin.core")' in code
     assert 'find_spec("witwin.channel._channel")' in code
     assert 'build_info.get("uses_dr_jit") is not False' in code
     assert 'build_info.get("uses_rayd_native") is not True' in code

@@ -26,16 +26,17 @@ def _load_resolver():
 
 def _rayd_source() -> Path:
     configured = os.environ.get("RAYD_SOURCE_DIR")
-    source = Path(configured) if configured else ROOT.parent.parent / "RayDi"
-    assert (source / "backends" / "torch" / "scripts" / "generate_source_bundle.py").is_file()
+    platform_root = ROOT.parent.parent if ROOT.parent.name == ".worktrees" else ROOT.parent
+    source = Path(configured) if configured else platform_root / "RayD"
+    assert (source / ".git").exists()
     return source
 
 
 class _FakeDistribution:
-    def __init__(self, root: Path, *, version: str = "0.6.0") -> None:
+    def __init__(self, root: Path, *, version: str) -> None:
         self.root = root
         self.version = version
-        self._path = root / "rayd_torch-0.6.0.dist-info"
+        self._path = root / f"rayd_torch-{version}.dist-info"
         self.files = [
             path.relative_to(root).as_posix()
             for path in root.rglob("*")
@@ -48,23 +49,47 @@ class _FakeDistribution:
 
 def _package(tmp_path: Path) -> tuple[_FakeDistribution, Path]:
     lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+    version = str(lock["source_bundle"]["distribution_version"])
+    workspace = tmp_path / "rayd"
+    cloned = subprocess.run(
+        (
+            "git",
+            "clone",
+            "--shared",
+            "--no-checkout",
+            os.fspath(_rayd_source()),
+            os.fspath(workspace),
+        ),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert cloned.returncode == 0, cloned.stderr
+    checked_out = subprocess.run(
+        ("git", "checkout", "--detach", str(lock["commit"])),
+        cwd=workspace,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert checked_out.returncode == 0, checked_out.stderr
     bundle = tmp_path / "generated"
     completed = subprocess.run(
         (
             sys.executable,
             os.fspath(
-                _rayd_source()
+                workspace
                 / "backends"
                 / "torch"
                 / "scripts"
                 / "generate_source_bundle.py"
             ),
             "--workspace",
-            os.fspath(_rayd_source()),
+            os.fspath(workspace),
             "--output",
             os.fspath(bundle),
             "--distribution-version",
-            "0.6.0",
+            version,
             "--commit",
             lock["commit"],
             "--repository-url",
@@ -78,13 +103,13 @@ def _package(tmp_path: Path) -> tuple[_FakeDistribution, Path]:
     package_root = tmp_path / "site packages"
     resource = package_root / "rayd" / "torch" / "_source"
     shutil.copytree(bundle, resource)
-    dist_info = package_root / "rayd_torch-0.6.0.dist-info"
+    dist_info = package_root / f"rayd_torch-{version}.dist-info"
     dist_info.mkdir()
     (dist_info / "METADATA").write_text(
-        "Metadata-Version: 2.1\nName: rayd-torch\nVersion: 0.6.0\n",
+        f"Metadata-Version: 2.1\nName: rayd-torch\nVersion: {version}\n",
         encoding="utf-8",
     )
-    distribution = _FakeDistribution(package_root)
+    distribution = _FakeDistribution(package_root, version=version)
     return distribution, resource
 
 

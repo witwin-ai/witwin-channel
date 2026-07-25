@@ -17,14 +17,14 @@ once that wiring lands.
 import pytest
 import torch
 
-from witwin.channel import (
-    ReceiverPoint,
-    Scene,
-    Structure,
-    Transmitter,
+from witwin.core import Scene, Structure
+from tests.support.core_world import (
+    make_mesh_structure,
+    make_receiver,
+    make_transmitter,
 )
-from witwin.channel.core.kernels.extension import build_info
-from witwin.channel.core.materials import Layer, PhysicalSurface, Roughness
+from witwin.channel.deployment import build_info
+from witwin.core import MaterialLayer, PhysicalMaterial, SurfaceRoughness
 from witwin.channel.montecarlo.bdpt import Config, solve
 
 
@@ -39,20 +39,24 @@ _TX = torch.tensor([0.0, 0.0, 0.0])
 _RX = torch.tensor([0.5, 1.0, 0.3])
 
 
-def _roughness() -> Roughness:
-    return Roughness(rms_height_m=_SIGMA_H, corr_length_x_m=_CORR, corr_length_y_m=_CORR)
+def _roughness() -> SurfaceRoughness:
+    return SurfaceRoughness(
+        rms_height_m=_SIGMA_H,
+        correlation_length_x_m=_CORR,
+        correlation_length_y_m=_CORR,
+    )
 
 
-def _material() -> PhysicalSurface:
-    return PhysicalSurface(
-        layers=(Layer(thickness_m=_THICKNESS, eps_r=_EPS_R, sigma_e=_SIGMA_E),),
+def _material() -> PhysicalMaterial:
+    return PhysicalMaterial(
+        layers=(MaterialLayer(thickness_m=_THICKNESS, eps_r=_EPS_R, sigma_e=_SIGMA_E),),
         roughness_front=_roughness(),
         name="wall-material",
     )
 
 
-def _wall_x(material: PhysicalSurface, *, x: float = 2.5) -> Structure:
-    return Structure(
+def _wall_x(material: PhysicalMaterial, *, x: float = 2.5) -> Structure:
+    return make_mesh_structure(
         vertices=torch.tensor(
             [[x, -4.0, -4.0], [x, 4.0, -4.0], [x, -4.0, 4.0], [x, 4.0, 4.0]]
         ),
@@ -63,8 +67,8 @@ def _wall_x(material: PhysicalSurface, *, x: float = 2.5) -> Structure:
     )
 
 
-def _wall_y(material: PhysicalSurface, *, y: float = 2.5) -> Structure:
-    return Structure(
+def _wall_y(material: PhysicalMaterial, *, y: float = 2.5) -> Structure:
+    return make_mesh_structure(
         vertices=torch.tensor(
             [[-4.0, y, -4.0], [4.0, y, -4.0], [-4.0, y, 4.0], [4.0, y, 4.0]]
         ),
@@ -78,9 +82,10 @@ def _wall_y(material: PhysicalSurface, *, y: float = 2.5) -> Structure:
 def _single_wall_scene() -> Scene:
     return Scene(
         structures=[_wall_x(_material())],
-        transmitters=[Transmitter(position=_TX)],
-        receivers=[ReceiverPoint(position=_RX)],
-        frequency=_FREQUENCY,
+        endpoints=[
+            make_transmitter(position=_TX),
+            make_receiver(position=_RX),
+        ],
     )
 
 
@@ -90,9 +95,10 @@ def _corner_scene() -> Scene:
 
     return Scene(
         structures=[_wall_x(_material()), _wall_y(_material())],
-        transmitters=[Transmitter(position=_TX)],
-        receivers=[ReceiverPoint(position=_RX)],
-        frequency=_FREQUENCY,
+        endpoints=[
+            make_transmitter(position=_TX),
+            make_receiver(position=_RX),
+        ],
     )
 
 
@@ -164,7 +170,9 @@ def test_default_order_matches_explicit_order_one_bitwise():
     _require_native()
     scene = _single_wall_scene()
     default = solve(
-        scene, Config(samples=8192, seed=7, max_depth=2, components={"scattering"})
+        scene,
+        Config(samples=8192, seed=7, max_depth=2, components={"scattering"}),
+        reference_frequency_hz=_FREQUENCY,
     )
     explicit = solve(
         scene,
@@ -175,6 +183,7 @@ def test_default_order_matches_explicit_order_one_bitwise():
             components={"scattering"},
             max_scattering_order=1,
         ),
+        reference_frequency_hz=_FREQUENCY,
     )
     torch.testing.assert_close(
         default.path_gain, explicit.path_gain, rtol=0.0, atol=0.0
@@ -193,7 +202,7 @@ def test_order_two_does_not_perturb_an_order_one_rerun():
     _require_native()
     scene = _single_wall_scene()
     base = Config(samples=8192, seed=11, max_depth=2, components={"scattering"})
-    order_one_first = solve(scene, base)
+    order_one_first = solve(scene, base, reference_frequency_hz=_FREQUENCY)
     solve(
         scene,
         Config(
@@ -203,8 +212,9 @@ def test_order_two_does_not_perturb_an_order_one_rerun():
             components={"scattering"},
             max_scattering_order=2,
         ),
+        reference_frequency_hz=_FREQUENCY,
     )
-    order_one_again = solve(scene, base)
+    order_one_again = solve(scene, base, reference_frequency_hz=_FREQUENCY)
     torch.testing.assert_close(
         order_one_first.path_gain, order_one_again.path_gain, rtol=0.0, atol=0.0
     )
@@ -218,8 +228,16 @@ def test_order_two_scattered_power_at_least_order_one():
     _require_native()
     scene = _corner_scene()
     common = dict(samples=65_536, seed=7, max_depth=3, components={"scattering"})
-    order_one = solve(scene, Config(**common, max_scattering_order=1))
-    order_two = solve(scene, Config(**common, max_scattering_order=2))
+    order_one = solve(
+        scene,
+        Config(**common, max_scattering_order=1),
+        reference_frequency_hz=_FREQUENCY,
+    )
+    order_two = solve(
+        scene,
+        Config(**common, max_scattering_order=2),
+        reference_frequency_hz=_FREQUENCY,
+    )
     power_one = float(order_one.component_power["scattering"].sum())
     power_two = float(order_two.component_power["scattering"].sum())
     assert power_one > 0.0
@@ -230,7 +248,9 @@ def test_metadata_reports_scattering_order_and_depth_rule():
     _require_native()
     scene = _single_wall_scene()
     order_one = solve(
-        scene, Config(samples=1024, seed=7, max_depth=2, components={"scattering"})
+        scene,
+        Config(samples=1024, seed=7, max_depth=2, components={"scattering"}),
+        reference_frequency_hz=_FREQUENCY,
     )
     assert order_one.metadata["max_scattering_order"] == 1
     assert order_one.metadata["scattering_depth_rule"] == "single_bounce_terminal"
@@ -244,6 +264,7 @@ def test_metadata_reports_scattering_order_and_depth_rule():
             components={"scattering"},
             max_scattering_order=2,
         ),
+        reference_frequency_hz=_FREQUENCY,
     )
     assert order_two.metadata["max_scattering_order"] == 2
     assert order_two.metadata["scattering_depth_rule"] == "multi_order_continuation"

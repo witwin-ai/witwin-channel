@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-from witwin.channel.core.kernels import extension as compatibility_extension
+from witwin.channel import deployment
 from witwin.channel.runtime import extension
 
 
@@ -71,9 +72,15 @@ def _configure_identity_checks(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-def test_core_extension_is_only_a_compatibility_facade():
-    assert compatibility_extension.native_extension is extension.native_extension
-    assert compatibility_extension.build_info is extension.build_info
+def test_no_compatibility_extension_facade_exists():
+    """The dissolved ``core.kernels.extension`` shim must not come back."""
+
+    assert importlib.util.find_spec("witwin.channel.core") is None
+    # ``deployment`` publishes the runtime owner's function; it does not define
+    # a second one, so the object still reports the runtime module.
+    assert deployment.build_info is extension.build_info
+    assert deployment.build_info.__module__ == "witwin.channel.runtime.extension"
+    assert deployment._import_native_build_info() is extension.build_info
 
 
 def test_native_extension_prefers_packaged_module(monkeypatch: pytest.MonkeyPatch):

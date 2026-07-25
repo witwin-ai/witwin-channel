@@ -3,7 +3,7 @@
 import pytest
 import torch
 
-from witwin.channel.core.materials import Roughness
+from witwin.core import SurfaceRoughness
 from witwin.channel.scattering import build_kirchhoff_table
 from witwin.channel.scattering.kernels import functional as ops
 from witwin.channel.scene.scattering_resources import (
@@ -19,12 +19,12 @@ def _build_tables(device):
     frequency = 3.0e9
     tables = {
         0: build_kirchhoff_table(
-            Roughness(rms_height_m=0.01, corr_length_x_m=0.15, corr_length_y_m=0.15),
+            SurfaceRoughness(rms_height_m=0.01, correlation_length_x_m=0.15, correlation_length_y_m=0.15),
             layers, frequency, device=device,
         ),
         1: build_kirchhoff_table(
-            Roughness(
-                rms_height_m=0.012, corr_length_x_m=0.2, corr_length_y_m=0.1,
+            SurfaceRoughness(
+                rms_height_m=0.012, correlation_length_x_m=0.2, correlation_length_y_m=0.1,
                 principal_axis_rad=0.3,
             ),
             layers, frequency, device=device,

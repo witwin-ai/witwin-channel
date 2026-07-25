@@ -87,7 +87,14 @@ def test_capacity_failure_terminal_missing_symbol_has_no_fallback(
 def test_capacity_failure_terminal_trap_isolated_to_subprocess() -> None:
     code = textwrap.dedent(
         """
+        import sys
         import torch
+
+        sys.meta_path = [
+            finder
+            for finder in sys.meta_path
+            if "_witwin_channel_editable" not in type(finder).__module__
+        ]
 
         from witwin.channel.propagation.topology.kernels import coupled
         from witwin.channel.runtime import (
@@ -142,9 +149,10 @@ def test_capacity_failure_terminal_trap_isolated_to_subprocess() -> None:
     )
     environment = os.environ.copy()
     source_root = str(REPOSITORY_ROOT / "src")
+    core_root = str(REPOSITORY_ROOT.parent / "core-radar-architecture-stage1")
     environment["PYTHONPATH"] = os.pathsep.join(
         value
-        for value in (source_root, environment.get("PYTHONPATH"))
+        for value in (core_root, source_root, environment.get("PYTHONPATH"))
         if value
     )
 

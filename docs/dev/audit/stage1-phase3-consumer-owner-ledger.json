@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "contract_version": 2,
+  "status": "binding names finalized with implementation; measured acceptance pending",
+  "new_bindings": [
+    "enumerated_canonical_compact",
+    "enumerated_exact_pair_metadata",
+    "evaluated_paths_compact_finalize",
+    "evaluated_paths_compact_finalize_backward",
+    "evaluated_paths_compact_finalize_jvp",
+    "consumer_los_jones",
+    "consumer_fixed_los_gather",
+    "consumer_fixed_los_gather_backward",
+    "consumer_fixed_los_gather_jvp"
+  ],
+  "owners": [
+    {
+      "operation_family": "canonical selection, deduplication, limiting, exact-K gather, and pair segmentation",
+      "abi_owner": "Channel _channel",
+      "binding": "enumerated_canonical_compact",
+      "python_owner": "witwin.channel.propagation.topology.kernels.canonical_compact",
+      "current_numerical_owner": "Channel ADR-032 native canonical compact producer",
+      "failure_owner": "Channel propagation boundary",
+      "consumer_result_owner": "witwin.channel.propagation.consumer",
+      "count_observation_owner": "enumerated_canonical_compact",
+      "nonempty_observation": "one 8-byte int64 control D2H and one caller-current-stream synchronization",
+      "zero_candidate_observation": "no D2H and no synchronization",
+      "phase2_owner_replaced": "Torch canonical selection, nonzero, Boolean indexing, and hidden cardinality observation",
+      "pair_segmentation_complexity": "O(K + P) device histogram and inclusive scan"
+    },
+    {
+      "operation_family": "LoS exact-row pair metadata",
+      "abi_owner": "Channel _channel",
+      "binding": "enumerated_exact_pair_metadata",
+      "python_owner": "witwin.channel.propagation.topology.kernels.canonical_compact",
+      "current_numerical_owner": "Channel native LoS source-pipeline metadata producer",
+      "failure_owner": "Channel propagation boundary",
+      "count_observation_owner": "exact input tensor shape",
+      "pair_segmentation_complexity": "O(K + P) device histogram and inclusive scan",
+      "payload": "metadata only; LoS payload remains the existing exact native result",
+      "d2h_copies": 0,
+      "stream_synchronizations": 0
+    },
+    {
+      "operation_family": "legacy Path incoherent-scattering final compact and reorder",
+      "abi_owner": "Channel _channel",
+      "binding": "evaluated_paths_compact_finalize",
+      "python_owner": "witwin.channel.path.pipeline",
+      "current_numerical_owner": "Channel native stable-radix compact producer",
+      "failure_owner": "Channel Path solver boundary",
+      "reachability": "conditional on the legacy Path scattering component; not reachable from consumer contract version 1",
+      "nonempty_observation": "one 8-byte int64 control D2H and one caller-current-stream synchronization",
+      "zero_candidate_observation": "no D2H and no synchronization",
+      "pair_segmentation_complexity": "O(K + P) after fixed-width stable radix ordering"
+    },
+    {
+      "operation_family": "fixed-topology LoS validation and endpoint gather",
+      "abi_owner": "Channel _channel",
+      "python_owner": "witwin.channel.propagation.consumer._fixed_los",
+      "current_numerical_owner": "Channel native",
+      "failure_owner": "Channel propagation consumer preflight/native validation",
+      "nonempty_observation": "one 4-byte validation D2H and one caller-current-stream synchronization",
+      "zero_row_observation": "no D2H and no synchronization",
+      "pair_segmentation_complexity": "O(K + P) device histogram and inclusive scan"
+    },
+    {
+      "operation_family": "consumer LoS complete Jones transport",
+      "abi_owner": "Channel _channel",
+      "binding": "consumer_los_jones",
+      "python_owner": "witwin.channel.propagation.consumer internal provider",
+      "current_numerical_owner": "Channel native",
+      "failure_owner": "Channel propagation consumer preflight/native contract",
+      "d2h_copies": 0,
+      "stream_synchronizations": 0
+    },
+    {
+      "operation_family": "generic geometry and visibility",
+      "abi_owner": "Channel _channel",
+      "current_numerical_owner": "RayD 0.7.0 typed CUDA runtime",
+      "failure_owner": "Channel propagation boundary"
+    },
+    {
+      "operation_family": "shared RF, layer stack, transmission, pure-wedge diffraction, and generic scattering",
+      "abi_owner": "Channel _channel",
+      "current_numerical_owner": "RayD 0.7.0 typed CUDA runtime",
+      "failure_owner": "Channel propagation boundary"
+    },
+    {
+      "operation_family": "Channel-composed coupled RD/DD, MC Sionna diffraction, and solver policy",
+      "abi_owner": "Channel _channel",
+      "current_numerical_owner": "Channel native",
+      "failure_owner": "Channel solver/propagation boundary"
+    }
+  ],
+  "trace_backend": {
+    "selection_owner": "RayD",
+    "mode": "TraceBackend::Auto",
+    "optix": "preferred native implementation",
+    "pure_cuda": "accepted full-result native implementation",
+    "independent_evidence_required": true,
+    "fallback_claim": false
+  },
+  "adr_037_added_owners": [
+    {
+      "operation_family": "frozen topology partition by component and depth",
+      "abi_owner": "none; host-side structural partition",
+      "python_owner": "witwin.channel.propagation.consumer.contracts",
+      "entry_point": "prepare_fixed_topology",
+      "observation": "host-visible, recorded on the returned handle"
+    },
+    {
+      "operation_family": "frozen-row endpoint binding and pair segmentation",
+      "abi_owner": "none; structural index_select and integer segmentation",
+      "python_owner": "witwin.channel.propagation.consumer._rows",
+      "validation": "one int32 contract bitmask, 1 copy / 4 bytes / 1 sync"
+    },
+    {
+      "operation_family": "fixed-winner reflection stationary-point re-solve",
+      "abi_owner": "RayD via rayd_reflection_epc_paths",
+      "python_owner": "witwin.channel.propagation.geometry.reevaluate.reflection_epc_paths",
+      "policy_owners": [
+        "propagation.enumerated: every row must reproduce",
+        "propagation.consumer: per-row validity mask"
+      ]
+    },
+    {
+      "operation_family": "source-to-sink complex 2x2 transport",
+      "abi_owner": "Channel _channel field_reflection_sequence, field_free_space, field_project_complex3, consumer_los_jones",
+      "python_owner": "witwin.channel.propagation.consumer._jones",
+      "role": "structural composition only; no new native symbol"
+    }
+  ]
+}

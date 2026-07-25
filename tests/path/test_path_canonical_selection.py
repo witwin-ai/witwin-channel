@@ -3,6 +3,9 @@ import torch
 
 from witwin.channel.propagation.topology import concatenate
 from witwin.channel.propagation.topology.export import evaluated_paths_from_block
+from witwin.channel.propagation.topology.kernels.canonical_compact import (
+    enumerated_canonical_compact,
+)
 
 
 pytestmark = pytest.mark.skipif(
@@ -82,6 +85,7 @@ def _select(block, *, max_paths=None):
         max_paths=max_paths,
         max_paths_scope="per_pair",
         tx_count=1,
+        rx_count=2,
         max_depth=2,
         launch_count=0,
     )
@@ -120,3 +124,110 @@ def test_per_pair_cap_is_independent_at_pair_boundary():
         (selected.topology.rx_id[:, None], _identity(selected)), dim=1
     )
     assert torch.unique(endpoint_identity, dim=0).shape[0] == 4
+
+
+def test_exact_owner_carries_empty_pair_offsets_and_one_sync_ledger():
+    evaluated, sidecars = evaluated_paths_from_block(
+        _mixed_block(),
+        max_paths=None,
+        max_paths_scope="per_pair",
+        tx_count=1,
+        rx_count=3,
+        max_depth=2,
+        launch_count=0,
+    )
+
+    metadata = sidecars.compact_metadata
+    assert metadata is not None
+    assert metadata.path_count == evaluated.row_count == 7
+    torch.testing.assert_close(
+        metadata.pair_offsets,
+        torch.tensor([0, 5, 7, 7], device="cuda", dtype=torch.int64),
+    )
+    assert metadata.count_d2h_copies == 1
+    assert metadata.count_d2h_bytes == 8
+    assert metadata.count_synchronizations == 1
+    assert bool(evaluated.topology.valid.all())
+
+
+def test_exact_owner_vjp_scatters_continuous_rows_to_unique_sources():
+    block = _mixed_block()
+    path_length = block["path_length_m"].detach().requires_grad_(True)
+    interaction_positions = block["interaction_positions"].detach().requires_grad_(True)
+    block["path_length_m"] = path_length
+    block["interaction_positions"] = interaction_positions
+
+    compact = enumerated_canonical_compact(
+        block,
+        pair_count=2,
+        num_tx=1,
+        num_rx=2,
+        max_paths=None,
+        max_paths_scope="per_pair",
+        sequence_width=2,
+    )
+    loss = (
+        compact.block["path_length_m"].sum()
+        + compact.block["interaction_positions"].sum()
+    )
+    loss.backward()
+
+    selected_row_index = compact.selected_row_index
+    assert torch.unique(selected_row_index).numel() == selected_row_index.numel()
+    assert path_length.grad is not None
+    assert interaction_positions.grad is not None
+    expected_path_grad = torch.zeros_like(path_length)
+    expected_path_grad[selected_row_index] = 1
+    expected_positions_grad = torch.zeros_like(interaction_positions)
+    expected_positions_grad[selected_row_index] = 1
+    torch.testing.assert_close(path_length.grad, expected_path_grad)
+    torch.testing.assert_close(
+        interaction_positions.grad,
+        expected_positions_grad,
+    )
+    assert not compact.block["tx_id"].requires_grad
+    assert not compact.pair_index.requires_grad
+
+
+def test_exact_owner_jvp_gathers_path_and_interaction_tangents():
+    block = _mixed_block()
+    path_tangent = torch.arange(
+        1, block["path_length_m"].numel() + 1, device="cuda", dtype=torch.float32
+    )
+    position_tangent = torch.arange(
+        block["interaction_positions"].numel(),
+        device="cuda",
+        dtype=torch.float32,
+    ).reshape_as(block["interaction_positions"])
+
+    with torch.autograd.forward_ad.dual_level():
+        block["path_length_m"] = torch.autograd.forward_ad.make_dual(
+            block["path_length_m"], path_tangent
+        )
+        block["interaction_positions"] = torch.autograd.forward_ad.make_dual(
+            block["interaction_positions"], position_tangent
+        )
+        compact = enumerated_canonical_compact(
+            block,
+            pair_count=2,
+            num_tx=1,
+            num_rx=2,
+            max_paths=None,
+            max_paths_scope="per_pair",
+            sequence_width=2,
+        )
+        _, path_jvp = torch.autograd.forward_ad.unpack_dual(
+            compact.block["path_length_m"]
+        )
+        _, positions_jvp = torch.autograd.forward_ad.unpack_dual(
+            compact.block["interaction_positions"]
+        )
+        selected_row_index = compact.selected_row_index
+
+    assert path_jvp is not None
+    assert positions_jvp is not None
+    torch.testing.assert_close(path_jvp, path_tangent[selected_row_index])
+    torch.testing.assert_close(
+        positions_jvp,
+        position_tangent[selected_row_index],
+    )

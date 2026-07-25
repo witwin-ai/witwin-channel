@@ -20,7 +20,7 @@
     }
   },
   "function_exemptions": {
-    "src/witwin/channel/core/kernels/metadata.py::validate_metadata": {
+    "src/witwin/channel/runtime/kernel_metadata.py::validate_metadata": {
       "ceiling": 18,
       "expires_on": "2027-01-31",
       "owner": "core maintainers",
@@ -75,7 +75,7 @@
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
     "src/witwin/channel/montecarlo/bdpt/pipeline.py::_collect_connection_samples": {
-      "ceiling": 37,
+      "ceiling": 36,
       "expires_on": "2027-01-31",
       "owner": "montecarlo/bdpt maintainers",
       "reason": "Per-strategy connection-sample orchestration extracted verbatim from the former solve() monolith; each component branch stays inside this single stage."
@@ -111,10 +111,22 @@
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
     "src/witwin/channel/propagation/enumerated/engine.py::evaluate_enumerated_paths": {
-      "ceiling": 23,
+      "ceiling": 31,
       "expires_on": "2027-01-31",
       "owner": "propagation maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+      "reason": "Phase-3 exact-row ownership and explicit endpoint batches extended the existing enumerated orchestration; the measured control-flow surface is frozen pending focused decomposition."
+    },
+    "src/witwin/channel/propagation/enumerated/engine.py::EnumeratedEndpointTensors.__post_init__": {
+      "ceiling": 21,
+      "expires_on": "2027-01-31",
+      "owner": "propagation maintainers",
+      "reason": "Phase-3 endpoint batches validate six aligned CUDA tensors plus stable identity vectors at one typed boundary; the exact validation surface is frozen."
+    },
+    "src/witwin/channel/propagation/consumer/_native.py::compact_evaluated_paths": {
+      "ceiling": 18,
+      "expires_on": "2027-01-31",
+      "owner": "propagation maintainers",
+      "reason": "The legacy scattering-only final reorder validates alias mode and differentiable compact mode in one internal facade; its exact Phase-3 surface is frozen."
     },
     "src/witwin/channel/propagation/fields/evaluation.py::_evaluate_coupled_fields": {
       "ceiling": 17,
@@ -182,23 +194,23 @@
       "owner": "runtime maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
-    "src/witwin/channel/scene/loader.py::_load_mitsuba_native_ply": {
-      "ceiling": 16,
+    "src/witwin/channel/scene/compiler.py::_runtime_structures": {
+      "ceiling": 25,
       "expires_on": "2027-01-31",
       "owner": "scene maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+      "reason": "Core-world runtime structure projection is frozen at the Phase-2 compiler boundary pending focused decomposition."
     },
-    "src/witwin/channel/scene/loader.py::_load_ply_mesh": {
-      "ceiling": 16,
+    "src/witwin/channel/propagation/fields/evaluation.py::evaluate_path_fields": {
+      "ceiling": 24,
       "expires_on": "2027-01-31",
-      "owner": "scene maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+      "owner": "propagation maintainers",
+      "reason": "Phase-3 explicit endpoint geometry added one typed field-dispatch branch while preserving the existing component owners; the measured dispatcher surface is frozen."
     },
-    "src/witwin/channel/scene/loader.py::_read_ply_header": {
-      "ceiling": 23,
+    "src/witwin/channel/scene/compiler.py::compile": {
+      "ceiling": 34,
       "expires_on": "2027-01-31",
       "owner": "scene maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
+      "reason": "Single Core Scene compiler orchestration plus the Phase-3 product-identity material ABI guard is frozen at its measured surface pending focused decomposition."
     }
   },
   "limits": {

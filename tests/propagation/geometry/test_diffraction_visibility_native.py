@@ -4,12 +4,13 @@ import pytest
 import torch
 
 from tests.support.scenes import wedge_diffraction_scene
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.propagation.enumerated.diffraction import (
     _deterministic_diffraction_states,
 )
 from witwin.channel.propagation.geometry import diffraction
 from witwin.channel.propagation.geometry.kernels import bridge
+from witwin.channel.scene import compile as compile_scene
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
@@ -18,9 +19,12 @@ def test_native_tx_visibility_plan_matches_frozen_four_sample_contract() -> None
         pytest.skip("RayD native diffraction is not built")
 
     scene = wedge_diffraction_scene()
-    compiled = scene.compile()
+    compiled = compile_scene(scene, reference_frequency_hz=3.0e9)
     rayd = compiled.rayd
-    tx = scene.transmitters[0].position.to(device="cuda", dtype=torch.float32)
+    transmitter = next(
+        endpoint for endpoint in scene.endpoints if endpoint.role == "tx"
+    )
+    tx = transmitter.position.to(device="cuda", dtype=torch.float32)
     tx = tx.contiguous()
     states = _deterministic_diffraction_states(
         rayd,

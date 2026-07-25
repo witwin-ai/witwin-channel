@@ -156,7 +156,8 @@ def _native_scene() -> Any:
     sys.path.insert(0, str(_REPO_ROOT / "src"))
     sys.path.insert(0, str(_REPO_ROOT))
     import torch
-    from witwin.channel import ReceiverGrid, Scene, Transmitter
+    from witwin.channel import Transmitter
+    from witwin.core import ReceiverGrid, Scene
 
     dx = (BOUNDS[0][1] - BOUNDS[0][0]) / GRID[0]
     dy = (BOUNDS[1][1] - BOUNDS[1][0]) / GRID[1]

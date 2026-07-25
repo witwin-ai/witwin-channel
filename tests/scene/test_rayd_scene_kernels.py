@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import gc
 import hashlib
+import importlib.util
 import inspect
 from types import SimpleNamespace
 import weakref
@@ -11,8 +12,6 @@ import pytest
 import torch
 
 from witwin.channel.runtime import native_resources as ops
-from witwin.channel.core import scene as core_scene
-from witwin.channel.core.runtime import compiled_scene as legacy_compiled
 from witwin.channel.scene.kernels import rayd_scene as legacy_rayd
 from witwin.channel.runtime import native_resources as runtime_native_resources
 from witwin.channel.runtime import symbols
@@ -49,23 +48,21 @@ def _definition_ast_digest(definition: object) -> str:
     return hashlib.sha256(source).hexdigest()
 
 
-def test_rayd_scene_lifecycle_has_one_canonical_owner_and_legacy_identity():
+def test_rayd_scene_lifecycle_has_one_canonical_owner():
     assert (
         rayd_scene.RayDSceneResource
         is legacy_rayd.RayDSceneResource
-        is core_scene.RayDSceneResource
         is compiled.RayDSceneResource
-        is legacy_compiled.RayDSceneResource
     )
     assert rayd_scene.RayDEdgeRecords is legacy_rayd.RayDEdgeRecords
     assert rayd_scene.build_scene_from_structures is (
         legacy_rayd.build_scene_from_structures
     )
-    assert rayd_scene.build_scene_from_structures is (
-        core_scene.build_scene_from_structures
-    )
     assert rayd_scene.RayDSceneResource.__module__ == legacy_rayd.__name__
     assert rayd_scene.RayDEdgeRecords.__module__ == legacy_rayd.__name__
+    assert importlib.util.find_spec("witwin.channel.core") is None
+    with pytest.raises(ModuleNotFoundError):
+        importlib.util.find_spec("witwin.channel.core.runtime.compiled_scene")
 
 
 @pytest.mark.parametrize("name, expected", _RAYD_LIFECYCLE_AST_DIGESTS.items())

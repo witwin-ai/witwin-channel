@@ -3,10 +3,16 @@
 import pytest
 import torch
 
-from witwin.channel import ReceiverPoint, Scene, Structure, Transmitter
-from witwin.channel.core.kernels.extension import build_info
-from witwin.channel.core.materials import Dielectric
+from tests.support.core_world import (
+    make_mesh_structure,
+    make_receiver,
+    make_transmitter,
+)
+from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
+from witwin.core import PhysicalMaterial, Scene
+
+_REFERENCE_FREQUENCY_HZ = 3.0e9
 
 
 def _require_native() -> None:
@@ -41,18 +47,19 @@ def _subdivided_wall_vertices_faces(splits: int) -> tuple[torch.Tensor, torch.Te
 
 def _wall_scene(splits: int) -> Scene:
     vertices, faces = _subdivided_wall_vertices_faces(splits)
-    wall = Structure(
+    wall = make_mesh_structure(
         vertices=vertices,
         faces=faces,
-        material=Dielectric(eps_r=4.0, sigma_e=0.01),
+        material=PhysicalMaterial(eps_r=4.0, sigma_e=0.01),
         name=f"wall-{splits}x{splits}",
         surface_id=1,
     )
     return Scene(
         structures=[wall],
-        transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.5]))],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.5]))],
-        frequency=3.0e9,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, -1.0, 0.5])),
+            make_receiver(position=torch.tensor([0.0, 1.0, 0.5])),
+        ],
     )
 
 
@@ -61,8 +68,8 @@ def test_coplanar_subdivision_invariance():
 
     _require_native()
     config = Config(components={"reflection"}, coherent=True, export_paths=True)
-    coarse = solve(_wall_scene(1), config)
-    fine = solve(_wall_scene(8), config)
+    coarse = solve(_wall_scene(1), config, reference_frequency_hz=3.0e9)
+    fine = solve(_wall_scene(8), config, reference_frequency_hz=3.0e9)
 
     assert coarse.paths is not None and fine.paths is not None
     assert int(coarse.paths.valid.numel()) == 1
@@ -79,7 +86,7 @@ def test_inner_corner_double_reflection_within_one_structure():
     """Consecutive bounces on two walls of the same structure must survive (D-2d)."""
 
     _require_native()
-    corner = Structure(
+    corner = make_mesh_structure(
         vertices=torch.tensor(
             [
                 # wall A at x=2 spanning y in [-1, 3]
@@ -95,18 +102,25 @@ def test_inner_corner_double_reflection_within_one_structure():
             ]
         ),
         faces=torch.tensor([[0, 1, 2], [1, 3, 2], [4, 6, 5], [5, 6, 7]]),
-        material=Dielectric(eps_r=3.0, sigma_e=0.005),
+        material=PhysicalMaterial(eps_r=3.0, sigma_e=0.005),
         name="l-corner",
         surface_id=7,
     )
     scene = Scene(
         structures=[corner],
-        transmitters=[Transmitter(position=torch.tensor([0.0, 0.0, 1.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 1.0]))],
-        frequency=3.0e9,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, 0.0, 1.0])),
+            make_receiver(position=torch.tensor([0.0, 1.0, 1.0])),
+        ],
     )
 
-    result = solve(scene, Config(components={"reflection"}, max_depth=2, coherent=True, export_paths=True))
+    result = solve(
+        scene,
+        Config(
+            components={"reflection"}, max_depth=2, coherent=True, export_paths=True
+        ),
+        reference_frequency_hz=3.0e9,
+    )
 
     assert result.paths is not None
     assert bool((result.paths.depth == 2).any())
@@ -147,7 +161,7 @@ def test_conductor_skew_reflection_preserves_friis_amplitude():
     """
 
     _require_native()
-    wall = Structure(
+    wall = make_mesh_structure(
         vertices=torch.tensor(
             [
                 [2.5, -3.0, -2.0],
@@ -157,22 +171,27 @@ def test_conductor_skew_reflection_preserves_friis_amplitude():
             ]
         ),
         faces=torch.tensor([[0, 1, 2], [1, 3, 2]]),
-        material=Dielectric(eps_r=1.0, sigma_e=1.0e7),
+        material=PhysicalMaterial(eps_r=1.0, sigma_e=1.0e7),
         name="conductor-wall",
         surface_id=1,
     )
     scene = Scene(
         structures=[wall],
-        transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 2.0]))],
-        frequency=3.0e9,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, -1.0, 0.0])),
+            make_receiver(position=torch.tensor([0.0, 1.0, 2.0])),
+        ],
     )
 
-    result = solve(scene, Config(components={"reflection"}, coherent=True, export_paths=True))
+    result = solve(
+        scene,
+        Config(components={"reflection"}, coherent=True, export_paths=True),
+        reference_frequency_hz=3.0e9,
+    )
 
     assert result.paths is not None
     assert int(result.paths.valid.numel()) == 1
-    wavelength = 299_792_458.0 / scene.frequency
+    wavelength = 299_792_458.0 / _REFERENCE_FREQUENCY_HZ
     unfolded = torch.tensor([5.0, -1.0, 0.0]) - torch.tensor([0.0, 1.0, 2.0])
     expected_length = float(unfolded.norm())
     # F1/R5: multiply the Friis free-space gain by the z-hat dipole coupling.
@@ -198,9 +217,8 @@ def test_perfect_conductor_reflects_with_unit_magnitude():
     field kernels only receive (eps_r, sigma_e, mu_r)."""
 
     _require_native()
-    from witwin.channel.core.materials import PerfectConductor
 
-    wall = Structure(
+    wall = make_mesh_structure(
         vertices=torch.tensor(
             [
                 [2.5, -3.0, -2.0],
@@ -210,22 +228,27 @@ def test_perfect_conductor_reflects_with_unit_magnitude():
             ]
         ),
         faces=torch.tensor([[0, 1, 2], [1, 3, 2]]),
-        material=PerfectConductor(),
+        material=PhysicalMaterial.perfect_conductor(),
         name="pec-wall",
         surface_id=1,
     )
     scene = Scene(
         structures=[wall],
-        transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.0]))],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 2.0]))],
-        frequency=3.0e9,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, -1.0, 0.0])),
+            make_receiver(position=torch.tensor([0.0, 1.0, 2.0])),
+        ],
     )
 
-    result = solve(scene, Config(components={"reflection"}, coherent=True, export_paths=True))
+    result = solve(
+        scene,
+        Config(components={"reflection"}, coherent=True, export_paths=True),
+        reference_frequency_hz=3.0e9,
+    )
 
     assert result.paths is not None
     assert int(result.paths.valid.numel()) == 1
-    wavelength = 299_792_458.0 / scene.frequency
+    wavelength = 299_792_458.0 / _REFERENCE_FREQUENCY_HZ
     unfolded = torch.tensor([5.0, -1.0, 0.0]) - torch.tensor([0.0, 1.0, 2.0])
     # F1/R5: multiply the Friis free-space gain by the z-hat dipole coupling.
     expected_gain = (
@@ -243,7 +266,7 @@ def test_back_wall_reflection_is_blocked_by_front_wall():
     """A reflection off a hidden back wall must be occluded, even within one structure (D-2b)."""
 
     _require_native()
-    walls = Structure(
+    walls = make_mesh_structure(
         vertices=torch.tensor(
             [
                 # front wall at x=2.5
@@ -259,18 +282,23 @@ def test_back_wall_reflection_is_blocked_by_front_wall():
             ]
         ),
         faces=torch.tensor([[0, 1, 2], [1, 3, 2], [4, 5, 6], [5, 7, 6]]),
-        material=Dielectric(eps_r=4.0, sigma_e=0.01),
+        material=PhysicalMaterial(eps_r=4.0, sigma_e=0.01),
         name="front-and-back",
         surface_id=3,
     )
     scene = Scene(
         structures=[walls],
-        transmitters=[Transmitter(position=torch.tensor([0.0, -1.0, 0.5]))],
-        receivers=[ReceiverPoint(position=torch.tensor([0.0, 1.0, 0.5]))],
-        frequency=3.0e9,
+        endpoints=[
+            make_transmitter(position=torch.tensor([0.0, -1.0, 0.5])),
+            make_receiver(position=torch.tensor([0.0, 1.0, 0.5])),
+        ],
     )
 
-    result = solve(scene, Config(components={"reflection"}, coherent=True, export_paths=True))
+    result = solve(
+        scene,
+        Config(components={"reflection"}, coherent=True, export_paths=True),
+        reference_frequency_hz=3.0e9,
+    )
 
     assert result.paths is not None
     # Only the front-wall specular path may survive; the back-wall path is occluded.

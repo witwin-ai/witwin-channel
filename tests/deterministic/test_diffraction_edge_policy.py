@@ -2,9 +2,11 @@ import pytest
 import torch
 
 from tests.support.scenes import wedge_diffraction_scene
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config
 from witwin.channel.propagation.enumerated.engine import evaluate_enumerated_paths
+from witwin.channel.scene import compile as compile_scene
+from witwin.channel.scene.endpoints import bind_solver_scene
 
 
 def test_diffraction_topology_uses_selected_edge_ids():
@@ -13,7 +15,10 @@ def test_diffraction_topology_uses_selected_edge_ids():
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native diffraction is not built")
 
-    scene = wedge_diffraction_scene()
+    compiled = compile_scene(
+        wedge_diffraction_scene(), reference_frequency_hz=3.0e9
+    )
+    scene = bind_solver_scene(compiled)
     paths, _ = evaluate_enumerated_paths(scene, Config(components={"diffraction"}))
     topology = paths.topology
 
@@ -21,4 +26,6 @@ def test_diffraction_topology_uses_selected_edge_ids():
     assert torch.all(topology.component_id == 2)
     assert torch.all(topology.edge_id >= 0)
     assert torch.any(paths.geometry.interaction_position.abs() > 0.0)
-    assert int(torch.unique(topology.edge_id).numel()) <= scene.diffraction_edge_count()
+    assert int(torch.unique(topology.edge_id).numel()) <= int(
+        compiled.geometry.edges.shape[0]
+    )

@@ -5,9 +5,17 @@ from dataclasses import replace
 
 import torch
 
-from witwin.channel.core.antenna import orientation_matrix, steering_vector
-from witwin.channel.scene.models import ReceiverGrid, ReceiverPoint, Transmitter
-from witwin.channel.scene.models import Scene
+from witwin.channel.scene.antenna import (
+    orientation_matrix,
+    pattern_field_response,
+    steering_vector,
+)
+from witwin.channel.scene.endpoints import (
+    ReceiverGrid,
+    ReceiverPoint,
+    SolverScene as Scene,
+    Transmitter,
+)
 
 from .result import PathResult
 
@@ -77,8 +85,9 @@ def _synthetic_endpoint_factor(
             frequency_hz=frequency_hz,
             orientation=endpoint.orientation,
         )
-        pattern = endpoint.pattern.field_response(
-            _local_direction(sub, endpoint.orientation)
+        pattern = pattern_field_response(
+            endpoint.pattern,
+            _local_direction(sub, endpoint.orientation),
         )
         if conjugate_pattern:
             pattern = pattern.conj()
@@ -207,8 +216,9 @@ def pack_synthetic_arrays(
             frequency_hz=frequency_hz,
             orientation=transmitter.orientation,
         )
-        pattern = transmitter.pattern.field_response(
-            _local_direction(direction, transmitter.orientation)
+        pattern = pattern_field_response(
+            transmitter.pattern,
+            _local_direction(direction, transmitter.orientation),
         )
         tx_factors.append(steering * pattern.unsqueeze(-1))
     # (rx, tx, path, tx_ant) -> (rx, tx, tx_ant, path)
@@ -288,10 +298,10 @@ def explicit_array_scene(scene: Scene) -> tuple[Scene, int, int]:
         )
         for position in positions:
             expanded_tx.append(
-                Transmitter(
-                    position=position,
-                    power_w=transmitter.power_w,
-                    polarization=transmitter.polarization,
+                replace(
+                    transmitter,
+                    position_override=position,
+                    single_element=True,
                 )
             )
     expanded_rx: list[ReceiverPoint] = []
@@ -300,18 +310,17 @@ def explicit_array_scene(scene: Scene) -> tuple[Scene, int, int]:
         positions = receiver.array.world_positions(receiver.position, receiver.orientation)
         for position in positions:
             expanded_rx.append(
-                ReceiverPoint(position=position, polarization=receiver.polarization)
+                replace(
+                    receiver,
+                    position_override=position,
+                    single_element=True,
+                )
             )
     return (
-        Scene(
-            structures=scene.structures,
-            transmitters=expanded_tx,
-            receivers=expanded_rx,
-            frequency=scene.frequency,
-            metadata=scene.metadata,
-            _geometry_version=scene._geometry_version,
-            _material_version=scene._material_version,
-            _assignment_version=scene._assignment_version,
+        replace(
+            scene,
+            transmitters=tuple(expanded_tx),
+            receivers=tuple(expanded_rx),
         ),
         num_rx_ant,
         num_tx_ant,
@@ -346,12 +355,14 @@ def pack_explicit_arrays(
     departure = _unit_vector(theta_t, phi_t)
     arrival = _unit_vector(theta_r, phi_r)
     for tx_id, transmitter in enumerate(scene.transmitters):
-        pattern_factor[:, :, tx_id] *= transmitter.pattern.field_response(
-            _local_direction(departure[:, :, tx_id], transmitter.orientation)
+        pattern_factor[:, :, tx_id] *= pattern_field_response(
+            transmitter.pattern,
+            _local_direction(departure[:, :, tx_id], transmitter.orientation),
         )
     for rx_id, receiver in enumerate(scene.receivers):
-        pattern_factor[rx_id] *= receiver.pattern.field_response(
-            _local_direction(arrival[rx_id], receiver.orientation)
+        pattern_factor[rx_id] *= pattern_field_response(
+            receiver.pattern,
+            _local_direction(arrival[rx_id], receiver.orientation),
         ).conj()
     a = a * pattern_factor.unsqueeze(-1)
     field_xyz = field_xyz * pattern_factor.unsqueeze(-1)

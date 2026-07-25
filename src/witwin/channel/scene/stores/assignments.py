@@ -4,13 +4,17 @@ from dataclasses import dataclass, field
 
 import torch
 
-from witwin.channel.materials.models import PhaseScreen
+from witwin.core import PhaseScreen
 
 from ._validation import require_tensor
 
 
 @dataclass(frozen=True, slots=True)
 class AssignmentStore:
+    assignment_id: torch.Tensor
+    material_id: torch.Tensor
+    structure_id: torch.Tensor
+    surface_id: torch.Tensor
     face_material_id: torch.Tensor
     edge_material_id0: torch.Tensor
     edge_material_id1: torch.Tensor
@@ -19,10 +23,14 @@ class AssignmentStore:
     num_faces: int
     num_edges: int
     version: int
-    # ABI v3: per-structure phase-screen bindings from SurfaceAssignment.
+    # Per-structure phase-screen bindings from the Core Structure assignment.
     structure_phase_screens: dict[int, PhaseScreen] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        require_tensor("assignment_id", self.assignment_id, dtype=torch.int64, ndim=1)
+        require_tensor("material_id", self.material_id, dtype=torch.int64, ndim=1)
+        require_tensor("structure_id", self.structure_id, dtype=torch.int64, ndim=1)
+        require_tensor("surface_id", self.surface_id, dtype=torch.int64, ndim=1)
         require_tensor("face_material_id", self.face_material_id, dtype=torch.int32, ndim=1)
         require_tensor("edge_material_id0", self.edge_material_id0, dtype=torch.int32, ndim=1)
         require_tensor("edge_material_id1", self.edge_material_id1, dtype=torch.int32, ndim=1)
@@ -37,6 +45,23 @@ class AssignmentStore:
         if self.edge_material_id1.shape[0] != self.num_edges:
             raise ValueError("edge_material_id1 length must match num_edges")
         num_structures = self.structure_material_id.shape[0]
+        if not (
+            self.assignment_id.shape[0]
+            == self.material_id.shape[0]
+            == self.structure_id.shape[0]
+            == self.surface_id.shape[0]
+            == num_structures
+        ):
+            raise ValueError(
+                "stable assignment/material/structure IDs must have one row "
+                "per structure"
+            )
+        for name, values in (
+            ("assignment_id", self.assignment_id),
+            ("structure_id", self.structure_id),
+        ):
+            if torch.unique(values).numel() != values.numel():
+                raise ValueError(f"{name} must be unique")
         for index, screen in self.structure_phase_screens.items():
             if not isinstance(index, int) or not 0 <= index < num_structures:
                 raise ValueError(
@@ -45,6 +70,3 @@ class AssignmentStore:
                 )
             if not isinstance(screen, PhaseScreen):
                 raise ValueError("structure_phase_screens values must be PhaseScreen")
-
-
-AssignmentStore.__module__ = "witwin.channel.core.runtime.assignments"

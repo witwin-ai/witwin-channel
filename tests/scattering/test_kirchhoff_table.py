@@ -13,7 +13,7 @@ import math
 import pytest
 import torch
 
-from witwin.channel.core.materials import Roughness
+from witwin.core import SurfaceRoughness
 from witwin.channel.scattering import build_kirchhoff_table, eval_bsdf
 
 _EPS0 = 8.8541878128e-12
@@ -29,7 +29,7 @@ def _lossy_layers(frequency_hz: float, thickness_m: float) -> list[tuple]:
 
 @pytest.fixture(scope="module")
 def table_60ghz():
-    rough = Roughness(rms_height_m=1e-3, corr_length_x_m=10e-3, corr_length_y_m=10e-3)
+    rough = SurfaceRoughness(rms_height_m=1e-3, correlation_length_x_m=10e-3, correlation_length_y_m=10e-3)
     return build_kirchhoff_table(rough, _lossy_layers(60e9, 0.1), 60e9, device=DEVICE)
 
 
@@ -56,7 +56,7 @@ def test_energy_matches_r_diff(table_60ghz, ti):
 def test_energy_6ghz_contract_material():
     """The contract's 6 GHz eps 4-0.1j material builds and conserves energy."""
 
-    rough = Roughness(rms_height_m=1e-3, corr_length_x_m=0.1, corr_length_y_m=0.1)
+    rough = SurfaceRoughness(rms_height_m=1e-3, correlation_length_x_m=0.1, correlation_length_y_m=0.1)
     table = build_kirchhoff_table(rough, _lossy_layers(6e9, 0.5), 6e9, device=DEVICE)
     for ti in (8, 16, 24, 31):
         for f, r_diff in ((table.f_te, table.r_diff_te), (table.f_tm, table.r_diff_tm)):
@@ -69,7 +69,7 @@ def test_energy_6ghz_contract_material():
 def test_smooth_limit_near_zero_lobe():
     """sigma_h -> 1e-6 gives R_diff ~ 0 and a near-zero diffuse lobe."""
 
-    rough = Roughness(rms_height_m=1e-6, corr_length_x_m=0.1, corr_length_y_m=0.1)
+    rough = SurfaceRoughness(rms_height_m=1e-6, correlation_length_x_m=0.1, correlation_length_y_m=0.1)
     table = build_kirchhoff_table(rough, _lossy_layers(60e9, 0.1), 60e9, device=DEVICE)
     assert float(table.r_diff_unpol.max()) < 1e-6
     assert float(table.f_te.max()) < 1e-3
@@ -116,7 +116,7 @@ def test_final_table_reciprocity_at_bin_centers(table_60ghz):
 
 
 def test_anisotropic_table_has_phi_i_axis(table_60ghz):
-    rough = Roughness(rms_height_m=1e-3, corr_length_x_m=10e-3, corr_length_y_m=20e-3)
+    rough = SurfaceRoughness(rms_height_m=1e-3, correlation_length_x_m=10e-3, correlation_length_y_m=20e-3)
     table = build_kirchhoff_table(rough, _lossy_layers(60e9, 0.1), 60e9, device=DEVICE)
     assert table.anisotropic
     assert table.phi_i.numel() == 64
@@ -141,11 +141,11 @@ def test_out_of_domain_roughness_raises():
     """Applicability guards: k0*l >= 6 and slope <= 0.5, contract wording."""
 
     # 6 GHz with l = 10 mm: k0*l = 1.26 < 6 (tangent-plane violated).
-    rough = Roughness(rms_height_m=1e-3, corr_length_x_m=10e-3, corr_length_y_m=10e-3)
+    rough = SurfaceRoughness(rms_height_m=1e-3, correlation_length_x_m=10e-3, correlation_length_y_m=10e-3)
     with pytest.raises(ValueError, match="kirchhoff_domain_exceeded"):
         build_kirchhoff_table(rough, _lossy_layers(6e9, 0.1), 6e9, device=DEVICE)
     # 60 GHz with sigma_h = 4 mm, l = 10 mm: slope 0.57 > 0.5.
-    steep = Roughness(rms_height_m=4e-3, corr_length_x_m=10e-3, corr_length_y_m=10e-3)
+    steep = SurfaceRoughness(rms_height_m=4e-3, correlation_length_x_m=10e-3, correlation_length_y_m=10e-3)
     with pytest.raises(ValueError, match="kirchhoff_domain_exceeded"):
         build_kirchhoff_table(steep, _lossy_layers(60e9, 0.1), 60e9, device=DEVICE)
 

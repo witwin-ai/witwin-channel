@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from witwin.channel.core.components import (
+from witwin.channel.components import (
     AD_MODES as _VALID_AD_MODES,
     BOUNCE_COMPONENTS as _BOUNCE_COMPONENTS,
     DEFAULT_COMPONENTS as _DEFAULT_COMPONENTS,

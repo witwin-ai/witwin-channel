@@ -22,8 +22,8 @@ import math
 import numpy as np
 import torch
 
-from witwin.channel.materials.models import PhaseScreen, Roughness
-from witwin.channel.physics.conventions import C0
+from witwin.core import PhaseScreen, SurfaceRoughness
+from witwin.channel.constants import C0
 
 __all__ = [
     "PhaseScreenRuntime",
@@ -41,7 +41,7 @@ class PhaseScreenRuntime:
             raise ValueError("screen must be a PhaseScreen")
         device = torch.device(device)
         # Metric heights [m]: stored texture * scale + offset, float32.
-        heights = screen.height_tensor().to(device=device, dtype=torch.float32)
+        heights = screen.height.to(device=device, dtype=torch.float32)
         self.heights_m = (
             heights * float(screen.height_scale_m) + float(screen.height_offset_m)
         ).contiguous()
@@ -110,7 +110,7 @@ def realization_seed(scene_seed: int, surface_id: int, realization_id: int) -> i
 
 
 def generate_gaussian_realization(
-    roughness: Roughness,
+    roughness: SurfaceRoughness,
     extent_m: tuple[float, float] | float,
     resolution: tuple[int, int] | int,
     seed: int,
@@ -138,8 +138,8 @@ def generate_gaussian_realization(
     """
 
     sigma_h = float(roughness.rms_height_m)
-    lx = float(roughness.corr_length_x_m)
-    ly = float(roughness.corr_length_y_m)
+    lx = float(roughness.correlation_length_x_m)
+    ly = float(roughness.correlation_length_y_m)
     if isinstance(extent_m, (int, float)):
         extent_m = (float(extent_m), float(extent_m))
     if isinstance(resolution, int):

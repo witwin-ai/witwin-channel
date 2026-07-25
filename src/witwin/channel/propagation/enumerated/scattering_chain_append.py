@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any
 
 import torch
 
-from witwin.channel.core.field_state import (
+from witwin.channel.field_state import (
     receiver_polarizations,
     transmitter_polarizations,
 )
@@ -29,7 +29,7 @@ from witwin.channel.materials.encoding import (
     face_material_tensors,
     face_material_thickness,
 )
-from witwin.channel.materials.models import PhaseScreen
+from witwin.core import PhaseScreen
 from witwin.channel.scattering.kernels import autograd as scattering_autograd
 from witwin.channel.scattering.kernels import functional_chain as scattering_chain_kernels
 from witwin.channel.propagation.enumerated.contracts import TopologyConfig
@@ -40,6 +40,7 @@ from witwin.channel.propagation.enumerated.scattering import (
 from witwin.channel.scene.scattering_resources import (
     realization_phase_screens,
 )
+from witwin.channel.scene.endpoints import require_compiled
 from witwin.channel.propagation.enumerated.scattering_chain import (
     KMAX_AD_DEPTH,
     ScatterChainDiscovery,
@@ -58,10 +59,10 @@ from witwin.channel.propagation.models.fields import PathFields
 from witwin.channel.propagation.models.geometry import PathGeometry
 from witwin.channel.propagation.models.topology import PathTopology
 from witwin.channel.propagation.topology.export import EvaluatedPathSidecars
-from witwin.channel.physics.conventions import C0
+from witwin.channel.constants import C0
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.models import Scene
+    from witwin.channel.scene.endpoints import SolverScene as Scene
 
 __all__ = ["append_chain_scattering_paths"]
 
@@ -81,8 +82,9 @@ def _ensemble_scatter_faces(
         device=device, dtype=torch.int64
     )
     realization_face = torch.zeros_like(scatter_face)
-    for index in screens:
-        realization_face |= face_structure == index
+    for structure_index in screens:
+        structure_id = int(compiled.assignments.structure_id[structure_index])
+        realization_face |= face_structure == structure_id
     return torch.nonzero(scatter_face & ~realization_face, as_tuple=False).reshape(-1)
 
 
@@ -540,7 +542,7 @@ def append_chain_scattering_paths(
     """
 
     device = evaluated.device
-    compiled = scene.compile()
+    compiled = require_compiled(scene)
     if not compiled.rayd.available:
         raise RuntimeError(
             "deterministic scatter-chain discovery requires RayD native capability"

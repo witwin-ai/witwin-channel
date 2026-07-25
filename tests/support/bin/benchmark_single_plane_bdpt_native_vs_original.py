@@ -17,8 +17,11 @@ sys.path.insert(0, str(_REPO_ROOT / "src"))
 sys.path.insert(0, str(_REPO_ROOT))
 
 # Local source must resolve from this checkout before importing the benchmark target.
-from witwin.channel import ReceiverGrid, Scene, Structure, Transmitter  # noqa: E402
-from witwin.channel.core.materials import Dielectric  # noqa: E402
+from witwin.core import PhysicalMaterial, Scene, Structure  # noqa: E402
+from tests.support.core_world import (  # noqa: E402
+    make_receiver_grid,
+    make_transmitter,
+)
 from witwin.channel.montecarlo.bdpt import Config, solve  # noqa: E402
 
 
@@ -59,14 +62,14 @@ def _native_scene(grid_size: int) -> Scene:
             Structure(
                 vertices=vertices,
                 faces=faces,
-                material=Dielectric(eps_r=4.0, sigma_e=0.01),
+                material=PhysicalMaterial(eps_r=4.0, sigma_e=0.01),
                 name="single-plane-wall",
                 surface_id=11,
             )
         ],
-        transmitters=[Transmitter(position=torch.tensor(TX_POSITION, dtype=torch.float32), power_w=1.0)],
+        transmitters=[make_transmitter(position=torch.tensor(TX_POSITION, dtype=torch.float32), power_w=1.0)],
         receivers=[
-            ReceiverGrid(
+            make_receiver_grid(
                 origin=torch.tensor([RECEIVER_PLANE_X, y_min + 0.5 * spacing_y, z_min + 0.5 * spacing_z]),
                 x_axis=torch.tensor([0.0, 1.0, 0.0]),
                 y_axis=torch.tensor([0.0, 0.0, 1.0]),
@@ -146,9 +149,9 @@ def main() -> None:
                 material=Material(eps_r=4.0, sigma_e=0.01),
             ),
         ],
-        transmitters=[Transmitter("tx", (0.0, -1.0, 0.5), power=1.0)],
+        transmitters=[make_transmitter("tx", (0.0, -1.0, 0.5), power=1.0)],
         receivers=[
-            ReceiverGrid(
+            make_receiver_grid(
                 "rm",
                 axis="x",
                 position=0.0,

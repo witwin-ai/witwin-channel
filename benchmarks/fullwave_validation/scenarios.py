@@ -6,14 +6,21 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from witwin.channel import (
-    PerfectConductor,
+from witwin.core import (
+    AntennaState,
+    MaterialLayer,
+    Mesh,
+    PhysicalMaterial,
     ReceiverGrid,
     Scene,
     Structure,
-    Transmitter,
 )
-from witwin.channel.core.materials import Layer, PhysicalSurface
+from witwin.core.identity import (
+    new_antenna_id,
+    new_assignment_id,
+    new_material_id,
+    new_structure_id,
+)
 
 from .models import CaseSpec, MaterialSpec
 
@@ -102,11 +109,11 @@ def _cube_mesh(
 
 def build_channel_scene(spec: CaseSpec) -> Scene:
     if spec.material.kind == "metal":
-        material = PerfectConductor(name="pec")
+        material = PhysicalMaterial.perfect_conductor(name="pec")
     else:
-        material = PhysicalSurface(
+        material = PhysicalMaterial(
             layers=(
-                Layer(
+                MaterialLayer(
                     thickness_m=spec.cube_size_m / 2.0,
                     eps_r=spec.material.eps_r,
                     sigma_e=spec.material.sigma_e,
@@ -119,10 +126,18 @@ def build_channel_scene(spec: CaseSpec) -> Scene:
         vertices, faces = _cube_mesh(center, spec.cube_size_m)
         structures.append(
             Structure(
-                vertices=vertices,
-                faces=faces,
-                material=material,
+                Mesh(
+                    vertices,
+                    faces,
+                    recenter=False,
+                    fill_mode="solid",
+                    topology_diagnostics=False,
+                ),
+                material,
                 name=f"cube-{index}",
+                structure_id=new_structure_id(),
+                material_id=new_material_id(),
+                assignment_id=new_assignment_id(),
                 surface_id=index,
             )
         )
@@ -131,14 +146,15 @@ def build_channel_scene(spec: CaseSpec) -> Scene:
     y = spec.y
     return Scene(
         structures=structures,
-        transmitters=[
-            Transmitter(
-                position=torch.tensor(spec.tx_position),
+        endpoints=[
+            AntennaState(
+                new_antenna_id(),
+                "tx",
+                torch.tensor(spec.tx_position),
                 polarization=torch.tensor([0.0, 0.0, 1.0]),
-            )
-        ],
-        receivers=[
+            ),
             ReceiverGrid(
+                new_antenna_id(),
                 origin=torch.tensor([x[0], y[0], spec.plane_z]),
                 x_axis=torch.tensor([1.0, 0.0, 0.0]),
                 y_axis=torch.tensor([0.0, 1.0, 0.0]),
@@ -147,10 +163,10 @@ def build_channel_scene(spec: CaseSpec) -> Scene:
                 polarization=torch.tensor([0.0, 0.0, 1.0]),
             )
         ],
-        frequency=spec.frequency_hz,
         metadata={
             "fullwave_validation_case": spec.case_id,
             "fullwave_validation_fingerprint": spec.fingerprint,
+            "reference_frequency_hz": spec.frequency_hz,
         },
     )
 

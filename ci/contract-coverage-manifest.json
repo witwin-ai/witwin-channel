@@ -37,6 +37,8 @@
     "native-diffraction-path-capacity": "tests/propagation/topology/test_diffraction_path_capacity.py::test_diffraction_order1_capacity_block_handles_empty_input_and_capacity",
     "native-deterministic-capacity-finalize": "tests/propagation/topology/test_deterministic_capacity_finalize.py::test_capacity_finalize_is_pair_major_stable_and_poison_safe",
     "native-enumerated-canonical-capacity-select": "tests/propagation/topology/test_enumerated_canonical_capacity_select.py::test_selector_contract_needs_no_public_result_capacity",
+    "native-enumerated-canonical-compact": "tests/path/test_path_canonical_selection.py::test_exact_owner_carries_empty_pair_offsets_and_one_sync_ledger",
+    "native-enumerated-exact-pair-metadata": "tests/propagation/consumer/test_e2e.py::test_consumer_scalar_complex3_and_jones_end_to_end",
     "native-enumerated-transmission-topology": "tests/propagation/topology/test_transmission_topology_capacity.py::test_pack_preserves_pair_capacity_normal_bits_and_device_counts",
     "native-enumerated-transmission-topology-ad": "tests/propagation/topology/test_transmission_topology_capacity.py::test_pack_jvp_routes_only_valid_continuous_geometry",
     "native-enumerated-capacity-failure-sanitize": "tests/propagation/enumerated/test_capacity_pack.py::test_mixed_capacity_failure_makes_paths_and_vector_sidecar_fully_inert",
@@ -84,7 +86,14 @@
     "native-scattering-chain-realization": "tests/scattering/test_chain_kernel_contracts.py::test_chain_realization_forward_schema",
     "native-scattering-chain-realization-ad": "tests/scattering/test_chain_kernel_contracts.py::test_chain_realization_backward_schema_and_gating",
     "native-bdpt-ad-companions": "tests/ad/test_bdpt_companion_ad.py::test_reflected_backward_matches_oracle",
-    "native-mc-discovery": "tests/montecarlo/basic/test_diffraction_discovery.py::test_diffraction_discover_edges_uses_prim_id_and_best_edge_filter"
+    "native-mc-discovery": "tests/montecarlo/basic/test_diffraction_discovery.py::test_diffraction_discover_edges_uses_prim_id_and_best_edge_filter",
+    "consumer-public-contract": "tests/propagation/consumer/test_public_contracts.py::test_consumer_cold_import_is_solver_neutral",
+    "native-consumer-compact": "tests/propagation/consumer/test_native_compact_finalizer.py::test_compact_finalize_radix_order_vjp_and_jvp_use_real_native",
+    "native-consumer-fixed-los": "tests/propagation/consumer/test_fixed_los_gather.py::test_fixed_los_gather_returns_exact_k_rows_and_pair_offsets",
+    "native-consumer-fixed-los-backward": "tests/propagation/consumer/test_fixed_los_gather.py::test_fixed_los_gather_vjp_scatter_adds_duplicate_endpoint_rows",
+    "native-consumer-fixed-los-jvp": "tests/propagation/consumer/test_fixed_los_gather.py::test_fixed_los_gather_jvp_uses_native_endpoint_gather",
+    "native-consumer-los-jones": "tests/propagation/consumer/test_los_jones.py::test_consumer_los_jones_matches_analytic_rotated_basis",
+    "consumer-prepared-topology": "tests/propagation/consumer/test_fixed_reflection.py::test_prepare_fixed_topology_buckets_cover_every_row_in_frozen_order"
   },
   "e2e_scenarios": {
     "bdpt-diffraction": "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available",
@@ -123,7 +132,6 @@
     "public-capabilities": "tests/test_capabilities.py::test_capability_manifest_is_versioned_serializable_and_defensive",
     "public-core": "tests/core/test_public_scene.py::test_public_scene_objects_capture_structured_inputs",
     "public-deployment": "tests/performance/test_deployment_contract.py::test_pipeline_cache_key_is_stable_and_invalidates_all_contract_inputs",
-    "public-materials": "tests/core/test_public_scene.py::test_materials_compile_scalar_parameters",
     "scene-native": "tests/scene/test_rayd_scene_kernels.py::test_rayd_scene_builder_preserves_native_order_flags_uv_and_keepalive",
     "deterministic-rough-reflection-ad": "tests/ad/test_solver_rough_reflection_ad.py::test_rough_reflection_frequency_grad_matches_fd",
     "deterministic-scattering-ensemble": "tests/deterministic/test_scattering.py::test_rough_wall_energy_budget_and_smooth_limit",
@@ -135,58 +143,17 @@
     "scattering-table-build-ad": "tests/scattering/test_table_build_ad.py::test_end_to_end_roughness_gradient_is_nonzero",
     "scattering-chain-ensemble": "tests/ad/test_chain_scattering_ad.py::test_chain_ensemble_ad_wrapper_and_fixed_rejection",
     "scattering-chain-realization": "tests/ad/test_chain_scattering_ad.py::test_chain_realization_ad_wrapper_and_fixed_rejection",
-    "bdpt-solver-ad": "tests/ad/test_bdpt_solver_ad.py::test_primal_under_ad_equals_none_bitwise"
+    "bdpt-solver-ad": "tests/ad/test_bdpt_solver_ad.py::test_primal_under_ad_equals_none_bitwise",
+    "consumer-discover": "tests/propagation/consumer/test_e2e.py::test_consumer_scalar_complex3_and_jones_end_to_end",
+    "consumer-fixed": "tests/propagation/consumer/test_e2e.py::test_fixed_los_reevaluation_vjp_and_jvp_end_to_end",
+    "consumer-compact-native": "tests/propagation/consumer/test_native_compact_finalizer.py::test_compact_finalize_radix_order_vjp_and_jvp_use_real_native",
+    "consumer-fixed-native": "tests/propagation/consumer/test_fixed_los_gather.py::test_fixed_los_gather_returns_exact_k_rows_and_pair_offsets",
+    "consumer-fixed-ad": "tests/propagation/consumer/test_fixed_los_gather.py::test_fixed_los_gather_vjp_scatter_adds_duplicate_endpoint_rows",
+    "consumer-jones-native": "tests/propagation/consumer/test_los_jones.py::test_consumer_los_jones_matches_analytic_rotated_basis",
+    "consumer-fixed-reflection": "tests/propagation/consumer/test_fixed_reflection.py::test_fixed_reflection_reproduces_discovery_at_unchanged_endpoints",
+    "consumer-reflection-jones": "tests/propagation/consumer/test_reflection_jones.py::test_reflection_jones_matches_the_superposition_oracle"
   },
   "public_exports": [
-    [
-      "witwin.channel.AntennaArray",
-      "public-api-snapshot",
-      [
-        "public-core"
-      ]
-    ],
-    [
-      "witwin.channel.AntennaPattern",
-      "public-api-snapshot",
-      [
-        "public-core"
-      ]
-    ],
-    [
-      "witwin.channel.ReceiverGrid",
-      "public-api-snapshot",
-      [
-        "public-core"
-      ]
-    ],
-    [
-      "witwin.channel.ReceiverPoint",
-      "public-api-snapshot",
-      [
-        "public-core"
-      ]
-    ],
-    [
-      "witwin.channel.Scene",
-      "public-api-snapshot",
-      [
-        "public-core"
-      ]
-    ],
-    [
-      "witwin.channel.Structure",
-      "public-api-snapshot",
-      [
-        "public-core"
-      ]
-    ],
-    [
-      "witwin.channel.Transmitter",
-      "public-api-snapshot",
-      [
-        "public-core"
-      ]
-    ],
     [
       "witwin.channel.Complex3State",
       "public-api-snapshot",
@@ -209,6 +176,13 @@
       ]
     ],
     [
+      "witwin.channel.capabilities",
+      "public-api-snapshot",
+      [
+        "public-capabilities"
+      ]
+    ],
+    [
       "witwin.channel.pipeline_cache_key",
       "public-api-snapshot",
       [
@@ -220,48 +194,6 @@
       "public-api-snapshot",
       [
         "public-deployment"
-      ]
-    ],
-    [
-      "witwin.channel.capabilities",
-      "public-api-snapshot",
-      [
-        "public-capabilities"
-      ]
-    ],
-    [
-      "witwin.channel.Dielectric",
-      "public-api-snapshot",
-      [
-        "public-materials"
-      ]
-    ],
-    [
-      "witwin.channel.DispersiveMaterial",
-      "public-api-snapshot",
-      [
-        "public-materials"
-      ]
-    ],
-    [
-      "witwin.channel.ITUMaterial",
-      "public-api-snapshot",
-      [
-        "public-materials"
-      ]
-    ],
-    [
-      "witwin.channel.LossyDielectric",
-      "public-api-snapshot",
-      [
-        "public-materials"
-      ]
-    ],
-    [
-      "witwin.channel.PerfectConductor",
-      "public-api-snapshot",
-      [
-        "public-materials"
       ]
     ],
     [
@@ -297,27 +229,6 @@
       "public-api-snapshot",
       [
         "path-los"
-      ]
-    ],
-    [
-      "witwin.channel.path.pack_synthetic_arrays",
-      "public-api-snapshot",
-      [
-        "path-reflection"
-      ]
-    ],
-    [
-      "witwin.channel.path.explicit_array_scene",
-      "public-api-snapshot",
-      [
-        "path-reflection"
-      ]
-    ],
-    [
-      "witwin.channel.path.pack_explicit_arrays",
-      "public-api-snapshot",
-      [
-        "path-reflection"
       ]
     ],
     [
@@ -395,6 +306,230 @@
       "public-api-snapshot",
       [
         "bdpt-los"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.AD_MODES",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.COMPONENTS",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.CONTRACT_VERSION",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.Complex3Transport",
+      "consumer-public-contract",
+      [
+        "consumer-discover",
+        "consumer-fixed"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.EndpointBatch",
+      "consumer-public-contract",
+      [
+        "consumer-discover",
+        "consumer-fixed"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.FixedTopologyBucket",
+      "consumer-prepared-topology",
+      [
+        "consumer-fixed-reflection"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.FixedTopologyEvaluation",
+      "consumer-public-contract",
+      [
+        "consumer-fixed",
+        "consumer-fixed-reflection"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.FixedTopologyRequest",
+      "consumer-public-contract",
+      [
+        "consumer-fixed",
+        "consumer-fixed-reflection"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.JonesTransport",
+      "consumer-public-contract",
+      [
+        "consumer-discover",
+        "consumer-reflection-jones"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.MAX_DEPTH",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.PreparedFixedTopology",
+      "consumer-prepared-topology",
+      [
+        "consumer-fixed-reflection",
+        "consumer-reflection-jones"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.PropagationAdMode",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.PropagationCapabilities",
+      "consumer-public-contract",
+      [
+        "consumer-discover",
+        "consumer-fixed"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.PropagationComponent",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.PropagationConvention",
+      "consumer-public-contract",
+      [
+        "consumer-discover",
+        "consumer-fixed"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.PropagationDiagnostics",
+      "consumer-public-contract",
+      [
+        "consumer-discover",
+        "consumer-fixed"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.PropagationEvaluation",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.PropagationGeometry",
+      "consumer-public-contract",
+      [
+        "consumer-discover",
+        "consumer-fixed"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.PropagationPathBatch",
+      "consumer-public-contract",
+      [
+        "consumer-discover",
+        "consumer-fixed"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.PropagationRequest",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.PropagationResponse",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.PropagationTopology",
+      "consumer-public-contract",
+      [
+        "consumer-discover",
+        "consumer-fixed"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.PropagationTopologyMode",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.RESPONSES",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.ScalarTransport",
+      "consumer-public-contract",
+      [
+        "consumer-discover",
+        "consumer-fixed"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.TOPOLOGY_MODES",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.capabilities",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.evaluate",
+      "consumer-public-contract",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.prepare_fixed_topology",
+      "consumer-prepared-topology",
+      [
+        "consumer-fixed-reflection",
+        "consumer-reflection-jones"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.reevaluate",
+      "consumer-public-contract",
+      [
+        "consumer-fixed"
       ]
     ]
   ],
@@ -2533,6 +2668,87 @@
       "native-scattering",
       [
         "bdpt-scattering"
+      ]
+    ],
+    [
+      "consumer_fixed_los_gather",
+      "witwin.channel.propagation.consumer._fixed_los._FixedLoSGatherFunction.forward",
+      "native_call_site",
+      "native-consumer-fixed-los",
+      [
+        "consumer-fixed-native"
+      ]
+    ],
+    [
+      "consumer_fixed_los_gather_backward",
+      "witwin.channel.propagation.consumer._fixed_los._FixedLoSGatherFunction.backward",
+      "native_call_site",
+      "native-consumer-fixed-los-backward",
+      [
+        "consumer-fixed-ad"
+      ]
+    ],
+    [
+      "consumer_fixed_los_gather_jvp",
+      "witwin.channel.propagation.consumer._fixed_los._FixedLoSGatherFunction.jvp",
+      "native_call_site",
+      "native-consumer-fixed-los-jvp",
+      [
+        "consumer-fixed-ad"
+      ]
+    ],
+    [
+      "consumer_los_jones",
+      "witwin.channel.propagation.consumer._native.consumer_los_jones",
+      "named_wrapper",
+      "native-consumer-los-jones",
+      [
+        "consumer-jones-native"
+      ]
+    ],
+    [
+      "evaluated_paths_compact_finalize",
+      "witwin.channel.propagation.consumer._native.evaluated_paths_compact_finalize",
+      "named_wrapper",
+      "native-consumer-compact",
+      [
+        "consumer-compact-native"
+      ]
+    ],
+    [
+      "evaluated_paths_compact_finalize_backward",
+      "witwin.channel.propagation.topology.kernels.compact_autograd.evaluated_paths_compact_finalize_backward",
+      "native_call_site",
+      "native-consumer-compact",
+      [
+        "consumer-compact-native"
+      ]
+    ],
+    [
+      "evaluated_paths_compact_finalize_jvp",
+      "witwin.channel.propagation.topology.kernels.compact_autograd.evaluated_paths_compact_finalize_jvp",
+      "native_call_site",
+      "native-consumer-compact",
+      [
+        "consumer-compact-native"
+      ]
+    ],
+    [
+      "enumerated_canonical_compact",
+      "witwin.channel.propagation.topology.kernels.canonical_compact.enumerated_canonical_compact",
+      "named_wrapper",
+      "native-enumerated-canonical-compact",
+      [
+        "consumer-discover"
+      ]
+    ],
+    [
+      "enumerated_exact_pair_metadata",
+      "witwin.channel.propagation.topology.kernels.canonical_compact.enumerated_exact_pair_metadata",
+      "named_wrapper",
+      "native-enumerated-exact-pair-metadata",
+      [
+        "consumer-discover"
       ]
     ]
   ]

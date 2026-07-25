@@ -221,12 +221,16 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "manylinux_2_28" in workflow
 
     locked_rayd = "49c58c4cb8212f6babb920cc88fb937509826cc5"
+    locked_core = "7791ce21a23d471bf4306b21d6919000ef97bccc"
     lock = json.loads(
         (ROOT / "dependencies" / "rayd.lock.json").read_text(encoding="utf-8")
     )
     assert lock["commit"] == locked_rayd
     assert lock["source_bundle"]["distribution_version"] == "0.7.0"
     assert f"RAYD_COMMIT: {locked_rayd}" in workflow
+    assert f"CORE_COMMIT: {locked_core}" in workflow
+    assert "repository: witwin-ai/witwin-core" in workflow
+    assert "python -m pip install --no-deps ./core" in workflow
     assert "repository: Asixa/RayD" in workflow
     assert "RAYD_SOURCE_DIR=" in workflow
     assert "-DCHANNEL_RELEASE_BUILD=ON" in workflow
@@ -251,6 +255,12 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "sub-packages:" in workflow
     assert "safe.directory /project/channel" in workflow
     assert "safe.directory /host${{ github.workspace }}/rayd" in workflow
+    assert "python channel/ci/wheel_smoke.py" in workflow
+    assert "import witwin.channel as channel" in workflow
+    assert "from witwin.channel.propagation import consumer" in workflow
+    assert '"enumerated_canonical_compact"' in workflow
+    assert '"enumerated_exact_pair_metadata"' in workflow
+    assert '"consumer_los_jones"' in workflow
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
     assert "CHANNEL_CUDA_GENCODE_FLAGS" in cmake
     second_torch_find = cmake.index("find_package(Torch REQUIRED)", cmake.index("add_subdirectory("))

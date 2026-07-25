@@ -8,7 +8,7 @@ from tests.support.scenes import (
     wedge_diffraction_scene,
 )
 from witwin.channel.propagation.topology.kernels import blocks as topology_blocks
-from witwin.channel.core.kernels.extension import build_info
+from witwin.channel.deployment import build_info
 from witwin.channel.path import Config, InteractionType, PathResult, solve
 
 
@@ -17,7 +17,11 @@ def test_path_solver_empty_space_los_returns_one_path_per_pair():
         pytest.skip("CUDA is required for path solver")
 
     scene = empty_space_los_scene()
-    result = solve(scene, Config(components={"los"}))
+    result = solve(
+        scene,
+        Config(components={"los"}),
+        reference_frequency_hz=3.0e9,
+    )
 
     assert isinstance(result, PathResult)
     assert result.valid.is_cuda
@@ -33,10 +37,20 @@ def test_path_solver_reflection_is_capability_gated():
         pytest.skip("CUDA is required for path solver")
 
     if not build_info()["uses_rayd_native"]:
-        with pytest.raises(RuntimeError, match="reflection paths require RayD native capability"):
-            solve(single_wall_reflection_scene(), Config(components={"reflection"}))
+        with pytest.raises(
+            RuntimeError, match="reflection paths require RayD native capability"
+        ):
+            solve(
+                single_wall_reflection_scene(),
+                Config(components={"reflection"}),
+                reference_frequency_hz=3.0e9,
+            )
     else:
-        result = solve(single_wall_reflection_scene(), Config(components={"reflection"}))
+        result = solve(
+            single_wall_reflection_scene(),
+            Config(components={"reflection"}),
+            reference_frequency_hz=3.0e9,
+        )
         assert result.metadata["components"]["reflection"] == "enabled"
         assert int(result.valid.sum()) == 0
 
@@ -47,10 +61,16 @@ def test_path_solver_exports_native_reflection_paths_when_available():
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native reflection is not built")
 
-    result = solve(same_side_wall_reflection_scene(), Config(components={"reflection"}))
+    result = solve(
+        same_side_wall_reflection_scene(),
+        Config(components={"reflection"}),
+        reference_frequency_hz=3.0e9,
+    )
 
     assert result.metadata["components"]["reflection"] == "enabled"
-    reflection = result.valid & (result.interaction_type == int(InteractionType.REFLECTION)).any(dim=-1)
+    reflection = result.valid & (
+        result.interaction_type == int(InteractionType.REFLECTION)
+    ).any(dim=-1)
     assert int(reflection.sum().item()) >= 1
     assert torch.all(result.a[reflection].abs() > 0)
 
@@ -61,10 +81,16 @@ def test_path_solver_exports_native_diffraction_paths_when_available():
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native diffraction is not built")
 
-    result = solve(wedge_diffraction_scene(), Config(components={"diffraction"}))
+    result = solve(
+        wedge_diffraction_scene(),
+        Config(components={"diffraction"}),
+        reference_frequency_hz=3.0e9,
+    )
 
     assert result.metadata["components"]["diffraction"] == "enabled"
-    diffraction = result.valid & (result.interaction_type == int(InteractionType.DIFFRACTION)).any(dim=-1)
+    diffraction = result.valid & (
+        result.interaction_type == int(InteractionType.DIFFRACTION)
+    ).any(dim=-1)
     assert int(diffraction.sum().item()) >= 1
     assert torch.all(result.primitive_id[diffraction, 0] >= 0)
     assert torch.all(result.a[diffraction].abs() > 0)
@@ -76,7 +102,9 @@ def test_path_solver_accepts_transmission_and_scattering_as_empty_plumbing():
 
     scene = empty_space_los_scene()
     result = solve(
-        scene, Config(components={"los", "transmission", "scattering"})
+        scene,
+        Config(components={"los", "transmission", "scattering"}),
+        reference_frequency_hz=3.0e9,
     )
 
     # (a) validates and the LoS paths still export, (b) no transmission (5) or
@@ -108,6 +136,10 @@ def test_path_solver_calls_kernel_facade(monkeypatch):
 
     monkeypatch.setattr(topology_blocks, "path_los_export", wrapped)
 
-    solve(empty_space_los_scene(), Config(components={"los"}))
+    solve(
+        empty_space_los_scene(),
+        Config(components={"los"}),
+        reference_frequency_hz=3.0e9,
+    )
 
     assert len(calls) == 1

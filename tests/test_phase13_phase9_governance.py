@@ -158,7 +158,7 @@ def test_phase9_records_and_repository_guardrails_are_synchronized() -> None:
 
     assert "ADR-032 已接受" in plan
     assert "ADR-029 已因 Munich E2E/显存/吞吐" in plan
-    assert "ADR-030 reducer 保持 dormant" in plan
+    assert "ADR-030 reducer 保持 Dormant" in plan
     assert "Phase 9 — ADR-026" in plan
     assert "**状态：已完成（2026-07-19）。**" in plan
     assert "implementation ownership is superseded by ADR-026" in adr010

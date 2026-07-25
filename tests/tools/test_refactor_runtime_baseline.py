@@ -285,6 +285,77 @@ def test_extended_cells_cover_forward_and_path_deterministic_ad_only():
         assert (scenario, mode) in runtime._EXTENDED_AD_SEEDS
 
 
+def test_extended_builders_use_core_scene_material_and_endpoint_contracts():
+    from witwin.core import (
+        PhaseScreen,
+        PhysicalMaterial,
+        ReceiverGrid,
+        Scene,
+        SurfaceRoughness,
+    )
+
+    thin_scene, _, _ = runtime._extended_scene_and_config(
+        "path", "thin-wall-transmission"
+    )
+    grid_scene, _, _ = runtime._extended_scene_and_config(
+        "montecarlo-basic", "single-wedge-diffraction"
+    )
+    realization_scene, _, _ = runtime._extended_scene_and_config(
+        "deterministic", "rough-scattering-realization"
+    )
+
+    for scene in (thin_scene, grid_scene, realization_scene):
+        assert isinstance(scene, Scene)
+        assert not hasattr(scene, "frequency")
+        assert {endpoint.role for endpoint in scene.endpoints} == {"tx", "rx"}
+    assert isinstance(thin_scene.structures[0].material, PhysicalMaterial)
+    assert isinstance(grid_scene.endpoints[-1], ReceiverGrid)
+    rough_structure = realization_scene.structures[0]
+    assert isinstance(rough_structure.material, PhysicalMaterial)
+    assert isinstance(rough_structure.material.roughness_front, SurfaceRoughness)
+    assert isinstance(rough_structure.phase_screen, PhaseScreen)
+
+
+def test_reference_frequency_metadata_preserves_and_forwards_tensor_identity():
+    from witwin.core import Scene
+
+    frequency = torch.tensor(3.0e9, requires_grad=True)
+    scene = Scene(
+        metadata={runtime._REFERENCE_FREQUENCY_METADATA_KEY: frequency}
+    )
+    observed = {}
+
+    def solve(scene_arg, config_arg, *, reference_frequency_hz):
+        observed["scene"] = scene_arg
+        observed["config"] = config_arg
+        observed["frequency"] = reference_frequency_hz
+        return "result"
+
+    assert scene.metadata[runtime._REFERENCE_FREQUENCY_METADATA_KEY] is frequency
+    assert runtime._reference_frequency(scene) is frequency
+    assert runtime._solve_scene(solve, scene, "config") == "result"
+    assert observed == {
+        "scene": scene,
+        "config": "config",
+        "frequency": frequency,
+    }
+
+
+def test_extended_frequency_ad_builder_keeps_leaf_in_scene_metadata():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for the extended frequency AD leaf")
+
+    scene, _, _, seed = runtime._extended_ad_scene_config(
+        "path", "rough-reflection-cr", "vjp"
+    )
+    leaf = runtime._reference_frequency(scene)
+
+    assert seed == "frequency"
+    assert scene.metadata[runtime._REFERENCE_FREQUENCY_METADATA_KEY] is leaf
+    assert isinstance(leaf, torch.Tensor)
+    assert leaf.requires_grad
+
+
 def test_gradient_capture_manifest_hashes_gradient_and_excludes_timing():
     capture = runtime._GradientCapture(
         mode="vjp",

@@ -9,4 +9,8 @@ def test_bdpt_solver_requires_cuda(monkeypatch):
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
 
     with pytest.raises(RuntimeError, match="bdpt requires CUDA"):
-        solve(empty_space_los_scene(), Config(components={"los"}))
+        solve(
+            empty_space_los_scene(),
+            Config(components={"los"}),
+            reference_frequency_hz=3.0e9,
+        )
