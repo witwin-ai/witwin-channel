@@ -820,11 +820,13 @@ one-copy/four-byte/one-synchronization budget.
   zeros in every payload field and exactly zero derivative contribution - it
   does not raise and does not void the surviving rows. The mask is the sole
   authority for the components it covers; a valid row may legitimately carry a
-  zero coefficient. It covers `fixed_topology_row_validity_components` only,
-  today `{"reflection"}`: a frozen line-of-sight row is replayed as free space
-  and is never re-tested for visibility, so a sink that moves behind a wall
-  still reports a valid, full-strength row where fresh discovery would drop it.
-  Rediscover if you need blockage on the direct path.
+  zero coefficient. It covers `fixed_topology_row_validity_components`, today
+  `{"los", "reflection"}`. When ADR-037 landed the set was reflection-only and
+  a frozen line-of-sight row was replayed as free space without a visibility
+  re-test; since the 2026-07-25 amendment the prepared replay re-tests it with
+  the same native gate discovery applies, so a sink that moves behind a wall
+  publishes `row_valid=False` with exact zeros instead of a stale
+  full-strength answer.
 - Forward mode on the prepared route requires endpoint positions that carry
   `requires_grad` in addition to their forward tangent. `Function.apply`
   unpacks a dual before `setup_context` runs, so the shared native field

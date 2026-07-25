@@ -389,6 +389,7 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-035-rayd-native-trace-backend-selection.md`
 - `docs/dev/standards/adr-036-channel-public-surface-and-module-ownership.md`
 - `docs/dev/standards/adr-037-fixed-topology-reflection-and-composed-jones.md`
+- `docs/dev/standards/adr-038-wrapper-level-forward-ad-liveness.md`
 
 ADR-029 is Superseded, ADR-030 is Dormant, and ADR-031 is Rejected. They are
 historical records rather than implementation or release requirements; ADR-032

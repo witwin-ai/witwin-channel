@@ -55,6 +55,7 @@ class _FieldRoughReflectionScaleAdFunction(torch.autograd.Function):
         replaced,
         frequency,
         frequency_value,
+        geometry_live,
     ):
         out = field_rough_reflection_scale(
             field_vector,
@@ -85,7 +86,8 @@ class _FieldRoughReflectionScaleAdFunction(torch.autograd.Function):
             if isinstance(frequency, torch.Tensor)
             else None
         )
-        ctx.geometry_live = _ad_geometry_live(*inputs[4:7])
+        # Computed by the wrapper, where forward duals are still visible.
+        ctx.geometry_live = inputs[12]
         ctx.save_for_backward(*primals)
         ctx.save_for_forward(*primals)
 
@@ -98,7 +100,7 @@ class _FieldRoughReflectionScaleAdFunction(torch.autograd.Function):
         grad_path_field,
         grad_path_gain,
     ):
-        none_grads = (None,) * 12
+        none_grads = (None,) * 13
         _ad_reject_fixed_inputs(
             "field_rough_reflection_scale_ad",
             ctx.needs_input_grad,
@@ -147,6 +149,7 @@ class _FieldRoughReflectionScaleAdFunction(torch.autograd.Function):
             None,
             grad_frequency,
             None,
+            None,
         )
 
     @staticmethod
@@ -164,6 +167,7 @@ class _FieldRoughReflectionScaleAdFunction(torch.autograd.Function):
         _t_replaced,
         t_frequency,
         _t_frequency_value,
+        _t_geometry_live,
     ):
         _ad_reject_fixed_tangents(
             "field_rough_reflection_scale_ad",
@@ -250,6 +254,7 @@ def field_rough_reflection_scale_ad(
         replaced,
         frequency,
         float(frequency_value),
+        _ad_geometry_live(positions, normals, source),
     )
     return dict(zip(_ROUGH_SCALE_OUTPUT_FIELDS, values, strict=True))
 

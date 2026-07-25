@@ -48,6 +48,7 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
         rx_polarization,
         frequency,
         frequency_value,
+        geometry_live,
     ):
         op_name = (
             "field_free_space_fwd64"
@@ -75,6 +76,7 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
             rx_polarization,
             frequency,
             frequency_value,
+            geometry_live,
         ) = inputs
         primals = tuple(
             torch.autograd.forward_ad.unpack_dual(value).primal
@@ -86,7 +88,9 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
             if isinstance(frequency, torch.Tensor)
             else None
         )
-        ctx.geometry_live = _ad_geometry_live(source, target)
+        # Computed by the wrapper, where forward duals are still visible;
+        # Function.apply unpacks them before this hook runs.
+        ctx.geometry_live = geometry_live
         ctx.save_for_backward(*primals)
         ctx.save_for_forward(*primals)
         if ctx.geometry_live:
@@ -106,7 +110,7 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
         grad_delay,
         _grad_direction,
     ):
-        none_grads = (None,) * 7
+        none_grads = (None,) * 8
         _ad_reject_fixed_inputs(
             "field_free_space_ad",
             ctx.needs_input_grad,
@@ -162,6 +166,7 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
             None,
             grad_frequency,
             None,
+            None,
         )
 
     @staticmethod
@@ -174,6 +179,7 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
         t_rx_pol,
         t_frequency,
         _t_frequency_value,
+        _t_geometry_live,
     ):
         _ad_reject_fixed_tangents(
             "field_free_space_ad",
@@ -243,6 +249,7 @@ def field_free_space_ad(
         rx_polarization,
         frequency,
         float(frequency_value),
+        _ad_geometry_live(source, target),
     )
     return dict(zip(_FIELD_AD_OUTPUT_FIELDS, values, strict=True))
 
@@ -270,6 +277,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
         thickness,
         frequency,
         frequency_value,
+        geometry_live,
     ):
         out = _required_native_op("field_reflection_sequence")(
             source,
@@ -302,7 +310,8 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
             if isinstance(frequency, torch.Tensor)
             else None
         )
-        ctx.geometry_live = _ad_geometry_live(*inputs[:4])
+        # Computed by the wrapper, where forward duals are still visible.
+        ctx.geometry_live = inputs[14]
         ctx.save_for_backward(*primals)
         ctx.save_for_forward(*primals)
         if ctx.geometry_live:
@@ -322,7 +331,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
         grad_delay,
         _grad_direction,
     ):
-        none_grads = (None,) * 14
+        none_grads = (None,) * 15
         _ad_reject_fixed_inputs(
             "field_reflection_sequence_ad",
             ctx.needs_input_grad,
@@ -417,6 +426,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
             out["grad_thickness"] if need_thickness else None,
             grad_frequency,
             None,
+            None,
         )
 
     @staticmethod
@@ -436,6 +446,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
         t_thickness,
         t_frequency,
         _t_frequency_value,
+        _t_geometry_live,
     ):
         _ad_reject_fixed_tangents(
             "field_reflection_sequence_ad",
@@ -558,6 +569,7 @@ def field_reflection_sequence_ad(
         thickness,
         frequency,
         float(frequency_value),
+        _ad_geometry_live(source, target, interaction_positions, interaction_normals),
     )
     return dict(zip(_FIELD_AD_OUTPUT_FIELDS, values, strict=True))
 

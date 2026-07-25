@@ -110,13 +110,13 @@ zeros in its transport, path length, delay, direction, and interaction tables,
 and contributes exactly zero to every gradient.
 
 It covers exactly `capabilities().fixed_topology_row_validity_components`,
-today `{"reflection"}`. **A frozen line-of-sight row is never invalidated.** It
-is replayed as pure free-space transport and is not re-tested for visibility,
-so a sink that moves behind a wall still reports `row_valid=True` and a
-full-strength field even though fresh discovery would drop that row. This is
-the shipped version-1 line-of-sight behavior, unchanged. If your scene has
-blockers and you need blockage on the direct path, rediscover; the mask will
-not tell you.
+today `{"los", "reflection"}`. A frozen reflection row dies when its
+stationary point leaves the facet or a leg becomes occluded. A frozen
+line-of-sight row is re-tested with the same native visibility gate discovery
+applies to LoS candidates, so a sink that moves behind a wall publishes
+`row_valid=False` and exact zeros rather than a stale full-strength answer.
+The raw zero-interaction route remains version-1 surface and does not carry a
+mask; on that route, rediscover when blockage matters.
 
 This does not weaken the all-or-nothing rule. Capacity, ABI, contract, and
 device failures still raise before a result exists; only geometric
@@ -125,18 +125,19 @@ non-existence is published as data.
 ### Forward mode
 
 `ad_mode="jvp"` on the prepared route requires the endpoint position tensors to
-carry `requires_grad` **in addition to** their forward tangent:
+carry only a forward tangent; `requires_grad` is not required:
 
 ```python
-positions = base.clone().requires_grad_()
 with torch.autograd.forward_ad.dual_level():
     dual = torch.autograd.forward_ad.make_dual(positions, velocity)
 ```
 
-Without it the shared native field companions cannot observe a forward-only
-tangent and publish `path_length_m` and `delay_s` without one, which would make
-a delay-rate reader silently read zero. The route raises rather than answering
-partially. See ADR-037 section 8.
+Geometry liveness is decided at the caller-facing wrapper, where a forward
+dual is still visible, and passed into the shared field companions explicitly
+(ADR-038). `path_length_m`, `delay_s`, and the transport all carry tangents
+from a forward-only dual, and the `delay_s` tangent is what a Doppler
+`delay_rate` reader consumes. The older requires_grad-plus-dual convention
+keeps working unchanged.
 
 ### Per-call cost beyond the published budget
 

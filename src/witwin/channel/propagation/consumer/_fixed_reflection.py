@@ -114,18 +114,10 @@ def require_smooth_reflection_scene(compiled: CompiledScene) -> None:
 
 
 def _scene_tables(compiled: CompiledScene) -> dict[str, object]:
-    from witwin.channel.materials.encoding import face_material_field_bundle
-    from witwin.channel.scene import ad_geometry
-
-    # ``scene_vertex_table`` reads only ``.structures``, and CompiledScene
-    # exposes the same live structure tensors the discovery path binds, so the
-    # reevaluated geometry anchors on the same mesh-vertex leaves.
-    return {
-        "vertices": ad_geometry.scene_vertex_table(compiled, compiled),
-        "material": face_material_field_bundle(
-            compiled, device=compiled.geometry.vertices.device
-        ),
-    }
+    # CompiledScene owns the lazy scene-static cache (Plan-13 pattern); the
+    # replay just consumes it. The primal per-frame case stages host-to-device
+    # once per compiled scene instead of once per call.
+    return compiled.fixed_reevaluation_tables()
 
 
 def _reflection_inputs(
@@ -168,23 +160,46 @@ def _reflection_inputs(
 
 
 def _los_inputs(
-    bucket: FixedTopologyBucket, rows: PreparedRows
+    compiled: CompiledScene, bucket: FixedTopologyBucket, rows: PreparedRows
 ) -> BucketInputs:
     source = select_rows(rows.source, bucket.rows)
+    target = select_rows(rows.target, bucket.rows)
     empty = source.new_empty((int(source.shape[0]), 0, 3))
+    # Re-test visibility with the same native gate discovery applies to LoS
+    # candidates, so a sink that moved behind a wall publishes row_valid=False
+    # and exact zeros instead of a full-strength free-space answer. A
+    # structure-less scene cannot occlude anything and skips the launch.
+    if compiled.structures:
+        from witwin.channel.propagation.geometry.visibility import (
+            VisibilityQuery,
+            run_visibility_query,
+        )
+
+        valid = run_visibility_query(
+            VisibilityQuery(
+                rayd=compiled.rayd,
+                start=source.contiguous(),
+                end=target.contiguous(),
+                active=None,
+            )
+        ).visible
+    else:
+        valid = torch.ones(
+            (int(source.shape[0]),), dtype=torch.bool, device=source.device
+        )
     return BucketInputs(
         depth=0,
         source=source,
-        target=select_rows(rows.target, bucket.rows),
+        target=target,
         tx_power=select_rows(rows.tx_power, bucket.rows),
-        tx_polarization=select_rows(rows.tx_polarization, bucket.rows),
+        tx_polarization=_inert_where_invalid(
+            select_rows(rows.tx_polarization, bucket.rows), valid
+        ),
         rx_polarization=select_rows(rows.rx_polarization, bucket.rows),
         interaction_positions=empty,
         interaction_normals=empty,
         material=(),
-        valid=torch.ones(
-            (int(source.shape[0]),), dtype=torch.bool, device=source.device
-        ),
+        valid=valid,
     )
 
 
@@ -422,7 +437,7 @@ def evaluate_prepared(
     )
     for bucket in prepared.buckets:
         inputs = (
-            _los_inputs(bucket, rows)
+            _los_inputs(compiled, bucket, rows)
             if bucket.depth == 0
             else _reflection_inputs(compiled, bucket, tables, prepared, rows)
         )

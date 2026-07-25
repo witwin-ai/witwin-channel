@@ -47,6 +47,9 @@ class CompiledScene:
     _phase_screen_resources_cache: PhaseScreenRuntimeResources | None = field(
         default=None, repr=False, compare=False
     )
+    _fixed_reevaluation_tables_cache: dict | None = field(
+        default=None, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         if not isinstance(self.source, (Scene, SceneSnapshot)):
@@ -100,6 +103,48 @@ class CompiledScene:
             raise ValueError(
                 "reference_frequency_hz does not exactly match CompiledScene"
             )
+
+    def fixed_reevaluation_tables(self) -> dict[str, object]:
+        """Scene-static vertex and material tables for fixed-topology replay.
+
+        Built lazily per instance following the Plan-13 scene-static pattern:
+        both tables depend only on this CompiledScene's immutable stores and
+        structure tensors, and any world change produces a new instance through
+        the version-token compile cache. The cache is bypassed whenever a table
+        tensor participates in autograd - a cached graph node would be freed by
+        the first backward and fail the second - so differentiable-material or
+        differentiable-mesh loops pay the staging exactly as before, while the
+        primal per-frame replay (the Radar Doppler shape) stages once.
+        """
+
+        if self._fixed_reevaluation_tables_cache is not None:
+            return self._fixed_reevaluation_tables_cache
+
+        from witwin.channel.materials.encoding import face_material_field_bundle
+        from witwin.channel.scene import ad_geometry
+
+        tables: dict[str, object] = {
+            "vertices": ad_geometry.scene_vertex_table(self, self),
+            "material": face_material_field_bundle(
+                self, device=self.geometry.vertices.device
+            ),
+        }
+
+        def _participates(value: object) -> bool:
+            if not isinstance(value, torch.Tensor):
+                return False
+            if value.requires_grad or value.grad_fn is not None:
+                return True
+            return (
+                torch.autograd.forward_ad.unpack_dual(value).tangent is not None
+            )
+
+        graph_bearing = _participates(tables["vertices"]) or any(
+            _participates(value) for value in tables["material"].values()
+        )
+        if not graph_bearing:
+            self._fixed_reevaluation_tables_cache = tables
+        return tables
 
     @property
     def kirchhoff_resources(self) -> KirchhoffRuntimeResources:

@@ -131,10 +131,11 @@ partially differentiated answer (ADR-037 section 8). The raw zero-interaction
 route keeps its version-1 acceptance rules.
 
 Row validity applies to
-`capabilities().fixed_topology_row_validity_components` only. A frozen
-line-of-sight row is replayed as free-space transport and is never re-tested
-for visibility, so an occluded direct path still reports a valid full-strength
-row and requires rediscovery to detect.
+`capabilities().fixed_topology_row_validity_components`, today
+`{"los", "reflection"}`. A frozen line-of-sight row is re-tested with the same
+native visibility gate discovery applies, so an occluded direct path publishes
+`row_valid=False` with exact zeros. The raw zero-interaction route carries no
+mask and keeps its version-1 behavior.
 
 ## Release boundary
 

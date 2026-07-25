@@ -103,6 +103,12 @@ which is a separate decision. A caller whose scene has blockers and needs
 blockage on the direct path must rediscover; the mask will not tell it. A test
 pins this so it cannot drift into a silent surprise.
 
+  **Amended 2026-07-25**: `fixed_topology_row_validity_components` now
+  includes `los`. The prepared replay re-tests each frozen LoS row with the
+  same native visibility gate discovery applies, so occlusion is published
+  as `row_valid=False` with exact zeros. The raw zero-interaction route is
+  unchanged version-1 surface.
+
 **Reconciliation with ADR-034's "failure publishes no usable partial result".**
 That clause governs failure transactions: capacity overflow, ABI or contract
 violation, device fault. Those still raise before a result exists and are
@@ -276,10 +282,13 @@ for a first-order endpoint-motion derivative.
   positions `requires_grad` in addition to making them dual makes the same
   companions publish both tangents, correctly: the measured `delay_s` tangent is
   `3.3356e-9` s/m, exactly `1/c`, and the `path_length_m` tangent matches central
-  differences. The prepared route therefore requires that convention and raises
-  `NotImplementedError` on a forward-only dual. The check is scoped to the
-  prepared route; the raw zero-interaction route is version-1 surface with
-  shipped callers and keeps its acceptance rules unchanged.
+  differences. The prepared route therefore required that convention and raised
+  `NotImplementedError` on a forward-only dual when this ADR was accepted.
+
+  **Resolved by ADR-038**: liveness is now computed at the caller-facing
+  wrapper, where the dual is visible, and passed into the companions
+  explicitly. The refusal is deleted and a forward-only dual carries full
+  geometry tangents on every route.
 
 ### 9. `CONTRACT_VERSION` goes to 2
 

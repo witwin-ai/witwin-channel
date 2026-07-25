@@ -55,9 +55,10 @@ priority `scattering > diffraction > transmission > reflection > los`.
   and exact-zero derivative contribution. It is a complete answer, not a
   failure: the surviving rows are unaffected and nothing raises. The mask is
   the sole authority on row validity for the components it covers, and it
-  covers `capabilities().fixed_topology_row_validity_components` only. A frozen
-  line-of-sight row is replayed as free space and is never re-tested for
-  visibility, so blockage on the direct path still requires rediscovery.
+  covers `capabilities().fixed_topology_row_validity_components`, today
+  `{"los", "reflection"}`. A frozen line-of-sight row is re-tested with the
+  native visibility gate on every prepared replay and is invalidated when
+  occluded, publishing exact zeros instead of a stale full-strength answer.
 - `polarimetric_transport` publishes the complete complex 2x2 operator through
   reflection paths under fixed topology, composed from the native transport and
   endpoint-basis owners, and supports `jvp` and `vjp`. Both transverse bases,

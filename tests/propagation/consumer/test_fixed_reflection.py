@@ -329,7 +329,11 @@ def test_prepared_los_route_agrees_with_the_native_los_gather_route() -> None:
         raw.paths.geometry.path_length_m, prepared.paths.geometry.path_length_m
     )
     assert raw.row_valid is None
-    assert prepared.row_valid is None
+    # Deliberately updated with the ADR-037 amendment: a prepared LoS row is
+    # now visibility-tested, so its validity is a published result rather than
+    # a construction guarantee. The raw route keeps None.
+    assert prepared.row_valid is not None
+    assert bool(prepared.row_valid.all())
 
 
 def test_prepared_gather_rejects_endpoint_identity_drift_before_native_work() -> None:
@@ -571,14 +575,15 @@ def test_an_occluded_reflection_row_is_invalid_and_the_occluder_is_the_cause(
     assert discover(compiled, sources, moved).paths.path_count == 1
 
 
-def test_a_frozen_los_row_is_never_invalidated_by_an_occluder() -> None:
-    """A declared limit, pinned so it cannot drift into a silent surprise.
+def test_a_frozen_los_row_is_invalidated_when_occluded() -> None:
+    """Row validity now covers LoS: blockage is data, not a stale answer.
 
-    Row validity covers reflection only. A frozen LoS row is replayed as pure
-    free space and is not re-tested for visibility, so a sink that moves behind
-    a wall still publishes a full-strength LoS answer while fresh discovery
-    drops the row entirely. A caller that needs blockage on LoS has to
-    rediscover; the mask will not tell it.
+    The prepared replay re-tests each frozen LoS row with the same native
+    visibility gate discovery applies to LoS candidates. A sink that moves
+    behind a wall publishes ``row_valid=False`` and exact zeros - previously it
+    published a full-strength free-space answer, a limit ADR-037 declared and
+    this test used to pin. The clear-path control stays valid and nonzero,
+    and agrees with what fresh discovery finds at the same endpoints.
     """
 
     compiled = los_blocker_scene()
@@ -594,6 +599,11 @@ def test_a_frozen_los_row_is_never_invalidated_by_an_occluder() -> None:
     los_row = depths.index(0)
     prepared = prepare_fixed_topology(discovered.paths.topology)
 
+    # Control: replaying at the clear endpoints keeps the row alive.
+    control = _reevaluate(compiled, prepared, sources, clear_sinks)
+    assert bool(control.row_valid[los_row])
+    assert float(control.paths.transport.field[los_row].abs().max()) > 0.0
+
     behind = endpoints(
         sink_positions=torch.tensor([[0.0, 0.5, 0.0]], device="cuda")
     )[1]
@@ -603,8 +613,12 @@ def test_a_frozen_los_row_is_never_invalidated_by_an_occluder() -> None:
     assert 0 not in fresh.paths.topology.depth.tolist(), (
         "discovery still finds the blocked LoS row"
     )
-    assert bool(replayed.row_valid[los_row])
-    assert float(replayed.paths.transport.field[los_row].abs().max()) > 0.0
+    assert not bool(replayed.row_valid[los_row]), (
+        "occluded frozen LoS row must be invalidated"
+    )
+    assert float(replayed.paths.transport.field[los_row].abs().max()) == 0.0
+    assert float(replayed.paths.geometry.path_length_m[los_row]) == 0.0
+    assert float(replayed.paths.geometry.delay_s[los_row]) == 0.0
 
 
 def test_a_multi_pair_batch_reproduces_discovery_row_for_row() -> None:
@@ -714,16 +728,15 @@ def test_forward_mode_publishes_geometry_tangents_under_the_declared_convention(
     )
 
 
-def test_a_forward_only_dual_is_rejected_rather_than_partially_differentiated(
-) -> None:
-    """A partial derivative is not an acceptable answer.
+def test_a_forward_only_dual_carries_full_geometry_tangents() -> None:
+    """A dual without requires_grad gets the same derivative, FD-verified.
 
-    ``Function.apply`` unpacks a dual before ``setup_context`` runs, so the
-    shared native field companions cannot see a forward-only tangent and
-    publish ``path_length_m`` and ``delay_s`` without one while the transport
-    still carries its tangent. Radar reads exactly those two outputs, so the
-    prepared route refuses the call instead of returning a silently incomplete
-    derivative.
+    ``Function.apply`` unpacks a dual before ``setup_context`` runs, so a
+    liveness check made there cannot see a forward-only tangent. ADR-038 moves
+    that check to the caller-facing wrapper, which still sees the dual, so
+    ``path_length_m`` and ``delay_s`` now carry tangents without the old
+    requires_grad-plus-dual convention. Radar's Doppler ``delay_rate`` reads
+    exactly these outputs.
     """
 
     import torch.autograd.forward_ad as forward_ad
@@ -731,25 +744,56 @@ def test_a_forward_only_dual_is_rejected_rather_than_partially_differentiated(
     compiled = smooth_wall_scene()
     sources, sinks = endpoints()
     _, prepared = _prepared(compiled, sources, sinks)
+
+    def path_lengths(sink_y: float) -> torch.Tensor:
+        moved = endpoints(
+            sink_positions=torch.tensor([[0.0, sink_y, 0.0]], device="cuda")
+        )[1]
+        return _reevaluate(
+            compiled, prepared, sources, moved
+        ).paths.geometry.path_length_m
+
+    step = 1.0e-3
+    reference = (path_lengths(0.5 + step) - path_lengths(0.5 - step)) / (2 * step)
+
+    # No requires_grad anywhere: the tangent is the only derivative request.
     primal = torch.tensor([[0.0, 0.5, 0.0]], device="cuda", dtype=torch.float32)
     tangent = torch.tensor([[0.0, 1.0, 0.0]], device="cuda")
-
     with forward_ad.dual_level():
         dual_sinks = endpoints(
             sink_positions=forward_ad.make_dual(primal, tangent)
         )[1]
-        with pytest.raises(NotImplementedError, match="requires_grad"):
-            reevaluate(
-                compiled,
-                FixedTopologyRequest(
-                    sources=sources,
-                    sinks=dual_sinks,
-                    reference_frequency_hz=FREQUENCY_HZ,
-                    topology=prepared,
-                    response="scalar_transport",
-                    ad_mode="jvp",
-                ),
-            )
+        result = reevaluate(
+            compiled,
+            FixedTopologyRequest(
+                sources=sources,
+                sinks=dual_sinks,
+                reference_frequency_hz=FREQUENCY_HZ,
+                topology=prepared,
+                response="scalar_transport",
+                ad_mode="jvp",
+            ),
+        )
+        path_tangent = forward_ad.unpack_dual(
+            result.paths.geometry.path_length_m
+        ).tangent
+        delay_tangent = forward_ad.unpack_dual(
+            result.paths.geometry.delay_s
+        ).tangent
+        coefficient_tangent = forward_ad.unpack_dual(
+            result.paths.transport.coefficient
+        ).tangent
+        path_tangent = None if path_tangent is None else path_tangent.clone()
+        delay_tangent = None if delay_tangent is None else delay_tangent.clone()
+        has_coefficient_tangent = coefficient_tangent is not None
+
+    assert path_tangent is not None, "geometry tangent silently dropped"
+    assert delay_tangent is not None
+    assert has_coefficient_tangent
+    torch.testing.assert_close(path_tangent, reference, rtol=1.0e-3, atol=1.0e-4)
+    torch.testing.assert_close(
+        delay_tangent * 299792458.0, path_tangent, rtol=1.0e-5, atol=1.0e-9
+    )
 
 
 def test_reevaluate_rejects_a_realization_coherent_screen_before_native_work(
@@ -768,11 +812,71 @@ def test_reevaluate_rejects_a_realization_coherent_screen_before_native_work(
         _reevaluate(flat_phase_screen_wall_scene(), prepared, sources, sinks)
 
 
-def test_row_validity_capability_is_declared_for_reflection_only() -> None:
+def test_row_validity_capability_covers_los_and_reflection() -> None:
+    """Deliberately updated: the 2026-07-25 ADR-037 amendment adds ``los``.
+
+    The prepared replay re-tests frozen LoS rows with the native visibility
+    gate, so LoS validity is now a test result rather than a construction
+    guarantee, and the capability record declares it.
+    """
+
     record = capabilities()
 
     assert record.fixed_topology_components == frozenset({"los", "reflection"})
     assert record.fixed_topology_row_validity_components == frozenset(
-        {"reflection"}
+        {"los", "reflection"}
     )
     assert "polarimetric_transport" in record.fixed_topology_responses
+
+def test_scene_static_tables_are_cached_per_compiled_instance() -> None:
+    """The replay stages its scene-static tables once, not once per call.
+
+    A prepared reflection call was re-running the vertex concatenation and the
+    face-material host-to-device bundle every frame (~20 synchronizing torch
+    operations, ADR-037 "Residual cost"). The tables depend only on the
+    immutable compiled stores, so CompiledScene now owns them lazily, exactly
+    like the Plan-13 scattering resources. Replay output is bit-identical.
+    """
+
+    compiled = smooth_wall_scene()
+    sources, sinks = endpoints()
+    _, prepared = _prepared(compiled, sources, sinks)
+
+    first = _reevaluate(compiled, prepared, sources, sinks, response="scalar_transport")
+    tables_first = compiled.fixed_reevaluation_tables()
+    second = _reevaluate(compiled, prepared, sources, sinks, response="scalar_transport")
+    tables_second = compiled.fixed_reevaluation_tables()
+
+    assert tables_first is tables_second, "primal tables must stage once"
+    torch.testing.assert_close(
+        first.paths.transport.coefficient,
+        second.paths.transport.coefficient,
+        rtol=0.0,
+        atol=0.0,
+    )
+    torch.testing.assert_close(
+        first.paths.geometry.path_length_m,
+        second.paths.geometry.path_length_m,
+        rtol=0.0,
+        atol=0.0,
+    )
+
+
+def test_scene_static_table_cache_is_bypassed_for_graph_bearing_scenes() -> None:
+    """A cached autograd node would be freed by the first backward.
+
+    With a differentiable mesh leaf the tables carry ``grad_fn``, and reusing
+    them across calls would make the second backward traverse a freed graph.
+    The cache therefore only publishes primal tables; graph-bearing scenes
+    stage per call, exactly as before the cache existed.
+    """
+
+    compiled = smooth_wall_scene()
+    compiled.structures[0].vertices.requires_grad_()
+    try:
+        first = compiled.fixed_reevaluation_tables()
+        second = compiled.fixed_reevaluation_tables()
+        assert first is not second, "graph-bearing tables must not be cached"
+        assert first["vertices"].grad_fn is not None
+    finally:
+        compiled.structures[0].vertices.requires_grad_(False)

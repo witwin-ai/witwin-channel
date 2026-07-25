@@ -550,7 +550,7 @@ _CAPABILITIES = PropagationCapabilities(
     ),
     supports_fixed_topology=True,
     supports_los_jones=True,
-    fixed_topology_row_validity_components=frozenset({"reflection"}),
+    fixed_topology_row_validity_components=frozenset({"los", "reflection"}),
     polarimetric_frozen_ad_inputs=(
         "tx_power",
         "mu_r",

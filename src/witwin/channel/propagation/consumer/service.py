@@ -103,42 +103,6 @@ def _require_fixed_los_ad_inputs(request: FixedTopologyRequest) -> None:
             )
 
 
-def _require_prepared_forward_mode_convention(
-    request: FixedTopologyRequest,
-) -> None:
-    """Reject a forward-mode request whose geometry tangents would vanish.
-
-    ``torch.autograd.Function.apply`` unpacks a dual before ``setup_context``
-    runs, so the shared native field companions cannot see a forward-only
-    tangent and mark ``path_length_m`` and ``delay_s`` non-differentiable. The
-    result would then be partially dual: the transport carries a tangent and
-    the two geometry outputs silently do not, which is exactly the derivative
-    a Doppler consumer reads. Marking the endpoint positions ``requires_grad``
-    in addition to making them dual makes the same companions publish both, so
-    this route demands that convention instead of answering with an incomplete
-    derivative.
-
-    The check is scoped to the prepared route. The raw zero-interaction route
-    is contract-version-1 surface with shipped callers, and widening its
-    acceptance rules is a separate decision.
-    """
-
-    if request.ad_mode != "jvp":
-        return
-    for name, value in (
-        ("sources.positions_m", request.sources.positions_m),
-        ("sinks.positions_m", request.sinks.positions_m),
-    ):
-        if _has_forward_tangent(value) and not value.requires_grad:
-            raise NotImplementedError(
-                f"prepared fixed-topology ad_mode='jvp' requires {name} to "
-                "carry requires_grad in addition to its forward tangent; "
-                "without it the native field companions publish path_length_m "
-                "and delay_s without a tangent and the answer would be only "
-                "partially differentiated"
-            )
-
-
 def _preflight_evaluate(
     compiled: object, request: object
 ) -> tuple[CompiledScene, PropagationRequest]:
@@ -579,8 +543,6 @@ def _preflight_reevaluate(
                 "zero-interaction scalar and complex3 fast path"
             )
     _require_fixed_los_ad_inputs(request)
-    if isinstance(request.topology, PreparedFixedTopology):
-        _require_prepared_forward_mode_convention(request)
     return compiled, request
 
 
@@ -615,7 +577,7 @@ def _reevaluate_prepared(
     prepared = request.topology
     assert isinstance(prepared, PreparedFixedTopology)
     validity = _CAPABILITIES.fixed_topology_row_validity_components
-    if any(bucket.component in validity for bucket in prepared.buckets):
+    if any(bucket.component == "reflection" for bucket in prepared.buckets):
         require_smooth_reflection_scene(compiled)
     rows = prepared_row_gather(prepared.topology, request.sources, request.sinks)
     bases = (
