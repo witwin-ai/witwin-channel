@@ -527,6 +527,9 @@ jobs:
         shell: bash
         run: |
           python -m pip install build twine
+          # Torch 2.10 no longer depends on numpy, and Core is installed
+          # --no-deps below, so numpy must arrive explicitly for the smoke.
+          python -m pip install numpy
           python -m pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cu128
           python -m pip install --no-deps ./core
           python -m build core --wheel --outdir core/dist
