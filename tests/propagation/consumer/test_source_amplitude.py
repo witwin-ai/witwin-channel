@@ -266,6 +266,70 @@ def test_prepared_reflection_reevaluation_scales_by_the_source_amplitude(
         )
 
 
+@pytest.mark.parametrize(
+    "response", ["scalar_transport", "complex3_transport"]
+)
+def test_prepared_reflection_reevaluation_scales_each_row_by_its_own_source(
+    response: str,
+) -> None:
+    """Distinct powers on a reflection topology: one factor per row.
+
+    The uniform-power reflection case above cannot separate a per-row gather
+    from a single global amplitude, and the per-row discovery cases above carry
+    no reflection rows. Two sources with different declared powers, reevaluated
+    on a prepared topology that holds both components, pin both at once.
+    """
+
+    compiled = world.smooth_wall_scene()
+    sources, sinks = world.multi_endpoints()
+    powered = EndpointBatch(
+        stable_ids=sources.stable_ids,
+        positions_m=sources.positions_m,
+        polarizations=sources.polarizations,
+        polarization_basis=sources.polarization_basis,
+        powers_w=torch.tensor(_POWERS_W, device="cuda", dtype=torch.float32),
+    )
+    discovered = world.discover(compiled, sources, sinks, response=response)
+    prepared = prepare_fixed_topology(discovered.paths.topology)
+    assert any(bucket.component == "reflection" for bucket in prepared.buckets)
+
+    excited = reevaluate(
+        compiled,
+        FixedTopologyRequest(
+            sources=powered,
+            sinks=sinks,
+            reference_frequency_hz=world.FREQUENCY_HZ,
+            topology=prepared,
+            response=response,
+            ad_mode="none",
+        ),
+    )
+    unit = reevaluate(
+        compiled,
+        FixedTopologyRequest(
+            sources=sources,
+            sinks=sinks,
+            reference_frequency_hz=world.FREQUENCY_HZ,
+            topology=prepared,
+            response=response,
+            ad_mode="none",
+        ),
+    )
+
+    amplitude = _row_amplitude(excited, powered)
+    assert torch.unique(amplitude).numel() == len(_POWERS_W)
+    if response == "scalar_transport":
+        torch.testing.assert_close(
+            excited.paths.transport.coefficient,
+            unit.paths.transport.coefficient * amplitude,
+        )
+    else:
+        torch.testing.assert_close(
+            excited.paths.transport.field,
+            unit.paths.transport.field * amplitude[:, None],
+        )
+
+
 @pytest.mark.parametrize("ad_mode", ["none", "jvp", "vjp"])
 @pytest.mark.parametrize(
     "response", ["scalar_transport", "complex3_transport"]
