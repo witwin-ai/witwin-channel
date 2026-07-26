@@ -6,7 +6,7 @@ waveform, target, RCS, IQ, ADC, detection, or processing policy.
 
 ## Version and compatibility
 
-- `CONTRACT_VERSION == 2`.
+- `CONTRACT_VERSION == 3`.
 - The module's `__all__` is the complete stable public surface. Consumer names
   are not duplicated at `witwin.channel`.
 - A breaking schema or semantic change increments the version and atomically
@@ -97,11 +97,15 @@ The contract uses SI units and `torch.complex64` CUDA tensors:
 - time convention: `exp(+j 2*pi*f*t)`;
 - propagation convention: `exp(-j k d)`.
 
-Scalar transport is the complex source-to-sink coefficient for unit source
-amplitude. Complex3 transport is a world-Cartesian complex electric-field
-vector with direction. Jones transport is a complete complex `2 x 2` linear
+Scalar transport is the complex source-to-sink coefficient excited by the
+declared source amplitude `sqrt(sources.powers_w)`. Complex3 transport is the
+world-Cartesian complex electric-field vector of the same excited transport,
+with direction; projecting it onto the receive polarization reproduces the
+scalar coefficient. Jones transport is a complete complex `2 x 2` linear
 operator from an explicit source transverse basis to an explicit sink
-transverse basis; it is not a renamed projected field or sidecar.
+transverse basis; it is not a renamed projected field or sidecar, and it
+deliberately excludes source amplitude because a linear polarization-basis map
+is not a transported field (ADR-039).
 
 ## Failure and AD
 

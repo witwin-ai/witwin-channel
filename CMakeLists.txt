@@ -586,6 +586,7 @@ Python_add_library(
     native/channel/kernels/field_transport_free_space.cu
     native/channel/kernels/field_transport_reflection.cu
     native/channel/kernels/field_rough_scale.cu
+    native/channel/kernels/field_source_amplitude.cu
     native/channel/kernels/field_wedge_ad_coupled.cu
     native/channel/kernels/field_wedge_ad_project.cu
     native/channel/kernels/field_wedge_ad_prepare.cu

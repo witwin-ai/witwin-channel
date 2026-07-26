@@ -93,7 +93,8 @@
     "native-consumer-fixed-los-backward": "tests/propagation/consumer/test_fixed_los_gather.py::test_fixed_los_gather_vjp_scatter_adds_duplicate_endpoint_rows",
     "native-consumer-fixed-los-jvp": "tests/propagation/consumer/test_fixed_los_gather.py::test_fixed_los_gather_jvp_uses_native_endpoint_gather",
     "native-consumer-los-jones": "tests/propagation/consumer/test_los_jones.py::test_consumer_los_jones_matches_analytic_rotated_basis",
-    "consumer-prepared-topology": "tests/propagation/consumer/test_fixed_reflection.py::test_prepare_fixed_topology_buckets_cover_every_row_in_frozen_order"
+    "consumer-prepared-topology": "tests/propagation/consumer/test_fixed_reflection.py::test_prepare_fixed_topology_buckets_cover_every_row_in_frozen_order",
+    "native-field-source-amplitude": "tests/kernels/test_field_source_amplitude_scale.py::test_source_amplitude_scale_contract_shapes_and_dtypes"
   },
   "e2e_scenarios": {
     "bdpt-diffraction": "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available",
@@ -151,7 +152,9 @@
     "consumer-fixed-ad": "tests/propagation/consumer/test_fixed_los_gather.py::test_fixed_los_gather_vjp_scatter_adds_duplicate_endpoint_rows",
     "consumer-jones-native": "tests/propagation/consumer/test_los_jones.py::test_consumer_los_jones_matches_analytic_rotated_basis",
     "consumer-fixed-reflection": "tests/propagation/consumer/test_fixed_reflection.py::test_fixed_reflection_reproduces_discovery_at_unchanged_endpoints",
-    "consumer-reflection-jones": "tests/propagation/consumer/test_reflection_jones.py::test_reflection_jones_matches_the_superposition_oracle"
+    "consumer-reflection-jones": "tests/propagation/consumer/test_reflection_jones.py::test_reflection_jones_matches_the_superposition_oracle",
+    "consumer-source-amplitude": "tests/propagation/consumer/test_source_amplitude.py::test_discovery_complex3_transport_scales_by_each_row_own_source",
+    "consumer-source-amplitude-ad": "tests/propagation/consumer/test_source_amplitude.py::test_endpoint_gradients_carry_the_source_amplitude"
   },
   "public_exports": [
     [
@@ -1809,6 +1812,33 @@
       "native-field-rough-scale",
       [
         "deterministic-rough-reflection-ad"
+      ]
+    ],
+    [
+      "field_source_amplitude_scale",
+      "witwin.channel.propagation.fields.kernels.source_amplitude.field_source_amplitude_scale",
+      "named_wrapper",
+      "native-field-source-amplitude",
+      [
+        "consumer-source-amplitude"
+      ]
+    ],
+    [
+      "field_source_amplitude_scale_backward",
+      "witwin.channel.propagation.fields.kernels.source_amplitude.field_source_amplitude_scale_backward",
+      "named_wrapper",
+      "native-field-source-amplitude",
+      [
+        "consumer-source-amplitude-ad"
+      ]
+    ],
+    [
+      "field_source_amplitude_scale_jvp",
+      "witwin.channel.propagation.fields.kernels.source_amplitude.field_source_amplitude_scale_jvp",
+      "named_wrapper",
+      "native-field-source-amplitude",
+      [
+        "consumer-source-amplitude-ad"
       ]
     ],
     [

@@ -25,7 +25,7 @@ forbidden = (
     "witwin.channel.propagation.enumerated",
     "witwin.channel.propagation.models",
 )
-assert consumer.CONTRACT_VERSION == 2
+assert consumer.CONTRACT_VERSION == 3
 assert not any(name.startswith(forbidden) for name in sys.modules)
 """
     completed = subprocess.run(
@@ -38,26 +38,40 @@ assert not any(name.startswith(forbidden) for name in sys.modules)
     assert completed.returncode == 0, completed.stderr
 
 
-def test_consumer_import_is_solver_neutral() -> None:
+def _pop_consumer_modules() -> dict[str, object]:
+    popped = {}
     for name in tuple(sys.modules):
         if name.startswith("witwin.channel.propagation.consumer"):
-            sys.modules.pop(name)
-    before = set(sys.modules)
-    consumer = importlib.import_module("witwin.channel.propagation.consumer")
-    loaded = set(sys.modules) - before
-    assert consumer.CONTRACT_VERSION == 2
-    assert not any(
-        name.startswith(
-            (
-                "witwin.channel.path",
-                "witwin.channel.deterministic",
-                "witwin.channel.montecarlo",
-                "witwin.channel.propagation.enumerated",
-                "witwin.channel.propagation.models",
+            popped[name] = sys.modules.pop(name)
+    return popped
+
+
+def test_consumer_import_is_solver_neutral() -> None:
+    # Restore the original module objects afterwards. A re-import leaves a
+    # second copy of every consumer class behind, and an isinstance check in a
+    # later test file then compares a value built by one copy against the
+    # other.
+    original = _pop_consumer_modules()
+    try:
+        before = set(sys.modules)
+        consumer = importlib.import_module("witwin.channel.propagation.consumer")
+        loaded = set(sys.modules) - before
+        assert consumer.CONTRACT_VERSION == 3
+        assert not any(
+            name.startswith(
+                (
+                    "witwin.channel.path",
+                    "witwin.channel.deterministic",
+                    "witwin.channel.montecarlo",
+                    "witwin.channel.propagation.enumerated",
+                    "witwin.channel.propagation.models",
+                )
             )
+            for name in loaded
         )
-        for name in loaded
-    )
+    finally:
+        _pop_consumer_modules()
+        sys.modules.update(original)
 
 
 def test_pair_layout_convention_is_explicit() -> None:

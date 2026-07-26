@@ -200,7 +200,7 @@ def test_evaluate_consumes_request_batch_and_aliases_finalized_rows(
     assert (
         result.paths.geometry.path_length_m is compact.evaluated.geometry.path_length_m
     )
-    assert result.paths.transport.coefficient is compact.evaluated.fields.coefficient
+    assert result.paths.transport.coefficient is compact.evaluated.fields.path_field
     assert result.diagnostics.discovery_launch_count == 3
     assert result.capabilities.components == frozenset(
         {"los", "reflection", "transmission", "diffraction"}
@@ -300,6 +300,7 @@ def test_reevaluate_reuses_frozen_topology_without_discovery(
         validation_synchronizations=1,
     )
     coefficient = torch.randn((2,), device="cuda", dtype=torch.complex64)
+    path_field = torch.randn((2,), device="cuda", dtype=torch.complex64)
     field_vector = torch.randn((2, 3), device="cuda", dtype=torch.complex64)
     path_length = torch.tensor([10.0, 8.0], device="cuda")
     delay = torch.tensor([1.0, 2.0], device="cuda")
@@ -317,6 +318,7 @@ def test_reevaluate_reuses_frozen_topology_without_discovery(
         calls["field_kwargs"] = kwargs
         return {
             "coefficient": coefficient,
+            "path_field": path_field,
             "field_vector": field_vector,
             "path_length_m": path_length,
             "delay_s": delay,
@@ -350,7 +352,7 @@ def test_reevaluate_reuses_frozen_topology_without_discovery(
     assert result.paths.pair_offsets is pair_offsets
     assert result.paths.geometry.path_length_m is path_length
     assert isinstance(result.paths.transport, ScalarTransport)
-    assert result.paths.transport.coefficient is coefficient
+    assert result.paths.transport.coefficient is path_field
     assert result.diagnostics.discovery_launch_count == 0
     assert result.diagnostics.candidate_count == 0
     assert result.diagnostics.validation_d2h_copies == 1

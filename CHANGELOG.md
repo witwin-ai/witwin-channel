@@ -2,6 +2,24 @@
 
 All notable changes to `witwin-channel` are documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking (ADR-039).** The propagation consumer publishes the declared
+  source amplitude. `ScalarTransport.coefficient` and `Complex3Transport.field`
+  now carry `sqrt(sources.powers_w)` of each row's own transmitting endpoint;
+  `JonesTransport` stays excitation-free because a polarization-basis map is
+  not a transported field. `CONTRACT_VERSION` moves from 2 to 3. A caller that
+  already multiplied by `sqrt(powers_w)` itself must stop doing so.
+- The Path solver's `phase_convention` metadata quotes the unit-excitation
+  free-space amplitude, matching its own `coefficient_semantics`.
+
+### Added
+
+- Native `field_source_amplitude_scale` and its backward/JVP companions, the
+  owner of the excited complex3 field vector.
+
 ## [0.4.0] - 2026-07-23
 
 ### Added

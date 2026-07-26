@@ -4,9 +4,9 @@
   "applied_count_delta": -9,
   "projected_final_count": 202,
   "projected_count_formula": "211 - 9 bindings proven dead by all four Phase 4 reachability checks = 202",
-  "live_binding_count": 250,
-  "live_count_delta_from_plan13_baseline": 39,
-  "live_count_formula": "211 - 9 Phase 4 dead bindings + 1 Phase 8B planner + 26 ADR-027/029/030 capacity-foundation bindings + 5 Phase 6C Phase P bindings + 4 Phase 6C Phase E bindings + 3 Phase 6C Phase M bindings + 9 Stage-I Phase 3 consumer bindings = 250",
+  "live_binding_count": 253,
+  "live_count_delta_from_plan13_baseline": 42,
+  "live_count_formula": "211 - 9 Phase 4 dead bindings + 1 Phase 8B planner + 26 ADR-027/029/030 capacity-foundation bindings + 5 Phase 6C Phase P bindings + 4 Phase 6C Phase E bindings + 3 Phase 6C Phase M bindings + 9 Stage-I Phase 3 consumer bindings + 3 ADR-039 source-amplitude bindings = 253",
   "phase6c_phase_p_delta": {
     "before": 229,
     "added": 5,
@@ -859,6 +859,35 @@
       "count_delta": 1,
       "status": "live in Stage-I Phase 3",
       "reason": "fixed-topology LoS endpoint gather JVP"
+    },
+    {
+      "symbol": "field_source_amplitude_scale",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "activated in ADR-039",
+      "reason": "excited complex3 field vector owner"
+    },
+    {
+      "symbol": "field_source_amplitude_scale_backward",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "activated in ADR-039",
+      "reason": "VJP of the source-amplitude scale"
+    },
+    {
+      "symbol": "field_source_amplitude_scale_jvp",
+      "action": "add",
+      "replacement": null,
+      "count_delta": 1,
+      "status": "activated in ADR-039",
+      "reason": "JVP of the source-amplitude scale"
     }
-  ]
+  ],
+  "adr039_source_amplitude_delta": {
+    "before": 250,
+    "added": 3,
+    "after": 253
+  }
 }

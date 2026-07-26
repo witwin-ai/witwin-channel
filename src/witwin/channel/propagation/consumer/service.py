@@ -356,10 +356,18 @@ def _transport(
     fields = compact.evaluated.fields
     geometry = compact.evaluated.geometry
     if response == "scalar_transport":
-        return ScalarTransport(coefficient=fields.coefficient)
+        return ScalarTransport(coefficient=fields.path_field)
     if response == "complex3_transport":
+        from ._amplitude import excited_field
+        from ._rows import select_rows
+
+        assert sources.powers_w is not None
+        tx_power = select_rows(
+            sources.powers_w,
+            compact.evaluated.topology.tx_id.to(dtype=torch.int64),
+        )
         return Complex3Transport(
-            field=fields.field_xyz,
+            field=excited_field(fields.field_xyz, tx_power, ad_mode=ad_mode),
             direction=geometry.field_direction,
         )
     if response == "polarimetric_transport":
@@ -550,10 +558,11 @@ def _fixed_transport(
     response: str, outputs: object
 ) -> ScalarTransport | Complex3Transport | JonesTransport:
     if response == "scalar_transport":
-        return ScalarTransport(coefficient=outputs.coefficient)
+        return ScalarTransport(coefficient=outputs.path_field)
     if response == "complex3_transport":
+        assert outputs.path_field_vector is not None
         return Complex3Transport(
-            field=outputs.field_vector, direction=outputs.direction
+            field=outputs.path_field_vector, direction=outputs.direction
         )
     assert outputs.matrix is not None
     return JonesTransport(
@@ -648,6 +657,7 @@ def reevaluate(
         functional as field_functional,
     )
 
+    from ._amplitude import excited_field
     from ._fixed_los import fixed_los_gather
 
     compiled, request = _preflight_reevaluate(compiled_scene, request)
@@ -689,10 +699,12 @@ def reevaluate(
         interaction_normals=empty_interactions,
     )
     transport = (
-        ScalarTransport(coefficient=field_rows["coefficient"])
+        ScalarTransport(coefficient=field_rows["path_field"])
         if request.response == "scalar_transport"
         else Complex3Transport(
-            field=field_rows["field_vector"],
+            field=excited_field(
+                field_rows["field_vector"], tx_power, ad_mode=request.ad_mode
+            ),
             direction=field_rows["direction"],
         )
     )

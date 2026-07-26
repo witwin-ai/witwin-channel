@@ -71,10 +71,15 @@ class BucketInputs:
 
 @dataclass(frozen=True, slots=True)
 class FixedRowOutputs:
-    """Frozen-order ``K`` row outputs of one reevaluation."""
+    """Frozen-order ``K`` row outputs of one reevaluation.
 
-    coefficient: torch.Tensor
-    field_vector: torch.Tensor
+    ``path_field`` and ``path_field_vector`` are the source-excited transport,
+    matching what discovery publishes. ``path_field_vector`` is only produced
+    for the complex3 response, which is the only reader of it.
+    """
+
+    path_field: torch.Tensor
+    path_field_vector: torch.Tensor | None
     path_length_m: torch.Tensor
     delay_s: torch.Tensor
     direction: torch.Tensor
@@ -324,20 +329,32 @@ def _bucket_values(
     run: Callable[[torch.Tensor, torch.Tensor], dict[str, torch.Tensor]],
     *,
     response: str,
+    ad_mode: str,
     source_reference: torch.Tensor | None,
     sink_reference: torch.Tensor | None,
     frequency_value: float,
 ) -> dict[str, torch.Tensor]:
     if response != "polarimetric_transport":
-        return run(inputs.tx_polarization, inputs.rx_polarization)
-    assert source_reference is not None and sink_reference is not None
-    return _jones_values(
-        inputs,
-        run,
-        source_reference=source_reference,
-        sink_reference=sink_reference,
-        frequency_value=frequency_value,
-    )
+        values = run(inputs.tx_polarization, inputs.rx_polarization)
+    else:
+        assert source_reference is not None and sink_reference is not None
+        values = _jones_values(
+            inputs,
+            run,
+            source_reference=source_reference,
+            sink_reference=sink_reference,
+            frequency_value=frequency_value,
+        )
+    if response != "complex3_transport":
+        return values
+    from ._amplitude import excited_field
+
+    return {
+        **values,
+        "path_field_vector": excited_field(
+            values["field_vector"], inputs.tx_power, ad_mode=ad_mode
+        ),
+    }
 
 
 def _pad_interactions(values: torch.Tensor, width: int) -> torch.Tensor:
@@ -357,8 +374,11 @@ def _publish_bucket(
 ) -> None:
     rows = bucket.rows
     valid = inputs.valid
-    outputs["coefficient"].index_copy_(0, rows, values["coefficient"])
-    outputs["field_vector"].index_copy_(0, rows, values["field_vector"])
+    outputs["path_field"].index_copy_(0, rows, values["path_field"])
+    if outputs["path_field_vector"] is not None:
+        outputs["path_field_vector"].index_copy_(
+            0, rows, values["path_field_vector"]
+        )
     outputs["path_length_m"].index_copy_(
         0, rows, _inert_where_invalid(values["path_length_m"], valid)
     )
@@ -387,11 +407,13 @@ def _allocate(
     device = rows.source.device
     polarimetric = response == "polarimetric_transport"
     return {
-        "coefficient": torch.zeros(
+        "path_field": torch.zeros(
             (count,), dtype=torch.complex64, device=device
         ),
-        "field_vector": torch.zeros(
-            (count, 3), dtype=torch.complex64, device=device
+        "path_field_vector": (
+            torch.zeros((count, 3), dtype=torch.complex64, device=device)
+            if response == "complex3_transport"
+            else None
         ),
         "path_length_m": torch.zeros((count,), device=device),
         "delay_s": torch.zeros((count,), device=device),
@@ -450,6 +472,7 @@ def evaluate_prepared(
                 frequency_value=frequency_value,
             ),
             response=response,
+            ad_mode=ad_mode,
             source_reference=(
                 None
                 if source_reference_basis is None
@@ -464,8 +487,8 @@ def evaluate_prepared(
         )
         _publish_bucket(outputs, values, inputs, bucket, width)
     return FixedRowOutputs(
-        coefficient=outputs["coefficient"],
-        field_vector=outputs["field_vector"],
+        path_field=outputs["path_field"],
+        path_field_vector=outputs["path_field_vector"],
         path_length_m=outputs["path_length_m"],
         delay_s=outputs["delay_s"],
         direction=outputs["direction"],

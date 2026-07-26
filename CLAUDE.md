@@ -142,7 +142,10 @@ Organize code by RF domain capability, with a single owner for each operation:
   as a complete answer, never as a failure that voids the batch. The composed
   source-to-sink Jones operator is structural packing over already-owned native
   transport and basis operators; it must not restate a direction, a transverse
-  basis, or a projection in Torch.
+  basis, or a projection in Torch. Under ADR-039 the published scalar and
+  complex3 transport carry the declared source amplitude `sqrt(powers_w)` and
+  come from native excited outputs; the Jones operator stays excitation-free
+  because it is a basis map. Never apply the amplitude in Torch.
 - `path`, `deterministic`, `montecarlo.basic`, and `montecarlo.bdpt`: thin
   solver-owned configuration, orchestration, accumulation, result, and metadata
   layers. Solvers must never import another solver.
@@ -390,6 +393,7 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-036-channel-public-surface-and-module-ownership.md`
 - `docs/dev/standards/adr-037-fixed-topology-reflection-and-composed-jones.md`
 - `docs/dev/standards/adr-038-wrapper-level-forward-ad-liveness.md`
+- `docs/dev/standards/adr-039-consumer-source-amplitude.md`
 
 ADR-029 is Superseded, ADR-030 is Dormant, and ADR-031 is Rejected. They are
 historical records rather than implementation or release requirements; ADR-032

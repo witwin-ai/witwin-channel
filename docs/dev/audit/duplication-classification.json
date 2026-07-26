@@ -36,6 +36,18 @@
       ]
     }
   ],
+  "adr039_lockstep_duplicates": [
+    {
+      "owner": "consumer complex3 source amplitude (ADR-039)",
+      "source": "native/channel/kernels/field_source_amplitude.cu::source_amplitude_scale_kernel",
+      "lockstep_with": "native/channel/kernels/field_transport.cu::source_amplitude",
+      "reason": "ADR-039 requires path_field_vector to apply the identical sqrtf(fmaxf(tx_power, 0.0f)) amplitude the field transport kernels apply to path_field, so the projected complex3 response and the scalar response remain the same physical quantity. The shared region is one expression, far below the 100-token gate threshold, so it is recorded here by hand; removing the duplicate would move the amplitude across the transport fusion boundary and requires its own numerical change.",
+      "lockstep_tests": [
+        "tests/kernels/test_field_source_amplitude_scale.py::test_source_amplitude_scale_applies_the_transport_amplitude",
+        "tests/propagation/consumer/test_source_amplitude.py::test_discovery_complex3_projects_onto_the_scalar_coefficient"
+      ]
+    }
+  ],
   "categories": [
     "host_check",
     "indexing_packing",

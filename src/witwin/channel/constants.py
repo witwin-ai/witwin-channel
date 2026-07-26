@@ -22,7 +22,15 @@ ETA0 = MU0 * C0  # vacuum impedance [ohm]
 
 PHASOR = "exp(-j*k*d)"
 TIME_DEPENDENCE = "exp(+j*2*pi*f*t)"
+# The source-excited free-space amplitude: the ``path_field`` convention that
+# the Deterministic and Monte Carlo results and the propagation consumer
+# publish.
 FREE_SPACE_AMPLITUDE = "sqrt(tx_power)*wavelength/(4*pi*distance)"
+# The same amplitude at unit source excitation: the ``coefficient`` /
+# ``field_xyz`` convention that the Path result publishes. Quoting the excited
+# string next to ``coefficient_semantics="unit_excitation..."`` states two
+# different amplitudes for one number, so each result quotes its own.
+UNIT_EXCITATION_FREE_SPACE_AMPLITUDE = "wavelength/(4*pi*distance)"
 POLARIZATION = "world_cartesian_complex3_then_receiver_projection"
 
 PHASE_CONVENTION = {
@@ -30,6 +38,11 @@ PHASE_CONVENTION = {
     "time_dependence": TIME_DEPENDENCE,
     "free_space_amplitude": FREE_SPACE_AMPLITUDE,
     "polarization": POLARIZATION,
+}
+
+UNIT_EXCITATION_PHASE_CONVENTION = {
+    **PHASE_CONVENTION,
+    "free_space_amplitude": UNIT_EXCITATION_FREE_SPACE_AMPLITUDE,
 }
 
 # Narrowband law for shifting an evaluated coefficient off the reference
@@ -58,4 +71,6 @@ __all__ = [
     "PHASOR",
     "POLARIZATION",
     "TIME_DEPENDENCE",
+    "UNIT_EXCITATION_FREE_SPACE_AMPLITUDE",
+    "UNIT_EXCITATION_PHASE_CONVENTION",
 ]

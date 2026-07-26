@@ -219,10 +219,13 @@ propagation phase: exp(-j k d)
 
 For a path `p`, the reference-frequency scalar coefficient `C_p(f_ref)`
 includes free-space attenuation, propagation phase at `f_ref`, interaction
-coefficients, and source-to-sink polarization projection for unit source
-amplitude. A transmitted field value may additionally include source
-amplitude. Power/gain values are squared magnitudes of the corresponding
-field quantity; they are not interchangeable with complex coefficients.
+coefficients, and source-to-sink polarization projection. ADR-039 supersedes
+the original "for unit source amplitude" wording of this paragraph: the
+published scalar and complex3 transport are excited by the declared source
+amplitude `sqrt(sources.powers_w)`, and the Jones operator remains
+excitation-free because it is a basis map rather than a transported field.
+Power/gain values are squared magnitudes of the corresponding field quantity;
+they are not interchangeable with complex coefficients.
 
 For an explicitly supported frozen nondispersive offset:
 

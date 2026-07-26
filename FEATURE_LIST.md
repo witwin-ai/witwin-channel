@@ -29,9 +29,14 @@ priority `scattering > diffraction > transmission > reflection > los`.
 
 ## Solver-neutral propagation consumer
 
-- `witwin.channel.propagation.consumer` contract version 2 is a stable public
+- `witwin.channel.propagation.consumer` contract version 3 is a stable public
   module; it is not duplicated at the package root and does not expose
   `EvaluatedPaths` or a solver result.
+- `ScalarTransport.coefficient` and `Complex3Transport.field` carry the
+  declared source amplitude `sqrt(sources.powers_w)` of each row's own
+  transmitting endpoint, so they are transported field values and a power is
+  their squared magnitude. `JonesTransport` stays excitation-free: a complex
+  2x2 polarization-basis map is not a transported field.
 - Typed endpoint/request/convention/capability/evaluation contracts publish
   exact compact `K` rows, native-produced `pair_index`/`pair_offsets`, and
   scalar, Complex3, or complete 2x2 Jones transport according to capability.
