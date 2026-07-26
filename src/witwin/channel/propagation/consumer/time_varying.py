@@ -74,6 +74,17 @@ class TimeVaryingRequest:
     slots; it is never differenced, integrated, or otherwise used to compute a
     published number. A delay RATE comes from the ADR-038 forward dual on the
     endpoint positions, not from a finite difference across these samples.
+
+    Because they are labels, they are the caller's assertion and not a checked
+    fact, and the sharp edge is worth naming: nothing reconciles ``times_s``
+    against the world the ``CompiledScene`` was built from. Endpoint motion
+    legitimately runs many instants against one compiled scene, so
+    ``times_s != compiled.time_s`` cannot be refused - which means a caller who
+    labels slots ``t = 1, 2`` while the structures still stand at their
+    ``t = 0`` pose gets a result that claims to be a channel it is not, with
+    every row valid. One ``CompiledScene`` is one structure-geometry epoch;
+    keeping the labels inside it is the caller's obligation, and
+    ``CompiledScene.time_s`` is published so that obligation is checkable.
     """
 
     sources: EndpointBatch

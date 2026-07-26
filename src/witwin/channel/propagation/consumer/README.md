@@ -275,6 +275,15 @@ whole `T`-instant frame is readable in one place.
 is the ADR-038 forward tangent on the endpoint positions, and a production
 finite difference is forbidden.
 
+Being labels, they are also never reconciled against the world. Endpoint motion
+legitimately runs many instants against one compiled scene, so a gate on
+`times_s == compiled.time_s` would refuse the normal case; the consequence is
+that labelling slots `t = 1, 2` while the structures still stand at their
+`t = 0` pose proceeds silently, with every row valid. Keeping the labels inside
+one structure-geometry epoch is the caller's obligation, and
+`CompiledScene.time_s` is published so that obligation is checkable rather than
+assumed.
+
 `evaluate_time_varying` does not compile scenes. The caller passes one
 `CompiledScene` per structure-geometry epoch, which keeps scene lifecycle out
 of the consumer and keeps a moving-structure sequence honest: `T` epochs are
