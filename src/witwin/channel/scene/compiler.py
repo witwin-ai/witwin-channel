@@ -889,6 +889,10 @@ def compile(
         geometry_version=geometry_version,
         material_version=material_version,
         assignment_version=assignment_version,
+        # A SceneSnapshot carries the world instant it was taken at; a plain
+        # Scene has no time. Recorded verbatim, so a tensor time keeps its
+        # identity and never costs a host read.
+        time_s=getattr(scene_or_snapshot, "time_s", None),
         enumerated_penetration_scene_diagonal_m=diagonals[0],
         montecarlo_penetration_scene_diagonal_m=diagonals[1],
     )

@@ -215,7 +215,7 @@
           "name": "FixedTopologyRequest",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.contracts.FixedTopologyRequest",
-          "contract_sha256": "21c18b43364609edfdc08c837f0b51dd2f416f0a1900de2f98b1dc12807487ba"
+          "contract_sha256": "929be9d306c73de94fce450b6100aec0dad0780c18607495be3cb0fb34a692b5"
         },
         {
           "name": "JonesTransport",
@@ -245,7 +245,7 @@
           "name": "PropagationCapabilities",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.contracts.PropagationCapabilities",
-          "contract_sha256": "4a5a28621cd2649456c926d6aeea5ccb38590262528f04df4010bb3d7783ef7f"
+          "contract_sha256": "201fc558e3fecae2bcfff182fca46346c18c6f3b3a59b6c1fdea5989c38d3463"
         },
         {
           "name": "PropagationComponent",
@@ -299,7 +299,7 @@
           "name": "PropagationTopology",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.contracts.PropagationTopology",
-          "contract_sha256": "37d7244e6fa39748517cc66f942750636782897ad48ed209a03baed91542c53b"
+          "contract_sha256": "cade5abe88abc2f04863a38f496b5d009e21b1fdf05a1aed7097554a9759ac0b"
         },
         {
           "name": "PropagationTopologyMode",
@@ -326,6 +326,12 @@
           "contract_sha256": "cd487a0e7acd8c7a50b83989239d9f5add8c83b85fb741d8f61de71aafba5deb"
         },
         {
+          "name": "WorldProvenance",
+          "kind": "class",
+          "target": "witwin.channel.propagation.consumer.contracts.WorldProvenance",
+          "contract_sha256": "0316a6382e3cc8cd3d7189181e30c2428fe96575fe3d2649a8c729fdba24ce0a"
+        },
+        {
           "name": "capabilities",
           "kind": "function",
           "target": "witwin.channel.propagation.consumer.contracts.capabilities",
@@ -345,6 +351,13 @@
           "target": "witwin.channel.propagation.consumer.contracts.prepare_fixed_topology",
           "contract_sha256": "2ca36f0fc646a02c62e1813601e6897bbf572dc7eb4917d8d268bc16a3f8e649",
           "signature": "(topology: PropagationTopology)"
+        },
+        {
+          "name": "rediscovery_required",
+          "kind": "function",
+          "target": "witwin.channel.propagation.consumer.service.rediscovery_required",
+          "contract_sha256": "26fec5c24d2a12805f069c793f4fc15a3a9e41a3aebe287d09574a4583f7e66e",
+          "signature": "(compiled_scene: CompiledScene, topology: PropagationTopology | PreparedFixedTopology, *, revalidate_source: bool=False)"
         },
         {
           "name": "reevaluate",

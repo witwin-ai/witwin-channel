@@ -21,6 +21,22 @@ from witwin.channel.scene.stores.geometry import GeometryStore
 from witwin.channel.scene.stores.materials import MaterialStore
 
 
+def _validated_time(
+    time_s: float | torch.Tensor | None,
+) -> float | torch.Tensor | None:
+    """Normalize a compiled snapshot instant without reading a tensor."""
+
+    if isinstance(time_s, torch.Tensor):
+        if time_s.ndim != 0 or not time_s.dtype.is_floating_point:
+            raise TypeError("time_s must be a scalar floating-point tensor")
+        return time_s
+    if time_s is None or isinstance(time_s, float):
+        return time_s
+    if isinstance(time_s, int) and not isinstance(time_s, bool):
+        return float(time_s)
+    raise TypeError("time_s must be a float, a scalar tensor, or None")
+
+
 @dataclass(slots=True)
 class CompiledScene:
     source: Scene | SceneSnapshot
@@ -35,6 +51,11 @@ class CompiledScene:
     geometry_version: int
     material_version: int
     assignment_version: int
+    # The SceneSnapshot instant this runtime was compiled from, or None for a
+    # plain Scene. Reporting and cross-consumer correlation only: it records
+    # which world instant a CompiledScene is, and it never gates a call. The
+    # four version domains above are the freshness authority (ADR-040).
+    time_s: float | torch.Tensor | None = None
     enumerated_penetration_scene_diagonal_m: float = 0.0
     montecarlo_penetration_scene_diagonal_m: float = 0.0
     # Lazy scattering caches (built on first access so smooth scenes pay no
@@ -68,6 +89,7 @@ class CompiledScene:
             raise TypeError("reference_frequency_hz must be a float or tensor")
         elif self.reference_frequency_revision is not None:
             raise TypeError("scalar reference frequency has no mutation revision")
+        self.time_s = _validated_time(self.time_s)
         for name in (
             "enumerated_penetration_scene_diagonal_m",
             "montecarlo_penetration_scene_diagonal_m",

@@ -26,6 +26,17 @@ def _compiled(frequency: float = 77.0e9):
     )
     object.__setattr__(compiled, "reference_frequency_hz", frequency)
     object.__setattr__(compiled, "reference_frequency_revision", None)
+    # The four world version domains the ADR-040 freshness check reads, plus
+    # the compiled snapshot instant. A stand-in for a CompiledScene has to
+    # carry them or `evaluate` cannot stamp the topology it publishes.
+    for name in (
+        "topology_version",
+        "geometry_version",
+        "material_version",
+        "assignment_version",
+    ):
+        object.__setattr__(compiled, name, 7)
+    object.__setattr__(compiled, "time_s", None)
     return compiled
 
 

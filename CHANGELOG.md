@@ -14,11 +14,24 @@ All notable changes to `witwin-channel` are documented in this file.
   already multiplied by `sqrt(powers_w)` itself must stop doing so.
 - The Path solver's `phase_convention` metadata quotes the unit-excitation
   free-space amplitude, matching its own `coefficient_semantics`.
+- **Breaking (ADR-040).** `reevaluate` refuses a frozen topology whose world
+  moved since discovery. A moved `topology_version`, `material_version`, or
+  `assignment_version` always raises; a moved `geometry_version` raises unless
+  the request declares `world_motion="fixed_winner_replay"`. Previously a
+  stale replay returned a full-strength old answer with no signal.
+  `CONTRACT_VERSION` moves from 3 to 4.
 
 ### Added
 
 - Native `field_source_amplitude_scale` and its backward/JVP companions, the
   owner of the excited complex3 field vector.
+- **ADR-040.** `consumer.WorldProvenance`, stamped onto
+  `PropagationTopology.provenance` by `evaluate` and forwarded verbatim by
+  `prepare_fixed_topology`; `consumer.rediscovery_required(compiled, prepared)`,
+  a host-only signal naming the version domain that moved;
+  `FixedTopologyRequest.world_motion`; `CompiledScene.time_s`, the compiled
+  snapshot instant, carried for reporting only. No call signature changes and
+  no device work: the freshness check is four host integer comparisons.
 
 ## [0.4.0] - 2026-07-23
 

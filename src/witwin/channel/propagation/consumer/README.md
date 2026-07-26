@@ -122,6 +122,18 @@ This does not weaken the all-or-nothing rule. Capacity, ABI, contract, and
 device failures still raise before a result exists; only geometric
 non-existence is published as data.
 
+### Replay is subtractive: rows die, rows are never born
+
+A frozen row that stops existing is published as `row_valid=False`. A path that
+comes into existence at the new endpoint or world state is **not** discovered
+by a replay and is silently absent from the batch. The published rows are
+exactly correct and the batch under-reports.
+
+There is no birth signal, by design: every candidate detector costs either a
+full discovery or a device reduction plus a host read the ADR-032 budget does
+not have. A caller whose scene can gain paths owns the rediscovery cadence.
+ADR-040 records the limitation and a test pins it.
+
 ### Forward mode
 
 `ad_mode="jvp"` on the prepared route requires the endpoint position tensors to
@@ -141,10 +153,60 @@ keeps working unchanged.
 
 ### Per-call cost beyond the published budget
 
-`validation_d2h_copies` counts device-to-host reads and is one. It is not the
-whole per-call cost: a prepared reflection call also re-stages scene-static
-material and face tables host-to-device on every call, at parity with what a
-discovery solve pays per solve. ADR-037 names and measures this.
+`validation_d2h_copies` counts device-to-host reads and is one. The
+scene-static vertex and material tables a prepared reflection call needs are
+staged once per `CompiledScene` and cached on it
+(`CompiledScene.fixed_reevaluation_tables`), so a primal per-frame replay pays
+the staging once rather than per call. The cache is bypassed whenever a table
+tensor participates in autograd, because a cached graph node would be freed by
+the first backward; a differentiable-material or differentiable-mesh loop
+therefore pays the staging every call, at parity with what a discovery solve
+pays per solve. ADR-037 names and measures the uncached cost.
+
+## World provenance and staleness
+
+`evaluate` stamps the four `witwin.core` version domains of the compiled scene
+onto the topology it publishes, `prepare_fixed_topology` forwards the stamp
+verbatim, and `reevaluate` compares it before any native work: four host
+integer comparisons, no device work, no allocation, no synchronization.
+
+```python
+provenance = discovered.paths.topology.provenance   # WorldProvenance | None
+moved = consumer.rediscovery_required(compiled, prepared)   # str | None
+if moved is not None:
+    prepared = consumer.prepare_fixed_topology(
+        consumer.evaluate(compiled, request).paths.topology
+    )
+```
+
+A mismatched `topology_version`, `material_version`, or `assignment_version`
+always raises: those respecify the very labels the frozen rows carry, so no
+replay of them can mean anything. A mismatched `geometry_version` raises too,
+unless the request declares `world_motion="fixed_winner_replay"`. That
+declaration is the caller's statement that the discrete winner set is
+deliberately held fixed while the geometry moves, which is a legitimate and
+already-correct case: a rigid motion or a deformation preserves face indexing,
+the reflection re-solve reads vertices from the passed compiled scene, and a
+row that stops existing is published through `row_valid`.
+
+A topology with `provenance is None` is hand-built and has no world to be
+stale against, so it replays unchecked. That escape is pinned by test so it
+cannot widen to cover a discovery-produced topology.
+
+`CompiledScene.time_s` carries the `SceneSnapshot` instant a scene was
+compiled from, or `None` for a plain `Scene`. It is reporting and
+cross-consumer correlation only. It is never compared and never gates a call,
+because two instants of a static world are the same world.
+
+### The one staleness class the versions cannot see
+
+A compiled scene and the rows discovered on it always agree with each other, so
+mutating the live world in place after compilation leaves the pair internally
+consistent and the freshness check silent. Pass `revalidate_source=True` to
+`rediscovery_required` to recompute the four domains from the live
+`witwin.core` world and catch it. That walks and hashes the world, so it is
+`O(scene)` host work: poll it on a motion-event cadence, never inside a replay
+loop.
 
 ## Source amplitude
 

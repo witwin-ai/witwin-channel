@@ -34,10 +34,11 @@ from .contracts import (
     PropagationTopology,
     PropagationTopologyMode,
     ScalarTransport,
+    WorldProvenance,
     capabilities,
     prepare_fixed_topology,
 )
-from .service import evaluate, reevaluate
+from .service import evaluate, rediscovery_required, reevaluate
 
 __all__ = [
     "AD_MODES",
@@ -66,8 +67,10 @@ __all__ = [
     "RESPONSES",
     "ScalarTransport",
     "TOPOLOGY_MODES",
+    "WorldProvenance",
     "capabilities",
     "evaluate",
     "prepare_fixed_topology",
+    "rediscovery_required",
     "reevaluate",
 ]

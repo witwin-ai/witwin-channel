@@ -48,7 +48,7 @@ from witwin.channel.propagation.consumer import (
     evaluate,
 )
 
-assert CONTRACT_VERSION == 1
+assert CONTRACT_VERSION == 4
 ```
 
 The consumer publishes exact compact `K` rows with native-produced stable pair

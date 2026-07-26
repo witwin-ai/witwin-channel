@@ -22,6 +22,7 @@ from .contracts import (
     PropagationRequest,
     PropagationTopology,
     ScalarTransport,
+    WorldProvenance,
     capabilities,
 )
 
@@ -398,6 +399,7 @@ def _path_batch(
     reference_frequency_hz: float | torch.Tensor,
     ad_mode: str,
     frequency_value: float,
+    provenance: WorldProvenance,
 ) -> PropagationPathBatch:
     evaluated = compact.evaluated
     source = evaluated.topology
@@ -416,6 +418,7 @@ def _path_batch(
         primitive_sequence=source.primitive_sequence,
         material_sequence=source.material_sequence,
         interaction_type=source.interaction_type,
+        provenance=provenance,
     )
     geometry = PropagationGeometry(
         path_length_m=continuous.path_length_m,
@@ -501,6 +504,7 @@ def evaluate(
         reference_frequency_hz=request.reference_frequency_hz,
         ad_mode=request.ad_mode,
         frequency_value=compiled.materials.frequency_hz,
+        provenance=WorldProvenance.of(compiled),
     )
     return PropagationEvaluation(
         paths=paths,
@@ -508,6 +512,86 @@ def evaluate(
         capabilities=_CAPABILITIES,
         diagnostics=_diagnostics(sidecars, compact),
     )
+
+
+def _require_current_world(
+    compiled: CompiledScene, request: FixedTopologyRequest
+) -> None:
+    """Refuse a frozen replay against a world that moved (ADR-040).
+
+    Four host integer comparisons against the version domains the compiled
+    scene recorded. No device work, no allocation, no synchronization, and no
+    ADR-032 budget impact. A frozen topology with no provenance is hand-built
+    and has no world to be stale against, so it proceeds.
+    """
+
+    provenance = request.frozen_topology.provenance
+    if provenance is None:
+        return
+    moved = provenance.moved_domain(
+        WorldProvenance.of(compiled),
+        allow_geometry=request.world_motion == "fixed_winner_replay",
+    )
+    if moved is None:
+        return
+    remedy = (
+        "declare world_motion='fixed_winner_replay' to hold the discrete "
+        "winner set fixed while the geometry moves, or rediscover"
+        if moved == "geometry_version"
+        else "the frozen row labels no longer name the same world; rediscover"
+    )
+    raise ValueError(
+        f"frozen topology is stale: {moved} changed between discovery and "
+        f"this reevaluation; {remedy} with evaluate() and "
+        f"prepare_fixed_topology()"
+    )
+
+
+def rediscovery_required(
+    compiled_scene: CompiledScene,
+    topology: PropagationTopology | PreparedFixedTopology,
+    *,
+    revalidate_source: bool = False,
+) -> str | None:
+    """Name the version domain that moved under a frozen topology, or ``None``.
+
+    This is the explicit rediscovery signal: poll it per frame and call
+    :func:`evaluate` plus
+    :func:`witwin.channel.propagation.consumer.prepare_fixed_topology` again
+    when it fires. The default comparison is four host integers against the
+    versions ``compiled_scene`` recorded, so it costs no device work, no
+    allocation, and no synchronization. ``"geometry_version"`` is reported
+    like any other domain; a caller replaying under
+    ``world_motion="fixed_winner_replay"`` deliberately ignores that one.
+
+    ``revalidate_source=True`` additionally recomputes the four domains from
+    the live ``witwin.core`` world the compiled scene was built from, which
+    catches a scene mutated in place after compilation - the one staleness
+    class the recorded versions cannot see, because a compiled scene and the
+    rows discovered on it always agree with each other. That recomputation
+    walks the world and hashes it, so it is O(scene) host work and belongs on
+    a motion-event cadence, never in a per-frame replay loop.
+
+    Returns ``None`` when nothing moved.
+    """
+
+    from witwin.channel.scene.compiled import CompiledScene
+
+    if not isinstance(compiled_scene, CompiledScene):
+        raise TypeError("rediscovery_required requires a CompiledScene")
+    if not isinstance(topology, PropagationTopology | PreparedFixedTopology):
+        raise TypeError(
+            "topology must be a PropagationTopology or a PreparedFixedTopology"
+        )
+    current = WorldProvenance.of(compiled_scene)
+    provenance = topology.provenance
+    if provenance is not None:
+        moved = provenance.moved_domain(current)
+        if moved is not None:
+            return moved
+    if not revalidate_source:
+        return None
+    return current.moved_domain(WorldProvenance.of(compiled_scene.source))
 
 
 def _preflight_reevaluate(
@@ -519,6 +603,7 @@ def _preflight_reevaluate(
         raise TypeError("reevaluate requires a CompiledScene")
     if not isinstance(request, FixedTopologyRequest):
         raise TypeError("request must be a FixedTopologyRequest")
+    _require_current_world(compiled, request)
     if request.frozen_topology.device != request.sources.device:
         raise ValueError("fixed topology and endpoint batches must share a device")
     compiled.require_reference_frequency(request.reference_frequency_hz)
@@ -735,4 +820,4 @@ def reevaluate(
     )
 
 
-__all__ = ["evaluate", "reevaluate"]
+__all__ = ["evaluate", "reevaluate", "rediscovery_required"]

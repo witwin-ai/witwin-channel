@@ -145,7 +145,18 @@ Organize code by RF domain capability, with a single owner for each operation:
   basis, or a projection in Torch. Under ADR-039 the published scalar and
   complex3 transport carry the declared source amplitude `sqrt(powers_w)` and
   come from native excited outputs; the Jones operator stays excitation-free
-  because it is a basis map. Never apply the amplitude in Torch.
+  because it is a basis map. Never apply the amplitude in Torch. Under ADR-040
+  a discovered topology carries the four `witwin.core` version domains it was
+  discovered against, `prepare_fixed_topology` forwards that token verbatim,
+  and `reevaluate` refuses a frozen replay against a moved world by name before
+  any native work. A moved `topology_version`, `material_version`, or
+  `assignment_version` is always fatal; a moved `geometry_version` is fatal
+  unless the request declares `world_motion="fixed_winner_replay"`. The check
+  is four host integer comparisons and must never grow a device read, a
+  synchronization, or an `O(scene)` host walk in `_preflight_reevaluate`.
+  `CompiledScene.time_s` is reporting metadata and is never a gate. Replay
+  stays subtractive: a row can die through `row_valid`, a row is never born,
+  and that limitation is documented rather than hidden.
 - `path`, `deterministic`, `montecarlo.basic`, and `montecarlo.bdpt`: thin
   solver-owned configuration, orchestration, accumulation, result, and metadata
   layers. Solvers must never import another solver.
@@ -394,6 +405,7 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-037-fixed-topology-reflection-and-composed-jones.md`
 - `docs/dev/standards/adr-038-wrapper-level-forward-ad-liveness.md`
 - `docs/dev/standards/adr-039-consumer-source-amplitude.md`
+- `docs/dev/standards/adr-040-world-provenance-and-fixed-topology-staleness.md`
 
 ADR-029 is Superseded, ADR-030 is Dormant, and ADR-031 is Rejected. They are
 historical records rather than implementation or release requirements; ADR-032

@@ -360,10 +360,12 @@ def test_reevaluate_rejects_a_rough_scene_before_any_native_work() -> None:
     silently disagreeing with ``evaluate`` is worse than refusing.
     """
 
-    compiled = smooth_wall_scene()
-    sources, sinks = endpoints()
-    _, prepared = _prepared(compiled, sources, sinks)
     rough = smooth_wall_scene(rms_height_m=0.01)
+    sources, sinks = endpoints()
+    # Freeze against the rough scene itself, so the only thing standing between
+    # this call and native work is the smooth-scene gate. A topology frozen on
+    # a different scene would be refused first, by the ADR-040 freshness check.
+    _, prepared = _prepared(rough, sources, sinks)
 
     with pytest.raises(NotImplementedError, match="requires a smooth scene"):
         _reevaluate(rough, prepared, sources, sinks)
@@ -552,11 +554,14 @@ def test_an_occluded_reflection_row_is_invalid_and_the_occluder_is_the_cause(
     assert blocked.row_valid.tolist() == [True, False]
     assert float(blocked.paths.transport.field[1].abs().max()) == 0.0
 
+    # One control scene object for both the freeze and the replay: two
+    # independently built worlds are two different worlds under ADR-040.
+    control_scene = smooth_wall_scene()
     control = _reevaluate(
-        smooth_wall_scene(),
+        control_scene,
         prepare_fixed_topology(
             discover(
-                smooth_wall_scene(), sources, sinks, response="complex3_transport"
+                control_scene, sources, sinks, response="complex3_transport"
             ).paths.topology
         ),
         sources,
@@ -804,12 +809,14 @@ def test_reevaluate_rejects_a_realization_coherent_screen_before_native_work(
     slips past the roughness check and has to be rejected on its own terms.
     """
 
-    compiled = smooth_wall_scene()
+    screened = flat_phase_screen_wall_scene()
     sources, sinks = endpoints()
-    _, prepared = _prepared(compiled, sources, sinks)
+    # Frozen against the screened scene itself, so the screen gate is the only
+    # thing left to refuse the call (see the rough-scene test above).
+    _, prepared = _prepared(screened, sources, sinks)
 
     with pytest.raises(NotImplementedError, match="realization_coherent"):
-        _reevaluate(flat_phase_screen_wall_scene(), prepared, sources, sinks)
+        _reevaluate(screened, prepared, sources, sinks)
 
 
 def test_row_validity_capability_covers_los_and_reflection() -> None:

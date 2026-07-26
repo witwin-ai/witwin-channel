@@ -11,7 +11,7 @@ rejected call.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, TypeAlias, get_args
+from typing import Literal, Protocol, TypeAlias, get_args
 
 import torch
 
@@ -22,7 +22,7 @@ from witwin.channel.constants import (
 )
 
 
-CONTRACT_VERSION = 3
+CONTRACT_VERSION = 4
 
 
 PropagationComponent: TypeAlias = Literal[
@@ -33,13 +33,27 @@ PropagationResponse: TypeAlias = Literal[
 ]
 PropagationTopologyMode: TypeAlias = Literal["discover"]
 PropagationAdMode: TypeAlias = Literal["none", "jvp", "vjp"]
+PropagationWorldMotion: TypeAlias = Literal["frozen_world", "fixed_winner_replay"]
 
 COMPONENTS: frozenset[str] = frozenset(get_args(PropagationComponent))
 RESPONSES: frozenset[str] = frozenset(get_args(PropagationResponse))
 TOPOLOGY_MODES: frozenset[str] = frozenset(get_args(PropagationTopologyMode))
 AD_MODES: frozenset[str] = frozenset(get_args(PropagationAdMode))
+WORLD_MOTIONS: frozenset[str] = frozenset(get_args(PropagationWorldMotion))
 
 MAX_DEPTH = 5
+
+# The four witwin.core version domains, in the order a freshness check reports
+# them. Geometry is last because it is the one domain a caller can declare
+# tolerable: a rigid motion or a deformation renumbers nothing, so a frozen
+# winner label still means what it meant, while a topology, material, or
+# assignment change respecifies the very labels the frozen rows carry.
+WORLD_VERSION_DOMAINS: tuple[str, ...] = (
+    "topology_version",
+    "material_version",
+    "assignment_version",
+    "geometry_version",
+)
 
 # Native component identifiers a frozen topology may carry into reevaluation.
 # The names are the contract vocabulary above; the integers are the discovery
@@ -70,6 +84,66 @@ def _require_tensor(
     if device is not None and value.device != device:
         raise ValueError(f"{name} must be on {device}, got {value.device}")
     return value
+
+
+class _WorldVersionSource(Protocol):
+    """What a freshness check reads. Structural, so it never imports a scene."""
+
+    topology_version: int
+    geometry_version: int
+    material_version: int
+    assignment_version: int
+
+
+@dataclass(frozen=True, slots=True, eq=False)
+class WorldProvenance:
+    """Which world a discovered topology belongs to (ADR-040).
+
+    The four integers are the ``witwin.core`` version domains the compiled
+    scene was built from. They are content hashes, so equal versions mean equal
+    world content, which is exactly the condition under which replaying a
+    frozen topology is numerically meaningful. Comparison is by domain, never
+    by object identity.
+
+    ``time_s`` is the compiled snapshot instant. It is carried for reporting
+    and cross-consumer correlation only: it is never compared and never gates
+    a call, because two different instants of a static world are the same
+    world.
+    """
+
+    topology_version: int
+    geometry_version: int
+    material_version: int
+    assignment_version: int
+    time_s: float | torch.Tensor | None = None
+
+    @classmethod
+    def of(cls, compiled: _WorldVersionSource) -> WorldProvenance:
+        """Read the four version domains a compiled scene recorded."""
+
+        return cls(
+            topology_version=int(compiled.topology_version),
+            geometry_version=int(compiled.geometry_version),
+            material_version=int(compiled.material_version),
+            assignment_version=int(compiled.assignment_version),
+            time_s=getattr(compiled, "time_s", None),
+        )
+
+    def moved_domain(
+        self, current: WorldProvenance, *, allow_geometry: bool = False
+    ) -> str | None:
+        """Name the first version domain that differs, or ``None``.
+
+        Four host integer comparisons. No device work, no allocation, no
+        synchronization.
+        """
+
+        for name in WORLD_VERSION_DOMAINS:
+            if allow_geometry and name == "geometry_version":
+                continue
+            if getattr(self, name) != getattr(current, name):
+                return name
+        return None
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -216,7 +290,15 @@ class PropagationRequest:
 
 @dataclass(frozen=True, slots=True, eq=False)
 class PropagationTopology:
-    """Compact discrete rows in stable pair-major order."""
+    """Compact discrete rows in stable pair-major order.
+
+    ``provenance`` records which world these rows were discovered against.
+    :func:`witwin.channel.propagation.consumer.evaluate` stamps it,
+    :func:`prepare_fixed_topology` forwards it verbatim, and
+    :func:`witwin.channel.propagation.consumer.reevaluate` refuses a frozen
+    replay against a world that moved out from under it. It is ``None`` on a
+    hand-built topology, which has no world to be stale against.
+    """
 
     source_index: torch.Tensor
     sink_index: torch.Tensor
@@ -230,8 +312,13 @@ class PropagationTopology:
     primitive_sequence: torch.Tensor
     material_sequence: torch.Tensor
     interaction_type: torch.Tensor
+    provenance: WorldProvenance | None = None
 
     def __post_init__(self) -> None:
+        if self.provenance is not None and not isinstance(
+            self.provenance, WorldProvenance
+        ):
+            raise TypeError("provenance must be a WorldProvenance or None")
         source_index = _require_tensor(
             "source_index", self.source_index, dtype=torch.int32, ndim=1
         )
@@ -514,6 +601,12 @@ class PropagationCapabilities:
     responses: frozenset[str]
     topology_modes: frozenset[str]
     ad_modes: frozenset[str]
+    # What a FixedTopologyRequest may declare about world motion between
+    # discovery and replay. See FixedTopologyRequest.world_motion.
+    world_motions: frozenset[str]
+    # The version domains a frozen replay is checked against, in the order a
+    # mismatch is reported.
+    world_version_domains: tuple[str, ...]
     response_components: tuple[tuple[str, frozenset[str]], ...]
     response_ad_modes: tuple[tuple[str, frozenset[str]], ...]
     component_ad_modes: tuple[tuple[str, frozenset[str]], ...]
@@ -546,6 +639,8 @@ _CAPABILITIES = PropagationCapabilities(
     responses=RESPONSES,
     topology_modes=TOPOLOGY_MODES,
     ad_modes=AD_MODES,
+    world_motions=WORLD_MOTIONS,
+    world_version_domains=WORLD_VERSION_DOMAINS,
     response_components=(
         ("scalar_transport", COMPONENTS),
         ("complex3_transport", COMPONENTS),
@@ -662,6 +757,12 @@ class PreparedFixedTopology:
     def device(self) -> torch.device:
         return self.topology.device
 
+    @property
+    def provenance(self) -> WorldProvenance | None:
+        """The world the frozen rows were discovered against, forwarded."""
+
+        return self.topology.provenance
+
 
 def _fixed_topology_component_name(component_id: int) -> str:
     for name, value in _FIXED_TOPOLOGY_COMPONENT_IDS:
@@ -765,6 +866,15 @@ class FixedTopologyRequest:
     interactions. Structural validity is enforced here; scene-dependent
     capability checks belong to
     :func:`witwin.channel.propagation.consumer.reevaluate`.
+
+    ``world_motion`` declares what the caller expects of the world between
+    discovery and this replay. ``"frozen_world"`` is the safe default and
+    accepts only the world the rows were discovered against.
+    ``"fixed_winner_replay"`` additionally accepts a moved
+    ``geometry_version`` - a translated, rotated, or deformed structure - and
+    states that the caller deliberately holds the discrete winner set fixed
+    while the geometry moves. It never accepts a moved topology, material, or
+    assignment version: those respecify the labels the frozen rows carry.
     """
 
     sources: EndpointBatch
@@ -773,6 +883,7 @@ class FixedTopologyRequest:
     topology: PropagationTopology | PreparedFixedTopology
     response: PropagationResponse
     ad_mode: PropagationAdMode
+    world_motion: PropagationWorldMotion = "frozen_world"
 
     def __post_init__(self) -> None:
         _require_endpoints(self.sources, self.sinks)
@@ -785,6 +896,7 @@ class FixedTopologyRequest:
             )
         response = _require_vocabulary("response", self.response, RESPONSES)
         _require_vocabulary("ad_mode", self.ad_mode, AD_MODES)
+        _require_vocabulary("world_motion", self.world_motion, WORLD_MOTIONS)
         if response not in _CAPABILITIES.fixed_topology_responses:
             raise NotImplementedError(
                 f"fixed-topology reevaluation does not support {response!r}; "
@@ -813,12 +925,24 @@ class FixedTopologyEvaluation:
     zero coefficient, so validity can never be inferred from the payload.
 
     It covers exactly ``fixed_topology_row_validity_components``. A frozen
-    line-of-sight row is replayed as pure free-space transport and is never
-    re-tested for visibility, so a sink that moves behind a wall still reports
-    ``True`` and a full-strength field while fresh discovery would drop the
-    row. A row also keeps its ORIGINAL ``primitive_sequence`` label when the
-    stationary point slides onto a coplanar twin triangle; the numbers are
-    exact, the discrete label is stale. Both are recorded in ADR-037.
+    line-of-sight row IS re-tested against the passed scene with the same
+    native visibility gate discovery applies, so a sink that moves behind a
+    wall publishes ``row_valid=False`` and exact zeros rather than a stale
+    full-strength answer. A row keeps its ORIGINAL ``primitive_sequence``
+    label when the stationary point slides onto a coplanar twin triangle; the
+    numbers are exact, the discrete label is stale. Both are recorded in
+    ADR-037.
+
+    **Replay is subtractive (ADR-040).** A frozen row can stop existing and is
+    published as ``row_valid=False``; a path that comes into existence at the
+    new endpoint or world state is NOT discovered here and is silently absent
+    from the batch. The rows that are published are exactly correct, and the
+    batch under-reports. There is no birth signal, by design: every candidate
+    detector costs either a full discovery or a device reduction plus a host
+    read the ADR-032 budget does not have. A caller whose scene can gain paths
+    owns the rediscovery cadence; poll
+    :func:`witwin.channel.propagation.consumer.rediscovery_required` for a
+    changed world and rediscover on a motion-event cadence.
     """
 
     paths: PropagationPathBatch
@@ -865,6 +989,9 @@ __all__ = [
     "RESPONSES",
     "ScalarTransport",
     "TOPOLOGY_MODES",
+    "WORLD_MOTIONS",
+    "WORLD_VERSION_DOMAINS",
+    "WorldProvenance",
     "capabilities",
     "prepare_fixed_topology",
 ]
