@@ -38,6 +38,8 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from witwin.channel.runtime.autograd_contracts import _ad_geometry_live
+
 from ._jones import compose_jones, transverse_basis
 from ._rows import PreparedRows, select_rows
 from .contracts import FixedTopologyBucket, PreparedFixedTopology
@@ -54,13 +56,21 @@ class GeometryLiveness:
     """ADR-038 liveness, decided once above every loop that reuses it.
 
     ADR-038 requires the conditional differentiability of ``path_length_m`` and
-    ``delay_s`` to be decided in the caller-facing wrapper, where forward duals
-    are still visible. A wideband request evaluates the same frozen rows at
-    several frequencies, so it invokes the same field operators repeatedly over
-    identical geometry inputs. Deciding liveness inside that loop, or letting
-    the first column decide for the rest, is exactly the shape of the defect
-    ADR-038 removed, so the decision is made once, from the inputs, before any
-    column runs, and the same flag reaches every one of them.
+    ``delay_s`` to be decided where forward duals are still visible, because
+    ``Function.apply`` unpacks them before ``setup_context`` runs. A wideband
+    request evaluates the same frozen rows at several frequencies, so it drives
+    the same field operators repeatedly over identical geometry inputs.
+    Deciding liveness inside that loop, or letting the first column decide for
+    the rest, is exactly the shape of the defect ADR-038 removed.
+
+    So the decision is made ONCE here, above the column loop, from the inputs
+    every column shares, and :meth:`require` re-asserts it against the actual
+    operator inputs of every bucket of every column. The field facades keep
+    deciding for themselves - that is their ADR-038 contract and their frozen
+    surface - and this record makes it a checked invariant that they all decide
+    the same thing, rather than an assumption. A disagreement is a loud failure
+    before the operator runs, never a column that silently answers a different
+    question than its siblings.
 
     Two flags rather than one because the two bucket kinds consume different
     geometry: a zero-depth line-of-sight row is a function of the endpoints
@@ -79,16 +89,25 @@ class GeometryLiveness:
         target: torch.Tensor,
         vertices: object,
     ) -> GeometryLiveness:
-        from witwin.channel.runtime.autograd_contracts import _ad_geometry_live
-
         endpoints = _ad_geometry_live(source, target)
         return cls(
-            los=endpoints,
-            reflection=endpoints or _ad_geometry_live(vertices),
+            los=endpoints, reflection=endpoints or _ad_geometry_live(vertices)
         )
 
     def at_depth(self, depth: int) -> bool:
         return self.reflection if depth else self.los
+
+    def require(self, depth: int, *values: object) -> None:
+        """Fail loudly if one column's inputs disagree with the decision."""
+
+        decided = self.at_depth(depth)
+        if _ad_geometry_live(*values) != decided:
+            raise RuntimeError(
+                "fixed-topology geometry liveness disagrees with the decision "
+                f"taken above the frequency-column loop (depth {depth}, "
+                f"decided {decided}); every column must answer the same ADR-038 "
+                "question"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -265,7 +284,7 @@ def _field_op(
     ad_mode: str,
     frequency: float | torch.Tensor,
     frequency_value: float,
-    geometry_live: bool | None,
+    geometry_live: GeometryLiveness | None,
 ) -> Callable[[torch.Tensor, torch.Tensor], dict[str, torch.Tensor]]:
     from witwin.channel.propagation.fields.kernels import (
         autograd as field_autograd,
@@ -290,6 +309,10 @@ def _field_op(
                 inputs.interaction_normals,
             )
             trailing = inputs.material
+        if geometry_live is not None:
+            # The liveness these exact inputs imply must equal the one decided
+            # above the frequency-column loop, for every bucket of every column.
+            geometry_live.require(inputs.depth, *leading)
         arguments = (
             *leading,
             inputs.tx_power,
@@ -304,10 +327,7 @@ def _field_op(
                 else field_autograd.field_reflection_sequence_ad
             )
             return operator(
-                *arguments,
-                frequency=frequency,
-                frequency_value=frequency_value,
-                geometry_live=geometry_live,
+                *arguments, frequency=frequency, frequency_value=frequency_value
             )
         operator = (
             field_functional.field_free_space
@@ -497,11 +517,11 @@ def evaluate_prepared(
 ) -> FixedRowOutputs:
     """Replay every host-known bucket of a prepared frozen topology.
 
-    ``geometry_live`` carries an ADR-038 liveness decision taken by the caller
+    ``geometry_live`` carries an ADR-038 liveness decision the caller took
     before this call. A wideband caller runs this replay once per frequency
-    column over identical geometry inputs and must pass the same record to every
-    column; a single-frequency caller leaves it ``None`` and each field operator
-    decides for itself, exactly as before.
+    column over identical geometry inputs and passes the SAME record to every
+    column, which turns "every column answers the same liveness question" into a
+    checked invariant. A single-frequency caller leaves it ``None``.
     """
 
     width = int(prepared.topology.primitive_sequence.shape[1])
@@ -524,11 +544,7 @@ def evaluate_prepared(
                 ad_mode=ad_mode,
                 frequency=frequency,
                 frequency_value=frequency_value,
-                geometry_live=(
-                    None
-                    if geometry_live is None
-                    else geometry_live.at_depth(bucket.depth)
-                ),
+                geometry_live=geometry_live,
             ),
             response=response,
             ad_mode=ad_mode,

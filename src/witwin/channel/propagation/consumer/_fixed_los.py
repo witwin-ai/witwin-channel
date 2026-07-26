@@ -171,12 +171,32 @@ def fixed_los_geometry_live(rows: FixedLoSRows) -> bool:
 
     A zero-interaction row is a function of its two gathered endpoints alone, so
     this is the complete liveness question for that route. It is answered here,
-    once, from the gathered rows, so a wideband request that evaluates those
-    same rows at several frequencies passes one decision to every column instead
-    of letting each column - or the first one - decide for the rest.
+    once, from the gathered rows, above any frequency-column loop that replays
+    them.
     """
 
     return _ad_geometry_live(rows.source, rows.target)
 
 
-__all__ = ["FixedLoSRows", "fixed_los_gather", "fixed_los_geometry_live"]
+def require_fixed_los_geometry_live(rows: FixedLoSRows, decided: bool) -> None:
+    """Fail loudly if one column disagrees with the hoisted decision.
+
+    The field facade keeps deciding liveness for itself - that is its ADR-038
+    contract - and this makes "every column decides the same thing" a checked
+    invariant instead of an assumption, before the operator runs.
+    """
+
+    if fixed_los_geometry_live(rows) != decided:
+        raise RuntimeError(
+            "fixed LoS geometry liveness disagrees with the decision taken "
+            f"above the frequency-column loop (decided {decided}); every "
+            "column must answer the same ADR-038 question"
+        )
+
+
+__all__ = [
+    "FixedLoSRows",
+    "fixed_los_gather",
+    "fixed_los_geometry_live",
+    "require_fixed_los_geometry_live",
+]

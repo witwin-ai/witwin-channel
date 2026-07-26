@@ -11,8 +11,6 @@ rejected call.
 from __future__ import annotations
 
 from dataclasses import dataclass
-import math
-import struct
 from typing import Literal, Protocol, TypeAlias, get_args
 
 import torch
@@ -22,6 +20,15 @@ from witwin.channel.constants import (
     NARROWBAND_FREQUENCY_OFFSET_LAW,
     PHASOR,
     TIME_DEPENDENCE,
+)
+
+from ._wideband import (
+    NATIVE_FREQUENCY_RESOLUTION_LAW,
+    WIDEBAND_FREQUENCY_QUANTIZATION_LAW,
+    WIDEBAND_OFFSET_LAYOUT,
+    native_frequency_resolution_hz,
+    require_frequency_offsets,
+    require_wideband_payload,
 )
 
 
@@ -67,84 +74,6 @@ _FIXED_TOPOLOGY_COMPONENT_IDS: tuple[tuple[str, int], ...] = (
 )
 
 
-# The launch grid the native field bridges actually resolve. Every bridge takes
-# a double ``frequency_hz`` and ``static_cast<float>``s it at the launch, so two
-# absolute frequencies inside one float32 ULP are the SAME launch and return
-# bit-identical coefficients. Published as a law plus a function rather than as
-# a constant, because the resolution is a function of the reference frequency
-# (8192 Hz at 77 GHz, 64 Hz at 1 GHz).
-NATIVE_FREQUENCY_RESOLUTION_LAW = (
-    "resolution_hz = ulp_float32(reference_frequency_hz)"
-)
-
-
-def native_frequency_resolution_hz(reference_frequency_hz: float) -> float:
-    """Smallest absolute frequency step the native launch grid resolves.
-
-    The value is one float32 unit in the last place at
-    ``reference_frequency_hz``. A caller computes the same number the
-    wideband refusal uses instead of rederiving it, which is the ADR-036 rule
-    that a declared limit is discoverable rather than learned from a rejection.
-    """
-
-    value = abs(float(reference_frequency_hz))
-    if not math.isfinite(value) or value == 0.0:
-        raise ValueError(
-            "reference_frequency_hz must be finite and non-zero to have a "
-            "native frequency resolution"
-        )
-    # Round to the float32 the launch actually receives before reading the
-    # binade, so a value that rounds up across a power of two reports the
-    # resolution of the launch rather than of the request.
-    launched = struct.unpack("<f", struct.pack("<f", value))[0]
-    _, exponent = math.frexp(launched)
-    # float32 carries a 24-bit significand, so one ULP in that binade is
-    # 2**(exponent - 24).
-    return math.ldexp(1.0, exponent - 24)
-
-
-def _require_frequency_offsets(value: object) -> tuple[float, ...] | None:
-    """Structural validation of a wideband offset grid, before any native work.
-
-    The grid is a HOST DECLARATION in the same class as ``slot_count``: it
-    names which absolute frequencies the same frozen rows are evaluated at. It
-    is deliberately not a tensor and deliberately not differentiable.
-    """
-
-    if value is None:
-        return None
-    if isinstance(value, torch.Tensor):
-        raise TypeError(
-            "frequency_offsets_hz must be a tuple of host floats, not a "
-            "torch.Tensor: the offset grid is a host declaration of which "
-            "absolute frequencies to evaluate, not a differentiable input. A "
-            "tangent with respect to one grid point is identical to the "
-            "reference_frequency_hz tangent evaluated at that point, so seed "
-            "reference_frequency_hz instead"
-        )
-    if not isinstance(value, tuple):
-        raise TypeError("frequency_offsets_hz must be a tuple of floats or None")
-    if not value:
-        raise ValueError(
-            "frequency_offsets_hz must be a non-empty tuple; pass None for a "
-            "single-frequency request"
-        )
-    offsets = []
-    for entry in value:
-        if isinstance(entry, bool) or not isinstance(entry, (int, float)):
-            raise TypeError("frequency_offsets_hz entries must be floats")
-        offset = float(entry)
-        if not math.isfinite(offset):
-            raise ValueError(
-                f"frequency_offsets_hz entries must be finite, got {entry!r}"
-            )
-        offsets.append(offset)
-    if len(set(offsets)) != len(offsets):
-        raise ValueError(
-            "frequency_offsets_hz must not repeat an offset; duplicate entries "
-            "produce bit-identical columns and hide a caller bug"
-        )
-    return tuple(offsets)
 
 
 def _require_tensor(
@@ -514,41 +443,6 @@ class PropagationGeometry:
         return self.path_length_m.device
 
 
-def _require_wideband_payload(
-    name: str,
-    payload: object,
-    offsets: object,
-    *,
-    rows: int,
-    trailing: tuple[int, ...],
-    device: torch.device,
-) -> None:
-    """Enforce the ADR-042 paired-presence and shape law on one transport.
-
-    The payload and the grid it was evaluated on are both present or both
-    absent. An unpaired payload is a column set nobody can label, and an
-    unpaired grid is a promise nobody kept; either one is a contract error
-    rather than something a reader should have to guess about.
-    """
-
-    if payload is None and offsets is None:
-        return
-    if payload is None or offsets is None:
-        raise ValueError(
-            f"{name} and frequency_offsets_hz are paired: publish both or "
-            "neither"
-        )
-    if not isinstance(offsets, tuple) or not offsets:
-        raise TypeError("frequency_offsets_hz must be a non-empty tuple of floats")
-    _require_tensor(
-        name,
-        payload,
-        dtype=torch.complex64,
-        shape=(rows, len(offsets), *trailing),
-        device=device,
-    )
-
-
 @dataclass(frozen=True, slots=True, eq=False)
 class ScalarTransport:
     """Endpoint-projected complex scalar transport at the reference frequency.
@@ -573,13 +467,11 @@ class ScalarTransport:
 
     def __post_init__(self) -> None:
         _require_tensor("coefficient", self.coefficient, dtype=torch.complex64, ndim=1)
-        _require_wideband_payload(
+        require_wideband_payload(
             "coefficient_offsets",
             self.coefficient_offsets,
             self.frequency_offsets_hz,
-            rows=int(self.coefficient.shape[0]),
-            trailing=(),
-            device=self.coefficient.device,
+            self.coefficient,
         )
 
     @property
@@ -622,13 +514,8 @@ class Complex3Transport:
             shape=(int(field.shape[0]), 3),
             device=field.device,
         )
-        _require_wideband_payload(
-            "field_offsets",
-            self.field_offsets,
-            self.frequency_offsets_hz,
-            rows=int(field.shape[0]),
-            trailing=(3,),
-            device=field.device,
+        require_wideband_payload(
+            "field_offsets", self.field_offsets, self.frequency_offsets_hz, field
         )
 
     @property
@@ -761,30 +648,11 @@ class PropagationConvention:
     narrowband_frequency_offset_error_law: str = (
         NARROWBAND_FREQUENCY_OFFSET_ERROR_LAW
     )
-    # The layout a wideband payload adds on top of the row layouts above, which
-    # it does not redefine. Frequency is orthogonal to rows and to slots: the
-    # same rows are evaluated at F frequencies, so the axis is appended and
-    # nothing is tiled, re-paired, or re-segmented.
-    wideband_offset_layout: str = (
-        "frequency_minor:"
-        "payload[row, j] = response(row) at"
-        " reference_frequency_hz+frequency_offsets_hz[j];"
-        "row axis and pair segmentation unchanged;"
-        "row_valid stays [K] and broadcasts over j;"
-        "geometry published once from the reference evaluation;"
-        "slot composition gives [slot_count*frozen_row_count, F]"
-    )
-    # Why an offset grid can be refused as unresolvable. Every native field
-    # bridge casts the frequency to float32 at the launch, so two absolute
-    # frequencies inside one float32 ULP are the same launch. Channel publishes
-    # the resolution and the resulting phase bound; it does not compute the
-    # bound, because that needs max(delay_s), which is a device reduction plus a
-    # host read the ADR-032 budget does not have. The caller owns that check.
-    wideband_frequency_quantization_law: str = (
-        "launch_grid=float32;"
-        " resolution_hz=ulp_float32(reference_frequency_hz);"
-        " abs_phase_error_rad <= pi*resolution_hz*delay_s"
-    )
+    # The layout a wideband payload adds on top of the row layouts above, and
+    # the float32 launch grid that bounds how fine an offset grid may be. Both
+    # are owned by the wideband module beside this one.
+    wideband_offset_layout: str = WIDEBAND_OFFSET_LAYOUT
+    wideband_frequency_quantization_law: str = WIDEBAND_FREQUENCY_QUANTIZATION_LAW
     complex3_basis: str = "world_cartesian"
     jones_mapping: str = "source_transverse_basis_to_sink_transverse_basis"
 
@@ -1017,97 +885,6 @@ class PreparedFixedTopology:
         return self.topology.provenance
 
 
-def _fixed_topology_component_name(component_id: int) -> str:
-    for name, value in _FIXED_TOPOLOGY_COMPONENT_IDS:
-        if value == component_id:
-            return name
-    raise NotImplementedError(
-        f"fixed-topology reevaluation does not support component id "
-        f"{component_id}; supported components are "
-        f"{sorted(_CAPABILITIES.fixed_topology_components)}"
-    )
-
-
-def _require_bucket_depth(component: str, depth: int) -> None:
-    if component == "los" and depth != 0:
-        raise ValueError("a los row must have depth 0")
-    if component == "reflection" and depth < 1:
-        raise ValueError("a reflection row must have depth >= 1")
-
-
-def _malformed_rows(topology: PropagationTopology, width: int) -> torch.Tensor:
-    """Rows whose depth or interaction padding contradicts the contract."""
-
-    depth = topology.depth.to(dtype=torch.int64)
-    slots = torch.arange(
-        width, device=topology.device, dtype=torch.int64
-    ).reshape(1, -1)
-    active = slots < depth.reshape(-1, 1)
-    sequence = topology.primitive_sequence.to(dtype=torch.int64)
-    return (
-        (depth < 0)
-        | (depth > width)
-        | ((sequence < 0) & active).any(dim=1)
-        | ((sequence != -1) & ~active).any(dim=1)
-    )
-
-
-def prepare_fixed_topology(
-    topology: PropagationTopology,
-) -> PreparedFixedTopology:
-    """Partition a frozen topology by component and interaction depth.
-
-    This is the one place the consumer looks at a frozen topology on the host.
-    It validates the depth/interaction padding of every row, rejects any
-    component outside ``capabilities().fixed_topology_components``, and returns
-    the ascending ``(component, depth)`` buckets that
-    :func:`witwin.channel.propagation.consumer.reevaluate` replays.
-
-    Call it once per frozen topology and reuse the handle. It synchronizes; a
-    per-frame call would reintroduce exactly the host observation the fixed
-    topology capability exists to avoid.
-    """
-
-    if not isinstance(topology, PropagationTopology):
-        raise TypeError("topology must be a PropagationTopology")
-    if topology.row_count == 0:
-        return PreparedFixedTopology(
-            topology=topology,
-            buckets=(),
-            prepare_d2h_copies=0,
-            prepare_d2h_bytes=0,
-            prepare_synchronizations=0,
-        )
-    width = int(topology.primitive_sequence.shape[1])
-    if bool(_malformed_rows(topology, width).any().item()):
-        raise ValueError(
-            "frozen topology rows disagree with their interaction sequence "
-            "padding; depth must be in [0, sequence width] and unused slots "
-            "must hold -1"
-        )
-    key = topology.component_id.to(dtype=torch.int64) * (width + 1) + (
-        topology.depth.to(dtype=torch.int64)
-    )
-    distinct = torch.unique(key).tolist()
-    buckets = []
-    for value in distinct:
-        component_id, depth = divmod(int(value), width + 1)
-        component = _fixed_topology_component_name(component_id)
-        _require_bucket_depth(component, depth)
-        buckets.append(
-            FixedTopologyBucket(
-                component=component,
-                depth=depth,
-                rows=torch.nonzero(key == value, as_tuple=False).reshape(-1),
-            )
-        )
-    return PreparedFixedTopology(
-        topology=topology,
-        buckets=tuple(buckets),
-        prepare_d2h_copies=2 + len(buckets),
-        prepare_d2h_bytes=1 + 8 * (len(distinct) + len(buckets)),
-        prepare_synchronizations=2 + len(buckets),
-    )
 
 
 def _require_slot_divisible(name: str, count: int, slot_count: int) -> None:
@@ -1124,86 +901,6 @@ def _require_slot_count(slot_count: object) -> int:
     return slot_count
 
 
-def replicate_over_slots(
-    prepared: PreparedFixedTopology,
-    slot_count: int,
-    *,
-    source_count: int,
-    sink_count: int,
-) -> PreparedFixedTopology:
-    """Tile a frozen topology over ``slot_count`` block-diagonal slots.
-
-    ``source_count`` and ``sink_count`` are the PER-SLOT endpoint counts of the
-    stacked batches the replicated topology will be replayed against. They are
-    required rather than inferred: an endpoint that publishes no frozen row
-    never appears in ``source_index``, so the largest index in a topology is
-    not the endpoint count and inferring one would silently mislabel every
-    later slot.
-
-    This is pure index arithmetic and bucket re-partitioning: row ``t*K + r``
-    names the same frozen row ``r`` shifted into slot ``t``, so the frozen row
-    order is preserved inside every slot and the ``(component, depth)`` bucket
-    COUNT is unchanged - only the bucket row counts grow. No compaction, no
-    physics, no native symbol, no host observation. ``slot_count == 1`` returns
-    the handle unchanged, so a single-slot replay is bit-identical to one that
-    never asked for slots.
-
-    ``provenance`` is forwarded verbatim, so a replicated topology is checked
-    for staleness exactly like the topology it came from (ADR-040).
-    """
-
-    if not isinstance(prepared, PreparedFixedTopology):
-        raise TypeError("prepared must be a PreparedFixedTopology")
-    slot_count = _require_slot_count(slot_count)
-    for name, value in (("source_count", source_count), ("sink_count", sink_count)):
-        if type(value) is not int or value <= 0:
-            raise ValueError(f"{name} must be a positive int")
-    if slot_count == 1:
-        return prepared
-    topology = prepared.topology
-    rows = topology.row_count
-    device = topology.device
-    slot = torch.arange(slot_count, device=device, dtype=torch.int32)
-    replicated = PropagationTopology(
-        source_index=(
-            topology.source_index.repeat(slot_count)
-            + slot.mul(source_count).repeat_interleave(rows)
-        ),
-        sink_index=(
-            topology.sink_index.repeat(slot_count)
-            + slot.mul(sink_count).repeat_interleave(rows)
-        ),
-        source_id=topology.source_id.repeat(slot_count),
-        sink_id=topology.sink_id.repeat(slot_count),
-        depth=topology.depth.repeat(slot_count),
-        component_id=topology.component_id.repeat(slot_count),
-        primitive_id=topology.primitive_id.repeat(slot_count),
-        edge_id=topology.edge_id.repeat(slot_count),
-        material_id=topology.material_id.repeat(slot_count),
-        primitive_sequence=topology.primitive_sequence.repeat(slot_count, 1),
-        material_sequence=topology.material_sequence.repeat(slot_count, 1),
-        interaction_type=topology.interaction_type.repeat(slot_count, 1),
-        provenance=topology.provenance,
-    )
-    row_offset = torch.arange(
-        slot_count, device=device, dtype=torch.int64
-    ).mul(rows).reshape(-1, 1)
-    return PreparedFixedTopology(
-        topology=replicated,
-        buckets=tuple(
-            FixedTopologyBucket(
-                component=bucket.component,
-                depth=bucket.depth,
-                rows=(bucket.rows.reshape(1, -1) + row_offset).reshape(-1),
-            )
-            for bucket in prepared.buckets
-        ),
-        # Replication observes nothing, so the handle keeps the cost of the one
-        # preparation it was derived from rather than claiming a new one.
-        prepare_d2h_copies=prepared.prepare_d2h_copies,
-        prepare_d2h_bytes=prepared.prepare_d2h_bytes,
-        prepare_synchronizations=prepared.prepare_synchronizations,
-    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -1265,7 +962,7 @@ class FixedTopologyRequest:
         object.__setattr__(
             self,
             "frequency_offsets_hz",
-            _require_frequency_offsets(self.frequency_offsets_hz),
+            require_frequency_offsets(self.frequency_offsets_hz),
         )
         if not isinstance(
             self.topology, PropagationTopology | PreparedFixedTopology
@@ -1403,6 +1100,4 @@ __all__ = [
     "WorldProvenance",
     "capabilities",
     "native_frequency_resolution_hz",
-    "prepare_fixed_topology",
-    "replicate_over_slots",
 ]

@@ -976,7 +976,11 @@ def reevaluate(
     )
 
     from ._amplitude import excited_field
-    from ._fixed_los import fixed_los_gather, fixed_los_geometry_live
+    from ._fixed_los import (
+        fixed_los_gather,
+        fixed_los_geometry_live,
+        require_fixed_los_geometry_live,
+    )
 
     compiled, request = _preflight_reevaluate(compiled_scene, request)
     if isinstance(request.topology, PreparedFixedTopology):
@@ -989,8 +993,8 @@ def reevaluate(
     tx_power = rows.tx_power.detach()
     tx_polarization = rows.tx_polarization.detach()
     rx_polarization = rows.rx_polarization.detach()
-    # ADR-038: one liveness decision, taken here from the gathered rows, shared
-    # by every column.
+    # ADR-038: one liveness decision, taken here from the gathered rows, and
+    # re-asserted for every column against the inputs that column launches on.
     geometry_live = fixed_los_geometry_live(rows)
 
     def column(offset: float) -> dict[str, torch.Tensor]:
@@ -1003,6 +1007,7 @@ def reevaluate(
                 rx_polarization,
                 frequency_hz=frequency_value + offset,
             )
+        require_fixed_los_geometry_live(rows, geometry_live)
         return field_autograd.field_free_space_ad(
             rows.source,
             rows.target,
@@ -1011,7 +1016,6 @@ def reevaluate(
             rx_polarization,
             frequency=_offset_frequency(frequency, offset),
             frequency_value=frequency_value + offset,
-            geometry_live=geometry_live,
         )
 
     field_rows = column(0.0)

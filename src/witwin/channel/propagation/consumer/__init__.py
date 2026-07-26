@@ -49,9 +49,8 @@ from .contracts import (
     WorldProvenance,
     capabilities,
     native_frequency_resolution_hz,
-    prepare_fixed_topology,
-    replicate_over_slots,
 )
+from ._prepared import prepare_fixed_topology, replicate_over_slots
 from .service import evaluate, rediscovery_required, reevaluate
 from .time_varying import (
     TimeVaryingEvaluation,

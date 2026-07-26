@@ -257,7 +257,7 @@
           "name": "PropagationConvention",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.contracts.PropagationConvention",
-          "contract_sha256": "c14f37cb456014f681707a094e0b6a990ac0526246085d57ddc933d557b4f720"
+          "contract_sha256": "d6606f3dba92f2aa0491988f18c8e2fcfe7a55a8af0352891d89d7c505d5c1ac"
         },
         {
           "name": "PropagationDiagnostics",
@@ -373,15 +373,15 @@
         {
           "name": "native_frequency_resolution_hz",
           "kind": "function",
-          "target": "witwin.channel.propagation.consumer.contracts.native_frequency_resolution_hz",
-          "contract_sha256": "b8bb44c28c9fa255cc40fea835ace9b8f4d5918c2fe7ee91c6f4f1224933d28b",
+          "target": "witwin.channel.propagation.consumer._wideband.native_frequency_resolution_hz",
+          "contract_sha256": "9c55069dc4549f7f69e8e8eaa4f1c165b4fa8b90fac275cfa539291b6b8e9367",
           "signature": "(reference_frequency_hz: float)"
         },
         {
           "name": "prepare_fixed_topology",
           "kind": "function",
-          "target": "witwin.channel.propagation.consumer.contracts.prepare_fixed_topology",
-          "contract_sha256": "2ca36f0fc646a02c62e1813601e6897bbf572dc7eb4917d8d268bc16a3f8e649",
+          "target": "witwin.channel.propagation.consumer._prepared.prepare_fixed_topology",
+          "contract_sha256": "42ab03d7eb4268b65a12c7b03d4d1675046e54df496e4db7d53a78c5ee548bfd",
           "signature": "(topology: PropagationTopology)"
         },
         {
@@ -401,8 +401,8 @@
         {
           "name": "replicate_over_slots",
           "kind": "function",
-          "target": "witwin.channel.propagation.consumer.contracts.replicate_over_slots",
-          "contract_sha256": "44816b2d705b02912dd7f7e28645f3223096683e6a8b67b53054bd9b7d531d73",
+          "target": "witwin.channel.propagation.consumer._prepared.replicate_over_slots",
+          "contract_sha256": "9642122df4a48bd20914ae06433d831c3bb778beb904fcb5dac3a25229b8a8c3",
           "signature": "(prepared: PreparedFixedTopology, slot_count: int, *, source_count: int, sink_count: int)"
         }
       ]

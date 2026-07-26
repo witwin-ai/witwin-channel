@@ -189,18 +189,29 @@ identity path so an AD seed reaches every column. The `[K, F]` payload is
 `torch.stack` over the column outputs: **structural packing only.** No
 offset-dependent phase, magnitude, or basis is applied in Torch anywhere.
 
-**ADR-038 liveness is computed once, above the loop, and the same explicit flag
-is passed to every column.** `field_free_space_ad` and
-`field_reflection_sequence_ad` gained an optional `geometry_live` parameter for
-this; when it is omitted they decide for themselves, exactly as before. The
-consumer computes a two-flag `GeometryLiveness` record from the inputs every
-column shares - the gathered endpoints for a zero-depth bucket, and those plus
-the scene vertex table for a reflection bucket, since a differentiable mesh
-makes the stationary point live even when the endpoints are primal. Recomputing
+**ADR-038 liveness is decided once, above the loop, and enforced at every
+column.** The consumer builds a two-flag `GeometryLiveness` record from the
+inputs every column shares - the gathered endpoints for a zero-depth bucket,
+and those plus the scene vertex table for a reflection bucket, since a
+differentiable mesh makes the stationary point live even when the endpoints are
+primal - and re-asserts it against the actual operator inputs of every bucket of
+every column, raising before the operator runs on disagreement. Recomputing
 liveness inside the loop, or letting the first column decide for the rest, is
-the exact shape of the defect ADR-038 removed, and it would show up as a
-missing `delay_s` tangent on precisely the forward-only-dual requests Radar's
-Doppler chain uses.
+the exact shape of the defect ADR-038 removed, and it would show up as a missing
+`delay_s` tangent on precisely the forward-only-dual requests Radar's Doppler
+chain uses.
+
+The design sketched this as an optional `geometry_live` parameter threaded into
+`field_free_space_ad` and `field_reflection_sequence_ad`. That form was built,
+measured, and abandoned: it costs 12 lines in
+`propagation/fields/kernels/autograd.py`, which sits at a frozen maintenance
+ceiling of 1790 lines with zero headroom, and raising that ceiling would widen
+allowlisted debt to make a change pass. The enforced-invariant form gives the
+same guarantee - no column can silently answer a different liveness question
+than its siblings - keeps the field facades at their frozen ADR-038 surface,
+and costs nothing there. If a caller ever needs to OVERRIDE liveness rather than
+agree with it, the parameter is the right answer and it arrives with the
+decomposition that ceiling is waiting on.
 
 ### 4. The launch-count law, stated out loud
 
@@ -294,6 +305,26 @@ exactly as Radar already owns its declared aspect phase budget.
 grid), which is what makes the launch law auditable from a result.
 
 `CONTRACT_VERSION` moves from 4 to 5.
+
+### 7. `contracts.py` is decomposed, not exempted
+
+The consumer vocabulary module stood at 1151 lines against a 1200-line
+recommended budget, so any substantial contract addition trips it. Rather than
+write an exemption, two coherent sub-topics move out verbatim, with no
+behavioural change:
+
+- `_wideband.py`: the float32 launch resolution and its law, the offset-grid
+  structural validation, the paired-payload law, and the two convention
+  strings. It depends on nothing in `contracts`, so the dependency runs one
+  way.
+- `_prepared.py`: `prepare_fixed_topology`, `replicate_over_slots`, and their
+  private helpers - the frozen-topology preparation sub-topic, which is
+  boundary work rather than a type.
+
+`contracts.py` ends at 1103 lines and remains the single place a reader looks
+up a consumer TYPE. The package facade re-exports both moved functions under
+their existing names, so `__all__` and every caller are unchanged; only the
+`target` field of two rows in the public API snapshot moves, deliberately.
 
 ## Evidence
 

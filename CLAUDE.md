@@ -191,7 +191,10 @@ Organize code by RF domain capability, with a single owner for each operation:
   before any native work, each individually reachable. Discovery has no
   frequency grid, frequency never becomes a fifth world version domain, and
   neither `replicate_over_slots` nor `evaluate_time_varying` gains a frequency
-  variant.
+  variant. The wideband surface and the frozen-topology preparation helpers live
+  in `_wideband.py` and `_prepared.py` beside `contracts.py`, which stays the
+  single place a reader looks up a consumer type; that split is what keeps the
+  vocabulary module inside its maintenance budget without an exemption.
 - `path`, `deterministic`, `montecarlo.basic`, and `montecarlo.bdpt`: thin
   solver-owned configuration, orchestration, accumulation, result, and metadata
   layers. Solvers must never import another solver.

@@ -37,8 +37,8 @@ from .contracts import (
     PropagationWorldMotion,
     ScalarTransport,
     _require_slot_divisible,
-    replicate_over_slots,
 )
+from ._prepared import replicate_over_slots
 from .service import reevaluate
 
 if TYPE_CHECKING:
