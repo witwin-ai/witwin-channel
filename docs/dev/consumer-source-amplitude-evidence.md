@@ -146,6 +146,7 @@ tests/deterministic`:
 |---|---|
 | before | 902 passed, 7 skipped, 1 xfailed (163.70s) |
 | after | 930 passed, 7 skipped, 1 xfailed (106.00s) |
+| after the audit hardening (+2 tests) | 932 passed, 7 skipped, 1 xfailed (125.73s) |
 
 Whole suite less `tests/performance` and the three Munich parity files:
 
@@ -162,6 +163,18 @@ its outcome.
 native surface and the AD dispatch changed. After the change its gates report
 `2126 + 14 + 26 + 117` passed and `contract coverage passed (52 public
 exports, 253 native bindings)`.
+
+Rerun after the audit hardening, on the same environment: quick tier passes
+(exit 0), cuda tier passes (exit 0) with
+`2128 passed, 4 skipped` on the unit-contract-acceptance gate and
+`14 + 26 + 117` on the solver-smoke, no-fallback and AD gates. The `+2` on the
+acceptance gate is the new reflection multi-source case.
+
+One intermittent, pre-existing artifact seen once while gathering these
+numbers: three `tests/deterministic/test_transmission.py` tests failed in one
+of three otherwise identical targeted runs and passed on repeat and in
+isolation. It is not order-dependent (no random ordering plugin is installed)
+and no run of the cuda tier reproduced it.
 
 Pass `--basetemp` explicitly on Windows. Without it, and with a long temp
 path, `tests/kernels/test_rayd_package_discovery.py` fails nine times on
