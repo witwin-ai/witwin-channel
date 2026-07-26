@@ -6,7 +6,7 @@ waveform, target, RCS, IQ, ADC, detection, or processing policy.
 
 ## Version and compatibility
 
-- `CONTRACT_VERSION == 4`.
+- `CONTRACT_VERSION == 5`.
 - The module's `__all__` is the complete stable public surface. Consumer names
   are not duplicated at `witwin.channel`.
 - A breaking schema or semantic change increments the version and atomically
@@ -128,6 +128,25 @@ or AD modes fail before partial evaluation publication. Channel completes the
 internal failure transaction before constructing the public result. No public
 contract contains a failure bit/state, observer, native handle, resource,
 cache, or tape.
+
+The frequency-offset entry in that list is now a supported capability with
+independent refusals rather than a blanket one (ADR-042).
+`FixedTopologyRequest.frequency_offsets_hz` is a host-declared grid of
+propagation frequencies at which the same frozen rows are evaluated. A tensor
+grid, an empty, non-finite, or duplicated grid, and `polarimetric_transport`
+are refused structurally, before any scene is consulted. A dispersive scene, an
+offset grid finer than the native float32 launch resolution, and a rough or
+phase-screen scene are each refused by name in the preflight, before any native
+work, and each is reachable on its own.
+`capabilities().supports_wideband_offsets` and the six fields beside it publish
+the supported cell; `native_frequency_resolution_hz` publishes the number the
+resolution refusal quotes. The published payload is `[K, F]`, `row_valid` stays
+`[K]`, geometry is published once from the reference evaluation, and the
+validation budget stays at one 4-byte copy and one synchronization however
+large `F` is - the launch count is what grows, as
+`(1 + F) * buckets * launches_per_bucket`, and
+`PropagationDiagnostics.frequency_column_count` reports `F` so that is
+auditable.
 
 Reevaluation is defined only for fixed topology, fixed compact row identity
 and order, fixed pair segmentation, fixed winner selection, and advertised

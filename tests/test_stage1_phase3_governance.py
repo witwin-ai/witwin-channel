@@ -72,12 +72,17 @@ def test_consumer_contract_is_versioned_and_snapshot_frozen() -> None:
         "capabilities",
         "evaluate",
         "evaluate_time_varying",
+        "native_frequency_resolution_hz",
         "prepare_fixed_topology",
         "rediscovery_required",
         "reevaluate",
         "replicate_over_slots",
     ]
     contracts = (CONSUMER_ROOT / "contracts.py").read_text(encoding="utf-8")
+    # Version 5 (ADR-042): the same frozen rows can be evaluated at a declared
+    # grid of absolute frequencies. Additive behind
+    # ``frequency_offsets_hz=None``, so every existing call and every published
+    # number is unchanged; one export and one request field arrive with it.
     # Version 4 covers all of Phase 7 and is bumped exactly once. ADR-041 is
     # additive on top of it: slot batching arrives behind ``slot_count=1``, so
     # every existing call and every published number is unchanged, and the
@@ -90,7 +95,7 @@ def test_consumer_contract_is_versioned_and_snapshot_frozen() -> None:
     # published quantity. Version 2 (ADR-037) grew ``row_valid``, two
     # capability fields, and three exports, and lifted the documented
     # "polarimetric_transport is primal-only" limit.
-    assert "CONTRACT_VERSION = 4" in contracts
+    assert "CONTRACT_VERSION = 5" in contracts
 
     snapshot = json.loads(
         (ROOT / "ci" / "public-api-snapshot.json").read_text(encoding="utf-8")
@@ -268,21 +273,39 @@ def test_consumer_vocabulary_has_one_source_of_truth() -> None:
     assert "capabilities()" in service
 
 
-def test_consumer_v1_declares_no_unimplemented_frequency_offsets() -> None:
-    """The contract states the shift law without claiming to perform it.
+def test_consumer_frequency_offsets_are_implemented_not_merely_declared() -> None:
+    """A frequency-offset input exists, works, and publishes its own limits.
 
-    A request field that is always rejected is not part of a frozen contract,
-    so there is no frequency-offset input and no capability flag. The narrowband
-    law itself stays on the convention: its sign follows the frozen phasor, and
-    ``delay_s`` is published per row so a caller can apply it.
+    Version 4 carried no such field on purpose: a request field that is always
+    rejected is not part of a frozen contract. ADR-042 delivers the capability
+    instead of declaring it, so the inverse rule now binds. Every wideband flag
+    the capability record publishes must have a matching enforcement site, and
+    the narrowband law it supersedes stays on the convention next to the
+    quantified statement of what that law costs.
     """
 
-    contracts = (CONSUMER_ROOT / "contracts.py").read_text(encoding="utf-8")
-    assert "frequency_offsets_hz" not in contracts
-    assert "supports_frequency_offsets" not in contracts
+    from witwin.channel.constants import (
+        NARROWBAND_FREQUENCY_OFFSET_ERROR_LAW,
+        NARROWBAND_FREQUENCY_OFFSET_LAW,
+    )
+    from witwin.channel.propagation.consumer import (
+        PropagationConvention,
+        capabilities,
+    )
 
-    from witwin.channel.constants import NARROWBAND_FREQUENCY_OFFSET_LAW
-    from witwin.channel.propagation.consumer import PropagationConvention
+    contracts = (CONSUMER_ROOT / "contracts.py").read_text(encoding="utf-8")
+    service = (CONSUMER_ROOT / "service.py").read_text(encoding="utf-8")
+    assert "frequency_offsets_hz: tuple[float, ...] | None = None" in contracts
+
+    record = capabilities()
+    assert record.supports_wideband_offsets is True
+    # The three refusals the capability record advertises, each with its own
+    # enforcement site rather than a shared one.
+    assert record.wideband_dispersive_materials is False
+    assert "_require_wideband_dispersive_materials" in service
+    assert record.wideband_rough_materials is False
+    assert "_require_wideband_smooth_scene" in service
+    assert "_require_resolvable_offsets" in service
 
     convention = PropagationConvention()
     assert (
@@ -290,6 +313,10 @@ def test_consumer_v1_declares_no_unimplemented_frequency_offsets() -> None:
         == NARROWBAND_FREQUENCY_OFFSET_LAW
     )
     assert "delay_s" in convention.narrowband_frequency_offset_law
+    assert (
+        convention.narrowband_frequency_offset_error_law
+        == NARROWBAND_FREQUENCY_OFFSET_ERROR_LAW
+    )
 
 
 def test_consumer_geometry_has_no_duplicate_first_interaction_fields() -> None:

@@ -187,6 +187,7 @@ def replay(
     slot_count: int = 1,
     response: str = "scalar_transport",
     ad_mode: str = "none",
+    frequency_offsets_hz: tuple[float, ...] | None = None,
 ):
     return reevaluate(
         compiled,
@@ -198,5 +199,6 @@ def replay(
             response=response,
             ad_mode=ad_mode,
             slot_count=slot_count,
+            frequency_offsets_hz=frequency_offsets_hz,
         ),
     )

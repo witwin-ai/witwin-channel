@@ -11,18 +11,21 @@ rejected call.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
+import struct
 from typing import Literal, Protocol, TypeAlias, get_args
 
 import torch
 
 from witwin.channel.constants import (
+    NARROWBAND_FREQUENCY_OFFSET_ERROR_LAW,
     NARROWBAND_FREQUENCY_OFFSET_LAW,
     PHASOR,
     TIME_DEPENDENCE,
 )
 
 
-CONTRACT_VERSION = 4
+CONTRACT_VERSION = 5
 
 
 PropagationComponent: TypeAlias = Literal[
@@ -62,6 +65,86 @@ _FIXED_TOPOLOGY_COMPONENT_IDS: tuple[tuple[str, int], ...] = (
     ("los", 0),
     ("reflection", 1),
 )
+
+
+# The launch grid the native field bridges actually resolve. Every bridge takes
+# a double ``frequency_hz`` and ``static_cast<float>``s it at the launch, so two
+# absolute frequencies inside one float32 ULP are the SAME launch and return
+# bit-identical coefficients. Published as a law plus a function rather than as
+# a constant, because the resolution is a function of the reference frequency
+# (8192 Hz at 77 GHz, 64 Hz at 1 GHz).
+NATIVE_FREQUENCY_RESOLUTION_LAW = (
+    "resolution_hz = ulp_float32(reference_frequency_hz)"
+)
+
+
+def native_frequency_resolution_hz(reference_frequency_hz: float) -> float:
+    """Smallest absolute frequency step the native launch grid resolves.
+
+    The value is one float32 unit in the last place at
+    ``reference_frequency_hz``. A caller computes the same number the
+    wideband refusal uses instead of rederiving it, which is the ADR-036 rule
+    that a declared limit is discoverable rather than learned from a rejection.
+    """
+
+    value = abs(float(reference_frequency_hz))
+    if not math.isfinite(value) or value == 0.0:
+        raise ValueError(
+            "reference_frequency_hz must be finite and non-zero to have a "
+            "native frequency resolution"
+        )
+    # Round to the float32 the launch actually receives before reading the
+    # binade, so a value that rounds up across a power of two reports the
+    # resolution of the launch rather than of the request.
+    launched = struct.unpack("<f", struct.pack("<f", value))[0]
+    _, exponent = math.frexp(launched)
+    # float32 carries a 24-bit significand, so one ULP in that binade is
+    # 2**(exponent - 24).
+    return math.ldexp(1.0, exponent - 24)
+
+
+def _require_frequency_offsets(value: object) -> tuple[float, ...] | None:
+    """Structural validation of a wideband offset grid, before any native work.
+
+    The grid is a HOST DECLARATION in the same class as ``slot_count``: it
+    names which absolute frequencies the same frozen rows are evaluated at. It
+    is deliberately not a tensor and deliberately not differentiable.
+    """
+
+    if value is None:
+        return None
+    if isinstance(value, torch.Tensor):
+        raise TypeError(
+            "frequency_offsets_hz must be a tuple of host floats, not a "
+            "torch.Tensor: the offset grid is a host declaration of which "
+            "absolute frequencies to evaluate, not a differentiable input. A "
+            "tangent with respect to one grid point is identical to the "
+            "reference_frequency_hz tangent evaluated at that point, so seed "
+            "reference_frequency_hz instead"
+        )
+    if not isinstance(value, tuple):
+        raise TypeError("frequency_offsets_hz must be a tuple of floats or None")
+    if not value:
+        raise ValueError(
+            "frequency_offsets_hz must be a non-empty tuple; pass None for a "
+            "single-frequency request"
+        )
+    offsets = []
+    for entry in value:
+        if isinstance(entry, bool) or not isinstance(entry, (int, float)):
+            raise TypeError("frequency_offsets_hz entries must be floats")
+        offset = float(entry)
+        if not math.isfinite(offset):
+            raise ValueError(
+                f"frequency_offsets_hz entries must be finite, got {entry!r}"
+            )
+        offsets.append(offset)
+    if len(set(offsets)) != len(offsets):
+        raise ValueError(
+            "frequency_offsets_hz must not repeat an offset; duplicate entries "
+            "produce bit-identical columns and hide a caller bug"
+        )
+    return tuple(offsets)
 
 
 def _require_tensor(
@@ -431,6 +514,41 @@ class PropagationGeometry:
         return self.path_length_m.device
 
 
+def _require_wideband_payload(
+    name: str,
+    payload: object,
+    offsets: object,
+    *,
+    rows: int,
+    trailing: tuple[int, ...],
+    device: torch.device,
+) -> None:
+    """Enforce the ADR-042 paired-presence and shape law on one transport.
+
+    The payload and the grid it was evaluated on are both present or both
+    absent. An unpaired payload is a column set nobody can label, and an
+    unpaired grid is a promise nobody kept; either one is a contract error
+    rather than something a reader should have to guess about.
+    """
+
+    if payload is None and offsets is None:
+        return
+    if payload is None or offsets is None:
+        raise ValueError(
+            f"{name} and frequency_offsets_hz are paired: publish both or "
+            "neither"
+        )
+    if not isinstance(offsets, tuple) or not offsets:
+        raise TypeError("frequency_offsets_hz must be a non-empty tuple of floats")
+    _require_tensor(
+        name,
+        payload,
+        dtype=torch.complex64,
+        shape=(rows, len(offsets), *trailing),
+        device=device,
+    )
+
+
 @dataclass(frozen=True, slots=True, eq=False)
 class ScalarTransport:
     """Endpoint-projected complex scalar transport at the reference frequency.
@@ -439,12 +557,30 @@ class ScalarTransport:
     ``sqrt(sources.powers_w)`` of the transmitting endpoint, so it is a
     transported field value and not a unit-excitation transfer function
     (ADR-039). Power/gain values are its squared magnitude.
+
+    ``coefficient_offsets`` is the optional wideband payload (ADR-042):
+    ``[K, F]`` complex64, where column ``j`` is the SAME row evaluated at
+    ``reference_frequency_hz + frequency_offsets_hz[j]``. It is present exactly
+    when the request declared ``frequency_offsets_hz``, and the grid it was
+    evaluated on is echoed here so a column can never be read against the wrong
+    frequency. A ``0.0`` entry produces a column bit-identical to
+    ``coefficient``.
     """
 
     coefficient: torch.Tensor
+    coefficient_offsets: torch.Tensor | None = None
+    frequency_offsets_hz: tuple[float, ...] | None = None
 
     def __post_init__(self) -> None:
         _require_tensor("coefficient", self.coefficient, dtype=torch.complex64, ndim=1)
+        _require_wideband_payload(
+            "coefficient_offsets",
+            self.coefficient_offsets,
+            self.frequency_offsets_hz,
+            rows=int(self.coefficient.shape[0]),
+            trailing=(),
+            device=self.coefficient.device,
+        )
 
     @property
     def row_count(self) -> int:
@@ -463,10 +599,17 @@ class Complex3Transport:
     ``sqrt(sources.powers_w)`` of the transmitting endpoint, so projecting it
     onto the receive polarization reproduces
     :class:`ScalarTransport.coefficient` (ADR-039).
+
+    ``field_offsets`` is the optional wideband payload (ADR-042): ``[K, F, 3]``
+    complex64 on the same grid law as
+    :attr:`ScalarTransport.coefficient_offsets`. ``direction`` stays ``[K, 3]``
+    because it is geometry, and geometry does not depend on frequency.
     """
 
     field: torch.Tensor
     direction: torch.Tensor
+    field_offsets: torch.Tensor | None = None
+    frequency_offsets_hz: tuple[float, ...] | None = None
 
     def __post_init__(self) -> None:
         field = _require_tensor("field", self.field, dtype=torch.complex64, ndim=2)
@@ -477,6 +620,14 @@ class Complex3Transport:
             self.direction,
             dtype=torch.float32,
             shape=(int(field.shape[0]), 3),
+            device=field.device,
+        )
+        _require_wideband_payload(
+            "field_offsets",
+            self.field_offsets,
+            self.frequency_offsets_hz,
+            rows=int(field.shape[0]),
+            trailing=(3,),
             device=field.device,
         )
 
@@ -604,6 +755,36 @@ class PropagationConvention:
     # sign. This contract does not apply it and has no frequency-offset input;
     # `PropagationGeometry.delay_s` is published per row for exactly this use.
     narrowband_frequency_offset_law: str = NARROWBAND_FREQUENCY_OFFSET_LAW
+    # What that law costs, so "narrowband" is a number rather than an adjective.
+    # The wideband route (FixedTopologyRequest.frequency_offsets_hz) removes the
+    # spreading and material terms exactly and refuses the dispersion term.
+    narrowband_frequency_offset_error_law: str = (
+        NARROWBAND_FREQUENCY_OFFSET_ERROR_LAW
+    )
+    # The layout a wideband payload adds on top of the row layouts above, which
+    # it does not redefine. Frequency is orthogonal to rows and to slots: the
+    # same rows are evaluated at F frequencies, so the axis is appended and
+    # nothing is tiled, re-paired, or re-segmented.
+    wideband_offset_layout: str = (
+        "frequency_minor:"
+        "payload[row, j] = response(row) at"
+        " reference_frequency_hz+frequency_offsets_hz[j];"
+        "row axis and pair segmentation unchanged;"
+        "row_valid stays [K] and broadcasts over j;"
+        "geometry published once from the reference evaluation;"
+        "slot composition gives [slot_count*frozen_row_count, F]"
+    )
+    # Why an offset grid can be refused as unresolvable. Every native field
+    # bridge casts the frequency to float32 at the launch, so two absolute
+    # frequencies inside one float32 ULP are the same launch. Channel publishes
+    # the resolution and the resulting phase bound; it does not compute the
+    # bound, because that needs max(delay_s), which is a device reduction plus a
+    # host read the ADR-032 budget does not have. The caller owns that check.
+    wideband_frequency_quantization_law: str = (
+        "launch_grid=float32;"
+        " resolution_hz=ulp_float32(reference_frequency_hz);"
+        " abs_phase_error_rad <= pi*resolution_hz*delay_s"
+    )
     complex3_basis: str = "world_cartesian"
     jones_mapping: str = "source_transverse_basis_to_sink_transverse_basis"
 
@@ -645,6 +826,36 @@ class PropagationCapabilities:
     # launch, and no per-slot synchronization, so nothing grows with the slot
     # count except the row and pair tensors themselves.
     max_slot_count: int | None
+    # Whether a FixedTopologyRequest may declare frequency_offsets_hz and
+    # receive the same frozen rows evaluated at F absolute frequencies
+    # (ADR-042). The payload layout is
+    # PropagationConvention.wideband_offset_layout.
+    supports_wideband_offsets: bool
+    # Responses that carry a wideband payload. polarimetric_transport does not:
+    # it is line-of-sight only and power-free, and widening it is a separate
+    # decision rather than a side effect of this one.
+    wideband_responses: frozenset[str]
+    # Components a wideband request may replay. This is the fixed-topology set,
+    # because the grid is declared on the fixed-topology route only:
+    # transmission and diffraction are not freezable components.
+    wideband_components: frozenset[str]
+    # A compiled dispersive material record is frozen at the primal compile
+    # frequency, so evaluating it at an offset would publish the
+    # reference-frequency material law under a different frequency label. The
+    # request is refused instead, at every AD mode including "none".
+    wideband_dispersive_materials: bool
+    # A Kirchhoff roughness table and a phase screen are resident resources
+    # keyed on a material cache token that hashes the compile frequency, so
+    # reusing one at an offset is a frozen approximation of the same class.
+    # Refused for the same reason.
+    wideband_rough_materials: bool
+    # A contract bound on len(frequency_offsets_hz), or None when the only
+    # bound is device memory and launch time. Each column is one more launch
+    # per bucket; no column adds a host observation or a synchronization.
+    max_frequency_offset_count: int | None
+    # How the smallest resolvable offset is computed. Matches
+    # native_frequency_resolution_hz, which a caller calls to get the number.
+    native_frequency_resolution_law: str
 
     def components_for(self, response: str) -> frozenset[str]:
         return dict(self.response_components)[response]
@@ -693,6 +904,15 @@ _CAPABILITIES = PropagationCapabilities(
     ),
     supports_slot_batching=True,
     max_slot_count=None,
+    supports_wideband_offsets=True,
+    wideband_responses=frozenset({"scalar_transport", "complex3_transport"}),
+    wideband_components=frozenset(
+        name for name, _ in _FIXED_TOPOLOGY_COMPONENT_IDS
+    ),
+    wideband_dispersive_materials=False,
+    wideband_rough_materials=False,
+    max_frequency_offset_count=None,
+    native_frequency_resolution_law=NATIVE_FREQUENCY_RESOLUTION_LAW,
 )
 
 
@@ -718,6 +938,14 @@ class PropagationDiagnostics:
     validation_d2h_copies: int
     validation_d2h_bytes: int
     validation_sync_count: int
+    # Published response columns: len(frequency_offsets_hz) with a wideband
+    # grid, and 1 without one, where the single column is the reference
+    # evaluation itself. It makes the honest launch law auditable: a wideband
+    # call costs (1 + F) * buckets * launches_per_bucket, the leading 1 being
+    # the reference column that also produces the shared geometry and
+    # row_valid, while the copy and synchronization counts above stay at one
+    # whatever F is.
+    frequency_column_count: int = 1
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -1006,6 +1234,19 @@ class FixedTopologyRequest:
     :class:`PreparedFixedTopology`: the raw zero-interaction route builds its
     pair segmentation inside the native gather over the full source/sink outer
     product and therefore cannot express a block-diagonal layout.
+
+    ``frequency_offsets_hz`` declares that the same frozen rows are wanted at
+    the ``F`` absolute frequencies ``reference_frequency_hz + df_j``, in the
+    declared order (ADR-042). ``None``, the default, is exactly the
+    single-frequency behaviour, bit for bit. The grid is a host tuple rather
+    than a tensor because it is a declaration in the same class as
+    ``slot_count``: it names which frequencies to evaluate, it is structurally
+    non-differentiable, and it is float64-exact. It is a PROPAGATION frequency
+    grid and nothing else - it never names a subcarrier count, an FFT size, or
+    a bandwidth. Scene-dependent limits (dispersive materials, rough materials
+    and phase screens, and the native float32 launch resolution) are enforced
+    by :func:`witwin.channel.propagation.consumer.reevaluate` before any native
+    work; see :func:`native_frequency_resolution_hz`.
     """
 
     sources: EndpointBatch
@@ -1016,10 +1257,16 @@ class FixedTopologyRequest:
     ad_mode: PropagationAdMode
     world_motion: PropagationWorldMotion = "frozen_world"
     slot_count: int = 1
+    frequency_offsets_hz: tuple[float, ...] | None = None
 
     def __post_init__(self) -> None:
         _require_endpoints(self.sources, self.sinks)
         self._require_slots()
+        object.__setattr__(
+            self,
+            "frequency_offsets_hz",
+            _require_frequency_offsets(self.frequency_offsets_hz),
+        )
         if not isinstance(
             self.topology, PropagationTopology | PreparedFixedTopology
         ):
@@ -1035,6 +1282,15 @@ class FixedTopologyRequest:
                 f"fixed-topology reevaluation does not support {response!r}; "
                 f"supported responses are "
                 f"{sorted(_CAPABILITIES.fixed_topology_responses)}"
+            )
+        if (
+            self.frequency_offsets_hz is not None
+            and response not in _CAPABILITIES.wideband_responses
+        ):
+            raise NotImplementedError(
+                f"frequency_offsets_hz is not supported for {response!r}; "
+                f"capabilities().wideband_responses is "
+                f"{sorted(_CAPABILITIES.wideband_responses)}"
             )
 
     def _require_slots(self) -> None:
@@ -1146,6 +1402,7 @@ __all__ = [
     "WORLD_VERSION_DOMAINS",
     "WorldProvenance",
     "capabilities",
+    "native_frequency_resolution_hz",
     "prepare_fixed_topology",
     "replicate_over_slots",
 ]

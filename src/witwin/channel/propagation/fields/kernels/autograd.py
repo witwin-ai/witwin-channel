@@ -231,16 +231,27 @@ def field_free_space_ad(
     *,
     frequency: torch.Tensor | float,
     frequency_value: float | None = None,
+    geometry_live: bool | None = None,
 ) -> dict[str, torch.Tensor]:
     """Differentiable :func:`field_free_space` (frequency only in AD-1).
 
     ``frequency_value`` optionally carries the precomputed host scalar of
     ``frequency`` (one read per solve at the seam, audit M3); when not
     supplied it is read here, exactly once per apply.
+
+    ``geometry_live`` optionally carries the ADR-038 liveness decision made by
+    an outer wrapper. A caller that invokes this operator several times over the
+    SAME geometry inputs - a wideband frequency sweep is the one such caller
+    today - decides liveness once, above its loop, and passes the same flag to
+    every invocation, so no invocation can silently answer a different question
+    than its siblings. When it is not supplied the decision is made here, from
+    these inputs, exactly as ADR-038 specifies for a single evaluation.
     """
 
     if frequency_value is None:
         frequency_value = _ad_frequency_value(frequency)
+    if geometry_live is None:
+        geometry_live = _ad_geometry_live(source, target)
     values = _FieldFreeSpaceAdFunction.apply(
         source,
         target,
@@ -249,7 +260,7 @@ def field_free_space_ad(
         rx_polarization,
         frequency,
         float(frequency_value),
-        _ad_geometry_live(source, target),
+        bool(geometry_live),
     )
     return dict(zip(_FIELD_AD_OUTPUT_FIELDS, values, strict=True))
 
@@ -544,16 +555,25 @@ def field_reflection_sequence_ad(
     *,
     frequency: torch.Tensor | float,
     frequency_value: float | None = None,
+    geometry_live: bool | None = None,
 ) -> dict[str, torch.Tensor]:
     """Differentiable :func:`field_reflection_sequence` (materials + frequency).
 
     ``frequency_value`` optionally carries the precomputed host scalar of
     ``frequency`` (one read per solve at the seam, audit M3); when not
     supplied it is read here, exactly once per apply.
+
+    ``geometry_live`` optionally carries the ADR-038 liveness decision made by
+    an outer wrapper, for a caller that invokes this operator several times over
+    the same geometry inputs. See :func:`field_free_space_ad`.
     """
 
     if frequency_value is None:
         frequency_value = _ad_frequency_value(frequency)
+    if geometry_live is None:
+        geometry_live = _ad_geometry_live(
+            source, target, interaction_positions, interaction_normals
+        )
     values = _FieldReflectionSequenceAdFunction.apply(
         source,
         target,
@@ -569,7 +589,7 @@ def field_reflection_sequence_ad(
         thickness,
         frequency,
         float(frequency_value),
-        _ad_geometry_live(source, target, interaction_positions, interaction_normals),
+        bool(geometry_live),
     )
     return dict(zip(_FIELD_AD_OUTPUT_FIELDS, values, strict=True))
 

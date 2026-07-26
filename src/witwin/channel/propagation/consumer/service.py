@@ -24,6 +24,7 @@ from .contracts import (
     ScalarTransport,
     WorldProvenance,
     capabilities,
+    native_frequency_resolution_hz,
 )
 
 if TYPE_CHECKING:
@@ -594,6 +595,133 @@ def rediscovery_required(
     return current.moved_domain(WorldProvenance.of(compiled_scene.source))
 
 
+def _require_wideband_dispersive_materials(compiled: CompiledScene) -> None:
+    """W1: refuse an offset grid on a scene with a frozen dispersive record.
+
+    ``scene.compile`` evaluates a ``witwin.core`` ``DispersionSpec`` once, at
+    the primal frequency, and stores the result as a plain ``eps_r`` plus an
+    equivalent ``sigma_e``. Every other frequency dependence in the material
+    model - the conductivity loss tangent, the layer electrical thicknesses, the
+    whole Airy recursion - is re-derived natively from the frequency the launch
+    receives, so it is already exact at an offset. Dispersion is the one term
+    that is not, and re-evaluating it here would need either a recompile or a
+    second host-side dispersion evaluator, both of which the Channel guardrails
+    forbid inside the consumer.
+
+    This fires at EVERY AD mode. The existing gate refuses a frequency GRADIENT
+    against a frozen record; the primal at an offset has the identical defect
+    and, until an offset grid existed, was unreachable only because the
+    compile-frequency mismatch rule forced a recompile.
+    """
+
+    dependent = tuple(compiled.materials.frequency_dependent)
+    if not dependent:
+        return
+    raise NotImplementedError(
+        "frequency_offsets_hz is not supported on a scene with "
+        f"frequency-dependent materials {sorted(dependent)}: their records are "
+        "frozen at the primal frequency at compile time, so an offset column "
+        "would publish the reference-frequency material law under a different "
+        "frequency label. capabilities().wideband_dispersive_materials is "
+        "False. Compile one scene per frequency instead, which is the caller's "
+        "explicit choice rather than an implicit recompile"
+    )
+
+
+def _require_resolvable_offsets(
+    offsets: tuple[float, ...], reference_frequency_hz: float
+) -> None:
+    """W2: refuse an offset grid the native launch grid cannot resolve.
+
+    Every native field bridge casts the frequency to float32 at the launch, so
+    two absolute frequencies inside one float32 ULP are the same launch and
+    return bit-identical columns. Publishing them as distinct frequencies would
+    be a declaration nobody enforces.
+    """
+
+    resolution = native_frequency_resolution_hz(reference_frequency_hz)
+    for offset in offsets:
+        if offset != 0.0 and abs(offset) < resolution:
+            raise ValueError(
+                f"frequency_offsets_hz entry {offset!r} Hz is below the native "
+                f"frequency resolution {resolution!r} Hz at "
+                f"{reference_frequency_hz!r} Hz: the native launch grid is "
+                "float32, so this offset evaluates at the reference frequency "
+                "and would publish a duplicate column under a different label"
+            )
+    ordered = sorted(offsets)
+    for lower, upper in zip(ordered, ordered[1:]):
+        if upper - lower < resolution:
+            raise ValueError(
+                f"frequency_offsets_hz entries {lower!r} Hz and {upper!r} Hz "
+                f"are closer than the native frequency resolution "
+                f"{resolution!r} Hz at {reference_frequency_hz!r} Hz: the "
+                "native launch grid is float32, so they evaluate at the same "
+                "absolute frequency"
+            )
+
+
+def _require_wideband_smooth_scene(compiled: CompiledScene) -> None:
+    """W4: refuse an offset grid on a rough or phase-screen scene.
+
+    The Kirchhoff roughness tables and the phase-screen realization resources
+    are resident resources keyed on a material cache token that hashes the
+    compile frequency (ADR-026, Plan-13). Reusing a table built at ``f_ref`` at
+    ``f_ref + df`` freezes the scattering response the same way a
+    ``DispersionSpec`` record freezes the material law, so it is refused for the
+    same reason and until a decision that covers resident-table lifetime across
+    a band.
+
+    One device read: a single reduced bitmask over the two roughness columns,
+    in the preflight, before any native work. It is a refusal guard rather than
+    a hot-path transfer and it is not part of the per-call validation budget.
+    """
+
+    materials = compiled.materials
+    rough = bool(
+        (
+            (materials.scatter_model_id == 1)
+            | (materials.rough_sigma_h_m > 0.0)
+        ).any()
+    )
+    if rough:
+        raise NotImplementedError(
+            "frequency_offsets_hz is not supported on a scene with rough "
+            "materials: the Kirchhoff tables are resident resources keyed on a "
+            "material cache token that hashes the compile frequency, so a table "
+            "built at the reference frequency is frozen exactly as a dispersive "
+            "record is. capabilities().wideband_rough_materials is False"
+        )
+    screens = getattr(compiled.assignments, "structure_phase_screens", {})
+    if screens:
+        raise NotImplementedError(
+            "frequency_offsets_hz is not supported on a scene carrying phase "
+            "screens: their realization resources are keyed on the same "
+            "frequency-hashed material cache token as the roughness tables. "
+            "capabilities().wideband_rough_materials is False"
+        )
+
+
+def _preflight_wideband(
+    compiled: CompiledScene, request: FixedTopologyRequest
+) -> None:
+    """Scene-dependent wideband refusals, each independent (ADR-042).
+
+    Every check is reachable on its own: a dispersive smooth scene with a
+    resolvable grid trips only W1, a non-dispersive smooth scene with an
+    unresolvable grid trips only W2, and a rough non-dispersive scene with a
+    resolvable grid trips only W4. Folding any of them into another would make
+    one of the three limits undiscoverable.
+    """
+
+    offsets = request.frequency_offsets_hz
+    if offsets is None:
+        return
+    _require_wideband_dispersive_materials(compiled)
+    _require_resolvable_offsets(offsets, compiled.materials.frequency_hz)
+    _require_wideband_smooth_scene(compiled)
+
+
 def _preflight_reevaluate(
     compiled: object, request: object
 ) -> tuple[CompiledScene, FixedTopologyRequest]:
@@ -636,18 +764,72 @@ def _preflight_reevaluate(
                 "zero-interaction scalar and complex3 fast path"
             )
     _require_fixed_los_ad_inputs(request)
+    _preflight_wideband(compiled, request)
     return compiled, request
 
 
+def _offset_frequency(
+    frequency: float | torch.Tensor, offset: float
+) -> float | torch.Tensor:
+    """The AD-facing frequency of one wideband column.
+
+    A tensor reference frequency stays a tensor, so the seed a caller placed on
+    it reaches every column through the same native companion. ``offset == 0.0``
+    is the additive identity in both branches, which is what makes a zero entry
+    reproduce the reference column bit for bit.
+    """
+
+    return frequency if offset == 0.0 else frequency + offset
+
+
+def _wideband_columns(
+    offsets: tuple[float, ...], column: object
+) -> torch.Tensor:
+    """Stack per-frequency native outputs into one payload axis.
+
+    Structural packing and nothing else: every value in the stack came out of
+    the native owner that computed it at its own absolute frequency, and no
+    offset-dependent phase, magnitude, or basis is applied here.
+    """
+
+    return torch.stack([column(offset) for offset in offsets], dim=1)
+
+
+def _column_payload(response: str, outputs: object) -> torch.Tensor:
+    """The one tensor a wideband column contributes to the payload axis.
+
+    A column recomputes the geometry natively and discards it: the published
+    geometry is the reference column's, because path length, delay, direction,
+    and the interaction table are facts about where the path goes and do not
+    depend on the frequency it is evaluated at.
+    """
+
+    if response == "scalar_transport":
+        return outputs.path_field
+    assert outputs.path_field_vector is not None
+    return outputs.path_field_vector
+
+
 def _fixed_transport(
-    response: str, outputs: object
+    response: str,
+    outputs: object,
+    *,
+    offsets: tuple[float, ...] | None = None,
+    payload: torch.Tensor | None = None,
 ) -> ScalarTransport | Complex3Transport | JonesTransport:
     if response == "scalar_transport":
-        return ScalarTransport(coefficient=outputs.path_field)
+        return ScalarTransport(
+            coefficient=outputs.path_field,
+            coefficient_offsets=payload,
+            frequency_offsets_hz=offsets,
+        )
     if response == "complex3_transport":
         assert outputs.path_field_vector is not None
         return Complex3Transport(
-            field=outputs.path_field_vector, direction=outputs.direction
+            field=outputs.path_field_vector,
+            direction=outputs.direction,
+            field_offsets=payload,
+            frequency_offsets_hz=offsets,
         )
     assert outputs.matrix is not None
     return JonesTransport(
@@ -678,8 +860,10 @@ def _reevaluate_prepared(
     """Replay a prepared frozen topology bucket by bucket."""
 
     from ._fixed_reflection import (
+        GeometryLiveness,
         evaluate_prepared,
         require_smooth_reflection_scene,
+        scene_vertex_table,
     )
     from ._rows import prepared_row_gather, select_rows
 
@@ -688,6 +872,10 @@ def _reevaluate_prepared(
     validity = _CAPABILITIES.fixed_topology_row_validity_components
     if any(bucket.component == "reflection" for bucket in prepared.buckets):
         require_smooth_reflection_scene(compiled)
+    # The row gather owns the one validation copy and the one synchronization,
+    # and it runs ONCE here, above the frequency-column loop below. That is what
+    # holds the ADR-032 budget at 1/1 however many columns a wideband request
+    # declares.
     rows = prepared_row_gather(
         prepared.topology,
         request.sources,
@@ -702,19 +890,41 @@ def _reevaluate_prepared(
         if request.response == "polarimetric_transport"
         else (None, None)
     )
-    outputs = evaluate_prepared(
-        compiled,
-        prepared,
-        rows,
-        response=request.response,
-        ad_mode=request.ad_mode,
-        frequency=request.reference_frequency_hz,
-        frequency_value=compiled.materials.frequency_hz,
-        source_reference_basis=bases[0],
-        sink_reference_basis=bases[1],
-        publish_row_validity=any(
-            bucket.component in validity for bucket in prepared.buckets
-        ),
+    # ADR-038: liveness is decided once, here, from the inputs every column
+    # shares, and the same record reaches every column.
+    geometry_live = GeometryLiveness.of(
+        rows.source,
+        rows.target,
+        scene_vertex_table(compiled)
+        if any(bucket.depth > 0 for bucket in prepared.buckets)
+        else None,
+    )
+
+    def column(offset: float):
+        return evaluate_prepared(
+            compiled,
+            prepared,
+            rows,
+            response=request.response,
+            ad_mode=request.ad_mode,
+            frequency=_offset_frequency(request.reference_frequency_hz, offset),
+            frequency_value=compiled.materials.frequency_hz + offset,
+            source_reference_basis=bases[0],
+            sink_reference_basis=bases[1],
+            publish_row_validity=any(
+                bucket.component in validity for bucket in prepared.buckets
+            ),
+            geometry_live=geometry_live,
+        )
+
+    outputs = column(0.0)
+    offsets = request.frequency_offsets_hz
+    payload = (
+        None
+        if offsets is None
+        else _wideband_columns(
+            offsets, lambda offset: _column_payload(request.response, column(offset))
+        )
     )
     paths = PropagationPathBatch(
         pair_count=_slot_pair_count(request),
@@ -729,7 +939,9 @@ def _reevaluate_prepared(
             interaction_positions_m=outputs.interaction_positions,
             interaction_normals=outputs.interaction_normals,
         ),
-        transport=_fixed_transport(request.response, outputs),
+        transport=_fixed_transport(
+            request.response, outputs, offsets=offsets, payload=payload
+        ),
     )
     return FixedTopologyEvaluation(
         paths=paths,
@@ -745,6 +957,7 @@ def _reevaluate_prepared(
             validation_d2h_copies=rows.validation_d2h_copies,
             validation_d2h_bytes=rows.validation_d2h_bytes,
             validation_sync_count=rows.validation_synchronizations,
+            frequency_column_count=1 if offsets is None else len(offsets),
         ),
         row_valid=outputs.row_valid,
     )
@@ -763,37 +976,45 @@ def reevaluate(
     )
 
     from ._amplitude import excited_field
-    from ._fixed_los import fixed_los_gather
+    from ._fixed_los import fixed_los_gather, fixed_los_geometry_live
 
     compiled, request = _preflight_reevaluate(compiled_scene, request)
     if isinstance(request.topology, PreparedFixedTopology):
         return _reevaluate_prepared(compiled, request)
+    # One gather for the whole call, above the frequency-column loop: it owns
+    # the single validation copy and the single synchronization.
     rows = fixed_los_gather(request.topology, request.sources, request.sinks)
     frequency = request.reference_frequency_hz
     frequency_value = compiled.materials.frequency_hz
     tx_power = rows.tx_power.detach()
     tx_polarization = rows.tx_polarization.detach()
     rx_polarization = rows.rx_polarization.detach()
-    field_rows = (
-        field_functional.field_free_space(
+    # ADR-038: one liveness decision, taken here from the gathered rows, shared
+    # by every column.
+    geometry_live = fixed_los_geometry_live(rows)
+
+    def column(offset: float) -> dict[str, torch.Tensor]:
+        if request.ad_mode == "none":
+            return field_functional.field_free_space(
+                rows.source,
+                rows.target,
+                tx_power,
+                tx_polarization,
+                rx_polarization,
+                frequency_hz=frequency_value + offset,
+            )
+        return field_autograd.field_free_space_ad(
             rows.source,
             rows.target,
             tx_power,
             tx_polarization,
             rx_polarization,
-            frequency_hz=frequency_value,
+            frequency=_offset_frequency(frequency, offset),
+            frequency_value=frequency_value + offset,
+            geometry_live=geometry_live,
         )
-        if request.ad_mode == "none"
-        else field_autograd.field_free_space_ad(
-            rows.source,
-            rows.target,
-            tx_power,
-            tx_polarization,
-            rx_polarization,
-            frequency=frequency,
-            frequency_value=frequency_value,
-        )
-    )
+
+    field_rows = column(0.0)
     row_count = rows.row_count
     empty_interactions = rows.source.new_empty((row_count, 0, 3))
     geometry = PropagationGeometry(
@@ -803,14 +1024,32 @@ def reevaluate(
         interaction_positions_m=empty_interactions,
         interaction_normals=empty_interactions,
     )
+    offsets = request.frequency_offsets_hz
+
+    def payload_of(values: dict[str, torch.Tensor]) -> torch.Tensor:
+        if request.response == "scalar_transport":
+            return values["path_field"]
+        return excited_field(
+            values["field_vector"], tx_power, ad_mode=request.ad_mode
+        )
+
+    payload = (
+        None
+        if offsets is None
+        else _wideband_columns(offsets, lambda offset: payload_of(column(offset)))
+    )
     transport = (
-        ScalarTransport(coefficient=field_rows["path_field"])
+        ScalarTransport(
+            coefficient=field_rows["path_field"],
+            coefficient_offsets=payload,
+            frequency_offsets_hz=offsets,
+        )
         if request.response == "scalar_transport"
         else Complex3Transport(
-            field=excited_field(
-                field_rows["field_vector"], tx_power, ad_mode=request.ad_mode
-            ),
+            field=payload_of(field_rows),
             direction=field_rows["direction"],
+            field_offsets=payload,
+            frequency_offsets_hz=offsets,
         )
     )
     paths = PropagationPathBatch(
@@ -836,6 +1075,7 @@ def reevaluate(
             validation_d2h_copies=rows.validation_d2h_copies,
             validation_d2h_bytes=rows.validation_d2h_bytes,
             validation_sync_count=rows.validation_synchronizations,
+            frequency_column_count=1 if offsets is None else len(offsets),
         ),
     )
 

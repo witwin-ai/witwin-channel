@@ -169,7 +169,29 @@ Organize code by RF domain capability, with a single owner for each operation:
   compaction, no scene compilation, and `times_s` is a label that is never
   differenced into a rate. `slot_count > 1` requires a `PreparedFixedTopology`;
   the raw route's pairing law lives inside a native gather and refuses slot
-  batching by name rather than growing a second Python owner of it.
+  batching by name rather than growing a second Python owner of it. Under
+  ADR-042 a fixed-topology request may declare `frequency_offsets_hz`, a host
+  tuple of propagation-frequency offsets, and receive the same frozen rows
+  evaluated at each absolute frequency as an additive `[K, F]` payload paired
+  with the grid it was evaluated on. It is a host declaration, never a tensor
+  and never differentiable, and it is a propagation-frequency grid only: it
+  must never accept a subcarrier count, an FFT size, or a bandwidth. The row
+  gather runs once above the column loop and stays the sole owner of the one
+  validation copy and the one synchronization, whatever `F` is; the launch
+  count is what grows, as `(1 + F) * buckets * launches_per_bucket`, and the
+  ADR states that out loud. `[K, F]` assembly is `torch.stack` structural
+  packing over native column outputs - no offset-dependent phase, magnitude, or
+  basis may be applied in Torch, and `sqrt(powers_w)` stays with the native
+  owner. `row_valid` stays `[K]` and geometry is published once from the
+  reference column; a `0.0` offset must reproduce the reference coefficient
+  bitwise. ADR-038 liveness is decided once, above the column loop, from the
+  inputs every column shares, and the same explicit flag reaches every column.
+  Dispersive scenes, rough or phase-screen scenes, and grids finer than
+  `native_frequency_resolution_hz` are three independent fail-loud refusals
+  before any native work, each individually reachable. Discovery has no
+  frequency grid, frequency never becomes a fifth world version domain, and
+  neither `replicate_over_slots` nor `evaluate_time_varying` gains a frequency
+  variant.
 - `path`, `deterministic`, `montecarlo.basic`, and `montecarlo.bdpt`: thin
   solver-owned configuration, orchestration, accumulation, result, and metadata
   layers. Solvers must never import another solver.
@@ -179,8 +201,10 @@ several domains all need, and that therefore cannot live under `runtime`,
 `propagation`, or a `kernels` package without tripping the public-init boundary:
 
 - `constants`: electromagnetic constants and the package-wide phase convention.
-  It is the single owner of the phasor and time-dependence strings that solver
-  metadata and the consumer contract quote.
+  It is the single owner of the phasor, time-dependence, and narrowband
+  frequency-offset strings that solver metadata and the consumer contract
+  quote, including the quantified error law that states what the narrowband
+  approximation costs.
 - `field_state`: the `Complex3State` / `JonesState` native field ABI contracts.
 - `components`: cross-domain component identity.
 - `tensor_math`: shared tensor helpers with no domain of their own.
@@ -420,6 +444,7 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-039-consumer-source-amplitude.md`
 - `docs/dev/standards/adr-040-world-provenance-and-fixed-topology-staleness.md`
 - `docs/dev/standards/adr-041-slot-batched-reevaluation-and-time-varying-cir.md`
+- `docs/dev/standards/adr-042-wideband-frequency-offsets.md`
 
 ADR-029 is Superseded, ADR-030 is Dormant, and ADR-031 is Rejected. They are
 historical records rather than implementation or release requirements; ADR-032

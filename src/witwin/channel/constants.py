@@ -60,12 +60,35 @@ NARROWBAND_FREQUENCY_OFFSET_LAW = (
     "H(f_ref+df) = C(f_ref)*exp(-j*2*pi*df*delay_s)"
 )
 
+# What the law above costs, quantified, so "narrowband" is a number rather than
+# an adjective. Three independent terms:
+#
+#   1. spreading - the free-space lambda/(4*pi*d) amplitude, exactly
+#      f_ref/(f_ref+df) in magnitude with zero phase;
+#   2. material - the frequency selectivity of the compiled material response,
+#      bounded by the slab fringe scale df_fringe below (a 0.1 m eps_r=4 slab at
+#      normal incidence fringes every 750 MHz);
+#   3. dispersion - d(eps_r)/df from a witwin.core DispersionSpec, which the law
+#      drops entirely because a compiled record freezes it at the primal
+#      frequency.
+#
+# The wideband frequency-offset capability removes terms 1 and 2 exactly, by
+# evaluating the same frozen rows natively at each absolute frequency, and
+# REFUSES term 3 rather than approximating it (ADR-042).
+NARROWBAND_FREQUENCY_OFFSET_ERROR_LAW = (
+    "relative_error = O(df/f_ref) spreading"
+    " + O(df/df_fringe) material"
+    " + zeroth_order dispersion;"
+    " df_fringe = c/(2*Re(sqrt(eps_r))*thickness_m*cos(theta_t))"
+)
+
 __all__ = [
     "C0",
     "EPS0",
     "ETA0",
     "FREE_SPACE_AMPLITUDE",
     "MU0",
+    "NARROWBAND_FREQUENCY_OFFSET_ERROR_LAW",
     "NARROWBAND_FREQUENCY_OFFSET_LAW",
     "PHASE_CONVENTION",
     "PHASOR",

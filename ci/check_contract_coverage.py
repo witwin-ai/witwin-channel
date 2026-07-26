@@ -25,7 +25,7 @@ PUBLIC_SNAPSHOT_PATH = Path("ci/public-api-snapshot.json")
 BINDING_BASELINE_PATH = Path("ci/native-binding-manifest.json")
 PHASE10_AUDIT_PATH = Path("docs/dev/audit/phase10-legacy-dead-binding.json")
 PYTHON_PACKAGE_PATH = Path("src/witwin/channel")
-EXPECTED_PUBLIC_EXPORT_COUNT = 59
+EXPECTED_PUBLIC_EXPORT_COUNT = 60
 PUBLIC_COLUMNS = ("export", "contract_test", "e2e_callers")
 NATIVE_COLUMNS = (
     "symbol",

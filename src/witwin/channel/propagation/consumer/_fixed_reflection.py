@@ -50,6 +50,48 @@ _MATERIAL_FIELDS = ("eps_r", "sigma_e", "mu_r", "gain", "thickness")
 
 
 @dataclass(frozen=True, slots=True)
+class GeometryLiveness:
+    """ADR-038 liveness, decided once above every loop that reuses it.
+
+    ADR-038 requires the conditional differentiability of ``path_length_m`` and
+    ``delay_s`` to be decided in the caller-facing wrapper, where forward duals
+    are still visible. A wideband request evaluates the same frozen rows at
+    several frequencies, so it invokes the same field operators repeatedly over
+    identical geometry inputs. Deciding liveness inside that loop, or letting
+    the first column decide for the rest, is exactly the shape of the defect
+    ADR-038 removed, so the decision is made once, from the inputs, before any
+    column runs, and the same flag reaches every one of them.
+
+    Two flags rather than one because the two bucket kinds consume different
+    geometry: a zero-depth line-of-sight row is a function of the endpoints
+    alone, while a reflection row additionally resolves its stationary point
+    against the scene vertices, so a differentiable mesh makes the reflection
+    geometry live even when the endpoints are primal.
+    """
+
+    los: bool
+    reflection: bool
+
+    @classmethod
+    def of(
+        cls,
+        source: torch.Tensor,
+        target: torch.Tensor,
+        vertices: object,
+    ) -> GeometryLiveness:
+        from witwin.channel.runtime.autograd_contracts import _ad_geometry_live
+
+        endpoints = _ad_geometry_live(source, target)
+        return cls(
+            los=endpoints,
+            reflection=endpoints or _ad_geometry_live(vertices),
+        )
+
+    def at_depth(self, depth: int) -> bool:
+        return self.reflection if depth else self.los
+
+
+@dataclass(frozen=True, slots=True)
 class BucketInputs:
     """Everything one bucket hands to the native transport."""
 
@@ -223,6 +265,7 @@ def _field_op(
     ad_mode: str,
     frequency: float | torch.Tensor,
     frequency_value: float,
+    geometry_live: bool | None,
 ) -> Callable[[torch.Tensor, torch.Tensor], dict[str, torch.Tensor]]:
     from witwin.channel.propagation.fields.kernels import (
         autograd as field_autograd,
@@ -261,7 +304,10 @@ def _field_op(
                 else field_autograd.field_reflection_sequence_ad
             )
             return operator(
-                *arguments, frequency=frequency, frequency_value=frequency_value
+                *arguments,
+                frequency=frequency,
+                frequency_value=frequency_value,
+                geometry_live=geometry_live,
             )
         operator = (
             field_functional.field_free_space
@@ -447,8 +493,16 @@ def evaluate_prepared(
     source_reference_basis: torch.Tensor | None,
     sink_reference_basis: torch.Tensor | None,
     publish_row_validity: bool,
+    geometry_live: GeometryLiveness | None = None,
 ) -> FixedRowOutputs:
-    """Replay every host-known bucket of a prepared frozen topology."""
+    """Replay every host-known bucket of a prepared frozen topology.
+
+    ``geometry_live`` carries an ADR-038 liveness decision taken by the caller
+    before this call. A wideband caller runs this replay once per frequency
+    column over identical geometry inputs and must pass the same record to every
+    column; a single-frequency caller leaves it ``None`` and each field operator
+    decides for itself, exactly as before.
+    """
 
     width = int(prepared.topology.primitive_sequence.shape[1])
     outputs = _allocate(rows, width, response)
@@ -470,6 +524,11 @@ def evaluate_prepared(
                 ad_mode=ad_mode,
                 frequency=frequency,
                 frequency_value=frequency_value,
+                geometry_live=(
+                    None
+                    if geometry_live is None
+                    else geometry_live.at_depth(bucket.depth)
+                ),
             ),
             response=response,
             ad_mode=ad_mode,
@@ -501,9 +560,24 @@ def evaluate_prepared(
     )
 
 
+def scene_vertex_table(compiled: CompiledScene) -> object:
+    """The scene-static vertex tensor the reflection stationary point uses.
+
+    Exposed so a caller can decide ADR-038 geometry liveness before the first
+    bucket runs without reaching past this module into the compiled scene's
+    lazy table cache. Only a batch that actually carries a reflection bucket
+    should ask: the tables are built lazily, and a line-of-sight replay must not
+    start paying for them.
+    """
+
+    return _scene_tables(compiled)["vertices"]
+
+
 __all__ = [
     "BucketInputs",
     "FixedRowOutputs",
+    "GeometryLiveness",
     "evaluate_prepared",
     "require_smooth_reflection_scene",
+    "scene_vertex_table",
 ]

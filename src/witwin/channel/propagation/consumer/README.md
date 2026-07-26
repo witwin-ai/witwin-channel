@@ -377,9 +377,83 @@ and Jones mapping. Its phasor and time-dependence strings come from
 
 ## Frequency offsets
 
-There is no frequency-offset input, and a coefficient is always reported at the
-compiled reference frequency. Shifting off that frequency under the narrowband
-approximation is a post-multiply the caller owns:
+A `FixedTopologyRequest` may declare a grid of frequency offsets and receive the
+same frozen rows evaluated at each of them (ADR-042):
+
+```python
+result = consumer.reevaluate(
+    compiled,
+    consumer.FixedTopologyRequest(
+        sources=sources,
+        sinks=sinks,
+        reference_frequency_hz=f_ref,
+        topology=prepared,
+        response="scalar_transport",
+        ad_mode="none",
+        frequency_offsets_hz=(-4.0e8, 0.0, 4.0e8),
+    ),
+)
+transport = result.paths.transport
+transport.coefficient_offsets     # [K, F] complex64
+transport.frequency_offsets_hz    # the grid it was evaluated on
+```
+
+Column `j` is the response at `reference_frequency_hz + frequency_offsets_hz[j]`.
+A `0.0` entry produces a column BIT-IDENTICAL to `coefficient`. The grid and the
+payload are always both present or both absent. `Complex3Transport` publishes
+`field_offsets` as `[K, F, 3]` under the same law; `direction` stays `[K, 3]`
+because it is geometry, and geometry does not depend on frequency. The same is
+true of `path_length_m`, `delay_s`, `interaction_positions_m`, and
+`interaction_normals`, which are published once, from the reference evaluation.
+`row_valid` stays `[K]` and broadcasts over the frequency axis: row validity is
+a geometric fact about whether the stationary point exists at these endpoints
+and cannot depend on frequency.
+
+`JonesTransport` carries no wideband payload.
+
+The grid is a **propagation-frequency grid** and nothing else. It names
+frequencies at which a field is evaluated; it is never a subcarrier count, an
+FFT size, or a bandwidth.
+
+The grid is a host tuple, not a tensor, and is not differentiable. A tangent
+with respect to one grid point is identical to the `reference_frequency_hz`
+tangent evaluated at that point, so seed `reference_frequency_hz` and read the
+column you want. Every column supports the same AD the single-frequency route
+does: `d/d(reference_frequency_hz)` in both modes, material parameters, and
+endpoint positions.
+
+Cost: `launches = (1 + F) * buckets * launches_per_bucket`, and exactly one
+validation copy and one synchronization however large `F` is. The row gather
+that owns both runs once, above the column loop.
+`PropagationDiagnostics.frequency_column_count` reports `F`, so the launch law
+is auditable from a result.
+
+### What is refused, and why
+
+| Refusal | Condition | Reason |
+|---|---|---|
+| `NotImplementedError` | dispersive scene (`compiled.materials.frequency_dependent`), at EVERY AD mode | a `DispersionSpec` record is frozen at the primal frequency at compile time; compile one scene per frequency instead |
+| `ValueError` | an offset below `native_frequency_resolution_hz(f_ref)`, or two offsets closer than it | the native launch grid is float32, so those frequencies are the same launch |
+| `NotImplementedError` | rough materials or a phase screen | their resident tables are keyed on a material cache token that hashes the compile frequency (ADR-026) |
+| `TypeError` | a tensor grid | the grid is a host declaration, not a differentiable input |
+| `ValueError` | an empty, non-finite, or duplicated grid | a duplicate would publish bit-identical columns under different labels |
+| `NotImplementedError` | `polarimetric_transport` | see `capabilities().wideband_responses` |
+
+`capabilities()` publishes `supports_wideband_offsets`, `wideband_responses`,
+`wideband_components`, `wideband_dispersive_materials`,
+`wideband_rough_materials`, `max_frequency_offset_count`, and
+`native_frequency_resolution_law`. Call
+`consumer.native_frequency_resolution_hz(f_ref)` for the same number a
+resolution refusal quotes: 8192 Hz at 77 GHz, 256 Hz at 3 GHz, 64 Hz at 1 GHz.
+
+`PropagationRequest` (discovery) has no offset grid. Wideband `transmission`
+and `diffraction` are therefore out of scope: they are not freezable
+components, so they cannot ride the fixed-topology route at all.
+
+### The narrowband law it replaces
+
+`PropagationConvention.narrowband_frequency_offset_law` is still published, and
+now so is what it costs:
 
 ```python
 # convention.narrowband_frequency_offset_law
@@ -389,14 +463,34 @@ shifted = coefficient * torch.exp(
 )
 ```
 
-`delay_s` is published per row for exactly this, and
-`coefficient_reference` confirms the coefficient already carries the
-reference-frequency phase. The law is stated on `PropagationConvention` rather
-than left implicit because its sign follows the frozen phasor and
-time-dependence, which is easy to get wrong when rederived.
+`delay_s` is published per row for exactly this, and `coefficient_reference`
+confirms the coefficient already carries the reference-frequency phase. The law
+is stated on `PropagationConvention` rather than left implicit because its sign
+follows the frozen phasor and time-dependence, which is easy to get wrong when
+rederived.
 
-This holds only while the coefficient is constant across the offset.
-Re-evaluating dispersive material response per frequency point is a different
-operation - N field evaluations rather than a post-multiply - and would arrive
-as its own capability with a `CONTRACT_VERSION` bump, not as a parameter on
-this one.
+**The narrowband law is exact to `O(df/f_ref)` in spreading and
+`O(df/df_fringe)` in material response, and is zeroth-order in dispersion. The
+wideband route removes the first two terms exactly and refuses the third.**
+`convention.narrowband_frequency_offset_error_law` publishes that statement,
+with `df_fringe = c/(2*Re(sqrt(eps_r))*thickness_m*cos(theta_t))`.
+
+The numbers are not small. On a 0.1 m `eps_r = 4` wall at 77 GHz a 1 MHz offset
+- a fractional shift of `1.3e-5` - already puts the law 0.63% out in magnitude
+and 15 mrad out in phase, because that slab fringes every 755 MHz. Across a
+2.4 GHz sweep the law is off by a factor of 10.
+
+### The float32 launch grid
+
+`convention.wideband_frequency_quantization_law`:
+
+```text
+launch_grid=float32;
+resolution_hz=ulp_float32(reference_frequency_hz);
+abs_phase_error_rad <= pi*resolution_hz*delay_s
+```
+
+Channel publishes the resolution and the bound; it does not evaluate the bound,
+because that needs `max(delay_s)`, which is a device reduction plus a host read
+the ADR-032 budget does not have. Checking it against a declared phase budget is
+the caller's job.

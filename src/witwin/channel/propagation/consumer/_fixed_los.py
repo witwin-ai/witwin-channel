@@ -8,6 +8,7 @@ import torch
 
 from witwin.channel.runtime import torch_compat
 from witwin.channel.runtime.autograd_contracts import (
+    _ad_geometry_live,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
 )
@@ -165,4 +166,17 @@ def fixed_los_gather(
     )
 
 
-__all__ = ["FixedLoSRows", "fixed_los_gather"]
+def fixed_los_geometry_live(rows: FixedLoSRows) -> bool:
+    """ADR-038 liveness for the raw frozen line-of-sight route.
+
+    A zero-interaction row is a function of its two gathered endpoints alone, so
+    this is the complete liveness question for that route. It is answered here,
+    once, from the gathered rows, so a wideband request that evaluates those
+    same rows at several frequencies passes one decision to every column instead
+    of letting each column - or the first one - decide for the rest.
+    """
+
+    return _ad_geometry_live(rows.source, rows.target)
+
+
+__all__ = ["FixedLoSRows", "fixed_los_gather", "fixed_los_geometry_live"]

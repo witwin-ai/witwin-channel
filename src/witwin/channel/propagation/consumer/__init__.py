@@ -11,6 +11,12 @@ per instant: declare ``slot_count`` on a :class:`FixedTopologyRequest` built
 over :func:`replicate_over_slots`, or use
 :func:`evaluate_time_varying`, which publishes the same rows at ``T`` instants
 as a ``[T, K]`` time-varying impulse response.
+
+A whole band is one call too: declare ``frequency_offsets_hz`` on a
+:class:`FixedTopologyRequest` and the same frozen rows are published at
+``F`` absolute frequencies as a ``[K, F]`` payload paired with the grid it
+was evaluated on. Call :func:`native_frequency_resolution_hz` first to check
+that the grid is resolvable.
 """
 
 from .contracts import (
@@ -42,6 +48,7 @@ from .contracts import (
     ScalarTransport,
     WorldProvenance,
     capabilities,
+    native_frequency_resolution_hz,
     prepare_fixed_topology,
     replicate_over_slots,
 )
@@ -87,6 +94,7 @@ __all__ = [
     "capabilities",
     "evaluate",
     "evaluate_time_varying",
+    "native_frequency_resolution_hz",
     "prepare_fixed_topology",
     "rediscovery_required",
     "reevaluate",

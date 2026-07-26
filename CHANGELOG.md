@@ -51,6 +51,28 @@ All notable changes to `witwin-channel` are documented in this file.
   zero-interaction route builds its pair segmentation inside a native gather
   over the full outer product and refuses slot batching by name.
   `CONTRACT_VERSION` is unchanged at 4.
+- **ADR-042.** Wideband frequency offsets on the fixed-topology route.
+  `FixedTopologyRequest.frequency_offsets_hz` (default `None`, so every
+  existing call is unchanged bit for bit) is a host tuple of propagation
+  frequency offsets, and declaring it publishes the same frozen rows evaluated
+  natively at each absolute frequency `reference_frequency_hz + df_j`.
+  `ScalarTransport` gains `coefficient_offsets` (`[K, F]` complex64) and
+  `Complex3Transport` gains `field_offsets` (`[K, F, 3]`), each paired with a
+  `frequency_offsets_hz` echo of the grid it was evaluated on; a `0.0` entry
+  reproduces the reference coefficient bitwise. `row_valid` stays `[K]`,
+  geometry is published once, and the validation budget stays at one four-byte
+  copy and one synchronization however large `F` is - the launch count is what
+  grows, as `(1 + F) * buckets * launches_per_bucket`, reported by the new
+  `PropagationDiagnostics.frequency_column_count`.
+  `consumer.native_frequency_resolution_hz(f_ref)` publishes the float32 launch
+  resolution a caller needs to build a resolvable grid (8192 Hz at 77 GHz).
+  Seven new capability fields, two new convention strings, and
+  `constants.NARROWBAND_FREQUENCY_OFFSET_ERROR_LAW` quantify what the
+  narrowband law this replaces actually costs. Dispersive scenes, rough or
+  phase-screen scenes, and unresolvable grids are three independent fail-loud
+  refusals before any native work; `polarimetric_transport` and a tensor grid
+  are refused structurally. No native code, no ABI symbol, no new production
+  Torch physics. `CONTRACT_VERSION` moves from 4 to 5.
 
 ## [0.4.0] - 2026-07-23
 

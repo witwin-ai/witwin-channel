@@ -97,7 +97,8 @@
     "native-field-source-amplitude": "tests/kernels/test_field_source_amplitude_scale.py::test_source_amplitude_scale_contract_shapes_and_dtypes",
     "consumer-world-provenance": "tests/propagation/consumer/test_phase7_world_provenance.py::test_the_topology_carries_the_world_it_was_discovered_against",
     "consumer-slot-batching": "tests/propagation/consumer/test_phase7_slot_batching.py::test_slot_pairing_is_block_diagonal",
-    "consumer-time-varying-cir": "tests/propagation/consumer/test_phase7_time_varying_cir.py::test_time_varying_cir_matches_a_per_time_reevaluate"
+    "consumer-time-varying-cir": "tests/propagation/consumer/test_phase7_time_varying_cir.py::test_time_varying_cir_matches_a_per_time_reevaluate",
+    "consumer-wideband-offsets": "tests/propagation/consumer/test_wideband_offsets.py::test_the_capability_record_publishes_the_wideband_contract"
   },
   "e2e_scenarios": {
     "bdpt-diffraction": "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available",
@@ -162,7 +163,8 @@
     "consumer-fixed-winner-replay": "tests/propagation/consumer/test_phase7_world_provenance.py::test_a_declared_fixed_winner_replay_is_allowed_and_correct",
     "consumer-slot-batching": "tests/propagation/consumer/test_phase7_slot_batching.py::test_slot_batching_is_bitwise_identical_to_a_per_slot_loop",
     "consumer-slot-budget": "tests/propagation/consumer/test_phase7_slot_batching.py::test_the_budget_is_flat_in_slot_count",
-    "consumer-time-varying-cir": "tests/propagation/consumer/test_phase7_time_varying_cir.py::test_time_varying_cir_is_a_valid_impulse_response"
+    "consumer-time-varying-cir": "tests/propagation/consumer/test_phase7_time_varying_cir.py::test_time_varying_cir_is_a_valid_impulse_response",
+    "consumer-wideband": "tests/propagation/consumer/test_wideband_offsets.py::test_multilayer_sweep_crosses_fringes_and_falsifies_the_narrowband_law"
   },
   "public_exports": [
     [
@@ -544,6 +546,13 @@
       "consumer-public-contract",
       [
         "consumer-discover"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.native_frequency_resolution_hz",
+      "consumer-wideband-offsets",
+      [
+        "consumer-wideband"
       ]
     ],
     [

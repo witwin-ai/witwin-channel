@@ -599,7 +599,7 @@ def test_compile_applies_rigid_motion_and_deformation_from_a_dynamic_scene() -> 
 def test_the_capability_record_publishes_the_world_motion_vocabulary() -> None:
     record = capabilities()
 
-    assert record.contract_version == 4
+    assert record.contract_version == 5
     assert record.world_motions == frozenset(
         {"frozen_world", "fixed_winner_replay"}
     )
