@@ -8,6 +8,16 @@
 - **Related:** ADR-034 (supersedes its "for unit source amplitude" wording for
   the published scalar and complex3 transport), ADR-036, ADR-037, ADR-038
 
+## Provenance
+
+The survey of this defect hit a STOP condition: the power-free publication was
+the convention ADR-034 had accepted, which made the change an owner decision
+rather than a defect fix. This ADR was written and implemented after that STOP,
+on the direction of the maintainer who owns the convention. Because it changes
+a published quantity, it takes effect only when `claude/fix-powers-w` is merged
+by that maintainer; the merge is the record of the decision, and no separate
+approval file is kept.
+
 ## Context
 
 `EndpointBatch.powers_w` is required for a source batch. Before this decision
@@ -82,11 +92,20 @@ Two properties make this a contained addition rather than a second physics
 owner:
 
 - The amplitude expression is the identical `sqrtf(fmaxf(tx_power, 0))` the
-  transport kernels use, so the receiver projection of `path_field_vector`
-  reproduces `path_field` to the same float rounding.
+  transport kernels use, so the receiver projection of `path_field_vector` is
+  the same quantity as `path_field`. The two are not bit-identical: this owner
+  scales before the projection and the transport kernel scales after it, so
+  they differ by float rounding order, which is why the consumer test that
+  compares them uses the default tolerance rather than `rtol=0, atol=0`.
 - The map is linear in the field vector and its amplitude is real, so the VJP
   and the JVP are the same scale and need no primal field input, no saved
   field tensor, and no reduction.
+
+That shared amplitude expression is an ADR-004 lockstep duplicate. It is one
+expression, well under the 100-token duplication gate, so it is recorded by
+hand as `adr039_lockstep_duplicates` in
+`docs/dev/audit/duplication-classification.json` together with the two tests
+that hold the two sites together.
 
 It costs one elementwise launch, and only on a `complex3_transport` request.
 The alternative - threading a new `path_field_vector` output through the
@@ -105,9 +124,12 @@ the consumer preflight refusals in `service.py` are unchanged.
   responses. It stays inert for `polarimetric_transport` by the decision
   above, which the contract docstring now states.
 - Every Channel test that exercised the consumer used `powers_w = 1.0`, so
-  the numerical change is invisible to all of them. Four tests changed: two
-  `CONTRACT_VERSION` assertions and two unit tests whose fake native result
-  dicts now carry `path_field`.
+  the numerical change is invisible to all of them. Seven existing test files
+  changed, plus the two new ones: two files carry the `CONTRACT_VERSION` bump,
+  two unit tests read `path_field` from the route or its fake native result
+  dict, four governance files carry the binding-universe count of the three new
+  symbols, and one test restores the modules it pops from `sys.modules`. The
+  evidence record lists them individually.
 - Radar's `test_channel_does_not_apply_the_declared_transmit_power` pins the
   old convention and will flip. Radar's own
   `batch.weight_includes_tx_power is True` is the belief that contradicted it,

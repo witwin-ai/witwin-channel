@@ -87,9 +87,12 @@ tests compare at `rtol=0, atol=0`.
 
 - Numerically zero for every existing Channel test: all of them build
   `powers_w = torch.ones(...)`, and `sqrt(1) == 1`.
-- Four Channel tests changed, each for a stated reason:
-  - `tests/propagation/consumer/test_public_contracts.py` (x2):
+- Seven existing Channel test files changed, each for a stated reason, and two
+  new files were added (section 6). Four of the changes are semantic:
+  - `tests/propagation/consumer/test_public_contracts.py` (x2 assertions):
     `CONTRACT_VERSION` 2 -> 3.
+  - `tests/test_stage1_phase3_governance.py`: the same version bump, with the
+    reason recorded in the comment.
   - `tests/propagation/consumer/test_service_contract.py`
     `test_evaluate_consumes_request_batch_and_aliases_finalized_rows`: the
     published scalar transport is now aliased to `fields.path_field`.
@@ -97,6 +100,20 @@ tests compare at `rtol=0, atol=0`.
     `test_reevaluate_reuses_frozen_topology_without_discovery`: the fake
     native result dict now carries `path_field`, which is what the route
     reads.
+
+  Four are governance counts that follow the three new native symbols
+  (binding universe 250 -> 253, `live_count_delta_from_plan13_baseline`
+  39 -> 42): `tests/test_phase13_adr027_mc_activation.py`,
+  `tests/test_phase13_adr027_penetration_activation.py`,
+  `tests/test_phase13_adr027_penetration_governance.py`,
+  `tests/test_phase13_phase11a_governance.py`.
+
+  One is unrelated hygiene:
+  `tests/propagation/consumer/test_public_contracts.py`
+  `test_consumer_import_is_solver_neutral` now restores the consumer modules
+  it pops from `sys.modules`. That is a pre-existing pollution bug it exposed,
+  fixed in its own commit with its assertions unchanged.
+
   No tolerance was weakened.
 - Radar (read-only here) `test_channel_does_not_apply_the_declared_transmit_power`
   pins the old convention and flips; `EFFECTIVE_TRANSMIT_POWER_W` and
@@ -109,14 +126,16 @@ tests compare at `rtol=0, atol=0`.
   contract for the three native symbols, the exact amplitude, inert
   zero/negative-power rows, row-count refusal, autograd VJP/JVP agreement
   with the native companions, and the `tx_power` derivative refusal.
-- `tests/propagation/consumer/test_source_amplitude.py` (19 tests):
+- `tests/propagation/consumer/test_source_amplitude.py` (21 tests):
   discovery and both reevaluation routes scale by `sqrt(powers_w)` per row
   from each row's own source, a distinct-power multi-source batch scales each
-  row independently, complex3 projects onto the scalar coefficient, the Jones
-  operator stays bit-identical under a power change, all three AD modes agree
-  on the fixed primal, VJP gradients and JVP tangents carry the amplitude as
-  a constant factor, and the Path/Deterministic surfaces keep their own
-  conventions.
+  row independently, a prepared topology carrying both LoS and reflection rows
+  scales each of those rows by its own source (two sources at 4 W and 9 W, so a
+  single global amplitude fails the test), complex3 projects onto the scalar
+  coefficient, the Jones operator stays bit-identical under a power change, all
+  three AD modes agree on the fixed primal, VJP gradients and JVP tangents
+  carry the amplitude as a constant factor, and the Path/Deterministic surfaces
+  keep their own conventions.
 
 ## 7. Validation
 

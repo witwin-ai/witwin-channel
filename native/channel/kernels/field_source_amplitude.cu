@@ -10,9 +10,11 @@
 //   path_field_vector = field_vector * sqrt(max(tx_power, 0))
 //
 // with the identical ``sqrtf(fmaxf(tx_power, 0))`` amplitude expression the
-// transport kernels use, so
-// ``<path_field_vector, rx_axis> == path_field`` holds to the same float
-// rounding as the fused launch. The map is linear in the field vector and the
+// transport kernels use, so ``<path_field_vector, rx_axis>`` and
+// ``path_field`` are the same quantity. They are not required to be
+// bit-identical: this owner scales and the caller then projects, while the
+// transport kernel projects and then scales, so the two differ by float
+// rounding order. The map is linear in the field vector and the
 // amplitude is real, so the VJP and JVP are the same scale.
 //
 // ``tx_power`` is a frozen primal here exactly as it is in every field
