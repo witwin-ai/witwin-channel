@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from witwin.channel.constants import PHASE_CONVENTION
+from witwin.channel.constants import UNIT_EXCITATION_PHASE_CONVENTION
 from witwin.channel.runtime.kernel_metadata import make_metadata
 
 from .config import Config
@@ -124,7 +124,7 @@ def _metadata(
         ),
         "kernel": kernel,
         "field_abi": "complex3_v1",
-        "phase_convention": dict(PHASE_CONVENTION),
+        "phase_convention": dict(UNIT_EXCITATION_PHASE_CONVENTION),
         "coefficient_semantics": "unit_excitation_dimensionless_receiver_projection",
         "coupled_paths": {
             "requested": config.coupled_paths,
