@@ -71,10 +71,12 @@ def test_consumer_contract_is_versioned_and_snapshot_frozen() -> None:
         "reevaluate",
     ]
     contracts = (CONSUMER_ROOT / "contracts.py").read_text(encoding="utf-8")
-    # Version 2 (ADR-037): the result schema grew ``row_valid``, the capability
-    # record grew two fields, the package grew three exports, and the
-    # documented "polarimetric_transport is primal-only" limit was lifted.
-    assert "CONTRACT_VERSION = 2" in contracts
+    # Version 3 (ADR-039): the scalar and complex3 transport now carry the
+    # declared source amplitude ``sqrt(sources.powers_w)``, which is a semantic
+    # change to a published quantity. Version 2 (ADR-037) grew ``row_valid``,
+    # two capability fields, and three exports, and lifted the documented
+    # "polarimetric_transport is primal-only" limit.
+    assert "CONTRACT_VERSION = 3" in contracts
 
     snapshot = json.loads(
         (ROOT / "ci" / "public-api-snapshot.json").read_text(encoding="utf-8")
