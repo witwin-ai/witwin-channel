@@ -17,18 +17,14 @@ def excited_field(
 ) -> torch.Tensor:
     """Return the source-excited complex3 field for a unit-excitation one."""
 
-    if ad_mode == "none":
-        from witwin.channel.propagation.fields.kernels import (
-            functional as field_functional,
-        )
-
-        return field_functional.field_source_amplitude_scale(
-            field_vector, tx_power
-        )["path_field_vector"]
     from witwin.channel.propagation.fields.kernels import (
-        autograd_amplitude as field_amplitude,
+        source_amplitude as field_amplitude,
     )
 
+    if ad_mode == "none":
+        return field_amplitude.field_source_amplitude_scale(
+            field_vector, tx_power
+        )["path_field_vector"]
     return field_amplitude.field_source_amplitude_scale_ad(field_vector, tx_power)
 
 

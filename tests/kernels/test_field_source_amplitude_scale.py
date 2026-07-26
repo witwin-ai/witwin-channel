@@ -12,8 +12,7 @@ import pytest
 import torch
 
 from witwin.channel.propagation.fields.kernels import (
-    autograd_amplitude as field_amplitude,
-    functional as field_functional,
+    source_amplitude as field_amplitude,
 )
 from witwin.channel.runtime import symbols
 
@@ -36,7 +35,7 @@ def _case(rows: int = 6, seed: int = 11):
 def test_source_amplitude_scale_contract_shapes_and_dtypes() -> None:
     field_vector, tx_power = _case()
 
-    out = field_functional.field_source_amplitude_scale(field_vector, tx_power)
+    out = field_amplitude.field_source_amplitude_scale(field_vector, tx_power)
 
     assert set(out) == {"path_field_vector"}
     scaled = out["path_field_vector"]
@@ -49,7 +48,7 @@ def test_source_amplitude_scale_contract_shapes_and_dtypes() -> None:
 def test_source_amplitude_scale_applies_the_transport_amplitude() -> None:
     field_vector, tx_power = _case()
 
-    scaled = field_functional.field_source_amplitude_scale(field_vector, tx_power)[
+    scaled = field_amplitude.field_source_amplitude_scale(field_vector, tx_power)[
         "path_field_vector"
     ]
 
@@ -63,7 +62,7 @@ def test_zero_and_negative_power_publish_an_inert_row() -> None:
     tx_power[0] = 0.0
     tx_power[1] = -3.0
 
-    scaled = field_functional.field_source_amplitude_scale(field_vector, tx_power)[
+    scaled = field_amplitude.field_source_amplitude_scale(field_vector, tx_power)[
         "path_field_vector"
     ]
 
@@ -74,19 +73,19 @@ def test_source_amplitude_scale_rejects_a_row_count_mismatch() -> None:
     field_vector, tx_power = _case()
 
     with pytest.raises(ValueError):
-        field_functional.field_source_amplitude_scale(field_vector, tx_power[:-1])
+        field_amplitude.field_source_amplitude_scale(field_vector, tx_power[:-1])
 
 
 def test_backward_and_jvp_reproduce_the_forward_scale() -> None:
     field_vector, tx_power = _case()
 
-    forward = field_functional.field_source_amplitude_scale(field_vector, tx_power)[
+    forward = field_amplitude.field_source_amplitude_scale(field_vector, tx_power)[
         "path_field_vector"
     ]
-    backward = field_functional.field_source_amplitude_scale_backward(
+    backward = field_amplitude.field_source_amplitude_scale_backward(
         tx_power, field_vector
     )["grad_field_vector"]
-    jvp = field_functional.field_source_amplitude_scale_jvp(tx_power, field_vector)[
+    jvp = field_amplitude.field_source_amplitude_scale_jvp(tx_power, field_vector)[
         "tangent_path_field_vector"
     ]
 
@@ -104,7 +103,7 @@ def test_autograd_vjp_matches_the_native_backward() -> None:
     )
     scaled.backward(cotangent)
 
-    expected = field_functional.field_source_amplitude_scale_backward(
+    expected = field_amplitude.field_source_amplitude_scale_backward(
         tx_power, cotangent
     )["grad_field_vector"]
     assert leaf.grad is not None
@@ -122,14 +121,14 @@ def test_autograd_jvp_matches_the_native_jvp() -> None:
         scaled = field_amplitude.field_source_amplitude_scale_ad(dual, tx_power)
         primal, out_tangent = torch.autograd.forward_ad.unpack_dual(scaled)
 
-    expected = field_functional.field_source_amplitude_scale_jvp(tx_power, tangent)[
+    expected = field_amplitude.field_source_amplitude_scale_jvp(tx_power, tangent)[
         "tangent_path_field_vector"
     ]
     assert out_tangent is not None
     torch.testing.assert_close(out_tangent, expected, rtol=0.0, atol=0.0)
     torch.testing.assert_close(
         primal,
-        field_functional.field_source_amplitude_scale(field_vector, tx_power)[
+        field_amplitude.field_source_amplitude_scale(field_vector, tx_power)[
             "path_field_vector"
         ],
         rtol=0.0,
@@ -158,11 +157,11 @@ def test_source_amplitude_scale_requires_the_native_symbol(monkeypatch) -> None:
         symbols, "required_symbol", _missing_symbol, raising=True
     )
     monkeypatch.setattr(
-        field_functional, "_required_native_op", _missing_symbol, raising=True
+        field_amplitude, "_required_native_op", _missing_symbol, raising=True
     )
 
     with pytest.raises(RuntimeError):
-        field_functional.field_source_amplitude_scale(field_vector, tx_power)
+        field_amplitude.field_source_amplitude_scale(field_vector, tx_power)
 
 
 def _missing_symbol(name: str):

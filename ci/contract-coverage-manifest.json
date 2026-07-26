@@ -1816,7 +1816,7 @@
     ],
     [
       "field_source_amplitude_scale",
-      "witwin.channel.propagation.fields.kernels.functional.field_source_amplitude_scale",
+      "witwin.channel.propagation.fields.kernels.source_amplitude.field_source_amplitude_scale",
       "named_wrapper",
       "native-field-source-amplitude",
       [
@@ -1825,7 +1825,7 @@
     ],
     [
       "field_source_amplitude_scale_backward",
-      "witwin.channel.propagation.fields.kernels.functional.field_source_amplitude_scale_backward",
+      "witwin.channel.propagation.fields.kernels.source_amplitude.field_source_amplitude_scale_backward",
       "named_wrapper",
       "native-field-source-amplitude",
       [
@@ -1834,7 +1834,7 @@
     ],
     [
       "field_source_amplitude_scale_jvp",
-      "witwin.channel.propagation.fields.kernels.functional.field_source_amplitude_scale_jvp",
+      "witwin.channel.propagation.fields.kernels.source_amplitude.field_source_amplitude_scale_jvp",
       "named_wrapper",
       "native-field-source-amplitude",
       [
