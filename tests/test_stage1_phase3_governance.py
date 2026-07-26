@@ -65,14 +65,23 @@ def test_consumer_contract_is_versioned_and_snapshot_frozen() -> None:
         "RESPONSES",
         "ScalarTransport",
         "TOPOLOGY_MODES",
+        "TimeVaryingEvaluation",
+        "TimeVaryingRequest",
+        "TimeVaryingTransport",
         "WorldProvenance",
         "capabilities",
         "evaluate",
+        "evaluate_time_varying",
         "prepare_fixed_topology",
         "rediscovery_required",
         "reevaluate",
+        "replicate_over_slots",
     ]
     contracts = (CONSUMER_ROOT / "contracts.py").read_text(encoding="utf-8")
+    # Version 4 covers all of Phase 7 and is bumped exactly once. ADR-041 is
+    # additive on top of it: slot batching arrives behind ``slot_count=1``, so
+    # every existing call and every published number is unchanged, and the
+    # time-varying surface is views over a replay rather than a new answer.
     # Version 4 (ADR-040): a discovered topology now carries the world it was
     # discovered against, a frozen replay against a moved world is refused by
     # name, and two exports plus one request field arrive with it. Version 3
@@ -103,6 +112,19 @@ def test_public_consumer_import_does_not_eagerly_load_internal_definitions() -> 
         or module.startswith("witwin.channel.deterministic")
         or module.startswith("witwin.channel.montecarlo")
         for module in service_imports
+    )
+    # The time-varying surface is a second public entry point into the same
+    # boundary, so the solver-neutrality rule has to bind it too. It is prose
+    # in CLAUDE.md and unenforced by ci/check_import_graph.py, which carries no
+    # consumer rule at all.
+    time_varying_imports = _top_level_imports(CONSUMER_ROOT / "time_varying.py")
+    assert not any(
+        module.startswith("witwin.channel.path")
+        or module.startswith("witwin.channel.deterministic")
+        or module.startswith("witwin.channel.montecarlo")
+        or module.startswith("witwin.channel.propagation.enumerated")
+        or module.startswith("witwin.channel.propagation.models")
+        for module in time_varying_imports
     )
 
 
