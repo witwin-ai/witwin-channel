@@ -22,7 +22,7 @@ from witwin.channel.constants import (
 )
 
 
-CONTRACT_VERSION = 2
+CONTRACT_VERSION = 3
 
 
 PropagationComponent: TypeAlias = Literal[
@@ -346,7 +346,13 @@ class PropagationGeometry:
 
 @dataclass(frozen=True, slots=True, eq=False)
 class ScalarTransport:
-    """Endpoint-projected complex scalar transfer at the reference frequency."""
+    """Endpoint-projected complex scalar transport at the reference frequency.
+
+    The coefficient carries the declared source amplitude
+    ``sqrt(sources.powers_w)`` of the transmitting endpoint, so it is a
+    transported field value and not a unit-excitation transfer function
+    (ADR-039). Power/gain values are its squared magnitude.
+    """
 
     coefficient: torch.Tensor
 
@@ -364,7 +370,13 @@ class ScalarTransport:
 
 @dataclass(frozen=True, slots=True, eq=False)
 class Complex3Transport:
-    """World-Cartesian complex electric field and propagation direction."""
+    """World-Cartesian complex electric field and propagation direction.
+
+    The field carries the declared source amplitude
+    ``sqrt(sources.powers_w)`` of the transmitting endpoint, so projecting it
+    onto the receive polarization reproduces
+    :class:`ScalarTransport.coefficient` (ADR-039).
+    """
 
     field: torch.Tensor
     direction: torch.Tensor
@@ -395,7 +407,10 @@ class JonesTransport:
     """Complete source-basis to sink-basis complex 2 x 2 operator.
 
     The operator excludes transmitter power and endpoint antenna-pattern
-    factors; those are not part of a linear polarization-basis map.
+    factors; those are not part of a linear polarization-basis map. This is
+    deliberately unlike :class:`ScalarTransport` and :class:`Complex3Transport`,
+    which publish the excited transport: a caller that wants a powered response
+    applies ``sqrt(powers_w)`` to the source-basis excitation itself.
     """
 
     matrix: torch.Tensor

@@ -918,6 +918,15 @@ pybind11::dict channel_field_coupled_dd(
 
 #undef CHANNEL_DIFFRACTION_WEDGE_COMMON_ARGUMENTS
 #undef CHANNEL_TRANSMISSION_SEQUENCE_ARGUMENTS
+pybind11::dict channel_field_source_amplitude_scale(
+    torch::Tensor field_vector,
+    torch::Tensor tx_power);
+pybind11::dict channel_field_source_amplitude_scale_backward(
+    torch::Tensor tx_power,
+    torch::Tensor grad_path_field_vector);
+pybind11::dict channel_field_source_amplitude_scale_jvp(
+    torch::Tensor tx_power,
+    torch::Tensor tangent_field_vector);
 pybind11::dict channel_field_rough_reflection_scale(
     torch::Tensor field_vector,
     torch::Tensor coefficient,
@@ -1062,6 +1071,19 @@ void register_fields(pybind11::module_ &module) {
         "field_project_complex3_jvp",
         &channel_field_project_complex3_jvp,
         "JVP of the receiver projection (field vector and arrival direction).");
+    module.def(
+        "field_source_amplitude_scale",
+        &channel_field_source_amplitude_scale,
+        "Apply the source amplitude sqrt(tx_power) onto a transported complex3 "
+        "field vector (ADR-039).");
+    module.def(
+        "field_source_amplitude_scale_backward",
+        &channel_field_source_amplitude_scale_backward,
+        "VJP of the source-amplitude scale (field vector; tx_power is frozen).");
+    module.def(
+        "field_source_amplitude_scale_jvp",
+        &channel_field_source_amplitude_scale_jvp,
+        "JVP of the source-amplitude scale (field vector; tx_power is frozen).");
     module.def(
         "field_rough_reflection_scale",
         &channel_field_rough_reflection_scale,

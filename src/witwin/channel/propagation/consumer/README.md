@@ -146,6 +146,25 @@ whole per-call cost: a prepared reflection call also re-stages scene-static
 material and face tables host-to-device on every call, at parity with what a
 discovery solve pays per solve. ADR-037 names and measures this.
 
+## Source amplitude
+
+`sources.powers_w` is the declared transmit power of each source endpoint, and
+under ADR-039 it reaches what you read. `ScalarTransport.coefficient` and
+`Complex3Transport.field` carry `sqrt(powers_w)` of the row's own transmitting
+source, so they are transported field values: projecting the complex3 field
+onto the receive polarization reproduces the scalar coefficient, and a power or
+gain is the squared magnitude of either.
+
+`JonesTransport` does not. A complex `2 x 2` polarization-basis map is not a
+transported field; the fused native LoS Jones owner takes no power input at
+all. Apply the amplitude to your own source-basis excitation instead.
+
+The amplitude is applied by a native owner
+(`field_source_amplitude_scale`, using the same expression the transport
+kernels use for `path_field`). The scalar response reads the excited output
+the transport launch already produced, so it costs nothing; the complex3
+response pays one elementwise launch.
+
 ## Polarimetric transport
 
 `polarimetric_transport` publishes the complete complex 2 x 2 operator from the
