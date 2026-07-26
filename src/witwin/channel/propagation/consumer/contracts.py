@@ -581,6 +581,20 @@ class PropagationConvention:
         "sink_major_source_minor:"
         "pair_index=sink_index*source_count+source_index"
     )
+    # The block-diagonal law a slot-batched reevaluation adds on top of
+    # ``pair_layout``, which it does not redefine. Slots never cross-pair: slot
+    # ``t`` pairs only the sources and sinks of slot ``t``, so ``pair_count``
+    # grows linearly in ``slot_count`` instead of quadratically, and the
+    # sink-major layout above is preserved exactly within one slot.
+    slot_pair_layout: str = (
+        "block_diagonal_slots:"
+        "row=slot*frozen_row_count+frozen_row;"
+        "source_index=slot*slot_source_count+slot_source_index;"
+        "sink_index=slot*slot_sink_count+slot_sink_index;"
+        "pair_index=slot*slot_source_count*slot_sink_count"
+        "+slot_sink_index*slot_source_count+slot_source_index;"
+        "pair_count=slot_count*slot_source_count*slot_sink_count"
+    )
     distance_unit: str = "m"
     delay_unit: str = "s"
     phasor: str = PHASOR
@@ -622,6 +636,15 @@ class PropagationCapabilities:
     # The native field companions reject gradients on them by contract, so a
     # differentiable request carrying one of these fails before native work.
     polarimetric_frozen_ad_inputs: tuple[str, ...]
+    # Whether a FixedTopologyRequest may declare slot_count > 1 and replay a
+    # whole block of world instants in one launch per bucket. The pairing law
+    # is PropagationConvention.slot_pair_layout.
+    supports_slot_batching: bool
+    # A contract bound on slot_count, or None when the only bound is device
+    # memory. Slot batching adds no per-slot host observation, no per-slot
+    # launch, and no per-slot synchronization, so nothing grows with the slot
+    # count except the row and pair tensors themselves.
+    max_slot_count: int | None
 
     def components_for(self, response: str) -> frozenset[str]:
         return dict(self.response_components)[response]
@@ -668,6 +691,8 @@ _CAPABILITIES = PropagationCapabilities(
         "sink_basis",
         "endpoint_polarizations",
     ),
+    supports_slot_batching=True,
+    max_slot_count=None,
 )
 
 
@@ -857,6 +882,102 @@ def prepare_fixed_topology(
     )
 
 
+def _require_slot_divisible(name: str, count: int, slot_count: int) -> None:
+    if count % slot_count:
+        raise ValueError(
+            f"{name} carries {count} entries, which is not a multiple of "
+            f"slot_count={slot_count}; every slot must hold the same number"
+        )
+
+
+def _require_slot_count(slot_count: object) -> int:
+    if type(slot_count) is not int or slot_count <= 0:
+        raise ValueError("slot_count must be a positive int")
+    return slot_count
+
+
+def replicate_over_slots(
+    prepared: PreparedFixedTopology,
+    slot_count: int,
+    *,
+    source_count: int,
+    sink_count: int,
+) -> PreparedFixedTopology:
+    """Tile a frozen topology over ``slot_count`` block-diagonal slots.
+
+    ``source_count`` and ``sink_count`` are the PER-SLOT endpoint counts of the
+    stacked batches the replicated topology will be replayed against. They are
+    required rather than inferred: an endpoint that publishes no frozen row
+    never appears in ``source_index``, so the largest index in a topology is
+    not the endpoint count and inferring one would silently mislabel every
+    later slot.
+
+    This is pure index arithmetic and bucket re-partitioning: row ``t*K + r``
+    names the same frozen row ``r`` shifted into slot ``t``, so the frozen row
+    order is preserved inside every slot and the ``(component, depth)`` bucket
+    COUNT is unchanged - only the bucket row counts grow. No compaction, no
+    physics, no native symbol, no host observation. ``slot_count == 1`` returns
+    the handle unchanged, so a single-slot replay is bit-identical to one that
+    never asked for slots.
+
+    ``provenance`` is forwarded verbatim, so a replicated topology is checked
+    for staleness exactly like the topology it came from (ADR-040).
+    """
+
+    if not isinstance(prepared, PreparedFixedTopology):
+        raise TypeError("prepared must be a PreparedFixedTopology")
+    slot_count = _require_slot_count(slot_count)
+    for name, value in (("source_count", source_count), ("sink_count", sink_count)):
+        if type(value) is not int or value <= 0:
+            raise ValueError(f"{name} must be a positive int")
+    if slot_count == 1:
+        return prepared
+    topology = prepared.topology
+    rows = topology.row_count
+    device = topology.device
+    slot = torch.arange(slot_count, device=device, dtype=torch.int32)
+    replicated = PropagationTopology(
+        source_index=(
+            topology.source_index.repeat(slot_count)
+            + slot.mul(source_count).repeat_interleave(rows)
+        ),
+        sink_index=(
+            topology.sink_index.repeat(slot_count)
+            + slot.mul(sink_count).repeat_interleave(rows)
+        ),
+        source_id=topology.source_id.repeat(slot_count),
+        sink_id=topology.sink_id.repeat(slot_count),
+        depth=topology.depth.repeat(slot_count),
+        component_id=topology.component_id.repeat(slot_count),
+        primitive_id=topology.primitive_id.repeat(slot_count),
+        edge_id=topology.edge_id.repeat(slot_count),
+        material_id=topology.material_id.repeat(slot_count),
+        primitive_sequence=topology.primitive_sequence.repeat(slot_count, 1),
+        material_sequence=topology.material_sequence.repeat(slot_count, 1),
+        interaction_type=topology.interaction_type.repeat(slot_count, 1),
+        provenance=topology.provenance,
+    )
+    row_offset = torch.arange(
+        slot_count, device=device, dtype=torch.int64
+    ).mul(rows).reshape(-1, 1)
+    return PreparedFixedTopology(
+        topology=replicated,
+        buckets=tuple(
+            FixedTopologyBucket(
+                component=bucket.component,
+                depth=bucket.depth,
+                rows=(bucket.rows.reshape(1, -1) + row_offset).reshape(-1),
+            )
+            for bucket in prepared.buckets
+        ),
+        # Replication observes nothing, so the handle keeps the cost of the one
+        # preparation it was derived from rather than claiming a new one.
+        prepare_d2h_copies=prepared.prepare_d2h_copies,
+        prepare_d2h_bytes=prepared.prepare_d2h_bytes,
+        prepare_synchronizations=prepared.prepare_synchronizations,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class FixedTopologyRequest:
     """A reevaluation request against an already-discovered topology.
@@ -875,6 +996,16 @@ class FixedTopologyRequest:
     states that the caller deliberately holds the discrete winner set fixed
     while the geometry moves. It never accepts a moved topology, material, or
     assignment version: those respecify the labels the frozen rows carry.
+
+    ``slot_count`` declares that the frozen rows and the endpoint batches are
+    ``slot_count`` block-diagonal slots stacked slot-major, so one call replays
+    a whole frame, pulse train, or symbol block in one launch per bucket with
+    one validation copy and one synchronization for the whole set. The pairing
+    law is :attr:`PropagationConvention.slot_pair_layout`; build the topology
+    with :func:`replicate_over_slots`. It requires a
+    :class:`PreparedFixedTopology`: the raw zero-interaction route builds its
+    pair segmentation inside the native gather over the full source/sink outer
+    product and therefore cannot express a block-diagonal layout.
     """
 
     sources: EndpointBatch
@@ -884,9 +1015,11 @@ class FixedTopologyRequest:
     response: PropagationResponse
     ad_mode: PropagationAdMode
     world_motion: PropagationWorldMotion = "frozen_world"
+    slot_count: int = 1
 
     def __post_init__(self) -> None:
         _require_endpoints(self.sources, self.sinks)
+        self._require_slots()
         if not isinstance(
             self.topology, PropagationTopology | PreparedFixedTopology
         ):
@@ -903,6 +1036,26 @@ class FixedTopologyRequest:
                 f"supported responses are "
                 f"{sorted(_CAPABILITIES.fixed_topology_responses)}"
             )
+
+    def _require_slots(self) -> None:
+        """Reject a malformed slot declaration before any native work."""
+
+        slot_count = _require_slot_count(self.slot_count)
+        if slot_count == 1:
+            return
+        if isinstance(self.topology, PropagationTopology):
+            raise NotImplementedError(
+                "slot_count > 1 requires a PreparedFixedTopology; the raw "
+                "zero-interaction route builds its pair segmentation in the "
+                "native gather over the full source/sink outer product and "
+                "cannot express the block-diagonal slot layout. Call "
+                "prepare_fixed_topology first."
+            )
+        _require_slot_divisible("sources", self.sources.count, slot_count)
+        _require_slot_divisible("sinks", self.sinks.count, slot_count)
+        _require_slot_divisible(
+            "topology rows", self.frozen_topology.row_count, slot_count
+        )
 
     @property
     def frozen_topology(self) -> PropagationTopology:
@@ -994,4 +1147,5 @@ __all__ = [
     "WorldProvenance",
     "capabilities",
     "prepare_fixed_topology",
+    "replicate_over_slots",
 ]

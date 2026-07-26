@@ -208,6 +208,94 @@ consistent and the freshness check silent. Pass `revalidate_source=True` to
 `O(scene)` host work: poll it on a motion-event cadence, never inside a replay
 loop.
 
+## Slot batching: a whole frame in one call
+
+A caller who needs the same frozen rows at `T` world instants declares
+`slot_count=T` instead of calling `reevaluate` `T` times. The frozen rows and
+both endpoint batches are then `T` slots stacked slot-major, and the pairing
+law becomes block diagonal (`PropagationConvention.slot_pair_layout`):
+
+```python
+replicated = consumer.replicate_over_slots(
+    prepared, slot_count, source_count=S, sink_count=K   # PER-SLOT counts
+)
+result = consumer.reevaluate(compiled, consumer.FixedTopologyRequest(
+    sources=stacked_sources, sinks=stacked_sinks,        # [T*S, 3], [T*K, 3]
+    reference_frequency_hz=f_ref, topology=replicated,
+    response="scalar_transport", ad_mode="jvp", slot_count=slot_count))
+```
+
+Slots never cross-pair, so `pair_count = slot_count * S * K` is linear in the
+slot count rather than the `(T*S) x (T*K)` outer product; inside one slot the
+sink-major layout above is preserved exactly. One launch per bucket, one
+four-byte validation copy, and one synchronization cover the whole set,
+whatever `T` is - which is the point, because a Python loop over instants keeps
+every call inside its own ADR-032 budget while multiplying the budget of the
+frame by `T`.
+
+`source_count` and `sink_count` are the per-slot endpoint counts and are
+required, not inferred: an endpoint that publishes no frozen row never appears
+in `source_index`, so the largest index a topology carries is not an endpoint
+count.
+
+`slot_count > 1` requires a `PreparedFixedTopology`. The raw zero-interaction
+route builds its pair segmentation inside the native gather over the full outer
+product and refuses slot batching by name rather than approximating it; a
+LoS-only prepared topology reaches the same field owner and additionally
+re-tests visibility.
+
+All slots share one `CompiledScene`, so a slot set is one structure-geometry
+epoch - one frame, one pulse train, one symbol block. Structure motion is a new
+call with a new compiled scene, not another slot.
+
+## Time-varying impulse response
+
+`delay_s` plus the transport plus `pair_offsets` plus `row_valid` already IS an
+impulse response per pair. `evaluate_time_varying` is the time axis over it,
+and nothing else:
+
+```python
+cir = consumer.evaluate_time_varying(compiled, consumer.TimeVaryingRequest(
+    sources=stacked_sources, sinks=stacked_sinks,
+    reference_frequency_hz=f_ref, topology=prepared,   # PER-SLOT topology
+    times_s=torch.arange(T, dtype=torch.float64) * dt,
+    response="scalar_transport", ad_mode="jvp"))
+
+cir.delay_s                    # [T, K]
+cir.transport.coefficient      # [T, K]
+cir.row_valid                  # [T, K], still the sole authority
+cir.pair_offsets               # per slot, frozen: the same segmentation every T
+```
+
+Every published tensor is a view over the storage one replay produced. The
+result carries the diagnostics of that one call, so the ADR-032 budget of a
+whole `T`-instant frame is readable in one place.
+
+`times_s` labels the slots. It is never differenced or integrated: a delay RATE
+is the ADR-038 forward tangent on the endpoint positions, and a production
+finite difference is forbidden.
+
+`evaluate_time_varying` does not compile scenes. The caller passes one
+`CompiledScene` per structure-geometry epoch, which keeps scene lifecycle out
+of the consumer and keeps a moving-structure sequence honest: `T` epochs are
+`T` compiles and `T` calls.
+
+## Rediscovery cadence
+
+| Tier | What runs | Cadence |
+|---|---|---|
+| 0 - session freeze | `compile` + `evaluate` + `prepare_fixed_topology` | once per topology epoch |
+| 1 - motion event | `evaluate` + `prepare_fixed_topology` when `rediscovery_required` fires, or on a declared cadence for the birth gap | per motion event, never per pulse |
+| 2 - inner loop | one slot-batched `reevaluate` / `evaluate_time_varying` per frame | per frame, pulse train, or symbol block |
+
+Measured on the fixture geometry: discovery is 9.1 ms at 2 x 2 pairs, 14.0 ms
+at 4 x 16 and 39.6 ms at 16 x 128, and it grows with the endpoint count.
+`prepare_fixed_topology` is 0.7-2.5 ms and synchronizes. A batched replay is
+~2.2 ms for the whole frame and is flat in the slot count: 128 rows and 131072
+rows cost the same, because replay is launch-bound rather than work-bound. That
+asymmetry is the whole argument - tier 1 is affordable per motion event and
+never per pulse, and tier 2 is never a Python loop.
+
 ## Source amplitude
 
 `sources.powers_w` is the declared transmit power of each source endpoint, and

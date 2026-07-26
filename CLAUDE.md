@@ -156,7 +156,20 @@ Organize code by RF domain capability, with a single owner for each operation:
   synchronization, or an `O(scene)` host walk in `_preflight_reevaluate`.
   `CompiledScene.time_s` is reporting metadata and is never a gate. Replay
   stays subtractive: a row can die through `row_valid`, a row is never born,
-  and that limitation is documented rather than hidden.
+  and that limitation is documented rather than hidden. Under ADR-041 a
+  request may declare `slot_count`, which states that the frozen rows and both
+  endpoint batches are that many block-diagonal slots stacked slot-major and
+  makes `pair_count` linear rather than quadratic in the slot count; a whole
+  frame is then one launch per bucket, one four-byte validation copy, and one
+  synchronization. `replicate_over_slots` is index arithmetic and bucket
+  re-partitioning only, forwards `provenance` verbatim, adds no bucket, and
+  requires the per-slot endpoint counts because an endpoint that publishes no
+  row is invisible to a topology. `evaluate_time_varying` is the time axis over
+  one such replay and nothing else: `[T, K]` views, no physics, no second
+  compaction, no scene compilation, and `times_s` is a label that is never
+  differenced into a rate. `slot_count > 1` requires a `PreparedFixedTopology`;
+  the raw route's pairing law lives inside a native gather and refuses slot
+  batching by name rather than growing a second Python owner of it.
 - `path`, `deterministic`, `montecarlo.basic`, and `montecarlo.bdpt`: thin
   solver-owned configuration, orchestration, accumulation, result, and metadata
   layers. Solvers must never import another solver.
@@ -406,6 +419,7 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-038-wrapper-level-forward-ad-liveness.md`
 - `docs/dev/standards/adr-039-consumer-source-amplitude.md`
 - `docs/dev/standards/adr-040-world-provenance-and-fixed-topology-staleness.md`
+- `docs/dev/standards/adr-041-slot-batched-reevaluation-and-time-varying-cir.md`
 
 ADR-029 is Superseded, ADR-030 is Dormant, and ADR-031 is Rejected. They are
 historical records rather than implementation or release requirements; ADR-032

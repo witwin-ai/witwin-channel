@@ -95,7 +95,9 @@
     "native-consumer-los-jones": "tests/propagation/consumer/test_los_jones.py::test_consumer_los_jones_matches_analytic_rotated_basis",
     "consumer-prepared-topology": "tests/propagation/consumer/test_fixed_reflection.py::test_prepare_fixed_topology_buckets_cover_every_row_in_frozen_order",
     "native-field-source-amplitude": "tests/kernels/test_field_source_amplitude_scale.py::test_source_amplitude_scale_contract_shapes_and_dtypes",
-    "consumer-world-provenance": "tests/propagation/consumer/test_phase7_world_provenance.py::test_the_topology_carries_the_world_it_was_discovered_against"
+    "consumer-world-provenance": "tests/propagation/consumer/test_phase7_world_provenance.py::test_the_topology_carries_the_world_it_was_discovered_against",
+    "consumer-slot-batching": "tests/propagation/consumer/test_phase7_slot_batching.py::test_slot_pairing_is_block_diagonal",
+    "consumer-time-varying-cir": "tests/propagation/consumer/test_phase7_time_varying_cir.py::test_time_varying_cir_matches_a_per_time_reevaluate"
   },
   "e2e_scenarios": {
     "bdpt-diffraction": "tests/montecarlo/bdpt/test_diffraction_single_wedge.py::test_bdpt_single_wedge_diffraction_returns_finite_native_component_when_available",
@@ -157,7 +159,10 @@
     "consumer-source-amplitude": "tests/propagation/consumer/test_source_amplitude.py::test_discovery_complex3_transport_scales_by_each_row_own_source",
     "consumer-source-amplitude-ad": "tests/propagation/consumer/test_source_amplitude.py::test_endpoint_gradients_carry_the_source_amplitude",
     "consumer-world-provenance": "tests/propagation/consumer/test_phase7_world_provenance.py::test_a_moved_structure_fails_loudly_by_default",
-    "consumer-fixed-winner-replay": "tests/propagation/consumer/test_phase7_world_provenance.py::test_a_declared_fixed_winner_replay_is_allowed_and_correct"
+    "consumer-fixed-winner-replay": "tests/propagation/consumer/test_phase7_world_provenance.py::test_a_declared_fixed_winner_replay_is_allowed_and_correct",
+    "consumer-slot-batching": "tests/propagation/consumer/test_phase7_slot_batching.py::test_slot_batching_is_bitwise_identical_to_a_per_slot_loop",
+    "consumer-slot-budget": "tests/propagation/consumer/test_phase7_slot_batching.py::test_the_budget_is_flat_in_slot_count",
+    "consumer-time-varying-cir": "tests/propagation/consumer/test_phase7_time_varying_cir.py::test_time_varying_cir_is_a_valid_impulse_response"
   },
   "public_exports": [
     [
@@ -386,7 +391,8 @@
       "consumer-public-contract",
       [
         "consumer-fixed",
-        "consumer-fixed-reflection"
+        "consumer-fixed-reflection",
+        "consumer-slot-batching"
       ]
     ],
     [
@@ -424,7 +430,8 @@
       "consumer-public-contract",
       [
         "consumer-discover",
-        "consumer-fixed"
+        "consumer-fixed",
+        "consumer-slot-batching"
       ]
     ],
     [
@@ -439,7 +446,8 @@
       "consumer-public-contract",
       [
         "consumer-discover",
-        "consumer-fixed"
+        "consumer-fixed",
+        "consumer-slot-batching"
       ]
     ],
     [
@@ -551,6 +559,42 @@
       "consumer-public-contract",
       [
         "consumer-fixed"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.replicate_over_slots",
+      "consumer-slot-batching",
+      [
+        "consumer-slot-batching",
+        "consumer-slot-budget"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.TimeVaryingRequest",
+      "consumer-time-varying-cir",
+      [
+        "consumer-time-varying-cir"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.TimeVaryingEvaluation",
+      "consumer-time-varying-cir",
+      [
+        "consumer-time-varying-cir"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.TimeVaryingTransport",
+      "consumer-time-varying-cir",
+      [
+        "consumer-time-varying-cir"
+      ]
+    ],
+    [
+      "witwin.channel.propagation.consumer.evaluate_time_varying",
+      "consumer-time-varying-cir",
+      [
+        "consumer-time-varying-cir"
       ]
     ]
   ],

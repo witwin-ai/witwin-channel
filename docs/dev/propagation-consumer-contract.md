@@ -61,6 +61,20 @@ pair_index = sink_index * source_count + source_index
 Therefore `pair_offsets` has `sink_count * source_count + 1` entries,
 including empty segments for endpoint pairs with no published path.
 
+A reevaluation that declares `slot_count > 1` (ADR-041) keeps that law inside
+one slot and adds a block-diagonal law across slots:
+
+```text
+pair_index = slot * slot_source_count * slot_sink_count
+           + slot_sink_index * slot_source_count + slot_source_index
+pair_count = slot_count * slot_source_count * slot_sink_count
+```
+
+`pair_count` is therefore linear in `slot_count`, not the `(T*S) x (T*K)`
+outer product, and the per-slot segmentation - empty segments included - is
+identical in every slot. The law is published verbatim as
+`PropagationConvention.slot_pair_layout`; `pair_layout` is not redefined.
+
 The enumerated source pipeline owns the ADR-032 cardinality observation.
 Consumer projection receives exact rows plus the owner's pair sidecar and adds
 zero count D2H copies, zero stream synchronizations, and zero segmentation
@@ -123,16 +137,19 @@ differentiable; transmitter power and endpoint polarization vectors are
 primal-only and are rejected by preflight when marked for AD. The compiled
 host frequency value is reused, so reevaluation does not add a frequency D2H
 observation. A nonempty frozen-row request performs one 4-byte validation D2H
-and one current-stream synchronization; an empty request performs neither.
+and one current-stream synchronization; an empty request performs neither. A
+slot-batched request performs the same one copy and one synchronization for
+the whole slot set, whatever `slot_count` is; a Python loop over instants pays
+one of each per instant and is not a supported inner loop (ADR-041).
 The versioned capability object is the source of truth for supported cells.
 
-Forward mode on the prepared route requires endpoint positions carrying
-`requires_grad` in addition to their forward tangent. `Function.apply` unpacks
-a dual before `setup_context` runs, so the shared native field companions
-cannot observe a forward-only tangent and publish `path_length_m` and `delay_s`
-without one; the prepared route rejects that call rather than publishing a
-partially differentiated answer (ADR-037 section 8). The raw zero-interaction
-route keeps its version-1 acceptance rules.
+Forward mode on the prepared route accepts a forward-only dual: liveness is
+decided in the caller-facing wrapper, where the dual is still visible, and
+passed into the shared native field companions as an explicit trailing input
+(ADR-038, commit `fb23078`). `requires_grad` is not required, and the older
+`requires_grad`-plus-dual convention keeps working unchanged. Slot replication
+preserves the tangent because it is a gather on the dual tensor itself. The raw
+zero-interaction route keeps its version-1 acceptance rules.
 
 Row validity applies to
 `capabilities().fixed_topology_row_validity_components`, today

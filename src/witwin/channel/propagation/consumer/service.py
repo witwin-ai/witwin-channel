@@ -657,6 +657,21 @@ def _fixed_transport(
     )
 
 
+def _slot_pair_count(request: FixedTopologyRequest) -> int:
+    """Pairs published by one call, under the declared slot layout.
+
+    One slot is the full source/sink outer product. More than one is block
+    diagonal, so the count is linear in the slot count rather than quadratic.
+    """
+
+    slot_count = request.slot_count
+    return (
+        slot_count
+        * (request.sources.count // slot_count)
+        * (request.sinks.count // slot_count)
+    )
+
+
 def _reevaluate_prepared(
     compiled: CompiledScene, request: FixedTopologyRequest
 ) -> FixedTopologyEvaluation:
@@ -673,7 +688,12 @@ def _reevaluate_prepared(
     validity = _CAPABILITIES.fixed_topology_row_validity_components
     if any(bucket.component == "reflection" for bucket in prepared.buckets):
         require_smooth_reflection_scene(compiled)
-    rows = prepared_row_gather(prepared.topology, request.sources, request.sinks)
+    rows = prepared_row_gather(
+        prepared.topology,
+        request.sources,
+        request.sinks,
+        slot_count=request.slot_count,
+    )
     bases = (
         (
             select_rows(request.sources.polarization_basis, rows.source_row_index),
@@ -697,7 +717,7 @@ def _reevaluate_prepared(
         ),
     )
     paths = PropagationPathBatch(
-        pair_count=request.sources.count * request.sinks.count,
+        pair_count=_slot_pair_count(request),
         path_count=rows.row_count,
         pair_index=rows.pair_index,
         pair_offsets=rows.pair_offsets,

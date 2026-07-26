@@ -32,6 +32,25 @@ All notable changes to `witwin-channel` are documented in this file.
   `FixedTopologyRequest.world_motion`; `CompiledScene.time_s`, the compiled
   snapshot instant, carried for reporting only. No call signature changes and
   no device work: the freshness check is four host integer comparisons.
+- **ADR-041.** Slot-batched fixed-topology reevaluation and the time-varying
+  channel impulse response. `FixedTopologyRequest.slot_count` (default `1`, so
+  every existing call is unchanged) declares that the frozen rows and both
+  endpoint batches are `slot_count` block-diagonal slots stacked slot-major,
+  and `consumer.replicate_over_slots(prepared, slot_count, *, source_count,
+  sink_count)` builds that topology by index arithmetic. `pair_count` becomes
+  `slot_count * source_count * sink_count`, linear in the slot count, and a
+  whole frame costs one launch per bucket, one four-byte validation copy, and
+  one synchronization instead of one of each per instant.
+  `consumer.evaluate_time_varying(compiled, TimeVaryingRequest)` publishes
+  `delay_s`, `path_length_m`, the transport, and `row_valid` as `[T, K]` views
+  over that single replay, with `times_s: float64[T]` and the frozen per-slot
+  `pair_offsets`. `PropagationConvention.slot_pair_layout` states the pairing
+  law without redefining `pair_layout`, and
+  `PropagationCapabilities.supports_slot_batching` / `max_slot_count` disclose
+  it. `slot_count > 1` requires a `PreparedFixedTopology`: the raw
+  zero-interaction route builds its pair segmentation inside a native gather
+  over the full outer product and refuses slot batching by name.
+  `CONTRACT_VERSION` is unchanged at 4.
 
 ## [0.4.0] - 2026-07-23
 
