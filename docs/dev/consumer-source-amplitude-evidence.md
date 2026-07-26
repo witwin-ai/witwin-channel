@@ -126,11 +126,29 @@ tests/deterministic`:
 | | result |
 |---|---|
 | before | 902 passed, 7 skipped, 1 xfailed (163.70s) |
-| after | 930 passed, 7 skipped, 1 xfailed |
+| after | 930 passed, 7 skipped, 1 xfailed (106.00s) |
+
+Whole suite less `tests/performance` and the three Munich parity files:
+
+| | result |
+|---|---|
+| before | 2401 passed, 6 skipped, 1 xfailed |
+| after | 2429 passed, 6 skipped, 1 xfailed |
+
+The `+28` is exactly the new coverage in section 6; no existing test changed
+its outcome.
 
 `python ci/run_ci_tier.py quick`: passing before and after.
-`python ci/run_ci_tier.py cuda`: run because the native surface and the AD
-dispatch changed.
+`python ci/run_ci_tier.py cuda`: passing before and after, run because the
+native surface and the AD dispatch changed. After the change its gates report
+`2126 + 14 + 26 + 117` passed and `contract coverage passed (52 public
+exports, 253 native bindings)`.
+
+Pass `--basetemp` explicitly on Windows. Without it, and with a long temp
+path, `tests/kernels/test_rayd_package_discovery.py` fails nine times on
+`Filename too long` while cloning the locked RayD checkout. That is an
+environment artifact, unrelated to this change, and reproduces on the
+unmodified base commit.
 
 ## 8. Extension fingerprint
 
