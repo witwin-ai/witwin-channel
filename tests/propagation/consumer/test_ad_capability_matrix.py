@@ -139,6 +139,31 @@ def test_the_matrix_agrees_with_the_live_capability_record() -> None:
     assert record.ad_accounting is True
 
 
+def test_every_advertised_component_has_a_row_that_names_it() -> None:
+    """An advertised component with no row is the silent class, not a gap.
+
+    `component_ad_modes` is the machine-readable half of ADR-043; a component it
+    admits for `jvp`/`vjp` while this document rows nothing for it advertises a
+    derivative whose only evidence lives on some other surface. Transmission was
+    exactly that: admitted on both modes, reachable from both transport
+    responses, and covered only one layer down in the enumerated engine. A
+    component restricted to `none` must instead carry a refusal row.
+    """
+
+    for component, modes in capabilities().component_ad_modes:
+        mentioning = [
+            row
+            for row in MATRIX_ROWS
+            if component in f"{row['route']} {row['leaf-or-output']}"
+        ]
+        assert mentioning, f"{component} is advertised and rowed nowhere"
+        states = {row["state"] for row in mentioning}
+        if modes & {"jvp", "vjp"}:
+            assert "SUP" in states, f"{component} admits AD with no supported row"
+        else:
+            assert "REF" in states, f"{component} is primal-only with no refusal row"
+
+
 def test_the_deferred_section_names_every_declared_output() -> None:
     """A `DECL` cell without a named deferral is a defect, not a declaration."""
 

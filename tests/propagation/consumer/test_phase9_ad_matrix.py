@@ -33,6 +33,7 @@ from witwin.channel.propagation.consumer import (
     replicate_over_slots,
 )
 from witwin.channel.scene import compile as compile_scene
+from witwin.core import PhysicalMaterial, Scene
 
 from tests.propagation.consumer._multi_endpoint_world import (
     FREQUENCY_HZ as SLOT_FREQUENCY_HZ,
@@ -54,7 +55,11 @@ from tests.propagation.consumer._reflection_world import (
     endpoints,
     smooth_wall_scene,
 )
-from tests.support.scenes import wedge_diffraction_scene
+from tests.support.core_world import make_receiver, make_transmitter
+from tests.support.scenes import (
+    transmission_wall_structure,
+    wedge_diffraction_scene,
+)
 
 
 pytestmark = pytest.mark.skipif(
@@ -840,3 +845,121 @@ def test_a_time_varying_replay_carries_reverse_gradients() -> None:
     per_slot = leaf.grad.reshape(3, -1, 3).abs().sum(dim=(1, 2))
     for slot in range(3):
         assert float(per_slot[slot]) > 0.0, f"instant {slot} carries no gradient"
+
+
+# ---------------------------------------------------------------------------
+# transmission: advertised by the capability record on both AD modes, and now
+# proved at the consumer boundary the record describes.
+# ---------------------------------------------------------------------------
+
+
+_TRANSMISSION_FREQUENCY_HZ = 3.0e9
+_TRANSMISSION_SOURCE = [[0.0, 0.0, 0.5]]
+_TRANSMISSION_SINK = [[4.0, 0.0, 0.5]]
+_TRANSMISSION_WEIGHT = (0.7, -1.3)
+
+
+def _transmission_world():
+    """One thin sheet between one transmitter and one receiver."""
+
+    wall = transmission_wall_structure(
+        2.0,
+        PhysicalMaterial(eps_r=4.0, sigma_e=0.01, thickness_m=0.1),
+        name="sheet",
+        surface_id=7,
+    )
+    scene = Scene(
+        structures=[wall],
+        endpoints=[
+            make_transmitter(torch.tensor([0.0, 0.0, 0.5])),
+            make_receiver(torch.tensor([4.0, 0.0, 0.5])),
+        ],
+    )
+    return compile_scene(
+        scene, reference_frequency_hz=_TRANSMISSION_FREQUENCY_HZ
+    )
+
+
+def _transmission_loss(compiled):
+    """Weighted real/imaginary loss: a magnitude loss cannot see the phase."""
+
+    weight_re, weight_im = _TRANSMISSION_WEIGHT
+
+    def loss(source_positions: torch.Tensor, ad_mode: str = "none"):
+        sources = EndpointBatch(
+            stable_ids=torch.tensor([1], dtype=torch.int64, device="cuda"),
+            positions_m=source_positions,
+            polarizations=_cuda([[0.0, 0.0, 1.0]]),
+            powers_w=torch.ones(1, device="cuda"),
+        )
+        sinks = EndpointBatch(
+            stable_ids=torch.tensor([2], dtype=torch.int64, device="cuda"),
+            positions_m=_cuda(_TRANSMISSION_SINK),
+            polarizations=_cuda([[0.0, 0.0, 1.0]]),
+        )
+        result = evaluate(
+            compiled,
+            PropagationRequest(
+                sources=sources,
+                sinks=sinks,
+                reference_frequency_hz=_TRANSMISSION_FREQUENCY_HZ,
+                components=frozenset({"transmission"}),
+                max_depth=2,
+                response="scalar_transport",
+                topology_mode="discover",
+                ad_mode=ad_mode,
+            ),
+        )
+        coefficient = result.paths.transport.coefficient
+        assert int(coefficient.shape[0]) == 1, "the sheet must publish one row"
+        value = (coefficient.real * weight_re + coefficient.imag * weight_im).sum()
+        return value, result
+
+    return loss
+
+
+def test_a_transmission_scene_carries_a_reverse_gradient_matching_fd() -> None:
+    """The one advertised component that had no consumer-boundary row.
+
+    `capabilities().ad_modes_for_component("transmission")` has always carried
+    `jvp` and `vjp`, and `response_components` reaches transmission from both
+    transport responses, but the only coverage sat one layer below the consumer
+    in the enumerated engine. An advertised cell whose only evidence is a
+    different surface is exactly the silent class this matrix exists to remove.
+    """
+
+    compiled = _transmission_world()
+    loss = _transmission_loss(compiled)
+
+    base = _cuda(_TRANSMISSION_SOURCE)
+    leaf = base.clone().requires_grad_(True)
+    value, result = loss(leaf, "vjp")
+    assert result.paths.transport.coefficient.requires_grad is True
+    value.backward()
+
+    reference = _central_difference(base, lambda pos: loss(pos)[0].item())
+    assert float(reference.abs().max()) > 1.0e-2, "the oracle must be nonzero"
+    torch.testing.assert_close(leaf.grad, reference, atol=2.0e-3, rtol=2.0e-2)
+
+
+def test_the_transmission_tangent_agrees_with_its_reverse_gradient() -> None:
+    """jvp and vjp answer the same question about the same transmitted row."""
+
+    compiled = _transmission_world()
+    loss = _transmission_loss(compiled)
+
+    base = _cuda(_TRANSMISSION_SOURCE)
+    leaf = base.clone().requires_grad_(True)
+    loss(leaf, "vjp")[0].backward()
+
+    generator = torch.Generator(device="cuda").manual_seed(43)
+    direction = torch.randn(base.shape, device="cuda", generator=generator)
+    with forward_ad.dual_level():
+        dual = forward_ad.make_dual(base.clone(), direction)
+        value, _ = loss(dual, "jvp")
+        tangent = forward_ad.unpack_dual(value).tangent
+    assert tangent is not None, "the forward route published no tangent"
+
+    expected = float((leaf.grad * direction).sum())
+    assert abs(expected) > 1.0e-2, "the adjoint identity must be nontrivial"
+    assert abs(float(tangent) - expected) <= 2.0e-3 * abs(expected)

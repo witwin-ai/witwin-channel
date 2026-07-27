@@ -64,6 +64,8 @@ outside the hot path (result assembly, refusal checks); it is never physics.
 | reevaluate/jones | sinks.positions_m | vjp | SUP | native-companion | src/witwin/channel/propagation/consumer/_jones.py | tests/propagation/consumer/test_reflection_jones.py::test_reflection_jones_reverse_mode_matches_central_differences | fd |
 | reevaluate/jones | sinks.positions_m | jvp | SUP | native-companion | src/witwin/channel/propagation/consumer/_jones.py | tests/propagation/consumer/test_phase9_ad_matrix.py::test_the_jones_operator_carries_forward_tangents | analytic |
 | reevaluate/prepared | combined endpoint + material leaves | vjp | SUP | native-companion | src/witwin/channel/propagation/consumer/_fixed_reflection.py:496 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_a_combined_request_equals_the_sum_of_its_single_leaf_gradients | fd |
+| discovery/transmission | sources.positions_m | vjp | SUP | native-companion | src/witwin/channel/propagation/fields/kernels/autograd.py:577 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_a_transmission_scene_carries_a_reverse_gradient_matching_fd | fd |
+| discovery/transmission | sources.positions_m | jvp | SUP | native-companion | src/witwin/channel/propagation/fields/kernels/autograd.py:577 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_the_transmission_tangent_agrees_with_its_reverse_gradient | adjoint |
 
 ### 2.3 Material and mesh leaves
 
