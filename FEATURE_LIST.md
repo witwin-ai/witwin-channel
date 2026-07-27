@@ -260,9 +260,13 @@ priority `scattering > diffraction > transmission > reflection > los`.
   `max_num_paths` report actual rows, and exact complete `O(K)` results are
   returned in stable order. `path_capacity_per_pair`,
   `diffraction_state_capacity`, capacity-shaped public results, and ADR-031
-  `Qr` are absent from production configuration and public API. Historical
-  ADR-029/030 implementation artifacts are caller-free and unsupported; they
-  do not define public API, feature, test, or release requirements.
+  `Qr` are absent from production configuration and public API. ADR-029,
+  ADR-030 and ADR-031 are REMOVED: the Phase-11 cutover deleted their 19
+  native registrations, 13 CUDA translation units and 11 Python modules, so
+  the extension exports 234 symbols rather than 253 and the dormant-symbol
+  allowlist is empty. `ci/check_contract_coverage.py` now asserts that no
+  caller-free native binding exists, keeping its dormant branch armed so a
+  future one needs a named decision rather than an allowlist entry.
 - `PathResult` per-event `InteractionType` includes `TRANSMISSION` and
   `SCATTERING`; scattering paths are exported as incoherent power paths
   (`scattering_paths_incoherent: true` metadata).
