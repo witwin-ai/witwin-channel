@@ -887,3 +887,97 @@ def test_scene_static_table_cache_is_bypassed_for_graph_bearing_scenes() -> None
         assert first["vertices"].grad_fn is not None
     finally:
         compiled.structures[0].vertices.requires_grad_(False)
+
+
+def _material_and_endpoint_gradients(warm: bool) -> tuple[torch.Tensor, torch.Tensor]:
+    """Backward through one prepared replay, optionally after a primal warm-up."""
+
+    compiled = smooth_wall_scene()
+    sources, sinks = endpoints()
+    _, prepared = _prepared(compiled, sources, sinks)
+    if warm:
+        _reevaluate(compiled, prepared, sources, sinks, response="scalar_transport")
+
+    eps_r = compiled.materials.eps_r
+    eps_r.requires_grad_(True)
+    sink_leaf = torch.tensor([[0.0, 0.5, 0.0]], device="cuda", requires_grad=True)
+    moved = endpoints(sink_positions=sink_leaf)[1]
+    result = _reevaluate(
+        compiled,
+        prepared,
+        sources,
+        moved,
+        response="scalar_transport",
+        ad_mode="vjp",
+    )
+    result.paths.transport.coefficient.abs().sum().backward()
+    return eps_r.grad.clone(), sink_leaf.grad.clone()
+
+
+def test_a_scene_leaf_marked_after_a_primal_replay_still_reaches_the_gradient() -> None:
+    """Cache warm-up must not decide which leaves exist for the rest of the run.
+
+    The replay-table cache was populated on the first primal call and then
+    served unconditionally, so ``materials.eps_r`` marked AFTER that call was
+    severed from the graph: with a live endpoint leaf in the same loss,
+    ``backward()`` succeeded and ``eps_r.grad`` was silently ``None`` on a cell
+    the AD capability matrix advertises as supported. The cache is now keyed on
+    a host-only liveness signature of its source tensors, so the two orders
+    produce bitwise identical gradients.
+    """
+
+    cold_eps, cold_endpoint = _material_and_endpoint_gradients(warm=False)
+    warm_eps, warm_endpoint = _material_and_endpoint_gradients(warm=True)
+
+    assert warm_eps is not None and float(warm_eps.abs().sum()) > 0.0
+    assert torch.equal(cold_eps, warm_eps), "cache warm-up changed a material gradient"
+    assert torch.equal(cold_endpoint, warm_endpoint)
+
+
+def test_a_mesh_leaf_marked_after_a_primal_replay_bypasses_the_warm_cache() -> None:
+    """The vertex table follows the same rule as the material bundle."""
+
+    compiled = smooth_wall_scene()
+    sources, sinks = endpoints()
+    _, prepared = _prepared(compiled, sources, sinks)
+    _reevaluate(compiled, prepared, sources, sinks, response="scalar_transport")
+
+    compiled.structures[0].vertices.requires_grad_(True)
+    try:
+        result = _reevaluate(
+            compiled,
+            prepared,
+            sources,
+            sinks,
+            response="scalar_transport",
+            ad_mode="vjp",
+        )
+        assert result.paths.geometry.path_length_m.requires_grad
+        assert compiled.fixed_reevaluation_tables()["vertices"].grad_fn is not None
+    finally:
+        compiled.structures[0].vertices.requires_grad_(False)
+
+
+def test_an_in_place_material_edit_after_a_primal_replay_moves_the_primal() -> None:
+    """A warm cache must not serve a stale primal either.
+
+    The cached bundle tracked neither ``requires_grad`` nor ``_version`` of its
+    sources, so an in-place edit of the compiled material values after the first
+    replay left the replayed coefficient unchanged. The signature covers the
+    mutation counter, so the edit is seen.
+    """
+
+    compiled = smooth_wall_scene()
+    sources, sinks = endpoints()
+    _, prepared = _prepared(compiled, sources, sinks)
+    before = _reevaluate(
+        compiled, prepared, sources, sinks, response="scalar_transport"
+    ).paths.transport.coefficient.clone()
+
+    with torch.no_grad():
+        compiled.materials.eps_r.add_(2.0)
+
+    after = _reevaluate(
+        compiled, prepared, sources, sinks, response="scalar_transport"
+    ).paths.transport.coefficient.clone()
+    assert float((before - after).abs().max()) > 0.0

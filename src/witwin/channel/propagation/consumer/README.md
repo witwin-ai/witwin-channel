@@ -207,6 +207,16 @@ the first backward; a differentiable-material or differentiable-mesh loop
 therefore pays the staging every call, at parity with what a discovery solve
 pays per solve. ADR-037 names and measures the uncached cost.
 
+That bypass is decided on every call, not once when the cache is populated. A
+warm cache is reused only while the host-only liveness/mutation signature of
+its source tensors is unchanged - `requires_grad`, `grad_fn`, the forward-AD
+tangent slot and `_version` of the structure vertex tensors and of the material
+and assignment stores. Marking `materials.eps_r` or a structure's vertices
+after a primal replay therefore rebuilds the tables and keeps that leaf on the
+graph; serving the warm cache there would drop the leaf silently, which the AD
+capability record forbids. The signature reads attributes only: no device
+memory, no launch, no synchronization.
+
 ## World provenance and staleness
 
 `evaluate` stamps the four `witwin.core` version domains of the compiled scene

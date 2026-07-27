@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 import torch
 from witwin.core import Scene, SceneSnapshot
 
@@ -68,7 +68,10 @@ class CompiledScene:
     _phase_screen_resources_cache: PhaseScreenRuntimeResources | None = field(
         default=None, repr=False, compare=False
     )
-    _fixed_reevaluation_tables_cache: dict | None = field(
+    # (source-state signature, tables). The signature is re-derived on every
+    # call so a scene leaf marked AFTER the cache was populated invalidates it
+    # instead of being silently severed from the graph.
+    _fixed_reevaluation_tables_cache: tuple[tuple, dict] | None = field(
         default=None, repr=False, compare=False
     )
 
@@ -126,6 +129,50 @@ class CompiledScene:
                 "reference_frequency_hz does not exactly match CompiledScene"
             )
 
+    def _fixed_reevaluation_table_sources(self) -> tuple[torch.Tensor, ...]:
+        """Every tensor the fixed-replay tables are built from.
+
+        The vertex table concatenates the live structure vertex tensors (or the
+        native table when the scene has no structures); the material bundle is
+        an index_select over the material and assignment stores. Enumerating the
+        stores by dataclass field keeps this a superset of whatever the bundle
+        builder reads, so a new store field cannot silently escape the liveness
+        signature below.
+        """
+
+        sources: list[torch.Tensor] = [self.geometry.vertices]
+        for structure in self.structures:
+            vertices = getattr(structure, "vertices", None)
+            if isinstance(vertices, torch.Tensor):
+                sources.append(vertices)
+        for store in (self.materials, self.assignments):
+            for store_field in fields(store):
+                value = getattr(store, store_field.name)
+                if isinstance(value, torch.Tensor):
+                    sources.append(value)
+        return tuple(sources)
+
+    def _fixed_reevaluation_table_state(self) -> tuple[tuple[bool, bool, bool, int], ...]:
+        """Host-only autograd/mutation signature of the replay-table sources.
+
+        Reads tensor attributes only - ``requires_grad``, the presence of a
+        ``grad_fn`` or a forward-AD tangent, and the mutation ``_version``. It
+        touches no device memory, launches nothing, and never synchronizes, so
+        it is cheap enough to re-derive on every replay.
+        """
+
+        state: list[tuple[bool, bool, bool, int]] = []
+        for source in self._fixed_reevaluation_table_sources():
+            state.append(
+                (
+                    bool(source.requires_grad),
+                    source.grad_fn is not None,
+                    torch.autograd.forward_ad.unpack_dual(source).tangent is not None,
+                    int(source._version),
+                )
+            )
+        return tuple(state)
+
     def fixed_reevaluation_tables(self) -> dict[str, object]:
         """Scene-static vertex and material tables for fixed-topology replay.
 
@@ -137,10 +184,20 @@ class CompiledScene:
         the first backward and fail the second - so differentiable-material or
         differentiable-mesh loops pay the staging exactly as before, while the
         primal per-frame replay (the Radar Doppler shape) stages once.
+
+        The bypass is decided per call, not once at population time: the cache
+        is keyed on the host-only liveness/mutation signature of the source
+        tensors, so marking ``materials.eps_r`` or a structure's vertices after
+        a primal replay has already warmed the cache rebuilds the tables and
+        keeps that leaf on the graph. Serving a stale cached table there would
+        drop the leaf's gradient silently, which the AD capability record
+        forbids.
         """
 
-        if self._fixed_reevaluation_tables_cache is not None:
-            return self._fixed_reevaluation_tables_cache
+        signature = self._fixed_reevaluation_table_state()
+        cached = self._fixed_reevaluation_tables_cache
+        if cached is not None and cached[0] == signature:
+            return cached[1]
 
         from witwin.channel.materials.encoding import face_material_field_bundle
         from witwin.channel.scene import ad_geometry
@@ -164,8 +221,9 @@ class CompiledScene:
         graph_bearing = _participates(tables["vertices"]) or any(
             _participates(value) for value in tables["material"].values()
         )
-        if not graph_bearing:
-            self._fixed_reevaluation_tables_cache = tables
+        self._fixed_reevaluation_tables_cache = (
+            None if graph_bearing else (signature, tables)
+        )
         return tables
 
     @property
