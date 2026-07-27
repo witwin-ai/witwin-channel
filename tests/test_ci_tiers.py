@@ -68,6 +68,7 @@ def test_tiers_cover_the_required_gate_families() -> None:
         "nightly.full-ad",
         "nightly.statistics-gate",
         "nightly.wheel-build-py311-cu128-win-x64",
+        "nightly.core-wheel-build",
         "nightly.wheel-smoke-py311-cu128-win-x64",
         "nightly.duplication",
     } <= set(_ids("nightly"))
@@ -77,6 +78,7 @@ def test_tiers_cover_the_required_gate_families() -> None:
         "release.cold-start",
         "release.scaling",
         "release.fresh-checkout-wheel-build",
+        "release.core-wheel-build",
         "release.fresh-checkout-wheel-smoke",
         "release.rayd-lock-build-identity",
     } <= set(_ids("release"))
@@ -100,7 +102,11 @@ def test_tiers_cover_the_required_gate_families() -> None:
         if gate.id.endswith("wheel-build")
         or "wheel-build-py311-cu128-win-x64" in gate.id
     ]
-    assert len(wheel_builds) == 2
+    # Four, not two: each tier that smokes a Channel wheel also has to produce
+    # the Core wheel that goes into the same isolated target. `wheel_smoke.py`
+    # requires --core-wheel, so before those two gates existed both smokes
+    # exited in argparse and neither tier could reach the gate it names.
+    assert len(wheel_builds) == 4
     assert all("--no-isolation" in gate.args for gate in wheel_builds)
     wheel_smokes = {
         gate.id: gate.args
@@ -111,16 +117,30 @@ def test_tiers_cover_the_required_gate_families() -> None:
         "nightly.wheel-smoke-py311-cu128-win-x64": (
             "ci/wheel_smoke.py",
             "artifacts/nightly/wheel",
+            "--core-wheel",
+            "artifacts/nightly/core-wheel",
             "--output",
             "artifacts/nightly/wheel-smoke-pe-audit.v1.json",
         ),
         "release.fresh-checkout-wheel-smoke": (
             "ci/wheel_smoke.py",
             "artifacts/release/wheel",
+            "--core-wheel",
+            "artifacts/release/core-wheel",
             "--output",
             "artifacts/release/wheel-smoke-pe-audit.v1.json",
         ),
     }
+    # Every wheel smoke must receive the Core wheel produced by the gate that
+    # runs immediately before it, in the same tier. Pinning the ORDER is the
+    # part that matters: a smoke scheduled before its producer would fail on a
+    # missing directory instead of on the artifact it is supposed to audit.
+    ordered = _ids("release")
+    for smoke_id, core_gate_id in (
+        ("nightly.wheel-smoke-py311-cu128-win-x64", "nightly.core-wheel-build"),
+        ("release.fresh-checkout-wheel-smoke", "release.core-wheel-build"),
+    ):
+        assert ordered.index(core_gate_id) < ordered.index(smoke_id)
 
 
 def test_all_python_entry_points_in_the_registry_exist() -> None:

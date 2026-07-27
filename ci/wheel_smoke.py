@@ -238,18 +238,20 @@ def _source_member_payload(member: str) -> bytes:
 
 
 @lru_cache(maxsize=1)
-def _repository_consumer_contract_version() -> int:
+def repository_consumer_contract_version() -> int:
     """Read ``CONTRACT_VERSION`` from the checked-in consumer contract module.
 
     Parsed rather than imported: the smoke must not need an importable, natively
     loadable ``witwin.channel`` in the parent process, and parsing keeps the
     expected value tied to the source revision the wheel is built from.
 
-    Any other gate that needs the expected contract version should CALL THIS
-    rather than restate the integer. That is the whole point: the literal 5 this
-    replaced went stale silently and failed every release wheel smoke, and the
-    Linux workflow smoke carries an independently stale copy of the same
-    constant.
+    Public because it has a second caller by design. Any other gate that needs
+    the expected contract version CALLS THIS rather than restating the integer -
+    the Linux wheel-metadata smoke in ``publish-witwin-channel.yml`` now does.
+    That is the whole point: the literal 5 this replaced went stale silently and
+    failed every release wheel smoke, while the workflow carried an
+    independently stale 2 for the same constant. Two copies of one integer is
+    how both of them went wrong without anyone noticing.
     """
     payload = _source_member_payload(_CONSUMER_CONTRACT_MEMBER)
     try:
@@ -760,7 +762,7 @@ def _smoke_code(
 ) -> str:
     # Derived here, not passed in, so the expected contract version has exactly
     # one home and no caller can supply a second opinion about it.
-    expected_contract_version = _repository_consumer_contract_version()
+    expected_contract_version = repository_consumer_contract_version()
     return f"""
 import hashlib
 import importlib.metadata

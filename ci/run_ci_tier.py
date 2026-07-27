@@ -166,11 +166,26 @@ NIGHTLY_GATES = (
             "artifacts/nightly/wheel",
         ),
     ),
+    # The smoke installs Core and Channel into ONE isolated target with
+    # --no-deps, so it needs the Core wheel as an input and refuses to run
+    # without it. Until this gate existed the smoke below died in argparse and
+    # the tier reported the failure of a gate it had never actually reached.
+    Gate(
+        "nightly.core-wheel-build",
+        (
+            "ci/build_core_wheel.py",
+            "--outdir",
+            "artifacts/nightly/core-wheel",
+            "--no-isolation",
+        ),
+    ),
     Gate(
         "nightly.wheel-smoke-py311-cu128-win-x64",
         (
             "ci/wheel_smoke.py",
             "artifacts/nightly/wheel",
+            "--core-wheel",
+            "artifacts/nightly/core-wheel",
             "--output",
             "artifacts/nightly/wheel-smoke-pe-audit.v1.json",
         ),
@@ -254,11 +269,24 @@ RELEASE_GATES = (
             "artifacts/release/wheel",
         ),
     ),
+    # Same defect as the nightly pair, and it would have surfaced later and
+    # cost more: a release tier that cannot reach its own wheel smoke.
+    Gate(
+        "release.core-wheel-build",
+        (
+            "ci/build_core_wheel.py",
+            "--outdir",
+            "artifacts/release/core-wheel",
+            "--no-isolation",
+        ),
+    ),
     Gate(
         "release.fresh-checkout-wheel-smoke",
         (
             "ci/wheel_smoke.py",
             "artifacts/release/wheel",
+            "--core-wheel",
+            "artifacts/release/core-wheel",
             "--output",
             "artifacts/release/wheel-smoke-pe-audit.v1.json",
         ),

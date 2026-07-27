@@ -543,6 +543,17 @@ jobs:
           import zipfile
           from pathlib import Path
 
+          # The propagation consumer contract version has exactly one home: the
+          # checked-in module. This smoke used to restate it as a literal, and
+          # the literal went stale at 2 while the source moved to 6 - so the
+          # only gate that reads the INSTALLED value was comparing it against a
+          # number nothing else believed. Read it from the same helper the wheel
+          # smoke uses instead of growing a third copy.
+          sys.path.insert(0, str(Path("channel/ci").resolve()))
+          import wheel_smoke
+
+          expected_contract_version = wheel_smoke.repository_consumer_contract_version()
+
           wheels = list(Path("channel/dist").glob("*.whl"))
           assert len(wheels) == 1, wheels
           core_wheels = list(Path("core/dist").glob("*.whl"))
@@ -591,7 +602,10 @@ jobs:
           assert Path(native.__file__).resolve().is_relative_to(target)
           assert Path(core.__file__).resolve().is_relative_to(target)
           assert channel.build_info()["backend"] == "channel"
-          assert consumer.CONTRACT_VERSION == 2
+          assert consumer.CONTRACT_VERSION == {expected_contract_version}, (
+              consumer.CONTRACT_VERSION,
+              {expected_contract_version},
+          )
           required = {{
               "enumerated_canonical_compact",
               "enumerated_exact_pair_metadata",
