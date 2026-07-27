@@ -8,6 +8,7 @@ import torch
 
 from witwin.channel.runtime import torch_compat
 from witwin.channel.runtime.autograd_contracts import (
+    _ad_first_order_only,
     _ad_geometry_live,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
@@ -76,6 +77,7 @@ class _FixedLoSGatherFunction(torch.autograd.Function):
         ctx.mark_non_differentiable(*output[5:])
 
     @staticmethod
+    @_ad_first_order_only
     @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         endpoint_grads = grad_outputs[:5]

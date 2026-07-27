@@ -675,6 +675,7 @@ pybind11::dict channel_field_free_space_backward(
     pybind11::object grad_path_gain,
     pybind11::object grad_path_length,
     pybind11::object grad_delay,
+    pybind11::object grad_direction,
     bool need_grad_frequency,
     bool need_grad_geometry);
 pybind11::dict channel_field_free_space_jvp(
@@ -707,6 +708,7 @@ pybind11::dict channel_field_reflection_sequence_backward(
     pybind11::object grad_path_gain,
     pybind11::object grad_path_length,
     pybind11::object grad_delay,
+    pybind11::object grad_direction,
     bool need_grad_eps_r,
     bool need_grad_sigma_e,
     bool need_grad_gain,
@@ -1012,19 +1014,23 @@ void register_fields(pybind11::module_ &module) {
     module.def(
         "field_free_space_backward",
         &channel_field_free_space_backward,
-        "Fixed-topology VJP of the free-space field (frequency and endpoints).");
+        "Fixed-topology VJP of the free-space field (frequency, endpoints, and "
+        "the arrival-direction seam).");
     module.def(
         "field_free_space_jvp",
         &channel_field_free_space_jvp,
-        "Fixed-topology JVP of the free-space field (frequency and endpoints).");
+        "Fixed-topology JVP of the free-space field (frequency, endpoints, and "
+        "the arrival-direction seam).");
     module.def(
         "field_reflection_sequence_backward",
         &channel_field_reflection_sequence_backward,
-        "Fixed-topology VJP of the reflection sequence (materials, frequency, geometry).");
+        "Fixed-topology VJP of the reflection sequence (materials, frequency, "
+        "geometry, and the arrival-direction seam).");
     module.def(
         "field_reflection_sequence_jvp",
         &channel_field_reflection_sequence_jvp,
-        "Fixed-topology JVP of the reflection sequence (materials, frequency, geometry).");
+        "Fixed-topology JVP of the reflection sequence (materials, frequency, "
+        "geometry, and the arrival-direction seam).");
     module.def(
         "field_transmission_sequence_backward",
         &channel_field_transmission_sequence_backward,

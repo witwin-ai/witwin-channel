@@ -245,7 +245,7 @@
           "name": "PropagationCapabilities",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.contracts.PropagationCapabilities",
-          "contract_sha256": "713307f77f60d7e6661014c905c3d0e7cab279102673813ed95e0fca73fc7551"
+          "contract_sha256": "fb69984448e7798e6524a108f2af3dee4f66d32d0e1bb434423721fa0478de28"
         },
         {
           "name": "PropagationComponent",
@@ -263,7 +263,7 @@
           "name": "PropagationDiagnostics",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.contracts.PropagationDiagnostics",
-          "contract_sha256": "90bd9010d4cb1313da430f86cd1bd0d270b3f2efd41ba7cba25deb9e52d29055"
+          "contract_sha256": "9c698e4248d8e40a78885f4f533e3b341a4fcc6e308040b65473b3297c00b446"
         },
         {
           "name": "PropagationEvaluation",

@@ -17,6 +17,7 @@ from witwin.channel.runtime.capacity import (
     require_capacity_failure_state,
 )
 from witwin.channel.runtime.autograd_contracts import (
+    _ad_first_order_only,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
 )
@@ -197,6 +198,7 @@ class _DeterministicPathTableCapacityPackFunction(torch.autograd.Function):
         ctx.mark_non_differentiable(*output[: len(_NONDIFFERENTIABLE_OUTPUT_FIELDS)])
 
     @staticmethod
+    @_ad_first_order_only
     @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 27

@@ -81,6 +81,13 @@ class GeometryLiveness:
 
     los: bool
     reflection: bool
+    # ADR-043: whether the published arrival direction carries a derivative.
+    # This is a whole-result decision taken from the request's component set,
+    # never a per-row one: a batch that carries a component whose direction
+    # seam Channel does not own publishes a fully detached field_direction for
+    # every row rather than a live derivative for some rows and a silent zero
+    # for the rest.
+    direction_components: bool = True
 
     @classmethod
     def of(
@@ -88,14 +95,29 @@ class GeometryLiveness:
         source: torch.Tensor,
         target: torch.Tensor,
         vertices: object,
+        *,
+        direction_components: bool = True,
     ) -> GeometryLiveness:
         endpoints = _ad_geometry_live(source, target)
         return cls(
-            los=endpoints, reflection=endpoints or _ad_geometry_live(vertices)
+            los=endpoints,
+            reflection=endpoints or _ad_geometry_live(vertices),
+            direction_components=direction_components,
         )
 
     def at_depth(self, depth: int) -> bool:
         return self.reflection if depth else self.los
+
+    def direction_at_depth(self, depth: int) -> bool:
+        """Direction liveness for one bucket, under both decisions.
+
+        A direction derivative is a geometry derivative, so it can only be live
+        where the geometry is. The component half is host-known and identical
+        for every bucket and every column, which is what makes the whole-result
+        rule hold without a second device observation.
+        """
+
+        return self.at_depth(depth) and self.direction_components
 
     def require(self, depth: int, *values: object) -> None:
         """Fail loudly if one column's inputs disagree with the decision."""
@@ -285,6 +307,7 @@ def _field_op(
     frequency: float | torch.Tensor,
     frequency_value: float,
     geometry_live: GeometryLiveness | None,
+    ledger: object | None = None,
 ) -> Callable[[torch.Tensor, torch.Tensor], dict[str, torch.Tensor]]:
     from witwin.channel.propagation.fields.kernels import (
         autograd as field_autograd,
@@ -326,8 +349,16 @@ def _field_op(
                 if inputs.depth == 0
                 else field_autograd.field_reflection_sequence_ad
             )
+            if ledger is not None:
+                ledger.add(*arguments)
             return operator(
-                *arguments, frequency=frequency, frequency_value=frequency_value
+                *arguments,
+                frequency=frequency,
+                frequency_value=frequency_value,
+                direction_live=(
+                    geometry_live is not None
+                    and geometry_live.direction_at_depth(inputs.depth)
+                ),
             )
         operator = (
             field_functional.field_free_space
@@ -399,6 +430,7 @@ def _bucket_values(
     source_reference: torch.Tensor | None,
     sink_reference: torch.Tensor | None,
     frequency_value: float,
+    ledger: object | None = None,
 ) -> dict[str, torch.Tensor]:
     if response != "polarimetric_transport":
         values = run(inputs.tx_polarization, inputs.rx_polarization)
@@ -415,6 +447,8 @@ def _bucket_values(
         return values
     from ._amplitude import excited_field
 
+    if ledger is not None and ad_mode != "none":
+        ledger.add(values["field_vector"], inputs.tx_power)
     return {
         **values,
         "path_field_vector": excited_field(
@@ -514,6 +548,7 @@ def evaluate_prepared(
     sink_reference_basis: torch.Tensor | None,
     publish_row_validity: bool,
     geometry_live: GeometryLiveness | None = None,
+    ledger: object | None = None,
 ) -> FixedRowOutputs:
     """Replay every host-known bucket of a prepared frozen topology.
 
@@ -545,6 +580,7 @@ def evaluate_prepared(
                 frequency=frequency,
                 frequency_value=frequency_value,
                 geometry_live=geometry_live,
+                ledger=ledger,
             ),
             response=response,
             ad_mode=ad_mode,
@@ -559,6 +595,7 @@ def evaluate_prepared(
                 else select_rows(sink_reference_basis, bucket.rows)
             ),
             frequency_value=frequency_value,
+            ledger=ledger,
         )
         _publish_bucket(outputs, values, inputs, bucket, width)
     return FixedRowOutputs(

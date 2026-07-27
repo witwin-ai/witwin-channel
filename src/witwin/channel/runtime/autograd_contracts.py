@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import functools
+
 import torch
 
 from witwin.channel.runtime import torch_compat
@@ -261,7 +263,38 @@ def _ad_geometry_tangent(
     return value
 
 
+def _ad_first_order_only(backward):
+    """Reject a second-order request before the backward companion launches.
+
+    ADR-043: Channel publishes first derivatives only. ``create_graph=True`` is
+    precisely what leaves grad mode enabled while a backward runs, so this is an
+    exact detector that fires before any native launch, names the owner, and
+    produces no partial second-order result. Without it the first gradient comes
+    back silently detached and the failure surfaces one step later as a generic
+    Torch message that names Torch rather than the owner that cannot answer.
+
+    ``torch.autograd.function.once_differentiable`` stays underneath as defence
+    in depth. It cannot replace this check: it runs the backward body inside
+    ``torch.no_grad()``, so the grad-mode signal is already gone by the time the
+    body executes, and it only fails when the detached gradient is later used.
+    """
+
+    @functools.wraps(backward)
+    def guarded(ctx, *grad_outputs):
+        if torch.is_grad_enabled():
+            owner = f"{backward.__module__}.{backward.__qualname__}"
+            raise NotImplementedError(
+                f"{owner} is first-order only; Channel does not support "
+                "higher-order AD (create_graph=True, grad-of-grad). "
+                "capabilities().supports_higher_order_ad is False"
+            )
+        return backward(ctx, *grad_outputs)
+
+    return guarded
+
+
 __all__ = [
+    "_ad_first_order_only",
     "_ad_active_ctx",
     "_ad_check_active",
     "_ad_check_optional_grad",

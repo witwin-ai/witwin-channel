@@ -9,6 +9,7 @@ import torch
 from witwin.channel.propagation.models.capacity import CapacityEvaluatedPaths
 from witwin.channel.runtime import torch_compat
 from witwin.channel.runtime.autograd_contracts import (
+    _ad_first_order_only,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
 )
@@ -96,6 +97,7 @@ class _PathResultCapacityPackFunction(torch.autograd.Function):
         )
 
     @staticmethod
+    @_ad_first_order_only
     @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         if not any(ctx.needs_input_grad[12:20]):

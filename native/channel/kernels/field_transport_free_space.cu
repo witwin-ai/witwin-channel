@@ -65,6 +65,7 @@ __global__ void free_space_backward_kernel(
     const T* grad_path_gain,
     const T* grad_path_length,
     const T* grad_delay,
+    const T* grad_direction,
     T* grad_frequency,
     T* grad_source,
     T* grad_target) {
@@ -131,7 +132,13 @@ __global__ void free_space_backward_kernel(
             g_distance += grad_delay[index] / T(ad::kSpeedOfLight);
         const ad::Vec3<T> offset =
             ad::v3_sub(ad::v3_load(target, index), ad::v3_load(source, index));
-        ad::Vec3<T> g_direction = {T(0), T(0), T(0)};
+        // The published arrival direction is exactly eval.direction, so an
+        // external cotangent on it seeds the same accumulator the two
+        // transverse projections below feed. Seeding here rather than after
+        // them keeps one adjoint chain: direction -> offset -> endpoints.
+        ad::Vec3<T> g_direction = grad_direction != nullptr
+                                      ? ad::v3_load(grad_direction, index)
+                                      : ad::Vec3<T>{T(0), T(0), T(0)};
         ad::adj_v3_transverse_project(
             eval.direction, ad::v3_load(tx_polarization, index), g_tx_axis,
             g_direction);
@@ -174,7 +181,8 @@ __global__ void free_space_jvp_kernel(
     c10::complex<T>* t_path_field,
     T* t_path_gain,
     T* t_path_length,
-    T* t_delay) {
+    T* t_delay,
+    T* t_direction) {
     for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count;
          index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
@@ -225,6 +233,11 @@ __global__ void free_space_jvp_kernel(
                     path_field_value.imag() * d_path_field.imag());
         t_path_length[index] = d_distance;
         t_delay[index] = d_distance / T(ad::kSpeedOfLight);
+        // direction.d is the dual already built above for the two transverse
+        // projections; publishing it is three stores and no extra math.
+        t_direction[base] = direction.d.x;
+        t_direction[base + 1] = direction.d.y;
+        t_direction[base + 2] = direction.d.z;
     }
 }
 
@@ -320,6 +333,7 @@ pybind11::dict channel_field_free_space_backward(
     pybind11::object grad_path_gain,
     pybind11::object grad_path_length,
     pybind11::object grad_delay,
+    pybind11::object grad_direction,
     bool need_grad_frequency,
     bool need_grad_geometry) {
     const c10::ScalarType real_dtype = source.scalar_type();
@@ -338,6 +352,7 @@ pybind11::dict channel_field_free_space_backward(
     at::Tensor gpg_storage;
     at::Tensor gpl_storage;
     at::Tensor gd_storage;
+    at::Tensor gdir_storage;
     const at::Tensor* gfv = optional_grad(
         std::move(grad_field_vector), gfv_storage, "grad_field_vector",
         complex_dtype, {count, 3}, source);
@@ -356,6 +371,9 @@ pybind11::dict channel_field_free_space_backward(
     const at::Tensor* gd = optional_grad(
         std::move(grad_delay), gd_storage, "grad_delay",
         real_dtype, {count}, source);
+    const at::Tensor* gdir = optional_grad(
+        std::move(grad_direction), gdir_storage, "grad_direction",
+        real_dtype, {count, 3}, source);
 
     pybind11::dict out;
     if (!need_grad_frequency && !need_grad_geometry) {
@@ -374,7 +392,8 @@ pybind11::dict channel_field_free_space_backward(
                                  ? zero_filled({count, 3}, source.options())
                                  : at::Tensor();
     const bool any_grad = gfv != nullptr || gc != nullptr || gpf != nullptr ||
-                          gpg != nullptr || gpl != nullptr || gd != nullptr;
+                          gpg != nullptr || gpl != nullptr || gd != nullptr ||
+                          gdir != nullptr;
     if (count > 0 && any_grad) {
         cudaStream_t stream =
             at::cuda::getCurrentCUDAStream(source.get_device()).stream();
@@ -394,6 +413,7 @@ pybind11::dict channel_field_free_space_backward(
                     grad_ptr<float>(gpg),
                     grad_ptr<float>(gpl),
                     grad_ptr<float>(gd),
+                    grad_ptr<float>(gdir),
                     need_grad_frequency ? grad_frequency.data_ptr<float>()
                                         : nullptr,
                     need_grad_geometry ? grad_source.data_ptr<float>() : nullptr,
@@ -414,6 +434,7 @@ pybind11::dict channel_field_free_space_backward(
                     grad_ptr<double>(gpg),
                     grad_ptr<double>(gpl),
                     grad_ptr<double>(gd),
+                    grad_ptr<double>(gdir),
                     need_grad_frequency ? grad_frequency.data_ptr<double>()
                                         : nullptr,
                     need_grad_geometry ? grad_source.data_ptr<double>() : nullptr,
@@ -469,6 +490,7 @@ pybind11::dict channel_field_free_space_jvp(
     auto t_path_gain = at::empty({count}, source.options());
     auto t_path_length = at::empty({count}, source.options());
     auto t_delay = at::empty({count}, source.options());
+    auto t_direction = at::empty({count, 3}, source.options());
     if (count > 0) {
         cudaStream_t stream =
             at::cuda::getCurrentCUDAStream(source.get_device()).stream();
@@ -490,7 +512,8 @@ pybind11::dict channel_field_free_space_jvp(
                     t_path_field.data_ptr<c10::complex<float>>(),
                     t_path_gain.data_ptr<float>(),
                     t_path_length.data_ptr<float>(),
-                    t_delay.data_ptr<float>());
+                    t_delay.data_ptr<float>(),
+                    t_direction.data_ptr<float>());
         } else {
             free_space_jvp_kernel<double>
                 <<<launch_blocks(count), kBlockSize, 0, stream>>>(
@@ -509,7 +532,8 @@ pybind11::dict channel_field_free_space_jvp(
                     t_path_field.data_ptr<c10::complex<double>>(),
                     t_path_gain.data_ptr<double>(),
                     t_path_length.data_ptr<double>(),
-                    t_delay.data_ptr<double>());
+                    t_delay.data_ptr<double>(),
+                    t_direction.data_ptr<double>());
         }
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
@@ -520,5 +544,6 @@ pybind11::dict channel_field_free_space_jvp(
     out["path_gain"] = t_path_gain;
     out["path_length_m"] = t_path_length;
     out["delay_s"] = t_delay;
+    out["direction"] = t_direction;
     return out;
 }

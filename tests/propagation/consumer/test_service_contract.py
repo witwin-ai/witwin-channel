@@ -21,8 +21,13 @@ def _compiled(frequency: float = 77.0e9):
         SimpleNamespace(metadata={}, endpoints=("compiled-endpoint-must-not-run",)),
     )
     object.__setattr__(compiled, "structures", ())
+    # mu_r / layer_mu_r are named by capabilities().primal_only_ad_inputs, so
+    # the stand-in has to declare them even though this scene has no material
+    # store; None is "this scene carries no such tensor", not "unset".
     object.__setattr__(
-        compiled, "materials", SimpleNamespace(frequency_hz=float(frequency))
+        compiled,
+        "materials",
+        SimpleNamespace(frequency_hz=float(frequency), mu_r=None, layer_mu_r=None),
     )
     object.__setattr__(compiled, "reference_frequency_hz", frequency)
     object.__setattr__(compiled, "reference_frequency_revision", None)
@@ -173,6 +178,8 @@ def test_evaluate_consumes_request_batch_and_aliases_finalized_rows(
                 launch_count=3,
                 candidate_count=2,
                 visibility_rejection_count=0,
+                ad_companion_launches=0,
+                ad_tape_bytes=0,
             ),
             capacity_transaction=None,
         )

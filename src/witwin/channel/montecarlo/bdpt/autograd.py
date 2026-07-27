@@ -26,6 +26,7 @@ import torch
 
 from witwin.channel.runtime import torch_compat
 from witwin.channel.runtime.autograd_contracts import (
+    _ad_first_order_only,
     _ad_frequency_grad,
     _ad_frequency_tangent,
     _ad_frequency_value,
@@ -213,6 +214,7 @@ class _BdptReflectedSubpathAdFunction(torch.autograd.Function):
         _mark_subpath_structural(ctx, output)
 
     @staticmethod
+    @_ad_first_order_only
     @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 14
@@ -502,6 +504,7 @@ class _BdptTransmittedSubpathAdFunction(torch.autograd.Function):
         _mark_subpath_structural(ctx, output)
 
     @staticmethod
+    @_ad_first_order_only
     @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 15
@@ -829,6 +832,7 @@ class _BdptEndpointConnectionAdFunction(torch.autograd.Function):
         return light, sensor
 
     @staticmethod
+    @_ad_first_order_only
     @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 14

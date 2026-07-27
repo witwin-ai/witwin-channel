@@ -6,7 +6,7 @@ waveform, target, RCS, IQ, ADC, detection, or processing policy.
 
 ## Version and compatibility
 
-- `CONTRACT_VERSION == 5`.
+- `CONTRACT_VERSION == 6`.
 - The module's `__all__` is the complete stable public surface. Consumer names
   are not duplicated at `witwin.channel`.
 - A breaking schema or semantic change increments the version and atomically
@@ -169,6 +169,31 @@ passed into the shared native field companions as an explicit trailing input
 `requires_grad`-plus-dual convention keeps working unchanged. Slot replication
 preserves the tangent because it is a gather on the dual tensor itself. The raw
 zero-interaction route keeps its version-1 acceptance rules.
+
+The AD capability matrix is published rather than inferred (ADR-043).
+`component_ad_modes` narrows `diffraction` to `{"none"}`, so an AD request for
+it is refused at the preflight instead of advertising a column the consumer
+cannot produce a row for. `component_material_leaves` names the compiled
+material tensors each component reads, so a leaf outside its component's tuple
+is a discoverable exact zero rather than an indistinguishable silence.
+`differentiable_geometry_outputs` names, per route, which of `path_length_m`,
+`delay_s`, `interaction_positions_m`, and `field_direction` carry a derivative:
+discovery publishes the first two and declares the other two
+non-differentiable, because discovery re-solves the topology and Channel
+publishes no subgradient at a selection boundary; the fixed-topology route
+publishes all four. `direction_differentiable_components` is
+`{"los", "reflection"}` and `field_direction` liveness is one decision for the
+whole result, taken in the same wrapper-level place ADR-038 decides geometry
+liveness, so a batch is never live for some rows and silently dead for others.
+`primal_only_ad_inputs` names every input refused before any native work on
+every response and every route. `supports_higher_order_ad` is `False`:
+`create_graph=True` raises from inside the backward it asked to differentiate,
+naming the owner, and `ad_mode="vjp"` with a forward dual is refused at the
+preflight. `ad_accounting` is `True`, and
+`PropagationDiagnostics.ad_companion_launches` / `.ad_tape_bytes` publish the
+AD ledger on both routes; forward mode reports zero tape by contract.
+The full cell-by-cell statement is
+`docs/dev/propagation-ad-capability-matrix.md`.
 
 Row validity applies to
 `capabilities().fixed_topology_row_validity_components`, today

@@ -6,6 +6,7 @@ import torch
 
 from witwin.channel.runtime import torch_compat
 from witwin.channel.runtime.autograd_contracts import (
+    _ad_first_order_only,
     _ad_frequency_grad,
     _ad_frequency_tangent,
     _ad_frequency_value,
@@ -92,6 +93,7 @@ class _FieldRoughReflectionScaleAdFunction(torch.autograd.Function):
         ctx.save_for_forward(*primals)
 
     @staticmethod
+    @_ad_first_order_only
     @torch.autograd.function.once_differentiable
     def backward(
         ctx,

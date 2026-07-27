@@ -73,6 +73,29 @@ All notable changes to `witwin-channel` are documented in this file.
   refusals before any native work; `polarimetric_transport` and a tensor grid
   are refused structurally. No native code, no ABI symbol, no new production
   Torch physics. `CONTRACT_VERSION` moves from 4 to 5.
+- **Breaking (ADR-043).** The propagation-consumer AD capability matrix is
+  published rather than inferred, and `CONTRACT_VERSION` moves from 5 to 6.
+  `PropagationCapabilities` gains `component_material_leaves`,
+  `differentiable_geometry_outputs`, `direction_differentiable_components`,
+  `primal_only_ad_inputs`, `supports_higher_order_ad`, and `ad_accounting`, and
+  `component_ad_modes` narrows `diffraction` to `{"none"}` because the consumer
+  cannot produce a diffraction row at any AD mode. `PropagationDiagnostics`
+  gains `ad_companion_launches` and `ad_tape_bytes`, published on both consumer
+  routes with the reverse-only tape gate the solver metadata layer already
+  applied.
+  `PropagationGeometry.field_direction` now carries a real derivative on the
+  fixed-topology route for `los` and `reflection` rows, in both AD modes, from
+  new optional `grad_direction` / `direction` seams on the two Channel-owned
+  native field transports; liveness is one decision for the whole result. A
+  caller that relied on it being detached now receives a graph-bearing tensor,
+  with bit-for-bit unchanged primal values.
+  Every input named by `primal_only_ad_inputs` is now refused before any native
+  work on every response and every route, instead of raising from inside
+  `backward()` after a complete result had been published. Second-order AD is
+  refused everywhere: `create_graph=True` raises from inside the backward it
+  asked to differentiate, naming the owner, and `ad_mode="vjp"` with a forward
+  dual is refused at the preflight. No published primal number changes; no new
+  launch, transfer, or synchronization on any route.
 
 ## [0.4.0] - 2026-07-23
 

@@ -13,6 +13,7 @@ from witwin.channel.propagation.models.transmission import (
 )
 from witwin.channel.runtime import torch_compat
 from witwin.channel.runtime.autograd_contracts import (
+    _ad_first_order_only,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
 )
@@ -81,6 +82,7 @@ class _EnumeratedTransmissionTopologyPackFunction(torch.autograd.Function):
         )
 
     @staticmethod
+    @_ad_first_order_only
     @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 13

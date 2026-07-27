@@ -786,7 +786,7 @@ def test_the_capability_record_publishes_the_wideband_contract() -> None:
     record = capabilities()
     convention = PropagationConvention()
 
-    assert record.contract_version == 5
+    assert record.contract_version == 6
     assert record.supports_wideband_offsets is True
     assert record.wideband_responses == frozenset(
         {"scalar_transport", "complex3_transport"}

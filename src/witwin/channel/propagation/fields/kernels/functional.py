@@ -529,6 +529,13 @@ _FIELD_AD_TANGENT_FIELDS = (
 )
 
 
+# The two Channel-owned transports additionally publish the arrival-direction
+# tangent (ADR-043). Transmission and the wedge/coupled families forward to
+# rayd::torch, which owns their direction seam and does not publish it, so the
+# shared tuple above stays exactly what those families return.
+_FIELD_AD_DIRECTION_TANGENT_FIELDS = (*_FIELD_AD_TANGENT_FIELDS, "direction")
+
+
 def field_free_space_backward(
     source: torch.Tensor,
     target: torch.Tensor,
@@ -543,6 +550,7 @@ def field_free_space_backward(
     grad_path_gain: torch.Tensor | None = None,
     grad_path_length: torch.Tensor | None = None,
     grad_delay: torch.Tensor | None = None,
+    grad_direction: torch.Tensor | None = None,
     need_grad_frequency: bool = True,
     need_grad_geometry: bool = False,
 ) -> dict[str, torch.Tensor | None]:
@@ -559,6 +567,7 @@ def field_free_space_backward(
         grad_path_gain,
         grad_path_length,
         grad_delay,
+        grad_direction,
         bool(need_grad_frequency),
         bool(need_grad_geometry),
     )
@@ -591,7 +600,9 @@ def field_free_space_jvp(
         tangent_source,
         tangent_target,
     )
-    if not isinstance(out, dict) or set(out) != set(_FIELD_AD_TANGENT_FIELDS):
+    if not isinstance(out, dict) or set(out) != set(
+        _FIELD_AD_DIRECTION_TANGENT_FIELDS
+    ):
         raise TypeError("_channel.field_free_space_jvp returned invalid fields")
     return out
 
@@ -617,6 +628,7 @@ def field_reflection_sequence_backward(
     grad_path_gain: torch.Tensor | None = None,
     grad_path_length: torch.Tensor | None = None,
     grad_delay: torch.Tensor | None = None,
+    grad_direction: torch.Tensor | None = None,
     need_grad_eps_r: bool = True,
     need_grad_sigma_e: bool = True,
     need_grad_gain: bool = False,
@@ -644,6 +656,7 @@ def field_reflection_sequence_backward(
         grad_path_gain,
         grad_path_length,
         grad_delay,
+        grad_direction,
         bool(need_grad_eps_r),
         bool(need_grad_sigma_e),
         bool(need_grad_gain),
@@ -718,7 +731,9 @@ def field_reflection_sequence_jvp(
         tangent_interaction_positions,
         tangent_interaction_normals,
     )
-    if not isinstance(out, dict) or set(out) != set(_FIELD_AD_TANGENT_FIELDS):
+    if not isinstance(out, dict) or set(out) != set(
+        _FIELD_AD_DIRECTION_TANGENT_FIELDS
+    ):
         raise TypeError(
             "_channel.field_reflection_sequence_jvp returned invalid fields"
         )

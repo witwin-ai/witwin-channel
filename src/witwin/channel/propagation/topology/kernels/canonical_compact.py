@@ -17,6 +17,7 @@ from witwin.channel.propagation.topology.kernels.compact_autograd import (
 )
 from witwin.channel.runtime import torch_compat
 from witwin.channel.runtime.autograd_contracts import (
+    _ad_first_order_only,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
 )
@@ -132,6 +133,7 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
         ctx.mark_non_differentiable(*output[:_DISCRETE_OUTPUT_COUNT])
 
     @staticmethod
+    @_ad_first_order_only
     @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         input_grads: list[torch.Tensor | None] = [None] * 28
