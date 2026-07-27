@@ -194,7 +194,21 @@ Organize code by RF domain capability, with a single owner for each operation:
   variant. The wideband surface and the frozen-topology preparation helpers live
   in `_wideband.py` and `_prepared.py` beside `contracts.py`, which stays the
   single place a reader looks up a consumer type; that split is what keeps the
-  vocabulary module inside its maintenance budget without an exemption.
+  vocabulary module inside its maintenance budget without an exemption. Under
+  ADR-043 the AD capability matrix is published, not inferred:
+  `component_ad_modes` narrows `diffraction` to the primal,
+  `component_material_leaves` and `differentiable_geometry_outputs` name the
+  per-component and per-route derivative surface,
+  `direction_differentiable_components` is `{los, reflection}` and
+  `field_direction` liveness is ONE decision for the whole result rather than a
+  per-row one, `primal_only_ad_inputs` is refused before any native work on
+  every response and every route, `supports_higher_order_ad` is False and every
+  second-order composition fails before a partial second-order result, and
+  `PropagationDiagnostics` publishes the AD ledger with the reverse-only tape
+  gate. RayD owns the transmission, wedge, and coupled direction seam; those
+  cells stay declared non-differentiable with a named deferral and must never be
+  reconstructed in Torch. The consumer diffraction primal defect is a recorded
+  gap with a pinned regression test, not something to fix as a side effect.
 - `path`, `deterministic`, `montecarlo.basic`, and `montecarlo.bdpt`: thin
   solver-owned configuration, orchestration, accumulation, result, and metadata
   layers. Solvers must never import another solver.
@@ -448,6 +462,7 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-040-world-provenance-and-fixed-topology-staleness.md`
 - `docs/dev/standards/adr-041-slot-batched-reevaluation-and-time-varying-cir.md`
 - `docs/dev/standards/adr-042-wideband-frequency-offsets.md`
+- `docs/dev/standards/adr-043-propagation-ad-capability-matrix.md`
 
 ADR-029 is Superseded, ADR-030 is Dormant, and ADR-031 is Rejected. They are
 historical records rather than implementation or release requirements; ADR-032

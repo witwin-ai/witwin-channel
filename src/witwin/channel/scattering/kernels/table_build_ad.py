@@ -24,6 +24,7 @@ import torch
 from witwin.channel.runtime import torch_compat
 from witwin.channel.runtime.symbols import required_symbol as _required_native_op
 from witwin.channel.runtime.autograd_contracts import (
+    _ad_first_order_only,
     _ad_frequency_grad,
     _ad_frequency_value,
     _ad_native_tangent_or_none,
@@ -352,7 +353,7 @@ class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
         ctx.save_for_forward(*saved)
 
     @staticmethod
-    @torch.autograd.function.once_differentiable
+    @_ad_first_order_only
     def backward(ctx, grad_f_te, grad_f_tm):
         none_grads = (None,) * 21
         _ad_reject_fixed_inputs(

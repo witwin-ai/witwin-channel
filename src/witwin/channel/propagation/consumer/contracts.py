@@ -32,7 +32,7 @@ from ._wideband import (
 )
 
 
-CONTRACT_VERSION = 5
+CONTRACT_VERSION = 6
 
 
 PropagationComponent: TypeAlias = Literal[
@@ -71,6 +71,51 @@ WORLD_VERSION_DOMAINS: tuple[str, ...] = (
 _FIXED_TOPOLOGY_COMPONENT_IDS: tuple[tuple[str, int], ...] = (
     ("los", 0),
     ("reflection", 1),
+)
+
+# Which compiled-material tensors each component actually reads (ADR-043).
+# Marking a tensor a component does not read is not an error - the zero it
+# produces is the true derivative - but that zero was previously
+# undiscoverable, so the split is published instead of inferred from a silent
+# result.
+_COMPONENT_MATERIAL_LEAVES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("diffraction", ("eps_r", "sigma_e", "thickness_m", "gain")),
+    ("los", ()),
+    ("reflection", ("eps_r", "sigma_e", "thickness_m", "gain")),
+    ("transmission", ("layer_eps_r", "layer_sigma_e", "layer_thickness_m")),
+)
+
+# Which published geometry tensors carry a derivative, per route (ADR-043).
+# Discovery re-solves the topology, so its interaction table and arrival
+# direction are declared non-differentiable outputs rather than silently
+# detached ones; the supported differentiable geometry route is
+# prepare_fixed_topology + reevaluate.
+_DIFFERENTIABLE_GEOMETRY_OUTPUTS: tuple[tuple[str, frozenset[str]], ...] = (
+    ("discovery", frozenset({"path_length_m", "delay_s"})),
+    (
+        "fixed_topology",
+        frozenset(
+            {
+                "path_length_m",
+                "delay_s",
+                "interaction_positions_m",
+                "field_direction",
+            }
+        ),
+    ),
+)
+
+# Inputs every response refuses before any native work, in every AD mode but
+# "none". The native field companions reject them by contract, so a request
+# that carries one fails at the boundary instead of inside backward().
+_PRIMAL_ONLY_AD_INPUTS: tuple[str, ...] = (
+    "materials.layer_mu_r",
+    "materials.mu_r",
+    "sinks.polarization_basis",
+    "sinks.polarizations",
+    "sources.polarization_basis",
+    "sources.polarizations",
+    "sources.powers_w",
 )
 
 
@@ -724,6 +769,29 @@ class PropagationCapabilities:
     # How the smallest resolvable offset is computed. Matches
     # native_frequency_resolution_hz, which a caller calls to get the number.
     native_frequency_resolution_law: str
+    # Which compiled-material tensors each component reads. A leaf outside its
+    # component's tuple has an exactly zero derivative, which is the true and
+    # complete answer rather than a missing one.
+    component_material_leaves: tuple[tuple[str, tuple[str, ...]], ...]
+    # Which published PropagationGeometry tensors carry a derivative, per route
+    # ("discovery" and "fixed_topology"). A tensor absent from a route's set is
+    # a declared non-differentiable output on that route.
+    differentiable_geometry_outputs: tuple[tuple[str, frozenset[str]], ...]
+    # The components for which PropagationGeometry.field_direction is live on
+    # the fixed-topology route. A request that mixes in any other component
+    # publishes a fully detached field_direction for the whole result: liveness
+    # is one decision per result, never a per-row one.
+    direction_differentiable_components: frozenset[str]
+    # Inputs refused before any native work on EVERY response, not only the
+    # polarimetric one. polarimetric_frozen_ad_inputs stays as the composed
+    # operator's own vocabulary and names the same physics.
+    primal_only_ad_inputs: tuple[str, ...]
+    # Second-order AD is refused everywhere, loudly, before any partial
+    # second-order result. There is no route that supports it.
+    supports_higher_order_ad: bool
+    # Whether PropagationDiagnostics carries ad_companion_launches and
+    # ad_tape_bytes.
+    ad_accounting: bool
 
     def components_for(self, response: str) -> frozenset[str]:
         return dict(self.response_components)[response]
@@ -733,6 +801,16 @@ class PropagationCapabilities:
 
     def ad_modes_for_component(self, component: str) -> frozenset[str]:
         return dict(self.component_ad_modes)[component]
+
+    def material_leaves_for(self, component: str) -> tuple[str, ...]:
+        """Which compiled-material tensors ``component`` reads (ADR-043)."""
+
+        return dict(self.component_material_leaves)[component]
+
+    def differentiable_geometry_for(self, route: str) -> frozenset[str]:
+        """Which published geometry tensors carry a derivative on ``route``."""
+
+        return dict(self.differentiable_geometry_outputs)[route]
 
 
 _CAPABILITIES = PropagationCapabilities(
@@ -753,7 +831,14 @@ _CAPABILITIES = PropagationCapabilities(
         ("complex3_transport", AD_MODES),
         ("polarimetric_transport", AD_MODES),
     ),
-    component_ad_modes=tuple((component, AD_MODES) for component in sorted(COMPONENTS)),
+    # diffraction advertises only the primal: the consumer cannot produce a
+    # diffraction row at all (see docs/dev/propagation-ad-capability-matrix.md),
+    # so an AD column for it would be fictional. The existing unsupported-AD
+    # branch of _preflight_evaluate turns this into a pre-compute refusal.
+    component_ad_modes=tuple(
+        (component, frozenset({"none"}) if component == "diffraction" else AD_MODES)
+        for component in sorted(COMPONENTS)
+    ),
     fixed_topology_components=frozenset(
         name for name, _ in _FIXED_TOPOLOGY_COMPONENT_IDS
     ),
@@ -781,6 +866,12 @@ _CAPABILITIES = PropagationCapabilities(
     wideband_rough_materials=False,
     max_frequency_offset_count=None,
     native_frequency_resolution_law=NATIVE_FREQUENCY_RESOLUTION_LAW,
+    component_material_leaves=_COMPONENT_MATERIAL_LEAVES,
+    differentiable_geometry_outputs=_DIFFERENTIABLE_GEOMETRY_OUTPUTS,
+    direction_differentiable_components=frozenset({"los", "reflection"}),
+    primal_only_ad_inputs=_PRIMAL_ONLY_AD_INPUTS,
+    supports_higher_order_ad=False,
+    ad_accounting=True,
 )
 
 
@@ -814,6 +905,12 @@ class PropagationDiagnostics:
     # row_valid, while the copy and synchronization counts above stay at one
     # whatever F is.
     frequency_column_count: int = 1
+    # ADR-043 AD accounting. One entry per registered differentiable native
+    # companion this call launched, and the bytes those companions retained for
+    # backward. Forward mode retains nothing past the solve, so a jvp call
+    # reports zero tape however many companions it launched.
+    ad_companion_launches: int = 0
+    ad_tape_bytes: int = 0
 
 
 @dataclass(frozen=True, slots=True, eq=False)

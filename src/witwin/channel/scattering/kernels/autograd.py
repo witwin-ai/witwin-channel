@@ -16,6 +16,7 @@ import torch
 from witwin.channel.runtime import torch_compat
 from witwin.channel.runtime.symbols import required_symbol as _required_native_op
 from witwin.channel.runtime.autograd_contracts import (
+    _ad_first_order_only,
     _ad_frequency_grad,
     _ad_frequency_tangent,
     _ad_frequency_value,
@@ -160,7 +161,7 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
         ctx.mark_non_differentiable(output[3])
 
     @staticmethod
-    @torch.autograd.function.once_differentiable
+    @_ad_first_order_only
     def backward(ctx, grad_gain, grad_amplitude, grad_length, _grad_keep):
         none_grads = (None,) * 26
         _ad_reject_fixed_inputs(
@@ -425,7 +426,7 @@ class _ScatteringTableEvalAdFunction(torch.autograd.Function):
         ctx.save_for_forward(*primals)
 
     @staticmethod
-    @torch.autograd.function.once_differentiable
+    @_ad_first_order_only
     def backward(ctx, grad_f_te, grad_f_tm):
         _ad_reject_fixed_inputs(
             "scattering_table_eval_ad", ctx.needs_input_grad, ((0, "valid"),)
@@ -572,7 +573,7 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
         ctx.mark_non_differentiable(output[1], output[2])
 
     @staticmethod
-    @torch.autograd.function.once_differentiable
+    @_ad_first_order_only
     def backward(ctx, grad_total, _grad_integral, _grad_row_value):
         none_grads = (None,) * 20
         _ad_reject_fixed_inputs(

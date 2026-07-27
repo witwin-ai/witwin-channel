@@ -11,6 +11,7 @@ from witwin.channel.runtime import torch_compat
 from witwin.channel.runtime.autograd_contracts import (
     _ad_active_ctx,
     _ad_checked_tangent,
+    _ad_first_order_only,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
 )
@@ -161,7 +162,7 @@ class _RaydSegmentPenetrationAdFunction(torch.autograd.Function):
         return origins, targets, input_active, tape
 
     @staticmethod
-    @torch.autograd.function.once_differentiable
+    @_ad_first_order_only
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 10
         continuous_grads = grad_outputs[4:10]

@@ -57,6 +57,50 @@ can be reevaluated into is `fixed_topology_components` crossed with
 `fixed_topology_responses`, which is where reflection and the polarimetric
 operator are available.
 
+### What carries a derivative (ADR-043)
+
+The AD matrix is published too, so a caller never has to learn a limit from a
+zero:
+
+```python
+caps = consumer.capabilities()
+caps.ad_modes_for_component("diffraction")        # frozenset({"none"})
+caps.material_leaves_for("reflection")            # per-face material tensors
+caps.differentiable_geometry_for("fixed_topology")
+caps.direction_differentiable_components          # {"los", "reflection"}
+caps.primal_only_ad_inputs                        # refused before native work
+caps.supports_higher_order_ad                     # False
+```
+
+- `component_ad_modes` advertises only the primal for `diffraction`, so an AD
+  request for it is refused at the preflight rather than advertising a column
+  the consumer cannot produce a row for.
+- `component_material_leaves` names the compiled material tensors each
+  component reads. Marking one it does not read is not an error - the zero is
+  the true derivative - but the record makes that zero discoverable in advance.
+- `differentiable_geometry_outputs` names, per route, which of `path_length_m`,
+  `delay_s`, `interaction_positions_m`, and `field_direction` carry a
+  derivative. Discovery publishes the first two: it re-solves the topology, so
+  the derivative is only defined between selection boundaries and no
+  subgradient is published at one. The supported differentiable geometry route
+  is `prepare_fixed_topology` plus `reevaluate`, which publishes all four.
+- `direction_differentiable_components` is `{"los", "reflection"}`.
+  `field_direction` liveness is ONE decision for the whole result, so a batch
+  is never live for some rows and silently dead for others; RayD owns the
+  transmission, wedge, and coupled direction seam, so those rows keep a
+  declared non-differentiable direction.
+- `primal_only_ad_inputs` names every input refused before any native work, on
+  every response and every route.
+- `supports_higher_order_ad` is `False`. `create_graph=True` raises from inside
+  the backward it asked to differentiate, naming the owner, and `ad_mode="vjp"`
+  with a forward dual is refused at the preflight.
+- `ad_accounting` is `True`: `PropagationDiagnostics.ad_companion_launches` and
+  `.ad_tape_bytes` report the AD ledger on both routes, and forward mode reports
+  zero retained tape by contract.
+
+The cell-by-cell statement, with the test that proves each cell, is
+`docs/dev/propagation-ad-capability-matrix.md`.
+
 ## Reevaluating a frozen topology
 
 `reevaluate` takes either form of frozen rows.
@@ -162,6 +206,16 @@ tensor participates in autograd, because a cached graph node would be freed by
 the first backward; a differentiable-material or differentiable-mesh loop
 therefore pays the staging every call, at parity with what a discovery solve
 pays per solve. ADR-037 names and measures the uncached cost.
+
+That bypass is decided on every call, not once when the cache is populated. A
+warm cache is reused only while the host-only liveness/mutation signature of
+its source tensors is unchanged - `requires_grad`, `grad_fn`, the forward-AD
+tangent slot and `_version` of the structure vertex tensors and of the material
+and assignment stores. Marking `materials.eps_r` or a structure's vertices
+after a primal replay therefore rebuilds the tables and keeps that leaf on the
+graph; serving the warm cache there would drop the leaf silently, which the AD
+capability record forbids. The signature reads attributes only: no device
+memory, no launch, no synchronization.
 
 ## World provenance and staleness
 

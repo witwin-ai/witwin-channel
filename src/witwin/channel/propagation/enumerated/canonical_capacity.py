@@ -14,6 +14,7 @@ from witwin.channel.propagation.models.geometry import PathGeometry
 from witwin.channel.propagation.models.topology import PathTopology
 from witwin.channel.runtime import torch_compat
 from witwin.channel.runtime.autograd_contracts import (
+    _ad_first_order_only,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
 )
@@ -140,7 +141,7 @@ class _EvaluatedPathsCanonicalCapacityGatherFunction(torch.autograd.Function):
         ctx.mark_non_differentiable(*output[:_DISCRETE_OUTPUT_COUNT])
 
     @staticmethod
-    @torch.autograd.function.once_differentiable
+    @_ad_first_order_only
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 29
         continuous_grads = grad_outputs[_DISCRETE_OUTPUT_COUNT:]

@@ -7,6 +7,13 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from ._ad_policy import (
+    ad_ledger,
+    carries_ad,
+    require_first_order_request,
+    require_primal_only_ad_inputs,
+    tape_bytes,
+)
 from .contracts import (
     Complex3Transport,
     EndpointBatch,
@@ -69,42 +76,6 @@ class _ConsumerRows:
     count_synchronizations: int
 
 
-def _has_forward_tangent(value: torch.Tensor) -> bool:
-    return torch.autograd.forward_ad.unpack_dual(value).tangent is not None
-
-
-def _carries_ad(value: torch.Tensor | None) -> bool:
-    return value is not None and (
-        value.requires_grad or _has_forward_tangent(value)
-    )
-
-
-def _require_fixed_los_ad_inputs(request: FixedTopologyRequest) -> None:
-    """Reject AD on inputs the native field companions treat as constants.
-
-    Transmit power, endpoint polarizations, and the polarization reference
-    vectors are rejected by the native forward/backward/JVP contracts, so a
-    differentiable request carrying one of them fails here rather than
-    producing a silently incomplete derivative.
-    """
-
-    if request.ad_mode == "none":
-        return
-    fixed_inputs = (
-        ("sources.powers_w", request.sources.powers_w),
-        ("sources.polarizations", request.sources.polarizations),
-        ("sinks.polarizations", request.sinks.polarizations),
-        ("sources.polarization_basis", request.sources.polarization_basis),
-        ("sinks.polarization_basis", request.sinks.polarization_basis),
-    )
-    for name, value in fixed_inputs:
-        if _carries_ad(value):
-            raise NotImplementedError(
-                f"fixed LoS {name} is primal-only; only endpoint positions "
-                "and reference_frequency_hz support AD"
-            )
-
-
 def _preflight_evaluate(
     compiled: object, request: object
 ) -> tuple[CompiledScene, PropagationRequest]:
@@ -136,6 +107,8 @@ def _preflight_evaluate(
         )
     if request.response == "polarimetric_transport":
         _require_polarimetric_inputs(request)
+    require_primal_only_ad_inputs(compiled, request)
+    require_first_order_request(compiled, request)
     compiled.require_reference_frequency(request.reference_frequency_hz)
     return compiled, request
 
@@ -163,7 +136,7 @@ def _require_polarimetric_inputs(request: PropagationRequest) -> None:
         ("sources.polarization_basis", request.sources.polarization_basis),
         ("sinks.polarization_basis", request.sinks.polarization_basis),
     ):
-        if _carries_ad(value):
+        if carries_ad(value):
             raise NotImplementedError(
                 f"polarimetric_transport {name} is primal-only; the operator "
                 "is published in a frozen world-referenced transverse basis"
@@ -179,7 +152,7 @@ def _require_polarimetric_inputs(request: PropagationRequest) -> None:
         ("sources.polarizations", request.sources.polarizations),
         ("sinks.polarizations", request.sinks.polarizations),
     ):
-        if _carries_ad(value):
+        if carries_ad(value):
             raise NotImplementedError(
                 f"polarimetric_transport {name} is primal-only; the operator "
                 "is excited by the two transverse basis vectors and carries no "
@@ -191,7 +164,7 @@ def _require_polarimetric_inputs(request: PropagationRequest) -> None:
         raise NotImplementedError(
             "polarimetric_transport requires a scalar compiled frequency"
         )
-    if _carries_ad(request.sources.positions_m) or _carries_ad(
+    if carries_ad(request.sources.positions_m) or carries_ad(
         request.sinks.positions_m
     ):
         raise NotImplementedError(
@@ -451,6 +424,7 @@ def _path_batch(
 def _diagnostics(
     sidecars: object,
     compact: _ConsumerRows,
+    ad_mode: str,
 ) -> PropagationDiagnostics:
     execution = sidecars.execution
     return PropagationDiagnostics(
@@ -463,6 +437,8 @@ def _diagnostics(
         validation_d2h_copies=0,
         validation_d2h_bytes=0,
         validation_sync_count=0,
+        ad_companion_launches=int(execution.ad_companion_launches),
+        ad_tape_bytes=tape_bytes(execution.ad_tape_bytes, ad_mode),
     )
 
 
@@ -511,7 +487,7 @@ def evaluate(
         paths=paths,
         convention=_CONVENTION,
         capabilities=_CAPABILITIES,
-        diagnostics=_diagnostics(sidecars, compact),
+        diagnostics=_diagnostics(sidecars, compact, request.ad_mode),
     )
 
 
@@ -763,7 +739,8 @@ def _preflight_reevaluate(
                 "PreparedFixedTopology; the raw-topology form is the "
                 "zero-interaction scalar and complex3 fast path"
             )
-    _require_fixed_los_ad_inputs(request)
+    require_primal_only_ad_inputs(compiled, request)
+    require_first_order_request(compiled, request)
     _preflight_wideband(compiled, request)
     return compiled, request
 
@@ -891,14 +868,25 @@ def _reevaluate_prepared(
         else (None, None)
     )
     # ADR-038: liveness is decided once, here, from the inputs every column
-    # shares, and the same record reaches every column.
+    # shares, and the same record reaches every column. ADR-043 adds the
+    # arrival-direction half of the same decision, taken from the host-known
+    # component set of the frozen batch: a batch that carries a component whose
+    # direction seam RayD owns publishes a fully detached field_direction for
+    # the whole result rather than a partly live one.
+    frozen_components = frozenset(
+        bucket.component for bucket in prepared.buckets
+    )
     geometry_live = GeometryLiveness.of(
         rows.source,
         rows.target,
         scene_vertex_table(compiled)
         if any(bucket.depth > 0 for bucket in prepared.buckets)
         else None,
+        direction_components=frozen_components.issubset(
+            _CAPABILITIES.direction_differentiable_components
+        ),
     )
+    ledger = ad_ledger(request.ad_mode)
 
     def column(offset: float):
         return evaluate_prepared(
@@ -915,6 +903,7 @@ def _reevaluate_prepared(
                 bucket.component in validity for bucket in prepared.buckets
             ),
             geometry_live=geometry_live,
+            ledger=ledger,
         )
 
     outputs = column(0.0)
@@ -958,6 +947,12 @@ def _reevaluate_prepared(
             validation_d2h_bytes=rows.validation_d2h_bytes,
             validation_sync_count=rows.validation_synchronizations,
             frequency_column_count=1 if offsets is None else len(offsets),
+            ad_companion_launches=0 if ledger is None else ledger.launches,
+            ad_tape_bytes=(
+                0
+                if ledger is None
+                else tape_bytes(ledger.tape_bytes, request.ad_mode)
+            ),
         ),
         row_valid=outputs.row_valid,
     )
@@ -996,6 +991,13 @@ def reevaluate(
     # ADR-038: one liveness decision, taken here from the gathered rows, and
     # re-asserted for every column against the inputs that column launches on.
     geometry_live = fixed_los_geometry_live(rows)
+    # ADR-043: this route carries line-of-sight rows only, so the direction
+    # seam is Channel-owned for the whole result and its liveness is exactly
+    # the geometry decision above.
+    direction_live = geometry_live and frozenset({"los"}).issubset(
+        _CAPABILITIES.direction_differentiable_components
+    )
+    ledger = ad_ledger(request.ad_mode)
 
     def column(offset: float) -> dict[str, torch.Tensor]:
         if request.ad_mode == "none":
@@ -1008,6 +1010,10 @@ def reevaluate(
                 frequency_hz=frequency_value + offset,
             )
         require_fixed_los_geometry_live(rows, geometry_live)
+        assert ledger is not None
+        ledger.add(
+            rows.source, rows.target, tx_power, tx_polarization, rx_polarization
+        )
         return field_autograd.field_free_space_ad(
             rows.source,
             rows.target,
@@ -1016,6 +1022,7 @@ def reevaluate(
             rx_polarization,
             frequency=_offset_frequency(frequency, offset),
             frequency_value=frequency_value + offset,
+            direction_live=direction_live,
         )
 
     field_rows = column(0.0)
@@ -1033,6 +1040,8 @@ def reevaluate(
     def payload_of(values: dict[str, torch.Tensor]) -> torch.Tensor:
         if request.response == "scalar_transport":
             return values["path_field"]
+        if ledger is not None:
+            ledger.add(values["field_vector"], tx_power)
         return excited_field(
             values["field_vector"], tx_power, ad_mode=request.ad_mode
         )
@@ -1080,6 +1089,12 @@ def reevaluate(
             validation_d2h_bytes=rows.validation_d2h_bytes,
             validation_sync_count=rows.validation_synchronizations,
             frequency_column_count=1 if offsets is None else len(offsets),
+            ad_companion_launches=0 if ledger is None else ledger.launches,
+            ad_tape_bytes=(
+                0
+                if ledger is None
+                else tape_bytes(ledger.tape_bytes, request.ad_mode)
+            ),
         ),
     )
 

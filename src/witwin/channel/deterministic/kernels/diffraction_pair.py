@@ -8,6 +8,7 @@ import torch
 
 from witwin.channel.runtime import torch_compat
 from witwin.channel.runtime.autograd_contracts import (
+    _ad_first_order_only,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
 )
@@ -272,7 +273,7 @@ class _DeterministicDiffractionPairReduceFunction(torch.autograd.Function):
         ctx.save_for_forward(*saved)
 
     @staticmethod
-    @torch.autograd.function.once_differentiable
+    @_ad_first_order_only
     def backward(ctx, grad_field_xyz, grad_power):
         if (
             not any(ctx.needs_input_grad[3:9])

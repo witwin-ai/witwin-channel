@@ -18,6 +18,7 @@ import torch
 
 from witwin.channel.runtime import torch_compat
 from witwin.channel.runtime.autograd_contracts import (
+    _ad_first_order_only,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
 )
@@ -83,7 +84,7 @@ class _BdptFinalizeAdFunction(torch.autograd.Function):
         ctx.save_for_forward(*primals)
 
     @staticmethod
-    @torch.autograd.function.once_differentiable
+    @_ad_first_order_only
     def backward(ctx, grad_path_gain, *grad_powers):
         if not any(bool(flag) for flag in ctx.needs_input_grad[:5]):
             return (None,) * 6
@@ -261,7 +262,7 @@ class _BdptAccumulateAdFunction(torch.autograd.Function):
             ctx.mark_non_differentiable(*ctx.bin_sums)
 
     @staticmethod
-    @torch.autograd.function.once_differentiable
+    @_ad_first_order_only
     def backward(ctx, *grad_outputs):
         grad_matrices = grad_outputs[: len(_ACCUMULATE_MATRIX_FIELDS)]
         none_grads = (None,) * 8

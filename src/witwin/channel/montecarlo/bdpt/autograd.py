@@ -26,6 +26,7 @@ import torch
 
 from witwin.channel.runtime import torch_compat
 from witwin.channel.runtime.autograd_contracts import (
+    _ad_first_order_only,
     _ad_frequency_grad,
     _ad_frequency_tangent,
     _ad_frequency_value,
@@ -213,7 +214,7 @@ class _BdptReflectedSubpathAdFunction(torch.autograd.Function):
         _mark_subpath_structural(ctx, output)
 
     @staticmethod
-    @torch.autograd.function.once_differentiable
+    @_ad_first_order_only
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 14
         _ad_reject_fixed_inputs(
@@ -502,7 +503,7 @@ class _BdptTransmittedSubpathAdFunction(torch.autograd.Function):
         _mark_subpath_structural(ctx, output)
 
     @staticmethod
-    @torch.autograd.function.once_differentiable
+    @_ad_first_order_only
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 15
         _ad_reject_fixed_inputs(
@@ -829,7 +830,7 @@ class _BdptEndpointConnectionAdFunction(torch.autograd.Function):
         return light, sensor
 
     @staticmethod
-    @torch.autograd.function.once_differentiable
+    @_ad_first_order_only
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 14
         need_field = any(bool(ctx.needs_input_grad[i]) for i in range(8))

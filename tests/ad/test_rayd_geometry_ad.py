@@ -729,15 +729,20 @@ def test_composed_functorch_transforms_raise_not_implemented():
 
 def test_double_backward_raises():
     """create_graph=True through the once-differentiable backwards must raise
-    instead of silently dropping second-order contributions."""
+    instead of silently dropping second-order contributions.
+
+    ADR-043 moves the raise to the request itself: it now fires inside the
+    backward that ``create_graph=True`` asked to be differentiable, before any
+    native companion launches, and names the owner rather than Torch.
+    """
 
     rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()
     ray_o_ad = ray_o.clone().requires_grad_(True)
     out = ops.rayd_intersect_ad(rayd, vertices, ray_o_ad, ray_d, _empty_tmax())
-    (grad,) = torch.autograd.grad(out["t"].sum(), ray_o_ad, create_graph=True)
-    with pytest.raises(RuntimeError):
-        grad.sum().backward()
+    with pytest.raises(NotImplementedError, match="first-order only") as raised:
+        torch.autograd.grad(out["t"].sum(), ray_o_ad, create_graph=True)
+    assert "_RaydIntersectAdFunction.backward" in str(raised.value)
 
     wall, wall_vertices = _wall_scene()
     refl_ray_o, refl_ray_d = _wall_reflection_rays()
@@ -745,8 +750,7 @@ def test_double_backward_raises():
     refl_out = ops.rayd_trace_reflections_ad(
         wall, wall_vertices, refl_ray_o_ad, refl_ray_d, _empty_tmax(), None, 1
     )
-    (refl_grad,) = torch.autograd.grad(
-        refl_out["t"].sum(), refl_ray_o_ad, create_graph=True
-    )
-    with pytest.raises(RuntimeError):
-        refl_grad.sum().backward()
+    with pytest.raises(NotImplementedError, match="first-order only"):
+        torch.autograd.grad(
+            refl_out["t"].sum(), refl_ray_o_ad, create_graph=True
+        )

@@ -16,6 +16,7 @@ from witwin.channel.propagation.topology.kernels import (
 )
 from witwin.channel.runtime import torch_compat
 from witwin.channel.runtime.autograd_contracts import (
+    _ad_first_order_only,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
 )
@@ -166,7 +167,7 @@ class _CompactEvaluatedPathsFunction(torch.autograd.Function):
         ctx.mark_non_differentiable(*output[:_DISCRETE_OUTPUT_COUNT])
 
     @staticmethod
-    @torch.autograd.function.once_differentiable
+    @_ad_first_order_only
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 24
         continuous_grads = grad_outputs[_DISCRETE_OUTPUT_COUNT:]

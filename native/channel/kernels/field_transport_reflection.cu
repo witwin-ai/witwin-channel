@@ -145,6 +145,7 @@ __global__ void reflection_sequence_backward_kernel(
     const float* grad_path_gain,
     const float* grad_path_length,
     const float* grad_delay,
+    const float* grad_direction,
     float* grad_eps_r,
     float* grad_sigma_e,
     float* grad_gain,
@@ -219,7 +220,14 @@ __global__ void reflection_sequence_backward_kernel(
                 chain.frames[depth - 1].reflected_direction;
             const field::float3a final_direction = field::safe_normalize(
                 final_offset, outgoing_last);
-            field::float3a g_final_direction = field::f3_zero();
+            // The published direction is exactly this final_direction, so an
+            // external cotangent seeds the same accumulator the rx transverse
+            // projection feeds. adj_safe_normalize then splits it over
+            // final_offset and the alternate branch (outgoing_last), which is
+            // what carries a direction cotangent back into the bounce chain.
+            field::float3a g_final_direction =
+                grad_direction != nullptr ? load3f(grad_direction, index)
+                                          : field::f3_zero();
             field::float3a g_pol_dump = field::f3_zero();
             ad::adj_transverse_project(
                 final_direction, load3f(rx_polarization, index), g_rx_axis,
@@ -455,7 +463,8 @@ __global__ void reflection_sequence_jvp_kernel(
     c10::complex<float>* t_path_field,
     float* t_path_gain,
     float* t_path_length,
-    float* t_delay) {
+    float* t_delay,
+    float* t_direction) {
     for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count;
          index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
@@ -583,6 +592,12 @@ __global__ void reflection_sequence_jvp_kernel(
             sqrtf(fmaxf(tx_power[index], 0.0f)), total_length.d,
             t_field_vector, t_coefficient, t_path_field, t_path_gain,
             t_path_length, t_delay);
+        // final_direction is the published direction output; its dual is
+        // already built above for the rx transverse projection.
+        const int64_t direction_base = index * 3;
+        t_direction[direction_base] = final_direction.d.x;
+        t_direction[direction_base + 1] = final_direction.d.y;
+        t_direction[direction_base + 2] = final_direction.d.z;
     }
 }
 
@@ -656,6 +671,7 @@ pybind11::dict channel_field_reflection_sequence_backward(
     pybind11::object grad_path_gain,
     pybind11::object grad_path_length,
     pybind11::object grad_delay,
+    pybind11::object grad_direction,
     bool need_grad_eps_r,
     bool need_grad_sigma_e,
     bool need_grad_gain,
@@ -673,6 +689,7 @@ pybind11::dict channel_field_reflection_sequence_backward(
     at::Tensor gpg_storage;
     at::Tensor gpl_storage;
     at::Tensor gd_storage;
+    at::Tensor gdir_storage;
     const at::Tensor* gfv = optional_grad(
         std::move(grad_field_vector), gfv_storage, "grad_field_vector",
         at::kComplexFloat, {count, 3}, source);
@@ -691,6 +708,9 @@ pybind11::dict channel_field_reflection_sequence_backward(
     const at::Tensor* gd = optional_grad(
         std::move(grad_delay), gd_storage, "grad_delay",
         at::kFloat, {count}, source);
+    const at::Tensor* gdir = optional_grad(
+        std::move(grad_direction), gdir_storage, "grad_direction",
+        at::kFloat, {count, 3}, source);
 
     auto material_grad = [&](bool needed) {
         return needed ? zero_filled({count, depth}, source.options()) : at::Tensor();
@@ -713,7 +733,8 @@ pybind11::dict channel_field_reflection_sequence_backward(
         grad_normals = zero_filled({count, depth, 3}, source.options());
     }
     const bool any_grad_in = gfv != nullptr || gc != nullptr || gpf != nullptr ||
-                             gpg != nullptr || gpl != nullptr || gd != nullptr;
+                             gpg != nullptr || gpl != nullptr || gd != nullptr ||
+                             gdir != nullptr;
     const bool any_grad_out = need_grad_eps_r || need_grad_sigma_e ||
                               need_grad_gain || need_grad_thickness ||
                               need_grad_frequency || need_grad_geometry;
@@ -743,6 +764,7 @@ pybind11::dict channel_field_reflection_sequence_backward(
                 grad_ptr<float>(gpg),
                 grad_ptr<float>(gpl),
                 grad_ptr<float>(gd),
+                grad_ptr<float>(gdir),
                 need_grad_eps_r ? grad_eps.data_ptr<float>() : nullptr,
                 need_grad_sigma_e ? grad_sigma.data_ptr<float>() : nullptr,
                 need_grad_gain ? grad_gain_out.data_ptr<float>() : nullptr,
@@ -851,6 +873,7 @@ pybind11::dict channel_field_reflection_sequence_jvp(
     auto t_path_gain = at::empty({count}, source.options());
     auto t_path_length = at::empty({count}, source.options());
     auto t_delay = at::empty({count}, source.options());
+    auto t_direction = at::empty({count, 3}, source.options());
     if (count > 0) {
         cudaStream_t stream =
             at::cuda::getCurrentCUDAStream(source.get_device()).stream();
@@ -885,7 +908,8 @@ pybind11::dict channel_field_reflection_sequence_jvp(
                 t_path_field.data_ptr<c10::complex<float>>(),
                 t_path_gain.data_ptr<float>(),
                 t_path_length.data_ptr<float>(),
-                t_delay.data_ptr<float>());
+                t_delay.data_ptr<float>(),
+                t_direction.data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     pybind11::dict out;
@@ -895,5 +919,6 @@ pybind11::dict channel_field_reflection_sequence_jvp(
     out["path_gain"] = t_path_gain;
     out["path_length_m"] = t_path_length;
     out["delay_s"] = t_delay;
+    out["direction"] = t_direction;
     return out;
 }

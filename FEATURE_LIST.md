@@ -77,6 +77,33 @@ priority `scattering > diffraction > transmission > reflection > los`.
   stream-synchronization delta relative to the same internal evaluation is
   zero. Failure state, raw bits, handles, resources, caches, and tapes do not
   cross the boundary.
+- The AD capability matrix is published and machine readable (ADR-043).
+  `component_ad_modes` advertises only the primal for `diffraction`;
+  `component_material_leaves` names the compiled material tensors each
+  component reads; `differentiable_geometry_outputs` names, per route, which of
+  `path_length_m`, `delay_s`, `interaction_positions_m`, and `field_direction`
+  carry a derivative; `direction_differentiable_components` names the
+  components whose arrival direction is differentiable;
+  `primal_only_ad_inputs` names every input refused before any native work;
+  `supports_higher_order_ad` is `False`; `ad_accounting` is `True`. The
+  cell-by-cell statement is `docs/dev/propagation-ad-capability-matrix.md`.
+- `PropagationGeometry.field_direction` carries a real derivative on the
+  fixed-topology route for `los` and `reflection` rows, in both AD modes, from
+  the native companions that already computed the adjoint and the dual.
+  Liveness is one decision for the whole result, taken where forward duals are
+  still visible: a batch is never live for some rows and silently dead for
+  others. Transmission, wedge, and coupled rows keep a declared
+  non-differentiable direction, because RayD owns their direction seam.
+- Every input the native field companions treat as a constant - transmit power,
+  the endpoint polarizations, the two polarization bases, and the two relative
+  permeabilities - is refused before any native work on every response and
+  every route, so an unsupported AD request never produces a result object.
+- Second-order AD is refused everywhere. `create_graph=True` raises from inside
+  the backward it asked to differentiate, naming the owner, before any native
+  launch; `ad_mode="vjp"` with a forward dual is refused at the preflight.
+- `PropagationDiagnostics.ad_companion_launches` and `.ad_tape_bytes` publish
+  the AD ledger on the discovery route and on the fixed-topology route.
+  Forward mode reports zero retained tape by contract.
 - The API is propagation-only and has no Radar waveform, target/RCS, IQ, ADC,
   detection, or processing fields.
 

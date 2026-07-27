@@ -625,6 +625,137 @@ def test_reflection_gain_jvp_matches_fd():
     )
 
 
+def _direction_adjoint_identity(jvp_call, backward_call, seeds, tangents) -> None:
+    """``<w, J v> == <J^T w, v>`` for the arrival-direction seam (ADR-043).
+
+    An adjoint identity, not a finite difference: it is exact up to float32
+    rounding and it falsifies a transposed, dropped, or double-counted seed,
+    which is precisely what a hand-added cotangent input can get wrong.
+    """
+
+    forward = jvp_call()
+    reverse = backward_call()
+    left = float((seeds * forward["direction"]).sum())
+    right = sum(
+        float((reverse[f"grad_{name}"] * tangent).sum())
+        for name, tangent in tangents.items()
+    )
+    assert relative_error(
+        torch.tensor(left), torch.tensor(right), abs_floor=ABS_TOL
+    ) <= REL_TOL_PATH
+    assert abs(left) > 1.0e-6, "the identity must not be checked at zero"
+
+
+def test_free_space_direction_seed_satisfies_the_adjoint_identity():
+    batch = _free_space_batch()
+    generator = torch.Generator(device="cpu").manual_seed(211)
+
+    def rand():
+        return torch.randn(4, 3, generator=generator).to("cuda").contiguous()
+
+    seeds = rand()
+    tangent_source = rand()
+    tangent_target = rand()
+    _direction_adjoint_identity(
+        lambda: field_functional.field_free_space_jvp(
+            *batch.values(),
+            frequency_hz=_FREQUENCY_HZ,
+            tangent_frequency=0.0,
+            tangent_source=tangent_source,
+            tangent_target=tangent_target,
+        ),
+        lambda: field_functional.field_free_space_backward(
+            *batch.values(),
+            frequency_hz=_FREQUENCY_HZ,
+            grad_direction=seeds,
+            need_grad_frequency=False,
+            need_grad_geometry=True,
+        ),
+        seeds,
+        {"source": tangent_source, "target": tangent_target},
+    )
+
+
+def test_reflection_direction_seed_satisfies_the_adjoint_identity():
+    batch = _reflection_batch(depth=2)
+    generator = torch.Generator(device="cpu").manual_seed(213)
+    count = batch["source"].shape[0]
+    depth = batch["interaction_positions"].shape[1]
+
+    def rand(*shape):
+        return torch.randn(*shape, generator=generator).to("cuda").contiguous()
+
+    seeds = rand(count, 3)
+    tangent_source = rand(count, 3)
+    tangent_target = rand(count, 3)
+    tangent_positions = rand(count, depth, 3)
+    _direction_adjoint_identity(
+        lambda: field_functional.field_reflection_sequence_jvp(
+            *batch.values(),
+            frequency_hz=_FREQUENCY_HZ,
+            tangent_source=tangent_source,
+            tangent_target=tangent_target,
+            tangent_interaction_positions=tangent_positions,
+        ),
+        lambda: field_functional.field_reflection_sequence_backward(
+            *batch.values(),
+            frequency_hz=_FREQUENCY_HZ,
+            grad_direction=seeds,
+            need_grad_eps_r=False,
+            need_grad_sigma_e=False,
+            need_grad_thickness=False,
+            need_grad_frequency=False,
+            need_grad_geometry=True,
+        ),
+        seeds,
+        {
+            "source": tangent_source,
+            "target": tangent_target,
+            "interaction_positions": tangent_positions,
+        },
+    )
+
+
+def test_a_direction_seed_of_the_wrong_shape_fails_loudly():
+    """No silent broadcast, no reshape, no ignored seed."""
+
+    batch = _free_space_batch()
+    with pytest.raises(RuntimeError):
+        field_functional.field_free_space_backward(
+            *batch.values(),
+            frequency_hz=_FREQUENCY_HZ,
+            grad_direction=torch.zeros(4, device="cuda"),
+            need_grad_geometry=True,
+        )
+    with pytest.raises(RuntimeError):
+        field_functional.field_reflection_sequence_backward(
+            *_reflection_batch(depth=1).values(),
+            frequency_hz=_FREQUENCY_HZ,
+            grad_direction=torch.zeros(3, 4, device="cuda"),
+            need_grad_geometry=True,
+        )
+
+
+def test_a_direction_seed_alone_still_launches_the_geometry_adjoint():
+    """The seed is a real cotangent input, not a passenger of another one.
+
+    With every other cotangent absent the launch used to be skipped entirely,
+    so a direction-only loss would have come back as an exact zero.
+    """
+
+    batch = _free_space_batch()
+    seeds = torch.ones(4, 3, device="cuda")
+    grads = field_functional.field_free_space_backward(
+        *batch.values(),
+        frequency_hz=_FREQUENCY_HZ,
+        grad_direction=seeds,
+        need_grad_frequency=False,
+        need_grad_geometry=True,
+    )
+    assert float(grads["grad_source"].abs().sum()) > 0.0
+    assert float(grads["grad_target"].abs().sum()) > 0.0
+
+
 def test_free_space_vjp_matches_sum_of_jvp():
     batch = _free_space_batch()
     ones = torch.ones(4, device="cuda")
@@ -826,16 +957,26 @@ def test_non_differentiable_outputs_stay_detached():
 
 
 def test_double_backward_raises():
+    """ADR-043: the second-order request fails at the request, by owner name.
+
+    Before ADR-043 this returned a silently detached first gradient and only
+    failed one step later, with a generic Torch message that named Torch rather
+    than the owner that cannot answer. The raise now happens inside the very
+    backward that ``create_graph=True`` asked to be differentiable, before any
+    native companion launches, so no partial second-order result exists.
+    """
+
     batch = _reflection_batch(depth=1)
     eps_r = batch["eps_r"].clone().requires_grad_(True)
     ad_batch = dict(batch)
     ad_batch["eps_r"] = eps_r
     out = field_autograd.field_reflection_sequence_ad(*ad_batch.values(), frequency=_FREQUENCY_HZ)
-    (grad,) = torch.autograd.grad(
-        out["path_gain"].sum(), eps_r, create_graph=True
-    )
-    with pytest.raises(RuntimeError):
-        grad.sum().backward()
+    with pytest.raises(NotImplementedError, match="first-order only") as raised:
+        torch.autograd.grad(out["path_gain"].sum(), eps_r, create_graph=True)
+    assert "_FieldReflectionSequenceAdFunction.backward" in str(raised.value)
+    # The first-order request over the same graph still works, unchanged.
+    (grad,) = torch.autograd.grad(out["path_gain"].sum(), eps_r)
+    assert grad.requires_grad is False
 
 
 def test_composed_functorch_transforms_raise():
