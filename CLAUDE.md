@@ -389,6 +389,10 @@ For architecture moves:
   performance/resource gates within their recorded budgets.
 - New dependencies must pass `ci/check_import_graph.py`. Do not create, widen,
   relocate, or inherit allowlisted architecture debt.
+- Every production module must stay reachable from the package root or one of
+  the four solver entry points; `ci/check_orphan_modules.py` rejects the rest.
+  A deleted owner does not come back as an unreachable file, and a module kept
+  alive only by its own tests is an orphan.
 - Public API changes require an intentional `ci/public-api-snapshot.json`
   update and migration note.
 - Native binding changes require the binding manifest, contract-coverage
