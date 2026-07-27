@@ -35,7 +35,6 @@ class _FieldProjectComplex3AdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, grad_coefficient, grad_path_gain):
         _ad_reject_fixed_inputs(
             "field_project_complex3_ad",

@@ -95,7 +95,7 @@ def test_consumer_contract_is_versioned_and_snapshot_frozen() -> None:
     # published quantity. Version 2 (ADR-037) grew ``row_valid``, two
     # capability fields, and three exports, and lifted the documented
     # "polarimetric_transport is primal-only" limit.
-    assert "CONTRACT_VERSION = 5" in contracts
+    assert "CONTRACT_VERSION = 6" in contracts
 
     snapshot = json.loads(
         (ROOT / "ci" / "public-api-snapshot.json").read_text(encoding="utf-8")

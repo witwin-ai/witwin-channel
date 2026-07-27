@@ -7,6 +7,13 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from ._ad_policy import (
+    ad_ledger,
+    carries_ad,
+    require_first_order_request,
+    require_primal_only_ad_inputs,
+    tape_bytes,
+)
 from .contracts import (
     Complex3Transport,
     EndpointBatch,
@@ -69,133 +76,6 @@ class _ConsumerRows:
     count_synchronizations: int
 
 
-def _has_forward_tangent(value: torch.Tensor) -> bool:
-    return torch.autograd.forward_ad.unpack_dual(value).tangent is not None
-
-
-def _carries_ad(value: torch.Tensor | None) -> bool:
-    return value is not None and (
-        value.requires_grad or _has_forward_tangent(value)
-    )
-
-
-def _primal_only_values(
-    compiled: CompiledScene, request: object
-) -> dict[str, torch.Tensor | None]:
-    """The tensors named by ``capabilities().primal_only_ad_inputs``.
-
-    Two of them live on the compiled scene rather than on the request: the
-    relative permeabilities reach the Fresnel companions as constants and are
-    rejected there, so they belong in the same pre-compute refusal as the
-    request-side constants.
-    """
-
-    materials = compiled.materials
-    return {
-        "sources.powers_w": request.sources.powers_w,
-        "sources.polarizations": request.sources.polarizations,
-        "sinks.polarizations": request.sinks.polarizations,
-        "sources.polarization_basis": request.sources.polarization_basis,
-        "sinks.polarization_basis": request.sinks.polarization_basis,
-        "materials.mu_r": materials.mu_r,
-        "materials.layer_mu_r": materials.layer_mu_r,
-    }
-
-
-def _require_primal_only_ad_inputs(
-    compiled: CompiledScene, request: object
-) -> None:
-    """Reject AD on inputs the native field companions treat as constants.
-
-    ADR-043. The native forward/backward/JVP contracts reject every one of
-    these by name, but on the discovery route they used to reject from inside
-    ``backward()`` - after a complete ``PropagationEvaluation`` had already been
-    published. That is a partial result for an unsupported request, so the same
-    refusal now runs on the pre-flight of every response and every route, driven
-    by the published ``primal_only_ad_inputs`` record rather than by a list
-    duplicated per route.
-    """
-
-    if request.ad_mode == "none":
-        return
-    values = _primal_only_values(compiled, request)
-    for name in _CAPABILITIES.primal_only_ad_inputs:
-        if _carries_ad(values[name]):
-            raise NotImplementedError(
-                f"{name} is primal-only; the native field companion that "
-                "consumes it does not differentiate it. "
-                "capabilities().primal_only_ad_inputs names every such input"
-            )
-
-
-def _ad_leaf_tensors(
-    compiled: CompiledScene, request: object
-) -> tuple[tuple[str, torch.Tensor], ...]:
-    """Every tensor a caller can seed on this call, named for a refusal.
-
-    Host attribute reads only: no device work, no allocation, and no
-    synchronization, so this is free to run on the pre-flight of every call.
-    """
-
-    materials = compiled.materials
-    candidates: list[tuple[str, object]] = [
-        ("sources.positions_m", request.sources.positions_m),
-        ("sinks.positions_m", request.sinks.positions_m),
-        ("reference_frequency_hz", request.reference_frequency_hz),
-    ]
-    candidates.extend(_primal_only_values(compiled, request).items())
-    for name in (
-        "eps_r",
-        "sigma_e",
-        "thickness_m",
-        "gain",
-        "layer_eps_r",
-        "layer_sigma_e",
-        "layer_thickness_m",
-    ):
-        candidates.append((f"materials.{name}", getattr(materials, name, None)))
-    for index, structure in enumerate(compiled.structures):
-        candidates.append(
-            (f"structures[{index}].vertices", getattr(structure, "vertices", None))
-        )
-    return tuple(
-        (name, value)
-        for name, value in candidates
-        if isinstance(value, torch.Tensor)
-    )
-
-
-def _require_first_order_request(
-    compiled: CompiledScene, request: object
-) -> None:
-    """Refuse a forward-over-reverse composition before any numerical work.
-
-    ADR-043. A reverse pass cannot carry a forward tangent through the native
-    companions: the gradient comes back with the correct first-order value and
-    ``unpack_dual(grad).tangent is None``, so a mixed second derivative reads as
-    an exact zero with no error anywhere. That is the worst shape a silent cell
-    can take, and it is refused here rather than answered wrongly.
-
-    The symmetric rule ("jvp with a requires_grad input") is deliberately NOT
-    enforced: the declared forward-mode convention explicitly supports a dual
-    built on a ``requires_grad`` primal, and the field facades run the same
-    Function for both modes, so such a request is a legitimate first-order one.
-    Reverse-over-reverse is caught instead where it becomes wrong, by
-    ``_ad_first_order_only`` inside every backward.
-    """
-
-    if request.ad_mode != "vjp":
-        return
-    for name, value in _ad_leaf_tensors(compiled, request):
-        if _has_forward_tangent(value):
-            raise NotImplementedError(
-                f"ad_mode='vjp' with a forward dual on {name} is a "
-                "second-order request; Channel is first-order only and a "
-                "reverse gradient carries no tangent. "
-                "capabilities().supports_higher_order_ad is False"
-            )
-
-
 def _preflight_evaluate(
     compiled: object, request: object
 ) -> tuple[CompiledScene, PropagationRequest]:
@@ -227,8 +107,8 @@ def _preflight_evaluate(
         )
     if request.response == "polarimetric_transport":
         _require_polarimetric_inputs(request)
-    _require_primal_only_ad_inputs(compiled, request)
-    _require_first_order_request(compiled, request)
+    require_primal_only_ad_inputs(compiled, request)
+    require_first_order_request(compiled, request)
     compiled.require_reference_frequency(request.reference_frequency_hz)
     return compiled, request
 
@@ -256,7 +136,7 @@ def _require_polarimetric_inputs(request: PropagationRequest) -> None:
         ("sources.polarization_basis", request.sources.polarization_basis),
         ("sinks.polarization_basis", request.sinks.polarization_basis),
     ):
-        if _carries_ad(value):
+        if carries_ad(value):
             raise NotImplementedError(
                 f"polarimetric_transport {name} is primal-only; the operator "
                 "is published in a frozen world-referenced transverse basis"
@@ -272,7 +152,7 @@ def _require_polarimetric_inputs(request: PropagationRequest) -> None:
         ("sources.polarizations", request.sources.polarizations),
         ("sinks.polarizations", request.sinks.polarizations),
     ):
-        if _carries_ad(value):
+        if carries_ad(value):
             raise NotImplementedError(
                 f"polarimetric_transport {name} is primal-only; the operator "
                 "is excited by the two transverse basis vectors and carries no "
@@ -284,7 +164,7 @@ def _require_polarimetric_inputs(request: PropagationRequest) -> None:
         raise NotImplementedError(
             "polarimetric_transport requires a scalar compiled frequency"
         )
-    if _carries_ad(request.sources.positions_m) or _carries_ad(
+    if carries_ad(request.sources.positions_m) or carries_ad(
         request.sinks.positions_m
     ):
         raise NotImplementedError(
@@ -541,36 +421,6 @@ def _path_batch(
     )
 
 
-def _ad_ledger(ad_mode: str) -> object | None:
-    """One AD ledger per reevaluation, or ``None`` for a primal call.
-
-    The discovery route already builds one inside its field loop and hands it
-    up through the execution sidecars. The fixed-topology route built none, so
-    the inner loop Radar runs per frame reported no AD accounting at all; this
-    is the same counter, constructed at the one place that owns the whole call.
-    A primal call constructs nothing and pays nothing.
-    """
-
-    if ad_mode == "none":
-        return None
-    from witwin.channel.runtime.kernel_metadata import AdLaunchLedger
-
-    return AdLaunchLedger()
-
-
-def _tape_bytes(ledger_bytes: int, ad_mode: str) -> int:
-    """Reproduce the solver-metadata tape gate rather than the raw counter.
-
-    ``AdLaunchLedger`` sums what every registered companion saved, and forward
-    mode retains none of it past the solve. The solver metadata layer applies
-    exactly this gate (``deterministic/pipeline.py``), so forwarding the raw
-    sidecar number here would report retained tape for a jvp call and
-    contradict the ledger's own contract.
-    """
-
-    return int(ledger_bytes) if ad_mode == "vjp" else 0
-
-
 def _diagnostics(
     sidecars: object,
     compact: _ConsumerRows,
@@ -588,7 +438,7 @@ def _diagnostics(
         validation_d2h_bytes=0,
         validation_sync_count=0,
         ad_companion_launches=int(execution.ad_companion_launches),
-        ad_tape_bytes=_tape_bytes(execution.ad_tape_bytes, ad_mode),
+        ad_tape_bytes=tape_bytes(execution.ad_tape_bytes, ad_mode),
     )
 
 
@@ -889,8 +739,8 @@ def _preflight_reevaluate(
                 "PreparedFixedTopology; the raw-topology form is the "
                 "zero-interaction scalar and complex3 fast path"
             )
-    _require_primal_only_ad_inputs(compiled, request)
-    _require_first_order_request(compiled, request)
+    require_primal_only_ad_inputs(compiled, request)
+    require_first_order_request(compiled, request)
     _preflight_wideband(compiled, request)
     return compiled, request
 
@@ -1036,7 +886,7 @@ def _reevaluate_prepared(
             _CAPABILITIES.direction_differentiable_components
         ),
     )
-    ledger = _ad_ledger(request.ad_mode)
+    ledger = ad_ledger(request.ad_mode)
 
     def column(offset: float):
         return evaluate_prepared(
@@ -1101,7 +951,7 @@ def _reevaluate_prepared(
             ad_tape_bytes=(
                 0
                 if ledger is None
-                else _tape_bytes(ledger.tape_bytes, request.ad_mode)
+                else tape_bytes(ledger.tape_bytes, request.ad_mode)
             ),
         ),
         row_valid=outputs.row_valid,
@@ -1147,7 +997,7 @@ def reevaluate(
     direction_live = geometry_live and frozenset({"los"}).issubset(
         _CAPABILITIES.direction_differentiable_components
     )
-    ledger = _ad_ledger(request.ad_mode)
+    ledger = ad_ledger(request.ad_mode)
 
     def column(offset: float) -> dict[str, torch.Tensor]:
         if request.ad_mode == "none":
@@ -1243,7 +1093,7 @@ def reevaluate(
             ad_tape_bytes=(
                 0
                 if ledger is None
-                else _tape_bytes(ledger.tape_bytes, request.ad_mode)
+                else tape_bytes(ledger.tape_bytes, request.ad_mode)
             ),
         ),
     )

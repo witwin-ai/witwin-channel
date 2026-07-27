@@ -5,8 +5,7 @@ import torch
 from witwin.channel.propagation.topology import path_los_export
 from witwin.channel.runtime import torch_compat
 from witwin.channel.runtime.autograd_contracts import (
-    _ad_checked_tangent,
-    _ad_first_order_only,
+    _ad_checked_tangent, _ad_first_order_only,
     _ad_frequency_grad,
     _ad_frequency_tangent,
     _ad_frequency_value,
@@ -88,7 +87,6 @@ class _McFinalizeComponentMapsAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, grad_path_gain, *grad_powers):
         tx_count, dim0, dim1 = ctx.map_shape
         base = (
@@ -204,7 +202,6 @@ class _McLosGridMapsAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, grad_maps):
         if grad_maps is None or not ctx.needs_input_grad[0]:
             return None, None, None, None
@@ -651,7 +648,6 @@ class _McLosPathGainAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, grad_output):
         _ad_reject_fixed_inputs(
             "mc_los_path_gain_ad",
@@ -1037,7 +1033,6 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, grad_output):
         none_grads = (None,) * 14
         _ad_reject_fixed_inputs(
@@ -1575,7 +1570,6 @@ class _McDiffractionMapAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, grad_output):
         none_grads = (None,) * 24
         _ad_reject_fixed_inputs(

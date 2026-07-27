@@ -140,7 +140,6 @@ class _FieldSourceAmplitudeScaleAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, grad_path_field_vector):
         _ad_reject_fixed_inputs(
             "field_source_amplitude_scale_ad",

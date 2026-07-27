@@ -233,6 +233,30 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
         transformation["before"]["name"]
         for transformation in phase11b_transformations
     }
+    # ADR-043 gave the two Channel-owned field transports an optional
+    # arrival-direction cotangent input and a direction tangent output. Eight
+    # frozen bodies moved and nothing else did, so they are recorded here by
+    # before/after hash rather than silently absorbed.
+    adr043_transformations = migration["adr043_current"][
+        "approved_phase9_body_hash_transformations"
+    ]
+    adr043_names = {
+        transformation["before"]["name"]
+        for transformation in adr043_transformations
+    }
+    adr043_before = Counter(
+        _hash_tuple(transformation["before"])
+        for transformation in adr043_transformations
+    )
+    adr043_after = Counter(
+        _hash_tuple(transformation["after"])
+        for transformation in adr043_transformations
+    )
+    actual_adr043 = Counter(
+        _hash_tuple(entry)
+        for entry in current_hashes
+        if entry["name"] in adr043_names
+    )
     actual_phase11b = Counter(
         _hash_tuple(entry)
         for entry in current_hashes
@@ -273,6 +297,35 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
         + approved_deletions
         + phase11b_before
         + compact_count_helper_before
+        + adr043_before
+    )
+    assert actual_adr043 == adr043_after
+    assert len(adr043_transformations) == len(adr043_names) == 8
+    for transformation in adr043_transformations:
+        assert transformation["owner_before"] == "Channel Native"
+        assert transformation["owner_after"] == "Channel Native"
+        assert set(transformation["before"]) == set(HASH_FIELDS)
+        assert set(transformation["after"]) == set(HASH_FIELDS)
+        assert transformation["before"]["name"] == transformation["after"]["name"]
+        # Every one of them really did change body, and only the four that
+        # gained a parameter changed signature.
+        assert (
+            transformation["before"]["body_sha256"]
+            != transformation["after"]["body_sha256"]
+        )
+        assert transformation["signature_changed"] == (
+            transformation["before"]["signature_sha256"]
+            != transformation["after"]["signature_sha256"]
+        )
+        assert phase9_owners[transformation["owner_id"]][
+            _hash_tuple(transformation["before"])
+        ] == 1
+    assert (
+        sum(
+            transformation["signature_changed"]
+            for transformation in adr043_transformations
+        )
+        == 6
     )
     assert {
         entry["name"] for entry in compact_count_helper_after_entries

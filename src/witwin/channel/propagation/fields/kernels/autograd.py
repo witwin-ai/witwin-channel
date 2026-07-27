@@ -18,9 +18,9 @@ from witwin.channel.runtime.autograd_contracts import (
 )
 from witwin.channel.runtime.symbols import required_symbol as _required_native_op
 
+from . import _liveness
 from .functional import (
     _COUPLED_OUTPUT_FIELDS,
-    _FIELD_AD_DIRECTION_TANGENT_FIELDS,
     _FIELD_AD_OUTPUT_FIELDS,
     _FIELD_AD_TANGENT_FIELDS,
     _WEDGE_OUTPUT_FIELDS,
@@ -32,44 +32,6 @@ from .functional import (
     field_transmission_sequence_backward,
     field_transmission_sequence_jvp,
 )
-
-
-def _mark_dead_outputs(ctx, output) -> None:
-    """Declare which conditional outputs of one apply carry no derivative.
-
-    ``path_length_m`` and ``delay_s`` follow the ADR-038 geometry decision and
-    ``direction`` follows the ADR-043 direction decision. Both are taken by the
-    wrapper, where forward duals are still visible, and both are recorded on the
-    context before this runs. A dead output is marked exactly as it was before
-    the direction seam existed, so a caller that does not ask for a live
-    direction sees the same object graph it saw at contract version 5.
-    """
-
-    dead = []
-    if not ctx.geometry_live:
-        dead.extend((output[4], output[5]))
-    if not ctx.direction_live:
-        dead.append(output[6])
-    if dead:
-        ctx.mark_non_differentiable(*dead)
-
-
-def _direction_tangents(ctx, out: dict[str, torch.Tensor]) -> tuple:
-    """Publish one apply's output tangents under the two liveness decisions.
-
-    The native companion always computes the direction tangent - it is the dual
-    the transverse projection already needed - so this only decides whether it
-    is published. A dead output must receive ``None`` rather than a zero tensor,
-    because a zero tangent on a declared-dead output is exactly the silent
-    answer ADR-043 removes.
-    """
-
-    tangents = tuple(out[name] for name in _FIELD_AD_DIRECTION_TANGENT_FIELDS)
-    if not ctx.geometry_live:
-        return (*tangents[:4], None, None, None)
-    if not ctx.direction_live:
-        return (*tangents[:6], None)
-    return tangents
 
 
 class _FieldFreeSpaceAdFunction(torch.autograd.Function):
@@ -88,8 +50,7 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
         rx_polarization,
         frequency,
         frequency_value,
-        geometry_live,
-        direction_live,
+        liveness,
     ):
         op_name = (
             "field_free_space_fwd64"
@@ -117,8 +78,7 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
             rx_polarization,
             frequency,
             frequency_value,
-            geometry_live,
-            direction_live,
+            liveness,
         ) = inputs
         primals = tuple(
             torch.autograd.forward_ad.unpack_dual(value).primal
@@ -130,21 +90,15 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
             if isinstance(frequency, torch.Tensor)
             else None
         )
-        # Computed by the wrapper, where forward duals are still visible;
+        # Both decided by the wrapper, where forward duals are still visible;
         # Function.apply unpacks them before this hook runs.
-        ctx.geometry_live = geometry_live
-        # ADR-043: the arrival direction is a declared output whose liveness the
-        # wrapper decides once for the whole result. A dead direction is marked
-        # non-differentiable exactly as before, so nothing about the primal or
-        # the other outputs moves.
-        ctx.direction_live = direction_live
+        ctx.geometry_live, ctx.direction_live = liveness
         ctx.save_for_backward(*primals)
         ctx.save_for_forward(*primals)
-        _mark_dead_outputs(ctx, output)
+        _liveness.mark_dead_outputs(ctx, output)
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(
         ctx,
         grad_field_vector,
@@ -155,7 +109,7 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
         grad_delay,
         grad_direction,
     ):
-        none_grads = (None,) * 9
+        none_grads = (None,) * 8
         _ad_reject_fixed_inputs(
             "field_free_space_ad",
             ctx.needs_input_grad,
@@ -169,7 +123,7 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
             ctx.needs_input_grad[1]
         )
         need_frequency = bool(ctx.needs_input_grad[5])
-        grad_direction = grad_direction if ctx.direction_live else None
+        grad_direction = _liveness.direction_cotangent(ctx, grad_direction)
         grads = (
             grad_field_vector,
             grad_coefficient,
@@ -215,7 +169,6 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
             grad_frequency,
             None,
             None,
-            None,
         )
 
     @staticmethod
@@ -228,8 +181,7 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
         t_rx_pol,
         t_frequency,
         _t_frequency_value,
-        _t_geometry_live,
-        _t_direction_live,
+        _t_liveness,
     ):
         _ad_reject_fixed_tangents(
             "field_free_space_ad",
@@ -266,7 +218,7 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
                 tangent_source=tangent_source,
                 tangent_target=tangent_target,
             )
-        return _direction_tangents(ctx, out)
+        return _liveness.direction_tangents(ctx, out)
 
 
 def field_free_space_ad(
@@ -289,7 +241,6 @@ def field_free_space_ad(
 
     if frequency_value is None:
         frequency_value = _ad_frequency_value(frequency)
-    geometry_live = _ad_geometry_live(source, target)
     values = _FieldFreeSpaceAdFunction.apply(
         source,
         target,
@@ -298,8 +249,7 @@ def field_free_space_ad(
         rx_polarization,
         frequency,
         float(frequency_value),
-        geometry_live,
-        geometry_live and bool(direction_live),
+        _liveness.ad_liveness(direction_live, source, target),
     )
     return dict(zip(_FIELD_AD_OUTPUT_FIELDS, values, strict=True))
 
@@ -327,8 +277,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
         thickness,
         frequency,
         frequency_value,
-        geometry_live,
-        direction_live,
+        liveness,
     ):
         out = _required_native_op("field_reflection_sequence")(
             source,
@@ -361,16 +310,14 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
             if isinstance(frequency, torch.Tensor)
             else None
         )
-        # Computed by the wrapper, where forward duals are still visible.
-        ctx.geometry_live = inputs[14]
-        ctx.direction_live = inputs[15]
+        # Both decided by the wrapper, where forward duals are still visible.
+        ctx.geometry_live, ctx.direction_live = inputs[14]
         ctx.save_for_backward(*primals)
         ctx.save_for_forward(*primals)
-        _mark_dead_outputs(ctx, output)
+        _liveness.mark_dead_outputs(ctx, output)
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(
         ctx,
         grad_field_vector,
@@ -381,7 +328,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
         grad_delay,
         grad_direction,
     ):
-        none_grads = (None,) * 16
+        none_grads = (None,) * 15
         _ad_reject_fixed_inputs(
             "field_reflection_sequence_ad",
             ctx.needs_input_grad,
@@ -398,7 +345,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
         need_gain = bool(ctx.needs_input_grad[10])
         need_thickness = bool(ctx.needs_input_grad[11])
         need_frequency = bool(ctx.needs_input_grad[12])
-        grad_direction = grad_direction if ctx.direction_live else None
+        grad_direction = _liveness.direction_cotangent(ctx, grad_direction)
         grads = (
             grad_field_vector,
             grad_coefficient,
@@ -480,7 +427,6 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
             grad_frequency,
             None,
             None,
-            None,
         )
 
     @staticmethod
@@ -500,8 +446,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
         t_thickness,
         t_frequency,
         _t_frequency_value,
-        _t_geometry_live,
-        _t_direction_live,
+        _t_liveness,
     ):
         _ad_reject_fixed_tangents(
             "field_reflection_sequence_ad",
@@ -577,7 +522,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
                 tangent_interaction_positions=tangent_positions,
                 tangent_interaction_normals=tangent_normals,
             )
-        return _direction_tangents(ctx, out)
+        return _liveness.direction_tangents(ctx, out)
 
 
 def field_reflection_sequence_ad(
@@ -607,9 +552,6 @@ def field_reflection_sequence_ad(
 
     if frequency_value is None:
         frequency_value = _ad_frequency_value(frequency)
-    geometry_live = _ad_geometry_live(
-        source, target, interaction_positions, interaction_normals
-    )
     values = _FieldReflectionSequenceAdFunction.apply(
         source,
         target,
@@ -625,8 +567,9 @@ def field_reflection_sequence_ad(
         thickness,
         frequency,
         float(frequency_value),
-        geometry_live,
-        geometry_live and bool(direction_live),
+        _liveness.ad_liveness(
+            direction_live, source, target, interaction_positions, interaction_normals
+        ),
     )
     return dict(zip(_FIELD_AD_OUTPUT_FIELDS, values, strict=True))
 
@@ -703,14 +646,13 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
         ctx.geometry_live = _ad_geometry_live(*inputs[1:5])
         ctx.save_for_backward(*primals)
         ctx.save_for_forward(*primals)
-        if ctx.geometry_live:
-            ctx.mark_non_differentiable(output[6])
-        else:
-            ctx.mark_non_differentiable(output[4], output[5], output[6])
+        # ADR-043: RayD owns this family's direction seam, so the arrival
+        # direction is a declared non-differentiable output on every route.
+        ctx.direction_live = False
+        _liveness.mark_dead_outputs(ctx, output)
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(
         ctx,
         grad_field_vector,
@@ -1061,7 +1003,6 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, grad_field_vector, grad_direction):
         none_grads = (None,) * 28
         _ad_reject_fixed_inputs(
@@ -1415,7 +1356,6 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(
         ctx,
         grad_field_vector,
@@ -1732,7 +1672,6 @@ class _CoupledRdPrepareAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, grad_edge_point, grad_reflection_point, _grad_active):
         none_grads = (None,) * 8
         _ad_reject_fixed_inputs(

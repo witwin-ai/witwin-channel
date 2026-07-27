@@ -4,13 +4,12 @@ import torch
 
 from witwin.channel.runtime import torch_compat
 from witwin.channel.runtime.autograd_contracts import (
-    _ad_active_ctx,
+    _ad_active_ctx, _ad_first_order_only,
     _ad_check_active,
     _ad_check_optional_grad,
     _ad_check_rows,
     _ad_check_tangent_vec3,
     _ad_checked_tangent,
-    _ad_first_order_only,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
 )
@@ -378,7 +377,6 @@ class _RaydIntersectAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         none_grads = (None, None, None, None, None, None)
         if all(value is None for value in grad_outputs[:6]):
@@ -576,7 +574,6 @@ class _RaydTraceReflectionsAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         none_grads = (None, None, None, None, None, None, None)
         grad_t = grad_outputs[1]
@@ -951,7 +948,6 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 12
         grad_path_length = grad_outputs[1]
@@ -1198,7 +1194,6 @@ class _RaydFaceNormalsAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, grad_face_normals):
         if ctx.needs_input_grad[2]:
             raise RuntimeError(

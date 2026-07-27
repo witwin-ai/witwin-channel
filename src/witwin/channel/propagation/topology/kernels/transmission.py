@@ -83,7 +83,6 @@ class _EnumeratedTransmissionTopologyPackFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 13
         continuous_grads = tuple(

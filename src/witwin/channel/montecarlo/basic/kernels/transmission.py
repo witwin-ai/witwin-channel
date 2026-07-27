@@ -409,7 +409,6 @@ class _McTransmissionWallProductAd(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, grad_scaled, grad_transmittance, _grad_count, _grad_penetrated):
         _ad_reject_fixed_inputs(
             "mc_transmission_wall_product_ad",

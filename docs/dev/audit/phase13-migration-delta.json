@@ -1,1323 +1,1480 @@
 {
-    "schema_version": 1,
-    "baseline": {
-        "channel_commit_required": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
-        "channel_commit_scanned": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
-        "rayd_commit_required": "346416f8f35250cd50c7d320d877307d55a8fc9f",
-        "rayd_commit_scanned": "346416f8f35250cd50c7d320d877307d55a8fc9f",
-        "binding_count": 211,
-        "binding_manifest_sha256": "bcca1358baed39dfb95838bb4069b4b43b3ff62abf3d81859840c477a6fbaef7",
-        "immutable_owner_inventory_sha256": "772c2fe6023edb869c9671ff6e28bd0a1e970657da5010e07908586bbb926aab",
-        "rayd_lock": {
-            "schema_version": 1,
-            "repository_url": "https://github.com/Asixa/RayD.git",
-            "commit": "346416f8f35250cd50c7d320d877307d55a8fc9f",
-            "integration_abi": {
-                "kind": "source-header-sha256",
-                "path": "backends/torch/include/rayd/torch/integration.h",
-                "sha256": "13cf52d0d2e45638b3262faed249bded739887129ede09c2f8c5c0774f64d939"
-            }
-        }
-    },
-    "current_phase": 12,
-    "current_subphase": "validated RayD package-source discovery implemented; ADR-032 compact stable recovery accepted; ADR-027 comparative evidence closure open",
-    "transfers_applied": [
-        {
-            "phase": 3,
-            "scope": "RayD integration boundary",
-            "from": "copied extern-C signatures, getter indirection, integer scene handles",
-            "to": "source-linked typed rayd::torch API and RAII SceneResource",
-            "numerical_owner_changed": false
-        },
-        {
-            "phase": "6A",
-            "scope": "resident CSR layer-stack primal/JVP/VJP family",
-            "symbols": [
-                "em_layer_stack_eval",
-                "em_layer_stack_backward",
-                "em_layer_stack_jvp"
-            ],
-            "from": "Channel Native numerical implementation",
-            "to": "RayD typed RF implementation with Channel Native ABI facade",
-            "numerical_owner_changed": true,
-            "rayd_commit": "4cb400acbfcc2da7fda4110d1298d311816905f1",
-            "integration_header_sha256": "c8e162c55a0e5abe789e4f1b19cd6ab00ee4ef59d70244cfc55d58166aeb646b"
-        },
-        {
-            "phase": "6B",
-            "scope": "complete-row transmission field primal/JVP/VJP family",
-            "symbols": [
-                "field_transmission_sequence",
-                "field_transmission_sequence_backward",
-                "field_transmission_sequence_jvp"
-            ],
-            "from": "Channel Native numerical implementation",
-            "to": "RayD typed RF implementation with Channel Native ABI facade",
-            "numerical_owner_changed": true,
-            "rayd_commit": "3988f0934fec7b521ee5190b0defc0883c84b9e6",
-            "integration_header_sha256": "6cb18f682e08cb0bb0853507e3b4b82a68e681bb1dad89dc8c36518705f74989"
-        },
-        {
-            "phase": "8A",
-            "scope": "pure-wedge fixed-winner field primal/backward/JVP family",
-            "symbols": [
-                "field_diffraction_wedge",
-                "field_diffraction_wedge_backward",
-                "field_diffraction_wedge_jvp"
-            ],
-            "from": "Channel Native numerical implementation",
-            "to": "RayD typed RF implementation with Channel Native ABI facade",
-            "numerical_owner_changed": true,
-            "rayd_commit": "11e72526cdddf669678975c8921a9d44c6504e20",
-            "integration_header_sha256": "7a2b68f459e7e981a23735271eff2844fe0483d119cf514d59d2032d11be5aef"
-        },
-        {
-            "phase": "10A",
-            "scope": "scattering table evaluation/sampling, single-bounce ensemble, and patch-integral families",
-            "symbols": [
-                "scattering_table_eval",
-                "scattering_table_eval_backward",
-                "scattering_table_eval_jvp",
-                "scattering_table_sample",
-                "scattering_table_pdf",
-                "scattering_ensemble_eval",
-                "scattering_ensemble_eval_backward",
-                "scattering_ensemble_eval_jvp",
-                "scattering_patch_integral_eval",
-                "scattering_patch_integral_eval_backward",
-                "scattering_patch_integral_eval_jvp"
-            ],
-            "from": "Channel Native numerical implementation",
-            "to": "RayD typed RF implementation with Channel Native ABI facade",
-            "numerical_owner_changed": true,
-            "rayd_commit": "4577e744adfe8665f7817e3aff5e8e533ec896e7",
-            "integration_header_sha256": "9f95ad9e8e3b790d00f8e762a3e6a09252d46afb65bfc3aba7c42325836cb1fb",
-            "typed_header_sha256": "66d75a20be16057f03cdfb79e3b9dcc85cacec79b555cd73b019259aa510262a",
-            "shared_table_header_sha256": "38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38"
-        },
-        {
-            "phase": "10B",
-            "scope": "scattering v2 ensemble-chain and realization-chain primal/backward/JVP families",
-            "symbols": [
-                "scattering_chain_ensemble_eval",
-                "scattering_chain_ensemble_eval_backward",
-                "scattering_chain_ensemble_eval_jvp",
-                "scattering_chain_realization_eval",
-                "scattering_chain_realization_eval_backward",
-                "scattering_chain_realization_eval_jvp"
-            ],
-            "from": "Channel Native numerical implementation",
-            "to": "RayD typed RF implementation with Channel Native ABI facade",
-            "numerical_owner_changed": true,
-            "rayd_commit": "768b96e42a95f70c32d55f98a72000085317e288",
-            "integration_header_sha256": "0608bfbaf022379bc03442f9baa777ec05cfe3f6ab9b964e2385ec12a7b6c654",
-            "typed_header_sha256": "ac95c418860d109aeaa96623131592e4df8887992e5fc25ecab71b4ddbf1f55b",
-            "shared_table_header_sha256": "38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38"
-        }
-    ],
-    "renames_applied": [
-        {
-            "phase": 3,
-            "from": "raydn_scene_create",
-            "to": "rayd_scene_create"
-        },
-        {
-            "phase": 3,
-            "from": "raydn_scene_edge_records",
-            "to": "rayd_scene_edge_records"
-        },
-        {
-            "phase": 3,
-            "from": "raydn_intersect_backward",
-            "to": "rayd_intersect_backward"
-        },
-        {
-            "phase": 3,
-            "from": "raydn_intersect_jvp",
-            "to": "rayd_intersect_jvp"
-        },
-        {
-            "phase": 3,
-            "from": "raydn_trace_reflections_forward",
-            "to": "rayd_trace_reflections_forward"
-        },
-        {
-            "phase": 3,
-            "from": "raydn_trace_reflections_forward_tape",
-            "to": "rayd_trace_reflections_forward_tape"
-        },
-        {
-            "phase": 3,
-            "from": "raydn_trace_reflections_backward",
-            "to": "rayd_trace_reflections_backward"
-        },
-        {
-            "phase": 3,
-            "from": "raydn_trace_reflections_jvp",
-            "to": "rayd_trace_reflections_jvp"
-        },
-        {
-            "phase": 3,
-            "from": "raydn_reflection_epc_paths_forward",
-            "to": "rayd_reflection_epc_paths_forward"
-        },
-        {
-            "phase": 3,
-            "from": "raydn_reflection_epc_paths_backward",
-            "to": "rayd_reflection_epc_paths_backward"
-        },
-        {
-            "phase": 3,
-            "from": "raydn_reflection_epc_paths_jvp",
-            "to": "rayd_reflection_epc_paths_jvp"
-        },
-        {
-            "phase": 3,
-            "from": "raydn_scene_face_normals_backward",
-            "to": "rayd_scene_face_normals_backward"
-        },
-        {
-            "phase": 3,
-            "from": "raydn_scene_face_normals_jvp",
-            "to": "rayd_scene_face_normals_jvp"
-        },
-        {
-            "phase": 3,
-            "from": "raydn_diffraction_paths_order1_forward",
-            "to": "rayd_diffraction_paths_order1_forward"
-        },
-        {
-            "phase": 3,
-            "from": "raydn_coupled_rd_geometry_forward",
-            "to": "coupled_rd_geometry_forward"
-        },
-        {
-            "phase": 3,
-            "from": "raydn_coupled_dd_geometry_forward",
-            "to": "coupled_dd_geometry_forward"
-        },
-        {
-            "phase": 4,
-            "from": "bdpt_intersect_forward",
-            "to": "rayd_intersect_forward"
-        },
-        {
-            "phase": 4,
-            "from": "bdpt_visibility_forward",
-            "to": "rayd_visibility_forward"
-        },
-        {
-            "phase": 4,
-            "from": "bdpt_diffraction_discover_edges",
-            "to": "mc_diffraction_discover_edges"
-        },
-        {
-            "phase": 4,
-            "from": "bdpt_diffraction_discover_edges_counted",
-            "to": "mc_diffraction_discover_edges_counted"
-        },
-        {
-            "phase": "8B",
-            "from": "bdpt_diffraction_accumulation_forward",
-            "to": "rayd_diffraction_sample_tape_forward"
-        }
-    ],
-    "deletions_applied": [
-        {
-            "phase": 3,
-            "path": "native/channel_native/rayd/bridge.h"
-        },
-        {
-            "phase": 3,
-            "path": "native/channel_native/rayd/common.cpp"
-        },
-        {
-            "phase": 3,
-            "path": "src/witwin/channel_native/runtime/native_handles.py"
-        },
-        {
-            "phase": 3,
-            "path": "src/witwin/channel_native/core/runtime/raydn.py"
-        },
-        {
-            "phase": 4,
-            "binding": "bdpt_diffraction_connection_samples_from_tape",
-            "reachability": "dead by four-axis audit"
-        },
-        {
-            "phase": 4,
-            "binding": "bdpt_diffraction_edge_geometry",
-            "reachability": "dead by four-axis audit"
-        },
-        {
-            "phase": 4,
-            "binding": "bdpt_diffraction_point_connection_samples",
-            "reachability": "dead by four-axis audit"
-        },
-        {
-            "phase": 4,
-            "binding": "bdpt_diffraction_state_pack",
-            "reachability": "dead by four-axis audit"
-        },
-        {
-            "phase": 4,
-            "binding": "bdpt_diffraction_state_wi",
-            "reachability": "dead by four-axis audit"
-        },
-        {
-            "phase": 4,
-            "binding": "bdpt_reflection_accumulation_forward",
-            "reachability": "dead by four-axis audit"
-        },
-        {
-            "phase": 4,
-            "binding": "bdpt_selected_edge_indices",
-            "reachability": "dead by four-axis audit"
-        },
-        {
-            "phase": 4,
-            "binding": "bdpt_surface_group_edge_candidates",
-            "reachability": "dead by four-axis audit"
-        },
-        {
-            "phase": 4,
-            "binding": "path_diffraction_paths_order1",
-            "reachability": "dead by four-axis audit"
-        },
-        {
-            "phase": "6A",
-            "path": "native/channel_native/em/complex.cuh",
-            "replacement": "RayD:shared/include/rayd/shared/rf/complex.cuh"
-        },
-        {
-            "phase": "6A",
-            "path": "native/channel_native/em/medium.cuh",
-            "replacement": "RayD:shared/include/rayd/shared/rf/medium.cuh"
-        },
-        {
-            "phase": "6A",
-            "path": "native/channel_native/em/fresnel.cuh",
-            "replacement": "RayD:shared/include/rayd/shared/rf/fresnel.cuh"
-        },
-        {
-            "phase": "6A",
-            "path": "native/channel_native/em/layer_stack.cuh",
-            "replacement": "RayD:shared/include/rayd/shared/rf/layer_stack.cuh"
-        },
-        {
-            "phase": "6A",
-            "path": "native/channel_native/field_transport.cuh",
-            "replacement": "RayD:shared/include/rayd/shared/rf/field_transport.cuh"
-        },
-        {
-            "phase": "6A",
-            "path": "native/channel_native/field_transport_ad.cuh",
-            "replacement": "RayD:backends/torch/include/rayd/torch/rf/field_transport_ad.cuh"
-        },
-        {
-            "phase": "6A",
-            "path": "native/channel_native/kernels/em_debug.cu",
-            "replacement": "RayD:backends/torch/src/torch_ext/rf/layer_stack.cu"
-        },
-        {
-            "phase": "6B",
-            "path": "native/channel_native/kernels/field_transport_transmission.cu",
-            "replacement": "RayD:backends/torch/src/torch_ext/rf/transmission_sequence_ad.cu"
-        },
-        {
-            "phase": "6B",
-            "source": "native/channel_native/kernels/field_transport.cu",
-            "removed_complete_owner": "transmission_sequence_kernel and cn_field_transmission_sequence",
-            "replacement": "RayD:backends/torch/src/torch_ext/rf/transmission_sequence.cu"
-        },
-        {
-            "phase": "8A",
-            "path": "native/channel_native/kernels/field_wedge_ad_diffraction.cu",
-            "replacement": "RayD:backends/torch/src/torch_ext/rf/diffraction_wedge.cu",
-            "deleted_source_sha256": "68ec3fe180cd900834f0263969ee75d54764ad014e5d22b7c0b57822ea8e975b"
-        },
-        {
-            "phase": "10B",
-            "path": "native/channel_native/kernels/scattering_chain_ensemble.cu",
-            "replacement": "RayD:backends/torch/src/torch_ext/rf/scattering_chain_ensemble.cu"
-        },
-        {
-            "phase": "10B",
-            "path": "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
-            "replacement": "RayD:backends/torch/src/torch_ext/rf/scattering_chain_ensemble_ad.cu"
-        },
-        {
-            "phase": "10B",
-            "path": "native/channel_native/kernels/scattering_chain_realization.cu",
-            "replacement": "RayD:backends/torch/src/torch_ext/rf/scattering_chain_realization.cu"
-        },
-        {
-            "phase": "10B",
-            "path": "native/channel_native/kernels/scattering_chain_realization_ad.cu",
-            "replacement": "RayD:backends/torch/src/torch_ext/rf/scattering_chain_realization_ad.cu"
-        }
-    ],
-    "binding_count_delta": 23,
-    "implementation_owner_delta": {
-        "Channel Native": -26,
-        "RayD": 26
-    },
-    "next_update_rule": "Append one record after each accepted owner transfer; never rewrite the immutable Phase 9 inventory.",
-    "phase3_current": {
-        "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
-        "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
-        "integration_header_sha256": "d133b054e009fc5e9bf719df71cb91a3a0079382acdcbf3c04224d59cd3f7928",
-        "binding_count": 211,
-        "binding_manifest_sha256": "0bdefc4c1094578e82fbc4f1983e7bd0cf12b7c44d12fad3d8420586e97b84cb",
-        "typed_scene_resource": "RayDSceneResource",
-        "coupled_layered_owner_names": [
-            "coupled_rd_geometry_forward",
-            "coupled_dd_geometry_forward"
-        ],
-        "approved_post_phase9_field_wedge_launch_additions": [
-            {
-                "adr": "ADR-013",
-                "introduced_by_commit": "06ce1971ec5c4b26d2183a0ee928874dad387b8c",
-                "split_owner": "coupled",
-                "binding_symbol": "field_coupled_dd_backward",
-                "kernel": "coupled_dd_backward_kernel",
-                "launch_count": 1,
-                "numerical_owner": "Channel Native",
-                "plan13_disposition": "retained complete coupled-DD family"
-            },
-            {
-                "adr": "ADR-013",
-                "introduced_by_commit": "06ce1971ec5c4b26d2183a0ee928874dad387b8c",
-                "split_owner": "coupled",
-                "binding_symbol": "field_coupled_dd_jvp",
-                "kernel": "coupled_dd_jvp_kernel",
-                "launch_count": 1,
-                "numerical_owner": "Channel Native",
-                "plan13_disposition": "retained complete coupled-DD family"
-            }
-        ],
-        "approved_phase9_body_hash_transfer_multiset": [
-            {
-                "owner_id": "bdpt.diffraction_connection",
-                "binding_symbol": "bdpt_diffraction_connection_samples_from_tape",
-                "owner_before": "Channel Native",
-                "owner_after": "Channel Native",
-                "transfer_kind": "phase3-identifier-normalization",
-                "before": {
-                    "name": "bdpt_diffraction_connection_samples_from_tape_kernel",
-                    "token_count": 656,
-                    "signature_sha256": "8022464ff1c5c5d8a8876227ead50cb698d90ee99461463e8b074b56dabbadc1",
-                    "body_sha256": "1ab283eeff561f9fda2449b71c22734f9313be62681db51313768defb78b5cf1"
-                },
-                "after": {
-                    "name": "bdpt_diffraction_connection_samples_from_tape_kernel",
-                    "token_count": 656,
-                    "signature_sha256": "8022464ff1c5c5d8a8876227ead50cb698d90ee99461463e8b074b56dabbadc1",
-                    "body_sha256": "3300f3fc73a33e8dbc17522dc4f2ab434f9344fc2d224288ee752e2113f83885"
-                }
-            }
-        ]
-    },
-    "phase4_current": {
-        "binding_count": 202,
-        "binding_manifest_sha256": "283b7ea04fe8eaeeb5c4b8e4316856a099d5a31f7750e38acb2bfb810fd4b205",
-        "reachability_audit": "docs/dev/audit/phase13-phase4-dead-binding-reachability.json",
-        "renames": {
-            "bdpt_intersect_forward": "rayd_intersect_forward",
-            "bdpt_visibility_forward": "rayd_visibility_forward",
-            "bdpt_diffraction_discover_edges": "mc_diffraction_discover_edges",
-            "bdpt_diffraction_discover_edges_counted": "mc_diffraction_discover_edges_counted"
-        },
-        "deleted_bindings": [
-            "bdpt_diffraction_connection_samples_from_tape",
-            "bdpt_diffraction_edge_geometry",
-            "bdpt_diffraction_point_connection_samples",
-            "bdpt_diffraction_state_pack",
-            "bdpt_diffraction_state_wi",
-            "bdpt_reflection_accumulation_forward",
-            "bdpt_selected_edge_indices",
-            "bdpt_surface_group_edge_candidates",
-            "path_diffraction_paths_order1"
-        ],
-        "approved_phase9_body_hash_deletions": [
-            {
-                "owner_id": "bdpt.mis",
-                "name": "bdpt_diffraction_contribution",
-                "body_sha256": "6ba7b9ad09cd6f8d14fc6c4d1fe798c1c3638297669725fbb9f7ecb4d890d97d",
-                "signature_sha256": "f95a33e6fb6554ce82b2867cccc33d0980c6124d43cb264458f284fe623c8cef",
-                "token_count": 108
-            },
-            {
-                "owner_id": "bdpt.diffraction_connection",
-                "name": "bdpt_diffraction_connection_samples_from_tape_kernel",
-                "body_sha256": "1ab283eeff561f9fda2449b71c22734f9313be62681db51313768defb78b5cf1",
-                "signature_sha256": "8022464ff1c5c5d8a8876227ead50cb698d90ee99461463e8b074b56dabbadc1",
-                "token_count": 656
-            },
-            {
-                "owner_id": "bdpt.diffraction_connection",
-                "name": "bdpt_diffraction_point_connection_samples_kernel",
-                "body_sha256": "e59bbc0f522b41d301bd6c27596e6b93021b70d91077d4d706e89f7218496a73",
-                "signature_sha256": "ba55d4768e923178326ac6e990475c2773a0a212e77d812087e375faca340195",
-                "token_count": 943
-            },
-            {
-                "owner_id": "bdpt.diffraction_connection",
-                "name": "cn_bdpt_diffraction_connection_samples_from_tape_cuda",
-                "body_sha256": "cdc2d5d1ea4eae7254c43d9a30cc11d299514910d4d5492238f214e59230fa90",
-                "signature_sha256": "d7db6402a4550f7e83ed8df859823a3710945bd3c43e1d4f57597c7a3bbe3698",
-                "token_count": 1150
-            },
-            {
-                "owner_id": "bdpt.diffraction_connection",
-                "name": "cn_bdpt_diffraction_point_connection_samples_cuda",
-                "body_sha256": "aca1c567d6f426d2b4928845dbd957a7ae5f9b79fc833dfd48b35aba59baa95b",
-                "signature_sha256": "9e38a2fe15edb0d87ba2ff720a9c003e2a141025482f40692765433e04787d05",
-                "token_count": 1154
-            },
-            {
-                "owner_id": "bdpt.mis",
-                "name": "bdpt_splitmix64",
-                "body_sha256": "55c55df8585edd4b09a922f9326568f5c31df7943189dc63754c2ad68015773a",
-                "signature_sha256": "5ec9989bbfbc9420d54e0aff654eb168a9ae801a2384dfbae2c18288408da810",
-                "token_count": 53
-            },
-            {
-                "owner_id": "bdpt.mis",
-                "name": "bdpt_uniform01_from_u64",
-                "body_sha256": "66302863fd5c5cc7b7aaa781abd208662220f47d8fde5d470409bce608ab1896",
-                "signature_sha256": "87bbdc5971b85d92943d990f745d60607c5685a816648e4c8ecaf36590f3ad04",
-                "token_count": 17
-            },
-            {
-                "owner_id": "bdpt.mis",
-                "name": "check_diffraction_mis_args",
-                "body_sha256": "1662dea83dc0719f642187f849d909ae1debfa5ed3ff9866e574615a3e46a76e",
-                "signature_sha256": "42893ecf04e441321790859f996fdbcb4e4ecb6f86f674741720f4f169e9b5fb",
-                "token_count": 53
-            },
-            {
-                "owner_id": "bdpt.mis",
-                "name": "bdpt_diffraction_strategy_mis_weight",
-                "body_sha256": "18757532b218208a0ab52f4f44ac018f38e6c9deaeb489bf4436c47aa452eb9a",
-                "signature_sha256": "89dabfe3e52a34d1322150d00206b6eef01369309bc23ac783cd9a58d080d82c",
-                "token_count": 78
-            },
-            {
-                "owner_id": "bdpt.mis",
-                "name": "bdpt_grid_cell_center",
-                "body_sha256": "7831a389c5d90ed1004e5f1d60e8a39335499e16f99bfb7e844bd298143da6cd",
-                "signature_sha256": "20c1065e77af3b129f19d9d81194d6fef2dc43f27fcedc24b2d594c40160c5ba",
-                "token_count": 136
-            }
-        ],
-        "mc_discovery_owner_move": {
-            "from": "RayD bridge extern-C pointer-output forwarder",
-            "to": "montecarlo.basic typed Tensor-returning CUDA facade",
-            "numerical_owner_changed": false
-        },
-        "public_api_delta": false
-    },
-    "phase6a_current": {
-        "status": "complete",
-        "rayd_commit": "4cb400acbfcc2da7fda4110d1298d311816905f1",
-        "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
-        "integration_header_sha256": "c8e162c55a0e5abe789e4f1b19cd6ab00ee4ef59d70244cfc55d58166aeb646b",
-        "binding_count": 202,
-        "binding_manifest_sha256": "c9fca37ed77bfbfe23eb035214269e0e1ec351d7b587137215f67c80b5fe292d",
-        "owner_counts": {
-            "RayD": 20,
-            "layered": 2,
-            "Channel Native": 180
-        },
-        "transferred_symbols": [
-            "em_layer_stack_eval",
-            "em_layer_stack_backward",
-            "em_layer_stack_jvp"
-        ],
-        "shared_rf_helper_ownership": {
-            "RayD ADR-024 active": 112,
-            "Channel boundary retained": 10,
-            "Channel pending ADR-026": 7
-        },
-        "approved_phase9_body_hash_deletions": [
-            {
-              "owner_id": "field_transport.free_space",
-              "name": "fold_output_cotangents",
-              "token_count": 249,
-              "signature_sha256": "e183ddaadbd34a377450726aeda25285f9e4d4024b33eb81b3c352b1320a1dd7",
-              "body_sha256": "3dcfa11e35a32673dda99ec6956182f3e1064f0b81b6a28c9a66de346d32a49b"
-            },
-            {
-              "owner_id": "field_transport.free_space",
-              "name": "write_output_tangents",
-              "token_count": 185,
-              "signature_sha256": "30e8ea97dd96bad2ce1b8bd931bf4bd104a59fce9f9c3f043aae54c057e5cf02",
-              "body_sha256": "91f2a90d220d03da83b0a468acdd6f3dfed8e92771155675f65036f5deb7ab20"
-            },
-            {
-              "owner_id": "legacy_slab.primal",
-              "name": "legacy_add",
-              "token_count": 19,
-              "signature_sha256": "b47eb81386480eae6a8b0a0a5496b14b110f08892f4d08e9bfcce0fb9a4a9ac7",
-              "body_sha256": "d0d22f3046a2182ec921a0b9c67807f5cae23551132240fe40d11352b7774120"
-            },
-            {
-              "owner_id": "legacy_slab.primal",
-              "name": "legacy_sub",
-              "token_count": 19,
-              "signature_sha256": "6fc5a295c04c76caeda50bafaaa11a191db6eea9e00a484a1c175c572ebb37b3",
-              "body_sha256": "6e6ad0d4dc6e0879d2c364a6d2b94618bccc3b0a8e5cfd023ffde440866fa263"
-            },
-            {
-              "owner_id": "legacy_slab.primal",
-              "name": "legacy_mul",
-              "token_count": 35,
-              "signature_sha256": "5065ffe6ad33c58a0c195e6dc25f4b83015b9885ebfa5965e1b92687a76212a0",
-              "body_sha256": "f8835b07803fccee7b171d8fe42dd360db1d624b885fb97c72ab67881be47416"
-            },
-            {
-              "owner_id": "legacy_slab.primal",
-              "name": "legacy_scale",
-              "token_count": 15,
-              "signature_sha256": "019d36b71db32806515f91a0151dc98ab44dabecd3aafe0da5ba50eaf5da8ab3",
-              "body_sha256": "dcdf72a3f8412047491720804b0ea90f04a535adbea425c2103ca5adffbc5d84"
-            },
-            {
-              "owner_id": "legacy_slab.primal",
-              "name": "legacy_div",
-              "token_count": 68,
-              "signature_sha256": "c1a755fb048e1ff14f60c7a0227250ebc5f9eb47693105f93c7392ee72bdaa5d",
-              "body_sha256": "daf06092b1f1360af8e4b8a575cacaa9bd06837a7690f3a0e6f3fd1df750729a"
-            },
-            {
-              "owner_id": "legacy_slab.primal",
-              "name": "legacy_div_floor",
-              "token_count": 68,
-              "signature_sha256": "986fbbbbdab33a495b47c40ebae1fd0e67a03962b574a2e7c3e1b0ec532a9f02",
-              "body_sha256": "9092337aab9d177fcc7c2932fad76680eb72968dd828792398bd27f9bf839b4b"
-            },
-            {
-              "owner_id": "legacy_slab.primal",
-              "name": "legacy_sqrt",
-              "token_count": 73,
-              "signature_sha256": "877dad44857d87bce786dfddb4bd5eec1c9af49a0e77c487c26efdf1f9587987",
-              "body_sha256": "3dded7023a4f68bde90150028d002f6f06593d8fccfb6572d08d49842dbd8cc5"
-            },
-            {
-              "owner_id": "legacy_slab.primal",
-              "name": "legacy_interface_sqrt",
-              "token_count": 83,
-              "signature_sha256": "afa3d60a35d960e6a41b9bb9b4bde07bcced6efe8a1c4ff3d8a3a36c1b558f6e",
-              "body_sha256": "a2e7639876f8e5d302ade1f394606be43784b1839e5bece0985ffc8e7f755668"
-            },
-            {
-              "owner_id": "legacy_slab.primal",
-              "name": "legacy_interface_fresnel",
-              "token_count": 170,
-              "signature_sha256": "ea052aec3c75d7a69d947c2d610005dbd3238cf5501aadb00a2150e1966baee1",
-              "body_sha256": "a742c4f8298e50013b3262d4fb032ab0324672ce5679b0a52ae7025b45330ecf"
-            },
-            {
-              "owner_id": "legacy_slab.primal",
-              "name": "legacy_exp_neg_2i",
-              "token_count": 51,
-              "signature_sha256": "7a9937061fe6bc3a004c04c8975dc6df705dc00e1eeba870b6133baec565d520",
-              "body_sha256": "e41285ac832d174fbddd5d4abb98b52f146370fbd859243fa481fe0894951d55"
-            },
-            {
-              "owner_id": "legacy_slab.primal",
-              "name": "legacy_sionna_slab_fresnel",
-              "token_count": 332,
-              "signature_sha256": "9d7bb17cda78996cbae3928c4cf0dabbe208429b2ceb56b4e82c94a8463055d1",
-              "body_sha256": "c9cd0be01a95967efab64ffc85004aa459ce37ac935560b991123f185039fff6"
-            },
-            {
-              "owner_id": "legacy_slab.dual",
-              "name": "dlc_const",
-              "token_count": 15,
-              "signature_sha256": "d7a9771bd2b1a1e04e7ad728e8e460329920962ad964265a1eb975c70bb3b2f1",
-              "body_sha256": "34258cb9c4dfc6aa004daac912a8cd6f2d725809b6e2dffd122a718f9a533729"
-            },
-            {
-              "owner_id": "legacy_slab.dual",
-              "name": "dlc_make",
-              "token_count": 15,
-              "signature_sha256": "c3f12e72e39fb405f37470e191d4ebaccbb3f7af2aa815d44d06c7e2432e698f",
-              "body_sha256": "1db2023c639bf43976f698c471c8c084c8eeff058bb529b10a4eecfc6bb4faf2"
-            },
-            {
-              "owner_id": "legacy_slab.dual",
-              "name": "dlc_add",
-              "token_count": 29,
-              "signature_sha256": "eb0c849fe7dfb3f27b50b46b6a12986affeb33c84b0735910798fb081d28a1d8",
-              "body_sha256": "9f4ea2743602e873114a40d4f43d9df8086947ca4159f37693aec4a8d39fc3bb"
-            },
-            {
-              "owner_id": "legacy_slab.dual",
-              "name": "dlc_sub",
-              "token_count": 29,
-              "signature_sha256": "c308a43bc0d88acb6fb30a5f3db9baf2d5c440ce3596ff10d3356f3270f27254",
-              "body_sha256": "992f6ec5ceb33a8063e0b4b8982a463faf8ad29a4ca31f776b2fc815f035336c"
-            },
-            {
-              "owner_id": "legacy_slab.dual",
-              "name": "dlc_mul",
-              "token_count": 47,
-              "signature_sha256": "e02906b8da9c76632181ee287b89769ba0d47761f0e3dfda639d2640a2e9ef42",
-              "body_sha256": "bd98c786324306f88ec56879f2eeb4bbaf37a750562180c23f66962e64f1947b"
-            },
-            {
-              "owner_id": "legacy_slab.dual",
-              "name": "dlc_scale_dual",
-              "token_count": 47,
-              "signature_sha256": "9574b7b3c044562552cacb568854dd51ba0616f5de57c98f3f1fbae652745cb8",
-              "body_sha256": "152d8bfecb71401f27a901c75e82d146d27cd7e45e4dc759b4f5ee98ab3575c2"
-            },
-            {
-              "owner_id": "legacy_slab.dual",
-              "name": "dlc_div",
-              "token_count": 197,
-              "signature_sha256": "188141e8ac169fc3383ca792007a2a7950b6c0c35e1ca2e6d32a0a69678bae7d",
-              "body_sha256": "4068dc59d550ce72058b7be845688dd3368717b27a4a253e16b66cb04d3f5e53"
-            },
-            {
-              "owner_id": "legacy_slab.dual",
-              "name": "dlc_sqrt",
-              "token_count": 146,
-              "signature_sha256": "a04cd1b061db7ff79d7277ed4120c1a18c1f9100dd131f5eeb72997e6babb92f",
-              "body_sha256": "cae8e025b4024b342feaf5767f701570d04ce75cde79d9906dc5bd91d7367b29"
-            },
-            {
-              "owner_id": "legacy_slab.dual",
-              "name": "dlc_exp_neg_2i",
-              "token_count": 131,
-              "signature_sha256": "9a4d5cacd0f6db8cde838391d1233faec22e0456f87f78570e9f3007ef95de6d",
-              "body_sha256": "a648d9d062e768b5152a2c64f5fa3b744c76e87340a648fc9360fe6bd258dcf1"
-            },
-            {
-              "owner_id": "legacy_slab.dual",
-              "name": "legacy_sionna_slab_fresnel_dual",
-              "token_count": 531,
-              "signature_sha256": "e484e1b309567f92ee0da437641f920bc5d1930a7c679f777e37b97368683743",
-              "body_sha256": "a2869629125cea3e050edb1b2bdd8789058bb52fb961daa22a28fd7540b086f7"
-            }
-        ],
-        "public_api_delta": false,
-        "binding_count_delta": 0
-    },
-    "phase6b_current": {
-        "status": "complete",
-        "rayd_commit": "3988f0934fec7b521ee5190b0defc0883c84b9e6",
-        "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
-        "integration_header_sha256": "6cb18f682e08cb0bb0853507e3b4b82a68e681bb1dad89dc8c36518705f74989",
-        "integration_header_identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence",
-        "binding_count": 202,
-        "binding_manifest_sha256": "6c9ac270c8f243ff63f1c6f4466e5410e78683e10d906a0c7226fd84a208c252",
-        "owner_counts": {
-            "RayD": 23,
-            "layered": 2,
-            "Channel Native": 177
-        },
-        "transferred_symbols": [
-            "field_transmission_sequence",
-            "field_transmission_sequence_backward",
-            "field_transmission_sequence_jvp"
-        ],
-        "deleted_channel_numerical_sources": [
-            "native/channel_native/kernels/field_transport_transmission.cu"
-        ],
-        "reduced_channel_numerical_sources": {
-            "native/channel_native/kernels/field_transport.cu": [
-                "transmission_sequence_kernel",
-                "cn_field_transmission_sequence"
-            ]
-        },
-        "retained_channel_complete_owner": [
-            "bdpt_transmitted_light_subpath_state",
-            "bdpt_transmitted_light_subpath_state_backward",
-            "bdpt_transmitted_light_subpath_state_jvp"
-        ],
-        "approved_phase9_body_hash_deletions": [
-            {
-                "owner_id": "field_transport.transmission_sequence",
-                "name": "transmission_chain_eval",
-                "token_count": 749,
-                "signature_sha256": "7e61a9e0dc3ceef7defbdc0a36d440d990556b6f32caf5158e3dc7fefa538851",
-                "body_sha256": "ebae8067eee80a2d56216325e8b4785d07a32e38cdac74dfda117b3b1f8eb8f7"
-            },
-            {
-                "owner_id": "field_transport.transmission_sequence",
-                "name": "transmission_sequence_backward_kernel",
-                "token_count": 1541,
-                "signature_sha256": "082fc621f6b557ad9e7f8e2cb1c6336f2cc592caf35b5c84841ad766385aed8a",
-                "body_sha256": "3e64e3d516a5f627813de43a0aaff03ea6c2816ce2c56d42d288532e5a2ba7fc"
-            },
-            {
-                "owner_id": "field_transport.transmission_sequence",
-                "name": "transmission_sequence_jvp_kernel",
-                "token_count": 1036,
-                "signature_sha256": "53a89f1e70d317242f005a3cb79b93d4d1f7e61e6f8374ae8437ab8b58f86e89",
-                "body_sha256": "477444b24733dc05cca1e299fd771a91214ac1ece643ae6f0a9caae9eee5eba8"
-            },
-            {
-                "owner_id": "field_transport.transmission_sequence",
-                "name": "cn_field_transmission_sequence_backward",
-                "token_count": 1043,
-                "signature_sha256": "4cce9017deb64e3fe6eaa617292a028a9423d8e33e3e11f8e0a553b738bd8d8d",
-                "body_sha256": "41c911f87712c8ea5efa226620c183ff4d873170f099e0824ab32994702bbb70"
-            },
-            {
-                "owner_id": "field_transport.transmission_sequence",
-                "name": "cn_field_transmission_sequence_jvp",
-                "token_count": 800,
-                "signature_sha256": "baff4f19bf6743a2edceaf47edd89b7b5d534b0b6dbdea17b53d02a681f66892",
-                "body_sha256": "f7149697c4f8a188ebc7ba79a00a8b7d8ee194e0aad726870947b1d5101d1d8c"
-            }
-        ],
-        "public_api_delta": false,
-        "binding_count_delta": 0
-    },
-    "phase8a_current": {
-        "status": "complete",
-        "rayd_commit": "11e72526cdddf669678975c8921a9d44c6504e20",
-        "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
-        "integration_header_sha256": "7a2b68f459e7e981a23735271eff2844fe0483d119cf514d59d2032d11be5aef",
-        "integration_header_identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction",
-        "binding_count": 202,
-        "binding_manifest_sha256": "fd42f559bebe3933360312a35fa839b72f94faeef49c88c28e06a83e896994a4",
-        "owner_counts": {
-            "RayD": 26,
-            "layered": 2,
-            "Channel Native": 174
-        },
-        "transferred_symbols": [
-            "field_diffraction_wedge",
-            "field_diffraction_wedge_backward",
-            "field_diffraction_wedge_jvp"
-        ],
-        "deleted_channel_numerical_sources": [
-            "native/channel_native/kernels/field_wedge_ad_diffraction.cu"
-        ],
-        "deleted_source_sha256": "68ec3fe180cd900834f0263969ee75d54764ad014e5d22b7c0b57822ea8e975b",
-        "activation_evidence": "docs/dev/audit/phase13-diffraction-phase8a-evidence.json",
-        "duplication_refresh": {
-            "duplicate_lines": 10661,
-            "total_lines": 84347,
-            "duplicate_coverage_percent": 12.639454,
-            "frozen_budget_percent": 10.211512,
-            "classified_regions": 179,
-            "stale_region_count": 0,
-            "unclassified_region_count": 0
-        },
-        "approved_phase9_body_hash_deletions": [
-            {
-                "owner_id": "field_wedge.diffraction",
-                "name": "wedge_seeds_zero",
-                "token_count": 108,
-                "signature_sha256": "a149126cf1ed8b922240300c1a76a941dd92572c5f3989827d4944f1ba4fd3f4",
-                "body_sha256": "3b927142dda284ec9ebec16f5be5a184b4717dd1c36b09b1c790ed2047dbabb3"
-            },
-            {
-                "owner_id": "field_wedge.diffraction",
-                "name": "wedge_acos",
-                "token_count": 29,
-                "signature_sha256": "6a3bf299257c3da1321d53be304d2c41742d1dc8a6047e9104b76f72cf2399f2",
-                "body_sha256": "213f330e2f0b1a7b2f7ce1a23fd93c1fe1b660a683031d6eb0984f75ec14dbba"
-            },
-            {
-                "owner_id": "field_wedge.diffraction",
-                "name": "primal3",
-                "token_count": 33,
-                "signature_sha256": "dc6b3ee987518dc443c1bafcce8c5ce097b36490010e69041d3500f634a8bc72",
-                "body_sha256": "d00ee7f54088aed44c0bfee1fc6eb60f2ab64ee877e99908cb20e1566e512814"
-            },
-            {
-                "owner_id": "field_wedge.diffraction",
-                "name": "wedge_edge_tables_from_vertices",
-                "token_count": 556,
-                "signature_sha256": "b8ade5a32075ce7fe7046a422ae6ae77320696a84608679b572a205f21830094",
-                "body_sha256": "7512fabea5a8f664836d6f95798eb96ea46ddc6dc96fb752a3f25befba9039c4"
-            },
-            {
-                "owner_id": "field_wedge.diffraction",
-                "name": "wedge_face_material",
-                "token_count": 62,
-                "signature_sha256": "9855841b90020b7547403ab356b62e88b582838104bbb18c15c1a2f929de66ca",
-                "body_sha256": "f9c19f747b3c7854e5da127adfe8ee0f8abe6b3e2ee110a8aabbabc416a343b9"
-            },
-            {
-                "owner_id": "field_wedge.diffraction",
-                "name": "wedge_row_eval",
-                "token_count": 749,
-                "signature_sha256": "eebcfc55403a0d9c73a824f557b15ef52218955daf3bde3ce44aac86eaae4485",
-                "body_sha256": "ca1ba4d3b175facda66f81e86cc91620249b2e5e1d53cd0c9d3504402ac4ba99"
-            },
-            {
-                "owner_id": "field_wedge.diffraction",
-                "name": "load_wedge_row",
-                "token_count": 328,
-                "signature_sha256": "40bc68470cebaec399cd48dc7e41f5ddf58e92717a7cd947abf1d0a59eea0402",
-                "body_sha256": "555d0db0eaed8ba47f6187ef5cf87db6f538b106d74dad207d99c20dca5e9535"
-            },
-            {
-                "owner_id": "field_wedge.diffraction",
-                "name": "diffraction_wedge_forward_kernel",
-                "token_count": 167,
-                "signature_sha256": "c8c41f829c9291572a9e41373bc65ac762bf13f0e831314d9739681b07fae7d6",
-                "body_sha256": "7deeb4ded7817c6a6e95d7130f909c2547d7d866095dba515bd55e6be47c1286"
-            },
-            {
-                "owner_id": "field_wedge.diffraction",
-                "name": "wedge_contract",
-                "token_count": 157,
-                "signature_sha256": "46507750e363cb10a0efb033105eda7d5cfd4e2bfacb28bf5201b5ec55f84870",
-                "body_sha256": "566f08a0523c6fbc023091c707f877d097eaf7da16fa2fc8fc17f083bc57af6b"
-            },
-            {
-                "owner_id": "field_wedge.diffraction",
-                "name": "diffraction_wedge_backward_kernel",
-                "token_count": 694,
-                "signature_sha256": "be272f0018592ab92b6d158e4be9b7753fc2c72b230374127b49e017ae0e65e8",
-                "body_sha256": "632a488649c5e7ade9abab3ede15ce91df53fd34863ed6beea064cb9db472a1e"
-            },
-            {
-                "owner_id": "field_wedge.diffraction",
-                "name": "diffraction_wedge_jvp_kernel",
-                "token_count": 385,
-                "signature_sha256": "0190aac0e29e77e3dc68e81b254f1bb1e64edf9aa870cc951296b3a97602cf29",
-                "body_sha256": "5598c64cd07c5d88d807ef09e8403ca12b2851e2107fcaea2ed11730696e8151"
-            },
-            {
-                "owner_id": "field_wedge.diffraction",
-                "name": "check_wedge_primal",
-                "token_count": 312,
-                "signature_sha256": "39a2db69a32f68733a3153ec4c2e3f09b18f4deeea778da09008b77fadca541e",
-                "body_sha256": "56ad519db7910ada20ff04ba06ecc34679df9c8e923fc4428ea0e68d2f27d9d9"
-            },
-            {
-                "owner_id": "field_wedge.diffraction",
-                "name": "resolve_wedge_vertices",
-                "token_count": 259,
-                "signature_sha256": "33d16b51bffd8ebd7f3f9097b2fcb37bb5c6319e217eaef43771c8cdc88ab1d5",
-                "body_sha256": "2e1947b0d17b4d169bbb18d9cf1e2f1d40c1a7ff9c23e4a1f1892d178820f201"
-            },
-            {
-                "owner_id": "field_wedge.diffraction",
-                "name": "cn_field_diffraction_wedge",
-                "token_count": 247,
-                "signature_sha256": "6fe72cadfd77e9c427a244bc092c9ba781d390303de94935201787daf3f4e5b1",
-                "body_sha256": "c5d257682b148e3abbaf71ed254d081ab24939365d6ae758a861e618f598d9eb"
-            },
-            {
-                "owner_id": "field_wedge.diffraction",
-                "name": "cn_field_diffraction_wedge_backward",
-                "token_count": 1205,
-                "signature_sha256": "d7e1c2fedfc70e00246ac50c9d63e0ebb7f652c6aa121f3f915be0ea601b9e91",
-                "body_sha256": "e584db67ef5f8c8e8d02a29fbf8fc11d1f15749edc349cdbf14e854943549f66"
-            },
-            {
-                "owner_id": "field_wedge.diffraction",
-                "name": "cn_field_diffraction_wedge_jvp",
-                "token_count": 808,
-                "signature_sha256": "b14ea8c47a4cd210f01ca93820644be19dbd0d81afa9404499576368d919359f",
-                "body_sha256": "744f1ca42788f6c3262ced6f84aadaaa3c5dce0bf04e42213b9172c05176a85e"
-            }
-        ],
-        "public_api_delta": false,
-        "binding_count_delta": 0
-    },
-    "phase10a_current": {
-        "status": "complete",
-        "rayd_commit": "4577e744adfe8665f7817e3aff5e8e533ec896e7",
-        "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
-        "integration_header_sha256": "9f95ad9e8e3b790d00f8e762a3e6a09252d46afb65bfc3aba7c42325836cb1fb",
-        "integration_header_identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction.scattering-table-single-bounce",
-        "typed_header_sha256": "66d75a20be16057f03cdfb79e3b9dcc85cacec79b555cd73b019259aa510262a",
-        "shared_table_header_sha256": "38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38",
-        "binding_count": 202,
-        "binding_manifest_sha256": "54a0e643fd6d5986e3a0ba12c30db5a23372b62b7537f9218c327aadac2ee308",
-        "contract_coverage_manifest_sha256": "a04d12baff4aeb2fdbee09cc40f30dbca9bb7588680c1317423f6e34e856071f",
-        "owner_counts": {
-            "RayD": 37,
-            "layered": 2,
-            "Channel Native": 163
-        },
-        "transferred_symbols": [
-            "scattering_table_eval",
-            "scattering_table_eval_backward",
-            "scattering_table_eval_jvp",
-            "scattering_table_sample",
-            "scattering_table_pdf",
-            "scattering_ensemble_eval",
-            "scattering_ensemble_eval_backward",
-            "scattering_ensemble_eval_jvp",
-            "scattering_patch_integral_eval",
-            "scattering_patch_integral_eval_backward",
-            "scattering_patch_integral_eval_jvp"
-        ],
-        "deleted_channel_numerical_sources": [
-            "native/channel_native/kernels/scattering_table_eval_ad.cu",
-            "native/channel_native/kernels/scattering_ensemble.cu",
-            "native/channel_native/kernels/scattering_ensemble_ad.cu",
-            "native/channel_native/kernels/scattering_patch_integral.cu",
-            "native/channel_native/kernels/scattering_patch_integral_ad.cu",
-            "native/channel_native/kernels/scattering_table.cuh"
-        ],
-        "retained_channel_numerical_owners": [
-            "native/channel_native/kernels/scattering.cu:event policy only",
-            "native/channel_native/kernels/scattering_chain_ensemble.cu",
-            "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
-            "native/channel_native/kernels/scattering_chain_realization.cu",
-            "native/channel_native/kernels/scattering_chain_realization_ad.cu"
-        ],
-        "activation_evidence": "docs/dev/audit/phase13-scattering-phase10a-evidence.json",
-        "duplication_refresh": {
-            "duplicate_lines": 9730,
-            "total_lines": 81675,
-            "duplicate_coverage_percent": 11.91307,
-            "frozen_budget_percent": 10.211512,
-            "classified_regions": 169,
-            "stale_region_count": 0,
-            "unclassified_region_count": 0
-        },
-        "approved_phase9_body_hash_deletions": [
-            {
-                "owner_id": "scattering.ensemble_eval",
-                "name": "ensemble_eval_kernel",
-                "token_count": 591,
-                "signature_sha256": "0b0be25829f757cc720f79e524409dec2899ee7026d34b9f179d4f6b4c1c4201",
-                "body_sha256": "1bef2ea288e8a6a5c8a9665c98d4dac37f62a6e899fb82181198f687b604c54e"
-            },
-            {
-                "owner_id": "scattering.ensemble_eval",
-                "name": "cn_scattering_ensemble_eval",
-                "token_count": 889,
-                "signature_sha256": "fce18566d73ed42c87a94bbb20cd7ff35276959b4399ac753d74e563bd83fef1",
-                "body_sha256": "4339267a52878c4dad94ac4d79543a0cacb6f213c624c147abac1a2a05f87275"
-            },
-            {
-                "owner_id": "scattering.ensemble_eval",
-                "name": "eval_te_tm",
-                "token_count": 255,
-                "signature_sha256": "0057a85f808b3cc054f7c05788c309ea74ad28712f35c52d68008caf5825c21c",
-                "body_sha256": "650f97839e80a488d96f3bb2f303734f97790d6889f24d56056f74c588a4c8c1"
-            },
-            {
-                "owner_id": "scattering.patch_integral",
-                "name": "patch_integral_rows_kernel",
-                "token_count": 1211,
-                "signature_sha256": "e9b3880059dbb0b27e5e0bb553be0a8e9360339d54a62d30abefdc5a308ef9c2",
-                "body_sha256": "c6d9d489a09ace50d73593aec8e7d003a707de9f2c9df99948753060d2026250"
-            },
-            {
-                "owner_id": "scattering.patch_integral",
-                "name": "patch_integral_total_kernel",
-                "token_count": 174,
-                "signature_sha256": "4c238e7696c3ca793d3b80d18c8e2c46859ad30f659750758acb55ebf620c79e",
-                "body_sha256": "1da4a5ebfd313f2258fa8cc065087af6e4bc703b7342d208c37215999d972a68"
-            },
-            {
-                "owner_id": "scattering.patch_integral",
-                "name": "cn_scattering_patch_integral_eval",
-                "token_count": 869,
-                "signature_sha256": "67d41c340fa140172b2123f52d8e4b0c234fee9a0e3ed063b2f35c8922f80bb6",
-                "body_sha256": "e05c29877d2cf3cb99dd12fc03dd00f2587eeeff238a59b4695fb484467a52e4"
-            }
-        ],
-        "public_api_delta": false,
-        "binding_count_delta": 0
-    },
-    "phase10b_current": {
-        "status": "complete",
-        "rayd_commit": "768b96e42a95f70c32d55f98a72000085317e288",
-        "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
-        "integration_header_sha256": "0608bfbaf022379bc03442f9baa777ec05cfe3f6ab9b964e2385ec12a7b6c654",
-        "integration_header_identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction.scattering-table-single-bounce.scattering-chains",
-        "typed_header_sha256": "ac95c418860d109aeaa96623131592e4df8887992e5fc25ecab71b4ddbf1f55b",
-        "shared_table_header_sha256": "38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38",
-        "binding_count": 202,
-        "binding_manifest_sha256": "264bddd77eed701b951bab1bb03185ba8ef53c0e6953c1f1ed3a0a1c12405b71",
-        "contract_coverage_manifest_sha256": "a04d12baff4aeb2fdbee09cc40f30dbca9bb7588680c1317423f6e34e856071f",
-        "owner_counts": {
-            "RayD": 43,
-            "layered": 2,
-            "Channel Native": 157
-        },
-        "transferred_symbols": [
-            "scattering_chain_ensemble_eval",
-            "scattering_chain_ensemble_eval_backward",
-            "scattering_chain_ensemble_eval_jvp",
-            "scattering_chain_realization_eval",
-            "scattering_chain_realization_eval_backward",
-            "scattering_chain_realization_eval_jvp"
-        ],
-        "deleted_channel_numerical_sources": [
-            "native/channel_native/kernels/scattering_chain_ensemble.cu",
-            "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
-            "native/channel_native/kernels/scattering_chain_realization.cu",
-            "native/channel_native/kernels/scattering_chain_realization_ad.cu"
-        ],
-        "retained_channel_numerical_owners": [
-            "native/channel_native/kernels/scattering.cu:event policy only"
-        ],
-        "ad_contract": {
-            "ensemble_geometry": "JVP-only; VJP fails loudly",
-            "realization_geometry": "VJP and JVP supported"
-        },
-        "activation_evidence": "docs/dev/audit/phase13-scattering-phase10b-evidence.json",
-        "duplication_refresh": {
-            "duplicate_lines": 8747,
-            "total_lines": 78304,
-            "duplicate_coverage_percent": 11.170566,
-            "frozen_budget_percent": 10.211512,
-            "classified_regions": 160,
-            "stale_region_count": 0,
-            "unclassified_region_count": 0,
-            "budget_relaxed": false,
-            "status": "all regions classified; implementation complete; frozen duplication acceptance remains a Phase 11 blocker"
-        },
-        "approved_phase9_body_hash_deletions": [],
-        "public_api_delta": false,
-        "binding_count_delta": 0
-    },
-    "phase11a_current": {
-        "scope": "mechanical typed-boundary deduplication in fields.cpp and materials.cpp",
-        "evidence": "docs/dev/audit/phase13-boundary-dedup-phase11a-evidence.json",
-        "binding_count": 202,
-        "binding_manifest_sha256": "65e8adc54774d77989476bd05e0186f5c68ba74e8e763c5c467b9490d972bc52",
-        "binding_semantic_changes": 0,
-        "duplication_refresh": {
-            "duplicate_lines": 8402,
-            "total_lines": 78162,
-            "duplicate_coverage_percent": 10.749469,
-            "frozen_budget_percent": 10.211512,
-            "classified_regions": 155,
-            "stale_region_count": 0,
-            "unclassified_region_count": 0,
-            "budget_relaxed": false,
-            "status": "boundary deduplication complete; frozen duplication acceptance remains pending Phase 11B"
-        },
-        "numerical_change": false,
-        "native_abi_change": false,
-        "launch_contract_change": false,
-        "public_api_delta": false
-    },
-    "phase11b_current": {
-        "status": "historical Phase 11B implementation snapshot; frozen duplication acceptance met and later release closure completed",
-        "scope": "mechanical Python facade and native launch/configuration boilerplate deduplication",
-        "evidence": "docs/dev/audit/phase13-boundary-dedup-phase11b-evidence.json",
-        "duplication_refresh": {
-            "duplicate_lines": 7826,
-            "total_lines": 77821,
-            "duplicate_coverage_percent": 10.056413,
-            "frozen_budget_percent": 10.211512,
-            "classified_regions": 143,
-            "stale_region_count": 0,
-            "unclassified_region_count": 0,
-            "budget_relaxed": false,
-            "budget_met": true,
-            "status": "all current regions classified; frozen duplication coverage acceptance met"
-        },
-        "binding_count": 202,
-        "binding_manifest_sha256": "65e8adc54774d77989476bd05e0186f5c68ba74e8e763c5c467b9490d972bc52",
-        "binding_manifest_changed": false,
-        "approved_phase9_body_hash_transformations": [
-            {
-                "owner_id": "bdpt.connection_storage",
-                "binding_symbol": "bdpt_compact_connection_samples",
-                "owner_before": "Channel Native",
-                "owner_after": "Channel Native",
-                "transformation_kind": "phase11b-compile-time-boilerplate-deduplication",
-                "before": {
-                    "name": "cn_bdpt_compact_connection_samples_cuda",
-                    "token_count": 1010,
-                    "signature_sha256": "6b1964b3abfe917f5a3f159911ea99e322725d3d583645c91306f30f0d4caaf5",
-                    "body_sha256": "9923aac65a6d2aea3abfd39cc0dd18f91e92a662c1123179bd90c22287f79aaf"
-                },
-                "after": {
-                    "name": "cn_bdpt_compact_connection_samples_cuda",
-                    "token_count": 537,
-                    "signature_sha256": "6b1964b3abfe917f5a3f159911ea99e322725d3d583645c91306f30f0d4caaf5",
-                    "body_sha256": "82231840fabd06b7896d475e3bc47478d67209d0711208557114dfd402d312b3"
-                }
-            },
-            {
-                "owner_id": "bdpt.connection_storage",
-                "binding_symbol": "bdpt_concat_connection_samples",
-                "owner_before": "Channel Native",
-                "owner_after": "Channel Native",
-                "transformation_kind": "phase11b-compile-time-boilerplate-deduplication",
-                "before": {
-                    "name": "cn_bdpt_concat_connection_samples_cuda",
-                    "token_count": 1200,
-                    "signature_sha256": "ae7d850602662328b0ce273c4aff81c29ec99debff17e5dc56b5717c9bec8ac2",
-                    "body_sha256": "37dd23e42f3810ac8e391dfb0c614a0bcfd1819c1a46a7494aef2ba3eeae4700"
-                },
-                "after": {
-                    "name": "cn_bdpt_concat_connection_samples_cuda",
-                    "token_count": 729,
-                    "signature_sha256": "ae7d850602662328b0ce273c4aff81c29ec99debff17e5dc56b5717c9bec8ac2",
-                    "body_sha256": "d2bc972e76fff241db1dca0a53cd4577c134891ba2e7681811ec60164be869e4"
-                }
-            }
-        ],
-        "numerical_change": false,
-        "native_abi_change": false,
-        "callable_signature_change": false,
-        "launch_contract_change": false,
-        "public_api_delta": false,
-        "remaining_at_snapshot": [
-            "RayD legacy extern-C consumer retirement",
-            "wheel and PE/DSO packaging audit",
-            "nightly and release acceptance from clean locked checkouts"
-        ]
-    },
-    "phase11_stable_integration_naming": {
-        "status": "historical API-2 activation snapshot; stable unsuffixed naming remains active and the current boundary advanced to API 6 in Phase 6C",
-        "scope": "stable typed RayD source boundary naming",
-        "rayd_commit": "3869c2ab76bb06498dc95e3cf634fdf117529906",
-        "integration_header": "backends/torch/include/rayd/torch/integration.h",
-        "integration_header_sha256": "e88626c4486b99a88737d39dc3ec3d277a5b554b9bd664ba9c384577cd141c86",
-        "integration_header_identity": "rayd.torch.integration",
-        "integration_api_version": 2,
-        "historical_predecessor": {
-            "header": "backends/torch/include/rayd/torch/integration_v2.h",
-            "identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction.scattering-table-single-bounce.scattering-chains",
-            "scope": "immutable Phase 10B activation evidence"
-        },
-        "binding_count": 202,
-        "binding_count_delta": 0,
-        "owner_count_delta": 0,
-        "numerical_change": false,
-        "native_abi_symbol_change": false,
-        "callable_signature_change": false,
-        "launch_contract_change": false,
-        "public_api_delta": false,
-        "compatibility_alias": false
-    },
-    "phase8b_device_resident_diffraction_planning": {
-        "status": "active",
-        "adr": "docs/dev/standards/adr-028-device-resident-diffraction-state-selection.md",
-        "native_symbol_added": "diffraction_tx_visible_state_plan",
-        "rayd_typed_operation": "rayd::torch::axial_edge_visibility_forward",
-        "rayd_commit": "102470daf44b649030df3b2554d9ace5c1eea482",
-        "integration_header": "backends/torch/include/rayd/torch/integration.h",
-        "integration_header_sha256": "65ae4e8e35cf6067cb320a770a1945e2685feab6af44a2233d4db0cfe6b1f435",
-        "binding_count": 203,
-        "binding_count_delta": 1,
-        "owner_count_delta": {
-            "layered": 1
-        },
-        "capacity": 4194304,
-        "validity_contract": "capacity N plus contiguous CUDA bool[N] active mask",
-        "state_alias_count": 12,
-        "host_selected_count": false,
-        "python_torch_numerical_geometry": false,
-        "compatibility_alias": false,
-        "public_api_delta": false
-    },
-    "phase11_release_governance_closure": {
-        "status": "historical Phase 11 pending snapshot; release execution was completed by later ADR-032 stable-recovery acceptance",
-        "historical_evidence": "docs/dev/audit/phase13-phase11-release-acceptance.json",
-        "superseding_evidence": "docs/dev/audit/phase13-adr032-stable-recovery-final-report.json",
-        "completed": [
-            "Phase 11A and 11B frozen duplication acceptance",
-            "RayD legacy extern-C retirement",
-            "stable typed integration naming",
-            "live manifest, current owner, lock, feature, migration, and workflow alignment",
-            "live-surface version-suffixed WIP boundary scan"
-        ],
-        "historical_evidence_mutated": false,
-        "pending": []
-    },
-    "phase6c_adr027_penetration_foundation": {
-        "status": "immutable Phase P dormant-foundation snapshot; solver activation completed later in Phase E and Phase M",
-        "rayd_commit": "474c122aa3cd6b6d098675e076a73e6f485bd6be",
-        "integration_header": "backends/torch/include/rayd/torch/integration.h",
-        "integration_header_sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
-        "integration_header_identity": "rayd.torch.integration",
-        "integration_api_version": 6,
-        "binding_count_before": 229,
-        "binding_count_after": 234,
-        "binding_count_delta": 5,
-        "added_symbols": [
-            "rayd_segment_penetration_forward",
-            "rayd_segment_penetration_forward_tape",
-            "rayd_segment_penetration_backward",
-            "rayd_segment_penetration_jvp",
-            "enumerated_transmission_topology_pack"
-        ],
-        "owner_counts_after": {
-            "RayD": 47,
-            "layered": 3,
-            "Channel Native": 184
-        },
-        "api6_explicit_valid": {
-            "transmission_symbol_count": 3,
-            "scattering_symbol_count": 17,
-            "diffraction_active_required": true,
-            "implicit_all_valid": false,
-            "compatibility_mask": false
-        },
-        "failure_contract": "SEGMENT_PENETRATION_FAILURE = 1 << 7 covers overflow, contract contradiction, and non-finite state through the shared solve-owned CapacityFailureState",
-        "live_solver_route_changed": false,
-        "public_api_delta": false,
-        "compatibility_alias": false,
-        "resource_ledger": "docs/dev/audit/phase13-adr027-penetration-foundation.json"
-    },
-    "phase6c_adr027_activation_closure": {
-        "status": "Phase P/E/M production activation complete; original independent P-to-E and E-to-M comparative performance/resource evidence remains open",
-        "rayd_commit": "474c122aa3cd6b6d098675e076a73e6f485bd6be",
-        "integration_header": "backends/torch/include/rayd/torch/integration.h",
-        "integration_header_sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
-        "integration_header_identity": "rayd.torch.integration",
-        "integration_api_version": 6,
-        "binding_count_after": 241,
-        "live_symbols": [
-            "rayd_segment_penetration_forward",
-            "rayd_segment_penetration_forward_tape",
-            "rayd_segment_penetration_backward",
-            "rayd_segment_penetration_jvp",
-            "enumerated_transmission_topology_pack",
-            "enumerated_transmission_topology_pack_backward",
-            "enumerated_transmission_topology_pack_jvp",
-            "enumerated_capacity_failure_sanitize",
-            "enumerated_capacity_failure_vector_sanitize",
-            "mc_transmission_wall_product",
-            "mc_transmission_wall_product_backward",
-            "mc_transmission_wall_product_jvp",
-            "mc_capacity_failure_component_maps_sanitize",
-            "mc_capacity_failure_component_maps_sanitize_backward",
-            "mc_capacity_failure_component_maps_sanitize_jvp"
-        ],
-        "owner_counts_after": {
-            "RayD": 47,
-            "layered": 3,
-            "Channel Native": 191
-        },
-        "live_solver_route_changed": true,
-        "public_api_delta": false,
-        "compatibility_alias": false,
-        "foundation_resource_ledger": "docs/dev/audit/phase13-adr027-penetration-foundation.json",
-        "stable_recovery_evidence": "docs/dev/audit/phase13-adr032-stable-recovery-final-report.json",
-        "comparative_evidence_open": true
-    },
-    "rayd_package_source_discovery": {
-        "status": "implemented and validate-only accepted; all-architecture publication delegated to GitHub Actions",
-        "rayd_commit": "402262d3b0c07dffb9d51d1852abb97ab2280f2f",
-        "distribution": "rayd-torch==0.6.0",
-        "metadata_path": "rayd/torch/_source/rayd-source.json",
-        "source_manifest_sha256": "9c284b7861d6f25be2f103855a7c8842fc167792633b881ad9b4a0112e1c0800",
-        "source_resolution": "explicit valid Git checkout first; otherwise the selected Python interpreter's unique lock-valid distribution; no prefix or global CMake scan",
-        "build_identity_delta": [
-            "rayd_source_kind",
-            "rayd_source_manifest_sha256"
-        ],
-        "native_owner_changed": false,
-        "numerical_code_changed": false,
-        "public_solver_api_changed": false,
-        "historical_munich_evidence_mutated": false,
-        "full_architecture_local_build_deferred": true
+  "schema_version": 1,
+  "baseline": {
+    "channel_commit_required": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
+    "channel_commit_scanned": "a741f8d2a0ff5ba353be60584f21ee7f910f03ad",
+    "rayd_commit_required": "346416f8f35250cd50c7d320d877307d55a8fc9f",
+    "rayd_commit_scanned": "346416f8f35250cd50c7d320d877307d55a8fc9f",
+    "binding_count": 211,
+    "binding_manifest_sha256": "bcca1358baed39dfb95838bb4069b4b43b3ff62abf3d81859840c477a6fbaef7",
+    "immutable_owner_inventory_sha256": "772c2fe6023edb869c9671ff6e28bd0a1e970657da5010e07908586bbb926aab",
+    "rayd_lock": {
+      "schema_version": 1,
+      "repository_url": "https://github.com/Asixa/RayD.git",
+      "commit": "346416f8f35250cd50c7d320d877307d55a8fc9f",
+      "integration_abi": {
+        "kind": "source-header-sha256",
+        "path": "backends/torch/include/rayd/torch/integration.h",
+        "sha256": "13cf52d0d2e45638b3262faed249bded739887129ede09c2f8c5c0774f64d939"
+      }
     }
+  },
+  "current_phase": 12,
+  "current_subphase": "validated RayD package-source discovery implemented; ADR-032 compact stable recovery accepted; ADR-027 comparative evidence closure open",
+  "transfers_applied": [
+    {
+      "phase": 3,
+      "scope": "RayD integration boundary",
+      "from": "copied extern-C signatures, getter indirection, integer scene handles",
+      "to": "source-linked typed rayd::torch API and RAII SceneResource",
+      "numerical_owner_changed": false
+    },
+    {
+      "phase": "6A",
+      "scope": "resident CSR layer-stack primal/JVP/VJP family",
+      "symbols": [
+        "em_layer_stack_eval",
+        "em_layer_stack_backward",
+        "em_layer_stack_jvp"
+      ],
+      "from": "Channel Native numerical implementation",
+      "to": "RayD typed RF implementation with Channel Native ABI facade",
+      "numerical_owner_changed": true,
+      "rayd_commit": "4cb400acbfcc2da7fda4110d1298d311816905f1",
+      "integration_header_sha256": "c8e162c55a0e5abe789e4f1b19cd6ab00ee4ef59d70244cfc55d58166aeb646b"
+    },
+    {
+      "phase": "6B",
+      "scope": "complete-row transmission field primal/JVP/VJP family",
+      "symbols": [
+        "field_transmission_sequence",
+        "field_transmission_sequence_backward",
+        "field_transmission_sequence_jvp"
+      ],
+      "from": "Channel Native numerical implementation",
+      "to": "RayD typed RF implementation with Channel Native ABI facade",
+      "numerical_owner_changed": true,
+      "rayd_commit": "3988f0934fec7b521ee5190b0defc0883c84b9e6",
+      "integration_header_sha256": "6cb18f682e08cb0bb0853507e3b4b82a68e681bb1dad89dc8c36518705f74989"
+    },
+    {
+      "phase": "8A",
+      "scope": "pure-wedge fixed-winner field primal/backward/JVP family",
+      "symbols": [
+        "field_diffraction_wedge",
+        "field_diffraction_wedge_backward",
+        "field_diffraction_wedge_jvp"
+      ],
+      "from": "Channel Native numerical implementation",
+      "to": "RayD typed RF implementation with Channel Native ABI facade",
+      "numerical_owner_changed": true,
+      "rayd_commit": "11e72526cdddf669678975c8921a9d44c6504e20",
+      "integration_header_sha256": "7a2b68f459e7e981a23735271eff2844fe0483d119cf514d59d2032d11be5aef"
+    },
+    {
+      "phase": "10A",
+      "scope": "scattering table evaluation/sampling, single-bounce ensemble, and patch-integral families",
+      "symbols": [
+        "scattering_table_eval",
+        "scattering_table_eval_backward",
+        "scattering_table_eval_jvp",
+        "scattering_table_sample",
+        "scattering_table_pdf",
+        "scattering_ensemble_eval",
+        "scattering_ensemble_eval_backward",
+        "scattering_ensemble_eval_jvp",
+        "scattering_patch_integral_eval",
+        "scattering_patch_integral_eval_backward",
+        "scattering_patch_integral_eval_jvp"
+      ],
+      "from": "Channel Native numerical implementation",
+      "to": "RayD typed RF implementation with Channel Native ABI facade",
+      "numerical_owner_changed": true,
+      "rayd_commit": "4577e744adfe8665f7817e3aff5e8e533ec896e7",
+      "integration_header_sha256": "9f95ad9e8e3b790d00f8e762a3e6a09252d46afb65bfc3aba7c42325836cb1fb",
+      "typed_header_sha256": "66d75a20be16057f03cdfb79e3b9dcc85cacec79b555cd73b019259aa510262a",
+      "shared_table_header_sha256": "38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38"
+    },
+    {
+      "phase": "10B",
+      "scope": "scattering v2 ensemble-chain and realization-chain primal/backward/JVP families",
+      "symbols": [
+        "scattering_chain_ensemble_eval",
+        "scattering_chain_ensemble_eval_backward",
+        "scattering_chain_ensemble_eval_jvp",
+        "scattering_chain_realization_eval",
+        "scattering_chain_realization_eval_backward",
+        "scattering_chain_realization_eval_jvp"
+      ],
+      "from": "Channel Native numerical implementation",
+      "to": "RayD typed RF implementation with Channel Native ABI facade",
+      "numerical_owner_changed": true,
+      "rayd_commit": "768b96e42a95f70c32d55f98a72000085317e288",
+      "integration_header_sha256": "0608bfbaf022379bc03442f9baa777ec05cfe3f6ab9b964e2385ec12a7b6c654",
+      "typed_header_sha256": "ac95c418860d109aeaa96623131592e4df8887992e5fc25ecab71b4ddbf1f55b",
+      "shared_table_header_sha256": "38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38"
+    }
+  ],
+  "renames_applied": [
+    {
+      "phase": 3,
+      "from": "raydn_scene_create",
+      "to": "rayd_scene_create"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_scene_edge_records",
+      "to": "rayd_scene_edge_records"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_intersect_backward",
+      "to": "rayd_intersect_backward"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_intersect_jvp",
+      "to": "rayd_intersect_jvp"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_trace_reflections_forward",
+      "to": "rayd_trace_reflections_forward"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_trace_reflections_forward_tape",
+      "to": "rayd_trace_reflections_forward_tape"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_trace_reflections_backward",
+      "to": "rayd_trace_reflections_backward"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_trace_reflections_jvp",
+      "to": "rayd_trace_reflections_jvp"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_reflection_epc_paths_forward",
+      "to": "rayd_reflection_epc_paths_forward"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_reflection_epc_paths_backward",
+      "to": "rayd_reflection_epc_paths_backward"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_reflection_epc_paths_jvp",
+      "to": "rayd_reflection_epc_paths_jvp"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_scene_face_normals_backward",
+      "to": "rayd_scene_face_normals_backward"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_scene_face_normals_jvp",
+      "to": "rayd_scene_face_normals_jvp"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_diffraction_paths_order1_forward",
+      "to": "rayd_diffraction_paths_order1_forward"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_coupled_rd_geometry_forward",
+      "to": "coupled_rd_geometry_forward"
+    },
+    {
+      "phase": 3,
+      "from": "raydn_coupled_dd_geometry_forward",
+      "to": "coupled_dd_geometry_forward"
+    },
+    {
+      "phase": 4,
+      "from": "bdpt_intersect_forward",
+      "to": "rayd_intersect_forward"
+    },
+    {
+      "phase": 4,
+      "from": "bdpt_visibility_forward",
+      "to": "rayd_visibility_forward"
+    },
+    {
+      "phase": 4,
+      "from": "bdpt_diffraction_discover_edges",
+      "to": "mc_diffraction_discover_edges"
+    },
+    {
+      "phase": 4,
+      "from": "bdpt_diffraction_discover_edges_counted",
+      "to": "mc_diffraction_discover_edges_counted"
+    },
+    {
+      "phase": "8B",
+      "from": "bdpt_diffraction_accumulation_forward",
+      "to": "rayd_diffraction_sample_tape_forward"
+    }
+  ],
+  "deletions_applied": [
+    {
+      "phase": 3,
+      "path": "native/channel_native/rayd/bridge.h"
+    },
+    {
+      "phase": 3,
+      "path": "native/channel_native/rayd/common.cpp"
+    },
+    {
+      "phase": 3,
+      "path": "src/witwin/channel_native/runtime/native_handles.py"
+    },
+    {
+      "phase": 3,
+      "path": "src/witwin/channel_native/core/runtime/raydn.py"
+    },
+    {
+      "phase": 4,
+      "binding": "bdpt_diffraction_connection_samples_from_tape",
+      "reachability": "dead by four-axis audit"
+    },
+    {
+      "phase": 4,
+      "binding": "bdpt_diffraction_edge_geometry",
+      "reachability": "dead by four-axis audit"
+    },
+    {
+      "phase": 4,
+      "binding": "bdpt_diffraction_point_connection_samples",
+      "reachability": "dead by four-axis audit"
+    },
+    {
+      "phase": 4,
+      "binding": "bdpt_diffraction_state_pack",
+      "reachability": "dead by four-axis audit"
+    },
+    {
+      "phase": 4,
+      "binding": "bdpt_diffraction_state_wi",
+      "reachability": "dead by four-axis audit"
+    },
+    {
+      "phase": 4,
+      "binding": "bdpt_reflection_accumulation_forward",
+      "reachability": "dead by four-axis audit"
+    },
+    {
+      "phase": 4,
+      "binding": "bdpt_selected_edge_indices",
+      "reachability": "dead by four-axis audit"
+    },
+    {
+      "phase": 4,
+      "binding": "bdpt_surface_group_edge_candidates",
+      "reachability": "dead by four-axis audit"
+    },
+    {
+      "phase": 4,
+      "binding": "path_diffraction_paths_order1",
+      "reachability": "dead by four-axis audit"
+    },
+    {
+      "phase": "6A",
+      "path": "native/channel_native/em/complex.cuh",
+      "replacement": "RayD:shared/include/rayd/shared/rf/complex.cuh"
+    },
+    {
+      "phase": "6A",
+      "path": "native/channel_native/em/medium.cuh",
+      "replacement": "RayD:shared/include/rayd/shared/rf/medium.cuh"
+    },
+    {
+      "phase": "6A",
+      "path": "native/channel_native/em/fresnel.cuh",
+      "replacement": "RayD:shared/include/rayd/shared/rf/fresnel.cuh"
+    },
+    {
+      "phase": "6A",
+      "path": "native/channel_native/em/layer_stack.cuh",
+      "replacement": "RayD:shared/include/rayd/shared/rf/layer_stack.cuh"
+    },
+    {
+      "phase": "6A",
+      "path": "native/channel_native/field_transport.cuh",
+      "replacement": "RayD:shared/include/rayd/shared/rf/field_transport.cuh"
+    },
+    {
+      "phase": "6A",
+      "path": "native/channel_native/field_transport_ad.cuh",
+      "replacement": "RayD:backends/torch/include/rayd/torch/rf/field_transport_ad.cuh"
+    },
+    {
+      "phase": "6A",
+      "path": "native/channel_native/kernels/em_debug.cu",
+      "replacement": "RayD:backends/torch/src/torch_ext/rf/layer_stack.cu"
+    },
+    {
+      "phase": "6B",
+      "path": "native/channel_native/kernels/field_transport_transmission.cu",
+      "replacement": "RayD:backends/torch/src/torch_ext/rf/transmission_sequence_ad.cu"
+    },
+    {
+      "phase": "6B",
+      "source": "native/channel_native/kernels/field_transport.cu",
+      "removed_complete_owner": "transmission_sequence_kernel and cn_field_transmission_sequence",
+      "replacement": "RayD:backends/torch/src/torch_ext/rf/transmission_sequence.cu"
+    },
+    {
+      "phase": "8A",
+      "path": "native/channel_native/kernels/field_wedge_ad_diffraction.cu",
+      "replacement": "RayD:backends/torch/src/torch_ext/rf/diffraction_wedge.cu",
+      "deleted_source_sha256": "68ec3fe180cd900834f0263969ee75d54764ad014e5d22b7c0b57822ea8e975b"
+    },
+    {
+      "phase": "10B",
+      "path": "native/channel_native/kernels/scattering_chain_ensemble.cu",
+      "replacement": "RayD:backends/torch/src/torch_ext/rf/scattering_chain_ensemble.cu"
+    },
+    {
+      "phase": "10B",
+      "path": "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+      "replacement": "RayD:backends/torch/src/torch_ext/rf/scattering_chain_ensemble_ad.cu"
+    },
+    {
+      "phase": "10B",
+      "path": "native/channel_native/kernels/scattering_chain_realization.cu",
+      "replacement": "RayD:backends/torch/src/torch_ext/rf/scattering_chain_realization.cu"
+    },
+    {
+      "phase": "10B",
+      "path": "native/channel_native/kernels/scattering_chain_realization_ad.cu",
+      "replacement": "RayD:backends/torch/src/torch_ext/rf/scattering_chain_realization_ad.cu"
+    }
+  ],
+  "binding_count_delta": 23,
+  "implementation_owner_delta": {
+    "Channel Native": -26,
+    "RayD": 26
+  },
+  "next_update_rule": "Append one record after each accepted owner transfer; never rewrite the immutable Phase 9 inventory.",
+  "phase3_current": {
+    "rayd_commit": "adf0ea2d1481f7548c5ef30c31b4adbaf831f963",
+    "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
+    "integration_header_sha256": "d133b054e009fc5e9bf719df71cb91a3a0079382acdcbf3c04224d59cd3f7928",
+    "binding_count": 211,
+    "binding_manifest_sha256": "0bdefc4c1094578e82fbc4f1983e7bd0cf12b7c44d12fad3d8420586e97b84cb",
+    "typed_scene_resource": "RayDSceneResource",
+    "coupled_layered_owner_names": [
+      "coupled_rd_geometry_forward",
+      "coupled_dd_geometry_forward"
+    ],
+    "approved_post_phase9_field_wedge_launch_additions": [
+      {
+        "adr": "ADR-013",
+        "introduced_by_commit": "06ce1971ec5c4b26d2183a0ee928874dad387b8c",
+        "split_owner": "coupled",
+        "binding_symbol": "field_coupled_dd_backward",
+        "kernel": "coupled_dd_backward_kernel",
+        "launch_count": 1,
+        "numerical_owner": "Channel Native",
+        "plan13_disposition": "retained complete coupled-DD family"
+      },
+      {
+        "adr": "ADR-013",
+        "introduced_by_commit": "06ce1971ec5c4b26d2183a0ee928874dad387b8c",
+        "split_owner": "coupled",
+        "binding_symbol": "field_coupled_dd_jvp",
+        "kernel": "coupled_dd_jvp_kernel",
+        "launch_count": 1,
+        "numerical_owner": "Channel Native",
+        "plan13_disposition": "retained complete coupled-DD family"
+      }
+    ],
+    "approved_phase9_body_hash_transfer_multiset": [
+      {
+        "owner_id": "bdpt.diffraction_connection",
+        "binding_symbol": "bdpt_diffraction_connection_samples_from_tape",
+        "owner_before": "Channel Native",
+        "owner_after": "Channel Native",
+        "transfer_kind": "phase3-identifier-normalization",
+        "before": {
+          "name": "bdpt_diffraction_connection_samples_from_tape_kernel",
+          "token_count": 656,
+          "signature_sha256": "8022464ff1c5c5d8a8876227ead50cb698d90ee99461463e8b074b56dabbadc1",
+          "body_sha256": "1ab283eeff561f9fda2449b71c22734f9313be62681db51313768defb78b5cf1"
+        },
+        "after": {
+          "name": "bdpt_diffraction_connection_samples_from_tape_kernel",
+          "token_count": 656,
+          "signature_sha256": "8022464ff1c5c5d8a8876227ead50cb698d90ee99461463e8b074b56dabbadc1",
+          "body_sha256": "3300f3fc73a33e8dbc17522dc4f2ab434f9344fc2d224288ee752e2113f83885"
+        }
+      }
+    ]
+  },
+  "phase4_current": {
+    "binding_count": 202,
+    "binding_manifest_sha256": "283b7ea04fe8eaeeb5c4b8e4316856a099d5a31f7750e38acb2bfb810fd4b205",
+    "reachability_audit": "docs/dev/audit/phase13-phase4-dead-binding-reachability.json",
+    "renames": {
+      "bdpt_intersect_forward": "rayd_intersect_forward",
+      "bdpt_visibility_forward": "rayd_visibility_forward",
+      "bdpt_diffraction_discover_edges": "mc_diffraction_discover_edges",
+      "bdpt_diffraction_discover_edges_counted": "mc_diffraction_discover_edges_counted"
+    },
+    "deleted_bindings": [
+      "bdpt_diffraction_connection_samples_from_tape",
+      "bdpt_diffraction_edge_geometry",
+      "bdpt_diffraction_point_connection_samples",
+      "bdpt_diffraction_state_pack",
+      "bdpt_diffraction_state_wi",
+      "bdpt_reflection_accumulation_forward",
+      "bdpt_selected_edge_indices",
+      "bdpt_surface_group_edge_candidates",
+      "path_diffraction_paths_order1"
+    ],
+    "approved_phase9_body_hash_deletions": [
+      {
+        "owner_id": "bdpt.mis",
+        "name": "bdpt_diffraction_contribution",
+        "body_sha256": "6ba7b9ad09cd6f8d14fc6c4d1fe798c1c3638297669725fbb9f7ecb4d890d97d",
+        "signature_sha256": "f95a33e6fb6554ce82b2867cccc33d0980c6124d43cb264458f284fe623c8cef",
+        "token_count": 108
+      },
+      {
+        "owner_id": "bdpt.diffraction_connection",
+        "name": "bdpt_diffraction_connection_samples_from_tape_kernel",
+        "body_sha256": "1ab283eeff561f9fda2449b71c22734f9313be62681db51313768defb78b5cf1",
+        "signature_sha256": "8022464ff1c5c5d8a8876227ead50cb698d90ee99461463e8b074b56dabbadc1",
+        "token_count": 656
+      },
+      {
+        "owner_id": "bdpt.diffraction_connection",
+        "name": "bdpt_diffraction_point_connection_samples_kernel",
+        "body_sha256": "e59bbc0f522b41d301bd6c27596e6b93021b70d91077d4d706e89f7218496a73",
+        "signature_sha256": "ba55d4768e923178326ac6e990475c2773a0a212e77d812087e375faca340195",
+        "token_count": 943
+      },
+      {
+        "owner_id": "bdpt.diffraction_connection",
+        "name": "cn_bdpt_diffraction_connection_samples_from_tape_cuda",
+        "body_sha256": "cdc2d5d1ea4eae7254c43d9a30cc11d299514910d4d5492238f214e59230fa90",
+        "signature_sha256": "d7db6402a4550f7e83ed8df859823a3710945bd3c43e1d4f57597c7a3bbe3698",
+        "token_count": 1150
+      },
+      {
+        "owner_id": "bdpt.diffraction_connection",
+        "name": "cn_bdpt_diffraction_point_connection_samples_cuda",
+        "body_sha256": "aca1c567d6f426d2b4928845dbd957a7ae5f9b79fc833dfd48b35aba59baa95b",
+        "signature_sha256": "9e38a2fe15edb0d87ba2ff720a9c003e2a141025482f40692765433e04787d05",
+        "token_count": 1154
+      },
+      {
+        "owner_id": "bdpt.mis",
+        "name": "bdpt_splitmix64",
+        "body_sha256": "55c55df8585edd4b09a922f9326568f5c31df7943189dc63754c2ad68015773a",
+        "signature_sha256": "5ec9989bbfbc9420d54e0aff654eb168a9ae801a2384dfbae2c18288408da810",
+        "token_count": 53
+      },
+      {
+        "owner_id": "bdpt.mis",
+        "name": "bdpt_uniform01_from_u64",
+        "body_sha256": "66302863fd5c5cc7b7aaa781abd208662220f47d8fde5d470409bce608ab1896",
+        "signature_sha256": "87bbdc5971b85d92943d990f745d60607c5685a816648e4c8ecaf36590f3ad04",
+        "token_count": 17
+      },
+      {
+        "owner_id": "bdpt.mis",
+        "name": "check_diffraction_mis_args",
+        "body_sha256": "1662dea83dc0719f642187f849d909ae1debfa5ed3ff9866e574615a3e46a76e",
+        "signature_sha256": "42893ecf04e441321790859f996fdbcb4e4ecb6f86f674741720f4f169e9b5fb",
+        "token_count": 53
+      },
+      {
+        "owner_id": "bdpt.mis",
+        "name": "bdpt_diffraction_strategy_mis_weight",
+        "body_sha256": "18757532b218208a0ab52f4f44ac018f38e6c9deaeb489bf4436c47aa452eb9a",
+        "signature_sha256": "89dabfe3e52a34d1322150d00206b6eef01369309bc23ac783cd9a58d080d82c",
+        "token_count": 78
+      },
+      {
+        "owner_id": "bdpt.mis",
+        "name": "bdpt_grid_cell_center",
+        "body_sha256": "7831a389c5d90ed1004e5f1d60e8a39335499e16f99bfb7e844bd298143da6cd",
+        "signature_sha256": "20c1065e77af3b129f19d9d81194d6fef2dc43f27fcedc24b2d594c40160c5ba",
+        "token_count": 136
+      }
+    ],
+    "mc_discovery_owner_move": {
+      "from": "RayD bridge extern-C pointer-output forwarder",
+      "to": "montecarlo.basic typed Tensor-returning CUDA facade",
+      "numerical_owner_changed": false
+    },
+    "public_api_delta": false
+  },
+  "phase6a_current": {
+    "status": "complete",
+    "rayd_commit": "4cb400acbfcc2da7fda4110d1298d311816905f1",
+    "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
+    "integration_header_sha256": "c8e162c55a0e5abe789e4f1b19cd6ab00ee4ef59d70244cfc55d58166aeb646b",
+    "binding_count": 202,
+    "binding_manifest_sha256": "c9fca37ed77bfbfe23eb035214269e0e1ec351d7b587137215f67c80b5fe292d",
+    "owner_counts": {
+      "RayD": 20,
+      "layered": 2,
+      "Channel Native": 180
+    },
+    "transferred_symbols": [
+      "em_layer_stack_eval",
+      "em_layer_stack_backward",
+      "em_layer_stack_jvp"
+    ],
+    "shared_rf_helper_ownership": {
+      "RayD ADR-024 active": 112,
+      "Channel boundary retained": 10,
+      "Channel pending ADR-026": 7
+    },
+    "approved_phase9_body_hash_deletions": [
+      {
+        "owner_id": "field_transport.free_space",
+        "name": "fold_output_cotangents",
+        "token_count": 249,
+        "signature_sha256": "e183ddaadbd34a377450726aeda25285f9e4d4024b33eb81b3c352b1320a1dd7",
+        "body_sha256": "3dcfa11e35a32673dda99ec6956182f3e1064f0b81b6a28c9a66de346d32a49b"
+      },
+      {
+        "owner_id": "field_transport.free_space",
+        "name": "write_output_tangents",
+        "token_count": 185,
+        "signature_sha256": "30e8ea97dd96bad2ce1b8bd931bf4bd104a59fce9f9c3f043aae54c057e5cf02",
+        "body_sha256": "91f2a90d220d03da83b0a468acdd6f3dfed8e92771155675f65036f5deb7ab20"
+      },
+      {
+        "owner_id": "legacy_slab.primal",
+        "name": "legacy_add",
+        "token_count": 19,
+        "signature_sha256": "b47eb81386480eae6a8b0a0a5496b14b110f08892f4d08e9bfcce0fb9a4a9ac7",
+        "body_sha256": "d0d22f3046a2182ec921a0b9c67807f5cae23551132240fe40d11352b7774120"
+      },
+      {
+        "owner_id": "legacy_slab.primal",
+        "name": "legacy_sub",
+        "token_count": 19,
+        "signature_sha256": "6fc5a295c04c76caeda50bafaaa11a191db6eea9e00a484a1c175c572ebb37b3",
+        "body_sha256": "6e6ad0d4dc6e0879d2c364a6d2b94618bccc3b0a8e5cfd023ffde440866fa263"
+      },
+      {
+        "owner_id": "legacy_slab.primal",
+        "name": "legacy_mul",
+        "token_count": 35,
+        "signature_sha256": "5065ffe6ad33c58a0c195e6dc25f4b83015b9885ebfa5965e1b92687a76212a0",
+        "body_sha256": "f8835b07803fccee7b171d8fe42dd360db1d624b885fb97c72ab67881be47416"
+      },
+      {
+        "owner_id": "legacy_slab.primal",
+        "name": "legacy_scale",
+        "token_count": 15,
+        "signature_sha256": "019d36b71db32806515f91a0151dc98ab44dabecd3aafe0da5ba50eaf5da8ab3",
+        "body_sha256": "dcdf72a3f8412047491720804b0ea90f04a535adbea425c2103ca5adffbc5d84"
+      },
+      {
+        "owner_id": "legacy_slab.primal",
+        "name": "legacy_div",
+        "token_count": 68,
+        "signature_sha256": "c1a755fb048e1ff14f60c7a0227250ebc5f9eb47693105f93c7392ee72bdaa5d",
+        "body_sha256": "daf06092b1f1360af8e4b8a575cacaa9bd06837a7690f3a0e6f3fd1df750729a"
+      },
+      {
+        "owner_id": "legacy_slab.primal",
+        "name": "legacy_div_floor",
+        "token_count": 68,
+        "signature_sha256": "986fbbbbdab33a495b47c40ebae1fd0e67a03962b574a2e7c3e1b0ec532a9f02",
+        "body_sha256": "9092337aab9d177fcc7c2932fad76680eb72968dd828792398bd27f9bf839b4b"
+      },
+      {
+        "owner_id": "legacy_slab.primal",
+        "name": "legacy_sqrt",
+        "token_count": 73,
+        "signature_sha256": "877dad44857d87bce786dfddb4bd5eec1c9af49a0e77c487c26efdf1f9587987",
+        "body_sha256": "3dded7023a4f68bde90150028d002f6f06593d8fccfb6572d08d49842dbd8cc5"
+      },
+      {
+        "owner_id": "legacy_slab.primal",
+        "name": "legacy_interface_sqrt",
+        "token_count": 83,
+        "signature_sha256": "afa3d60a35d960e6a41b9bb9b4bde07bcced6efe8a1c4ff3d8a3a36c1b558f6e",
+        "body_sha256": "a2e7639876f8e5d302ade1f394606be43784b1839e5bece0985ffc8e7f755668"
+      },
+      {
+        "owner_id": "legacy_slab.primal",
+        "name": "legacy_interface_fresnel",
+        "token_count": 170,
+        "signature_sha256": "ea052aec3c75d7a69d947c2d610005dbd3238cf5501aadb00a2150e1966baee1",
+        "body_sha256": "a742c4f8298e50013b3262d4fb032ab0324672ce5679b0a52ae7025b45330ecf"
+      },
+      {
+        "owner_id": "legacy_slab.primal",
+        "name": "legacy_exp_neg_2i",
+        "token_count": 51,
+        "signature_sha256": "7a9937061fe6bc3a004c04c8975dc6df705dc00e1eeba870b6133baec565d520",
+        "body_sha256": "e41285ac832d174fbddd5d4abb98b52f146370fbd859243fa481fe0894951d55"
+      },
+      {
+        "owner_id": "legacy_slab.primal",
+        "name": "legacy_sionna_slab_fresnel",
+        "token_count": 332,
+        "signature_sha256": "9d7bb17cda78996cbae3928c4cf0dabbe208429b2ceb56b4e82c94a8463055d1",
+        "body_sha256": "c9cd0be01a95967efab64ffc85004aa459ce37ac935560b991123f185039fff6"
+      },
+      {
+        "owner_id": "legacy_slab.dual",
+        "name": "dlc_const",
+        "token_count": 15,
+        "signature_sha256": "d7a9771bd2b1a1e04e7ad728e8e460329920962ad964265a1eb975c70bb3b2f1",
+        "body_sha256": "34258cb9c4dfc6aa004daac912a8cd6f2d725809b6e2dffd122a718f9a533729"
+      },
+      {
+        "owner_id": "legacy_slab.dual",
+        "name": "dlc_make",
+        "token_count": 15,
+        "signature_sha256": "c3f12e72e39fb405f37470e191d4ebaccbb3f7af2aa815d44d06c7e2432e698f",
+        "body_sha256": "1db2023c639bf43976f698c471c8c084c8eeff058bb529b10a4eecfc6bb4faf2"
+      },
+      {
+        "owner_id": "legacy_slab.dual",
+        "name": "dlc_add",
+        "token_count": 29,
+        "signature_sha256": "eb0c849fe7dfb3f27b50b46b6a12986affeb33c84b0735910798fb081d28a1d8",
+        "body_sha256": "9f4ea2743602e873114a40d4f43d9df8086947ca4159f37693aec4a8d39fc3bb"
+      },
+      {
+        "owner_id": "legacy_slab.dual",
+        "name": "dlc_sub",
+        "token_count": 29,
+        "signature_sha256": "c308a43bc0d88acb6fb30a5f3db9baf2d5c440ce3596ff10d3356f3270f27254",
+        "body_sha256": "992f6ec5ceb33a8063e0b4b8982a463faf8ad29a4ca31f776b2fc815f035336c"
+      },
+      {
+        "owner_id": "legacy_slab.dual",
+        "name": "dlc_mul",
+        "token_count": 47,
+        "signature_sha256": "e02906b8da9c76632181ee287b89769ba0d47761f0e3dfda639d2640a2e9ef42",
+        "body_sha256": "bd98c786324306f88ec56879f2eeb4bbaf37a750562180c23f66962e64f1947b"
+      },
+      {
+        "owner_id": "legacy_slab.dual",
+        "name": "dlc_scale_dual",
+        "token_count": 47,
+        "signature_sha256": "9574b7b3c044562552cacb568854dd51ba0616f5de57c98f3f1fbae652745cb8",
+        "body_sha256": "152d8bfecb71401f27a901c75e82d146d27cd7e45e4dc759b4f5ee98ab3575c2"
+      },
+      {
+        "owner_id": "legacy_slab.dual",
+        "name": "dlc_div",
+        "token_count": 197,
+        "signature_sha256": "188141e8ac169fc3383ca792007a2a7950b6c0c35e1ca2e6d32a0a69678bae7d",
+        "body_sha256": "4068dc59d550ce72058b7be845688dd3368717b27a4a253e16b66cb04d3f5e53"
+      },
+      {
+        "owner_id": "legacy_slab.dual",
+        "name": "dlc_sqrt",
+        "token_count": 146,
+        "signature_sha256": "a04cd1b061db7ff79d7277ed4120c1a18c1f9100dd131f5eeb72997e6babb92f",
+        "body_sha256": "cae8e025b4024b342feaf5767f701570d04ce75cde79d9906dc5bd91d7367b29"
+      },
+      {
+        "owner_id": "legacy_slab.dual",
+        "name": "dlc_exp_neg_2i",
+        "token_count": 131,
+        "signature_sha256": "9a4d5cacd0f6db8cde838391d1233faec22e0456f87f78570e9f3007ef95de6d",
+        "body_sha256": "a648d9d062e768b5152a2c64f5fa3b744c76e87340a648fc9360fe6bd258dcf1"
+      },
+      {
+        "owner_id": "legacy_slab.dual",
+        "name": "legacy_sionna_slab_fresnel_dual",
+        "token_count": 531,
+        "signature_sha256": "e484e1b309567f92ee0da437641f920bc5d1930a7c679f777e37b97368683743",
+        "body_sha256": "a2869629125cea3e050edb1b2bdd8789058bb52fb961daa22a28fd7540b086f7"
+      }
+    ],
+    "public_api_delta": false,
+    "binding_count_delta": 0
+  },
+  "phase6b_current": {
+    "status": "complete",
+    "rayd_commit": "3988f0934fec7b521ee5190b0defc0883c84b9e6",
+    "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
+    "integration_header_sha256": "6cb18f682e08cb0bb0853507e3b4b82a68e681bb1dad89dc8c36518705f74989",
+    "integration_header_identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence",
+    "binding_count": 202,
+    "binding_manifest_sha256": "6c9ac270c8f243ff63f1c6f4466e5410e78683e10d906a0c7226fd84a208c252",
+    "owner_counts": {
+      "RayD": 23,
+      "layered": 2,
+      "Channel Native": 177
+    },
+    "transferred_symbols": [
+      "field_transmission_sequence",
+      "field_transmission_sequence_backward",
+      "field_transmission_sequence_jvp"
+    ],
+    "deleted_channel_numerical_sources": [
+      "native/channel_native/kernels/field_transport_transmission.cu"
+    ],
+    "reduced_channel_numerical_sources": {
+      "native/channel_native/kernels/field_transport.cu": [
+        "transmission_sequence_kernel",
+        "cn_field_transmission_sequence"
+      ]
+    },
+    "retained_channel_complete_owner": [
+      "bdpt_transmitted_light_subpath_state",
+      "bdpt_transmitted_light_subpath_state_backward",
+      "bdpt_transmitted_light_subpath_state_jvp"
+    ],
+    "approved_phase9_body_hash_deletions": [
+      {
+        "owner_id": "field_transport.transmission_sequence",
+        "name": "transmission_chain_eval",
+        "token_count": 749,
+        "signature_sha256": "7e61a9e0dc3ceef7defbdc0a36d440d990556b6f32caf5158e3dc7fefa538851",
+        "body_sha256": "ebae8067eee80a2d56216325e8b4785d07a32e38cdac74dfda117b3b1f8eb8f7"
+      },
+      {
+        "owner_id": "field_transport.transmission_sequence",
+        "name": "transmission_sequence_backward_kernel",
+        "token_count": 1541,
+        "signature_sha256": "082fc621f6b557ad9e7f8e2cb1c6336f2cc592caf35b5c84841ad766385aed8a",
+        "body_sha256": "3e64e3d516a5f627813de43a0aaff03ea6c2816ce2c56d42d288532e5a2ba7fc"
+      },
+      {
+        "owner_id": "field_transport.transmission_sequence",
+        "name": "transmission_sequence_jvp_kernel",
+        "token_count": 1036,
+        "signature_sha256": "53a89f1e70d317242f005a3cb79b93d4d1f7e61e6f8374ae8437ab8b58f86e89",
+        "body_sha256": "477444b24733dc05cca1e299fd771a91214ac1ece643ae6f0a9caae9eee5eba8"
+      },
+      {
+        "owner_id": "field_transport.transmission_sequence",
+        "name": "cn_field_transmission_sequence_backward",
+        "token_count": 1043,
+        "signature_sha256": "4cce9017deb64e3fe6eaa617292a028a9423d8e33e3e11f8e0a553b738bd8d8d",
+        "body_sha256": "41c911f87712c8ea5efa226620c183ff4d873170f099e0824ab32994702bbb70"
+      },
+      {
+        "owner_id": "field_transport.transmission_sequence",
+        "name": "cn_field_transmission_sequence_jvp",
+        "token_count": 800,
+        "signature_sha256": "baff4f19bf6743a2edceaf47edd89b7b5d534b0b6dbdea17b53d02a681f66892",
+        "body_sha256": "f7149697c4f8a188ebc7ba79a00a8b7d8ee194e0aad726870947b1d5101d1d8c"
+      }
+    ],
+    "public_api_delta": false,
+    "binding_count_delta": 0
+  },
+  "phase8a_current": {
+    "status": "complete",
+    "rayd_commit": "11e72526cdddf669678975c8921a9d44c6504e20",
+    "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
+    "integration_header_sha256": "7a2b68f459e7e981a23735271eff2844fe0483d119cf514d59d2032d11be5aef",
+    "integration_header_identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction",
+    "binding_count": 202,
+    "binding_manifest_sha256": "fd42f559bebe3933360312a35fa839b72f94faeef49c88c28e06a83e896994a4",
+    "owner_counts": {
+      "RayD": 26,
+      "layered": 2,
+      "Channel Native": 174
+    },
+    "transferred_symbols": [
+      "field_diffraction_wedge",
+      "field_diffraction_wedge_backward",
+      "field_diffraction_wedge_jvp"
+    ],
+    "deleted_channel_numerical_sources": [
+      "native/channel_native/kernels/field_wedge_ad_diffraction.cu"
+    ],
+    "deleted_source_sha256": "68ec3fe180cd900834f0263969ee75d54764ad014e5d22b7c0b57822ea8e975b",
+    "activation_evidence": "docs/dev/audit/phase13-diffraction-phase8a-evidence.json",
+    "duplication_refresh": {
+      "duplicate_lines": 10661,
+      "total_lines": 84347,
+      "duplicate_coverage_percent": 12.639454,
+      "frozen_budget_percent": 10.211512,
+      "classified_regions": 179,
+      "stale_region_count": 0,
+      "unclassified_region_count": 0
+    },
+    "approved_phase9_body_hash_deletions": [
+      {
+        "owner_id": "field_wedge.diffraction",
+        "name": "wedge_seeds_zero",
+        "token_count": 108,
+        "signature_sha256": "a149126cf1ed8b922240300c1a76a941dd92572c5f3989827d4944f1ba4fd3f4",
+        "body_sha256": "3b927142dda284ec9ebec16f5be5a184b4717dd1c36b09b1c790ed2047dbabb3"
+      },
+      {
+        "owner_id": "field_wedge.diffraction",
+        "name": "wedge_acos",
+        "token_count": 29,
+        "signature_sha256": "6a3bf299257c3da1321d53be304d2c41742d1dc8a6047e9104b76f72cf2399f2",
+        "body_sha256": "213f330e2f0b1a7b2f7ce1a23fd93c1fe1b660a683031d6eb0984f75ec14dbba"
+      },
+      {
+        "owner_id": "field_wedge.diffraction",
+        "name": "primal3",
+        "token_count": 33,
+        "signature_sha256": "dc6b3ee987518dc443c1bafcce8c5ce097b36490010e69041d3500f634a8bc72",
+        "body_sha256": "d00ee7f54088aed44c0bfee1fc6eb60f2ab64ee877e99908cb20e1566e512814"
+      },
+      {
+        "owner_id": "field_wedge.diffraction",
+        "name": "wedge_edge_tables_from_vertices",
+        "token_count": 556,
+        "signature_sha256": "b8ade5a32075ce7fe7046a422ae6ae77320696a84608679b572a205f21830094",
+        "body_sha256": "7512fabea5a8f664836d6f95798eb96ea46ddc6dc96fb752a3f25befba9039c4"
+      },
+      {
+        "owner_id": "field_wedge.diffraction",
+        "name": "wedge_face_material",
+        "token_count": 62,
+        "signature_sha256": "9855841b90020b7547403ab356b62e88b582838104bbb18c15c1a2f929de66ca",
+        "body_sha256": "f9c19f747b3c7854e5da127adfe8ee0f8abe6b3e2ee110a8aabbabc416a343b9"
+      },
+      {
+        "owner_id": "field_wedge.diffraction",
+        "name": "wedge_row_eval",
+        "token_count": 749,
+        "signature_sha256": "eebcfc55403a0d9c73a824f557b15ef52218955daf3bde3ce44aac86eaae4485",
+        "body_sha256": "ca1ba4d3b175facda66f81e86cc91620249b2e5e1d53cd0c9d3504402ac4ba99"
+      },
+      {
+        "owner_id": "field_wedge.diffraction",
+        "name": "load_wedge_row",
+        "token_count": 328,
+        "signature_sha256": "40bc68470cebaec399cd48dc7e41f5ddf58e92717a7cd947abf1d0a59eea0402",
+        "body_sha256": "555d0db0eaed8ba47f6187ef5cf87db6f538b106d74dad207d99c20dca5e9535"
+      },
+      {
+        "owner_id": "field_wedge.diffraction",
+        "name": "diffraction_wedge_forward_kernel",
+        "token_count": 167,
+        "signature_sha256": "c8c41f829c9291572a9e41373bc65ac762bf13f0e831314d9739681b07fae7d6",
+        "body_sha256": "7deeb4ded7817c6a6e95d7130f909c2547d7d866095dba515bd55e6be47c1286"
+      },
+      {
+        "owner_id": "field_wedge.diffraction",
+        "name": "wedge_contract",
+        "token_count": 157,
+        "signature_sha256": "46507750e363cb10a0efb033105eda7d5cfd4e2bfacb28bf5201b5ec55f84870",
+        "body_sha256": "566f08a0523c6fbc023091c707f877d097eaf7da16fa2fc8fc17f083bc57af6b"
+      },
+      {
+        "owner_id": "field_wedge.diffraction",
+        "name": "diffraction_wedge_backward_kernel",
+        "token_count": 694,
+        "signature_sha256": "be272f0018592ab92b6d158e4be9b7753fc2c72b230374127b49e017ae0e65e8",
+        "body_sha256": "632a488649c5e7ade9abab3ede15ce91df53fd34863ed6beea064cb9db472a1e"
+      },
+      {
+        "owner_id": "field_wedge.diffraction",
+        "name": "diffraction_wedge_jvp_kernel",
+        "token_count": 385,
+        "signature_sha256": "0190aac0e29e77e3dc68e81b254f1bb1e64edf9aa870cc951296b3a97602cf29",
+        "body_sha256": "5598c64cd07c5d88d807ef09e8403ca12b2851e2107fcaea2ed11730696e8151"
+      },
+      {
+        "owner_id": "field_wedge.diffraction",
+        "name": "check_wedge_primal",
+        "token_count": 312,
+        "signature_sha256": "39a2db69a32f68733a3153ec4c2e3f09b18f4deeea778da09008b77fadca541e",
+        "body_sha256": "56ad519db7910ada20ff04ba06ecc34679df9c8e923fc4428ea0e68d2f27d9d9"
+      },
+      {
+        "owner_id": "field_wedge.diffraction",
+        "name": "resolve_wedge_vertices",
+        "token_count": 259,
+        "signature_sha256": "33d16b51bffd8ebd7f3f9097b2fcb37bb5c6319e217eaef43771c8cdc88ab1d5",
+        "body_sha256": "2e1947b0d17b4d169bbb18d9cf1e2f1d40c1a7ff9c23e4a1f1892d178820f201"
+      },
+      {
+        "owner_id": "field_wedge.diffraction",
+        "name": "cn_field_diffraction_wedge",
+        "token_count": 247,
+        "signature_sha256": "6fe72cadfd77e9c427a244bc092c9ba781d390303de94935201787daf3f4e5b1",
+        "body_sha256": "c5d257682b148e3abbaf71ed254d081ab24939365d6ae758a861e618f598d9eb"
+      },
+      {
+        "owner_id": "field_wedge.diffraction",
+        "name": "cn_field_diffraction_wedge_backward",
+        "token_count": 1205,
+        "signature_sha256": "d7e1c2fedfc70e00246ac50c9d63e0ebb7f652c6aa121f3f915be0ea601b9e91",
+        "body_sha256": "e584db67ef5f8c8e8d02a29fbf8fc11d1f15749edc349cdbf14e854943549f66"
+      },
+      {
+        "owner_id": "field_wedge.diffraction",
+        "name": "cn_field_diffraction_wedge_jvp",
+        "token_count": 808,
+        "signature_sha256": "b14ea8c47a4cd210f01ca93820644be19dbd0d81afa9404499576368d919359f",
+        "body_sha256": "744f1ca42788f6c3262ced6f84aadaaa3c5dce0bf04e42213b9172c05176a85e"
+      }
+    ],
+    "public_api_delta": false,
+    "binding_count_delta": 0
+  },
+  "phase10a_current": {
+    "status": "complete",
+    "rayd_commit": "4577e744adfe8665f7817e3aff5e8e533ec896e7",
+    "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
+    "integration_header_sha256": "9f95ad9e8e3b790d00f8e762a3e6a09252d46afb65bfc3aba7c42325836cb1fb",
+    "integration_header_identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction.scattering-table-single-bounce",
+    "typed_header_sha256": "66d75a20be16057f03cdfb79e3b9dcc85cacec79b555cd73b019259aa510262a",
+    "shared_table_header_sha256": "38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38",
+    "binding_count": 202,
+    "binding_manifest_sha256": "54a0e643fd6d5986e3a0ba12c30db5a23372b62b7537f9218c327aadac2ee308",
+    "contract_coverage_manifest_sha256": "a04d12baff4aeb2fdbee09cc40f30dbca9bb7588680c1317423f6e34e856071f",
+    "owner_counts": {
+      "RayD": 37,
+      "layered": 2,
+      "Channel Native": 163
+    },
+    "transferred_symbols": [
+      "scattering_table_eval",
+      "scattering_table_eval_backward",
+      "scattering_table_eval_jvp",
+      "scattering_table_sample",
+      "scattering_table_pdf",
+      "scattering_ensemble_eval",
+      "scattering_ensemble_eval_backward",
+      "scattering_ensemble_eval_jvp",
+      "scattering_patch_integral_eval",
+      "scattering_patch_integral_eval_backward",
+      "scattering_patch_integral_eval_jvp"
+    ],
+    "deleted_channel_numerical_sources": [
+      "native/channel_native/kernels/scattering_table_eval_ad.cu",
+      "native/channel_native/kernels/scattering_ensemble.cu",
+      "native/channel_native/kernels/scattering_ensemble_ad.cu",
+      "native/channel_native/kernels/scattering_patch_integral.cu",
+      "native/channel_native/kernels/scattering_patch_integral_ad.cu",
+      "native/channel_native/kernels/scattering_table.cuh"
+    ],
+    "retained_channel_numerical_owners": [
+      "native/channel_native/kernels/scattering.cu:event policy only",
+      "native/channel_native/kernels/scattering_chain_ensemble.cu",
+      "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+      "native/channel_native/kernels/scattering_chain_realization.cu",
+      "native/channel_native/kernels/scattering_chain_realization_ad.cu"
+    ],
+    "activation_evidence": "docs/dev/audit/phase13-scattering-phase10a-evidence.json",
+    "duplication_refresh": {
+      "duplicate_lines": 9730,
+      "total_lines": 81675,
+      "duplicate_coverage_percent": 11.91307,
+      "frozen_budget_percent": 10.211512,
+      "classified_regions": 169,
+      "stale_region_count": 0,
+      "unclassified_region_count": 0
+    },
+    "approved_phase9_body_hash_deletions": [
+      {
+        "owner_id": "scattering.ensemble_eval",
+        "name": "ensemble_eval_kernel",
+        "token_count": 591,
+        "signature_sha256": "0b0be25829f757cc720f79e524409dec2899ee7026d34b9f179d4f6b4c1c4201",
+        "body_sha256": "1bef2ea288e8a6a5c8a9665c98d4dac37f62a6e899fb82181198f687b604c54e"
+      },
+      {
+        "owner_id": "scattering.ensemble_eval",
+        "name": "cn_scattering_ensemble_eval",
+        "token_count": 889,
+        "signature_sha256": "fce18566d73ed42c87a94bbb20cd7ff35276959b4399ac753d74e563bd83fef1",
+        "body_sha256": "4339267a52878c4dad94ac4d79543a0cacb6f213c624c147abac1a2a05f87275"
+      },
+      {
+        "owner_id": "scattering.ensemble_eval",
+        "name": "eval_te_tm",
+        "token_count": 255,
+        "signature_sha256": "0057a85f808b3cc054f7c05788c309ea74ad28712f35c52d68008caf5825c21c",
+        "body_sha256": "650f97839e80a488d96f3bb2f303734f97790d6889f24d56056f74c588a4c8c1"
+      },
+      {
+        "owner_id": "scattering.patch_integral",
+        "name": "patch_integral_rows_kernel",
+        "token_count": 1211,
+        "signature_sha256": "e9b3880059dbb0b27e5e0bb553be0a8e9360339d54a62d30abefdc5a308ef9c2",
+        "body_sha256": "c6d9d489a09ace50d73593aec8e7d003a707de9f2c9df99948753060d2026250"
+      },
+      {
+        "owner_id": "scattering.patch_integral",
+        "name": "patch_integral_total_kernel",
+        "token_count": 174,
+        "signature_sha256": "4c238e7696c3ca793d3b80d18c8e2c46859ad30f659750758acb55ebf620c79e",
+        "body_sha256": "1da4a5ebfd313f2258fa8cc065087af6e4bc703b7342d208c37215999d972a68"
+      },
+      {
+        "owner_id": "scattering.patch_integral",
+        "name": "cn_scattering_patch_integral_eval",
+        "token_count": 869,
+        "signature_sha256": "67d41c340fa140172b2123f52d8e4b0c234fee9a0e3ed063b2f35c8922f80bb6",
+        "body_sha256": "e05c29877d2cf3cb99dd12fc03dd00f2587eeeff238a59b4695fb484467a52e4"
+      }
+    ],
+    "public_api_delta": false,
+    "binding_count_delta": 0
+  },
+  "phase10b_current": {
+    "status": "complete",
+    "rayd_commit": "768b96e42a95f70c32d55f98a72000085317e288",
+    "integration_header": "backends/torch/include/rayd/torch/integration_v2.h",
+    "integration_header_sha256": "0608bfbaf022379bc03442f9baa777ec05cfe3f6ab9b964e2385ec12a7b6c654",
+    "integration_header_identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction.scattering-table-single-bounce.scattering-chains",
+    "typed_header_sha256": "ac95c418860d109aeaa96623131592e4df8887992e5fc25ecab71b4ddbf1f55b",
+    "shared_table_header_sha256": "38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38",
+    "binding_count": 202,
+    "binding_manifest_sha256": "264bddd77eed701b951bab1bb03185ba8ef53c0e6953c1f1ed3a0a1c12405b71",
+    "contract_coverage_manifest_sha256": "a04d12baff4aeb2fdbee09cc40f30dbca9bb7588680c1317423f6e34e856071f",
+    "owner_counts": {
+      "RayD": 43,
+      "layered": 2,
+      "Channel Native": 157
+    },
+    "transferred_symbols": [
+      "scattering_chain_ensemble_eval",
+      "scattering_chain_ensemble_eval_backward",
+      "scattering_chain_ensemble_eval_jvp",
+      "scattering_chain_realization_eval",
+      "scattering_chain_realization_eval_backward",
+      "scattering_chain_realization_eval_jvp"
+    ],
+    "deleted_channel_numerical_sources": [
+      "native/channel_native/kernels/scattering_chain_ensemble.cu",
+      "native/channel_native/kernels/scattering_chain_ensemble_ad.cu",
+      "native/channel_native/kernels/scattering_chain_realization.cu",
+      "native/channel_native/kernels/scattering_chain_realization_ad.cu"
+    ],
+    "retained_channel_numerical_owners": [
+      "native/channel_native/kernels/scattering.cu:event policy only"
+    ],
+    "ad_contract": {
+      "ensemble_geometry": "JVP-only; VJP fails loudly",
+      "realization_geometry": "VJP and JVP supported"
+    },
+    "activation_evidence": "docs/dev/audit/phase13-scattering-phase10b-evidence.json",
+    "duplication_refresh": {
+      "duplicate_lines": 8747,
+      "total_lines": 78304,
+      "duplicate_coverage_percent": 11.170566,
+      "frozen_budget_percent": 10.211512,
+      "classified_regions": 160,
+      "stale_region_count": 0,
+      "unclassified_region_count": 0,
+      "budget_relaxed": false,
+      "status": "all regions classified; implementation complete; frozen duplication acceptance remains a Phase 11 blocker"
+    },
+    "approved_phase9_body_hash_deletions": [],
+    "public_api_delta": false,
+    "binding_count_delta": 0
+  },
+  "phase11a_current": {
+    "scope": "mechanical typed-boundary deduplication in fields.cpp and materials.cpp",
+    "evidence": "docs/dev/audit/phase13-boundary-dedup-phase11a-evidence.json",
+    "binding_count": 202,
+    "binding_manifest_sha256": "65e8adc54774d77989476bd05e0186f5c68ba74e8e763c5c467b9490d972bc52",
+    "binding_semantic_changes": 0,
+    "duplication_refresh": {
+      "duplicate_lines": 8402,
+      "total_lines": 78162,
+      "duplicate_coverage_percent": 10.749469,
+      "frozen_budget_percent": 10.211512,
+      "classified_regions": 155,
+      "stale_region_count": 0,
+      "unclassified_region_count": 0,
+      "budget_relaxed": false,
+      "status": "boundary deduplication complete; frozen duplication acceptance remains pending Phase 11B"
+    },
+    "numerical_change": false,
+    "native_abi_change": false,
+    "launch_contract_change": false,
+    "public_api_delta": false
+  },
+  "phase11b_current": {
+    "status": "historical Phase 11B implementation snapshot; frozen duplication acceptance met and later release closure completed",
+    "scope": "mechanical Python facade and native launch/configuration boilerplate deduplication",
+    "evidence": "docs/dev/audit/phase13-boundary-dedup-phase11b-evidence.json",
+    "duplication_refresh": {
+      "duplicate_lines": 7826,
+      "total_lines": 77821,
+      "duplicate_coverage_percent": 10.056413,
+      "frozen_budget_percent": 10.211512,
+      "classified_regions": 143,
+      "stale_region_count": 0,
+      "unclassified_region_count": 0,
+      "budget_relaxed": false,
+      "budget_met": true,
+      "status": "all current regions classified; frozen duplication coverage acceptance met"
+    },
+    "binding_count": 202,
+    "binding_manifest_sha256": "65e8adc54774d77989476bd05e0186f5c68ba74e8e763c5c467b9490d972bc52",
+    "binding_manifest_changed": false,
+    "approved_phase9_body_hash_transformations": [
+      {
+        "owner_id": "bdpt.connection_storage",
+        "binding_symbol": "bdpt_compact_connection_samples",
+        "owner_before": "Channel Native",
+        "owner_after": "Channel Native",
+        "transformation_kind": "phase11b-compile-time-boilerplate-deduplication",
+        "before": {
+          "name": "cn_bdpt_compact_connection_samples_cuda",
+          "token_count": 1010,
+          "signature_sha256": "6b1964b3abfe917f5a3f159911ea99e322725d3d583645c91306f30f0d4caaf5",
+          "body_sha256": "9923aac65a6d2aea3abfd39cc0dd18f91e92a662c1123179bd90c22287f79aaf"
+        },
+        "after": {
+          "name": "cn_bdpt_compact_connection_samples_cuda",
+          "token_count": 537,
+          "signature_sha256": "6b1964b3abfe917f5a3f159911ea99e322725d3d583645c91306f30f0d4caaf5",
+          "body_sha256": "82231840fabd06b7896d475e3bc47478d67209d0711208557114dfd402d312b3"
+        }
+      },
+      {
+        "owner_id": "bdpt.connection_storage",
+        "binding_symbol": "bdpt_concat_connection_samples",
+        "owner_before": "Channel Native",
+        "owner_after": "Channel Native",
+        "transformation_kind": "phase11b-compile-time-boilerplate-deduplication",
+        "before": {
+          "name": "cn_bdpt_concat_connection_samples_cuda",
+          "token_count": 1200,
+          "signature_sha256": "ae7d850602662328b0ce273c4aff81c29ec99debff17e5dc56b5717c9bec8ac2",
+          "body_sha256": "37dd23e42f3810ac8e391dfb0c614a0bcfd1819c1a46a7494aef2ba3eeae4700"
+        },
+        "after": {
+          "name": "cn_bdpt_concat_connection_samples_cuda",
+          "token_count": 729,
+          "signature_sha256": "ae7d850602662328b0ce273c4aff81c29ec99debff17e5dc56b5717c9bec8ac2",
+          "body_sha256": "d2bc972e76fff241db1dca0a53cd4577c134891ba2e7681811ec60164be869e4"
+        }
+      }
+    ],
+    "numerical_change": false,
+    "native_abi_change": false,
+    "callable_signature_change": false,
+    "launch_contract_change": false,
+    "public_api_delta": false,
+    "remaining_at_snapshot": [
+      "RayD legacy extern-C consumer retirement",
+      "wheel and PE/DSO packaging audit",
+      "nightly and release acceptance from clean locked checkouts"
+    ]
+  },
+  "phase11_stable_integration_naming": {
+    "status": "historical API-2 activation snapshot; stable unsuffixed naming remains active and the current boundary advanced to API 6 in Phase 6C",
+    "scope": "stable typed RayD source boundary naming",
+    "rayd_commit": "3869c2ab76bb06498dc95e3cf634fdf117529906",
+    "integration_header": "backends/torch/include/rayd/torch/integration.h",
+    "integration_header_sha256": "e88626c4486b99a88737d39dc3ec3d277a5b554b9bd664ba9c384577cd141c86",
+    "integration_header_identity": "rayd.torch.integration",
+    "integration_api_version": 2,
+    "historical_predecessor": {
+      "header": "backends/torch/include/rayd/torch/integration_v2.h",
+      "identity": "rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction.scattering-table-single-bounce.scattering-chains",
+      "scope": "immutable Phase 10B activation evidence"
+    },
+    "binding_count": 202,
+    "binding_count_delta": 0,
+    "owner_count_delta": 0,
+    "numerical_change": false,
+    "native_abi_symbol_change": false,
+    "callable_signature_change": false,
+    "launch_contract_change": false,
+    "public_api_delta": false,
+    "compatibility_alias": false
+  },
+  "phase8b_device_resident_diffraction_planning": {
+    "status": "active",
+    "adr": "docs/dev/standards/adr-028-device-resident-diffraction-state-selection.md",
+    "native_symbol_added": "diffraction_tx_visible_state_plan",
+    "rayd_typed_operation": "rayd::torch::axial_edge_visibility_forward",
+    "rayd_commit": "102470daf44b649030df3b2554d9ace5c1eea482",
+    "integration_header": "backends/torch/include/rayd/torch/integration.h",
+    "integration_header_sha256": "65ae4e8e35cf6067cb320a770a1945e2685feab6af44a2233d4db0cfe6b1f435",
+    "binding_count": 203,
+    "binding_count_delta": 1,
+    "owner_count_delta": {
+      "layered": 1
+    },
+    "capacity": 4194304,
+    "validity_contract": "capacity N plus contiguous CUDA bool[N] active mask",
+    "state_alias_count": 12,
+    "host_selected_count": false,
+    "python_torch_numerical_geometry": false,
+    "compatibility_alias": false,
+    "public_api_delta": false
+  },
+  "phase11_release_governance_closure": {
+    "status": "historical Phase 11 pending snapshot; release execution was completed by later ADR-032 stable-recovery acceptance",
+    "historical_evidence": "docs/dev/audit/phase13-phase11-release-acceptance.json",
+    "superseding_evidence": "docs/dev/audit/phase13-adr032-stable-recovery-final-report.json",
+    "completed": [
+      "Phase 11A and 11B frozen duplication acceptance",
+      "RayD legacy extern-C retirement",
+      "stable typed integration naming",
+      "live manifest, current owner, lock, feature, migration, and workflow alignment",
+      "live-surface version-suffixed WIP boundary scan"
+    ],
+    "historical_evidence_mutated": false,
+    "pending": []
+  },
+  "phase6c_adr027_penetration_foundation": {
+    "status": "immutable Phase P dormant-foundation snapshot; solver activation completed later in Phase E and Phase M",
+    "rayd_commit": "474c122aa3cd6b6d098675e076a73e6f485bd6be",
+    "integration_header": "backends/torch/include/rayd/torch/integration.h",
+    "integration_header_sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
+    "integration_header_identity": "rayd.torch.integration",
+    "integration_api_version": 6,
+    "binding_count_before": 229,
+    "binding_count_after": 234,
+    "binding_count_delta": 5,
+    "added_symbols": [
+      "rayd_segment_penetration_forward",
+      "rayd_segment_penetration_forward_tape",
+      "rayd_segment_penetration_backward",
+      "rayd_segment_penetration_jvp",
+      "enumerated_transmission_topology_pack"
+    ],
+    "owner_counts_after": {
+      "RayD": 47,
+      "layered": 3,
+      "Channel Native": 184
+    },
+    "api6_explicit_valid": {
+      "transmission_symbol_count": 3,
+      "scattering_symbol_count": 17,
+      "diffraction_active_required": true,
+      "implicit_all_valid": false,
+      "compatibility_mask": false
+    },
+    "failure_contract": "SEGMENT_PENETRATION_FAILURE = 1 << 7 covers overflow, contract contradiction, and non-finite state through the shared solve-owned CapacityFailureState",
+    "live_solver_route_changed": false,
+    "public_api_delta": false,
+    "compatibility_alias": false,
+    "resource_ledger": "docs/dev/audit/phase13-adr027-penetration-foundation.json"
+  },
+  "phase6c_adr027_activation_closure": {
+    "status": "Phase P/E/M production activation complete; original independent P-to-E and E-to-M comparative performance/resource evidence remains open",
+    "rayd_commit": "474c122aa3cd6b6d098675e076a73e6f485bd6be",
+    "integration_header": "backends/torch/include/rayd/torch/integration.h",
+    "integration_header_sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
+    "integration_header_identity": "rayd.torch.integration",
+    "integration_api_version": 6,
+    "binding_count_after": 241,
+    "live_symbols": [
+      "rayd_segment_penetration_forward",
+      "rayd_segment_penetration_forward_tape",
+      "rayd_segment_penetration_backward",
+      "rayd_segment_penetration_jvp",
+      "enumerated_transmission_topology_pack",
+      "enumerated_transmission_topology_pack_backward",
+      "enumerated_transmission_topology_pack_jvp",
+      "enumerated_capacity_failure_sanitize",
+      "enumerated_capacity_failure_vector_sanitize",
+      "mc_transmission_wall_product",
+      "mc_transmission_wall_product_backward",
+      "mc_transmission_wall_product_jvp",
+      "mc_capacity_failure_component_maps_sanitize",
+      "mc_capacity_failure_component_maps_sanitize_backward",
+      "mc_capacity_failure_component_maps_sanitize_jvp"
+    ],
+    "owner_counts_after": {
+      "RayD": 47,
+      "layered": 3,
+      "Channel Native": 191
+    },
+    "live_solver_route_changed": true,
+    "public_api_delta": false,
+    "compatibility_alias": false,
+    "foundation_resource_ledger": "docs/dev/audit/phase13-adr027-penetration-foundation.json",
+    "stable_recovery_evidence": "docs/dev/audit/phase13-adr032-stable-recovery-final-report.json",
+    "comparative_evidence_open": true
+  },
+  "rayd_package_source_discovery": {
+    "status": "implemented and validate-only accepted; all-architecture publication delegated to GitHub Actions",
+    "rayd_commit": "402262d3b0c07dffb9d51d1852abb97ab2280f2f",
+    "distribution": "rayd-torch==0.6.0",
+    "metadata_path": "rayd/torch/_source/rayd-source.json",
+    "source_manifest_sha256": "9c284b7861d6f25be2f103855a7c8842fc167792633b881ad9b4a0112e1c0800",
+    "source_resolution": "explicit valid Git checkout first; otherwise the selected Python interpreter's unique lock-valid distribution; no prefix or global CMake scan",
+    "build_identity_delta": [
+      "rayd_source_kind",
+      "rayd_source_manifest_sha256"
+    ],
+    "native_owner_changed": false,
+    "numerical_code_changed": false,
+    "public_solver_api_changed": false,
+    "historical_munich_evidence_mutated": false,
+    "full_architecture_local_build_deferred": true
+  },
+  "adr043_current": {
+    "status": "ADR-043 direction-seam transformation; the two Channel-owned field transports gained an optional grad_direction cotangent input and a direction tangent output, and nothing else about them moved",
+    "approved_phase9_body_hash_transformations": [
+      {
+        "owner_id": "field_transport.free_space",
+        "owner_before": "Channel Native",
+        "owner_after": "Channel Native",
+        "transformation_kind": "arrival-direction cotangent input and tangent output added; no change to any primal value, launch count, or reduction order",
+        "signature_changed": true,
+        "before": {
+          "name": "cn_field_free_space_backward",
+          "token_count": 941,
+          "signature_sha256": "d719d3c5909a691947262777c4c6ee1ff5267c4614a16d97661b736648627d4a",
+          "body_sha256": "a2cf6546428a2633170ead7c2ff8d5b8ffbaaf67b8d64d9848f52083e563a32b"
+        },
+        "after": {
+          "name": "cn_field_free_space_backward",
+          "token_count": 997,
+          "signature_sha256": "0db4b3da4721c283da3076718db72ffd621e0dc8b236d99049ddce56c3a33616",
+          "body_sha256": "46b1d1835549eeef26ea953d6d4775add6a00484bde44823bce576e97c0d4178"
+        }
+      },
+      {
+        "owner_id": "field_transport.free_space",
+        "owner_before": "Channel Native",
+        "owner_after": "Channel Native",
+        "transformation_kind": "arrival-direction cotangent input and tangent output added; no change to any primal value, launch count, or reduction order",
+        "signature_changed": false,
+        "before": {
+          "name": "cn_field_free_space_jvp",
+          "token_count": 674,
+          "signature_sha256": "b4a5de74cb0aa675f23a1556378c12a77b1ac286a001d7a2ba70ec9268957143",
+          "body_sha256": "c3c96ac98d7eca0b8af577196ccc776cc5b18344ebdb63dcafc34a555a52cf3b"
+        },
+        "after": {
+          "name": "cn_field_free_space_jvp",
+          "token_count": 719,
+          "signature_sha256": "b4a5de74cb0aa675f23a1556378c12a77b1ac286a001d7a2ba70ec9268957143",
+          "body_sha256": "eda1753dbe39efacc29c262d18b5bddb5aec7ce2e00e6c0d20eda63271e75b8e"
+        }
+      },
+      {
+        "owner_id": "field_transport.reflection_sequence",
+        "owner_before": "Channel Native",
+        "owner_after": "Channel Native",
+        "transformation_kind": "arrival-direction cotangent input and tangent output added; no change to any primal value, launch count, or reduction order",
+        "signature_changed": true,
+        "before": {
+          "name": "cn_field_reflection_sequence_backward",
+          "token_count": 1105,
+          "signature_sha256": "78fec0568239a24bf578ccea75eead1ca35d99f9d23b5b16aaf48def56c697ba",
+          "body_sha256": "dca9fdfe347ee817c3729235912be39da8f87523db05a1dff499b16c5629223e"
+        },
+        "after": {
+          "name": "cn_field_reflection_sequence_backward",
+          "token_count": 1155,
+          "signature_sha256": "fffebfae44c246eabc8a08de0d7f897cbef48a9dd1993241b567f951e9550327",
+          "body_sha256": "a2a3648b88d3376514beb3ad5a1fd3ddd1c441d02f05550262b14fdf5c2bdce1"
+        }
+      },
+      {
+        "owner_id": "field_transport.reflection_sequence",
+        "owner_before": "Channel Native",
+        "owner_after": "Channel Native",
+        "transformation_kind": "arrival-direction cotangent input and tangent output added; no change to any primal value, launch count, or reduction order",
+        "signature_changed": false,
+        "before": {
+          "name": "cn_field_reflection_sequence_jvp",
+          "token_count": 823,
+          "signature_sha256": "d3c566e0043479c038ebfda67a29c1080e1fe2f8e32f43e102dcee7820089327",
+          "body_sha256": "827e7273d9712673a2c2a1ce044c268c89ee171b102909673d928e6c487dfd57"
+        },
+        "after": {
+          "name": "cn_field_reflection_sequence_jvp",
+          "token_count": 859,
+          "signature_sha256": "d3c566e0043479c038ebfda67a29c1080e1fe2f8e32f43e102dcee7820089327",
+          "body_sha256": "a26ec25bbbc4c61dea87b515fa9facfad4d07d66d2aeda822e8898889a51129a"
+        }
+      },
+      {
+        "owner_id": "field_transport.free_space",
+        "owner_before": "Channel Native",
+        "owner_after": "Channel Native",
+        "transformation_kind": "arrival-direction cotangent input and tangent output added; no change to any primal value, launch count, or reduction order",
+        "signature_changed": true,
+        "before": {
+          "name": "free_space_backward_kernel",
+          "token_count": 928,
+          "signature_sha256": "3a61f6c8c815838d230c1b9246d96d642b2decd756213b473e3cf493f87b48da",
+          "body_sha256": "0fd6da6ad0db5e7e20105f87b4fb5465e9e7e269270166543af22953c9fc3c5e"
+        },
+        "after": {
+          "name": "free_space_backward_kernel",
+          "token_count": 947,
+          "signature_sha256": "2d45227056e11f269f168620a731a28ab05190fe30a2291971e7c0fd22f0b355",
+          "body_sha256": "f2609607052b877d89e8ae8f1b8f03b5d99b01267bc82d8b40825b8e0272d62c"
+        }
+      },
+      {
+        "owner_id": "field_transport.free_space",
+        "owner_before": "Channel Native",
+        "owner_after": "Channel Native",
+        "transformation_kind": "arrival-direction cotangent input and tangent output added; no change to any primal value, launch count, or reduction order",
+        "signature_changed": true,
+        "before": {
+          "name": "free_space_jvp_kernel",
+          "token_count": 596,
+          "signature_sha256": "b6aff5a450b9e4e20a7411af5666305e7a72443f390e2932e38d87a9164e50b0",
+          "body_sha256": "aca29505b9947255ed1a86a9ee7bc14c28da09c5b907d2db8780a82b394bbcde"
+        },
+        "after": {
+          "name": "free_space_jvp_kernel",
+          "token_count": 633,
+          "signature_sha256": "4b902cf3f2f9c226e4afe3e9d8503ba4db54ad9be23e1c0083a0d918c643f734",
+          "body_sha256": "ef6d0a3cb09df53ce9be86bdd4a9ba2a25e748d47672e287165d8ce0ec2ed367"
+        }
+      },
+      {
+        "owner_id": "field_transport.reflection_sequence",
+        "owner_before": "Channel Native",
+        "owner_after": "Channel Native",
+        "transformation_kind": "arrival-direction cotangent input and tangent output added; no change to any primal value, launch count, or reduction order",
+        "signature_changed": true,
+        "before": {
+          "name": "reflection_sequence_backward_kernel",
+          "token_count": 2056,
+          "signature_sha256": "3b237d348b9af7e8d7838722714ccbcfb954e4c641b575526f4da623910d1dfc",
+          "body_sha256": "a910894e58458c73e5c1929a0de7dc03ddd3c7dc0f61ef42ae14a17e98c56ad1"
+        },
+        "after": {
+          "name": "reflection_sequence_backward_kernel",
+          "token_count": 2067,
+          "signature_sha256": "0e15cd7cc0fd3584baa07ad3cfec4a85c4433e7807ffc62c15a007ed8a9c0e1c",
+          "body_sha256": "de80400c77d77668024ed2c5977a9623f8e199e8e26d3b9d9635a9f28de462c6"
+        }
+      },
+      {
+        "owner_id": "field_transport.reflection_sequence",
+        "owner_before": "Channel Native",
+        "owner_after": "Channel Native",
+        "transformation_kind": "arrival-direction cotangent input and tangent output added; no change to any primal value, launch count, or reduction order",
+        "signature_changed": true,
+        "before": {
+          "name": "reflection_sequence_jvp_kernel",
+          "token_count": 1163,
+          "signature_sha256": "0d7514ff4c6a7358ab7c5f61533f595264503a733d26c9f6884b45a5fb8f26ce",
+          "body_sha256": "9d182d97166cfaf056ddc1d2e9c187b6185a1ea9d27ebe45176c6e2460cd27b9"
+        },
+        "after": {
+          "name": "reflection_sequence_jvp_kernel",
+          "token_count": 1208,
+          "signature_sha256": "21dc0e5f5ca37db779cb9cbfb243433fe123a0bc3ecb0fb588766622bd54f9c0",
+          "body_sha256": "74ab0c968bd1cd9cd53b1ed596e5e1796b6f43ec8faf4266b76a697cbb207e79"
+        }
+      }
+    ]
+  }
 }

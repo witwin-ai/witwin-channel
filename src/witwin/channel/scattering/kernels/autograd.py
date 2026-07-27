@@ -162,7 +162,6 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, grad_gain, grad_amplitude, grad_length, _grad_keep):
         none_grads = (None,) * 26
         _ad_reject_fixed_inputs(
@@ -428,7 +427,6 @@ class _ScatteringTableEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, grad_f_te, grad_f_tm):
         _ad_reject_fixed_inputs(
             "scattering_table_eval_ad", ctx.needs_input_grad, ((0, "valid"),)
@@ -576,7 +574,6 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, grad_total, _grad_integral, _grad_row_value):
         none_grads = (None,) * 20
         _ad_reject_fixed_inputs(

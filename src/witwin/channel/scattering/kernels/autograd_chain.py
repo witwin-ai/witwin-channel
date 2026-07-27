@@ -237,7 +237,6 @@ class _ScatteringChainEnsembleEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, grad_gain, grad_amplitude, grad_length, _grad_keep):
         none_grads = (None,) * 45
         # Rejects reverse-mode grads on both the structurally frozen inputs and
@@ -811,7 +810,6 @@ class _ScatteringChainRealizationEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(
         ctx, grad_total, grad_path_field, grad_path_gain, _grad_integral, _grad_row_value
     ):

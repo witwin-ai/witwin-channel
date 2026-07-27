@@ -215,7 +215,6 @@ class _BdptReflectedSubpathAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 14
         _ad_reject_fixed_inputs(
@@ -505,7 +504,6 @@ class _BdptTransmittedSubpathAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 15
         _ad_reject_fixed_inputs(
@@ -833,7 +831,6 @@ class _BdptEndpointConnectionAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 14
         need_field = any(bool(ctx.needs_input_grad[i]) for i in range(8))

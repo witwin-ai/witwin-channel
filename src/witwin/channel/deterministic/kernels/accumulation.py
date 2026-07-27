@@ -302,7 +302,6 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(
         ctx,
         grad_power_total,

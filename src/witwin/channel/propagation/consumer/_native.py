@@ -168,7 +168,6 @@ class _CompactEvaluatedPathsFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 24
         continuous_grads = grad_outputs[_DISCRETE_OUTPUT_COUNT:]

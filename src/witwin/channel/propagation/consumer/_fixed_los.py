@@ -78,7 +78,6 @@ class _FixedLoSGatherFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         endpoint_grads = grad_outputs[:5]
         if all(value is None for value in endpoint_grads):

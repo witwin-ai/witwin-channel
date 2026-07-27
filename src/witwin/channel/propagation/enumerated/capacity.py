@@ -188,7 +188,6 @@ class _EvaluatedPathsCapacityPackFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 27
         continuous_grads = grad_outputs[_DISCRETE_OUTPUT_COUNT:]
@@ -364,7 +363,6 @@ class _EnumeratedCapacityFailureSanitizeFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 23
         continuous_grads = grad_outputs[_SANITIZE_DISCRETE_OUTPUT_COUNT:]
@@ -486,7 +484,6 @@ class _EnumeratedCapacityFailureVectorSanitizeFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, grad_output):
         if grad_output is None or not ctx.needs_input_grad[1]:
             return None, None

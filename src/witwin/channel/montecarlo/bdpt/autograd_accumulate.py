@@ -85,7 +85,6 @@ class _BdptFinalizeAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, grad_path_gain, *grad_powers):
         if not any(bool(flag) for flag in ctx.needs_input_grad[:5]):
             return (None,) * 6
@@ -264,7 +263,6 @@ class _BdptAccumulateAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         grad_matrices = grad_outputs[: len(_ACCUMULATE_MATRIX_FIELDS)]
         none_grads = (None,) * 8

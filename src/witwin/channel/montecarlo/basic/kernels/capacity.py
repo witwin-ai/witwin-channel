@@ -107,7 +107,6 @@ class _McCapacityFailureComponentMapsSanitizeFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, *gradients):
         if not any(ctx.needs_input_grad[1:]):
             return (None,) * 6

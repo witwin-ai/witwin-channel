@@ -134,7 +134,6 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         input_grads: list[torch.Tensor | None] = [None] * 28
         continuous_grads = grad_outputs[_DISCRETE_OUTPUT_COUNT:]

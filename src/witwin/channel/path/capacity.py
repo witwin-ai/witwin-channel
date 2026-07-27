@@ -98,7 +98,6 @@ class _PathResultCapacityPackFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         if not any(ctx.needs_input_grad[12:20]):
             return (None,) * _INPUT_COUNT

@@ -199,7 +199,6 @@ class _DeterministicPathTableCapacityPackFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, *grad_outputs):
         none_grads = (None,) * 27
         continuous_grads = grad_outputs[len(_NONDIFFERENTIABLE_OUTPUT_FIELDS) :]

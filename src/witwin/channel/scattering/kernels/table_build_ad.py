@@ -354,7 +354,6 @@ class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    @torch.autograd.function.once_differentiable
     def backward(ctx, grad_f_te, grad_f_tm):
         none_grads = (None,) * 21
         _ad_reject_fixed_inputs(

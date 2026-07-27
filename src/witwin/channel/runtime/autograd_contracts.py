@@ -264,20 +264,24 @@ def _ad_geometry_tangent(
 
 
 def _ad_first_order_only(backward):
-    """Reject a second-order request before the backward companion launches.
+    """The one backward decorator: first-order guard over ``once_differentiable``.
 
     ADR-043: Channel publishes first derivatives only. ``create_graph=True`` is
-    precisely what leaves grad mode enabled while a backward runs, so this is an
-    exact detector that fires before any native launch, names the owner, and
-    produces no partial second-order result. Without it the first gradient comes
-    back silently detached and the failure surfaces one step later as a generic
-    Torch message that names Torch rather than the owner that cannot answer.
+    precisely what leaves grad mode enabled while a backward runs, so the check
+    below is an exact detector that fires before any native launch, names the
+    owner, and produces no partial second-order result. Without it the first
+    gradient comes back silently detached and the failure surfaces one step
+    later as a generic Torch message that names Torch, not the owner that
+    cannot answer.
 
-    ``torch.autograd.function.once_differentiable`` stays underneath as defence
-    in depth. It cannot replace this check: it runs the backward body inside
-    ``torch.no_grad()``, so the grad-mode signal is already gone by the time the
-    body executes, and it only fails when the detached gradient is later used.
+    ``torch.autograd.function.once_differentiable`` is applied underneath, as
+    defence in depth, from here rather than from every call site. It cannot
+    replace the check: it runs the backward body inside ``torch.no_grad()``, so
+    the grad-mode signal is gone by the time the body executes, and it only
+    fails when the detached gradient is later used.
     """
+
+    once = torch.autograd.function.once_differentiable(backward)
 
     @functools.wraps(backward)
     def guarded(ctx, *grad_outputs):
@@ -288,7 +292,7 @@ def _ad_first_order_only(backward):
                 "higher-order AD (create_graph=True, grad-of-grad). "
                 "capabilities().supports_higher_order_ad is False"
             )
-        return backward(ctx, *grad_outputs)
+        return once(ctx, *grad_outputs)
 
     return guarded
 
