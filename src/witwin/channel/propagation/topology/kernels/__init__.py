@@ -19,14 +19,10 @@ from .blocks import (
 )
 from .candidates import path_reflection_candidates
 from .compaction import (
-    DiffractionOrder1CapacityBlock,
-    deterministic_capacity_finalize,
-    deterministic_diffraction_order1_capacity_block,
     deterministic_diffraction_order1_compact,
     deterministic_reflection_order1_compact,
     deterministic_reflection_sequence_compact,
     deterministic_sort_order,
-    enumerated_canonical_capacity_select,
 )
 from .compact_autograd import (
     COMPACT_CONTINUOUS_FIELDS,
@@ -44,19 +40,15 @@ from .construction import (
     deterministic_topology_base_fields,
     deterministic_topology_default_fields,
 )
-from .coupled import coupled_candidate_capacity_block
 from .primitives import (
-    DiffractionStateCapacityBlock,
     core_pack_int2,
     deterministic_component_counts,
-    deterministic_diffraction_state_capacity_select,
     deterministic_diffraction_state_pack,
     deterministic_diffraction_state_pack_selected,
     deterministic_selected_edge_count,
     mc_selected_edge_indices,
     path_concat_vec3,
 )
-from .reflection import deterministic_reflection_candidate_capacity_block
 from .transmission import enumerated_transmission_topology_pack
 
 
@@ -68,17 +60,11 @@ __all__ = [
     "_validate_path_reflection_candidates",
     "_validate_topology_extra_fields",
     "COMPACT_CONTINUOUS_FIELDS",
-    "DiffractionStateCapacityBlock",
-    "DiffractionOrder1CapacityBlock",
-    "deterministic_capacity_finalize",
     "core_pack_int2",
-    "coupled_candidate_capacity_block",
     "deterministic_concat_topology_blocks",
     "deterministic_component_counts",
-    "deterministic_diffraction_state_capacity_select",
     "deterministic_diffraction_state_pack",
     "deterministic_diffraction_state_pack_selected",
-    "deterministic_diffraction_order1_capacity_block",
     "deterministic_diffraction_order1_compact",
     "deterministic_face_anchor_points",
     "deterministic_face_sequence_chunk",
@@ -87,13 +73,11 @@ __all__ = [
     "deterministic_mapped_face_sequence_chunk",
     "deterministic_pad_topology_sequences",
     "deterministic_reflection_epc_input_batch",
-    "deterministic_reflection_candidate_capacity_block",
     "deterministic_reflection_order1_compact",
     "deterministic_reflection_sequence_compact",
     "deterministic_repeat_range",
     "deterministic_selected_edge_count",
     "deterministic_sort_order",
-    "enumerated_canonical_capacity_select",
     "evaluated_paths_compact_finalize_backward",
     "evaluated_paths_compact_finalize_jvp",
     "enumerated_transmission_topology_pack",

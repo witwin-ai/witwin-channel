@@ -1,7 +1,8 @@
 # ADR-031: Per-pair raw reflection EPC capacity
 
-- **Status:** Rejected (2026-07-21); ADR-032 is authoritative, retained for
-  historical evidence only
+- **Status:** Removed (2026-07-27); rejected on 2026-07-21, ADR-032 is
+  authoritative, and nothing was ever implemented. Retained for historical
+  evidence only.
 - **Date:** 2026-07-21
 - **Kind:** Experimental planning-capacity, device-cardinality, enumerated
   reflection, cross-solver, and failure-transaction proposal.

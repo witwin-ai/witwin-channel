@@ -43,18 +43,18 @@ def test_phase_p_binding_owner_and_symbol_ledgers_close_exactly() -> None:
     assert recorded == expected
     assert expected <= binding_names == coverage_names == set(owner_rows)
     assert audit["binding_universe"]["after"] == 234
-    assert len(binding_names) == inventory["counts"]["bindings"] == 253
+    assert len(binding_names) == inventory["counts"]["bindings"] == 234
     assert (
         sum(
             inventory["counts"][name]
             for name in ("rayd_numerical", "layered", "channel_numerical")
         )
-        == 253
+        == 234
     )
     assert ledger["projected_final_count"] == 202
     assert ledger["applied_count_delta"] == -9
-    assert ledger["live_binding_count"] == 253
-    assert ledger["live_count_delta_from_plan13_baseline"] == 42
+    assert ledger["live_binding_count"] == 234
+    assert ledger["live_count_delta_from_plan13_baseline"] == 23
     assert ledger["phase6c_phase_p_delta"] == {
         "before": 229,
         "added": 5,

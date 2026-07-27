@@ -578,7 +578,6 @@ Python_add_library(
     native/channel/kernels/bdpt_subpaths.cu
     native/channel/kernels/bdpt_subpaths_ad.cu
     native/channel/kernels/bdpt_maps.cu
-    native/channel/kernels/coupled_candidate_capacity.cu
     native/channel/kernels/capacity_failure_state.cu
     native/channel/kernels/capacity_failure_terminal.cu
     native/channel/kernels/coupled_topology.cu
@@ -591,25 +590,15 @@ Python_add_library(
     native/channel/kernels/field_wedge_ad_project.cu
     native/channel/kernels/field_wedge_ad_prepare.cu
     native/channel/kernels/diffraction.cu
-    native/channel/kernels/diffraction_state_capacity.cu
-    native/channel/kernels/diffraction_path_capacity.cu
     native/channel/kernels/diffraction_discovery.cu
     native/channel/kernels/deterministic_accum.cu
-    native/channel/kernels/deterministic_capacity_finalize.cu
     native/channel/kernels/enumerated_canonical_capacity_select.cu
     native/channel/kernels/enumerated_transmission_topology_pack.cu
     native/channel/kernels/enumerated_capacity_failure_sanitize.cu
-    native/channel/kernels/evaluated_paths_canonical_capacity_gather.cu
-    native/channel/kernels/evaluated_paths_canonical_capacity_gather_ad.cu
-    native/channel/kernels/evaluated_paths_capacity_pack.cu
     native/channel/kernels/evaluated_paths_capacity_pack_ad.cu
     native/channel/kernels/evaluated_paths_compact_finalize.cu
     native/channel/kernels/consumer_los_jones.cu
     native/channel/kernels/consumer_fixed_los_gather.cu
-    native/channel/kernels/deterministic_path_table_capacity_pack.cu
-    native/channel/kernels/deterministic_diffraction_pair_reduce.cu
-    native/channel/kernels/path_result_capacity_pack.cu
-    native/channel/kernels/path_result_capacity_pack_ad.cu
     native/channel/kernels/deterministic_field.cu
     native/channel/kernels/deterministic_topology.cu
     native/channel/kernels/los.cu
@@ -618,7 +607,6 @@ Python_add_library(
     native/channel/kernels/mc_capacity_failure_component_maps_sanitize.cu
     native/channel/kernels/mc_transmission_wall_product.cu
     native/channel/kernels/path_compaction.cu
-    native/channel/kernels/reflection_candidate_capacity.cu
     native/channel/kernels/path_trace.cu
     native/channel/kernels/kirchhoff_table_ad.cu
     native/channel/kernels/reflection.cu
@@ -657,18 +645,6 @@ target_compile_features(_channel PRIVATE cxx_std_17)
 # interpolation, are unaffected).
 set_source_files_properties(
     native/channel/kernels/kirchhoff_table_ad.cu
-    PROPERTIES COMPILE_OPTIONS "--fmad=false")
-# ADR-030 freezes the source-state-serial additions and the separate
-# multiply/add power, VJP, and JVP expressions for the pair reducer.
-set_source_files_properties(
-    native/channel/kernels/deterministic_diffraction_pair_reduce.cu
-    PROPERTIES COMPILE_OPTIONS "--fmad=false")
-# ADR-029 PathResult packing freezes the former Torch endpoint-angle operation
-# order. Contraction across those per-op multiply/add boundaries changes the
-# public valid-row bits and its fixed-topology derivative companions.
-set_source_files_properties(
-    native/channel/kernels/path_result_capacity_pack.cu
-    native/channel/kernels/path_result_capacity_pack_ad.cu
     PROPERTIES COMPILE_OPTIONS "--fmad=false")
 # ADR-027 freezes the former per-wall Torch multiply/add sequence and its
 # continuous derivative companions for the MC straight-penetration estimator.

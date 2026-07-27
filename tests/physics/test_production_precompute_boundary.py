@@ -96,7 +96,6 @@ def test_production_and_reference_precompute_have_static_zero_dependency() -> No
         root / "constants.py",
         root / "materials" / "evaluation.py",
         root / "scattering" / "tables.py",
-        root / "scattering" / "energy.py",
         root / "scattering" / "phase_screen.py",
         root / "propagation" / "enumerated" / "scattering.py",
     )

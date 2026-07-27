@@ -4,9 +4,9 @@
   "applied_count_delta": -9,
   "projected_final_count": 202,
   "projected_count_formula": "211 - 9 bindings proven dead by all four Phase 4 reachability checks = 202",
-  "live_binding_count": 253,
-  "live_count_delta_from_plan13_baseline": 42,
-  "live_count_formula": "211 - 9 Phase 4 dead bindings + 1 Phase 8B planner + 26 ADR-027/029/030 capacity-foundation bindings + 5 Phase 6C Phase P bindings + 4 Phase 6C Phase E bindings + 3 Phase 6C Phase M bindings + 9 Stage-I Phase 3 consumer bindings + 3 ADR-039 source-amplitude bindings = 253",
+  "live_binding_count": 234,
+  "live_count_delta_from_plan13_baseline": 23,
+  "live_count_formula": "211 - 9 Phase 4 dead bindings + 1 Phase 8B planner + 26 ADR-027/029/030 capacity-foundation bindings + 5 Phase 6C Phase P bindings + 4 Phase 6C Phase E bindings + 3 Phase 6C Phase M bindings + 9 Stage-I Phase 3 consumer bindings + 3 ADR-039 source-amplitude bindings - 19 Phase-11 dormant ADR-029/030/031 bindings = 234",
   "phase6c_phase_p_delta": {
     "before": 229,
     "added": 5,
@@ -889,5 +889,10 @@
     "before": 250,
     "added": 3,
     "after": 253
+  },
+  "phase11_dormant_removal_delta": {
+    "before": 253,
+    "removed": 19,
+    "after": 234
   }
 }

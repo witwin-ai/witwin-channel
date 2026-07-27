@@ -1,6 +1,8 @@
 # ADR-029: Device-resident capacity results
 
-- **Status:** Superseded by ADR-032 (2026-07-21); historical experiment only
+- **Status:** Removed (2026-07-27); superseded by ADR-032 (2026-07-21) and
+  its caller-free artifacts were deleted in the Phase-11 cutover. Historical
+  record only.
 - **Date:** 2026-07-20
 - **Kind:** Public result, dynamic-cardinality, native selection, AD, and
   launch-contract decision.

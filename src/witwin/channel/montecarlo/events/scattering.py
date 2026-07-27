@@ -10,7 +10,7 @@ connection-row builder.
 
 Measure and normalization conventions (documented once, used everywhere):
 
-- Event probabilities are proportional to the ``scattering.energy``
+- Event probabilities are proportional to the native energy
   budgets ``(R_coh, R_diff, T_bar)`` at the hit incidence with the same
   minimum-probability floor pattern as the wave-2 two-way split; the
   selected branch's POWER is divided by its probability (fields by
@@ -79,7 +79,6 @@ and future multi-bounce MIS.
 
 from __future__ import annotations
 
-from dataclasses import dataclass  # noqa: F401 - legacy reachable global
 import math
 from typing import Any
 

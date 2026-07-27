@@ -37,7 +37,7 @@ def test_phase_e_symbols_have_one_live_owner_contract_and_e2e_caller() -> None:
     owner_rows = {entry["symbol"]: entry for entry in inventory["symbols"]}
     actions = {entry["symbol"]: entry for entry in ledger["actions"]}
 
-    assert len(binding_names) == 253
+    assert len(binding_names) == 234
     assert _PHASE_E_SYMBOLS <= binding_names
     assert _PHASE_E_SYMBOLS <= set(coverage_rows) == binding_names
     assert _PHASE_E_SYMBOLS <= set(owner_rows) == binding_names

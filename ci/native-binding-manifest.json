@@ -2264,7 +2264,7 @@
       "name": "consumer_fixed_los_gather",
       "target": "channel_consumer_fixed_los_gather",
       "path": "native/channel/binding/path.cpp",
-      "line": 1291,
+      "line": 841,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2341,7 +2341,7 @@
       "name": "consumer_fixed_los_gather_backward",
       "target": "channel_consumer_fixed_los_gather_backward",
       "path": "native/channel/binding/path.cpp",
-      "line": 1295,
+      "line": 845,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2398,7 +2398,7 @@
       "name": "consumer_fixed_los_gather_jvp",
       "target": "channel_consumer_fixed_los_gather_jvp",
       "path": "native/channel/binding/path.cpp",
-      "line": 1299,
+      "line": 849,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2455,7 +2455,7 @@
       "name": "consumer_los_jones",
       "target": "channel_consumer_los_jones",
       "path": "native/channel/binding/path.cpp",
-      "line": 1287,
+      "line": 837,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2497,7 +2497,7 @@
       "name": "core_diffraction_edge_count",
       "target": "channel_core_diffraction_edge_count",
       "path": "native/channel/binding/path.cpp",
-      "line": 871,
+      "line": 535,
       "return_type": "int64_t",
       "return_arity": 1,
       "parameters": [
@@ -2564,7 +2564,7 @@
       "name": "core_pack_int2",
       "target": "channel_core_pack_int2",
       "path": "native/channel/binding/path.cpp",
-      "line": 867,
+      "line": 531,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -2581,91 +2581,6 @@
       ],
       "pybind_arguments": [],
       "doc": "Pack two int32 CUDA vectors into an Nx2 tensor."
-    },
-    {
-      "name": "coupled_candidate_capacity_block",
-      "target": "channel_coupled_candidate_capacity_block",
-      "path": "native/channel/binding/path.cpp",
-      "line": 1155,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "failure_state",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "representative_faces",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "selected_edges",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_count",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "rx_count",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "rx_id_offset",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "candidate_capacity",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "candidate_limit",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [
-        {
-          "name": "failure_state",
-          "default": null
-        },
-        {
-          "name": "representative_faces",
-          "default": null
-        },
-        {
-          "name": "selected_edges",
-          "default": null
-        },
-        {
-          "name": "tx_count",
-          "default": null
-        },
-        {
-          "name": "rx_count",
-          "default": null
-        },
-        {
-          "name": "rx_id_offset",
-          "default": null
-        },
-        {
-          "name": "candidate_capacity",
-          "default": null
-        },
-        {
-          "name": "candidate_limit",
-          "default": null
-        }
-      ],
-      "doc": "Generate the fixed-capacity coupled R-D/D-R/D-D candidate axes."
     },
     {
       "name": "coupled_dd_geometry_forward",
@@ -3011,7 +2926,7 @@
       "name": "deterministic_accumulate_flat",
       "target": "channel_deterministic_accumulate_flat",
       "path": "native/channel/binding/path.cpp",
-      "line": 1486,
+      "line": 861,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3123,7 +3038,7 @@
       "name": "deterministic_accumulate_flat_backward",
       "target": "channel_deterministic_accumulate_flat_backward",
       "path": "native/channel/binding/path.cpp",
-      "line": 1516,
+      "line": 891,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3307,7 +3222,7 @@
       "name": "deterministic_accumulate_flat_fwd64",
       "target": "channel_deterministic_accumulate_flat_fwd64",
       "path": "native/channel/binding/path.cpp",
-      "line": 1501,
+      "line": 876,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3419,7 +3334,7 @@
       "name": "deterministic_accumulate_flat_jvp",
       "target": "channel_deterministic_accumulate_flat_jvp",
       "path": "native/channel/binding/path.cpp",
-      "line": 1539,
+      "line": 914,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3555,95 +3470,10 @@
       "doc": "Fixed-gate JVP of the flat accumulation (per-path field and power tangents)."
     },
     {
-      "name": "deterministic_capacity_finalize",
-      "target": "channel_deterministic_capacity_finalize",
-      "path": "native/channel/binding/path.cpp",
-      "line": 1222,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "failure_state",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "rx_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "pair_count",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "num_tx",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "num_rx",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "path_capacity_per_pair",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [
-        {
-          "name": "failure_state",
-          "default": null
-        },
-        {
-          "name": "valid",
-          "default": null
-        },
-        {
-          "name": "tx_id",
-          "default": null
-        },
-        {
-          "name": "rx_id",
-          "default": null
-        },
-        {
-          "name": "pair_count",
-          "default": null
-        },
-        {
-          "name": "num_tx",
-          "default": null
-        },
-        {
-          "name": "num_rx",
-          "default": null
-        },
-        {
-          "name": "path_capacity_per_pair",
-          "default": null
-        }
-      ],
-      "doc": "Stably finalize deterministic rows into pair-major fixed CUDA capacity."
-    },
-    {
       "name": "deterministic_component_counts",
       "target": "channel_deterministic_component_counts",
       "path": "native/channel/binding/path.cpp",
-      "line": 929,
+      "line": 589,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3660,7 +3490,7 @@
       "name": "deterministic_concat_topology_blocks",
       "target": "channel_deterministic_concat_topology_blocks",
       "path": "native/channel/binding/path.cpp",
-      "line": 1147,
+      "line": 781,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3682,7 +3512,7 @@
       "name": "deterministic_delay_to_path_length",
       "target": "channel_deterministic_delay_to_path_length",
       "path": "native/channel/binding/path.cpp",
-      "line": 966,
+      "line": 626,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -3696,97 +3526,10 @@
       "doc": "Convert deterministic path delays to path lengths with a CUDA kernel."
     },
     {
-      "name": "deterministic_diffraction_order1_capacity_block",
-      "target": "channel_deterministic_diffraction_order1_capacity_block",
-      "path": "native/channel/binding/path.cpp",
-      "line": 1135,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "failure_state",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "count",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "rx_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "depth",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "delay",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "x_re",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "x_im",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "y_re",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "y_im",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "z_re",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "z_im",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_position",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "output_capacity",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Stably gather one RayD diffraction exporter chunk into a fixed CUDA capacity block."
-    },
-    {
       "name": "deterministic_diffraction_order1_compact",
       "target": "channel_deterministic_diffraction_order1_compact",
       "path": "native/channel/binding/path.cpp",
-      "line": 1131,
+      "line": 769,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3855,397 +3598,10 @@
       "doc": "Compact deterministic first-order diffraction RayD outputs with native CUDA."
     },
     {
-      "name": "deterministic_diffraction_pair_reduce",
-      "target": "channel_deterministic_diffraction_pair_reduce",
-      "path": "native/channel/binding/path.cpp",
-      "line": 1410,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "failure_state",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "reported_count",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "x_re",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "x_im",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "y_re",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "y_im",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "z_re",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "z_im",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "pair_count",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "state_capacity",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [
-        {
-          "name": "failure_state",
-          "default": null
-        },
-        {
-          "name": "reported_count",
-          "default": null
-        },
-        {
-          "name": "valid",
-          "default": null
-        },
-        {
-          "name": "x_re",
-          "default": null
-        },
-        {
-          "name": "x_im",
-          "default": null
-        },
-        {
-          "name": "y_re",
-          "default": null
-        },
-        {
-          "name": "y_im",
-          "default": null
-        },
-        {
-          "name": "z_re",
-          "default": null
-        },
-        {
-          "name": "z_im",
-          "default": null
-        },
-        {
-          "name": "pair_count",
-          "default": null
-        },
-        {
-          "name": "state_capacity",
-          "default": null
-        }
-      ],
-      "doc": "Reduce fixed source-lane diffraction fields in source-state order."
-    },
-    {
-      "name": "deterministic_diffraction_pair_reduce_backward",
-      "target": "channel_deterministic_diffraction_pair_reduce_backward",
-      "path": "native/channel/binding/path.cpp",
-      "line": 1425,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "failure_state",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "field_xyz",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "grad_field_xyz",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_power",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "pair_count",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "state_capacity",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [
-        {
-          "name": "failure_state",
-          "default": null
-        },
-        {
-          "name": "valid",
-          "default": null
-        },
-        {
-          "name": "field_xyz",
-          "default": null
-        },
-        {
-          "name": "grad_field_xyz",
-          "default": null
-        },
-        {
-          "name": "grad_power",
-          "default": null
-        },
-        {
-          "name": "pair_count",
-          "default": null
-        },
-        {
-          "name": "state_capacity",
-          "default": null
-        }
-      ],
-      "doc": "Native fixed-valid diffraction pair-reduction VJP companion."
-    },
-    {
-      "name": "deterministic_diffraction_pair_reduce_jvp",
-      "target": "channel_deterministic_diffraction_pair_reduce_jvp",
-      "path": "native/channel/binding/path.cpp",
-      "line": 1436,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "failure_state",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "field_xyz",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tangent_x_re",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_x_im",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_y_re",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_y_im",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_z_re",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_z_im",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "pair_count",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "state_capacity",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [
-        {
-          "name": "failure_state",
-          "default": null
-        },
-        {
-          "name": "valid",
-          "default": null
-        },
-        {
-          "name": "field_xyz",
-          "default": null
-        },
-        {
-          "name": "tangent_x_re",
-          "default": null
-        },
-        {
-          "name": "tangent_x_im",
-          "default": null
-        },
-        {
-          "name": "tangent_y_re",
-          "default": null
-        },
-        {
-          "name": "tangent_y_im",
-          "default": null
-        },
-        {
-          "name": "tangent_z_re",
-          "default": null
-        },
-        {
-          "name": "tangent_z_im",
-          "default": null
-        },
-        {
-          "name": "pair_count",
-          "default": null
-        },
-        {
-          "name": "state_capacity",
-          "default": null
-        }
-      ],
-      "doc": "Native fixed-valid diffraction pair-reduction JVP companion."
-    },
-    {
-      "name": "deterministic_diffraction_state_capacity_select",
-      "target": "channel_deterministic_diffraction_state_capacity_select",
-      "path": "native/channel/binding/path.cpp",
-      "line": 886,
-      "return_type": "pybind11::tuple",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "failure_state",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "active",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_index",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_position",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_direction",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_t_min",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_t_max",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "n0",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "n1",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "prim0",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "prim1",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "exterior_angle",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "source",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "source_power",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "state_capacity",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Stably select diffraction states into an explicit CUDA capacity block."
-    },
-    {
       "name": "deterministic_diffraction_state_pack",
       "target": "channel_deterministic_diffraction_state_pack",
       "path": "native/channel/binding/path.cpp",
-      "line": 878,
+      "line": 542,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -4322,7 +3678,7 @@
       "name": "deterministic_diffraction_state_pack_selected",
       "target": "channel_deterministic_diffraction_state_pack_selected",
       "path": "native/channel/binding/path.cpp",
-      "line": 882,
+      "line": 546,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -4399,7 +3755,7 @@
       "name": "deterministic_diffraction_vector_field",
       "target": "channel_deterministic_diffraction_vector_field",
       "path": "native/channel/binding/path.cpp",
-      "line": 954,
+      "line": 614,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4441,7 +3797,7 @@
       "name": "deterministic_face_anchor_points",
       "target": "channel_deterministic_face_anchor_points",
       "path": "native/channel/binding/path.cpp",
-      "line": 1014,
+      "line": 674,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4463,7 +3819,7 @@
       "name": "deterministic_face_groups",
       "target": "channel_deterministic_face_groups",
       "path": "native/channel/binding/path.cpp",
-      "line": 1167,
+      "line": 789,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4495,7 +3851,7 @@
       "name": "deterministic_face_sequence_chunk",
       "target": "channel_deterministic_face_sequence_chunk",
       "path": "native/channel/binding/path.cpp",
-      "line": 1022,
+      "line": 682,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4537,7 +3893,7 @@
       "name": "deterministic_field_from_power_phase",
       "target": "channel_deterministic_field_from_power_phase",
       "path": "native/channel/binding/path.cpp",
-      "line": 986,
+      "line": 646,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4559,7 +3915,7 @@
       "name": "deterministic_gather_topology_block",
       "target": "channel_deterministic_gather_topology_block",
       "path": "native/channel/binding/path.cpp",
-      "line": 1151,
+      "line": 785,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4591,7 +3947,7 @@
       "name": "deterministic_los_field",
       "target": "channel_deterministic_los_field",
       "path": "native/channel/binding/path.cpp",
-      "line": 940,
+      "line": 600,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4618,7 +3974,7 @@
       "name": "deterministic_los_topology_block",
       "target": "channel_deterministic_los_topology_block",
       "path": "native/channel/binding/path.cpp",
-      "line": 990,
+      "line": 650,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4670,7 +4026,7 @@
       "name": "deterministic_los_topology_block_all_visible",
       "target": "channel_deterministic_los_topology_block_all_visible",
       "path": "native/channel/binding/path.cpp",
-      "line": 994,
+      "line": 654,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4717,7 +4073,7 @@
       "name": "deterministic_mapped_face_sequence_chunk",
       "target": "channel_deterministic_mapped_face_sequence_chunk",
       "path": "native/channel/binding/path.cpp",
-      "line": 1026,
+      "line": 686,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4754,7 +4110,7 @@
       "name": "deterministic_normalize_vec3",
       "target": "channel_deterministic_normalize_vec3",
       "path": "native/channel/binding/path.cpp",
-      "line": 1139,
+      "line": 773,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4776,7 +4132,7 @@
       "name": "deterministic_pack_complex",
       "target": "channel_deterministic_pack_complex",
       "path": "native/channel/binding/path.cpp",
-      "line": 970,
+      "line": 630,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4798,7 +4154,7 @@
       "name": "deterministic_pad_topology_sequences",
       "target": "channel_deterministic_pad_topology_sequences",
       "path": "native/channel/binding/path.cpp",
-      "line": 1002,
+      "line": 662,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4857,553 +4213,10 @@
       "doc": "Pad deterministic topology sequence fields with native CUDA."
     },
     {
-      "name": "deterministic_path_table_capacity_pack",
-      "target": "channel_deterministic_path_table_capacity_pack",
-      "path": "native/channel/binding/path.cpp",
-      "line": 1342,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "failure_state",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "rx_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "depth",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "component_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "primitive_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "primitive_sequence",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_sequence",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "path_length_m",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "delay_s",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "field_direction",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_position",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_normal",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_positions",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_normals",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "path_gain",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "path_field",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "field_xyz",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "coefficient",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "num_paths",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "overflow",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "include_fields",
-          "type": "bool",
-          "default": null
-        },
-        {
-          "name": "pair_count",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "path_capacity_per_pair",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [
-        {
-          "name": "failure_state",
-          "default": null
-        },
-        {
-          "name": "valid",
-          "default": null
-        },
-        {
-          "name": "tx_id",
-          "default": null
-        },
-        {
-          "name": "rx_id",
-          "default": null
-        },
-        {
-          "name": "depth",
-          "default": null
-        },
-        {
-          "name": "component_id",
-          "default": null
-        },
-        {
-          "name": "primitive_id",
-          "default": null
-        },
-        {
-          "name": "edge_id",
-          "default": null
-        },
-        {
-          "name": "material_id",
-          "default": null
-        },
-        {
-          "name": "primitive_sequence",
-          "default": null
-        },
-        {
-          "name": "material_sequence",
-          "default": null
-        },
-        {
-          "name": "path_length_m",
-          "default": null
-        },
-        {
-          "name": "delay_s",
-          "default": null
-        },
-        {
-          "name": "field_direction",
-          "default": null
-        },
-        {
-          "name": "interaction_position",
-          "default": null
-        },
-        {
-          "name": "interaction_normal",
-          "default": null
-        },
-        {
-          "name": "interaction_positions",
-          "default": null
-        },
-        {
-          "name": "interaction_normals",
-          "default": null
-        },
-        {
-          "name": "path_gain",
-          "default": null
-        },
-        {
-          "name": "path_field",
-          "default": null
-        },
-        {
-          "name": "field_xyz",
-          "default": null
-        },
-        {
-          "name": "coefficient",
-          "default": null
-        },
-        {
-          "name": "num_paths",
-          "default": null
-        },
-        {
-          "name": "overflow",
-          "default": null
-        },
-        {
-          "name": "include_fields",
-          "default": null
-        },
-        {
-          "name": "pair_count",
-          "default": null
-        },
-        {
-          "name": "path_capacity_per_pair",
-          "default": null
-        }
-      ],
-      "doc": "Pack a dormant deterministic PathTable into fixed pair-major CUDA capacity."
-    },
-    {
-      "name": "deterministic_path_table_capacity_pack_backward",
-      "target": "channel_deterministic_path_table_capacity_pack_backward",
-      "path": "native/channel/binding/path.cpp",
-      "line": 1373,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "include_fields",
-          "type": "bool",
-          "default": null
-        },
-        {
-          "name": "grad_path_length_m",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_delay_s",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_path_gain",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_interaction_position",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_interaction_normal",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_interaction_positions",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_interaction_normals",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_field_real",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_field_imag",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_coefficient",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_field_xyz",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_field_direction",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "sequence_width",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [
-        {
-          "name": "valid",
-          "default": null
-        },
-        {
-          "name": "include_fields",
-          "default": null
-        },
-        {
-          "name": "grad_path_length_m",
-          "default": null
-        },
-        {
-          "name": "grad_delay_s",
-          "default": null
-        },
-        {
-          "name": "grad_path_gain",
-          "default": null
-        },
-        {
-          "name": "grad_interaction_position",
-          "default": null
-        },
-        {
-          "name": "grad_interaction_normal",
-          "default": null
-        },
-        {
-          "name": "grad_interaction_positions",
-          "default": null
-        },
-        {
-          "name": "grad_interaction_normals",
-          "default": null
-        },
-        {
-          "name": "grad_field_real",
-          "default": null
-        },
-        {
-          "name": "grad_field_imag",
-          "default": null
-        },
-        {
-          "name": "grad_coefficient",
-          "default": null
-        },
-        {
-          "name": "grad_field_xyz",
-          "default": null
-        },
-        {
-          "name": "grad_field_direction",
-          "default": null
-        },
-        {
-          "name": "sequence_width",
-          "default": null
-        }
-      ],
-      "doc": "Propagate fixed-capacity PathTable cotangents without compacting rows."
-    },
-    {
-      "name": "deterministic_path_table_capacity_pack_jvp",
-      "target": "channel_deterministic_path_table_capacity_pack_jvp",
-      "path": "native/channel/binding/path.cpp",
-      "line": 1392,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "include_fields",
-          "type": "bool",
-          "default": null
-        },
-        {
-          "name": "tangent_path_length_m",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_delay_s",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_field_direction",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_interaction_position",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_interaction_normal",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_interaction_positions",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_interaction_normals",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_path_gain",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_path_field",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_field_xyz",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_coefficient",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "sequence_width",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [
-        {
-          "name": "valid",
-          "default": null
-        },
-        {
-          "name": "include_fields",
-          "default": null
-        },
-        {
-          "name": "tangent_path_length_m",
-          "default": null
-        },
-        {
-          "name": "tangent_delay_s",
-          "default": null
-        },
-        {
-          "name": "tangent_field_direction",
-          "default": null
-        },
-        {
-          "name": "tangent_interaction_position",
-          "default": null
-        },
-        {
-          "name": "tangent_interaction_normal",
-          "default": null
-        },
-        {
-          "name": "tangent_interaction_positions",
-          "default": null
-        },
-        {
-          "name": "tangent_interaction_normals",
-          "default": null
-        },
-        {
-          "name": "tangent_path_gain",
-          "default": null
-        },
-        {
-          "name": "tangent_path_field",
-          "default": null
-        },
-        {
-          "name": "tangent_field_xyz",
-          "default": null
-        },
-        {
-          "name": "tangent_coefficient",
-          "default": null
-        },
-        {
-          "name": "sequence_width",
-          "default": null
-        }
-      ],
-      "doc": "Propagate fixed-capacity PathTable tangents without compacting rows."
-    },
-    {
       "name": "deterministic_phase_from_field",
       "target": "channel_deterministic_phase_from_field",
       "path": "native/channel/binding/path.cpp",
-      "line": 974,
+      "line": 634,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -5425,7 +4238,7 @@
       "name": "deterministic_phase_from_length",
       "target": "channel_deterministic_phase_from_length",
       "path": "native/channel/binding/path.cpp",
-      "line": 982,
+      "line": 642,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -5447,7 +4260,7 @@
       "name": "deterministic_reflect_points",
       "target": "channel_deterministic_reflect_points",
       "path": "native/channel/binding/path.cpp",
-      "line": 1143,
+      "line": 777,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -5471,185 +4284,10 @@
       "doc": "Reflect deterministic points about planes with native CUDA."
     },
     {
-      "name": "deterministic_reflection_candidate_capacity_block",
-      "target": "channel_deterministic_reflection_candidate_capacity_block",
-      "path": "native/channel/binding/path.cpp",
-      "line": 1038,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "failure_state",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "visible",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "epc_sequences",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "epc_hits",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "epc_normals",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "sequence_batch",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "rx_indices",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "rx_positions",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_power",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_index",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "face_eps_r",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "face_sigma_e",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "face_mu_r",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "face_gain",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "face_material_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "grouped_export",
-          "type": "bool",
-          "default": null
-        },
-        {
-          "name": "candidate_capacity",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [
-        {
-          "name": "failure_state",
-          "default": null
-        },
-        {
-          "name": "visible",
-          "default": null
-        },
-        {
-          "name": "epc_sequences",
-          "default": null
-        },
-        {
-          "name": "epc_hits",
-          "default": null
-        },
-        {
-          "name": "epc_normals",
-          "default": null
-        },
-        {
-          "name": "sequence_batch",
-          "default": null
-        },
-        {
-          "name": "rx_indices",
-          "default": null
-        },
-        {
-          "name": "tx",
-          "default": null
-        },
-        {
-          "name": "rx_positions",
-          "default": null
-        },
-        {
-          "name": "tx_power",
-          "default": null
-        },
-        {
-          "name": "tx_index",
-          "default": null
-        },
-        {
-          "name": "face_eps_r",
-          "default": null
-        },
-        {
-          "name": "face_sigma_e",
-          "default": null
-        },
-        {
-          "name": "face_mu_r",
-          "default": null
-        },
-        {
-          "name": "face_gain",
-          "default": null
-        },
-        {
-          "name": "face_material_id",
-          "default": null
-        },
-        {
-          "name": "grouped_export",
-          "default": null
-        },
-        {
-          "name": "candidate_capacity",
-          "default": null
-        }
-      ],
-      "doc": "Stably gather visible reflection EPC rows into fixed CUDA capacity."
-    },
-    {
       "name": "deterministic_reflection_epc_input_batch",
       "target": "channel_deterministic_reflection_epc_input_batch",
       "path": "native/channel/binding/path.cpp",
-      "line": 1018,
+      "line": 678,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5696,7 +4334,7 @@
       "name": "deterministic_reflection_field",
       "target": "channel_deterministic_reflection_field",
       "path": "native/channel/binding/path.cpp",
-      "line": 958,
+      "line": 618,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5758,7 +4396,7 @@
       "name": "deterministic_reflection_order1_compact",
       "target": "channel_deterministic_reflection_order1_compact",
       "path": "native/channel/binding/path.cpp",
-      "line": 1030,
+      "line": 690,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5850,7 +4488,7 @@
       "name": "deterministic_reflection_sequence_compact",
       "target": "channel_deterministic_reflection_sequence_compact",
       "path": "native/channel/binding/path.cpp",
-      "line": 1034,
+      "line": 694,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5937,7 +4575,7 @@
       "name": "deterministic_reflection_sequence_field",
       "target": "channel_deterministic_reflection_sequence_field",
       "path": "native/channel/binding/path.cpp",
-      "line": 962,
+      "line": 622,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5999,7 +4637,7 @@
       "name": "deterministic_repeat_range",
       "target": "channel_deterministic_repeat_range",
       "path": "native/channel/binding/path.cpp",
-      "line": 1010,
+      "line": 670,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -6031,7 +4669,7 @@
       "name": "deterministic_selected_edge_count",
       "target": "channel_deterministic_selected_edge_count",
       "path": "native/channel/binding/path.cpp",
-      "line": 933,
+      "line": 593,
       "return_type": "int64_t",
       "return_arity": 1,
       "parameters": [
@@ -6048,7 +4686,7 @@
       "name": "deterministic_sort_order",
       "target": "channel_deterministic_sort_order",
       "path": "native/channel/binding/path.cpp",
-      "line": 1175,
+      "line": 797,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -6100,7 +4738,7 @@
       "name": "deterministic_surface_face_groups",
       "target": "channel_deterministic_surface_face_groups",
       "path": "native/channel/binding/path.cpp",
-      "line": 1171,
+      "line": 793,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6117,7 +4755,7 @@
       "name": "deterministic_topology_base_fields",
       "target": "channel_deterministic_topology_base_fields",
       "path": "native/channel/binding/path.cpp",
-      "line": 1006,
+      "line": 666,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6189,7 +4827,7 @@
       "name": "deterministic_topology_default_fields",
       "target": "channel_deterministic_topology_default_fields",
       "path": "native/channel/binding/path.cpp",
-      "line": 998,
+      "line": 658,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6206,7 +4844,7 @@
       "name": "deterministic_zero_field_phase",
       "target": "channel_deterministic_zero_field_phase",
       "path": "native/channel/binding/path.cpp",
-      "line": 978,
+      "line": 638,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6478,158 +5116,10 @@
       "doc": "Layer-stack JVP over cos_theta, CSR layer parameters and frequency (CUDA duals)."
     },
     {
-      "name": "enumerated_canonical_capacity_select",
-      "target": "channel_enumerated_canonical_capacity_select",
-      "path": "native/channel/binding/path.cpp",
-      "line": 1179,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "failure_state",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "rx_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "depth",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "component_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "primitive_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "primitive_sequence",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "path_length_m",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "pair_count",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "num_tx",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "num_rx",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "max_paths",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "max_paths_scope",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [
-        {
-          "name": "failure_state",
-          "default": null
-        },
-        {
-          "name": "valid",
-          "default": null
-        },
-        {
-          "name": "tx_id",
-          "default": null
-        },
-        {
-          "name": "rx_id",
-          "default": null
-        },
-        {
-          "name": "depth",
-          "default": null
-        },
-        {
-          "name": "component_id",
-          "default": null
-        },
-        {
-          "name": "primitive_id",
-          "default": null
-        },
-        {
-          "name": "edge_id",
-          "default": null
-        },
-        {
-          "name": "primitive_sequence",
-          "default": null
-        },
-        {
-          "name": "path_length_m",
-          "default": null
-        },
-        {
-          "name": "pair_count",
-          "default": null
-        },
-        {
-          "name": "num_tx",
-          "default": null
-        },
-        {
-          "name": "num_rx",
-          "default": null
-        },
-        {
-          "name": "max_paths",
-          "default": null
-        },
-        {
-          "name": "max_paths_scope",
-          "default": null
-        }
-      ],
-      "doc": "Select canonical enumerated rows into a fixed compact-prefix CUDA capacity."
-    },
-    {
       "name": "enumerated_canonical_compact",
       "target": "channel_enumerated_canonical_compact",
       "path": "native/channel/binding/path.cpp",
-      "line": 1198,
+      "line": 801,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6723,7 +5213,7 @@
       "name": "enumerated_capacity_failure_sanitize",
       "target": "channel_enumerated_capacity_failure_sanitize",
       "path": "native/channel/binding/path.cpp",
-      "line": 1098,
+      "line": 736,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6943,7 +5433,7 @@
       "name": "enumerated_capacity_failure_vector_sanitize",
       "target": "channel_enumerated_capacity_failure_vector_sanitize",
       "path": "native/channel/binding/path.cpp",
-      "line": 1125,
+      "line": 763,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -6974,7 +5464,7 @@
       "name": "enumerated_exact_pair_metadata",
       "target": "channel_enumerated_exact_pair_metadata",
       "path": "native/channel/binding/path.cpp",
-      "line": 1211,
+      "line": 814,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7050,7 +5540,7 @@
       "name": "enumerated_transmission_topology_pack",
       "target": "channel_enumerated_transmission_topology_pack",
       "path": "native/channel/binding/path.cpp",
-      "line": 1060,
+      "line": 698,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7180,7 +5670,7 @@
       "name": "enumerated_transmission_topology_pack_backward",
       "target": "channel_enumerated_transmission_topology_pack_backward",
       "path": "native/channel/binding/path.cpp",
-      "line": 1077,
+      "line": 715,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7265,7 +5755,7 @@
       "name": "enumerated_transmission_topology_pack_jvp",
       "target": "channel_enumerated_transmission_topology_pack_jvp",
       "path": "native/channel/binding/path.cpp",
-      "line": 1089,
+      "line": 727,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7320,724 +5810,10 @@
       "doc": "Propagate RayD penetration tangents through transmission topology packing."
     },
     {
-      "name": "evaluated_paths_canonical_capacity_gather",
-      "target": "channel_evaluated_paths_canonical_capacity_gather",
-      "path": "native/channel/binding/path.cpp",
-      "line": 1234,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "failure_state",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "selected_row_index",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "selected_valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "num_selected",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "num_paths",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "candidate_valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "rx_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "depth",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "component_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "primitive_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "primitive_sequence",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_sequence",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_type",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "path_length_m",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "delay_s",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "field_direction",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_position",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_normal",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_positions",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_normals",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "path_gain",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "path_field",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "field_xyz",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "coefficient",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "num_tx",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "num_rx",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [
-        {
-          "name": "failure_state",
-          "default": null
-        },
-        {
-          "name": "selected_row_index",
-          "default": null
-        },
-        {
-          "name": "selected_valid",
-          "default": null
-        },
-        {
-          "name": "num_selected",
-          "default": null
-        },
-        {
-          "name": "num_paths",
-          "default": null
-        },
-        {
-          "name": "candidate_valid",
-          "default": null
-        },
-        {
-          "name": "tx_id",
-          "default": null
-        },
-        {
-          "name": "rx_id",
-          "default": null
-        },
-        {
-          "name": "depth",
-          "default": null
-        },
-        {
-          "name": "component_id",
-          "default": null
-        },
-        {
-          "name": "primitive_id",
-          "default": null
-        },
-        {
-          "name": "edge_id",
-          "default": null
-        },
-        {
-          "name": "material_id",
-          "default": null
-        },
-        {
-          "name": "primitive_sequence",
-          "default": null
-        },
-        {
-          "name": "material_sequence",
-          "default": null
-        },
-        {
-          "name": "interaction_type",
-          "default": null
-        },
-        {
-          "name": "path_length_m",
-          "default": null
-        },
-        {
-          "name": "delay_s",
-          "default": null
-        },
-        {
-          "name": "field_direction",
-          "default": null
-        },
-        {
-          "name": "interaction_position",
-          "default": null
-        },
-        {
-          "name": "interaction_normal",
-          "default": null
-        },
-        {
-          "name": "interaction_positions",
-          "default": null
-        },
-        {
-          "name": "interaction_normals",
-          "default": null
-        },
-        {
-          "name": "path_gain",
-          "default": null
-        },
-        {
-          "name": "path_field",
-          "default": null
-        },
-        {
-          "name": "field_xyz",
-          "default": null
-        },
-        {
-          "name": "coefficient",
-          "default": null
-        },
-        {
-          "name": "num_tx",
-          "default": null
-        },
-        {
-          "name": "num_rx",
-          "default": null
-        }
-      ],
-      "doc": "Gather canonical selected rows into a fixed compact-prefix CUDA capacity."
-    },
-    {
-      "name": "evaluated_paths_canonical_capacity_gather_backward",
-      "target": "channel_evaluated_paths_canonical_capacity_gather_backward",
-      "path": "native/channel/binding/path.cpp",
-      "line": 1267,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "failure_state",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "selected_row_index",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "grad_path_length_m",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_delay_s",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_field_direction",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_interaction_position",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_interaction_normal",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_interaction_positions",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_interaction_normals",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_path_gain",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_path_field",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_field_xyz",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_coefficient",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "candidate_count",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "sequence_width",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Scatter canonical gather cotangents to unique evaluated-path source rows."
-    },
-    {
-      "name": "evaluated_paths_canonical_capacity_gather_jvp",
-      "target": "channel_evaluated_paths_canonical_capacity_gather_jvp",
-      "path": "native/channel/binding/path.cpp",
-      "line": 1271,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "failure_state",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "selected_row_index",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tangent_path_length_m",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_delay_s",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_field_direction",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_interaction_position",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_interaction_normal",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_interaction_positions",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_interaction_normals",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_path_gain",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_path_field",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_field_xyz",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_coefficient",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "candidate_count",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "sequence_width",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Gather evaluated-path tangents into canonical compact-prefix capacity."
-    },
-    {
-      "name": "evaluated_paths_capacity_pack",
-      "target": "channel_evaluated_paths_capacity_pack",
-      "path": "native/channel/binding/path.cpp",
-      "line": 1303,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "failure_state",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "rx_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "depth",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "component_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "primitive_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "primitive_sequence",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_sequence",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_type",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "path_length_m",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "delay_s",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "field_direction",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_position",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_normal",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_positions",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_normals",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "path_gain",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "path_field",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "field_xyz",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "coefficient",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "pair_count",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "num_tx",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "num_rx",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "path_capacity_per_pair",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [
-        {
-          "name": "failure_state",
-          "default": null
-        },
-        {
-          "name": "valid",
-          "default": null
-        },
-        {
-          "name": "tx_id",
-          "default": null
-        },
-        {
-          "name": "rx_id",
-          "default": null
-        },
-        {
-          "name": "depth",
-          "default": null
-        },
-        {
-          "name": "component_id",
-          "default": null
-        },
-        {
-          "name": "primitive_id",
-          "default": null
-        },
-        {
-          "name": "edge_id",
-          "default": null
-        },
-        {
-          "name": "material_id",
-          "default": null
-        },
-        {
-          "name": "primitive_sequence",
-          "default": null
-        },
-        {
-          "name": "material_sequence",
-          "default": null
-        },
-        {
-          "name": "interaction_type",
-          "default": null
-        },
-        {
-          "name": "path_length_m",
-          "default": null
-        },
-        {
-          "name": "delay_s",
-          "default": null
-        },
-        {
-          "name": "field_direction",
-          "default": null
-        },
-        {
-          "name": "interaction_position",
-          "default": null
-        },
-        {
-          "name": "interaction_normal",
-          "default": null
-        },
-        {
-          "name": "interaction_positions",
-          "default": null
-        },
-        {
-          "name": "interaction_normals",
-          "default": null
-        },
-        {
-          "name": "path_gain",
-          "default": null
-        },
-        {
-          "name": "path_field",
-          "default": null
-        },
-        {
-          "name": "field_xyz",
-          "default": null
-        },
-        {
-          "name": "coefficient",
-          "default": null
-        },
-        {
-          "name": "pair_count",
-          "default": null
-        },
-        {
-          "name": "num_tx",
-          "default": null
-        },
-        {
-          "name": "num_rx",
-          "default": null
-        },
-        {
-          "name": "path_capacity_per_pair",
-          "default": null
-        }
-      ],
-      "doc": "Pack complete evaluated paths into stable pair-major CUDA capacity."
-    },
-    {
       "name": "evaluated_paths_capacity_pack_backward",
       "target": "channel_evaluated_paths_capacity_pack_backward",
       "path": "native/channel/binding/path.cpp",
-      "line": 1334,
+      "line": 853,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -8124,7 +5900,7 @@
       "name": "evaluated_paths_capacity_pack_jvp",
       "target": "channel_evaluated_paths_capacity_pack_jvp",
       "path": "native/channel/binding/path.cpp",
-      "line": 1338,
+      "line": 857,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -8211,7 +5987,7 @@
       "name": "evaluated_paths_compact_finalize",
       "target": "channel_evaluated_paths_compact_finalize",
       "path": "native/channel/binding/path.cpp",
-      "line": 1275,
+      "line": 825,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -8348,7 +6124,7 @@
       "name": "evaluated_paths_compact_finalize_backward",
       "target": "channel_evaluated_paths_compact_finalize_backward",
       "path": "native/channel/binding/path.cpp",
-      "line": 1279,
+      "line": 829,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -8435,7 +6211,7 @@
       "name": "evaluated_paths_compact_finalize_jvp",
       "target": "channel_evaluated_paths_compact_finalize_jvp",
       "path": "native/channel/binding/path.cpp",
-      "line": 1283,
+      "line": 833,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12062,7 +9838,7 @@
       "name": "los_silhouette_clearance",
       "target": "channel_los_silhouette_clearance",
       "path": "native/channel/binding/path.cpp",
-      "line": 944,
+      "line": 604,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -12104,7 +9880,7 @@
       "name": "los_taper_apply",
       "target": "channel_los_taper_apply",
       "path": "native/channel/binding/path.cpp",
-      "line": 949,
+      "line": 609,
       "return_type": "std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>",
       "return_arity": 4,
       "parameters": [
@@ -14733,7 +12509,7 @@
       "name": "path_concat_vec3",
       "target": "channel_path_concat_vec3",
       "path": "native/channel/binding/path.cpp",
-      "line": 897,
+      "line": 557,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -14750,7 +12526,7 @@
       "name": "path_diffraction_block",
       "target": "channel_path_diffraction_block",
       "path": "native/channel/binding/path.cpp",
-      "line": 917,
+      "line": 577,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -14772,7 +12548,7 @@
       "name": "path_filter_block",
       "target": "channel_path_filter_block",
       "path": "native/channel/binding/path.cpp",
-      "line": 913,
+      "line": 573,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -14799,7 +12575,7 @@
       "name": "path_filter_los",
       "target": "channel_path_filter_los",
       "path": "native/channel/binding/path.cpp",
-      "line": 905,
+      "line": 565,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -14841,7 +12617,7 @@
       "name": "path_finalize_blocks",
       "target": "channel_path_finalize_blocks",
       "path": "native/channel/binding/path.cpp",
-      "line": 925,
+      "line": 585,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -14883,7 +12659,7 @@
       "name": "path_los_export",
       "target": "channel_path_los_export",
       "path": "native/channel/binding/path.cpp",
-      "line": 893,
+      "line": 553,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -14920,7 +12696,7 @@
       "name": "path_los_visibility_inputs",
       "target": "channel_path_los_visibility_inputs",
       "path": "native/channel/binding/path.cpp",
-      "line": 901,
+      "line": 561,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -14952,7 +12728,7 @@
       "name": "path_merge_blocks",
       "target": "channel_path_merge_blocks",
       "path": "native/channel/binding/path.cpp",
-      "line": 921,
+      "line": 581,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -14979,7 +12755,7 @@
       "name": "path_reflection_candidates",
       "target": "channel_path_reflection_candidates",
       "path": "native/channel/binding/path.cpp",
-      "line": 909,
+      "line": 569,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -15026,460 +12802,6 @@
       ],
       "pybind_arguments": [],
       "doc": "Generate first-order reflection path candidates and visibility segments with native CUDA kernels."
-    },
-    {
-      "name": "path_result_capacity_pack",
-      "target": "channel_path_result_capacity_pack",
-      "path": "native/channel/binding/path.cpp",
-      "line": 1451,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "failure_state",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "overflow",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "num_paths",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "rx_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "depth",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "component_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "primitive_sequence",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_sequence",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_type",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "delay_s",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "field_direction",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_positions",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_normals",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "coefficient",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "field_xyz",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_positions",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "rx_positions",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "num_tx",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "num_rx",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "path_capacity_per_pair",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [
-        {
-          "name": "failure_state",
-          "default": null
-        },
-        {
-          "name": "overflow",
-          "default": null
-        },
-        {
-          "name": "valid",
-          "default": null
-        },
-        {
-          "name": "num_paths",
-          "default": null
-        },
-        {
-          "name": "tx_id",
-          "default": null
-        },
-        {
-          "name": "rx_id",
-          "default": null
-        },
-        {
-          "name": "depth",
-          "default": null
-        },
-        {
-          "name": "component_id",
-          "default": null
-        },
-        {
-          "name": "edge_id",
-          "default": null
-        },
-        {
-          "name": "primitive_sequence",
-          "default": null
-        },
-        {
-          "name": "material_sequence",
-          "default": null
-        },
-        {
-          "name": "interaction_type",
-          "default": null
-        },
-        {
-          "name": "delay_s",
-          "default": null
-        },
-        {
-          "name": "field_direction",
-          "default": null
-        },
-        {
-          "name": "interaction_positions",
-          "default": null
-        },
-        {
-          "name": "interaction_normals",
-          "default": null
-        },
-        {
-          "name": "coefficient",
-          "default": null
-        },
-        {
-          "name": "field_xyz",
-          "default": null
-        },
-        {
-          "name": "tx_positions",
-          "default": null
-        },
-        {
-          "name": "rx_positions",
-          "default": null
-        },
-        {
-          "name": "num_tx",
-          "default": null
-        },
-        {
-          "name": "num_rx",
-          "default": null
-        },
-        {
-          "name": "path_capacity_per_pair",
-          "default": null
-        }
-      ],
-      "doc": "Pack evaluated capacity rows into canonical PathResult storage."
-    },
-    {
-      "name": "path_result_capacity_pack_backward",
-      "target": "channel_path_result_capacity_pack_backward",
-      "path": "native/channel/binding/path.cpp",
-      "line": 1478,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "rx_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "depth",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_type",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_positions",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_normals",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_positions",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "rx_positions",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "grad_a",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_tau",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_theta_t",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_phi_t",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_theta_r",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_phi_r",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_position",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_normal",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_field_xyz",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "grad_field_direction",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "num_tx",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "num_rx",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "path_capacity_per_pair",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Native fixed-topology PathResult capacity VJP companion."
-    },
-    {
-      "name": "path_result_capacity_pack_jvp",
-      "target": "channel_path_result_capacity_pack_jvp",
-      "path": "native/channel/binding/path.cpp",
-      "line": 1482,
-      "return_type": "pybind11::dict",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "rx_id",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "depth",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_type",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_positions",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "interaction_normals",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tx_positions",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "rx_positions",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tangent_delay_s",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_field_direction",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_interaction_positions",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_interaction_normals",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_coefficient",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_field_xyz",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_tx_positions",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "tangent_rx_positions",
-          "type": "std::optional<torch::Tensor>",
-          "default": null
-        },
-        {
-          "name": "num_tx",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "num_rx",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "path_capacity_per_pair",
-          "type": "int64_t",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Native fixed-topology PathResult capacity JVP companion."
     },
     {
       "name": "rayd_diffraction_paths_order1_forward",

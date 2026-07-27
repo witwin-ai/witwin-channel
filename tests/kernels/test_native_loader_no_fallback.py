@@ -248,7 +248,7 @@ def test_mc_bdpt_hot_paths_do_not_make_python_empty_wedge_sentinels():
         / "channel"
         / "montecarlo"
         / "bdpt"
-        / "subpaths.py",
+        / "workspace.py",
     )
 
     offenders: list[str] = []

@@ -758,40 +758,6 @@ static pybind11::dict canonical_capacity_select_impl(
     return result;
 }
 
-pybind11::dict channel_enumerated_canonical_capacity_select(
-    at::Tensor failure_state,
-    at::Tensor valid,
-    at::Tensor tx_id,
-    at::Tensor rx_id,
-    at::Tensor depth,
-    at::Tensor component_id,
-    at::Tensor primitive_id,
-    at::Tensor edge_id,
-    at::Tensor primitive_sequence,
-    at::Tensor path_length_m,
-    int64_t pair_count,
-    int64_t num_tx,
-    int64_t num_rx,
-    int64_t max_paths,
-    int64_t max_paths_scope) {
-    return canonical_capacity_select_impl(
-        std::move(failure_state),
-        std::move(valid),
-        std::move(tx_id),
-        std::move(rx_id),
-        std::move(depth),
-        std::move(component_id),
-        std::move(primitive_id),
-        std::move(edge_id),
-        std::move(primitive_sequence),
-        std::move(path_length_m),
-        pair_count,
-        num_tx,
-        num_rx,
-        max_paths,
-        max_paths_scope);
-}
-
 pybind11::dict channel_deterministic_gather_topology_block(
     pybind11::dict block,
     at::Tensor order,

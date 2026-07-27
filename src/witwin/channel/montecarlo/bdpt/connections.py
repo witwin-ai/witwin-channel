@@ -553,8 +553,8 @@ def _transmission_sampled_connection_samples(
     Event probabilities: smooth faces keep the wave-2 two-way split
     p_t = T/(R+T) from the native stack budgets BIT-IDENTICALLY (their
     scatter probability is exactly zero, so the same uniform partitions the
-    same way); rough faces use the (R_coh, R_diff, T_bar) budgets from
-    scattering.energy with the same floor pattern. The rough reflect branch
+    same way); rough faces use the native (R_coh, R_diff, T_bar) budgets
+    with the same floor pattern. The rough reflect branch
     additionally multiplies the field by the coherent attenuation C_r so its
     amplitude represents sqrt(R_coh), matching the budget that selected it.
 

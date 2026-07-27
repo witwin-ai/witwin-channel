@@ -42,129 +42,13 @@ OWNER_KINDS = frozenset(
         "dormant_native_call_site",
     }
 )
-DORMANT_SYMBOL_FACADES = {
-    "coupled_candidate_capacity_block": "coupled_candidate_capacity_block",
-    "deterministic_capacity_finalize": "deterministic_capacity_finalize",
-    "deterministic_diffraction_order1_capacity_block": (
-        "deterministic_diffraction_order1_capacity_block"
-    ),
-    "deterministic_diffraction_pair_reduce": "deterministic_diffraction_pair_reduce",
-    "deterministic_diffraction_pair_reduce_backward": (
-        "deterministic_diffraction_pair_reduce_backward"
-    ),
-    "deterministic_diffraction_pair_reduce_jvp": (
-        "deterministic_diffraction_pair_reduce_jvp"
-    ),
-    "deterministic_diffraction_state_capacity_select": (
-        "deterministic_diffraction_state_capacity_select"
-    ),
-    "deterministic_path_table_capacity_pack": (
-        "deterministic_path_table_capacity_pack"
-    ),
-    "deterministic_path_table_capacity_pack_backward": (
-        "deterministic_path_table_capacity_pack"
-    ),
-    "deterministic_path_table_capacity_pack_jvp": (
-        "deterministic_path_table_capacity_pack"
-    ),
-    "deterministic_reflection_candidate_capacity_block": (
-        "deterministic_reflection_candidate_capacity_block"
-    ),
-    "enumerated_canonical_capacity_select": "enumerated_canonical_capacity_select",
-    "evaluated_paths_canonical_capacity_gather": (
-        "evaluated_paths_canonical_capacity_gather"
-    ),
-    "evaluated_paths_canonical_capacity_gather_backward": (
-        "evaluated_paths_canonical_capacity_gather"
-    ),
-    "evaluated_paths_canonical_capacity_gather_jvp": (
-        "evaluated_paths_canonical_capacity_gather"
-    ),
-    "evaluated_paths_capacity_pack": "evaluated_paths_capacity_pack",
-    "evaluated_paths_capacity_pack_backward": "evaluated_paths_capacity_pack",
-    "evaluated_paths_capacity_pack_jvp": "evaluated_paths_capacity_pack",
-    "path_result_capacity_pack": "from_capacity_evaluated_paths",
-    "path_result_capacity_pack_backward": "from_capacity_evaluated_paths",
-    "path_result_capacity_pack_jvp": "from_capacity_evaluated_paths",
-}
+# ADR-029/030/031 dormant caller-free artifacts were removed in the Phase-11
+# cutover. The gate keeps its dormant branch so a future caller-free binding
+# still needs a named, explicitly recorded decision before it can land.
+DORMANT_SYMBOL_FACADES: dict[str, str] = {}
 DORMANT_EXPERIMENT_SYMBOLS = frozenset(DORMANT_SYMBOL_FACADES)
-DORMANT_FACADE_OWNERS = {
-    "coupled_candidate_capacity_block": (
-        "witwin.channel.propagation.topology.kernels.coupled."
-        "coupled_candidate_capacity_block"
-    ),
-    "deterministic_capacity_finalize": (
-        "witwin.channel.propagation.topology.kernels.compaction."
-        "deterministic_capacity_finalize"
-    ),
-    "deterministic_diffraction_order1_capacity_block": (
-        "witwin.channel.propagation.topology.kernels.compaction."
-        "deterministic_diffraction_order1_capacity_block"
-    ),
-    "deterministic_diffraction_pair_reduce": (
-        "witwin.channel.deterministic.kernels.diffraction_pair."
-        "deterministic_diffraction_pair_reduce"
-    ),
-    "deterministic_diffraction_pair_reduce_backward": (
-        "witwin.channel.deterministic.kernels.diffraction_pair."
-        "deterministic_diffraction_pair_reduce_backward"
-    ),
-    "deterministic_diffraction_pair_reduce_jvp": (
-        "witwin.channel.deterministic.kernels.diffraction_pair."
-        "deterministic_diffraction_pair_reduce_jvp"
-    ),
-    "deterministic_diffraction_pair_reduce_ad": (
-        "witwin.channel.deterministic.kernels.diffraction_pair."
-        "deterministic_diffraction_pair_reduce_ad"
-    ),
-    "deterministic_diffraction_state_capacity_select": (
-        "witwin.channel.propagation.topology.kernels.primitives."
-        "deterministic_diffraction_state_capacity_select"
-    ),
-    "deterministic_path_table_capacity_pack": (
-        "witwin.channel.deterministic.capacity."
-        "deterministic_path_table_capacity_pack"
-    ),
-    "deterministic_reflection_candidate_capacity_block": (
-        "witwin.channel.propagation.topology.kernels.reflection."
-        "deterministic_reflection_candidate_capacity_block"
-    ),
-    "enumerated_canonical_capacity_select": (
-        "witwin.channel.propagation.topology.kernels.compaction."
-        "enumerated_canonical_capacity_select"
-    ),
-    "evaluated_paths_canonical_capacity_gather": (
-        "witwin.channel.propagation.enumerated.canonical_capacity."
-        "evaluated_paths_canonical_capacity_gather"
-    ),
-    "evaluated_paths_capacity_pack": (
-        "witwin.channel.propagation.enumerated.capacity."
-        "evaluated_paths_capacity_pack"
-    ),
-    "from_capacity_evaluated_paths": (
-        "witwin.channel.path.capacity.from_capacity_evaluated_paths"
-    ),
-}
-DORMANT_ALLOWED_FACADE_CALLERS = {
-    "deterministic_diffraction_pair_reduce": frozenset(
-        {
-            "witwin.channel.deterministic.kernels.diffraction_pair."
-            "_DeterministicDiffractionPairReduceFunction.forward"
-        }
-    ),
-    "deterministic_diffraction_pair_reduce_backward": frozenset(
-        {
-            "witwin.channel.deterministic.kernels.diffraction_pair."
-            "_DeterministicDiffractionPairReduceFunction.backward"
-        }
-    ),
-    "deterministic_diffraction_pair_reduce_jvp": frozenset(
-        {
-            "witwin.channel.deterministic.kernels.diffraction_pair."
-            "_DeterministicDiffractionPairReduceFunction.jvp"
-        }
-    ),
-}
+DORMANT_FACADE_OWNERS: dict[str, str] = {}
+DORMANT_ALLOWED_FACADE_CALLERS: dict[str, frozenset[str]] = {}
 BOOTSTRAP_CALL_SITE_OWNERS = {
     "coupled_rd_prepare": (
         "witwin.channel.propagation.fields.kernels.autograd."
@@ -181,18 +65,6 @@ BOOTSTRAP_CALL_SITE_OWNERS = {
     "deterministic_accumulate_flat_fwd64": (
         "witwin.channel.deterministic.kernels.accumulation."
         "_DeterministicAccumulateFlatAdFunction.forward"
-    ),
-    "deterministic_path_table_capacity_pack": (
-        "witwin.channel.deterministic.capacity."
-        "_DeterministicPathTableCapacityPackFunction.forward"
-    ),
-    "deterministic_path_table_capacity_pack_backward": (
-        "witwin.channel.deterministic.capacity."
-        "_DeterministicPathTableCapacityPackFunction.backward"
-    ),
-    "deterministic_path_table_capacity_pack_jvp": (
-        "witwin.channel.deterministic.capacity."
-        "_DeterministicPathTableCapacityPackFunction.jvp"
     ),
     "deterministic_los_topology_block_all_visible": (
         "witwin.channel.propagation.topology.kernels.construction."
@@ -214,10 +86,6 @@ BOOTSTRAP_CALL_SITE_OWNERS = {
         "witwin.channel.propagation.topology.kernels.transmission."
         "_EnumeratedTransmissionTopologyPackFunction.jvp"
     ),
-    "evaluated_paths_capacity_pack": (
-        "witwin.channel.propagation.enumerated.capacity."
-        "_EvaluatedPathsCapacityPackFunction.forward"
-    ),
     "evaluated_paths_capacity_pack_backward": (
         "witwin.channel.propagation.enumerated.capacity."
         "_evaluated_paths_capacity_pack_backward_native"
@@ -225,27 +93,6 @@ BOOTSTRAP_CALL_SITE_OWNERS = {
     "evaluated_paths_capacity_pack_jvp": (
         "witwin.channel.propagation.enumerated.capacity."
         "_evaluated_paths_capacity_pack_jvp_native"
-    ),
-    "evaluated_paths_canonical_capacity_gather": (
-        "witwin.channel.propagation.enumerated.canonical_capacity."
-        "_EvaluatedPathsCanonicalCapacityGatherFunction.forward"
-    ),
-    "evaluated_paths_canonical_capacity_gather_backward": (
-        "witwin.channel.propagation.enumerated.canonical_capacity."
-        "_EvaluatedPathsCanonicalCapacityGatherFunction.backward"
-    ),
-    "evaluated_paths_canonical_capacity_gather_jvp": (
-        "witwin.channel.propagation.enumerated.canonical_capacity."
-        "_EvaluatedPathsCanonicalCapacityGatherFunction.jvp"
-    ),
-    "path_result_capacity_pack": (
-        "witwin.channel.path.capacity._PathResultCapacityPackFunction.forward"
-    ),
-    "path_result_capacity_pack_backward": (
-        "witwin.channel.path.capacity._PathResultCapacityPackFunction.backward"
-    ),
-    "path_result_capacity_pack_jvp": (
-        "witwin.channel.path.capacity._PathResultCapacityPackFunction.jvp"
     ),
     "field_coupled_rd_backward": (
         "witwin.channel.propagation.fields.kernels.autograd."
@@ -312,14 +159,6 @@ BOOTSTRAP_E2E_SCENARIOS = {
     "build-info": "tests/kernels/test_build_info.py::test_build_info_contract",
     "deterministic-ad": (
         "tests/ad/test_deterministic_accum_ad.py::test_accumulate_flat_jvp_vjp_duality"
-    ),
-    "deterministic-path-table-capacity": (
-        "tests/deterministic/test_path_table_capacity_pack.py::"
-        "test_path_table_capacity_pack_matches_live_export_bitwise"
-    ),
-    "deterministic-diffraction-pair-reduction": (
-        "tests/deterministic/test_diffraction_pair_reduce.py::"
-        "test_diffraction_pair_reduce_multi_pair_sparse_valid_skips_poison"
     ),
     "deterministic-diffraction": (
         "tests/deterministic/test_diffraction_single_wedge.py::"
@@ -706,8 +545,6 @@ def _initial_native_scenario(name: str) -> str:
             return "field-free-space"
         return "field-reflection"
     if name.startswith("deterministic_"):
-        if name.startswith("deterministic_diffraction_pair_reduce"):
-            return "deterministic-diffraction-pair-reduction"
         if any(token in name for token in ("backward", "jvp", "fwd64")):
             return "deterministic-ad"
         if "diffraction" in name or "edge" in name:
@@ -774,12 +611,6 @@ def _initial_native_contract(name: str) -> str:
             return "native-field-free-space"
         return "native-field-reflection"
     if name.startswith("deterministic_"):
-        if name == "deterministic_diffraction_pair_reduce":
-            return "native-deterministic-diffraction-pair-reduce"
-        if name == "deterministic_diffraction_pair_reduce_backward":
-            return "native-deterministic-diffraction-pair-reduce-backward"
-        if name == "deterministic_diffraction_pair_reduce_jvp":
-            return "native-deterministic-diffraction-pair-reduce-jvp"
         if "accumulate" in name or name == "deterministic_component_counts":
             return "native-deterministic-accumulation"
         if any(
@@ -932,18 +763,6 @@ def build_initial_manifest(repo: Path) -> dict[str, object]:
             "native-deterministic-accumulation": (
                 "tests/kernels/test_ops_facade.py::"
                 "test_deterministic_accumulate_flat_validity_masks_poison_rows"
-            ),
-            "native-deterministic-diffraction-pair-reduce": (
-                "tests/deterministic/test_diffraction_pair_reduce.py::"
-                "test_diffraction_pair_reduce_capacity_boundaries"
-            ),
-            "native-deterministic-diffraction-pair-reduce-backward": (
-                "tests/deterministic/test_diffraction_pair_reduce.py::"
-                "test_diffraction_pair_reduce_backward_formula_and_missing_cotangents"
-            ),
-            "native-deterministic-diffraction-pair-reduce-jvp": (
-                "tests/deterministic/test_diffraction_pair_reduce.py::"
-                "test_diffraction_pair_reduce_jvp_vjp_duality_and_poison_gating"
             ),
             "native-deterministic-fields": (
                 "tests/kernels/test_ops_facade.py::"

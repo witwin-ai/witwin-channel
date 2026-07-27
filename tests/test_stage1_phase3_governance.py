@@ -166,9 +166,9 @@ def test_compact_provenance_and_historical_adr_dispositions_are_frozen() -> None
     assert compact["python_torch_compaction"] is False
     assert compact["capacity_shaped_public_result"] is False
     assert provenance["historical_experiments"] == {
-        "ADR-029": "Superseded; caller-free",
-        "ADR-030": "Dormant; caller-free",
-        "ADR-031": "Rejected; caller-free",
+        "ADR-029": "Removed; caller-free artifacts deleted in the Phase-11 cutover",
+        "ADR-030": "Removed; caller-free artifacts deleted in the Phase-11 cutover",
+        "ADR-031": "Removed; rejected and never implemented",
     }
 
     consumer_source = "\n".join(
@@ -184,9 +184,9 @@ def test_compact_provenance_and_historical_adr_dispositions_are_frozen() -> None
         assert forbidden not in consumer_source
 
     expected_status = {
-        "adr-029-device-resident-capacity-results.md": "Superseded",
-        "adr-030-deterministic-diffraction-pair-reduction.md": "Dormant",
-        "adr-031-per-pair-raw-reflection-epc-capacity.md": "Rejected",
+        "adr-029-device-resident-capacity-results.md": "Removed",
+        "adr-030-deterministic-diffraction-pair-reduction.md": "Removed",
+        "adr-031-per-pair-raw-reflection-epc-capacity.md": "Removed",
     }
     for name, status in expected_status.items():
         header = (ROOT / "docs" / "dev" / "standards" / name).read_text(

@@ -95,9 +95,9 @@
     "solver tape"
   ],
   "historical_experiments": {
-    "ADR-029": "Superseded; caller-free",
-    "ADR-030": "Dormant; caller-free",
-    "ADR-031": "Rejected; caller-free"
+    "ADR-029": "Removed; caller-free artifacts deleted in the Phase-11 cutover",
+    "ADR-030": "Removed; caller-free artifacts deleted in the Phase-11 cutover",
+    "ADR-031": "Removed; rejected and never implemented"
   },
   "adr_037_fixed_topology": {
     "decision": "ADR-037",

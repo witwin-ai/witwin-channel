@@ -1,7 +1,8 @@
 # ADR-030: Deterministic diffraction pair reduction
 
-- **Status:** Dormant (2026-07-21); not production-authoritative, and any
-  reactivation requires a new accepted ADR
+- **Status:** Removed (2026-07-27); the dormant reducer family was deleted in
+  the Phase-11 cutover. Not production-authoritative, and any reactivation
+  requires a new accepted ADR and a fresh implementation.
 - **Date:** 2026-07-20
 - **Kind:** Numerical-order, cross-repository typed storage, native reduction,
   AD, and performance decision.

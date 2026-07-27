@@ -297,10 +297,10 @@ requires them.
   kernels. They must not contain a second host implementation of RF physics.
 - Every supported native ABI symbol has one Python owner and must appear in
   `ci/native-binding-manifest.json` with direct contract coverage. A live symbol
-  must have at least one production end-to-end caller. Caller-free ADR-029/030
-  artifacts are unsupported cleanup debt: they create no coverage, manifest,
-  or release requirement and must not appear in production E2E coverage,
-  capabilities, defaults, or the public API.
+  must have at least one production end-to-end caller. There is no caller-free
+  native binding and no dormant-symbol allowlist: `ci/check_contract_coverage.py`
+  keeps its dormant branch armed so a future caller-free binding needs a named,
+  recorded decision, but the allowlist itself must stay empty.
 - Native ownership follows ABI operation, fusion/launch contract, tape lifetime,
   device primitive, and numerical order—not the Python directory layout.
 - Under ADR-025 and the completed Phase 8A atomic pin/switch/delete, RayD is
@@ -342,10 +342,12 @@ requires them.
   ascending pair/slot order. The completed ADR-027 Phase M atomic switch makes
   it the Monte Carlo Basic `MonteCarloTargetInset` production estimator; the
   prior scalar/per-transmitter route is deleted and must not be restored.
-- ADR-029 is Superseded, ADR-030 is Dormant, and ADR-031 is Rejected. Their
-  caller-free artifacts are not supported features and may be removed after
-  confirming that no accepted production contract depends on them. They must
-  not replace or constrain ADR-032's compact `O(K)` production route.
+- ADR-029, ADR-030, and ADR-031 are Removed. Their caller-free Python modules,
+  native translation units, and 19 ABI symbols were deleted in the Phase-11
+  cutover; only `evaluated_paths_capacity_pack_backward`/`_jvp` survive, because
+  the live enumerated capacity failure sanitizer owns those AD companions. Do
+  not reintroduce a capacity-shaped route: ADR-032's compact `O(K)` boundary is
+  the only production cardinality contract.
 - Phase-screen mode resolution and scene-static realization resources are
   CompiledScene-owned and lazy. The first phase-screen consumer atomically
   caches immutable resident heights, structure/material ids, face ranges, UV
@@ -464,7 +466,7 @@ acceptance evidence live in:
 - `docs/dev/standards/adr-042-wideband-frequency-offsets.md`
 - `docs/dev/standards/adr-043-propagation-ad-capability-matrix.md`
 
-ADR-029 is Superseded, ADR-030 is Dormant, and ADR-031 is Rejected. They are
+ADR-029, ADR-030, and ADR-031 are Removed (Phase-11 cutover). They are
 historical records rather than implementation or release requirements; ADR-032
 is the authoritative production cardinality decision.
 

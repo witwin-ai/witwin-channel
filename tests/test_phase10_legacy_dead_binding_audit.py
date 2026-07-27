@@ -20,6 +20,14 @@ PYTHON_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
 PHASE12_RETIRED_EVIDENCE_TESTS = frozenset(
     {"tests/propagation/geometry/test_reevaluate_compat.py"}
 )
+# Phase-11 cutover: the zero-importer BDPT MIS facade and its only test were
+# deleted with the ADR-029/030/031 dormant sweep.
+PHASE11_RETIRED_EVIDENCE_TESTS = frozenset(
+    {"tests/montecarlo/bdpt/test_mis_weights.py"}
+)
+RETIRED_EVIDENCE_TESTS = (
+    PHASE12_RETIRED_EVIDENCE_TESTS | PHASE11_RETIRED_EVIDENCE_TESTS
+)
 
 
 def _audit() -> dict[str, object]:
@@ -55,7 +63,7 @@ def test_phase10_zero_reference_inventory_is_complete_and_classified() -> None:
         assert candidate["tests"]
         assert candidate["compatibility_cycle"]
         for test_path in candidate["tests"]:
-            if test_path in PHASE12_RETIRED_EVIDENCE_TESTS:
+            if test_path in RETIRED_EVIDENCE_TESTS:
                 assert not (REPOSITORY_ROOT / test_path).exists(), test_path
             else:
                 assert (REPOSITORY_ROOT / test_path).exists(), test_path

@@ -1,4 +1,4 @@
-"""Dormant native fixed-capacity packing for complete evaluated path rows."""
+"""Native failure sanitizers for complete evaluated enumerated path rows."""
 
 from __future__ import annotations
 
@@ -12,11 +12,6 @@ if TYPE_CHECKING:
         EvaluatedPathSidecars,
     )
 
-from witwin.channel.propagation.models.capacity import (
-    CapacityEvaluatedPaths,
-    CapacityPathLayout,
-    CapacityPathSelection,
-)
 from witwin.channel.propagation.models.evaluated import EvaluatedPaths
 from witwin.channel.propagation.models.fields import PathFields
 from witwin.channel.propagation.models.geometry import PathGeometry
@@ -60,15 +55,6 @@ _CONTINUOUS_FIELDS = (
     "field_xyz",
     "coefficient",
 )
-_PACK_OUTPUT_FIELDS = (
-    "selected_row_index",
-    "valid",
-    "num_paths",
-    "overflow",
-    *_TOPOLOGY_INPUT_FIELDS[1:],
-    *_CONTINUOUS_FIELDS,
-)
-_DISCRETE_OUTPUT_COUNT = 14
 _SANITIZE_OUTPUT_FIELDS = (
     "selected_row_index",
     *_TOPOLOGY_INPUT_FIELDS,
@@ -132,208 +118,6 @@ def _validate_candidate(paths: EvaluatedPaths) -> tuple[torch.Tensor, ...]:
         if not tensor.is_contiguous():
             raise ValueError(f"{name} must be contiguous")
     return tensors
-
-
-def _validate_host_layout(
-    *,
-    pair_count: int,
-    num_tx: int,
-    num_rx: int,
-    path_capacity_per_pair: int,
-) -> None:
-    for name, value in (
-        ("pair_count", pair_count),
-        ("num_tx", num_tx),
-        ("num_rx", num_rx),
-        ("path_capacity_per_pair", path_capacity_per_pair),
-    ):
-        if type(value) is not int:
-            raise TypeError(f"{name} must be an int")
-        if value < 0:
-            raise ValueError(f"{name} must be non-negative")
-    if pair_count != num_tx * num_rx:
-        raise ValueError("pair_count must equal num_tx * num_rx")
-
-
-class _EvaluatedPathsCapacityPackFunction(torch.autograd.Function):
-    @staticmethod
-    def forward(*inputs):
-        tensors = inputs[:22]
-        pair_count, num_tx, num_rx, capacity = inputs[22:26]
-        failure_state_bits = inputs[26]
-        raw = _required_native_op("evaluated_paths_capacity_pack")(
-            failure_state_bits,
-            *tensors,
-            int(pair_count),
-            int(num_tx),
-            int(num_rx),
-            int(capacity),
-        )
-        if not isinstance(raw, dict) or set(raw) != set(_PACK_OUTPUT_FIELDS):
-            raise TypeError("native evaluated path capacity pack returned bad fields")
-        return tuple(raw[name] for name in _PACK_OUTPUT_FIELDS)
-
-    @staticmethod
-    def setup_context(ctx, inputs, output):
-        ctx.set_materialize_grads(False)
-        ctx.candidate_count = int(inputs[0].shape[0])
-        ctx.sequence_width = int(inputs[8].shape[1])
-        saved = tuple(
-            torch.autograd.forward_ad.unpack_dual(value).primal
-            for value in (output[1], output[0])
-        )
-        ctx.save_for_backward(*saved)
-        ctx.save_for_forward(*saved)
-        ctx.mark_non_differentiable(*output[:_DISCRETE_OUTPUT_COUNT])
-
-    @staticmethod
-    @_ad_first_order_only
-    def backward(ctx, *grad_outputs):
-        none_grads = (None,) * 27
-        continuous_grads = grad_outputs[_DISCRETE_OUTPUT_COUNT:]
-        if all(value is None for value in continuous_grads):
-            return none_grads
-        if not any(ctx.needs_input_grad[11:22]):
-            return none_grads
-        valid, selected_row_index = ctx.saved_tensors
-        raw = _evaluated_paths_capacity_pack_backward_native(
-            valid,
-            selected_row_index,
-            *continuous_grads,
-            ctx.candidate_count,
-            ctx.sequence_width,
-        )
-        if not isinstance(raw, dict) or set(raw) != set(_CONTINUOUS_FIELDS):
-            raise TypeError(
-                "native evaluated path capacity backward returned bad fields"
-            )
-        return (
-            *(None for _ in range(11)),
-            *(
-                raw[name] if ctx.needs_input_grad[index] else None
-                for index, name in enumerate(_CONTINUOUS_FIELDS, start=11)
-            ),
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-
-    @staticmethod
-    def jvp(ctx, *tangents):
-        continuous_tangents = tuple(
-            _ad_native_tangent_or_none(value) for value in tangents[11:22]
-        )
-        if all(value is None for value in continuous_tangents):
-            return (None,) * len(_PACK_OUTPUT_FIELDS)
-        valid, selected_row_index = (
-            _ad_native_tensor(value) for value in ctx.saved_tensors
-        )
-        with torch_compat.disable_functorch():
-            raw = _evaluated_paths_capacity_pack_jvp_native(
-                valid,
-                selected_row_index,
-                *continuous_tangents,
-                ctx.candidate_count,
-                ctx.sequence_width,
-            )
-        if not isinstance(raw, dict) or set(raw) != set(_CONTINUOUS_FIELDS):
-            raise TypeError("native evaluated path capacity JVP returned bad fields")
-        return (
-            *(None for _ in range(_DISCRETE_OUTPUT_COUNT)),
-            *(raw[name] for name in _CONTINUOUS_FIELDS),
-        )
-
-
-def _contract_from_outputs(
-    outputs: tuple[torch.Tensor, ...],
-    *,
-    failure_state: CapacityFailureState,
-    pair_count: int,
-    path_capacity_per_pair: int,
-) -> CapacityEvaluatedPaths:
-    raw = dict(zip(_PACK_OUTPUT_FIELDS, outputs, strict=True))
-    topology = PathTopology(
-        valid=raw["valid"],
-        tx_id=raw["tx_id"],
-        rx_id=raw["rx_id"],
-        depth=raw["depth"],
-        component_id=raw["component_id"],
-        primitive_id=raw["primitive_id"],
-        edge_id=raw["edge_id"],
-        material_id=raw["material_id"],
-        primitive_sequence=raw["primitive_sequence"],
-        material_sequence=raw["material_sequence"],
-        interaction_type=raw["interaction_type"],
-    )
-    geometry = PathGeometry(
-        row_identity=topology.row_identity,
-        path_length_m=raw["path_length_m"],
-        delay_s=raw["delay_s"],
-        field_direction=raw["field_direction"],
-        interaction_position=raw["interaction_position"],
-        interaction_normal=raw["interaction_normal"],
-        interaction_positions=raw["interaction_positions"],
-        interaction_normals=raw["interaction_normals"],
-    )
-    fields = PathFields(
-        row_identity=topology.row_identity,
-        path_gain=raw["path_gain"],
-        path_field=raw["path_field"],
-        field_xyz=raw["field_xyz"],
-        coefficient=raw["coefficient"],
-    )
-    selection = CapacityPathSelection(
-        selected_row_index=raw["selected_row_index"],
-        layout=CapacityPathLayout(
-            pair_count=pair_count,
-            path_capacity_per_pair=path_capacity_per_pair,
-            failure_state=failure_state,
-            valid=topology.valid,
-            num_paths=raw["num_paths"],
-            overflow=raw["overflow"],
-        ),
-    )
-    return CapacityEvaluatedPaths(
-        selection=selection,
-        evaluated=EvaluatedPaths(topology=topology, geometry=geometry, fields=fields),
-    )
-
-
-def evaluated_paths_capacity_pack(
-    paths: EvaluatedPaths,
-    *,
-    failure_state: CapacityFailureState,
-    pair_count: int,
-    num_tx: int,
-    num_rx: int,
-    path_capacity_per_pair: int,
-) -> CapacityEvaluatedPaths:
-    """Pack final selected candidates without changing live solver callers."""
-
-    tensors = _validate_candidate(paths)
-    _validate_host_layout(
-        pair_count=pair_count,
-        num_tx=num_tx,
-        num_rx=num_rx,
-        path_capacity_per_pair=path_capacity_per_pair,
-    )
-    require_capacity_failure_state(failure_state, device=tensors[0].device)
-    outputs = _EvaluatedPathsCapacityPackFunction.apply(
-        *tensors,
-        pair_count,
-        num_tx,
-        num_rx,
-        path_capacity_per_pair,
-        failure_state.bits,
-    )
-    return _contract_from_outputs(
-        outputs,
-        failure_state=failure_state,
-        pair_count=pair_count,
-        path_capacity_per_pair=path_capacity_per_pair,
-    )
 
 
 class _EnumeratedCapacityFailureSanitizeFunction(torch.autograd.Function):
@@ -557,6 +341,5 @@ __all__ = [
     "_EnumeratedCapacityFailureVectorSanitizeFunction",
     "enumerated_capacity_failure_sanitize",
     "enumerated_capacity_failure_vector_sanitize",
-    "evaluated_paths_capacity_pack",
     "sanitize_enumerated_capacity_transaction",
 ]

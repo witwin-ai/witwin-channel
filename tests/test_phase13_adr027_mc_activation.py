@@ -41,7 +41,7 @@ def test_phase_m_native_symbols_have_live_owners_and_complete_coverage() -> None
     owner_rows = {entry["symbol"]: entry for entry in inventory["symbols"]}
     actions = {entry["symbol"]: entry for entry in ledger["actions"]}
 
-    assert len(binding_names) == 253
+    assert len(binding_names) == 234
     assert _LIVE_MC_SYMBOLS <= binding_names
     assert set(coverage_rows) == binding_names
     assert set(owner_rows) == binding_names

@@ -96,44 +96,21 @@ def test_capacity_failure_terminal_trap_isolated_to_subprocess() -> None:
             if "_witwin_channel_editable" not in type(finder).__module__
         ]
 
-        from witwin.channel.propagation.topology.kernels import coupled
         from witwin.channel.runtime import (
             CapacityFailureBit,
             capacity_failure_terminal_check,
             create_capacity_failure_state,
         )
 
-        faces = torch.tensor([5], device="cuda", dtype=torch.int32)
-        edges = torch.tensor([7], device="cuda", dtype=torch.int32)
-        state = create_capacity_failure_state(faces)
-        block = coupled.coupled_candidate_capacity_block(
-            faces,
-            edges,
-            failure_state=state,
-            tx_count=1,
-            rx_count=1,
-            rx_id_offset=0,
-            candidate_capacity=1,
-            candidate_limit=100,
-        )
+        reference = torch.tensor([5], device="cuda", dtype=torch.int32)
+        state = create_capacity_failure_state(reference)
+        expected = int(CapacityFailureBit.SEGMENT_PENETRATION_FAILURE)
+        state.bits.fill_(expected)
 
-        # Test-only observation before the terminal launch proves the producer
-        # completed canonical sanitization and did not itself poison CUDA.
+        # Test-only observation before the terminal launch proves the failure
+        # state itself is a plain device value and did not poison CUDA.
         torch.cuda.synchronize()
-        expected = int(CapacityFailureBit.COUPLED_CANDIDATE_OVERFLOW)
         assert state.bits.tolist() == [expected]
-        assert block.candidate_count.tolist() == [0]
-        assert block.overflow.tolist() == [True]
-        assert block.valid.tolist() == [False]
-        for identifiers in (
-            block.tx_id,
-            block.rx_id,
-            block.component_id,
-            block.face_id,
-            block.edge1_id,
-            block.edge2_id,
-        ):
-            assert identifiers.tolist() == [-1]
 
         terminal_stream = torch.cuda.Stream()
         with torch.cuda.stream(terminal_stream):

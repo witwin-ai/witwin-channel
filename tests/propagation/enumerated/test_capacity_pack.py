@@ -5,10 +5,10 @@ from pathlib import Path
 import pytest
 import torch
 
+from witwin.channel.propagation.enumerated import capacity as capacity_module
 from witwin.channel.propagation.enumerated.capacity import (
     enumerated_capacity_failure_sanitize,
     enumerated_capacity_failure_vector_sanitize,
-    evaluated_paths_capacity_pack,
 )
 from witwin.channel.propagation.models.evaluated import EvaluatedPaths
 from witwin.channel.propagation.models.fields import PathFields
@@ -16,7 +16,6 @@ from witwin.channel.propagation.models.geometry import PathGeometry
 from witwin.channel.propagation.models.topology import PathTopology
 from witwin.channel.runtime import (
     CapacityFailureBit,
-    CapacityFailureState,
     create_capacity_failure_state,
 )
 
@@ -146,23 +145,6 @@ def _with_continuous(
     )
 
 
-def _pack(
-    paths: EvaluatedPaths,
-    *,
-    capacity: int = 3,
-    failure_state: CapacityFailureState | None = None,
-):
-    failure_state = failure_state or create_capacity_failure_state(paths.topology.valid)
-    return evaluated_paths_capacity_pack(
-        paths,
-        failure_state=failure_state,
-        pair_count=4,
-        num_tx=2,
-        num_rx=2,
-        path_capacity_per_pair=capacity,
-    )
-
-
 def test_failure_sanitizers_preserve_success_and_zero_invalid_poison() -> None:
     paths = _paths([True, False, True])
     state = create_capacity_failure_state(paths.topology.valid)
@@ -253,300 +235,72 @@ def test_vector_failure_sanitizer_is_native_vjp_jvp_identity_on_success() -> Non
         torch.testing.assert_close(actual_tangent, tangent)
 
 
-def test_capacity_pack_is_exact_pair_major_inert_and_identity_shared() -> None:
-    paths = _paths(
-        [True, False, True, True, True, False, True],
-        tx_values=[1, 0, 0, 1, 0, 0, 1],
-        rx_values=[1, 0, 0, 1, 0, 0, 0],
+def test_enumerated_failure_sanitizer_vjp_jvp_are_native_and_dual() -> None:
+    """The live sanitizer owns evaluated_paths_capacity_pack_{backward,jvp}."""
+
+    reverse = _paths([True, False, True], differentiable=True)
+    reverse_state = create_capacity_failure_state(reverse.topology.valid)
+    reverse_output = enumerated_capacity_failure_sanitize(
+        reverse, failure_state=reverse_state
     )
+    weight = torch.arange(
+        reverse_output.geometry.path_length_m.numel(),
+        device="cuda",
+        dtype=torch.float32,
+    ) + 0.25
+    (reverse_output.geometry.path_length_m * weight).sum().backward()
+    gradient = reverse.geometry.path_length_m.grad
+    assert gradient is not None
+    valid = reverse.topology.valid
+    torch.testing.assert_close(gradient[valid], weight[valid])
+    assert torch.count_nonzero(gradient[~valid]).item() == 0
 
-    packed = _pack(paths)
-    selection = packed.selection
-    output = packed.evaluated
-
-    assert selection.selected_row_index.tolist() == [
-        2,
-        4,
-        -1,
-        6,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        0,
-        3,
-        -1,
-    ]
-    assert selection.num_paths.tolist() == [2, 1, 0, 2]
-    assert selection.overflow.tolist() == [False]
-    assert selection.valid is output.topology.valid
-    assert output.geometry.row_identity is output.topology.row_identity
-    assert output.fields.row_identity is output.topology.row_identity
-    assert len(set(selection.selected_row_index[selection.valid].tolist())) == 5
-
-    selected = selection.selected_row_index[selection.valid]
-    for name in (
-        "tx_id",
-        "rx_id",
-        "depth",
-        "component_id",
-        "primitive_id",
-        "edge_id",
-        "material_id",
-        "primitive_sequence",
-        "material_sequence",
-        "interaction_type",
-    ):
-        torch.testing.assert_close(
-            getattr(output.topology, name)[selection.valid],
-            getattr(paths.topology, name)[selected],
-        )
-    for name, source in _continuous(paths).items():
-        target = _continuous(output)[name]
-        torch.testing.assert_close(target[selection.valid], source[selected])
-
-    invalid = ~selection.valid
-    for name in (
-        "tx_id",
-        "rx_id",
-        "component_id",
-        "primitive_id",
-        "edge_id",
-        "material_id",
-    ):
-        assert torch.all(getattr(output.topology, name)[invalid] == -1)
-    assert torch.count_nonzero(output.topology.depth[invalid]).item() == 0
-    assert torch.all(output.topology.primitive_sequence[invalid] == -1)
-    assert torch.all(output.topology.material_sequence[invalid] == -1)
-    assert torch.count_nonzero(output.topology.interaction_type[invalid]).item() == 0
-    assert torch.all(output.geometry.path_length_m[invalid] == -1)
-    assert torch.all(output.geometry.delay_s[invalid] == -1)
-    for name in _CONTINUOUS[2:]:
-        assert torch.count_nonzero(_continuous(output)[name][invalid]).item() == 0
-
-
-def test_capacity_pack_handles_zero_capacity_and_current_stream() -> None:
-    paths = _paths([False, False])
-    stream = torch.cuda.Stream()
-    with torch.cuda.stream(stream):
-        packed = _pack(paths, capacity=0)
-    stream.synchronize()
-
-    assert packed.selection.selected_row_index.shape == (0,)
-    assert packed.selection.valid.shape == (0,)
-    assert packed.selection.num_paths.tolist() == [0, 0, 0, 0]
-    assert packed.selection.overflow.tolist() == [False]
-    assert packed.evaluated.row_count == 0
-
-
-def test_capacity_pack_backward_none_cotangents_and_invalid_sources_are_zero() -> None:
-    paths = _paths(
-        [True, False, True, True],
-        tx_values=[0, 0, 1, 1],
-        rx_values=[0, 0, 0, 1],
-        differentiable=True,
-    )
-    packed = _pack(paths)
-    loss = (
-        packed.evaluated.geometry.path_length_m.sum()
-        + packed.evaluated.fields.path_field.real.sum()
-    )
-    loss.backward()
-
-    selected = set(packed.selection.selected_row_index[packed.selection.valid].tolist())
-    for name, source in _continuous(paths).items():
-        assert source.grad is not None
-        if name in {"path_length_m", "path_field"}:
-            for row in range(source.shape[0]):
-                value = source.grad[row]
-                if row in selected:
-                    torch.testing.assert_close(value, torch.ones_like(value))
-                else:
-                    assert torch.count_nonzero(value).item() == 0
-        else:
-            assert torch.count_nonzero(source.grad).item() == 0
-
-
-def test_capacity_pack_jvp_gathers_every_continuous_field_and_preserves_zero_slots() -> (
-    None
-):
-    paths = _paths(
-        [True, False, True, True],
-        tx_values=[0, 0, 1, 1],
-        rx_values=[0, 0, 0, 1],
-    )
-    values = _continuous(paths)
-    tangents = {
-        name: torch.full_like(value, complex(2.0, -0.5) if value.is_complex() else 2.0)
-        for name, value in values.items()
-    }
-    with torch.autograd.forward_ad.dual_level():
-        dual_values = {
-            name: torch.autograd.forward_ad.make_dual(values[name], tangents[name])
-            for name in _CONTINUOUS
-        }
-        packed = _pack(_with_continuous(paths, dual_values))
-        selected = packed.selection.selected_row_index
-        valid = packed.selection.valid
-        for name, output in _continuous(packed.evaluated).items():
-            _primal, tangent = torch.autograd.forward_ad.unpack_dual(output)
-            assert tangent is not None
-            torch.testing.assert_close(tangent[valid], tangents[name][selected[valid]])
-            assert torch.count_nonzero(tangent[~valid]).item() == 0
-
-
-def test_capacity_pack_jvp_vjp_duality_for_real_geometry() -> None:
-    base = _paths(
-        [True, False, True, True],
-        tx_values=[0, 0, 1, 1],
-        rx_values=[0, 0, 0, 1],
-    )
-    values = _continuous(base)
-    tangent = torch.arange(1, 5, device="cuda", dtype=torch.float32)
+    forward = _paths([True, False, True])
+    values = _continuous(forward)
+    tangent = torch.arange(3, device="cuda", dtype=torch.float32) + 1.0
     with torch.autograd.forward_ad.dual_level():
         dual_values = dict(values)
         dual_values["path_length_m"] = torch.autograd.forward_ad.make_dual(
             values["path_length_m"], tangent
         )
-        dual_output = _pack(_with_continuous(base, dual_values))
+        forward_state = create_capacity_failure_state(forward.topology.valid)
+        forward_output = enumerated_capacity_failure_sanitize(
+            _with_continuous(forward, dual_values), failure_state=forward_state
+        )
         _primal, jvp = torch.autograd.forward_ad.unpack_dual(
-            dual_output.evaluated.geometry.path_length_m
+            forward_output.geometry.path_length_m
         )
         assert jvp is not None
-        weight = torch.arange(jvp.numel(), device="cuda", dtype=torch.float32) + 0.25
+        torch.testing.assert_close(jvp[valid], tangent[valid])
+        assert torch.count_nonzero(jvp[~valid]).item() == 0
         lhs = (jvp * weight).sum()
-
-    reverse_values = _continuous(base)
-    reverse_values["path_length_m"] = (
-        reverse_values["path_length_m"].detach().clone().requires_grad_(True)
-    )
-    reverse_output = _pack(_with_continuous(base, reverse_values))
-    grad = torch.autograd.grad(
-        (reverse_output.evaluated.geometry.path_length_m * weight).sum(),
-        reverse_values["path_length_m"],
-    )[0]
-    rhs = (grad * tangent).sum()
+    rhs = (gradient * tangent).sum()
     torch.testing.assert_close(lhs, rhs)
 
 
-@pytest.mark.parametrize(
-    ("pair_count", "num_tx", "num_rx", "capacity"),
-    ((-1, 1, 1, 1), (1, 1, 1, -1), (2, 1, 1, 1)),
-)
-def test_capacity_pack_rejects_bad_host_metadata_before_native_allocation(
-    pair_count: int, num_tx: int, num_rx: int, capacity: int
-) -> None:
-    with pytest.raises((ValueError, RuntimeError)):
-        paths = _paths([])
-        evaluated_paths_capacity_pack(
-            paths,
-            failure_state=create_capacity_failure_state(paths.topology.valid),
-            pair_count=pair_count,
-            num_tx=num_tx,
-            num_rx=num_rx,
-            path_capacity_per_pair=capacity,
-        )
+def test_enumerated_failure_sanitizer_ad_owns_the_native_companions() -> None:
+    import inspect
 
-
-@pytest.mark.parametrize(
-    ("mode", "bit"),
-    (
-        ("overflow", CapacityFailureBit.PAIR_CAPACITY_OVERFLOW),
-        ("bad_id", CapacityFailureBit.PAIR_CONTRACT_ERROR),
-    ),
-)
-def test_capacity_pack_failure_sets_state_and_returns_fully_inert(
-    mode: str, bit: CapacityFailureBit
-) -> None:
-    paths = _paths(
-        [True, True, True] if mode == "overflow" else [True, False],
-        tx_values=[0, 0, 0] if mode == "overflow" else [3, 0],
-        rx_values=[0, 0, 0] if mode == "overflow" else [0, 0],
+    backward = inspect.getsource(
+        capacity_module._EnumeratedCapacityFailureSanitizeFunction.backward
     )
-    failure_state = create_capacity_failure_state(paths.topology.valid)
-
-    packed = evaluated_paths_capacity_pack(
-        paths,
-        failure_state=failure_state,
-        pair_count=1,
-        num_tx=1,
-        num_rx=1,
-        path_capacity_per_pair=2,
+    jvp = inspect.getsource(
+        capacity_module._EnumeratedCapacityFailureSanitizeFunction.jvp
     )
-
-    assert packed.selection.layout.failure_state is failure_state
-    assert failure_state.bits.tolist() == [int(bit)]
-    assert packed.selection.selected_row_index.tolist() == [-1, -1]
-    assert packed.selection.valid.tolist() == [False, False]
-    assert packed.selection.num_paths.tolist() == [0]
-    assert packed.selection.overflow.tolist() == [mode == "overflow"]
-    assert torch.all(packed.evaluated.topology.tx_id == -1)
-    assert torch.all(packed.evaluated.geometry.path_length_m == -1)
-    assert torch.count_nonzero(packed.evaluated.fields.field_xyz).item() == 0
+    assert "_evaluated_paths_capacity_pack_backward_native" in backward
+    assert "_evaluated_paths_capacity_pack_jvp_native" in jvp
 
 
-def test_capacity_pack_failure_keeps_vjp_and_jvp_zero_without_state_ad_abi() -> None:
-    reverse = _paths([True], tx_values=[3], rx_values=[0], differentiable=True)
-    reverse_state = create_capacity_failure_state(reverse.topology.valid)
-    reverse_output = evaluated_paths_capacity_pack(
-        reverse,
-        failure_state=reverse_state,
-        pair_count=1,
-        num_tx=1,
-        num_rx=1,
-        path_capacity_per_pair=1,
-    )
-    reverse_output.evaluated.geometry.path_length_m.sum().backward()
-    assert reverse.geometry.path_length_m.grad is not None
-    assert torch.count_nonzero(reverse.geometry.path_length_m.grad).item() == 0
-
-    forward = _paths([True], tx_values=[3], rx_values=[0])
-    values = _continuous(forward)
-    with torch.autograd.forward_ad.dual_level():
-        dual_values = dict(values)
-        dual_values["path_length_m"] = torch.autograd.forward_ad.make_dual(
-            values["path_length_m"], torch.ones_like(values["path_length_m"])
-        )
-        forward_state = create_capacity_failure_state(forward.topology.valid)
-        forward_output = evaluated_paths_capacity_pack(
-            _with_continuous(forward, dual_values),
-            failure_state=forward_state,
-            pair_count=1,
-            num_tx=1,
-            num_rx=1,
-            path_capacity_per_pair=1,
-        )
-        _primal, tangent = torch.autograd.forward_ad.unpack_dual(
-            forward_output.evaluated.geometry.path_length_m
-        )
-        assert tangent is not None
-        assert torch.count_nonzero(tangent).item() == 0
-
-
-def test_capacity_pack_family_uses_shared_no_trap_helper_without_host_transfer() -> (
-    None
-):
+def test_enumerated_failure_sanitizer_family_has_no_host_transfer() -> None:
     root = Path(__file__).resolve().parents[3]
-    finalizer = (
-        root / "native/channel/kernels/deterministic_capacity_finalize.cu"
-    ).read_text(encoding="utf-8")
-    packer = (
-        root / "native/channel/kernels/evaluated_paths_capacity_pack.cu"
+    sanitizer = (
+        root / "native/channel/kernels/enumerated_capacity_failure_sanitize.cu"
     ).read_text(encoding="utf-8")
     ad = (
         root / "native/channel/kernels/evaluated_paths_capacity_pack_ad.cu"
     ).read_text(encoding="utf-8")
-    assert "deterministic_capacity_finalize_no_trap" in finalizer
-    assert "deterministic_capacity_finalize_no_trap" in packer
-    assert packer.index("evaluated_paths_capacity_init_kernel<<<") < packer.index(
-        "deterministic_capacity_finalize_no_trap"
-    )
-    assert "trap;" not in finalizer
-    assert "trap;" not in packer
-    assert "failure_state[0] != 0" in packer
-    assert "if (!output.valid[destination])" in packer
+    assert "failure_state[0] != 0" in sanitizer
     assert "if (!valid[destination])" in ad
-    for source in (finalizer, packer, ad):
-        for forbidden in ("cudaMemcpy", "cudaStreamSynchronize", ".item", ".cpu"):
+    for source in (sanitizer, ad):
+        for forbidden in ("trap;", "cudaMemcpy", "cudaStreamSynchronize", ".item", ".cpu"):
             assert forbidden not in source

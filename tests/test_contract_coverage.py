@@ -14,30 +14,6 @@ MANIFEST_PATH = REPOSITORY_ROOT / "ci" / "contract-coverage-manifest.json"
 OWNER_INVENTORY_PATH = (
     REPOSITORY_ROOT / "docs/dev/audit/phase13-current-native-owner-inventory.json"
 )
-_DORMANT_SYMBOLS = {
-    "coupled_candidate_capacity_block",
-    "deterministic_capacity_finalize",
-    "deterministic_diffraction_order1_capacity_block",
-    "deterministic_diffraction_pair_reduce",
-    "deterministic_diffraction_pair_reduce_backward",
-    "deterministic_diffraction_pair_reduce_jvp",
-    "deterministic_diffraction_state_capacity_select",
-    "deterministic_path_table_capacity_pack",
-    "deterministic_path_table_capacity_pack_backward",
-    "deterministic_path_table_capacity_pack_jvp",
-    "deterministic_reflection_candidate_capacity_block",
-    "enumerated_canonical_capacity_select",
-    "evaluated_paths_canonical_capacity_gather",
-    "evaluated_paths_canonical_capacity_gather_backward",
-    "evaluated_paths_canonical_capacity_gather_jvp",
-    "evaluated_paths_capacity_pack",
-    "evaluated_paths_capacity_pack_backward",
-    "evaluated_paths_capacity_pack_jvp",
-    "path_result_capacity_pack",
-    "path_result_capacity_pack_backward",
-    "path_result_capacity_pack_jvp",
-}
-
 
 def _manifest() -> dict[str, object]:
     return coverage.load_manifest(MANIFEST_PATH)
@@ -84,84 +60,61 @@ def test_contract_matrix_rejects_missing_e2e_callers_and_bad_owners():
     )
 
 
-def test_contract_matrix_distinguishes_dormant_execution_from_live_e2e() -> None:
-    manifest = copy.deepcopy(_manifest())
-    dormant = next(
+
+def test_contract_matrix_has_no_dormant_or_caller_free_native_binding() -> None:
+    """Phase-11 acceptance: the dormant ADR-029/030/031 allowlist is empty."""
+
+    manifest = _manifest()
+    assert coverage.DORMANT_SYMBOL_FACADES == {}
+    assert coverage.DORMANT_EXPERIMENT_SYMBOLS == frozenset()
+    assert coverage.DORMANT_FACADE_OWNERS == {}
+    assert coverage.DORMANT_ALLOWED_FACADE_CALLERS == {}
+    for row in manifest["native_bindings"]:
+        assert not row[2].startswith("dormant_"), row[0]
+        assert row[4], row[0]
+
+    inventory = json.loads(OWNER_INVENTORY_PATH.read_text(encoding="utf-8"))
+    assert not [
         row
-        for row in manifest["native_bindings"]
-        if row[0] == "deterministic_diffraction_pair_reduce"
-    )
-    assert dormant[2] == "dormant_named_wrapper"
-    assert dormant[4] == []
+        for row in inventory["symbols"]
+        if row["liveness"] == "dormant-native-producer"
+    ]
 
-    dormant[4] = ["deterministic-diffraction"]
-    issues = coverage.check_contract_coverage(REPOSITORY_ROOT, manifest)
-    assert (
-        "dormant native binding has E2E caller: "
-        "deterministic_diffraction_pair_reduce"
-    ) in issues
 
-    dormant[4] = []
-    dormant[2] = "named_wrapper"
-    issues = coverage.check_contract_coverage(REPOSITORY_ROOT, manifest)
-    assert (
-        "dormant native binding uses live owner kind: "
-        "deterministic_diffraction_pair_reduce"
-    ) in issues
-
+def test_contract_matrix_still_rejects_an_unapproved_dormant_binding() -> None:
+    manifest = copy.deepcopy(_manifest())
     live = next(row for row in manifest["native_bindings"] if row[0] == "build_info")
     live[2] = "dormant_named_wrapper"
+    live[4] = []
+
     issues = coverage.check_contract_coverage(REPOSITORY_ROOT, manifest)
+
     assert "unapproved dormant native binding: build_info" in issues
 
 
-def test_dormant_binding_inventory_has_direct_contracts_but_no_e2e_callers() -> None:
-    manifest_rows = {row[0]: row for row in _manifest()["native_bindings"]}
-    inventory = json.loads(OWNER_INVENTORY_PATH.read_text(encoding="utf-8"))
-    owner_rows = {row["symbol"]: row for row in inventory["symbols"]}
-
-    assert set(coverage.DORMANT_EXPERIMENT_SYMBOLS) == _DORMANT_SYMBOLS
-    assert set(coverage.DORMANT_SYMBOL_FACADES) == _DORMANT_SYMBOLS
-    assert set(coverage.DORMANT_SYMBOL_FACADES.values()) <= set(
-        coverage.DORMANT_FACADE_OWNERS
-    )
-    assert _DORMANT_SYMBOLS <= set(manifest_rows)
-    for symbol in coverage.DORMANT_EXPERIMENT_SYMBOLS:
-        assert manifest_rows[symbol][2].startswith("dormant_")
-        assert manifest_rows[symbol][3]
-        assert manifest_rows[symbol][4] == []
-        assert owner_rows[symbol]["liveness"] == "dormant-native-producer"
-        assert owner_rows[symbol]["contract_test"]
-        assert owner_rows[symbol]["production_callers"] == []
-        assert owner_rows[symbol]["e2e_callers"] == []
-
-
-def test_contract_matrix_rejects_injected_dormant_production_caller(
+def test_contract_matrix_keeps_the_dormant_production_caller_gate_armed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    real_call_sites = coverage._python_call_sites
+    """A future dormant symbol still needs a named decision and zero callers."""
 
-    def injected_call_sites(
-        repo: Path, targets: frozenset[str]
-    ) -> dict[str, list[tuple[str, str, int]]]:
-        rows = real_call_sites(repo, targets)
-        rows["evaluated_paths_capacity_pack"].append(
-            (
-                "witwin.channel.path.pipeline._solve_base",
-                "src/witwin/channel/path/pipeline.py",
-                1,
-            )
-        )
-        return rows
+    symbol = "evaluated_paths_capacity_pack_backward"
+    facade = "_evaluated_paths_capacity_pack_backward_native"
+    owner = f"witwin.channel.propagation.enumerated.capacity.{facade}"
+    monkeypatch.setattr(coverage, "DORMANT_SYMBOL_FACADES", {symbol: facade})
+    monkeypatch.setattr(
+        coverage, "DORMANT_EXPERIMENT_SYMBOLS", frozenset({symbol})
+    )
+    monkeypatch.setattr(coverage, "DORMANT_FACADE_OWNERS", {facade: owner})
+    monkeypatch.setattr(coverage, "DORMANT_ALLOWED_FACADE_CALLERS", {})
 
-    monkeypatch.setattr(coverage, "_python_call_sites", injected_call_sites)
     issues = coverage.check_contract_coverage(REPOSITORY_ROOT, _manifest())
+
     assert any(
-        issue.startswith(
-            "dormant facade has production caller: evaluated_paths_capacity_pack:"
-        )
+        issue.startswith(f"dormant facade has production caller: {facade}:")
         for issue in issues
     )
+    assert f"dormant native binding uses live owner kind: {symbol}" in issues
+
 
 
 def test_contract_matrix_rejects_nonexistent_contract_nodeids():
