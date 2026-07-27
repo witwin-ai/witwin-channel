@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import base64
 import csv
 from functools import lru_cache
@@ -32,6 +33,11 @@ _REQUIRED_RUNTIME_MEMBERS = {
     "witwin/channel/runtime/rayd.lock.json",
 }
 _SPECIAL_PACKAGE_MEMBERS = frozenset({_NATIVE_MEMBER, *_REQUIRED_RUNTIME_MEMBERS})
+# The propagation consumer contract version has exactly one home, the checked-in
+# module below.  The smoke reads it from there rather than restating the integer,
+# because a restated literal goes stale silently and only fails a release run.
+_CONSUMER_CONTRACT_MEMBER = "witwin/channel/propagation/consumer/contracts.py"
+_CONSUMER_CONTRACT_SYMBOL = "CONTRACT_VERSION"
 _SMOKE_KEYS = frozenset(
     {
         "build_info",
@@ -229,6 +235,58 @@ def _source_member_payload(member: str) -> bytes:
         return path.read_bytes()
     except OSError as exc:
         raise ValueError(f"checked-in source member is unreadable: {member!r}") from exc
+
+
+@lru_cache(maxsize=1)
+def _repository_consumer_contract_version() -> int:
+    """Read ``CONTRACT_VERSION`` from the checked-in consumer contract module.
+
+    Parsed rather than imported: the smoke must not need an importable, natively
+    loadable ``witwin.channel`` in the parent process, and parsing keeps the
+    expected value tied to the source revision the wheel is built from.
+
+    Any other gate that needs the expected contract version should CALL THIS
+    rather than restate the integer. That is the whole point: the literal 5 this
+    replaced went stale silently and failed every release wheel smoke, and the
+    Linux workflow smoke carries an independently stale copy of the same
+    constant.
+    """
+    payload = _source_member_payload(_CONSUMER_CONTRACT_MEMBER)
+    try:
+        module = ast.parse(payload.decode("utf-8"), filename=_CONSUMER_CONTRACT_MEMBER)
+    except (UnicodeDecodeError, SyntaxError) as exc:
+        raise ValueError(
+            f"checked-in consumer contract is not parseable: {_CONSUMER_CONTRACT_MEMBER!r}"
+        ) from exc
+    found: list[int] = []
+    for node in module.body:
+        targets: list[ast.expr]
+        if isinstance(node, ast.Assign):
+            targets = list(node.targets)
+        elif isinstance(node, ast.AnnAssign):
+            targets = [node.target]
+        else:
+            continue
+        if node.value is None:
+            continue
+        if not any(
+            isinstance(target, ast.Name) and target.id == _CONSUMER_CONTRACT_SYMBOL
+            for target in targets
+        ):
+            continue
+        value = node.value
+        if not isinstance(value, ast.Constant) or type(value.value) is not int:
+            raise ValueError(
+                f"{_CONSUMER_CONTRACT_SYMBOL} in {_CONSUMER_CONTRACT_MEMBER!r} "
+                "is not an integer literal"
+            )
+        found.append(value.value)
+    if len(found) != 1:
+        raise ValueError(
+            f"expected exactly one module-level {_CONSUMER_CONTRACT_SYMBOL} in "
+            f"{_CONSUMER_CONTRACT_MEMBER!r}, found {len(found)}"
+        )
+    return found[0]
 
 
 def _rayd_lock_identity(payload: bytes, *, label: str) -> dict[str, str]:
@@ -700,6 +758,9 @@ def _smoke_code(
     expected_name: str,
     expected_version: str,
 ) -> str:
+    # Derived here, not passed in, so the expected contract version has exactly
+    # one home and no caller can supply a second opinion about it.
+    expected_contract_version = _repository_consumer_contract_version()
     return f"""
 import hashlib
 import importlib.metadata
@@ -776,9 +837,16 @@ if build_info.get(\"uses_dr_jit\") is not False:
     raise RuntimeError(\"wheel native extension must report uses_dr_jit=false\")
 if build_info.get(\"uses_rayd_native\") is not True:
     raise RuntimeError(\"wheel native extension must report uses_rayd_native=true\")
-if consumer.CONTRACT_VERSION != 5:
+expected_contract_version = {expected_contract_version!r}
+if type(consumer.CONTRACT_VERSION) is not int:
     raise RuntimeError(
-        f\"unexpected propagation consumer contract: {{consumer.CONTRACT_VERSION!r}}\"
+        f\"propagation consumer contract is not an integer: {{consumer.CONTRACT_VERSION!r}}\"
+    )
+if consumer.CONTRACT_VERSION != expected_contract_version:
+    raise RuntimeError(
+        \"installed propagation consumer contract disagrees with the checked-in \"
+        f\"source: installed {{consumer.CONTRACT_VERSION!r}}, \"
+        f\"repository {{expected_contract_version!r}}\"
     )
 for symbol in (
     \"enumerated_canonical_compact\",
