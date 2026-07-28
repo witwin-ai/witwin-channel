@@ -124,7 +124,11 @@ Organize code by RF domain capability, with a single owner for each operation:
   `witwin.channel.runtime` directly; there are no runtime submodules and no
   second spelling of an import. Its owner document is
   `docs/dev/runtime/README.md`, because a module has no directory to hold a
-  README. The packaged RayD identity lock and build-fingerprint sidecar sit
+  README. The same rule places the `materials`, `scattering`, and
+  `propagation.consumer` owner documents under `docs/dev/materials/`,
+  `docs/dev/scattering/`, and `docs/dev/consumer/`; a domain that is still a
+  package keeps its README beside its code. The packaged RayD identity lock and
+  build-fingerprint sidecar sit
   beside the extension in `witwin/channel/`, not in a `runtime/` data
   directory.
 - `scene`: scene lifecycle, compilation, immutable native resources, RayD
@@ -163,7 +167,7 @@ Organize code by RF domain capability, with a single owner for each operation:
 - `propagation.rows`: the typed internal row contracts those stages exchange.
   One path table is four zero-copy views keyed on one opaque row-identity
   token, and they live in one module rather than one per stage because
-  `propagation.topology.export` constructs all four together while the import
+  `propagation.topology` constructs all four together while the import
   graph forbids topology from reaching geometry or fields.
 - `propagation.penetration`: the typed ADR-027 segment-penetration results.
   They sit beside the row contracts for the same reason: the component-5
@@ -227,10 +231,10 @@ Organize code by RF domain capability, with a single owner for each operation:
   before any native work, each individually reachable. Discovery has no
   frequency grid, frequency never becomes a fifth world version domain, and
   neither `replicate_over_slots` nor `evaluate_time_varying` gains a frequency
-  variant. The wideband surface and the frozen-topology preparation helpers live
-  in `_wideband.py` and `_prepared.py` beside `contracts.py`, which stays the
-  single place a reader looks up a consumer type; that split is what keeps the
-  vocabulary module inside its maintenance budget without an exemption. Under
+  variant. The wideband surface and the frozen-topology preparation helpers are
+  their own sections of `consumer.py`, ahead of and beside the vocabulary
+  section, which stays the single place a reader looks up a consumer type.
+  Under
   ADR-043 the AD capability matrix is published, not inferred:
   `component_ad_modes` narrows `diffraction` to the primal,
   `component_material_leaves` and `differentiable_geometry_outputs` name the

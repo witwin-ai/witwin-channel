@@ -71,7 +71,7 @@ from witwin.channel.interactions.scattering import scattering_map_matrix
 from witwin.channel.interactions.transmission import (
     straight_transmission_chains,
 )
-from witwin.channel.propagation.geometry.edge_state import (
+from witwin.channel.propagation.geometry import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
 )
 from witwin.channel.runtime import (

@@ -150,7 +150,7 @@ def test_bdpt_consumes_the_typed_engine_without_a_mixed_export():
 
     assert "witwin.channel.propagation" in imported_modules
     assert "witwin.channel.propagation.enumerated.engine" not in imported_modules
-    assert "witwin.channel.propagation.topology.export" not in imported_modules
+    assert "witwin.channel.propagation.topology" not in imported_modules
 
 
 def test_bdpt_connection_samples_read_typed_domains_exactly():

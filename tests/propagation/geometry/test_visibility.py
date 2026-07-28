@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from witwin.channel.propagation.geometry import visibility
+from witwin.channel.propagation import geometry as visibility
 
 
 # ``_rayd_visibility_mask`` re-pinned when the geometry kernel facades moved to

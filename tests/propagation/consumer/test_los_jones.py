@@ -5,7 +5,7 @@ import math
 import pytest
 import torch
 
-from witwin.channel.propagation.consumer.replay import consumer_los_jones
+from witwin.channel.propagation.consumer import consumer_los_jones
 
 
 pytestmark = pytest.mark.skipif(

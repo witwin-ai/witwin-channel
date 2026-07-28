@@ -44,7 +44,7 @@ from witwin.channel import build_info
 from witwin.channel.propagation.enumerated.capacity import (
     sanitize_enumerated_capacity_transaction,
 )
-from witwin.channel.propagation.consumer.replay import compact_evaluated_paths
+from witwin.channel.propagation.consumer import compact_evaluated_paths
 from witwin.channel.scene.compiler import (
     compile as compile_scene,
     receiver_positions as _shared_receiver_positions,

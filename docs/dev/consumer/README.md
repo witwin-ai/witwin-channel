@@ -1,5 +1,9 @@
 # Propagation consumer boundary
 
+This is the owner document for `src/witwin/channel/propagation/consumer.py`.
+It lives in docs rather than beside the code because `consumer` is a module
+and no longer a package with a directory to hold its README.
+
 ## Ownership
 
 `propagation.consumer` is the stable, solver-neutral contract that packages
@@ -21,7 +25,8 @@ here.
 
 ## Vocabulary
 
-`contracts.py` is the single source of truth for the accepted values. Each
+The vocabulary section of `consumer.py` is the single source of truth for the
+accepted values. Each
 dimension is a `Literal` alias with a matching frozen set:
 
 | Dimension | Alias | Values |

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import torch
 
 if TYPE_CHECKING:
-    from witwin.channel.propagation.topology.export import (
+    from witwin.channel.propagation.topology import (
         EvaluatedPathSidecars,
     )
 
@@ -316,7 +316,7 @@ def sanitize_enumerated_capacity_transaction(
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     """Sanitize all enumerated payloads before outer solver result assembly."""
 
-    from witwin.channel.propagation.topology.export import (
+    from witwin.channel.propagation.topology import (
         EvaluatedPathSidecars,
     )
 

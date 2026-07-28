@@ -152,8 +152,9 @@ def test_phase9_records_and_repository_guardrails_are_synchronized() -> None:
     adr010 = (
         ROOT / "docs/dev/standards/adr-010-native-scattering-kernels.md"
     ).read_text(encoding="utf-8")
+    # `scattering` is one module now, so its owner document lives under docs/.
     scattering_readme = (
-        ROOT / "src/witwin/channel/scattering/README.md"
+        ROOT / "docs/dev/scattering/README.md"
     ).read_text(encoding="utf-8")
 
     assert "ADR-032 已接受" in plan

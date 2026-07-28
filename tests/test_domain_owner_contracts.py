@@ -13,12 +13,16 @@ OWNER_SECTIONS = {
     "## Numerical and AD contract",
     "## Forbidden fallback",
 }
+# `runtime`, `materials` and `scattering` are single modules, not packages, so
+# they have no directory to hold a README; their owner documents live under
+# `docs/dev/<owner>/README.md`. `scene` and `propagation` are still packages and
+# keep their README beside the code they describe.
 OWNER_DOCS = (
     ROOT / "docs" / "dev" / "runtime" / "README.md",
     ROOT / "src" / "witwin" / "channel" / "scene" / "README.md",
     ROOT / "src" / "witwin" / "channel" / "propagation" / "README.md",
-    ROOT / "src" / "witwin" / "channel" / "scattering" / "README.md",
-    ROOT / "docs" / "dev" / "materials-owner.md",
+    ROOT / "docs" / "dev" / "scattering" / "README.md",
+    ROOT / "docs" / "dev" / "materials" / "README.md",
 )
 
 
@@ -34,11 +38,12 @@ def test_materials_package_preserves_public_identity_and_owns_kernel_contracts()
     from witwin.channel.kernels.materials import validate_layer_csr
 
     package_root = ROOT / "src" / "witwin" / "channel"
-    materials_root = package_root / "materials"
 
-    assert not (package_root / "materials.py").exists()
+    # `materials` is one module. A `materials/` package beside it would shadow
+    # the module on import, so the directory must not come back.
+    assert not (package_root / "materials").exists()
     assert not (package_root / "core" / "materials.py").exists()
-    assert (materials_root / "__init__.py").is_file()
+    assert (package_root / "materials.py").is_file()
     assert (package_root / "kernels" / "materials.py").is_file()
     assert public_materials.__all__ == ["validate_layer_csr"]
     assert public_materials.validate_layer_csr is validate_layer_csr

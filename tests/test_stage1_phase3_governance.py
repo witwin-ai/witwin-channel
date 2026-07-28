@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 from pathlib import Path
 import tomllib
 
@@ -10,7 +11,20 @@ from ci import check_import_graph
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = ROOT / "src" / "witwin" / "channel"
-CONSUMER_ROOT = PACKAGE_ROOT / "propagation" / "consumer"
+CONSUMER_MODULE = PACKAGE_ROOT / "propagation" / "consumer.py"
+
+
+def _all_imports(path: Path) -> set[str]:
+    """Every module this file imports, at any nesting level."""
+
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    imports: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imports.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            imports.add(node.module or "")
+    return imports
 
 
 def _top_level_imports(path: Path) -> set[str]:
@@ -26,8 +40,8 @@ def _top_level_imports(path: Path) -> set[str]:
 
 def test_consumer_contract_is_versioned_and_snapshot_frozen() -> None:
     init = ast.parse(
-        (CONSUMER_ROOT / "__init__.py").read_text(encoding="utf-8"),
-        filename="consumer/__init__.py",
+        CONSUMER_MODULE.read_text(encoding="utf-8"),
+        filename="propagation/consumer.py",
     )
     exported = next(
         ast.literal_eval(node.value)
@@ -78,7 +92,7 @@ def test_consumer_contract_is_versioned_and_snapshot_frozen() -> None:
         "reevaluate",
         "replicate_over_slots",
     ]
-    contracts = (CONSUMER_ROOT / "contracts.py").read_text(encoding="utf-8")
+    contracts = CONSUMER_MODULE.read_text(encoding="utf-8")
     # Version 5 (ADR-042): the same frozen rows can be evaluated at a declared
     # grid of absolute frequencies. Additive behind
     # ``frequency_offsets_hz=None``, so every existing call and every published
@@ -106,29 +120,25 @@ def test_consumer_contract_is_versioned_and_snapshot_frozen() -> None:
 
 
 def test_public_consumer_import_does_not_eagerly_load_internal_definitions() -> None:
-    service_imports = _top_level_imports(CONSUMER_ROOT / "service.py")
-    assert "witwin.channel.propagation.enumerated.engine" not in service_imports
-    assert "witwin.channel.propagation.rows" not in service_imports
-    assert "witwin.channel.propagation.penetration" not in service_imports
-    assert not any(
-        module.startswith("witwin.channel.path")
-        or module.startswith("witwin.channel.deterministic")
-        or module.startswith("witwin.channel.montecarlo")
-        for module in service_imports
-    )
-    # The time-varying surface is a second public entry point into the same
-    # boundary, so the solver-neutrality rule has to bind it too. It is prose
-    # in CLAUDE.md and unenforced by ci/check_import_graph.py, which carries no
-    # consumer rule at all.
-    time_varying_imports = _top_level_imports(CONSUMER_ROOT / "time_varying.py")
+    # The consumer is one module, so the discovery route, the fixed-topology
+    # replay, and the time-varying surface all share one top-level import list
+    # and the solver-neutrality rule binds every one of them at once. It is
+    # prose in CLAUDE.md and unenforced by ci/check_import_graph.py, which
+    # carries no consumer rule at all.
+    consumer_imports = _top_level_imports(CONSUMER_MODULE)
+    assert "witwin.channel.propagation.enumerated.engine" not in consumer_imports
+    assert "witwin.channel.propagation.rows" not in consumer_imports
+    assert "witwin.channel.propagation.penetration" not in consumer_imports
+    # ``witwin.channel.kernels.topology`` reaches ``propagation.penetration``,
+    # so the compact finalizer's AD companions stay behind a call-time import
+    # for exactly the same reason.
+    assert "witwin.channel.kernels.topology" not in consumer_imports
     assert not any(
         module.startswith("witwin.channel.path")
         or module.startswith("witwin.channel.deterministic")
         or module.startswith("witwin.channel.montecarlo")
         or module.startswith("witwin.channel.propagation.enumerated")
-        or module.startswith("witwin.channel.propagation.rows")
-        or module.startswith("witwin.channel.propagation.penetration")
-        for module in time_varying_imports
+        for module in consumer_imports
     )
 
 
@@ -142,11 +152,11 @@ def test_consumer_has_exact_named_adr008_enumerated_edge() -> None:
     ]
     assert {(edge.source, edge.imported_name) for edge in consumer_edges} == {
         (
-            "witwin.channel.propagation.consumer.service",
+            "witwin.channel.propagation.consumer",
             "EnumeratedEndpointTensors",
         ),
         (
-            "witwin.channel.propagation.consumer.service",
+            "witwin.channel.propagation.consumer",
             "evaluate_enumerated_paths",
         ),
     }
@@ -170,9 +180,7 @@ def test_compact_provenance_and_historical_adr_dispositions_are_frozen() -> None
         "ADR-031": "Removed; rejected and never implemented",
     }
 
-    consumer_source = "\n".join(
-        path.read_text(encoding="utf-8") for path in sorted(CONSUMER_ROOT.glob("*.py"))
-    )
+    consumer_source = CONSUMER_MODULE.read_text(encoding="utf-8")
     for forbidden in (
         "path_capacity_per_pair",
         "diffraction_state_capacity",
@@ -216,13 +224,18 @@ def test_release_matrix_is_truthful_about_channel_abi() -> None:
 
 
 def test_consumer_governance_is_radar_neutral() -> None:
-    capabilities = (CONSUMER_ROOT / "service.py").read_text(encoding="utf-8")
+    # The whole consumer module, not one of its sections: collapsing the
+    # package widened this from the orchestration file to every line of the
+    # boundary. The acronyms are matched as words because "unique" and
+    # "broadcasts" contain "iq" and "adc"; a substring hit on either is
+    # noise, and the rule is about radar vocabulary, not letter runs.
+    source = CONSUMER_MODULE.read_text(encoding="utf-8").lower()
     for forbidden in ("waveform", "rcs", "iq", "adc", "cfar", "detection"):
-        assert forbidden not in capabilities.lower()
+        assert re.search(rf"\b{forbidden}\b", source) is None, forbidden
 
 
 def test_consumer_v1_has_no_scattering_execution_route() -> None:
-    service = (CONSUMER_ROOT / "service.py").read_text(encoding="utf-8")
+    service = CONSUMER_MODULE.read_text(encoding="utf-8")
     assert '"scattering"' not in service
     assert "append_scattering_evaluated_paths" not in service
 
@@ -248,22 +261,26 @@ def test_compact_autograd_native_companions_have_one_topology_owner() -> None:
 
     facade = PACKAGE_ROOT / "kernels" / "topology.py"
     assert owners == {symbol: [facade] for symbol in symbols}
-    assert "witwin.channel.kernels.topology" in _top_level_imports(
-        CONSUMER_ROOT / "replay.py"
-    )
+    # The consumer reaches both companions through that one facade. The
+    # import is call-time rather than top level because
+    # ``witwin.channel.kernels.topology`` reaches
+    # ``witwin.channel.propagation.penetration``, which the cold public
+    # import of the consumer must not load.
+    assert "witwin.channel.kernels.topology" in _all_imports(CONSUMER_MODULE)
 
 
 def test_consumer_vocabulary_has_one_source_of_truth() -> None:
     """The accepted values live in ``contracts``, not in the service layer."""
 
-    contracts = (CONSUMER_ROOT / "contracts.py").read_text(encoding="utf-8")
-    service = (CONSUMER_ROOT / "service.py").read_text(encoding="utf-8")
+    consumer = CONSUMER_MODULE.read_text(encoding="utf-8")
 
     for name in ("COMPONENTS", "RESPONSES", "TOPOLOGY_MODES", "AD_MODES"):
-        assert f"{name}: frozenset[str] = frozenset(" in contracts, name
-        assert f"_{name} = frozenset(" not in service, name
-    assert "PropagationCapabilities(" not in service
-    assert "capabilities()" in service
+        assert f"{name}: frozenset[str] = frozenset(" in consumer, name
+        assert f"_{name} = frozenset(" not in consumer, name
+    # One construction of the record, and every reader reaches it through
+    # the published accessor rather than building a second one.
+    assert consumer.count("PropagationCapabilities(") == 1
+    assert "capabilities()" in consumer
 
 
 def test_consumer_frequency_offsets_are_implemented_not_merely_declared() -> None:
@@ -286,8 +303,8 @@ def test_consumer_frequency_offsets_are_implemented_not_merely_declared() -> Non
         capabilities,
     )
 
-    contracts = (CONSUMER_ROOT / "contracts.py").read_text(encoding="utf-8")
-    service = (CONSUMER_ROOT / "service.py").read_text(encoding="utf-8")
+    contracts = CONSUMER_MODULE.read_text(encoding="utf-8")
+    service = contracts
     assert "frequency_offsets_hz: tuple[float, ...] | None = None" in contracts
 
     record = capabilities()
@@ -315,7 +332,7 @@ def test_consumer_frequency_offsets_are_implemented_not_merely_declared() -> Non
 def test_consumer_geometry_has_no_duplicate_first_interaction_fields() -> None:
     """``interaction_position_m`` was column 0 of ``interaction_positions_m``."""
 
-    contracts = (CONSUMER_ROOT / "contracts.py").read_text(encoding="utf-8")
+    contracts = CONSUMER_MODULE.read_text(encoding="utf-8")
     assert "interaction_position_m" not in contracts
     assert "interaction_normal:" not in contracts
     assert "interaction_positions_m: torch.Tensor" in contracts

@@ -376,7 +376,7 @@ def test_the_raw_route_refuses_slot_batching_by_name() -> None:
 def test_a_row_that_pairs_across_slots_is_rejected() -> None:
     """The block-diagonal law is enforced, not assumed."""
 
-    from witwin.channel.propagation.consumer.contracts import PropagationTopology
+    from witwin.channel.propagation.consumer import PropagationTopology
 
     compiled = compiled_world()
     prepared = frozen_topology(compiled)

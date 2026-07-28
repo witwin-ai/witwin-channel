@@ -58,9 +58,16 @@ def test_the_entry_points_are_the_public_surface():
 
 
 def test_a_resurrected_dead_module_is_unreachable(tmp_path: Path):
-    """`scattering/energy.py` is one of the modules Phase 11 deleted."""
+    """`scattering/energy.py` is one of the modules Phase 11 deleted.
+
+    `scattering` is a module now, so resurrecting the file also resurrects the
+    directory it used to live in. The gate walks paths, not the import system,
+    so it still sees `witwin.channel.scattering.energy` and still has to answer
+    the same reachability question.
+    """
 
     package_root = _mirror(tmp_path)
+    (package_root / "scattering").mkdir()
     (package_root / "scattering" / "energy.py").write_text(
         "from __future__ import annotations\n\n"
         "import torch\n\n\n"
@@ -142,6 +149,7 @@ def test_cli_passes_with_repository_defaults(capsys):
 
 def test_cli_fails_and_names_the_orphan(tmp_path: Path, capsys):
     package_root = _mirror(tmp_path)
+    (package_root / "scattering").mkdir()
     (package_root / "scattering" / "energy.py").write_text("VALUE = 1\n", encoding="utf-8")
 
     assert (

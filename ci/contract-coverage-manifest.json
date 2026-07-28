@@ -1843,7 +1843,7 @@
     ],
     [
       "los_silhouette_clearance",
-      "witwin.channel.propagation.geometry.silhouette_clearance.los_clearance_factor",
+      "witwin.channel.propagation.geometry.los_clearance_factor",
       "native_call_site",
       "native-isb-taper",
       [
@@ -1852,7 +1852,7 @@
     ],
     [
       "los_taper_apply",
-      "witwin.channel.propagation.geometry.silhouette_clearance.apply_los_taper",
+      "witwin.channel.propagation.geometry.apply_los_taper",
       "native_call_site",
       "native-isb-taper",
       [
@@ -2629,7 +2629,7 @@
     ],
     [
       "consumer_fixed_los_gather",
-      "witwin.channel.propagation.consumer.replay._FixedLoSGatherFunction.forward",
+      "witwin.channel.propagation.consumer._FixedLoSGatherFunction.forward",
       "native_call_site",
       "native-consumer-fixed-los",
       [
@@ -2638,7 +2638,7 @@
     ],
     [
       "consumer_fixed_los_gather_backward",
-      "witwin.channel.propagation.consumer.replay._FixedLoSGatherFunction.backward",
+      "witwin.channel.propagation.consumer._FixedLoSGatherFunction.backward",
       "native_call_site",
       "native-consumer-fixed-los-backward",
       [
@@ -2647,7 +2647,7 @@
     ],
     [
       "consumer_fixed_los_gather_jvp",
-      "witwin.channel.propagation.consumer.replay._FixedLoSGatherFunction.jvp",
+      "witwin.channel.propagation.consumer._FixedLoSGatherFunction.jvp",
       "native_call_site",
       "native-consumer-fixed-los-jvp",
       [
@@ -2656,7 +2656,7 @@
     ],
     [
       "consumer_los_jones",
-      "witwin.channel.propagation.consumer.replay.consumer_los_jones",
+      "witwin.channel.propagation.consumer.consumer_los_jones",
       "named_wrapper",
       "native-consumer-los-jones",
       [
@@ -2665,7 +2665,7 @@
     ],
     [
       "evaluated_paths_compact_finalize",
-      "witwin.channel.propagation.consumer.replay.evaluated_paths_compact_finalize",
+      "witwin.channel.propagation.consumer.evaluated_paths_compact_finalize",
       "named_wrapper",
       "native-consumer-compact",
       [

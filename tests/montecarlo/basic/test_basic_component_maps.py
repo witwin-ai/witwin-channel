@@ -8,7 +8,7 @@ from witwin.channel.deployment import build_info
 from witwin.channel.montecarlo.basic import Config, solve as solve_basic
 from witwin.channel.scene import compile as compile_scene
 from witwin.channel.montecarlo import basic as mc_basic
-from witwin.channel.propagation.geometry.edge_state import (
+from witwin.channel.propagation.geometry import (
     diffraction_edge_geometry,
 )
 

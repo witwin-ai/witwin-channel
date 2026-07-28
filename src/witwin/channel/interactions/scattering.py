@@ -75,18 +75,18 @@ from witwin.channel.materials import (
     face_material_thickness,
 )
 from witwin.channel.propagation.enumerated.contracts import TopologyConfig
-from witwin.channel.propagation.geometry.endpoints import (
+from witwin.channel.propagation.geometry import (
     receiver_positions_and_layout,
     transmitter_tensors,
 )
-from witwin.channel.propagation.geometry.reevaluate import _cached_coplanar_face_groups
+from witwin.channel.propagation.geometry import _cached_coplanar_face_groups
 from witwin.channel.propagation.rows import (
     EvaluatedPaths,
     PathFields,
     PathGeometry,
     PathTopology,
 )
-from witwin.channel.propagation.topology.export import EvaluatedPathSidecars
+from witwin.channel.propagation.topology import EvaluatedPathSidecars
 from witwin.channel.scattering import KirchhoffTable  # noqa: F401
 from witwin.channel.scene.endpoints import require_compiled
 from witwin.channel.scene.resources import (

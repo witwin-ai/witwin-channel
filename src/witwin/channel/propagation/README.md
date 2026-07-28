@@ -176,7 +176,7 @@ policy.
 
 `propagation.consumer` is the one public surface in this package: the stable,
 solver-neutral contract that packages outside Channel use to obtain propagation
-paths. See `consumer/README.md` for its vocabulary, capability record,
+paths. See `docs/dev/consumer/README.md` for its vocabulary, capability record,
 validation split, and result shape. It is a façade only — it owns no physics,
 adds no second compaction, and never imports a solver.
 

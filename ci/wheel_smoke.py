@@ -36,7 +36,7 @@ _SPECIAL_PACKAGE_MEMBERS = frozenset({_NATIVE_MEMBER, *_REQUIRED_RUNTIME_MEMBERS
 # The propagation consumer contract version has exactly one home, the checked-in
 # module below.  The smoke reads it from there rather than restating the integer,
 # because a restated literal goes stale silently and only fails a release run.
-_CONSUMER_CONTRACT_MEMBER = "witwin/channel/propagation/consumer/contracts.py"
+_CONSUMER_CONTRACT_MEMBER = "witwin/channel/propagation/consumer.py"
 _CONSUMER_CONTRACT_SYMBOL = "CONTRACT_VERSION"
 _SMOKE_KEYS = frozenset(
     {

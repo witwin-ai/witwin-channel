@@ -23,8 +23,8 @@ from witwin.channel.propagation.penetration import (
     SegmentPenetrationPolicy,
     SegmentPenetrationResult,
 )
-from witwin.channel.propagation.topology.concatenate import _empty_path_block
-from witwin.channel.propagation.topology.export import _ensure_topology_fields
+from witwin.channel.propagation.topology import _empty_path_block
+from witwin.channel.propagation.topology import _ensure_topology_fields
 from witwin.channel.kernels.topology import (
     enumerated_transmission_topology_pack,
 )

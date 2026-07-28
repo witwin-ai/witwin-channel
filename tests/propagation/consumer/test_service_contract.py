@@ -75,7 +75,7 @@ def _endpoints():
 
 
 def _compact_rows():
-    from witwin.channel.propagation.consumer.replay import CompactEvaluatedPaths
+    from witwin.channel.propagation.consumer import CompactEvaluatedPaths
     from witwin.channel.propagation.rows import (
         EvaluatedPaths,
         PathFields,
@@ -160,7 +160,7 @@ def test_evaluate_consumes_request_batch_and_aliases_finalized_rows(
         ScalarTransport,
         evaluate,
     )
-    from witwin.channel.propagation.consumer import service
+    from witwin.channel.propagation import consumer
     from witwin.channel.propagation.enumerated import capacity
     from witwin.channel.propagation.enumerated import engine
 
@@ -185,7 +185,7 @@ def test_evaluate_consumes_request_batch_and_aliases_finalized_rows(
         )
 
     monkeypatch.setattr(engine, "evaluate_enumerated_paths", fake_engine)
-    monkeypatch.setattr(service, "_compact", lambda *args, **kwargs: compact)
+    monkeypatch.setattr(consumer, "_compact", lambda *args, **kwargs: compact)
     monkeypatch.setattr(
         capacity,
         "sanitize_enumerated_capacity_transaction",
@@ -292,7 +292,7 @@ def test_reevaluate_reuses_frozen_topology_without_discovery(
         ScalarTransport,
         reevaluate,
     )
-    from witwin.channel.propagation.consumer import replay
+    from witwin.channel.propagation import consumer
     from witwin.channel.kernels import fields as field_kernels
 
     sources, sinks = _endpoints()
@@ -341,7 +341,7 @@ def test_reevaluate_reuses_frozen_topology_without_discovery(
     def forbidden(*args, **kwargs):
         raise AssertionError("AD field owner must not run")
 
-    monkeypatch.setattr(replay, "fixed_los_gather", fake_gather)
+    monkeypatch.setattr(consumer, "fixed_los_gather", fake_gather)
     monkeypatch.setattr(field_kernels, "field_free_space", fake_field)
     monkeypatch.setattr(field_kernels, "field_free_space_ad", forbidden)
     request = FixedTopologyRequest(
@@ -389,14 +389,14 @@ def test_unsupported_fixed_response_fails_at_request_construction(
         FixedTopologyRequest,
         capabilities,
     )
-    from witwin.channel.propagation.consumer import replay
+    from witwin.channel.propagation import consumer
 
     sources, sinks = _endpoints()
 
     def forbidden(*args, **kwargs):
         raise AssertionError("fixed gather must not run")
 
-    monkeypatch.setattr(replay, "fixed_los_gather", forbidden)
+    monkeypatch.setattr(consumer, "fixed_los_gather", forbidden)
     assert "polarimetric_transport" in capabilities().fixed_topology_responses
 
     with pytest.raises(NotImplementedError, match="unsupported response"):
@@ -453,7 +453,7 @@ def test_fixed_primal_only_endpoint_ad_fails_before_gather(monkeypatch) -> None:
         FixedTopologyRequest,
         reevaluate,
     )
-    from witwin.channel.propagation.consumer import replay
+    from witwin.channel.propagation import consumer
 
     sources, sinks = _endpoints()
     sources = EndpointBatch(
@@ -466,7 +466,7 @@ def test_fixed_primal_only_endpoint_ad_fails_before_gather(monkeypatch) -> None:
     def forbidden(*args, **kwargs):
         raise AssertionError("fixed gather must not run")
 
-    monkeypatch.setattr(replay, "fixed_los_gather", forbidden)
+    monkeypatch.setattr(consumer, "fixed_los_gather", forbidden)
     request = FixedTopologyRequest(
         sources=sources,
         sinks=sinks,

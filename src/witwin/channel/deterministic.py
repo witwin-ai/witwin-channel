@@ -30,7 +30,7 @@ from witwin.channel.propagation.enumerated.engine import (
 from witwin.channel.interactions.scattering import (
     append_scattering_evaluated_paths,
 )
-from witwin.channel.propagation.geometry.endpoints import (
+from witwin.channel.propagation.geometry import (
     apply_receiver_layout,
     receiver_positions_and_layout,
 )
@@ -51,7 +51,7 @@ from witwin.channel.scene.endpoints import ReceiverGrid
 from witwin.channel.kernels.topology import (
     deterministic_component_counts,
 )
-from witwin.channel.propagation.topology.export import EvaluatedPathSidecars
+from witwin.channel.propagation.topology import EvaluatedPathSidecars
 from witwin.channel.propagation.enumerated.capacity import (
     sanitize_enumerated_capacity_transaction,
 )
@@ -65,7 +65,7 @@ from collections.abc import Mapping
 
 from witwin.channel.kernels import deterministic as accumulation_kernels
 from witwin.channel.kernels import fields as field_kernels
-from witwin.channel.propagation.geometry.endpoints import ReceiverLayout
+from witwin.channel.propagation.geometry import ReceiverLayout
 from witwin.channel.propagation.rows import EvaluatedPaths
 
 if TYPE_CHECKING:

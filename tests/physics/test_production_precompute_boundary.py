@@ -94,8 +94,8 @@ def test_production_and_reference_precompute_have_static_zero_dependency() -> No
     root = Path(__file__).parents[2] / "src" / "witwin" / "channel"
     production_paths = (
         root / "constants.py",
-        root / "materials" / "__init__.py",
-        root / "scattering" / "__init__.py",
+        root / "materials.py",
+        root / "scattering.py",
         root / "interactions" / "scattering.py",
     )
     for path in production_paths:

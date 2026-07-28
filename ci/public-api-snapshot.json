@@ -172,237 +172,237 @@
         {
           "name": "AD_MODES",
           "kind": "unresolved",
-          "target": "witwin.channel.propagation.consumer.contracts.AD_MODES",
-          "contract_sha256": "06e1bce6abd4ea2595300bbf2daacc0f91cb9e9b41f63dbecd0d61752a2789f3"
+          "target": "witwin.channel.propagation.consumer.AD_MODES",
+          "contract_sha256": "8b7cd8494544dd255fd2913a6d3a5ed9e3af234a29eace690ebc839bc47a3715"
         },
         {
           "name": "COMPONENTS",
           "kind": "unresolved",
-          "target": "witwin.channel.propagation.consumer.contracts.COMPONENTS",
-          "contract_sha256": "2f5bf21c47a93045c033aee07c5da3544c5e0baea87914e3f8566fd8fd4e7456"
+          "target": "witwin.channel.propagation.consumer.COMPONENTS",
+          "contract_sha256": "809014ac8df2601767c69fb3f916e78964bd12669b34f745776655de9067f078"
         },
         {
           "name": "CONTRACT_VERSION",
           "kind": "unresolved",
-          "target": "witwin.channel.propagation.consumer.contracts.CONTRACT_VERSION",
-          "contract_sha256": "89b3aeb88c64435cc95c65a949adcb329efc94031bd55e826e956518785eedbb"
+          "target": "witwin.channel.propagation.consumer.CONTRACT_VERSION",
+          "contract_sha256": "73019799fb583e9c165799f775220073cea05c58abd4c42afc158466fa32e0fa"
         },
         {
           "name": "Complex3Transport",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.contracts.Complex3Transport",
-          "contract_sha256": "32337094f66523b29e2e4686cbb2a5bcd84e76c82e85d2b6a967bae3523304c4"
+          "target": "witwin.channel.propagation.consumer.Complex3Transport",
+          "contract_sha256": "a2978c77b751c552f731c3709b6aed3f97b1af0ee50a3c3fd733c2a3a993ce31"
         },
         {
           "name": "EndpointBatch",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.contracts.EndpointBatch",
-          "contract_sha256": "4750752121684732660cfbb503bd1c9cb4d64ac20aa9acca7286645add744179"
+          "target": "witwin.channel.propagation.consumer.EndpointBatch",
+          "contract_sha256": "d22a9045d2164ec458a5dfa0822d8c59b5bc222fea342a8486880c8f859e929a"
         },
         {
           "name": "FixedTopologyBucket",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.contracts.FixedTopologyBucket",
-          "contract_sha256": "05b7881b39f1534c1eaebe8797c2ad7994d130952d15c8953fd9ccb0c2614883"
+          "target": "witwin.channel.propagation.consumer.FixedTopologyBucket",
+          "contract_sha256": "b811ba3a57070edc54f35fcc04e5f110df736970821d7a0894473a4d35e7ad9c"
         },
         {
           "name": "FixedTopologyEvaluation",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.contracts.FixedTopologyEvaluation",
-          "contract_sha256": "673416d87f3ef3d818fafd0ca79a3e9c20416bb2f1b3f0ec6fc30aff8d275e79"
+          "target": "witwin.channel.propagation.consumer.FixedTopologyEvaluation",
+          "contract_sha256": "b657cdd68db7c82546f6aec52a9624878fd451803366b280300811b51a4f34b6"
         },
         {
           "name": "FixedTopologyRequest",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.contracts.FixedTopologyRequest",
-          "contract_sha256": "4ac0349d242a00d1dae81a5d6533962d0abb900ebd4c92cb30608a9f41e1043a"
+          "target": "witwin.channel.propagation.consumer.FixedTopologyRequest",
+          "contract_sha256": "770b64af5a2cd0cb24291efbcbe0f7b5fcd2af145fb9d5f899643bcbe106c099"
         },
         {
           "name": "JonesTransport",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.contracts.JonesTransport",
-          "contract_sha256": "5a3d3ce987b0e01424a55b8f2b09bb74df0d57af035fe291662ca62094a66641"
+          "target": "witwin.channel.propagation.consumer.JonesTransport",
+          "contract_sha256": "5bbb0ab94dd95c5307e06b17d8b6653fe1afac73782143f37a9d9fdae3d1c819"
         },
         {
           "name": "MAX_DEPTH",
           "kind": "unresolved",
-          "target": "witwin.channel.propagation.consumer.contracts.MAX_DEPTH",
-          "contract_sha256": "b967197ec307cbe0193d87f451ba13515c9813687116f579317b158c3e8d00aa"
+          "target": "witwin.channel.propagation.consumer.MAX_DEPTH",
+          "contract_sha256": "93ad71d9cbd339a995249875dbb73f9b5bfd78ec69f0d7b22390e3bb6a9bb75f"
         },
         {
           "name": "PreparedFixedTopology",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.contracts.PreparedFixedTopology",
-          "contract_sha256": "b6b8c74af3eeca005679358c764f328222d90c0ffaddb4656f20456632d89911"
+          "target": "witwin.channel.propagation.consumer.PreparedFixedTopology",
+          "contract_sha256": "2c3e4061994a7b9b77e029802eaeacfae05f3a529cbe5ef7bb4b3a141ebd66c3"
         },
         {
           "name": "PropagationAdMode",
           "kind": "unresolved",
-          "target": "witwin.channel.propagation.consumer.contracts.PropagationAdMode",
-          "contract_sha256": "1736490395be8d73b76f950bd8fc2cffff4778d18e081586f5509e0cbf4194b8"
+          "target": "witwin.channel.propagation.consumer.PropagationAdMode",
+          "contract_sha256": "070889d34de1e1897b837bc2857e4978cfe967c5fea304bf6fc170e860c2b2dc"
         },
         {
           "name": "PropagationCapabilities",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.contracts.PropagationCapabilities",
-          "contract_sha256": "fb69984448e7798e6524a108f2af3dee4f66d32d0e1bb434423721fa0478de28"
+          "target": "witwin.channel.propagation.consumer.PropagationCapabilities",
+          "contract_sha256": "99d7b4f3314334215941ea7d253dc639aac68317942ab8989b5b88c3e113ba34"
         },
         {
           "name": "PropagationComponent",
           "kind": "unresolved",
-          "target": "witwin.channel.propagation.consumer.contracts.PropagationComponent",
-          "contract_sha256": "8cacf31393110479041c0740582f84e5c1fa4c7736d21e19ec338c760e80bb37"
+          "target": "witwin.channel.propagation.consumer.PropagationComponent",
+          "contract_sha256": "54bad2063bbc83f4571786b168910a7682bd9f97cc6bd43a79a13aef0fa19374"
         },
         {
           "name": "PropagationConvention",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.contracts.PropagationConvention",
-          "contract_sha256": "d6606f3dba92f2aa0491988f18c8e2fcfe7a55a8af0352891d89d7c505d5c1ac"
+          "target": "witwin.channel.propagation.consumer.PropagationConvention",
+          "contract_sha256": "15986d2dbaf70e83c5f8e6ec05126146652bf9313dc4777652d8ed38a02dff77"
         },
         {
           "name": "PropagationDiagnostics",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.contracts.PropagationDiagnostics",
-          "contract_sha256": "9c698e4248d8e40a78885f4f533e3b341a4fcc6e308040b65473b3297c00b446"
+          "target": "witwin.channel.propagation.consumer.PropagationDiagnostics",
+          "contract_sha256": "444c08cbf0100b3f2443af842b09f83ac9ca693f6b1a857b8dedd1357622d7ec"
         },
         {
           "name": "PropagationEvaluation",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.contracts.PropagationEvaluation",
-          "contract_sha256": "75ea9352ff15e22415f5aa27472ca5ce68a3d5d7577073679d1489aa0715f841"
+          "target": "witwin.channel.propagation.consumer.PropagationEvaluation",
+          "contract_sha256": "66e4aacc5c059d9131cb9e869fb676ad75de5a8975b1f9d330c34ecb6700fbf5"
         },
         {
           "name": "PropagationGeometry",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.contracts.PropagationGeometry",
-          "contract_sha256": "f9bf147b7f89bbd120ba8ba3962d9e959b5de56f52edb955ea8adf7425c26e60"
+          "target": "witwin.channel.propagation.consumer.PropagationGeometry",
+          "contract_sha256": "e32f25c7c4731d2fc23d9390d386943e0f0df52b5733e905044e5ba7413d4842"
         },
         {
           "name": "PropagationPathBatch",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.contracts.PropagationPathBatch",
-          "contract_sha256": "251607e545bbf2a21268317806c191d03990402a04faa60b020a04291542fa90"
+          "target": "witwin.channel.propagation.consumer.PropagationPathBatch",
+          "contract_sha256": "325ccb076aa2f1a7428634fe5c6bb79b224a91ed75c6da756d3c9c8907d2e619"
         },
         {
           "name": "PropagationRequest",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.contracts.PropagationRequest",
-          "contract_sha256": "2a44e030836b3e52e9940087be490db08bd6094fe2d2606cd6fb526c485027de"
+          "target": "witwin.channel.propagation.consumer.PropagationRequest",
+          "contract_sha256": "0f377227abe54e09c428fd1dd304feb8f8ba9fc8078778edbaf1c969c234a17c"
         },
         {
           "name": "PropagationResponse",
           "kind": "unresolved",
-          "target": "witwin.channel.propagation.consumer.contracts.PropagationResponse",
-          "contract_sha256": "de5bd9375b3618fc8fb7036ea302d7959679af105a6869524ff2a71b8833440e"
+          "target": "witwin.channel.propagation.consumer.PropagationResponse",
+          "contract_sha256": "ad7c45c9e0a9092275307cb476f1deefd9866f1ee26c375a70a7ab09a0344bb1"
         },
         {
           "name": "PropagationTopology",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.contracts.PropagationTopology",
-          "contract_sha256": "cade5abe88abc2f04863a38f496b5d009e21b1fdf05a1aed7097554a9759ac0b"
+          "target": "witwin.channel.propagation.consumer.PropagationTopology",
+          "contract_sha256": "11d5afafb7ec3f06327a1e514732d0edd2433e22581b147eb64f144f2634a03b"
         },
         {
           "name": "PropagationTopologyMode",
           "kind": "unresolved",
-          "target": "witwin.channel.propagation.consumer.contracts.PropagationTopologyMode",
-          "contract_sha256": "72ccdf4152a89d9d2805360a92bbd2d0890c32df5686ed10dd1f654ae6d2e840"
+          "target": "witwin.channel.propagation.consumer.PropagationTopologyMode",
+          "contract_sha256": "def8a0796e4c8dda122851a2a7774f1b642269b7f0956f9057f40a118b6debbe"
         },
         {
           "name": "RESPONSES",
           "kind": "unresolved",
-          "target": "witwin.channel.propagation.consumer.contracts.RESPONSES",
-          "contract_sha256": "8482e7cbc4bd0722a30e47329a23a310641af0522e1dfdae1c545aab8d4474b4"
+          "target": "witwin.channel.propagation.consumer.RESPONSES",
+          "contract_sha256": "39425e275c056672f80d102f948a2943ab200489ba0c21629544129111421a65"
         },
         {
           "name": "ScalarTransport",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.contracts.ScalarTransport",
-          "contract_sha256": "c8ec5b0f334cfa09d083d29ee555281f456b92c75136b00a9836cb68fad88533"
+          "target": "witwin.channel.propagation.consumer.ScalarTransport",
+          "contract_sha256": "74a337e1a709fbb520fbb3de04b573b87fa602cf873e17fd0586975162d6ad0e"
         },
         {
           "name": "TOPOLOGY_MODES",
           "kind": "unresolved",
-          "target": "witwin.channel.propagation.consumer.contracts.TOPOLOGY_MODES",
-          "contract_sha256": "cd487a0e7acd8c7a50b83989239d9f5add8c83b85fb741d8f61de71aafba5deb"
+          "target": "witwin.channel.propagation.consumer.TOPOLOGY_MODES",
+          "contract_sha256": "9a1952b0712562fdffe334dda6ae93d12b83215b7f319513f1ea5f1de0856886"
         },
         {
           "name": "TimeVaryingEvaluation",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.time_varying.TimeVaryingEvaluation",
-          "contract_sha256": "5b5dd19f3d756e1f4370df6f025e52f7eed39ae34d6a98a8a842d3521eb7fbba"
+          "target": "witwin.channel.propagation.consumer.TimeVaryingEvaluation",
+          "contract_sha256": "73650c3bf2156a872c9664e629622ea56784ea7be898a090a193411356ec7808"
         },
         {
           "name": "TimeVaryingRequest",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.time_varying.TimeVaryingRequest",
-          "contract_sha256": "0cb328a04c2a4618cdd70669b28bbf1f01cf8ef9c8b93cbc58e33e473f0be699"
+          "target": "witwin.channel.propagation.consumer.TimeVaryingRequest",
+          "contract_sha256": "9a9ead72103b0d7488d88583d4f7975d782cdc4e2ed9021d443787624330df5b"
         },
         {
           "name": "TimeVaryingTransport",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.time_varying.TimeVaryingTransport",
-          "contract_sha256": "4f3da1012c956e82b8bcfe84973dc54bed39dab03a65366faefd1f5a86bc1b20"
+          "target": "witwin.channel.propagation.consumer.TimeVaryingTransport",
+          "contract_sha256": "8d57ac7a71353a92f91e254f274b93874ee46ecb1e8e0d64e5996b1c73aa17c3"
         },
         {
           "name": "WorldProvenance",
           "kind": "class",
-          "target": "witwin.channel.propagation.consumer.contracts.WorldProvenance",
-          "contract_sha256": "0316a6382e3cc8cd3d7189181e30c2428fe96575fe3d2649a8c729fdba24ce0a"
+          "target": "witwin.channel.propagation.consumer.WorldProvenance",
+          "contract_sha256": "bc7adfec0abbf02ebe421a59155c70147efcd204fe04a8108b14afe29ee85b4c"
         },
         {
           "name": "capabilities",
           "kind": "function",
-          "target": "witwin.channel.propagation.consumer.contracts.capabilities",
-          "contract_sha256": "cb6573f72c4ddd96dd366b9a7b1aff6209351769b0fadd309c4815b730593964",
+          "target": "witwin.channel.propagation.consumer.capabilities",
+          "contract_sha256": "e49fef4c7e426e88605e17ebcd21233cc3d1e422fcbfc6274a4e24f93fb20d45",
           "signature": "()"
         },
         {
           "name": "evaluate",
           "kind": "function",
-          "target": "witwin.channel.propagation.consumer.service.evaluate",
-          "contract_sha256": "4c1201a20a2a25ff9ff7818d56990830b20c0583da22f82e7c7bed7068f7c402",
+          "target": "witwin.channel.propagation.consumer.evaluate",
+          "contract_sha256": "d02d4c73c3ecd4be8df6b62db34e1eaee75342422a8100b55c3cf856772e37d3",
           "signature": "(compiled_scene: CompiledScene, request: PropagationRequest)"
         },
         {
           "name": "evaluate_time_varying",
           "kind": "function",
-          "target": "witwin.channel.propagation.consumer.time_varying.evaluate_time_varying",
-          "contract_sha256": "271d0c317f45d69d7086c6cadcd901559fbfac4a4a69a97733cf2074bac7297c",
+          "target": "witwin.channel.propagation.consumer.evaluate_time_varying",
+          "contract_sha256": "1d433919def9acfb17733fda2e136d8d5070043690fe46dd982847dbd6b5554f",
           "signature": "(compiled_scene: CompiledScene, request: TimeVaryingRequest)"
         },
         {
           "name": "native_frequency_resolution_hz",
           "kind": "function",
-          "target": "witwin.channel.propagation.consumer._wideband.native_frequency_resolution_hz",
-          "contract_sha256": "9c55069dc4549f7f69e8e8eaa4f1c165b4fa8b90fac275cfa539291b6b8e9367",
+          "target": "witwin.channel.propagation.consumer.native_frequency_resolution_hz",
+          "contract_sha256": "2ffe991332fae30be9ddc373c0574b7fd65c8fa131d5cbb511bc01d51a48c970",
           "signature": "(reference_frequency_hz: float)"
         },
         {
           "name": "prepare_fixed_topology",
           "kind": "function",
-          "target": "witwin.channel.propagation.consumer._prepared.prepare_fixed_topology",
-          "contract_sha256": "42ab03d7eb4268b65a12c7b03d4d1675046e54df496e4db7d53a78c5ee548bfd",
+          "target": "witwin.channel.propagation.consumer.prepare_fixed_topology",
+          "contract_sha256": "fa1331d26ba7040830e36b1736226bd3b9089068fdd7d3dde11cf52a642153e8",
           "signature": "(topology: PropagationTopology)"
         },
         {
           "name": "rediscovery_required",
           "kind": "function",
-          "target": "witwin.channel.propagation.consumer.service.rediscovery_required",
-          "contract_sha256": "26fec5c24d2a12805f069c793f4fc15a3a9e41a3aebe287d09574a4583f7e66e",
+          "target": "witwin.channel.propagation.consumer.rediscovery_required",
+          "contract_sha256": "4b0c49a9ac8e46b5ff33110befe9aa8fc1d29f3fcb1caabc31ec244496d8450e",
           "signature": "(compiled_scene: CompiledScene, topology: PropagationTopology | PreparedFixedTopology, *, revalidate_source: bool=False)"
         },
         {
           "name": "reevaluate",
           "kind": "function",
-          "target": "witwin.channel.propagation.consumer.service.reevaluate",
-          "contract_sha256": "361ec98c1e2b4ca844cc56899e6744de390fb6240065cbb81e664bf87bd94f37",
+          "target": "witwin.channel.propagation.consumer.reevaluate",
+          "contract_sha256": "2a37c944ea2c51fb050eb78565c6a25fee138c548ba94c15284d4e27c06af976",
           "signature": "(compiled_scene: CompiledScene, request: FixedTopologyRequest)"
         },
         {
           "name": "replicate_over_slots",
           "kind": "function",
-          "target": "witwin.channel.propagation.consumer._prepared.replicate_over_slots",
-          "contract_sha256": "9642122df4a48bd20914ae06433d831c3bb778beb904fcb5dac3a25229b8a8c3",
+          "target": "witwin.channel.propagation.consumer.replicate_over_slots",
+          "contract_sha256": "daacec1a190fbe3e4d9b210ccdbc2d127d5c3b30e5afc91cf0936d46a675ae3c",
           "signature": "(prepared: PreparedFixedTopology, slot_count: int, *, source_count: int, sink_count: int)"
         }
       ]

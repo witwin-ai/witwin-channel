@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.propagation.geometry.endpoints import ReceiverLayout
+from witwin.channel.propagation.geometry import ReceiverLayout
 from witwin.channel import deterministic
 from witwin.channel.propagation.rows import (
     EvaluatedPaths,

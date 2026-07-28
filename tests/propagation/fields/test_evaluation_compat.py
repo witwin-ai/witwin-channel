@@ -5,8 +5,8 @@ from pathlib import Path
 
 from tools.refactor_baseline import python_body_hashes
 from witwin.channel.scene import compiler as scene_tensors
-from witwin.channel.propagation.fields import evaluation
-from witwin.channel.propagation.geometry import reevaluate
+from witwin.channel.propagation import fields as evaluation
+from witwin.channel.propagation import geometry as reevaluate
 from witwin.channel import runtime
 
 

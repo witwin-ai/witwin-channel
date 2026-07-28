@@ -29,17 +29,17 @@ from witwin.channel.interactions.reflection import (
 from witwin.channel.interactions.transmission import (
     _transmission_topology,
 )
-from witwin.channel.propagation.fields.evaluation import evaluate_path_fields
-from witwin.channel.propagation.geometry.endpoints import (
+from witwin.channel.propagation.fields import evaluate_path_fields
+from witwin.channel.propagation.geometry import (
     receiver_positions_and_layout,
     transmitter_tensors,
 )
 from witwin.channel.propagation.rows import EvaluatedPaths
-from witwin.channel.propagation.topology.concatenate import (
+from witwin.channel.propagation.topology import (
     _pad_topology_sequences,
     concatenate_path_blocks,
 )
-from witwin.channel.propagation.topology.export import (
+from witwin.channel.propagation.topology import (
     EvaluatedPathSidecars,
     evaluated_paths_from_block,
     evaluated_paths_from_result,

@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from witwin.channel.propagation.consumer import EndpointBatch, PropagationTopology
-from witwin.channel.propagation.consumer.replay import fixed_los_gather
+from witwin.channel.propagation.consumer import fixed_los_gather
 
 
 pytestmark = pytest.mark.skipif(

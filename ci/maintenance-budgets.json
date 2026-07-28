@@ -72,13 +72,13 @@
       "owner": "propagation maintainers",
       "reason": "Phase-3 endpoint batches validate six aligned CUDA tensors plus stable identity vectors at one typed boundary; the exact validation surface is frozen."
     },
-    "src/witwin/channel/propagation/consumer/replay.py::compact_evaluated_paths": {
+    "src/witwin/channel/propagation/consumer.py::compact_evaluated_paths": {
       "ceiling": 18,
       "expires_on": "2027-01-31",
       "owner": "propagation maintainers",
       "reason": "The legacy scattering-only final reorder validates alias mode and differentiable compact mode in one internal facade; its exact Phase-3 surface is frozen."
     },
-    "src/witwin/channel/propagation/fields/evaluation.py::_evaluate_coupled_fields": {
+    "src/witwin/channel/propagation/fields.py::_evaluate_coupled_fields": {
       "ceiling": 17,
       "expires_on": "2027-01-31",
       "owner": "propagation maintainers",
@@ -108,7 +108,7 @@
       "owner": "propagation maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
-    "src/witwin/channel/propagation/topology/export.py::_ensure_topology_fields": {
+    "src/witwin/channel/propagation/topology.py::_ensure_topology_fields": {
       "ceiling": 17,
       "expires_on": "2027-01-31",
       "owner": "propagation maintainers",
@@ -150,7 +150,7 @@
       "owner": "scene maintainers",
       "reason": "Core-world runtime structure projection is frozen at the Phase-2 compiler boundary pending focused decomposition."
     },
-    "src/witwin/channel/propagation/fields/evaluation.py::evaluate_path_fields": {
+    "src/witwin/channel/propagation/fields.py::evaluate_path_fields": {
       "ceiling": 24,
       "expires_on": "2027-01-31",
       "owner": "propagation maintainers",

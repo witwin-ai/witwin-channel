@@ -17,7 +17,7 @@ from witwin.channel.propagation.rows import (
     PathGeometry,
     PathTopology,
 )
-from witwin.channel.propagation.topology.export import (
+from witwin.channel.propagation.topology import (
     EvaluatedPathSidecars,
     PathExecutionStats,
 )

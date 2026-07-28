@@ -17,15 +17,15 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel.propagation.geometry.silhouette_clearance import (
+from witwin.channel.propagation.geometry import (
     los_clearance_factor,
     occluder_boxes,
 )
-from witwin.channel.propagation.geometry.visibility import (
+from witwin.channel.propagation.geometry import (
     VisibilityQuery,
     run_visibility_query,
 )
-from witwin.channel.propagation.topology.export import _ensure_topology_fields
+from witwin.channel.propagation.topology import _ensure_topology_fields
 from witwin.channel.kernels import topology as topology_kernels
 
 if TYPE_CHECKING:

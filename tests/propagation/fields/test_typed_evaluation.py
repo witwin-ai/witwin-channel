@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import torch
 
 from tests.path.test_path_evaluated_paths import _evaluated_paths_fixture
-from witwin.channel.propagation.fields import evaluation
+from witwin.channel.propagation import fields as evaluation
 from witwin.channel.propagation.rows import (
     EvaluatedPaths,
     PathFields,

@@ -6,7 +6,7 @@ and first-order path geometry queries (``propagation.geometry.diffraction``),
 and the enumerated topology owner (``propagation.enumerated.diffraction``) - so
 one file holds the whole concept. The native facades it dispatches through stay
 in :mod:`witwin.channel.kernels`; the shared edge-state helpers stay in
-:mod:`witwin.channel.propagation.geometry.edge_state`, and the shared receiver
+:mod:`witwin.channel.propagation.geometry`, and the shared receiver
 chunk size stays with its owner in
 :mod:`witwin.channel.interactions.reflection`.
 """
@@ -24,17 +24,17 @@ from witwin.channel.materials import face_material_tensors
 from witwin.channel.scene.compiler import (
     LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,
 )
-from witwin.channel.propagation.geometry.edge_state import (
+from witwin.channel.propagation.geometry import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
     diffraction_edge_geometry as _diffraction_edge_geometry,
 )
-from witwin.channel.propagation.topology.concatenate import (
+from witwin.channel.propagation.topology import (
     concatenate_path_blocks,
 )
 from witwin.channel.interactions.reflection import (
     _MULTIBOUNCE_PAIR_CHUNK_SIZE,
 )
-from witwin.channel.propagation.topology.export import _ensure_topology_fields
+from witwin.channel.propagation.topology import _ensure_topology_fields
 from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel.kernels import topology as topology_kernels
 from witwin.channel.runtime import (

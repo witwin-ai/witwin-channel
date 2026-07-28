@@ -15,19 +15,19 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel.propagation.geometry.edge_state import (
+from witwin.channel.propagation.geometry import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
     diffraction_edge_geometry as _diffraction_edge_geometry,
 )
 from witwin.channel.kernels import geometry as geometry_kernels
-from witwin.channel.propagation.geometry.reevaluate import (
+from witwin.channel.propagation.geometry import (
     _cached_coplanar_face_groups,
 )
-from witwin.channel.propagation.topology.concatenate import (
+from witwin.channel.propagation.topology import (
     _empty_path_block,
     concatenate_path_blocks,
 )
-from witwin.channel.propagation.topology.export import _ensure_topology_fields
+from witwin.channel.propagation.topology import _ensure_topology_fields
 from witwin.channel.kernels import topology as topology_kernels
 
 if TYPE_CHECKING:

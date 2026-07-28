@@ -74,6 +74,14 @@ def test_consumer_import_is_solver_neutral() -> None:
     finally:
         _pop_consumer_modules()
         sys.modules.update(original)
+        # The re-import above also rebound ``consumer`` on the parent package
+        # to the second copy, and restoring ``sys.modules`` does not undo that.
+        # A later ``from witwin.channel.propagation import consumer`` resolves
+        # through that attribute, so it has to be put back as well or the next
+        # test monkeypatches a module nothing calls.
+        sys.modules["witwin.channel.propagation"].consumer = sys.modules[
+            "witwin.channel.propagation.consumer"
+        ]
 
 
 def test_pair_layout_convention_is_explicit() -> None:

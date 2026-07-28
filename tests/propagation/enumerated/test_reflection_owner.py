@@ -4,9 +4,12 @@ import ast
 import hashlib
 from pathlib import Path
 
+import pytest
+
 from ci import check_import_graph as graph
 from witwin.channel.interactions import reflection
-from witwin.channel.propagation.geometry import reevaluate
+from witwin.channel.propagation import geometry as reevaluate
+from witwin.channel.propagation import topology
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -183,8 +186,11 @@ def test_enumerated_public_all_is_unchanged_and_discovery_init_is_empty():
     assert enumerated.__all__ == []
     # The concept axis emptied ``propagation.topology.discovery`` completely, so
     # the package was deleted rather than left as an empty namespace. "Empty"
-    # is now "absent": nothing may recreate it as a discovery owner.
-    assert (
+    # is now "absent": nothing may recreate it as a discovery owner. Collapsing
+    # the stage package into ``propagation/topology.py`` makes that structural
+    # rather than conventional - a module carries no ``__path__``, so the
+    # submodule cannot be created at all and the lookup raises instead of
+    # answering ``None``.
+    assert not hasattr(topology, "__path__")
+    with pytest.raises(ModuleNotFoundError):
         importlib.util.find_spec("witwin.channel.propagation.topology.discovery")
-        is None
-    )

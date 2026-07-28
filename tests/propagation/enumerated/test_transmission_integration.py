@@ -10,7 +10,7 @@ from witwin.channel.propagation.enumerated import engine
 from witwin.channel.propagation.penetration import (
     SegmentPenetrationPolicy,
 )
-from witwin.channel.propagation.topology.export import (
+from witwin.channel.propagation.topology import (
     EvaluatedPathSidecars,
     PathExecutionStats,
 )

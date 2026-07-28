@@ -6,7 +6,7 @@ from pathlib import Path
 
 from witwin.channel.propagation import enumerated
 from witwin.channel.propagation.enumerated import engine
-from witwin.channel.propagation.topology import export
+from witwin.channel.propagation import topology as export
 
 
 _COMPONENT_STAGES = (

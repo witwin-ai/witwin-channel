@@ -8,7 +8,7 @@ evaluates, and the composition of the three. The token is minted once, by
 view can never be paired with a table it was not built against.
 
 That shared token is why these four live in one module at the propagation root
-instead of one per stage: ``propagation.topology.export`` constructs all four
+instead of one per stage: ``propagation.topology`` constructs all four
 together, and the import graph forbids the topology stage from reaching the
 geometry or field stage. Splitting them by stage would either invert that
 layering or duplicate the row identity.

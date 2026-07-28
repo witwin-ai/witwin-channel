@@ -1,8 +1,8 @@
 import pytest
 import torch
 
-from witwin.channel.propagation.topology import concatenate
-from witwin.channel.propagation.topology.export import evaluated_paths_from_block
+from witwin.channel.propagation import topology as concatenate
+from witwin.channel.propagation.topology import evaluated_paths_from_block
 from witwin.channel.kernels.topology import (
     enumerated_canonical_compact,
 )

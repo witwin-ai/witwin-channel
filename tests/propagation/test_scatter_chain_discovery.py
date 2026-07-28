@@ -268,7 +268,7 @@ def _two_wall_scene():
 
 
 def _run_discovery(scene, config):
-    from witwin.channel.propagation.geometry.endpoints import (
+    from witwin.channel.propagation.geometry import (
         receiver_positions_and_layout,
         transmitter_tensors,
     )

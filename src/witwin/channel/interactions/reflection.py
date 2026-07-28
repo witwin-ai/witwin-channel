@@ -20,13 +20,13 @@ from witwin.channel.kernels import topology as topology_kernels
 from witwin.channel.kernels.topology import (
     mc_sample_directions,
 )
-from witwin.channel.propagation.geometry.reevaluate import (
+from witwin.channel.propagation.geometry import (
     _cached_coplanar_face_groups,
 )
-from witwin.channel.propagation.topology.concatenate import (
+from witwin.channel.propagation.topology import (
     concatenate_path_blocks,
 )
-from witwin.channel.propagation.topology.export import _ensure_topology_fields
+from witwin.channel.propagation.topology import _ensure_topology_fields
 
 if TYPE_CHECKING:
     from witwin.channel.scene.endpoints import SolverScene as Scene
