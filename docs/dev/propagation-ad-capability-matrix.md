@@ -98,15 +98,15 @@ outside the hot path (result assembly, refusal checks); it is never physics.
 
 | route | leaf-or-output | mode | state | mechanism | owner | test | validation |
 |---|---|---|---|---|---|---|---|
-| discovery | create_graph=True | vjp | REF | torch-orchestration | src/witwin/channel/runtime/autograd_contracts.py:265 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_create_graph_through_a_discovery_names_the_owner | refusal |
-| reevaluate/prepared | create_graph=True | vjp | REF | torch-orchestration | src/witwin/channel/runtime/autograd_contracts.py:265 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_create_graph_through_a_reevaluation_names_the_owner | refusal |
+| discovery | create_graph=True | vjp | REF | torch-orchestration | src/witwin/channel/runtime.py:970 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_create_graph_through_a_discovery_names_the_owner | refusal |
+| reevaluate/prepared | create_graph=True | vjp | REF | torch-orchestration | src/witwin/channel/runtime.py:970 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_create_graph_through_a_reevaluation_names_the_owner | refusal |
 | discovery | forward dual under ad_mode=vjp | vjp | REF | torch-orchestration | src/witwin/channel/propagation/consumer/service.py:169 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_a_forward_over_reverse_request_is_refused_before_any_result | refusal |
 | reevaluate/prepared | forward dual under ad_mode=vjp | vjp | REF | torch-orchestration | src/witwin/channel/propagation/consumer/service.py:169 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_a_forward_over_reverse_reevaluation_is_refused_before_any_result | refusal |
 | reevaluate/prepared | requires_grad primal under a forward dual | jvp | SUP | native-companion | src/witwin/channel/propagation/consumer/service.py:169 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_a_requires_grad_primal_under_a_forward_dual_stays_supported | analytic |
 | reevaluate/prepared | nested forward levels | jvp | REF | torch-orchestration | torch/autograd/forward_ad.py | tests/propagation/consumer/test_phase9_ad_matrix.py::test_nested_forward_levels_raise_from_torch_and_that_is_the_owner | refusal |
-| kernel/reflection | create_graph=True | vjp | REF | torch-orchestration | src/witwin/channel/runtime/autograd_contracts.py:265 | tests/ad/test_field_em_ad.py::test_double_backward_raises | refusal |
-| kernel/geometry | create_graph=True | vjp | REF | torch-orchestration | src/witwin/channel/runtime/autograd_contracts.py:265 | tests/ad/test_rayd_geometry_ad.py::test_double_backward_raises | refusal |
-| kernel/reflection | composed functorch transforms | jvp | REF | torch-orchestration | src/witwin/channel/runtime/autograd_contracts.py:15 | tests/ad/test_field_em_ad.py::test_composed_functorch_transforms_raise | refusal |
+| kernel/reflection | create_graph=True | vjp | REF | torch-orchestration | src/witwin/channel/runtime.py:970 | tests/ad/test_field_em_ad.py::test_double_backward_raises | refusal |
+| kernel/geometry | create_graph=True | vjp | REF | torch-orchestration | src/witwin/channel/runtime.py:970 | tests/ad/test_rayd_geometry_ad.py::test_double_backward_raises | refusal |
+| kernel/reflection | composed functorch transforms | jvp | REF | torch-orchestration | src/witwin/channel/runtime.py:721 | tests/ad/test_field_em_ad.py::test_composed_functorch_transforms_raise | refusal |
 
 ### 2.7 AD accounting
 
@@ -118,7 +118,7 @@ outside the hot path (result assembly, refusal checks); it is never physics.
 
 ## 3. Tape ledger
 
-`AdLaunchLedger` (`src/witwin/channel/runtime/kernel_metadata.py:10`) is the one
+`AdLaunchLedger` (`src/witwin/channel/runtime.py:1008`) is the one
 counter both consumer routes now publish. One `add()` per registered
 differentiable native `Function` this call drives, and `tape_bytes` is the sum
 of what those `Function`s retained for backward.

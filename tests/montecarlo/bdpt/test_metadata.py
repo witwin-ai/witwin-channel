@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel.runtime.kernel_metadata import validate_metadata
+from witwin.channel.runtime import validate_metadata
 from witwin.channel.montecarlo.bdpt import Config, solve
 
 

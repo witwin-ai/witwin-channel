@@ -19,9 +19,7 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.runtime import torch_compat
-from witwin.channel.runtime.symbols import required_symbol as _required_native_op
-from witwin.channel.runtime.autograd_contracts import (
+from witwin.channel.runtime import (
     _ad_first_order_only,
     _ad_frequency_grad,
     _ad_frequency_tangent,
@@ -30,6 +28,8 @@ from witwin.channel.runtime.autograd_contracts import (
     _ad_native_tensor,
     _ad_reject_fixed_inputs,
     _ad_reject_fixed_tangents,
+    disable_functorch,
+    required_symbol as _required_native_op,
 )
 
 from .functional_chain import (
@@ -440,7 +440,7 @@ class _ScatteringChainEnsembleEvalAdFunction(torch.autograd.Function):
             and all(value is None for value in tangents.values())
         ):
             return (None,) * len(_CHAIN_ENSEMBLE_OUTPUT_FIELDS)
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = scattering_chain_ensemble_eval_jvp(
                 *(_ad_native_tensor(value) for value in saved),
                 coef=ctx.coef_value,
@@ -1030,7 +1030,7 @@ class _ScatteringChainRealizationEvalAdFunction(torch.autograd.Function):
             and all(value is None for value in tangents.values())
         ):
             return (None,) * len(_CHAIN_REALIZATION_OUTPUT_FIELDS)
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = scattering_chain_realization_eval_jvp(
                 *(_ad_native_tensor(value) for value in saved[:42]),
                 k0=ctx.k0_value,

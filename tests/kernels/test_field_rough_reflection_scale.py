@@ -7,7 +7,7 @@ from witwin.channel.propagation.fields.kernels import (
     functional as field_functional,
     rough_scale as field_rough_scale,
 )
-from witwin.channel.runtime import symbols
+from witwin.channel import runtime
 
 from tests.reference import rough_reflection as reference
 
@@ -109,7 +109,7 @@ def test_rough_reflection_scale_contract_shapes_and_dtypes():
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
 def test_rough_reflection_scale_requires_native_kernel(monkeypatch):
     case = _random_case(4, 1, device="cuda", seed=3)
-    monkeypatch.setattr(symbols, "native_extension", lambda: None)
+    monkeypatch.setattr(runtime, "native_extension", lambda: None)
     with pytest.raises(RuntimeError, match="field_rough_reflection_scale CUDA kernel is required"):
         field_functional.field_rough_reflection_scale(
             *(case[name] for name in (

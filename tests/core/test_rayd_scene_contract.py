@@ -3,7 +3,7 @@ import sys
 import pytest
 import torch
 
-from witwin.channel.runtime import symbols
+from witwin.channel import runtime
 from witwin.channel.scene import compile as compile_scene
 from witwin.core import Scene
 from tests.support.core_world import (
@@ -26,14 +26,14 @@ def _source_linked_rayd_available() -> bool:
 def test_rayd_scene_wrapper_does_not_import_python_rayd():
     sys.modules.pop("rayd", None)
 
-    from witwin.channel.scene.kernels.rayd_scene import RayDSceneResource
+    from witwin.channel.scene.resources import RayDSceneResource
 
     assert RayDSceneResource.__name__ == "RayDSceneResource"
     assert "rayd" not in sys.modules
 
 
 def test_rayd_scene_exposes_typed_resource():
-    from witwin.channel.scene.kernels.rayd_scene import RayDSceneResource
+    from witwin.channel.scene.resources import RayDSceneResource
 
     resource = object()
     scene = RayDSceneResource(resource)
@@ -44,7 +44,7 @@ def test_rayd_scene_exposes_typed_resource():
 def test_validated_native_loader_does_not_import_python_rayd():
     sys.modules.pop("rayd", None)
 
-    symbols.native_extension()
+    runtime.native_extension()
 
     assert "rayd" not in sys.modules
 

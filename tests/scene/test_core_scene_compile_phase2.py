@@ -7,7 +7,7 @@ import torch
 
 import witwin.channel as channel
 from witwin.core import Mesh, PhysicalMaterial, Scene, Structure
-from witwin.channel.scene.kernels.rayd_scene import (
+from witwin.channel.scene.resources import (
     RayDEdgeRecords,
     RayDSceneResource,
 )

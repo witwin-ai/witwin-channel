@@ -5,8 +5,10 @@ from collections.abc import Mapping
 import numpy as np
 import torch
 
-from witwin.channel.runtime.symbols import required_symbol as _required_native_op
-from witwin.channel.runtime.tensor_contracts import validate_cuda_tensor
+from witwin.channel.runtime import (
+    required_symbol as _required_native_op,
+    validate_cuda_tensor,
+)
 
 _PATCH_QUAD_ORDER = 16
 _duffy_cache: dict[torch.device, tuple[torch.Tensor, torch.Tensor, torch.Tensor]] = {}
@@ -17,7 +19,7 @@ def _duffy_nodes(device: torch.device) -> tuple[torch.Tensor, torch.Tensor, torc
 
     The unit square ``(xi, eta)`` maps to barycentric ``(a, b) =
     (xi, eta * (1 - xi))`` with Jacobian ``(1 - xi)`` - the same construction
-    as ``scattering.phase_screen.patch_phase_integral``.
+    as ``scattering.patch_phase_integral``.
     """
 
     cached = _duffy_cache.get(device)

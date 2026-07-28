@@ -27,7 +27,7 @@ from witwin.channel.montecarlo.events.scattering import (
     scatter_direction_uniforms,
 )
 from witwin.channel.scattering import build_kirchhoff_table, eval_bsdf
-from witwin.channel.scattering.tables import pdf as table_pdf
+from witwin.channel.scattering import pdf as table_pdf
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA torch is required"

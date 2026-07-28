@@ -1,5 +1,9 @@
 # Runtime owner
 
+`runtime` is one module, `src/witwin/channel/runtime.py`. This document lives
+in `docs/dev/` rather than beside it because a module has no directory to hold
+a README; the sibling package owners keep theirs in-tree.
+
 ## Ownership
 
 `runtime` owns extension selection, symbol/bootstrap validation, immutable build
@@ -7,7 +11,7 @@ identity, tensor/AD call contracts, native buffers, and pure-stdlib native
 handle normalization. It does not own solver policy, scene construction,
 materials, propagation algorithms, or RF numerical kernels.
 
-`runtime.capacity.CapacityFailureState` owns the shared failure protocol used
+`runtime.CapacityFailureState` owns the shared failure protocol used
 by accepted genuinely fixed-capacity operations and retained caller-free
 experiments. Native creation asynchronously zeros one contiguous CUDA
 `int32[1]` bitmask on the caller's current stream. Participants receive and
@@ -38,8 +42,8 @@ wall-product estimator receive the exact same
 trap it. The completed ADR-027 Phase P/E/M switches do not create a
 penetration-local failure observer.
 
-`runtime.profiling` owns the closed semantic NVTX annotation vocabulary used
-by performance evidence. It may emit only balanced ranges and point marks: it
+`runtime.CudaProfileRange` and `runtime.CudaProfileMark` own the closed
+semantic NVTX annotation vocabulary used by performance evidence. It may emit only balanced ranges and point marks: it
 does not evaluate tensors, allocate results, launch CUDA work, synchronize,
 copy data, or affect numerical/error behavior. Payloads describe stable domain
 operations and must not encode a plan phase, candidate identity, or temporary
@@ -49,7 +53,7 @@ generation name.
 
 The stable root entry is `witwin.channel.build_info`. `runtime.__all__`
 also exposes internal loader/symbol APIs for domain facades; these are not root
-public promises. `runtime.native_resources._rayd_scene_resource` is the unique
+public promises. `runtime._rayd_scene_resource` is the unique
 owner and scene/core modules compatibility-re-export the same object.
 
 Build-time RayD source selection is not a runtime backend choice. The compiled
@@ -74,7 +78,7 @@ symbol validation finish before native computation.
 
 ### AD contract
 
-`autograd_contracts` and `torch_compat` validate dispatch state, tangents, and
+The `_ad_*` contracts and the Torch-compatibility helpers validate dispatch state, tangents, and
 native tape boundaries but do not invent derivatives. Unsupported active
 inputs, missing companions, and higher-order requests fail explicitly.
 

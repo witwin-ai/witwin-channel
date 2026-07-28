@@ -13,7 +13,7 @@ from witwin.channel.propagation.geometry.endpoints import (
     ReceiverLayout,
     apply_receiver_layout,
 )
-from witwin.channel.propagation.models.evaluated import EvaluatedPaths
+from witwin.channel.propagation.rows import EvaluatedPaths
 
 
 # Component slots materialized by the native accumulator

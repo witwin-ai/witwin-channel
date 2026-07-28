@@ -13,16 +13,16 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.runtime import torch_compat
-from witwin.channel.runtime.autograd_contracts import (
+from witwin.channel.runtime import (
     _ad_first_order_only,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
     _ad_reject_fixed_inputs,
     _ad_reject_fixed_tangents,
+    disable_functorch,
+    required_symbol as _required_native_op,
+    validate_cuda_tensor,
 )
-from witwin.channel.runtime.symbols import required_symbol as _required_native_op
-from witwin.channel.runtime.tensor_contracts import validate_cuda_tensor
 
 
 def _validate_source_amplitude_inputs(
@@ -163,7 +163,7 @@ class _FieldSourceAmplitudeScaleAdFunction(torch.autograd.Function):
         if tangent is None:
             return None
         (tx_power,) = ctx.saved_tensors
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = _required_native_op("field_source_amplitude_scale_jvp")(
                 _ad_native_tensor(tx_power), tangent
             )

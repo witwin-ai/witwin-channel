@@ -397,7 +397,7 @@ def test_solver_chain_enabled_end_to_end():
     _require_cuda_rayd()
     if getattr(scattering_mod.scattering_kernels, "scattering_chain_ensemble_eval", None) is None:
         pytest.skip("ADR-021 D2 Op A facade not yet registered")
-    from witwin.channel.runtime.symbols import native_extension
+    from witwin.channel.runtime import native_extension
 
     if not hasattr(native_extension(), "scattering_chain_ensemble_eval"):
         pytest.skip("ADR-021 D2 Op A native symbol not built into this extension")

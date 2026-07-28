@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from witwin.core import Scene, SceneSnapshot
 
 if TYPE_CHECKING:
-    from .compiled import CompiledScene
+    from .compiler import CompiledScene
 
 
 def compile(
@@ -31,7 +31,7 @@ def clear_compile_cache() -> None:
 
 def __getattr__(name: str):
     if name == "CompiledScene":
-        from .compiled import CompiledScene
+        from .compiler import CompiledScene
 
         return CompiledScene
     raise AttributeError(name)

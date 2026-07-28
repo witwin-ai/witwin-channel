@@ -10,8 +10,7 @@ from witwin.channel.montecarlo.basic.kernels.transmission import (
     mc_transmission_wall_product_backward,
     mc_transmission_wall_product_jvp,
 )
-from witwin.channel.runtime import CapacityFailureBit
-from witwin.channel.runtime.capacity import create_capacity_failure_state
+from witwin.channel.runtime import CapacityFailureBit, create_capacity_failure_state
 
 
 pytestmark = pytest.mark.skipif(

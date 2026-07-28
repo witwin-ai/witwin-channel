@@ -27,9 +27,7 @@ python_version = "3.11"
 files = [
     "src/witwin/channel/capabilities.py",
     "src/witwin/channel/deployment.py",
-    "src/witwin/channel/runtime/native_buffers.py",
-    "src/witwin/channel/runtime/tensor_contracts.py",
-    "src/witwin/channel/runtime/torch_compat.py",
+    "src/witwin/channel/runtime.py",
     "src/witwin/channel/deterministic/config.py",
     "src/witwin/channel/montecarlo/basic/config.py",
     "src/witwin/channel/montecarlo/bdpt/config.py",

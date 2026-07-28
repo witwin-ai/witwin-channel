@@ -3,11 +3,13 @@ from __future__ import annotations
 import pytest
 import torch
 
-from witwin.channel.propagation.consumer import _native
-from witwin.channel.propagation.models.evaluated import EvaluatedPaths
-from witwin.channel.propagation.models.fields import PathFields
-from witwin.channel.propagation.models.geometry import PathGeometry
-from witwin.channel.propagation.models.topology import PathTopology
+from witwin.channel.propagation.consumer import replay
+from witwin.channel.propagation.rows import (
+    EvaluatedPaths,
+    PathFields,
+    PathGeometry,
+    PathTopology,
+)
 
 
 pytestmark = pytest.mark.skipif(
@@ -72,7 +74,7 @@ def test_compact_finalize_radix_order_vjp_and_jvp_use_real_native() -> None:
     primal = torch.arange(1, 5, device="cuda", dtype=torch.float32)
 
     def evaluate(values):
-        compact = _native.compact_evaluated_paths(
+        compact = replay.compact_evaluated_paths(
             _paths(
                 values,
                 valid_values=(True, True, False, True),
@@ -109,7 +111,7 @@ def test_exact_row_mode_aliases_payload_and_has_no_count_boundary() -> None:
         tx_values=(0, 1, 0, 1),
         rx_values=(0, 0, 1, 1),
     )
-    compact = _native.compact_evaluated_paths(
+    compact = replay.compact_evaluated_paths(
         paths,
         source_stable_ids=torch.tensor(
             [101, 102], device="cuda", dtype=torch.int64
@@ -139,7 +141,7 @@ def test_compact_finalize_handles_zero_k_without_radix_launch() -> None:
         valid_values=(False, False, False, False),
     )
 
-    compact = _native.compact_evaluated_paths(
+    compact = replay.compact_evaluated_paths(
         paths,
         source_stable_ids=torch.tensor(
             [101, 102], device="cuda", dtype=torch.int64

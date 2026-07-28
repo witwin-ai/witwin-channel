@@ -538,7 +538,7 @@ def _fresh_build(
     resource_capture.pop("stderr_bytes")
     compiler_resources = parse_cuobjdump_resource_usage(resource_stdout)
     fingerprints = [
-        installed_package / "channel" / "runtime" / "_channel.build-fingerprint"
+        installed_package / "channel" / "_channel.build-fingerprint"
     ]
     fingerprints = [path for path in fingerprints if path.is_file()]
     if len(fingerprints) != 1:

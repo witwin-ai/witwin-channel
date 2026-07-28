@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.runtime.native_buffers import bdpt_zero_matrix  # noqa: F401
-from witwin.channel.runtime.symbols import (
-    native_extension,
+from witwin.channel.runtime import (
+    bdpt_zero_matrix,  # noqa: F401
     required_symbol as _required_native_op,
+    validate_cuda_tensor,
 )
-from witwin.channel.runtime.tensor_contracts import validate_cuda_tensor
 
 
 def bdpt_store_point_component_column(
@@ -84,12 +83,9 @@ def bdpt_point_component_power(
     path_gain: torch.Tensor, *, include_los: bool
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("path_gain", path_gain, dtype=torch.float32, ndim=2)
-    native = native_extension()
-    if native is None or not hasattr(native, "bdpt_point_component_power"):
-        raise RuntimeError(
-            "_channel.bdpt_point_component_power CUDA kernel is required"
-        )
-    exported = native.bdpt_point_component_power(path_gain, bool(include_los))
+    exported = _required_native_op("bdpt_point_component_power")(
+        path_gain, bool(include_los)
+    )
     if not isinstance(exported, dict):
         raise TypeError("_channel.bdpt_point_component_power must return a dict")
     for name in ("los", "reflection", "diffraction"):

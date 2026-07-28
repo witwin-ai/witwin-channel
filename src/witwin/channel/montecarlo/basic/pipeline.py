@@ -6,16 +6,18 @@ import torch
 from witwin.channel.scene.endpoints import require_compiled
 
 from witwin.channel import build_info
-from witwin.channel.scene.antenna import validate_scalar_endpoint_features
-from witwin.channel.scene.edge_selection import resolve_scene_edge_policy
-from witwin.channel.runtime.memory_budget import (
+from witwin.channel.scene.endpoints import validate_scalar_endpoint_features
+from witwin.channel.scene.resources import resolve_scene_edge_policy
+from witwin.channel.runtime import (
+    SolveCapacityTransaction,
+    create_solve_capacity_transaction,
     enforce_memory_budget,
     estimate_monte_carlo_memory,
 )
-from witwin.channel.scene.receiver_geometry import first_receiver_grid
-from witwin.channel.materials.encoding import face_material_field_bundle
-from witwin.channel.materials.evaluation import (
+from witwin.channel.scene.endpoints import first_receiver_grid
+from witwin.channel.materials import (
     _require_frequency_ad_constant_materials,
+    face_material_field_bundle,
 )
 from witwin.channel.montecarlo.basic.kernels.capacity import (
     mc_capacity_failure_component_maps_sanitize,
@@ -27,10 +29,6 @@ from witwin.channel.montecarlo.basic.kernels.maps import (
     mc_point_component_power,
     mc_reflection_ad_max_depth,
     mc_zero_matrix,
-)
-from witwin.channel.runtime.capacity import (
-    SolveCapacityTransaction,
-    create_solve_capacity_transaction,
 )
 from witwin.channel.scene.endpoints import ReceiverGrid
 

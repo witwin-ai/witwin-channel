@@ -2,17 +2,14 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.runtime import torch_compat
-from witwin.channel.runtime.autograd_contracts import (
+from witwin.channel.runtime import (
     _ad_first_order_only,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
-)
-from witwin.channel.runtime.symbols import (
-    native_extension,
+    disable_functorch,
     required_symbol as _required_native_op,
+    validate_cuda_tensor,
 )
-from witwin.channel.runtime.tensor_contracts import validate_cuda_tensor
 
 
 def deterministic_accumulate_flat(
@@ -51,12 +48,7 @@ def deterministic_accumulate_flat(
     if num_tx < 0 or num_rx < 0:
         raise ValueError("num_tx and num_rx must be non-negative")
 
-    native = native_extension()
-    if native is None or not hasattr(native, "deterministic_accumulate_flat"):
-        raise RuntimeError(
-            "_channel.deterministic_accumulate_flat CUDA kernel is required"
-        )
-    exported = native.deterministic_accumulate_flat(
+    exported = _required_native_op("deterministic_accumulate_flat")(
         valid,
         tx_id,
         rx_id,
@@ -401,7 +393,7 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
             _field_total_imag,
             power_total,
         ) = (_ad_native_tensor(value) for value in ctx.saved_tensors)
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = deterministic_accumulate_flat_jvp(
                 valid,
                 tx_id,

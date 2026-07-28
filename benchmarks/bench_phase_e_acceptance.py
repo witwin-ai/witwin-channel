@@ -28,7 +28,7 @@ from benchmarks.harness import (  # noqa: E402
     tensor_bytes,
 )
 from tests.support.native_ext import inject_native_paths  # noqa: E402
-from witwin.channel.runtime.memory_budget import (  # noqa: E402
+from witwin.channel.runtime import (  # noqa: E402
     MemoryBudgetError,
     MemoryEstimate,
     enforce_memory_budget,

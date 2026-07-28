@@ -102,6 +102,7 @@ def test_each_protected_concept_resolves_to_its_declared_owner(real_facts):
             site
             for site in single.definition_sites(entry, real_facts)
             if site.module == entry.owner
+            and (site.module, site.qualname) not in entry.recorded_duplicates
         ]
         assert len(owned) == entry.owner_definitions, entry.name
 
@@ -114,7 +115,7 @@ def test_the_registry_protects_the_three_named_concepts():
     }
     assert concept(AVAILABILITY).owner == "witwin.channel.components"
     assert concept(DEPTH).owner == "witwin.channel.components"
-    assert concept(SYMBOL).owner == "witwin.channel.runtime.symbols"
+    assert concept(SYMBOL).owner == "witwin.channel.runtime"
 
 
 def test_a_signature_is_not_satisfied_by_ordinary_code(real_facts):
@@ -225,19 +226,28 @@ def test_a_module_level_copy_is_rejected(real_facts):
 def test_the_recorded_duplicates_are_only_the_symbol_lookup_debt():
     assert concept(AVAILABILITY).recorded_duplicates == frozenset()
     assert concept(DEPTH).recorded_duplicates == frozenset()
-    assert len(concept(SYMBOL).recorded_duplicates) == 37
-    assert len({module for module, _ in concept(SYMBOL).recorded_duplicates}) == 11
+    # Started at 37 across 11 modules; the four solver domains repaid their 18
+    # sites by routing them through runtime.required_symbol. The ledger may
+    # only shrink further.
+    assert len(concept(SYMBOL).recorded_duplicates) == 19
+    assert len({module for module, _ in concept(SYMBOL).recorded_duplicates}) == 6
     assert concept(SYMBOL).debt
 
 
 def test_every_recorded_duplicate_still_exists(real_facts):
-    entry = concept(SYMBOL)
-    found = {
-        (site.module, site.qualname)
-        for site in single.definition_sites(entry, real_facts)
-        if site.module != entry.owner
-    }
+    """Everything that is not the one canonical definition is on the ledger."""
 
+    entry = concept(SYMBOL)
+    sites = single.definition_sites(entry, real_facts)
+    canonical = {
+        (site.module, site.qualname)
+        for site in sites
+        if site.module == entry.owner
+        and (site.module, site.qualname) not in entry.recorded_duplicates
+    }
+    found = {(site.module, site.qualname) for site in sites} - canonical
+
+    assert len(canonical) == entry.owner_definitions
     assert found == entry.recorded_duplicates
 
 
@@ -264,7 +274,7 @@ def test_a_cleaned_up_duplicate_must_leave_the_ledger(real_facts):
 def test_an_unrecorded_probe_fails_even_though_37_are_recorded(real_facts):
     violations = single.concept_violations(
         concept(SYMBOL),
-        real_facts + planted(SYMBOL_COPY, "witwin.channel.runtime.native_buffers"),
+        real_facts + planted(SYMBOL_COPY, "witwin.channel.scene.compiler"),
     )
 
     assert [violation.kind for violation in violations] == ["second-definition"]

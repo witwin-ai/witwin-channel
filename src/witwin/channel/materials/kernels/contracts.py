@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.runtime.tensor_contracts import validate_cuda_tensor
+from witwin.channel.runtime import validate_cuda_tensor
 
 
 def _validate_layer_csr(

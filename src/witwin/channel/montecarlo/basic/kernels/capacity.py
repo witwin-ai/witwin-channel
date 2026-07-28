@@ -2,18 +2,16 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.runtime import torch_compat
-from witwin.channel.runtime.autograd_contracts import (
+from witwin.channel.runtime import (
+    CapacityFailureState,
     _ad_first_order_only,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
-)
-from witwin.channel.runtime.capacity import (
-    CapacityFailureState,
+    disable_functorch,
     require_capacity_failure_state,
+    required_symbol as _required_native_op,
+    validate_cuda_tensor,
 )
-from witwin.channel.runtime.symbols import required_symbol as _required_native_op
-from witwin.channel.runtime.tensor_contracts import validate_cuda_tensor
 
 
 _MC_COMPONENT_MAP_FIELDS = (
@@ -130,7 +128,7 @@ class _McCapacityFailureComponentMapsSanitizeFunction(torch.autograd.Function):
         failure_state_bits, reference = (
             _ad_native_tensor(value) for value in ctx.saved_tensors
         )
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             return _mc_capacity_failure_component_maps_sanitize_jvp_native(
                 failure_state_bits, reference, *tangents
             )

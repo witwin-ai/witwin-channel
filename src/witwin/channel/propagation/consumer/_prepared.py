@@ -18,12 +18,12 @@ import torch
 
 from .contracts import (
     _CAPABILITIES,
-    _FIXED_TOPOLOGY_COMPONENT_IDS,
     _require_slot_count,
     FixedTopologyBucket,
     PreparedFixedTopology,
     PropagationTopology,
 )
+from .policy import _FIXED_TOPOLOGY_COMPONENT_IDS
 
 
 def _fixed_topology_component_name(component_id: int) -> str:

@@ -4,7 +4,7 @@ from functools import partial
 
 import torch
 
-from witwin.channel.runtime.kernel_metadata import AdLaunchLedger
+from witwin.channel.runtime import AdLaunchLedger
 from witwin.channel.propagation.fields.kernels import (
     autograd as field_autograd,
 )
@@ -14,8 +14,7 @@ from witwin.channel.propagation.fields.kernels import (
 from witwin.channel.propagation.fields.kernels import (
     functional as field_functional,
 )
-from witwin.channel.propagation.models.geometry import PathGeometry
-from witwin.channel.propagation.models.topology import PathTopology
+from witwin.channel.propagation.rows import PathGeometry, PathTopology
 
 
 def _resolve_coupled_rd_stationary(

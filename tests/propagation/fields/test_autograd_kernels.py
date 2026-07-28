@@ -12,7 +12,7 @@ from witwin.channel.propagation.fields.kernels import (
     autograd_projection,
     functional,
 )
-from witwin.channel.runtime import autograd_contracts, symbols, torch_compat
+from witwin.channel import runtime
 
 
 _OWNER_NAMES = (
@@ -57,8 +57,8 @@ def test_fields_projection_autograd_is_the_single_object_owner(name: str):
 
 
 def test_fields_autograd_uses_canonical_runtime_dependencies():
-    assert autograd._required_native_op is symbols.required_symbol
-    assert autograd.torch_compat is torch_compat
+    assert autograd._required_native_op is runtime.required_symbol
+    assert autograd.disable_functorch is runtime.disable_functorch
     for name in (
         "_ad_checked_tangent",
         "_ad_frequency_grad",
@@ -71,7 +71,7 @@ def test_fields_autograd_uses_canonical_runtime_dependencies():
         "_ad_reject_fixed_inputs",
         "_ad_reject_fixed_tangents",
     ):
-        assert getattr(autograd, name) is getattr(autograd_contracts, name)
+        assert getattr(autograd, name) is getattr(runtime, name)
 
 
 def test_fields_autograd_uses_canonical_functional_companions():

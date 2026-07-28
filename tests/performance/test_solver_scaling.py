@@ -5,7 +5,7 @@ import argparse
 import pytest
 
 from benchmarks import bench_solver_scaling as scaling
-from witwin.channel.runtime.memory_budget import MemoryBudgetError
+from witwin.channel.runtime import MemoryBudgetError
 
 
 @pytest.mark.parametrize("solver", ("basic", "bdpt"))

@@ -7,12 +7,12 @@ from types import SimpleNamespace
 import pytest
 
 from witwin.channel import deployment
-from witwin.channel.runtime import extension
+from witwin.channel import runtime
 
 
 @pytest.fixture(autouse=True)
 def _isolated_loader(monkeypatch: pytest.MonkeyPatch):
-    extension._clear_loader_caches()
+    runtime._clear_loader_caches()
     monkeypatch.delenv("WITWIN_CHANNEL_DEVELOPER_OVERRIDE", raising=False)
     monkeypatch.delenv("WITWIN_CHANNEL_EXTENSION_PATH", raising=False)
     monkeypatch.delenv("WITWIN_CHANNEL_EXPECTED_FINGERPRINT", raising=False)
@@ -48,13 +48,13 @@ def _valid_build_info() -> dict[str, object]:
         "torch_version": "2.10.0",
         "build_type": "Release",
     }
-    info["build_fingerprint"] = extension._expected_fingerprint(info)
+    info["build_fingerprint"] = runtime._expected_fingerprint(info)
     return info
 
 
 def _configure_identity_checks(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        extension,
+        runtime,
         "_load_rayd_lock",
         lambda: {
             "repository_url": "https://example.invalid/RayD.git",
@@ -68,7 +68,7 @@ def _configure_identity_checks(monkeypatch: pytest.MonkeyPatch) -> None:
         },
     )
     monkeypatch.setattr(
-        extension, "_runtime_identity", lambda: ("2.10.0", "12.8", "msvc")
+        runtime, "_runtime_identity", lambda: ("2.10.0", "12.8", "msvc")
     )
 
 
@@ -78,9 +78,9 @@ def test_no_compatibility_extension_facade_exists():
     assert importlib.util.find_spec("witwin.channel.core") is None
     # ``deployment`` publishes the runtime owner's function; it does not define
     # a second one, so the object still reports the runtime module.
-    assert deployment.build_info is extension.build_info
-    assert deployment.build_info.__module__ == "witwin.channel.runtime.extension"
-    assert deployment._import_native_build_info() is extension.build_info
+    assert deployment.build_info is runtime.build_info
+    assert deployment.build_info.__module__ == "witwin.channel.runtime"
+    assert deployment._import_native_build_info() is runtime.build_info
 
 
 def test_native_extension_prefers_packaged_module(monkeypatch: pytest.MonkeyPatch):
@@ -91,22 +91,22 @@ def test_native_extension_prefers_packaged_module(monkeypatch: pytest.MonkeyPatc
         calls.append((name, package))
         return packaged
 
-    monkeypatch.setattr(extension.util, "find_spec", lambda _name: object())
-    monkeypatch.setattr(extension.importlib, "import_module", import_module)
+    monkeypatch.setattr(runtime.util, "find_spec", lambda _name: object())
+    monkeypatch.setattr(runtime.importlib, "import_module", import_module)
     monkeypatch.setattr(
-        extension,
+        runtime,
         "_validate_extension",
         lambda module, *, packaged, expected_fingerprint: (
             module if packaged and expected_fingerprint == "0" * 64 else None
         ),
     )
-    monkeypatch.setattr(extension, "_packaged_expected_fingerprint", lambda: "0" * 64)
+    monkeypatch.setattr(runtime, "_packaged_expected_fingerprint", lambda: "0" * 64)
     monkeypatch.setenv("WITWIN_CHANNEL_DEVELOPER_OVERRIDE", "1")
     monkeypatch.setenv("WITWIN_CHANNEL_EXTENSION_PATH", "ignored")
     monkeypatch.setenv("WITWIN_CHANNEL_EXPECTED_FINGERPRINT", "0" * 64)
 
-    assert extension.native_extension() is packaged
-    assert extension.native_extension() is packaged
+    assert runtime.native_extension() is packaged
+    assert runtime.native_extension() is packaged
     assert calls == [("._channel", "witwin.channel")]
 
 
@@ -119,11 +119,11 @@ def test_native_extension_never_imports_a_global_module(
         calls.append((name, package))
         return object()
 
-    monkeypatch.setattr(extension.util, "find_spec", lambda _name: None)
-    monkeypatch.setattr(extension.importlib, "import_module", import_module)
+    monkeypatch.setattr(runtime.util, "find_spec", lambda _name: None)
+    monkeypatch.setattr(runtime.importlib, "import_module", import_module)
 
-    with pytest.raises(extension.ExtensionLoadError, match="is not installed"):
-        extension.native_extension()
+    with pytest.raises(runtime.ExtensionLoadError, match="is not installed"):
+        runtime.native_extension()
     assert calls == []
 
 
@@ -136,11 +136,11 @@ def test_native_extension_preserves_packaged_dependency_import_errors(
     def import_module(name: str, package: str | None = None):
         raise error
 
-    monkeypatch.setattr(extension.util, "find_spec", lambda _name: object())
-    monkeypatch.setattr(extension.importlib, "import_module", import_module)
+    monkeypatch.setattr(runtime.util, "find_spec", lambda _name: object())
+    monkeypatch.setattr(runtime.importlib, "import_module", import_module)
 
     with pytest.raises(ModuleNotFoundError, match="missing_native_dependency"):
-        extension.native_extension()
+        runtime.native_extension()
 
 
 @pytest.mark.parametrize(
@@ -150,21 +150,21 @@ def test_native_extension_preserves_packaged_dependency_import_errors(
 def test_developer_override_requires_switch_and_path(
     monkeypatch: pytest.MonkeyPatch, enabled: str | None, path: str | None
 ):
-    monkeypatch.setattr(extension.util, "find_spec", lambda _name: None)
+    monkeypatch.setattr(runtime.util, "find_spec", lambda _name: None)
     if enabled is not None:
         monkeypatch.setenv("WITWIN_CHANNEL_DEVELOPER_OVERRIDE", enabled)
     if path is not None:
         monkeypatch.setenv("WITWIN_CHANNEL_EXTENSION_PATH", path)
     monkeypatch.setenv("WITWIN_CHANNEL_EXPECTED_FINGERPRINT", "0" * 64)
 
-    with pytest.raises(extension.ExtensionLoadError, match="requires"):
-        extension.native_extension()
+    with pytest.raises(runtime.ExtensionLoadError, match="requires"):
+        runtime.native_extension()
 
 
 def test_developer_override_loads_only_the_exact_absolute_path(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
-    suffix = extension.machinery.EXTENSION_SUFFIXES[0]
+    suffix = runtime.machinery.EXTENSION_SUFFIXES[0]
     path = tmp_path / f"_channel{suffix}"
     path.touch()
     loaded = object()
@@ -174,15 +174,15 @@ def test_developer_override_loads_only_the_exact_absolute_path(
         calls.append((raw_path, fingerprint))
         return loaded
 
-    monkeypatch.setattr(extension.util, "find_spec", lambda _name: None)
+    monkeypatch.setattr(runtime.util, "find_spec", lambda _name: None)
     monkeypatch.setattr(
-        extension, "_load_developer_extension", load_developer_extension
+        runtime, "_load_developer_extension", load_developer_extension
     )
     monkeypatch.setenv("WITWIN_CHANNEL_DEVELOPER_OVERRIDE", "1")
     monkeypatch.setenv("WITWIN_CHANNEL_EXTENSION_PATH", str(path))
     monkeypatch.setenv("WITWIN_CHANNEL_EXPECTED_FINGERPRINT", "a" * 64)
 
-    assert extension.native_extension() is loaded
+    assert runtime.native_extension() is loaded
     assert calls == [(str(path.resolve()), "a" * 64)]
 
 
@@ -194,12 +194,12 @@ def test_packaged_module_origin_cannot_resolve_to_global_extension(
     module = SimpleNamespace(
         __file__=str(global_extension), build_info=lambda: _valid_build_info()
     )
-    monkeypatch.setattr(extension.util, "find_spec", lambda _name: object())
-    monkeypatch.setattr(extension.importlib, "import_module", lambda *_a, **_k: module)
-    monkeypatch.setattr(extension, "_packaged_expected_fingerprint", lambda: "0" * 64)
+    monkeypatch.setattr(runtime.util, "find_spec", lambda _name: object())
+    monkeypatch.setattr(runtime.importlib, "import_module", lambda *_a, **_k: module)
+    monkeypatch.setattr(runtime, "_packaged_expected_fingerprint", lambda: "0" * 64)
 
-    with pytest.raises(extension.ExtensionLoadError, match="outside"):
-        extension.native_extension()
+    with pytest.raises(runtime.ExtensionLoadError, match="outside"):
+        runtime.native_extension()
 
 
 def test_extension_origin_accepts_spec_origin_when_file_is_missing(tmp_path: Path):
@@ -207,32 +207,32 @@ def test_extension_origin_accepts_spec_origin_when_file_is_missing(tmp_path: Pat
     extension_file.touch()
     module = SimpleNamespace(__spec__=SimpleNamespace(origin=str(extension_file)))
 
-    assert extension._extension_origin(module) == extension_file.resolve()
+    assert runtime._extension_origin(module) == extension_file.resolve()
 
 
 def test_missing_bootstrap_symbol_fails_before_any_computation():
-    with pytest.raises(extension.ExtensionSymbolError, match="build_info"):
-        extension._validate_extension(SimpleNamespace(), packaged=False)
+    with pytest.raises(runtime.ExtensionSymbolError, match="build_info"):
+        runtime._validate_extension(SimpleNamespace(), packaged=False)
 
 
 def test_wrong_channel_abi_is_rejected(monkeypatch: pytest.MonkeyPatch):
     _configure_identity_checks(monkeypatch)
     info = _valid_build_info()
     info["channel_abi_version"] = 99
-    info["build_fingerprint"] = extension._expected_fingerprint(info)
+    info["build_fingerprint"] = runtime._expected_fingerprint(info)
 
-    with pytest.raises(extension.ExtensionABIError, match="ABI mismatch"):
-        extension._validate_build_info(info)
+    with pytest.raises(runtime.ExtensionABIError, match="ABI mismatch"):
+        runtime._validate_build_info(info)
 
 
 def test_wrong_rayd_sha_is_rejected(monkeypatch: pytest.MonkeyPatch):
     _configure_identity_checks(monkeypatch)
     info = _valid_build_info()
     info["rayd_commit"] = "4" * 40
-    info["build_fingerprint"] = extension._expected_fingerprint(info)
+    info["build_fingerprint"] = runtime._expected_fingerprint(info)
 
-    with pytest.raises(extension.ExtensionABIError, match="rayd_commit"):
-        extension._validate_build_info(info)
+    with pytest.raises(runtime.ExtensionABIError, match="rayd_commit"):
+        runtime._validate_build_info(info)
 
 
 @pytest.mark.parametrize("field", ("torch_version", "cuda_version", "cxx_abi"))
@@ -240,10 +240,10 @@ def test_wrong_runtime_abi_is_rejected(monkeypatch: pytest.MonkeyPatch, field: s
     _configure_identity_checks(monkeypatch)
     info = _valid_build_info()
     info[field] = "wrong"
-    info["build_fingerprint"] = extension._expected_fingerprint(info)
+    info["build_fingerprint"] = runtime._expected_fingerprint(info)
 
-    with pytest.raises(extension.ExtensionABIError, match=field):
-        extension._validate_build_info(info)
+    with pytest.raises(runtime.ExtensionABIError, match=field):
+        runtime._validate_build_info(info)
 
 
 def test_tampered_build_fingerprint_is_rejected(monkeypatch: pytest.MonkeyPatch):
@@ -251,8 +251,8 @@ def test_tampered_build_fingerprint_is_rejected(monkeypatch: pytest.MonkeyPatch)
     info = _valid_build_info()
     info["compiler"] = "different compiler"
 
-    with pytest.raises(extension.ExtensionABIError, match="fingerprint"):
-        extension._validate_build_info(info)
+    with pytest.raises(runtime.ExtensionABIError, match="fingerprint"):
+        runtime._validate_build_info(info)
 
 
 def test_developer_expected_fingerprint_mismatch_is_rejected(
@@ -261,15 +261,15 @@ def test_developer_expected_fingerprint_mismatch_is_rejected(
     _configure_identity_checks(monkeypatch)
     module = SimpleNamespace(build_info=lambda: _valid_build_info())
 
-    with pytest.raises(extension.ExtensionABIError, match="expected build fingerprint"):
-        extension._validate_extension(
+    with pytest.raises(runtime.ExtensionABIError, match="expected build fingerprint"):
+        runtime._validate_extension(
             module, packaged=False, expected_fingerprint="f" * 64
         )
 
 
 def test_valid_complete_identity_is_accepted(monkeypatch: pytest.MonkeyPatch):
     _configure_identity_checks(monkeypatch)
-    assert extension._validate_build_info(_valid_build_info()) == _valid_build_info()
+    assert runtime._validate_build_info(_valid_build_info()) == _valid_build_info()
 
 
 def test_build_info_validates_once_and_returns_fresh_mappings(
@@ -284,10 +284,10 @@ def test_build_info_validates_once_and_returns_fresh_mappings(
         return _valid_build_info()
 
     module = SimpleNamespace(build_info=native_build_info)
-    monkeypatch.setattr(extension, "native_extension", lambda: module)
+    monkeypatch.setattr(runtime, "native_extension", lambda: module)
 
-    first = extension.build_info()
-    second = extension.build_info()
+    first = runtime.build_info()
+    second = runtime.build_info()
 
     assert calls == 1
     assert first == second
@@ -297,7 +297,7 @@ def test_build_info_validates_once_and_returns_fresh_mappings(
 
 
 def test_real_rayd_lock_uses_the_canonical_schema():
-    lock = extension._load_rayd_lock()
+    lock = runtime._load_rayd_lock()
 
     assert lock["schema_version"] == 2
     assert isinstance(lock["repository_url"], str)

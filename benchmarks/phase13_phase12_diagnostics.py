@@ -91,7 +91,7 @@ def _enumerated() -> tuple[dict[str, torch.Tensor], dict[str, object]]:
     from witwin.channel.propagation.enumerated.transmission import (
         _transmission_topology,
     )
-    from witwin.channel.scene.tensors import (
+    from witwin.channel.scene.compiler import (
         receiver_positions,
         transmitter_positions,
     )
@@ -140,13 +140,13 @@ def _enumerated() -> tuple[dict[str, torch.Tensor], dict[str, object]]:
 
 
 def _montecarlo() -> tuple[dict[str, torch.Tensor], dict[str, object]]:
-    from witwin.channel.materials.encoding import face_material_field_bundle
+    from witwin.channel.materials import face_material_field_bundle
     from witwin.channel.montecarlo.events.transmission import (
         layer_csr_view,
         scene_diagonal_m,
         straight_transmission_chains,
     )
-    from witwin.channel.scene.tensors import (
+    from witwin.channel.scene.compiler import (
         receiver_grid_points,
         transmitter_polarizations,
         transmitter_positions,
@@ -186,7 +186,7 @@ def _diffraction(
         plan_tx_visible_diffraction_states,
         query_diffraction_order1,
     )
-    from witwin.channel.scene.tensors import (
+    from witwin.channel.scene.compiler import (
         LIGHT_SPEED_M_PER_S,
         receiver_positions,
         transmitter_positions,
@@ -210,9 +210,9 @@ def _diffraction(
         return {"target": target}, {"mode": "old_compact_atomic_target"}
 
     from witwin.channel.field_state import transmitter_polarizations as field_polarizations
-    from witwin.channel.materials.encoding import face_material_tensors
+    from witwin.channel.materials import face_material_tensors
     from witwin.channel.propagation.geometry.diffraction import DiffractionPathLayout
-    from witwin.channel.runtime.capacity import create_capacity_failure_state
+    from witwin.channel.runtime import create_capacity_failure_state
 
     face_eps_r, face_sigma_e, face_mu_r, material_gain, material_valid = (
         face_material_tensors(compiled, device=device)

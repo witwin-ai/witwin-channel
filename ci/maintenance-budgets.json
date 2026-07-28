@@ -1,6 +1,6 @@
 {
   "function_exemptions": {
-    "src/witwin/channel/runtime/kernel_metadata.py::validate_metadata": {
+    "src/witwin/channel/runtime.py::validate_metadata": {
       "ceiling": 18,
       "expires_on": "2027-01-31",
       "owner": "core maintainers",
@@ -10,12 +10,6 @@
       "ceiling": 25,
       "expires_on": "2027-01-31",
       "owner": "deterministic maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
-    },
-    "src/witwin/channel/montecarlo/basic/kernels/maps.py::mc_los_path_gain_backward": {
-      "ceiling": 16,
-      "expires_on": "2027-01-31",
-      "owner": "montecarlo/basic maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
     "src/witwin/channel/montecarlo/basic/pipeline.py::solve_pipeline": {
@@ -78,7 +72,7 @@
       "owner": "propagation maintainers",
       "reason": "Phase-3 endpoint batches validate six aligned CUDA tensors plus stable identity vectors at one typed boundary; the exact validation surface is frozen."
     },
-    "src/witwin/channel/propagation/consumer/_native.py::compact_evaluated_paths": {
+    "src/witwin/channel/propagation/consumer/replay.py::compact_evaluated_paths": {
       "ceiling": 18,
       "expires_on": "2027-01-31",
       "owner": "propagation maintainers",
@@ -144,7 +138,7 @@
       "owner": "propagation maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
-    "src/witwin/channel/runtime/extension.py::_validate_build_info": {
+    "src/witwin/channel/runtime.py::_validate_build_info": {
       "ceiling": 24,
       "expires_on": "2027-01-31",
       "owner": "runtime maintainers",

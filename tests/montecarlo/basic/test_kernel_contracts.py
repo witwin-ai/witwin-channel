@@ -8,13 +8,7 @@ from witwin.channel.montecarlo.basic import kernels
 from witwin.channel.montecarlo.basic.kernels import capacity, maps, sampling
 from witwin.channel.propagation import topology
 from witwin.channel.propagation.topology.kernels import blocks as topology_blocks
-from witwin.channel.runtime import (
-    autograd_contracts,
-    native_buffers,
-    symbols,
-    tensor_contracts,
-    torch_compat,
-)
+from witwin.channel import runtime
 
 
 _SAMPLING_OWNER_NAMES = (
@@ -141,21 +135,25 @@ def test_mc_basic_sampling_is_the_single_object_owner(name: str):
 
 @pytest.mark.parametrize("name", _NATIVE_BUFFER_OWNER_NAMES)
 def test_runtime_native_buffers_is_the_neutral_single_object_owner(name: str):
-    owner = getattr(native_buffers, name)
+    owner = getattr(runtime, name)
 
-    assert owner.__module__ == native_buffers.__name__
+    assert owner.__module__ == runtime.__name__
     assert getattr(sampling, name) is owner
     assert not hasattr(kernels, name)
 
 
 def test_mc_basic_sampling_uses_canonical_runtime_dependencies():
-    assert sampling.native_extension is symbols.native_extension
-    assert sampling.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
+    # The raw accessor is not a solver dependency: every probe goes through
+    # runtime.required_symbol, and ci/check_import_graph.py rejects a solver
+    # that imports ``native_extension`` at all.
+    assert not hasattr(sampling, "native_extension")
+    assert sampling.required_symbol is runtime.required_symbol
+    assert sampling.validate_cuda_tensor is runtime.validate_cuda_tensor
 
 
 def test_runtime_native_buffers_uses_canonical_runtime_dependencies():
-    assert native_buffers.native_extension is symbols.native_extension
-    assert native_buffers.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
+    assert runtime.native_extension is runtime.native_extension
+    assert runtime.validate_cuda_tensor is runtime.validate_cuda_tensor
 
 
 @pytest.mark.parametrize("name", _CAPACITY_OWNER_NAMES)
@@ -168,14 +166,14 @@ def test_mc_basic_capacity_is_the_single_object_owner(name: str):
 
 
 def test_mc_basic_capacity_uses_canonical_runtime_dependencies():
-    assert capacity._required_native_op is symbols.required_symbol
-    assert capacity.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
-    assert capacity.torch_compat is torch_compat
+    assert capacity._required_native_op is runtime.required_symbol
+    assert capacity.validate_cuda_tensor is runtime.validate_cuda_tensor
+    assert capacity.disable_functorch is runtime.disable_functorch
     assert (
         capacity._ad_native_tangent_or_none
-        is autograd_contracts._ad_native_tangent_or_none
+        is runtime._ad_native_tangent_or_none
     )
-    assert capacity._ad_native_tensor is autograd_contracts._ad_native_tensor
+    assert capacity._ad_native_tensor is runtime._ad_native_tensor
 
 
 @pytest.mark.parametrize("name", _MAP_OWNER_NAMES)
@@ -187,21 +185,21 @@ def test_mc_basic_maps_is_the_single_object_owner(name: str):
 
 
 def test_mc_basic_maps_uses_canonical_runtime_dependencies():
-    assert maps.native_extension is symbols.native_extension
-    assert maps._required_native_op is symbols.required_symbol
-    assert maps.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
-    assert maps.torch_compat is torch_compat
-    assert maps._ad_frequency_grad is autograd_contracts._ad_frequency_grad
-    assert maps._ad_frequency_tangent is autograd_contracts._ad_frequency_tangent
-    assert maps._ad_frequency_value is autograd_contracts._ad_frequency_value
-    assert maps._ad_geometry_tangent is autograd_contracts._ad_geometry_tangent
+    assert not hasattr(maps, "native_extension")
+    assert maps._required_native_op is runtime.required_symbol
+    assert maps.validate_cuda_tensor is runtime.validate_cuda_tensor
+    assert maps.disable_functorch is runtime.disable_functorch
+    assert maps._ad_frequency_grad is runtime._ad_frequency_grad
+    assert maps._ad_frequency_tangent is runtime._ad_frequency_tangent
+    assert maps._ad_frequency_value is runtime._ad_frequency_value
+    assert maps._ad_geometry_tangent is runtime._ad_geometry_tangent
     assert (
-        maps._ad_native_tangent_or_none is autograd_contracts._ad_native_tangent_or_none
+        maps._ad_native_tangent_or_none is runtime._ad_native_tangent_or_none
     )
-    assert maps._ad_native_tensor is autograd_contracts._ad_native_tensor
-    assert maps._ad_reject_fixed_inputs is autograd_contracts._ad_reject_fixed_inputs
+    assert maps._ad_native_tensor is runtime._ad_native_tensor
+    assert maps._ad_reject_fixed_inputs is runtime._ad_reject_fixed_inputs
     assert (
-        maps._ad_reject_fixed_tangents is autograd_contracts._ad_reject_fixed_tangents
+        maps._ad_reject_fixed_tangents is runtime._ad_reject_fixed_tangents
     )
     assert maps._LIGHT_SPEED_M_PER_S_AD == 299_792_458.0
     assert maps._MC_FINALIZE_FIELDS

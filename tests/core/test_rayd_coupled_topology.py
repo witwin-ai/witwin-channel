@@ -9,7 +9,7 @@ from witwin.core import Scene
 from witwin.channel.scene import compile as compile_scene
 from witwin.channel.propagation.geometry.kernels import bridge as ops
 from witwin.core import PhysicalMaterial
-from witwin.channel.runtime import symbols
+from witwin.channel import runtime
 
 
 def _wall_and_wedge_scene():
@@ -45,7 +45,7 @@ def _coupled_inputs(*, edge_id: int, reverse_endpoints: bool = False):
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")
 def test_coupled_reflection_diffraction_geometry_matches_image_solution():
-    symbols.native_extension()
+    runtime.native_extension()
     scene = _wall_and_wedge_scene()
     records = scene.edge_records()
     axis = ((records.edge_v0 == 4) & (records.edge_v1 == 5)) | (
@@ -100,7 +100,7 @@ def test_coupled_reflection_diffraction_geometry_matches_image_solution():
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")
 def test_coupled_diffraction_reflection_is_reciprocal_geometry():
-    symbols.native_extension()
+    runtime.native_extension()
     scene = _wall_and_wedge_scene()
     records = scene.edge_records()
     axis = ((records.edge_v0 == 4) & (records.edge_v1 == 5)) | (
@@ -135,7 +135,7 @@ def test_coupled_diffraction_reflection_is_reciprocal_geometry():
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")
 def test_coupled_geometry_rejects_stationary_point_outside_edge_bounds():
-    symbols.native_extension()
+    runtime.native_extension()
     scene = _wall_and_wedge_scene()
     records = scene.edge_records()
     axis = ((records.edge_v0 == 4) & (records.edge_v1 == 5)) | (
@@ -152,7 +152,7 @@ def test_coupled_geometry_rejects_stationary_point_outside_edge_bounds():
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")
 def test_coupled_geometry_rejects_blocked_secondary_segment():
-    symbols.native_extension()
+    runtime.native_extension()
     base = coupled_wall_wedge_scene()
     blocker = make_mesh_structure(
         vertices=torch.tensor(

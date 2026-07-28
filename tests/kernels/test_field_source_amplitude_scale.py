@@ -14,7 +14,7 @@ import torch
 from witwin.channel.propagation.fields.kernels import (
     source_amplitude as field_amplitude,
 )
-from witwin.channel.runtime import symbols
+from witwin.channel import runtime
 
 
 pytestmark = pytest.mark.skipif(
@@ -154,7 +154,7 @@ def test_tx_power_carries_no_derivative() -> None:
 def test_source_amplitude_scale_requires_the_native_symbol(monkeypatch) -> None:
     field_vector, tx_power = _case()
     monkeypatch.setattr(
-        symbols, "required_symbol", _missing_symbol, raising=True
+        runtime, "required_symbol", _missing_symbol, raising=True
     )
     monkeypatch.setattr(
         field_amplitude, "_required_native_op", _missing_symbol, raising=True

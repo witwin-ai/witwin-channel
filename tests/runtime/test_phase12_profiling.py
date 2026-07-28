@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from witwin.channel.runtime import profiling
+from witwin.channel import runtime
 
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -36,19 +36,19 @@ def _profile_enum_members(node: ast.AST, helper: str) -> set[str]:
 def test_cuda_profile_range_is_balanced_on_failure(monkeypatch) -> None:
     calls: list[tuple[str, str | None]] = []
     monkeypatch.setattr(
-        profiling.torch.cuda.nvtx,
+        runtime.torch.cuda.nvtx,
         "range_push",
         lambda name: calls.append(("push", name)),
     )
     monkeypatch.setattr(
-        profiling.torch.cuda.nvtx,
+        runtime.torch.cuda.nvtx,
         "range_pop",
         lambda: calls.append(("pop", None)),
     )
 
     with pytest.raises(RuntimeError, match="sentinel"):
-        with profiling.cuda_profile_range(
-            profiling.CudaProfileRange.DIFFRACTION_TOTAL_STAGE
+        with runtime.cuda_profile_range(
+            runtime.CudaProfileRange.DIFFRACTION_TOTAL_STAGE
         ):
             raise RuntimeError("sentinel")
 
@@ -59,16 +59,16 @@ def test_cuda_profile_range_is_balanced_on_failure(monkeypatch) -> None:
 
 
 def test_profiled_cuda_range_preserves_callable_contract(monkeypatch) -> None:
-    monkeypatch.setattr(profiling.torch.cuda.nvtx, "range_push", lambda _name: None)
-    monkeypatch.setattr(profiling.torch.cuda.nvtx, "range_pop", lambda: None)
+    monkeypatch.setattr(runtime.torch.cuda.nvtx, "range_push", lambda _name: None)
+    monkeypatch.setattr(runtime.torch.cuda.nvtx, "range_pop", lambda: None)
 
     def operation(value: int, *, increment: int = 1) -> int:
         """Example operation."""
 
         return value + increment
 
-    wrapped = profiling.profiled_cuda_range(
-        profiling.CudaProfileRange.ENUMERATED_PENETRATION_DISCOVERY
+    wrapped = runtime.profiled_cuda_range(
+        runtime.CudaProfileRange.ENUMERATED_PENETRATION_DISCOVERY
     )(operation)
 
     assert wrapped(2, increment=3) == 5
@@ -79,21 +79,38 @@ def test_profiled_cuda_range_preserves_callable_contract(monkeypatch) -> None:
 
 def test_cuda_profile_mark_emits_only_the_semantic_payload(monkeypatch) -> None:
     calls: list[str] = []
-    monkeypatch.setattr(profiling.torch.cuda.nvtx, "mark", calls.append)
+    monkeypatch.setattr(runtime.torch.cuda.nvtx, "mark", calls.append)
 
-    profiling.cuda_profile_mark(profiling.CudaProfileMark.DIFFRACTION_EXPORTER_REQUEST)
+    runtime.cuda_profile_mark(runtime.CudaProfileMark.DIFFRACTION_EXPORTER_REQUEST)
 
     assert calls == ["witwin.channel:diffraction_exporter_request"]
 
 
 def test_profiling_owner_has_no_tensor_or_cuda_execution_calls() -> None:
+    """The three annotation emitters call NVTX and nothing else.
+
+    The profiling owner shares a module with the rest of runtime now, so the
+    claim is read off the three functions that own the annotations instead of
+    off the whole file. The file-wide reading would have been vacuous here,
+    not stricter: every other runtime function would have had to be listed.
+    """
+
     source = (
-        _ROOT / "src" / "witwin" / "channel" / "runtime" / "profiling.py"
+        _ROOT / "src" / "witwin" / "channel" / "runtime.py"
     ).read_text(encoding="utf-8")
     tree = ast.parse(source)
+    owners = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name
+        in {"cuda_profile_range", "profiled_cuda_range", "cuda_profile_mark"}
+    ]
+    assert len(owners) == 3
     torch_calls = {
         ast.unparse(call.func)
-        for call in ast.walk(tree)
+        for owner in owners
+        for call in ast.walk(owner)
         if isinstance(call, ast.Call) and ast.unparse(call.func).startswith("torch.")
     }
 
@@ -102,8 +119,11 @@ def test_profiling_owner_has_no_tensor_or_cuda_execution_calls() -> None:
         "torch.cuda.nvtx.range_pop",
         "torch.cuda.nvtx.range_push",
     }
+    owner_source = "\n".join(
+        ast.get_source_segment(source, owner) or "" for owner in owners
+    )
     assert all(
-        forbidden not in source
+        forbidden not in owner_source
         for forbidden in (
             ".cpu(",
             ".item(",
@@ -127,8 +147,8 @@ def test_profile_contract_matches_closed_semantic_name_sets() -> None:
         "diffraction",
     )
 
-    range_names = {item.value for item in profiling.CudaProfileRange}
-    mark_names = {item.value for item in profiling.CudaProfileMark}
+    range_names = {item.value for item in runtime.CudaProfileRange}
+    mark_names = {item.value for item in runtime.CudaProfileMark}
     observed_ranges: set[str] = set()
     observed_marks: set[str] = set()
     expected_ncu_families = {

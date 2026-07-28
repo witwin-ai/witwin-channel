@@ -1,4 +1,11 @@
-"""Typed fixed-capacity contracts for RayD segment penetration."""
+"""Typed fixed-capacity contracts for RayD segment penetration.
+
+ADR-027 makes RayD the sole numerical owner of batched straight-segment
+penetration geometry. These are the typed results its Channel facade publishes.
+They sit at the propagation root rather than under the geometry stage because
+the topology stage packs component-5 rows out of a ``SegmentPenetrationResult``
+and the import graph forbids topology from reaching geometry.
+"""
 
 from __future__ import annotations
 
@@ -7,12 +14,12 @@ from dataclasses import dataclass
 
 import torch
 
-from witwin.channel.runtime.capacity import (
+from witwin.channel.runtime import (
     CapacityFailureState,
     require_capacity_failure_state,
+    require_host_count,
 )
-
-from .capacity import _require_cuda_tensor, _require_host_count
+from witwin.channel.tensor_math import require_tensor
 
 
 class SegmentPenetrationPolicy(enum.IntEnum):
@@ -41,12 +48,17 @@ class SegmentPenetrationResult:
     global_primitive_id: torch.Tensor
 
     def __post_init__(self) -> None:
-        capacity = _require_host_count("hit_capacity", self.hit_capacity)
+        capacity = require_host_count("hit_capacity", self.hit_capacity)
         if not isinstance(self.valid, torch.Tensor) or self.valid.ndim != 2:
             raise ValueError("valid must have shape (N, hit_capacity)")
         rows = int(self.valid.shape[0])
-        valid = _require_cuda_tensor(
-            "valid", self.valid, dtype=torch.bool, shape=(rows, capacity)
+        valid = require_tensor(
+            "valid",
+            self.valid,
+            dtype=torch.bool,
+            shape=(rows, capacity),
+            cuda=True,
+            contiguous=True,
         )
         require_capacity_failure_state(self.failure_state, device=valid.device)
         for name, dtype in (
@@ -55,38 +67,46 @@ class SegmentPenetrationResult:
             ("overflow", torch.bool),
             ("distance", torch.float32),
         ):
-            _require_cuda_tensor(
+            require_tensor(
                 name,
                 getattr(self, name),
                 dtype=dtype,
                 shape=(rows,),
                 device=valid.device,
+                cuda=True,
+                contiguous=True,
             )
-        _require_cuda_tensor(
+        require_tensor(
             "direction",
             self.direction,
             dtype=torch.float32,
             shape=(rows, 3),
             device=valid.device,
+            cuda=True,
+            contiguous=True,
         )
         for name, dtype in (
             ("t", torch.float32),
             ("global_primitive_id", torch.int32),
         ):
-            _require_cuda_tensor(
+            require_tensor(
                 name,
                 getattr(self, name),
                 dtype=dtype,
                 shape=(rows, capacity),
                 device=valid.device,
+                cuda=True,
+                contiguous=True,
             )
         for name in ("position", "normal", "geometric_normal"):
-            _require_cuda_tensor(
+            require_tensor(
                 name,
                 getattr(self, name),
                 dtype=torch.float32,
                 shape=(rows, capacity, 3),
                 device=valid.device,
+                cuda=True,
+                contiguous=True,
             )
 
     @property
@@ -116,41 +136,51 @@ class SegmentPenetrationTapeResult:
         rows = self.result.segment_count
         capacity = self.result.hit_capacity
         device = self.result.device
-        _require_cuda_tensor(
+        require_tensor(
             "tape_primitive_id",
             self.tape_primitive_id,
             dtype=torch.int32,
             shape=(rows, capacity),
             device=device,
+            cuda=True,
+            contiguous=True,
         )
-        _require_cuda_tensor(
+        require_tensor(
             "tape_barycentric",
             self.tape_barycentric,
             dtype=torch.float32,
             shape=(rows, capacity, 2),
             device=device,
+            cuda=True,
+            contiguous=True,
         )
-        _require_cuda_tensor(
+        require_tensor(
             "tape_restart_epsilon",
             self.tape_restart_epsilon,
             dtype=torch.float32,
             shape=(rows, capacity),
             device=device,
+            cuda=True,
+            contiguous=True,
         )
         for name in ("tape_restart_branch", "tape_restart_tie_mask"):
-            _require_cuda_tensor(
+            require_tensor(
                 name,
                 getattr(self, name),
                 dtype=torch.uint8,
                 shape=(rows, capacity),
                 device=device,
+                cuda=True,
+                contiguous=True,
             )
-        _require_cuda_tensor(
+        require_tensor(
             "tape_direction_denominator_branch",
             self.tape_direction_denominator_branch,
             dtype=torch.bool,
             shape=(rows,),
             device=device,
+            cuda=True,
+            contiguous=True,
         )
 
     @property

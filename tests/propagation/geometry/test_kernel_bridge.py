@@ -6,7 +6,7 @@ import torch
 from witwin.channel.propagation.geometry.kernels import bridge as ops
 from witwin.channel.propagation.geometry import kernels
 from witwin.channel.propagation.geometry.kernels import bridge
-from witwin.channel.runtime import native_resources, symbols, tensor_contracts
+from witwin.channel import runtime
 
 
 _CANONICAL_FUNCTION_NAMES = (
@@ -31,10 +31,10 @@ def test_geometry_bridge_is_the_single_body_owner(name: str):
 
 
 def test_geometry_bridge_uses_canonical_runtime_and_scene_dependencies():
-    assert bridge._required_native_op is symbols.required_symbol
-    assert bridge.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
+    assert bridge._required_native_op is runtime.required_symbol
+    assert bridge.validate_cuda_tensor is runtime.validate_cuda_tensor
     assert "_rayd_resource" not in bridge.__dict__
-    assert bridge._rayd_scene_resource is native_resources._rayd_scene_resource
+    assert bridge._rayd_scene_resource is runtime._rayd_scene_resource
 
 
 def test_intersection_returns_the_named_tensor_contract(

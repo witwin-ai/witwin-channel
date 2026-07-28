@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 
-from witwin.channel.materials.abi import MATERIAL_ABI_VERSION
+from witwin.channel.materials import MATERIAL_ABI_VERSION
 
 
 def test_material_abi_v2_facades_are_deleted() -> None:

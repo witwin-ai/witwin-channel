@@ -11,7 +11,7 @@ from witwin.channel.path import pipeline as path_pipeline
 from witwin.channel.propagation.enumerated import engine, transmission
 from witwin.channel.propagation.geometry.kernels import bridge
 from witwin.channel.propagation.geometry.kernels import penetration_autograd
-from witwin.channel.propagation.models.penetration import (
+from witwin.channel.propagation.penetration import (
     SegmentPenetrationPolicy,
 )
 from witwin.channel.propagation.topology.kernels import (

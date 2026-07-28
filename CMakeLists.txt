@@ -684,11 +684,11 @@ add_custom_command(
 install(TARGETS _channel LIBRARY DESTINATION witwin/channel)
 install(
     FILES "${CHANNEL_RAYD_LOCK_FILE}"
-    DESTINATION witwin/channel/runtime
+    DESTINATION witwin/channel
     RENAME rayd.lock.json)
 install(
     FILES "${CHANNEL_BUILD_FINGERPRINT_SOURCE}"
-    DESTINATION witwin/channel/runtime)
+    DESTINATION witwin/channel)
 
 include(CTest)
 if(BUILD_TESTING)

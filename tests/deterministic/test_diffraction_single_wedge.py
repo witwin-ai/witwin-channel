@@ -94,7 +94,7 @@ def test_vertical_only_edge_policy_filters_horizontal_edges():
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native diffraction is not built")
 
-    from witwin.channel.scene.edge_policy import EdgePolicy
+    from witwin.channel.scene.resources import EdgePolicy
 
     base_scene = wedge_diffraction_scene()
     scene = Scene(

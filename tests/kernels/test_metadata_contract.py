@@ -1,6 +1,6 @@
 import pytest
 
-from witwin.channel.runtime.kernel_metadata import (
+from witwin.channel.runtime import (
     REQUIRED_METADATA_FIELDS,
     make_metadata,
     validate_metadata,

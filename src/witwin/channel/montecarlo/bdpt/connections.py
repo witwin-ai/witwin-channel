@@ -29,7 +29,7 @@ from witwin.channel.montecarlo.bdpt.kernels.paths import (
     bdpt_subpath_intersection_inputs,
     bdpt_transmitted_light_subpath_state,
 )
-from witwin.channel.runtime.autograd_contracts import _ad_frequency_value
+from witwin.channel.runtime import _ad_frequency_value
 from witwin.channel.montecarlo.bdpt.kernels.sampling import (
     bdpt_reflection_launch_inputs,
     bdpt_sample_directions,

@@ -22,12 +22,12 @@ from witwin.channel.propagation.geometry.kernels import (
     rayd_segment_penetration_ad,
     rayd_segment_penetration_forward,
 )
-from witwin.channel.propagation.models.penetration import (
+from witwin.channel.propagation.penetration import (
     SegmentPenetrationPolicy,
     SegmentPenetrationResult,
 )
-from witwin.channel.runtime.capacity import CapacityFailureState
-from witwin.channel.runtime.profiling import (
+from witwin.channel.runtime import (
+    CapacityFailureState,
     CudaProfileMark,
     CudaProfileRange,
     cuda_profile_mark,

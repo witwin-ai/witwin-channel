@@ -14,7 +14,7 @@ from witwin.channel.components import (
     component_availability_status,
     validated_components,
 )
-from witwin.channel.scene.receiver_geometry import (
+from witwin.channel.scene.endpoints import (
     axis_aligned_grid_spec,
     component_grid_shape,
     first_receiver_grid,

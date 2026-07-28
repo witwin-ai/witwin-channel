@@ -2,21 +2,21 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.propagation.models.penetration import (
+from witwin.channel.propagation.penetration import (
     SegmentPenetrationPolicy,
     SegmentPenetrationResult,
     SegmentPenetrationTapeResult,
 )
-from witwin.channel.runtime import torch_compat
-from witwin.channel.runtime.autograd_contracts import (
+from witwin.channel.runtime import (
     _ad_active_ctx,
     _ad_checked_tangent,
     _ad_first_order_only,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
+    _rayd_scene_resource,
+    disable_functorch,
+    validate_cuda_tensor,
 )
-from witwin.channel.runtime.native_resources import _rayd_scene_resource
-from witwin.channel.runtime.tensor_contracts import validate_cuda_tensor
 
 from .bridge import (
     rayd_segment_penetration_backward,
@@ -241,7 +241,7 @@ class _RaydSegmentPenetrationAdFunction(torch.autograd.Function):
             hit_capacity=ctx.hit_capacity,
             failure_state=ctx.failure_state,
         )
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             tangents = rayd_segment_penetration_jvp(
                 ctx.scene_resource,
                 native_origins,

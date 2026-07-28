@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel.scene.ad_geometry import (
+from witwin.channel.scene.endpoints import (
     scene_vertex_table,
     transmitter_positions_ad,
 )
@@ -14,11 +14,11 @@ from witwin.channel.propagation.geometry.edge_state import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
     diffraction_edge_geometry as _diffraction_edge_geometry,
 )
-from witwin.channel.scene.receiver_geometry import (
+from witwin.channel.scene.endpoints import (
     axis_aligned_grid_spec as grid_spec,
     component_grid_shape,
 )
-from witwin.channel.materials.encoding import face_material_field_bundle
+from witwin.channel.materials import face_material_field_bundle
 from witwin.channel.montecarlo.basic.kernels import sampling as sampling_kernels
 from witwin.channel.montecarlo.basic.kernels.maps import (
     mc_apply_los_visibility,
@@ -49,10 +49,10 @@ from witwin.channel.propagation.topology.kernels.primitives import (
     deterministic_diffraction_state_pack,
     deterministic_diffraction_state_pack_selected,
 )
-from witwin.channel.runtime.capacity import CapacityFailureState
-from witwin.channel.scene.kernels.rayd_scene import RayDSceneResource
+from witwin.channel.runtime import CapacityFailureState
+from witwin.channel.scene.resources import RayDSceneResource
 from witwin.channel.scene.endpoints import ReceiverGrid, require_compiled
-from witwin.channel.scene.tensors import transmitter_polarizations
+from witwin.channel.scene.compiler import transmitter_polarizations
 
 from .backend import (
     _LIGHT_SPEED_M_PER_S,

@@ -5,6 +5,13 @@ this request carry this derivative at all? None of it is physics, none of it
 touches a device, and all of it runs on the pre-flight of both routes, so an
 unsupported AD request never reaches a native launch and never produces a
 result object.
+
+The declaration tables the ADR-043 capability record is built from live here
+too, beside the refusals that enforce them.
+:mod:`witwin.channel.propagation.consumer.contracts` owns the record TYPE and
+the published :func:`~witwin.channel.propagation.consumer.capabilities`
+accessor; what each column of that record asserts about differentiability is a
+policy statement and is written down once, here.
 """
 
 from __future__ import annotations
@@ -13,13 +20,62 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from .contracts import capabilities
-
 if TYPE_CHECKING:
-    from witwin.channel.scene.compiled import CompiledScene
+    from witwin.channel.scene.compiler import CompiledScene
 
 
-_CAPABILITIES = capabilities()
+# Native component identifiers a frozen topology may carry into reevaluation.
+# The names are the contract vocabulary; the integers are the discovery
+# owner's encoding, which the consumer reads but does not define.
+_FIXED_TOPOLOGY_COMPONENT_IDS: tuple[tuple[str, int], ...] = (
+    ("los", 0),
+    ("reflection", 1),
+)
+
+# Which compiled-material tensors each component actually reads (ADR-043).
+# Marking a tensor a component does not read is not an error - the zero it
+# produces is the true derivative - but that zero was previously
+# undiscoverable, so the split is published instead of inferred from a silent
+# result.
+_COMPONENT_MATERIAL_LEAVES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("diffraction", ("eps_r", "sigma_e", "thickness_m", "gain")),
+    ("los", ()),
+    ("reflection", ("eps_r", "sigma_e", "thickness_m", "gain")),
+    ("transmission", ("layer_eps_r", "layer_sigma_e", "layer_thickness_m")),
+)
+
+# Which published geometry tensors carry a derivative, per route (ADR-043).
+# Discovery re-solves the topology, so its interaction table and arrival
+# direction are declared non-differentiable outputs rather than silently
+# detached ones; the supported differentiable geometry route is
+# prepare_fixed_topology + reevaluate.
+_DIFFERENTIABLE_GEOMETRY_OUTPUTS: tuple[tuple[str, frozenset[str]], ...] = (
+    ("discovery", frozenset({"path_length_m", "delay_s"})),
+    (
+        "fixed_topology",
+        frozenset(
+            {
+                "path_length_m",
+                "delay_s",
+                "interaction_positions_m",
+                "field_direction",
+            }
+        ),
+    ),
+)
+
+# Inputs every response refuses before any native work, in every AD mode but
+# "none". The native field companions reject them by contract, so a request
+# that carries one fails at the boundary instead of inside backward().
+_PRIMAL_ONLY_AD_INPUTS: tuple[str, ...] = (
+    "materials.layer_mu_r",
+    "materials.mu_r",
+    "sinks.polarization_basis",
+    "sinks.polarizations",
+    "sources.polarization_basis",
+    "sources.polarizations",
+    "sources.powers_w",
+)
 
 _MATERIAL_AD_LEAVES = (
     "eps_r",
@@ -81,8 +137,10 @@ def require_primal_only_ad_inputs(
 
     if request.ad_mode == "none":
         return
+    from .contracts import capabilities
+
     values = _primal_only_values(compiled, request)
-    for name in _CAPABILITIES.primal_only_ad_inputs:
+    for name in capabilities().primal_only_ad_inputs:
         if carries_ad(values[name]):
             raise NotImplementedError(
                 f"{name} is primal-only; the native field companion that "
@@ -165,7 +223,7 @@ def ad_ledger(ad_mode: str) -> object | None:
 
     if ad_mode == "none":
         return None
-    from witwin.channel.runtime.kernel_metadata import AdLaunchLedger
+    from witwin.channel.runtime import AdLaunchLedger
 
     return AdLaunchLedger()
 

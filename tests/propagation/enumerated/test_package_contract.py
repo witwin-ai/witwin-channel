@@ -10,10 +10,12 @@ import torch
 
 from witwin.channel.propagation import enumerated
 from witwin.channel.propagation.enumerated import contracts, scattering
-from witwin.channel.propagation.models.evaluated import EvaluatedPaths
-from witwin.channel.propagation.models.fields import PathFields
-from witwin.channel.propagation.models.geometry import PathGeometry
-from witwin.channel.propagation.models.topology import PathTopology
+from witwin.channel.propagation.rows import (
+    EvaluatedPaths,
+    PathFields,
+    PathGeometry,
+    PathTopology,
+)
 from witwin.channel.propagation.topology.export import (
     EvaluatedPathSidecars,
     PathExecutionStats,

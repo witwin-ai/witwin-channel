@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.runtime import torch_compat
-from witwin.channel.runtime.autograd_contracts import (
+from witwin.channel.runtime import (
     _ad_checked_tangent,
     _ad_first_order_only,
     _ad_frequency_grad,
@@ -13,6 +12,7 @@ from witwin.channel.runtime.autograd_contracts import (
     _ad_native_tensor,
     _ad_reject_fixed_inputs,
     _ad_reject_fixed_tangents,
+    disable_functorch,
 )
 
 from .functional import (
@@ -167,7 +167,7 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
             and tangent_frequency == 0.0
         ):
             return (None,) * len(_EM_LAYER_STACK_FIELDS)
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = em_layer_stack_jvp(
                 *(_ad_native_tensor(value) for value in saved),
                 frequency_hz=ctx.frequency_value,

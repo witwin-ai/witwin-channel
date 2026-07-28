@@ -16,7 +16,7 @@ from witwin.channel.montecarlo.bdpt.kernels import maps, paths, sampling
 from witwin.channel.montecarlo.bdpt.solver import _BDPTTopologyOptions
 from witwin.channel.propagation import geometry
 from witwin.channel.propagation.geometry.kernels import bridge
-from witwin.channel.runtime import native_buffers, symbols, tensor_contracts
+from witwin.channel import runtime
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -76,9 +76,12 @@ def test_bdpt_paths_is_the_single_object_owner(name: str):
 
 
 def test_bdpt_paths_uses_canonical_dependencies():
-    assert paths.native_extension is symbols.native_extension
-    assert paths._required_native_op is symbols.required_symbol
-    assert paths.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
+    # The raw accessor is not a solver dependency: every probe goes through
+    # runtime.required_symbol, and ci/check_import_graph.py rejects a solver
+    # that imports ``native_extension`` at all.
+    assert not hasattr(paths, "native_extension")
+    assert paths._required_native_op is runtime.required_symbol
+    assert paths.validate_cuda_tensor is runtime.validate_cuda_tensor
     assert paths._validate_layer_csr is material_contracts._validate_layer_csr
     assert paths._BDPT_INTERSECTION_FIELDS is geometry.BDPT_INTERSECTION_FIELDS
     assert geometry.BDPT_INTERSECTION_FIELDS is bridge._BDPT_INTERSECTION_FIELDS
@@ -96,15 +99,15 @@ def test_bdpt_maps_is_the_single_object_owner(name: str):
 
 
 def test_bdpt_maps_uses_canonical_runtime_dependencies():
-    assert maps.native_extension is symbols.native_extension
-    assert maps._required_native_op is symbols.required_symbol
-    assert maps.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
+    assert not hasattr(maps, "native_extension")
+    assert maps._required_native_op is runtime.required_symbol
+    assert maps.validate_cuda_tensor is runtime.validate_cuda_tensor
 
 
 def test_bdpt_zero_matrix_has_one_neutral_owner():
-    owner = native_buffers.bdpt_zero_matrix
+    owner = runtime.bdpt_zero_matrix
 
-    assert owner.__module__ == native_buffers.__name__
+    assert owner.__module__ == runtime.__name__
     assert maps.bdpt_zero_matrix is owner
     assert not hasattr(core_scene, "bdpt_zero_matrix")
 
@@ -118,8 +121,8 @@ def test_bdpt_sampling_is_the_single_object_owner(name: str):
 
 
 def test_bdpt_sampling_uses_canonical_runtime_dependencies():
-    assert sampling._required_native_op is symbols.required_symbol
-    assert sampling.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
+    assert sampling._required_native_op is runtime.required_symbol
+    assert sampling.validate_cuda_tensor is runtime.validate_cuda_tensor
 
 
 def test_bdpt_solver_uses_canonical_sampling_owners():

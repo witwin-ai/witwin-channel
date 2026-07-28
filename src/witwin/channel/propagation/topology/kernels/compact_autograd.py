@@ -6,7 +6,7 @@ from collections.abc import Callable
 
 import torch
 
-from witwin.channel.runtime.symbols import required_symbol as _required_native_op
+from witwin.channel.runtime import required_symbol as _required_native_op
 
 
 COMPACT_CONTINUOUS_FIELDS = (

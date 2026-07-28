@@ -4,12 +4,12 @@ from dataclasses import dataclass
 import pytest
 import torch
 
-from witwin.channel.materials.abi import (
+from witwin.channel.materials import (
     DIELECTRIC_MODEL_ID,
     MATERIAL_ABI_VERSION,
     PEC_EFFECTIVE_SIGMA_E,
+    face_material_field_bundle,
 )
-from witwin.channel.materials.encoding import face_material_field_bundle
 from witwin.channel.scene import compile as compile_scene
 from witwin.core import (
     MaterialLayer,

@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 import torch
 from witwin.channel.scene.endpoints import require_compiled
 
-from witwin.channel.materials.evaluation import (
+from witwin.channel.materials import (
     _require_frequency_ad_constant_materials,
 )
 from witwin.channel.propagation.enumerated.coupled import (
@@ -34,9 +34,7 @@ from witwin.channel.propagation.geometry.endpoints import (
     receiver_positions_and_layout,
     transmitter_tensors,
 )
-from witwin.channel.propagation.models.capacity import CapacityExecutionCounts
-from witwin.channel.propagation.models.contracts import TopologyConfig
-from witwin.channel.propagation.models.evaluated import EvaluatedPaths
+from witwin.channel.propagation.rows import EvaluatedPaths
 from witwin.channel.propagation.topology.concatenate import (
     _pad_topology_sequences,
     concatenate_path_blocks,
@@ -52,17 +50,30 @@ from witwin.channel.propagation.topology.kernels import (
 from witwin.channel.propagation.topology.kernels.canonical_compact import (
     enumerated_exact_pair_metadata,
 )
-from witwin.channel.runtime.capacity import (
+from witwin.channel.runtime import (
+    CapacityExecutionCounts,
     SolveCapacityTransaction,
     create_solve_capacity_transaction,
 )
-from witwin.channel.scene.tensors import (
+from witwin.channel.scene.compiler import (
     _frequency_scalar,
     transmitter_polarizations,
 )
 
 if TYPE_CHECKING:
     from witwin.channel.scene.endpoints import SolverScene as Scene
+
+
+# The structural view of a solver config this engine reads. It is declared here,
+# beside its only consumer, so a solver config satisfies it without importing a
+# solver. ``enumerated.contracts.TopologyConfig`` is a different, larger view
+# read by the scattering stages; the two are deliberately not merged, because a
+# Protocol is exactly its field set.
+class TopologyConfig(Protocol):
+    max_depth: int
+    components: frozenset[str] | set[str] | tuple[str, ...] | list[str]
+    max_paths: int | None
+    max_paths_scope: str
 
 
 @dataclass(frozen=True, slots=True)

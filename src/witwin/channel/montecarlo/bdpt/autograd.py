@@ -24,8 +24,7 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.runtime import torch_compat
-from witwin.channel.runtime.autograd_contracts import (
+from witwin.channel.runtime import (
     _ad_first_order_only,
     _ad_frequency_grad,
     _ad_frequency_tangent,
@@ -34,6 +33,7 @@ from witwin.channel.runtime.autograd_contracts import (
     _ad_native_tensor,
     _ad_reject_fixed_inputs,
     _ad_reject_fixed_tangents,
+    disable_functorch,
 )
 
 from .kernels.paths import (
@@ -331,7 +331,7 @@ class _BdptReflectedSubpathAdFunction(torch.autograd.Function):
         }
         if tangent_frequency == 0.0 and all(v is None for v in tangents.values()):
             return (None,) * len(_SUBPATH_FIELDS)
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = bdpt_reflected_light_subpath_state_jvp(
                 light,
                 ctx.intersection,
@@ -623,7 +623,7 @@ class _BdptTransmittedSubpathAdFunction(torch.autograd.Function):
         }
         if tangent_frequency == 0.0 and all(v is None for v in tangents.values()):
             return (None,) * len(_SUBPATH_FIELDS)
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = bdpt_transmitted_light_subpath_state_jvp(
                 light,
                 ctx.intersection,
@@ -893,7 +893,7 @@ class _BdptEndpointConnectionAdFunction(torch.autograd.Function):
         }
         if tangent_frequency == 0.0 and all(v is None for v in payload.values()):
             return (None,) * len(_CONNECTION_FIELDS)
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = bdpt_endpoint_connection_samples_jvp(
                 light,
                 sensor,

@@ -19,9 +19,9 @@ from witwin.channel.propagation.enumerated.capacity import (
 from witwin.channel.propagation.enumerated.scattering import (
     append_scattering_evaluated_paths,
 )
-from witwin.channel.propagation.consumer._native import compact_evaluated_paths
-from witwin.channel.runtime.capacity import SolveCapacityTransaction
-from witwin.channel.scene.tensors import (
+from witwin.channel.propagation.consumer.replay import compact_evaluated_paths
+from witwin.channel.runtime import SolveCapacityTransaction
+from witwin.channel.scene.compiler import (
     receiver_positions as _shared_receiver_positions,
     transmitter_positions as _shared_transmitter_positions,
 )

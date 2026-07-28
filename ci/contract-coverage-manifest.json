@@ -1052,7 +1052,7 @@
     ],
     [
       "bdpt_zero_matrix",
-      "witwin.channel.runtime.native_buffers.bdpt_zero_matrix",
+      "witwin.channel.runtime.bdpt_zero_matrix",
       "named_wrapper",
       "native-bdpt-maps",
       [
@@ -1061,7 +1061,7 @@
     ],
     [
       "build_info",
-      "witwin.channel.runtime.extension.build_info",
+      "witwin.channel.runtime.build_info",
       "named_wrapper",
       "native-bootstrap",
       [
@@ -1070,7 +1070,7 @@
     ],
     [
       "capacity_failure_state_create",
-      "witwin.channel.runtime.capacity.create_capacity_failure_state",
+      "witwin.channel.runtime.create_capacity_failure_state",
       "native_call_site",
       "native-capacity-failure-state",
       [
@@ -1079,7 +1079,7 @@
     ],
     [
       "capacity_failure_terminal_check",
-      "witwin.channel.runtime.capacity.capacity_failure_terminal_check",
+      "witwin.channel.runtime.capacity_failure_terminal_check",
       "native_call_site",
       "native-capacity-failure-terminal",
       [
@@ -1978,7 +1978,7 @@
     ],
     [
       "mc_pack_vec3",
-      "witwin.channel.runtime.native_buffers.mc_pack_vec3",
+      "witwin.channel.runtime.mc_pack_vec3",
       "named_wrapper",
       "native-mc-sampling",
       [
@@ -1996,7 +1996,7 @@
     ],
     [
       "mc_receiver_grid_points",
-      "witwin.channel.runtime.native_buffers.mc_receiver_grid_points",
+      "witwin.channel.runtime.mc_receiver_grid_points",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -2176,7 +2176,7 @@
     ],
     [
       "mc_transmitter_tensors",
-      "witwin.channel.runtime.native_buffers.mc_transmitter_tensors",
+      "witwin.channel.runtime.mc_transmitter_tensors",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -2395,7 +2395,7 @@
     ],
     [
       "rayd_scene_create",
-      "witwin.channel.scene.kernels.rayd_scene.rayd_scene_create",
+      "witwin.channel.scene.resources.rayd_scene_create",
       "named_wrapper",
       "native-rayd-scene",
       [
@@ -2404,7 +2404,7 @@
     ],
     [
       "rayd_scene_edge_records",
-      "witwin.channel.scene.kernels.rayd_scene.rayd_scene_edge_records",
+      "witwin.channel.scene.resources.rayd_scene_edge_records",
       "named_wrapper",
       "native-rayd-scene",
       [
@@ -2629,7 +2629,7 @@
     ],
     [
       "consumer_fixed_los_gather",
-      "witwin.channel.propagation.consumer._fixed_los._FixedLoSGatherFunction.forward",
+      "witwin.channel.propagation.consumer.replay._FixedLoSGatherFunction.forward",
       "native_call_site",
       "native-consumer-fixed-los",
       [
@@ -2638,7 +2638,7 @@
     ],
     [
       "consumer_fixed_los_gather_backward",
-      "witwin.channel.propagation.consumer._fixed_los._FixedLoSGatherFunction.backward",
+      "witwin.channel.propagation.consumer.replay._FixedLoSGatherFunction.backward",
       "native_call_site",
       "native-consumer-fixed-los-backward",
       [
@@ -2647,7 +2647,7 @@
     ],
     [
       "consumer_fixed_los_gather_jvp",
-      "witwin.channel.propagation.consumer._fixed_los._FixedLoSGatherFunction.jvp",
+      "witwin.channel.propagation.consumer.replay._FixedLoSGatherFunction.jvp",
       "native_call_site",
       "native-consumer-fixed-los-jvp",
       [
@@ -2656,7 +2656,7 @@
     ],
     [
       "consumer_los_jones",
-      "witwin.channel.propagation.consumer._native.consumer_los_jones",
+      "witwin.channel.propagation.consumer.replay.consumer_los_jones",
       "named_wrapper",
       "native-consumer-los-jones",
       [
@@ -2665,7 +2665,7 @@
     ],
     [
       "evaluated_paths_compact_finalize",
-      "witwin.channel.propagation.consumer._native.evaluated_paths_compact_finalize",
+      "witwin.channel.propagation.consumer.replay.evaluated_paths_compact_finalize",
       "named_wrapper",
       "native-consumer-compact",
       [

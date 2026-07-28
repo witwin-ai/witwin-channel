@@ -8,10 +8,10 @@ import torch
 
 from witwin.channel.montecarlo.events import transmission
 from witwin.channel.montecarlo.basic import rayd_components
-from witwin.channel.propagation.models.penetration import (
+from witwin.channel.propagation.penetration import (
     SegmentPenetrationPolicy,
 )
-from witwin.channel.runtime.capacity import CapacityFailureState
+from witwin.channel.runtime import CapacityFailureState
 from witwin.channel.scene.endpoints import SolverScene
 
 

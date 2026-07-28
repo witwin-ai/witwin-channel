@@ -18,6 +18,7 @@ import hashlib
 import pytest
 import torch
 
+from witwin.channel import runtime
 from witwin.channel.deterministic.kernels import accumulation as ops
 
 pytestmark = pytest.mark.skipif(
@@ -413,7 +414,7 @@ def test_accumulate_flat_uses_current_cuda_stream():
 
 def test_accumulate_flat_missing_native_symbol_fails_without_fallback(monkeypatch):
     valid, tx_id, rx_id, component_id, gain, real, imag = _fixture(torch.float32)
-    monkeypatch.setattr(ops, "native_extension", lambda: None)
+    monkeypatch.setattr(runtime, "native_extension", lambda: None)
     with pytest.raises(RuntimeError, match="CUDA kernel is required"):
         ops.deterministic_accumulate_flat(
             valid,

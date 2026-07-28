@@ -6,7 +6,7 @@ import pytest
 from witwin.channel.propagation.topology.kernels import blocks as ops
 from witwin.channel.propagation.topology import kernels
 from witwin.channel.propagation.topology.kernels import blocks
-from witwin.channel.runtime import symbols, tensor_contracts
+from witwin.channel import runtime
 
 
 _OWNER_NAMES = (
@@ -44,8 +44,8 @@ def test_topology_blocks_owns_the_shared_schemas():
 
 
 def test_topology_blocks_use_only_canonical_dependencies():
-    assert blocks._required_native_op is symbols.required_symbol
-    assert blocks.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
+    assert blocks._required_native_op is runtime.required_symbol
+    assert blocks.validate_cuda_tensor is runtime.validate_cuda_tensor
     for name in _OWNER_NAMES:
         assert getattr(blocks, name).__globals__ is blocks.__dict__
     assert "ops" not in blocks.__dict__

@@ -15,14 +15,14 @@ from witwin.channel.propagation.topology.kernels.compact_autograd import (
     evaluated_paths_compact_finalize_backward,
     evaluated_paths_compact_finalize_jvp,
 )
-from witwin.channel.runtime import torch_compat
-from witwin.channel.runtime.autograd_contracts import (
+from witwin.channel.runtime import (
     _ad_first_order_only,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
+    disable_functorch,
+    required_symbol as _required_native_op,
+    validate_cuda_tensor,
 )
-from witwin.channel.runtime.symbols import required_symbol as _required_native_op
-from witwin.channel.runtime.tensor_contracts import validate_cuda_tensor
 
 
 _BLOCK_FIELDS = tuple(
@@ -191,7 +191,7 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
             None,
             *continuous_tangents[2:],
         )
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             raw = evaluated_paths_compact_finalize_jvp(
                 valid,
                 selected_row_index,

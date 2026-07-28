@@ -8,7 +8,7 @@ from witwin.channel.components import (
     component_max_depth,
 )
 from witwin.channel.constants import UNIT_EXCITATION_PHASE_CONVENTION
-from witwin.channel.runtime.kernel_metadata import make_metadata
+from witwin.channel.runtime import make_metadata
 
 from .config import Config
 

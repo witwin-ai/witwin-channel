@@ -5,15 +5,25 @@
 `scene` owns scene/endpoint/structure models, Mitsuba loading, compilation,
 canonical geometry/material/assignment stores, cache invalidation, lazy
 scattering resources, and typed RayD resource lifetime. `core.scene` retains
-the stable public scene identity; the RayD lifecycle owner is exclusively
-`scene.kernels.rayd_scene` and has no compatibility re-export.
+the stable public scene identity.
+
+The package is three modules, one per artifact category, and each is the single
+owner of what it holds:
+
+| Module | Owns |
+|---|---|
+| `scene.compiler` | `compile`, the compile registry, `CompiledScene`, the geometry/material/assignment stores and their tensor validation, and the endpoint tensor exports every solver reads off a bound scene |
+| `scene.endpoints` | the endpoint views over one Core antenna state, `SolverScene` and `bind_solver_scene`, antenna pattern/array/weight response, axis-aligned receiver-grid geometry, and the plan 07 AD-2 scene-leaf geometry seam |
+| `scene.resources` | the typed RayD scene lifetime (`RayDSceneResource`, `build_scene_from_structures`, and their two native facades), the diffraction `EdgePolicy` and the scene-policy edge refinement, and the lazy Kirchhoff and phase-screen resources |
+
+The RayD lifecycle owner is exclusively `scene.resources` and has no
+compatibility re-export.
 
 ## Public entry points
 
-`scene.__init__` intentionally exports nothing. The root package exports
-`Scene`, `Structure`, `Transmitter`, `ReceiverGrid`, and `ReceiverPoint`. The
-frozen `Scene` target remains `core.scene.Scene`, the same class object defined
-by `scene.models`. Compile, stores, and kernels are internal.
+`scene.__init__` exports `compile`, `clear_compile_cache`, and `CompiledScene`.
+The logical world model is owned by `witwin.core` and is not re-exported here.
+Stores, endpoint views, and native resources are internal.
 
 ## Dependency rules
 
@@ -22,6 +32,15 @@ types, and narrow topology/geometry primitives needed during compilation. It
 must not import a solver or solver pipeline. Typed resources and mutable caches
 remain private; propagation topology and geometry kernels may not import scene
 back.
+
+Inside the package the dependency runs one way: `compiler` imports `endpoints`
+and `resources`, and neither imports `compiler` at module scope. That is load
+bearing, not cosmetic. The root `field_state` contract imports the endpoint
+views, so an edge from `endpoints` back to `compiler` would pull the whole
+compile-time dependency set - materials, topology kernels, penetration - into a
+cold import of the solver-neutral propagation consumer. `require_compiled`
+resolves `CompiledScene` inside the call, and `resources` annotates the stores
+under `TYPE_CHECKING`, for that reason.
 
 ## Numerical and AD contract
 

@@ -10,7 +10,7 @@ from witwin.channel.materials.kernels import contracts as material_contracts
 from witwin.channel.propagation import fields
 from witwin.channel.propagation.fields import kernels
 from witwin.channel.propagation.fields.kernels import functional
-from witwin.channel.runtime import symbols, tensor_contracts
+from witwin.channel import runtime
 
 
 _OWNER_NAMES = (
@@ -42,8 +42,8 @@ def test_fields_functional_is_the_single_object_owner(name: str):
 def test_fields_functional_uses_canonical_dependencies():
     owner = material_contracts._validate_layer_csr
 
-    assert functional._required_native_op is symbols.required_symbol
-    assert functional.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
+    assert functional._required_native_op is runtime.required_symbol
+    assert functional.validate_cuda_tensor is runtime.validate_cuda_tensor
     assert functional._validate_layer_csr is owner
     assert material_contracts.validate_layer_csr is owner
     assert materials.validate_layer_csr is owner

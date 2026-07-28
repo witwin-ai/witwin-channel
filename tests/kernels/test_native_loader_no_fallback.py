@@ -5,12 +5,12 @@ import pytest
 
 from witwin.channel.montecarlo.basic.kernels import sampling as mc_sampling
 from witwin.channel.propagation.geometry.kernels import bridge as ops
-from witwin.channel.runtime import extension, symbols
-from witwin.channel.scene.kernels import rayd_scene
+from witwin.channel import runtime
+from witwin.channel.scene import resources as rayd_scene
 
 
 def test_channel_extension_loader_has_no_artifact_fallback():
-    source = inspect.getsource(extension.native_extension)
+    source = inspect.getsource(runtime.native_extension)
 
     assert "artifacts" not in source
     assert "sys.path" not in source
@@ -19,12 +19,12 @@ def test_channel_extension_loader_has_no_artifact_fallback():
 
 
 def test_rayd_uses_the_validated_fail_loud_native_loader():
-    source = inspect.getsource(symbols.native_extension)
+    source = inspect.getsource(runtime.native_extension)
 
-    assert extension.native_extension is symbols.native_extension
+    assert runtime.native_extension is runtime.native_extension
     assert "_load_native_extension" in source
     assert "return None" not in source
-    assert symbols.native_extension() is not None
+    assert runtime.native_extension() is not None
 
 
 def test_rayd_visibility_uses_channel_bridge():
@@ -80,15 +80,15 @@ def test_mc_diffraction_discovery_requires_native_symbols(monkeypatch):
     )
 
     def missing(name: str):
-        raise symbols.NativeSymbolError(
+        raise runtime.NativeSymbolError(
             f"_channel.{name} CUDA kernel is required"
         )
 
     monkeypatch.setattr(mc_sampling, "required_symbol", missing)
-    with pytest.raises(symbols.NativeSymbolError, match="mc_diffraction_discover_edges"):
+    with pytest.raises(runtime.NativeSymbolError, match="mc_diffraction_discover_edges"):
         mc_sampling.mc_diffraction_discover_edges()
     with pytest.raises(
-        symbols.NativeSymbolError,
+        runtime.NativeSymbolError,
         match="mc_diffraction_discover_edges_counted",
     ):
         mc_sampling.mc_diffraction_discover_edges_counted()
@@ -108,7 +108,7 @@ def test_rayd_path_exports_use_channel_bridge():
 def test_simplified_coherent_diffraction_grid_api_is_not_public():
     assert not hasattr(ops, "deterministic_diffraction_coherent_accumulation_forward")
     assert not hasattr(
-        extension.native_extension(),
+        runtime.native_extension(),
         "deterministic_diffraction_coherent_accumulation_forward",
     )
 

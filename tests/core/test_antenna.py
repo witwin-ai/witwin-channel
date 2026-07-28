@@ -5,7 +5,7 @@ import torch
 
 from witwin.core import AntennaPattern
 from tests.support.core_world import make_transmitter
-from witwin.channel.scene.antenna import (
+from witwin.channel.scene.endpoints import (
     apply_endpoint_weights,
     apply_precoding_combining,
     orientation_matrix,

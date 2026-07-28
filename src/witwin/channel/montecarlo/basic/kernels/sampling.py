@@ -5,13 +5,13 @@ import torch
 from witwin.channel.propagation.topology import (  # noqa: F401
     mc_sample_directions,
 )
-from witwin.channel.runtime.native_buffers import (  # noqa: F401
-    mc_pack_vec3,
-    mc_receiver_grid_points,
-    mc_transmitter_tensors,
+from witwin.channel.runtime import (
+    mc_pack_vec3,  # noqa: F401
+    mc_receiver_grid_points,  # noqa: F401
+    mc_transmitter_tensors,  # noqa: F401
+    required_symbol,
+    validate_cuda_tensor,
 )
-from witwin.channel.runtime.symbols import native_extension, required_symbol
-from witwin.channel.runtime.tensor_contracts import validate_cuda_tensor
 
 
 def mc_reflection_launch_inputs(
@@ -25,12 +25,7 @@ def mc_reflection_launch_inputs(
     )
     if sample_count < 0:
         raise ValueError("sample_count must be non-negative")
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_reflection_launch_inputs"):
-        raise RuntimeError(
-            "_channel.mc_reflection_launch_inputs CUDA kernel is required"
-        )
-    exported = native.mc_reflection_launch_inputs(
+    exported = required_symbol("mc_reflection_launch_inputs")(
         tx_positions, int(tx_index), int(sample_count)
     )
     if not isinstance(exported, dict):
@@ -128,12 +123,7 @@ def mc_diffraction_state_wi(
     )
     if state_src.shape != state_edge_pos.shape:
         raise ValueError("state_src must match state_edge_pos shape")
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_diffraction_state_wi"):
-        raise RuntimeError(
-            "_channel.mc_diffraction_state_wi CUDA kernel is required"
-        )
-    state_wi = native.mc_diffraction_state_wi(state_edge_pos, state_src)
+    state_wi = required_symbol("mc_diffraction_state_wi")(state_edge_pos, state_src)
     if not isinstance(state_wi, torch.Tensor):
         raise TypeError("_channel.mc_diffraction_state_wi must return a tensor")
     validate_cuda_tensor(
@@ -174,12 +164,7 @@ def mc_diffraction_state_pack(
     validate_cuda_tensor("tx_power", tx_power, dtype=torch.float32, ndim=0)
     if tx.shape[0] != 3:
         raise ValueError("tx must have shape (3,)")
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_diffraction_state_pack"):
-        raise RuntimeError(
-            "_channel.mc_diffraction_state_pack CUDA kernel is required"
-        )
-    states = native.mc_diffraction_state_pack(
+    states = required_symbol("mc_diffraction_state_pack")(
         edge_indices,
         edge_pos,
         edge_dir,

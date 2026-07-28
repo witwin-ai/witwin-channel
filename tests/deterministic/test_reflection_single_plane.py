@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from witwin.channel.runtime import symbols as ops
+from witwin.channel import runtime
 from tests.support.scenes import same_side_wall_reflection_scene
 from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
@@ -99,7 +99,7 @@ def test_reflection_solver_uses_native_field_kernel_when_available(monkeypatch):
         pytest.skip("CUDA is required for deterministic reflection")
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native reflection is not built")
-    if not hasattr(ops.native_extension(), "deterministic_reflection_field"):
+    if not hasattr(runtime.native_extension(), "deterministic_reflection_field"):
         pytest.skip("native deterministic reflection field kernel is not built")
 
     calls = 0

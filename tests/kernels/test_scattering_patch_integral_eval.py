@@ -9,7 +9,7 @@ from witwin.core import PhaseScreen
 from witwin.channel.constants import C0
 from witwin.channel.scattering import PhaseScreenRuntime
 from witwin.channel.scattering.kernels import functional as ops
-from witwin.channel.runtime import symbols
+from witwin.channel import runtime
 
 from tests.reference import phase_screen_realization as reference
 
@@ -218,7 +218,7 @@ def test_patch_integral_contract_shapes_and_dtypes():
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
 def test_patch_integral_requires_native_kernel(monkeypatch):
     case = _random_case(8, 4, device="cuda", seed=13)
-    monkeypatch.setattr(symbols, "native_extension", lambda: None)
+    monkeypatch.setattr(runtime, "native_extension", lambda: None)
     with pytest.raises(
         RuntimeError, match="scattering_patch_integral_eval CUDA kernel is required"
     ):

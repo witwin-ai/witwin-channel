@@ -13,11 +13,11 @@ migrate to `torch.library` dispatch during this cycle.
 `torch.library` would standardize op registration but would also re-plumb every
 kernel entry point and its tape ownership without changing numerical behavior.
 The migration goal is a clean boundary, not a dispatch rewrite, so the existing
-pybind11 modules stay the ABI surface and `runtime/autograd_contracts.py`
+pybind11 modules stay the ABI surface and `runtime.py`
 remains the single owner of dispatch-state validation. Revisiting `torch.library`
 is deferred to a separate, evidence-backed change.
 
 ## Implementing artifact
 
-The pybind11 binding registries and the `runtime/autograd_contracts.py` status
+The pybind11 binding registries and the `runtime.py` status
 quo carry this decision; `tests/runtime/test_autograd_contracts.py` guards it.

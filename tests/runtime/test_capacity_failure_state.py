@@ -5,10 +5,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from witwin.channel.runtime import (
-    CapacityFailureState,
-    create_capacity_failure_state,
-)
+from witwin.channel.runtime import CapacityFailureState, create_capacity_failure_state
 
 
 pytestmark = pytest.mark.skipif(

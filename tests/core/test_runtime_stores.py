@@ -5,17 +5,17 @@ from dataclasses import replace
 import pytest
 import torch
 
-from witwin.channel.scene.stores.assignments import AssignmentStore
-from witwin.channel.scene.stores.geometry import GeometryStore
-from witwin.channel.scene.stores.materials import MaterialStore
-from witwin.channel.scene.stores import _validation as canonical_validation
-from witwin.channel.scene.stores.assignments import (
+from witwin.channel.scene.compiler import AssignmentStore
+from witwin.channel.scene.compiler import GeometryStore
+from witwin.channel.scene.compiler import MaterialStore
+from witwin.channel.scene import compiler as canonical_validation
+from witwin.channel.scene.compiler import (
     AssignmentStore as CanonicalAssignmentStore,
 )
-from witwin.channel.scene.stores.geometry import (
+from witwin.channel.scene.compiler import (
     GeometryStore as CanonicalGeometryStore,
 )
-from witwin.channel.scene.stores.materials import (
+from witwin.channel.scene.compiler import (
     MaterialStore as CanonicalMaterialStore,
 )
 

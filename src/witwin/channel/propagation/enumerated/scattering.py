@@ -69,14 +69,16 @@ from witwin.channel.propagation.enumerated.scattering_scalars import (
     ensemble_coef_scale,
     realization_scalars,
 )
-from witwin.channel.propagation.models.evaluated import EvaluatedPaths
-from witwin.channel.propagation.models.fields import PathFields
-from witwin.channel.propagation.models.geometry import PathGeometry
-from witwin.channel.propagation.models.topology import PathTopology
+from witwin.channel.propagation.rows import (
+    EvaluatedPaths,
+    PathFields,
+    PathGeometry,
+    PathTopology,
+)
 from witwin.channel.propagation.topology.export import EvaluatedPathSidecars
 from witwin.core import PhaseScreen
 from witwin.channel.constants import C0
-from witwin.channel.scene.scattering_resources import (
+from witwin.channel.scene.resources import (
     realization_phase_screens,
 )
 from witwin.channel.scene.endpoints import require_compiled

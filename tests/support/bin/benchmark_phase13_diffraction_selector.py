@@ -23,7 +23,7 @@ sys.path.insert(0, str(_REPO_ROOT))
 
 from tests.support.scenes import wedge_diffraction_scene  # noqa: E402
 from witwin.channel.path import Config, solve  # noqa: E402
-from witwin.channel.runtime.extension import build_info  # noqa: E402
+from witwin.channel.runtime import build_info  # noqa: E402
 
 
 def _result_hash(result: object) -> str:

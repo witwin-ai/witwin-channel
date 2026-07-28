@@ -271,7 +271,7 @@ for a first-order endpoint-motion derivative.
   result is then partially dual: the transport carries a tangent and the two
   geometry outputs silently do not.
 
-  This is pre-existing, lives in `witwin.channel.runtime.autograd_contracts` and
+  This is pre-existing, lives in `witwin.channel.runtime` and
   `propagation.fields.kernels.autograd`, affects the shipped line-of-sight route
   and all four solvers identically, and fixing it means changing the
   differentiability marking of a shared native AD facade - a `propagation.fields`

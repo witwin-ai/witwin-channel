@@ -11,10 +11,7 @@ from witwin.channel.propagation.geometry.edge_state import (
     diffraction_edge_geometry as _diffraction_edge_geometry,
 )
 from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
-from witwin.channel.runtime.profiling import (
-    CudaProfileMark,
-    cuda_profile_mark,
-)
+from witwin.channel.runtime import CudaProfileMark, cuda_profile_mark
 
 
 @dataclass(frozen=True, slots=True)

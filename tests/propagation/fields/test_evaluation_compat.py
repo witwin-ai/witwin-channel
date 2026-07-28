@@ -4,10 +4,10 @@ import ast
 from pathlib import Path
 
 from tools.refactor_baseline import python_body_hashes
-from witwin.channel.scene import tensors as scene_tensors
+from witwin.channel.scene import compiler as scene_tensors
 from witwin.channel.propagation.fields import evaluation
 from witwin.channel.propagation.geometry import reevaluate
-from witwin.channel.runtime import autograd_contracts
+from witwin.channel import runtime
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -180,7 +180,7 @@ def test_evaluation_preserves_nested_material_tuple_body():
 
 
 def test_evaluation_uses_canonical_dependencies():
-    assert evaluation.ops is autograd_contracts
+    assert evaluation._ad_frequency_value is runtime._ad_frequency_value
     assert evaluation._frequency_scalar is scene_tensors._frequency_scalar
     assert (
         evaluation._geometry_participates_in_ad

@@ -10,18 +10,15 @@ from witwin.channel.propagation.geometry.kernels import (
     bridge,
     penetration_autograd,
 )
-from witwin.channel.propagation.models import penetration
-from witwin.channel.propagation.models.penetration import (
+from witwin.channel.propagation import penetration
+from witwin.channel.propagation.penetration import (
     SegmentPenetrationBackwardResult,
     SegmentPenetrationJvpResult,
     SegmentPenetrationPolicy,
     SegmentPenetrationResult,
     SegmentPenetrationTapeResult,
 )
-from witwin.channel.runtime.capacity import (
-    CapacityFailureBit,
-    CapacityFailureState,
-)
+from witwin.channel.runtime import CapacityFailureBit, CapacityFailureState
 
 
 def _failure_state() -> CapacityFailureState:
@@ -74,7 +71,7 @@ def cpu_contracts(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(bridge, "_ad_check_optional_grad", lambda *args, **kwargs: None)
     monkeypatch.setattr(bridge, "_ad_check_tangent_vec3", lambda *args, **kwargs: None)
     monkeypatch.setattr(
-        penetration, "_require_cuda_tensor", lambda name, value, **kwargs: value
+        penetration, "require_tensor", lambda name, value, **kwargs: value
     )
     monkeypatch.setattr(
         penetration, "require_capacity_failure_state", lambda state, **kwargs: state

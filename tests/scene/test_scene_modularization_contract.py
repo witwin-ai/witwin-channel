@@ -5,7 +5,7 @@ import pytest
 import witwin.channel as channel
 import witwin.channel.scene as channel_scene
 import witwin.core as core
-from witwin.channel.scene.compiled import CompiledScene
+from witwin.channel.scene.compiler import CompiledScene
 
 
 def test_public_logical_world_contracts_are_core_owned():

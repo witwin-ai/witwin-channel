@@ -6,14 +6,14 @@ import pytest
 import torch
 
 from witwin.channel.propagation.enumerated import engine, transmission
-from witwin.channel.propagation.models.penetration import (
+from witwin.channel.propagation.penetration import (
     SegmentPenetrationPolicy,
 )
 from witwin.channel.propagation.topology.export import (
     EvaluatedPathSidecars,
     PathExecutionStats,
 )
-from witwin.channel.runtime.capacity import CapacityFailureState
+from witwin.channel.runtime import CapacityFailureState
 from witwin.channel.scene.endpoints import SolverScene
 
 
@@ -131,17 +131,17 @@ def test_ad_route_uses_native_tape_companions_and_live_geometry(
     observed: list[tuple[object, ...]] = []
 
     monkeypatch.setattr(
-        transmission.ad_geometry,
+        transmission.scene_endpoints,
         "scene_vertex_table",
         lambda actual_scene, actual_compiled: vertices,
     )
     monkeypatch.setattr(
-        transmission.ad_geometry,
+        transmission.scene_endpoints,
         "transmitter_positions_ad",
         lambda actual_scene, actual_tx, *, device: tx_ad,
     )
     monkeypatch.setattr(
-        transmission.ad_geometry,
+        transmission.scene_endpoints,
         "receiver_positions_ad",
         lambda actual_scene, actual_rx, *, device: rx_ad,
     )

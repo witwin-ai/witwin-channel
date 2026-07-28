@@ -5,11 +5,12 @@ from types import SimpleNamespace
 
 import torch
 
-from witwin.channel.propagation.models.capacity import CapacityExecutionCounts
-from witwin.channel.propagation.models.evaluated import EvaluatedPaths
-from witwin.channel.propagation.models.fields import PathFields
-from witwin.channel.propagation.models.geometry import PathGeometry
-from witwin.channel.propagation.models.topology import PathTopology
+from witwin.channel.propagation.rows import (
+    EvaluatedPaths,
+    PathFields,
+    PathGeometry,
+    PathTopology,
+)
 from witwin.channel.propagation.topology.concatenate import (
     _interaction_type_sequence,
 )
@@ -20,7 +21,7 @@ from witwin.channel.propagation.topology.kernels.canonical_compact import (
 from witwin.channel.propagation.topology.kernels import (
     construction as topology_construction,
 )
-from witwin.channel.runtime.capacity import SolveCapacityTransaction
+from witwin.channel.runtime import CapacityExecutionCounts, SolveCapacityTransaction
 
 
 @dataclass(frozen=True, slots=True)

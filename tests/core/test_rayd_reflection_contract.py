@@ -5,11 +5,11 @@ from witwin.core import Mesh, Scene, Structure
 from witwin.channel.scene import compile as compile_scene
 from witwin.channel.propagation.geometry.kernels import bridge as ops
 from witwin.core import PhysicalMaterial
-from witwin.channel.runtime import symbols
+from witwin.channel import runtime
 
 
 def _native_single_triangle_scene():
-    symbols.native_extension()
+    runtime.native_extension()
     scene = Scene(
         structures=[
             Structure(

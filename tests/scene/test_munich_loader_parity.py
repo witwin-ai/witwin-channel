@@ -1,4 +1,4 @@
-from witwin.channel.scene.edge_policy import EdgePolicy
+from witwin.channel.scene.resources import EdgePolicy
 from witwin.core import Scene
 
 

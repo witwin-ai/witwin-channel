@@ -1,7 +1,7 @@
 """Reference float64 Torch Kirchhoff table build (ADR-015 Part C oracle).
 
 A self-contained, fully differentiable Torch re-derivation of
-``scattering/tables.py::build_kirchhoff_table`` used ONLY as an autograd oracle
+``scattering.build_kirchhoff_table`` used ONLY as an autograd oracle
 for the native ``kirchhoff_table_build_backward`` / ``kirchhoff_table_build_jvp``
 companions. It mirrors the production numpy pipeline term by term (transfer-
 matrix stack reflectance, Beckmann diffuse-lobe series, reciprocity
@@ -34,7 +34,7 @@ def _stack_power_reflectance(
     """``(|r_te|^2, |r_tm|^2)`` for the vacuum|layers|vacuum stack (float64).
 
     ``layers`` is ``[L, 4]`` (thickness_m, eps_r, sigma_e, mu_r); ``cos_theta``
-    is a real tensor of incidence cosines. Mirrors ``materials.evaluation``.
+    is a real tensor of incidence cosines. Mirrors ``materials``.
     """
 
     omega = 2.0 * math.pi * frequency

@@ -1,6 +1,6 @@
 """Differentiable Kirchhoff table construction (ADR-015 Part C).
 
-The float64 numpy build (``scattering/tables.py::build_kirchhoff_table``) stays
+The float64 numpy build (``scattering.build_kirchhoff_table``) stays
 the sanctioned compile-time island and is unchanged bit-for-bit. This module
 adds the native derivative: a ``torch.autograd.Function`` whose forward passes
 the numpy-built ``f_te``/``f_tm`` through unchanged and whose backward / jvp
@@ -21,9 +21,7 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.runtime import torch_compat
-from witwin.channel.runtime.symbols import required_symbol as _required_native_op
-from witwin.channel.runtime.autograd_contracts import (
+from witwin.channel.runtime import (
     _ad_first_order_only,
     _ad_frequency_grad,
     _ad_frequency_value,
@@ -31,6 +29,8 @@ from witwin.channel.runtime.autograd_contracts import (
     _ad_native_tensor,
     _ad_reject_fixed_inputs,
     _ad_reject_fixed_tangents,
+    disable_functorch,
+    required_symbol as _required_native_op,
 )
 
 __all__ = [
@@ -438,7 +438,7 @@ class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
             and tangent_sigma is None
         ):
             return None, None
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = kirchhoff_table_build_jvp(
                 *(_ad_native_tensor(value) for value in saved),
                 sigma_h=ctx.sigma_h,

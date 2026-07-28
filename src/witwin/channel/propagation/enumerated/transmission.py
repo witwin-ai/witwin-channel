@@ -6,13 +6,12 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel.scene import ad_geometry
+from witwin.channel.scene import endpoints as scene_endpoints
 from witwin.channel.propagation.geometry.kernels import (
     rayd_segment_penetration_ad,
     rayd_segment_penetration_forward,
 )
-from witwin.channel.propagation.models.capacity import CapacityExecutionCounts
-from witwin.channel.propagation.models.penetration import (
+from witwin.channel.propagation.penetration import (
     SegmentPenetrationPolicy,
 )
 from witwin.channel.propagation.topology.concatenate import _empty_path_block
@@ -20,8 +19,9 @@ from witwin.channel.propagation.topology.export import _ensure_topology_fields
 from witwin.channel.propagation.topology.kernels import (
     enumerated_transmission_topology_pack,
 )
-from witwin.channel.runtime.capacity import CapacityFailureState
-from witwin.channel.runtime.profiling import (
+from witwin.channel.runtime import (
+    CapacityExecutionCounts,
+    CapacityFailureState,
     CudaProfileRange,
     profiled_cuda_range,
 )
@@ -87,11 +87,11 @@ def _transmission_topology(
         rx_geometry = rx_positions
         vertices = None
     else:
-        vertices = ad_geometry.scene_vertex_table(scene, compiled)
-        tx_geometry = ad_geometry.transmitter_positions_ad(
+        vertices = scene_endpoints.scene_vertex_table(scene, compiled)
+        tx_geometry = scene_endpoints.transmitter_positions_ad(
             scene, tx_positions, device=device
         )
-        rx_geometry = ad_geometry.receiver_positions_ad(
+        rx_geometry = scene_endpoints.receiver_positions_ad(
             scene, rx_positions, device=device
         )
     origins, targets = _pair_major_endpoints(tx_geometry, rx_geometry)

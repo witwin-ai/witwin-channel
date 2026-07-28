@@ -19,7 +19,7 @@ def __getattr__(name: str):
             "witwin.channel.propagation.enumerated.engine"
         ).evaluate_enumerated_paths
     elif name in {"EvaluatedPaths", "PathFields", "PathGeometry", "PathTopology"}:
-        value = getattr(import_module("witwin.channel.propagation.models"), name)
+        value = getattr(import_module("witwin.channel.propagation.rows"), name)
     else:
         raise AttributeError(name)
     globals()[name] = value

@@ -9,14 +9,14 @@ from witwin.channel.scene import compile as compile_scene
 from witwin.core import PhysicalMaterial
 from witwin.channel.deployment import build_info
 from witwin.channel.propagation.geometry.kernels import bridge
-from witwin.channel.propagation.models.penetration import (
+from witwin.channel.propagation.penetration import (
     SegmentPenetrationPolicy,
     SegmentPenetrationResult,
 )
 from witwin.channel.propagation.topology.kernels.transmission import (
     enumerated_transmission_topology_pack,
 )
-from witwin.channel.runtime.capacity import create_capacity_failure_state
+from witwin.channel.runtime import create_capacity_failure_state
 
 
 pytestmark = pytest.mark.skipif(

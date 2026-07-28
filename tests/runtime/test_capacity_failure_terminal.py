@@ -14,8 +14,7 @@ from witwin.channel.runtime import (
     capacity_failure_terminal_check,
     create_capacity_failure_state,
 )
-from witwin.channel.runtime import capacity as capacity_runtime
-from witwin.channel.runtime import symbols
+from witwin.channel import runtime
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -42,18 +41,18 @@ def test_capacity_failure_terminal_requires_typed_state_before_dispatch(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        symbols,
+        runtime,
         "required_symbol",
         lambda _name: pytest.fail("native dispatch accepted an untyped state"),
     )
     with pytest.raises(TypeError, match="CapacityFailureState"):
-        capacity_runtime.capacity_failure_terminal_check(
+        runtime.capacity_failure_terminal_check(
             torch.zeros(1, device="cuda", dtype=torch.int32)  # type: ignore[arg-type]
         )
 
 
 def test_capacity_failure_terminal_native_bridge_rejects_bad_metadata() -> None:
-    native = symbols.required_symbol("capacity_failure_terminal_check")
+    native = runtime.required_symbol("capacity_failure_terminal_check")
 
     with pytest.raises(RuntimeError, match="CUDA tensor"):
         native(torch.zeros(1, dtype=torch.int32))
@@ -73,13 +72,13 @@ def test_capacity_failure_terminal_missing_symbol_has_no_fallback(
 
     def missing(name: str):
         requested.append(name)
-        raise symbols.NativeSymbolError("terminal native symbol is required")
+        raise runtime.NativeSymbolError("terminal native symbol is required")
 
-    monkeypatch.setattr(symbols, "required_symbol", missing)
+    monkeypatch.setattr(runtime, "required_symbol", missing)
     with pytest.raises(
-        symbols.NativeSymbolError, match="terminal native symbol is required"
+        runtime.NativeSymbolError, match="terminal native symbol is required"
     ):
-        capacity_runtime.capacity_failure_terminal_check(state)
+        runtime.capacity_failure_terminal_check(state)
 
     assert requested == ["capacity_failure_terminal_check"]
 
@@ -155,7 +154,7 @@ def test_capacity_failure_terminal_source_has_one_async_device_observer() -> Non
     ).read_text(encoding="utf-8")
     facade = (
         REPOSITORY_ROOT
-        / "src/witwin/channel/runtime/capacity.py"
+        / "src/witwin/channel/runtime.py"
     ).read_text(encoding="utf-8")
 
     assert native.count('asm volatile("trap;")') == 1
@@ -194,7 +193,4 @@ def test_capacity_failure_terminal_source_has_one_async_device_observer() -> Non
         for path in (REPOSITORY_ROOT / "src/witwin/channel").rglob("*.py")
         if "capacity_failure_terminal_check" in path.read_text(encoding="utf-8")
     )
-    assert production_mentions == [
-        "src/witwin/channel/runtime/__init__.py",
-        "src/witwin/channel/runtime/capacity.py",
-    ]
+    assert production_mentions == ["src/witwin/channel/runtime.py"]

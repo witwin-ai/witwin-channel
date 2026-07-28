@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.scene.edge_selection import refine_edge_geometry
-from witwin.channel.scene.kernels.rayd_scene import RayDSceneResource
+from witwin.channel.scene.resources import refine_edge_geometry
+from witwin.channel.scene.resources import RayDSceneResource
 from witwin.channel.propagation.geometry.kernels import (
     primitives as geometry_primitives,
 )

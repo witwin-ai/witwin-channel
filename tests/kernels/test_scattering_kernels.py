@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from witwin.channel.scattering.kernels import functional as ops
-from witwin.channel.runtime import symbols
+from witwin.channel import runtime
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
@@ -53,7 +53,7 @@ def test_scattering_event_probabilities_match_energy_split():
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
 def test_scattering_event_probabilities_require_native_kernel(monkeypatch):
-    monkeypatch.setattr(symbols, "native_extension", lambda: None)
+    monkeypatch.setattr(runtime, "native_extension", lambda: None)
     x = torch.ones(1, device="cuda")
     material = torch.zeros(1, device="cuda", dtype=torch.int32)
     with pytest.raises(

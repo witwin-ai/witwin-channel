@@ -2,12 +2,12 @@ import pytest
 import torch
 
 from witwin.channel.montecarlo.basic.kernels import sampling as ops
-from witwin.channel.runtime import symbols
+from witwin.channel import runtime
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")
 def test_diffraction_discover_edges_uses_prim_id_and_best_edge_filter():
-    symbols.native_extension()
+    runtime.native_extension()
     device = torch.device("cuda")
     tx_pos = torch.tensor([0.0, -1.0, 0.5], device=device, dtype=torch.float32)
     ray_dir = torch.tensor([[0.0, 1.0, 0.0]], device=device, dtype=torch.float32)

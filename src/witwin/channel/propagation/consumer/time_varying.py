@@ -10,7 +10,7 @@ This module is that axis and nothing else. It replicates the frozen rows over
 ``T`` block-diagonal slots, runs ONE reevaluation, and publishes ``[T, K]``
 views over the storage that replay produced. It owns no physics, adds no
 compaction, allocates no result, and introduces no native symbol. It also does
-not compile scenes: one :class:`~witwin.channel.scene.compiled.CompiledScene`
+not compile scenes: one :class:`~witwin.channel.scene.compiler.CompiledScene`
 covers one structure-geometry epoch, and a world whose structures move is
 ``T`` epochs, which is a motion-event cadence rather than an inner loop.
 """
@@ -42,7 +42,7 @@ from ._prepared import replicate_over_slots
 from .service import reevaluate
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.compiled import CompiledScene
+    from witwin.channel.scene.compiler import CompiledScene
 
 
 def _slot_view(values: torch.Tensor, slot_count: int) -> torch.Tensor:

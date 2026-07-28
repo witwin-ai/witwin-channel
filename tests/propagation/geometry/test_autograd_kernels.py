@@ -7,13 +7,7 @@ import pytest
 from witwin.channel.propagation.geometry.kernels import autograd as ops
 from witwin.channel.propagation.geometry import kernels
 from witwin.channel.propagation.geometry.kernels import autograd, primitives
-from witwin.channel.runtime import (
-    autograd_contracts,
-    native_resources,
-    symbols,
-    tensor_contracts,
-)
-from witwin.channel.runtime import torch_compat
+from witwin.channel import runtime
 
 
 _OWNER_NAMES = (
@@ -48,11 +42,11 @@ def test_geometry_autograd_is_the_single_object_owner(name: str):
 
 
 def test_geometry_autograd_uses_canonical_runtime_and_scene_dependencies():
-    assert autograd._required_native_op is symbols.required_symbol
-    assert autograd.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
-    assert autograd.torch_compat is torch_compat
+    assert autograd._required_native_op is runtime.required_symbol
+    assert autograd.validate_cuda_tensor is runtime.validate_cuda_tensor
+    assert autograd.disable_functorch is runtime.disable_functorch
     assert "_rayd_resource" not in autograd.__dict__
-    assert autograd._rayd_scene_resource is native_resources._rayd_scene_resource
+    assert autograd._rayd_scene_resource is runtime._rayd_scene_resource
     assert (
         autograd.deterministic_normalize_vec3 is primitives.deterministic_normalize_vec3
     )
@@ -66,7 +60,7 @@ def test_geometry_autograd_uses_canonical_runtime_and_scene_dependencies():
         "_ad_native_tangent_or_none",
         "_ad_native_tensor",
     ):
-        assert getattr(autograd, name) is getattr(autograd_contracts, name)
+        assert getattr(autograd, name) is getattr(runtime, name)
 
 
 def test_autograd_methods_resolve_companions_in_the_canonical_owner():

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from ._ad_policy import (
+from .policy import (
     ad_ledger,
     carries_ad,
     require_first_order_request,
@@ -38,11 +38,11 @@ if TYPE_CHECKING:
     from witwin.channel.propagation.enumerated.engine import (
         EnumeratedEndpointTensors,
     )
-    from witwin.channel.propagation.models.evaluated import EvaluatedPaths
+    from witwin.channel.propagation.rows import EvaluatedPaths
     from witwin.channel.propagation.topology.kernels.canonical_compact import (
         ExactPairMetadata,
     )
-    from witwin.channel.scene.compiled import CompiledScene
+    from witwin.channel.scene.compiler import CompiledScene
     from witwin.channel.scene.endpoints import SolverScene
 
 
@@ -79,7 +79,7 @@ class _ConsumerRows:
 def _preflight_evaluate(
     compiled: object, request: object
 ) -> tuple[CompiledScene, PropagationRequest]:
-    from witwin.channel.scene.compiled import CompiledScene
+    from witwin.channel.scene.compiler import CompiledScene
 
     if not isinstance(compiled, CompiledScene):
         raise TypeError("evaluate requires a CompiledScene")
@@ -208,7 +208,7 @@ def _compact(
     evaluated: object,
     metadata: ExactPairMetadata | None,
 ) -> _ConsumerRows:
-    from witwin.channel.propagation.models.evaluated import EvaluatedPaths
+    from witwin.channel.propagation.rows import EvaluatedPaths
 
     if not isinstance(evaluated, EvaluatedPaths):
         raise TypeError("consumer source owner returned non-EvaluatedPaths")
@@ -240,7 +240,7 @@ def _fused_los_jones(
 ) -> JonesTransport:
     """Primal-only fused operator: one native launch for the whole batch."""
 
-    from ._native import consumer_los_jones
+    from .replay import consumer_los_jones
 
     assert sources.polarization_basis is not None
     assert sinks.polarization_basis is not None
@@ -279,8 +279,7 @@ def _composed_los_jones(
         autograd as field_autograd,
     )
 
-    from ._jones import compose_jones, transverse_basis
-    from ._rows import select_rows
+    from .replay import compose_jones, select_rows, transverse_basis
 
     assert sources.polarization_basis is not None
     assert sinks.polarization_basis is not None
@@ -333,8 +332,7 @@ def _transport(
     if response == "scalar_transport":
         return ScalarTransport(coefficient=fields.path_field)
     if response == "complex3_transport":
-        from ._amplitude import excited_field
-        from ._rows import select_rows
+        from .replay import excited_field, select_rows
 
         assert sources.powers_w is not None
         tx_power = select_rows(
@@ -552,7 +550,7 @@ def rediscovery_required(
     Returns ``None`` when nothing moved.
     """
 
-    from witwin.channel.scene.compiled import CompiledScene
+    from witwin.channel.scene.compiler import CompiledScene
 
     if not isinstance(compiled_scene, CompiledScene):
         raise TypeError("rediscovery_required requires a CompiledScene")
@@ -701,7 +699,7 @@ def _preflight_wideband(
 def _preflight_reevaluate(
     compiled: object, request: object
 ) -> tuple[CompiledScene, FixedTopologyRequest]:
-    from witwin.channel.scene.compiled import CompiledScene
+    from witwin.channel.scene.compiler import CompiledScene
 
     if not isinstance(compiled, CompiledScene):
         raise TypeError("reevaluate requires a CompiledScene")
@@ -836,13 +834,14 @@ def _reevaluate_prepared(
 ) -> FixedTopologyEvaluation:
     """Replay a prepared frozen topology bucket by bucket."""
 
-    from ._fixed_reflection import (
+    from .replay import (
         GeometryLiveness,
         evaluate_prepared,
+        prepared_row_gather,
         require_smooth_reflection_scene,
         scene_vertex_table,
+        select_rows,
     )
-    from ._rows import prepared_row_gather, select_rows
 
     prepared = request.topology
     assert isinstance(prepared, PreparedFixedTopology)
@@ -970,8 +969,8 @@ def reevaluate(
         functional as field_functional,
     )
 
-    from ._amplitude import excited_field
-    from ._fixed_los import (
+    from .replay import (
+        excited_field,
         fixed_los_gather,
         fixed_los_geometry_live,
         require_fixed_los_geometry_live,

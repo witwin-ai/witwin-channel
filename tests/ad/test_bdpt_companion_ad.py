@@ -49,7 +49,7 @@ from tests.reference import bdpt_ad_oracles as O
 from witwin.channel.montecarlo.bdpt.kernels import maps as M
 from witwin.channel.montecarlo.bdpt.kernels import paths as P
 from witwin.channel.montecarlo.bdpt import paths_ad as PA
-from witwin.channel.runtime import symbols
+from witwin.channel import runtime
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for BDPT companion AD"
@@ -1146,9 +1146,9 @@ def test_ad_mode_none_reflected_has_no_tape():
 
 def test_companion_symbols_are_registered():
     for name in _BDPT_COMPANION_SYMBOLS:
-        assert symbols.has_symbol(name), name
+        assert runtime.has_symbol(name), name
 
 
 def test_missing_symbol_fails_loudly():
-    with pytest.raises(symbols.NativeSymbolError):
-        symbols.required_symbol("bdpt_reflected_light_subpath_state_backward_absent")
+    with pytest.raises(runtime.NativeSymbolError):
+        runtime.required_symbol("bdpt_reflected_light_subpath_state_backward_absent")

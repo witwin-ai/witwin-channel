@@ -3,12 +3,12 @@ from __future__ import annotations
 import pytest
 import torch
 
-from witwin.channel.propagation.models.capacity import CapacityExecutionCounts
-from witwin.channel.runtime import capacity as capacity_runtime
-from witwin.channel.runtime.capacity import (
+from witwin.channel.runtime import (
+    CapacityExecutionCounts,
     SolveCapacityTransaction,
     create_solve_capacity_transaction,
 )
+from witwin.channel import runtime
 
 
 pytestmark = pytest.mark.skipif(
@@ -21,7 +21,7 @@ def test_solve_capacity_transaction_owns_state_and_one_terminal(monkeypatch) -> 
     transaction = create_solve_capacity_transaction(reference)
     observed: list[object] = []
     monkeypatch.setattr(
-        capacity_runtime,
+        runtime,
         "capacity_failure_terminal_check",
         lambda state: observed.append(state),
     )

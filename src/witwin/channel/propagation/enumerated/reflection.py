@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel.materials.encoding import face_material_tensors
+from witwin.channel.materials import face_material_tensors
 from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
 from witwin.channel.propagation.geometry.kernels import (
     primitives as geometry_primitives,

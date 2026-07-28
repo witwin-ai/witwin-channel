@@ -14,7 +14,7 @@ OWNER_SECTIONS = {
     "## Forbidden fallback",
 }
 OWNER_DOCS = (
-    ROOT / "src" / "witwin" / "channel" / "runtime" / "README.md",
+    ROOT / "docs" / "dev" / "runtime" / "README.md",
     ROOT / "src" / "witwin" / "channel" / "scene" / "README.md",
     ROOT / "src" / "witwin" / "channel" / "propagation" / "README.md",
     ROOT / "src" / "witwin" / "channel" / "scattering" / "README.md",

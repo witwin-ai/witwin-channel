@@ -3,7 +3,7 @@ import torch
 
 from tests.support.scenes import empty_space_los_scene
 from witwin.channel.deployment import build_info
-from witwin.channel.runtime.kernel_metadata import validate_metadata
+from witwin.channel.runtime import validate_metadata
 from witwin.channel.path import Config, solve
 
 

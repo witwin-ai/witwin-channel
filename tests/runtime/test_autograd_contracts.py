@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from witwin.channel.runtime import autograd_contracts
+from witwin.channel import runtime
 
 
 CONTRACT_NAMES = (
@@ -29,17 +29,17 @@ CONTRACT_NAMES = (
 
 @pytest.mark.parametrize("name", CONTRACT_NAMES)
 def test_autograd_contract_has_the_canonical_owner(name: str):
-    owner = getattr(autograd_contracts, name)
+    owner = getattr(runtime, name)
 
-    assert owner.__module__ == autograd_contracts.__name__
+    assert owner.__module__ == runtime.__name__
 
 
 def test_active_context_preserves_or_creates_the_expected_mask():
     like = torch.empty((2, 3))
     active = torch.tensor([True, False])
 
-    assert autograd_contracts._ad_active_ctx(active, like) is active
-    empty = autograd_contracts._ad_active_ctx(None, like)
+    assert runtime._ad_active_ctx(active, like) is active
+    empty = runtime._ad_active_ctx(None, like)
     assert empty.shape == (0,)
     assert empty.dtype == torch.bool
     assert empty.device == like.device
@@ -47,4 +47,4 @@ def test_active_context_preserves_or_creates_the_expected_mask():
 
 def test_composed_transform_error_remains_fail_loud():
     with pytest.raises(NotImplementedError, match="composed functorch transforms"):
-        autograd_contracts._ad_raise_composed_transforms()
+        runtime._ad_raise_composed_transforms()

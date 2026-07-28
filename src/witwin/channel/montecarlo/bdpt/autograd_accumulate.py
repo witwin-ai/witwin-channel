@@ -16,11 +16,11 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.runtime import torch_compat
-from witwin.channel.runtime.autograd_contracts import (
+from witwin.channel.runtime import (
     _ad_first_order_only,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
+    disable_functorch,
 )
 
 from .kernels.maps import (
@@ -128,7 +128,7 @@ class _BdptFinalizeAdFunction(torch.autograd.Function):
             if ctx.kind == "point"
             else bdpt_finalize_component_maps_jvp
         )
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = jvp(*(_ad_native_tensor(value) for value in ctx.saved_tensors), **tangents)
         return tuple(out[name] for name in _FINALIZE_TANGENT_FIELDS)
 
@@ -330,7 +330,7 @@ class _BdptAccumulateAdFunction(torch.autograd.Function):
             and tangent_coeff_imag is None
         ):
             return (None,) * n_out
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = bdpt_accumulate_connection_samples_jvp(
                 samples,
                 tx_count=ctx.tx_count,

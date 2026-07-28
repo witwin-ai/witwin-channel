@@ -18,5 +18,5 @@ Silent ABI downgrade is rejected rather than tolerated.
 
 ## Implementing artifact
 
-`runtime/extension.py` performs the explicit override and fingerprint check,
+`runtime.py` performs the explicit override and fingerprint check,
 guarded by `tests/kernels/test_extension_loading.py`.

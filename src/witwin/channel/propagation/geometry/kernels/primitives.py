@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.runtime.symbols import (
+from witwin.channel.runtime import (
     native_extension,
     required_symbol as _required_native_op,
+    validate_cuda_tensor,
 )
-from witwin.channel.runtime.tensor_contracts import validate_cuda_tensor
 
 
 def core_diffraction_edge_count(

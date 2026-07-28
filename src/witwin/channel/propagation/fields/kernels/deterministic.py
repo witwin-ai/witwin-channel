@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.runtime.symbols import native_extension
-from witwin.channel.runtime.tensor_contracts import validate_cuda_tensor
+from witwin.channel.runtime import native_extension, validate_cuda_tensor
 
 
 def deterministic_los_field(

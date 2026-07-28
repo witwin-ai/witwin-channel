@@ -11,13 +11,9 @@ import weakref
 import pytest
 import torch
 
-from witwin.channel.runtime import native_resources as ops
-from witwin.channel.scene.kernels import rayd_scene as legacy_rayd
-from witwin.channel.runtime import native_resources as runtime_native_resources
-from witwin.channel.runtime import symbols
-from witwin.channel.scene import kernels
-from witwin.channel.scene import compiled
-from witwin.channel.scene.kernels import rayd_scene
+from witwin.channel import runtime
+from witwin.channel.scene import compiler
+from witwin.channel.scene import resources as rayd_scene
 
 
 _SCENE_KERNEL_NAMES = (
@@ -49,18 +45,15 @@ def _definition_ast_digest(definition: object) -> str:
 
 
 def test_rayd_scene_lifecycle_has_one_canonical_owner():
-    assert (
-        rayd_scene.RayDSceneResource
-        is legacy_rayd.RayDSceneResource
-        is compiled.RayDSceneResource
-    )
-    assert rayd_scene.RayDEdgeRecords is legacy_rayd.RayDEdgeRecords
-    assert rayd_scene.build_scene_from_structures is (
-        legacy_rayd.build_scene_from_structures
-    )
-    assert rayd_scene.RayDSceneResource.__module__ == legacy_rayd.__name__
-    assert rayd_scene.RayDEdgeRecords.__module__ == legacy_rayd.__name__
+    assert rayd_scene.RayDSceneResource is compiler.RayDSceneResource
+    assert rayd_scene.build_scene_from_structures.__module__ == rayd_scene.__name__
+    assert rayd_scene.RayDSceneResource.__module__ == rayd_scene.__name__
+    assert rayd_scene.RayDEdgeRecords.__module__ == rayd_scene.__name__
     assert importlib.util.find_spec("witwin.channel.core") is None
+    # The kernels package and the separate compiled-scene module were folded
+    # into scene.resources and scene.compiler; neither may come back.
+    assert importlib.util.find_spec("witwin.channel.scene.kernels") is None
+    assert importlib.util.find_spec("witwin.channel.scene.compiled") is None
     with pytest.raises(ModuleNotFoundError):
         importlib.util.find_spec("witwin.channel.core.runtime.compiled_scene")
 
@@ -78,18 +71,18 @@ def test_scene_kernel_package_reexports_canonical_owner(name: str):
     owner = getattr(rayd_scene, name)
 
     assert owner.__module__ == rayd_scene.__name__
-    assert getattr(kernels, name) is owner
+    assert name in rayd_scene.__all__
 
 
 def test_scene_resource_normalizer_has_one_runtime_owner():
-    owner = runtime_native_resources._rayd_scene_resource
+    owner = runtime._rayd_scene_resource
 
-    assert owner.__module__ == runtime_native_resources.__name__
-    assert ops._rayd_scene_resource is owner
+    assert owner.__module__ == runtime.__name__
+    assert runtime._rayd_scene_resource is owner
 
 
 def test_scene_kernel_uses_canonical_required_symbol():
-    assert rayd_scene._required_native_op is symbols.required_symbol
+    assert rayd_scene._required_native_op is runtime.required_symbol
 
 
 def test_rayd_edge_records_preserve_order_cache_identity_and_owner_lifetime(

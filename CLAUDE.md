@@ -118,7 +118,15 @@ Organize code by RF domain capability, with a single owner for each operation:
 
 - `runtime`: packaged extension loading, ABI/build identity, symbol validation,
   Torch compatibility isolation, native buffers, kernel metadata, memory
-  budgets, and AD dispatch contracts.
+  budgets, AD dispatch contracts, and the capacity failure state, execution
+  counts, and host-count guard that every capacity-shaped contract shares. It
+  is one module, `runtime.py`, and every one of those names is imported from
+  `witwin.channel.runtime` directly; there are no runtime submodules and no
+  second spelling of an import. Its owner document is
+  `docs/dev/runtime/README.md`, because a module has no directory to hold a
+  README. The packaged RayD identity lock and build-fingerprint sidecar sit
+  beside the extension in `witwin/channel/`, not in a `runtime/` data
+  directory.
 - `scene`: scene lifecycle, compilation, immutable native resources, RayD
   handles, endpoint/antenna/receiver geometry, diffraction edge policy and
   selection, and the scene-leaf AD geometry seam.
@@ -132,7 +140,15 @@ Organize code by RF domain capability, with a single owner for each operation:
 - `propagation.fields`: RF field evaluation and native derivative companions.
 - `propagation.enumerated`: shared deterministic path evaluation for Path and
   Deterministic solvers.
-- `propagation.models`: the typed internal row contracts those stages exchange.
+- `propagation.rows`: the typed internal row contracts those stages exchange.
+  One path table is four zero-copy views keyed on one opaque row-identity
+  token, and they live in one module rather than one per stage because
+  `propagation.topology.export` constructs all four together while the import
+  graph forbids topology from reaching geometry or fields.
+- `propagation.penetration`: the typed ADR-027 segment-penetration results.
+  They sit beside the row contracts for the same reason: the component-5
+  topology packer reads a `SegmentPenetrationResult`, so they cannot live
+  under `propagation.geometry`.
 - `propagation.consumer`: the stable solver-neutral public propagation
   contract, its vocabulary, and its capability record. It owns no physics, adds
   no second compaction, and must never import a solver. Under ADR-037 a frozen
@@ -224,7 +240,10 @@ several domains all need, and that therefore cannot live under `runtime`,
   approximation costs.
 - `field_state`: the `Complex3State` / `JonesState` native field ABI contracts.
 - `components`: cross-domain component identity.
-- `tensor_math`: shared tensor helpers with no domain of their own.
+- `tensor_math`: shared tensor helpers with no domain of their own, including
+  `require_tensor`, the single owner of the dtype/shape/rank/device/CUDA/
+  contiguity check that the row, capacity, and consumer contracts all apply
+  to a declared tensor field.
 
 `capabilities` reports solver-level capability and embeds the consumer contract
 record under `propagation_consumer` rather than restating it. `deployment` owns

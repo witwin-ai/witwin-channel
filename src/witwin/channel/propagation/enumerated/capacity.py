@@ -12,21 +12,21 @@ if TYPE_CHECKING:
         EvaluatedPathSidecars,
     )
 
-from witwin.channel.propagation.models.evaluated import EvaluatedPaths
-from witwin.channel.propagation.models.fields import PathFields
-from witwin.channel.propagation.models.geometry import PathGeometry
-from witwin.channel.propagation.models.topology import PathTopology
-from witwin.channel.runtime import torch_compat
-from witwin.channel.runtime.autograd_contracts import (
+from witwin.channel.propagation.rows import (
+    EvaluatedPaths,
+    PathFields,
+    PathGeometry,
+    PathTopology,
+)
+from witwin.channel.runtime import (
+    CapacityFailureState,
     _ad_first_order_only,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
-)
-from witwin.channel.runtime.capacity import (
-    CapacityFailureState,
+    disable_functorch,
     require_capacity_failure_state,
+    required_symbol as _required_native_op,
 )
-from witwin.channel.runtime.symbols import required_symbol as _required_native_op
 
 
 _TOPOLOGY_INPUT_FIELDS = (
@@ -185,7 +185,7 @@ class _EnumeratedCapacityFailureSanitizeFunction(torch.autograd.Function):
         valid, selected_row_index = (
             _ad_native_tensor(value) for value in ctx.saved_tensors
         )
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             raw = _evaluated_paths_capacity_pack_jvp_native(
                 valid,
                 selected_row_index,
@@ -285,7 +285,7 @@ class _EnumeratedCapacityFailureVectorSanitizeFunction(torch.autograd.Function):
         (failure_state_bits,) = (
             _ad_native_tensor(value) for value in ctx.saved_tensors
         )
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             return _enumerated_capacity_failure_vector_sanitize_native(
                 failure_state_bits, values_tangent
             )

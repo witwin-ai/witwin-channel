@@ -1,9 +1,36 @@
-"""Compile canonical Core world contracts into Channel runtime resources."""
+"""Compile canonical Core world contracts into Channel runtime resources.
+
+This module is the single owner of the Channel side of the world boundary: the
+canonical geometry/material/assignment stores, the immutable
+:class:`CompiledScene` that holds them, the bounded compile registry that decides
+when a store can be reused, and the endpoint tensor exports every solver reads
+off a bound scene.
+
+They were six modules with one lifetime between them. A store existed only to be
+a :class:`CompiledScene` field, ``compiled`` existed only to be what ``compile``
+returns, and the tensor exports read the same endpoint collections the compile
+cache is keyed on, so a reader following one compiled scene had to walk six
+files.
+
+Under ADR-034 ``witwin.core`` owns the logical world - ``Scene``,
+``SceneSnapshot``, ``Structure``, stable IDs, material specifications, and the
+four version domains - and Channel owns everything below: the reference
+frequency the world is compiled at, the native resources, the stores, and the
+caches. Nothing here computes RF physics; it projects an already-owned world
+into the tensors a native kernel consumes.
+
+The immutable native resources this module holds - the typed RayD scene, the
+edge policy cached on it, and the lazy Kirchhoff and phase-screen resources -
+live in :mod:`witwin.channel.scene.resources`, and the endpoint views the tensor
+exports read live in :mod:`witwin.channel.scene.endpoints`. Both are imported
+here rather than the other way round, so that importing an endpoint view or a
+resource type does not drag in the compiler and everything it compiles against.
+"""
 
 from __future__ import annotations
 
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field, fields
 import hashlib
 import math
 from threading import RLock
@@ -23,7 +50,7 @@ from witwin.core import (
 )
 from witwin.core.material import VACUUM_PERMITTIVITY
 
-from witwin.channel.materials.abi import (
+from witwin.channel.materials import (
     DIELECTRIC_MODEL_ID,
     MATERIAL_ABI_VERSION,
     PEC_EFFECTIVE_SIGMA_E,
@@ -32,15 +59,596 @@ from witwin.channel.materials.abi import (
 from witwin.channel.propagation.topology.kernels import (
     primitives as topology_primitives,
 )
-from witwin.channel.runtime.native_buffers import bdpt_zero_matrix
-from witwin.channel.scene.compiled import CompiledScene
-from witwin.channel.scene.kernels.rayd_scene import (
+from witwin.channel.runtime import (
+    bdpt_zero_matrix,
+    mc_receiver_grid_points,
+    mc_transmitter_tensors,
+)
+from witwin.channel.scattering import KirchhoffTable
+from witwin.channel.scene.endpoints import (
+    ReceiverGrid,
+    ReceiverPoint,
+    SolverScene,
+    vector3_tuple,
+)
+from witwin.channel.scene.resources import (
+    KirchhoffRuntimeResources,
+    PhaseScreenResourceKey,
+    PhaseScreenRuntimeResources,
     RayDSceneResource,
+    RoughMaterialRuntime,
+    ScatteringResourceKey,
+    build_kirchhoff_resources,
+    build_phase_screen_resources,
     build_scene_from_structures,
 )
-from witwin.channel.scene.stores.assignments import AssignmentStore
-from witwin.channel.scene.stores.geometry import GeometryStore
-from witwin.channel.scene.stores.materials import MaterialStore
+
+
+def require_tensor(
+    name: str,
+    tensor: torch.Tensor,
+    *,
+    dtype: torch.dtype,
+    ndim: int,
+    trailing_shape: tuple[int, ...] = (),
+) -> None:
+    if not isinstance(tensor, torch.Tensor):
+        raise TypeError(f"{name} must be a torch.Tensor")
+    if tensor.dtype != dtype:
+        raise TypeError(f"{name} must have dtype {dtype}")
+    if tensor.ndim != ndim:
+        raise ValueError(f"{name} must have {ndim} dimensions")
+    if trailing_shape and tuple(tensor.shape[-len(trailing_shape) :]) != trailing_shape:
+        raise ValueError(f"{name} must end with shape {trailing_shape}")
+    if not tensor.is_contiguous():
+        raise ValueError(f"{name} must be contiguous")
+
+
+@dataclass(frozen=True, slots=True)
+class GeometryStore:
+    vertices: torch.Tensor
+    faces: torch.Tensor
+    face_normals: torch.Tensor
+    edges: torch.Tensor
+    edge_adj_faces: torch.Tensor
+    edge_param_range: torch.Tensor
+    face_structure_id: torch.Tensor
+    face_surface_id: torch.Tensor
+    face_primitive_id: torch.Tensor
+    structure_uv_presence: tuple[tuple[bool, bool], ...]
+    version: int
+
+    def __post_init__(self) -> None:
+        require_tensor("vertices", self.vertices, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+        require_tensor("faces", self.faces, dtype=torch.int32, ndim=2, trailing_shape=(3,))
+        require_tensor(
+            "face_normals", self.face_normals, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+        )
+        require_tensor("edges", self.edges, dtype=torch.int32, ndim=2, trailing_shape=(2,))
+        require_tensor(
+            "edge_adj_faces", self.edge_adj_faces, dtype=torch.int32, ndim=2, trailing_shape=(2,)
+        )
+        require_tensor(
+            "edge_param_range",
+            self.edge_param_range,
+            dtype=torch.float32,
+            ndim=2,
+            trailing_shape=(2,),
+        )
+        require_tensor("face_structure_id", self.face_structure_id, dtype=torch.int64, ndim=1)
+        require_tensor("face_surface_id", self.face_surface_id, dtype=torch.int64, ndim=1)
+        require_tensor("face_primitive_id", self.face_primitive_id, dtype=torch.int64, ndim=1)
+        if self.faces.shape[0] != self.face_normals.shape[0]:
+            raise ValueError("face_normals length must match faces")
+        if self.faces.shape[0] != self.face_structure_id.shape[0]:
+            raise ValueError("face_structure_id length must match faces")
+        if self.faces.shape[0] != self.face_surface_id.shape[0]:
+            raise ValueError("face_surface_id length must match faces")
+        if self.faces.shape[0] != self.face_primitive_id.shape[0]:
+            raise ValueError("face_primitive_id length must match faces")
+        if self.edges.shape[0] != self.edge_adj_faces.shape[0]:
+            raise ValueError("edge_adj_faces length must match edges")
+        if self.edges.shape[0] != self.edge_param_range.shape[0]:
+            raise ValueError("edge_param_range length must match edges")
+        if any(
+            type(uv_present) is not bool or type(face_uv_present) is not bool
+            for uv_present, face_uv_present in self.structure_uv_presence
+        ):
+            raise ValueError("structure_uv_presence entries must contain bool values")
+
+
+@dataclass(frozen=True, slots=True)
+class MaterialStore:
+    material_id: torch.Tensor
+    eps_r: torch.Tensor
+    mu_r: torch.Tensor
+    sigma_e: torch.Tensor
+    gain: torch.Tensor
+    model_id: torch.Tensor
+    thickness_m: torch.Tensor
+    scattering_coefficient: torch.Tensor
+    xpd_coefficient: torch.Tensor
+    # ABI v3: flat CSR layer stack over all M materials (L total layers).
+    layer_offset: torch.Tensor
+    layer_count: torch.Tensor
+    layer_thickness_m: torch.Tensor
+    layer_eps_r: torch.Tensor
+    layer_sigma_e: torch.Tensor
+    layer_mu_r: torch.Tensor
+    # ABI v3: front-surface roughness statistics (sigma_h == 0 means smooth).
+    rough_sigma_h_m: torch.Tensor
+    rough_corr_x_m: torch.Tensor
+    rough_corr_y_m: torch.Tensor
+    rough_axis_rad: torch.Tensor
+    # ABI v3: 0=thin_sheet, 1=closed_volume / 0=smooth, 1=kirchhoff_ensemble.
+    geometry_mode_id: torch.Tensor
+    scatter_model_id: torch.Tensor
+    material_keys: tuple[str, ...]
+    frequency_hz: float
+    abi_version: int
+    cache_token: str
+    version: int
+    # Keys of records whose material law changes with the carrier frequency
+    # (records are frozen at the primal frequency at compile time). Consumed
+    # by the plan 07 AD-1 explicit-failure check for frequency AD.
+    frequency_dependent: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        require_tensor("material_id", self.material_id, dtype=torch.int64, ndim=1)
+        require_tensor("eps_r", self.eps_r, dtype=torch.float32, ndim=1)
+        require_tensor("mu_r", self.mu_r, dtype=torch.float32, ndim=1)
+        require_tensor("sigma_e", self.sigma_e, dtype=torch.float32, ndim=1)
+        require_tensor("gain", self.gain, dtype=torch.float32, ndim=1)
+        require_tensor("model_id", self.model_id, dtype=torch.int32, ndim=1)
+        require_tensor("thickness_m", self.thickness_m, dtype=torch.float32, ndim=1)
+        require_tensor(
+            "scattering_coefficient",
+            self.scattering_coefficient,
+            dtype=torch.float32,
+            ndim=1,
+        )
+        require_tensor(
+            "xpd_coefficient", self.xpd_coefficient, dtype=torch.float32, ndim=1
+        )
+        require_tensor("layer_offset", self.layer_offset, dtype=torch.int32, ndim=1)
+        require_tensor("layer_count", self.layer_count, dtype=torch.int32, ndim=1)
+        require_tensor(
+            "layer_thickness_m", self.layer_thickness_m, dtype=torch.float32, ndim=1
+        )
+        require_tensor("layer_eps_r", self.layer_eps_r, dtype=torch.float32, ndim=1)
+        require_tensor("layer_sigma_e", self.layer_sigma_e, dtype=torch.float32, ndim=1)
+        require_tensor("layer_mu_r", self.layer_mu_r, dtype=torch.float32, ndim=1)
+        require_tensor(
+            "rough_sigma_h_m", self.rough_sigma_h_m, dtype=torch.float32, ndim=1
+        )
+        require_tensor(
+            "rough_corr_x_m", self.rough_corr_x_m, dtype=torch.float32, ndim=1
+        )
+        require_tensor(
+            "rough_corr_y_m", self.rough_corr_y_m, dtype=torch.float32, ndim=1
+        )
+        require_tensor(
+            "rough_axis_rad", self.rough_axis_rad, dtype=torch.float32, ndim=1
+        )
+        require_tensor(
+            "geometry_mode_id", self.geometry_mode_id, dtype=torch.int32, ndim=1
+        )
+        require_tensor(
+            "scatter_model_id", self.scatter_model_id, dtype=torch.int32, ndim=1
+        )
+        lengths = {
+            self.material_id.shape[0],
+            self.eps_r.shape[0],
+            self.mu_r.shape[0],
+            self.sigma_e.shape[0],
+            self.gain.shape[0],
+            self.model_id.shape[0],
+            self.thickness_m.shape[0],
+            self.scattering_coefficient.shape[0],
+            self.xpd_coefficient.shape[0],
+            self.layer_offset.shape[0],
+            self.layer_count.shape[0],
+            self.rough_sigma_h_m.shape[0],
+            self.rough_corr_x_m.shape[0],
+            self.rough_corr_y_m.shape[0],
+            self.rough_axis_rad.shape[0],
+            self.geometry_mode_id.shape[0],
+            self.scatter_model_id.shape[0],
+            len(self.material_keys),
+        }
+        if len(lengths) != 1:
+            raise ValueError("material tensors must have the same length")
+        layer_lengths = {
+            self.layer_thickness_m.shape[0],
+            self.layer_eps_r.shape[0],
+            self.layer_sigma_e.shape[0],
+            self.layer_mu_r.shape[0],
+        }
+        if len(layer_lengths) != 1:
+            raise ValueError("layer tensors must have the same length")
+        total_layers = self.layer_thickness_m.shape[0]
+        counts = self.layer_count.to(dtype=torch.int64)
+        offsets = self.layer_offset.to(dtype=torch.int64)
+        if self.layer_count.numel():
+            if bool((counts < 1).any()):
+                raise ValueError("layer_count must be >= 1 for every material")
+            expected_offsets = torch.cumsum(counts, dim=0) - counts
+            if not torch.equal(offsets, expected_offsets):
+                raise ValueError("layer_offset must be the exclusive scan of layer_count")
+        if int(counts.sum()) != total_layers:
+            raise ValueError("layer_count must sum to the layer tensor length")
+        if self.frequency_hz <= 0.0:
+            raise ValueError("frequency_hz must be positive")
+        if self.abi_version != 3:
+            raise ValueError("MaterialStore requires material ABI version 3")
+        if self.material_id.numel() and bool((self.material_id < 0).any()):
+            raise ValueError("material_id must be non-negative")
+        if torch.unique(self.material_id).numel() != self.material_id.numel():
+            raise ValueError("material_id must be unique")
+        if len(set(self.material_keys)) != len(self.material_keys):
+            raise ValueError("material_keys must be unique")
+
+
+@dataclass(frozen=True, slots=True)
+class AssignmentStore:
+    assignment_id: torch.Tensor
+    material_id: torch.Tensor
+    structure_id: torch.Tensor
+    surface_id: torch.Tensor
+    face_material_id: torch.Tensor
+    edge_material_id0: torch.Tensor
+    edge_material_id1: torch.Tensor
+    surface_material_id: torch.Tensor
+    structure_material_id: torch.Tensor
+    num_faces: int
+    num_edges: int
+    version: int
+    # Per-structure phase-screen bindings from the Core Structure assignment.
+    structure_phase_screens: dict[int, PhaseScreen] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        require_tensor("assignment_id", self.assignment_id, dtype=torch.int64, ndim=1)
+        require_tensor("material_id", self.material_id, dtype=torch.int64, ndim=1)
+        require_tensor("structure_id", self.structure_id, dtype=torch.int64, ndim=1)
+        require_tensor("surface_id", self.surface_id, dtype=torch.int64, ndim=1)
+        require_tensor("face_material_id", self.face_material_id, dtype=torch.int32, ndim=1)
+        require_tensor("edge_material_id0", self.edge_material_id0, dtype=torch.int32, ndim=1)
+        require_tensor("edge_material_id1", self.edge_material_id1, dtype=torch.int32, ndim=1)
+        require_tensor("surface_material_id", self.surface_material_id, dtype=torch.int32, ndim=1)
+        require_tensor(
+            "structure_material_id", self.structure_material_id, dtype=torch.int32, ndim=1
+        )
+        if self.face_material_id.shape[0] != self.num_faces:
+            raise ValueError("face_material_id length must match num_faces")
+        if self.edge_material_id0.shape[0] != self.num_edges:
+            raise ValueError("edge_material_id0 length must match num_edges")
+        if self.edge_material_id1.shape[0] != self.num_edges:
+            raise ValueError("edge_material_id1 length must match num_edges")
+        num_structures = self.structure_material_id.shape[0]
+        if not (
+            self.assignment_id.shape[0]
+            == self.material_id.shape[0]
+            == self.structure_id.shape[0]
+            == self.surface_id.shape[0]
+            == num_structures
+        ):
+            raise ValueError(
+                "stable assignment/material/structure IDs must have one row "
+                "per structure"
+            )
+        for name, values in (
+            ("assignment_id", self.assignment_id),
+            ("structure_id", self.structure_id),
+        ):
+            if torch.unique(values).numel() != values.numel():
+                raise ValueError(f"{name} must be unique")
+        for index, screen in self.structure_phase_screens.items():
+            if not isinstance(index, int) or not 0 <= index < num_structures:
+                raise ValueError(
+                    "structure_phase_screens keys must be structure indices in "
+                    f"[0, {num_structures})"
+                )
+            if not isinstance(screen, PhaseScreen):
+                raise ValueError("structure_phase_screens values must be PhaseScreen")
+
+
+def _validated_time(
+    time_s: float | torch.Tensor | None,
+) -> float | torch.Tensor | None:
+    """Normalize a compiled snapshot instant without reading a tensor."""
+
+    if isinstance(time_s, torch.Tensor):
+        if time_s.ndim != 0 or not time_s.dtype.is_floating_point:
+            raise TypeError("time_s must be a scalar floating-point tensor")
+        return time_s
+    if time_s is None or isinstance(time_s, float):
+        return time_s
+    if isinstance(time_s, int) and not isinstance(time_s, bool):
+        return float(time_s)
+    raise TypeError("time_s must be a float, a scalar tensor, or None")
+
+
+@dataclass(slots=True)
+class CompiledScene:
+    source: Scene | SceneSnapshot
+    structures: tuple[object, ...]
+    geometry: GeometryStore
+    materials: MaterialStore
+    assignments: AssignmentStore
+    rayd: RayDSceneResource
+    reference_frequency_hz: float | torch.Tensor
+    reference_frequency_revision: int | None
+    topology_version: int
+    geometry_version: int
+    material_version: int
+    assignment_version: int
+    # The SceneSnapshot instant this runtime was compiled from, or None for a
+    # plain Scene. Reporting and cross-consumer correlation only: it records
+    # which world instant a CompiledScene is, and it never gates a call. The
+    # four version domains above are the freshness authority (ADR-040).
+    time_s: float | torch.Tensor | None = None
+    enumerated_penetration_scene_diagonal_m: float = 0.0
+    montecarlo_penetration_scene_diagonal_m: float = 0.0
+    # Lazy scattering caches (built on first access so smooth scenes pay no
+    # compile cost). A CompiledScene instance is already cache-keyed by the
+    # material cache_token in Scene.compile, so instance-level caching is
+    # consistent with the material cache.
+    _kirchhoff_resources_cache: KirchhoffRuntimeResources | None = field(
+        default=None, repr=False, compare=False
+    )
+    _phase_screen_resources_cache: PhaseScreenRuntimeResources | None = field(
+        default=None, repr=False, compare=False
+    )
+    # (source-state signature, tables). The signature is re-derived on every
+    # call so a scene leaf marked AFTER the cache was populated invalidates it
+    # instead of being silently severed from the graph.
+    _fixed_reevaluation_tables_cache: tuple[tuple, dict] | None = field(
+        default=None, repr=False, compare=False
+    )
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.source, (Scene, SceneSnapshot)):
+            raise TypeError("source must be a witwin.core Scene or SceneSnapshot")
+        frequency = self.reference_frequency_hz
+        if isinstance(frequency, torch.Tensor):
+            if frequency.ndim != 0 or not frequency.dtype.is_floating_point:
+                raise TypeError(
+                    "reference_frequency_hz must be a scalar floating-point tensor"
+                )
+            if self.reference_frequency_revision is None:
+                raise TypeError(
+                    "tensor reference frequency requires a mutation revision"
+                )
+        elif not isinstance(frequency, float):
+            raise TypeError("reference_frequency_hz must be a float or tensor")
+        elif self.reference_frequency_revision is not None:
+            raise TypeError("scalar reference frequency has no mutation revision")
+        self.time_s = _validated_time(self.time_s)
+        for name in (
+            "enumerated_penetration_scene_diagonal_m",
+            "montecarlo_penetration_scene_diagonal_m",
+        ):
+            value = getattr(self, name)
+            if not isinstance(value, float):
+                raise TypeError(f"{name} must be a float")
+            if not math.isfinite(value) or value < 0.0:
+                raise ValueError(f"{name} must be finite and non-negative")
+
+    def require_reference_frequency(
+        self, reference_frequency_hz: float | torch.Tensor
+    ) -> None:
+        """Reject a request/compile frequency mismatch before native work."""
+
+        compiled = self.reference_frequency_hz
+        if isinstance(compiled, torch.Tensor):
+            if reference_frequency_hz is not compiled:
+                raise ValueError(
+                    "reference_frequency_hz does not match the compiled tensor "
+                    "identity"
+                )
+            if int(reference_frequency_hz._version) != self.reference_frequency_revision:
+                raise ValueError(
+                    "reference_frequency_hz changed after scene compilation"
+                )
+            return
+        if isinstance(reference_frequency_hz, torch.Tensor):
+            raise ValueError(
+                "reference_frequency_hz tensor does not match the compiled scalar"
+            )
+        if float(reference_frequency_hz).hex() != compiled.hex():
+            raise ValueError(
+                "reference_frequency_hz does not exactly match CompiledScene"
+            )
+
+    def _fixed_reevaluation_table_sources(self) -> tuple[torch.Tensor, ...]:
+        """Every tensor the fixed-replay tables are built from.
+
+        The vertex table concatenates the live structure vertex tensors (or the
+        native table when the scene has no structures); the material bundle is
+        an index_select over the material and assignment stores. Enumerating the
+        stores by dataclass field keeps this a superset of whatever the bundle
+        builder reads, so a new store field cannot silently escape the liveness
+        signature below.
+        """
+
+        sources: list[torch.Tensor] = [self.geometry.vertices]
+        for structure in self.structures:
+            vertices = getattr(structure, "vertices", None)
+            if isinstance(vertices, torch.Tensor):
+                sources.append(vertices)
+        for store in (self.materials, self.assignments):
+            for store_field in fields(store):
+                value = getattr(store, store_field.name)
+                if isinstance(value, torch.Tensor):
+                    sources.append(value)
+        return tuple(sources)
+
+    def _fixed_reevaluation_table_state(self) -> tuple[tuple[bool, bool, bool, int], ...]:
+        """Host-only autograd/mutation signature of the replay-table sources.
+
+        Reads tensor attributes only - ``requires_grad``, the presence of a
+        ``grad_fn`` or a forward-AD tangent, and the mutation ``_version``. It
+        touches no device memory, launches nothing, and never synchronizes, so
+        it is cheap enough to re-derive on every replay.
+        """
+
+        state: list[tuple[bool, bool, bool, int]] = []
+        for source in self._fixed_reevaluation_table_sources():
+            state.append(
+                (
+                    bool(source.requires_grad),
+                    source.grad_fn is not None,
+                    torch.autograd.forward_ad.unpack_dual(source).tangent is not None,
+                    int(source._version),
+                )
+            )
+        return tuple(state)
+
+    def fixed_reevaluation_tables(self) -> dict[str, object]:
+        """Scene-static vertex and material tables for fixed-topology replay.
+
+        Built lazily per instance following the Plan-13 scene-static pattern:
+        both tables depend only on this CompiledScene's immutable stores and
+        structure tensors, and any world change produces a new instance through
+        the version-token compile cache. The cache is bypassed whenever a table
+        tensor participates in autograd - a cached graph node would be freed by
+        the first backward and fail the second - so differentiable-material or
+        differentiable-mesh loops pay the staging exactly as before, while the
+        primal per-frame replay (the Radar Doppler shape) stages once.
+
+        The bypass is decided per call, not once at population time: the cache
+        is keyed on the host-only liveness/mutation signature of the source
+        tensors, so marking ``materials.eps_r`` or a structure's vertices after
+        a primal replay has already warmed the cache rebuilds the tables and
+        keeps that leaf on the graph. Serving a stale cached table there would
+        drop the leaf's gradient silently, which the AD capability record
+        forbids.
+        """
+
+        signature = self._fixed_reevaluation_table_state()
+        cached = self._fixed_reevaluation_tables_cache
+        if cached is not None and cached[0] == signature:
+            return cached[1]
+
+        from witwin.channel.materials import face_material_field_bundle
+        from witwin.channel.scene import endpoints
+
+        tables: dict[str, object] = {
+            "vertices": endpoints.scene_vertex_table(self, self),
+            "material": face_material_field_bundle(
+                self, device=self.geometry.vertices.device
+            ),
+        }
+
+        def _participates(value: object) -> bool:
+            if not isinstance(value, torch.Tensor):
+                return False
+            if value.requires_grad or value.grad_fn is not None:
+                return True
+            return (
+                torch.autograd.forward_ad.unpack_dual(value).tangent is not None
+            )
+
+        graph_bearing = _participates(tables["vertices"]) or any(
+            _participates(value) for value in tables["material"].values()
+        )
+        self._fixed_reevaluation_tables_cache = (
+            None if graph_bearing else (signature, tables)
+        )
+        return tables
+
+    @property
+    def kirchhoff_resources(self) -> KirchhoffRuntimeResources:
+        """Kirchhoff BSDF tables per material index (scatter_model_id == 1).
+
+        Built lazily from the MaterialStore CSR layers and roughness fields
+        at the store frequency; raises ``kirchhoff_domain_exceeded`` for
+        out-of-domain roughness (never silently degrades).
+        """
+
+        key = self._scattering_resource_key()
+        if (
+            self._kirchhoff_resources_cache is None
+            or self._kirchhoff_resources_cache.key != key
+        ):
+            self._kirchhoff_resources_cache = build_kirchhoff_resources(
+                self.materials, key
+            )
+        return self._kirchhoff_resources_cache
+
+    @property
+    def phase_screen_resources(self) -> PhaseScreenRuntimeResources:
+        """Immutable per-structure phase-screen resources, built lazily."""
+
+        key = self._phase_screen_resource_key()
+        if (
+            self._phase_screen_resources_cache is None
+            or self._phase_screen_resources_cache.key != key
+        ):
+            self._phase_screen_resources_cache = build_phase_screen_resources(
+                self.materials, self.assignments, self.rayd, key
+            )
+        return self._phase_screen_resources_cache
+
+    @property
+    def kirchhoff_tables(self) -> dict[int, KirchhoffTable]:
+        """Compatibility view of the typed Kirchhoff table resources."""
+
+        return self.kirchhoff_resources.tables
+
+    @property
+    def rough_material_runtimes(self) -> dict[int, RoughMaterialRuntime]:
+        """Typed rough-material runtimes sharing the cached table objects."""
+
+        return self.kirchhoff_resources.materials
+
+    def _scattering_resource_key(self) -> ScatteringResourceKey:
+        device = torch.device("cuda")
+        return ScatteringResourceKey(
+            material_cache_token=self.materials.cache_token,
+            assignment_version=self.assignment_version,
+            device=device,
+        )
+
+    def _phase_screen_resource_key(self) -> PhaseScreenResourceKey:
+        device = torch.device("cuda")
+        return PhaseScreenResourceKey(
+            material_cache_token=self.materials.cache_token,
+            geometry_version=self.geometry_version,
+            assignment_version=self.assignment_version,
+            phase_screen_token=self._phase_screen_assignment_token(),
+            structure_uv_presence=self.geometry.structure_uv_presence,
+            # Pure Python wrapper identity for cache invalidation. This is not
+            # a native pointer or an integer scene handle; CompiledScene keeps
+            # the owning RayDSceneResource alive for the cache lifetime.
+            rayd_scene_identity=id(self.rayd),
+            device=device,
+        )
+
+    def _phase_screen_assignment_token(self) -> tuple[tuple[object, ...], ...]:
+        """Mutation-aware identity without reading resident values to the host."""
+
+        tokens: list[tuple[object, ...]] = []
+        for structure_index, screen in sorted(
+            self.assignments.structure_phase_screens.items()
+        ):
+            height = screen.height
+            if isinstance(height, torch.Tensor):
+                height_token: tuple[object, ...] = (
+                    "tensor",
+                    id(height),
+                    int(height._version),
+                    tuple(height.shape),
+                    height.dtype,
+                    height.device,
+                )
+            else:
+                height_token = (
+                    "sequence",
+                    tuple(tuple(float(value) for value in row) for row in height),
+                )
+            tokens.append((structure_index, id(screen), *height_token))
+        return tuple(tokens)
 
 
 _GEOMETRY_MODE_IDS = {"thin_sheet": 0, "volumetric": 1}
@@ -790,7 +1398,7 @@ def compile(
     )
     if rayd is None:
         rayd = build_scene_from_structures(structures)
-        from witwin.channel.scene.edge_selection import resolve_scene_edge_policy
+        from witwin.channel.scene.resources import resolve_scene_edge_policy
 
         rayd.runtime_cache["edge_policy"] = resolve_scene_edge_policy(
             scene_or_snapshot
@@ -898,6 +1506,122 @@ def compile(
     )
     _REGISTRY.put(key, compiled)
     return compiled
+
+
+LIGHT_SPEED_M_PER_S = 299_792_458.0
+
+
+def _frequency_scalar(scene: SolverScene) -> float:
+    """Detached scalar carrier for non-differentiable consumers.
+
+    Topology discovery and metadata never differentiate with respect to
+    frequency (fixed-topology contract), so detach before float() to keep AD
+    solves with a requires_grad tensor frequency warning-free. The field
+    evaluation seam must NOT use this helper: it forwards the live tensor so
+    the frequency stays on the autograd graph.
+    """
+
+    frequency = scene.frequency
+    if isinstance(frequency, torch.Tensor):
+        return float(frequency.detach())
+    return float(frequency)
+
+
+def receiver_grid_points(grid: ReceiverGrid, *, reference: torch.Tensor) -> torch.Tensor:
+    return mc_receiver_grid_points(
+        reference,
+        origin=vector3_tuple(grid.origin),
+        x_axis=vector3_tuple(grid.x_axis),
+        y_axis=vector3_tuple(grid.y_axis),
+        shape=grid.shape,
+        spacing=grid.spacing,
+    )
+
+
+def host_vec3_tensor(flat_positions: tuple[float, ...]) -> torch.Tensor:
+    powers = tuple(1.0 for _ in range(len(flat_positions) // 3))
+    return mc_transmitter_tensors(flat_positions, powers)["positions"]
+
+
+def receiver_positions(
+    scene: object,
+    *,
+    device: torch.device,
+    reference: torch.Tensor | None = None,
+) -> torch.Tensor:
+    if (
+        len(scene.receivers) == 1
+        and isinstance(scene.receivers[0], ReceiverGrid)
+        and reference is not None
+    ):
+        return receiver_grid_points(scene.receivers[0], reference=reference)
+    blocks: list[torch.Tensor] = []
+    grid_reference = reference
+
+    for receiver in scene.receivers:
+        if isinstance(receiver, ReceiverPoint):
+            block = receiver.position.reshape(1, 3).to(device=device)
+            blocks.append(block)
+            if grid_reference is None:
+                grid_reference = block
+        elif isinstance(receiver, ReceiverGrid):
+            if grid_reference is None:
+                grid_reference = host_vec3_tensor(())
+            blocks.append(receiver_grid_points(receiver, reference=grid_reference))
+        else:
+            raise TypeError(f"receiver type is not accepted: {type(receiver)!r}")
+    if not blocks:
+        return host_vec3_tensor(())
+    if len(blocks) == 1:
+        return blocks[0]
+    return topology_primitives.path_concat_vec3(blocks)
+
+
+def transmitter_positions(
+    scene: object, *, device: torch.device
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if not scene.transmitters:
+        exported = mc_transmitter_tensors((), ())
+        return exported["positions"], exported["power"]
+    positions = torch.stack(
+        tuple(transmitter.position for transmitter in scene.transmitters)
+    ).to(device=device, dtype=torch.float32)
+    powers = torch.stack(
+        tuple(
+            power.reshape(())
+            if isinstance((power := transmitter.power_w), torch.Tensor)
+            else positions.new_tensor(float(power))
+            for transmitter in scene.transmitters
+        )
+    ).to(device=device, dtype=torch.float32)
+    return positions, powers
+
+
+def transmitter_polarizations(
+    scene: object, *, device: torch.device
+) -> torch.Tensor:
+    """Per-transmitter polarization unit vectors as a (N, 3) CUDA tensor.
+
+    Row order matches :func:`transmitter_positions`. The transmitter model
+    already normalizes and orients ``.polarization`` in ``__post_init__``, so
+    this is a straight device upload of the fixed physical vectors (frozen
+    winners of AD; the dipole sin^2 pattern they induce is differentiated
+    through the endpoint geometry, not through the polarization itself).
+
+    This is NOT the same function as
+    :func:`witwin.channel.field_state.transmitter_polarizations`, which casts to
+    float32 and calls ``.contiguous()``. Both are live and both are called; the
+    unfinished ownership migration between them predates this consolidation and
+    is deliberately left as it was.
+    """
+
+    if not scene.transmitters:
+        return host_vec3_tensor(())
+    return torch.stack(
+        tuple(transmitter.polarization for transmitter in scene.transmitters)
+    ).to(
+        device=device
+    )
 
 
 __all__ = ["clear_compile_cache", "compile"]

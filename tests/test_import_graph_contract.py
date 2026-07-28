@@ -52,12 +52,12 @@ def test_solver_and_deleted_module_boundaries_are_detected(tmp_path: Path):
 import witwin.channel.deterministic.solver
 import witwin.channel.montecarlo.scattering_events
 from witwin.channel.core.kernels import ops
-from witwin.channel.runtime import extension
 from witwin.channel.runtime import native_extension
+import witwin.channel._channel
 """,
             "deterministic/solver.py": "",
             "montecarlo/scattering_events.py": "",
-            "runtime/extension.py": "",
+            "runtime.py": "",
         },
     )
 

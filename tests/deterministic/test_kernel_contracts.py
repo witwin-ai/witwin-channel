@@ -7,12 +7,7 @@ import pytest
 from witwin.channel.deterministic.kernels import accumulation
 from witwin.channel.propagation import fields as public_fields
 from witwin.channel.propagation.fields.kernels import deterministic as fields
-from witwin.channel.runtime import (
-    autograd_contracts,
-    symbols,
-    tensor_contracts,
-    torch_compat,
-)
+from witwin.channel import runtime
 
 
 _OWNER_NAMES = (
@@ -46,8 +41,8 @@ def test_deterministic_fields_is_the_single_object_owner(name: str):
 
 
 def test_deterministic_fields_uses_canonical_runtime_dependencies():
-    assert fields.native_extension is symbols.native_extension
-    assert fields.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
+    assert fields.native_extension is runtime.native_extension
+    assert fields.validate_cuda_tensor is runtime.validate_cuda_tensor
 
 
 @pytest.mark.parametrize("name", _ACCUMULATION_OWNER_NAMES)
@@ -58,15 +53,18 @@ def test_deterministic_accumulation_is_the_single_object_owner(name: str):
 
 
 def test_deterministic_accumulation_uses_canonical_runtime_dependencies():
-    assert accumulation.native_extension is symbols.native_extension
-    assert accumulation._required_native_op is symbols.required_symbol
-    assert accumulation.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
-    assert accumulation.torch_compat is torch_compat
+    # The raw accessor is not a solver dependency: every probe goes through
+    # runtime.required_symbol, and ci/check_import_graph.py rejects a solver
+    # that imports ``native_extension`` at all.
+    assert not hasattr(accumulation, "native_extension")
+    assert accumulation._required_native_op is runtime.required_symbol
+    assert accumulation.validate_cuda_tensor is runtime.validate_cuda_tensor
+    assert accumulation.disable_functorch is runtime.disable_functorch
     assert (
         accumulation._ad_native_tangent_or_none
-        is autograd_contracts._ad_native_tangent_or_none
+        is runtime._ad_native_tangent_or_none
     )
-    assert accumulation._ad_native_tensor is autograd_contracts._ad_native_tensor
+    assert accumulation._ad_native_tensor is runtime._ad_native_tensor
     assert accumulation._DETERMINISTIC_ACCUM_FIELDS
 
 

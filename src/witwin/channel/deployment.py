@@ -84,9 +84,9 @@ def _torch_runtime_diagnostics(torch: ModuleType) -> dict[str, Any]:
 
 
 def _import_native_build_info() -> Callable[[], dict[str, object]]:
-    from witwin.channel.runtime.extension import build_info
+    from witwin.channel.runtime import build_info
 
-    return cast(Callable[[], dict[str, object]], build_info)
+    return build_info
 
 
 def _require_active_cuda_device(torch: ModuleType) -> int:

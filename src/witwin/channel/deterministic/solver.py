@@ -16,7 +16,7 @@ from witwin.channel.propagation.geometry.endpoints import (
     apply_receiver_layout,
     receiver_positions_and_layout,
 )
-from witwin.channel.scene.tensors import _frequency_scalar
+from witwin.channel.scene.compiler import _frequency_scalar
 
 from .config import Config
 from .pipeline import _metadata, solve as _solve_pipeline

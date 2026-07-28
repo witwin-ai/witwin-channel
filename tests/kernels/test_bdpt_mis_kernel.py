@@ -1,8 +1,8 @@
 import pytest
 import torch
 
+from witwin.channel import runtime
 from witwin.channel.montecarlo.bdpt.kernels import paths as ops
-from witwin.channel.montecarlo.bdpt.kernels import paths
 
 
 def test_bdpt_mis_kernel_matches_expected_constants():
@@ -31,7 +31,9 @@ def test_bdpt_mis_kernel_has_no_python_fallback(monkeypatch):
 
     pdf = torch.ones(1, device="cuda", dtype=torch.float32)
     strategy_sum = torch.ones((), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(paths, "native_extension", lambda: None)
+    # The facade holds no raw accessor of its own; it goes through
+    # runtime.required_symbol, so the loader is the only place to cut.
+    monkeypatch.setattr(runtime, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="bdpt_mis_weights CUDA kernel is required"):
         ops.bdpt_mis_weights(pdf, strategy_sum, mis="balance")

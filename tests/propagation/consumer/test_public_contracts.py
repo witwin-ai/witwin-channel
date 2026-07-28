@@ -23,7 +23,8 @@ forbidden = (
     "witwin.channel.deterministic",
     "witwin.channel.montecarlo",
     "witwin.channel.propagation.enumerated",
-    "witwin.channel.propagation.models",
+    "witwin.channel.propagation.rows",
+    "witwin.channel.propagation.penetration",
 )
 assert consumer.CONTRACT_VERSION == 6
 assert not any(name.startswith(forbidden) for name in sys.modules)
@@ -64,7 +65,8 @@ def test_consumer_import_is_solver_neutral() -> None:
                     "witwin.channel.deterministic",
                     "witwin.channel.montecarlo",
                     "witwin.channel.propagation.enumerated",
-                    "witwin.channel.propagation.models",
+                    "witwin.channel.propagation.rows",
+                    "witwin.channel.propagation.penetration",
                 )
             )
             for name in loaded

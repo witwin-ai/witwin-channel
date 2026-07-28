@@ -2,20 +2,21 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.runtime import torch_compat
-from witwin.channel.runtime.autograd_contracts import (
-    _ad_active_ctx, _ad_first_order_only,
+from witwin.channel.runtime import (
+    _ad_active_ctx,
     _ad_check_active,
     _ad_check_optional_grad,
     _ad_check_rows,
     _ad_check_tangent_vec3,
     _ad_checked_tangent,
+    _ad_first_order_only,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
+    _rayd_scene_resource,
+    disable_functorch,
+    required_symbol as _required_native_op,
+    validate_cuda_tensor,
 )
-from witwin.channel.runtime.symbols import required_symbol as _required_native_op
-from witwin.channel.runtime.tensor_contracts import validate_cuda_tensor
-from witwin.channel.runtime.native_resources import _rayd_scene_resource
 
 from .bridge import _BDPT_INTERSECTION_FIELDS
 from .primitives import deterministic_normalize_vec3
@@ -443,7 +444,7 @@ class _RaydIntersectAdFunction(torch.autograd.Function):
         _grad_active,
     ):
         ray_o, ray_d, active_ctx, tape_prim_id, tape_barycentric = ctx.saved_tensors
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             values = rayd_intersect_jvp(
                 ctx.scene_resource,
                 _ad_native_tensor(ray_o),
@@ -654,7 +655,7 @@ class _RaydTraceReflectionsAdFunction(torch.autograd.Function):
             tape_normals,
             image_sources,
         ) = ctx.saved_tensors
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             tangent_t, tangent_image_sources = rayd_trace_reflections_jvp(
                 ctx.scene_resource,
                 _ad_native_tensor(ray_o),
@@ -1023,7 +1024,7 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
             valid,
             bounce_count,
         ) = ctx.saved_tensors
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             tangents = rayd_reflection_epc_paths_jvp(
                 ctx.scene_resource,
                 _ad_native_tensor(source),
@@ -1214,7 +1215,7 @@ class _RaydFaceNormalsAdFunction(torch.autograd.Function):
         tangent_vertices = _ad_native_tangent_or_none(grad_vertices)
         if tangent_vertices is None:
             return None
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             return rayd_scene_face_normals_jvp(
                 ctx.scene_resource,
                 _ad_checked_tangent(

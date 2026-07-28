@@ -1,24 +1,32 @@
-"""Native component-5 topology packing for RayD segment penetration."""
+"""Native component-5 topology packing for RayD segment penetration.
+
+This facade owns both the dispatch and the fixed-capacity row table it
+publishes: ``TransmissionTopologyCapacity`` is the named typed contract this
+one native operation converts its result into, and it has no other producer.
+"""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import torch
 
-from witwin.channel.propagation.models.capacity import CapacityExecutionCounts
-from witwin.channel.propagation.models.penetration import (
+from witwin.channel.propagation.penetration import (
     SegmentPenetrationResult,
 )
-from witwin.channel.propagation.models.transmission import (
-    TransmissionTopologyCapacity,
-)
-from witwin.channel.runtime import torch_compat
-from witwin.channel.runtime.autograd_contracts import (
+from witwin.channel.runtime import (
+    CapacityExecutionCounts,
+    CapacityFailureState,
     _ad_first_order_only,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
+    disable_functorch,
+    require_capacity_failure_state,
+    require_host_count,
+    required_symbol as _required_native_op,
+    validate_cuda_tensor,
 )
-from witwin.channel.runtime.tensor_contracts import validate_cuda_tensor
-from witwin.channel.runtime.symbols import required_symbol as _required_native_op
+from witwin.channel.tensor_math import require_tensor
 
 
 _BLOCK_FIELDS = (
@@ -132,7 +140,7 @@ class _EnumeratedTransmissionTopologyPackFunction(torch.autograd.Function):
         topology_valid, hit_valid = (
             _ad_native_tensor(value) for value in ctx.saved_tensors
         )
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             raw = _required_native_op("enumerated_transmission_topology_pack_jvp")(
                 topology_valid, hit_valid, *native_tangents
             )
@@ -141,12 +149,146 @@ class _EnumeratedTransmissionTopologyPackFunction(torch.autograd.Function):
         return tuple(raw.get(name) for name in _OUTPUT_FIELDS)
 
 
-def _host_count(name: str, value: object) -> int:
-    if type(value) is not int:
-        raise TypeError(f"{name} must be an int")
-    if value < 0:
-        raise ValueError(f"{name} must be non-negative")
-    return value
+@dataclass(frozen=True, slots=True, eq=False)
+class TransmissionTopologyCapacity:
+    """Pair-major component-5 rows with CUDA-resident actual counts."""
+
+    candidate_capacity: int
+    sequence_width: int
+    failure_state: CapacityFailureState
+    execution: CapacityExecutionCounts
+    valid: torch.Tensor
+    tx_id: torch.Tensor
+    rx_id: torch.Tensor
+    depth: torch.Tensor
+    component_id: torch.Tensor
+    primitive_id: torch.Tensor
+    edge_id: torch.Tensor
+    path_length_m: torch.Tensor
+    delay_s: torch.Tensor
+    path_gain: torch.Tensor
+    path_field: torch.Tensor
+    interaction_position: torch.Tensor
+    interaction_normal: torch.Tensor
+    material_id: torch.Tensor
+    primitive_sequence: torch.Tensor
+    material_sequence: torch.Tensor
+    interaction_positions: torch.Tensor
+    interaction_normals: torch.Tensor
+
+    def __post_init__(self) -> None:
+        capacity = require_host_count("candidate_capacity", self.candidate_capacity)
+        width = require_host_count("sequence_width", self.sequence_width)
+        valid = require_tensor(
+            "valid",
+            self.valid,
+            dtype=torch.bool,
+            shape=(capacity,),
+            cuda=True,
+            contiguous=True,
+        )
+        require_capacity_failure_state(self.failure_state, device=valid.device)
+        if not isinstance(self.execution, CapacityExecutionCounts):
+            raise TypeError("execution must be CapacityExecutionCounts")
+        if self.execution.candidate_capacity != capacity:
+            raise ValueError("execution capacity must match candidate_capacity")
+        if self.execution.failure_state is not self.failure_state:
+            raise ValueError("execution must retain the exact failure_state")
+        for name in (
+            "tx_id",
+            "rx_id",
+            "depth",
+            "component_id",
+            "primitive_id",
+            "edge_id",
+            "material_id",
+        ):
+            require_tensor(
+                name,
+                getattr(self, name),
+                dtype=torch.int32,
+                shape=(capacity,),
+                device=valid.device,
+                cuda=True,
+                contiguous=True,
+            )
+        for name in ("path_length_m", "delay_s", "path_gain"):
+            require_tensor(
+                name,
+                getattr(self, name),
+                dtype=torch.float32,
+                shape=(capacity,),
+                device=valid.device,
+                cuda=True,
+                contiguous=True,
+            )
+        require_tensor(
+            "path_field",
+            self.path_field,
+            dtype=torch.complex64,
+            shape=(capacity,),
+            device=valid.device,
+            cuda=True,
+            contiguous=True,
+        )
+        for name in ("interaction_position", "interaction_normal"):
+            require_tensor(
+                name,
+                getattr(self, name),
+                dtype=torch.float32,
+                shape=(capacity, 3),
+                device=valid.device,
+                cuda=True,
+                contiguous=True,
+            )
+        for name in ("primitive_sequence", "material_sequence"):
+            require_tensor(
+                name,
+                getattr(self, name),
+                dtype=torch.int32,
+                shape=(capacity, width),
+                device=valid.device,
+                cuda=True,
+                contiguous=True,
+            )
+        for name in ("interaction_positions", "interaction_normals"):
+            require_tensor(
+                name,
+                getattr(self, name),
+                dtype=torch.float32,
+                shape=(capacity, width, 3),
+                device=valid.device,
+                cuda=True,
+                contiguous=True,
+            )
+
+    @property
+    def device(self) -> torch.device:
+        return self.valid.device
+
+    def as_block(self) -> dict[str, torch.Tensor]:
+        """Return the topology block without copying or reordering tensors."""
+
+        return {
+            "valid": self.valid,
+            "tx_id": self.tx_id,
+            "rx_id": self.rx_id,
+            "depth": self.depth,
+            "component_id": self.component_id,
+            "primitive_id": self.primitive_id,
+            "edge_id": self.edge_id,
+            "path_length_m": self.path_length_m,
+            "delay_s": self.delay_s,
+            "path_gain": self.path_gain,
+            "path_field": self.path_field,
+            "interaction_position": self.interaction_position,
+            "interaction_normal": self.interaction_normal,
+            "material_id": self.material_id,
+            "primitive_sequence": self.primitive_sequence,
+            "material_sequence": self.material_sequence,
+            "interaction_positions": self.interaction_positions,
+            "interaction_normals": self.interaction_normals,
+        }
 
 
 def enumerated_transmission_topology_pack(
@@ -171,8 +313,8 @@ def enumerated_transmission_topology_pack(
         raise ValueError("face_material_id must share the penetration device")
     if geometry_mode_id.device != penetration.device:
         raise ValueError("geometry_mode_id must share the penetration device")
-    tx_count = _host_count("tx_count", tx_count)
-    rx_count = _host_count("rx_count", rx_count)
+    tx_count = require_host_count("tx_count", tx_count)
+    rx_count = require_host_count("rx_count", rx_count)
     candidate_capacity = tx_count * rx_count
     if penetration.segment_count != candidate_capacity:
         raise ValueError("penetration rows must equal tx_count * rx_count")
@@ -210,6 +352,7 @@ def enumerated_transmission_topology_pack(
 
 
 __all__ = [
+    "TransmissionTopologyCapacity",
     "_EnumeratedTransmissionTopologyPackFunction",
     "enumerated_transmission_topology_pack",
 ]

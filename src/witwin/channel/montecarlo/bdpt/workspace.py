@@ -21,7 +21,7 @@ from witwin.channel.field_state import (
     receiver_polarizations,
     transmitter_polarizations,
 )
-from witwin.channel.runtime.kernel_metadata import AdLaunchLedger
+from witwin.channel.runtime import AdLaunchLedger
 from witwin.channel.scene.endpoints import ReceiverGrid, SolverScene as Scene
 from witwin.channel.montecarlo.bdpt.autograd import (
     bdpt_endpoint_connection_samples_ad,

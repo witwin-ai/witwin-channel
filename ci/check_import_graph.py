@@ -37,13 +37,13 @@ _SOLVER_PREFIXES = (
     f"{PACKAGE}.montecarlo.bdpt",
 )
 _PUBLIC_INIT_MODULES = frozenset({PACKAGE, *_SOLVER_PREFIXES})
-_RAW_EXTENSION_MODULES = frozenset(
-    {
-        f"{PACKAGE}._channel",
-        f"{PACKAGE}.runtime.extension",
-    }
+_RAW_EXTENSION_MODULES = frozenset({f"{PACKAGE}._channel"})
+# ``witwin.channel.runtime`` is a single module, so the raw accessor it exports
+# has no submodule of its own to name. The rule therefore names the symbol.
+_RAW_EXTENSION_SYMBOLS = frozenset({"native_extension"})
+_COMPILED_SCENE_MODULES = frozenset(
+    {f"{PACKAGE}.scene.compiled", f"{PACKAGE}.scene.compiler"}
 )
-_COMPILED_SCENE_MODULES = frozenset({f"{PACKAGE}.scene.compiled"})
 # The `core` grab-bag was dissolved into its real domain owners. Nothing may
 # recreate that namespace or import through it.
 _DISSOLVED_PREFIXES = (f"{PACKAGE}.core",)
@@ -424,11 +424,17 @@ def _solver_boundary_violations(edge: ImportEdge) -> list[Violation]:
 
     if source_solver is not None and target_solver not in {None, source_solver}:
         violations.append(_violation(edge, "solver_to_solver"))
+    # ``witwin.channel.runtime`` is one module now, so its raw accessor is
+    # reachable only as a symbol import. The rule is fail-closed on both
+    # spellings: the extension module itself, and the accessor imported out of
+    # the collapsed runtime module. No solver needs either - every solver
+    # kernel facade goes through ``runtime.required_symbol``, which owns the
+    # None-extension case and the fail-loud message.
     if source_solver is not None and (
         edge.target in _RAW_EXTENSION_MODULES
         or (
             edge.target == f"{PACKAGE}.runtime"
-            and edge.imported_name == "native_extension"
+            and edge.imported_name in _RAW_EXTENSION_SYMBOLS
         )
     ):
         violations.append(_violation(edge, "solver_raw_extension"))

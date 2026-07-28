@@ -19,7 +19,7 @@ import torch
 
 from witwin.core import Scene, SurfaceRoughness
 from tests.support.core_world import make_receiver, make_transmitter
-from witwin.channel.runtime.symbols import has_symbol
+from witwin.channel.runtime import has_symbol
 from witwin.channel.scene import compile as compile_scene
 from tests.reference.kirchhoff_table_build import (
     build_n_terms,

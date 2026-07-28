@@ -12,7 +12,7 @@ pytestmark = pytest.mark.skipif(
 
 
 def _compiled(frequency: float = 77.0e9):
-    from witwin.channel.scene.compiled import CompiledScene
+    from witwin.channel.scene.compiler import CompiledScene
 
     compiled = object.__new__(CompiledScene)
     object.__setattr__(
@@ -75,8 +75,8 @@ def _endpoints():
 
 
 def _compact_rows():
-    from witwin.channel.propagation.consumer._native import CompactEvaluatedPaths
-    from witwin.channel.propagation.models import (
+    from witwin.channel.propagation.consumer.replay import CompactEvaluatedPaths
+    from witwin.channel.propagation.rows import (
         EvaluatedPaths,
         PathFields,
         PathGeometry,
@@ -292,7 +292,7 @@ def test_reevaluate_reuses_frozen_topology_without_discovery(
         ScalarTransport,
         reevaluate,
     )
-    from witwin.channel.propagation.consumer import _fixed_los
+    from witwin.channel.propagation.consumer import replay
     from witwin.channel.propagation.fields.kernels import (
         autograd as field_autograd,
     )
@@ -346,7 +346,7 @@ def test_reevaluate_reuses_frozen_topology_without_discovery(
     def forbidden(*args, **kwargs):
         raise AssertionError("AD field owner must not run")
 
-    monkeypatch.setattr(_fixed_los, "fixed_los_gather", fake_gather)
+    monkeypatch.setattr(replay, "fixed_los_gather", fake_gather)
     monkeypatch.setattr(field_functional, "field_free_space", fake_field)
     monkeypatch.setattr(field_autograd, "field_free_space_ad", forbidden)
     request = FixedTopologyRequest(
@@ -394,14 +394,14 @@ def test_unsupported_fixed_response_fails_at_request_construction(
         FixedTopologyRequest,
         capabilities,
     )
-    from witwin.channel.propagation.consumer import _fixed_los
+    from witwin.channel.propagation.consumer import replay
 
     sources, sinks = _endpoints()
 
     def forbidden(*args, **kwargs):
         raise AssertionError("fixed gather must not run")
 
-    monkeypatch.setattr(_fixed_los, "fixed_los_gather", forbidden)
+    monkeypatch.setattr(replay, "fixed_los_gather", forbidden)
     assert "polarimetric_transport" in capabilities().fixed_topology_responses
 
     with pytest.raises(NotImplementedError, match="unsupported response"):
@@ -458,7 +458,7 @@ def test_fixed_primal_only_endpoint_ad_fails_before_gather(monkeypatch) -> None:
         FixedTopologyRequest,
         reevaluate,
     )
-    from witwin.channel.propagation.consumer import _fixed_los
+    from witwin.channel.propagation.consumer import replay
 
     sources, sinks = _endpoints()
     sources = EndpointBatch(
@@ -471,7 +471,7 @@ def test_fixed_primal_only_endpoint_ad_fails_before_gather(monkeypatch) -> None:
     def forbidden(*args, **kwargs):
         raise AssertionError("fixed gather must not run")
 
-    monkeypatch.setattr(_fixed_los, "fixed_los_gather", forbidden)
+    monkeypatch.setattr(replay, "fixed_los_gather", forbidden)
     request = FixedTopologyRequest(
         sources=sources,
         sinks=sinks,

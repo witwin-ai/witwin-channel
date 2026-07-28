@@ -5,7 +5,7 @@ import pytest
 
 from witwin.channel.propagation.topology import kernels
 from witwin.channel.propagation.topology.kernels import blocks, candidates
-from witwin.channel.runtime import symbols, tensor_contracts
+from witwin.channel import runtime
 
 
 _OWNER_NAMES = (
@@ -22,8 +22,8 @@ def test_topology_candidates_is_the_single_object_owner(name: str):
 
 
 def test_topology_candidates_use_only_canonical_dependencies():
-    assert candidates._required_native_op is symbols.required_symbol
-    assert candidates.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
+    assert candidates._required_native_op is runtime.required_symbol
+    assert candidates.validate_cuda_tensor is runtime.validate_cuda_tensor
     assert (
         candidates._validate_path_reflection_candidates
         is blocks._validate_path_reflection_candidates

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.runtime.autograd_contracts import _ad_geometry_live
+from witwin.channel.runtime import _ad_geometry_live
 
 from .functional import _FIELD_AD_DIRECTION_TANGENT_FIELDS
 

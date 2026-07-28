@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel.scene import ad_geometry
+from witwin.channel.scene import endpoints as scene_endpoints
 from witwin.channel.propagation.geometry.edge_state import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
     diffraction_edge_geometry as _diffraction_edge_geometry,
@@ -16,12 +16,12 @@ from witwin.channel.field_state import (
     receiver_polarizations,
     transmitter_polarizations,
 )
-from witwin.channel.runtime.kernel_metadata import AdLaunchLedger
-from witwin.channel.materials.encoding import (
+from witwin.channel.runtime import AdLaunchLedger, _ad_frequency_value
+from witwin.channel.materials import (
     face_material_field_bundle,
     face_material_tensors,
 )
-from witwin.channel.scene.tensors import (
+from witwin.channel.scene.compiler import (
     _frequency_scalar,
 )
 from witwin.channel.propagation.fields.kernels import (
@@ -58,17 +58,18 @@ from witwin.channel.propagation.geometry.reevaluate import (
     _reflection_geometry_ad,
     _vertices_participate_in_ad,
 )
-from witwin.channel.propagation.models.evaluated import EvaluatedPaths
-from witwin.channel.propagation.models.fields import PathFields
-from witwin.channel.propagation.models.geometry import PathGeometry
-from witwin.channel.propagation.models.topology import PathTopology
+from witwin.channel.propagation.rows import (
+    EvaluatedPaths,
+    PathFields,
+    PathGeometry,
+    PathTopology,
+)
 from witwin.channel.propagation.topology.export import (
     PathExecutionStats,
 )
 from witwin.channel.propagation.topology.kernels import (
     construction as topology_construction,
 )
-from witwin.channel.runtime import autograd_contracts as ops
 
 if TYPE_CHECKING:
     from witwin.channel.scene.endpoints import SolverScene as Scene
@@ -868,7 +869,7 @@ def evaluate_path_fields(
             else float(scene.frequency)
         )
         if frequency_value is None:
-            frequency_value = ops._ad_frequency_value(frequency)
+            frequency_value = _ad_frequency_value(frequency)
         frequency_value = float(frequency_value)
         los_field_op = partial(
             field_autograd.field_free_space_ad,
@@ -916,12 +917,12 @@ def evaluate_path_fields(
         or (not explicit_endpoint_geometry and _geometry_participates_in_ad(scene))
     )
     if geometry_ad:
-        vertices = ad_geometry.scene_vertex_table(scene, compiled)
+        vertices = scene_endpoints.scene_vertex_table(scene, compiled)
         if not explicit_endpoint_geometry:
-            tx_positions = ad_geometry.transmitter_positions_ad(
+            tx_positions = scene_endpoints.transmitter_positions_ad(
                 scene, tx_positions, device=device
             )
-            rx_positions = ad_geometry.receiver_positions_ad(
+            rx_positions = scene_endpoints.receiver_positions_ad(
                 scene, rx_positions, device=device
             )
     tx_id = topology.tx_id.to(dtype=torch.int64)

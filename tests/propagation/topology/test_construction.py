@@ -6,7 +6,7 @@ import pytest
 from witwin.channel.propagation.topology.kernels import construction as ops
 from witwin.channel.propagation.topology import kernels
 from witwin.channel.propagation.topology.kernels import blocks, construction
-from witwin.channel.runtime import symbols, tensor_contracts
+from witwin.channel import runtime
 
 
 _OWNER_NAMES = (
@@ -32,8 +32,8 @@ def test_topology_construction_is_the_single_object_owner(name: str):
 
 
 def test_topology_construction_uses_only_canonical_dependencies():
-    assert construction._required_native_op is symbols.required_symbol
-    assert construction.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
+    assert construction._required_native_op is runtime.required_symbol
+    assert construction.validate_cuda_tensor is runtime.validate_cuda_tensor
     assert construction._validate_deterministic_topology_block is (
         blocks._validate_deterministic_topology_block
     )

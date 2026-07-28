@@ -3,9 +3,9 @@ from __future__ import annotations
 import torch
 
 from witwin.channel.propagation.topology import path_los_export
-from witwin.channel.runtime import torch_compat
-from witwin.channel.runtime.autograd_contracts import (
-    _ad_checked_tangent, _ad_first_order_only,
+from witwin.channel.runtime import (
+    _ad_checked_tangent,
+    _ad_first_order_only,
     _ad_frequency_grad,
     _ad_frequency_tangent,
     _ad_frequency_value,
@@ -14,12 +14,10 @@ from witwin.channel.runtime.autograd_contracts import (
     _ad_native_tensor,
     _ad_reject_fixed_inputs,
     _ad_reject_fixed_tangents,
-)
-from witwin.channel.runtime.symbols import (
-    native_extension,
+    disable_functorch,
     required_symbol as _required_native_op,
+    validate_cuda_tensor,
 )
-from witwin.channel.runtime.tensor_contracts import validate_cuda_tensor
 
 
 _LIGHT_SPEED_M_PER_S_AD = 299_792_458.0
@@ -55,12 +53,7 @@ def mc_finalize_component_maps(
     if scattering.shape != los.shape:
         raise ValueError("scattering must match los shape")
 
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_finalize_component_maps"):
-        raise RuntimeError(
-            "_channel.mc_finalize_component_maps CUDA kernel is required"
-        )
-    exported = native.mc_finalize_component_maps(
+    exported = _required_native_op("mc_finalize_component_maps")(
         los, reflection, diffraction, transmission, scattering
     )
     if not isinstance(exported, dict):
@@ -131,7 +124,7 @@ class _McFinalizeComponentMapsAdFunction(torch.autograd.Function):
                     zero = torch.zeros_like(_ad_native_tensor(reference))
                 value = zero
             filled.append(value)
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = mc_finalize_component_maps(*filled)
         return tuple(out[name] for name in _MC_FINALIZE_FIELDS)
 
@@ -219,7 +212,7 @@ class _McLosGridMapsAdFunction(torch.autograd.Function):
         if tangent is None:
             return None
         visible = ctx.saved_tensors[0] if ctx.has_visible else None
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             maps = mc_los_component_maps_from_matrix(
                 tangent, rows=ctx.rows, cols=ctx.cols
             )
@@ -281,12 +274,7 @@ def mc_component_map_buffer(
     validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=2)
     if tx_count < 0 or dim0 < 0 or dim1 < 0:
         raise ValueError("tx_count, dim0, and dim1 must be non-negative")
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_component_map_buffer"):
-        raise RuntimeError(
-            "_channel.mc_component_map_buffer CUDA kernel is required"
-        )
-    maps = native.mc_component_map_buffer(
+    maps = _required_native_op("mc_component_map_buffer")(
         reference, int(tx_count), int(dim0), int(dim1)
     )
     if not isinstance(maps, torch.Tensor):
@@ -309,12 +297,7 @@ def mc_store_component_map(
     validate_cuda_tensor("source", source, dtype=torch.float32, ndim=2)
     if source.shape != maps.shape[1:]:
         raise ValueError("source shape must match one maps slot")
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_store_component_map"):
-        raise RuntimeError(
-            "_channel.mc_store_component_map CUDA kernel is required"
-        )
-    out = native.mc_store_component_map(maps, source, int(tx_index))
+    out = _required_native_op("mc_store_component_map")(maps, source, int(tx_index))
     if not isinstance(out, torch.Tensor):
         raise TypeError("_channel.mc_store_component_map must return a tensor")
     validate_cuda_tensor("maps", out, dtype=torch.float32, ndim=3)
@@ -334,12 +317,7 @@ def mc_store_scaled_component_map(
     validate_cuda_tensor("scale_values", scale_values, dtype=torch.float32, ndim=1)
     if source.shape != maps.shape[1:]:
         raise ValueError("source shape must match one maps slot")
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_store_scaled_component_map"):
-        raise RuntimeError(
-            "_channel.mc_store_scaled_component_map CUDA kernel is required"
-        )
-    out = native.mc_store_scaled_component_map(
+    out = _required_native_op("mc_store_scaled_component_map")(
         maps,
         source,
         scale_values,
@@ -356,12 +334,7 @@ def mc_store_scaled_component_map(
 
 def mc_los_component_maps(los: torch.Tensor) -> torch.Tensor:
     validate_cuda_tensor("los", los, dtype=torch.float32, ndim=3)
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_los_component_maps"):
-        raise RuntimeError(
-            "_channel.mc_los_component_maps CUDA kernel is required"
-        )
-    maps = native.mc_los_component_maps(los)
+    maps = _required_native_op("mc_los_component_maps")(los)
     if not isinstance(maps, torch.Tensor):
         raise TypeError("_channel.mc_los_component_maps must return a tensor")
     validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
@@ -403,12 +376,9 @@ def mc_apply_los_visibility(
     validate_cuda_tensor("visible", visible, dtype=torch.bool, ndim=1)
     if maps.shape[0] != los.shape[0] or los.shape[1] != maps.shape[1] * maps.shape[2]:
         raise ValueError("los must match maps flattened grid layout")
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_apply_los_visibility"):
-        raise RuntimeError(
-            "_channel.mc_apply_los_visibility CUDA kernel is required"
-        )
-    out = native.mc_apply_los_visibility(maps, los, visible, int(tx_index))
+    out = _required_native_op("mc_apply_los_visibility")(
+        maps, los, visible, int(tx_index)
+    )
     if not isinstance(out, torch.Tensor):
         raise TypeError("_channel.mc_apply_los_visibility must return a tensor")
     return out
@@ -425,12 +395,7 @@ def mc_los_visibility_inputs(
     )
     if rx_count < 0:
         raise ValueError("rx_count must be non-negative")
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_los_visibility_inputs"):
-        raise RuntimeError(
-            "_channel.mc_los_visibility_inputs CUDA kernel is required"
-        )
-    exported = native.mc_los_visibility_inputs(
+    exported = _required_native_op("mc_los_visibility_inputs")(
         tx_positions, int(tx_index), int(rx_count)
     )
     if not isinstance(exported, dict):
@@ -480,12 +445,7 @@ def mc_los_path_gain_backward(
     if frequency_hz <= 0.0:
         raise ValueError("frequency_hz must be positive")
 
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_los_path_gain_backward"):
-        raise RuntimeError(
-            "_channel.mc_los_path_gain_backward CUDA kernel is required"
-        )
-    gradients = native.mc_los_path_gain_backward(
+    gradients = _required_native_op("mc_los_path_gain_backward")(
         tx_positions,
         tx_power,
         rx_positions,
@@ -576,12 +536,7 @@ def mc_los_path_gain_jvp(
     if frequency_hz <= 0.0:
         raise ValueError("frequency_hz must be positive")
 
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_los_path_gain_jvp"):
-        raise RuntimeError(
-            "_channel.mc_los_path_gain_jvp CUDA kernel is required"
-        )
-    out = native.mc_los_path_gain_jvp(
+    out = _required_native_op("mc_los_path_gain_jvp")(
         tx_positions,
         tx_power,
         rx_positions,
@@ -693,7 +648,7 @@ class _McLosPathGainAdFunction(torch.autograd.Function):
         if tangent_tx is None and tangent_rx is None and tangent_frequency == 0.0:
             return None
         tx_positions, tx_power, rx_positions, tx_pol = saved
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             return mc_los_path_gain_jvp(
                 _ad_native_tensor(tx_positions),
                 _ad_native_tensor(tx_power),
@@ -771,12 +726,7 @@ def mc_sionna_reflection_accumulate(
     solid_angle_per_ray: float,
     grid_cell_area: float,
 ) -> torch.Tensor:
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_sionna_reflection_accumulate"):
-        raise RuntimeError(
-            "_channel.mc_sionna_reflection_accumulate CUDA kernel is required"
-        )
-    return native.mc_sionna_reflection_accumulate(
+    return _required_native_op("mc_sionna_reflection_accumulate")(
         ray_o,
         ray_d,
         trace_valid,
@@ -1220,7 +1170,7 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
             material_valid,
         ) = saved
         wavelength = float(params["wavelength"])
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             return mc_sionna_reflection_accumulate_jvp(
                 _ad_native_tensor(ray_o),
                 _ad_native_tensor(ray_d),
@@ -1320,12 +1270,7 @@ def mc_sionna_reflection_accumulate_ad(
 
 
 def mc_sionna_diffraction_tape_accumulate(*args: object) -> torch.Tensor:
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_sionna_diffraction_tape_accumulate"):
-        raise RuntimeError(
-            "_channel.mc_sionna_diffraction_tape_accumulate CUDA kernel is required"
-        )
-    output = native.mc_sionna_diffraction_tape_accumulate(*args)
+    output = _required_native_op("mc_sionna_diffraction_tape_accumulate")(*args)
     if not isinstance(output, torch.Tensor):
         raise TypeError(
             "_channel.mc_sionna_diffraction_tape_accumulate must return a tensor"
@@ -1703,7 +1648,7 @@ class _McDiffractionMapAdFunction(torch.autograd.Function):
         tape_tensors = tuple(_ad_native_tensor(value) for value in saved[4:8])
         state_tensors = tuple(_ad_native_tensor(value) for value in saved[8:19])
         wavelength = float(params["wavelength"])
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             return mc_sionna_diffraction_tape_accumulate_jvp(
                 tape_tensors,
                 state_tensors,

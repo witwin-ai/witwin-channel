@@ -91,12 +91,12 @@ from witwin.channel.scattering.kernels.functional import (
     scattering_table_sample,
 )
 from witwin.core import SurfaceRoughness  # noqa: F401
-from witwin.channel.scattering import tables as kirchhoff_tables
-from witwin.channel.scattering.tables import KirchhoffTable  # noqa: F401
-from witwin.channel.scene.scattering_resources import RoughMaterialRuntime
+from witwin.channel import scattering as kirchhoff_tables
+from witwin.channel.scattering import KirchhoffTable  # noqa: F401
+from witwin.channel.scene.resources import RoughMaterialRuntime
 from witwin.channel.scene.endpoints import require_compiled
 
-from witwin.channel.materials.encoding import face_material_field_bundle
+from witwin.channel.materials import face_material_field_bundle
 from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
 
 from .transmission import (

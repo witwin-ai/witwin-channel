@@ -12,9 +12,14 @@ never a redundant reimplementation.
 
 That gap is not hypothetical in this package:
 
-  - `runtime/symbols.py` exports `required_symbol`, and 11 modules hand-roll the
+  - `runtime.py` exports `required_symbol`, and 11 modules hand-rolled the
     same "probe the extension for a named attribute, raise if absent" guard at 37
-    call sites, two of them a few lines apart inside one module.
+    call sites, two of them a few lines apart inside one module. Four of those
+    sites now sit in the owner module itself, because the ex-`native_buffers`
+    buffer constructors moved there with the rest of `runtime/`. The four solver
+    domains have since been repaid - 18 sites across 5 kernel facades now call
+    `required_symbol` - which is exactly the shrink this ratchet exists to force;
+    19 sites remain in the non-solver domains.
   - `components.py` exports `component_availability_status`, and three solver
     metadata modules each defined their own until Phase 1a deleted them.
   - The component depth rule grew a FOURTH copy, in `deterministic/pipeline.py`,
@@ -50,16 +55,20 @@ The rule is ONE definition site, counted package-wide - not one per module. Each
 concept declares its canonical owner module and how many matching functions that
 module is allowed to contain. A copy inside the owner module is a violation too,
 because "two of them twelve lines apart in one module" is one of the failures
-above.
+above - unless that copy is on the recorded ledger below, which is where a copy
+that moved into the owner module during a layout change lands. The ledger keeps
+its identity either way, so the ratchet does not lose a site to a file move.
 
 Recorded duplicates
 -------------------
-`native symbol lookup` ships with its 37 pre-existing call sites recorded by
-(module, function). This is a ratchet, not an exemption: an unrecorded match
-fails the gate, and so does a recorded entry that no longer matches. The second
-half is the important half - it means the commit that finally routes those sites
-through `required_symbol` cannot land without shrinking this list, and the list
-can only ever get shorter. Adding to it is a deliberate, reviewable act.
+`native symbol lookup` ships with its remaining 19 pre-existing call sites
+recorded by (module, function). This is a ratchet, not an exemption: an
+unrecorded match fails the gate, and so does a recorded entry that no longer
+matches. The second half is the important half - it means the commit that
+finally routes those sites through `required_symbol` cannot land without
+shrinking this list, and the list can only ever get shorter. It started at 37
+and the solver-domain repayment took it to 19. Adding to it is a deliberate,
+reviewable act.
 
 False negatives, stated honestly
 --------------------------------
@@ -184,7 +193,7 @@ CONCEPTS: tuple[Concept, ...] = (
     ),
     Concept(
         name="native symbol lookup",
-        owner=f"{PACKAGE}.runtime.symbols",
+        owner=f"{PACKAGE}.runtime",
         reason=(
             "probing the validated extension for a required symbol is the "
             "runtime's job; a hand-rolled probe is a second place the "
@@ -196,33 +205,17 @@ CONCEPTS: tuple[Concept, ...] = (
             must_raise=True,
         ),
         debt=(
-            "37 pre-existing hand-rolled probes across 11 kernel facades, "
-            "recorded so they cannot grow. They are routed through "
-            "runtime.symbols.required_symbol by a separate change, which must "
-            "shrink this list; a recorded entry that no longer matches fails "
-            "this gate."
+            "19 pre-existing hand-rolled probes across 6 kernel facades, "
+            "recorded so they cannot grow. The list started at 37; the four "
+            "solver domains repaid their 18 sites by routing them through "
+            "runtime.required_symbol, which is also what closes the "
+            "solver_raw_extension boundary in ci/check_import_graph.py. The "
+            "rest are routed by a later change, which must shrink this list "
+            "again; a recorded entry that no longer matches fails this gate."
         ),
         recorded_duplicates=frozenset(
             {
-                (f"{PACKAGE}.deterministic.kernels.accumulation", "deterministic_accumulate_flat"),
                 (f"{PACKAGE}.materials.kernels.functional", "mc_face_material_tensors"),
-                (f"{PACKAGE}.montecarlo.basic.kernels.maps", "mc_apply_los_visibility"),
-                (f"{PACKAGE}.montecarlo.basic.kernels.maps", "mc_component_map_buffer"),
-                (f"{PACKAGE}.montecarlo.basic.kernels.maps", "mc_finalize_component_maps"),
-                (f"{PACKAGE}.montecarlo.basic.kernels.maps", "mc_los_component_maps"),
-                (f"{PACKAGE}.montecarlo.basic.kernels.maps", "mc_los_path_gain_backward"),
-                (f"{PACKAGE}.montecarlo.basic.kernels.maps", "mc_los_path_gain_jvp"),
-                (f"{PACKAGE}.montecarlo.basic.kernels.maps", "mc_los_visibility_inputs"),
-                (f"{PACKAGE}.montecarlo.basic.kernels.maps", "mc_sionna_diffraction_tape_accumulate"),
-                (f"{PACKAGE}.montecarlo.basic.kernels.maps", "mc_sionna_reflection_accumulate"),
-                (f"{PACKAGE}.montecarlo.basic.kernels.maps", "mc_store_component_map"),
-                (f"{PACKAGE}.montecarlo.basic.kernels.maps", "mc_store_scaled_component_map"),
-                (f"{PACKAGE}.montecarlo.basic.kernels.sampling", "mc_diffraction_state_pack"),
-                (f"{PACKAGE}.montecarlo.basic.kernels.sampling", "mc_diffraction_state_wi"),
-                (f"{PACKAGE}.montecarlo.basic.kernels.sampling", "mc_reflection_launch_inputs"),
-                (f"{PACKAGE}.montecarlo.bdpt.kernels.maps", "bdpt_point_component_power"),
-                (f"{PACKAGE}.montecarlo.bdpt.kernels.paths", "bdpt_launch_state"),
-                (f"{PACKAGE}.montecarlo.bdpt.kernels.paths", "bdpt_mis_weights"),
                 (f"{PACKAGE}.propagation.fields.kernels.deterministic", "deterministic_delay_to_path_length"),
                 (f"{PACKAGE}.propagation.fields.kernels.deterministic", "deterministic_diffraction_vector_field"),
                 (f"{PACKAGE}.propagation.fields.kernels.deterministic", "deterministic_field_from_power_phase"),
@@ -237,10 +230,10 @@ CONCEPTS: tuple[Concept, ...] = (
                 (f"{PACKAGE}.propagation.geometry.kernels.primitives", "mc_surface_group_edge_candidates"),
                 (f"{PACKAGE}.propagation.topology.kernels.primitives", "mc_selected_edge_indices"),
                 (f"{PACKAGE}.propagation.topology.kernels.sampling", "mc_sample_directions"),
-                (f"{PACKAGE}.runtime.native_buffers", "bdpt_zero_matrix"),
-                (f"{PACKAGE}.runtime.native_buffers", "mc_pack_vec3"),
-                (f"{PACKAGE}.runtime.native_buffers", "mc_receiver_grid_points"),
-                (f"{PACKAGE}.runtime.native_buffers", "mc_transmitter_tensors"),
+                (f"{PACKAGE}.runtime", "bdpt_zero_matrix"),
+                (f"{PACKAGE}.runtime", "mc_pack_vec3"),
+                (f"{PACKAGE}.runtime", "mc_receiver_grid_points"),
+                (f"{PACKAGE}.runtime", "mc_transmitter_tensors"),
             }
         ),
     ),
@@ -408,10 +401,22 @@ def concept_violations(
     concept: Concept, facts: list[FunctionFacts]
 ) -> list[Violation]:
     sites = definition_sites(concept, facts)
-    owned = [site for site in sites if site.module == concept.owner]
+    # A recorded duplicate is a copy wherever it lives, including inside the
+    # owner module, so it never counts towards the owner's definition budget.
+    owned = [
+        site
+        for site in sites
+        if site.module == concept.owner
+        and (site.module, site.qualname) not in concept.recorded_duplicates
+    ]
+    matched = {
+        (site.module, site.qualname)
+        for site in sites
+        if (site.module, site.qualname) in concept.recorded_duplicates
+    }
     foreign = {
         (site.module, site.qualname) for site in sites if site.module != concept.owner
-    }
+    } | matched
 
     violations: list[Violation] = []
     if len(owned) != concept.owner_definitions:
@@ -436,7 +441,7 @@ def concept_violations(
                 f"{concept.owner} instead",
             )
         )
-    for module, qualname in sorted(concept.recorded_duplicates - foreign):
+    for module, qualname in sorted(concept.recorded_duplicates - matched):
         violations.append(
             Violation(
                 concept.name,

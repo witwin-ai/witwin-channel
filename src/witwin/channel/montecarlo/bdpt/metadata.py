@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from witwin.channel.runtime.kernel_metadata import AdLaunchLedger, make_metadata
+from witwin.channel.runtime import AdLaunchLedger, make_metadata
 from witwin.channel.capabilities import (
     capabilities,
     config_metadata,

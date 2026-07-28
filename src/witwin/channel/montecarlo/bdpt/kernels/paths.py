@@ -6,11 +6,10 @@ from witwin.channel.materials import validate_layer_csr as _validate_layer_csr
 from witwin.channel.propagation.geometry import (
     BDPT_INTERSECTION_FIELDS as _BDPT_INTERSECTION_FIELDS,
 )
-from witwin.channel.runtime.symbols import (
-    native_extension,
+from witwin.channel.runtime import (
     required_symbol as _required_native_op,
+    validate_cuda_tensor,
 )
-from witwin.channel.runtime.tensor_contracts import validate_cuda_tensor
 
 
 def bdpt_launch_state(
@@ -31,10 +30,7 @@ def bdpt_launch_state(
     if seed < 0:
         raise ValueError("seed must be non-negative")
 
-    native = native_extension()
-    if native is None or not hasattr(native, "bdpt_launch_state"):
-        raise RuntimeError("_channel.bdpt_launch_state CUDA kernel is required")
-    exported = native.bdpt_launch_state(
+    exported = _required_native_op("bdpt_launch_state")(
         reference,
         int(tx_count),
         int(samples),
@@ -806,10 +802,9 @@ def bdpt_mis_weights(
     if beta <= 0.0:
         raise ValueError("beta must be positive")
 
-    native = native_extension()
-    if native is None or not hasattr(native, "bdpt_mis_weights"):
-        raise RuntimeError("_channel.bdpt_mis_weights CUDA kernel is required")
-    weights = native.bdpt_mis_weights(pdf, strategy_pdf_sum, int(mode_id), float(beta))
+    weights = _required_native_op("bdpt_mis_weights")(
+        pdf, strategy_pdf_sum, int(mode_id), float(beta)
+    )
     if not isinstance(weights, torch.Tensor):
         raise TypeError("_channel.bdpt_mis_weights must return a tensor")
     validate_cuda_tensor("weights", weights, dtype=torch.float32, ndim=1)

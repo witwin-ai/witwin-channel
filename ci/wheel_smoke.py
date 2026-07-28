@@ -29,8 +29,8 @@ _DIST_INFO_LICENSE = "licenses/LICENSE"
 _DIST_INFO_FILES = frozenset({"METADATA", "RECORD", "WHEEL", _DIST_INFO_LICENSE})
 _NATIVE_MEMBER = "witwin/channel/_channel.cp311-win_amd64.pyd"
 _REQUIRED_RUNTIME_MEMBERS = {
-    "witwin/channel/runtime/_channel.build-fingerprint",
-    "witwin/channel/runtime/rayd.lock.json",
+    "witwin/channel/_channel.build-fingerprint",
+    "witwin/channel/rayd.lock.json",
 }
 _SPECIAL_PACKAGE_MEMBERS = frozenset({_NATIVE_MEMBER, *_REQUIRED_RUNTIME_MEMBERS})
 # The propagation consumer contract version has exactly one home, the checked-in
@@ -353,14 +353,14 @@ def _rayd_lock_identity(payload: bytes, *, label: str) -> dict[str, str]:
 
 def _runtime_identity_from_archive(archive: zipfile.ZipFile) -> dict[str, object]:
     fingerprint_member = (
-        "witwin/channel/runtime/_channel.build-fingerprint"
+        "witwin/channel/_channel.build-fingerprint"
     )
     fingerprint = archive.read(fingerprint_member)
     match = re.fullmatch(rb"([0-9a-f]{64})(?:\r?\n)?", fingerprint)
     if match is None:
         raise ValueError("wheel build fingerprint must contain exactly one SHA-256")
 
-    lock_member = "witwin/channel/runtime/rayd.lock.json"
+    lock_member = "witwin/channel/rayd.lock.json"
     wheel_lock_payload = archive.read(lock_member)
     repository_root = Path(__file__).resolve().parents[1]
     try:

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import torch
 
-from witwin.channel.scene import tensors as scene_tensors
+from witwin.channel.scene import compiler as scene_tensors
 from witwin.channel.deterministic import solver
 
 

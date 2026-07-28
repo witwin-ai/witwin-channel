@@ -60,7 +60,7 @@ def duffy_gl_nodes(
 
     The unit square ``(xi, eta)`` maps to barycentric ``(a, b) =
     (xi, eta*(1 - xi))`` with Jacobian ``(1 - xi)`` -- the same construction as
-    ``scattering.phase_screen.patch_phase_integral`` and the native op. Built in
+    ``scattering.patch_phase_integral`` and the native op. Built in
     float64 here (the oracle is double precision); the native op consumes the
     float32 cast of the identical nodes.
     """

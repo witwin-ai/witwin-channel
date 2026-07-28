@@ -6,18 +6,18 @@ from typing import Any
 
 import torch
 
-from witwin.channel.scene.antenna import validate_scalar_endpoint_features
-from witwin.channel.scene.edge_selection import resolve_scene_edge_policy
-from witwin.channel.runtime.kernel_metadata import AdLaunchLedger
-from witwin.channel.runtime.memory_budget import (
+from witwin.channel.scene.endpoints import validate_scalar_endpoint_features
+from witwin.channel.scene.resources import resolve_scene_edge_policy
+from witwin.channel.runtime import (
+    AdLaunchLedger,
     MemoryEstimate,
+    _ad_geometry_live,
     enforce_memory_budget,
 )
-from witwin.channel.scene.receiver_geometry import (
+from witwin.channel.scene.endpoints import (
     first_receiver_grid,
 )
-from witwin.channel.materials.encoding import face_material_field_bundle
-from witwin.channel.runtime.autograd_contracts import _ad_geometry_live
+from witwin.channel.materials import face_material_field_bundle
 from witwin.channel.scene.endpoints import ReceiverGrid, SolverScene as Scene, require_compiled
 from witwin.channel.montecarlo.events.transmission import scene_diagonal_m
 from witwin.channel.propagation import EvaluatedPaths, evaluate_enumerated_paths

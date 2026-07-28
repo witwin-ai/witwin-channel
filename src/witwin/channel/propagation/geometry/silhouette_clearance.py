@@ -15,8 +15,10 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.runtime.symbols import required_symbol as _required_native_op
-from witwin.channel.runtime.tensor_contracts import validate_cuda_tensor
+from witwin.channel.runtime import (
+    required_symbol as _required_native_op,
+    validate_cuda_tensor,
+)
 
 # Speed of light (m/s); wavelength = c0 / frequency_hz. Matches the LoS kernel
 # and artifacts/isb-taper/common.py (lambda = 0.06 m at 5 GHz).

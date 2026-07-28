@@ -11,6 +11,7 @@ rejected call.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import partial
 from typing import Literal, Protocol, TypeAlias, get_args
 
 import torch
@@ -21,6 +22,7 @@ from witwin.channel.constants import (
     PHASOR,
     TIME_DEPENDENCE,
 )
+from witwin.channel.tensor_math import require_tensor
 
 from ._wideband import (
     NATIVE_FREQUENCY_RESOLUTION_LAW,
@@ -29,6 +31,12 @@ from ._wideband import (
     native_frequency_resolution_hz,
     require_frequency_offsets,
     require_wideband_payload,
+)
+from .policy import (
+    _COMPONENT_MATERIAL_LEAVES,
+    _DIFFERENTIABLE_GEOMETRY_OUTPUTS,
+    _FIXED_TOPOLOGY_COMPONENT_IDS,
+    _PRIMAL_ONLY_AD_INPUTS,
 )
 
 
@@ -65,82 +73,12 @@ WORLD_VERSION_DOMAINS: tuple[str, ...] = (
     "geometry_version",
 )
 
-# Native component identifiers a frozen topology may carry into reevaluation.
-# The names are the contract vocabulary above; the integers are the discovery
-# owner's encoding, which the consumer reads but does not define.
-_FIXED_TOPOLOGY_COMPONENT_IDS: tuple[tuple[str, int], ...] = (
-    ("los", 0),
-    ("reflection", 1),
-)
 
-# Which compiled-material tensors each component actually reads (ADR-043).
-# Marking a tensor a component does not read is not an error - the zero it
-# produces is the true derivative - but that zero was previously
-# undiscoverable, so the split is published instead of inferred from a silent
-# result.
-_COMPONENT_MATERIAL_LEAVES: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("diffraction", ("eps_r", "sigma_e", "thickness_m", "gain")),
-    ("los", ()),
-    ("reflection", ("eps_r", "sigma_e", "thickness_m", "gain")),
-    ("transmission", ("layer_eps_r", "layer_sigma_e", "layer_thickness_m")),
-)
-
-# Which published geometry tensors carry a derivative, per route (ADR-043).
-# Discovery re-solves the topology, so its interaction table and arrival
-# direction are declared non-differentiable outputs rather than silently
-# detached ones; the supported differentiable geometry route is
-# prepare_fixed_topology + reevaluate.
-_DIFFERENTIABLE_GEOMETRY_OUTPUTS: tuple[tuple[str, frozenset[str]], ...] = (
-    ("discovery", frozenset({"path_length_m", "delay_s"})),
-    (
-        "fixed_topology",
-        frozenset(
-            {
-                "path_length_m",
-                "delay_s",
-                "interaction_positions_m",
-                "field_direction",
-            }
-        ),
-    ),
-)
-
-# Inputs every response refuses before any native work, in every AD mode but
-# "none". The native field companions reject them by contract, so a request
-# that carries one fails at the boundary instead of inside backward().
-_PRIMAL_ONLY_AD_INPUTS: tuple[str, ...] = (
-    "materials.layer_mu_r",
-    "materials.mu_r",
-    "sinks.polarization_basis",
-    "sinks.polarizations",
-    "sources.polarization_basis",
-    "sources.polarizations",
-    "sources.powers_w",
-)
-
-
-
-
-def _require_tensor(
-    name: str,
-    value: object,
-    *,
-    dtype: torch.dtype,
-    shape: tuple[int, ...] | None = None,
-    ndim: int | None = None,
-    device: torch.device | None = None,
-) -> torch.Tensor:
-    if not isinstance(value, torch.Tensor):
-        raise TypeError(f"{name} must be a torch.Tensor")
-    if value.dtype != dtype:
-        raise TypeError(f"{name} must use {dtype}, got {value.dtype}")
-    if shape is not None and tuple(value.shape) != shape:
-        raise ValueError(f"{name} must have shape {shape}, got {tuple(value.shape)}")
-    if ndim is not None and value.ndim != ndim:
-        raise ValueError(f"{name} must have rank {ndim}, got {value.ndim}")
-    if device is not None and value.device != device:
-        raise ValueError(f"{name} must be on {device}, got {value.device}")
-    return value
+# The consumer boundary reports a wrong dtype as a TypeError; the internal row
+# and capacity contracts report it as a ValueError. That is the only difference
+# there ever was between the three copies of this check, so it is the only thing
+# bound here and the check itself has one owner.
+_require_tensor = partial(require_tensor, dtype_error=TypeError)
 
 
 class _WorldVersionSource(Protocol):

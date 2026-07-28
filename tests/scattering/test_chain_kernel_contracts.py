@@ -20,7 +20,7 @@ import math
 import pytest
 import torch
 
-from witwin.channel.runtime import symbols
+from witwin.channel import runtime
 from witwin.channel.scattering.kernels import functional_chain as F
 
 pytestmark = pytest.mark.skipif(
@@ -388,7 +388,7 @@ def test_chain_ensemble_forward_rejects_row_mismatch():
 
 def test_chain_ensemble_requires_native_kernel(monkeypatch):
     case = _chain_ensemble_case(seed=17)
-    monkeypatch.setattr(symbols, "native_extension", lambda: None)
+    monkeypatch.setattr(runtime, "native_extension", lambda: None)
     with pytest.raises(RuntimeError, match="CUDA kernel is required"):
         _ensemble_forward(case)
 
@@ -421,7 +421,7 @@ def test_chain_ensemble_backward_schema_and_gating():
 def test_chain_ensemble_backward_requires_native_kernel(monkeypatch):
     case = _chain_ensemble_case(seed=22)
     rows = case["rows"]
-    monkeypatch.setattr(symbols, "native_extension", lambda: None)
+    monkeypatch.setattr(runtime, "native_extension", lambda: None)
     with pytest.raises(RuntimeError, match="CUDA kernel is required"):
         F.scattering_chain_ensemble_eval_backward(
             *_ensemble_forward_args(case),
@@ -512,7 +512,7 @@ def test_chain_realization_forward_rejects_depth_over_max():
 
 def test_chain_realization_requires_native_kernel(monkeypatch):
     case = _chain_realization_case(seed=35)
-    monkeypatch.setattr(symbols, "native_extension", lambda: None)
+    monkeypatch.setattr(runtime, "native_extension", lambda: None)
     with pytest.raises(RuntimeError, match="CUDA kernel is required"):
         _realization_forward(case)
 
@@ -554,7 +554,7 @@ def test_chain_realization_backward_requires_grad_total_dtype():
 
 def test_chain_realization_backward_requires_native_kernel(monkeypatch):
     case = _chain_realization_case(seed=43)
-    monkeypatch.setattr(symbols, "native_extension", lambda: None)
+    monkeypatch.setattr(runtime, "native_extension", lambda: None)
     with pytest.raises(RuntimeError, match="CUDA kernel is required"):
         F.scattering_chain_realization_eval_backward(
             *_realization_forward_args(case),

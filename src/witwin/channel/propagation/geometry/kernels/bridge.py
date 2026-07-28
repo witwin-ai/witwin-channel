@@ -4,25 +4,23 @@ import math
 
 import torch
 
-from witwin.channel.propagation.models.penetration import (
+from witwin.channel.propagation.penetration import (
     SegmentPenetrationBackwardResult,
     SegmentPenetrationJvpResult,
     SegmentPenetrationPolicy,
     SegmentPenetrationResult,
     SegmentPenetrationTapeResult,
 )
-from witwin.channel.runtime.autograd_contracts import (
-    _ad_check_optional_grad,
-    _ad_check_tangent_vec3,
-)
-from witwin.channel.runtime.capacity import (
+from witwin.channel.runtime import (
     CapacityFailureBit,
     CapacityFailureState,
+    _ad_check_optional_grad,
+    _ad_check_tangent_vec3,
+    _rayd_scene_resource,
     require_capacity_failure_state,
+    required_symbol as _required_native_op,
+    validate_cuda_tensor,
 )
-from witwin.channel.runtime.symbols import required_symbol as _required_native_op
-from witwin.channel.runtime.tensor_contracts import validate_cuda_tensor
-from witwin.channel.runtime.native_resources import _rayd_scene_resource
 
 
 _SEGMENT_PENETRATION_FAILURE_BIT = int(CapacityFailureBit.SEGMENT_PENETRATION_FAILURE)

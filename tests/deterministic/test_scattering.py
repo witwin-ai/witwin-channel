@@ -24,11 +24,13 @@ from witwin.core import PhaseScreen, SurfaceRoughness
 from witwin.channel.deterministic import Config, solve
 from tests.reference.em_oracle import C0, layer_stack_rt
 from witwin.channel.scattering import (
+    N_COS_THETA_O,
+    N_PHI_O,
+    _cos_centers,
     build_kirchhoff_table,
     generate_gaussian_realization,
     realization_seed,
 )
-from witwin.channel.scattering.tables import N_COS_THETA_O, N_PHI_O, _cos_centers
 
 _FREQUENCY_HZ = 3.0e9
 _K0 = 2.0 * math.pi * _FREQUENCY_HZ / C0

@@ -14,14 +14,14 @@ from witwin.core import (
     Scene,
     Structure,
 )
-from witwin.channel.scene.antenna import pattern_field_response
+from witwin.channel.scene.endpoints import pattern_field_response
 from witwin.channel.montecarlo.basic import Config as MonteCarloBasicConfig
 from witwin.channel.montecarlo.basic import solver as montecarlo_basic_solver
 from witwin.channel.scene.endpoints import (
     _endpoint_views,
     _validate_scalar_endpoint_boundary,
 )
-from witwin.channel.scene.kernels.rayd_scene import (
+from witwin.channel.scene.resources import (
     RayDEdgeRecords,
     RayDSceneResource,
 )

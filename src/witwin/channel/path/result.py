@@ -12,7 +12,7 @@ from .schema import RaggedPathSoA
 _LIGHT_SPEED_M_PER_S = 299_792_458.0
 
 if TYPE_CHECKING:
-    from witwin.channel.propagation.models.evaluated import EvaluatedPaths
+    from witwin.channel.propagation.rows import EvaluatedPaths
 
 
 def _validate_tensor_predicate(predicate: torch.Tensor, message: str) -> None:

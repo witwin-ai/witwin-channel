@@ -13,9 +13,7 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.runtime import torch_compat
-from witwin.channel.runtime.symbols import required_symbol as _required_native_op
-from witwin.channel.runtime.autograd_contracts import (
+from witwin.channel.runtime import (
     _ad_first_order_only,
     _ad_frequency_grad,
     _ad_frequency_tangent,
@@ -24,6 +22,8 @@ from witwin.channel.runtime.autograd_contracts import (
     _ad_native_tensor,
     _ad_reject_fixed_inputs,
     _ad_reject_fixed_tangents,
+    disable_functorch,
+    required_symbol as _required_native_op,
 )
 
 from .functional import (
@@ -315,7 +315,7 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
         tangent_coef = _ad_frequency_tangent(t_coef)
         if tangent_coef == 0.0 and all(value is None for value in tangents.values()):
             return (None,) * len(_ENSEMBLE_OUTPUT_FIELDS)
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = scattering_ensemble_eval_jvp(
                 *(_ad_native_tensor(value) for value in saved),
                 coef=ctx.coef_value,
@@ -474,7 +474,7 @@ class _ScatteringTableEvalAdFunction(torch.autograd.Function):
         }
         if all(value is None for value in tangents.values()):
             return None, None
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = scattering_table_eval_jvp(
                 *(_ad_native_tensor(value) for value in saved), **tangents
             )
@@ -700,7 +700,7 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
         tangent_k0 = _ad_frequency_tangent(t_k0)
         if tangent_k0 == 0.0 and all(value is None for value in tangents.values()):
             return (None,) * len(_PATCH_OUTPUT_FIELDS)
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = scattering_patch_integral_eval_jvp(
                 *(_ad_native_tensor(value) for value in saved[:15]),
                 k0=ctx.k0_value,

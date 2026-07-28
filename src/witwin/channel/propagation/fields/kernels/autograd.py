@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.runtime import torch_compat
-from witwin.channel.runtime.autograd_contracts import (
+from witwin.channel.runtime import (
     _ad_checked_tangent,
     _ad_first_order_only,
     _ad_frequency_grad,
@@ -15,8 +14,9 @@ from witwin.channel.runtime.autograd_contracts import (
     _ad_native_tensor,
     _ad_reject_fixed_inputs,
     _ad_reject_fixed_tangents,
+    disable_functorch,
+    required_symbol as _required_native_op,
 )
-from witwin.channel.runtime.symbols import required_symbol as _required_native_op
 
 from . import _liveness
 from .functional import (
@@ -206,7 +206,7 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
         ):
             return (None,) * 7
         source, target, tx_power, tx_polarization, rx_polarization = saved
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = field_free_space_jvp(
                 _ad_native_tensor(source),
                 _ad_native_tensor(target),
@@ -508,7 +508,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
             and tangent_frequency == 0.0
         ):
             return (None,) * 7
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = field_reflection_sequence_jvp(
                 *(_ad_native_tensor(value) for value in saved),
                 frequency_hz=ctx.frequency_value,
@@ -816,7 +816,7 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
             and tangent_frequency == 0.0
         ):
             return (None,) * 7
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = field_transmission_sequence_jvp(
                 *(_ad_native_tensor(value) for value in saved),
                 frequency_hz=ctx.frequency_value,
@@ -1145,7 +1145,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
             and all(value is None for value in vertex_tangents)
         ):
             return (None, None)
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = _required_native_op("field_diffraction_wedge_jvp")(
                 *(_ad_native_tensor(value) for value in primals),
                 ctx.frequency_value,
@@ -1538,7 +1538,7 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
             and tangent_frequency == 0.0
         ):
             return (None,) * 5
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = _required_native_op("field_coupled_rd_jvp")(
                 *(_ad_native_tensor(value) for value in saved),
                 ctx.frequency_value,
@@ -1732,7 +1732,7 @@ class _CoupledRdPrepareAdFunction(torch.autograd.Function):
         )
         if tangent_source is None and tangent_receiver is None:
             return (None, None, None)
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             out = _required_native_op("coupled_rd_prepare_jvp")(
                 *(_ad_native_tensor(value) for value in saved),
                 tangent_source,

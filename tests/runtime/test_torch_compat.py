@@ -7,7 +7,7 @@ from packaging.version import Version
 import pytest
 import torch
 
-from witwin.channel.runtime import torch_compat
+from witwin.channel import runtime
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -34,26 +34,26 @@ def test_installed_torch_is_supported_and_cxx_abi_contract_holds(installed_torch
 
     value = torch.tensor([2.0])
 
-    assert torch_compat.is_transform_wrapped_tensor(value) is False
-    assert torch_compat.transform_level(value) == -1
-    assert torch_compat.interpreter_stack() == ()
-    assert torch_compat.uses_cxx11_abi() is bool(torch._C._GLIBCXX_USE_CXX11_ABI)
+    assert runtime.is_transform_wrapped_tensor(value) is False
+    assert runtime.transform_level(value) == -1
+    assert runtime.interpreter_stack() == ()
+    assert runtime.uses_cxx11_abi() is bool(torch._C._GLIBCXX_USE_CXX11_ABI)
 
 
 def test_single_jvp_reports_stack_and_unwraps_without_copy():
     observed: dict[str, object] = {}
 
     def function(value: torch.Tensor) -> torch.Tensor:
-        stack = torch_compat.interpreter_stack()
-        unwrapped = torch_compat.unwrap_transform_tensor(value)
+        stack = runtime.interpreter_stack()
+        unwrapped = runtime.unwrap_transform_tensor(value)
         observed.update(
-            wrapped=torch_compat.is_transform_wrapped_tensor(value),
-            level=torch_compat.transform_level(value),
+            wrapped=runtime.is_transform_wrapped_tensor(value),
+            level=runtime.transform_level(value),
             stack_length=len(stack),
-            jvp_entries=tuple(torch_compat.is_jvp_transform(item) for item in stack),
+            jvp_entries=tuple(runtime.is_jvp_transform(item) for item in stack),
             unwrapped=unwrapped,
-            unwrapped_wrapped=torch_compat.is_transform_wrapped_tensor(unwrapped),
-            unwrapped_level=torch_compat.transform_level(unwrapped),
+            unwrapped_wrapped=runtime.is_transform_wrapped_tensor(unwrapped),
+            unwrapped_level=runtime.transform_level(unwrapped),
         )
         return value.square()
 
@@ -74,7 +74,7 @@ def test_single_jvp_reports_stack_and_unwraps_without_copy():
     assert isinstance(unwrapped, torch.Tensor)
     assert unwrapped.data_ptr() == primal_input.data_ptr()
     assert unwrapped.stride() == primal_input.stride()
-    assert torch_compat.interpreter_stack() == ()
+    assert runtime.interpreter_stack() == ()
 
 
 def test_composed_transform_stack_exposes_grad_and_jvp_entries():
@@ -82,9 +82,9 @@ def test_composed_transform_stack_exposes_grad_and_jvp_entries():
 
     def outer(value: torch.Tensor) -> torch.Tensor:
         def inner(inner_value: torch.Tensor) -> torch.Tensor:
-            stack = torch_compat.interpreter_stack()
+            stack = runtime.interpreter_stack()
             observed.append(
-                tuple(torch_compat.is_jvp_transform(item) for item in stack)
+                tuple(runtime.is_jvp_transform(item) for item in stack)
             )
             return inner_value.square()
 
@@ -95,17 +95,17 @@ def test_composed_transform_stack_exposes_grad_and_jvp_entries():
 
     torch.testing.assert_close(gradient, torch.tensor([2.0]))
     assert observed == [(False, True)]
-    assert torch_compat.interpreter_stack() == ()
+    assert runtime.interpreter_stack() == ()
 
 
 def test_disable_functorch_context_disables_and_restores_dispatch():
     observed: dict[str, object] = {}
 
     def disabled_add(value: torch.Tensor) -> torch.Tensor:
-        with torch_compat.disable_functorch():
+        with runtime.disable_functorch():
             result = value + 1.0
-            observed["wrapped"] = torch_compat.is_transform_wrapped_tensor(result)
-            observed["level"] = torch_compat.transform_level(result)
+            observed["wrapped"] = runtime.is_transform_wrapped_tensor(result)
+            observed["level"] = runtime.transform_level(result)
         return result
 
     value = torch.tensor([2.0])
@@ -121,27 +121,27 @@ def test_disable_functorch_context_disables_and_restores_dispatch():
         lambda item: item + 1.0, (value,), (torch.full_like(value, 3.0),)
     )
     torch.testing.assert_close(restored_tangent, torch.tensor([3.0]))
-    assert torch_compat.interpreter_stack() == ()
+    assert runtime.interpreter_stack() == ()
 
 
 def test_missing_private_api_fails_loudly(monkeypatch: pytest.MonkeyPatch):
     value = torch.tensor([1.0])
     monkeypatch.setattr(
-        torch_compat,
+        runtime,
         "torch",
         SimpleNamespace(_C=SimpleNamespace()),
     )
 
     with pytest.raises(AttributeError):
-        torch_compat.is_transform_wrapped_tensor(value)
+        runtime.is_transform_wrapped_tensor(value)
     with pytest.raises(AttributeError):
-        torch_compat.disable_functorch()
+        runtime.disable_functorch()
     with pytest.raises(AttributeError):
-        torch_compat.uses_cxx11_abi()
+        runtime.uses_cxx11_abi()
 
 
 def test_private_torch_api_has_a_single_production_owner():
-    owner = PACKAGE_ROOT / "runtime" / "torch_compat.py"
+    owner = PACKAGE_ROOT / "runtime.py"
     violations = []
     for path in sorted(PACKAGE_ROOT.rglob("*.py")):
         if path == owner:

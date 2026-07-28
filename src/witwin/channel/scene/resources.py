@@ -1,32 +1,426 @@
-"""Typed scattering resources owned by :class:`CompiledScene`."""
+"""Immutable native resources a compiled scene owns.
+
+This module is the single owner of everything a :class:`CompiledScene` holds
+that is not a store: the typed RayD scene/BVH lifetime, the diffraction edge
+policy and the scene-policy refinement of the exported edge geometry, and the
+lazily built Kirchhoff and phase-screen resources.
+
+They were four modules that only ever called each other. The RayD resource is
+the thing the edge refinement reads its records from and the thing the
+phase-screen build takes its mesh tensors from, and the edge policy exists only
+to be cached on that resource at compile time, so a reader following one
+resource had to walk four files to see one lifetime.
+
+Nothing here computes RF physics. The RayD facade validates a contract and
+dispatches a native symbol; the edge refinement is scene-policy row selection
+over already-exported geometry; the resource builders cache scene-static data
+that the consumers used to recompute per solve, with their exception and
+numerical order preserved. Moving that retained static construction across the
+native boundary requires its own accepted ADR.
+
+The stores this module annotates against live in
+:mod:`witwin.channel.scene.compiler`, which imports this module for the RayD
+lifetime. The store names are needed for typing only, so they are imported
+under ``TYPE_CHECKING`` and the runtime dependency stays one-way.
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 import math
+from typing import TYPE_CHECKING
 
 import torch
 
 from witwin.core import PhaseScreen, SurfaceRoughness
-from witwin.channel.scattering.phase_screen import PhaseScreenRuntime
-from witwin.channel.scattering.tables import KirchhoffTable, MAX_RMS_SLOPE
-from witwin.channel.scene.kernels.rayd_scene import RayDSceneResource
-from witwin.channel.scene.stores.assignments import AssignmentStore
-from witwin.channel.scene.stores.materials import MaterialStore
+
+from witwin.channel.runtime import mc_pack_vec3, required_symbol as _required_native_op
+from witwin.channel.scattering import (
+    MAX_RMS_SLOPE,
+    KirchhoffTable,
+    PhaseScreenRuntime,
+)
+
+if TYPE_CHECKING:
+    from witwin.channel.scene.compiler import AssignmentStore, MaterialStore
 
 __all__ = [
+    "DEFAULT_EDGE_POLICY",
+    "EdgePolicy",
     "KirchhoffRuntimeResources",
     "KirchhoffTableStack",
     "PhaseScreenResourceKey",
     "PhaseScreenRuntimeResources",
     "PhaseScreenStructureResource",
+    "RayDEdgeRecords",
+    "RayDSceneResource",
     "RoughMaterialRuntime",
     "ScatteringResourceKey",
+    "_empty_tensor",
+    "_mesh_flags",
     "build_kirchhoff_resources",
     "build_kirchhoff_table_stack",
     "build_phase_screen_resources",
+    "build_scene_from_structures",
+    "rayd_scene_create",
+    "rayd_scene_edge_records",
     "realization_phase_screens",
+    "refine_edge_geometry",
+    "resolve_scene_edge_policy",
 ]
+
+
+def rayd_scene_create(
+    vertices: list[torch.Tensor],
+    faces: list[torch.Tensor],
+    uv: list[torch.Tensor],
+    face_uv: list[torch.Tensor],
+    to_world_left: list[torch.Tensor],
+    to_world_right: list[torch.Tensor],
+    mesh_flags: list[int],
+) -> object:
+    resource = _required_native_op("rayd_scene_create")(
+        vertices,
+        faces,
+        uv,
+        face_uv,
+        to_world_left,
+        to_world_right,
+        mesh_flags,
+    )
+    if resource is None or not bool(getattr(resource, "available", False)):
+        raise RuntimeError("_channel.rayd_scene_create returned an invalid resource")
+    return resource
+
+
+def rayd_scene_edge_records(resource: object) -> tuple[torch.Tensor, ...]:
+    out = _required_native_op("rayd_scene_edge_records")(resource)
+    if not isinstance(out, (tuple, list)):
+        raise TypeError(
+            "_channel.rayd_scene_edge_records must return a tensor sequence"
+        )
+    return tuple(out)
+
+
+@dataclass(frozen=True, slots=True)
+class RayDEdgeRecords:
+    vertices: torch.Tensor
+    faces: torch.Tensor
+    face_normals: torch.Tensor
+    edge_v0: torch.Tensor
+    edge_v1: torch.Tensor
+    face0: torch.Tensor
+    face1: torch.Tensor
+    shape_id: torch.Tensor
+    local_edge_id: torch.Tensor
+    opposite: torch.Tensor
+
+
+@dataclass(frozen=True, slots=True)
+class RayDSceneResource:
+    """Typed, owning wrapper for a native RayD scene resource."""
+
+    resource: object | None = None
+    mesh_tensors: tuple[tuple[torch.Tensor, ...], ...] = ()
+    reason: str | None = None
+    runtime_cache: dict[str, object] = field(
+        default_factory=dict, compare=False, repr=False
+    )
+
+    @property
+    def available(self) -> bool:
+        return self.resource is not None and bool(
+            getattr(self.resource, "available", False)
+        )
+
+    def require_resource(self) -> object:
+        if not self.available:
+            reason = "unknown" if self.reason is None else self.reason
+            raise RuntimeError(f"RayD native scene is unavailable: {reason}")
+        assert self.resource is not None
+        return self.resource
+
+    def edge_records(self) -> RayDEdgeRecords:
+        cached = self.runtime_cache.get("edge_records")
+        if cached is not None:
+            return cached  # type: ignore[return-value]
+        values = rayd_scene_edge_records(self.require_resource())
+        if len(values) != 12:
+            raise RuntimeError(
+                f"RayD edge_records returned {len(values)} tensors, expected 12"
+            )
+        face_normals = mc_pack_vec3(values[2], values[3], values[4])
+        records = RayDEdgeRecords(
+            vertices=values[0],
+            faces=values[1],
+            face_normals=face_normals,
+            edge_v0=values[5],
+            edge_v1=values[6],
+            face0=values[7],
+            face1=values[8],
+            shape_id=values[9],
+            local_edge_id=values[10],
+            opposite=values[11],
+        )
+        self.runtime_cache["edge_records"] = records
+        return records
+
+
+def _empty_tensor(
+    shape: tuple[int, ...], *, dtype: torch.dtype, device: torch.device
+) -> torch.Tensor:
+    return torch.empty(shape, dtype=dtype, device=device)
+
+
+def _mesh_flags(*, use_face_normals: bool, edges_enabled: bool, dynamic: bool) -> int:
+    flags = 0
+    if use_face_normals:
+        flags |= 1
+    if edges_enabled:
+        flags |= 2
+    if dynamic:
+        flags |= 4
+    return flags
+
+
+def build_scene_from_structures(structures: tuple[object, ...]) -> RayDSceneResource:
+    """Build a typed RayD native scene from Channel structures.
+
+    This function uses the RayD native core source-linked into
+    `_channel`. It does not import a RayD Python package or dispatcher.
+    """
+
+    if not structures:
+        return RayDSceneResource(reason="scene has no structures")
+    if not torch.cuda.is_available():
+        return RayDSceneResource(reason="CUDA is unavailable")
+
+    device = torch.device("cuda")
+    vertices: list[torch.Tensor] = []
+    faces: list[torch.Tensor] = []
+    uv: list[torch.Tensor] = []
+    face_uv: list[torch.Tensor] = []
+    to_world_left: list[torch.Tensor] = []
+    to_world_right: list[torch.Tensor] = []
+    mesh_flags: list[int] = []
+    keepalive: list[tuple[torch.Tensor, ...]] = []
+
+    for structure in structures:
+        mesh_vertices = structure.vertices.to(
+            device=device, dtype=torch.float32
+        ).contiguous()
+        mesh_faces = structure.faces.to(device=device, dtype=torch.int32).contiguous()
+        # Structures that carry a UV parametrization forward it to the native
+        # mesh (RayD carries UV end-to-end); structures without UV keep the
+        # empty per-mesh tensors, preserving the pre-UV behavior exactly.
+        structure_uv = getattr(structure, "uv", None)
+        structure_face_uv = getattr(structure, "face_uv", None)
+        if structure_uv is not None and structure_face_uv is not None:
+            mesh_uv = structure_uv.to(device=device, dtype=torch.float32).contiguous()
+            mesh_face_uv = structure_face_uv.to(
+                device=device, dtype=torch.int32
+            ).contiguous()
+        else:
+            mesh_uv = _empty_tensor((0, 2), dtype=torch.float32, device=device)
+            mesh_face_uv = _empty_tensor((0, 3), dtype=torch.int32, device=device)
+        mesh_to_world_left = _empty_tensor((0, 4), dtype=torch.float32, device=device)
+        mesh_to_world_right = _empty_tensor((0, 4), dtype=torch.float32, device=device)
+        vertices.append(mesh_vertices)
+        faces.append(mesh_faces)
+        uv.append(mesh_uv)
+        face_uv.append(mesh_face_uv)
+        to_world_left.append(mesh_to_world_left)
+        to_world_right.append(mesh_to_world_right)
+        mesh_flags.append(
+            _mesh_flags(use_face_normals=False, edges_enabled=True, dynamic=False)
+        )
+        keepalive.append(
+            (
+                mesh_vertices,
+                mesh_faces,
+                mesh_uv,
+                mesh_face_uv,
+                mesh_to_world_left,
+                mesh_to_world_right,
+            )
+        )
+
+    resource = rayd_scene_create(
+        vertices,
+        faces,
+        uv,
+        face_uv,
+        to_world_left,
+        to_world_right,
+        mesh_flags,
+    )
+    return RayDSceneResource(resource=resource, mesh_tensors=tuple(keepalive))
+
+
+_BOUNDARY_EDGE_POLICIES = {"exclude", "half_plane"}
+_EDGE_SELECTION_MODES = {"vertical_only", "all_edges"}
+
+
+@dataclass(slots=True)
+class EdgePolicy:
+    vertical_ratio: float = 0.7
+    edge_selection_mode: str = "all_edges"
+    edge_diffraction: bool | None = True
+    boundary_edge_policy: str | None = None
+
+    def __post_init__(self) -> None:
+        mode = str(self.edge_selection_mode)
+        if mode not in _EDGE_SELECTION_MODES:
+            raise ValueError(f"edge_selection_mode must be one of {sorted(_EDGE_SELECTION_MODES)}")
+        requested = None if self.edge_diffraction is None else bool(self.edge_diffraction)
+        boundary = (
+            "half_plane" if requested is not False else "exclude"
+        ) if self.boundary_edge_policy is None else str(self.boundary_edge_policy)
+        if boundary not in _BOUNDARY_EDGE_POLICIES:
+            raise ValueError(f"boundary_edge_policy must be one of {sorted(_BOUNDARY_EDGE_POLICIES)}")
+        resolved = boundary == "half_plane"
+        if requested is not None and requested != resolved:
+            raise ValueError(
+                f"edge_diffraction={requested!r} conflicts with boundary_edge_policy={boundary!r}"
+            )
+        self.vertical_ratio = float(self.vertical_ratio)
+        self.edge_selection_mode = mode
+        self.edge_diffraction = resolved
+        self.boundary_edge_policy = boundary
+
+    @property
+    def vertical_only(self) -> bool:
+        return self.edge_selection_mode == "vertical_only"
+
+    @property
+    def cache_key(self) -> tuple[float, str, str]:
+        return (self.vertical_ratio, self.edge_selection_mode, self.boundary_edge_policy or "half_plane")
+
+
+DEFAULT_EDGE_POLICY = EdgePolicy()
+
+
+# Scene-policy filtering and cross-structure merging for diffraction edges.
+#
+# The native edge-geometry kernel selects every interior wedge and every
+# boundary half-plane edge regardless of the scene's edge policy, and exports
+# one boundary record per structure even when two structures share the same
+# geometric edge. The refinement below rewrites the exported geometry tuple so
+# that:
+#
+# - the scene's ``EdgePolicy`` (``vertical_only`` filter,
+#   ``boundary_edge_policy``) is actually enforced for path generation (audit
+#   DF-4), and
+# - boundary edges shared between two structures are merged into a single wedge
+#   record with the correct exterior angle instead of two duplicate half-plane
+#   records that double count the diffracted field (audit D-6).
+
+_ENDPOINT_QUANTIZATION = 1.0e-4
+_NORMAL_COS_TOL = 1.0 - 1.0e-5
+_TWO_PI = 2.0 * math.pi
+
+
+def resolve_scene_edge_policy(scene: object) -> EdgePolicy:
+    policy = getattr(scene, "metadata", {}).get("sionna_import_edge_policy")
+    return policy if isinstance(policy, EdgePolicy) else DEFAULT_EDGE_POLICY
+
+
+def _lexicographic_min_first(p0: torch.Tensor, p1: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    le = (
+        (p0[:, 0] < p1[:, 0])
+        | ((p0[:, 0] == p1[:, 0]) & (p0[:, 1] < p1[:, 1]))
+        | ((p0[:, 0] == p1[:, 0]) & (p0[:, 1] == p1[:, 1]) & (p0[:, 2] <= p1[:, 2]))
+    ).unsqueeze(1)
+    return torch.where(le, p0, p1), torch.where(le, p1, p0)
+
+
+def _duplicate_boundary_pairs(
+    records: object,
+    candidate: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Group boundary edges by quantized endpoints.
+
+    Returns (first_of_pair, second_of_pair, extra_duplicates); the extras are
+    third-or-later records of a group and are simply deselected.
+    """
+
+    device = candidate.device
+    empty = torch.empty((0,), device=device, dtype=torch.long)
+    index = candidate.nonzero(as_tuple=False).squeeze(1)
+    if int(index.numel()) < 2:
+        return empty, empty, empty
+    v0 = records.edge_v0[index].to(dtype=torch.long)
+    v1 = records.edge_v1[index].to(dtype=torch.long)
+    p0 = torch.round(records.vertices[v0] / _ENDPOINT_QUANTIZATION).to(dtype=torch.long)
+    p1 = torch.round(records.vertices[v1] / _ENDPOINT_QUANTIZATION).to(dtype=torch.long)
+    first, second = _lexicographic_min_first(p0, p1)
+    key = torch.cat([first, second], dim=1)
+    _, inverse, counts = torch.unique(key, dim=0, return_inverse=True, return_counts=True)
+    order = torch.argsort(inverse, stable=True)
+    sorted_inverse = inverse[order]
+    is_first = torch.ones_like(sorted_inverse, dtype=torch.bool)
+    is_first[1:] = sorted_inverse[1:] != sorted_inverse[:-1]
+    is_second = torch.zeros_like(is_first)
+    is_second[1:] = is_first[:-1] & (sorted_inverse[1:] == sorted_inverse[:-1])
+    in_pair = counts[sorted_inverse] >= 2
+    pair_first = index[order[is_first & in_pair]]
+    pair_second = index[order[is_second]]
+    extras = index[order[~is_first & ~is_second]]
+    return pair_first, pair_second, extras
+
+
+def refine_edge_geometry(
+    rayd: object,
+    geometry: tuple[torch.Tensor, ...],
+    *,
+    policy: EdgePolicy | None = None,
+) -> tuple[torch.Tensor, ...]:
+    """Return the geometry tuple with policy filtering and shared-edge merges."""
+
+    (selected, edge_pos, edge_dir, lengths, line_min, line_max, n0, n1, face0, face1, exterior_angle) = geometry
+    if int(selected.numel()) == 0:
+        return geometry
+    records = rayd.edge_records()
+    if policy is None:
+        policy = rayd.runtime_cache.get("edge_policy")
+    if not isinstance(policy, EdgePolicy):
+        policy = DEFAULT_EDGE_POLICY
+
+    selected = selected.clone()
+    n1 = n1.clone()
+    face1 = face1.clone()
+    exterior_angle = exterior_angle.clone()
+
+    boundary = records.face1 < 0
+    pair_first, pair_second, extras = _duplicate_boundary_pairs(records, selected & boundary)
+    if int(pair_first.numel()) > 0:
+        normal_a = n0[pair_first]
+        normal_b = n0[pair_second]
+        normal_dot = (normal_a * normal_b).sum(dim=1).clamp(-1.0, 1.0)
+        interior_angle = torch.arccos((-normal_dot).clamp(-1.0, 1.0))
+        merged_exterior = _TWO_PI - interior_angle
+        coplanar = normal_dot.abs() >= _NORMAL_COS_TOL
+        keep = (merged_exterior > math.pi * (1.0 + 1.0e-6)) & ~coplanar
+        selected[pair_first] = keep
+        selected[pair_second] = False
+        n1[pair_first] = normal_b
+        face1[pair_first] = face0[pair_second]
+        exterior_angle[pair_first] = merged_exterior
+        boundary = boundary.clone()
+        boundary[pair_first] = False
+    if int(extras.numel()) > 0:
+        selected[extras] = False
+
+    if policy.boundary_edge_policy != "half_plane":
+        selected &= ~boundary
+    if policy.vertical_only:
+        v0 = records.edge_v0.to(dtype=torch.long)
+        v1 = records.edge_v1.to(dtype=torch.long)
+        delta = records.vertices[v1] - records.vertices[v0]
+        length = delta.norm(dim=1).clamp_min(1.0e-6)
+        selected &= (delta[:, 2].abs() / length) > float(policy.vertical_ratio)
+
+    return (selected, edge_pos, edge_dir, lengths, line_min, line_max, n0, n1, face0, face1, exterior_angle)
 
 
 @dataclass(frozen=True, slots=True)
@@ -262,7 +656,7 @@ def _maybe_differentiate_table(
     returned unchanged (bitwise primal path).
     """
 
-    from witwin.channel.runtime.autograd_contracts import _ad_geometry_live
+    from witwin.channel.runtime import _ad_geometry_live
 
     # Store parameter tensors are host-side float32 metadata; the native build
     # adjoint runs on device, so move the differentiable leaves to key.device.

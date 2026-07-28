@@ -6,10 +6,10 @@ import torch
 from witwin.core import SurfaceRoughness
 from witwin.channel.scattering import build_kirchhoff_table
 from witwin.channel.scattering.kernels import functional as ops
-from witwin.channel.scene.scattering_resources import (
+from witwin.channel.scene.resources import (
     build_kirchhoff_table_stack,
 )
-from witwin.channel.runtime import symbols
+from witwin.channel import runtime
 
 from tests.reference import kirchhoff_ensemble as reference
 
@@ -147,6 +147,6 @@ def test_scattering_ensemble_eval_requires_native_kernel(monkeypatch):
     tables = _build_tables(device)
     stack = build_kirchhoff_table_stack(tables, 2, device)
     case = _random_case(4, 2, 3, device=device, seed=5)
-    monkeypatch.setattr(symbols, "native_extension", lambda: None)
+    monkeypatch.setattr(runtime, "native_extension", lambda: None)
     with pytest.raises(RuntimeError, match="scattering_ensemble_eval CUDA kernel is required"):
         _native_eval(case, stack, 1.0, 0.0)

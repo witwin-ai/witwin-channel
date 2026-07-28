@@ -5,7 +5,7 @@ from dataclasses import replace
 import pytest
 import torch
 
-from witwin.channel.propagation.models.penetration import (
+from witwin.channel.propagation.penetration import (
     SegmentPenetrationResult,
 )
 from witwin.channel.propagation.topology.kernels import (
@@ -14,7 +14,7 @@ from witwin.channel.propagation.topology.kernels import (
 from witwin.channel.propagation.topology.kernels.transmission import (
     enumerated_transmission_topology_pack,
 )
-from witwin.channel.runtime.capacity import create_capacity_failure_state
+from witwin.channel.runtime import create_capacity_failure_state
 
 
 pytestmark = pytest.mark.skipif(

@@ -124,7 +124,7 @@ def _prepare_packaged_validation_checkout(
     if not source_extension.is_file() or source_extension.parent != installed_package:
         raise EvidenceError("runner extension is not inside its runner-owned installation")
     source_fingerprint = (
-        installed_package / "runtime" / "_channel.build-fingerprint"
+        installed_package / "_channel.build-fingerprint"
     )
     validation = config.build_parent / f"release-validation-{commit}"
     if os.path.lexists(validation):
@@ -156,12 +156,12 @@ def _prepare_packaged_validation_checkout(
     validation_package = validation / "src" / "witwin" / "channel"
     validation_extension = validation_package / source_extension.name
     validation_fingerprint = (
-        validation_package / "runtime" / "_channel.build-fingerprint"
+        validation_package / "_channel.build-fingerprint"
     )
     if validation_extension.exists() or validation_fingerprint.exists():
         raise EvidenceError("packaged validation overlay target already exists")
     git_exclude = validation / ".git" / "info" / "exclude"
-    exclude_line = "/src/witwin/channel/runtime/_channel.build-fingerprint"
+    exclude_line = "/src/witwin/channel/_channel.build-fingerprint"
     try:
         existing_excludes = git_exclude.read_text(encoding="utf-8")
         separator = "" if not existing_excludes or existing_excludes.endswith("\n") else "\n"
@@ -1162,7 +1162,7 @@ def _validate_packaged_validation_checkout(
         value["commit"] != final_history["candidate_commit"]
         or value["build_fingerprint"] != implementation.get("final_build_fingerprint")
         or value["local_exclude"]
-        != "/src/witwin/channel/runtime/_channel.build-fingerprint"
+        != "/src/witwin/channel/_channel.build-fingerprint"
     ):
         raise EvidenceError("packaged validation checkout identity differs")
     checkout = Path(str(value["checkout"]))

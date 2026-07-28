@@ -108,10 +108,8 @@ def test_consumer_contract_is_versioned_and_snapshot_frozen() -> None:
 def test_public_consumer_import_does_not_eagerly_load_internal_definitions() -> None:
     service_imports = _top_level_imports(CONSUMER_ROOT / "service.py")
     assert "witwin.channel.propagation.enumerated.engine" not in service_imports
-    assert "witwin.channel.propagation.models.evaluated" not in service_imports
-    assert "witwin.channel.propagation.models.topology" not in service_imports
-    assert "witwin.channel.propagation.models.geometry" not in service_imports
-    assert "witwin.channel.propagation.models.fields" not in service_imports
+    assert "witwin.channel.propagation.rows" not in service_imports
+    assert "witwin.channel.propagation.penetration" not in service_imports
     assert not any(
         module.startswith("witwin.channel.path")
         or module.startswith("witwin.channel.deterministic")
@@ -128,7 +126,8 @@ def test_public_consumer_import_does_not_eagerly_load_internal_definitions() -> 
         or module.startswith("witwin.channel.deterministic")
         or module.startswith("witwin.channel.montecarlo")
         or module.startswith("witwin.channel.propagation.enumerated")
-        or module.startswith("witwin.channel.propagation.models")
+        or module.startswith("witwin.channel.propagation.rows")
+        or module.startswith("witwin.channel.propagation.penetration")
         for module in time_varying_imports
     )
 
@@ -256,7 +255,7 @@ def test_compact_autograd_native_companions_have_one_topology_owner() -> None:
     )
     assert owners == {symbol: [facade] for symbol in symbols}
     assert "witwin.channel.propagation.topology.kernels" in _top_level_imports(
-        CONSUMER_ROOT / "_native.py"
+        CONSUMER_ROOT / "replay.py"
     )
 
 

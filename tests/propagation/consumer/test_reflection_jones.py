@@ -48,7 +48,7 @@ def _jones(compiled, sources, sinks, *, ad_mode: str = "none"):
 def _reflection_arguments(compiled, result, sources, sinks):
     """Rebuild the exact native transport arguments of the reflection row."""
 
-    from witwin.channel.materials.encoding import face_material_field_bundle
+    from witwin.channel.materials import face_material_field_bundle
 
     row = torch.tensor([_REFLECTION_ROW], device="cuda", dtype=torch.int64)
     geometry = result.paths.geometry

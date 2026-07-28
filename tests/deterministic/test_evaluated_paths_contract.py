@@ -4,7 +4,7 @@ import torch
 
 from witwin.channel.propagation.geometry.endpoints import ReceiverLayout
 from witwin.channel.deterministic import accumulation
-from witwin.channel.propagation.models import (
+from witwin.channel.propagation.rows import (
     EvaluatedPaths,
     PathFields,
     PathGeometry,

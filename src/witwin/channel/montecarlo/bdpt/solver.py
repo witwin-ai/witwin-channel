@@ -13,7 +13,7 @@ from witwin.channel.montecarlo.bdpt.kernels.sampling import (
     bdpt_sample_directions as bdpt_sample_directions,
 )
 from witwin.channel.scene.compiler import compile as compile_scene
-from witwin.channel.scene.antenna import validate_scalar_endpoint_features
+from witwin.channel.scene.endpoints import validate_scalar_endpoint_features
 from witwin.channel.scene.endpoints import (
     ReceiverGrid,
     _endpoint_views,

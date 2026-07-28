@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from witwin.channel.materials.evaluation import (
+from witwin.channel.materials import (
     layer_stack_rt as production_layer_stack_rt,
 )
 from tests.reference.em_oracle import (
@@ -15,7 +15,7 @@ from tests.reference.em_oracle import (
 from tests.reference.em_oracle import (
     layer_stack_rt as reference_layer_stack_rt,
 )
-from witwin.channel.scattering.tables import (
+from witwin.channel.scattering import (
     _kirchhoff_diffuse_lobe_series as production_kirchhoff_series,
 )
 
@@ -94,9 +94,8 @@ def test_production_and_reference_precompute_have_static_zero_dependency() -> No
     root = Path(__file__).parents[2] / "src" / "witwin" / "channel"
     production_paths = (
         root / "constants.py",
-        root / "materials" / "evaluation.py",
-        root / "scattering" / "tables.py",
-        root / "scattering" / "phase_screen.py",
+        root / "materials" / "__init__.py",
+        root / "scattering" / "__init__.py",
         root / "propagation" / "enumerated" / "scattering.py",
     )
     for path in production_paths:

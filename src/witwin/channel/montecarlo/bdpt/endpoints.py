@@ -11,7 +11,7 @@ from witwin.channel.montecarlo.bdpt.kernels.maps import (
     bdpt_transmitter_tensors,
 )
 from witwin.channel.scene.endpoints import SolverScene as Scene
-from witwin.channel.scene.receiver_geometry import (
+from witwin.channel.scene.endpoints import (
     vector3_tuple as _vector3_tuple,
 )
 

@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 import torch
 
 from witwin.channel.field_state import transmitter_polarizations
-from witwin.channel.materials.encoding import face_material_tensors
-from witwin.channel.scene.tensors import (
+from witwin.channel.materials import face_material_tensors
+from witwin.channel.scene.compiler import (
     LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,
 )
 from witwin.channel.propagation.geometry.diffraction import (
@@ -35,7 +35,7 @@ from witwin.channel.propagation.topology.kernels import (
 from witwin.channel.propagation.topology.kernels import (
     primitives as topology_primitives,
 )
-from witwin.channel.runtime.profiling import (
+from witwin.channel.runtime import (
     CudaProfileRange,
     cuda_profile_range,
     profiled_cuda_range,

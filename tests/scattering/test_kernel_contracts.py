@@ -7,7 +7,7 @@ import pytest
 
 from witwin.channel.scattering import kernels
 from witwin.channel.scattering.kernels import functional
-from witwin.channel.runtime import symbols, tensor_contracts
+from witwin.channel import runtime
 
 
 _OWNER_NAMES = (
@@ -48,5 +48,5 @@ def test_non_chain_row_operations_require_explicit_valid_first(name: str):
 
 
 def test_scattering_functional_uses_canonical_runtime_dependencies():
-    assert functional._required_native_op is symbols.required_symbol
-    assert functional.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
+    assert functional._required_native_op is runtime.required_symbol
+    assert functional.validate_cuda_tensor is runtime.validate_cuda_tensor

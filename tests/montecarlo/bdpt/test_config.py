@@ -56,7 +56,7 @@ def test_bdpt_config_rejects_invalid_values(kwargs, message):
 def test_bdpt_config_accepts_adr022_ad_modes(ad_mode):
     # ADR-022 wires native BDPT AD companions, so vjp/jvp are accepted AD modes
     # and the solver metadata reports the active mode as ad_status.
-    from witwin.channel.runtime.kernel_metadata import AdLaunchLedger
+    from witwin.channel.runtime import AdLaunchLedger
     from witwin.channel.montecarlo.bdpt.metadata import make_solver_metadata
 
     # components={"los"} keeps the metadata assembly free of a RayD capability

@@ -30,10 +30,7 @@ from witwin.channel.deployment import build_info
 from witwin.channel.montecarlo.basic import Config, solve as solve_basic
 from witwin.channel.montecarlo.basic import pipeline as basic_pipeline
 from tests.reference.em_oracle import layer_stack_rt
-from witwin.channel.runtime.capacity import (
-    CapacityFailureBit,
-    SolveCapacityTransaction,
-)
+from witwin.channel.runtime import CapacityFailureBit, SolveCapacityTransaction
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA torch is required"

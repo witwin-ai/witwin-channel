@@ -48,7 +48,7 @@ from witwin.channel.montecarlo.events.scattering import (
     rough_material_runtimes,
     scattering_map_matrix,
 )
-from witwin.channel.scene.tensors import (
+from witwin.channel.scene.compiler import (
     receiver_grid_points,
     transmitter_positions,
 )

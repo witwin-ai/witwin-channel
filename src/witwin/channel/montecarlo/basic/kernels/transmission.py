@@ -7,8 +7,9 @@ import math
 
 import torch
 
-from witwin.channel.runtime import torch_compat
-from witwin.channel.runtime.autograd_contracts import (
+from witwin.channel.runtime import (
+    CapacityFailureBit,
+    CapacityFailureState,
     _ad_checked_tangent,
     _ad_first_order_only,
     _ad_frequency_grad,
@@ -19,14 +20,11 @@ from witwin.channel.runtime.autograd_contracts import (
     _ad_native_tensor,
     _ad_reject_fixed_inputs,
     _ad_reject_fixed_tangents,
-)
-from witwin.channel.runtime.capacity import (
-    CapacityFailureBit,
-    CapacityFailureState,
+    disable_functorch,
     require_capacity_failure_state,
+    required_symbol,
+    validate_cuda_tensor,
 )
-from witwin.channel.runtime.symbols import required_symbol
-from witwin.channel.runtime.tensor_contracts import validate_cuda_tensor
 
 
 _CONTRACT_FAILURE_BIT = int(CapacityFailureBit.PAIR_CONTRACT_ERROR)
@@ -498,7 +496,7 @@ class _McTransmissionWallProductAd(torch.autograd.Function):
             and tangent_frequency == 0.0
         ):
             return None, None, None, None
-        with torch_compat.disable_functorch():
+        with disable_functorch():
             scaled, transmittance = mc_transmission_wall_product_jvp(
                 *inputs,
                 frequency_hz=ctx.frequency_value,

@@ -60,7 +60,7 @@ from tests.ad._fd import relative_error
 from tests.ad._tolerances import ABS_TOL, REL_TOL_PATH
 from tests.reference import kirchhoff_ensemble as ref_ensemble
 from tests.reference import phase_screen_realization as ref_patch
-from witwin.channel.runtime import symbols
+from witwin.channel import runtime
 from witwin.channel.scattering.kernels import autograd as scattering_autograd
 from witwin.channel.scattering.kernels import functional as scattering_functional
 
@@ -599,7 +599,7 @@ def test_ensemble_backward_empty_rows():
 def test_ensemble_backward_requires_native_kernel(monkeypatch):
     case = _ensemble_case(seed=3)
     rows = case["wo_rows"].shape[0]
-    monkeypatch.setattr(symbols, "native_extension", lambda: None)
+    monkeypatch.setattr(runtime, "native_extension", lambda: None)
     with pytest.raises(RuntimeError, match="CUDA kernel is required"):
         scattering_functional.scattering_ensemble_eval_backward(
             *(case[name] for name in _ENSEMBLE_FORWARD_ARGS),
@@ -1140,7 +1140,7 @@ def test_patch_backward_rejects_wrong_dtype():
 
 def test_patch_backward_requires_native_kernel(monkeypatch):
     case = _patch_case(seed=245)
-    monkeypatch.setattr(symbols, "native_extension", lambda: None)
+    monkeypatch.setattr(runtime, "native_extension", lambda: None)
     with pytest.raises(RuntimeError, match="CUDA kernel is required"):
         scattering_functional.scattering_patch_integral_eval_backward(
             *(case[name] for name in _PATCH_FORWARD_ARGS), k0=case["k0"],
@@ -1500,7 +1500,7 @@ def test_table_eval_horizon_rows_are_gated():
 def test_table_eval_backward_requires_native_kernel(monkeypatch):
     case = _table_case(seed=343)
     rows = case["wi"].shape[0]
-    monkeypatch.setattr(symbols, "native_extension", lambda: None)
+    monkeypatch.setattr(runtime, "native_extension", lambda: None)
     with pytest.raises(RuntimeError, match="CUDA kernel is required"):
         scattering_functional.scattering_table_eval_backward(
             *(case[n] for n in _TABLE_ARGS),

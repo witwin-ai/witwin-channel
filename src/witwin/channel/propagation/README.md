@@ -169,7 +169,9 @@ adds no second compaction, and never imports a solver.
 
 Everything else here is internal. The internal package export surface is
 `PathTopology`, `PathGeometry`, `PathFields`, and `EvaluatedPaths`, and
-`propagation.models` holds the typed row contracts behind them.
+`propagation.rows` holds the typed row contracts behind them.
+`propagation.penetration` holds the typed segment-penetration contracts that
+the topology and geometry stages both consume.
 `propagation.enumerated` owns shared component stages; solver-specific result
 conversion stays outside. Path and Deterministic keep using the internal
 contracts directly rather than routing through the consumer façade.

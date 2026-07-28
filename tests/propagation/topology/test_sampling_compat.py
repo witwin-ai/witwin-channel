@@ -9,7 +9,7 @@ from witwin.channel.propagation import topology
 from witwin.channel.propagation.topology.kernels import (
     sampling as topology_sampling,
 )
-from witwin.channel.runtime import symbols, tensor_contracts
+from witwin.channel import runtime
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -26,9 +26,9 @@ def test_topology_sampling_is_the_single_object_owner():
 
 
 def test_topology_sampling_uses_canonical_runtime_dependencies():
-    assert topology_sampling.native_extension is symbols.native_extension
+    assert topology_sampling.native_extension is runtime.native_extension
     assert (
-        topology_sampling.validate_cuda_tensor is tensor_contracts.validate_cuda_tensor
+        topology_sampling.validate_cuda_tensor is runtime.validate_cuda_tensor
     )
 
 

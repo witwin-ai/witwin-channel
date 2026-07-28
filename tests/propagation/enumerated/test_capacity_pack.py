@@ -10,14 +10,13 @@ from witwin.channel.propagation.enumerated.capacity import (
     enumerated_capacity_failure_sanitize,
     enumerated_capacity_failure_vector_sanitize,
 )
-from witwin.channel.propagation.models.evaluated import EvaluatedPaths
-from witwin.channel.propagation.models.fields import PathFields
-from witwin.channel.propagation.models.geometry import PathGeometry
-from witwin.channel.propagation.models.topology import PathTopology
-from witwin.channel.runtime import (
-    CapacityFailureBit,
-    create_capacity_failure_state,
+from witwin.channel.propagation.rows import (
+    EvaluatedPaths,
+    PathFields,
+    PathGeometry,
+    PathTopology,
 )
+from witwin.channel.runtime import CapacityFailureBit, create_capacity_failure_state
 
 
 pytestmark = pytest.mark.skipif(

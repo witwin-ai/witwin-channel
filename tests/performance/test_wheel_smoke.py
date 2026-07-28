@@ -33,9 +33,9 @@ def _write_wheel(path: Path, *, name: str, version: str) -> bytes:
                 repository_root / "LICENSE"
             ).read_bytes(),
             "witwin/channel/_channel.cp311-win_amd64.pyd": b"native",
-            "witwin/channel/runtime/_channel.build-fingerprint": b"f" * 64
+            "witwin/channel/_channel.build-fingerprint": b"f" * 64
             + b"\n",
-            "witwin/channel/runtime/rayd.lock.json": (
+            "witwin/channel/rayd.lock.json": (
                 repository_root / "dependencies" / "rayd.lock.json"
             ).read_bytes(),
         }
@@ -212,7 +212,7 @@ def test_wheel_content_audit_rejects_casefold_duplicate(tmp_path: Path):
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
     with zipfile.ZipFile(wheel, "a") as archive:
         archive.writestr(
-            "WITWIN/channel/runtime/rayd.lock.json", b"casefold duplicate"
+            "WITWIN/channel/rayd.lock.json", b"casefold duplicate"
         )
 
     with pytest.raises(ValueError, match="duplicate normalized/casefold"):
@@ -540,7 +540,7 @@ def test_wheel_runtime_identity_rejects_non_strict_lock_json(
 ):
     wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
-    _replace_member(wheel, "witwin/channel/runtime/rayd.lock.json", payload)
+    _replace_member(wheel, "witwin/channel/rayd.lock.json", payload)
 
     with pytest.raises(ValueError, match="strict UTF-8 JSON"):
         wheel_smoke._wheel_runtime_identity(wheel)
@@ -551,7 +551,7 @@ def test_wheel_runtime_identity_rejects_malformed_fingerprint(tmp_path: Path):
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
     _replace_member(
         wheel,
-        "witwin/channel/runtime/_channel.build-fingerprint",
+        "witwin/channel/_channel.build-fingerprint",
         b"not-a-sha256\n",
     )
 
@@ -574,7 +574,7 @@ def test_wheel_rejects_alternate_valid_rayd_identity_with_synced_record_and_buil
     alternate["integration_abi"]["sha256"] = "b" * 64
     _replace_member(
         wheel,
-        "witwin/channel/runtime/rayd.lock.json",
+        "witwin/channel/rayd.lock.json",
         (json.dumps(alternate, indent=2) + "\n").encode("utf-8"),
     )
     _refresh_record(wheel)
