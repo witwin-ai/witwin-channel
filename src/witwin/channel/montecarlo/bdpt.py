@@ -37,9 +37,9 @@ from witwin.channel.components import (
     validate_workspace_limit_bytes,
     validated_components,
 )
-from witwin.channel.field_state import (
-    receiver_polarizations,
-    transmitter_polarizations,
+from witwin.channel.scene.endpoints import (
+    receiver_polarizations_f32,
+    transmitter_polarizations_f32,
 )
 from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel.kernels.materials import em_layer_stack_eval
@@ -3437,8 +3437,8 @@ def _build_endpoint_subpaths(
             metadata=scene.metadata,
         )
     )
-    tx_polarization = transmitter_polarizations(scene, device=tx_reference.device)
-    rx_polarization = receiver_polarizations(
+    tx_polarization = transmitter_polarizations_f32(scene, device=tx_reference.device)
+    rx_polarization = receiver_polarizations_f32(
         scene, device=tx_reference.device, grid=grid
     )
     launch_state = make_launch_state(

@@ -8488,7 +8488,7 @@
       "plan13_disposition": "unaffected by Plan 13"
     },
     {
-      "symbol": "mc_sionna_diffraction_tape_accumulate",
+      "symbol": "mc_utd_diffraction_tape_accumulate",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_mc_sionna_diffraction_tape_accumulate",
       "binding_registration": {
@@ -8544,7 +8544,7 @@
       "plan13_disposition": "unaffected by Plan 13"
     },
     {
-      "symbol": "mc_sionna_diffraction_tape_accumulate_backward",
+      "symbol": "mc_utd_diffraction_tape_accumulate_backward",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_mc_sionna_diffraction_tape_accumulate_backward",
       "binding_registration": {
@@ -8597,7 +8597,7 @@
       "plan13_disposition": "unaffected by Plan 13"
     },
     {
-      "symbol": "mc_sionna_diffraction_tape_accumulate_jvp",
+      "symbol": "mc_utd_diffraction_tape_accumulate_jvp",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_mc_sionna_diffraction_tape_accumulate_jvp",
       "binding_registration": {
@@ -8650,7 +8650,7 @@
       "plan13_disposition": "unaffected by Plan 13"
     },
     {
-      "symbol": "mc_sionna_reflection_accumulate",
+      "symbol": "mc_slab_reflection_accumulate",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_mc_sionna_reflection_accumulate",
       "binding_registration": {
@@ -8706,7 +8706,7 @@
       "plan13_disposition": "unaffected by Plan 13"
     },
     {
-      "symbol": "mc_sionna_reflection_accumulate_backward",
+      "symbol": "mc_slab_reflection_accumulate_backward",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_mc_sionna_reflection_accumulate_backward",
       "binding_registration": {
@@ -8759,7 +8759,7 @@
       "plan13_disposition": "unaffected by Plan 13"
     },
     {
-      "symbol": "mc_sionna_reflection_accumulate_jvp",
+      "symbol": "mc_slab_reflection_accumulate_jvp",
       "abi_owner": "Channel Native _channel_native",
       "binding_target": "cn_mc_sionna_reflection_accumulate_jvp",
       "binding_registration": {

@@ -1157,7 +1157,7 @@ def _extended_scene_and_config(solver: str, scenario: str):
         return scene, config, solve
 
     if scenario == "rough-scattering-realization":
-        from witwin.channel.scattering import (
+        from witwin.channel.scene.resources import (
             generate_gaussian_realization,
             realization_seed,
         )

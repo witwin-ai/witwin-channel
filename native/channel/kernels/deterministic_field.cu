@@ -164,10 +164,16 @@ __device__ void fresnel_coefficients(
     r_tm = c_make(shared_tm.re, shared_tm.im);
 }
 
-/// Initial transverse polarization: the global x-hat transmit polarization
-/// projected perpendicular to the launch direction.
+/// Initial transverse polarization: the default transmit polarization
+/// projected perpendicular to the launch direction and renormalized.
 __device__ Float3 initial_transverse_polarization(Float3 incident) {
-    // Match Sionna's default vertically polarized isotropic transmitter.
+    // Default isotropic-transmitter convention: the transmit polarization is
+    // world vertical, +z. An isotropic radiator has no preferred frame of its
+    // own, so the source vector must be a fixed world direction rather than a
+    // per-ray quantity, and every map that shares this transmitter (LoS,
+    // reflection, diffraction) must read the same vector to stay
+    // polarization-consistent. Vertical is that shared convention; changing it
+    // rotates the pattern of every component at once.
     const Float3 tx_pol = make_f3(0.0f, 0.0f, 1.0f);
     Float3 transverse = sub_f3(tx_pol, scale_f3(incident, dot_f3(tx_pol, incident)));
     const float transverse_norm = norm_f3(transverse);

@@ -20,7 +20,7 @@ makes every component map inert after a failed transaction.
 basic maps
 ----------
 The MC Basic component-map owners: buffer allocation, per-component stores,
-LoS grid maps, the Sionna reflection and diffraction tape accumulators, the
+LoS grid maps, the slab reflection and UTD diffraction tape accumulators, the
 finalize reduction, and the ``torch.autograd.Function`` companions that
 dispatch their registered native backward/JVP entries.
 
@@ -920,7 +920,7 @@ def mc_los_path_gain_ad(
     )
 
 
-def mc_sionna_reflection_accumulate(
+def mc_slab_reflection_accumulate(
     ray_o: torch.Tensor,
     ray_d: torch.Tensor,
     trace_valid: torch.Tensor,
@@ -947,7 +947,27 @@ def mc_sionna_reflection_accumulate(
     solid_angle_per_ray: float,
     grid_cell_area: float,
 ) -> torch.Tensor:
-    return _required_native_op("mc_sionna_reflection_accumulate")(
+    """Accumulate finite-thickness slab specular reflections into a radiomap.
+
+    Convention. This family reproduces one law only, and that law is a
+    material law rather than a sampling rule: the ITU finite-thickness
+    single-slab Fresnel TE/TM coefficient pair over ``eta_r`` / ``sigma_e`` /
+    ``gain`` / ``thickness`` / ``wavelength``, applied per bounce in the
+    ``(s_hat, p_in) -> (s_hat, p_out)`` frame and deposited incoherently as
+    ``|E|^2 * solid_angle * (lambda / 4pi)^2 / (cell_area * |cos|)`` at the
+    first plane crossing that the next trace hit does not occlude. It
+    deliberately does NOT reproduce the hardcoded-vertical radiomap source
+    convention, under which every launched ray leaves the transmitter with
+    unit magnitude and a fixed z-hat polarization regardless of launch
+    direction. Here the launched field is the unnormalized transverse
+    projection of the true transmitter polarization instead, so every deposit
+    carries the short-dipole ``sin^2(theta)`` pattern (R5 polarization
+    consistency with the LoS and diffraction maps). Level parity with a
+    unit-magnitude-source radiomap is therefore knowingly abandoned; a
+    near-axis level offset is the intended behaviour, not a defect.
+    """
+
+    return _required_native_op("mc_slab_reflection_accumulate")(
         ray_o,
         ray_d,
         trace_valid,
@@ -986,7 +1006,7 @@ def mc_reflection_ad_max_depth() -> int:
     return int(_required_native_op("mc_reflection_ad_max_depth")())
 
 
-def mc_sionna_reflection_accumulate_backward(
+def mc_slab_reflection_accumulate_backward(
     ray_o: torch.Tensor,
     ray_d: torch.Tensor,
     trace_valid: torch.Tensor,
@@ -1017,7 +1037,7 @@ def mc_sionna_reflection_accumulate_backward(
     grid_cell_area: float,
     wavelength_dfreq: float,
 ) -> tuple[torch.Tensor, ...]:
-    gradients = _required_native_op("mc_sionna_reflection_accumulate_backward")(
+    gradients = _required_native_op("mc_slab_reflection_accumulate_backward")(
         ray_o,
         ray_d,
         trace_valid,
@@ -1049,13 +1069,13 @@ def mc_sionna_reflection_accumulate_backward(
     )
     if not isinstance(gradients, tuple) or len(gradients) != 5:
         raise TypeError(
-            "_channel.mc_sionna_reflection_accumulate_backward must "
+            "_channel.mc_slab_reflection_accumulate_backward must "
             "return 5 tensors"
         )
     return gradients
 
 
-def mc_sionna_reflection_accumulate_jvp(
+def mc_slab_reflection_accumulate_jvp(
     ray_o: torch.Tensor,
     ray_d: torch.Tensor,
     trace_valid: torch.Tensor,
@@ -1087,7 +1107,7 @@ def mc_sionna_reflection_accumulate_jvp(
     grid_cell_area: float,
     wavelength_tangent: float,
 ) -> torch.Tensor:
-    output = _required_native_op("mc_sionna_reflection_accumulate_jvp")(
+    output = _required_native_op("mc_slab_reflection_accumulate_jvp")(
         ray_o,
         ray_d,
         trace_valid,
@@ -1124,13 +1144,13 @@ def mc_sionna_reflection_accumulate_jvp(
     )
     if not isinstance(output, torch.Tensor):
         raise TypeError(
-            "_channel.mc_sionna_reflection_accumulate_jvp must return a tensor"
+            "_channel.mc_slab_reflection_accumulate_jvp must return a tensor"
         )
     return output
 
 
 class _McReflectionMapAdFunction(torch.autograd.Function):
-    """Differentiable Sionna reflection radiomap for one transmitter.
+    """Differentiable slab reflection radiomap for one transmitter.
 
     Differentiable inputs: per-face eta_r / sigma_e / gain / thickness, the
     carrier frequency and the transmitter anchor. The trace tape, sampled
@@ -1157,7 +1177,7 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
         material_valid,
         params,
     ):
-        return mc_sionna_reflection_accumulate(
+        return mc_slab_reflection_accumulate(
             ray_o,
             ray_d,
             trace_valid,
@@ -1207,7 +1227,7 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
     def backward(ctx, grad_output):
         none_grads = (None,) * 14
         _ad_reject_fixed_inputs(
-            "mc_sionna_reflection_accumulate_ad",
+            "mc_slab_reflection_accumulate_ad",
             ctx.needs_input_grad,
             (
                 (6, "ray_o"),
@@ -1252,7 +1272,7 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
             return (grad_anchor,) + (None,) * 13
         params = ctx.params
         wavelength = float(params["wavelength"])
-        gradients = mc_sionna_reflection_accumulate_backward(
+        gradients = mc_slab_reflection_accumulate_backward(
             ray_o,
             ray_d,
             trace_valid,
@@ -1323,7 +1343,7 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
         _t_params,
     ):
         _ad_reject_fixed_tangents(
-            "mc_sionna_reflection_accumulate_ad",
+            "mc_slab_reflection_accumulate_ad",
             (
                 (t_ray_o, "ray_o"),
                 (t_ray_d, "ray_d"),
@@ -1333,22 +1353,22 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
         saved = ctx.saved_tensors
         face_shape = tuple(saved[0].shape)
         tangent_eta = _ad_checked_tangent(
-            "mc_sionna_reflection_accumulate_ad tangent_eta_r",
+            "mc_slab_reflection_accumulate_ad tangent_eta_r",
             _ad_native_tangent_or_none(t_eta),
             face_shape,
         )
         tangent_sigma = _ad_checked_tangent(
-            "mc_sionna_reflection_accumulate_ad tangent_sigma_e",
+            "mc_slab_reflection_accumulate_ad tangent_sigma_e",
             _ad_native_tangent_or_none(t_sigma),
             face_shape,
         )
         tangent_gain = _ad_checked_tangent(
-            "mc_sionna_reflection_accumulate_ad tangent_gain",
+            "mc_slab_reflection_accumulate_ad tangent_gain",
             _ad_native_tangent_or_none(t_gain),
             face_shape,
         )
         tangent_thickness = _ad_checked_tangent(
-            "mc_sionna_reflection_accumulate_ad tangent_thickness",
+            "mc_slab_reflection_accumulate_ad tangent_thickness",
             _ad_native_tangent_or_none(t_thickness),
             face_shape,
         )
@@ -1392,7 +1412,7 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
         ) = saved
         wavelength = float(params["wavelength"])
         with disable_functorch():
-            return mc_sionna_reflection_accumulate_jvp(
+            return mc_slab_reflection_accumulate_jvp(
                 _ad_native_tensor(ray_o),
                 _ad_native_tensor(ray_d),
                 _ad_native_tensor(trace_valid),
@@ -1426,7 +1446,7 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
             )
 
 
-def mc_sionna_reflection_accumulate_ad(
+def mc_slab_reflection_accumulate_ad(
     tx_anchor: torch.Tensor,
     material_eta_r: torch.Tensor,
     material_sigma: torch.Tensor,
@@ -1455,7 +1475,7 @@ def mc_sionna_reflection_accumulate_ad(
     solid_angle_per_ray: float,
     grid_cell_area: float,
 ) -> torch.Tensor:
-    """Differentiable :func:`mc_sionna_reflection_accumulate` (one tx)."""
+    """Differentiable :func:`mc_slab_reflection_accumulate` (one tx)."""
 
     params = {
         "tx_pol": tx_pol,
@@ -1490,11 +1510,29 @@ def mc_sionna_reflection_accumulate_ad(
     )
 
 
-def mc_sionna_diffraction_tape_accumulate(*args: object) -> torch.Tensor:
-    output = _required_native_op("mc_sionna_diffraction_tape_accumulate")(*args)
+def mc_utd_diffraction_tape_accumulate(*args: object) -> torch.Tensor:
+    """Accumulate UTD diffraction power over the sampled Keller-cone tape.
+
+    Convention. The convention this family adopts is a Monte Carlo per-sample
+    acceptance interval, not a material law: RayD proposes the complete Keller
+    cone, a lane whose edge azimuth exceeds the wedge exterior angle is
+    rejected, and an accepted lane keeps the full-cone ``1 / (2pi)`` proposal
+    density, so its weight stays ``2pi`` rather than the accepted interval
+    width. Everything else is this package's own UTD: the full
+    Kouyoumjian-Pathak pair over the stored finite-thickness slab face
+    operators (fixed-point plus stored-ops convention, ``selectStationaryPoint
+    = 0`` and ``mat.omega = 0`` at the pair call), pseudo-infinite ``+-1e5``
+    edge bounds, and the true per-transmitter polarization (R5) rather than a
+    hardcoded vertical source. It deliberately does NOT reproduce the
+    diffracted field level or the cell-by-cell lit set of a radiomap built on
+    that hardcoded unit-magnitude vertical source; the short-dipole source
+    pattern alone separates the two, so a level delta is expected.
+    """
+
+    output = _required_native_op("mc_utd_diffraction_tape_accumulate")(*args)
     if not isinstance(output, torch.Tensor):
         raise TypeError(
-            "_channel.mc_sionna_diffraction_tape_accumulate must return a tensor"
+            "_channel.mc_utd_diffraction_tape_accumulate must return a tensor"
         )
     return output
 
@@ -1515,7 +1553,7 @@ def mc_sionna_diffraction_tape_accumulate(*args: object) -> torch.Tensor:
 # ---------------------------------------------------------------------------
 
 
-def mc_sionna_diffraction_tape_accumulate_backward(
+def mc_utd_diffraction_tape_accumulate_backward(
     tape_tensors: tuple[torch.Tensor, ...],
     state_tensors: tuple[torch.Tensor, ...],
     material_eta_r: torch.Tensor,
@@ -1540,7 +1578,7 @@ def mc_sionna_diffraction_tape_accumulate_backward(
     total_edge_length: float,
     wavelength_dfreq: float,
 ) -> tuple[torch.Tensor, ...]:
-    gradients = _required_native_op("mc_sionna_diffraction_tape_accumulate_backward")(
+    gradients = _required_native_op("mc_utd_diffraction_tape_accumulate_backward")(
         *tape_tensors,
         *state_tensors,
         material_eta_r,
@@ -1566,13 +1604,13 @@ def mc_sionna_diffraction_tape_accumulate_backward(
     )
     if not isinstance(gradients, tuple) or len(gradients) != 6:
         raise TypeError(
-            "_channel.mc_sionna_diffraction_tape_accumulate_backward "
+            "_channel.mc_utd_diffraction_tape_accumulate_backward "
             "must return 6 tensors"
         )
     return gradients
 
 
-def mc_sionna_diffraction_tape_accumulate_jvp(
+def mc_utd_diffraction_tape_accumulate_jvp(
     tape_tensors: tuple[torch.Tensor, ...],
     state_tensors: tuple[torch.Tensor, ...],
     material_eta_r: torch.Tensor,
@@ -1598,7 +1636,7 @@ def mc_sionna_diffraction_tape_accumulate_jvp(
     total_edge_length: float,
     wavelength_tangent: float,
 ) -> torch.Tensor:
-    output = _required_native_op("mc_sionna_diffraction_tape_accumulate_jvp")(
+    output = _required_native_op("mc_utd_diffraction_tape_accumulate_jvp")(
         *tape_tensors,
         *state_tensors,
         material_eta_r,
@@ -1632,14 +1670,14 @@ def mc_sionna_diffraction_tape_accumulate_jvp(
     )
     if not isinstance(output, torch.Tensor):
         raise TypeError(
-            "_channel.mc_sionna_diffraction_tape_accumulate_jvp must "
+            "_channel.mc_utd_diffraction_tape_accumulate_jvp must "
             "return a tensor"
         )
     return output
 
 
 class _McDiffractionMapAdFunction(torch.autograd.Function):
-    """Differentiable Sionna diffraction radiomap for one transmitter.
+    """Differentiable UTD diffraction radiomap for one transmitter.
 
     Differentiable inputs: per-face eta_r / sigma_e / gain / thickness, the
     carrier frequency and the transmitter anchor (the state sources are the
@@ -1679,7 +1717,7 @@ class _McDiffractionMapAdFunction(torch.autograd.Function):
         material_valid,
         params,
     ):
-        return mc_sionna_diffraction_tape_accumulate(
+        return mc_utd_diffraction_tape_accumulate(
             tape_active,
             tape_state,
             tape_cell,
@@ -1739,7 +1777,7 @@ class _McDiffractionMapAdFunction(torch.autograd.Function):
     def backward(ctx, grad_output):
         none_grads = (None,) * 24
         _ad_reject_fixed_inputs(
-            "mc_sionna_diffraction_tape_accumulate_ad",
+            "mc_utd_diffraction_tape_accumulate_ad",
             ctx.needs_input_grad,
             (
                 (6, "tape_active"),
@@ -1778,7 +1816,7 @@ class _McDiffractionMapAdFunction(torch.autograd.Function):
             return none_grads
         params = ctx.params
         wavelength = float(params["wavelength"])
-        gradients = mc_sionna_diffraction_tape_accumulate_backward(
+        gradients = mc_utd_diffraction_tape_accumulate_backward(
             tuple(tape_tensors),
             tuple(state_tensors),
             eta_r,
@@ -1819,7 +1857,7 @@ class _McDiffractionMapAdFunction(torch.autograd.Function):
     @staticmethod
     def jvp(ctx, t_anchor, t_eta, t_sigma, t_gain, t_thickness, t_frequency, *t_rest):
         _ad_reject_fixed_tangents(
-            "mc_sionna_diffraction_tape_accumulate_ad",
+            "mc_utd_diffraction_tape_accumulate_ad",
             (
                 (t_rest[4], "state_edge_pos"),
                 (t_rest[5], "state_edge_dir"),
@@ -1832,22 +1870,22 @@ class _McDiffractionMapAdFunction(torch.autograd.Function):
         saved = ctx.saved_tensors
         face_shape = tuple(saved[0].shape)
         tangent_eta = _ad_checked_tangent(
-            "mc_sionna_diffraction_tape_accumulate_ad tangent_eta_r",
+            "mc_utd_diffraction_tape_accumulate_ad tangent_eta_r",
             _ad_native_tangent_or_none(t_eta),
             face_shape,
         )
         tangent_sigma = _ad_checked_tangent(
-            "mc_sionna_diffraction_tape_accumulate_ad tangent_sigma_e",
+            "mc_utd_diffraction_tape_accumulate_ad tangent_sigma_e",
             _ad_native_tangent_or_none(t_sigma),
             face_shape,
         )
         tangent_gain = _ad_checked_tangent(
-            "mc_sionna_diffraction_tape_accumulate_ad tangent_gain",
+            "mc_utd_diffraction_tape_accumulate_ad tangent_gain",
             _ad_native_tangent_or_none(t_gain),
             face_shape,
         )
         tangent_thickness = _ad_checked_tangent(
-            "mc_sionna_diffraction_tape_accumulate_ad tangent_thickness",
+            "mc_utd_diffraction_tape_accumulate_ad tangent_thickness",
             _ad_native_tangent_or_none(t_thickness),
             face_shape,
         )
@@ -1870,7 +1908,7 @@ class _McDiffractionMapAdFunction(torch.autograd.Function):
         state_tensors = tuple(_ad_native_tensor(value) for value in saved[8:19])
         wavelength = float(params["wavelength"])
         with disable_functorch():
-            return mc_sionna_diffraction_tape_accumulate_jvp(
+            return mc_utd_diffraction_tape_accumulate_jvp(
                 tape_tensors,
                 state_tensors,
                 _ad_native_tensor(eta_r),
@@ -1898,7 +1936,7 @@ class _McDiffractionMapAdFunction(torch.autograd.Function):
             )
 
 
-def mc_sionna_diffraction_tape_accumulate_ad(
+def mc_utd_diffraction_tape_accumulate_ad(
     tx_anchor: torch.Tensor,
     material_eta_r: torch.Tensor,
     material_sigma: torch.Tensor,
@@ -1924,7 +1962,7 @@ def mc_sionna_diffraction_tape_accumulate_ad(
     seed: int,
     total_edge_length: float,
 ) -> torch.Tensor:
-    """Differentiable :func:`mc_sionna_diffraction_tape_accumulate` (one tx)."""
+    """Differentiable :func:`mc_utd_diffraction_tape_accumulate` (one tx)."""
 
     if len(tape_tensors) != 4:
         raise ValueError("tape_tensors must hold (active, state, cell, u)")

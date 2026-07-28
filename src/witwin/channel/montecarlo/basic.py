@@ -48,14 +48,14 @@ from witwin.channel.kernels.montecarlo import (
     mc_los_visibility_inputs,
     mc_point_component_power,
     mc_reflection_ad_max_depth,
-    mc_sionna_diffraction_tape_accumulate,
-    mc_sionna_diffraction_tape_accumulate_ad,
-    mc_sionna_reflection_accumulate,
-    mc_sionna_reflection_accumulate_ad,
+    mc_slab_reflection_accumulate,
+    mc_slab_reflection_accumulate_ad,
     mc_store_component_map,
     mc_store_scaled_component_map,
     mc_transmission_wall_product,
     mc_transmission_wall_product_ad,
+    mc_utd_diffraction_tape_accumulate,
+    mc_utd_diffraction_tape_accumulate_ad,
     mc_zero_matrix,
 )
 from witwin.channel.kernels.topology import (
@@ -88,7 +88,7 @@ from witwin.channel.scene.compiler import (
     compile as compile_scene,
     receiver_grid_points,
     receiver_positions,
-    transmitter_polarizations,
+    transmitter_polarizations_as_stored,
     transmitter_positions,
 )
 from witwin.channel.scene.endpoints import (
@@ -263,7 +263,7 @@ def los_path_gain(
         return mc_zero_matrix(tx_pos, rows=tx_pos.shape[0], cols=rx_pos.shape[0])
     # R5: the true per-transmitter polarization drives the LoS dipole sin^2
     # pattern (frozen winner of AD; the pattern moves through the endpoints).
-    tx_pol = transmitter_polarizations(scene, device=device)
+    tx_pol = transmitter_polarizations_as_stored(scene, device=device)
 
     if ad:
         # Plan 07 AD-3: swap the host-float endpoint tensors for the live
@@ -494,7 +494,7 @@ def transmission_component_map(
     origins = tx_march.repeat_interleave(rx_count, dim=0)
     targets = rx_pos.repeat(tx_count, 1)
     frequency_value = _frequency_scalar(scene)
-    tx_pol = transmitter_polarizations(scene, device=device)
+    tx_pol = transmitter_polarizations_as_stored(scene, device=device)
     pair_polarization = tx_pol.repeat_interleave(rx_count, dim=0)
     base_power = los_matrix.view(-1)
     vertices = scene_vertex_table(scene, compiled) if ad else None
@@ -661,7 +661,7 @@ def reflection_component_maps_with_wedges(
     tx_live = transmitter_positions_ad(scene, tx_pos, device=device) if ad else tx_pos
     # R5: per-transmitter polarization seeds the reflection field's unnormalized
     # transverse projection (short-dipole sin(theta) pattern).
-    tx_pol = transmitter_polarizations(scene, device=device)
+    tx_pol = transmitter_polarizations_as_stored(scene, device=device)
     wavelength = _LIGHT_SPEED_M_PER_S / _frequency_scalar(scene)
     (
         material_eta_r,
@@ -715,7 +715,7 @@ def reflection_component_maps_with_wedges(
                     material_valid,
                     material_thickness,
                 )
-            reflection_map = mc_sionna_reflection_accumulate_ad(
+            reflection_map = mc_slab_reflection_accumulate_ad(
                 tx_live,
                 material_eta_r,
                 material_sigma,
@@ -745,7 +745,7 @@ def reflection_component_maps_with_wedges(
             )
             ad_maps.append(reflection_map * tx_power[tx_index])
         else:
-            reflection_map = mc_sionna_reflection_accumulate(
+            reflection_map = mc_slab_reflection_accumulate(
                 ray_o,
                 ray_d,
                 trace[0],
@@ -1015,7 +1015,7 @@ def diffraction_component_map(
     tx_live = transmitter_positions_ad(scene, tx_pos, device=device) if ad else tx_pos
     # R5: per-transmitter polarization fed into direct_source_vector's incident
     # basis (replaces the fabricated z-axis).
-    tx_pol = transmitter_polarizations(scene, device=device)
+    tx_pol = transmitter_polarizations_as_stored(scene, device=device)
     (
         material_eta_r,
         material_sigma,
@@ -1187,7 +1187,7 @@ def diffraction_component_map(
                     material_valid,
                     material_thickness,
                 )
-            diffraction_map = mc_sionna_diffraction_tape_accumulate_ad(
+            diffraction_map = mc_utd_diffraction_tape_accumulate_ad(
                 tx_live[tx_index],
                 material_eta_r,
                 material_sigma,
@@ -1214,7 +1214,7 @@ def diffraction_component_map(
             )
             ad_maps.append(diffraction_map)
             continue
-        diffraction_map = mc_sionna_diffraction_tape_accumulate(
+        diffraction_map = mc_utd_diffraction_tape_accumulate(
             sampled[14],
             sampled[15],
             sampled[16],

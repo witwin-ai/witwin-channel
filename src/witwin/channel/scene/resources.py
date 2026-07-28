@@ -2,14 +2,20 @@
 
 This module is the single owner of everything a :class:`CompiledScene` holds
 that is not a store: the typed RayD scene/BVH lifetime, the diffraction edge
-policy and the scene-policy refinement of the exported edge geometry, and the
-lazily built Kirchhoff and phase-screen resources.
+policy and the scene-policy refinement of the exported edge geometry, the
+lazily built Kirchhoff and phase-screen resources, and - since the root
+``scattering`` module was merged into it - the compile-time definition of the
+Kirchhoff table and the phase-screen runtime those resources are made of.
 
 They were four modules that only ever called each other. The RayD resource is
 the thing the edge refinement reads its records from and the thing the
 phase-screen build takes its mesh tensors from, and the edge policy exists only
 to be cached on that resource at compile time, so a reader following one
-resource had to walk four files to see one lifetime.
+resource had to walk four files to see one lifetime. The root ``scattering``
+module was the fifth: it read like "the scattering owner" while
+:mod:`witwin.channel.interactions.scattering` owns per-solve path evaluation,
+and everything it held was compile-time resource construction that this module
+already caches.
 
 Nothing here computes RF physics. The RayD facade validates a contract and
 dispatches a native symbol; the edge refinement is scene-policy row selection
@@ -17,6 +23,12 @@ over already-exported geometry; the resource builders cache scene-static data
 that the consumers used to recompute per solve, with their exception and
 numerical order preserved. Moving that retained static construction across the
 native boundary requires its own accepted ADR.
+
+The merged compile-time section at the bottom of this file is kept visibly
+separated behind its own banner, because it is the only part of the module that
+runs float64 NumPy on the host. That is the sanctioned compile-time table
+construction, not a production backend, and the banner records which side of
+the CPU-compute policy line every name below it sits on.
 
 The stores this module annotates against live in
 :mod:`witwin.channel.scene.compiler`, which imports this module for the RayD
@@ -28,18 +40,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 
+import numpy as np
 import torch
 
 from witwin.core import PhaseScreen, SurfaceRoughness
 
+from witwin.channel.constants import C0
+from witwin.channel.materials import layer_stack_rt
 from witwin.channel.runtime import mc_pack_vec3, required_symbol as _required_native_op
-from witwin.channel.scattering import (
-    MAX_RMS_SLOPE,
-    KirchhoffTable,
-    PhaseScreenRuntime,
-)
 
 if TYPE_CHECKING:
     from witwin.channel.scene.compiler import AssignmentStore, MaterialStore
@@ -48,8 +58,10 @@ __all__ = [
     "DEFAULT_EDGE_POLICY",
     "EdgePolicy",
     "KirchhoffRuntimeResources",
+    "KirchhoffTable",
     "KirchhoffTableStack",
     "PhaseScreenResourceKey",
+    "PhaseScreenRuntime",
     "PhaseScreenRuntimeResources",
     "PhaseScreenStructureResource",
     "RayDEdgeRecords",
@@ -59,14 +71,22 @@ __all__ = [
     "_empty_tensor",
     "_mesh_flags",
     "build_kirchhoff_resources",
+    "build_kirchhoff_table",
     "build_kirchhoff_table_stack",
     "build_phase_screen_resources",
     "build_scene_from_structures",
+    "eval_bsdf",
+    "generate_gaussian_realization",
+    "patch_phase_integral",
+    "pdf",
+    "pdf_reverse",
     "rayd_scene_create",
     "rayd_scene_edge_records",
     "realization_phase_screens",
+    "realization_seed",
     "refine_edge_geometry",
     "resolve_scene_edge_policy",
+    "sample_directions",
 ]
 
 
@@ -321,7 +341,7 @@ _TWO_PI = 2.0 * math.pi
 
 
 def resolve_scene_edge_policy(scene: object) -> EdgePolicy:
-    policy = getattr(scene, "metadata", {}).get("sionna_import_edge_policy")
+    policy = getattr(scene, "metadata", {}).get("imported_edge_policy")
     return policy if isinstance(policy, EdgePolicy) else DEFAULT_EDGE_POLICY
 
 
@@ -590,9 +610,6 @@ def build_kirchhoff_resources(
 ) -> KirchhoffRuntimeResources:
     """Build all rough-material resources without publishing partial state."""
 
-    # Keep the supported package-level instrumentation seam lazy.
-    from witwin.channel import scattering
-
     tables: dict[int, KirchhoffTable] = {}
     materials: dict[int, RoughMaterialRuntime] = {}
     for index in range(int(store.material_id.numel())):
@@ -620,7 +637,7 @@ def build_kirchhoff_resources(
         # participates in AD, route f_te/f_tm through the native build adjoint so
         # the resident table values keep a graph to those leaves (ADR-015 Part
         # C); otherwise today's path is bitwise identical.
-        table = scattering.build_kirchhoff_table(
+        table = build_kirchhoff_table(
             roughness, layers, store.frequency_hz, device=key.device
         )
         table = _maybe_differentiate_table(store, index, offset, count, table, key)
@@ -750,8 +767,6 @@ def build_phase_screen_resources(
     work because they depend on endpoints, frequency, or solver configuration.
     """
 
-    from witwin.channel import scattering
-
     _require_phase_screen_rayd_identity(rayd, key)
     if not assignments.structure_phase_screens:
         return PhaseScreenRuntimeResources(key=key, structures={})
@@ -782,7 +797,7 @@ def build_phase_screen_resources(
 
     screens = sorted(realization_phase_screens(materials, assignments).items())
     runtimes = {
-        structure_index: scattering.PhaseScreenRuntime(screen, device=key.device)
+        structure_index: PhaseScreenRuntime(screen, device=key.device)
         for structure_index, screen in screens
     }
     resources: dict[int, PhaseScreenStructureResource] = {}
@@ -920,3 +935,878 @@ def _phase_screen_rms_slope(
             "as a pure phase screen"
         )
     return rms_slope
+
+
+# ==========================================================================
+# COMPILE-TIME SCATTERING RESOURCES  (merged from witwin/channel/scattering.py)
+# ==========================================================================
+#
+# CPU-COMPUTE POLICY LINE.  Everything ABOVE this banner is device-resident
+# resource lifetime, validation and packing.  Everything BELOW it is offline
+# compile-time construction: ``build_kirchhoff_table`` and
+# ``generate_gaussian_realization`` run float64 NumPy on the HOST.  CLAUDE.md
+# sanctions exactly that and nothing more: offline/compile-time table
+# construction is not a production numerical backend and must not grow into
+# production hot-path physics.  These run once per compiled scene, upload
+# once, and are never re-entered per solve.
+#
+# The runtime side of the same subject stays on the production side of the
+# line: ``eval_bsdf``, ``sample_directions``, ``pdf`` and ``pdf_reverse`` are
+# thin facades over ``witwin.channel.kernels.scattering``, so every production
+# eval/sample/PDF/event-budget operation requires native CUDA.  Nothing below
+# this banner is a Torch or CPU production alternative, and nothing below it
+# may grow into per-solve physics.
+#
+# Per-solve path evaluation is owned by
+# ``witwin.channel.interactions.scattering`` and lives nowhere in this file.
+#
+# The physics contract this section implements, verbatim from the module it
+# was merged from:
+#
+#
+# Tables are precomputed once in float64 at scene compile, uploaded once, and
+# all production eval/sample/PDF/event-budget operations require native CUDA.
+# PyTorch and CPU implementations are not production runtime alternatives.
+#
+# Kirchhoff ensemble BSDF tables (contract sections 6, 7.2)
+# ---------------------------------------------------------
+#
+# Conventions (fixed here, used by every consumer):
+#
+# - The table lives in the LOCAL roughness frame: ``z`` is the mean-plane
+#   normal, ``x``/``y`` are the roughness principal axes (``corr_length_x_m``
+#   along ``x``). Callers rotate world directions into this frame using the
+#   stored ``principal_axis_rad`` before evaluating.
+# - ``wi``/``wo`` are unit vectors POINTING AWAY from the surface
+#   (``z > 0``): ``wi`` toward the source, ``wo`` toward the observation
+#   direction. The incident propagation direction is ``-wi``, so the
+#   scattering wave-vector transfer is ``q = k_s - k_i = k0*(wo + wi)`` with
+#   normal component ``q_n = k0*(cos_theta_o + cos_theta_i) > 0``.
+# - ``f_te``/``f_tm`` are co-pol POWER BSDF values per steradian, defined so
+#   that ``sum_hemisphere f * |cos_theta_o| dOmega = R_diff`` for each
+#   incidence bin (exact on the table's own outgoing grid, by construction).
+#
+# Raw lobe shape (before normalization)::
+#
+#     f_raw_q(wi, wo) = |q|^4 / (16*pi^2 * q_n^2 * cos_theta_i * cos_theta_o)
+#                       * |r_q_stack(cos_theta_h)|^2 * I(q_par, q_n)
+#
+# where ``I`` is the production Beckmann series implemented in this module
+# and the polarized Fresnel factor is evaluated at the SPECULAR-EQUIVALENT
+# local incidence angle onto the half vector
+# ``h = normalize(wo - wi_dir) = normalize(wo + wi)``::
+#
+#     cos_theta_h = wi . h = wo . h = (1 + wi . wo) / |wo + wi|
+#
+# Documented choice: ``wi . h`` is the angle between the incident ray and
+# the micro-plane normal that specularly maps ``wi`` to ``wo``; it equals
+# ``cos_theta_i`` at the lobe peak, so the kernel reproduces the exact
+# stack reflectance ``R_bar_q(theta_i)`` there and tracks its angular /
+# Fabry-Perot structure across the lobe. (Evaluating at ``|h . n|`` instead
+# would sample the stack at NORMAL incidence for every near-specular pair
+# and misses the budget by ``R_bar(theta_i)/R_bar(0)``  -  measured up to 4x  -
+# so it cannot satisfy the normalization tolerance band.) ``wi . h`` is
+# exactly reciprocal, as are ``q`` and the geometry prefactor.
+#
+# Derivation of the prefactor (standard scalar Kirchhoff): the tangent-plane
+# aperture integral gives ``E_s = (j*k0/(4*pi*R)) * F * r *
+# Int exp(-j*q.x - j*q_n*h) dA`` with the Kirchhoff geometry factor
+# ``F = |q|^2/(k0*q_n)`` (Beckmann's ``F`` rescaled so a smooth plate
+# conserves energy: ``F -> 2*cos_theta_i`` at specular). Ensemble-averaging
+# the diffuse part gives ``<|Int|^2> = A * I(q)``, and dividing the scattered
+# power density by ``A * cos_theta_i * cos_theta_o`` (BSDF flux convention)
+# yields the expression above. Its hemispheric energy: substituting
+# ``d^2 q_par = k0^2 * cos_theta_o dOmega_o`` and Parseval
+# ``(1/(2*pi)^2) Int I(q_par; q_n) d^2 q_par = 1 - exp(-g)`` shows
+# ``Int f_raw*cos dOmega -> R_bar*(1 - C_r^2) = R_diff`` near specular
+# (``exp(-g) = C_r^2`` at ``q_n = 2*k0*cos_theta_i``). Residual horizon,
+# Fresnel-variation and grid errors are removed by reciprocal symmetric matrix
+# balancing. Its diagonal factor acts on both incident and outgoing states, so
+# the final production table retains Helmholtz reciprocity while matching every
+# directional diffuse-energy budget.
+#
+# Energy accounting is exact on the discrete outgoing grid: the hemisphere
+# sum of ``f * cos * dOmega`` over the table bins equals ``r_diff`` bitwise
+# (up to float32 rounding), which is also the measure the sampling CDFs use.
+#
+# Precompute runs in float64 numpy on CPU; the frozen table holds float32
+# torch tensors on the requested device. Runtime eval/sample/pdf are pure
+# batched torch (GPU-first).
+#
+# Realization-coherent phase screens (contract section 6, plan 6.7)
+# -----------------------------------------------------------------
+#
+# Heights NEVER displace geometry: RayD intersects the mean plane and the
+# sampled metric height ``h(u, v)`` enters only through the complex phasor
+# ``exp(-j*q_n*h)`` with ``q_n = (k_s - k_i) . n_hat`` (``e^{+j w t}`` /
+# ``e^{-j k r}`` conventions, matching ``core.field_state.PHASE_CONVENTION``
+# and the CPU oracle). Footprint averaging must happen on the PHASOR, never
+# on heights: ``E[exp(-j*q_n*h)] != exp(-j*q_n*E[h])``.
+#
+# Texture convention: ``height[iy, ix]`` samples the UV point
+# ``u = (ix + 0.5)/W``, ``v = (iy + 0.5)/H`` (texel centers). Bilinear
+# interpolation between texel centers with EDGE CLAMP at the borders (no
+# wrap): UV coordinates outside the half-texel margin reuse the border texel
+# value. Implemented with explicit gathers (not ``grid_sample``) so the
+# border behavior is exact and documented.
+# ==========================================================================
+
+# Grid resolution fixed by the implementation contract (section 6).
+N_COS_THETA_I = 32
+# An anisotropic reciprocal table must use the same directional state grid on
+# both sides of f(wi, wo).  A coarser incidence azimuth grid followed by a
+# per-incidence normalization cannot preserve reciprocity.  64 keeps the
+# contract's outgoing resolution and makes the discrete transport matrix
+# square, so symmetric balancing below can enforce both invariants exactly.
+N_PHI_I_ANISO = 64
+N_COS_THETA_O = 32
+N_PHI_O = 64
+
+# Applicability guards (contract section 6): tangent-plane approximation
+# needs k0*l >= ~6 and moderate RMS slope sqrt(2)*sigma_h/l <= 0.5.
+MIN_K0_CORR_LENGTH = 6.0
+MAX_RMS_SLOPE = 0.5
+
+
+def _kirchhoff_diffuse_lobe_series(
+    q_par_x, q_par_y, q_n, sigma_h, lx, ly, n_terms: int = 64
+):
+    """Production Beckmann series for the Gaussian-correlation lobe."""
+
+    qx, qy, qn = np.broadcast_arrays(
+        np.asarray(q_par_x, dtype=np.float64),
+        np.asarray(q_par_y, dtype=np.float64),
+        np.asarray(q_n, dtype=np.float64),
+    )
+    g = (qn * float(sigma_h)) ** 2
+    rho2 = (qx * lx) ** 2 + (qy * ly) ** 2
+    m_flat = np.arange(1, n_terms + 1, dtype=np.float64)
+    shape = (n_terms,) + (1,) * g.ndim
+    m = m_flat.reshape(shape)
+    log_fact = np.cumsum(np.log(m_flat)).reshape(shape)
+    with np.errstate(divide="ignore"):
+        log_g = np.log(g)
+    log_term = m * log_g - log_fact - np.log(m) - rho2 / (4.0 * m) - g
+    series = np.exp(log_term).sum(axis=0)
+    result = np.pi * lx * ly * series
+    return result if result.ndim else float(result)
+
+@dataclass(frozen=True, slots=True)
+class KirchhoffTable:
+    """Precomputed Kirchhoff ensemble BSDF for one rough material.
+
+    All tensors are float32 on one device. Axis tensors hold CELL CENTERS:
+    ``cos_theta_i``/``cos_theta_o`` are uniform in cos over (0, 1],
+    ``phi_i``/``phi_o`` uniform over [0, 2*pi). ``phi_i`` has one entry for
+    isotropic roughness (``lx == ly``).
+    """
+
+    # Axes (cell centers).
+    cos_theta_i: torch.Tensor  # [Nti]
+    phi_i: torch.Tensor  # [Nphi_i] (1 for isotropic)
+    cos_theta_o: torch.Tensor  # [Nto]
+    phi_o: torch.Tensor  # [Npo]
+    # Co-pol power BSDF channels [Nti, Nphi_i, Nto, Npo].
+    f_te: torch.Tensor
+    f_tm: torch.Tensor
+    # Diffuse reflection budgets per incidence bin [Nti, Nphi_i].
+    r_diff_te: torch.Tensor
+    r_diff_tm: torch.Tensor
+    r_diff_unpol: torch.Tensor
+    # Symmetric matrix-balance factor a(w) [Nti, Nphi_i, 2], channel order
+    # TE/TM.  The final table is f(wi,wo)=a(wi)*f_sym(wi,wo)*a(wo), which
+    # preserves reciprocity while enforcing every row's energy budget.
+    normalization_applied: torch.Tensor
+    # Sampling tables built from the UNPOLARIZED mean lobe:
+    # per-bin probability mass and the per-solid-angle density (mass/dOmega),
+    # marginal CDF over cos_theta_o, conditional CDF over phi_o.
+    sample_density: torch.Tensor  # [Nti, Nphi_i, Nto, Npo]
+    marginal_cdf: torch.Tensor  # [Nti, Nphi_i, Nto]
+    conditional_cdf: torch.Tensor  # [Nti, Nphi_i, Nto, Npo]
+    # Domain metadata / validity flags.
+    frequency_hz: float
+    k0: float
+    sigma_h_m: float
+    corr_x_m: float
+    corr_y_m: float
+    principal_axis_rad: float
+    anisotropic: bool
+    k0_l_min: float
+    rms_slope_max: float
+    tangent_plane_ok: bool
+    slope_ok: bool
+    reciprocity_error: float
+    # ADR-015 Part C differentiable-build intermediates. The float64 numpy
+    # build is unchanged bit-for-bit; these are the exact f32 downcasts of the
+    # structural quantities the native table-build adjoint recomputes against
+    # (no f32 recompute drift). ``pre_balance_lobe_*`` are the reciprocity-
+    # symmetrized raw lobes ``S`` BEFORE the diagonal energy balance
+    # (``F = a S a``); the balance factors ``a`` and the diffuse budgets are
+    # already exposed as ``normalization_applied`` and ``r_diff_te``/
+    # ``r_diff_tm``. All default to ``None`` so a table built without the AD
+    # path (e.g. a bare numpy import) carries no extra state.
+    pre_balance_lobe_te: torch.Tensor | None = None  # [Nti, Npi, Nto, Npo]
+    pre_balance_lobe_tm: torch.Tensor | None = None  # [Nti, Npi, Nto, Npo]
+
+    @property
+    def device(self) -> torch.device:
+        return self.f_te.device
+
+    @property
+    def bin_solid_angle(self) -> float:
+        """Solid angle of one outgoing bin: d(cos_theta) * d(phi)."""
+
+        return (1.0 / N_COS_THETA_O) * (2.0 * math.pi / N_PHI_O)
+
+
+def _cos_centers(n: int) -> np.ndarray:
+    return (np.arange(n, dtype=np.float64) + 0.5) / n
+
+
+def _phi_centers(n: int) -> np.ndarray:
+    return (np.arange(n, dtype=np.float64) + 0.5) * (2.0 * np.pi / n)
+
+
+def _stack_power_reflectances(
+    layers: Sequence[tuple], cos_theta: np.ndarray, frequency_hz: float
+) -> tuple[np.ndarray, np.ndarray]:
+    """``(|r_te_stack|^2, |r_tm_stack|^2)`` at real incidence cosines."""
+
+    rt = layer_stack_rt(layers, cos_theta, frequency_hz)
+    return np.abs(rt.r_te) ** 2, np.abs(rt.r_tm) ** 2
+
+
+def _raw_lobe_grid(
+    layers: Sequence[tuple],
+    frequency_hz: float,
+    k0: float,
+    sigma_h: float,
+    lx: float,
+    ly: float,
+    n_terms: int,
+    inc_cos: np.ndarray,
+    inc_phi: np.ndarray,
+    out_cos: np.ndarray,
+    out_phi: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Raw (un-normalized) TE/TM lobe on an (incidence x outgoing) grid.
+
+    Returns arrays ``[len(inc_cos), len(inc_phi), len(out_cos),
+    len(out_phi)]``. Used twice per build: once on the table axes and once
+    with incidence/outgoing axes swapped (the exact grid-resample of
+    ``f(wo, wi)``  -  the analytic kernel is reciprocal, so re-evaluating at
+    the swapped nodes is the lossless way to symmetrize; interpolating the
+    coarse ``phi_i`` axis would smear the specular peak instead).
+    """
+
+    sin_inc = np.sqrt(np.maximum(0.0, 1.0 - inc_cos**2))
+    sin_out = np.sqrt(np.maximum(0.0, 1.0 - out_cos**2))
+    wo_x = sin_out[:, None] * np.cos(out_phi)[None, :]
+    wo_y = sin_out[:, None] * np.sin(out_phi)[None, :]
+    wo_z = np.broadcast_to(out_cos[:, None], wo_x.shape)
+    f_te = np.empty((inc_cos.shape[0], inc_phi.shape[0], *wo_x.shape))
+    f_tm = np.empty_like(f_te)
+    for ti in range(inc_cos.shape[0]):
+        for pi_idx in range(inc_phi.shape[0]):
+            wi_x = sin_inc[ti] * np.cos(inc_phi[pi_idx])
+            wi_y = sin_inc[ti] * np.sin(inc_phi[pi_idx])
+            wi_z = inc_cos[ti]
+            # q = k_s - k_i = k0*(wo + wi); components already in the
+            # roughness principal frame (the table's local frame).
+            qx = k0 * (wo_x + wi_x)
+            qy = k0 * (wo_y + wi_y)
+            qn = k0 * (wo_z + wi_z)
+            lobe = _kirchhoff_diffuse_lobe_series(
+                qx, qy, qn, sigma_h, lx, ly, n_terms=n_terms
+            )
+            # Specular-equivalent local incidence: cos_theta_h = wi.h with
+            # h || (wo + wi) (module docstring); |wo + wi| = |q|/k0.
+            q_sq = qx**2 + qy**2 + qn**2
+            wi_dot_wo = wo_x * wi_x + wo_y * wi_y + wo_z * wi_z
+            cos_h = np.clip((1.0 + wi_dot_wo) * k0 / np.sqrt(q_sq), 1e-6, 1.0)
+            rr_te, rr_tm = _stack_power_reflectances(
+                layers, cos_h.reshape(-1), frequency_hz
+            )
+            # Standard Kirchhoff geometry prefactor (see module docstring):
+            # |q|^4 / (16*pi^2*q_n^2*cos_i*cos_o); reduces to k0^2/(4*pi^2)
+            # at the specular direction and is symmetric under wi <-> wo.
+            prefactor = q_sq**2 / (16.0 * np.pi**2 * qn**2 * wi_z * wo_z)
+            shape = prefactor * lobe
+            f_te[ti, pi_idx] = shape * rr_te.reshape(shape.shape)
+            f_tm[ti, pi_idx] = shape * rr_tm.reshape(shape.shape)
+    return f_te, f_tm
+
+
+def _symmetric_energy_balance(
+    symmetric_lobe: np.ndarray,
+    target: np.ndarray,
+    cos_o: np.ndarray,
+    *,
+    isotropic: bool,
+    tolerance: float = 1e-11,
+    max_iterations: int = 256,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Balance a reciprocal nonnegative kernel without breaking symmetry.
+
+    Finds positive diagonal factors ``a`` such that ``F_ij=a_i*S_ij*a_j``
+    and every cosine-weighted row integral of ``F`` equals ``target_i``.
+    This is the symmetric Sinkhorn fixed point with a half-step damping;
+    unlike one-sided row normalization, reciprocity is invariant at every
+    iteration.
+    """
+
+    n_ti, n_pi, n_to, n_po = symmetric_lobe.shape
+    if n_ti != n_to:
+        raise ValueError("reciprocal balance requires identical cos grids")
+    d_omega = (1.0 / n_to) * (2.0 * np.pi / n_po)
+    outgoing_weight = np.broadcast_to(
+        cos_o[:, None] * d_omega, (n_to, n_po)
+    ).reshape(-1)
+
+    if isotropic:
+        # Rotation invariance collapses the incident azimuth state.  The
+        # reverse state factor depends only on cos(theta_o), while the full
+        # relative-azimuth lobe remains in the row integral.
+        s = symmetric_lobe[:, 0]
+        rhs = target[:, 0]
+        factor = np.ones(n_ti, dtype=np.float64)
+        active = rhs > 0.0
+        for _ in range(max_iterations):
+            weighted = outgoing_weight * np.repeat(factor, n_po)
+            denom = (s * weighted[None, :, None].reshape(1, n_to, n_po)).sum(
+                axis=(1, 2)
+            )
+            ratio = np.ones_like(factor)
+            ratio[active] = rhs[active] / np.maximum(
+                factor[active] * denom[active], 1e-300
+            )
+            factor *= np.sqrt(ratio)
+            factor[~active] = 0.0
+            if np.max(np.abs(np.log(np.maximum(ratio[active], 1e-300))), initial=0.0) < tolerance:
+                break
+        else:
+            raise ValueError("symmetric Kirchhoff energy balance did not converge")
+        balanced = s * factor[:, None, None] * factor[None, :, None]
+        return balanced[:, None], factor[:, None]
+
+    if n_pi != n_po:
+        raise ValueError("anisotropic reciprocal balance requires identical phi grids")
+    states = n_ti * n_pi
+    s = symmetric_lobe.reshape(states, states)
+    rhs = target.reshape(states)
+    weights = np.repeat(cos_o * d_omega, n_po)
+    factor = np.ones(states, dtype=np.float64)
+    active = rhs > 0.0
+    for _ in range(max_iterations):
+        denom = s @ (weights * factor)
+        ratio = np.ones_like(factor)
+        ratio[active] = rhs[active] / np.maximum(
+            factor[active] * denom[active], 1e-300
+        )
+        factor *= np.sqrt(ratio)
+        factor[~active] = 0.0
+        if np.max(np.abs(np.log(np.maximum(ratio[active], 1e-300))), initial=0.0) < tolerance:
+            break
+    else:
+        raise ValueError("symmetric Kirchhoff energy balance did not converge")
+    balanced = s * factor[:, None] * factor[None, :]
+    return balanced.reshape(symmetric_lobe.shape), factor.reshape(n_ti, n_pi)
+
+
+def build_kirchhoff_table(
+    roughness,
+    layers: Sequence[tuple],
+    frequency_hz: float,
+    device: torch.device | str = "cuda",
+) -> KirchhoffTable:
+    """Precompute the Kirchhoff ensemble BSDF table for one material.
+
+    ``roughness`` is a :class:`witwin.core.SurfaceRoughness`
+    (or any object with the same fields); ``layers`` is the oracle layer
+    list ``[(thickness_m, eps_r, sigma_e, mu_r), ...]`` in incidence order.
+    Raises when the surface is outside the Kirchhoff applicability domain
+    (``kirchhoff_domain_exceeded``) or reciprocal energy balancing fails to
+    converge.
+    """
+
+    frequency_hz = float(frequency_hz)
+    sigma_h = float(roughness.rms_height_m)
+    lx = float(roughness.correlation_length_x_m)
+    ly = float(roughness.correlation_length_y_m)
+    axis_rad = float(roughness.principal_axis_rad)
+    k0 = 2.0 * math.pi * frequency_hz / C0
+
+    l_min = min(lx, ly)
+    k0_l_min = k0 * l_min
+    rms_slope_max = math.sqrt(2.0) * sigma_h / l_min
+    tangent_plane_ok = k0_l_min >= MIN_K0_CORR_LENGTH
+    slope_ok = rms_slope_max <= MAX_RMS_SLOPE
+    if not (tangent_plane_ok and slope_ok):
+        raise ValueError(
+            "kirchhoff_domain_exceeded: ensemble Kirchhoff requires "
+            f"k0*corr_length >= {MIN_K0_CORR_LENGTH:g} "
+            f"(got {k0_l_min:.3g}) and RMS slope sqrt(2)*sigma_h/l <= "
+            f"{MAX_RMS_SLOPE:g} (got {rms_slope_max:.3g})"
+        )
+
+    anisotropic = lx != ly
+    cos_i = _cos_centers(N_COS_THETA_I)
+    phi_i = _phi_centers(N_PHI_I_ANISO) if anisotropic else np.zeros(1)
+    cos_o = _cos_centers(N_COS_THETA_O)
+    phi_o = _phi_centers(N_PHI_O)
+    n_pi = phi_i.shape[0]
+
+    # 1) Smooth-stack budgets on the incidence grid (complex128 oracle).
+    r_bar_te, r_bar_tm = _stack_power_reflectances(layers, cos_i, frequency_hz)
+    # 2) Coherent part: |r_stack * C_r|^2 = R_bar * C_r^2.
+    c_r = np.exp(-2.0 * (k0 * cos_i * sigma_h) ** 2)
+    r_coh_te = r_bar_te * c_r**2
+    r_coh_tm = r_bar_tm * c_r**2
+    # 3) Diffuse budgets (>= 0 since C_r <= 1; max() guards fp rounding).
+    r_diff_te = np.maximum(0.0, r_bar_te - r_coh_te)
+    r_diff_tm = np.maximum(0.0, r_bar_tm - r_coh_tm)
+
+    # 4) Raw lobe on the 4D grid.
+    g_max = (2.0 * k0 * sigma_h) ** 2
+    n_terms = int(max(64, g_max + 12.0 * math.sqrt(g_max) + 16.0))
+    f_raw_te, f_raw_tm = _raw_lobe_grid(
+        layers, frequency_hz, k0, sigma_h, lx, ly, n_terms,
+        cos_i, phi_i, cos_o, phi_o,
+    )
+
+    # 5) Reciprocity symmetrization BEFORE normalization: f(wo, wi) is
+    # obtained by exact re-evaluation on the swapped grid nodes (see
+    # _raw_lobe_grid), then averaged with the forward evaluation. The
+    # residual measures genuine wi<->wo asymmetry of the implementation
+    # (the kernel is analytically reciprocal), so anything above float
+    # rounding is a bug.
+    swap_te, swap_tm = _raw_lobe_grid(
+        layers, frequency_hz, k0, sigma_h, lx, ly, n_terms,
+        cos_o, phi_o, cos_i, phi_i,
+    )
+    swap_te = np.transpose(swap_te, (2, 3, 0, 1))
+    swap_tm = np.transpose(swap_tm, (2, 3, 0, 1))
+    reciprocity_error = 0.0
+    for forward, swapped in ((f_raw_te, swap_te), (f_raw_tm, swap_tm)):
+        peak = float(forward.max())
+        if peak > 0.0:
+            err = float(np.abs(forward - swapped).max() / peak)
+            reciprocity_error = max(reciprocity_error, err)
+    if reciprocity_error >= 1e-3:
+        raise ValueError(
+            "kirchhoff table reciprocity error "
+            f"{reciprocity_error:.3e} exceeds 1e-3 after symmetrization"
+        )
+    f_sym_te = 0.5 * (f_raw_te + swap_te)
+    f_sym_tm = 0.5 * (f_raw_tm + swap_tm)
+
+    # ADR-015 Part C: snapshot the pre-balance symmetrized lobes S before the
+    # in-place diagonal energy balance below overwrites f_sym. The native
+    # table-build adjoint consumes these (with a, r_diff) as its saved
+    # intermediates; the numpy primal is unaffected.
+    pre_balance_lobe_te = f_sym_te.copy()
+    pre_balance_lobe_tm = f_sym_tm.copy()
+
+    # 6) Symmetric energy balance on the discrete directional state matrix.
+    # A one-sided row scale would make the energy exact but destroy
+    # f(wi,wo)==f(wo,wi).  Diagonal scaling on both arguments preserves the
+    # already-symmetric raw kernel and satisfies every row budget jointly.
+    d_omega = (1.0 / N_COS_THETA_O) * (2.0 * np.pi / N_PHI_O)
+    weight = cos_o[None, None, :, None] * d_omega  # broadcast over [.., to, po]
+    r_diff_te_grid = np.broadcast_to(r_diff_te[:, None], (N_COS_THETA_I, n_pi)).copy()
+    r_diff_tm_grid = np.broadcast_to(r_diff_tm[:, None], (N_COS_THETA_I, n_pi)).copy()
+    scales = np.ones((N_COS_THETA_I, n_pi, 2))
+    channels = (
+        (0, f_sym_te, r_diff_te_grid),
+        (1, f_sym_tm, r_diff_tm_grid),
+    )
+    for channel, f_sym, r_diff in channels:
+        balanced, factor = _symmetric_energy_balance(
+            f_sym, r_diff, cos_o, isotropic=not anisotropic
+        )
+        f_sym[...] = balanced
+        integral = (f_sym * weight).sum(axis=(2, 3))
+        active = r_diff > 0.0
+        relative_error = np.zeros_like(integral)
+        relative_error[active] = np.abs(integral[active] - r_diff[active]) / r_diff[active]
+        if relative_error.max(initial=0.0) > 2e-9:
+            raise ValueError(
+                "symmetric Kirchhoff balance failed energy tolerance: "
+                f"max relative error {relative_error.max():.3e}"
+            )
+        # Store the one-direction diagonal factor.  Unlike the obsolete
+        # one-sided row scale, its magnitude alone is not a shape-error
+        # metric: the physical correction on a pair is a(wi)*a(wo), and the
+        # factors are jointly constrained by all directional energy rows.
+        scales[:, :, channel] = factor
+
+    # 7) Sampling tables from the UNPOLARIZED mean lobe.
+    f_unpol = 0.5 * (f_sym_te + f_sym_tm)
+    mass = f_unpol * weight  # [ti, pi, to, po] probability mass per bin
+    total = mass.sum(axis=(2, 3), keepdims=True)
+    uniform = np.full_like(mass, 1.0 / (N_COS_THETA_O * N_PHI_O))
+    mass = np.where(total > 0.0, mass / np.where(total > 0.0, total, 1.0), uniform)
+    density = mass / d_omega
+    marginal = mass.sum(axis=3)  # [ti, pi, to]
+    marginal_cdf = np.cumsum(marginal, axis=2)
+    marginal_cdf /= marginal_cdf[..., -1:]
+    cond = np.where(
+        marginal[..., None] > 0.0,
+        mass / np.where(marginal[..., None] > 0.0, marginal[..., None], 1.0),
+        1.0 / N_PHI_O,
+    )
+    conditional_cdf = np.cumsum(cond, axis=3)
+    conditional_cdf /= conditional_cdf[..., -1:]
+
+    device = torch.device(device)
+
+    def as32(a: np.ndarray) -> torch.Tensor:
+        return torch.from_numpy(np.ascontiguousarray(a, dtype=np.float32)).to(device)
+
+    return KirchhoffTable(
+        cos_theta_i=as32(cos_i),
+        phi_i=as32(phi_i),
+        cos_theta_o=as32(cos_o),
+        phi_o=as32(phi_o),
+        f_te=as32(f_sym_te),
+        f_tm=as32(f_sym_tm),
+        r_diff_te=as32(r_diff_te_grid),
+        r_diff_tm=as32(r_diff_tm_grid),
+        r_diff_unpol=as32(0.5 * (r_diff_te_grid + r_diff_tm_grid)),
+        normalization_applied=as32(scales),
+        sample_density=as32(density),
+        marginal_cdf=as32(marginal_cdf),
+        conditional_cdf=as32(conditional_cdf),
+        frequency_hz=frequency_hz,
+        k0=k0,
+        sigma_h_m=sigma_h,
+        corr_x_m=lx,
+        corr_y_m=ly,
+        principal_axis_rad=axis_rad,
+        anisotropic=anisotropic,
+        k0_l_min=k0_l_min,
+        rms_slope_max=rms_slope_max,
+        tangent_plane_ok=tangent_plane_ok,
+        slope_ok=slope_ok,
+        reciprocity_error=reciprocity_error,
+        pre_balance_lobe_te=as32(pre_balance_lobe_te),
+        pre_balance_lobe_tm=as32(pre_balance_lobe_tm),
+    )
+
+
+def eval_bsdf(
+    table: KirchhoffTable,
+    valid: torch.Tensor,
+    wi: torch.Tensor,
+    wo: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Bilinear (multilinear) lookup of ``(f_te, f_tm)`` for batched pairs.
+
+    ``wi``/``wo`` are [N, 3] local-frame unit vectors pointing away from the
+    surface. Directions below the horizon return 0.
+    """
+
+    from witwin.channel.kernels.scattering import (
+        scattering_table_eval,
+    )
+
+    return scattering_table_eval(
+        valid.contiguous(), wi.contiguous(), wo.contiguous(), table.f_te, table.f_tm
+    )
+
+
+def sample_directions(
+    table: KirchhoffTable,
+    valid: torch.Tensor,
+    wi: torch.Tensor,
+    u1: torch.Tensor,
+    u2: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Sample outgoing directions by CDF inversion; returns ``(wo, pdf)``.
+
+    Uses the nearest incidence bin (the same convention :func:`pdf` uses, so
+    the sampler and its density are exactly consistent). ``u1`` inverts the
+    marginal CDF over ``cos_theta_o``; ``u2`` the conditional CDF over
+    ``phi_o``; both are linearly remapped inside the selected bin, i.e. the
+    sampled density is piecewise constant per outgoing bin.
+    """
+
+    from witwin.channel.kernels.scattering import (
+        scattering_table_sample,
+    )
+
+    uniforms = torch.stack((u1, u2), dim=1).contiguous()
+    out = scattering_table_sample(
+        valid.contiguous(),
+        wi.contiguous(),
+        uniforms,
+        table.marginal_cdf,
+        table.conditional_cdf,
+        table.sample_density,
+    )
+    return out["wo"], out["pdf_forward"]
+
+
+def pdf(
+    table: KirchhoffTable,
+    valid: torch.Tensor,
+    wi: torch.Tensor,
+    wo: torch.Tensor,
+) -> torch.Tensor:
+    """Solid-angle sampling density of :func:`sample_directions`.
+
+    Piecewise constant per outgoing bin and exactly consistent with the
+    sampler (same nearest incidence bin, same mass table); integrates to 1
+    over the hemisphere by construction. Zero below the horizon.
+    """
+
+    from witwin.channel.kernels.scattering import scattering_table_pdf
+
+    return scattering_table_pdf(
+        valid.contiguous(),
+        wi.contiguous(),
+        wo.contiguous(),
+        table.sample_density,
+        reverse=False,
+    )
+
+
+def pdf_reverse(
+    table: KirchhoffTable,
+    valid: torch.Tensor,
+    wo: torch.Tensor,
+    wi: torch.Tensor,
+) -> torch.Tensor:
+    """Reverse-direction PDF: the SAME table evaluated with swapped args.
+
+    BDPT evaluates the reverse strategy density by treating the outgoing
+    direction as the incidence direction (contract section 5); no separate
+    reverse table exists.
+    """
+
+    from witwin.channel.kernels.scattering import scattering_table_pdf
+
+    return scattering_table_pdf(
+        valid.contiguous(),
+        wi.contiguous(),
+        wo.contiguous(),
+        table.sample_density,
+        reverse=True,
+    )
+
+
+class PhaseScreenRuntime:
+    """GPU height texture + phasor sampling for one surface realization."""
+
+    def __init__(self, screen: PhaseScreen, device: torch.device | str = "cuda"):
+        if not isinstance(screen, PhaseScreen):
+            raise ValueError("screen must be a PhaseScreen")
+        device = torch.device(device)
+        # Metric heights [m]: stored texture * scale + offset, float32.
+        heights = screen.height.to(device=device, dtype=torch.float32)
+        self.heights_m = (
+            heights * float(screen.height_scale_m) + float(screen.height_offset_m)
+        ).contiguous()
+        self.screen = screen
+        self.device = device
+
+    def sample_height(self, uv: torch.Tensor) -> torch.Tensor:
+        """Bilinear metric height [m] at ``uv`` ([..., 2], u right, v down).
+
+        Manual gather with edge clamp (see module docstring for the texel
+        convention).
+        """
+
+        if uv.shape[-1] != 2:
+            raise ValueError("uv must have trailing dimension 2")
+        h_rows, w_cols = self.heights_m.shape
+        uv = uv.to(device=self.device, dtype=torch.float32)
+        # Edge clamp: clamp the CONTINUOUS texel coordinate into the span of
+        # texel centers before flooring, so UV outside the half-texel margin
+        # reproduces the border texel exactly (no border interpolation).
+        tx = (uv[..., 0] * w_cols - 0.5).clamp(0.0, float(w_cols - 1))
+        ty = (uv[..., 1] * h_rows - 0.5).clamp(0.0, float(h_rows - 1))
+        x0 = torch.floor(tx)
+        y0 = torch.floor(ty)
+        wx = tx - x0
+        wy = ty - y0
+        ix0 = x0.long()
+        iy0 = y0.long()
+        ix1 = (ix0 + 1).clamp(max=w_cols - 1)
+        iy1 = (iy0 + 1).clamp(max=h_rows - 1)
+        flat = self.heights_m.reshape(-1)
+
+        def tex(iy: torch.Tensor, ix: torch.Tensor) -> torch.Tensor:
+            return flat[iy * w_cols + ix]
+
+        top = tex(iy0, ix0) * (1.0 - wx) + tex(iy0, ix1) * wx
+        bot = tex(iy1, ix0) * (1.0 - wx) + tex(iy1, ix1) * wx
+        return top * (1.0 - wy) + bot * wy
+
+    def phasor(self, uv: torch.Tensor, q_n: torch.Tensor | float) -> torch.Tensor:
+        """Complex64 phase-screen factor ``exp(-j*q_n*h(u, v))``."""
+
+        h = self.sample_height(uv)
+        if not isinstance(q_n, torch.Tensor):
+            q_n = torch.as_tensor(q_n, dtype=torch.float32, device=self.device)
+        phase = -(q_n * h)
+        return torch.polar(torch.ones_like(phase), phase).to(torch.complex64)
+
+
+def realization_seed(scene_seed: int, surface_id: int, realization_id: int) -> int:
+    """Deterministic 64-bit seed for ``(scene_seed, surface_id, realization_id)``.
+
+    SplitMix64-style avalanche over the packed inputs so nearby ids give
+    decorrelated seeds while the mapping stays reproducible across runs and
+    platforms (pure integer arithmetic, no RNG state involved).
+    """
+
+    mask = (1 << 64) - 1
+    z = (int(scene_seed) & mask)
+    for salt in (int(surface_id), int(realization_id)):
+        z = (z + 0x9E3779B97F4A7C15 + (salt & mask)) & mask
+        z = ((z ^ (z >> 30)) * 0xBF58476D1CE4E5B9) & mask
+        z = ((z ^ (z >> 27)) * 0x94D049BB133111EB) & mask
+        z = z ^ (z >> 31)
+    return z
+
+
+def generate_gaussian_realization(
+    roughness: SurfaceRoughness,
+    extent_m: tuple[float, float] | float,
+    resolution: tuple[int, int] | int,
+    seed: int,
+    device: torch.device | str = "cuda",
+) -> torch.Tensor:
+    """Periodic Gaussian random height field with Gaussian correlation.
+
+    FFT spectral synthesis of the section-6.1 correlation
+    ``C(x, y) = sigma_h^2 * exp(-(x/lx)^2 - (y/ly)^2)`` whose PSD (plan
+    section 6.3 Fourier convention, ``(1/(2*pi)^2) Int W d^2q = sigma_h^2``)
+    is ``W(qx, qy) = pi*sigma_h^2*lx*ly*exp(-(qx^2*lx^2 + qy^2*ly^2)/4)``.
+
+    Normalization: on a periodic domain ``Lx x Ly`` each Fourier mode gets
+    variance ``E[|h_k|^2] = W(q_k)/(Lx*Ly)`` (the Riemann sum of the PSD
+    integral over the discrete mode lattice ``dq = 2*pi/L``). Modes are
+    drawn as independent circular complex Gaussians and the real part is
+    taken, which halves per-mode variance, so amplitudes carry a
+    compensating ``sqrt(2)``. Total variance then approximates ``sigma_h^2``
+    up to spectral truncation at Nyquist: for ``dx << l`` and ``L >> l`` the
+    sampled RMS height matches ``sigma_h`` within a few percent.
+
+    ``extent_m``/``resolution`` are ``(x, y)`` pairs (scalars broadcast).
+    Returns float32 heights [m] of shape ``(ny, nx)`` on ``device``
+    (row = v/y axis, matching :class:`PhaseScreenRuntime`).
+    """
+
+    sigma_h = float(roughness.rms_height_m)
+    lx = float(roughness.correlation_length_x_m)
+    ly = float(roughness.correlation_length_y_m)
+    if isinstance(extent_m, (int, float)):
+        extent_m = (float(extent_m), float(extent_m))
+    if isinstance(resolution, int):
+        resolution = (resolution, resolution)
+    length_x, length_y = float(extent_m[0]), float(extent_m[1])
+    nx, ny = int(resolution[0]), int(resolution[1])
+    if length_x <= 0.0 or length_y <= 0.0 or nx < 2 or ny < 2:
+        raise ValueError("extent_m must be positive and resolution >= 2")
+
+    qx = 2.0 * np.pi * np.fft.fftfreq(nx, d=length_x / nx)
+    qy = 2.0 * np.pi * np.fft.fftfreq(ny, d=length_y / ny)
+    psd = (
+        np.pi
+        * sigma_h**2
+        * lx
+        * ly
+        * np.exp(-((qx[None, :] * lx) ** 2 + (qy[:, None] * ly) ** 2) / 4.0)
+    )
+    amplitude = np.sqrt(2.0 * psd / (length_x * length_y))
+    rng = np.random.default_rng(int(seed) & ((1 << 64) - 1))
+    xi = (rng.standard_normal((ny, nx)) + 1j * rng.standard_normal((ny, nx))) / math.sqrt(2.0)
+    # h(x_m) = Re sum_k A_k xi_k exp(+j q_k . x_m); numpy ifft2 divides by
+    # nx*ny, so multiply it back to get the plain Fourier-series sum.
+    field = np.fft.ifft2(amplitude * xi) * (nx * ny)
+    heights = np.real(field)
+    return torch.from_numpy(np.ascontiguousarray(heights, dtype=np.float32)).to(
+        torch.device(device)
+    )
+
+
+def patch_phase_integral(
+    runtime: PhaseScreenRuntime,
+    patch_vertices: torch.Tensor,
+    uv_vertices: torch.Tensor,
+    k_i_vec: torch.Tensor,
+    k_s_vec: torch.Tensor,
+    frequency_hz: float,
+    n_quad: int = 16,
+) -> torch.Tensor:
+    """Triangle-domain quadrature of the Kirchhoff phase integral (GPU).
+
+    Evaluates ``sum_T Int_T exp(-j*(k_s - k_i).x) * exp(-j*q_n*h(u, v)) dA``
+    over triangles ``patch_vertices`` [T, 3, 3] with matching UVs
+    ``uv_vertices`` [T, 3, 2] (a single triangle may omit the leading dim).
+    Positions stay on the mean plane; heights enter only the phase, matching
+    ``oracle.phase_screen_patch_integral`` for the same height field.
+
+    Quadrature: Duffy-mapped tensor-product Gauss-Legendre with ``n_quad``
+    points per axis  -  the unit square ``(xi, eta)`` maps to barycentric
+    ``(a, b) = (xi, eta*(1 - xi))`` with Jacobian ``(1 - xi)``, so
+    refinement in ``n_quad`` converges to the exact triangle integral.
+    Returns a 0-dim complex64 tensor on the runtime device.
+    """
+
+    device = runtime.device
+    tri = patch_vertices.to(device=device, dtype=torch.float32)
+    uv = uv_vertices.to(device=device, dtype=torch.float32)
+    if tri.ndim == 2:
+        tri = tri.unsqueeze(0)
+    if uv.ndim == 2:
+        uv = uv.unsqueeze(0)
+    if tri.shape[1:] != (3, 3) or uv.shape[1:] != (3, 2) or tri.shape[0] != uv.shape[0]:
+        raise ValueError("patch_vertices must be [T, 3, 3] and uv_vertices [T, 3, 2]")
+    k_i = k_i_vec.to(device=device, dtype=torch.float32).reshape(3)
+    k_s = k_s_vec.to(device=device, dtype=torch.float32).reshape(3)
+    k0 = 2.0 * math.pi * float(frequency_hz) / C0
+    for name, vec in (("k_i_vec", k_i), ("k_s_vec", k_s)):
+        if abs(float(torch.linalg.vector_norm(vec)) - k0) > 1e-5 * k0:
+            raise ValueError(f"|{name}| does not match 2*pi*frequency_hz/c0")
+    q = k_s - k_i
+
+    # Per-triangle mean-plane frame: edges, normal, area.
+    e1 = tri[:, 1] - tri[:, 0]
+    e2 = tri[:, 2] - tri[:, 0]
+    normal = torch.cross(e1, e2, dim=1)
+    double_area = torch.linalg.vector_norm(normal, dim=1)
+    n_hat = normal / double_area.unsqueeze(1).clamp(min=1e-30)
+    q_n = n_hat @ q  # [T] normal wavenumber transfer per triangle
+
+    # Duffy-mapped Gauss points on the unit square (float64 nodes -> f32).
+    nodes, weights = np.polynomial.legendre.leggauss(int(n_quad))
+    xi = torch.from_numpy(0.5 * (nodes + 1.0)).to(device=device, dtype=torch.float32)
+    w1 = torch.from_numpy(0.5 * weights).to(device=device, dtype=torch.float32)
+    a = xi[:, None].expand(n_quad, n_quad)  # barycentric a = xi
+    b = xi[None, :] * (1.0 - xi[:, None])  # barycentric b = eta*(1 - xi)
+    w2d = (w1[:, None] * w1[None, :]) * (1.0 - xi[:, None])  # Duffy Jacobian
+    a = a.reshape(-1)
+    b = b.reshape(-1)
+    w2d = w2d.reshape(-1)
+
+    # Quadrature positions/UVs: x = p0 + a*e1 + b*e2 (same barycentric
+    # interpolation for UV), batched [T, Q, ...].
+    pos = (
+        tri[:, 0, None, :]
+        + a[None, :, None] * e1[:, None, :]
+        + b[None, :, None] * e2[:, None, :]
+    )
+    uv_pts = (
+        uv[:, 0, None, :]
+        + a[None, :, None] * (uv[:, 1] - uv[:, 0])[:, None, :]
+        + b[None, :, None] * (uv[:, 2] - uv[:, 0])[:, None, :]
+    )
+    heights = runtime.sample_height(uv_pts)  # [T, Q]
+    phase = pos @ q + q_n[:, None] * heights
+    phasor = torch.polar(torch.ones_like(phase), -phase)
+    # dA = 2*Area * da db; the simplex measure is carried by w2d.
+    contrib = (phasor * w2d[None, :]).sum(dim=1) * double_area.to(phasor.real.dtype)
+    return contrib.sum().to(torch.complex64)

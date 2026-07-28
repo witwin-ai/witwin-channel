@@ -23,7 +23,7 @@ from witwin.channel.deployment import build_info
 from witwin.core import PhaseScreen, SurfaceRoughness
 from witwin.channel.deterministic import Config, solve
 from tests.reference.em_oracle import C0, layer_stack_rt
-from witwin.channel.scattering import (
+from witwin.channel.scene.resources import (
     N_COS_THETA_O,
     N_PHI_O,
     _cos_centers,

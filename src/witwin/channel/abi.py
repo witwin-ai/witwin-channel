@@ -1,10 +1,25 @@
+"""The native field-state ABI contracts.
+
+Two frozen dataclasses and nothing else: the world-Cartesian
+:class:`Complex3State` and the transverse-basis :class:`JonesState` that every
+native field kernel reads and writes. They live at the package root because
+:mod:`witwin.channel` exports them and the ``public_init_internal`` boundary
+forbids the root ``__init__`` from importing ``runtime``, ``propagation``, or a
+``kernels`` package to reach them.
+
+This module used to be called ``field_state`` and also held the scene-derived
+transmitter/receiver polarization tensors. Those were never an ABI contract -
+they read a logical scene and build endpoint tensors - so they moved to
+:mod:`witwin.channel.scene.endpoints`, which owns endpoint geometry. What is
+left here depends on ``torch`` alone, so importing the public root no longer
+drags the scene package in behind it.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 import torch
-
-from witwin.channel.scene.endpoints import ReceiverGrid, ReceiverPoint
 
 
 def _validate_rows(name: str, tensor: torch.Tensor, width: int) -> torch.Tensor:
@@ -62,35 +77,3 @@ class JonesState:
         object.__setattr__(self, "value", value.contiguous())
         object.__setattr__(self, "basis", basis.contiguous())
         object.__setattr__(self, "direction", direction)
-
-
-def transmitter_polarizations(scene: object, *, device: torch.device) -> torch.Tensor:
-    values = [tx.polarization for tx in scene.transmitters]
-    if not values:
-        return torch.empty((0, 3), device=device, dtype=torch.float32)
-    return torch.stack(values).to(device=device, dtype=torch.float32).contiguous()
-
-
-def receiver_polarizations(
-    scene: object,
-    *,
-    device: torch.device,
-    grid: ReceiverGrid | None = None,
-) -> torch.Tensor:
-    if grid is not None:
-        return (
-            grid.polarization.to(device=device, dtype=torch.float32)
-            .expand(grid.shape[0] * grid.shape[1], 3)
-            .contiguous()
-        )
-    values: list[torch.Tensor] = []
-    for receiver in scene.receivers:
-        if isinstance(receiver, ReceiverGrid):
-            values.extend([receiver.polarization] * (receiver.shape[0] * receiver.shape[1]))
-        elif isinstance(receiver, ReceiverPoint):
-            values.append(receiver.polarization)
-        else:
-            raise TypeError(f"receiver type is not accepted: {type(receiver)!r}")
-    if not values:
-        return torch.empty((0, 3), device=device, dtype=torch.float32)
-    return torch.stack(values).to(device=device, dtype=torch.float32).contiguous()

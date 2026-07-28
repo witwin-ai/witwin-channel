@@ -99,7 +99,7 @@ topology pack 和 MC wall-product 已落地并进入 production；两个 solver 
    `field_transmission_sequence` 完整 primal/backward/JVP family 的 numerical owner；
    Channel 保留 materials/fields façade、CSR resource contract、topology 和 solver policy。
 5. Diffraction 不能用一个笼统 owner 覆盖所有语义。Generic pure-wedge family 和 RayD
-   order-1 exporter 应由 RayD 统一；MC Sionna fixed-tape estimator、coupled RD/DD fused
+   order-1 exporter 应由 RayD 统一；MC UTD fixed-tape estimator、coupled RD/DD fused
    fields、packing/MIS/accumulation分别保留完整的 Channel owner。每个 operation family
    内部必须统一 primal/JVP/VJP，不能把 UTD 子段从 fused solver operation 中拆出。
 6. scattering v2 合并后，通用的、与 solver policy 无关的散射运行时计算适合成为 RayD
@@ -201,7 +201,7 @@ handle 表达结果；`common.cpp` 基本只把每个 getter 指向一个 RayD e
 | transmission sequence primal/backward/JVP | Channel Native CUDA | solver-neutral complete-row family，且 scattering chain 依赖同一 EM core | 整族迁 RayD；Channel fields façade 保持 |
 | pure-wedge diffraction primal/backward/JVP | Channel Native CUDA，重演 RayD UTD exporter | generic UTD physics 跨仓重复 owner | 整族迁 RayD typed API |
 | coupled RD/DD field primal/backward/JVP | Channel Native CUDA | 反射/双绕射 leg 与 row output 单 launch 融合 | 各 complete family 保持 Channel owner |
-| MC Sionna fixed-tape diffraction primal/backward/JVP | Channel Native CUDA | solver estimator/Jacobian/cell atomic fusion | 整族保持 Channel owner |
+| MC UTD fixed-tape diffraction primal/backward/JVP | Channel Native CUDA | solver estimator/Jacobian/cell atomic fusion | 整族保持 Channel owner |
 | enumerated topology、row selection、solver orchestration | Channel Native | 合理 | 保持 |
 | solver sampling policy、MIS、accumulation、result metadata | Channel Native CUDA/Python orchestration | 合理 | 保持 |
 | scattering runtime eval/sample/integral | Channel Native CUDA | 当前合法；但它们是可复用的 resident runtime primitive | ADR-026 接受后迁到 RayD |
@@ -225,7 +225,7 @@ operation 属于哪个项目”。决定 owner 的顺序是：
 - 完整 chain scattering operation 适合整体进入 RayD，是因为它可以作为通用、resident、
   solver-neutral runtime primitive；它绝不能为了匹配 Python 目录而拆成多个 kernel。
 - Pure-wedge UTD 适合进入 RayD，因为它与 RayD order-1 exporter 是同一通用数值语义；
-  coupled RD/DD 和 MC Sionna 虽含 UTD，却拥有不同的 fused operation/result contract，
+  coupled RD/DD 和 MC UTD 虽含 UTD，却拥有不同的 fused operation/result contract，
   所以保留 Channel 完整 owner 不构成 primal/JVP/VJP 拆分。
 - MIS、event probability 和 deterministic/BDPT accumulation 即便能写成 fused kernel，仍
   不应因为“更 fused”就移进 RayD，因为它们是 Channel solver policy。
@@ -399,7 +399,7 @@ forward-tape/VJP/JVP family；Channel 保留 eligibility/material encoding、com
 |---|---|---|---|
 | RayD order-1 path exporter / visibility | RayD OptiX | RayD | typed direct API；离散 winner 不求导 |
 | pure wedge `field_diffraction_wedge` + backward + JVP | Channel 完整 family，但重演 RayD generic UTD exporter | RayD | 三件套整体迁移；Channel fields/autograd façade保留 |
-| MC `mc_sionna_diffraction_tape_accumulate` + backward + JVP | Channel fixed-tape Sionna/ITU estimator | Channel | 三件套保持完整，不拆 UTD 子表达式 |
+| MC `mc_utd_diffraction_tape_accumulate` + backward + JVP | Channel fixed-tape UTD estimator | Channel | 三件套保持完整，不拆 UTD 子表达式 |
 | coupled RD `field_coupled_rd` + backward + JVP | Channel reflection-slab + UTD row fusion | Channel | 三件套保持完整；调用 RayD shared device primitives |
 | coupled DD `field_coupled_dd` + backward + JVP | Channel two-wedge one-launch row fusion | Channel | 三件套保持完整；调用 RayD shared device primitives |
 | `coupled_rd_prepare` + backward + JVP | Channel continuous stationary-geometry family | Channel（本计划） | 保持三件套；未来完整移动需独立证据 |
@@ -408,7 +408,7 @@ forward-tape/VJP/JVP family；Channel 保留 eligibility/material encoding、com
 | BDPT connection/PDF/MIS/storage | Channel BDPT | Channel | 有真实 caller才保留 |
 
 “统一所有权”的含义是每一行拥有一个完整 primal/JVP/VJP owner，而不是把所有带
-diffraction 字样的 kernel 都搬到 RayD。特别是 coupled RD/DD 与 MC Sionna 已各自拥有不同
+diffraction 字样的 kernel 都搬到 RayD。特别是 coupled RD/DD 与 MC UTD 已各自拥有不同
 result schema、tape 和 fusion；拆出其中的 UTD 子段会增加 launch/materialization并破坏 AD
 lockstep。
 
@@ -432,7 +432,7 @@ numerical duplication是独立 numerical ADR，不属于 owner move。
 ### 6.3 MC diffraction tape 的真实边界和命名
 
 MC Basic 当前先调用 RayD diffraction accumulation获取 sampling/visibility tape，再由 Channel
-`mc_sionna_diffraction_tape_accumulate` family 生成真实 solver map。它不是“RayD primal +
+`mc_utd_diffraction_tape_accumulate` family 生成真实 solver map。它不是“RayD primal +
 Channel derivative”的同一 operation split：两者是 tape producer 与 estimator consumer。
 
 计划必须：
@@ -1090,7 +1090,7 @@ ADR-032 stable recovery 不回滚 RayD owner migration，也不删除已完成�
 5. ADR-024 接受后，第 5.2 节 6 个 transmission-related contracts由 RayD作为唯一 numerical
    owner；shared RF/layer-stack/Jones primal/dual device math没有 Channel副本或反向 private
    include；BDPT transmitted-state完整留在 Channel。
-6. ADR-025 接受后，pure-wedge三件套由 RayD完整拥有；MC Sionna、coupled RD、coupled DD各自
+6. ADR-025 接受后，pure-wedge三件套由 RayD完整拥有；MC UTD、coupled RD、coupled DD各自
    在 Channel保持完整 primal/JVP/VJP owner，所有 legacy diffraction symbols有真实 owner/
    caller或被治理完整删除。
 7. ADR-026 接受后，第 7.2 节17个 scattering runtime contracts的 numerical implementation

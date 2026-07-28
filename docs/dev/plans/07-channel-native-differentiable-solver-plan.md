@@ -17,7 +17,7 @@
 
 **AD-4b 交付摘要（2026-07-14）**：
 
-- **basic 绕射功率图 AD**：`sionna_diffraction_tape_accumulate` 的逐 lane 行模板化到标量 `T`（float 实例即 primal、Dual 实例即精确导数），backward 为逐输入种子化对偶探针（12 个/lane 上限）、jvp 为单次对偶；可微输入 = 楔面板材 4 参数 + 频率 + tx 位置（源经 state_src 广播，源梯度原生归并到 (3,)）。伪无限 ±1e5 截断因子按 AD-4a 政策冻结（否则 1e5 杠杆把端点纹波放大成梯度垃圾——实测修复前后源梯度差 ~50 倍）。**tx 单元的 FD 判据**：全解 FD 在 h=3e-4..3e-2 全程不收敛（楔事件发现、采样带与逐 lane Keller 锥接受判据 `phi<=exterior` 都随 tx 离散翻转），有效判据是固定带 + 接受稳定 lane 聚合 + 两步长一致性过滤（剔除 UTD 过渡区 1/h 尖峰 lane），聚合 FD 与对偶 ≤5e-2。
+- **basic 绕射功率图 AD**：`utd_diffraction_tape_accumulate` 的逐 lane 行模板化到标量 `T`（float 实例即 primal、Dual 实例即精确导数），backward 为逐输入种子化对偶探针（12 个/lane 上限）、jvp 为单次对偶；可微输入 = 楔面板材 4 参数 + 频率 + tx 位置（源经 state_src 广播，源梯度原生归并到 (3,)）。伪无限 ±1e5 截断因子按 AD-4a 政策冻结（否则 1e5 杠杆把端点纹波放大成梯度垃圾——实测修复前后源梯度差 ~50 倍）。**tx 单元的 FD 判据**：全解 FD 在 h=3e-4..3e-2 全程不收敛（楔事件发现、采样带与逐 lane Keller 锥接受判据 `phi<=exterior` 都随 tx 离散翻转），有效判据是固定带 + 接受稳定 lane 聚合 + 两步长一致性过滤（剔除 UTD 过渡区 1/h 尖峰 lane），聚合 FD 与对偶 ≤5e-2。
 - **mesh 顶点 × {透射, 绕射}**：透射经 `raydn_face_normals_ad` 的活法线表（已验证与 torch 参考逐值一致；FD 用非相干步长——直线穿透路径长度与顶点无关，1e-3 步长下 2 点差分落在 float32 前向噪声底）；绕射经楔核内从 winner 顶点重建边表（边锚点/方向/界、符号对齐法线、外角；冻结发现表钉住平面指派，防 RayD 绕序约定漂移），新增 12 顶点分量探针。LoS × 顶点结构性为零（图不触及叶子，测试钉死）。**耦合 × 顶点不支持**：耦合伴随把墙平面/边表当冻结 winner，实现即静默缺失梯度，故 seam 在顶点叶子参与时显式 `NotImplementedError`，测试registered `xfail(strict=True)`。
 - **多反射（深度 2）solver 级**：新 `tests/ad/test_solver_multibounce_ad.py`，双平行墙（z 不对称）夹 TX/RX，损失只取 depth==2 行，eps_r/sigma_e/频率/TX/RX/顶点全部过中心 FD + JVP-VJP 对偶。
 - **metadata**：`AdLaunchLedger` 上移到 `core/kernels/metadata.py`（三 solver 一个形状）；deterministic/path 经 `TopologyBatch.ad_companion_launches/ad_tape_bytes` 上报真实注册伴随数与 save_for_backward 字节；`make_metadata` 增加 `forward_time_ms`（CUDA 同步壁钟；jvp 的对偶趟在其中）与 `peak_memory_bytes`（本次 solve 抬高的进程 CUDA 高水位）。vjp 的反向趟发生在 solve 之后、solve 无法观测，反向时间/显存预算由 CI 门禁承担（见下），不伪造 metadata 字段。
@@ -197,7 +197,7 @@ AD-1 加固（`bc6dd5a`）修掉两个真实的钳位边界梯度 bug：`fmaxf` 
 
 - [x] 打通 basic 的材料/频率通路：`_host_material_tensors` 已删除，反射/绕射材料与厚度统一走编译材料仓（`face_material_field_bundle`，`ad_mode="none"` 与 AD 模式同一来源、同一数值；primal 在 no_grad 下读取）；`float(scene.frequency)` 在 AD 模式换成活的 0-d 张量；
 - [x] LoS 功率增益：`mc_los_path_gain_jvp/backward` 补了 frequency 切向/余切（`d gain_scale/df = -2*gain_scale/f`），并入 `_McLosPathGainAdFunction`（tx/rx 位置、频率；tx_power 按固定拓扑契约显式拒绝）；
-- [x] 反射功率图：`mc_sionna_reflection_accumulate_backward/_jvp`（`eta_r`/`sigma`/`gain`/`thickness`/`wavelength`->frequency；逐 bounce 反向场链 + `legacy_sionna_slab_fresnel_dual` 参数对偶）。**交付偏差：ray origin（tx 位置）的解析梯度恒等于零**——沉积权重 `|Gamma|^2*Omega*(lambda/4pi)^2/(A*|cos|)` 的每个因子只依赖冻结的采样方向、法线与材料，1/d^2 扩散由冻结的射线密度/分箱承载（离散 winner）；已实测验证（对 tx 的中心差分在 h=1e-2 只读到单射线换箱跳变 ~7e-7，h<=1e-3 只剩 float32 重排序噪声），梯度经活图返回精确零；
+- [x] 反射功率图：`mc_slab_reflection_accumulate_backward/_jvp`（`eta_r`/`sigma`/`gain`/`thickness`/`wavelength`->frequency；逐 bounce 反向场链 + `legacy_slab_fresnel_dual` 参数对偶）。**交付偏差：ray origin（tx 位置）的解析梯度恒等于零**——沉积权重 `|Gamma|^2*Omega*(lambda/4pi)^2/(A*|cos|)` 的每个因子只依赖冻结的采样方向、法线与材料，1/d^2 扩散由冻结的射线密度/分箱承载（离散 winner）；已实测验证（对 tx 的中心差分在 h=1e-2 只读到单射线换箱跳变 ~7e-7，h<=1e-3 只剩 float32 重排序噪声），梯度经活图返回精确零；
 - [x] 绕射功率图：AD-4b 交付——逐 lane 行模板化（float=primal、Dual=导数），backward 逐输入种子化探针、jvp 单次对偶；材料/频率/tx 位置可微；伪无限截断因子冻结（AD-4a 政策）；
 - [x] 透射功率图：`em_layer_stack_backward/_jvp`（`stack_rt_dual` 补 cap_r/cap_t 对偶；cos_theta/CSR 层参数/频率），`straight_transmission_chains` 在 AD 模式走 `em_layer_stack_ad`；`mc_finalize_component_maps` 的 VJP 是余切 view + 广播、JVP 复用前向核；LoS/透射图布局与可见性掩码经 `mc_los_grid_maps_ad`（伴随为一只掩码 gather 核）；
 - [x] `montecarlo.basic` 的 `Config` 接受 `ad_mode`；散射与绕射分量 + AD 在 launch 前显式拒绝；

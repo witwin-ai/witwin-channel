@@ -2040,8 +2040,8 @@
       ]
     ],
     [
-      "mc_sionna_diffraction_tape_accumulate",
-      "witwin.channel.kernels.montecarlo.mc_sionna_diffraction_tape_accumulate",
+      "mc_utd_diffraction_tape_accumulate",
+      "witwin.channel.kernels.montecarlo.mc_utd_diffraction_tape_accumulate",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -2049,8 +2049,8 @@
       ]
     ],
     [
-      "mc_sionna_diffraction_tape_accumulate_backward",
-      "witwin.channel.kernels.montecarlo.mc_sionna_diffraction_tape_accumulate_backward",
+      "mc_utd_diffraction_tape_accumulate_backward",
+      "witwin.channel.kernels.montecarlo.mc_utd_diffraction_tape_accumulate_backward",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -2058,8 +2058,8 @@
       ]
     ],
     [
-      "mc_sionna_diffraction_tape_accumulate_jvp",
-      "witwin.channel.kernels.montecarlo.mc_sionna_diffraction_tape_accumulate_jvp",
+      "mc_utd_diffraction_tape_accumulate_jvp",
+      "witwin.channel.kernels.montecarlo.mc_utd_diffraction_tape_accumulate_jvp",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -2067,8 +2067,8 @@
       ]
     ],
     [
-      "mc_sionna_reflection_accumulate",
-      "witwin.channel.kernels.montecarlo.mc_sionna_reflection_accumulate",
+      "mc_slab_reflection_accumulate",
+      "witwin.channel.kernels.montecarlo.mc_slab_reflection_accumulate",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -2076,8 +2076,8 @@
       ]
     ],
     [
-      "mc_sionna_reflection_accumulate_backward",
-      "witwin.channel.kernels.montecarlo.mc_sionna_reflection_accumulate_backward",
+      "mc_slab_reflection_accumulate_backward",
+      "witwin.channel.kernels.montecarlo.mc_slab_reflection_accumulate_backward",
       "named_wrapper",
       "native-mc-maps",
       [
@@ -2085,8 +2085,8 @@
       ]
     ],
     [
-      "mc_sionna_reflection_accumulate_jvp",
-      "witwin.channel.kernels.montecarlo.mc_sionna_reflection_accumulate_jvp",
+      "mc_slab_reflection_accumulate_jvp",
+      "witwin.channel.kernels.montecarlo.mc_slab_reflection_accumulate_jvp",
       "named_wrapper",
       "native-mc-maps",
       [

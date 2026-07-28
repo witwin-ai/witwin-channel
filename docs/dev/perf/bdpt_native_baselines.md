@@ -27,7 +27,7 @@ Initial native BDPT gates use `benchmarks/bench_bdpt_basic.py` and
 - The former crude receiver-grid and point diffraction connection exporters
   were removed by Plan 13 Phase 4 after failing the four-axis reachability
   audit. Standalone BDPT diffraction now uses the opaque enumerated-path oracle;
-  MC Basic retains the fused RayD sample-tape producer plus the Channel Sionna
+  MC Basic retains the fused RayD sample-tape producer plus the Channel UTD
   tape accumulator. The historical timings below predate that cleanup and are
   retained as baseline evidence, not as a live ABI contract.
 

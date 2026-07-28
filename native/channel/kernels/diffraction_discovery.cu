@@ -46,8 +46,13 @@ __device__ __forceinline__ Vec3 silhouette_viewpoint(
     }
     tangent=normalize(tangent,v3(1.f,0.f,0.f));
     Vec3 d=add(mul(surface_n,cosf(kHalfPiMinusOffset)),mul(tangent,sinf(kHalfPiMinusOffset)));
-    // Sionna's primitive_silhouette_projection uses a fixed 0.1 scene-unit
-    // viewpoint displacement.
+    // Fixed 0.1 scene-unit viewpoint displacement, deliberately absolute and
+    // not scaled by primitive or scene size. Together with kHalfPiMinusOffset
+    // (pi/2 - 0.05 rad, so `d` is the surface tangent lifted 0.05 rad off the
+    // surface) it pushes the viewpoint just past the hit point and slightly
+    // clear of the plane, which is what lets the silhouette projection below
+    // see the primitive's perimeter edges. Both constants select which edges
+    // are discovered, so they are pinned to these values rather than tuned.
     const float offset=0.1f;
     return add(hit_p,mul(d,offset));
 }

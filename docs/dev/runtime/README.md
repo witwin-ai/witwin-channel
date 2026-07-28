@@ -12,6 +12,13 @@ identity, tensor/AD call contracts, native buffers, and pure-stdlib native
 handle normalization. It does not own solver policy, scene construction,
 materials, propagation algorithms, or RF numerical kernels.
 
+`runtime.require_tensor` is the single owner of the declared-tensor-field check
+that the row, capacity, and consumer contracts each apply to one field:
+dtype, shape, rank, device, CUDA residency, and contiguity, with the dtype
+exception left caller-declared through `dtype_error`. It lives here rather than
+beside the row contracts because `runtime` sits below `propagation` and may
+never import it, and `runtime`'s own `CapacityExecutionCounts` needs the check.
+
 `runtime.CapacityFailureState` owns the shared failure protocol used
 by accepted genuinely fixed-capacity operations and retained caller-free
 experiments. Native creation asynchronously zeros one contiguous CUDA

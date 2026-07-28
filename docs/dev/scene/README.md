@@ -13,8 +13,8 @@ owner of what it holds:
 | Module | Owns |
 |---|---|
 | `scene.compiler` | `compile`, the compile registry, `CompiledScene`, the geometry/material/assignment stores and their tensor validation, and the endpoint tensor exports every solver reads off a bound scene |
-| `scene.endpoints` | the endpoint views over one Core antenna state, `SolverScene` and `bind_solver_scene`, antenna pattern/array/weight response, axis-aligned receiver-grid geometry, and the plan 07 AD-2 scene-leaf geometry seam |
-| `scene.resources` | the typed RayD scene lifetime (`RayDSceneResource`, `build_scene_from_structures`, and their two native facades), the diffraction `EdgePolicy` and the scene-policy edge refinement, and the lazy Kirchhoff and phase-screen resources |
+| `scene.endpoints` | the endpoint views over one Core antenna state, `SolverScene` and `bind_solver_scene`, antenna pattern/array/weight response, axis-aligned receiver-grid geometry, the `transmitter_polarizations_f32` / `receiver_polarizations_f32` endpoint tensors, and the plan 07 AD-2 scene-leaf geometry seam |
+| `scene.resources` | the typed RayD scene lifetime (`RayDSceneResource`, `build_scene_from_structures`, and their two native facades), the diffraction `EdgePolicy` and the scene-policy edge refinement, the lazy Kirchhoff and phase-screen resources, and the compile-time construction of the `KirchhoffTable` and `PhaseScreenRuntime` those resources are made of |
 
 The RayD lifecycle owner is exclusively `scene.resources` and has no
 compatibility re-export.
@@ -27,20 +27,38 @@ Stores, endpoint views, and native resources are internal.
 
 ## Dependency rules
 
-Scene may depend on runtime resources, material encoding, scattering resource
-types, and narrow topology/geometry primitives needed during compilation. It
+Scene may depend on runtime resources, material encoding, the layer-stack
+evaluation its compile-time Kirchhoff build calls, and narrow topology/geometry
+primitives needed during compilation. It
 must not import a solver or solver pipeline. Typed resources and mutable caches
 remain private; propagation topology and geometry kernels may not import scene
 back.
 
 Inside the package the dependency runs one way: `compiler` imports `endpoints`
 and `resources`, and neither imports `compiler` at module scope. That is load
-bearing, not cosmetic. The root `field_state` contract imports the endpoint
-views, so an edge from `endpoints` back to `compiler` would pull the whole
-compile-time dependency set - materials, topology kernels, penetration - into a
-cold import of the solver-neutral propagation consumer. `require_compiled`
-resolves `CompiledScene` inside the call, and `resources` annotates the stores
-under `TYPE_CHECKING`, for that reason.
+bearing, not cosmetic. An edge from `endpoints` back to `compiler` would pull
+the whole compile-time dependency set - materials, topology kernels,
+penetration - into a cold import of every consumer of the endpoint views, the
+solver-neutral propagation consumer among them. `require_compiled` resolves
+`CompiledScene` inside the call, and `resources` annotates the stores under
+`TYPE_CHECKING`, for that reason.
+
+The two same-named `transmitter_polarizations` owners the audit reported are
+resolved by name rather than by unification, because their bodies are not
+interchangeable. `scene.endpoints.transmitter_polarizations_f32` casts to
+float32, calls `.contiguous()`, and builds its empty case on the requested
+`device`; `scene.compiler.transmitter_polarizations_as_stored` uploads the
+stored vectors as they are and takes its empty case from the native transmitter
+builder. Both are live, each has its own callers, and merging them would be a
+behaviour change rather than a rename.
+
+`scene.resources` also holds the compile-time Kirchhoff/phase-screen
+construction that used to sit in a root `scattering` module. That module read
+like the scattering owner while `interactions.scattering` owns per-solve path
+evaluation, and everything it held was compile-time resource construction this
+module already cached. The float64 NumPy build sits behind an explicit banner
+inside the file: the CPU-compute policy line is drawn there, and nothing below
+it may grow into per-solve physics.
 
 ## Numerical and AD contract
 

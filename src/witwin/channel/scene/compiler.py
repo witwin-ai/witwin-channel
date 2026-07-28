@@ -62,7 +62,6 @@ from witwin.channel.runtime import (
     mc_receiver_grid_points,
     mc_transmitter_tensors,
 )
-from witwin.channel.scattering import KirchhoffTable
 from witwin.channel.scene.endpoints import (
     ReceiverGrid,
     ReceiverPoint,
@@ -71,6 +70,7 @@ from witwin.channel.scene.endpoints import (
 )
 from witwin.channel.scene.resources import (
     KirchhoffRuntimeResources,
+    KirchhoffTable,
     PhaseScreenResourceKey,
     PhaseScreenRuntimeResources,
     RayDSceneResource,
@@ -1283,7 +1283,7 @@ def _cache_key(
 def _rayd_input_identity(
     scene_or_snapshot: Scene | SceneSnapshot,
 ) -> tuple[object, ...]:
-    edge_policy = scene_or_snapshot.metadata.get("sionna_import_edge_policy")
+    edge_policy = scene_or_snapshot.metadata.get("imported_edge_policy")
     states = tuple(
         item
         for item in _source_structures(scene_or_snapshot)
@@ -1595,7 +1595,7 @@ def transmitter_positions(
     return positions, powers
 
 
-def transmitter_polarizations(
+def transmitter_polarizations_as_stored(
     scene: object, *, device: torch.device
 ) -> torch.Tensor:
     """Per-transmitter polarization unit vectors as a (N, 3) CUDA tensor.
@@ -1605,12 +1605,17 @@ def transmitter_polarizations(
     this is a straight device upload of the fixed physical vectors (frozen
     winners of AD; the dipole sin^2 pattern they induce is differentiated
     through the endpoint geometry, not through the polarization itself).
+    ``as_stored`` is the whole contract: the scene's dtype and layout are
+    preserved, and the empty case comes from the native transmitter builder
+    rather than from ``device``.
 
-    This is NOT the same function as
-    :func:`witwin.channel.field_state.transmitter_polarizations`, which casts to
-    float32 and calls ``.contiguous()``. Both are live and both are called; the
-    unfinished ownership migration between them predates this consolidation and
-    is deliberately left as it was.
+    This is NOT
+    :func:`witwin.channel.scene.endpoints.transmitter_polarizations_f32`, which
+    casts to float32 and calls ``.contiguous()``. Both are live and both are
+    called by different solvers; the unfinished ownership migration between
+    them predates this consolidation and is deliberately left as it was, so the
+    two now carry names that state the difference rather than one shared name
+    that hides it.
     """
 
     if not scene.transmitters:

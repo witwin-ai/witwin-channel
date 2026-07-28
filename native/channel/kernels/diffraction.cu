@@ -182,9 +182,9 @@ __device__ __forceinline__ void freeze_complex_tangent<utd::Dual>(
 }
 
 // ---------------------------------------------------------------------------
-// Templated per-lane row of the Sionna diffraction tape accumulator (plan 07
+// Templated per-lane row of the UTD diffraction tape accumulator (plan 07
 // AD-4). The float instantiation is the primal deposit computed by
-// sionna_diffraction_tape_accumulate_kernel below; the Dual instantiation
+// utd_diffraction_tape_accumulate_kernel below; the Dual instantiation
 // carries an exact directional derivative through the recomputed Keller-cone
 // geometry, the incident spherical wave, the stored slab face operators and
 // the UTD pair (fixed-point + stored-ops convention: selectStationaryPoint =
@@ -429,11 +429,12 @@ __device__ bool tape_row_value(
     const utd::Vec3T<T> ko = ko_exact;
     T phi = utd::atan2f(utd::f3_dot(ko, p.n0), utd::f3_dot(ko, t0v));
     if (utd::scalar_value(phi) < 0.0f) phi += T(2.0f * utd::UTD_PI);
-    // RayD proposes the complete Keller cone. Sionna's lit-region
-    // estimator only accepts the exterior angular interval [0, 2pi-i].
-    // Rejection keeps the full-cone 1/(2pi) proposal density, hence the
-    // accepted sample weight below remains 2pi rather than the interval
-    // width.
+    // RayD proposes the complete Keller cone, but only the wedge exterior is
+    // lit, so a lane is accepted only while its edge azimuth lies in the
+    // exterior angular interval [0, exterior_angle] = [0, 2pi - interior].
+    // This is rejection, not reparameterization: the proposal density stays
+    // the full-cone 1/(2pi), hence the accepted sample weight below remains
+    // 2pi rather than the width of the accepted interval.
     if (utd::scalar_value(phi) > c.exterior_angle) return false;
     const utd::Vec3T<T> dko = utd::f3_mul(
         utd::f3_add(
@@ -461,7 +462,7 @@ __device__ bool tape_row_value(
         source, source_power, tape_u, eta_r, sigma, mu_r, gain, thickness,    \
         material_valid
 
-__global__ void sionna_diffraction_tape_accumulate_kernel(
+__global__ void utd_diffraction_tape_accumulate_kernel(
     const bool *tape_active, const int *tape_state, const int *tape_cell, const float *tape_u,
     const float *edge_pos, const float *edge_dir, const float *t_min, const float *t_max,
     const float *n0, const float *nn, const int *prim0, const int *prim1,
@@ -488,7 +489,7 @@ __global__ void sionna_diffraction_tape_accumulate_kernel(
     }
 }
 
-__global__ void sionna_diffraction_tape_accumulate_backward_kernel(
+__global__ void utd_diffraction_tape_accumulate_backward_kernel(
     const bool *tape_active, const int *tape_state, const int *tape_cell, const float *tape_u,
     const float *edge_pos, const float *edge_dir, const float *t_min, const float *t_max,
     const float *n0, const float *nn, const int *prim0, const int *prim1,
@@ -566,7 +567,7 @@ __global__ void sionna_diffraction_tape_accumulate_backward_kernel(
     }
 }
 
-__global__ void sionna_diffraction_tape_accumulate_jvp_kernel(
+__global__ void utd_diffraction_tape_accumulate_jvp_kernel(
     const bool *tape_active, const int *tape_state, const int *tape_cell, const float *tape_u,
     const float *edge_pos, const float *edge_dir, const float *t_min, const float *t_max,
     const float *n0, const float *nn, const int *prim0, const int *prim1,
@@ -1357,10 +1358,12 @@ std::vector<at::Tensor> surface_group_edge_candidates_cuda_impl(
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
 
-    // Mitsuba's primitive_silhouette_projection() samples the perimeter of the
-    // intersected primitive. Keep every triangle as its own root: merging
-    // coplanar neighbours changes the sampling domain and both drops and adds
-    // wedges relative to Sionna RT.
+    // The silhouette projection samples the perimeter of the single
+    // intersected primitive, so the sampling domain is the per-triangle
+    // perimeter set. Keep every triangle as its own root: merging coplanar
+    // neighbours into one surface group replaces that domain with the merged
+    // group's outline, which both drops interior wedges the per-triangle
+    // domain contains and adds outline wedges it does not.
     (void)vertices;
     (void)face_normals;
     (void)edge_v0;
@@ -1569,7 +1572,7 @@ std::vector<at::Tensor> channel_mc_surface_group_edge_candidates_cuda(
         plane_tol);
 }
 
-at::Tensor channel_mc_sionna_diffraction_tape_accumulate_cuda(
+at::Tensor channel_mc_utd_diffraction_tape_accumulate_cuda(
     at::Tensor tape_active, at::Tensor tape_state, at::Tensor tape_cell, at::Tensor tape_u,
     at::Tensor edge_pos, at::Tensor edge_dir, at::Tensor t_min, at::Tensor t_max,
     at::Tensor n0, at::Tensor nn, at::Tensor prim0, at::Tensor prim1,
@@ -1586,7 +1589,7 @@ at::Tensor channel_mc_sionna_diffraction_tape_accumulate_cuda(
     const int64_t samples=tape_active.numel();
     if(samples==0) return output;
     const int blocks=static_cast<int>(std::min<int64_t>((samples+kDiffractionBlockSize-1)/kDiffractionBlockSize,65535));
-    sionna_diffraction_tape_accumulate_kernel<<<blocks,kDiffractionBlockSize,0,stream>>>(
+    utd_diffraction_tape_accumulate_kernel<<<blocks,kDiffractionBlockSize,0,stream>>>(
         tape_active.data_ptr<bool>(),tape_state.data_ptr<int>(),tape_cell.data_ptr<int>(),tape_u.data_ptr<float>(),
         edge_pos.data_ptr<float>(),edge_dir.data_ptr<float>(),t_min.data_ptr<float>(),t_max.data_ptr<float>(),
         n0.data_ptr<float>(),nn.data_ptr<float>(),prim0.data_ptr<int>(),prim1.data_ptr<int>(),
@@ -1623,7 +1626,7 @@ at::Tensor diffraction_zero_filled(
 }  // namespace
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
-channel_mc_sionna_diffraction_tape_accumulate_backward_cuda(
+channel_mc_utd_diffraction_tape_accumulate_backward_cuda(
     at::Tensor tape_active, at::Tensor tape_state, at::Tensor tape_cell, at::Tensor tape_u,
     at::Tensor edge_pos, at::Tensor edge_dir, at::Tensor t_min, at::Tensor t_max,
     at::Tensor n0, at::Tensor nn, at::Tensor prim0, at::Tensor prim1,
@@ -1656,7 +1659,7 @@ channel_mc_sionna_diffraction_tape_accumulate_backward_cuda(
     const auto stream = at::cuda::getCurrentCUDAStream();
     const int blocks = static_cast<int>(std::min<int64_t>(
         (samples + kDiffractionBlockSize - 1) / kDiffractionBlockSize, 65535));
-    sionna_diffraction_tape_accumulate_backward_kernel<<<blocks, kDiffractionBlockSize, 0, stream>>>(
+    utd_diffraction_tape_accumulate_backward_kernel<<<blocks, kDiffractionBlockSize, 0, stream>>>(
         tape_active.data_ptr<bool>(), tape_state.data_ptr<int>(),
         tape_cell.data_ptr<int>(), tape_u.data_ptr<float>(),
         edge_pos.data_ptr<float>(), edge_dir.data_ptr<float>(),
@@ -1687,7 +1690,7 @@ channel_mc_sionna_diffraction_tape_accumulate_backward_cuda(
             grad_frequency};
 }
 
-at::Tensor channel_mc_sionna_diffraction_tape_accumulate_jvp_cuda(
+at::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp_cuda(
     at::Tensor tape_active, at::Tensor tape_state, at::Tensor tape_cell, at::Tensor tape_u,
     at::Tensor edge_pos, at::Tensor edge_dir, at::Tensor t_min, at::Tensor t_max,
     at::Tensor n0, at::Tensor nn, at::Tensor prim0, at::Tensor prim1,
@@ -1707,7 +1710,7 @@ at::Tensor channel_mc_sionna_diffraction_tape_accumulate_jvp_cuda(
     const auto stream = at::cuda::getCurrentCUDAStream();
     const int blocks = static_cast<int>(std::min<int64_t>(
         (samples + kDiffractionBlockSize - 1) / kDiffractionBlockSize, 65535));
-    sionna_diffraction_tape_accumulate_jvp_kernel<<<blocks, kDiffractionBlockSize, 0, stream>>>(
+    utd_diffraction_tape_accumulate_jvp_kernel<<<blocks, kDiffractionBlockSize, 0, stream>>>(
         tape_active.data_ptr<bool>(), tape_state.data_ptr<int>(),
         tape_cell.data_ptr<int>(), tape_u.data_ptr<float>(),
         edge_pos.data_ptr<float>(), edge_dir.data_ptr<float>(),

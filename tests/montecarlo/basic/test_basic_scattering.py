@@ -28,7 +28,7 @@ from witwin.core import (
 )
 from witwin.channel.deployment import build_info
 from witwin.channel.montecarlo.basic import Config, solve as solve_basic
-from witwin.channel.scattering import build_kirchhoff_table, eval_bsdf
+from witwin.channel.scene.resources import build_kirchhoff_table, eval_bsdf
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA torch is required"

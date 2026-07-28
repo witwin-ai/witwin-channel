@@ -396,7 +396,7 @@ def test_primal_bitwise_pre_balance_lobe_exported():
     # The numpy build is unchanged; it now also exports the pre-balance lobes,
     # and f_te == a S a bit-for-bit on the table's own grid (the AD wiring never
     # alters the resident primal values).
-    from witwin.channel.scattering import build_kirchhoff_table
+    from witwin.channel.scene.resources import build_kirchhoff_table
 
     device = "cuda"
     sigma_e = 0.1 * 2.0 * math.pi * 60e9 * 8.8541878128e-12

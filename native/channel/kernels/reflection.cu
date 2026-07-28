@@ -101,7 +101,7 @@ __device__ __forceinline__ void slab_coefficients(
     Complex &r_tm) {
     rayd::shared::utd::Complex shared_te;
     rayd::shared::utd::Complex shared_tm;
-    transport::legacy_sionna_slab_fresnel(
+    transport::legacy_slab_fresnel(
         cos_theta,
         eta_r,
         sigma,
@@ -114,7 +114,7 @@ __device__ __forceinline__ void slab_coefficients(
     r_tm = c_make(shared_tm.re, shared_tm.im);
 }
 
-__global__ void sionna_reflection_accumulate_kernel(
+__global__ void slab_reflection_accumulate_kernel(
     const float *__restrict__ ray_o,
     const float *__restrict__ ray_d,
     const bool *__restrict__ trace_valid,
@@ -212,7 +212,7 @@ __global__ void sionna_reflection_accumulate_kernel(
 }
 
 // ---------------------------------------------------------------------------
-// Backward / JVP companions of sionna_reflection_accumulate_kernel
+// Backward / JVP companions of slab_reflection_accumulate_kernel
 // (plan 07 AD-3). Fixed-winner contract: the RayD trace tape (valid / t /
 // prim), the sampled directions and the ray origins are frozen constants of
 // the differentiation, so the deposit binning, the incidence cosines and the
@@ -222,7 +222,7 @@ __global__ void sionna_reflection_accumulate_kernel(
 // weight. The per-ray deposit weight does not depend on the ray origin at
 // all, so the ray-origin gradient of this map is exactly zero (the Python
 // dispatch layer returns it without a launch). The walk below REPLAYS
-// sionna_reflection_accumulate_kernel operation by operation; edit the primal
+// slab_reflection_accumulate_kernel operation by operation; edit the primal
 // kernel and these companions TOGETHER.
 // ---------------------------------------------------------------------------
 
@@ -266,7 +266,7 @@ __device__ __forceinline__ float adj_dot_local(
     return g.r * d.re + g.i * d.im;
 }
 
-__global__ void sionna_reflection_accumulate_backward_kernel(
+__global__ void slab_reflection_accumulate_backward_kernel(
     const float *__restrict__ ray_o,
     const float *__restrict__ ray_d,
     const bool *__restrict__ trace_valid,
@@ -308,7 +308,7 @@ __global__ void sionna_reflection_accumulate_backward_kernel(
     const float3 tx_polarization = f3(tx_pol[0], tx_pol[1], tx_pol[2]);
     for (int64_t ray = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          ray < ray_count; ray += stride) {
-        // Forward replay of sionna_reflection_accumulate_kernel, recording the
+        // Forward replay of slab_reflection_accumulate_kernel, recording the
         // per-bounce state the reverse sweep needs.
         float3 origin = f3(ray_o[3*ray], ray_o[3*ray+1], ray_o[3*ray+2]);
         float3 direction = normalize3(f3(ray_d[3*ray], ray_d[3*ray+1], ray_d[3*ray+2]));
@@ -432,28 +432,28 @@ __global__ void sionna_reflection_accumulate_backward_kernel(
             if (need_materials || need_frequency) {
                 ad::DualC dual_te, dual_tm;
                 if (need_materials) {
-                    ad::legacy_sionna_slab_fresnel_dual(
+                    ad::legacy_slab_fresnel_dual(
                         frame.cos_theta, eta_r[prim], sigma[prim], gain[prim],
                         thickness[prim], wavelength,
                         1.0f, 0.0f, 0.0f, 0.0f, 0.0f, dual_te, dual_tm);
                     atomicAdd(grad_eta_r + prim,
                               adj_dot_local(g_r_te, dual_te.d) +
                               adj_dot_local(g_r_tm, dual_tm.d));
-                    ad::legacy_sionna_slab_fresnel_dual(
+                    ad::legacy_slab_fresnel_dual(
                         frame.cos_theta, eta_r[prim], sigma[prim], gain[prim],
                         thickness[prim], wavelength,
                         0.0f, 1.0f, 0.0f, 0.0f, 0.0f, dual_te, dual_tm);
                     atomicAdd(grad_sigma + prim,
                               adj_dot_local(g_r_te, dual_te.d) +
                               adj_dot_local(g_r_tm, dual_tm.d));
-                    ad::legacy_sionna_slab_fresnel_dual(
+                    ad::legacy_slab_fresnel_dual(
                         frame.cos_theta, eta_r[prim], sigma[prim], gain[prim],
                         thickness[prim], wavelength,
                         0.0f, 0.0f, 1.0f, 0.0f, 0.0f, dual_te, dual_tm);
                     atomicAdd(grad_gain + prim,
                               adj_dot_local(g_r_te, dual_te.d) +
                               adj_dot_local(g_r_tm, dual_tm.d));
-                    ad::legacy_sionna_slab_fresnel_dual(
+                    ad::legacy_slab_fresnel_dual(
                         frame.cos_theta, eta_r[prim], sigma[prim], gain[prim],
                         thickness[prim], wavelength,
                         0.0f, 0.0f, 0.0f, 1.0f, 0.0f, dual_te, dual_tm);
@@ -462,7 +462,7 @@ __global__ void sionna_reflection_accumulate_backward_kernel(
                               adj_dot_local(g_r_tm, dual_tm.d));
                 }
                 if (need_frequency) {
-                    ad::legacy_sionna_slab_fresnel_dual(
+                    ad::legacy_slab_fresnel_dual(
                         frame.cos_theta, eta_r[prim], sigma[prim], gain[prim],
                         thickness[prim], wavelength,
                         0.0f, 0.0f, 0.0f, 0.0f, 1.0f, dual_te, dual_tm);
@@ -478,7 +478,7 @@ __global__ void sionna_reflection_accumulate_backward_kernel(
     }
 }
 
-__global__ void sionna_reflection_accumulate_jvp_kernel(
+__global__ void slab_reflection_accumulate_jvp_kernel(
     const float *__restrict__ ray_o,
     const float *__restrict__ ray_d,
     const bool *__restrict__ trace_valid,
@@ -540,7 +540,7 @@ __global__ void sionna_reflection_accumulate_jvp_kernel(
             slab_coefficients(frame.cos_theta, eta_r[prim], sigma[prim],
                               gain[prim], thickness[prim], wavelength, r_te, r_tm);
             ad::DualC dual_te, dual_tm;
-            ad::legacy_sionna_slab_fresnel_dual(
+            ad::legacy_slab_fresnel_dual(
                 frame.cos_theta, eta_r[prim], sigma[prim], gain[prim],
                 thickness[prim], wavelength,
                 tangent_eta_r != nullptr ? tangent_eta_r[prim] : 0.0f,
@@ -658,7 +658,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_mc_reflection
     return {ray_o, ray_tmax, active, tx_pol};
 }
 
-at::Tensor channel_mc_sionna_reflection_accumulate_cuda(
+at::Tensor channel_mc_slab_reflection_accumulate_cuda(
     at::Tensor ray_o, at::Tensor ray_d, at::Tensor trace_valid, at::Tensor trace_t,
     at::Tensor trace_prim, at::Tensor face_normals, at::Tensor eta_r, at::Tensor sigma,
     at::Tensor gain, at::Tensor material_valid, at::Tensor thickness,
@@ -674,7 +674,7 @@ at::Tensor channel_mc_sionna_reflection_accumulate_cuda(
         output.data_ptr<float>(), 0, static_cast<size_t>(output.numel()) * sizeof(float), stream));
     if (ray_count == 0 || contribution_depth <= 0) return output;
     const int blocks = static_cast<int>(std::min<int64_t>((ray_count + kReflectionBlockSize - 1) / kReflectionBlockSize, 65535));
-    sionna_reflection_accumulate_kernel<<<blocks, kReflectionBlockSize, 0, stream>>>(
+    slab_reflection_accumulate_kernel<<<blocks, kReflectionBlockSize, 0, stream>>>(
         ray_o.data_ptr<float>(), ray_d.data_ptr<float>(), trace_valid.data_ptr<bool>(),
         trace_t.data_ptr<float>(), trace_prim.data_ptr<int>(), face_normals.data_ptr<float>(),
         eta_r.data_ptr<float>(), sigma.data_ptr<float>(), gain.data_ptr<float>(),
@@ -718,7 +718,7 @@ int64_t channel_mc_reflection_ad_max_depth_cuda() {
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
-channel_mc_sionna_reflection_accumulate_backward_cuda(
+channel_mc_slab_reflection_accumulate_backward_cuda(
     at::Tensor ray_o, at::Tensor ray_d, at::Tensor trace_valid, at::Tensor trace_t,
     at::Tensor trace_prim, at::Tensor face_normals, at::Tensor eta_r, at::Tensor sigma,
     at::Tensor gain, at::Tensor material_valid, at::Tensor thickness,
@@ -754,7 +754,7 @@ channel_mc_sionna_reflection_accumulate_backward_cuda(
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(ray_o.get_device()).stream();
     const int blocks = static_cast<int>(std::min<int64_t>(
         (ray_count + kReflectionBlockSize - 1) / kReflectionBlockSize, 65535));
-    sionna_reflection_accumulate_backward_kernel<<<blocks, kReflectionBlockSize, 0, stream>>>(
+    slab_reflection_accumulate_backward_kernel<<<blocks, kReflectionBlockSize, 0, stream>>>(
         ray_o.data_ptr<float>(), ray_d.data_ptr<float>(), trace_valid.data_ptr<bool>(),
         trace_t.data_ptr<float>(), trace_prim.data_ptr<int>(), face_normals.data_ptr<float>(),
         eta_r.data_ptr<float>(), sigma.data_ptr<float>(), gain.data_ptr<float>(),
@@ -778,7 +778,7 @@ channel_mc_sionna_reflection_accumulate_backward_cuda(
     return {grad_eta_r, grad_sigma, grad_gain, grad_thickness, grad_frequency};
 }
 
-at::Tensor channel_mc_sionna_reflection_accumulate_jvp_cuda(
+at::Tensor channel_mc_slab_reflection_accumulate_jvp_cuda(
     at::Tensor ray_o, at::Tensor ray_d, at::Tensor trace_valid, at::Tensor trace_t,
     at::Tensor trace_prim, at::Tensor face_normals, at::Tensor eta_r, at::Tensor sigma,
     at::Tensor gain, at::Tensor material_valid, at::Tensor thickness,
@@ -803,7 +803,7 @@ at::Tensor channel_mc_sionna_reflection_accumulate_jvp_cuda(
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(ray_o.get_device()).stream();
     const int blocks = static_cast<int>(std::min<int64_t>(
         (ray_count + kReflectionBlockSize - 1) / kReflectionBlockSize, 65535));
-    sionna_reflection_accumulate_jvp_kernel<<<blocks, kReflectionBlockSize, 0, stream>>>(
+    slab_reflection_accumulate_jvp_kernel<<<blocks, kReflectionBlockSize, 0, stream>>>(
         ray_o.data_ptr<float>(), ray_d.data_ptr<float>(), trace_valid.data_ptr<bool>(),
         trace_t.data_ptr<float>(), trace_prim.data_ptr<int>(), face_normals.data_ptr<float>(),
         eta_r.data_ptr<float>(), sigma.data_ptr<float>(), gain.data_ptr<float>(),

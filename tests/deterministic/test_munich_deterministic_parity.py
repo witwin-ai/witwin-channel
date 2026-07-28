@@ -72,7 +72,7 @@ def test_reduced_munich_deterministic_parity_emits_artifacts():
     assert saved["component_delta"]["los"]["median_abs_delta_db"] < 1.0e-3
     assert saved["component_delta"]["los"]["max_abs_delta_db"] < 12.0
     assert saved["component_delta"]["reflection"]["median_abs_delta_db"] < 1.0
-    # Native uses Sionna's default vertical source polarization while the legacy
+    # Native uses the default vertical (+z) source polarization while the legacy
     # Channel oracle uses world-X. Geometry and K-P UTD still remain close after
     # that intentional convention change; F1's dipole pattern plus the F5
     # finite-edge truncation lift the median diffraction delta to ~3.1 dB (was

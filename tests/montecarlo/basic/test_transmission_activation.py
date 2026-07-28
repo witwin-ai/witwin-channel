@@ -193,7 +193,7 @@ def test_transmission_component_map_flattens_pair_major_and_shares_state(
     )
     monkeypatch.setattr(
         mc_basic,
-        "transmitter_polarizations",
+        "transmitter_polarizations_as_stored",
         lambda *args, **kwargs: polarization,
     )
 

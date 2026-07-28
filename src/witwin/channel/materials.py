@@ -83,7 +83,7 @@ def face_material_thickness(
     *,
     device: torch.device,
 ) -> torch.Tensor:
-    """Expand Sionna/ITU slab thickness to the global face layout."""
+    """Expand ITU slab thickness to the global face layout."""
 
     from witwin.channel.scene.endpoints import require_compiled
 

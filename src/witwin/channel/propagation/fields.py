@@ -58,9 +58,9 @@ from witwin.channel.propagation.geometry import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
     diffraction_edge_geometry as _diffraction_edge_geometry,
 )
-from witwin.channel.field_state import (
-    receiver_polarizations,
-    transmitter_polarizations,
+from witwin.channel.scene.endpoints import (
+    receiver_polarizations_f32,
+    transmitter_polarizations_f32,
 )
 from witwin.channel.materials import (
     face_material_field_bundle,
@@ -1162,12 +1162,12 @@ def evaluate_path_fields(
     target = rx_positions[rx_id].contiguous()
     source_power = tx_power[tx_id].to(dtype=torch.float32).contiguous()
     tx_pol_batch = (
-        transmitter_polarizations(scene, device=device)
+        transmitter_polarizations_f32(scene, device=device)
         if endpoint_tx_polarizations is None
         else endpoint_tx_polarizations
     )
     rx_pol_batch = (
-        receiver_polarizations(scene, device=device)
+        receiver_polarizations_f32(scene, device=device)
         if endpoint_rx_polarizations is None
         else endpoint_rx_polarizations
     )

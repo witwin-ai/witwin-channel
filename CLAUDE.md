@@ -120,6 +120,10 @@ Organize code by RF domain capability, with a single owner for each operation:
   Torch compatibility isolation, native buffers, kernel metadata, memory
   budgets, AD dispatch contracts, and the capacity failure state, execution
   counts, and host-count guard that every capacity-shaped contract shares. It
+  also owns `require_tensor`, the single dtype/shape/rank/device/CUDA/
+  contiguity check that the row, capacity, and consumer contracts each apply to
+  a declared tensor field; it sits here rather than beside the row contracts
+  because `runtime` is below `propagation` and may never import it. It
   is one module, `runtime.py`, and every one of those names is imported from
   `witwin.channel.runtime` directly; there are no runtime submodules and no
   second spelling of an import. Its owner document is
@@ -131,8 +135,13 @@ Organize code by RF domain capability, with a single owner for each operation:
   packaged RayD identity lock and build-fingerprint sidecar sit beside the
   extension in `witwin/channel/`, not in a `runtime/` data directory.
 - `scene`: scene lifecycle, compilation, immutable native resources, RayD
-  handles, endpoint/antenna/receiver geometry, diffraction edge policy and
-  selection, and the scene-leaf AD geometry seam.
+  handles, endpoint/antenna/receiver geometry, endpoint polarization tensors,
+  diffraction edge policy and selection, the scene-leaf AD geometry seam, and
+  the compile-time construction of the Kirchhoff table and phase-screen
+  runtime those resources are made of. `scene.resources` is the single owner
+  of that construction; it keeps the offline float64 NumPy build behind its own
+  banner so the sanctioned CPU-compute island stays auditable, and nothing
+  below that banner may grow into per-solve physics.
 - `kernels`: the single home of every native facade, one package with one
   module per domain - `fields`, `geometry`, `topology`, `montecarlo`,
   `scattering`, `materials`, and `deterministic`. It sits above the RF domains,
@@ -140,8 +149,13 @@ Organize code by RF domain capability, with a single owner for each operation:
   solver and never a domain that imports it back.
 - `materials`: material ABI, per-face encoding, and offline layer-stack
   evaluation. Its native facade is `kernels.materials`.
-- `scattering`: scattering models, resident tables, and phase screens. Its
-  native facades are `kernels.scattering`.
+- `scattering` is not a module. It is a subject with three owners, split on
+  when the work runs, and the split is the point: `scene.resources` owns the
+  compile-time Kirchhoff table and phase-screen construction, `kernels
+  .scattering` owns the native facades, and `interactions.scattering` owns
+  per-solve path evaluation. The root `scattering.py` that used to read like
+  "the scattering owner" held only the compile-time half and was merged into
+  `scene.resources`, which already cached it. Do not recreate it.
 - `interactions`: one module per RF interaction concept - `los`, `reflection`,
   `diffraction`, `transmission`, `scattering`, `coupled`. A concept module owns
   its topology discovery, its path geometry, and its enumerated orchestration
@@ -267,7 +281,7 @@ Organize code by RF domain capability, with a single owner for each operation:
   document themselves in `docs/dev/path/README.md` and
   `docs/dev/deterministic/README.md`.
 
-Four package-root modules hold cross-domain values that the public root and
+Three package-root modules hold cross-domain values that the public root and
 several domains all need, and that therefore cannot live under `runtime`,
 `propagation`, or the `kernels` package without tripping the public-init
 boundary:
@@ -277,12 +291,18 @@ boundary:
   frequency-offset strings that solver metadata and the consumer contract
   quote, including the quantified error law that states what the narrowband
   approximation costs.
-- `field_state`: the `Complex3State` / `JonesState` native field ABI contracts.
+- `abi`: the `Complex3State` / `JonesState` native field ABI contracts, and
+  nothing else. It was called `field_state` and also held the scene-derived
+  transmitter/receiver polarization tensors; those are endpoint geometry, not
+  an ABI contract, so they moved to `scene.endpoints` and the root module was
+  renamed for what remains. It depends on `torch` alone.
 - `components`: cross-domain component identity.
-- `tensor_math`: shared tensor helpers with no domain of their own, including
-  `require_tensor`, the single owner of the dtype/shape/rank/device/CUDA/
-  contiguity check that the row, capacity, and consumer contracts all apply
-  to a declared tensor field.
+
+There is no `tensor_math` module. It was a two-function grab-bag named after
+neither of them: `require_tensor` is a contract validator and now lives with the
+contracts' shared runtime in `runtime.py`, and `normalize_vec3` is plain vector
+maths and now lives in `witwin.core.math`, exported from `witwin.core` beside
+the quaternion helpers. Do not recreate it.
 
 `capabilities` reports solver-level capability and embeds the consumer contract
 record under `propagation_consumer` rather than restating it. `deployment` owns
@@ -369,7 +389,7 @@ requires them.
 - Under ADR-025 and the completed Phase 8A atomic pin/switch/delete, RayD is
   the sole numerical owner of pure-wedge diffraction primal/backward/JVP;
   Channel retains only its `_channel` ABI and typed field/autograd
-  facades. MC Sionna and coupled RD/DD diffraction stay complete Channel
+  facades. MC UTD and coupled RD/DD diffraction stay complete Channel
   owners; do not extract a UTD sub-launch or spread the pure-wedge fast-math
   flag into their precise-math translation units.
 - Under ADR-026 and the completed Phase 10A/10B atomic pin/switch/delete, RayD

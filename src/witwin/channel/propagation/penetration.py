@@ -18,8 +18,8 @@ from witwin.channel.runtime import (
     CapacityFailureState,
     require_capacity_failure_state,
     require_host_count,
+    require_tensor,
 )
-from witwin.channel.tensor_math import require_tensor
 
 
 class SegmentPenetrationPolicy(enum.IntEnum):

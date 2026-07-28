@@ -4,8 +4,8 @@ This module is the single owner of everything Channel knows about an endpoint:
 the internal views that project one ``witwin.core`` antenna state (plus any
 snapshot rigid motion) into the shape the solvers consume, the antenna pattern
 and array response those views feed, the axis-aligned receiver-grid geometry the
-grid ABI needs, and the live scene tensors that anchor the plan 07 AD-2 geometry
-seam.
+grid ABI needs, the endpoint polarization tensors solvers hand to the native
+kernels, and the live scene tensors that anchor the plan 07 AD-2 geometry seam.
 
 They were four modules with one subject between them. ``receiver_geometry``
 existed only to describe a :class:`ReceiverGrid` view defined here, ``antenna``
@@ -23,13 +23,18 @@ pure tensor passing: the live scene tensors (mesh vertices, transmitter and
 receiver positions) that anchor the autograd graph the native kernels route
 gradients and tangents to.
 
+``transmitter_polarizations_f32`` and ``receiver_polarizations_f32`` moved here
+from the root ``field_state`` module, which mixed them with the native field
+ABI contracts. They read a logical scene and build endpoint tensors, so they are
+endpoint geometry, not an ABI contract. The root now holds the two dataclasses
+alone, in :mod:`witwin.channel.abi`.
+
 This module must not import :mod:`witwin.channel.scene.compiler` at module
 scope. The dependency runs the other way - the compiler imports these views for
-its endpoint tensor exports - because the root ``field_state`` contract imports
-this module, and an edge back into the compiler would pull the whole
-compile-time dependency set into a cold import of the solver-neutral
-propagation consumer. :func:`require_compiled` resolves ``CompiledScene`` inside
-the call for that reason.
+its endpoint tensor exports - and an edge back into the compiler would pull the
+whole compile-time dependency set into a cold import of every consumer of the
+endpoint views. :func:`require_compiled` resolves ``CompiledScene`` inside the
+call for that reason.
 """
 
 from __future__ import annotations
@@ -500,8 +505,8 @@ def require_compiled(scene: SolverScene | CompiledScene) -> CompiledScene:
     # ``compiler`` imports this module for its endpoint tensor exports, so the
     # compiled-scene type is resolved here rather than at module scope. That
     # keeps the scene lifetime one-way at import time: an importer of the
-    # endpoint views (the root ``field_state`` contract is one) does not drag in
-    # the compiler and everything it compiles against.
+    # endpoint views does not drag in the compiler and everything it compiles
+    # against.
     from witwin.channel.scene.compiler import CompiledScene
 
     if isinstance(scene, SolverScene):
@@ -668,6 +673,60 @@ def receiver_positions_ad(
         ],
         dim=0,
     )
+
+
+def transmitter_polarizations_f32(
+    scene: object, *, device: torch.device
+) -> torch.Tensor:
+    """Transmitter polarizations as a contiguous float32 ``(N, 3)`` tensor.
+
+    Row order matches the transmitter order of the logical scene. The vectors
+    are already unit and oriented by the Core transmitter model, so this only
+    stacks them, casts to float32, and makes the result contiguous.
+
+    This is NOT :func:`witwin.channel.scene.compiler.transmitter_polarizations_as_stored`,
+    which is a straight device upload: it keeps whatever dtype and layout the
+    scene stored, and its empty case comes from the native transmitter builder
+    rather than ``device``. Both are live and each has its own callers; the two
+    names record the difference instead of hiding it behind one spelling.
+    """
+
+    values = [tx.polarization for tx in scene.transmitters]
+    if not values:
+        return torch.empty((0, 3), device=device, dtype=torch.float32)
+    return torch.stack(values).to(device=device, dtype=torch.float32).contiguous()
+
+
+def receiver_polarizations_f32(
+    scene: object,
+    *,
+    device: torch.device,
+    grid: ReceiverGrid | None = None,
+) -> torch.Tensor:
+    """Receiver polarizations as a contiguous float32 ``(N, 3)`` tensor.
+
+    With ``grid``, one grid polarization is broadcast over that grid's points.
+    Without it, the scene's receivers are expanded in order: a grid contributes
+    one row per point, a point receiver one row.
+    """
+
+    if grid is not None:
+        return (
+            grid.polarization.to(device=device, dtype=torch.float32)
+            .expand(grid.shape[0] * grid.shape[1], 3)
+            .contiguous()
+        )
+    values: list[torch.Tensor] = []
+    for receiver in scene.receivers:
+        if isinstance(receiver, ReceiverGrid):
+            values.extend([receiver.polarization] * (receiver.shape[0] * receiver.shape[1]))
+        elif isinstance(receiver, ReceiverPoint):
+            values.append(receiver.polarization)
+        else:
+            raise TypeError(f"receiver type is not accepted: {type(receiver)!r}")
+    if not values:
+        return torch.empty((0, 3), device=device, dtype=torch.float32)
+    return torch.stack(values).to(device=device, dtype=torch.float32).contiguous()
 
 
 __all__: list[str] = []

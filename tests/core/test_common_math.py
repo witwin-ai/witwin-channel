@@ -8,6 +8,7 @@ import pytest
 import torch
 
 from witwin.core import ReceiverGrid
+from witwin.core import normalize_vec3
 from tests.support.core_world import make_receiver_grid
 from witwin.channel.components import (
     DEFAULT_COMPONENTS,
@@ -19,7 +20,6 @@ from witwin.channel.scene.endpoints import (
     component_grid_shape,
     first_receiver_grid,
 )
-from witwin.channel.tensor_math import normalize_vec3
 from witwin.channel.scene.endpoints import (
     ReceiverGrid as RuntimeReceiverGrid,
 )

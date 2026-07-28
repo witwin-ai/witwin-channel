@@ -26,8 +26,8 @@ from witwin.channel.interactions.scattering import (
     sample_scatter_directions,
     scatter_direction_uniforms,
 )
-from witwin.channel.scattering import build_kirchhoff_table, eval_bsdf
-from witwin.channel.scattering import pdf as table_pdf
+from witwin.channel.scene.resources import build_kirchhoff_table, eval_bsdf
+from witwin.channel.scene.resources import pdf as table_pdf
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA torch is required"

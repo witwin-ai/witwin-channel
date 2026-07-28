@@ -240,7 +240,7 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "channel-linux-8core" not in workflow
     assert "manylinux_2_28" in workflow
 
-    locked_rayd = "49c58c4cb8212f6babb920cc88fb937509826cc5"
+    locked_rayd = "94cf6eaf39f3625af482bb3fd8cba1377a804ecc"
     locked_core = "7791ce21a23d471bf4306b21d6919000ef97bccc"
     lock = json.loads(
         (ROOT / "dependencies" / "rayd.lock.json").read_text(encoding="utf-8")

@@ -15,7 +15,7 @@ from tests.reference.em_oracle import (
     C0,
     phase_screen_patch_integral as oracle_patch_integral,
 )
-from witwin.channel.scattering import (
+from witwin.channel.scene.resources import (
     PhaseScreenRuntime,
     generate_gaussian_realization,
     patch_phase_integral,

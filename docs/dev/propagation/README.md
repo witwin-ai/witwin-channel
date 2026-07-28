@@ -67,7 +67,7 @@ copy/synchronization budget.
 ADR-025 freezes diffraction ownership by complete operation. After the atomic
 Phase 8A pin/switch/delete, RayD is the sole numerical owner of the pure-wedge
 fixed-winner primal/backward/JVP family; this package retains the stable ABI,
-typed field/autograd facades, and solver orchestration only. MC Sionna
+typed field/autograd facades, and solver orchestration only. MC UTD
 fixed-tape and coupled R-D/D-D families stay complete Channel numerical owners
 and may use RayD public device primitives without adding a UTD sub-launch. Pure
 wedge keeps its exporter-locked fast-math contract; retained MC and coupled

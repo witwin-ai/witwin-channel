@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 
 import torch
 
-from witwin.channel.tensor_math import require_tensor
+from witwin.channel.runtime import require_tensor
 
 
 @dataclass(frozen=True, slots=True, eq=False)

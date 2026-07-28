@@ -15,7 +15,7 @@ contract lives in :mod:`witwin.channel.propagation.consumer`.
 
 from .capabilities import capabilities
 from .deployment import build_info, pipeline_cache_key, runtime_diagnostics
-from .field_state import Complex3State, JonesState
+from .abi import Complex3State, JonesState
 
 __all__ = [
     "Complex3State",

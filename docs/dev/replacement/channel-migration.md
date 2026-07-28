@@ -126,7 +126,7 @@ including the crude BDPT diffraction connection exporters and the dead
 reflection/path wrappers. The binding count is therefore 202. The RayD fused
 diffraction sample-tape producer was historically exposed as
 `bdpt_diffraction_accumulation_forward` before its Phase 8B semantic rename; the
-Channel `mc_sionna_diffraction_tape_accumulate` primal/JVP/VJP consumer family
+Channel `mc_utd_diffraction_tape_accumulate` primal/JVP/VJP consumer family
 is unchanged. Exact deletion and body-hash evidence lives in
 `docs/dev/audit/phase13-phase4-dead-binding-reachability.json` and
 `docs/dev/audit/phase13-migration-delta.json`.

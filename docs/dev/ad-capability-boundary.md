@@ -66,7 +66,7 @@ exactly zero, because the continuous dependence is genuinely zero. They are
 pinned by tests so they cannot silently become nonzero-but-wrong.
 
 - **LoS x mesh vertex**: a line-of-sight path touches no face, so no vertex moves it.
-- **montecarlo.basic reflection map x TX position**: the Sionna-style radiomap
+- **montecarlo.basic reflection map x TX position**: the slab-reflection radiomap
   deposit weight `|Gamma|^2 * solid_angle * (lambda/4pi)^2 / (A_cell * |cos|)`
   depends only on the frozen sampled direction, the face normal and the
   materials; the `1/d^2` spreading lives in the frozen ray density and the cell

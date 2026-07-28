@@ -15,7 +15,7 @@ from tests.reference.em_oracle import (
 from tests.reference.em_oracle import (
     layer_stack_rt as reference_layer_stack_rt,
 )
-from witwin.channel.scattering import (
+from witwin.channel.scene.resources import (
     _kirchhoff_diffuse_lobe_series as production_kirchhoff_series,
 )
 
@@ -95,7 +95,9 @@ def test_production_and_reference_precompute_have_static_zero_dependency() -> No
     production_paths = (
         root / "constants.py",
         root / "materials.py",
-        root / "scattering.py",
+        # The compile-time Kirchhoff/phase-screen construction merged into the
+        # scene resource owner; the per-solve evaluator stayed where it was.
+        root / "scene" / "resources.py",
         root / "interactions" / "scattering.py",
     )
     for path in production_paths:
@@ -108,7 +110,8 @@ def test_production_and_reference_precompute_have_static_zero_dependency() -> No
     )
     assert not any(
         name.startswith("witwin.channel.materials")
-        or name.startswith("witwin.channel.scattering")
+        or name.startswith("witwin.channel.scene")
+        or name.startswith("witwin.channel.interactions")
         or name.startswith("witwin.channel.propagation")
         for name in oracle_imports
     )

@@ -92,7 +92,8 @@ def test_reference_oracle_is_numpy_only_and_production_independent() -> None:
     assert "torch" not in imports
     assert not any(
         name.startswith("witwin.channel.materials")
-        or name.startswith("witwin.channel.scattering")
+        or name.startswith("witwin.channel.scene")
+        or name.startswith("witwin.channel.interactions")
         or name.startswith("witwin.channel.propagation")
         for name in imports
     )

@@ -7,7 +7,7 @@ import torch
 from scipy.stats import chi2
 
 from witwin.core import SurfaceRoughness
-from witwin.channel.scattering import (
+from witwin.channel.scene.resources import (
     build_kirchhoff_table,
     pdf,
     pdf_reverse,
@@ -140,7 +140,7 @@ def test_runtime_table_ops_have_no_pytorch_fallback(table, monkeypatch):
     monkeypatch.setattr(runtime, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="scattering_table_eval CUDA kernel is required"):
-        from witwin.channel.scattering import eval_bsdf
+        from witwin.channel.scene.resources import eval_bsdf
 
         eval_bsdf(table, _all_valid(1, device=wi.device), wi, wi)
     with pytest.raises(RuntimeError, match="scattering_table_pdf CUDA kernel is required"):

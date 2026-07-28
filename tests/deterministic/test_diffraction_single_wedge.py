@@ -103,7 +103,7 @@ def test_vertical_only_edge_policy_filters_horizontal_edges():
         versions=base_scene.versions,
         metadata={
             **base_scene.metadata,
-            "sionna_import_edge_policy": EdgePolicy(
+            "imported_edge_policy": EdgePolicy(
                 edge_selection_mode="vertical_only"
             ),
         },

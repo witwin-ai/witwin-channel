@@ -74,10 +74,10 @@ from witwin.channel.runtime import (
     native_extension,
     require_capacity_failure_state,
     require_host_count,
+    require_tensor,
     required_symbol as _required_native_op,
     validate_cuda_tensor,
 )
-from witwin.channel.tensor_math import require_tensor
 
 __all__ = [
     "_DETERMINISTIC_TOPOLOGY_EXTRA_SCHEMA",

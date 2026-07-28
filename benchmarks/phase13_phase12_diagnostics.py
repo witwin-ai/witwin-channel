@@ -148,7 +148,7 @@ def _montecarlo() -> tuple[dict[str, torch.Tensor], dict[str, object]]:
     )
     from witwin.channel.scene.compiler import (
         receiver_grid_points,
-        transmitter_polarizations,
+        transmitter_polarizations_as_stored,
         transmitter_positions,
     )
 
@@ -159,7 +159,7 @@ def _montecarlo() -> tuple[dict[str, torch.Tensor], dict[str, object]]:
     rx = receiver_grid_points(scene.receivers[0], reference=tx)
     bundle = face_material_field_bundle(scene, device=device)
     origins = tx[0].reshape(1, 3).repeat(int(rx.shape[0]), 1)
-    polarization = transmitter_polarizations(scene, device=device)[0]
+    polarization = transmitter_polarizations_as_stored(scene, device=device)[0]
     arrays = straight_transmission_chains(
         compiled.rayd,
         origins,
@@ -207,7 +207,9 @@ def _diffraction(
     if variant == "baseline":
         return {"target": target}, {"mode": "old_compact_atomic_target"}
 
-    from witwin.channel.field_state import transmitter_polarizations as field_polarizations
+    from witwin.channel.scene.endpoints import (
+        transmitter_polarizations_f32 as field_polarizations,
+    )
     from witwin.channel.materials import face_material_tensors
     from witwin.channel.interactions.diffraction import DiffractionPathLayout
     from witwin.channel.runtime import create_capacity_failure_state

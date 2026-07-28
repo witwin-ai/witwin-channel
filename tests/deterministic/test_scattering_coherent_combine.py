@@ -18,7 +18,7 @@ from tests.support.core_world import make_receiver, make_transmitter
 from witwin.channel.deployment import build_info
 from witwin.core import PhaseScreen, SurfaceRoughness
 from witwin.channel.deterministic import Config, solve
-from witwin.channel.scattering import (
+from witwin.channel.scene.resources import (
     generate_gaussian_realization,
     realization_seed,
 )

@@ -46,9 +46,9 @@ from witwin.channel.runtime import (
     _ad_native_tangent_or_none,
     _ad_native_tensor,
     disable_functorch,
+    require_tensor,
     required_symbol as _required_native_op,
 )
-from witwin.channel.tensor_math import require_tensor
 
 if TYPE_CHECKING:
     from witwin.channel.kernels.topology import ExactPairMetadata

@@ -23,7 +23,7 @@ RayD already owns order-1 OptiX path export and visibility. Channel currently
 owns a fixed-winner pure-wedge field reevaluator that reproduces the same
 generic UTD coefficient, including its backward and JVP companions. That
 three-entry family is the duplicate generic runtime owner that should move.
-The MC Sionna fixed-tape estimator and coupled R-D/D-D field operations are
+The MC UTD fixed-tape estimator and coupled R-D/D-D field operations are
 different complete operations: extracting their UTD subexpressions would add
 launches and materialized intermediates and would break their AD lockstep.
 
@@ -44,7 +44,7 @@ operation family, not to a substring in a symbol name.
 |---|---|---|---|
 | order-1 path export / visibility and sample-tape production | `rayd_diffraction_paths_order1_forward`; renamed sample-tape producer | RayD | Keep exporter and producer distinct typed operations; discrete winner selection is not differentiated. |
 | pure-wedge fixed-winner field | `field_diffraction_wedge`, `field_diffraction_wedge_backward`, `field_diffraction_wedge_jvp` | RayD | Move all three entries together in Phase 8A; retain Channel fields/autograd facades and stable `_channel` names. |
-| MC Sionna fixed-tape estimator | `mc_sionna_diffraction_tape_accumulate`, backward, JVP | Channel | Keep the three-entry estimator whole. Do not extract a UTD sub-launch. |
+| MC UTD fixed-tape estimator | `mc_utd_diffraction_tape_accumulate`, backward, JVP | Channel | Keep the three-entry estimator whole. Do not extract a UTD sub-launch. |
 | coupled R-D field | `field_coupled_rd`, backward, JVP | Channel | Keep reflection-slab plus UTD row fusion whole; consume RayD public device primitives. |
 | coupled D-D field | `field_coupled_dd`, backward, JVP | Channel | Keep the two-wedge one-launch row fusion whole; consume RayD public device primitives. |
 | coupled R-D stationary geometry | `coupled_rd_prepare`, backward, JVP | Channel | Keep the continuous stationary-geometry family whole. A future move needs a separate ADR and evidence. |
@@ -90,7 +90,7 @@ path with fast math. Phase 8A must compare compiler commands, PTX/SASS,
 registers, occupancy, launch geometry, and exported-field parity before
 activation.
 
-Fast math does not spread across the ownership boundary. The MC Sionna
+Fast math does not spread across the ownership boundary. The MC UTD
 fixed-tape family, coupled R-D/D-D fields, `coupled_rd_prepare`, transmission,
 and other precise families remain precise. Scattering's separate `--fmad=false`
 contract does not apply to diffraction. A compiler flag inherited from a
@@ -99,7 +99,7 @@ the migration.
 
 ### 4. Channel-retained complete families
 
-The MC Sionna primal/backward/JVP family owns one fixed-tape estimator contract:
+The MC UTD primal/backward/JVP family owns one fixed-tape estimator contract:
 proposal and Jacobian terms, finite-thickness slab response, cell atomics, RNG,
 map schema, and output exactness. RayD's sample-tape producer is an upstream
 opaque producer, not the primal of this Channel derivative family.
@@ -117,7 +117,7 @@ order, tape lifetime, and solver schemas.
 
 The live `bdpt_diffraction_accumulation_forward` binding is a RayD fused
 sampling/visibility tape producer called by MC Basic. It is not a BDPT
-operation and it is not the MC Sionna estimator primal. Phase 8B renames the
+operation and it is not the MC UTD estimator primal. Phase 8B renames the
 native binding and owning facade to `rayd_diffraction_sample_tape_forward`.
 The old name is deleted in the same commit; no alias or re-export remains.
 
@@ -251,7 +251,7 @@ Stop Phase 8A or 8B before activation if any of the following occurs:
 ## Consequences
 
 RayD becomes the sole generic pure-wedge numerical owner only after the atomic
-Phase 8A activation. Channel remains the complete owner of MC Sionna and
+Phase 8A activation. Channel remains the complete owner of MC UTD and
 coupled diffraction operations and of solver packing/policy. Phase 8B then
 removes misleading legacy identity and the production Torch visibility
 geometry without conflating tape production with estimator evaluation. The

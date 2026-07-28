@@ -53,7 +53,7 @@ __global__ void run_lockstep_cases(const SlabCase* cases, TestResult* results, i
     TestResult result{};
     utd::Complex primal_te;
     utd::Complex primal_tm;
-    transport::legacy_sionna_slab_fresnel(
+    transport::legacy_slab_fresnel(
         input.cos_theta,
         input.eps_r,
         input.sigma_e,
@@ -65,7 +65,7 @@ __global__ void run_lockstep_cases(const SlabCase* cases, TestResult* results, i
 
     ad::DualC zero_te;
     ad::DualC zero_tm;
-    ad::legacy_sionna_slab_fresnel_dual(
+    ad::legacy_slab_fresnel_dual(
         input.cos_theta,
         input.eps_r,
         input.sigma_e,
@@ -82,7 +82,7 @@ __global__ void run_lockstep_cases(const SlabCase* cases, TestResult* results, i
 
     ad::DualC seeded_te;
     ad::DualC seeded_tm;
-    ad::legacy_sionna_slab_fresnel_dual(
+    ad::legacy_slab_fresnel_dual(
         input.cos_theta,
         input.eps_r,
         input.sigma_e,
@@ -132,7 +132,7 @@ __global__ void run_lockstep_cases(const SlabCase* cases, TestResult* results, i
         utd::Complex plus_tm;
         utd::Complex minus_te;
         utd::Complex minus_tm;
-        transport::legacy_sionna_slab_fresnel(
+        transport::legacy_slab_fresnel(
             input.cos_theta,
             input.eps_r,
             input.sigma_e,
@@ -141,7 +141,7 @@ __global__ void run_lockstep_cases(const SlabCase* cases, TestResult* results, i
             input.wavelength,
             plus_te,
             plus_tm);
-        transport::legacy_sionna_slab_fresnel(
+        transport::legacy_slab_fresnel(
             input.cos_theta,
             input.eps_r,
             input.sigma_e,
@@ -152,7 +152,7 @@ __global__ void run_lockstep_cases(const SlabCase* cases, TestResult* results, i
             minus_tm);
         ad::DualC gain_te;
         ad::DualC gain_tm;
-        ad::legacy_sionna_slab_fresnel_dual(
+        ad::legacy_slab_fresnel_dual(
             input.cos_theta,
             input.eps_r,
             input.sigma_e,

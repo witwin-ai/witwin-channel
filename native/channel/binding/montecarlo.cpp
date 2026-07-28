@@ -120,7 +120,7 @@ pybind11::dict channel_mc_reflection_launch_inputs(
     torch::Tensor tx_positions,
     int64_t tx_index,
     int64_t sample_count);
-torch::Tensor channel_mc_sionna_reflection_accumulate(
+torch::Tensor channel_mc_slab_reflection_accumulate(
     torch::Tensor ray_o, torch::Tensor ray_d, torch::Tensor trace_valid,
     torch::Tensor trace_t, torch::Tensor trace_prim, torch::Tensor face_normals,
     torch::Tensor eta_r, torch::Tensor sigma, torch::Tensor gain,
@@ -130,7 +130,7 @@ torch::Tensor channel_mc_sionna_reflection_accumulate(
     int64_t resolution0, int64_t resolution1, double wavelength,
     double solid_angle_per_ray, double cell_area, torch::Tensor tx_pol);
 int64_t channel_mc_reflection_ad_max_depth_cuda();
-pybind11::tuple channel_mc_sionna_reflection_accumulate_backward(
+pybind11::tuple channel_mc_slab_reflection_accumulate_backward(
     torch::Tensor ray_o, torch::Tensor ray_d, torch::Tensor trace_valid,
     torch::Tensor trace_t, torch::Tensor trace_prim, torch::Tensor face_normals,
     torch::Tensor eta_r, torch::Tensor sigma, torch::Tensor gain,
@@ -142,7 +142,7 @@ pybind11::tuple channel_mc_sionna_reflection_accumulate_backward(
     int64_t resolution0, int64_t resolution1, double wavelength,
     double solid_angle_per_ray, double cell_area, double wavelength_dfreq,
     torch::Tensor tx_pol);
-torch::Tensor channel_mc_sionna_reflection_accumulate_jvp(
+torch::Tensor channel_mc_slab_reflection_accumulate_jvp(
     torch::Tensor ray_o, torch::Tensor ray_d, torch::Tensor trace_valid,
     torch::Tensor trace_t, torch::Tensor trace_prim, torch::Tensor face_normals,
     torch::Tensor eta_r, torch::Tensor sigma, torch::Tensor gain,
@@ -157,12 +157,12 @@ torch::Tensor channel_mc_sionna_reflection_accumulate_jvp(
     double solid_angle_per_ray, double cell_area, double wavelength_tangent,
     torch::Tensor tx_pol);
 torch::Tensor channel_mc_diffraction_state_wi(torch::Tensor state_edge_pos, torch::Tensor state_src);
-torch::Tensor channel_mc_sionna_diffraction_tape_accumulate(
+torch::Tensor channel_mc_utd_diffraction_tape_accumulate(
     torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,
     torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,
     torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,int64_t,double,double,double,double,double,
     int64_t,int64_t,double,double,int64_t,double,torch::Tensor);
-pybind11::tuple channel_mc_sionna_diffraction_tape_accumulate_backward(
+pybind11::tuple channel_mc_utd_diffraction_tape_accumulate_backward(
     torch::Tensor tape_active, torch::Tensor tape_state, torch::Tensor tape_cell,
     torch::Tensor tape_u, torch::Tensor edge_pos, torch::Tensor edge_dir,
     torch::Tensor t_min, torch::Tensor t_max, torch::Tensor n0, torch::Tensor nn,
@@ -175,7 +175,7 @@ pybind11::tuple channel_mc_sionna_diffraction_tape_accumulate_backward(
     int64_t axis, double plane, int64_t r0, int64_t r1, double wavelength,
     double cell_area, int64_t seed, double total_edge_length,
     double wavelength_dfreq, torch::Tensor tx_pol);
-torch::Tensor channel_mc_sionna_diffraction_tape_accumulate_jvp(
+torch::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp(
     torch::Tensor tape_active, torch::Tensor tape_state, torch::Tensor tape_cell,
     torch::Tensor tape_u, torch::Tensor edge_pos, torch::Tensor edge_dir,
     torch::Tensor t_min, torch::Tensor t_max, torch::Tensor n0, torch::Tensor nn,
@@ -312,36 +312,36 @@ void register_montecarlo(pybind11::module_ &module) {
         &channel_mc_reflection_launch_inputs,
         "Prepare RayD reflection launch tensors with a CUDA kernel.");
     module.def(
-        "mc_sionna_reflection_accumulate",
-        &channel_mc_sionna_reflection_accumulate,
-        "Accumulate finite-thickness Sionna/ITU specular reflections from RayD traces.");
+        "mc_slab_reflection_accumulate",
+        &channel_mc_slab_reflection_accumulate,
+        "Accumulate finite-thickness ITU slab specular reflections from RayD traces.");
     module.def(
         "mc_reflection_ad_max_depth",
         &channel_mc_reflection_ad_max_depth_cuda,
         "Depth cap of the reflection radiomap AD companions (mirrors the native kernel constant).");
     module.def(
-        "mc_sionna_reflection_accumulate_backward",
-        &channel_mc_sionna_reflection_accumulate_backward,
+        "mc_slab_reflection_accumulate_backward",
+        &channel_mc_slab_reflection_accumulate_backward,
         "Reflection radiomap VJP over materials and frequency under the frozen trace tape.");
     module.def(
-        "mc_sionna_reflection_accumulate_jvp",
-        &channel_mc_sionna_reflection_accumulate_jvp,
+        "mc_slab_reflection_accumulate_jvp",
+        &channel_mc_slab_reflection_accumulate_jvp,
         "Reflection radiomap JVP over materials and frequency under the frozen trace tape.");
     module.def(
         "mc_diffraction_state_wi",
         &channel_mc_diffraction_state_wi,
         "Compute MC diffraction incident directions with a CUDA kernel.");
     module.def(
-        "mc_sionna_diffraction_tape_accumulate",
-        &channel_mc_sionna_diffraction_tape_accumulate,
+        "mc_utd_diffraction_tape_accumulate",
+        &channel_mc_utd_diffraction_tape_accumulate,
         "Evaluate full UTD power for valid Keller-cone diffraction samples.");
     module.def(
-        "mc_sionna_diffraction_tape_accumulate_backward",
-        &channel_mc_sionna_diffraction_tape_accumulate_backward,
+        "mc_utd_diffraction_tape_accumulate_backward",
+        &channel_mc_utd_diffraction_tape_accumulate_backward,
         "Diffraction radiomap VJP over materials, source and frequency under the frozen sampling tape.");
     module.def(
-        "mc_sionna_diffraction_tape_accumulate_jvp",
-        &channel_mc_sionna_diffraction_tape_accumulate_jvp,
+        "mc_utd_diffraction_tape_accumulate_jvp",
+        &channel_mc_utd_diffraction_tape_accumulate_jvp,
         "Diffraction radiomap JVP over materials, source and frequency under the frozen sampling tape.");
     module.def(
         "mc_selected_edge_indices",

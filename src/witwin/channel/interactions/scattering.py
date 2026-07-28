@@ -38,12 +38,12 @@ import torch
 
 from witwin.core import PhaseScreen
 from witwin.core import SurfaceRoughness  # noqa: F401 - legacy reachable global
+from witwin.core import normalize_vec3
 
-from witwin.channel import scattering as kirchhoff_tables
 from witwin.channel.constants import C0
-from witwin.channel.field_state import (
-    receiver_polarizations,
-    transmitter_polarizations,
+from witwin.channel.scene.endpoints import (
+    receiver_polarizations_f32,
+    transmitter_polarizations_f32,
 )
 from witwin.channel.interactions.reflection import (
     ReflectionEpcQuery,
@@ -87,13 +87,13 @@ from witwin.channel.propagation.rows import (
     PathTopology,
 )
 from witwin.channel.propagation.topology import EvaluatedPathSidecars
-from witwin.channel.scattering import KirchhoffTable  # noqa: F401
+from witwin.channel.scene import resources as scene_resources
 from witwin.channel.scene.endpoints import require_compiled
 from witwin.channel.scene.resources import (
+    KirchhoffTable,  # noqa: F401 - legacy reachable global
     RoughMaterialRuntime,
     realization_phase_screens,
 )
-from witwin.channel.tensor_math import normalize_vec3
 
 if TYPE_CHECKING:
     from witwin.channel.scene.endpoints import SolverScene as Scene
@@ -1133,8 +1133,8 @@ def _collect_scattering_rows(
     if endpoint_tensors is None:
         tx_positions, tx_power = transmitter_tensors(scene, device=device)
         rx_positions, _layout = receiver_positions_and_layout(scene, device=device)
-        tx_pol = transmitter_polarizations(scene, device=device)
-        rx_pol = receiver_polarizations(scene, device=device)
+        tx_pol = transmitter_polarizations_f32(scene, device=device)
+        rx_pol = receiver_polarizations_f32(scene, device=device)
     else:
         tx_positions = endpoint_tensors.tx_positions
         tx_power = endpoint_tensors.tx_power
@@ -2888,8 +2888,8 @@ def append_chain_scattering_paths(
     rx_positions, _layout = receiver_positions_and_layout(scene, device=device)
     if tx_positions.numel() == 0 or rx_positions.numel() == 0:
         return evaluated, sidecars
-    tx_pol = transmitter_polarizations(scene, device=device)
-    rx_pol = receiver_polarizations(scene, device=device)
+    tx_pol = transmitter_polarizations_f32(scene, device=device)
+    rx_pol = receiver_polarizations_f32(scene, device=device)
     records = compiled.rayd.edge_records()
     vertices = records.vertices
     scene_diagonal = (vertices.max(dim=0).values - vertices.min(dim=0).values).norm()
@@ -3300,7 +3300,7 @@ def eval_bsdf_rows(
                 runtime.table.f_tm,
             )
         else:
-            te_rows, tm_rows = kirchhoff_tables.eval_bsdf(
+            te_rows, tm_rows = scene_resources.eval_bsdf(
                 runtime.table, valid_rows, wi_rows, wo_rows
             )
         f_te[rows] = te_rows
@@ -3456,7 +3456,7 @@ def scattering_nee_connection_samples(
         rows = torch.nonzero(material_rows == index, as_tuple=False).flatten()
         if int(rows.numel()) == 0:
             continue
-        pdf_omega[rows] = kirchhoff_tables.pdf(
+        pdf_omega[rows] = scene_resources.pdf(
             runtime.table,
             valid.index_select(0, rows).contiguous(),
             wi_rows.index_select(0, rows),

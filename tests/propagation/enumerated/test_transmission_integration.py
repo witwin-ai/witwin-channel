@@ -314,7 +314,7 @@ def test_engine_observes_shared_failure_once_after_field_sanitization(
     )
     monkeypatch.setattr(
         engine,
-        "transmitter_polarizations",
+        "transmitter_polarizations_as_stored",
         lambda actual_scene, *, device: torch.zeros((1, 3)),
     )
     monkeypatch.setattr(

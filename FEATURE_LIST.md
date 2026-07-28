@@ -110,7 +110,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
 ## Native runtime boundary
 
 - `_channel` is the single production extension. It source-links RayD
-  `49c58c4cb8212f6babb920cc88fb937509826cc5` (`rayd-torch 0.7.0`) and calls the typed
+  `d0e44b41da529eb75da50c9a2b80546ec6514c13` (`rayd-torch 0.7.0`) and calls the typed
   `rayd::torch` C++ API directly; no RayD Python module, second dispatcher,
   copied C ABI, getter table, or dynamic symbol lookup participates. RayD's
   legacy `extern "C"` Torch integration entry points are retired.
@@ -165,7 +165,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
   atomically moved the pure-wedge fixed-winner primal/backward/JVP numerical
   owner to RayD while preserving Channel ABI and typed field/autograd facades.
   The former Channel numerical TU is deleted; there is no forwarding source,
-  fallback, second launch, or second compiled owner. MC Sionna fixed-tape and
+  fallback, second launch, or second compiled owner. MC UTD fixed-tape and
   coupled R-D/D-D primal/backward/JVP families remain complete Channel owners.
   Pure wedge keeps exporter-locked `--use_fast_math`; MC and coupled families
   remain precise. Phase 8B still owns the sample-tape rename and native
@@ -488,7 +488,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
   squared transverse wave number so exactly-normal rays keep a finite
   cos_theta derivative. Grid receivers expose no per-receiver position leaf
   (the grid is the output).
-- Monte Carlo basic diffraction map AD (plan 07 AD-4b): the Sionna-style
+- Monte Carlo basic diffraction map AD (plan 07 AD-4b): the UTD
   Keller-cone diffraction radiomap differentiates with respect to the
   wedge-face slab materials (`eps_r` / `sigma_e` / `gain` / `thickness`),
   the carrier frequency and the transmitter position. The per-lane row of

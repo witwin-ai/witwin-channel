@@ -55,12 +55,12 @@ def _patch_field_stages(monkeypatch, events: list[str]) -> None:
     monkeypatch.setattr(evaluation, "_vertices_participate_in_ad", lambda _scene: False)
     monkeypatch.setattr(
         evaluation,
-        "transmitter_polarizations",
+        "transmitter_polarizations_f32",
         lambda _scene, *, device: torch.ones((12, 3), device=device),
     )
     monkeypatch.setattr(
         evaluation,
-        "receiver_polarizations",
+        "receiver_polarizations_f32",
         lambda _scene, *, device: torch.ones((12, 3), device=device),
     )
     monkeypatch.setattr(evaluation, "_evaluate_los_fields", fake_los)

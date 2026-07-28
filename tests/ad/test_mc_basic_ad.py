@@ -18,7 +18,7 @@ Two contracts this file pins, both of which the implementation has to honor:
 The reflection/diffraction maps bin contributions into grid cells by hit
 position, so a moving transmitter changes cell assignment discretely. Those
 assignments are part of the frozen winner (plan 07 section 4): the gradient
-describes the continuous part only. For the Sionna-style reflection radiomap
+describes the continuous part only. For the slab reflection radiomap
 the continuous part with respect to the transmitter is IDENTICALLY ZERO: the
 per-ray deposit weight is |Gamma|^2 * solid_angle * (lambda/4pi)^2 /
 (A_cell * |cos|), whose factors depend only on the frozen sampled direction,
@@ -640,7 +640,7 @@ def test_diffraction_transmitter_position_grad_matches_fixed_tape_fd(monkeypatch
         rows = list(states)
         rows[9] = src_rows
         return float(
-            _ops.mc_sionna_diffraction_tape_accumulate(
+            _ops.mc_utd_diffraction_tape_accumulate(
                 mask,
                 tape_state,
                 tape_cell,
@@ -675,7 +675,7 @@ def test_diffraction_transmitter_position_grad_matches_fixed_tape_fd(monkeypatch
         for axis in range(3):
             tangent_src = torch.zeros(3, device="cuda")
             tangent_src[axis] = 1.0
-            tangent = _ops.mc_sionna_diffraction_tape_accumulate_jvp(
+            tangent = _ops.mc_utd_diffraction_tape_accumulate_jvp(
                 (mask, tape_state, tape_cell, tape_u),
                 tuple(states),
                 materials[0],

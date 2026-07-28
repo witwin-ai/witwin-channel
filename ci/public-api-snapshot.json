@@ -8,14 +8,14 @@
         {
           "name": "Complex3State",
           "kind": "class",
-          "target": "witwin.channel.field_state.Complex3State",
-          "contract_sha256": "cf3b27735ee25949c27445ee62f51d7a8341f9d0c6ba7029ec2eb0d2760d7b3e"
+          "target": "witwin.channel.abi.Complex3State",
+          "contract_sha256": "79ad01c3158827cd0144914691d09b19acf5ae29809e2052c90f5b6efaaab740"
         },
         {
           "name": "JonesState",
           "kind": "class",
-          "target": "witwin.channel.field_state.JonesState",
-          "contract_sha256": "8175d1252607e06f8e253e30a6cb40fa9340b7f36415370e88d48fd4729e0b28"
+          "target": "witwin.channel.abi.JonesState",
+          "contract_sha256": "3d8d0995bd37f2bd71b590b8bd44a18efb70beb54bfee8f45aada88aea9e9ded"
         },
         {
           "name": "build_info",

@@ -10923,594 +10923,8 @@
       "doc": "Compact a selected edge mask into deterministic int32 indices with native CUDA kernels."
     },
     {
-      "name": "mc_sionna_diffraction_tape_accumulate",
-      "target": "channel_mc_sionna_diffraction_tape_accumulate",
-      "path": "native/channel/binding/montecarlo.cpp",
-      "line": 334,
-      "return_type": "torch::Tensor",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        },
-        {
-          "name": "int64_t",
-          "type": "",
-          "default": null
-        },
-        {
-          "name": "double",
-          "type": "",
-          "default": null
-        },
-        {
-          "name": "double",
-          "type": "",
-          "default": null
-        },
-        {
-          "name": "double",
-          "type": "",
-          "default": null
-        },
-        {
-          "name": "double",
-          "type": "",
-          "default": null
-        },
-        {
-          "name": "double",
-          "type": "",
-          "default": null
-        },
-        {
-          "name": "int64_t",
-          "type": "",
-          "default": null
-        },
-        {
-          "name": "int64_t",
-          "type": "",
-          "default": null
-        },
-        {
-          "name": "double",
-          "type": "",
-          "default": null
-        },
-        {
-          "name": "double",
-          "type": "",
-          "default": null
-        },
-        {
-          "name": "int64_t",
-          "type": "",
-          "default": null
-        },
-        {
-          "name": "double",
-          "type": "",
-          "default": null
-        },
-        {
-          "name": "Tensor",
-          "type": "torch::",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Evaluate full UTD power for valid Keller-cone diffraction samples."
-    },
-    {
-      "name": "mc_sionna_diffraction_tape_accumulate_backward",
-      "target": "channel_mc_sionna_diffraction_tape_accumulate_backward",
-      "path": "native/channel/binding/montecarlo.cpp",
-      "line": 338,
-      "return_type": "pybind11::tuple",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "tape_active",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tape_state",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tape_cell",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tape_u",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_pos",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_dir",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "t_min",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "t_max",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "n0",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "nn",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "prim0",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "prim1",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "exterior_angle",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "source",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "source_power",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "eta_r",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "sigma",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "mu_r",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "gain",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "thickness",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "grad_output",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "need_materials",
-          "type": "bool",
-          "default": null
-        },
-        {
-          "name": "need_source",
-          "type": "bool",
-          "default": null
-        },
-        {
-          "name": "need_frequency",
-          "type": "bool",
-          "default": null
-        },
-        {
-          "name": "axis",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "plane",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "r0",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "r1",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "wavelength",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "cell_area",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "seed",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "total_edge_length",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "wavelength_dfreq",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "tx_pol",
-          "type": "torch::Tensor",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Diffraction radiomap VJP over materials, source and frequency under the frozen sampling tape."
-    },
-    {
-      "name": "mc_sionna_diffraction_tape_accumulate_jvp",
-      "target": "channel_mc_sionna_diffraction_tape_accumulate_jvp",
-      "path": "native/channel/binding/montecarlo.cpp",
-      "line": 342,
-      "return_type": "torch::Tensor",
-      "return_arity": 1,
-      "parameters": [
-        {
-          "name": "tape_active",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tape_state",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tape_cell",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tape_u",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_pos",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "edge_dir",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "t_min",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "t_max",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "n0",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "nn",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "prim0",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "prim1",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "exterior_angle",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "source",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "source_power",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "eta_r",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "sigma",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "mu_r",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "gain",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "material_valid",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "thickness",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tangent_eta_r",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tangent_sigma",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tangent_gain",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tangent_thickness",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "tangent_source",
-          "type": "torch::Tensor",
-          "default": null
-        },
-        {
-          "name": "has_tangent_eta_r",
-          "type": "bool",
-          "default": null
-        },
-        {
-          "name": "has_tangent_sigma",
-          "type": "bool",
-          "default": null
-        },
-        {
-          "name": "has_tangent_gain",
-          "type": "bool",
-          "default": null
-        },
-        {
-          "name": "has_tangent_thickness",
-          "type": "bool",
-          "default": null
-        },
-        {
-          "name": "has_tangent_source",
-          "type": "bool",
-          "default": null
-        },
-        {
-          "name": "axis",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "plane",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "r0",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "r1",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "wavelength",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "cell_area",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "seed",
-          "type": "int64_t",
-          "default": null
-        },
-        {
-          "name": "total_edge_length",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "wavelength_tangent",
-          "type": "double",
-          "default": null
-        },
-        {
-          "name": "tx_pol",
-          "type": "torch::Tensor",
-          "default": null
-        }
-      ],
-      "pybind_arguments": [],
-      "doc": "Diffraction radiomap JVP over materials, source and frequency under the frozen sampling tape."
-    },
-    {
-      "name": "mc_sionna_reflection_accumulate",
-      "target": "channel_mc_sionna_reflection_accumulate",
+      "name": "mc_slab_reflection_accumulate",
+      "target": "channel_mc_slab_reflection_accumulate",
       "path": "native/channel/binding/montecarlo.cpp",
       "line": 314,
       "return_type": "torch::Tensor",
@@ -11638,11 +11052,11 @@
         }
       ],
       "pybind_arguments": [],
-      "doc": "Accumulate finite-thickness Sionna/ITU specular reflections from RayD traces."
+      "doc": "Accumulate finite-thickness ITU slab specular reflections from RayD traces."
     },
     {
-      "name": "mc_sionna_reflection_accumulate_backward",
-      "target": "channel_mc_sionna_reflection_accumulate_backward",
+      "name": "mc_slab_reflection_accumulate_backward",
+      "target": "channel_mc_slab_reflection_accumulate_backward",
       "path": "native/channel/binding/montecarlo.cpp",
       "line": 322,
       "return_type": "pybind11::tuple",
@@ -11793,8 +11207,8 @@
       "doc": "Reflection radiomap VJP over materials and frequency under the frozen trace tape."
     },
     {
-      "name": "mc_sionna_reflection_accumulate_jvp",
-      "target": "channel_mc_sionna_reflection_accumulate_jvp",
+      "name": "mc_slab_reflection_accumulate_jvp",
+      "target": "channel_mc_slab_reflection_accumulate_jvp",
       "path": "native/channel/binding/montecarlo.cpp",
       "line": 326,
       "return_type": "torch::Tensor",
@@ -12477,6 +11891,592 @@
       ],
       "pybind_arguments": [],
       "doc": "Create transmitter position and power CUDA tensors through native code."
+    },
+    {
+      "name": "mc_utd_diffraction_tape_accumulate",
+      "target": "channel_mc_utd_diffraction_tape_accumulate",
+      "path": "native/channel/binding/montecarlo.cpp",
+      "line": 334,
+      "return_type": "torch::Tensor",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        },
+        {
+          "name": "int64_t",
+          "type": "",
+          "default": null
+        },
+        {
+          "name": "double",
+          "type": "",
+          "default": null
+        },
+        {
+          "name": "double",
+          "type": "",
+          "default": null
+        },
+        {
+          "name": "double",
+          "type": "",
+          "default": null
+        },
+        {
+          "name": "double",
+          "type": "",
+          "default": null
+        },
+        {
+          "name": "double",
+          "type": "",
+          "default": null
+        },
+        {
+          "name": "int64_t",
+          "type": "",
+          "default": null
+        },
+        {
+          "name": "int64_t",
+          "type": "",
+          "default": null
+        },
+        {
+          "name": "double",
+          "type": "",
+          "default": null
+        },
+        {
+          "name": "double",
+          "type": "",
+          "default": null
+        },
+        {
+          "name": "int64_t",
+          "type": "",
+          "default": null
+        },
+        {
+          "name": "double",
+          "type": "",
+          "default": null
+        },
+        {
+          "name": "Tensor",
+          "type": "torch::",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "Evaluate full UTD power for valid Keller-cone diffraction samples."
+    },
+    {
+      "name": "mc_utd_diffraction_tape_accumulate_backward",
+      "target": "channel_mc_utd_diffraction_tape_accumulate_backward",
+      "path": "native/channel/binding/montecarlo.cpp",
+      "line": 338,
+      "return_type": "pybind11::tuple",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "tape_active",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "tape_state",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "tape_cell",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "tape_u",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_pos",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_dir",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "t_min",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "t_max",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "n0",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "nn",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "prim0",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "prim1",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "exterior_angle",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "source",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "source_power",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "eta_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "sigma",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "mu_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "gain",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "material_valid",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "thickness",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "grad_output",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "need_materials",
+          "type": "bool",
+          "default": null
+        },
+        {
+          "name": "need_source",
+          "type": "bool",
+          "default": null
+        },
+        {
+          "name": "need_frequency",
+          "type": "bool",
+          "default": null
+        },
+        {
+          "name": "axis",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "plane",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "r0",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "r1",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "wavelength",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "cell_area",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "seed",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "total_edge_length",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "wavelength_dfreq",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "tx_pol",
+          "type": "torch::Tensor",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "Diffraction radiomap VJP over materials, source and frequency under the frozen sampling tape."
+    },
+    {
+      "name": "mc_utd_diffraction_tape_accumulate_jvp",
+      "target": "channel_mc_utd_diffraction_tape_accumulate_jvp",
+      "path": "native/channel/binding/montecarlo.cpp",
+      "line": 342,
+      "return_type": "torch::Tensor",
+      "return_arity": 1,
+      "parameters": [
+        {
+          "name": "tape_active",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "tape_state",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "tape_cell",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "tape_u",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_pos",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "edge_dir",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "t_min",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "t_max",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "n0",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "nn",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "prim0",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "prim1",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "exterior_angle",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "source",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "source_power",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "eta_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "sigma",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "mu_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "gain",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "material_valid",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "thickness",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "tangent_eta_r",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "tangent_sigma",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "tangent_gain",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "tangent_thickness",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "tangent_source",
+          "type": "torch::Tensor",
+          "default": null
+        },
+        {
+          "name": "has_tangent_eta_r",
+          "type": "bool",
+          "default": null
+        },
+        {
+          "name": "has_tangent_sigma",
+          "type": "bool",
+          "default": null
+        },
+        {
+          "name": "has_tangent_gain",
+          "type": "bool",
+          "default": null
+        },
+        {
+          "name": "has_tangent_thickness",
+          "type": "bool",
+          "default": null
+        },
+        {
+          "name": "has_tangent_source",
+          "type": "bool",
+          "default": null
+        },
+        {
+          "name": "axis",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "plane",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "r0",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "r1",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "wavelength",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "cell_area",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "seed",
+          "type": "int64_t",
+          "default": null
+        },
+        {
+          "name": "total_edge_length",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "wavelength_tangent",
+          "type": "double",
+          "default": null
+        },
+        {
+          "name": "tx_pol",
+          "type": "torch::Tensor",
+          "default": null
+        }
+      ],
+      "pybind_arguments": [],
+      "doc": "Diffraction radiomap JVP over materials, source and frequency under the frozen sampling tape."
     },
     {
       "name": "mc_zero_matrix",

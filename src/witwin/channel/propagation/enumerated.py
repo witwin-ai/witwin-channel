@@ -76,7 +76,7 @@ from witwin.channel.runtime import (
 )
 from witwin.channel.scene.compiler import (
     _frequency_scalar,
-    transmitter_polarizations,
+    transmitter_polarizations_as_stored,
 )
 
 if TYPE_CHECKING:
@@ -597,7 +597,7 @@ def evaluate_enumerated_paths(
     device = torch.device("cuda")
     if endpoint_tensors is None:
         tx_positions, tx_power = transmitter_tensors(scene, device=device)
-        tx_polarizations = transmitter_polarizations(scene, device=device)
+        tx_polarizations = transmitter_polarizations_as_stored(scene, device=device)
         rx_positions, _ = receiver_positions_and_layout(scene, device=device)
         rx_polarizations = None
     else:
