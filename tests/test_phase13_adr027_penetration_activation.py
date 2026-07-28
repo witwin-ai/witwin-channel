@@ -90,7 +90,7 @@ def test_phase_e_docs_keep_the_adr029_compaction_blocker_explicit() -> None:
         ROOT
         / "docs/dev/plans/13-direct-rayd-integration-and-rf-runtime-ownership-plan.md"
     ).read_text(encoding="utf-8")
-    propagation = (ROOT / "src/witwin/channel/propagation/README.md").read_text(
+    propagation = (ROOT / "docs/dev/propagation/README.md").read_text(
         encoding="utf-8"
     )
 

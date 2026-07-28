@@ -124,13 +124,12 @@ Organize code by RF domain capability, with a single owner for each operation:
   `witwin.channel.runtime` directly; there are no runtime submodules and no
   second spelling of an import. Its owner document is
   `docs/dev/runtime/README.md`, because a module has no directory to hold a
-  README. The same rule places the `materials`, `scattering`, and
-  `propagation.consumer` owner documents under `docs/dev/materials/`,
-  `docs/dev/scattering/`, and `docs/dev/consumer/`; a domain that is still a
-  package keeps its README beside its code. The packaged RayD identity lock and
-  build-fingerprint sidecar sit
-  beside the extension in `witwin/channel/`, not in a `runtime/` data
-  directory.
+  README. No owner document lives inside the package tree at all: every domain,
+  module or package alike, documents itself at `docs/dev/<domain>/README.md`,
+  which is where the `materials`, `scattering`, `scene`, `propagation`,
+  `propagation.consumer`, and `montecarlo` owner documents live as well. The
+  packaged RayD identity lock and build-fingerprint sidecar sit beside the
+  extension in `witwin/channel/`, not in a `runtime/` data directory.
 - `scene`: scene lifecycle, compilation, immutable native resources, RayD
   handles, endpoint/antenna/receiver geometry, diffraction edge policy and
   selection, and the scene-leaf AD geometry seam.
@@ -161,9 +160,14 @@ Organize code by RF domain capability, with a single owner for each operation:
   endpoints, visibility, edge state, silhouette clearance, and reevaluation.
 - `propagation.fields`: RF field evaluation and native derivative companions.
 - `propagation.enumerated`: the concept-agnostic enumerated engine, its typed
-  config contract, and its capacity sanitizer - the shared deterministic path
+  config protocols, and its capacity sanitizers - the shared deterministic path
   evaluation for the Path and Deterministic solvers. The per-concept discovery
-  it drives lives in `interactions`.
+  it drives lives in `interactions`. It is one module, `enumerated.py`. It
+  declares two structural config views, and they are deliberately two objects:
+  `TopologyConfig` is the larger view the enumerated scattering stages read and
+  `interactions.scattering` imports by name, while `EnumeratedPathConfig` is the
+  four-field view the engine itself reads. A Protocol is exactly its field set,
+  so merging them would silently widen one of the two contracts.
 - `propagation.rows`: the typed internal row contracts those stages exchange.
   One path table is four zero-copy views keyed on one opaque row-identity
   token, and they live in one module rather than one per stage because
@@ -257,11 +261,11 @@ Organize code by RF domain capability, with a single owner for each operation:
   that path is the contract. Whether an owner is one module or a package of
   private submodules is internal layout: collapsing one moves definition sites
   only, every public name keeps its import path, and the deleted submodules
-  were never public API, so no alias or re-export replaces them. An owner that
-  is a single module keeps its owner document outside the package, for the same
-  reason `runtime` does - a module has no directory to hold a README - which is
-  why `path` and `deterministic` document themselves in
-  `docs/dev/path/README.md` and `docs/dev/deterministic/README.md`.
+  were never public API, so no alias or re-export replaces them. Every owner
+  keeps its owner document outside the package under
+  `docs/dev/<domain>/README.md`, which is why `path` and `deterministic`
+  document themselves in `docs/dev/path/README.md` and
+  `docs/dev/deterministic/README.md`.
 
 Four package-root modules hold cross-domain values that the public root and
 several domains all need, and that therefore cannot live under `runtime`,

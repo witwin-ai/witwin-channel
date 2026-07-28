@@ -1,4 +1,19 @@
-"""Canonical typed engine for enumerated propagation paths."""
+"""Enumerated propagation: the shared engine, its typed config protocols, and
+its capacity failure sanitizers.
+
+This is one module. The former ``enumerated/`` package split the same owner
+across ``contracts.py`` (the scattering-stage config view), ``engine.py`` (the
+canonical typed engine) and ``capacity.py`` (the final failure sanitizers);
+``engine`` imported ``capacity`` and nothing else imported across the split, so
+the three files were one unit already.
+
+``__all__`` stays empty, exactly as the former package ``__init__`` published
+it: this module is not a barrel facade, and in particular it publishes no
+scattering surface. The former ``capacity.py`` carried its own ``__all__``
+listing the five names it defined; that list only governed ``import *`` from a
+submodule that no longer exists, and every one of those names is still a module
+attribute reached by the same import path minus the ``.capacity`` segment.
+"""
 
 from __future__ import annotations
 
@@ -14,9 +29,6 @@ from witwin.channel.materials import (
 )
 from witwin.channel.interactions.coupled import (
     coupled_reflection_diffraction_topology,
-)
-from witwin.channel.propagation.enumerated.capacity import (
-    sanitize_enumerated_capacity_transaction,
 )
 from witwin.channel.interactions.diffraction import (
     _diffraction_topology_order1,
@@ -34,7 +46,12 @@ from witwin.channel.propagation.geometry import (
     receiver_positions_and_layout,
     transmitter_tensors,
 )
-from witwin.channel.propagation.rows import EvaluatedPaths
+from witwin.channel.propagation.rows import (
+    EvaluatedPaths,
+    PathFields,
+    PathGeometry,
+    PathTopology,
+)
 from witwin.channel.propagation.topology import (
     _pad_topology_sequences,
     concatenate_path_blocks,
@@ -47,8 +64,15 @@ from witwin.channel.propagation.topology import (
 from witwin.channel.kernels import topology as topology_kernels
 from witwin.channel.runtime import (
     CapacityExecutionCounts,
+    CapacityFailureState,
     SolveCapacityTransaction,
+    _ad_first_order_only,
+    _ad_native_tangent_or_none,
+    _ad_native_tensor,
     create_solve_capacity_transaction,
+    disable_functorch,
+    require_capacity_failure_state,
+    required_symbol as _required_native_op,
 )
 from witwin.channel.scene.compiler import (
     _frequency_scalar,
@@ -59,16 +83,355 @@ if TYPE_CHECKING:
     from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
+__all__: list[str] = []
+
+
+# --- Typed config protocols ------------------------------------------------
+#
+# Two structural views of a solver config are read here, and they are
+# deliberately different objects with different field sets, because a Protocol
+# is exactly its field set. ``TopologyConfig`` is the larger view the enumerated
+# scattering stages read (``interactions.scattering`` imports it by name);
+# ``EnumeratedPathConfig`` is the four-field view this engine itself reads.
+# Merging them would silently widen one of the two contracts.
+
+
+class TopologyConfig(Protocol):
+    components: frozenset[str] | set[str] | tuple[str, ...] | list[str]
+    max_depth: int
+    scattering_samples_per_m2: float
+    scattering_power_threshold: float
+    scattering_max_paths_per_pair: int
+    # ADR-021 D1 enumerated scatter-chain path class. DEFAULT-OFF: 0 disables
+    # chain discovery entirely (the pipeline stays byte-identical). When >= 1 it
+    # is the cap on d1 + d2, the combined reflection depth of the two specular
+    # legs around the single diffuse vertex; each leg is independently bounded by
+    # the native kMaxAdDepth = 8, so the public cap is 2 * 8 = 16.
+    scattering_chain_max_depth: int
+    # Chain-sample vertex density (samples / m^2). Documented lower density than
+    # the single-bounce scattering sampler (scattering_samples_per_m2) because a
+    # chain vertex is joined against two specular legs (ADR-021 D1).
+    scattering_chain_samples_per_m2: float
+    # Per-(tx, rx) keep-strongest cap on joined chain rows (ADR-021 D1 budget).
+    scattering_chain_max_rows: int
+
+
 # The structural view of a solver config this engine reads. It is declared here,
 # beside its only consumer, so a solver config satisfies it without importing a
-# solver. ``enumerated.contracts.TopologyConfig`` is a different, larger view
-# read by the scattering stages; the two are deliberately not merged, because a
-# Protocol is exactly its field set.
-class TopologyConfig(Protocol):
+# solver.
+class EnumeratedPathConfig(Protocol):
     max_depth: int
     components: frozenset[str] | set[str] | tuple[str, ...] | list[str]
     max_paths: int | None
     max_paths_scope: str
+
+
+# --- Native failure sanitizers for complete evaluated enumerated path rows ---
+
+_TOPOLOGY_INPUT_FIELDS = (
+    "valid",
+    "tx_id",
+    "rx_id",
+    "depth",
+    "component_id",
+    "primitive_id",
+    "edge_id",
+    "material_id",
+    "primitive_sequence",
+    "material_sequence",
+    "interaction_type",
+)
+_CONTINUOUS_FIELDS = (
+    "path_length_m",
+    "delay_s",
+    "field_direction",
+    "interaction_position",
+    "interaction_normal",
+    "interaction_positions",
+    "interaction_normals",
+    "path_gain",
+    "path_field",
+    "field_xyz",
+    "coefficient",
+)
+_SANITIZE_OUTPUT_FIELDS = (
+    "selected_row_index",
+    *_TOPOLOGY_INPUT_FIELDS,
+    *_CONTINUOUS_FIELDS,
+)
+_SANITIZE_DISCRETE_OUTPUT_COUNT = 1 + len(_TOPOLOGY_INPUT_FIELDS)
+
+
+def _evaluated_paths_capacity_pack_backward_native(*args: object) -> object:
+    return _required_native_op("evaluated_paths_capacity_pack_backward")(*args)
+
+
+def _evaluated_paths_capacity_pack_jvp_native(*args: object) -> object:
+    return _required_native_op("evaluated_paths_capacity_pack_jvp")(*args)
+
+
+def _enumerated_capacity_failure_vector_sanitize_native(
+    failure_state_bits: torch.Tensor,
+    values: torch.Tensor,
+) -> torch.Tensor:
+    output = _required_native_op("enumerated_capacity_failure_vector_sanitize")(
+        failure_state_bits, values
+    )
+    if not isinstance(output, torch.Tensor):
+        raise TypeError("native enumerated vector sanitizer returned a non-tensor")
+    return output
+
+
+def _candidate_tensors(paths: EvaluatedPaths) -> tuple[torch.Tensor, ...]:
+    topology = paths.topology
+    geometry = paths.geometry
+    fields = paths.fields
+    return (
+        *(getattr(topology, name) for name in _TOPOLOGY_INPUT_FIELDS),
+        geometry.path_length_m,
+        geometry.delay_s,
+        geometry.field_direction,
+        geometry.interaction_position,
+        geometry.interaction_normal,
+        geometry.interaction_positions,
+        geometry.interaction_normals,
+        fields.path_gain,
+        fields.path_field,
+        fields.field_xyz,
+        fields.coefficient,
+    )
+
+
+def _validate_candidate(paths: EvaluatedPaths) -> tuple[torch.Tensor, ...]:
+    if not isinstance(paths, EvaluatedPaths):
+        raise TypeError("paths must be EvaluatedPaths")
+    tensors = _candidate_tensors(paths)
+    device = tensors[0].device
+    if device.type != "cuda":
+        raise ValueError("evaluated path capacity packing requires CUDA tensors")
+    for name, tensor in zip(
+        (*_TOPOLOGY_INPUT_FIELDS, *_CONTINUOUS_FIELDS), tensors, strict=True
+    ):
+        if tensor.device != device:
+            raise ValueError(f"{name} must share evaluated path device")
+        if not tensor.is_contiguous():
+            raise ValueError(f"{name} must be contiguous")
+    return tensors
+
+
+class _EnumeratedCapacityFailureSanitizeFunction(torch.autograd.Function):
+    """Shape-preserving final failure sanitizer with native AD companions."""
+
+    @staticmethod
+    def forward(*inputs):
+        raw = _required_native_op("enumerated_capacity_failure_sanitize")(
+            inputs[22], *inputs[:22]
+        )
+        if not isinstance(raw, dict) or set(raw) != set(_SANITIZE_OUTPUT_FIELDS):
+            raise TypeError("native enumerated failure sanitizer returned bad fields")
+        return tuple(raw[name] for name in _SANITIZE_OUTPUT_FIELDS)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        ctx.candidate_count = int(inputs[0].shape[0])
+        ctx.sequence_width = int(inputs[8].shape[1])
+        saved = tuple(
+            torch.autograd.forward_ad.unpack_dual(value).primal
+            for value in (output[1], output[0])
+        )
+        ctx.save_for_backward(*saved)
+        ctx.save_for_forward(*saved)
+        ctx.mark_non_differentiable(*output[:_SANITIZE_DISCRETE_OUTPUT_COUNT])
+
+    @staticmethod
+    @_ad_first_order_only
+    def backward(ctx, *grad_outputs):
+        none_grads = (None,) * 23
+        continuous_grads = grad_outputs[_SANITIZE_DISCRETE_OUTPUT_COUNT:]
+        if all(value is None for value in continuous_grads):
+            return none_grads
+        if not any(ctx.needs_input_grad[11:22]):
+            return none_grads
+        valid, selected_row_index = ctx.saved_tensors
+        raw = _evaluated_paths_capacity_pack_backward_native(
+            valid,
+            selected_row_index,
+            *continuous_grads,
+            ctx.candidate_count,
+            ctx.sequence_width,
+        )
+        if not isinstance(raw, dict) or set(raw) != set(_CONTINUOUS_FIELDS):
+            raise TypeError(
+                "native enumerated failure sanitizer backward returned bad fields"
+            )
+        return (
+            *(None for _ in range(11)),
+            *(
+                raw[name] if ctx.needs_input_grad[index] else None
+                for index, name in enumerate(_CONTINUOUS_FIELDS, start=11)
+            ),
+            None,
+        )
+
+    @staticmethod
+    def jvp(ctx, *tangents):
+        continuous_tangents = tuple(
+            _ad_native_tangent_or_none(value) for value in tangents[11:22]
+        )
+        if all(value is None for value in continuous_tangents):
+            return (None,) * len(_SANITIZE_OUTPUT_FIELDS)
+        valid, selected_row_index = (
+            _ad_native_tensor(value) for value in ctx.saved_tensors
+        )
+        with disable_functorch():
+            raw = _evaluated_paths_capacity_pack_jvp_native(
+                valid,
+                selected_row_index,
+                *continuous_tangents,
+                ctx.candidate_count,
+                ctx.sequence_width,
+            )
+        if not isinstance(raw, dict) or set(raw) != set(_CONTINUOUS_FIELDS):
+            raise TypeError(
+                "native enumerated failure sanitizer JVP returned bad fields"
+            )
+        return (
+            *(None for _ in range(_SANITIZE_DISCRETE_OUTPUT_COUNT)),
+            *(raw[name] for name in _CONTINUOUS_FIELDS),
+        )
+
+
+def enumerated_capacity_failure_sanitize(
+    paths: EvaluatedPaths,
+    *,
+    failure_state: CapacityFailureState,
+) -> EvaluatedPaths:
+    """Make every final enumerated row inert after any transaction failure."""
+
+    tensors = _validate_candidate(paths)
+    require_capacity_failure_state(failure_state, device=tensors[0].device)
+    outputs = _EnumeratedCapacityFailureSanitizeFunction.apply(
+        *tensors, failure_state.bits
+    )
+    raw = dict(zip(_SANITIZE_OUTPUT_FIELDS, outputs, strict=True))
+    topology = PathTopology(
+        valid=raw["valid"],
+        tx_id=raw["tx_id"],
+        rx_id=raw["rx_id"],
+        depth=raw["depth"],
+        component_id=raw["component_id"],
+        primitive_id=raw["primitive_id"],
+        edge_id=raw["edge_id"],
+        material_id=raw["material_id"],
+        primitive_sequence=raw["primitive_sequence"],
+        material_sequence=raw["material_sequence"],
+        interaction_type=raw["interaction_type"],
+    )
+    geometry = PathGeometry(
+        row_identity=topology.row_identity,
+        path_length_m=raw["path_length_m"],
+        delay_s=raw["delay_s"],
+        field_direction=raw["field_direction"],
+        interaction_position=raw["interaction_position"],
+        interaction_normal=raw["interaction_normal"],
+        interaction_positions=raw["interaction_positions"],
+        interaction_normals=raw["interaction_normals"],
+    )
+    fields = PathFields(
+        row_identity=topology.row_identity,
+        path_gain=raw["path_gain"],
+        path_field=raw["path_field"],
+        field_xyz=raw["field_xyz"],
+        coefficient=raw["coefficient"],
+    )
+    return EvaluatedPaths(topology=topology, geometry=geometry, fields=fields)
+
+
+class _EnumeratedCapacityFailureVectorSanitizeFunction(torch.autograd.Function):
+    """Failure-aware complex-vector identity with native VJP/JVP copies."""
+
+    @staticmethod
+    def forward(failure_state_bits, values):
+        return _enumerated_capacity_failure_vector_sanitize_native(
+            failure_state_bits, values
+        )
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        del output
+        ctx.set_materialize_grads(False)
+        failure_state_bits = torch.autograd.forward_ad.unpack_dual(inputs[0]).primal
+        ctx.save_for_backward(failure_state_bits)
+        ctx.save_for_forward(failure_state_bits)
+
+    @staticmethod
+    @_ad_first_order_only
+    def backward(ctx, grad_output):
+        if grad_output is None or not ctx.needs_input_grad[1]:
+            return None, None
+        (failure_state_bits,) = ctx.saved_tensors
+        grad_values = _enumerated_capacity_failure_vector_sanitize_native(
+            failure_state_bits, grad_output
+        )
+        return None, grad_values
+
+    @staticmethod
+    def jvp(ctx, _failure_tangent, values_tangent):
+        values_tangent = _ad_native_tangent_or_none(values_tangent)
+        if values_tangent is None:
+            return None
+        (failure_state_bits,) = (
+            _ad_native_tensor(value) for value in ctx.saved_tensors
+        )
+        with disable_functorch():
+            return _enumerated_capacity_failure_vector_sanitize_native(
+                failure_state_bits, values_tangent
+            )
+
+
+def enumerated_capacity_failure_vector_sanitize(
+    values: torch.Tensor,
+    *,
+    failure_state: CapacityFailureState,
+) -> torch.Tensor:
+    """Sanitize the deterministic diffraction vector sidecar on failure."""
+
+    if not isinstance(values, torch.Tensor):
+        raise TypeError("diffraction_vector_field must be a torch.Tensor")
+    if not values.is_cuda or values.dtype != torch.complex64:
+        raise ValueError("diffraction_vector_field must be a CUDA complex64 tensor")
+    if values.ndim != 3 or values.shape[2] != 3:
+        raise ValueError("diffraction_vector_field must have shape (T, R, 3)")
+    require_capacity_failure_state(failure_state, device=values.device)
+    return _EnumeratedCapacityFailureVectorSanitizeFunction.apply(
+        failure_state.bits, values
+    )
+
+
+def sanitize_enumerated_capacity_transaction(
+    paths: EvaluatedPaths,
+    sidecars: EvaluatedPathSidecars,
+) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
+    """Sanitize all enumerated payloads before outer solver result assembly."""
+
+    if not isinstance(sidecars, EvaluatedPathSidecars):
+        raise TypeError("sidecars must be EvaluatedPathSidecars")
+    transaction = sidecars.capacity_transaction
+    if transaction is None:
+        return paths, sidecars
+    sanitized = enumerated_capacity_failure_sanitize(
+        paths, failure_state=transaction.failure_state
+    )
+    vector_field = sidecars.diffraction_vector_field
+    if vector_field is not None:
+        vector_field = enumerated_capacity_failure_vector_sanitize(
+            vector_field, failure_state=transaction.failure_state
+        )
+    return sanitized, replace(sidecars, diffraction_vector_field=vector_field)
+
+
+# --- The canonical typed engine for enumerated propagation paths ------------
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,7 +494,7 @@ class EnumeratedEndpointTensors:
                     )
 
 
-def _path_components(config: TopologyConfig) -> set[str]:
+def _path_components(config: EnumeratedPathConfig) -> set[str]:
     components = set(config.components)
     if config.max_depth == 0:
         # Every non-LoS component is a surface interaction that needs at least
@@ -146,7 +509,7 @@ def _path_components(config: TopologyConfig) -> set[str]:
     return components
 
 
-def _resolve_isb_taper(config: TopologyConfig) -> tuple[bool, float, float]:
+def _resolve_isb_taper(config: EnumeratedPathConfig) -> tuple[bool, float, float]:
     """Resolve the ADR-017 ISB boundary taper flag and per-stage widths.
 
     DEFAULT-OFF: when the taper is disabled the field/diffraction stages receive
@@ -168,7 +531,7 @@ def _require_defer_capacity_terminal(value: bool) -> None:
 
 def _create_transmission_capacity_transaction(
     scene: Scene,
-    config: TopologyConfig,
+    config: EnumeratedPathConfig,
     components: set[str],
     tx_positions: torch.Tensor,
     rx_positions: torch.Tensor,
@@ -209,7 +572,7 @@ def _finish_capacity_boundary(
 
 def evaluate_enumerated_paths(
     scene: Scene,
-    config: TopologyConfig,
+    config: EnumeratedPathConfig,
     *,
     frequency_value: float | None = None,
     coupled_rx_streaming: bool = False,

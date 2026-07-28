@@ -9,7 +9,7 @@ from witwin.channel import deterministic as deterministic_module
 from witwin.channel.montecarlo import bdpt as bdpt_pipeline
 from witwin.channel import path as path_module
 from witwin.channel.interactions import transmission
-from witwin.channel.propagation.enumerated import engine
+from witwin.channel.propagation import enumerated as engine
 from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel.propagation.penetration import (
     SegmentPenetrationPolicy,

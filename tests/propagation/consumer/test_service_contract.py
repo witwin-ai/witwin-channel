@@ -161,8 +161,7 @@ def test_evaluate_consumes_request_batch_and_aliases_finalized_rows(
         evaluate,
     )
     from witwin.channel.propagation import consumer
-    from witwin.channel.propagation.enumerated import capacity
-    from witwin.channel.propagation.enumerated import engine
+    from witwin.channel.propagation import enumerated
 
     sources, sinks = _endpoints()
     compact = _compact_rows()
@@ -184,10 +183,10 @@ def test_evaluate_consumes_request_batch_and_aliases_finalized_rows(
             capacity_transaction=None,
         )
 
-    monkeypatch.setattr(engine, "evaluate_enumerated_paths", fake_engine)
+    monkeypatch.setattr(enumerated, "evaluate_enumerated_paths", fake_engine)
     monkeypatch.setattr(consumer, "_compact", lambda *args, **kwargs: compact)
     monkeypatch.setattr(
-        capacity,
+        enumerated,
         "sanitize_enumerated_capacity_transaction",
         lambda evaluated, sidecars: (evaluated, sidecars),
     )
@@ -233,14 +232,14 @@ def test_unsupported_response_fails_at_request_construction(monkeypatch) -> None
     """An unsupported response is rejected before a request object exists."""
 
     from witwin.channel.propagation.consumer import PropagationRequest
-    from witwin.channel.propagation.enumerated import engine
+    from witwin.channel.propagation import enumerated
 
     sources, sinks = _endpoints()
 
     def forbidden(*args, **kwargs):
         raise AssertionError("engine must not run")
 
-    monkeypatch.setattr(engine, "evaluate_enumerated_paths", forbidden)
+    monkeypatch.setattr(enumerated, "evaluate_enumerated_paths", forbidden)
 
     with pytest.raises(NotImplementedError, match="unsupported response"):
         PropagationRequest(
@@ -259,14 +258,14 @@ def test_scattering_fails_at_request_construction(monkeypatch) -> None:
     """Scattering is not a v1 consumer component and never reaches the engine."""
 
     from witwin.channel.propagation.consumer import PropagationRequest
-    from witwin.channel.propagation.enumerated import engine
+    from witwin.channel.propagation import enumerated
 
     sources, sinks = _endpoints()
 
     def forbidden(*args, **kwargs):
         raise AssertionError("engine must not run")
 
-    monkeypatch.setattr(engine, "evaluate_enumerated_paths", forbidden)
+    monkeypatch.setattr(enumerated, "evaluate_enumerated_paths", forbidden)
 
     with pytest.raises(
         NotImplementedError,

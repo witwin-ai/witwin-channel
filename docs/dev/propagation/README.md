@@ -14,7 +14,7 @@ three owners: they were one concept split across three stage packages. They now
 live one module per concept in `witwin.channel.interactions` — `los`,
 `reflection`, `diffraction`, `transmission`, `scattering`, `coupled` — and
 `propagation.topology.discovery` was deleted rather than left as an empty
-namespace. `propagation.enumerated.engine` is the only production caller of
+namespace. `propagation.enumerated` is the only production caller of
 those concept modules; it drives them and owns none of their physics. The stage
 packages here keep exactly the pieces more than one concept shares: row export
 and concatenation, endpoint/visibility/edge-state/reevaluate geometry, the
@@ -185,8 +185,9 @@ Everything else here is internal. The internal package export surface is
 `propagation.rows` holds the typed row contracts behind them.
 `propagation.penetration` holds the typed segment-penetration contracts that
 the topology and geometry stages both consume.
-`propagation.enumerated` owns the shared engine, its typed config contract, and
-its capacity sanitizer; the per-concept stages it drives live in
+`propagation.enumerated` is one module and owns the shared engine, its two
+typed config protocols, and its capacity sanitizers; the per-concept stages it
+drives live in
 `witwin.channel.interactions`, and solver-specific result conversion stays
 outside. Path and Deterministic keep using the internal contracts directly
 rather than routing through the consumer façade.

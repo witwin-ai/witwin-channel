@@ -32,7 +32,7 @@ from witwin.channel.components import (
     validated_components,
 )
 from witwin.core import Scene, SceneSnapshot
-from witwin.channel.propagation.enumerated.engine import (
+from witwin.channel.propagation.enumerated import (
     evaluate_enumerated_paths,
 )
 from witwin.channel.interactions.scattering import (
@@ -41,7 +41,7 @@ from witwin.channel.interactions.scattering import (
 from witwin.channel.constants import UNIT_EXCITATION_PHASE_CONVENTION
 from witwin.channel.runtime import SolveCapacityTransaction, make_metadata
 from witwin.channel import build_info
-from witwin.channel.propagation.enumerated.capacity import (
+from witwin.channel.propagation.enumerated import (
     sanitize_enumerated_capacity_transaction,
 )
 from witwin.channel.propagation.consumer import compact_evaluated_paths

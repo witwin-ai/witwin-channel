@@ -1,6 +1,6 @@
 """Monte Carlo basic primal solver.
 
-``src/witwin/channel/montecarlo/README.md`` holds the ownership contract for
+``docs/dev/montecarlo/README.md`` holds the ownership contract for
 both Monte Carlo solvers. The sections below follow the former package layout:
 configuration, result, sampling, solver metadata, the LoS backend, the RayD
 component maps, the shared solve pipeline, and the public entry point.

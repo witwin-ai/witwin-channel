@@ -74,7 +74,7 @@ from witwin.channel.materials import (
     face_material_tensors,
     face_material_thickness,
 )
-from witwin.channel.propagation.enumerated.contracts import TopologyConfig
+from witwin.channel.propagation.enumerated import TopologyConfig
 from witwin.channel.propagation.geometry import (
     receiver_positions_and_layout,
     transmitter_tensors,

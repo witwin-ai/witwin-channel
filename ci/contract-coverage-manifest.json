@@ -1199,7 +1199,7 @@
     ],
     [
       "enumerated_capacity_failure_sanitize",
-      "witwin.channel.propagation.enumerated.capacity._EnumeratedCapacityFailureSanitizeFunction.forward",
+      "witwin.channel.propagation.enumerated._EnumeratedCapacityFailureSanitizeFunction.forward",
       "native_call_site",
       "native-enumerated-capacity-failure-sanitize",
       [
@@ -1209,7 +1209,7 @@
     ],
     [
       "enumerated_capacity_failure_vector_sanitize",
-      "witwin.channel.propagation.enumerated.capacity._enumerated_capacity_failure_vector_sanitize_native",
+      "witwin.channel.propagation.enumerated._enumerated_capacity_failure_vector_sanitize_native",
       "native_call_site",
       "native-enumerated-capacity-failure-vector-sanitize",
       [
@@ -1219,7 +1219,7 @@
     ],
     [
       "evaluated_paths_capacity_pack_backward",
-      "witwin.channel.propagation.enumerated.capacity._evaluated_paths_capacity_pack_backward_native",
+      "witwin.channel.propagation.enumerated._evaluated_paths_capacity_pack_backward_native",
       "native_call_site",
       "native-enumerated-capacity-failure-sanitize-ad",
       [
@@ -1229,7 +1229,7 @@
     ],
     [
       "evaluated_paths_capacity_pack_jvp",
-      "witwin.channel.propagation.enumerated.capacity._evaluated_paths_capacity_pack_jvp_native",
+      "witwin.channel.propagation.enumerated._evaluated_paths_capacity_pack_jvp_native",
       "native_call_site",
       "native-enumerated-capacity-failure-sanitize-ad",
       [

@@ -362,7 +362,7 @@ def test_reexport_canonicalization_exposes_real_bdpt_enumerated_edge():
     reexports = graph.build_reexport_map(PACKAGE_ROOT)
 
     assert reexports[(f"{package}.propagation", "evaluate_enumerated_paths")] == (
-        f"{package}.propagation.enumerated.engine"
+        f"{package}.propagation.enumerated"
     )
 
     # ``collect_import_edges`` keeps the raw facade target that owner and seam
@@ -389,7 +389,7 @@ def test_reexport_canonicalization_exposes_real_bdpt_enumerated_edge():
             0,
             "mc_enumerated_dependency",
             f"{package}.montecarlo.bdpt",
-            f"{package}.propagation.enumerated.engine",
+            f"{package}.propagation.enumerated",
         )
     ]
 
@@ -405,10 +405,13 @@ def test_bdpt_enumerated_allowlist_entry_is_exact_and_adr_bound():
     assert entry["id"] == "mc-enum-001"
     assert entry["rule"] == "mc_enumerated_dependency"
     # The 2026-07-27 re-baseline re-keyed this entry onto the collapsed
-    # ``montecarlo/bdpt.py`` module ahead of that collapse landing. The rule,
-    # target and ADR binding did not move; only the source module did.
+    # ``montecarlo/bdpt.py`` module ahead of that collapse landing, and the
+    # concept-axis collapse of ``propagation/enumerated/`` into one module
+    # re-keyed ``target`` onto that module. The rule and the ADR binding have
+    # never moved; only the two module spellings did, each when its own
+    # package became a module.
     assert entry["source"] == "witwin.channel.montecarlo.bdpt"
-    assert entry["target"] == "witwin.channel.propagation.enumerated.engine"
+    assert entry["target"] == "witwin.channel.propagation.enumerated"
     assert "ADR-008" in (entry.get("adr", "") + entry.get("justification", ""))
 
     assert graph._DEBT_GROUP_BY_RULE["mc_enumerated_dependency"] == (

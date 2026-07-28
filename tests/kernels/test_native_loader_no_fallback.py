@@ -222,7 +222,7 @@ def test_path_solver_uses_the_typed_enumerated_engine():
         repo / "src" / "witwin" / "channel" / "path.py"
     ).read_text()
 
-    assert "propagation.enumerated.engine import" in source
+    assert "propagation.enumerated import" in source
     assert "evaluate_enumerated_paths" in source
     assert "core.path_topology import export_topology" not in source
     assert "reflection_paths_order1" not in source

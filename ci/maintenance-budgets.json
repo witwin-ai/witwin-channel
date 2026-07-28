@@ -60,13 +60,13 @@
       "owner": "path maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
-    "src/witwin/channel/propagation/enumerated/engine.py::evaluate_enumerated_paths": {
+    "src/witwin/channel/propagation/enumerated.py::evaluate_enumerated_paths": {
       "ceiling": 31,
       "expires_on": "2027-01-31",
       "owner": "propagation maintainers",
       "reason": "Phase-3 exact-row ownership and explicit endpoint batches extended the existing enumerated orchestration; the measured control-flow surface is frozen pending focused decomposition."
     },
-    "src/witwin/channel/propagation/enumerated/engine.py::EnumeratedEndpointTensors.__post_init__": {
+    "src/witwin/channel/propagation/enumerated.py::EnumeratedEndpointTensors.__post_init__": {
       "ceiling": 21,
       "expires_on": "2027-01-31",
       "owner": "propagation maintainers",

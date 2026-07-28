@@ -16,7 +16,7 @@ __all__ = [
 def __getattr__(name: str):
     if name == "evaluate_enumerated_paths":
         value = import_module(
-            "witwin.channel.propagation.enumerated.engine"
+            "witwin.channel.propagation.enumerated"
         ).evaluate_enumerated_paths
     elif name in {"EvaluatedPaths", "PathFields", "PathGeometry", "PathTopology"}:
         value = getattr(import_module("witwin.channel.propagation.rows"), name)

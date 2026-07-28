@@ -52,7 +52,7 @@ from witwin.channel.tensor_math import require_tensor
 
 if TYPE_CHECKING:
     from witwin.channel.kernels.topology import ExactPairMetadata
-    from witwin.channel.propagation.enumerated.engine import (
+    from witwin.channel.propagation.enumerated import (
         EnumeratedEndpointTensors,
     )
     from witwin.channel.propagation.rows import EvaluatedPaths
@@ -3392,7 +3392,7 @@ def _solver_scene(
 ) -> tuple[SolverScene, EnumeratedEndpointTensors]:
     """Bind explicit request batches without consulting compiled endpoints."""
 
-    from witwin.channel.propagation.enumerated.engine import (
+    from witwin.channel.propagation.enumerated import (
         EnumeratedEndpointTensors,
     )
     from witwin.channel.scene.endpoints import SolverScene
@@ -3650,10 +3650,8 @@ def evaluate(
 ) -> PropagationEvaluation:
     """Discover and evaluate one all-or-nothing compact propagation batch."""
 
-    from witwin.channel.propagation.enumerated.engine import (
+    from witwin.channel.propagation.enumerated import (
         evaluate_enumerated_paths,
-    )
-    from witwin.channel.propagation.enumerated.capacity import (
         sanitize_enumerated_capacity_transaction,
     )
 

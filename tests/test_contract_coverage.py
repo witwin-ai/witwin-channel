@@ -99,7 +99,7 @@ def test_contract_matrix_keeps_the_dormant_production_caller_gate_armed(
 
     symbol = "evaluated_paths_capacity_pack_backward"
     facade = "_evaluated_paths_capacity_pack_backward_native"
-    owner = f"witwin.channel.propagation.enumerated.capacity.{facade}"
+    owner = f"witwin.channel.propagation.enumerated.{facade}"
     monkeypatch.setattr(coverage, "DORMANT_SYMBOL_FACADES", {symbol: facade})
     monkeypatch.setattr(
         coverage, "DORMANT_EXPERIMENT_SYMBOLS", frozenset({symbol})

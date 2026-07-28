@@ -45,8 +45,18 @@ DEFAULT_ALLOWLIST_PATH = Path("ci/import_graph_allowlist.json")
 #
 # Nothing was added: the new universe is the old one minus those eight entries,
 # with mc-enum-001 re-keyed and solver-001 unchanged.
+#
+# Re-keyed again when ``propagation/enumerated/`` collapsed into
+# ``propagation/enumerated.py``. mc-enum-001's ``target`` named the defining
+# submodule ``witwin.channel.propagation.enumerated.engine``, which stopped
+# existing; the re-export canonicalization now resolves the same BDPT edge to
+# ``witwin.channel.propagation.enumerated``. This is the mirror image of the
+# bdpt collapse above: the sanctioned ADR-008 edge did not move, its defining
+# module did. Only ``target`` changed, and the digest was recomputed for that
+# single field. The rule, source, line, column, ADR and justification are
+# untouched, and nothing was added to the universe.
 FROZEN_BASELINE_DIGEST = (
-    "9edd7c8c5e4af25d94a49fe9b25fe12447a7a64370f49651cde1e457e901ba76"
+    "17e3e0010425dca8335cfd513cc578df36e050b91ba1f628c5b699d05efbe91b"
 )
 
 _DEBT_GROUP_BY_RULE = {

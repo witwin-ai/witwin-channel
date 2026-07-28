@@ -1,6 +1,6 @@
 """Native CUDA/OptiX BDPT Monte Carlo solver with Torch tensor storage.
 
-``src/witwin/channel/montecarlo/README.md`` holds the ownership contract for
+``docs/dev/montecarlo/README.md`` holds the ownership contract for
 this solver, including the narrow ADR-008 exception that lets it consume the
 public enumerated entry read-only. The sections below follow the former package
 layout: configuration, public result contracts, accumulation helpers, the

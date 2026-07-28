@@ -5,7 +5,7 @@ import hashlib
 from pathlib import Path
 
 from ci import check_import_graph as graph
-from witwin.channel.propagation.enumerated import engine
+from witwin.channel.propagation import enumerated as engine
 from witwin.channel.interactions import coupled
 from witwin.channel.interactions import coupled as geometry_coupled
 from witwin.channel.interactions import coupled as discovery_coupled

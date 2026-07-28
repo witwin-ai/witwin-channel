@@ -71,11 +71,11 @@ BOOTSTRAP_CALL_SITE_OWNERS = {
         "deterministic_los_topology_block"
     ),
     "enumerated_capacity_failure_sanitize": (
-        "witwin.channel.propagation.enumerated.capacity."
+        "witwin.channel.propagation.enumerated."
         "_EnumeratedCapacityFailureSanitizeFunction.forward"
     ),
     "enumerated_capacity_failure_vector_sanitize": (
-        "witwin.channel.propagation.enumerated.capacity."
+        "witwin.channel.propagation.enumerated."
         "_enumerated_capacity_failure_vector_sanitize_native"
     ),
     "enumerated_transmission_topology_pack_backward": (
@@ -87,11 +87,11 @@ BOOTSTRAP_CALL_SITE_OWNERS = {
         "_EnumeratedTransmissionTopologyPackFunction.jvp"
     ),
     "evaluated_paths_capacity_pack_backward": (
-        "witwin.channel.propagation.enumerated.capacity."
+        "witwin.channel.propagation.enumerated."
         "_evaluated_paths_capacity_pack_backward_native"
     ),
     "evaluated_paths_capacity_pack_jvp": (
-        "witwin.channel.propagation.enumerated.capacity."
+        "witwin.channel.propagation.enumerated."
         "_evaluated_paths_capacity_pack_jvp_native"
     ),
     "field_coupled_rd_backward": (

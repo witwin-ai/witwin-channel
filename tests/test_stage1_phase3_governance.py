@@ -126,7 +126,7 @@ def test_public_consumer_import_does_not_eagerly_load_internal_definitions() -> 
     # prose in CLAUDE.md and unenforced by ci/check_import_graph.py, which
     # carries no consumer rule at all.
     consumer_imports = _top_level_imports(CONSUMER_MODULE)
-    assert "witwin.channel.propagation.enumerated.engine" not in consumer_imports
+    assert "witwin.channel.propagation.enumerated" not in consumer_imports
     assert "witwin.channel.propagation.rows" not in consumer_imports
     assert "witwin.channel.propagation.penetration" not in consumer_imports
     # ``witwin.channel.kernels.topology`` reaches ``propagation.penetration``,
@@ -148,8 +148,13 @@ def test_consumer_has_exact_named_adr008_enumerated_edge() -> None:
         edge
         for edge in edges
         if edge.source.startswith("witwin.channel.propagation.consumer")
-        and edge.target == "witwin.channel.propagation.enumerated.engine"
+        and edge.target == "witwin.channel.propagation.enumerated"
     ]
+    # ``propagation/enumerated/`` is one module now, so the third name -
+    # ``sanitize_enumerated_capacity_transaction``, previously reached at the
+    # separate ``.capacity`` target - lands on the same edge target as the other
+    # two. The consumer still names every enumerated symbol it uses explicitly,
+    # at call time, and still imports no solver.
     assert {(edge.source, edge.imported_name) for edge in consumer_edges} == {
         (
             "witwin.channel.propagation.consumer",
@@ -158,6 +163,10 @@ def test_consumer_has_exact_named_adr008_enumerated_edge() -> None:
         (
             "witwin.channel.propagation.consumer",
             "evaluate_enumerated_paths",
+        ),
+        (
+            "witwin.channel.propagation.consumer",
+            "sanitize_enumerated_capacity_transaction",
         ),
     }
 

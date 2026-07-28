@@ -10,7 +10,6 @@ import torch
 
 from witwin.channel.interactions import scattering
 from witwin.channel.propagation import enumerated
-from witwin.channel.propagation.enumerated import contracts
 from witwin.channel.propagation.rows import (
     EvaluatedPaths,
     PathFields,
@@ -227,9 +226,9 @@ def test_scattering_has_one_typed_concatenation_owner():
 
 
 def test_scattering_config_contract_is_minimal_protocol():
-    assert contracts.TopologyConfig._is_protocol
-    assert not is_dataclass(contracts.TopologyConfig)
-    assert set(contracts.TopologyConfig.__annotations__) == {
+    assert enumerated.TopologyConfig._is_protocol
+    assert not is_dataclass(enumerated.TopologyConfig)
+    assert set(enumerated.TopologyConfig.__annotations__) == {
         "components",
         "max_depth",
         "scattering_samples_per_m2",

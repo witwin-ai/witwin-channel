@@ -10,7 +10,7 @@ from witwin.channel import deterministic as deterministic_module
 from witwin.channel.montecarlo import bdpt as bdpt_pipeline
 from witwin.channel import path as path_module
 from witwin.channel.interactions import scattering
-from witwin.channel.propagation.enumerated import engine
+from witwin.channel.propagation import enumerated as engine
 
 
 def _function(module, name: str) -> ast.FunctionDef:
@@ -149,7 +149,7 @@ def test_bdpt_consumes_the_typed_engine_without_a_mixed_export():
     }
 
     assert "witwin.channel.propagation" in imported_modules
-    assert "witwin.channel.propagation.enumerated.engine" not in imported_modules
+    assert "witwin.channel.propagation.enumerated" not in imported_modules
     assert "witwin.channel.propagation.topology" not in imported_modules
 
 

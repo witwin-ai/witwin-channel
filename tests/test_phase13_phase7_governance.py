@@ -75,7 +75,7 @@ def test_phase7_decision_history_is_preserved_after_phase8a_activation() -> None
         ROOT / "docs/dev/replacement/channel-migration.md"
     ).read_text(encoding="utf-8")
     owner_readme = (
-        ROOT / "src/witwin/channel/propagation/README.md"
+        ROOT / "docs/dev/propagation/README.md"
     ).read_text(encoding="utf-8")
 
     assert "**Status:** Accepted (2026-07-19)" in adr

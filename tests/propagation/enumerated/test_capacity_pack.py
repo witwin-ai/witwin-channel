@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 import torch
 
-from witwin.channel.propagation.enumerated import capacity as capacity_module
-from witwin.channel.propagation.enumerated.capacity import (
+from witwin.channel.propagation import enumerated as capacity_module
+from witwin.channel.propagation.enumerated import (
     enumerated_capacity_failure_sanitize,
     enumerated_capacity_failure_vector_sanitize,
 )

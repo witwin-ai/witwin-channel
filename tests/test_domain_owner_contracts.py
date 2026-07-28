@@ -13,20 +13,21 @@ OWNER_SECTIONS = {
     "## Numerical and AD contract",
     "## Forbidden fallback",
 }
-# `runtime`, `materials` and `scattering` are single modules, not packages, so
-# they have no directory to hold a README; their owner documents live under
-# `docs/dev/<owner>/README.md`. `scene` and `propagation` are still packages and
-# keep their README beside the code they describe.
+# No owner document lives inside the package tree. Every domain owner document
+# lives under `docs/dev/<owner>/README.md`, whether the owner is a single module
+# with no directory to hold a README or a package.
 OWNER_DOCS = (
     ROOT / "docs" / "dev" / "runtime" / "README.md",
-    ROOT / "src" / "witwin" / "channel" / "scene" / "README.md",
-    ROOT / "src" / "witwin" / "channel" / "propagation" / "README.md",
+    ROOT / "docs" / "dev" / "scene" / "README.md",
+    ROOT / "docs" / "dev" / "propagation" / "README.md",
     ROOT / "docs" / "dev" / "scattering" / "README.md",
     ROOT / "docs" / "dev" / "materials" / "README.md",
 )
 
 
-@pytest.mark.parametrize("owner_doc", OWNER_DOCS, ids=lambda path: path.stem)
+# The owner documents are all named `README.md`, so the file stem no longer
+# identifies one. The parent directory is the domain name.
+@pytest.mark.parametrize("owner_doc", OWNER_DOCS, ids=lambda path: path.parent.name)
 def test_domain_owner_docs_freeze_required_boundaries(owner_doc: Path):
     content = owner_doc.read_text(encoding="utf-8")
 

@@ -28,7 +28,7 @@
           "column": 0,
           "rule": "mc_enumerated_dependency",
           "source": "witwin.channel.montecarlo.bdpt",
-          "target": "witwin.channel.propagation.enumerated.engine",
+          "target": "witwin.channel.propagation.enumerated",
           "adr": "ADR-008",
           "justification": "BDPT hybrid estimator consumes evaluate_enumerated_paths read-only as a black-box discrete-path oracle for delta-specular and coupled discrete connection samples; see docs/dev/standards/adr-008-enumerated-propagation.md. montecarlo.basic stays at zero enumerated dependency."
         }

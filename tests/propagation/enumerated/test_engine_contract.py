@@ -5,7 +5,6 @@ import inspect
 from pathlib import Path
 
 from witwin.channel.propagation import enumerated
-from witwin.channel.propagation.enumerated import engine
 from witwin.channel.propagation import topology as export
 
 
@@ -46,8 +45,8 @@ def _named_call_lines(definition: ast.AST) -> dict[str, list[int]]:
 
 
 def test_engine_signature_ownership_and_dependency_boundary():
-    signature = inspect.signature(engine.evaluate_enumerated_paths)
-    tree = ast.parse(Path(engine.__file__).read_text(encoding="utf-8"))
+    signature = inspect.signature(enumerated.evaluate_enumerated_paths)
+    tree = ast.parse(Path(enumerated.__file__).read_text(encoding="utf-8"))
     imported_modules = {
         node.module
         for node in tree.body
@@ -82,12 +81,12 @@ def test_engine_signature_ownership_and_dependency_boundary():
     assert not any(
         module.endswith(".core.path_topology") for module in imported_modules
     )
-    assert "TopologyBatch" not in Path(engine.__file__).read_text(encoding="utf-8")
+    assert "TopologyBatch" not in Path(enumerated.__file__).read_text(encoding="utf-8")
     assert "evaluate_enumerated_paths" not in enumerated.__all__
 
 
 def test_engine_preserves_component_order_los_fast_path_and_field_calls():
-    definition = _function(engine, "evaluate_enumerated_paths")
+    definition = _function(enumerated, "evaluate_enumerated_paths")
     calls = _named_call_lines(definition)
     stage_lines = [calls[name][0] for name in _COMPONENT_STAGES]
     fast_path = next(

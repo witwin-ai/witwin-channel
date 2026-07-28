@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING
 from witwin.channel.scene.compiler import compile as compile_scene
 from witwin.channel.scene.endpoints import bind_solver_scene
 
-from witwin.channel.propagation.enumerated.engine import (
+from witwin.channel.propagation.enumerated import (
     evaluate_enumerated_paths,
 )
 from witwin.channel.interactions.scattering import (
@@ -52,7 +52,7 @@ from witwin.channel.kernels.topology import (
     deterministic_component_counts,
 )
 from witwin.channel.propagation.topology import EvaluatedPathSidecars
-from witwin.channel.propagation.enumerated.capacity import (
+from witwin.channel.propagation.enumerated import (
     sanitize_enumerated_capacity_transaction,
 )
 from witwin.channel.components import (
