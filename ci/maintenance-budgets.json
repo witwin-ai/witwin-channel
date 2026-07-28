@@ -1,35 +1,9 @@
 {
-  "file_exemptions": {
-    "src/witwin/channel/montecarlo/basic/kernels/maps.py": {
-      "ceiling": 1794,
-      "expires_on": "2027-01-31",
-      "owner": "montecarlo/basic maintainers",
-      "reason": "Existing file-size debt scheduled for decomposition; grew by the MC-basic transmitter-polarization threading (F1/R5) and is frozen at the new surface pending that decomposition."
-    },
-    "src/witwin/channel/propagation/fields/kernels/autograd.py": {
-      "ceiling": 1790,
-      "expires_on": "2027-01-31",
-      "owner": "propagation maintainers",
-      "reason": "Existing file-size debt scheduled for decomposition; grew by the coupled R-D/D-R AD companions (ADR-011) and is frozen at the new surface pending that decomposition."
-    },
-    "src/witwin/channel/propagation/geometry/kernels/autograd.py": {
-      "ceiling": 1248,
-      "expires_on": "2027-01-31",
-      "owner": "propagation maintainers",
-      "reason": "Existing file-size debt is scheduled for decomposition without expanding its current surface."
-    }
-  },
   "function_exemptions": {
     "src/witwin/channel/runtime/kernel_metadata.py::validate_metadata": {
       "ceiling": 18,
       "expires_on": "2027-01-31",
       "owner": "core maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
-    },
-    "src/witwin/channel/deterministic/pipeline.py::_metadata": {
-      "ceiling": 19,
-      "expires_on": "2027-01-31",
-      "owner": "deterministic maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
     "src/witwin/channel/deterministic/pipeline.py::solve": {
@@ -40,12 +14,6 @@
     },
     "src/witwin/channel/montecarlo/basic/kernels/maps.py::mc_los_path_gain_backward": {
       "ceiling": 16,
-      "expires_on": "2027-01-31",
-      "owner": "montecarlo/basic maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
-    },
-    "src/witwin/channel/montecarlo/basic/metadata.py::make_solver_metadata": {
-      "ceiling": 18,
       "expires_on": "2027-01-31",
       "owner": "montecarlo/basic maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
@@ -63,7 +31,7 @@
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
     "src/witwin/channel/montecarlo/bdpt/config.py::Config.__post_init__": {
-      "ceiling": 26,
+      "ceiling": 19,
       "expires_on": "2027-01-31",
       "owner": "montecarlo/bdpt maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
@@ -85,18 +53,6 @@
       "expires_on": "2027-01-31",
       "owner": "montecarlo/bdpt maintainers",
       "reason": "Workspace-sizing and native-capability validation stage extracted verbatim from the former solve() monolith."
-    },
-    "src/witwin/channel/path/config.py::Config.__post_init__": {
-      "ceiling": 16,
-      "expires_on": "2027-01-31",
-      "owner": "path maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
-    },
-    "src/witwin/channel/path/metadata.py::_metadata": {
-      "ceiling": 18,
-      "expires_on": "2027-01-31",
-      "owner": "path maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
     "src/witwin/channel/path/result.py::PathResult.__post_init__": {
       "ceiling": 29,
@@ -214,10 +170,6 @@
     }
   },
   "limits": {
-    "file_lines": {
-      "hard": 2000,
-      "recommended": 1200
-    },
     "function_complexity": {
       "recommended": 15
     },
@@ -225,6 +177,11 @@
       "hard": 3000,
       "recommended": 2000
     }
+  },
+  "limits_policy": {
+    "file_lines": "Retired 2026-07-27 by owner decision, recorded in docs/dev/plans/15-concept-axis-layout-and-module-consolidation-plan.md (P2). There is no maximum Python file length. The retired limit (hard 2000, recommended 1200) encoded 'a person cannot hold more than N lines in their head at once', and this codebase is now read primarily by agents. This is a deliberate policy amendment, not a budget weakened to make a change pass, and the three file_exemptions it waived were removed with it.",
+    "function_complexity": "Mandatory. The retirement argument above is about file SIZE only. Complexity is about testability and defect density, not reading capacity, so agent-assisted reading does not weaken it.",
+    "native_file_lines": "Mandatory and unchanged. The Python retirement does not apply to native translation units."
   },
   "native_file_exemptions": {},
   "native_source_root": "native/channel",

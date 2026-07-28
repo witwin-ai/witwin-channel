@@ -2,53 +2,15 @@ from __future__ import annotations
 
 from typing import Any
 
+from witwin.channel.components import (
+    apply_exported_path_counts,
+    component_availability_status,
+    component_max_depth,
+)
 from witwin.channel.constants import UNIT_EXCITATION_PHASE_CONVENTION
 from witwin.channel.runtime.kernel_metadata import make_metadata
 
 from .config import Config
-
-
-def _component_status(
-    *,
-    config: Config,
-    reflection_available: bool,
-    diffraction_available: bool,
-    transmission_path_count: int,
-    scattering_path_count: int = 0,
-) -> dict[str, str]:
-    status = {
-        "los": "enabled" if "los" in config.components else "not_requested",
-        "reflection": "not_requested",
-        "diffraction": "not_requested",
-    }
-    if "reflection" in config.components:
-        if not reflection_available:
-            raise RuntimeError("reflection paths require RayD native capability")
-        if config.max_depth < 1:
-            raise RuntimeError("reflection paths require max_depth >= 1")
-        status["reflection"] = "enabled"
-    if "diffraction" in config.components:
-        if not diffraction_available:
-            raise RuntimeError("diffraction paths require RayD native capability")
-        if config.max_depth < 1:
-            raise RuntimeError("diffraction paths require max_depth >= 1")
-        status["diffraction"] = "enabled"
-    # transmission (wave 2) and scattering (wave 3) export real paths; the
-    # truthful requested-but-empty status remains when no wall penetration /
-    # rough surface produced a path.
-    if "transmission" in config.components:
-        status["transmission"] = (
-            "enabled" if transmission_path_count > 0 else "enabled_no_paths"
-        )
-    else:
-        status["transmission"] = "not_requested"
-    if "scattering" in config.components:
-        status["scattering"] = (
-            "enabled" if scattering_path_count > 0 else "enabled_no_paths"
-        )
-    else:
-        status["scattering"] = "not_requested"
-    return status
 
 
 def _metadata(
@@ -92,36 +54,43 @@ def _metadata(
         "reflection": reflection_available,
         "diffraction": diffraction_available,
     }
-    reflection_depth = config.max_depth if "reflection" in config.components else -1
-    diffraction_depth = (
-        2 if config.coupled_paths else (1 if "diffraction" in config.components else -1)
+    component_depths = component_max_depth(
+        config.components, chain_depth=config.max_depth, single_bounce_depth=1
     )
+    if config.coupled_paths:
+        # The coupled 1R1D/1D1R family reaches depth 2 whenever it is requested,
+        # including when plain diffraction is not in the component set.
+        component_depths["diffraction"] = 2
     effective_max_depth = max(
-        0 if "los" in config.components else -1, reflection_depth, diffraction_depth
+        component_depths["los"],
+        component_depths["reflection"],
+        component_depths["diffraction"],
+    )
+    components = component_availability_status(
+        config.components,
+        reflection_available=reflection_available,
+        diffraction_available=diffraction_available,
+        reflection_error="reflection paths require RayD native capability",
+        diffraction_error="diffraction paths require RayD native capability",
+        depth_available=config.max_depth >= 1,
+        reflection_depth_error="reflection paths require max_depth >= 1",
+        diffraction_depth_error="diffraction paths require max_depth >= 1",
+    )
+    apply_exported_path_counts(
+        components,
+        config.components,
+        transmission_path_count=transmission_path_count,
+        scattering_path_count=scattering_path_count,
     )
     metadata = {
         "solver": "path",
         "device": "cuda",
         "path_count": path_count,
         "effective_max_depth": effective_max_depth,
-        "component_max_depth": {
-            "los": 0 if "los" in config.components else -1,
-            "reflection": reflection_depth,
-            "diffraction": diffraction_depth,
-            "transmission": config.max_depth
-            if "transmission" in config.components
-            else -1,
-            "scattering": 1 if "scattering" in config.components else -1,
-        },
+        "component_max_depth": component_depths,
         "max_paths_per_pair": config.max_paths,
         "native_capabilities": capability,
-        "components": _component_status(
-            config=config,
-            reflection_available=reflection_available,
-            diffraction_available=diffraction_available,
-            transmission_path_count=transmission_path_count,
-            scattering_path_count=scattering_path_count,
-        ),
+        "components": components,
         "kernel": kernel,
         "field_abi": "complex3_v1",
         "phase_convention": dict(UNIT_EXCITATION_PHASE_CONVENTION),

@@ -34,7 +34,11 @@ from witwin.channel.propagation.enumerated.capacity import (
 from witwin.channel.propagation.enumerated.scattering import (
     append_scattering_evaluated_paths,
 )
-from witwin.channel.components import component_availability_status
+from witwin.channel.components import (
+    apply_exported_path_counts,
+    component_availability_status,
+    component_max_depth,
+)
 
 from .accumulation import (
     _OPTIONAL_COMPONENTS,
@@ -230,13 +234,12 @@ def _metadata(
     # scattering carries Kirchhoff rough-surface patch paths since wave 3.
     # Both keep the truthful requested-but-empty status when no paths were
     # found (e.g. every surface in the scene is smooth).
-    for name in ("transmission", "scattering"):
-        if name not in config.components:
-            components[name] = "not_requested"
-        elif component_counts.get(name, 0) > 0:
-            components[name] = "enabled"
-        else:
-            components[name] = "enabled_no_paths"
+    apply_exported_path_counts(
+        components,
+        config.components,
+        transmission_path_count=component_counts.get("transmission", 0),
+        scattering_path_count=component_counts.get("scattering", 0),
+    )
     if "transmission" in config.components:
         if not capability["rayd_native"]:
             raise RuntimeError(
@@ -307,19 +310,11 @@ def _metadata(
         config_metadata(
             requested=requested_config,
             effective=effective_config,
-            component_max_depth={
-                "los": 0 if "los" in config.components else -1,
-                "reflection": config.max_depth
-                if "reflection" in config.components
-                else -1,
-                "diffraction": 1 if "diffraction" in config.components else -1,
-                # transmission chains are capped like reflection; scattering is
-                # single-bounce in v1.
-                "transmission": config.max_depth
-                if "transmission" in config.components
-                else -1,
-                "scattering": 1 if "scattering" in config.components else -1,
-            },
+            component_max_depth=component_max_depth(
+                config.components,
+                chain_depth=config.max_depth,
+                single_bounce_depth=1,
+            ),
         )
     )
     metadata["semantic_capabilities"] = capabilities()["solvers"]["deterministic"]

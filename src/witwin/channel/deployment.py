@@ -84,7 +84,7 @@ def _torch_runtime_diagnostics(torch: ModuleType) -> dict[str, Any]:
 
 
 def _import_native_build_info() -> Callable[[], dict[str, object]]:
-    from .runtime.extension import build_info
+    from witwin.channel.runtime.extension import build_info
 
     return cast(Callable[[], dict[str, object]], build_info)
 

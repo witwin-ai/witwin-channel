@@ -8,7 +8,10 @@ from witwin.channel.capabilities import (
     config_metadata,
     serialize_config,
 )
-from witwin.channel.components import component_availability_status
+from witwin.channel.components import (
+    component_availability_status,
+    component_max_depth,
+)
 
 from .config import Config
 
@@ -72,21 +75,6 @@ def select_accumulation_strategy(
     return "atomic"
 
 
-def component_status(
-    *,
-    config: Config,
-    reflection_available: bool,
-    diffraction_available: bool,
-) -> dict[str, str]:
-    return component_availability_status(
-        config.components,
-        reflection_available=reflection_available,
-        diffraction_available=diffraction_available,
-        reflection_error="BDPT reflection requires RayD native capability",
-        diffraction_error="BDPT diffraction requires RayD native capability",
-    )
-
-
 def _ad_launch_accounting(
     config: Config, ad_ledger: AdLaunchLedger | None
 ) -> tuple[int, int, int]:
@@ -101,21 +89,6 @@ def _ad_launch_accounting(
     jvp_launch_count = ledger.launches if config.ad_mode == "jvp" else 0
     tape_bytes = ledger.tape_bytes if config.ad_mode == "vjp" else 0
     return backward_launch_count, jvp_launch_count, tape_bytes
-
-
-def _component_max_depth(
-    config: Config, effective_max_depth: int
-) -> dict[str, int]:
-    depth = int(effective_max_depth)
-    return {
-        "los": 0 if "los" in config.components else -1,
-        "reflection": depth if "reflection" in config.components else -1,
-        "diffraction": min(1, depth) if "diffraction" in config.components else -1,
-        # transmission chains are capped like reflection; scattering is
-        # single-bounce in v1 and carries zero paths until its wave.
-        "transmission": depth if "transmission" in config.components else -1,
-        "scattering": min(1, depth) if "scattering" in config.components else -1,
-    }
 
 
 def make_solver_metadata(
@@ -179,10 +152,12 @@ def make_solver_metadata(
         "max_diffraction_order": config.max_diffraction_order,
         "path_counts_by_strategy": path_counts_by_strategy,
         "valid_contribution_count": valid_contribution_count,
-        "components": component_status(
-            config=config,
+        "components": component_availability_status(
+            config.components,
             reflection_available=reflection_available,
             diffraction_available=diffraction_available,
+            reflection_error="BDPT reflection requires RayD native capability",
+            diffraction_error="BDPT diffraction requires RayD native capability",
         ),
         "native_capabilities": {
             "cuda": bool(cuda_available),
@@ -246,7 +221,13 @@ def make_solver_metadata(
         config_metadata(
             requested=requested_config,
             effective=effective_config,
-            component_max_depth=_component_max_depth(config, effective_max_depth),
+            # BDPT's single-bounce components are additionally clamped by the
+            # effective depth budget, which can be smaller than one bounce.
+            component_max_depth=component_max_depth(
+                config.components,
+                chain_depth=int(effective_max_depth),
+                single_bounce_depth=min(1, int(effective_max_depth)),
+            ),
         )
     )
     metadata["semantic_capabilities"] = capabilities()["solvers"]["montecarlo_bdpt"]

@@ -5,6 +5,12 @@ from dataclasses import dataclass
 from witwin.channel.components import (
     AD_MODES as _VALID_AD_MODES,
     DEFAULT_COMPONENTS as _DEFAULT_COMPONENTS,
+    DEPTH_CAPPED_COMPONENTS,
+    validate_coupled_candidate_limit,
+    validate_coupled_gate,
+    validate_isb_boundary_taper,
+    validate_max_depth,
+    validate_scatter_chain,
     validated_components,
 )
 
@@ -14,47 +20,7 @@ from witwin.channel.components import (
 # (wave 3). transmission depth is capped like reflection (chains count wall
 # penetrations); scattering is single-bounce in v1.
 # Default component set is unchanged: the new components are strictly opt-in.
-# Components whose chain length is bounded by max_depth (public cap of 5).
-_DEPTH_CAPPED_COMPONENTS = frozenset({"reflection", "transmission"})
 _VALID_MAX_PATHS_SCOPES = frozenset({"per_pair"})
-_MAX_COUPLED_CANDIDATES = 1_000_000
-# ADR-021 D1 chain-depth cap: each specular leg is bounded by the native
-# kMaxAdDepth = 8, so the public cap on d1 + d2 is 2 * 8 = 16.
-_MAX_SCATTER_CHAIN_DEPTH = 16
-
-
-def _validate_scatter_chain(
-    *,
-    max_depth: int,
-    samples_per_m2: float,
-    max_rows: int,
-    components: frozenset[str],
-) -> None:
-    """Validate the ADR-021 D1 enumerated scatter-chain config (shared)."""
-
-    if max_depth < 0:
-        raise ValueError("scattering_chain_max_depth must be non-negative")
-    if max_depth > _MAX_SCATTER_CHAIN_DEPTH:
-        raise ValueError(
-            "scattering_chain_max_depth cannot exceed 16 (2 * kMaxAdDepth); each "
-            "specular leg is bounded by the native kMaxAdDepth = 8"
-        )
-    if samples_per_m2 <= 0.0:
-        raise ValueError("scattering_chain_samples_per_m2 must be positive")
-    if max_rows <= 0:
-        raise ValueError("scattering_chain_max_rows must be positive")
-    if max_depth >= 1 and "scattering" not in components:
-        raise RuntimeError(
-            "scattering_chain_max_depth >= 1 requires the 'scattering' component "
-            "(ADR-021 D1 appends component_id=6 scatter-chain rows)"
-        )
-
-
-def _validate_isb_boundary_taper(width: float) -> None:
-    """Validate the ADR-017 ISB boundary taper width bound."""
-
-    if not (0.0 < width <= 4.0):
-        raise ValueError("isb_boundary_taper_width must be in (0, 4]")
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,9 +63,8 @@ class Config:
     isb_boundary_taper: bool = False
     isb_boundary_taper_width: float = 0.5
     def __post_init__(self) -> None:
-        if self.max_depth < 0:
-            raise ValueError("max_depth must be non-negative")
-        _validate_isb_boundary_taper(self.isb_boundary_taper_width)
+        validate_max_depth(self.max_depth)
+        validate_isb_boundary_taper(self.isb_boundary_taper_width)
         if self.scattering_samples_per_m2 <= 0.0:
             raise ValueError("scattering_samples_per_m2 must be positive")
         if self.scattering_max_paths_per_pair <= 0:
@@ -109,33 +74,24 @@ class Config:
         components = validated_components(
             self.components, error_message="components must be a subset of {valid}"
         )
-        _validate_scatter_chain(
+        validate_scatter_chain(
             max_depth=self.scattering_chain_max_depth,
             samples_per_m2=self.scattering_chain_samples_per_m2,
             max_rows=self.scattering_chain_max_rows,
             components=components,
         )
-        if self.max_depth > 5 and components & _DEPTH_CAPPED_COMPONENTS:
+        if self.max_depth > 5 and components & DEPTH_CAPPED_COMPONENTS:
             raise RuntimeError("path reflection/transmission support max_depth <= 5")
-        if self.coupled_paths:
-            if self.max_depth < 2:
-                raise RuntimeError(
-                    "coupled reflection-diffraction paths require max_depth >= 2"
-                )
-            if not {"reflection", "diffraction"}.issubset(components):
-                raise RuntimeError(
-                    "coupled paths require both reflection and diffraction components"
-                )
+        validate_coupled_gate(
+            coupled_paths=self.coupled_paths,
+            max_depth=self.max_depth,
+            components=components,
+        )
         if self.max_paths is not None and self.max_paths <= 0:
             raise ValueError("max_paths must be positive when set")
         if self.max_paths_scope not in _VALID_MAX_PATHS_SCOPES:
             raise ValueError("path max_paths_scope must be 'per_pair'")
-        if self.coupled_candidate_limit <= 0:
-            raise ValueError("coupled_candidate_limit must be positive")
-        if self.coupled_candidate_limit > _MAX_COUPLED_CANDIDATES:
-            raise ValueError(
-                "coupled_candidate_limit cannot exceed the hard limit of 1000000"
-            )
+        validate_coupled_candidate_limit(self.coupled_candidate_limit)
         if self.ad_mode not in _VALID_AD_MODES:
             raise ValueError(
                 f"path ad_mode must be one of {sorted(_VALID_AD_MODES)}"

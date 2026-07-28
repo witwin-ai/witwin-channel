@@ -1,4 +1,20 @@
-"""Enforce deterministic size and complexity budgets for production Python."""
+"""Enforce deterministic size and complexity budgets for production Python.
+
+``limits.file_lines`` is OPTIONAL. The Python file-size gate was retired on
+2026-07-27 by owner decision, recorded in
+``docs/dev/plans/15-concept-axis-layout-and-module-consolidation-plan.md`` (P2).
+The retired limit encoded "a person cannot hold more than N lines in their head
+at once", and this codebase is now read primarily by agents. That argument is
+about file SIZE only, which is why the two neighbouring budgets are unaffected:
+``limits.function_complexity`` stays MANDATORY because it is about testability
+and defect density rather than reading capacity, and ``limits.native_file_lines``
+stays MANDATORY and unchanged.
+
+When ``limits.file_lines`` is absent, the Python file-line hard limit, the file
+debt/exemption checks, and the stale-file-exemption check are skipped entirely,
+and a ``file_exemptions`` section is neither required nor read. When it is
+present, every one of those checks behaves exactly as before.
+"""
 
 from __future__ import annotations
 
@@ -275,39 +291,24 @@ def check_budgets(
     if not isinstance(source_root, str) or not source_root:
         raise ValueError("source_root must be a non-empty string")
 
-    file_recommended = _limit(config, "file_lines", "recommended")
-    file_hard = _limit(config, "file_lines", "hard")
+    limits = config.get("limits")
+    if not isinstance(limits, dict):
+        raise ValueError("limits must be an object")
+
     complexity_recommended = _limit(
         config, "function_complexity", "recommended"
     )
-    if file_recommended >= file_hard:
-        raise ValueError("file line recommended limit must be below hard limit")
-
-    file_exemptions = _exemptions(config, "file_exemptions")
     function_exemptions = _exemptions(config, "function_exemptions")
-    if any(item.ceiling > file_hard for item in file_exemptions.values()):
-        raise ValueError("file exemption ceilings cannot exceed the hard limit")
 
     files, functions = measure_repository(root, source_root)
-    violations = [
-        Violation(
-            "hard-limit",
-            metric.path,
-            f"file lines {metric.lines} exceeds hard limit {file_hard}",
-        )
-        for metric in files
-        if metric.lines > file_hard
-    ]
     check_date = today or date.today()
-    violations.extend(
-        _check_debt(
-            values={metric.path: metric.lines for metric in files},
-            recommended=file_recommended,
-            exemptions=file_exemptions,
-            today=check_date,
-            label="file lines",
+    violations: list[Violation] = []
+    # The Python file-size gate is retired policy: absent limits.file_lines
+    # means no maximum file length, so no file-line check runs at all.
+    if "file_lines" in limits:
+        violations.extend(
+            _check_python_file_budgets(files, config, today=check_date)
         )
-    )
     violations.extend(
         _check_debt(
             values={metric.key: metric.complexity for metric in functions},
@@ -321,6 +322,46 @@ def check_budgets(
         _check_native_budgets(root, config, today=check_date)
     )
     return sorted(violations)
+
+
+def _check_python_file_budgets(
+    files: list[FileMetric], config: dict[str, Any], *, today: date
+) -> list[Violation]:
+    """Apply the optional ``limits.file_lines`` gate to measured Python files.
+
+    Only reached when the caller has already seen ``limits.file_lines``; the
+    validation and the violation set are the same ones the gate applied before
+    it became optional.
+    """
+
+    file_recommended = _limit(config, "file_lines", "recommended")
+    file_hard = _limit(config, "file_lines", "hard")
+    if file_recommended >= file_hard:
+        raise ValueError("file line recommended limit must be below hard limit")
+
+    file_exemptions = _exemptions(config, "file_exemptions")
+    if any(item.ceiling > file_hard for item in file_exemptions.values()):
+        raise ValueError("file exemption ceilings cannot exceed the hard limit")
+
+    violations = [
+        Violation(
+            "hard-limit",
+            metric.path,
+            f"file lines {metric.lines} exceeds hard limit {file_hard}",
+        )
+        for metric in files
+        if metric.lines > file_hard
+    ]
+    violations.extend(
+        _check_debt(
+            values={metric.path: metric.lines for metric in files},
+            recommended=file_recommended,
+            exemptions=file_exemptions,
+            today=today,
+            label="file lines",
+        )
+    )
+    return violations
 
 
 def _check_native_budgets(

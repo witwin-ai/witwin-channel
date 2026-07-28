@@ -23,12 +23,22 @@ native kernels it dispatches (`channel/native/channel/kernels`).
 
 Contents:
 
-- **Part 0** — baseline measurements and the pipeline architecture map
-- **Part I** — where the Python bulk actually is (bloat, dead code, policy divergence)
+- **Part 0** — baseline, the pipeline architecture map, and **the unifying diagnosis (§0.3)**
+- **Part I** — where the Python bulk actually is: bloat, dead code, policy
+  divergence, the ceremony surface (§I.8), and file-level organization (§I.9)
 - **Part II** — the AD substrate: hand-written JVP/VJP versus Dr.Jit
 - **Part III** — are performance and developability incompatible?
 - **Part IV** — recommended sequencing
-- **Part V** — module boundaries, swappability, and the `witwin.lab` proposal
+- **Part V** — module boundaries, swappability, the `witwin.lab` proposal, the
+  interaction-indexed alternative (§V.7), and implementation language (§V.8)
+
+**Read §0.3 first.** Three findings reached independently at different scales
+turn out to be one error, and the sequencing in Part IV depends on that.
+
+Note: ADR-043 (propagation AD capability matrix) was accepted while this audit
+was being written. It satisfies part of the Part IV Tier 5 recommendation and is
+the natural anchor for §I.8's component registry. Cross-references were added,
+but the audit's measurements predate it and were not re-run against it.
 Method: static read of the package, `ci/native-binding-manifest.json`,
 `ci/contract-coverage-manifest.json`, `ci/public-api-snapshot.json`, and targeted
 reads of the CUDA translation units. Every claim below carries a `file:line`
@@ -100,6 +110,34 @@ Stage order verified from `propagation/enumerated/engine.py:204` and its imports
 
 Part V analyses these boundaries against the gsplat reference structure and
 against the proposed `witwin.lab` composition layer.
+
+## 0.3 The unifying diagnosis
+
+Three findings in this document were reached independently, from different
+evidence, at different scales. They are the same error:
+
+| Scale | Currently indexed by | Should be indexed by | Section |
+| --- | --- | --- | --- |
+| Field kernels | **path word** (`R`, `D`, `RD`, `DD`, …) | interaction | §V.7 |
+| Ceremony (config, metadata, status) | **solver** | component | §I.8 |
+| File layout | **stage / artifact category** | concept | §I.9 |
+
+The consequence is identical in all three: **adding one interaction, one
+component, or one concept requires editing N places**, so nothing gets added.
+§III.5 measured this directly — unfreezing one Class-B parameter costs ~15 edit
+sites, which is why the frozen-input table has never shrunk. Developability debt
+has converted itself into a capability limit.
+
+CLAUDE.md's own ownership list encodes the contradiction. Under "Organize code by
+RF domain capability" it lists `scattering` (a **concept**) alongside
+`propagation.topology`, `propagation.geometry`, and `propagation.fields`
+(**stages**). Two axes are asserted at once, which is why `scattering` exists
+both as `scattering/` and as `propagation/enumerated/scattering.py`. Resolving
+any of the three findings above therefore requires amending CLAUDE.md and
+ADR-036, not only moving code.
+
+**Sequencing note.** These three are not independent tasks; two are downstream of
+the others. See Part IV.
 
 ---
 
@@ -393,6 +431,190 @@ Contracts with a producer and **zero** consumers: `SegmentPenetrationBackwardRes
 and `SegmentPenetrationJvpResult` (constructed by positional splat at
 `bridge.py:315, :371`, never field-accessed), `CoupledCandidateCapacity`,
 `CanonicalEvaluatedPaths`.
+
+## I.8 Ceremony surface: load-bearing versus accreted
+
+Files matching `config|metadata|capabilit|schema|contracts|capacity|deployment`
+total **5,566 lines**. The package defines **137 dataclasses / NamedTuples**;
+gsplat defines roughly 5–10.
+
+That ratio is not by itself a defect: gsplat has one algorithm, Channel has four
+solvers × five components plus materials, antennas, dynamics, and four version
+domains. The useful question is not "how much ceremony" but:
+
+> **Does removing this entity make a wrong result possible, or does it only make
+> the code shorter?**
+
+### Load-bearing — do not cut (~500–800 lines)
+
+These are the *mechanism* for the property §II.4.d identifies as this
+architecture's largest correctness advantage. Deleting them reintroduces exactly
+the silent-zero failure mode that hand-declared AD exists to prevent.
+
+| Entity | Effect of removal | Cost |
+| --- | --- | --- |
+| `PropagationCapabilities` / the capability record (now also ADR-043's published AD matrix) | an unsupported AD mode silently returns zeros | moderate |
+| `capacity_failure_state` + `capacity_failure_terminal_check` | silent path truncation | **288 lines live** |
+| `WorldProvenance` + four version domains | stale replay yields plausible wrong numbers | **4 integer comparisons** |
+
+The codebase already records this lesson. `consumer/service.py`:
+
+> "The capability record declares tx_power and the endpoint polarizations frozen
+> too, and **a declaration nobody enforces is the ADR-036 pattern**."
+
+### Accreted — cut (~4,800 lines)
+
+**(1) Four implementations of component status, with the canonical owner
+bypassed three times.** `components.py:29` defines
+`component_availability_status()`. Then:
+
+```
+path/metadata.py:11              _component_status()
+montecarlo/basic/metadata.py:22  component_status()
+montecarlo/bdpt/metadata.py:75   component_status()
+```
+
+Same disease as `runtime/symbols.py`'s `required_symbol` being hand-rolled at 37
+sites (§I.1): the right abstraction is created and then not routed through.
+
+**(2) Three copies of the component depth rule, already drifting in spelling.**
+
+```python
+# path/metadata.py:107           "diffraction": diffraction_depth
+# montecarlo/basic/metadata.py:98  "diffraction": 1 if "diffraction" in config.components else -1
+# montecarlo/bdpt/metadata.py:113  "diffraction": min(1, depth) if "diffraction" in config.components else -1
+```
+
+One domain rule (diffraction is at most first order), three spellings.
+
+**(3) `path/config.py` ⊂ `deterministic/config.py`.** 13 of path's 16 fields
+appear verbatim in deterministic, including the six-field scattering group
+(`scattering_max_paths_per_pair`, `scattering_power_threshold`,
+`scattering_chain_max_depth`, `scattering_chain_max_rows`, `isb_boundary_taper`,
+`isb_boundary_taper_width`). Likewise `montecarlo/basic/config.py` ⊂
+`montecarlo/bdpt/config.py` (`samples`, `seed`, `max_depth`,
+`workspace_limit_bytes`). Two hand-maintained pairs.
+
+**(4) ~1,400 lines of dead capacity code** inside this bucket (§I.3).
+
+**(5) Contract near-duplication** (§I.7).
+
+### Estimated reduction
+
+| Category | Now | After | Saved |
+| --- | --- | --- | --- |
+| dead capacity | ~1,400 | 0 | 1,400 |
+| metadata (three → one) | 511 | ~200 | ~310 |
+| config (extract shared base) | 359 | ~220 | ~140 |
+| contract dedup | ~1,100 | ~850 | ~250 |
+| **Total** | **5,566** | **~3,400** | **~2,100 (38%)** |
+
+### Root cause
+
+Ceremony is indexed by **solver**, so it grows as O(solvers × components). Each
+solver hand-writes its own config, metadata, component status, and depth rule.
+Indexing by **component** — each component declaring `(name, mask, depth_rule,
+ad_modes, config_fields)` once, with solvers querying a registry — makes growth
+O(solvers + components). `components.py` is the intended owner and is anaemic at
+47 lines while three metadata modules hand-roll what it should own.
+
+ADR-043's published AD capability matrix (`component_ad_modes`,
+`component_material_leaves`, `direction_differentiable_components`) is a step in
+exactly this direction and should be the anchor the rest converges onto rather
+than a fifth parallel table.
+
+## I.9 File-level organization: the concept axis
+
+### Measurement
+
+One domain concept is spread across many files. For reflection:
+
+```
+propagation/topology/discovery/reflection.py     discovery
+propagation/topology/kernels/reflection.py       topology kernel
+propagation/geometry/reflection.py               geometry
+propagation/models/reflection.py                 contract
+propagation/enumerated/reflection.py             enumerated orchestration
+propagation/consumer/_fixed_reflection.py        frozen replay
+propagation/fields/kernels/functional.py         field (shared file)
+propagation/fields/kernels/autograd.py           field AD (shared file)
+path/config.py + deterministic/config.py         its config fields
+path|montecarlo.basic|montecarlo.bdpt/metadata.py  its metadata (three copies)
+```
+
+**Eleven files, and none of them is "the reflection file."** Scattering spans 6
+files, transmission 5, diffraction 4.
+
+Two further counts:
+
+- **43 of 196 files (22%) are named after an artifact category** rather than a
+  domain thing: `config`, `metadata`, `contracts`, `capacity`, `schema`,
+  `models`, `result`, `pipeline`, `primitives`, `blocks`, `arrays`, `tensors`, …
+- **139 of 195 files sit at directory depth 3–4.** gsplat is mostly depth 1–2.
+
+### Diagnosis
+
+The layout materializes a matrix — concepts × (stages + artifact kinds) — with one
+file per non-empty cell. gsplat's principle is the opposite: **one file per
+layer, all concepts inside it.** `_wrapper.py` holds every op; `rendering.py`
+holds composition; `_torch_impl.py` holds every reference implementation. There
+is no `gaussian.py` plus `projection/gaussian.py` plus `models/gaussian.py`.
+
+gsplat also has no `config.py` or `metadata.py` because its API style differs:
+functions take keyword arguments and return tensor tuples plus an inline `meta`
+dict. Channel takes config objects and returns result objects with separately
+constructed metadata. **The file count is downstream of that API choice.**
+
+### Criterion
+
+File boundaries should follow the axis along which the code actually changes.
+Channel's roadmap — the multi-order diffraction rebuild and T-matrix scattering
+fed from Maxwell — consists of "everything about one concept" changes. **The
+concept axis is the change axis, and the current layout is orthogonal to it.**
+
+### Two target shapes
+
+**Option B — collapse artifact-category files. Available now, no ADR, no manifest
+churn** (except the dead-code item):
+
+| Action | Effect |
+| --- | --- |
+| three `metadata.py` → one rule table in `components.py` | −310 lines, −2 files |
+| four `config.py` → shared base + kwargs | −140 lines, −2 files |
+| `propagation/models/*` → merged into the owning stage | −11 files |
+| six `capacity.py` → one (the rest is dead) | −5 files |
+| `path/{schema,arrays,result}.py` → `path.py` | −2 files |
+
+≈196 → ≈165 files; max depth 4 → 3.
+
+**Option A — concept-major layout. Target state, requires amending CLAUDE.md and
+ADR-036:**
+
+```
+channel/
+  runtime.py
+  scene/
+  interactions/
+    los.py  reflection.py  diffraction.py  transmission.py  scattering.py
+      └─ each holds: discovery + geometry + interaction operator + contract + depth rule
+  chain.py          ← the §V.7 composer
+  kernels.py        ← every native facade (the analogue of gsplat's _wrapper.py)
+  solvers/
+    path.py  deterministic.py  montecarlo.py  bdpt.py
+  consumer.py
+```
+
+≈90–110 files at depth 2.
+
+### Why Option A is downstream, not independent
+
+- `interactions/reflection.py` only stays a reasonable size **after §V.7**, because
+  the shared chain machinery moves out of the per-concept file.
+- The twelve `kernels/` directories — the main source of depth-4 — only disappear
+  **after Part IV Tier 1**, because they currently hold 47 hand-written
+  `autograd.Function` classes.
+
+Doing Option A first would be redone twice. Option B has neither dependency.
 
 ---
 
@@ -734,6 +956,35 @@ from over-generalizing "do not deduplicate" from numerical expressions to all co
 
 Ordered by risk × scope, not by size of payoff.
 
+```
+Start here ──────────────────────────────────────────────┐
+ (§I.8/§I.9 Option B: ceremony + artifact-category files) │  no ADR, no manifest churn
+                                                          │
+Tier 0  unfreeze Class-B ──────┐                          │
+                               │                          │
+§V.7 decision  ────────────────┼──▶ Tier 1 registry ──────┼──▶ §I.9 Option A
+ (word → interaction)          │     (kills kernels/)      │     (concept-major layout)
+                               │                          │
+§V.8 language ─────────────────┘                          │
+ (Slang for new code)                                     │
+                                                          │
+Tier 2 delete dead code ──────────────────────────────────┘
+Tier 3 L1 policy breaches   ← highest urgency: wrong results, not excess lines
+Tier 4 consumer + contracts
+Tier 5 higher-order          ← optional
+```
+
+**Start here — §I.8/§I.9 Option B cleanup.** Three metadata modules → one
+component rule table; four config classes → a shared base; `propagation/models/*`
+merged into owning stages; `path/{schema,arrays,result}.py` merged. ≈ −600 lines,
+−17 files, no ADR, no manifest change. It touches nothing the later tiers depend
+on, and it is the cheapest demonstration that the concept axis is the right one.
+
+Pair it with a CI rule that a domain concept (component status, depth rule,
+symbol lookup) may have only one definition site. Without that rule the
+duplication regrows — `required_symbol` being hand-rolled at 37 sites (§I.1) and
+`component_availability_status` at 3 (§I.8) are the evidence.
+
 ### Tier 0 — Unfreeze Class-B parameters (needs an ADR)
 
 Start with `tx_power`: `d/dP = field/(2P)`, primal already computed, adjoint is one
@@ -790,9 +1041,14 @@ duplicate ADR-038 liveness rule. Move the validator and capability table out of
 
 Forward-over-reverse HVP does **not** require N² kernels — it requires the
 backward kernel to itself support JVP, i.e. **one additional kernel per op**. This
-is the only route to HVP that preserves fusion. If it is not pursued, the
-`once_differentiable` limit should be stated in the capability record so callers
-do not read it as an unimplemented detail.
+is the only route to HVP that preserves fusion.
+
+**Partly satisfied since this audit began.** ADR-043 publishes
+`supports_higher_order_ad = False` and fails every second-order composition
+before a partial second-order result, which is exactly the "state the limit in
+the capability record" recommendation this tier carried. What remains is the
+implementation decision, and §V.8.d records that **Slang would not supply it
+either** — its compiler cannot differentiate a function that calls `bwd_diff`.
 
 ### Not scheduled — topology discontinuity (research)
 
@@ -1243,6 +1499,133 @@ Note also that V.7 reduces Tier 0's scope: with endpoint-level excitation, the
 Class-B `tx_power` and polarization adjoints are written once at the chain
 boundary rather than per word-kernel.
 
+## V.8 Implementation language: Dr.Jit, Slang, or CUDA
+
+### V.8.a Where the differentiable physics actually lives
+
+`transport::slab_fresnel` and `ad::slab_fresnel_dual` resolve to RayD, not
+Channel:
+
+```
+transport = rayd::shared::rf::field_transport
+ad        = rayd::torch::rf::field_transport_ad
+```
+
+| Layer | Size | Content |
+| --- | --- | --- |
+| `channel/native/**/*.cu` | **36,432 lines** | kernel entry points, tensor unpacking, launch config, row/bounce loops, reductions, packing — **orchestration** |
+| `rayd/shared/rf/field_transport.cuh` | **416 lines** | primal physics |
+| `rayd/torch/rf/field_transport_ad.cuh` | **1,580 lines** | the hand-written derivative mirror of that same physics |
+| `rayd/shared/utd/utd_math.h` | 1,910 lines | UTD math |
+
+**416 → 1,580 is a 3.8× expansion.** That ratio is the maintenance cost of
+hand-written adjoints, and it is exactly what a `[Differentiable]` attribute
+removes. (Line counts read from a RayD worktree; reconfirm on the main branch.)
+
+Note the split this creates. Channel owns the *strategy* — which one-hot seed to
+fire, when to skip (`if (grad_eps_r != nullptr)`), the reverse pass down to the
+Fresnel coefficients. RayD owns the *mechanical* dual arithmetic. **A compiler
+can generate RayD's part without touching Channel's**; the mixed-mode adjoint
+(§II.4.b) survives, because the seed vector is constructed caller-side.
+
+### V.8.b For new composable modules: Slang, not Dr.Jit
+
+Dr.Jit's niche is squeezed out of this architecture. Its value proposition —
+Python authoring plus JIT fusion plus AD — sits between Torch (already in the
+stack, adequate for prototyping) and Slang (fused, compiled, compiler-AD). If a
+slow Python-authored path is acceptable, Torch already provides it without a
+second runtime and a second tensor type.
+
+| | Dr.Jit | Slang |
+| --- | --- | --- |
+| Runtime | own JIT, own tensor type, own allocator | compiles to CUDA/PTX; same runtime, stream, Torch tensors |
+| AD form | runtime tape (§II.4.a memory problem) | **source-to-source**, compiler-generated adjoint, no tape |
+| Torch binding | `dr.wrap` bridge, materializes at the boundary | `slangtorch` generates the `autograd.Function` |
+| Reduction order | scatter-add atomics, nondeterministic | as written — preserves §II.4.c |
+| Modularity | Python classes | `interface` + generics, designed for substitution |
+
+Slang additionally eliminates the ADR-004 lockstep obligation for the code it
+generates, because primal and adjoint come from one source.
+
+Two integration paths differ materially:
+
+- **`slangtorch` module** — the researcher's operator becomes a separate Torch op.
+  Internally fused with a compiler-generated adjoint, but **not inlined into a
+  hand-written CUDA chain kernel**.
+- **Slang as the chain language** — §V.7's `compose_chain` and interaction
+  operators written in Slang, so a researcher's operator conforming to an
+  `interface IInteractionOperator` is specialized and inlined, preserving fusion.
+  This is the real prize, and it makes the language choice part of the §V.7
+  decision rather than a separate one.
+
+### V.8.c For existing kernels: a layer decision, and templating before migration
+
+Not "rewrite in Slang", and not "CUDA is optimal". By layer:
+
+| Layer | Recommendation | Reason |
+| --- | --- | --- |
+| Channel's 36k lines of `.cu` | **keep CUDA** | orchestration, little AD content; Slang buys ~nothing and forfeits the ADR-009 apparatus (body-hash multisets, SASS parity, frozen evaluation order) |
+| RayD's `*_ad.cuh` derivative mirrors | **highest-value target**, but see below | the 416→1,580 ratio lives here |
+| `utd_math.h` | **keep hand-written** | ADR-009 explicitly protects "floor, clamp, branch, complex-square-root, and phase evaluation order"; a compiler does not know your branch-cut convention. Compiler AD is mathematically correct and can be numerically poor exactly at grazing angles and shadow boundaries |
+| Discrete / packing kernels | **keep CUDA** | no AD content at all |
+| New code (§V.7 operators, T-matrix scattering) | **Slang** | no sunk verification apparatus; modularity is the point |
+
+**The cheapest high-value move is not a language migration.** Template the primal
+over scalar type (`float` / `DualF` / `DualC`), the classic C++ forward-AD
+approach. That collapses 416 + 1,580 into ~500 templated lines, yields
+forward-mode for free, leaves the mixed-mode strategy untouched, and requires no
+new toolchain. ADR-009 already sanctions it conditionally:
+
+> "Templating is permitted only after those tests, SASS evidence, and performance
+> gates demonstrate equivalence."
+
+The door is open; what is required is evidence, not a new language.
+
+Also worth stating plainly: **hand-written CUDA's raw performance advantage over
+Slang is smaller than usually assumed** — both go through nvcc. Hand-written
+CUDA's real advantages are numerical control at branch cuts, the existing
+verification apparatus, and toolchain determinism. None of those is "speed".
+
+A maintainability signal from the project's own governance points the other way:
+`diffraction.cu` (1,744), `path_trace.cu` (1,647), `field_wedge_ad_coupled.cu`
+(1,634) against ADR-009's 2,000-line recommendation, with a recorded baseline
+where `path_trace.cu` reached 4,270. A large share of that volume is AD mirrors
+and cross-TU duplication.
+
+### V.8.d Verified Slang limitations
+
+From the Slang user guide (fetched 2026-07-27):
+
+1. **Higher order is only partly available.** `fwd_diff(fwd_diff(f))` works, but
+   the guide states: *"The compiler does not currently support differentiating a
+   function that itself calls `bwd_diff`."* **Forward-over-reverse — the standard
+   HVP recipe — is unsupported.** Slang does **not** remove the Part IV Tier 5
+   wall; it lowers it to second-order forward only.
+2. **Global resources are non-differentiable by default**: *"All operations to
+   global resources, global variables and shader parameters … are treated as a
+   non-differentiable operation."* Channel's material data lives in resident
+   buffers. `IDifferentiablePtrType` provides a mechanism, but it must be
+   designed for.
+3. **Loops must be statically bounded**, via `[MaxIters(n)]`, with compiler
+   memory allocated for the maximum. A bounce loop can be annotated with the
+   configured max depth, but depth-1 rows then pay depth-max register/stack
+   pressure.
+4. **Side effects have no guaranteed execution count during backpropagation** —
+   relevant anywhere atomics accumulate.
+5. **`slangtorch` is JIT** (`loadModule`), which would return the §II.4.e
+   no-JIT advantage if used on a production path. It is per-kernel JIT, not
+   Dr.Jit's per-trace-shape JIT, so changing which parameters are differentiable
+   does not trigger recompilation — a materially different order of cost.
+
+Maturity caveat: the Slang language is mature and Khronos-hosted, but Slang.D's
+AD is 2023-era work and `slangtorch` is younger. That risk is real for code
+carrying production physics.
+
+### V.8.e Recommended shape
+
+Mixed CUDA + Slang is a stable end state, not a transitional one. Do not rewrite
+for uniformity.
+
 ---
 
 ## Appendix — Claims requiring confirmation before action
@@ -1283,3 +1666,20 @@ boundary rather than per word-kernel.
    coupled and scattering as an exception. Item (c) in particular should be
    settled before the ADR, because if UTD is non-local the proposal's benefit for
    plan 32 largely disappears.
+8. §V.8.a's RayD line counts (`field_transport.cuh` 416, `field_transport_ad.cuh`
+   1,580, `utd_math.h` 1,910) were read from the `sdf-intersection` worktree of
+   the RayD checkout, not from its main branch. Reconfirm before quoting the
+   3.8× ratio in an ADR.
+9. §V.8.c's templating proposal assumes RayD's 1,580-line AD header is
+   predominantly *forward-mode dual mirrors* of the primal. This was inferred
+   from the call sites (`ad::slab_fresnel_dual` seeded one-hot by the caller) and
+   from ADR-009's description of the `LegacySlabComplex` / `DualLC` pair; the
+   header itself was not read end to end. If a substantial part of it is
+   hand-written reverse-mode instead, templating recovers less than claimed.
+10. §I.8's ~2,100-line reduction estimate is a projection from field-overlap and
+   duplicate-implementation counts, not from an attempted refactor. The dead-code
+   component (~1,400) is solid; the metadata/config/contract components are
+   estimates.
+11. Changing RayD's implementation language or templating its headers is a
+   **RayD** decision with other consumers, not a Channel-internal one. §V.8 does
+   not account for that repository's constraints or release cadence.

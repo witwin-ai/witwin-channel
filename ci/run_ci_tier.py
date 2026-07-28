@@ -24,6 +24,7 @@ QUICK_GATES = (
     Gate("quick.import-graph", ("ci/check_import_graph.py",)),
     Gate("quick.contract-coverage", ("ci/check_contract_coverage.py",)),
     Gate("quick.orphan-modules", ("ci/check_orphan_modules.py",)),
+    Gate("quick.single-definition", ("ci/check_single_definition.py",)),
     Gate(
         "quick.public-api-binding-contract-manifests",
         (

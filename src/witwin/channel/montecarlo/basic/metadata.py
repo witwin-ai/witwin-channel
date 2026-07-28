@@ -14,24 +14,12 @@ from witwin.channel.capabilities import (
     config_metadata,
     serialize_config,
 )
-from witwin.channel.components import component_availability_status
+from witwin.channel.components import (
+    component_availability_status,
+    component_max_depth,
+)
 
 from .config import Config
-
-
-def component_status(
-    *,
-    config: Config,
-    reflection_available: bool,
-    diffraction_available: bool,
-) -> dict[str, str]:
-    return component_availability_status(
-        config.components,
-        reflection_available=reflection_available,
-        diffraction_available=diffraction_available,
-        reflection_error="reflection requires RayD native capability",
-        diffraction_error="diffraction requires RayD native capability",
-    )
 
 
 def make_solver_metadata(
@@ -75,10 +63,12 @@ def make_solver_metadata(
         "ad_mode": config.ad_mode,
         "path_count": path_count,
         "contribution_capacity": contribution_capacity,
-        "components": component_status(
-            config=config,
+        "components": component_availability_status(
+            config.components,
             reflection_available=reflection_available,
             diffraction_available=diffraction_available,
+            reflection_error="reflection requires RayD native capability",
+            diffraction_error="diffraction requires RayD native capability",
         ),
         "rayd": {
             "reflection": reflection_available,
@@ -90,19 +80,11 @@ def make_solver_metadata(
         config_metadata(
             requested=requested_config,
             effective=effective_config,
-            component_max_depth={
-                "los": 0 if "los" in config.components else -1,
-                "reflection": config.max_depth
-                if "reflection" in config.components
-                else -1,
-                "diffraction": 1 if "diffraction" in config.components else -1,
-                # transmission chains are capped like reflection; scattering
-                # is single-bounce in the current contract.
-                "transmission": config.max_depth
-                if "transmission" in config.components
-                else -1,
-                "scattering": 1 if "scattering" in config.components else -1,
-            },
+            component_max_depth=component_max_depth(
+                config.components,
+                chain_depth=config.max_depth,
+                single_bounce_depth=1,
+            ),
         )
     )
     metadata["semantic_capabilities"] = capabilities()["solvers"]["montecarlo_basic"]

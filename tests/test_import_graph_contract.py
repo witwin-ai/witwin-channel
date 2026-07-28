@@ -26,10 +26,14 @@ def test_current_import_debt_is_exact_and_allowlisted():
     allowlist = graph.load_allowlist(ALLOWLIST)
 
     assert graph.check_allowlist(violations, allowlist) == []
+    # The ``existing_boundary`` group is fully repaid: the last live entry, the
+    # relative ``deployment -> runtime.extension`` import, now uses the absolute
+    # cross-domain form the rest of the package uses. Only the ADR-008 BDPT
+    # enumerated oracle remains, and it is a sanctioned dependency, not debt to
+    # be repaid.
     assert Counter(
         graph._DEBT_GROUP_BY_RULE[violation.rule] for violation in violations
     ) == {
-        "existing_boundary": 1,
         "mc_enumerated_dependency": 1,
     }
 
@@ -217,17 +221,23 @@ def test_allowlist_cannot_add_or_relocate_debt():
 
 
 def test_allowlist_must_remove_stale_entries_with_resolved_debt():
+    """An allowance whose violation disappeared must be deleted, not kept.
+
+    The group is the one that still carries a live allowance, so the check is
+    exercised against real data rather than a synthetic package.
+    """
+
     violations = graph.scan_package(PACKAGE_ROOT)
     allowlist = graph.load_allowlist(ALLOWLIST)
     resolved = [
         violation
         for violation in violations
-        if graph._DEBT_GROUP_BY_RULE[violation.rule] != "existing_boundary"
+        if graph._DEBT_GROUP_BY_RULE[violation.rule] != "mc_enumerated_dependency"
     ]
 
     issues = graph.check_allowlist(resolved, allowlist)
 
-    assert any("stale existing_boundary allowance" in issue for issue in issues)
+    assert any("stale mc_enumerated_dependency allowance" in issue for issue in issues)
 
 
 def test_frozen_baseline_universe_cannot_change():

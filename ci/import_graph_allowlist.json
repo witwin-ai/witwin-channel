@@ -76,9 +76,7 @@
           "target": "witwin.channel.core.kernels.extension"
         }
       ],
-      "allowed": [
-        "boundary-003"
-      ]
+      "allowed": []
     },
     "solver_to_solver": {
       "baseline": [

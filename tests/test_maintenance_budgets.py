@@ -4,6 +4,8 @@ from copy import deepcopy
 from datetime import date
 from pathlib import Path
 
+import pytest
+
 from ci import check_maintenance_budgets as budgets
 
 
@@ -24,22 +26,31 @@ def _config(
     file_recommended: int = 100,
     file_hard: int = 200,
     complexity_recommended: int = 2,
+    file_lines: bool = True,
 ) -> dict:
-    return {
+    """Build a synthetic budget config.
+
+    ``file_lines=False`` produces the retired-gate shape: no
+    ``limits.file_lines`` and no ``file_exemptions`` section at all.
+    """
+
+    config: dict = {
         "schema_version": 1,
         "source_root": "src/product",
         "limits": {
-            "file_lines": {
-                "recommended": file_recommended,
-                "hard": file_hard,
-            },
             "function_complexity": {
                 "recommended": complexity_recommended,
             },
         },
-        "file_exemptions": {},
         "function_exemptions": {},
     }
+    if file_lines:
+        config["limits"]["file_lines"] = {
+            "recommended": file_recommended,
+            "hard": file_hard,
+        }
+        config["file_exemptions"] = {}
+    return config
 
 
 def _exemption(ceiling: int, *, expires_on: str = "2099-01-01") -> dict:
@@ -60,27 +71,113 @@ def _write_source(root: Path, source: str = BRANCH_SOURCE) -> Path:
 
 def test_current_baseline_is_exact_and_passes() -> None:
     config = budgets.load_budgets(BUDGET_PATH)
-    files, functions = budgets.measure_repository(ROOT, config["source_root"])
-    file_values = {metric.path: metric.lines for metric in files}
+    _, functions = budgets.measure_repository(ROOT, config["source_root"])
     function_values = {metric.key: metric.complexity for metric in functions}
-    file_recommended = config["limits"]["file_lines"]["recommended"]
     complexity_recommended = config["limits"]["function_complexity"][
         "recommended"
     ]
 
     assert budgets.check_budgets(ROOT, config) == []
-    assert config["file_exemptions"] == {
-        key: entry
-        for key, entry in config["file_exemptions"].items()
-        if file_values[key] > file_recommended
-        and entry["ceiling"] == file_values[key]
-    }
     assert config["function_exemptions"] == {
         key: entry
         for key, entry in config["function_exemptions"].items()
         if function_values[key] > complexity_recommended
         and entry["ceiling"] == function_values[key]
     }
+
+
+def test_repository_budget_retires_the_python_file_size_gate() -> None:
+    config = budgets.load_budgets(BUDGET_PATH)
+
+    # There is no maximum Python file length, so the limit and the three
+    # waivers it used to justify are gone rather than raised to a large number.
+    assert "file_lines" not in config["limits"]
+    assert "file_exemptions" not in config
+    # The reason is recorded in the config itself, next to what survived.
+    assert "Retired 2026-07-27" in config["limits_policy"]["file_lines"]
+    assert "Retired" not in config["limits_policy"]["function_complexity"]
+    # Complexity and native size stay mandatory and keep their exact values.
+    assert config["limits"]["function_complexity"] == {"recommended": 15}
+    assert config["limits"]["native_file_lines"] == {
+        "recommended": 2000,
+        "hard": 3000,
+    }
+    # Retiring the file-size gate must not disturb the complexity waivers: the
+    # section survives, is still enforced, and every surviving entry is live.
+    # Asserting a fixed count instead would be brittle and would say nothing -
+    # a refactor that simplifies an exempted function correctly retires its
+    # waiver, which is exactly what happened to four of them in plan 15 phase 1.
+    _, functions = budgets.measure_repository(ROOT, config["source_root"])
+    complexity = {metric.key: metric.complexity for metric in functions}
+    recommended = config["limits"]["function_complexity"]["recommended"]
+    exemptions = config["function_exemptions"]
+    assert exemptions
+    assert all(
+        complexity[key] > recommended and entry["ceiling"] == complexity[key]
+        for key, entry in exemptions.items()
+    )
+
+
+def test_absent_file_line_limit_skips_every_file_size_check(
+    tmp_path: Path,
+) -> None:
+    # A file far past the retired hard limit of 2000 lines, whose only real
+    # violation is control-flow complexity.
+    padding = "".join(f"# pad {index}\n" for index in range(5000))
+    _write_source(tmp_path, f"{BRANCH_SOURCE}{padding}")
+
+    retired = _config(file_lines=False)
+    assert [
+        (item.kind, item.subject)
+        for item in budgets.check_budgets(tmp_path, retired)
+    ] == [("unbudgeted-debt", "src/product/module.py::branch")]
+
+    # The same tree under a declared file_lines limit still reports the file:
+    # the gate is skipped because it is absent, not because it stopped working.
+    declared = _config(file_recommended=100, file_hard=200)
+    assert {
+        (item.kind, item.subject)
+        for item in budgets.check_budgets(tmp_path, declared)
+    } == {
+        ("unbudgeted-debt", "src/product/module.py"),
+        ("hard-limit", "src/product/module.py"),
+        ("unbudgeted-debt", "src/product/module.py::branch"),
+    }
+
+
+def test_absent_file_line_limit_ignores_a_leftover_file_exemption(
+    tmp_path: Path,
+) -> None:
+    # A stale file_exemptions section must not resurrect the gate, and must not
+    # be reported as a stale exemption either: with no limit there is nothing
+    # for it to be stale against.
+    _write_source(tmp_path)
+    config = _config(file_lines=False)
+    config["file_exemptions"] = {"src/product/module.py": _exemption(6)}
+    config["limits"]["function_complexity"]["recommended"] = 10
+
+    assert budgets.check_budgets(tmp_path, config) == []
+
+
+def test_function_complexity_and_native_limits_stay_mandatory(
+    tmp_path: Path,
+) -> None:
+    _write_source(tmp_path)
+
+    missing_complexity = _config(file_lines=False)
+    del missing_complexity["limits"]["function_complexity"]
+    with pytest.raises(ValueError, match="limits.function_complexity"):
+        budgets.check_budgets(tmp_path, missing_complexity)
+
+    missing_function_exemptions = _config(file_lines=False)
+    del missing_function_exemptions["function_exemptions"]
+    with pytest.raises(ValueError, match="function_exemptions"):
+        budgets.check_budgets(tmp_path, missing_function_exemptions)
+
+    missing_native = _config(file_lines=False)
+    missing_native["native_source_root"] = "native/channel"
+    with pytest.raises(ValueError, match="limits.native_file_lines"):
+        budgets.check_budgets(tmp_path, missing_native)
 
 
 def test_native_translation_units_are_within_budget() -> None:

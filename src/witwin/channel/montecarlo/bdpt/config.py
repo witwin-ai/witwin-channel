@@ -4,8 +4,12 @@ from dataclasses import dataclass
 
 from witwin.channel.components import (
     AD_MODES as _VALID_AD_MODES,
-    BOUNCE_COMPONENTS as _BOUNCE_COMPONENTS,
     DEFAULT_COMPONENTS as _DEFAULT_COMPONENTS,
+    validate_bounce_depth,
+    validate_max_depth,
+    validate_samples,
+    validate_seed,
+    validate_workspace_limit_bytes,
     validated_components,
 )
 
@@ -17,7 +21,6 @@ from witwin.channel.components import (
 # wall penetrations, scattering is single-bounce in v1. component_mask bits:
 # 1=los, 2=reflection, 4=diffraction, 8=transmission, 16=scattering.
 # Default component set is unchanged: the new components are strictly opt-in.
-# Components that require at least one interaction bounce to contribute.
 _VALID_MIS = frozenset({"balance", "power_heuristic", "none"})
 _VALID_RECEIVER_STRATEGIES = frozenset({"grid_area", "point_sphere"})
 _VALID_ACCUMULATION_STRATEGIES = frozenset({"auto", "atomic", "staged", "compact"})
@@ -120,12 +123,9 @@ class Config:
     workspace_limit_bytes: int | None = 1 << 30
 
     def __post_init__(self) -> None:
-        if self.samples <= 0:
-            raise ValueError("samples must be positive")
-        if self.seed < 0:
-            raise ValueError("seed must be non-negative")
-        if self.max_depth < 0:
-            raise ValueError("max_depth must be non-negative")
+        validate_samples(self.samples)
+        validate_seed(self.seed)
+        validate_max_depth(self.max_depth)
         max_light_depth = (
             self.max_depth if self.max_light_depth is None else self.max_light_depth
         )
@@ -138,8 +138,11 @@ class Config:
             self.components,
             error_message="components must be a non-empty subset of {valid}",
         )
-        if self.max_depth < 1 and components & _BOUNCE_COMPONENTS:
-            raise RuntimeError("BDPT scattering requires max_depth >= 1")
+        validate_bounce_depth(
+            self.max_depth,
+            components,
+            error_message="BDPT scattering requires max_depth >= 1",
+        )
         if "diffraction" in components and self.max_diffraction_order == 0:
             raise RuntimeError("diffraction requires max_diffraction_order > 0")
         if self.coupled_paths:
@@ -178,8 +181,7 @@ class Config:
             )
         _validate_coherent_combine(self.coherent, components)
         _validate_ad_readiness(self.ad_mode, components)
-        if self.workspace_limit_bytes is not None and self.workspace_limit_bytes < 0:
-            raise ValueError("workspace_limit_bytes must be non-negative")
+        validate_workspace_limit_bytes(self.workspace_limit_bytes)
 
         object.__setattr__(self, "max_light_depth", max_light_depth)
         object.__setattr__(self, "components", components)
