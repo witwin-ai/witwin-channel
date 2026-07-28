@@ -12,7 +12,7 @@ from witwin.channel.propagation import geometry as visibility
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
+PACKAGE_ROOT = REPOSITORY_ROOT / "witwin" / "channel"
 
 
 def _fake_exported() -> dict[str, torch.Tensor]:

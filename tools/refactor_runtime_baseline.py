@@ -531,7 +531,7 @@ def run_child(
     repeats: int,
 ) -> dict[str, object]:
     validate_measurement_policy(MIN_PROCESSES, warmup, repeats)
-    sys.path[:0] = [str(repo / "src"), str(repo)]
+    sys.path[:0] = [str(repo)]
     from tests.support.native_ext import inject_native_paths
 
     if not inject_native_paths():
@@ -1467,7 +1467,7 @@ def run_extended_child(
     repeats: int,
 ) -> dict[str, object]:
     validate_measurement_policy(MIN_PROCESSES, warmup, repeats)
-    sys.path[:0] = [str(repo / "src"), str(repo)]
+    sys.path[:0] = [str(repo)]
     from tests.support.native_ext import inject_native_paths
 
     if not inject_native_paths():

@@ -227,7 +227,7 @@ def test_max_depth_overflow_is_fail_loud_for_two_walls():
         """
     )
     environment = os.environ.copy()
-    source_root = str(_REPOSITORY_ROOT / "src")
+    source_root = str(_REPOSITORY_ROOT)
     core_source_root = str(Path(core_package.__file__).resolve().parents[2])
     environment["PYTHONPATH"] = os.pathsep.join((source_root, core_source_root))
     completed = subprocess.run(

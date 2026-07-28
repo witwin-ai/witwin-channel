@@ -306,7 +306,6 @@ def _native_case_stats(
 def _run_native(args: argparse.Namespace) -> dict[str, Any]:
     import torch
 
-    sys.path.insert(0, str(REPO_ROOT / "src"))
     sys.path.insert(0, str(REPO_ROOT))
     from witwin.channel import ReceiverPoint, Transmitter, build_info
     from witwin.core import Scene

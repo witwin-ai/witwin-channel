@@ -12,7 +12,7 @@ from witwin.channel.interactions import coupled as discovery_coupled
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
+PACKAGE_ROOT = REPOSITORY_ROOT / "witwin" / "channel"
 _COUPLED_DIGEST = "229a286fe971ea970efc5d2821234068a6ca7f0d428454f87e1e35d8450697b3"
 
 

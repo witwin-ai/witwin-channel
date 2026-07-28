@@ -270,7 +270,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
   `ci/check_orphan_modules.py` keeps the Python half of that deletion from
   regrowing: every production module must be reachable from the package root or
   one of the four solver entry points, so a resurrected dead module fails the
-  quick tier instead of sitting in `src/` until the next manual sweep.
+  quick tier instead of sitting in `witwin/` until the next manual sweep.
 - `PathResult` per-event `InteractionType` includes `TRANSMISSION` and
   `SCATTERING`; scattering paths are exported as incoherent power paths
   (`scattering_paths_incoherent: true` metadata).

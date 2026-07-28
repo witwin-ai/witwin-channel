@@ -510,7 +510,7 @@ def _fresh_build(
     )
     build_capture.pop("stdout_bytes")
     build_capture.pop("stderr_bytes")
-    source_package = source / "src" / "witwin"
+    source_package = source / "witwin"
     installed_package = site_packages / "witwin"
     site_packages.mkdir(parents=True, exist_ok=False)
     shutil.copytree(source_package, installed_package)

@@ -16,7 +16,6 @@ def _child(solver: str) -> dict[str, Any]:
     phase_start = time.perf_counter()
     import torch
 
-    sys.path.insert(0, str(REPO_ROOT / "src"))
     sys.path.insert(0, str(REPO_ROOT))
     from tests.support.native_ext import inject_native_paths
 
@@ -92,7 +91,6 @@ def _child(solver: str) -> dict[str, Any]:
 
 
 def _parent(solvers: tuple[str, ...], repeats: int) -> dict[str, Any]:
-    sys.path.insert(0, str(REPO_ROOT / "src"))
     sys.path.insert(0, str(REPO_ROOT))
     from benchmarks.harness import versioned_report
     from tests.support.native_ext import inject_native_paths

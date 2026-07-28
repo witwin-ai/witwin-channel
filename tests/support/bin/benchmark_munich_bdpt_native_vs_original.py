@@ -14,7 +14,6 @@ from typing import Any
 import torch
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(_REPO_ROOT / "src"))
 sys.path.insert(0, str(_REPO_ROOT))
 
 from witwin.core import PhysicalMaterial, Scene  # noqa: E402

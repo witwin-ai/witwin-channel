@@ -87,7 +87,7 @@ def test_normalize_vec3_matches_frozen_expression():
 
 
 def test_core_modules_do_not_depend_on_solver_packages():
-    core_dir = Path(__file__).resolve().parents[2] / "src" / "witwin" / "channel" / "core"
+    core_dir = Path(__file__).resolve().parents[2] / "witwin" / "channel" / "core"
     for path in core_dir.glob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         imported = [

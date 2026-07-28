@@ -37,7 +37,6 @@ def _is_oom(error: RuntimeError) -> bool:
 
 
 def _native_imports() -> dict[str, Any]:
-    sys.path.insert(0, str(_REPO_ROOT / "src"))
     sys.path.insert(0, str(_REPO_ROOT))
     import torch
     from witwin.channel import Transmitter

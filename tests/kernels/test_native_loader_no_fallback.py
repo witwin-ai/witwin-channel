@@ -127,7 +127,7 @@ def test_rayd_scene_builder_uses_channel_scene_bridge():
 def test_production_sources_have_no_rayd_dispatch_or_loader_fallbacks():
     repo = Path(__file__).resolve().parents[2]
     roots = (
-        repo / "src" / "witwin" / "channel",
+        repo / "witwin" / "channel",
         repo / "native" / "channel",
     )
     forbidden = (
@@ -157,7 +157,7 @@ def test_production_sources_have_no_rayd_dispatch_or_loader_fallbacks():
 def test_production_sources_have_no_legacy_fallback_state_terms():
     repo = Path(__file__).resolve().parents[2]
     roots = (
-        repo / "src" / "witwin" / "channel",
+        repo / "witwin" / "channel",
         repo / "native" / "channel",
     )
     forbidden = (
@@ -200,8 +200,8 @@ def test_mc_bdpt_hot_paths_do_not_make_python_layout_copies():
     # Each solver is either a collapsed single module or a package directory;
     # a missing directory would make this gate pass vacuously.
     roots = (
-        repo / "src" / "witwin" / "channel" / "montecarlo" / "basic.py",
-        repo / "src" / "witwin" / "channel" / "montecarlo" / "bdpt.py",
+        repo / "witwin" / "channel" / "montecarlo" / "basic.py",
+        repo / "witwin" / "channel" / "montecarlo" / "bdpt.py",
     )
     forbidden = (".contiguous(", ".reshape(")
 
@@ -219,7 +219,7 @@ def test_mc_bdpt_hot_paths_do_not_make_python_layout_copies():
 def test_path_solver_uses_the_typed_enumerated_engine():
     repo = Path(__file__).resolve().parents[2]
     source = (
-        repo / "src" / "witwin" / "channel" / "path.py"
+        repo / "witwin" / "channel" / "path.py"
     ).read_text()
 
     assert "propagation.enumerated import" in source
@@ -231,7 +231,7 @@ def test_path_solver_uses_the_typed_enumerated_engine():
 
 def test_mc_bdpt_hot_paths_do_not_make_python_empty_wedge_sentinels():
     repo = Path(__file__).resolve().parents[2]
-    montecarlo = repo / "src" / "witwin" / "channel" / "montecarlo"
+    montecarlo = repo / "witwin" / "channel" / "montecarlo"
     basic = montecarlo / "basic.py"
     bdpt = montecarlo / "bdpt.py"
     # BDPT is one module now. This gate is about its endpoint subpath and
@@ -303,7 +303,7 @@ def test_bdpt_package_does_not_reintroduce_python_los_visibility_helpers():
     # file it named: those two visibility facades live in kernels/montecarlo.py,
     # which this scan does not cover.
     repo = Path(__file__).resolve().parents[2]
-    module = repo / "src" / "witwin" / "channel" / "montecarlo" / "bdpt.py"
+    module = repo / "witwin" / "channel" / "montecarlo" / "bdpt.py"
     forbidden = (
         "direct_los_path_gain",
         "visible_los_path_gain",

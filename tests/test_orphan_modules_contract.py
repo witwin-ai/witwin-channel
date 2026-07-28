@@ -15,11 +15,11 @@ from ci import check_orphan_modules as orphan
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
+PACKAGE_ROOT = REPOSITORY_ROOT / "witwin" / "channel"
 
 
 def _synthetic_package(tmp_path: Path, files: dict[str, str]) -> Path:
-    package_root = tmp_path / "src" / "witwin" / "channel"
+    package_root = tmp_path / "witwin" / "channel"
     for relative, source in files.items():
         path = package_root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -28,7 +28,7 @@ def _synthetic_package(tmp_path: Path, files: dict[str, str]) -> Path:
 
 
 def _mirror(tmp_path: Path) -> Path:
-    package_root = tmp_path / "src" / "witwin" / "channel"
+    package_root = tmp_path / "witwin" / "channel"
     shutil.copytree(
         PACKAGE_ROOT,
         package_root,
@@ -166,4 +166,4 @@ def test_cli_fails_and_names_the_orphan(tmp_path: Path, capsys):
     output = capsys.readouterr().out
     assert "unreachable production module" in output
     assert "witwin.channel.scattering.energy" in output
-    assert "src/witwin/channel/scattering/energy.py" in output
+    assert "witwin/channel/scattering/energy.py" in output

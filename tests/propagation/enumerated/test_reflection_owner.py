@@ -13,7 +13,7 @@ from witwin.channel.propagation import topology
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
+PACKAGE_ROOT = REPOSITORY_ROOT / "witwin" / "channel"
 # ``_face_sequence_chunks`` re-pinned when the topology kernel facades moved to
 # ``witwin.channel.kernels.topology``: the only AST difference is the module
 # alias the two chunk calls are spelled through. Control flow, arguments and

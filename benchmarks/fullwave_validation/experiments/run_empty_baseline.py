@@ -18,7 +18,6 @@ OUTPUT_DIR = Path(
 ).resolve()
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(ROOT / "src"))
 maxwell_source = os.environ.get("WITWIN_MAXWELL_SOURCE")
 if maxwell_source:
     sys.path.insert(0, maxwell_source)

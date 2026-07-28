@@ -96,7 +96,7 @@ def test_profiling_owner_has_no_tensor_or_cuda_execution_calls() -> None:
     """
 
     source = (
-        _ROOT / "src" / "witwin" / "channel" / "runtime.py"
+        _ROOT / "witwin" / "channel" / "runtime.py"
     ).read_text(encoding="utf-8")
     tree = ast.parse(source)
     owners = [
@@ -225,7 +225,7 @@ def test_profile_contract_matches_closed_semantic_name_sets() -> None:
 
 def test_baseline_owners_emit_only_real_profile_annotations() -> None:
     enumerated = _function(
-        "src/witwin/channel/interactions/transmission.py",
+        "witwin/channel/interactions/transmission.py",
         "_transmission_topology",
     )
     assert _profile_enum_members(enumerated, "profiled_cuda_range") == {
@@ -233,7 +233,7 @@ def test_baseline_owners_emit_only_real_profile_annotations() -> None:
     }
 
     montecarlo = _function(
-        "src/witwin/channel/interactions/transmission.py",
+        "witwin/channel/interactions/transmission.py",
         "straight_transmission_chains",
     )
     assert _profile_enum_members(montecarlo, "profiled_cuda_range") == {
@@ -242,7 +242,7 @@ def test_baseline_owners_emit_only_real_profile_annotations() -> None:
     assert _profile_enum_members(montecarlo, "cuda_profile_mark") == {"OPTIX_TRAVERSAL"}
 
     diffraction = _function(
-        "src/witwin/channel/interactions/diffraction.py",
+        "witwin/channel/interactions/diffraction.py",
         "_diffraction_topology_order1",
     )
     assert _profile_enum_members(diffraction, "profiled_cuda_range") == {
@@ -256,7 +256,7 @@ def test_baseline_owners_emit_only_real_profile_annotations() -> None:
     assert "DIFFRACTION_PAIR_REDUCER" not in ast.dump(diffraction)
 
     diffraction_query = _function(
-        "src/witwin/channel/interactions/diffraction.py",
+        "witwin/channel/interactions/diffraction.py",
         "query_diffraction_order1",
     )
     assert _profile_enum_members(diffraction_query, "cuda_profile_mark") == {

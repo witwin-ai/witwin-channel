@@ -208,7 +208,7 @@ conda run -n witwin2 python ci/run_ci_tier.py cuda
 ```
 
 Architecture and domain-owner documentation lives next to the implementation
-under [`src/witwin/channel`](src/witwin/channel). Contributor rules and the
+under [`witwin/channel`](witwin/channel). Contributor rules and the
 full native validation matrix are defined in [`AGENTS.md`](AGENTS.md).
 
 ## Citation

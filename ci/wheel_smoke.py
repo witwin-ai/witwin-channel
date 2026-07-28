@@ -208,7 +208,7 @@ def _checked_in_package_members() -> frozenset[str]:
             "--others",
             "--exclude-standard",
             "--",
-            "src/witwin",
+            "witwin",
         ],
         cwd=repository_root,
         capture_output=True,
@@ -216,21 +216,20 @@ def _checked_in_package_members() -> frozenset[str]:
     )
     if result.returncode != 0:
         detail = result.stderr.decode("utf-8", errors="replace").strip()
-        raise ValueError(f"cannot read checked-in src/witwin member list: {detail}")
+        raise ValueError(f"cannot read checked-in witwin member list: {detail}")
     paths = [
         path
         for path in result.stdout.decode("utf-8").split("\0")
         if path and (repository_root / path).is_file()
     ]
-    prefix = "src/"
-    if not paths or any(not path.startswith(prefix) for path in paths):
-        raise ValueError("checked-in src/witwin member list is malformed or empty")
-    return frozenset(path[len(prefix) :] for path in paths)
+    if not paths or any(not path.startswith("witwin/") for path in paths):
+        raise ValueError("checked-in witwin member list is malformed or empty")
+    return frozenset(paths)
 
 
 def _source_member_payload(member: str) -> bytes:
     repository_root = Path(__file__).resolve().parents[1]
-    path = repository_root / "src" / member
+    path = repository_root / member
     try:
         return path.read_bytes()
     except OSError as exc:

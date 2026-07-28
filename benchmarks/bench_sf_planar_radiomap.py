@@ -153,7 +153,6 @@ def _run_sionna_in_child(*, samples: int, repeats: int, json_path: pathlib.Path,
 
 
 def _native_scene() -> Any:
-    sys.path.insert(0, str(_REPO_ROOT / "src"))
     sys.path.insert(0, str(_REPO_ROOT))
     import torch
     from witwin.channel import Transmitter
@@ -184,7 +183,6 @@ def run_native_planar_benchmark(
     repeats: int,
     components: set[str],
 ) -> dict[str, Any]:
-    sys.path.insert(0, str(_REPO_ROOT / "src"))
     sys.path.insert(0, str(_REPO_ROOT))
     import torch
     from witwin.channel.montecarlo.basic import Config, solve

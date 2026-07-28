@@ -240,7 +240,7 @@ def _load_rayd_lock() -> dict[str, Any]:
         raw = packaged.read_text(encoding="utf-8")
     else:
         repository_lock = (
-            Path(__file__).resolve().parents[3] / "dependencies" / "rayd.lock.json"
+            Path(__file__).resolve().parents[2] / "dependencies" / "rayd.lock.json"
         )
         try:
             raw = repository_lock.read_text(encoding="utf-8")

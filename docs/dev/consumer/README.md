@@ -1,6 +1,6 @@
 # Propagation consumer boundary
 
-This is the owner document for `src/witwin/channel/propagation/consumer.py`.
+This is the owner document for `witwin/channel/propagation/consumer.py`.
 It lives in docs rather than beside the code because every owner document does;
 no documentation remains inside the package tree.
 

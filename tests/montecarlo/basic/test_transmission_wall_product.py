@@ -711,7 +711,7 @@ def test_transmission_wall_product_source_freezes_residency_and_reduction() -> N
         _ROOT / "native/channel/kernels/mc_transmission_wall_product.cu"
     ).read_text(encoding="utf-8")
     live_route = (
-        _ROOT / "src/witwin/channel/montecarlo/basic.py"
+        _ROOT / "witwin/channel/montecarlo/basic.py"
     ).read_text(encoding="utf-8")
     assert "wall_product_shared_backward_kernel" in source
     assert "frequency_owner" in source

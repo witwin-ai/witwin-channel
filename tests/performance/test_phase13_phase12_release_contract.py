@@ -26,7 +26,6 @@ def _config(tmp_path: Path) -> tuple[SimpleNamespace, dict[str, object]]:
     checkout = tmp_path / "validation"
     extension = (
         checkout
-        / "src"
         / "witwin"
         / "channel"
         / "_channel.cp311-win_amd64.pyd"
@@ -96,7 +95,7 @@ def test_release_tiers_bind_packaged_checkout_without_developer_override(
     environment, binding = _runner_channel_environment(config, validation)  # type: ignore[arg-type]
 
     assert binding["mode"] == "runner-owned-packaged-validation-checkout"
-    assert environment["PYTHONPATH"] == str(tmp_path / "validation" / "src")
+    assert environment["PYTHONPATH"] == str(tmp_path / "validation")
     assert environment["TORCH_CUDA_ARCH_LIST"] == TORCH_WHEEL_ARCHITECTURES
     assert f'-DRAYD_SOURCE_DIR="{(tmp_path / "rayd").as_posix()}"' in environment[
         "CMAKE_ARGS"

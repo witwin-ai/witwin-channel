@@ -12,7 +12,7 @@ from typing import Any
 
 
 PACKAGE = "witwin.channel"
-DEFAULT_PACKAGE_PATH = Path("src/witwin/channel")
+DEFAULT_PACKAGE_PATH = Path("witwin/channel")
 DEFAULT_ALLOWLIST_PATH = Path("ci/import_graph_allowlist.json")
 
 # This digest freezes the debt universe. Entries may be removed from the active
@@ -55,8 +55,17 @@ DEFAULT_ALLOWLIST_PATH = Path("ci/import_graph_allowlist.json")
 # module did. Only ``target`` changed, and the digest was recomputed for that
 # single field. The rule, source, line, column, ADR and justification are
 # untouched, and nothing was added to the universe.
+#
+# Re-keyed a third time when the ``src/`` layer was removed and ``src/witwin/``
+# became ``witwin/``, aligning Channel with the three sibling subprojects that
+# already declare their package at the checkout root. Baseline entries are keyed
+# on file paths, so a sanctioned directory move relocates them exactly as the
+# two collapses above did. Only ``path`` changed, on both entries, and the
+# digest was recomputed for that single field. The entry set is identical -
+# solver-001 and mc-enum-001, zero added, zero removed - and the rule, source,
+# target, line, column, ADR, justification and ``allowed`` lists are untouched.
 FROZEN_BASELINE_DIGEST = (
-    "17e3e0010425dca8335cfd513cc578df36e050b91ba1f628c5b699d05efbe91b"
+    "0c78d55d6102c834134b55af2f4644cb36b3e460cd7830de6cbb78e55f35b361"
 )
 
 _DEBT_GROUP_BY_RULE = {
@@ -179,7 +188,7 @@ def _parse_file(
 ) -> list[ImportEdge]:
     source, is_package = _module_name(package_root, path)
     tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
-    repository_root = package_root.parents[2]
+    repository_root = package_root.parents[1]
     display_path = path.relative_to(repository_root).as_posix()
     edges: list[ImportEdge] = []
     for node in ast.walk(tree):

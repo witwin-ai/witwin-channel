@@ -33,7 +33,7 @@ IDENTITY_PROBE_REPO_PATH = Path("benchmarks/phase13_phase12_identity_probe.py")
 BOOTSTRAP_REPO_PATH = Path("benchmarks/phase13_phase12_bootstrap.py")
 RAYD_LOCK_REPO_PATH = Path("dependencies/rayd.lock.json")
 DIFFRACTION_ROUTE_REPO_PATH = Path(
-    "src/witwin/channel/interactions/diffraction.py"
+    "witwin/channel/interactions/diffraction.py"
 )
 NATIVE_MANIFEST_REPO_PATH = Path("ci/native-binding-manifest.json")
 RUNNER_REPO_PATHS = (
@@ -402,7 +402,7 @@ def verify_checkouts(
             assert isinstance(audit, dict)
             for relative in audit["changed_tracked_files"]:
                 if not (
-                    str(relative).startswith(("src/", "native/", "ci/", "cmake/"))
+                    str(relative).startswith(("witwin/", "native/", "ci/", "cmake/"))
                     or relative == "CMakeLists.txt"
                 ):
                     continue
@@ -459,7 +459,7 @@ def verify_checkouts(
     }
 
 
-_PRODUCTION_ROUTE_PATHS = ("src", "native", "ci", "cmake", "CMakeLists.txt")
+_PRODUCTION_ROUTE_PATHS = ("witwin", "native", "ci", "cmake", "CMakeLists.txt")
 _ROUTE_POLICY = {
     "enumerated_penetration": {
         "old": (
@@ -579,7 +579,7 @@ def _route_transition_at_revisions(
         _git(git_executable, repository, "diff", "--name-only", baseline, candidate)
     ).splitlines()
     checks["production_route_changed"] = any(
-        item.startswith(("src/", "native/", "ci/", "cmake/")) or item == "CMakeLists.txt"
+        item.startswith(("witwin/", "native/", "ci/", "cmake/")) or item == "CMakeLists.txt"
         for item in changed
     )
     if not all(checks.values()):
@@ -639,7 +639,7 @@ def verify_route_transition(
         )
     ).splitlines()
     checks["production_route_changed"] = any(
-        item.startswith(("src/", "native/", "ci/", "cmake/")) or item == "CMakeLists.txt"
+        item.startswith(("witwin/", "native/", "ci/", "cmake/")) or item == "CMakeLists.txt"
         for item in changed
     )
     if not all(checks.values()):

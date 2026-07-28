@@ -58,7 +58,7 @@ def test_phase_e_symbols_have_one_live_owner_contract_and_e2e_caller() -> None:
 
 
 def test_phase_e_deletes_old_depth_march_without_a_compatibility_alias() -> None:
-    package = ROOT / "src/witwin/channel"
+    package = ROOT / "witwin/channel"
     assert not (package / "propagation/geometry/transmission.py").exists()
     assert not (package / "propagation/topology/discovery/transmission.py").exists()
     for path in package.rglob("*.py"):

@@ -9,7 +9,7 @@
       "baseline": [
         {
           "id": "solver-001",
-          "path": "src/witwin/channel/montecarlo/bdpt/solver.py",
+          "path": "witwin/channel/montecarlo/bdpt/solver.py",
           "line": 27,
           "column": 0,
           "rule": "solver_to_solver",
@@ -23,7 +23,7 @@
       "baseline": [
         {
           "id": "mc-enum-001",
-          "path": "src/witwin/channel/montecarlo/bdpt.py",
+          "path": "witwin/channel/montecarlo/bdpt.py",
           "line": 105,
           "column": 0,
           "rule": "mc_enumerated_dependency",

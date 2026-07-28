@@ -230,7 +230,7 @@ def test_transmission_d_plus_one_capacity_failure_is_loud_in_subprocess():
         """
     )
     environment = os.environ.copy()
-    source_root = str(_ROOT / "src")
+    source_root = str(_ROOT)
     core_root = str(_ROOT.parent / "core-radar-architecture-stage1")
     environment["PYTHONPATH"] = os.pathsep.join(
         value

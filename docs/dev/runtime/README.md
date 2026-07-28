@@ -1,6 +1,6 @@
 # Runtime owner
 
-`runtime` is one module, `src/witwin/channel/runtime.py`. This document lives
+`runtime` is one module, `witwin/channel/runtime.py`. This document lives
 in `docs/dev/` rather than beside it because a module has no directory to hold
 a README. No owner document lives inside the package tree; the sibling owners
 keep theirs under `docs/dev/<domain>/README.md` too.

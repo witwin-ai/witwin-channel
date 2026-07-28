@@ -163,7 +163,7 @@ def test_bdpt_public_solve_lazy_import_preserves_identity_and_pickle():
         "assert pickle.loads(pickle.dumps(solve)) is solve"
     )
     environment = os.environ.copy()
-    source_root = str(REPOSITORY_ROOT / "src")
+    source_root = str(REPOSITORY_ROOT)
     core_root = str(REPOSITORY_ROOT.parent / "core-radar-architecture-stage1")
     environment["PYTHONPATH"] = os.pathsep.join(
         value

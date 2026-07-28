@@ -13,22 +13,22 @@ def _install_route_replay(
 ) -> None:
     matches = {
         ("base", "incident_te_tm_fractions"): [
-            "src/witwin/channel/montecarlo/events/transmission.py:129:def incident_te_tm_fractions("
+            "witwin/channel/montecarlo/events/transmission.py:129:def incident_te_tm_fractions("
         ],
         ("candidate", "incident_te_tm_fractions"): [],
         ("base", "straight_transmission_chains"): [
-            "src/witwin/channel/montecarlo/events/transmission.py:185:def straight_transmission_chains("
+            "witwin/channel/montecarlo/events/transmission.py:185:def straight_transmission_chains("
         ],
         ("candidate", "straight_transmission_chains"): (
             [
-                "src/witwin/channel/montecarlo/events/transmission.py:150:def straight_transmission_chains("
+                "witwin/channel/montecarlo/events/transmission.py:150:def straight_transmission_chains("
             ]
             if keep_stable_candidate
             else []
         ),
         ("base", "MonteCarloTargetInset"): [],
         ("candidate", "MonteCarloTargetInset"): [
-            "src/witwin/channel/montecarlo/events/transmission.py:212:    policy=MonteCarloTargetInset,"
+            "witwin/channel/montecarlo/events/transmission.py:212:    policy=MonteCarloTargetInset,"
         ],
     }
 
@@ -41,7 +41,7 @@ def _install_route_replay(
         workers,
         "_git",
         lambda _git, _repo, *args, **_kwargs: (
-            "src/witwin/channel/montecarlo/events/transmission.py"
+            "witwin/channel/montecarlo/events/transmission.py"
             if args[:2] == ("diff", "--name-only")
             else ""
         ),

@@ -5,7 +5,7 @@ from typed evaluated paths into antenna-aware signal views. Topology discovery,
 geometry re-evaluation, and electromagnetic field evaluation remain owned by
 `propagation`.
 
-The domain is one module, `src/witwin/channel/path.py`. This README lives under
+The domain is one module, `witwin/channel/path.py`. This README lives under
 `docs/dev/` because every owner document does; no documentation remains inside
 the package tree.
 

@@ -27,7 +27,6 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 maxwell_source = os.environ.get("WITWIN_MAXWELL_SOURCE")
 if maxwell_source:
     sys.path.insert(0, maxwell_source)
-sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT))
 
 # witwin-maxwell currently selects gcc-10 when its FDTD module is imported.

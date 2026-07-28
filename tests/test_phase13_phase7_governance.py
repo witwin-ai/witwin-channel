@@ -193,7 +193,7 @@ def test_phase7_freezes_native_tx_visibility_selection_requirements() -> None:
     matrix = _json(AUDIT / "phase13-diffraction-family-matrix.json")
     selection = matrix["tx_visible_state_selection"]  # type: ignore[index]
     source = (
-        ROOT / "src/witwin/channel/interactions/diffraction.py"
+        ROOT / "witwin/channel/interactions/diffraction.py"
     ).read_text(encoding="utf-8")
 
     assert selection["accepted_native_operation"] == (  # type: ignore[index]

@@ -11,7 +11,7 @@ from witwin.channel import runtime
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
+PACKAGE_ROOT = REPOSITORY_ROOT / "witwin" / "channel"
 
 
 def test_topology_sampling_is_the_single_object_owner():

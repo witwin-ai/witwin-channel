@@ -153,7 +153,7 @@ def _prepare_packaged_validation_checkout(
         stem="release-validation-checkout",
         timeout_seconds=timeout_seconds,
     )
-    validation_package = validation / "src" / "witwin" / "channel"
+    validation_package = validation / "witwin" / "channel"
     validation_extension = validation_package / source_extension.name
     validation_fingerprint = (
         validation_package / "_channel.build-fingerprint"
@@ -161,7 +161,7 @@ def _prepare_packaged_validation_checkout(
     if validation_extension.exists() or validation_fingerprint.exists():
         raise EvidenceError("packaged validation overlay target already exists")
     git_exclude = validation / ".git" / "info" / "exclude"
-    exclude_line = "/src/witwin/channel/_channel.build-fingerprint"
+    exclude_line = "/witwin/channel/_channel.build-fingerprint"
     try:
         existing_excludes = git_exclude.read_text(encoding="utf-8")
         separator = "" if not existing_excludes or existing_excludes.endswith("\n") else "\n"
@@ -222,7 +222,7 @@ def _prepare_packaged_validation_checkout(
             "-I",
             str(validation / "benchmarks" / "phase13_phase12_bootstrap.py"),
             "--site-packages",
-            str(validation / "src"),
+            str(validation),
             "--script",
             str(validation / "benchmarks" / "phase13_phase12_identity_probe.py"),
         ],
@@ -276,8 +276,7 @@ def _runner_channel_environment(
         python_executable = candidate.python_executable.resolve(strict=True)
     except (KeyError, OSError) as exc:
         raise EvidenceError("runner packaged validation binding is missing") from exc
-    source_root = checkout / "src"
-    expected_extension_parent = source_root / "witwin" / "channel"
+    expected_extension_parent = checkout / "witwin" / "channel"
     if extension.parent != expected_extension_parent:
         raise EvidenceError("validation extension is not in the packaged source layout")
     fingerprint = str(validation.get("build_fingerprint", ""))
@@ -309,7 +308,7 @@ def _runner_channel_environment(
         raise EvidenceError("release environment must not enable the developer loader")
     environment.update(
         {
-            "PYTHONPATH": str(source_root),
+            "PYTHONPATH": str(checkout),
             "CMAKE_ARGS": cmake_args,
             "CMAKE_GENERATOR": "Ninja",
             "CMAKE_BUILD_PARALLEL_LEVEL": "4",
@@ -870,7 +869,7 @@ def _naming_audit(checkout: Path) -> dict[str, object]:
         r"(?:^|\W)v2_[A-Za-z][A-Za-z0-9_]*(?:$|\W))"
     )
     protocol_exemptions = (re.compile(r"(?i)porcelain=v1\b"),)
-    production_roots = ("src/", "native/", "cmake/", "ci/")
+    production_roots = ("witwin/", "native/", "cmake/", "ci/")
     offenders: list[str] = []
     for path in checkout.rglob("*"):
         if not path.is_file() or path.suffix.casefold() not in suffixes:
@@ -1105,7 +1104,7 @@ def _validate_runner_binding(
         or not site_packages_source.is_absolute()
         or not extension.is_absolute()
         or extension.parent
-        != validation_checkout / "src" / "witwin" / "channel"
+        != validation_checkout / "witwin" / "channel"
         or not rayd_source.is_absolute()
         or not python_executable.is_absolute()
     ):
@@ -1162,7 +1161,7 @@ def _validate_packaged_validation_checkout(
         value["commit"] != final_history["candidate_commit"]
         or value["build_fingerprint"] != implementation.get("final_build_fingerprint")
         or value["local_exclude"]
-        != "/src/witwin/channel/_channel.build-fingerprint"
+        != "/witwin/channel/_channel.build-fingerprint"
     ):
         raise EvidenceError("packaged validation checkout identity differs")
     checkout = Path(str(value["checkout"]))
@@ -1172,7 +1171,7 @@ def _validate_packaged_validation_checkout(
         not checkout.is_absolute()
         or not source_site_packages.is_absolute()
         or packaged_path.parent
-        != checkout / "src" / "witwin" / "channel"
+        != checkout / "witwin" / "channel"
     ):
         raise EvidenceError("packaged validation checkout paths are not canonical")
     source_extension = value["source_extension"]

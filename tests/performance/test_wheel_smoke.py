@@ -22,7 +22,7 @@ def _write_wheel(path: Path, *, name: str, version: str) -> bytes:
     dist_info = f"witwin_channel-{version}.dist-info"
     repository_root = Path(wheel_smoke.__file__).resolve().parents[1]
     members = {
-        member: (repository_root / "src" / member).read_bytes()
+        member: (repository_root / member).read_bytes()
         for member in wheel_smoke._checked_in_package_members()
     }
     members.update(

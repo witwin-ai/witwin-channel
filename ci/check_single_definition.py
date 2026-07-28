@@ -107,7 +107,7 @@ from pathlib import Path
 
 
 PACKAGE = "witwin.channel"
-DEFAULT_PACKAGE_PATH = Path("src/witwin/channel")
+DEFAULT_PACKAGE_PATH = Path("witwin/channel")
 
 _COMPONENT_NAMES = frozenset(
     {"los", "reflection", "diffraction", "transmission", "scattering"}

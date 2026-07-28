@@ -86,7 +86,7 @@ def scan_file(
 
 def production_python_files(root: Path) -> list[Path]:
     root = root.resolve()
-    source_root = root / "src" if (root / "src").is_dir() else root
+    source_root = root / "witwin" if (root / "witwin").is_dir() else root
     return sorted(
         path
         for path in source_root.rglob("*.py")

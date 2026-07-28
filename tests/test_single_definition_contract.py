@@ -25,7 +25,7 @@ from ci import check_single_definition as single
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
+PACKAGE_ROOT = REPOSITORY_ROOT / "witwin" / "channel"
 
 AVAILABILITY = "component availability status"
 DEPTH = "component max-depth rule"
@@ -325,7 +325,7 @@ def test_cli_passes_with_repository_defaults(capsys):
 
 
 def test_cli_fails_on_a_duplicate_planted_in_a_mirror(tmp_path: Path, capsys):
-    package_root = tmp_path / "src" / "witwin" / "channel"
+    package_root = tmp_path / "witwin" / "channel"
     shutil.copytree(
         PACKAGE_ROOT,
         package_root,

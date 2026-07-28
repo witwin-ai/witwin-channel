@@ -7,7 +7,7 @@ where it is a documented structural zero, and where the solver refuses to
 differentiate rather than return a misleading value.
 
 The machine-readable form of this boundary lives in
-`src/witwin/channel/capabilities.py` (`ad_contract` and each solver's
+`witwin/channel/capabilities.py` (`ad_contract` and each solver's
 `ad_excluded`). If this document and that file disagree, the file is the source
 of truth and this document is stale — reconcile them.
 

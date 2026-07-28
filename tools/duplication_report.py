@@ -40,7 +40,7 @@ from pathlib import Path
 
 SCHEMA_VERSION = 1
 MIN_TOKENS = 100
-PACKAGE_RELATIVE = "src/witwin/channel"
+PACKAGE_RELATIVE = "witwin/channel"
 NATIVE_RELATIVE = "native/channel"
 NATIVE_SUFFIXES = frozenset({".cpp", ".cu", ".cuh", ".h", ".hpp"})
 _EXCLUDED_PARTS = frozenset({"tests", "benchmarks", "__pycache__"})

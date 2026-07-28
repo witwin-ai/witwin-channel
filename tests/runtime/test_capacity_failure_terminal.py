@@ -124,7 +124,7 @@ def test_capacity_failure_terminal_trap_isolated_to_subprocess() -> None:
         """
     )
     environment = os.environ.copy()
-    source_root = str(REPOSITORY_ROOT / "src")
+    source_root = str(REPOSITORY_ROOT)
     core_root = str(REPOSITORY_ROOT.parent / "core-radar-architecture-stage1")
     environment["PYTHONPATH"] = os.pathsep.join(
         value
@@ -154,7 +154,7 @@ def test_capacity_failure_terminal_source_has_one_async_device_observer() -> Non
     ).read_text(encoding="utf-8")
     facade = (
         REPOSITORY_ROOT
-        / "src/witwin/channel/runtime.py"
+        / "witwin/channel/runtime.py"
     ).read_text(encoding="utf-8")
 
     assert native.count('asm volatile("trap;")') == 1
@@ -190,7 +190,7 @@ def test_capacity_failure_terminal_source_has_one_async_device_observer() -> Non
 
     production_mentions = sorted(
         path.relative_to(REPOSITORY_ROOT).as_posix()
-        for path in (REPOSITORY_ROOT / "src/witwin/channel").rglob("*.py")
+        for path in (REPOSITORY_ROOT / "witwin/channel").rglob("*.py")
         if "capacity_failure_terminal_check" in path.read_text(encoding="utf-8")
     )
-    assert production_mentions == ["src/witwin/channel/runtime.py"]
+    assert production_mentions == ["witwin/channel/runtime.py"]

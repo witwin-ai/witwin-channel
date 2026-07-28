@@ -5,7 +5,7 @@
 answer "does anything import this module at all", and ruff answers the same
 question one level too low: it reports an unused *import*, never an unused
 *module*. That gap is not hypothetical. The ADR-029/030/031 capacity artifacts
-sat in `src/` after their last caller went away, and the audit that found them
+sat in `witwin/` after their last caller went away, and the audit that found them
 was a one-time manual sweep - a snapshot, not a gate. A committed resurrection
 of any of those modules passes hygiene, the import graph, contract coverage and
 ruff without a word.
@@ -40,7 +40,7 @@ from pathlib import Path
 
 
 PACKAGE = "witwin.channel"
-DEFAULT_PACKAGE_PATH = Path("src/witwin/channel")
+DEFAULT_PACKAGE_PATH = Path("witwin/channel")
 
 # The stable public API, per CLAUDE.md: the package root and the four solver
 # entry points. The root exports only what Channel owns, so it does not reach a

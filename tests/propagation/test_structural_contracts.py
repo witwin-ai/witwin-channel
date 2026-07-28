@@ -11,7 +11,7 @@ from witwin.channel.propagation import enumerated
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
+PACKAGE_ROOT = REPOSITORY_ROOT / "witwin" / "channel"
 
 # Re-frozen when ``propagation/enumerated/`` collapsed into one module. One
 # module cannot hold two classes named ``TopologyConfig``, so the engine-side

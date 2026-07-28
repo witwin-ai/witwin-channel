@@ -9,7 +9,7 @@ from witwin.channel.interactions import diffraction
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
+PACKAGE_ROOT = REPOSITORY_ROOT / "witwin" / "channel"
 # Re-pinned when the geometry kernel facades moved to
 # ``witwin.channel.kernels.geometry``: the only AST difference is the module
 # alias the native plan call is spelled through (``geometry_bridge`` ->

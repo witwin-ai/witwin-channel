@@ -30,7 +30,7 @@ def _json(path: Path) -> dict[str, Any]:
 def _live_path(relative: str) -> Path:
     return ROOT / relative.replace(
         "native/channel_native/", "native/channel/"
-    ).replace("src/witwin/channel_native/", "src/witwin/channel/")
+    ).replace("src/witwin/channel_native/", "witwin/channel/")
 
 
 def test_phase11a_duplication_refresh_is_classified_without_budget_relaxation() -> None:

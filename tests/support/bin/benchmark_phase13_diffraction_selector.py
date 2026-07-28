@@ -18,7 +18,6 @@ _REPO_ROOT = pathlib.Path(
         pathlib.Path(__file__).resolve().parents[3],
     )
 ).resolve()
-sys.path.insert(0, str(_REPO_ROOT / "src"))
 sys.path.insert(0, str(_REPO_ROOT))
 
 from tests.support.scenes import wedge_diffraction_scene  # noqa: E402

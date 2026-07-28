@@ -14,9 +14,9 @@ def test_live_repository_uses_only_channel_identity() -> None:
 
 def test_predecessor_identity_is_rejected_in_live_source() -> None:
     predecessor = "channel" + "_native"
-    findings = identity.scan_text("src/witwin/channel/example.py", predecessor)
+    findings = identity.scan_text("witwin/channel/example.py", predecessor)
     assert [(finding.path, finding.line) for finding in findings] == [
-        ("src/witwin/channel/example.py", 1)
+        ("witwin/channel/example.py", 1)
     ]
 
 

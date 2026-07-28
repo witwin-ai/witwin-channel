@@ -459,7 +459,7 @@ def build_manifest(
     discovered = sorted(
         path
         for suffix in ("*.pyd", "*.so", "*.dll")
-        for path in (repo / "src" / "witwin" / "channel").glob(
+        for path in (repo / "witwin" / "channel").glob(
             f"_channel{suffix}"
         )
     )
@@ -501,10 +501,10 @@ def build_manifest(
 
 
 def _python_modules(repo: Path) -> dict[str, Path]:
-    package_root = repo / "src" / "witwin" / "channel"
+    package_root = repo / "witwin" / "channel"
     modules: dict[str, Path] = {}
     for path in sorted(package_root.rglob("*.py")):
-        relative = path.relative_to(repo / "src").with_suffix("")
+        relative = path.relative_to(repo).with_suffix("")
         parts = list(relative.parts)
         if parts[-1] == "__init__":
             parts.pop()

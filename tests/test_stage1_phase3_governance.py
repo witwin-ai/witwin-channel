@@ -10,7 +10,7 @@ from ci import check_import_graph
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGE_ROOT = ROOT / "src" / "witwin" / "channel"
+PACKAGE_ROOT = ROOT / "witwin" / "channel"
 CONSUMER_MODULE = PACKAGE_ROOT / "propagation" / "consumer.py"
 
 

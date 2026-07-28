@@ -166,7 +166,7 @@ def measure_cold_import(
     repo_root = Path(__file__).resolve().parents[1]
     env = dict(os.environ)
     core_root = repo_root.parent / "core-radar-architecture-stage1"
-    source_paths = [str(core_root), str(repo_root / "src"), str(repo_root)]
+    source_paths = [str(core_root), str(repo_root)]
     inherited = env.get("PYTHONPATH")
     if inherited:
         source_paths.append(inherited)

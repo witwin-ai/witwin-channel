@@ -39,7 +39,7 @@ def _basic_section(title: str) -> str:
     bounds the corresponding section instead.
     """
 
-    source = (ROOT / "src/witwin/channel/montecarlo/basic.py").read_text(
+    source = (ROOT / "witwin/channel/montecarlo/basic.py").read_text(
         encoding="utf-8"
     )
     start = source.index(f"\n# --- {title} ")
@@ -88,7 +88,7 @@ def _transmission_events_section() -> str:
     discovery owner above it out of scope, exactly as a separate file did.
     """
 
-    source = (ROOT / "src/witwin/channel/interactions/transmission.py").read_text(
+    source = (ROOT / "witwin/channel/interactions/transmission.py").read_text(
         encoding="utf-8"
     )
     return source[
@@ -162,7 +162,7 @@ def test_phase_m_active_surface_has_no_generation_or_wip_names() -> None:
         assert "v2" not in entry["target"].casefold()
         assert "wip" not in entry["target"].casefold()
 
-    for root in (ROOT / "src", ROOT / "native"):
+    for root in (ROOT / "witwin", ROOT / "native"):
         for path in root.rglob("*"):
             if path.is_file() and "__pycache__" not in path.parts:
                 name = path.name.casefold()

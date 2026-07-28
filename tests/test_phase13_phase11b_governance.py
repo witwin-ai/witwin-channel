@@ -57,23 +57,23 @@ _PHASE11B_SOURCE_SHA256 = {
 # those regions had when it was captured, so the live-file check follows the
 # move instead of the evidence being rewritten.
 _PHASE15_KERNEL_RELOCATIONS = {
-    "src/witwin/channel/propagation/fields/kernels/functional.py": (
-        "src/witwin/channel/kernels/fields.py"
+    "witwin/channel/propagation/fields/kernels/functional.py": (
+        "witwin/channel/kernels/fields.py"
     ),
-    "src/witwin/channel/scattering/kernels/functional.py": (
-        "src/witwin/channel/kernels/scattering.py"
+    "witwin/channel/scattering/kernels/functional.py": (
+        "witwin/channel/kernels/scattering.py"
     ),
-    "src/witwin/channel/scattering/kernels/functional_chain.py": (
-        "src/witwin/channel/kernels/scattering.py"
+    "witwin/channel/scattering/kernels/functional_chain.py": (
+        "witwin/channel/kernels/scattering.py"
     ),
-    "src/witwin/channel/scattering/kernels/autograd_chain.py": (
-        "src/witwin/channel/kernels/scattering.py"
+    "witwin/channel/scattering/kernels/autograd_chain.py": (
+        "witwin/channel/kernels/scattering.py"
     ),
 }
 
 _LIVE_FILE_SUFFIXES = {".cpp", ".cu", ".cuh", ".h", ".json", ".md", ".py", ".toml", ".yml"}
 _LIVE_ROOTS = (
-    ROOT / "src",
+    ROOT / "witwin",
     ROOT / "native",
     ROOT / "ci",
     ROOT / ".github/workflows",
@@ -87,15 +87,15 @@ _LIVE_TOP_LEVEL = (
 )
 _TRIANGLE_VERTEX_V2_LINES = {
     (
-        "src/witwin/channel/interactions/scattering.py",
+        "witwin/channel/interactions/scattering.py",
         "v2 = vertices.index_select(0, faces[:, 2])",
     ),
     (
-        "src/witwin/channel/interactions/scattering.py",
+        "witwin/channel/interactions/scattering.py",
         "areas = 0.5 * torch.linalg.cross(v1 - v0, v2 - v0).norm(dim=-1)",
     ),
     (
-        "src/witwin/channel/interactions/scattering.py",
+        "witwin/channel/interactions/scattering.py",
         "+ b2 * v2.index_select(0, chosen)",
     ),
     (
@@ -104,7 +104,7 @@ _TRIANGLE_VERTEX_V2_LINES = {
     ),
     ("native/channel/kernels/diffraction.cu", "return v2;"),
     (
-        "src/witwin/channel/kernels/geometry.py",
+        "witwin/channel/kernels/geometry.py",
         "companions (the adjoint/tangent of normalize(cross(v1 - v0, v2 - v0))",
     ),
 }
@@ -202,7 +202,7 @@ def test_phase11b_ledger_refresh_and_source_snapshots_are_historical() -> None:
     for relative, digest in evidence["source_sha256"].items():
         live = relative.replace(
             "native/channel_native/", "native/channel/"
-        ).replace("src/witwin/channel_native/", "src/witwin/channel/")
+        ).replace("src/witwin/channel_native/", "witwin/channel/")
         live = _PHASE15_KERNEL_RELOCATIONS.get(live, live)
         assert (ROOT / live).is_file()
         assert re.fullmatch(r"[0-9a-f]{64}", digest)
@@ -220,7 +220,7 @@ def test_phase11b_ledger_refresh_and_source_snapshots_are_historical() -> None:
 
 
 def test_phase11b_explicit_signatures_and_tu_local_macro_contract_are_preserved() -> None:
-    functional_path = ROOT / "src/witwin/channel/kernels/scattering.py"
+    functional_path = ROOT / "witwin/channel/kernels/scattering.py"
     autograd_path = functional_path
     ensemble = _literal_tuple(functional_path, "_CHAIN_ENSEMBLE_PRIMAL_NAMES")
     realization = _literal_tuple(functional_path, "_CHAIN_REALIZATION_PRIMAL_NAMES")
@@ -302,7 +302,7 @@ def test_phase11_live_surface_has_no_version_suffixed_wip_boundary_name() -> Non
         ):
             if versioned_boundary.search(line):
                 unexpected_boundary_names.append(f"{relative}:{number}: {line.strip()}")
-            if relative.startswith(("src/", "native/")) and re.search(
+            if relative.startswith(("witwin/", "native/")) and re.search(
                 r"\bv2\b", line, re.IGNORECASE
             ):
                 record = (relative, line.strip())

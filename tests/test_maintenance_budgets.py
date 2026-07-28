@@ -214,8 +214,8 @@ def test_native_hard_limit_and_waiver_growth_are_enforced(tmp_path: Path) -> Non
 
 
 def test_ast_measurement_is_reproducible() -> None:
-    first = budgets.measure_repository(ROOT, "src/witwin/channel")
-    second = budgets.measure_repository(ROOT, "src/witwin/channel")
+    first = budgets.measure_repository(ROOT, "witwin/channel")
+    second = budgets.measure_repository(ROOT, "witwin/channel")
 
     assert first == second
 

@@ -13,7 +13,6 @@ import numpy as np
 import torch
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(_REPO_ROOT / "src"))
 sys.path.insert(0, str(_REPO_ROOT))
 
 # Local source must resolve from this checkout before importing the benchmark target.

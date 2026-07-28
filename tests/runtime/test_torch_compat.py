@@ -11,7 +11,7 @@ from witwin.channel import runtime
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PACKAGE_ROOT = REPO_ROOT / "src" / "witwin" / "channel"
+PACKAGE_ROOT = REPO_ROOT / "witwin" / "channel"
 _INSTALLED_TORCH = torch.__version__.split("+", maxsplit=1)[0]
 
 

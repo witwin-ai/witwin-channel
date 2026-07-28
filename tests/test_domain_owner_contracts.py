@@ -38,7 +38,7 @@ def test_materials_package_preserves_public_identity_and_owns_kernel_contracts()
     import witwin.channel.materials as public_materials
     from witwin.channel.kernels.materials import validate_layer_csr
 
-    package_root = ROOT / "src" / "witwin" / "channel"
+    package_root = ROOT / "witwin" / "channel"
 
     # `materials` is one module. A `materials/` package beside it would shadow
     # the module on import, so the directory must not come back.

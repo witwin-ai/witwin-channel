@@ -24,7 +24,6 @@ OUTPUT_DIR = Path(
     )
 ).resolve()
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(ROOT / "src"))
 
 from benchmarks.fullwave_validation.metrics import (  # noqa: E402
     analyze_boundaries,

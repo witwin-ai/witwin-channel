@@ -15,23 +15,22 @@ requires-python = ">=3.11,<3.12"
 dependencies = ["torch==2.10.0", "witwin==0.4.0"]
 
 [tool.scikit-build]
-wheel.packages = ["src/witwin"]
+wheel.packages = ["witwin"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "--import-mode=importlib"
 
 [tool.mypy]
 python_version = "3.11"
 files = [
-    "src/witwin/channel/capabilities.py",
-    "src/witwin/channel/deployment.py",
-    "src/witwin/channel/runtime.py",
-    "src/witwin/channel/deterministic.py",
-    "src/witwin/channel/montecarlo/basic.py",
-    "src/witwin/channel/montecarlo/bdpt.py",
-    "src/witwin/channel/path.py",
+    "witwin/channel/capabilities.py",
+    "witwin/channel/deployment.py",
+    "witwin/channel/runtime.py",
+    "witwin/channel/deterministic.py",
+    "witwin/channel/montecarlo/basic.py",
+    "witwin/channel/montecarlo/bdpt.py",
+    "witwin/channel/path.py",
 ]
 follow_imports = "skip"
 ignore_missing_imports = true
@@ -46,7 +45,7 @@ warn_unused_configs = true
 
 [tool.coverage.run]
 branch = true
-source = ["src/witwin/channel"]
+source = ["witwin/channel"]
 
 [tool.coverage.report]
 precision = 2

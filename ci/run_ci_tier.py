@@ -19,7 +19,7 @@ class Gate:
 
 
 QUICK_GATES = (
-    Gate("quick.ruff", ("-m", "ruff", "check", "src", "tests", "benchmarks", "ci")),
+    Gate("quick.ruff", ("-m", "ruff", "check", "witwin", "tests", "benchmarks", "ci")),
     Gate("quick.mypy", ("-m", "mypy")),
     Gate("quick.import-graph", ("ci/check_import_graph.py",)),
     Gate("quick.contract-coverage", ("ci/check_contract_coverage.py",)),
@@ -45,7 +45,7 @@ QUICK_GATES = (
         "quick.import-no-native",
         (
             "-c",
-            "import sys; sys.path.insert(0, 'src'); "
+            "import sys; sys.path.insert(0, '.'); "
             "import torch, witwin.channel; "
             "assert 'witwin.channel._channel' not in sys.modules; "
             "assert not torch.cuda.is_initialized()",

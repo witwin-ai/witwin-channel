@@ -16,7 +16,6 @@ sys.meta_path = [
     if "_witwin_channel_editable" not in type(finder).__module__
 ]
 sys.path.insert(0, str(_REPO_ROOT.parent / "core-radar-architecture-stage1"))
-sys.path.insert(0, str(_REPO_ROOT / "src"))
 sys.path.insert(0, str(_REPO_ROOT))
 
 from tests.support.native_ext import inject_native_paths  # noqa: E402

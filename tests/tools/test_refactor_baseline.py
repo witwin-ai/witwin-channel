@@ -16,11 +16,11 @@ def _write(path: Path, content: str) -> None:
 
 def test_api_manifest_resolves_reexported_dataclass_without_importing(tmp_path: Path):
     _write(
-        tmp_path / "src/witwin/channel/__init__.py",
+        tmp_path / "witwin/channel/__init__.py",
         "from .api import Config, solve\n__all__ = ['Config', 'solve']\n",
     )
     _write(
-        tmp_path / "src/witwin/channel/api.py",
+        tmp_path / "witwin/channel/api.py",
         """
 from dataclasses import dataclass, field
 
@@ -71,7 +71,7 @@ def solve(scene, config: Config | None = None):
 
 def test_api_manifest_keeps_class_definition_module_without_override(tmp_path: Path):
     _write(
-        tmp_path / "src/witwin/channel/api.py",
+        tmp_path / "witwin/channel/api.py",
         "class Config:\n    pass\n\n__all__ = ['Config']\n",
     )
 
@@ -84,7 +84,7 @@ def test_api_manifest_keeps_class_definition_module_without_override(tmp_path: P
 
 def test_api_manifest_uses_literal_class_module_override(tmp_path: Path):
     _write(
-        tmp_path / "src/witwin/channel/api.py",
+        tmp_path / "witwin/channel/api.py",
         """
 class Config:
     pass
@@ -103,7 +103,7 @@ __all__ = ["Config"]
 
 def test_api_manifest_ignores_nonliteral_and_unrelated_assignments(tmp_path: Path):
     _write(
-        tmp_path / "src/witwin/channel/api.py",
+        tmp_path / "witwin/channel/api.py",
         """
 compatibility_module = "legacy.compat.path"
 
@@ -127,11 +127,11 @@ def test_api_manifest_resolves_literal_module_override_through_reexport(
     tmp_path: Path,
 ):
     _write(
-        tmp_path / "src/witwin/channel/__init__.py",
+        tmp_path / "witwin/channel/__init__.py",
         "from .api import Config\n__all__ = ['Config']\n",
     )
     _write(
-        tmp_path / "src/witwin/channel/api.py",
+        tmp_path / "witwin/channel/api.py",
         """
 class Config:
     pass
@@ -151,11 +151,11 @@ def test_python_body_hash_ignores_locations_comments_and_formatting(tmp_path: Pa
     first = tmp_path / "first"
     second = tmp_path / "second"
     _write(
-        first / "src/witwin/channel/module.py",
+        first / "witwin/channel/module.py",
         "def compute(value):\n    return value + 1\n",
     )
     _write(
-        second / "src/witwin/channel/module.py",
+        second / "witwin/channel/module.py",
         "\n# moved during refactor\ndef compute( value ):\n\n    return value+1  # same body\n",
     )
 

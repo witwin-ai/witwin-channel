@@ -18,7 +18,7 @@ from witwin.channel.kernels import topology as topology_pack
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
+PACKAGE_ROOT = REPOSITORY_ROOT / "witwin" / "channel"
 _RETIRED_NAMES = (
     "TransmissionClosestHitQuery",
     "query_transmission_closest_hit",

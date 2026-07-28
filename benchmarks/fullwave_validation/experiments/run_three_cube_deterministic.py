@@ -27,7 +27,6 @@ OUTPUT_DIR = Path(
 ).resolve()
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(ROOT / "src"))
 
 from benchmarks.fullwave_validation.models import FieldMap  # noqa: E402
 from benchmarks.fullwave_validation.scenarios import (  # noqa: E402
