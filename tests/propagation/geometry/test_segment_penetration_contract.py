@@ -6,10 +6,7 @@ from collections.abc import Callable
 import pytest
 import torch
 
-from witwin.channel.propagation.geometry.kernels import (
-    bridge,
-    penetration_autograd,
-)
+from witwin.channel.kernels import geometry
 from witwin.channel.propagation import penetration
 from witwin.channel.propagation.penetration import (
     SegmentPenetrationBackwardResult,
@@ -56,20 +53,20 @@ def _tape_values(rows: int = 2, capacity: int = 3) -> tuple[torch.Tensor, ...]:
 
 @pytest.fixture
 def cpu_contracts(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(bridge, "validate_cuda_tensor", lambda *args, **kwargs: args[1])
+    monkeypatch.setattr(geometry, "validate_cuda_tensor", lambda *args, **kwargs: args[1])
     monkeypatch.setattr(
-        penetration_autograd, "validate_cuda_tensor", lambda *args, **kwargs: args[1]
+        geometry, "validate_cuda_tensor", lambda *args, **kwargs: args[1]
     )
     monkeypatch.setattr(
-        penetration_autograd,
+        geometry,
         "_ad_checked_tangent",
         lambda name, tangent, primal_shape: tangent,
     )
     monkeypatch.setattr(
-        bridge, "require_capacity_failure_state", lambda state, **kwargs: state
+        geometry, "require_capacity_failure_state", lambda state, **kwargs: state
     )
-    monkeypatch.setattr(bridge, "_ad_check_optional_grad", lambda *args, **kwargs: None)
-    monkeypatch.setattr(bridge, "_ad_check_tangent_vec3", lambda *args, **kwargs: None)
+    monkeypatch.setattr(geometry, "_ad_check_optional_grad", lambda *args, **kwargs: None)
+    monkeypatch.setattr(geometry, "_ad_check_tangent_vec3", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         penetration, "require_tensor", lambda name, value, **kwargs: value
     )
@@ -85,7 +82,7 @@ def _install_native(
     def required(name: str) -> Callable[..., object]:
         return implementations[name]
 
-    monkeypatch.setattr(bridge, "_required_native_op", required)
+    monkeypatch.setattr(geometry, "_required_native_op", required)
 
 
 def _request() -> tuple[object, torch.Tensor, torch.Tensor, torch.Tensor, CapacityFailureState]:
@@ -133,7 +130,7 @@ def test_forward_and_tape_keep_named_order_and_state_identity(
             "rayd_segment_penetration_forward_tape": tape,
         },
     )
-    result = bridge.rayd_segment_penetration_forward(
+    result = geometry.rayd_segment_penetration_forward(
         scene,
         origins,
         targets,
@@ -144,7 +141,7 @@ def test_forward_and_tape_keep_named_order_and_state_identity(
         scene_diagonal=4.5,
         failure_state=state,
     )
-    taped = bridge.rayd_segment_penetration_forward_tape(
+    taped = geometry.rayd_segment_penetration_forward_tape(
         scene,
         origins,
         targets,
@@ -160,8 +157,8 @@ def test_forward_and_tape_keep_named_order_and_state_identity(
     assert isinstance(taped, SegmentPenetrationTapeResult)
     assert result.failure_state is state
     assert taped.failure_state is state
-    assert tuple(getattr(result, name) for name in bridge._SEGMENT_PENETRATION_RESULT_FIELDS) == result_values
-    assert tuple(getattr(taped, name) for name in bridge._SEGMENT_PENETRATION_TAPE_FIELDS) == tape_values
+    assert tuple(getattr(result, name) for name in geometry._SEGMENT_PENETRATION_RESULT_FIELDS) == result_values
+    assert tuple(getattr(taped, name) for name in geometry._SEGMENT_PENETRATION_TAPE_FIELDS) == tape_values
     for _, args in calls:
         assert args[1] is origins
         assert args[2] is targets
@@ -209,7 +206,7 @@ def test_backward_and_jvp_flatten_complete_primal_tape_and_return_named_results(
         },
     )
     grad_distance = torch.ones(2)
-    gradients = bridge.rayd_segment_penetration_backward(
+    gradients = geometry.rayd_segment_penetration_backward(
         scene,
         origins,
         targets,
@@ -225,7 +222,7 @@ def test_backward_and_jvp_flatten_complete_primal_tape_and_return_named_results(
         need_grad_origins=True,
     )
     tangent_origins = torch.ones_like(origins)
-    tangents = bridge.rayd_segment_penetration_jvp(
+    tangents = geometry.rayd_segment_penetration_jvp(
         scene,
         origins,
         targets,
@@ -267,12 +264,12 @@ def test_companions_reject_a_different_failure_state_before_dispatch(
         SegmentPenetrationResult(3, state, *_result_values()), *_tape_values()
     )
     monkeypatch.setattr(
-        bridge,
+        geometry,
         "_required_native_op",
         lambda name: pytest.fail(f"unexpected native dispatch: {name}"),
     )
     with pytest.raises(ValueError, match="exact request failure_state"):
-        bridge.rayd_segment_penetration_jvp(
+        geometry.rayd_segment_penetration_jvp(
             scene,
             origins,
             targets,
@@ -297,7 +294,7 @@ def test_missing_segment_penetration_family_has_no_fallback(
     def missing(name: str) -> object:
         raise RuntimeError(f"missing required native symbol {name}")
 
-    monkeypatch.setattr(bridge, "_required_native_op", missing)
+    monkeypatch.setattr(geometry, "_required_native_op", missing)
     common = {
         "input_active_any": True,
         "hit_capacity": 3,
@@ -307,22 +304,22 @@ def test_missing_segment_penetration_family_has_no_fallback(
     }
     calls = {
         "rayd_segment_penetration_forward": lambda: (
-            bridge.rayd_segment_penetration_forward(
+            geometry.rayd_segment_penetration_forward(
                 scene, origins, targets, active, **common
             )
         ),
         "rayd_segment_penetration_forward_tape": lambda: (
-            bridge.rayd_segment_penetration_forward_tape(
+            geometry.rayd_segment_penetration_forward_tape(
                 scene, origins, targets, active, **common
             )
         ),
         "rayd_segment_penetration_backward": lambda: (
-            bridge.rayd_segment_penetration_backward(
+            geometry.rayd_segment_penetration_backward(
                 scene, origins, targets, active, tape=tape, **common
             )
         ),
         "rayd_segment_penetration_jvp": lambda: (
-            bridge.rayd_segment_penetration_jvp(
+            geometry.rayd_segment_penetration_jvp(
                 scene, origins, targets, active, tape=tape, **common
             )
         ),
@@ -337,7 +334,7 @@ def test_request_requires_explicit_policy_and_structural_inactive_mask(
 ) -> None:
     scene, origins, targets, _active, state = _request()
     with pytest.raises(TypeError, match="SegmentPenetrationPolicy"):
-        bridge._segment_penetration_request_args(
+        geometry._segment_penetration_request_args(
             scene,
             origins,
             targets,
@@ -349,7 +346,7 @@ def test_request_requires_explicit_policy_and_structural_inactive_mask(
             failure_state=state,
         )
     with pytest.raises(ValueError, match="explicit device input_active mask"):
-        bridge._segment_penetration_request_args(
+        geometry._segment_penetration_request_args(
             scene,
             origins,
             targets,
@@ -364,7 +361,7 @@ def test_request_requires_explicit_policy_and_structural_inactive_mask(
 
 def test_custom_function_routes_only_to_native_family_facades() -> None:
     source = inspect.getsource(
-        penetration_autograd._RaydSegmentPenetrationAdFunction
+        geometry._RaydSegmentPenetrationAdFunction
     )
     assert "rayd_segment_penetration_forward_tape(" in source
     assert "rayd_segment_penetration_backward(" in source
@@ -417,7 +414,7 @@ def test_custom_function_executes_native_tape_vjp_and_jvp(
             "rayd_segment_penetration_jvp": jvp,
         },
     )
-    result = penetration_autograd.rayd_segment_penetration_ad(
+    result = geometry.rayd_segment_penetration_ad(
         scene,
         vertices,
         origins,
@@ -446,7 +443,7 @@ def test_custom_function_executes_native_tape_vjp_and_jvp(
         dual_origins = torch.autograd.forward_ad.make_dual(
             primal_origins, torch.ones_like(primal_origins)
         )
-        dual_result = penetration_autograd.rayd_segment_penetration_ad(
+        dual_result = geometry.rayd_segment_penetration_ad(
             scene,
             vertices.detach(),
             dual_origins,

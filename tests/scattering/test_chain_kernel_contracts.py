@@ -9,7 +9,7 @@ Covers the six symbols frozen by plan 10a sections 3 and 4:
 exercising the facade key-set / shape / dtype contract, the ``keep`` and
 degenerate-row behavior, the need-flag gating and the loud missing-symbol
 failure. These run once the extension is rebuilt with the ADR-021 kernels; the
-Python facades are authored in parallel in ``scattering/kernels/functional.py``.
+Python facades are authored in parallel in ``kernels/scattering.py``.
 The padded per-leg block width is ``Dmax = kMaxAdDepth = 8`` (plan 10a s1).
 """
 
@@ -21,7 +21,7 @@ import pytest
 import torch
 
 from witwin.channel import runtime
-from witwin.channel.scattering.kernels import functional_chain as F
+from witwin.channel.kernels import scattering as F
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for chain scattering"

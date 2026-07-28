@@ -1,3 +1,10 @@
+"""Native deterministic accumulation kernel facades.
+
+Thin facades over the ``_channel`` deterministic flat-accumulation ABI: the
+primal reduction, its registered backward/JVP companions, and the
+:class:`torch.autograd.Function` that dispatches them.
+"""
+
 from __future__ import annotations
 
 import torch
@@ -12,6 +19,9 @@ from witwin.channel.runtime import (
 )
 
 
+# ---------------------------------------------------------------------------
+# accumulation
+# ---------------------------------------------------------------------------
 def deterministic_accumulate_flat(
     valid: torch.Tensor,
     tx_id: torch.Tensor,

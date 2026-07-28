@@ -28,10 +28,10 @@ files = [
     "src/witwin/channel/capabilities.py",
     "src/witwin/channel/deployment.py",
     "src/witwin/channel/runtime.py",
-    "src/witwin/channel/deterministic/config.py",
+    "src/witwin/channel/deterministic.py",
     "src/witwin/channel/montecarlo/basic/config.py",
     "src/witwin/channel/montecarlo/bdpt/config.py",
-    "src/witwin/channel/path/config.py",
+    "src/witwin/channel/path.py",
 ]
 follow_imports = "skip"
 ignore_missing_imports = true

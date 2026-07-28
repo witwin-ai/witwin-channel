@@ -7,9 +7,7 @@ import torch
 
 from witwin.channel import capabilities
 from witwin.channel.deterministic import Config as DeterministicConfig
-from witwin.channel.deterministic.solver import (
-    _metadata as deterministic_metadata,
-)
+from witwin.channel.deterministic import _metadata as deterministic_metadata
 from witwin.channel.montecarlo.basic import Config as BasicConfig
 from witwin.channel.montecarlo.basic.metadata import (
     make_solver_metadata as basic_metadata,
@@ -19,7 +17,7 @@ from witwin.channel.montecarlo.bdpt.metadata import (
     make_solver_metadata as bdpt_metadata,
 )
 from witwin.channel.path import Config as PathConfig
-from witwin.channel.path.solver import _metadata as path_metadata
+from witwin.channel.path import _metadata as path_metadata
 
 
 _CONFIG_TYPES = (PathConfig, DeterministicConfig, BasicConfig, BdptConfig)

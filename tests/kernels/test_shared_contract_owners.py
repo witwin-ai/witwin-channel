@@ -8,7 +8,7 @@ import pytest
 import torch
 
 from witwin.channel import runtime
-from witwin.channel.montecarlo.bdpt.kernels import paths
+from witwin.channel.kernels import montecarlo as paths
 
 
 def _body_hash(function: object) -> str:

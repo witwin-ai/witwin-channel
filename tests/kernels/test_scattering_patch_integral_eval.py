@@ -8,7 +8,7 @@ import torch
 from witwin.core import PhaseScreen
 from witwin.channel.constants import C0
 from witwin.channel.scattering import PhaseScreenRuntime
-from witwin.channel.scattering.kernels import functional as ops
+from witwin.channel.kernels import scattering as ops
 from witwin.channel import runtime
 
 from tests.reference import phase_screen_realization as reference

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.montecarlo.bdpt.kernels.paths import bdpt_launch_state
+from witwin.channel.kernels.montecarlo import bdpt_launch_state
 
 from .config import Config
 

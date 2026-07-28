@@ -5,7 +5,7 @@ from collections.abc import Callable
 import pytest
 import torch
 
-from witwin.channel.scattering.kernels import functional
+from witwin.channel.kernels import scattering as functional
 
 
 def _table_args(rows: int = 2) -> list[torch.Tensor]:

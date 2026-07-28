@@ -19,8 +19,8 @@ from witwin.channel.scene.endpoints import (
     component_grid_shape,
 )
 from witwin.channel.materials import face_material_field_bundle
-from witwin.channel.montecarlo.basic.kernels import sampling as sampling_kernels
-from witwin.channel.montecarlo.basic.kernels.maps import (
+from witwin.channel.kernels import montecarlo as montecarlo_kernels
+from witwin.channel.kernels.montecarlo import (
     mc_apply_los_visibility,
     mc_component_map_buffer,
     mc_los_component_maps_from_matrix,
@@ -32,8 +32,6 @@ from witwin.channel.montecarlo.basic.kernels.maps import (
     mc_sionna_reflection_accumulate_ad,
     mc_store_component_map,
     mc_store_scaled_component_map,
-)
-from witwin.channel.montecarlo.basic.kernels.transmission import (
     mc_transmission_wall_product,
     mc_transmission_wall_product_ad,
 )
@@ -41,11 +39,8 @@ from witwin.channel.montecarlo.events.scattering import scattering_map_matrix
 from witwin.channel.montecarlo.events.transmission import (
     straight_transmission_chains,
 )
-from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
-from witwin.channel.propagation.geometry.kernels import (
-    primitives as geometry_primitives,
-)
-from witwin.channel.propagation.topology.kernels.primitives import (
+from witwin.channel.kernels import geometry as geometry_kernels
+from witwin.channel.kernels.topology import (
     deterministic_diffraction_state_pack,
     deterministic_diffraction_state_pack_selected,
 )
@@ -138,7 +133,7 @@ def _grid_visibility_masks(
             tx_pos, tx_index=tx_index, rx_count=rx_pos.shape[0]
         )
         masks.append(
-            geometry_bridge.rayd_visibility_forward(
+            geometry_kernels.rayd_visibility_forward(
                 handle, inputs["start"], rx_pos, inputs["active"]
             )[0]
         )
@@ -183,7 +178,7 @@ def los_component_map(
         inputs = mc_los_visibility_inputs(
             tx_pos, tx_index=tx_index, rx_count=rx_pos.shape[0]
         )
-        visible = geometry_bridge.rayd_visibility_forward(
+        visible = geometry_kernels.rayd_visibility_forward(
             handle, inputs["start"], rx_pos, inputs["active"]
         )[0]
         mc_apply_los_visibility(maps, los, visible, tx_index=tx_index)
@@ -191,7 +186,7 @@ def los_component_map(
 
 
 def _sample_directions(count: int, *, reference: torch.Tensor) -> torch.Tensor:
-    return sampling_kernels.mc_sample_directions(count, reference)
+    return montecarlo_kernels.mc_sample_directions(count, reference)
 
 
 def transmission_component_map(
@@ -439,13 +434,13 @@ def reflection_component_maps_with_wedges(
     wedge_batches: list[WedgeEventBatch] = []
     for tx_index, tx in enumerate(tx_pos):
         ray_d = _sample_directions(samples, reference=tx_pos)
-        launch_inputs = sampling_kernels.mc_reflection_launch_inputs(
+        launch_inputs = montecarlo_kernels.mc_reflection_launch_inputs(
             tx_pos, tx_index=tx_index, sample_count=samples
         )
         ray_o = launch_inputs["ray_o"]
         ray_tmax = launch_inputs["ray_tmax"]
         active = launch_inputs["active"]
-        trace = geometry_bridge.rayd_trace_reflections_forward(
+        trace = geometry_kernels.rayd_trace_reflections_forward(
             handle,
             ray_o,
             ray_d,
@@ -565,7 +560,7 @@ def reflection_component_maps_with_wedges(
 def _native_surface_group_edge_candidates(
     records, selected: torch.Tensor
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    return geometry_primitives.mc_surface_group_edge_candidates(
+    return geometry_kernels.mc_surface_group_edge_candidates(
         records.vertices,
         records.faces,
         records.face_normals,
@@ -621,7 +616,7 @@ def _discover_diffraction_edges_from_wedges(
         edge_candidates = _cached_primitive_edge_candidates(rayd, selected)
     triangle_edge_count, triangle_edge_indices = edge_candidates
     if wedges.event_count is not None:
-        return sampling_kernels.mc_diffraction_discover_edges_counted(
+        return montecarlo_kernels.mc_diffraction_discover_edges_counted(
             wedges.tx_pos,
             wedges.ray_dir,
             wedges.prim_id,
@@ -639,7 +634,7 @@ def _discover_diffraction_edges_from_wedges(
             line_max,
             face1,
         )
-    return sampling_kernels.mc_diffraction_discover_edges(
+    return montecarlo_kernels.mc_diffraction_discover_edges(
         wedges.tx_pos,
         wedges.ray_dir,
         wedges.prim_id,
@@ -880,8 +875,8 @@ def diffraction_component_map(
             device=device,
             dtype=torch.float32,
         )
-        state_wi = sampling_kernels.mc_diffraction_state_wi(states[1], states[10])
-        sampled = geometry_bridge.rayd_diffraction_sample_tape_forward(
+        state_wi = montecarlo_kernels.mc_diffraction_state_wi(states[1], states[10])
+        sampled = geometry_kernels.rayd_diffraction_sample_tape_forward(
             handle,
             None,
             *states,

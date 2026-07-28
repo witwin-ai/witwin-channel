@@ -3,10 +3,7 @@
 import pytest
 import torch
 
-from witwin.channel.propagation.fields.kernels import (
-    functional as field_functional,
-    rough_scale as field_rough_scale,
-)
+from witwin.channel.kernels import fields as field_kernels
 from witwin.channel import runtime
 
 from tests.reference import rough_reflection as reference
@@ -62,7 +59,7 @@ def test_rough_reflection_scale_forward_matches_reference(depth, frequency_hz):
     # exp intrinsic vs Torch's exp can amplify above 1e-6; that regime is
     # outside the frozen cells and the contract envelope.
     case = _random_case(64, depth, device="cuda", seed=depth * 100 + 7, replaced_fraction=0.2)
-    native = field_functional.field_rough_reflection_scale(
+    native = field_kernels.field_rough_reflection_scale(
         *(case[name] for name in (
             "field_vector", "coefficient", "path_field", "path_gain",
             "positions", "normals", "source", "sigma_b", "rough_b", "replaced",
@@ -83,7 +80,7 @@ def test_rough_reflection_scale_forward_matches_reference(depth, frequency_hz):
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
 def test_rough_reflection_scale_contract_shapes_and_dtypes():
     case = _random_case(8, 2, device="cuda", seed=11)
-    out = field_functional.field_rough_reflection_scale(
+    out = field_kernels.field_rough_reflection_scale(
         *(case[name] for name in (
             "field_vector", "coefficient", "path_field", "path_gain",
             "positions", "normals", "source", "sigma_b", "rough_b", "replaced",
@@ -97,7 +94,7 @@ def test_rough_reflection_scale_contract_shapes_and_dtypes():
     assert out["path_gain"].dtype == torch.float32
     assert out["factor"].shape == (8,)
     with pytest.raises((TypeError, ValueError)):
-        field_functional.field_rough_reflection_scale(
+        field_kernels.field_rough_reflection_scale(
             case["field_vector"].real,  # wrong dtype (real not complex)
             case["coefficient"], case["path_field"], case["path_gain"],
             case["positions"], case["normals"], case["source"],
@@ -111,7 +108,7 @@ def test_rough_reflection_scale_requires_native_kernel(monkeypatch):
     case = _random_case(4, 1, device="cuda", seed=3)
     monkeypatch.setattr(runtime, "native_extension", lambda: None)
     with pytest.raises(RuntimeError, match="field_rough_reflection_scale CUDA kernel is required"):
-        field_functional.field_rough_reflection_scale(
+        field_kernels.field_rough_reflection_scale(
             *(case[name] for name in (
                 "field_vector", "coefficient", "path_field", "path_gain",
                 "positions", "normals", "source", "sigma_b", "rough_b", "replaced",
@@ -155,7 +152,7 @@ def test_rough_reflection_scale_vjp_matches_reference_autograd(depth):
     _ad_loss((ref["field_vector"], ref["coefficient"], ref["path_field"], ref["path_gain"])).backward()
 
     nat_in, nat_freq = leaves()
-    scaled = field_rough_scale.field_rough_reflection_scale_ad(
+    scaled = field_kernels.field_rough_reflection_scale_ad(
         nat_in["field_vector"], nat_in["coefficient"], nat_in["path_field"],
         nat_in["path_gain"], nat_in["positions"], nat_in["normals"],
         nat_in["source"], case["sigma_b"], case["rough_b"], case["replaced"],
@@ -219,7 +216,7 @@ def test_rough_reflection_scale_jvp_matches_reference_autograd(depth):
         )
 
     def native_fn(duals, freq_dual):
-        return field_rough_scale.field_rough_reflection_scale_ad(
+        return field_kernels.field_rough_reflection_scale_ad(
             duals["field_vector"], duals["coefficient"], duals["path_field"],
             duals["path_gain"], duals["positions"], duals["normals"],
             duals["source"], case["sigma_b"], case["rough_b"], case["replaced"],

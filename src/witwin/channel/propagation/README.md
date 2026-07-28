@@ -36,7 +36,7 @@ as the authoritative `O(K)` production route. Complete no-D2H and public
 capacity results are no longer solver goals; E2E latency, peak memory, steady
 throughput, capacity/active ratio, exactness, and device headroom are the gates.
 
-`propagation.topology.kernels.enumerated_transmission_topology_pack` is the
+`kernels.topology.enumerated_transmission_topology_pack` is the
 live component-5 capacity producer for the enumerated route. It consumes the
 same failure-state storage as penetration, preserves pair-major rows, checks
 validity before every hit/primitive/material read, and makes the entire

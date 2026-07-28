@@ -205,7 +205,7 @@ CONCEPTS: tuple[Concept, ...] = (
             must_raise=True,
         ),
         debt=(
-            "19 pre-existing hand-rolled probes across 6 kernel facades, "
+            "19 pre-existing hand-rolled probes across 5 kernel facades, "
             "recorded so they cannot grow. The list started at 37; the four "
             "solver domains repaid their 18 sites by routing them through "
             "runtime.required_symbol, which is also what closes the "
@@ -215,21 +215,21 @@ CONCEPTS: tuple[Concept, ...] = (
         ),
         recorded_duplicates=frozenset(
             {
-                (f"{PACKAGE}.materials.kernels.functional", "mc_face_material_tensors"),
-                (f"{PACKAGE}.propagation.fields.kernels.deterministic", "deterministic_delay_to_path_length"),
-                (f"{PACKAGE}.propagation.fields.kernels.deterministic", "deterministic_diffraction_vector_field"),
-                (f"{PACKAGE}.propagation.fields.kernels.deterministic", "deterministic_field_from_power_phase"),
-                (f"{PACKAGE}.propagation.fields.kernels.deterministic", "deterministic_los_field"),
-                (f"{PACKAGE}.propagation.fields.kernels.deterministic", "deterministic_pack_complex"),
-                (f"{PACKAGE}.propagation.fields.kernels.deterministic", "deterministic_phase_from_field"),
-                (f"{PACKAGE}.propagation.fields.kernels.deterministic", "deterministic_phase_from_length"),
-                (f"{PACKAGE}.propagation.fields.kernels.deterministic", "deterministic_reflection_field"),
-                (f"{PACKAGE}.propagation.fields.kernels.deterministic", "deterministic_reflection_sequence_field"),
-                (f"{PACKAGE}.propagation.fields.kernels.deterministic", "deterministic_zero_field_phase"),
-                (f"{PACKAGE}.propagation.geometry.kernels.primitives", "mc_diffraction_edge_geometry"),
-                (f"{PACKAGE}.propagation.geometry.kernels.primitives", "mc_surface_group_edge_candidates"),
-                (f"{PACKAGE}.propagation.topology.kernels.primitives", "mc_selected_edge_indices"),
-                (f"{PACKAGE}.propagation.topology.kernels.sampling", "mc_sample_directions"),
+                (f"{PACKAGE}.kernels.fields", "deterministic_delay_to_path_length"),
+                (f"{PACKAGE}.kernels.fields", "deterministic_diffraction_vector_field"),
+                (f"{PACKAGE}.kernels.fields", "deterministic_field_from_power_phase"),
+                (f"{PACKAGE}.kernels.fields", "deterministic_los_field"),
+                (f"{PACKAGE}.kernels.fields", "deterministic_pack_complex"),
+                (f"{PACKAGE}.kernels.fields", "deterministic_phase_from_field"),
+                (f"{PACKAGE}.kernels.fields", "deterministic_phase_from_length"),
+                (f"{PACKAGE}.kernels.fields", "deterministic_reflection_field"),
+                (f"{PACKAGE}.kernels.fields", "deterministic_reflection_sequence_field"),
+                (f"{PACKAGE}.kernels.fields", "deterministic_zero_field_phase"),
+                (f"{PACKAGE}.kernels.geometry", "mc_diffraction_edge_geometry"),
+                (f"{PACKAGE}.kernels.geometry", "mc_surface_group_edge_candidates"),
+                (f"{PACKAGE}.kernels.materials", "mc_face_material_tensors"),
+                (f"{PACKAGE}.kernels.topology", "mc_sample_directions"),
+                (f"{PACKAGE}.kernels.topology", "mc_selected_edge_indices"),
                 (f"{PACKAGE}.runtime", "bdpt_zero_matrix"),
                 (f"{PACKAGE}.runtime", "mc_pack_vec3"),
                 (f"{PACKAGE}.runtime", "mc_receiver_grid_points"),

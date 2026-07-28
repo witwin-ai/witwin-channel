@@ -9,7 +9,7 @@ from witwin.channel.propagation.enumerated.diffraction import (
     _deterministic_diffraction_states,
 )
 from witwin.channel.propagation.geometry import diffraction
-from witwin.channel.propagation.geometry.kernels import bridge
+from witwin.channel.kernels import geometry
 from witwin.channel.scene import compile as compile_scene
 
 
@@ -43,7 +43,7 @@ def test_native_tx_visibility_plan_matches_frozen_four_sample_contract() -> None
         sample_t = states[3] + scaled
         offset = sample_t.unsqueeze(1) * states[2]
         points = (states[1] + offset).contiguous()
-        visible = bridge.rayd_visibility_forward(
+        visible = geometry.rayd_visibility_forward(
             rayd.require_resource(), starts, points, None
         )[0]
         expected |= visible

@@ -5,7 +5,7 @@ import torch
 
 from witwin.core import SurfaceRoughness
 from witwin.channel.scattering import build_kirchhoff_table
-from witwin.channel.scattering.kernels import functional as ops
+from witwin.channel.kernels import scattering as ops
 from witwin.channel.scene.resources import (
     build_kirchhoff_table_stack,
 )

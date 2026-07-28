@@ -494,7 +494,7 @@ def test_scattering_ad_mode_none_stays_primal(scene_kind):
 def test_ensemble_wrapper_rejects_fixed_receiver_polarization():
     # rx_pol is a fixed ADR-014 op-1 input; requesting its gradient through the
     # public wrapper must fail loudly (no silent detach, no wrong gradient).
-    from witwin.channel.scattering.kernels import autograd as scattering_autograd
+    from witwin.channel.kernels import scattering as scattering_autograd
 
     device = "cuda"
     generator = torch.Generator(device=device).manual_seed(404)

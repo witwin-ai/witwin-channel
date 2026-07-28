@@ -7,7 +7,7 @@ from witwin.channel.scene.endpoints import (
     receiver_positions_ad,
     transmitter_positions_ad,
 )
-from witwin.channel.montecarlo.basic.kernels.maps import (
+from witwin.channel.kernels.montecarlo import (
     mc_los_path_gain_ad,
     mc_los_visibility_inputs,
     mc_zero_matrix,
@@ -20,8 +20,8 @@ from witwin.channel.scene.compiler import (
     transmitter_positions,
 )
 
-from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
-from witwin.channel.propagation.topology.kernels.blocks import path_los_export
+from witwin.channel.kernels import geometry as geometry_kernels
+from witwin.channel.kernels.topology import path_los_export
 
 if TYPE_CHECKING:
     from witwin.channel.scene.endpoints import SolverScene as Scene
@@ -85,7 +85,7 @@ def apply_point_los_visibility(scene: Scene, rayd: object, los: torch.Tensor, *,
     for tx_index in range(int(tx_pos.shape[0])):
         inputs = mc_los_visibility_inputs(tx_pos, tx_index=tx_index, rx_count=int(rx_pos.shape[0]))
         masks.append(
-            geometry_bridge.rayd_visibility_forward(
+            geometry_kernels.rayd_visibility_forward(
                 handle, inputs["start"], rx_pos, inputs["active"]
             )[0]
         )

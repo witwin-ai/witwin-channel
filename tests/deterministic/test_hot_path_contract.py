@@ -5,13 +5,8 @@ from tests.support.scenes import empty_space_los_scene
 from tests.support.scenes import wedge_diffraction_scene
 from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
-from witwin.channel.propagation.fields.kernels import (
-    deterministic as deterministic_fields,
-)
-from witwin.channel.propagation.topology.kernels import blocks as topology_blocks
-from witwin.channel.propagation.topology.kernels import (
-    construction as topology_construction,
-)
+from witwin.channel.kernels import fields as field_kernels
+from witwin.channel.kernels import topology as topology_kernels
 import witwin.channel.path as path_package
 
 
@@ -20,13 +15,13 @@ def test_los_hot_path_uses_channel_kernel_facade(monkeypatch):
         pytest.skip("CUDA is required for deterministic hot-path contract")
 
     calls = []
-    original = topology_blocks.path_los_export
+    original = topology_kernels.path_los_export
 
     def wrapped(*args, **kwargs):
         calls.append((args, kwargs))
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(topology_blocks, "path_los_export", wrapped)
+    monkeypatch.setattr(topology_kernels, "path_los_export", wrapped)
 
     solve(
         empty_space_los_scene(),
@@ -42,14 +37,14 @@ def test_los_hot_path_uses_native_topology_facade(monkeypatch):
         pytest.skip("CUDA is required for deterministic hot-path contract")
 
     calls = []
-    original = topology_construction.deterministic_los_topology_block
+    original = topology_kernels.deterministic_los_topology_block
 
     def wrapped(*args, **kwargs):
         calls.append((args, kwargs))
         return original(*args, **kwargs)
 
     monkeypatch.setattr(
-        topology_construction, "deterministic_los_topology_block", wrapped
+        topology_kernels, "deterministic_los_topology_block", wrapped
     )
 
     solve(
@@ -68,14 +63,14 @@ def test_diffraction_hot_path_uses_native_vector_field_facade(monkeypatch):
         pytest.skip("RayD native diffraction is not built")
 
     calls = []
-    original = deterministic_fields.deterministic_diffraction_vector_field
+    original = field_kernels.deterministic_diffraction_vector_field
 
     def wrapped(*args, **kwargs):
         calls.append((args, kwargs))
         return original(*args, **kwargs)
 
     monkeypatch.setattr(
-        deterministic_fields, "deterministic_diffraction_vector_field", wrapped
+        field_kernels, "deterministic_diffraction_vector_field", wrapped
     )
 
     solve(

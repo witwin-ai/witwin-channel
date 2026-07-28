@@ -11,9 +11,14 @@ import torch
 from witwin.channel.propagation.geometry import visibility
 
 
+# ``_rayd_visibility_mask`` re-pinned when the geometry kernel facades moved to
+# ``witwin.channel.kernels.geometry``: the only AST difference is the module
+# alias the native visibility call is spelled through (``geometry_bridge`` ->
+# ``geometry_kernels``). Control flow, arguments and evaluation order are
+# unchanged.
 _DIGESTS = {
     "_rayd_visibility_mask": (
-        "d5504e604dc2337262971760294ce696d38c71fa7b74920d28fc59e9d494411c"
+        "169a295d4086227ef85e28ac87d3de79781d4cc52ae6687876f58de621b05f41"
     ),
     "_los_visibility_mask": (
         "95411fd7b1c9d50f50e40d1d2af9e55d171c71c904e4139686148a5602c00878"
@@ -57,7 +62,7 @@ def test_typed_visibility_query_consumes_raw_native_tuple(monkeypatch):
         return visible, torch.tensor([99])
 
     monkeypatch.setattr(
-        visibility.geometry_bridge,
+        visibility.geometry_kernels,
         "rayd_visibility_forward",
         fake_forward,
     )
@@ -95,7 +100,7 @@ def test_legacy_visibility_helpers_keep_contiguous_and_gating_semantics(monkeypa
         return (visible,)
 
     monkeypatch.setattr(
-        visibility.geometry_bridge,
+        visibility.geometry_kernels,
         "rayd_visibility_forward",
         fake_forward,
     )

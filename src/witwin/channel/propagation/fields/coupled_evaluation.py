@@ -5,15 +5,7 @@ from functools import partial
 import torch
 
 from witwin.channel.runtime import AdLaunchLedger
-from witwin.channel.propagation.fields.kernels import (
-    autograd as field_autograd,
-)
-from witwin.channel.propagation.fields.kernels import (
-    autograd_coupled_dd as field_autograd_dd,
-)
-from witwin.channel.propagation.fields.kernels import (
-    functional as field_functional,
-)
+from witwin.channel.kernels import fields as field_kernels
 from witwin.channel.propagation.rows import PathGeometry, PathTopology
 
 
@@ -45,7 +37,7 @@ def _resolve_coupled_rd_stationary(
 
     epc_source = target[rows] if reverse_order else source[rows]
     epc_receiver = source[rows] if reverse_order else target[rows]
-    resolved = field_autograd.coupled_rd_prepare_ad(
+    resolved = field_kernels.coupled_rd_prepare_ad(
         epc_source.contiguous(),
         epc_receiver.contiguous(),
         tri_a[reflection_face].contiguous(),
@@ -174,13 +166,13 @@ def _evaluate_coupled_dd_rows(
 
         coupled_dd_field_op = (
             partial(
-                field_autograd_dd.field_coupled_dd_ad,
+                field_kernels.field_coupled_dd_ad,
                 frequency=frequency,
                 frequency_value=frequency_value,
             )
             if ad_enabled
             else partial(
-                field_functional.field_coupled_dd, frequency_hz=frequency
+                field_kernels.field_coupled_dd, frequency_hz=frequency
             )
         )
         dd_args = (

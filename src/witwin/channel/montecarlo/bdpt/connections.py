@@ -14,13 +14,13 @@ from typing import Any
 
 import torch
 
-from witwin.channel.materials.kernels.functional import em_layer_stack_eval
+from witwin.channel.kernels.materials import em_layer_stack_eval
 from witwin.channel.montecarlo.bdpt.autograd import (
     bdpt_endpoint_connection_samples_ad,
     bdpt_reflected_light_subpath_state_ad,
     bdpt_transmitted_light_subpath_state_ad,
 )
-from witwin.channel.montecarlo.bdpt.kernels.paths import (
+from witwin.channel.kernels.montecarlo import (
     bdpt_endpoint_connection_samples,
     bdpt_endpoint_connection_visibility_inputs,
     bdpt_endpoint_subpath_state,
@@ -30,7 +30,7 @@ from witwin.channel.montecarlo.bdpt.kernels.paths import (
     bdpt_transmitted_light_subpath_state,
 )
 from witwin.channel.runtime import _ad_frequency_value
-from witwin.channel.montecarlo.bdpt.kernels.sampling import (
+from witwin.channel.kernels.montecarlo import (
     bdpt_reflection_launch_inputs,
     bdpt_sample_directions,
 )
@@ -51,7 +51,7 @@ from witwin.channel.montecarlo.events.transmission import (
     transmission_event_probability,
     unpolarized_power_budgets,
 )
-from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel.kernels import geometry as geometry_kernels
 
 
 _MASK_REFLECTION = 2
@@ -117,7 +117,7 @@ def _native_los_connection_samples(
         sensor,
         sample_count=int(samples["valid"].shape[0]),
     )
-    visible = geometry_bridge.rayd_visibility_forward(
+    visible = geometry_kernels.rayd_visibility_forward(
         rayd.require_resource(),
         visibility_inputs["start"],
         visibility_inputs["end"],
@@ -472,7 +472,7 @@ def _emit_mixed_transmission(
             sensor,
             sample_count=int(samples_out["valid"].shape[0]),
         )
-        visible = geometry_bridge.rayd_visibility_forward(
+        visible = geometry_kernels.rayd_visibility_forward(
             rayd.require_resource(),
             visibility_inputs["start"],
             visibility_inputs["end"],
@@ -629,7 +629,7 @@ def _transmission_sampled_connection_samples(
             else None
         )
         for bounce in range(max(1, int(max_depth))):
-            hit = geometry_bridge.rayd_intersect_forward(
+            hit = geometry_kernels.rayd_intersect_forward(
                 rayd.require_resource(),
                 ray_inputs["ray_o"],
                 ray_inputs["ray_d"],

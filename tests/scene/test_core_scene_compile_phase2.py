@@ -73,7 +73,7 @@ def _install_cpu_compile_seams(monkeypatch):
 
     monkeypatch.setattr(compile_module, "build_scene_from_structures", build)
     monkeypatch.setattr(
-        compile_module.topology_primitives,
+        compile_module.topology_kernels,
         "core_pack_int2",
         lambda left, right: torch.stack((left, right), dim=1).to(torch.int32),
     )

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import torch
 
-from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel.kernels import geometry as geometry_kernels
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,7 +36,7 @@ class ReflectionEpcGeometry:
 
 
 def query_reflection_epc(query: ReflectionEpcQuery) -> ReflectionEpcGeometry:
-    raw = geometry_bridge.rayd_reflection_epc_paths_forward(
+    raw = geometry_kernels.rayd_reflection_epc_paths_forward(
         query.rayd.require_resource(),
         query.source,
         query.receiver,

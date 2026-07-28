@@ -2,13 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.propagation.topology.kernels import blocks as topology_blocks
-from witwin.channel.propagation.topology.kernels import (
-    compaction as topology_compaction,
-)
-from witwin.channel.propagation.topology.kernels import (
-    construction as topology_construction,
-)
+from witwin.channel.kernels import topology as topology_kernels
 
 
 def _empty_path_block(device: torch.device) -> dict[str, torch.Tensor]:
@@ -49,7 +43,7 @@ def concatenate_path_blocks(
         else _pad_topology_sequences(block, width=sequence_width)
         for block in nonempty
     ]
-    return topology_blocks.deterministic_concat_topology_blocks(
+    return topology_kernels.deterministic_concat_topology_blocks(
         nonempty, sequence_width=sequence_width
     )
 
@@ -63,7 +57,7 @@ def _sort_order(
         sequence = torch.empty(
             (paths["valid"].numel(), 0), device=paths["valid"].device, dtype=torch.int32
         )
-    return topology_compaction.deterministic_sort_order(
+    return topology_kernels.deterministic_sort_order(
         paths["valid"],
         paths["tx_id"],
         paths["rx_id"],
@@ -191,7 +185,7 @@ def _pad_topology_sequences(
     device = block["valid"].device
     empty_i32 = torch.empty((count, 0), device=device, dtype=torch.int32)
     empty_vec3 = torch.empty((count, 0, 3), device=device, dtype=torch.float32)
-    sequences = topology_construction.deterministic_pad_topology_sequences(
+    sequences = topology_kernels.deterministic_pad_topology_sequences(
         depth=block["depth"].to(dtype=torch.int32).contiguous(),
         primitive_id=block["primitive_id"].to(dtype=torch.int32).contiguous(),
         material_id=block["material_id"].to(dtype=torch.int32).contiguous(),

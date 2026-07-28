@@ -17,12 +17,21 @@ from witwin.channel.propagation.topology.discovery import (
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
+# ``_face_sequence_chunks`` re-pinned when the topology kernel facades moved to
+# ``witwin.channel.kernels.topology``: the only AST difference is the module
+# alias the two chunk calls are spelled through. Control flow, arguments and
+# evaluation order are unchanged.
+# ``_discovered_group_chains`` and ``_reflect_points`` re-pinned for the same
+# reason when the geometry kernel facades moved to
+# ``witwin.channel.kernels.geometry`` and the
+# ``geometry_bridge``/``geometry_primitives`` aliases collapsed into
+# ``geometry_kernels``.
 _DIGESTS = {
     "_face_sequence_count": "d7932ea0ae0bb7b781b5113800044489b7b5356129ccd0169d305749a1dbf121",
-    "_face_sequence_chunks": "c2e35ad0f2221530491334a89aec3d102bb34c53816c730a02d511e9964074e5",
-    "_reflect_points": "2d94849ad9f55be907f1fa6b8aa3024035506e24d4315c3128a96c1871ff3d30",
+    "_face_sequence_chunks": "58d450d46c6e15f13176972c3996ec222d7a9b218fdb53ffc9529d0fd4370220",
+    "_reflect_points": "ef2b934fe26c236d6c631c842707de838286409485341061add2e8a6a6060811",
     "_discovered_group_chains": (
-        "c153fbda36ca6c16bcac25397791309bdb0b184c5d12bf0058833644c96cbcd6"
+        "ac3e0339fa6b41914dd6e81465b98d30825498d85aac4c8f3d1df322d92398ff"
     ),
 }
 

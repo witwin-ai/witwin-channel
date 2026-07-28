@@ -3,9 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from witwin.channel.propagation.topology.kernels import construction as ops
-from witwin.channel.propagation.topology import kernels
-from witwin.channel.propagation.topology.kernels import blocks, construction
+from witwin.channel.kernels import topology
 from witwin.channel import runtime
 
 
@@ -24,32 +22,26 @@ _OWNER_NAMES = (
 
 @pytest.mark.parametrize("name", _OWNER_NAMES)
 def test_topology_construction_is_the_single_object_owner(name: str):
-    owner = getattr(construction, name)
+    owner = getattr(topology, name)
 
-    assert owner.__module__ == construction.__name__
-    assert getattr(kernels, name) is owner
-    assert getattr(ops, name) is owner
+    assert owner.__module__ == topology.__name__
 
 
 def test_topology_construction_uses_only_canonical_dependencies():
-    assert construction._required_native_op is runtime.required_symbol
-    assert construction.validate_cuda_tensor is runtime.validate_cuda_tensor
-    assert construction._validate_deterministic_topology_block is (
-        blocks._validate_deterministic_topology_block
-    )
-    assert construction._validate_path_block is blocks._validate_path_block
+    assert topology._required_native_op is runtime.required_symbol
+    assert topology.validate_cuda_tensor is runtime.validate_cuda_tensor
     assert (
-        construction.deterministic_los_topology_block.__globals__[
+        topology.deterministic_los_topology_block.__globals__[
             "_validate_deterministic_topology_block"
         ]
-        is blocks._validate_deterministic_topology_block
+        is topology._validate_deterministic_topology_block
     )
     assert (
-        construction.deterministic_topology_base_fields.__globals__[
+        topology.deterministic_topology_base_fields.__globals__[
             "_validate_path_block"
         ]
-        is blocks._validate_path_block
+        is topology._validate_path_block
     )
     for name in _OWNER_NAMES:
-        assert getattr(construction, name).__globals__ is construction.__dict__
-    assert "ops" not in construction.__dict__
+        assert getattr(topology, name).__globals__ is topology.__dict__
+    assert "ops" not in topology.__dict__

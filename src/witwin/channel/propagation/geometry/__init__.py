@@ -1,6 +1,6 @@
 """Continuous propagation geometry and native facade ownership."""
 
-from witwin.channel.propagation.geometry.kernels.bridge import (
+from witwin.channel.kernels.geometry import (
     _BDPT_INTERSECTION_FIELDS,
 )
 

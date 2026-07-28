@@ -19,10 +19,8 @@ from witwin.channel.materials import (
     _require_frequency_ad_constant_materials,
     face_material_field_bundle,
 )
-from witwin.channel.montecarlo.basic.kernels.capacity import (
+from witwin.channel.kernels.montecarlo import (
     mc_capacity_failure_component_maps_sanitize,
-)
-from witwin.channel.montecarlo.basic.kernels.maps import (
     mc_component_map_buffer,
     mc_finalize_component_maps,
     mc_finalize_component_maps_ad,

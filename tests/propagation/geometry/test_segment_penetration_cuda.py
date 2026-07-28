@@ -8,12 +8,12 @@ from witwin.core import Scene
 from witwin.channel.scene import compile as compile_scene
 from witwin.core import PhysicalMaterial
 from witwin.channel.deployment import build_info
-from witwin.channel.propagation.geometry.kernels import bridge
+from witwin.channel.kernels import geometry
 from witwin.channel.propagation.penetration import (
     SegmentPenetrationPolicy,
     SegmentPenetrationResult,
 )
-from witwin.channel.propagation.topology.kernels.transmission import (
+from witwin.channel.kernels.topology import (
     enumerated_transmission_topology_pack,
 )
 from witwin.channel.runtime import create_capacity_failure_state
@@ -118,10 +118,10 @@ def test_forward_tape_and_topology_pack_share_capacity_transaction() -> None:
     )
     failure_state, kwargs = _request(rayd, origins, targets)
 
-    plain = bridge.rayd_segment_penetration_forward(
+    plain = geometry.rayd_segment_penetration_forward(
         rayd, origins, targets, None, **kwargs
     )
-    taped = bridge.rayd_segment_penetration_forward_tape(
+    taped = geometry.rayd_segment_penetration_forward_tape(
         rayd, origins, targets, None, **kwargs
     )
 
@@ -175,7 +175,7 @@ def test_pair_major_batch_covers_clear_one_hit_exact_capacity_and_zero_length() 
     stream = torch.cuda.Stream()
     with torch.cuda.stream(stream):
         failure_state, kwargs = _request(rayd, origins, targets)
-        result = bridge.rayd_segment_penetration_forward(
+        result = geometry.rayd_segment_penetration_forward(
             rayd, origins, targets, None, **kwargs
         )
         packed = enumerated_transmission_topology_pack(
@@ -210,7 +210,7 @@ def test_invalid_material_makes_capacity_row_inert_without_partial_result() -> N
     origins = torch.tensor([[0.0, 0.0, -1.0]], dtype=torch.float32, device="cuda")
     targets = torch.tensor([[0.0, 0.0, 0.5]], dtype=torch.float32, device="cuda")
     failure_state, kwargs = _request(rayd, origins, targets, hit_capacity=1)
-    result = bridge.rayd_segment_penetration_forward(
+    result = geometry.rayd_segment_penetration_forward(
         rayd, origins, targets, None, **kwargs
     )
     packed = enumerated_transmission_topology_pack(
@@ -236,7 +236,7 @@ def test_forward_jvp_and_backward_obey_adjoint_identity() -> None:
     origins = torch.tensor([[0.0, 0.0, -1.0]], dtype=torch.float32, device="cuda")
     targets = torch.tensor([[0.0, 0.0, 1.5]], dtype=torch.float32, device="cuda")
     failure_state, kwargs = _request(rayd, origins, targets)
-    tape = bridge.rayd_segment_penetration_forward_tape(
+    tape = geometry.rayd_segment_penetration_forward_tape(
         rayd, origins, targets, None, **kwargs
     )
     tangent_vertices = torch.full_like(vertices, 0.001)
@@ -246,7 +246,7 @@ def test_forward_jvp_and_backward_obey_adjoint_identity() -> None:
     tangent_targets = torch.tensor(
         [[-0.03, 0.01, 0.02]], dtype=torch.float32, device="cuda"
     )
-    tangents = bridge.rayd_segment_penetration_jvp(
+    tangents = geometry.rayd_segment_penetration_jvp(
         rayd,
         origins,
         targets,
@@ -265,7 +265,7 @@ def test_forward_jvp_and_backward_obey_adjoint_identity() -> None:
         "grad_normal": torch.full_like(tape.result.normal, -0.15),
         "grad_geometric_normal": torch.full_like(tape.result.geometric_normal, 0.05),
     }
-    gradients = bridge.rayd_segment_penetration_backward(
+    gradients = geometry.rayd_segment_penetration_backward(
         rayd,
         origins,
         targets,
@@ -305,7 +305,7 @@ def test_overflow_sanitizes_penetration_and_downstream_topology() -> None:
     origins = torch.tensor([[0.0, 0.0, -1.0]], dtype=torch.float32, device="cuda")
     targets = torch.tensor([[0.0, 0.0, 3.0]], dtype=torch.float32, device="cuda")
     failure_state, kwargs = _request(rayd, origins, targets, hit_capacity=2)
-    tape = bridge.rayd_segment_penetration_forward_tape(
+    tape = geometry.rayd_segment_penetration_forward_tape(
         rayd, origins, targets, None, **kwargs
     )
 
@@ -356,7 +356,7 @@ def test_monte_carlo_policy_batches_clear_one_exact_capacity_and_zero_length() -
             targets,
             policy=SegmentPenetrationPolicy.MonteCarloTargetInset,
         )
-        result = bridge.rayd_segment_penetration_forward(
+        result = geometry.rayd_segment_penetration_forward(
             rayd, origins, targets, None, **kwargs
         )
     stream.synchronize()
@@ -392,7 +392,7 @@ def test_monte_carlo_d_plus_one_overflow_poison_is_batch_wide() -> None:
         targets,
         policy=SegmentPenetrationPolicy.MonteCarloTargetInset,
     )
-    result = bridge.rayd_segment_penetration_forward(
+    result = geometry.rayd_segment_penetration_forward(
         rayd, origins, targets, None, **kwargs
     )
 

@@ -227,7 +227,14 @@ Organize code by RF domain capability, with a single owner for each operation:
   gap with a pinned regression test, not something to fix as a side effect.
 - `path`, `deterministic`, `montecarlo.basic`, and `montecarlo.bdpt`: thin
   solver-owned configuration, orchestration, accumulation, result, and metadata
-  layers. Solvers must never import another solver.
+  layers. Solvers must never import another solver. `path` and `deterministic`
+  are each one module, `path.py` and `deterministic.py`; their owner documents
+  are `docs/dev/path/README.md` and `docs/dev/deterministic/README.md`, for the
+  same reason `runtime` keeps its README outside the package - a module has no
+  directory to hold one. The collapse moved definition sites only: every public
+  name is still imported from `witwin.channel.path` and
+  `witwin.channel.deterministic`, and the deleted submodules were never public
+  API, so no alias or re-export replaced them.
 
 Four package-root modules hold cross-domain values that the public root and
 several domains all need, and that therefore cannot live under `runtime`,

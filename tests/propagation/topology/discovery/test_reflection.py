@@ -24,7 +24,7 @@ def test_plan_limit_boundary(monkeypatch, count, exhaustive):
     representative = torch.arange(count)
     mapped = representative.reshape(-1, 1)
     monkeypatch.setattr(
-        reflection.topology_construction,
+        reflection.topology_kernels,
         "deterministic_mapped_face_sequence_chunk",
         lambda *args, **kwargs: mapped,
     )
@@ -56,7 +56,7 @@ def test_large_trace_unique_minus_one_tx_major_tail_and_identity(monkeypatch):
         return sentinel
 
     monkeypatch.setattr(
-        reflection.topology_construction,
+        reflection.topology_kernels,
         "deterministic_reflection_epc_input_batch",
         build,
     )
@@ -215,7 +215,7 @@ def test_exhaustive_order_is_depth_candidate_chunk_rx_tx_and_lazy(monkeypatch):
 
     monkeypatch.setattr(reflection, "_face_sequence_chunks", chunks)
     monkeypatch.setattr(
-        reflection.topology_construction,
+        reflection.topology_kernels,
         "deterministic_reflection_epc_input_batch",
         lambda **k: (
             events.append(
@@ -249,7 +249,7 @@ def test_traced_order_unique_minus_one_and_no_reached_depth(monkeypatch):
         return chains
 
     monkeypatch.setattr(
-        reflection.topology_construction,
+        reflection.topology_kernels,
         "deterministic_reflection_epc_input_batch",
         lambda **k: (
             events.append(f"build{int(k['tx'][0])}:{k['sequences'].tolist()}")

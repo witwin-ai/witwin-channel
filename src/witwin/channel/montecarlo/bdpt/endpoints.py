@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 
 from witwin.channel.scene.endpoints import ReceiverGrid, ReceiverPoint
-from witwin.channel.montecarlo.bdpt.kernels.maps import (
+from witwin.channel.kernels.montecarlo import (
     bdpt_host_vec3_tensor,
     bdpt_receiver_grid_points,
     bdpt_transmitter_tensors,

@@ -18,7 +18,7 @@ from typing import Any
 
 import torch
 
-from witwin.channel.propagation.geometry.kernels import (
+from witwin.channel.kernels.geometry import (
     rayd_segment_penetration_ad,
     rayd_segment_penetration_forward,
 )

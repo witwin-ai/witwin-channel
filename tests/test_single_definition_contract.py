@@ -230,7 +230,11 @@ def test_the_recorded_duplicates_are_only_the_symbol_lookup_debt():
     # sites by routing them through runtime.required_symbol. The ledger may
     # only shrink further.
     assert len(concept(SYMBOL).recorded_duplicates) == 19
-    assert len({module for module, _ in concept(SYMBOL).recorded_duplicates}) == 6
+    # 5, not 6: the kernel lift merged the two topology facades that each held
+    # one probe (mc_sample_directions and mc_selected_edge_indices) into one
+    # module. No probe was repaid, so the 19-site ratchet above is unchanged;
+    # only the number of modules the debt is spread across went down.
+    assert len({module for module, _ in concept(SYMBOL).recorded_duplicates}) == 5
     assert concept(SYMBOL).debt
 
 
@@ -327,7 +331,7 @@ def test_cli_fails_on_a_duplicate_planted_in_a_mirror(tmp_path: Path, capsys):
         package_root,
         ignore=shutil.ignore_patterns("__pycache__", "*.pyd", "*.so"),
     )
-    target = package_root / "deterministic" / "pipeline.py"
+    target = package_root / "deterministic.py"
     target.write_text(
         target.read_text(encoding="utf-8") + DEPTH_COPY, encoding="utf-8"
     )

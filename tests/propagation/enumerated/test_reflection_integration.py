@@ -6,7 +6,7 @@ import pytest
 import torch
 
 from witwin.channel.propagation.enumerated import reflection
-from witwin.channel.propagation.fields.kernels import deterministic as fields
+from witwin.channel.kernels import fields as field_kernels
 from witwin.channel.propagation.geometry import (
     reflection as geometry_reflection,
 )
@@ -38,12 +38,12 @@ def _fixture(monkeypatch, events: list[str], *, selected: bool = True):
     tri_a = torch.zeros((1, 3))
 
     monkeypatch.setattr(
-        reflection.geometry_primitives,
+        reflection.geometry_kernels,
         "deterministic_normalize_vec3",
         lambda value, eps: normals,
     )
     monkeypatch.setattr(
-        reflection.topology_construction,
+        reflection.topology_kernels,
         "deterministic_face_anchor_points",
         lambda *args: tri_a,
     )
@@ -90,7 +90,7 @@ def _fixture(monkeypatch, events: list[str], *, selected: bool = True):
         torch.ones((1, 3)),
     )
     monkeypatch.setattr(
-        reflection.geometry_bridge,
+        reflection.geometry_kernels,
         "rayd_reflection_epc_paths_forward",
         lambda *a: events.append("epc") or epc,
     )
@@ -102,7 +102,7 @@ def _fixture(monkeypatch, events: list[str], *, selected: bool = True):
         return selected_rows
 
     monkeypatch.setattr(
-        reflection.topology_compaction,
+        reflection.topology_kernels,
         "deterministic_reflection_order1_compact",
         compact,
     )
@@ -115,7 +115,7 @@ def _fixture(monkeypatch, events: list[str], *, selected: bool = True):
 
     if selected:
         monkeypatch.setattr(
-            fields,
+            field_kernels,
             "deterministic_reflection_field",
             lambda **k: (
                 events.append("field")
@@ -129,7 +129,7 @@ def _fixture(monkeypatch, events: list[str], *, selected: bool = True):
             ),
         )
         monkeypatch.setattr(
-            fields,
+            field_kernels,
             "deterministic_pack_complex",
             lambda *a: events.append("pack") or torch.ones(1, dtype=torch.complex64),
         )
@@ -140,17 +140,17 @@ def _fixture(monkeypatch, events: list[str], *, selected: bool = True):
             return {"valid": torch.ones(1, dtype=torch.bool)}
 
         monkeypatch.setattr(
-            reflection.topology_construction,
+            reflection.topology_kernels,
             "deterministic_topology_base_fields",
             base,
         )
     else:
         monkeypatch.setattr(
-            fields, "deterministic_reflection_field", forbidden("field")
+            field_kernels, "deterministic_reflection_field", forbidden("field")
         )
-        monkeypatch.setattr(fields, "deterministic_pack_complex", forbidden("pack"))
+        monkeypatch.setattr(field_kernels, "deterministic_pack_complex", forbidden("pack"))
         monkeypatch.setattr(
-            reflection.topology_construction,
+            reflection.topology_kernels,
             "deterministic_topology_base_fields",
             forbidden("base_fields"),
         )
@@ -357,12 +357,12 @@ def _patch_multibounce_selected(monkeypatch, events, *, selected=True):
         "material_sequence": chosen,
     }
     monkeypatch.setattr(
-        reflection.topology_compaction,
+        reflection.topology_kernels,
         "deterministic_reflection_sequence_compact",
         lambda **k: events.append("compact") or rows,
     )
     monkeypatch.setattr(
-        reflection.topology_construction,
+        reflection.topology_kernels,
         "deterministic_topology_base_fields",
         lambda **k: (
             events.append("base_fields")
@@ -371,7 +371,7 @@ def _patch_multibounce_selected(monkeypatch, events, *, selected=True):
     )
     if selected:
         monkeypatch.setattr(
-            fields,
+            field_kernels,
             "deterministic_reflection_sequence_field",
             lambda **k: (
                 events.append("field")

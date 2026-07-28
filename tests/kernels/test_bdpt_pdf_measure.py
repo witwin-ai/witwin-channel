@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from witwin.channel.montecarlo.bdpt.kernels import paths as ops
+from witwin.channel.kernels import montecarlo as ops
 from witwin.channel.montecarlo.events.scattering import (
     solid_angle_to_area_jacobian,
 )

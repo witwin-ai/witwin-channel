@@ -5,14 +5,14 @@ import torch
 
 from tests.support.core_world import make_receiver, make_transmitter
 from witwin.channel import capabilities
+from witwin.channel import path as path_module
 from witwin.channel.path import (
     Config,
     PathResult,
     RaggedPathSoA,
     solve,
 )
-from witwin.channel.path.arrays import pack_synthetic_arrays
-from witwin.channel.path import solver as path_solver
+from witwin.channel.path import pack_synthetic_arrays
 from witwin.channel.scene.endpoints import apply_endpoint_weights
 from witwin.channel.scene.endpoints import _ReceiverPointView, _TransmitterView
 from witwin.core import AntennaPattern, Scene
@@ -286,7 +286,7 @@ def test_unsupported_synthetic_layout_fails_before_native_solve(monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        path_solver,
+        path_module,
         "_solve_base",
         lambda *_args, **_kwargs: pytest.fail(
             "native solve ran before array preflight"
@@ -323,7 +323,7 @@ def test_partial_endpoint_weights_fail_before_native_solve(
         ],
     )
     monkeypatch.setattr(
-        path_solver,
+        path_module,
         "_solve_base",
         lambda *_args, **_kwargs: pytest.fail(
             "native solve ran before weight preflight"

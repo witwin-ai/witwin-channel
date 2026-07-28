@@ -4,10 +4,8 @@ from types import SimpleNamespace
 
 import torch
 
-from witwin.channel.path import pipeline as path_pipeline
-from witwin.channel.path import solver as path_solver
-from witwin.channel.path.config import Config
-from witwin.channel.path.result import InteractionType, from_evaluated_paths
+from witwin.channel import path as path_module
+from witwin.channel.path import Config, InteractionType, from_evaluated_paths
 from witwin.channel.propagation.rows import (
     EvaluatedPaths,
     PathFields,
@@ -154,7 +152,7 @@ def test_solver_passes_typed_rows_and_only_execution_ad_sidecars(monkeypatch):
     captured_metadata: dict[str, object] = {}
 
     monkeypatch.setattr(
-        path_solver, "_validate_runtime", lambda _config: (True, True, True)
+        path_module, "_validate_runtime", lambda _config: (True, True, True)
     )
 
     def fake_engine(_scene, _config, *, defer_capacity_terminal):
@@ -193,38 +191,38 @@ def test_solver_passes_typed_rows_and_only_execution_ad_sidecars(monkeypatch):
         assert kwargs["metadata"]["kernel"]["launch_count"] == 1
         return sentinel
 
-    monkeypatch.setattr(path_solver, "evaluate_enumerated_paths", fake_engine)
-    monkeypatch.setattr(path_solver, "append_scattering_evaluated_paths", fake_append)
+    monkeypatch.setattr(path_module, "evaluate_enumerated_paths", fake_engine)
+    monkeypatch.setattr(path_module, "append_scattering_evaluated_paths", fake_append)
     monkeypatch.setattr(
-        path_pipeline, "sanitize_enumerated_capacity_transaction", fake_sanitize
+        path_module, "sanitize_enumerated_capacity_transaction", fake_sanitize
     )
     monkeypatch.setattr(
-        path_pipeline,
+        path_module,
         "compact_evaluated_paths",
         fake_compact,
     )
     monkeypatch.setattr(
-        path_pipeline,
+        path_module,
         "_stable_endpoint_id_lookups",
         lambda _scene, *, device: (
             torch.tensor([101], device=device, dtype=torch.int64),
             torch.tensor([201], device=device, dtype=torch.int64),
         ),
     )
-    monkeypatch.setattr(path_solver, "_metadata", fake_metadata)
-    monkeypatch.setattr(path_solver, "from_evaluated_paths", fake_pack)
+    monkeypatch.setattr(path_module, "_metadata", fake_metadata)
+    monkeypatch.setattr(path_module, "from_evaluated_paths", fake_pack)
     monkeypatch.setattr(
-        path_solver,
+        path_module,
         "_transmitter_tensors",
         lambda _scene: (torch.zeros((1, 3)), torch.ones(1)),
     )
     monkeypatch.setattr(
-        path_solver,
+        path_module,
         "_receiver_positions",
         lambda _scene, *, reference: torch.zeros_like(reference),
     )
 
-    result = path_solver._solve_base(object(), Config(components={"los", "scattering"}))
+    result = path_module._solve_base(object(), Config(components={"los", "scattering"}))
 
     assert result.result is sentinel
     assert result.capacity_transaction is None

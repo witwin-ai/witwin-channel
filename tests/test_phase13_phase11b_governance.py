@@ -52,6 +52,25 @@ _PHASE11B_SOURCE_SHA256 = {
     ),
 }
 
+# Plan-15 phase 6 lifted the per-domain kernel facades into the top-level
+# `witwin/channel/kernels/` package. The Phase-11b evidence records the paths
+# those regions had when it was captured, so the live-file check follows the
+# move instead of the evidence being rewritten.
+_PHASE15_KERNEL_RELOCATIONS = {
+    "src/witwin/channel/propagation/fields/kernels/functional.py": (
+        "src/witwin/channel/kernels/fields.py"
+    ),
+    "src/witwin/channel/scattering/kernels/functional.py": (
+        "src/witwin/channel/kernels/scattering.py"
+    ),
+    "src/witwin/channel/scattering/kernels/functional_chain.py": (
+        "src/witwin/channel/kernels/scattering.py"
+    ),
+    "src/witwin/channel/scattering/kernels/autograd_chain.py": (
+        "src/witwin/channel/kernels/scattering.py"
+    ),
+}
+
 _LIVE_FILE_SUFFIXES = {".cpp", ".cu", ".cuh", ".h", ".json", ".md", ".py", ".toml", ".yml"}
 _LIVE_ROOTS = (
     ROOT / "src",
@@ -85,7 +104,7 @@ _TRIANGLE_VERTEX_V2_LINES = {
     ),
     ("native/channel/kernels/diffraction.cu", "return v2;"),
     (
-        "src/witwin/channel/propagation/geometry/kernels/autograd.py",
+        "src/witwin/channel/kernels/geometry.py",
         "companions (the adjoint/tangent of normalize(cross(v1 - v0, v2 - v0))",
     ),
 }
@@ -184,6 +203,7 @@ def test_phase11b_ledger_refresh_and_source_snapshots_are_historical() -> None:
         live = relative.replace(
             "native/channel_native/", "native/channel/"
         ).replace("src/witwin/channel_native/", "src/witwin/channel/")
+        live = _PHASE15_KERNEL_RELOCATIONS.get(live, live)
         assert (ROOT / live).is_file()
         assert re.fullmatch(r"[0-9a-f]{64}", digest)
 
@@ -200,12 +220,8 @@ def test_phase11b_ledger_refresh_and_source_snapshots_are_historical() -> None:
 
 
 def test_phase11b_explicit_signatures_and_tu_local_macro_contract_are_preserved() -> None:
-    functional_path = (
-        ROOT / "src/witwin/channel/scattering/kernels/functional_chain.py"
-    )
-    autograd_path = (
-        ROOT / "src/witwin/channel/scattering/kernels/autograd_chain.py"
-    )
+    functional_path = ROOT / "src/witwin/channel/kernels/scattering.py"
+    autograd_path = functional_path
     ensemble = _literal_tuple(functional_path, "_CHAIN_ENSEMBLE_PRIMAL_NAMES")
     realization = _literal_tuple(functional_path, "_CHAIN_REALIZATION_PRIMAL_NAMES")
     functional = _module_functions(functional_path)

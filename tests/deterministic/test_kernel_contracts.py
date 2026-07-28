@@ -4,9 +4,9 @@ import inspect
 
 import pytest
 
-from witwin.channel.deterministic.kernels import accumulation
+from witwin.channel.kernels import deterministic as accumulation
+from witwin.channel.kernels import fields as field_kernels
 from witwin.channel.propagation import fields as public_fields
-from witwin.channel.propagation.fields.kernels import deterministic as fields
 from witwin.channel import runtime
 
 
@@ -34,15 +34,15 @@ _ACCUMULATION_OWNER_NAMES = (
 
 @pytest.mark.parametrize("name", _OWNER_NAMES)
 def test_deterministic_fields_is_the_single_object_owner(name: str):
-    owner = getattr(fields, name)
+    owner = getattr(field_kernels, name)
 
-    assert owner.__module__ == fields.__name__
+    assert owner.__module__ == field_kernels.__name__
     assert getattr(public_fields, name) is owner
 
 
 def test_deterministic_fields_uses_canonical_runtime_dependencies():
-    assert fields.native_extension is runtime.native_extension
-    assert fields.validate_cuda_tensor is runtime.validate_cuda_tensor
+    assert field_kernels.native_extension is runtime.native_extension
+    assert field_kernels.validate_cuda_tensor is runtime.validate_cuda_tensor
 
 
 @pytest.mark.parametrize("name", _ACCUMULATION_OWNER_NAMES)

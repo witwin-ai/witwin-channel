@@ -99,16 +99,16 @@ def test_los_topology_preserves_fake_event_and_count_semantics(monkeypatch):
         return block
 
     compiled = SimpleNamespace(rayd=object())
-    monkeypatch.setattr(los.topology_blocks, "path_los_export", fake_export)
+    monkeypatch.setattr(los.topology_kernels, "path_los_export", fake_export)
     monkeypatch.setattr(los, "prepare_los_candidates", fake_prepare)
     monkeypatch.setattr(
-        los.topology_blocks,
+        los.topology_kernels,
         "path_los_visibility_inputs",
         fake_visibility_inputs,
     )
     monkeypatch.setattr(los, "run_visibility_query", fake_visibility)
     monkeypatch.setattr(
-        los.topology_construction,
+        los.topology_kernels,
         "deterministic_los_topology_block",
         fake_construct,
     )
@@ -140,12 +140,12 @@ def test_los_topology_skips_visibility_for_structure_free_scene(monkeypatch):
     exported = _fake_exported()
     raw_block = {"valid": torch.tensor([True, True])}
     monkeypatch.setattr(
-        los.topology_blocks,
+        los.topology_kernels,
         "path_los_export",
         lambda *args, **kwargs: exported,
     )
     monkeypatch.setattr(
-        los.topology_blocks,
+        los.topology_kernels,
         "path_los_visibility_inputs",
         lambda *args, **kwargs: pytest.fail("visibility inputs must be skipped"),
     )
@@ -160,7 +160,7 @@ def test_los_topology_skips_visibility_for_structure_free_scene(monkeypatch):
         return raw_block
 
     monkeypatch.setattr(
-        los.topology_construction,
+        los.topology_kernels,
         "deterministic_los_topology_block",
         fake_construct,
     )

@@ -3,9 +3,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from witwin.channel.propagation.geometry.kernels import bridge as ops
-from witwin.channel.propagation.geometry import kernels
-from witwin.channel.propagation.geometry.kernels import bridge
+from witwin.channel.kernels import geometry
 from witwin.channel import runtime
 
 
@@ -23,18 +21,16 @@ _CANONICAL_FUNCTION_NAMES = (
 
 @pytest.mark.parametrize("name", _CANONICAL_FUNCTION_NAMES)
 def test_geometry_bridge_is_the_single_body_owner(name: str):
-    owner = getattr(bridge, name)
+    owner = getattr(geometry, name)
 
-    assert owner.__module__ == bridge.__name__
-    assert getattr(kernels, name) is owner
-    assert getattr(ops, name) is owner
+    assert owner.__module__ == geometry.__name__
 
 
 def test_geometry_bridge_uses_canonical_runtime_and_scene_dependencies():
-    assert bridge._required_native_op is runtime.required_symbol
-    assert bridge.validate_cuda_tensor is runtime.validate_cuda_tensor
-    assert "_rayd_resource" not in bridge.__dict__
-    assert bridge._rayd_scene_resource is runtime._rayd_scene_resource
+    assert geometry._required_native_op is runtime.required_symbol
+    assert geometry.validate_cuda_tensor is runtime.validate_cuda_tensor
+    assert "_rayd_resource" not in geometry.__dict__
+    assert geometry._rayd_scene_resource is runtime._rayd_scene_resource
 
 
 def test_intersection_returns_the_named_tensor_contract(
@@ -66,11 +62,11 @@ def test_intersection_returns_the_named_tensor_contract(
 
         return intersect
 
-    monkeypatch.setattr(bridge, "_required_native_op", required_symbol)
-    monkeypatch.setattr(bridge, "validate_cuda_tensor", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(geometry, "_required_native_op", required_symbol)
+    monkeypatch.setattr(geometry, "validate_cuda_tensor", lambda *_args, **_kwargs: None)
 
     resource = object()
-    result = bridge.rayd_intersect_forward(
+    result = geometry.rayd_intersect_forward(
         resource, ray_o, ray_d, ray_tmax, None, flags=5
     )
 
@@ -122,10 +118,10 @@ def test_diffraction_visibility_plan_dispatches_only_native_numerical_inputs(
 
         return plan
 
-    monkeypatch.setattr(bridge, "validate_cuda_tensor", validate)
-    monkeypatch.setattr(bridge, "_required_native_op", required_symbol)
+    monkeypatch.setattr(geometry, "validate_cuda_tensor", validate)
+    monkeypatch.setattr(geometry, "_required_native_op", required_symbol)
 
-    result = bridge.diffraction_tx_visible_state_plan(
+    result = geometry.diffraction_tx_visible_state_plan(
         object(),
         tx,
         edge_index,
@@ -173,19 +169,19 @@ def test_diffraction_visibility_plan_dispatches_only_native_numerical_inputs(
 def test_diffraction_visibility_plan_rejects_capacity_before_dispatch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    rows = bridge._DIFFRACTION_STATE_CAPACITY + 1
+    rows = geometry._DIFFRACTION_STATE_CAPACITY + 1
     float3 = torch.empty((1, 3), device="meta").expand(rows, 3)
     float1 = torch.empty((1,), device="meta").expand(rows)
     int1 = torch.empty((1,), dtype=torch.int32, device="meta").expand(rows)
-    monkeypatch.setattr(bridge, "validate_cuda_tensor", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(geometry, "validate_cuda_tensor", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
-        bridge,
+        geometry,
         "_required_native_op",
         lambda _name: pytest.fail("native dispatch must not be reached"),
     )
 
     with pytest.raises(ValueError, match="exceeds 4194304"):
-        bridge.diffraction_tx_visible_state_plan(
+        geometry.diffraction_tx_visible_state_plan(
             object(),
             torch.empty((3,), device="meta"),
             int1,
@@ -206,21 +202,21 @@ def test_diffraction_visibility_plan_rejects_capacity_before_dispatch(
 def test_diffraction_visibility_plan_accepts_exact_capacity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    rows = bridge._DIFFRACTION_STATE_CAPACITY
+    rows = geometry._DIFFRACTION_STATE_CAPACITY
     float3 = torch.empty((1, 3), device="meta").expand(rows, 3)
     float1 = torch.empty((1,), device="meta").expand(rows)
     int1 = torch.empty((1,), dtype=torch.int32, device="meta").expand(rows)
     active = torch.empty((rows,), dtype=torch.bool, device="meta")
     calls: list[tuple[object, ...]] = []
-    monkeypatch.setattr(bridge, "validate_cuda_tensor", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(bridge, "_rayd_scene_resource", lambda resource: resource)
+    monkeypatch.setattr(geometry, "validate_cuda_tensor", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(geometry, "_rayd_scene_resource", lambda resource: resource)
     monkeypatch.setattr(
-        bridge,
+        geometry,
         "_required_native_op",
         lambda _name: lambda *args: calls.append(args) or active,
     )
 
-    result = bridge.diffraction_tx_visible_state_plan(
+    result = geometry.diffraction_tx_visible_state_plan(
         object(),
         torch.empty((3,), device="meta"),
         int1,
@@ -261,13 +257,13 @@ def test_diffraction_visibility_plan_accepts_passthrough_views_and_rejects_numer
     source = passthrough_float3
     source_power = passthrough_float
     active = torch.ones(rows, dtype=torch.bool, device="cuda")
-    monkeypatch.setattr(bridge, "_rayd_scene_resource", lambda resource: resource)
+    monkeypatch.setattr(geometry, "_rayd_scene_resource", lambda resource: resource)
     monkeypatch.setattr(
-        bridge, "_required_native_op", lambda _name: lambda *_args: active
+        geometry, "_required_native_op", lambda _name: lambda *_args: active
     )
 
     assert (
-        bridge.diffraction_tx_visible_state_plan(
+        geometry.diffraction_tx_visible_state_plan(
             object(),
             tx,
             edge_index,
@@ -304,7 +300,7 @@ def test_diffraction_visibility_plan_accepts_passthrough_views_and_rejects_numer
         invalid_numerical = numerical.copy()
         invalid_numerical[index] = view
         with pytest.raises(ValueError, match=f"{name} must be contiguous"):
-            bridge.diffraction_tx_visible_state_plan(
+            geometry.diffraction_tx_visible_state_plan(
                 object(),
                 invalid_numerical[0],
                 edge_index,

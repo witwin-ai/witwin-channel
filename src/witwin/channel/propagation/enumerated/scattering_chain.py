@@ -19,7 +19,7 @@ the derived per-row lengths / spreading / incident-outgoing directions the froze
 :class:`ScatterChainDiscovery` contract requires.
 
 The produced :class:`ScatterChainDiscovery` is the read-only typed contract the
-native Op A / Op B chain facades (ADR-021 D2, owner ``scattering/kernels/``)
+native Op A / Op B chain facades (ADR-021 D2, owner ``kernels/scattering.py``)
 consume; this module owns discovery only. Directions (``d_i``/``d_o``), lengths
 (``L1``/``L2``), spreading (``sp1``/``sp2``), and cosines are derived from the
 RayD-owned hit positions as structural packing, matching the reference oracles
@@ -34,10 +34,7 @@ from typing import TYPE_CHECKING
 import torch
 
 from witwin.channel.materials import face_material_tensors
-from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
-from witwin.channel.propagation.geometry.kernels import (
-    primitives as geometry_primitives,
-)
+from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel.propagation.geometry.reevaluate import (
     _cached_coplanar_face_groups,
 )
@@ -51,12 +48,7 @@ from witwin.channel.propagation.topology.discovery.reflection import (
     prepare_reflection_multibounce_plan,
     prepare_reflection_order1_plan,
 )
-from witwin.channel.propagation.topology.kernels import (
-    compaction as topology_compaction,
-)
-from witwin.channel.propagation.topology.kernels import (
-    construction as topology_construction,
-)
+from witwin.channel.kernels import topology as topology_kernels
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from witwin.channel.propagation.enumerated.contracts import TopologyConfig
@@ -223,7 +215,7 @@ class ChainSamples:
 
 
 def _normalize(vec: torch.Tensor, eps: float = 1.0e-12) -> torch.Tensor:
-    return geometry_primitives.deterministic_normalize_vec3(vec.contiguous(), eps=eps)
+    return geometry_kernels.deterministic_normalize_vec3(vec.contiguous(), eps=eps)
 
 
 def _pad_bounce_block(
@@ -459,10 +451,10 @@ def _reflection_geometry(compiled: object, device: torch.device) -> _ReflectionG
     records = compiled.rayd.edge_records()
     vertices = records.vertices
     faces = records.faces.contiguous()
-    normals = geometry_primitives.deterministic_normalize_vec3(
+    normals = geometry_kernels.deterministic_normalize_vec3(
         records.face_normals.contiguous(), eps=1.0e-6
     )
-    tri_a = topology_construction.deterministic_face_anchor_points(
+    tri_a = topology_kernels.deterministic_face_anchor_points(
         vertices.contiguous(), faces
     )
     face_eps_r, face_sigma_e, face_mu_r, face_gain, _valid = face_material_tensors(
@@ -522,7 +514,7 @@ def _visibility(
     for lo in range(0, count, _VISIBILITY_CHUNK):
         hi = min(lo + _VISIBILITY_CHUNK, count)
         masks.append(
-            geometry_bridge.rayd_visibility_forward(
+            geometry_kernels.rayd_visibility_forward(
                 handle, start[lo:hi].contiguous(), end[lo:hi].contiguous(), None
             )[0]
         )
@@ -752,7 +744,7 @@ def _gather_leg_order1(
                 visibility_ignore_mode=1,
             )
         )
-        selected = topology_compaction.deterministic_reflection_order1_compact(
+        selected = topology_kernels.deterministic_reflection_order1_compact(
             visible=epc.visible,
             epc_faces=epc.resolved_prim_ids,
             epc_hits=epc.hit_positions,
@@ -842,7 +834,7 @@ def _gather_leg_multibounce(
                 visibility_ignore_mode=1,
             )
         )
-        selected = topology_compaction.deterministic_reflection_sequence_compact(
+        selected = topology_kernels.deterministic_reflection_sequence_compact(
             visible=epc.visible,
             epc_sequences=epc.resolved_prim_ids,
             epc_hits=epc.hit_positions,
@@ -892,7 +884,7 @@ def _trace_group_chains(
     only by the non-exhaustive discovery branch of the shared iterators).
     """
 
-    from witwin.channel.propagation.topology.kernels.sampling import (
+    from witwin.channel.kernels.topology import (
         mc_sample_directions,
     )
 
@@ -900,7 +892,7 @@ def _trace_group_chains(
     ray_o = tx.reshape(1, 3).expand(ray_count, 3).contiguous()
     ray_d = mc_sample_directions(ray_count, tx.reshape(1, 3))
     ray_tmax = torch.empty((0,), device=device, dtype=torch.float32)
-    out = geometry_bridge.rayd_trace_reflections_forward(
+    out = geometry_kernels.rayd_trace_reflections_forward(
         rayd.require_resource(), ray_o, ray_d, ray_tmax, None, int(max_depth)
     )
     prim_chain = out[2].to(dtype=torch.long).reshape(ray_count, int(max_depth))

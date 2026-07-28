@@ -18,10 +18,7 @@ from witwin.channel.propagation.topology.discovery.los import (
     prepare_los_candidates,
 )
 from witwin.channel.propagation.topology.export import _ensure_topology_fields
-from witwin.channel.propagation.topology.kernels import blocks as topology_blocks
-from witwin.channel.propagation.topology.kernels import (
-    construction as topology_construction,
-)
+from witwin.channel.kernels import topology as topology_kernels
 
 if TYPE_CHECKING:
     from witwin.channel.scene.endpoints import SolverScene as Scene
@@ -42,7 +39,7 @@ def _los_topology(
 ) -> tuple[dict[str, torch.Tensor], int, int, int]:
     # R5: the per-transmitter polarization (threaded from the caller) drives the
     # LoS dipole sin^2 pattern in path_los_export.
-    exported = topology_blocks.path_los_export(
+    exported = topology_kernels.path_los_export(
         tx_positions,
         tx_power,
         rx_positions,
@@ -78,7 +75,7 @@ def _los_topology(
             visible = tau > 0.0
             launch_count += 1
         else:
-            visibility_inputs = topology_blocks.path_los_visibility_inputs(
+            visibility_inputs = topology_kernels.path_los_visibility_inputs(
                 tx_positions,
                 rx_positions,
                 plan.tx_id.to(dtype=torch.int32).contiguous(),
@@ -94,7 +91,7 @@ def _los_topology(
             ).visible
             launch_count += 1
     los_block = _ensure_topology_fields(
-        topology_construction.deterministic_los_topology_block(
+        topology_kernels.deterministic_los_topology_block(
             plan.tx_id.to(dtype=torch.int32).contiguous(),
             plan.rx_id.to(dtype=torch.int32).contiguous(),
             exported["path_length_m"].to(dtype=torch.float32).contiguous(),

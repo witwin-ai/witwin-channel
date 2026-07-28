@@ -7,9 +7,7 @@ import torch
 from tests.support.core_world import make_receiver_grid
 from witwin.core import Scene
 from witwin.channel.deterministic import Config as DeterministicConfig
-from witwin.channel.deterministic.solver import (
-    _metadata as deterministic_metadata,
-)
+from witwin.channel.deterministic import _metadata as deterministic_metadata
 from witwin.channel.montecarlo.basic import Config as BasicConfig
 from witwin.channel.montecarlo.basic.metadata import (
     make_solver_metadata as basic_metadata,

@@ -139,7 +139,7 @@ def _to_native(t: torch.Tensor) -> torch.Tensor:
 
 def _native_backward(out, grids, sigma_h, lx, ly, thickness, eps, sigma, frequency,
                      grad_f_te, grad_f_tm, *, rough, layers, freq):
-    from witwin.channel.scattering.kernels.table_build_ad import (
+    from witwin.channel.kernels.scattering import (
         kirchhoff_table_build_backward,
     )
 
@@ -245,7 +245,7 @@ def test_backward_matches_oracle(iso):
 @_require_native
 @pytest.mark.parametrize("iso", [True, False])
 def test_jvp_vs_vjp_inner_product(iso):
-    from witwin.channel.scattering.kernels.table_build_ad import (
+    from witwin.channel.kernels.scattering import (
         kirchhoff_table_build_jvp,
     )
 
@@ -386,7 +386,7 @@ def test_need_flags_gate_outputs():
 def test_fixed_input_rejection():
     # The Function is self-contained; assert the fixed-input map lists mu_r and
     # the four directional grids so requesting their gradient fails loudly.
-    from witwin.channel.scattering.kernels import table_build_ad
+    from witwin.channel.kernels import scattering as table_build_ad
 
     names = {name for _, name in table_build_ad._FIXED}
     assert names == {"layer_mu_r", "cos_i", "phi_i", "cos_o", "phi_o"}

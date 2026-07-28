@@ -13,8 +13,8 @@ forward, and for the contract / negative / edge-case behavior in the ADR
 acceptance protocol.
 
 Assumed Python facade signatures (the C++ ABI is pinned by ADR-014; the thin
-Python facades are authored in parallel in ``scattering/kernels/functional.py``
-and ``scattering/kernels/autograd.py``). These tests assume the natural design
+Python facades are authored in parallel in ``kernels/scattering.py``).
+These tests assume the natural design
 that mirrors the existing forward facade and ``propagation/fields/kernels``:
 
     scattering_ensemble_eval_backward(
@@ -61,8 +61,8 @@ from tests.ad._tolerances import ABS_TOL, REL_TOL_PATH
 from tests.reference import kirchhoff_ensemble as ref_ensemble
 from tests.reference import phase_screen_realization as ref_patch
 from witwin.channel import runtime
-from witwin.channel.scattering.kernels import autograd as scattering_autograd
-from witwin.channel.scattering.kernels import functional as scattering_functional
+from witwin.channel.kernels import scattering as scattering_autograd
+from witwin.channel.kernels import scattering as scattering_functional
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for scattering AD"

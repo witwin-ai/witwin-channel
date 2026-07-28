@@ -5,8 +5,8 @@ import inspect
 import pytest
 import torch
 
-from witwin.channel.montecarlo.basic.kernels import capacity as capacity_kernels
-from witwin.channel.montecarlo.basic.kernels.capacity import (
+from witwin.channel.kernels import montecarlo as capacity_kernels
+from witwin.channel.kernels.montecarlo import (
     mc_capacity_failure_component_maps_sanitize,
 )
 from witwin.channel.runtime import create_capacity_failure_state

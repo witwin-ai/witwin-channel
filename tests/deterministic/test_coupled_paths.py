@@ -14,7 +14,7 @@ import torch
 from tests.support.scenes import coupled_wall_wedge_scene
 from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
-from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel.kernels import geometry as geometry_kernels
 
 
 def _require_native() -> None:
@@ -163,7 +163,7 @@ def test_coupled_candidate_budget_fails_loudly_before_launch(monkeypatch):
 
     _require_native()
     monkeypatch.setattr(
-        geometry_bridge,
+        geometry_kernels,
         "coupled_rd_geometry_forward",
         lambda *_args, **_kwargs: pytest.fail(
             "coupled kernel launched before the candidate guard"
@@ -191,14 +191,14 @@ def test_coupled_dd_candidate_budget_fails_loudly_before_launch(monkeypatch):
 
     _require_native()
     monkeypatch.setattr(
-        geometry_bridge,
+        geometry_kernels,
         "coupled_rd_geometry_forward",
         lambda *_args, **_kwargs: pytest.fail(
             "coupled R-D kernel launched before the candidate guard"
         ),
     )
     monkeypatch.setattr(
-        geometry_bridge,
+        geometry_kernels,
         "coupled_dd_geometry_forward",
         lambda *_args, **_kwargs: pytest.fail(
             "coupled D-D kernel launched before the candidate guard"

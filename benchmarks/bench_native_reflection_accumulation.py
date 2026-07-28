@@ -42,13 +42,11 @@ def _native_imports() -> dict[str, Any]:
     import torch
     from witwin.channel import Transmitter
     from witwin.core import ReceiverGrid, Scene
-    from witwin.channel.montecarlo.basic.kernels.maps import (
+    from witwin.channel.kernels.montecarlo import (
         mc_component_map_buffer,
         mc_finalize_component_maps,
-        mc_store_scaled_component_map,
-    )
-    from witwin.channel.montecarlo.basic.kernels.sampling import (
         mc_reflection_launch_inputs,
+        mc_store_scaled_component_map,
     )
     from witwin.channel.core.material_runtime import face_material_tensors
     from witwin.channel.montecarlo.basic.backend import _LIGHT_SPEED_M_PER_S, transmitter_positions

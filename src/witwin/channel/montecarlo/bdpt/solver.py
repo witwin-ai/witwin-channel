@@ -4,13 +4,11 @@ import torch as torch
 from witwin.core import Scene, SceneSnapshot
 
 from witwin.channel import build_info
-from witwin.channel.montecarlo.bdpt.kernels.maps import (
+from witwin.channel.kernels.montecarlo import (
     bdpt_component_map_buffer as bdpt_component_map_buffer,
-    bdpt_store_component_map as bdpt_store_component_map,
-)
-from witwin.channel.montecarlo.bdpt.kernels.sampling import (
     bdpt_reflection_launch_inputs as bdpt_reflection_launch_inputs,
     bdpt_sample_directions as bdpt_sample_directions,
+    bdpt_store_component_map as bdpt_store_component_map,
 )
 from witwin.channel.scene.compiler import compile as compile_scene
 from witwin.channel.scene.endpoints import validate_scalar_endpoint_features

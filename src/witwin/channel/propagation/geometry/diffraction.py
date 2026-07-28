@@ -10,7 +10,7 @@ from witwin.channel.propagation.geometry.edge_state import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
     diffraction_edge_geometry as _diffraction_edge_geometry,
 )
-from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel.runtime import CudaProfileMark, cuda_profile_mark
 
 
@@ -114,7 +114,7 @@ def plan_tx_visible_diffraction_states(
     tx: torch.Tensor,
 ) -> DiffractionVisibleStatePlan:
     named = name_diffraction_states(states)
-    active = geometry_bridge.diffraction_tx_visible_state_plan(
+    active = geometry_kernels.diffraction_tx_visible_state_plan(
         rayd.require_resource(),
         tx,
         named.edge_index,
@@ -197,7 +197,7 @@ def query_diffraction_order1(
     states = query.states
     cuda_profile_mark(CudaProfileMark.OPTIX_TRAVERSAL)
     cuda_profile_mark(CudaProfileMark.DIFFRACTION_EXPORTER_REQUEST)
-    raw = geometry_bridge.rayd_diffraction_paths_order1_forward(
+    raw = geometry_kernels.rayd_diffraction_paths_order1_forward(
         query.handle,
         query.tx_position,
         query.tx_polarization,

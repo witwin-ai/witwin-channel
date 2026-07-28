@@ -4,14 +4,8 @@ import inspect
 
 import pytest
 
-from witwin.channel.propagation.fields.kernels import autograd as ops
+from witwin.channel.kernels import fields as field_kernels
 from witwin.channel.propagation import fields
-from witwin.channel.propagation.fields import kernels
-from witwin.channel.propagation.fields.kernels import (
-    autograd,
-    autograd_projection,
-    functional,
-)
 from witwin.channel import runtime
 
 
@@ -38,27 +32,23 @@ _PROJECTION_OWNER_NAMES = (
 
 @pytest.mark.parametrize("name", _OWNER_NAMES)
 def test_fields_autograd_is_the_single_object_owner(name: str):
-    owner = getattr(autograd, name)
+    owner = getattr(field_kernels, name)
 
-    assert owner.__module__ == autograd.__name__
-    assert getattr(kernels, name) is owner
+    assert owner.__module__ == field_kernels.__name__
     assert getattr(fields, name) is owner
-    assert getattr(ops, name) is owner
 
 
 @pytest.mark.parametrize("name", _PROJECTION_OWNER_NAMES)
 def test_fields_projection_autograd_is_the_single_object_owner(name: str):
-    owner = getattr(autograd_projection, name)
+    owner = getattr(field_kernels, name)
 
-    assert owner.__module__ == autograd_projection.__name__
-    assert getattr(kernels, name) is owner
+    assert owner.__module__ == field_kernels.__name__
     assert getattr(fields, name) is owner
-    assert not hasattr(autograd, name)
 
 
 def test_fields_autograd_uses_canonical_runtime_dependencies():
-    assert autograd._required_native_op is runtime.required_symbol
-    assert autograd.disable_functorch is runtime.disable_functorch
+    assert field_kernels._required_native_op is runtime.required_symbol
+    assert field_kernels.disable_functorch is runtime.disable_functorch
     for name in (
         "_ad_checked_tangent",
         "_ad_frequency_grad",
@@ -71,10 +61,13 @@ def test_fields_autograd_uses_canonical_runtime_dependencies():
         "_ad_reject_fixed_inputs",
         "_ad_reject_fixed_tangents",
     ):
-        assert getattr(autograd, name) is getattr(runtime, name)
+        assert getattr(field_kernels, name) is getattr(runtime, name)
 
 
 def test_fields_autograd_uses_canonical_functional_companions():
+    # The forward companions and the shared field tuples are defined in the
+    # same module as the wrappers that dispatch them, so the wrappers reach
+    # them through module globals rather than through a second binding.
     for name in (
         "field_free_space_backward",
         "field_free_space_jvp",
@@ -83,24 +76,24 @@ def test_fields_autograd_uses_canonical_functional_companions():
         "field_transmission_sequence_backward",
         "field_transmission_sequence_jvp",
     ):
-        assert getattr(autograd, name) is getattr(functional, name)
+        assert getattr(field_kernels, name).__globals__ is field_kernels.__dict__
     for name in (
         "_COUPLED_OUTPUT_FIELDS",
         "_FIELD_AD_OUTPUT_FIELDS",
         "_FIELD_AD_TANGENT_FIELDS",
         "_WEDGE_OUTPUT_FIELDS",
     ):
-        assert getattr(autograd, name) is getattr(functional, name)
+        assert isinstance(getattr(field_kernels, name), tuple)
 
 
 def test_transmission_autograd_requires_explicit_path_valid_first():
     parameters = tuple(
-        inspect.signature(autograd.field_transmission_sequence_ad).parameters
+        inspect.signature(field_kernels.field_transmission_sequence_ad).parameters
     )
     assert parameters[0] == "path_valid"
     function_parameters = tuple(
         inspect.signature(
-            autograd._FieldTransmissionSequenceAdFunction.forward
+            field_kernels._FieldTransmissionSequenceAdFunction.forward
         ).parameters
     )
     assert function_parameters[0] == "path_valid"
@@ -108,10 +101,10 @@ def test_transmission_autograd_requires_explicit_path_valid_first():
 
 def test_diffraction_wedge_autograd_requires_explicit_valid_first():
     parameters = tuple(
-        inspect.signature(autograd.field_diffraction_wedge_ad).parameters
+        inspect.signature(field_kernels.field_diffraction_wedge_ad).parameters
     )
     assert parameters[0] == "valid"
     function_parameters = tuple(
-        inspect.signature(autograd._FieldDiffractionWedgeAdFunction.forward).parameters
+        inspect.signature(field_kernels._FieldDiffractionWedgeAdFunction.forward).parameters
     )
     assert function_parameters[0] == "valid"

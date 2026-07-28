@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import torch
 
 from witwin.channel.scene import endpoints as scene_endpoints
-from witwin.channel.propagation.geometry.kernels import (
+from witwin.channel.kernels.geometry import (
     rayd_segment_penetration_ad,
     rayd_segment_penetration_forward,
 )
@@ -16,7 +16,7 @@ from witwin.channel.propagation.penetration import (
 )
 from witwin.channel.propagation.topology.concatenate import _empty_path_block
 from witwin.channel.propagation.topology.export import _ensure_topology_fields
-from witwin.channel.propagation.topology.kernels import (
+from witwin.channel.kernels.topology import (
     enumerated_transmission_topology_pack,
 )
 from witwin.channel.runtime import (

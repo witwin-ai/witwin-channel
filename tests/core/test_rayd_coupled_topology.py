@@ -7,7 +7,7 @@ from tests.support.scenes import coupled_wall_wedge_scene
 from tests.support.core_world import make_mesh_structure
 from witwin.core import Scene
 from witwin.channel.scene import compile as compile_scene
-from witwin.channel.propagation.geometry.kernels import bridge as ops
+from witwin.channel.kernels import geometry as ops
 from witwin.core import PhysicalMaterial
 from witwin.channel import runtime
 

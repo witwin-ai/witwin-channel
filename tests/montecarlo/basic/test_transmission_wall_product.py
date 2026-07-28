@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 import torch
 
-from witwin.channel.montecarlo.basic.kernels import transmission
-from witwin.channel.montecarlo.basic.kernels.transmission import (
+from witwin.channel.kernels import montecarlo as transmission
+from witwin.channel.kernels.montecarlo import (
     mc_transmission_wall_product,
     mc_transmission_wall_product_ad,
     mc_transmission_wall_product_backward,

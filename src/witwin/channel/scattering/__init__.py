@@ -568,7 +568,7 @@ def eval_bsdf(
     surface. Directions below the horizon return 0.
     """
 
-    from witwin.channel.scattering.kernels.functional import (
+    from witwin.channel.kernels.scattering import (
         scattering_table_eval,
     )
 
@@ -593,7 +593,7 @@ def sample_directions(
     sampled density is piecewise constant per outgoing bin.
     """
 
-    from witwin.channel.scattering.kernels.functional import (
+    from witwin.channel.kernels.scattering import (
         scattering_table_sample,
     )
 
@@ -622,7 +622,7 @@ def pdf(
     over the hemisphere by construction. Zero below the horizon.
     """
 
-    from witwin.channel.scattering.kernels.functional import scattering_table_pdf
+    from witwin.channel.kernels.scattering import scattering_table_pdf
 
     return scattering_table_pdf(
         valid.contiguous(),
@@ -646,7 +646,7 @@ def pdf_reverse(
     reverse table exists.
     """
 
-    from witwin.channel.scattering.kernels.functional import scattering_table_pdf
+    from witwin.channel.kernels.scattering import scattering_table_pdf
 
     return scattering_table_pdf(
         valid.contiguous(),

@@ -3,9 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from witwin.channel.propagation.geometry.kernels import primitives as ops
-from witwin.channel.propagation.geometry import kernels
-from witwin.channel.propagation.geometry.kernels import primitives
+from witwin.channel.kernels import geometry
 from witwin.channel import runtime
 
 
@@ -22,17 +20,15 @@ _OWNER_NAMES = (
 
 @pytest.mark.parametrize("name", _OWNER_NAMES)
 def test_geometry_primitives_is_the_single_object_owner(name: str):
-    owner = getattr(primitives, name)
+    owner = getattr(geometry, name)
 
-    assert owner.__module__ == primitives.__name__
-    assert getattr(kernels, name) is owner
-    assert getattr(ops, name) is owner
+    assert owner.__module__ == geometry.__name__
 
 
 def test_geometry_primitives_use_only_canonical_runtime_dependencies():
-    assert primitives._required_native_op is runtime.required_symbol
-    assert primitives.native_extension is runtime.native_extension
-    assert primitives.validate_cuda_tensor is runtime.validate_cuda_tensor
+    assert geometry._required_native_op is runtime.required_symbol
+    assert geometry.native_extension is runtime.native_extension
+    assert geometry.validate_cuda_tensor is runtime.validate_cuda_tensor
     for name in _OWNER_NAMES:
-        assert getattr(primitives, name).__globals__ is primitives.__dict__
-    assert "ops" not in primitives.__dict__
+        assert getattr(geometry, name).__globals__ is geometry.__dict__
+    assert "ops" not in geometry.__dict__

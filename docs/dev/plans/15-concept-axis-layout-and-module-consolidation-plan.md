@@ -523,7 +523,57 @@ Two further items:
   public `evaluate_enumerated_paths` through `propagation.__getattr__`. That entry
   point becomes `pipeline/enumerated.py`; the exception must be re-pointed, not
   quietly widened.
-- **`ci/public-api-snapshot.json`** is untouched under the recommendation in §4.3.
+- **`ci/public-api-snapshot.json`** is *not* untouched. §4.3 asserted it would
+  be, and that was wrong; see the migration note in §6.1 for what actually moves
+  and why it is not an API break.
+
+### 6.1 Migration note — Phase 4 solver collapse
+
+**No import path changed. Only definition sites moved.**
+
+Phase 4 collapsed `witwin/channel/path/` into `witwin/channel/path.py` and
+`witwin/channel/deterministic/` into `witwin/channel/deterministic.py`. Every
+public name keeps the module it was already imported from:
+
+```python
+from witwin.channel.path import Config, InteractionType, PathResult, RaggedPathSoA, solve
+from witwin.channel.deterministic import Config, PathTable, Result, solve
+```
+
+Nine `ci/public-api-snapshot.json` entries were regenerated. For each, `name`,
+`kind`, and `signature` are byte-identical; the entry count per module and the
+module list are unchanged. Only `target` moved, from the old submodule spelling
+to the collapsed module:
+
+| Module | Export | Old `target` | New `target` |
+| --- | --- | --- | --- |
+| `witwin.channel.path` | `Config` | `witwin.channel.path.config.Config` | `witwin.channel.path.Config` |
+| `witwin.channel.path` | `InteractionType` | `witwin.channel.path.result.InteractionType` | `witwin.channel.path.InteractionType` |
+| `witwin.channel.path` | `PathResult` | `witwin.channel.path.result.PathResult` | `witwin.channel.path.PathResult` |
+| `witwin.channel.path` | `RaggedPathSoA` | `witwin.channel.path.schema.RaggedPathSoA` | `witwin.channel.path.RaggedPathSoA` |
+| `witwin.channel.path` | `solve` | `witwin.channel.path.solver.solve` | `witwin.channel.path.solve` |
+| `witwin.channel.deterministic` | `Config` | `witwin.channel.deterministic.config.Config` | `witwin.channel.deterministic.Config` |
+| `witwin.channel.deterministic` | `PathTable` | `witwin.channel.deterministic.result.PathTable` | `witwin.channel.deterministic.PathTable` |
+| `witwin.channel.deterministic` | `Result` | `witwin.channel.deterministic.result.Result` | `witwin.channel.deterministic.Result` |
+| `witwin.channel.deterministic` | `solve` | `witwin.channel.deterministic.solver.solve` | `witwin.channel.deterministic.solve` |
+
+Those nine `contract_sha256` values also moved, and that is expected rather than
+a signature break. `tools.refactor_baseline._describe_definition` places `target`
+inside the contract dictionary that `tests/test_public_api_snapshot._contract_sha256`
+hashes, so relocating a definition necessarily rehashes it. This was verified
+directly: recomputing each new contract with `target` forced back to its old
+string reproduces the recorded old hash bit-for-bit for all nine, so `target` is
+the only field that differs.
+
+The submodules `path.config`, `path.result`, `path.schema`, `path.solver`,
+`deterministic.config`, `deterministic.result`, and `deterministic.solver` are
+gone and were never public API — ADR-003 makes internal modules non-promises,
+and no compatibility shim or re-export was added for them. Two in-repo test
+imports of `path.solver._metadata` and `deterministic.solver._metadata` were
+repointed at the collapsed modules in the same change.
+
+`witwin.channel.montecarlo.basic` and `witwin.channel.montecarlo.bdpt` were not
+collapsed in this phase and their seven snapshot entries are unchanged. See §8.
 
 ---
 
@@ -560,3 +610,20 @@ Two further items:
 4. **The import-graph baseline drift** noted in P4 needs an owner: it references a
    dissolved namespace, so someone must decide whether the frozen digest is
    re-baselined or the stale entries are formally removed.
+5. **Whether the two Monte Carlo solvers collapse at all.** Phase 4 landed
+   `path.py` and `deterministic.py`; `montecarlo/basic/` and `montecarlo/bdpt/`
+   were left as packages. `bdpt` is blocked on the same frozen digest as question
+   4, and hard-blocked rather than merely inconvenient: `mc-enum-001` is the one
+   *active* (not merely baseline) allowlist entry, and it is keyed on
+   `path: src/witwin/channel/montecarlo/bdpt/pipeline.py` /
+   `source: witwin.channel.montecarlo.bdpt.pipeline`. Collapsing the package
+   relocates the ADR-008 edge without changing it, and a relocation of an active
+   entry is exactly what the frozen digest forbids. That is the "re-pointed, not
+   quietly widened" item in §6, and it needs the owner decision in question 4
+   before Phase 4 can finish. `montecarlo/basic/` has no such entry — its
+   `boundary-006` is inert baseline history — but it was held back with its
+   sibling so the Monte Carlo axis moves once, and because its collapse merges
+   `backend.py` and `rayd_components.py` into one module object, which changes
+   what a `monkeypatch.setattr` scoped to one of them reaches (see
+   `tests/montecarlo/basic/test_basic_component_maps.py`). That is a behaviour
+   question, not a layout one, and needs its own evidence.

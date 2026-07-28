@@ -6,9 +6,7 @@ import pytest
 import torch
 
 from witwin.channel.propagation.enumerated import diffraction
-from witwin.channel.propagation.fields.kernels import (
-    deterministic as field_kernels,
-)
+from witwin.channel.kernels import fields as field_kernels
 from witwin.channel.propagation.geometry import (
     diffraction as geometry_diffraction,
 )
@@ -167,7 +165,7 @@ def test_nonempty_mask_keeps_capacity_n_for_exporter(monkeypatch, active) -> Non
 
     monkeypatch.setattr(diffraction, "query_diffraction_order1", export)
     monkeypatch.setattr(
-        diffraction.topology_compaction,
+        diffraction.topology_kernels,
         "deterministic_diffraction_order1_compact",
         lambda **_kwargs: {"rx_id": torch.empty(0, dtype=torch.int32)},
     )
@@ -349,7 +347,7 @@ def test_diffraction_lazy_event_field_and_export_order(monkeypatch):
         return compacted
 
     monkeypatch.setattr(
-        diffraction.topology_compaction,
+        diffraction.topology_kernels,
         "deterministic_diffraction_order1_compact",
         fake_compact,
     )
@@ -386,7 +384,7 @@ def test_diffraction_lazy_event_field_and_export_order(monkeypatch):
         return {"valid": torch.ones(1, dtype=torch.bool)}
 
     monkeypatch.setattr(
-        diffraction.topology_construction,
+        diffraction.topology_kernels,
         "deterministic_topology_base_fields",
         fake_base,
     )

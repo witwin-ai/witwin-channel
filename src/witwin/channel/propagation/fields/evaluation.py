@@ -24,28 +24,12 @@ from witwin.channel.materials import (
 from witwin.channel.scene.compiler import (
     _frequency_scalar,
 )
-from witwin.channel.propagation.fields.kernels import (
-    autograd as field_autograd,
-)
-from witwin.channel.propagation.fields.kernels import (
-    autograd_projection as field_autograd_projection,
-)
-from witwin.channel.propagation.fields.kernels import (
-    functional as field_functional,
-)
-from witwin.channel.propagation.fields.kernels import (
-    rough_scale as field_rough_scale,
-)
+from witwin.channel.kernels import fields as field_kernels
 from witwin.channel.propagation.fields.coupled_evaluation import (
     _evaluate_coupled_dd_rows,
     _resolve_coupled_rd_stationary,
 )
-from witwin.channel.propagation.geometry.kernels import (
-    autograd as geometry_autograd,
-)
-from witwin.channel.propagation.geometry.kernels import (
-    primitives as geometry_primitives,
-)
+from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel.propagation.geometry.silhouette_clearance import (
     apply_los_taper,
     los_clearance_factor,
@@ -67,9 +51,7 @@ from witwin.channel.propagation.rows import (
 from witwin.channel.propagation.topology.export import (
     PathExecutionStats,
 )
-from witwin.channel.propagation.topology.kernels import (
-    construction as topology_construction,
-)
+from witwin.channel.kernels import topology as topology_kernels
 
 if TYPE_CHECKING:
     from witwin.channel.scene.endpoints import SolverScene as Scene
@@ -333,13 +315,13 @@ def _evaluate_reflection_fields(
             if ledger is not None:
                 ledger.add(*scale_args)
             if ad_enabled:
-                scaled = field_rough_scale.field_rough_reflection_scale_ad(
+                scaled = field_kernels.field_rough_reflection_scale_ad(
                     *scale_args,
                     frequency=frequency,
                     frequency_value=frequency_value,
                 )
             else:
-                scaled = field_functional.field_rough_reflection_scale(
+                scaled = field_kernels.field_rough_reflection_scale(
                     *scale_args, frequency_hz=frequency
                 )
             evaluated = {
@@ -408,7 +390,7 @@ def _evaluate_transmission_fields(
             # convention does not matter. Invalid slots gather face 0 but are
             # skipped by the kernel, so they receive a zero cotangent.
             records = compiled.rayd.edge_records()
-            face_normal_table = geometry_autograd.rayd_face_normals_ad(
+            face_normal_table = geometry_kernels.rayd_face_normals_ad(
                 compiled.rayd.require_resource(),
                 vertices,
                 records.face_normals.contiguous(),
@@ -562,7 +544,7 @@ def _evaluate_diffraction_fields(
                     *wedge_args,
                     *(wedge_vertices if wedge_vertices is not None else ()),
                 )
-            evaluated = field_autograd.field_diffraction_wedge_ad(
+            evaluated = field_kernels.field_diffraction_wedge_ad(
                 *wedge_args,
                 frequency=frequency,
                 frequency_value=frequency_value,
@@ -572,13 +554,13 @@ def _evaluate_diffraction_fields(
             arrival = evaluated["direction"]
             if ledger is not None:
                 ledger.add(powered_xyz, arrival, rx_pol[diffraction_rows])
-            projected = field_autograd_projection.field_project_complex3_ad(
+            projected = field_kernels.field_project_complex3_ad(
                 powered_xyz,
                 arrival,
                 rx_pol[diffraction_rows].contiguous(),
             )
         else:
-            arrival = geometry_primitives.deterministic_normalize_vec3(
+            arrival = geometry_kernels.deterministic_normalize_vec3(
                 (
                     target[diffraction_rows]
                     - geometry.interaction_positions[diffraction_rows, 0]
@@ -586,7 +568,7 @@ def _evaluate_diffraction_fields(
                 eps=1.0e-6,
             )
             powered_xyz = input_fields.field_xyz[diffraction_rows].contiguous()
-            projected = field_functional.field_project_complex3(
+            projected = field_kernels.field_project_complex3(
                 powered_xyz,
                 arrival,
                 rx_pol[diffraction_rows].contiguous(),
@@ -669,10 +651,10 @@ def _evaluate_coupled_fields(
                 "tangent or disable coupled_paths."
             )
         if coupled_geometry_ad:
-            tri_a = topology_construction.deterministic_face_anchor_points(
+            tri_a = topology_kernels.deterministic_face_anchor_points(
                 records.vertices.contiguous(), records.faces.contiguous()
             )
-            normals_table = geometry_primitives.deterministic_normalize_vec3(
+            normals_table = geometry_kernels.deterministic_normalize_vec3(
                 records.face_normals.contiguous(), eps=1.0e-6
             )
         for component_id, reverse_order in ((3, False), (4, True)):
@@ -736,12 +718,12 @@ def _evaluate_coupled_fields(
 
             coupled_field_op = (
                 partial(
-                    field_autograd.field_coupled_rd_ad,
+                    field_kernels.field_coupled_rd_ad,
                     frequency=frequency,
                     frequency_value=frequency_value,
                 )
                 if ad_enabled
-                else partial(field_functional.field_coupled_rd, frequency_hz=frequency)
+                else partial(field_kernels.field_coupled_rd, frequency_hz=frequency)
             )
             reflection_materials = material_tuple(reflection_face)
             wedge_materials0 = material_tuple(face0)
@@ -872,17 +854,17 @@ def evaluate_path_fields(
             frequency_value = _ad_frequency_value(frequency)
         frequency_value = float(frequency_value)
         los_field_op = partial(
-            field_autograd.field_free_space_ad,
+            field_kernels.field_free_space_ad,
             frequency=frequency,
             frequency_value=frequency_value,
         )
         reflection_field_op = partial(
-            field_autograd.field_reflection_sequence_ad,
+            field_kernels.field_reflection_sequence_ad,
             frequency=frequency,
             frequency_value=frequency_value,
         )
         transmission_field_op = partial(
-            field_autograd.field_transmission_sequence_ad,
+            field_kernels.field_transmission_sequence_ad,
             frequency=frequency,
             frequency_value=frequency_value,
         )
@@ -892,12 +874,12 @@ def evaluate_path_fields(
             if frequency_value is None
             else float(frequency_value)
         )
-        los_field_op = partial(field_functional.field_free_space, frequency_hz=frequency)
+        los_field_op = partial(field_kernels.field_free_space, frequency_hz=frequency)
         reflection_field_op = partial(
-            field_functional.field_reflection_sequence, frequency_hz=frequency
+            field_kernels.field_reflection_sequence, frequency_hz=frequency
         )
         transmission_field_op = partial(
-            field_functional.field_transmission_sequence, frequency_hz=frequency
+            field_kernels.field_transmission_sequence, frequency_hz=frequency
         )
     device = paths.device
     # AD-2: when a geometry leaf is on the graph, the endpoints come from the

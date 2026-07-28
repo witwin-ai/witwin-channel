@@ -40,7 +40,7 @@ def test_reflection_epc_query_names_raw_geometry_and_preserves_identity(monkeypa
         return raw
 
     monkeypatch.setattr(
-        geometry_reflection.geometry_bridge,
+        geometry_reflection.geometry_kernels,
         "rayd_reflection_epc_paths_forward",
         fake_forward,
     )

@@ -51,23 +51,23 @@ DORMANT_FACADE_OWNERS: dict[str, str] = {}
 DORMANT_ALLOWED_FACADE_CALLERS: dict[str, frozenset[str]] = {}
 BOOTSTRAP_CALL_SITE_OWNERS = {
     "coupled_rd_prepare": (
-        "witwin.channel.propagation.fields.kernels.autograd."
+        "witwin.channel.kernels.fields."
         "_CoupledRdPrepareAdFunction.forward"
     ),
     "coupled_rd_prepare_backward": (
-        "witwin.channel.propagation.fields.kernels.autograd."
+        "witwin.channel.kernels.fields."
         "_CoupledRdPrepareAdFunction.backward"
     ),
     "coupled_rd_prepare_jvp": (
-        "witwin.channel.propagation.fields.kernels.autograd."
+        "witwin.channel.kernels.fields."
         "_CoupledRdPrepareAdFunction.jvp"
     ),
     "deterministic_accumulate_flat_fwd64": (
-        "witwin.channel.deterministic.kernels.accumulation."
+        "witwin.channel.kernels.deterministic."
         "_DeterministicAccumulateFlatAdFunction.forward"
     ),
     "deterministic_los_topology_block_all_visible": (
-        "witwin.channel.propagation.topology.kernels.construction."
+        "witwin.channel.kernels.topology."
         "deterministic_los_topology_block"
     ),
     "enumerated_capacity_failure_sanitize": (
@@ -79,11 +79,11 @@ BOOTSTRAP_CALL_SITE_OWNERS = {
         "_enumerated_capacity_failure_vector_sanitize_native"
     ),
     "enumerated_transmission_topology_pack_backward": (
-        "witwin.channel.propagation.topology.kernels.transmission."
+        "witwin.channel.kernels.topology."
         "_EnumeratedTransmissionTopologyPackFunction.backward"
     ),
     "enumerated_transmission_topology_pack_jvp": (
-        "witwin.channel.propagation.topology.kernels.transmission."
+        "witwin.channel.kernels.topology."
         "_EnumeratedTransmissionTopologyPackFunction.jvp"
     ),
     "evaluated_paths_capacity_pack_backward": (
@@ -95,43 +95,43 @@ BOOTSTRAP_CALL_SITE_OWNERS = {
         "_evaluated_paths_capacity_pack_jvp_native"
     ),
     "field_coupled_rd_backward": (
-        "witwin.channel.propagation.fields.kernels.autograd."
+        "witwin.channel.kernels.fields."
         "_FieldCoupledRdAdFunction.backward"
     ),
     "field_coupled_rd_jvp": (
-        "witwin.channel.propagation.fields.kernels.autograd."
+        "witwin.channel.kernels.fields."
         "_FieldCoupledRdAdFunction.jvp"
     ),
     "field_diffraction_wedge_backward": (
-        "witwin.channel.propagation.fields.kernels.autograd."
+        "witwin.channel.kernels.fields."
         "_FieldDiffractionWedgeAdFunction.backward"
     ),
     "field_diffraction_wedge_jvp": (
-        "witwin.channel.propagation.fields.kernels.autograd."
+        "witwin.channel.kernels.fields."
         "_FieldDiffractionWedgeAdFunction.jvp"
     ),
     "field_free_space_fwd64": (
-        "witwin.channel.propagation.fields.kernels.autograd."
+        "witwin.channel.kernels.fields."
         "_FieldFreeSpaceAdFunction.forward"
     ),
     "field_project_complex3_backward": (
-        "witwin.channel.propagation.fields.kernels.autograd."
+        "witwin.channel.kernels.fields."
         "_FieldProjectComplex3AdFunction.backward"
     ),
     "field_project_complex3_jvp": (
-        "witwin.channel.propagation.fields.kernels.autograd."
+        "witwin.channel.kernels.fields."
         "_FieldProjectComplex3AdFunction.jvp"
     ),
     "mc_capacity_failure_component_maps_sanitize": (
-        "witwin.channel.montecarlo.basic.kernels.capacity."
+        "witwin.channel.kernels.montecarlo."
         "_mc_capacity_failure_component_maps_sanitize_native"
     ),
     "mc_capacity_failure_component_maps_sanitize_backward": (
-        "witwin.channel.montecarlo.basic.kernels.capacity."
+        "witwin.channel.kernels.montecarlo."
         "_mc_capacity_failure_component_maps_sanitize_backward_native"
     ),
     "mc_capacity_failure_component_maps_sanitize_jvp": (
-        "witwin.channel.montecarlo.basic.kernels.capacity."
+        "witwin.channel.kernels.montecarlo."
         "_mc_capacity_failure_component_maps_sanitize_jvp_native"
     ),
 }

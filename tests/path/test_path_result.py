@@ -22,9 +22,14 @@ def test_path_public_api_is_single_versionless_contract():
         "RaggedPathSoA",
         "solve",
     }
-    assert not hasattr(path_api, "pack_synthetic_arrays")
-    assert not hasattr(path_api, "explicit_array_scene")
-    assert not hasattr(path_api, "pack_explicit_arrays")
+    # The collapsed ``path.py`` defines its array packers beside the public
+    # names, so they are reachable as module attributes. ``__all__`` remains
+    # the contract: the packers are internal helpers, never public API.
+    assert not {
+        "pack_synthetic_arrays",
+        "explicit_array_scene",
+        "pack_explicit_arrays",
+    } & set(path_api.__all__)
 
 
 def _ragged(

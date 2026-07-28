@@ -570,7 +570,7 @@ def test_diffraction_frequency_grad_matches_fd():
 def _captured_diffraction_tape(monkeypatch, tx: torch.Tensor) -> tuple:
     """Solve once in vjp mode and capture the tape-accumulate Function args."""
 
-    from witwin.channel.montecarlo.basic.kernels import maps as _maps
+    from witwin.channel.kernels import montecarlo as _maps
 
     captured: dict[str, tuple] = {}
     original = _maps._McDiffractionMapAdFunction.forward
@@ -613,7 +613,7 @@ def test_diffraction_transmitter_position_grad_matches_fixed_tape_fd(monkeypatch
     single-lane FD (measured ~10-15% per lane at the converged step).
     """
 
-    from witwin.channel.montecarlo.basic.kernels import maps as _ops
+    from witwin.channel.kernels import montecarlo as _ops
 
     base = torch.tensor([0.0, -1.0, 0.5])
     args = _captured_diffraction_tape(monkeypatch, base)

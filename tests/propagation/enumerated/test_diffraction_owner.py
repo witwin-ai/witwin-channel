@@ -16,8 +16,13 @@ from witwin.channel.propagation.topology.discovery import (
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
+# Re-pinned when the geometry kernel facades moved to
+# ``witwin.channel.kernels.geometry``: the only AST difference is the module
+# alias the native plan call is spelled through (``geometry_bridge`` ->
+# ``geometry_kernels``). Control flow, arguments and evaluation order are
+# unchanged.
 _DIGESTS = {
-    "plan_tx_visible_diffraction_states": "2313925423a053c7e466c982425e608aa847811a3c61347bc496a5acd2a99a64",
+    "plan_tx_visible_diffraction_states": "77cc58aea3a87b52b1d039624fc85c5f61e2ad435ab6d66424f578098727a271",
 }
 
 

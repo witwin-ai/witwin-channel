@@ -39,7 +39,7 @@ if TYPE_CHECKING:
         EnumeratedEndpointTensors,
     )
     from witwin.channel.propagation.rows import EvaluatedPaths
-    from witwin.channel.propagation.topology.kernels.canonical_compact import (
+    from witwin.channel.kernels.topology import (
         ExactPairMetadata,
     )
     from witwin.channel.scene.compiler import CompiledScene
@@ -275,9 +275,7 @@ def _composed_los_jones(
     one launch, and both routes are held to bit-identical agreement by test.
     """
 
-    from witwin.channel.propagation.fields.kernels import (
-        autograd as field_autograd,
-    )
+    from witwin.channel.kernels import fields as field_kernels
 
     from .replay import compose_jones, select_rows, transverse_basis
 
@@ -297,7 +295,7 @@ def _composed_los_jones(
         frequency_hz=frequency_value,
     )
     matrix, sink_basis, _ = compose_jones(
-        lambda polarization: field_autograd.field_free_space_ad(
+        lambda polarization: field_kernels.field_free_space_ad(
             source,
             target,
             power,
@@ -962,12 +960,7 @@ def reevaluate(
 ) -> FixedTopologyEvaluation:
     """Reevaluate frozen rows without topology discovery or compaction."""
 
-    from witwin.channel.propagation.fields.kernels import (
-        autograd as field_autograd,
-    )
-    from witwin.channel.propagation.fields.kernels import (
-        functional as field_functional,
-    )
+    from witwin.channel.kernels import fields as field_kernels
 
     from .replay import (
         excited_field,
@@ -1000,7 +993,7 @@ def reevaluate(
 
     def column(offset: float) -> dict[str, torch.Tensor]:
         if request.ad_mode == "none":
-            return field_functional.field_free_space(
+            return field_kernels.field_free_space(
                 rows.source,
                 rows.target,
                 tx_power,
@@ -1013,7 +1006,7 @@ def reevaluate(
         ledger.add(
             rows.source, rows.target, tx_power, tx_polarization, rx_polarization
         )
-        return field_autograd.field_free_space_ad(
+        return field_kernels.field_free_space_ad(
             rows.source,
             rows.target,
             tx_power,

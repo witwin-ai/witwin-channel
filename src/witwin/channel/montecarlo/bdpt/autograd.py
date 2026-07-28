@@ -36,7 +36,7 @@ from witwin.channel.runtime import (
     disable_functorch,
 )
 
-from .kernels.paths import (
+from witwin.channel.kernels.montecarlo import (
     _BDPT_SUBPATH_SCHEMA,
     bdpt_endpoint_connection_samples,
     bdpt_reflected_light_subpath_state,

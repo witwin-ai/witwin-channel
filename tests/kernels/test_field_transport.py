@@ -4,7 +4,7 @@ import math
 import pytest
 import torch
 
-from witwin.channel.propagation.fields.kernels import functional as ops
+from witwin.channel.kernels import fields as field_kernels
 
 
 def _slab_coefficient(
@@ -35,7 +35,7 @@ def test_free_space_complex3_matches_analytic_phase_and_power_contract():
     target = torch.tensor([[distance, 0.0, 0.0]], device="cuda")
     polarization = torch.tensor([[0.0, 0.0, 1.0]], device="cuda")
 
-    unit = ops.field_free_space(
+    unit = field_kernels.field_free_space(
         source,
         target,
         torch.tensor([1.0], device="cuda"),
@@ -43,7 +43,7 @@ def test_free_space_complex3_matches_analytic_phase_and_power_contract():
         polarization,
         frequency_hz=frequency,
     )
-    powered = ops.field_free_space(
+    powered = field_kernels.field_free_space(
         source,
         target,
         torch.tensor([4.0], device="cuda"),
@@ -87,7 +87,7 @@ def test_free_space_receiver_projection_and_global_rotation_are_invariant():
         device="cuda",
     )
 
-    base = ops.field_free_space(
+    base = field_kernels.field_free_space(
         source,
         target,
         torch.ones(1, device="cuda"),
@@ -95,7 +95,7 @@ def test_free_space_receiver_projection_and_global_rotation_are_invariant():
         rx_pol,
         frequency_hz=28.0e9,
     )
-    rotated = ops.field_free_space(
+    rotated = field_kernels.field_free_space(
         source @ rotation.T,
         target @ rotation.T,
         torch.ones(1, device="cuda"),
@@ -108,7 +108,7 @@ def test_free_space_receiver_projection_and_global_rotation_are_invariant():
     torch.testing.assert_close(
         rotated["field_vector"], base["field_vector"] @ rotation.T.to(torch.complex64)
     )
-    cross = ops.field_project_complex3(
+    cross = field_kernels.field_project_complex3(
         base["field_vector"],
         base["direction"],
         torch.tensor([[0.0, 1.0, 0.0]], device="cuda"),
@@ -124,7 +124,7 @@ def test_lossy_slab_reflection_matches_complex_reference():
     hit = torch.tensor([[[0.0, 0.0, 0.0]]], device="cuda")
     normal = torch.tensor([[[0.0, 0.0, 1.0]]], device="cuda")
     polarization = torch.tensor([[1.0, 0.0, 0.0]], device="cuda")
-    result = ops.field_reflection_sequence(
+    result = field_kernels.field_reflection_sequence(
         source,
         target,
         hit,
@@ -179,7 +179,7 @@ def test_non_coplanar_double_reflection_is_rotation_invariant():
 
     def solve(rotated: bool):
         matrix = rotation if rotated else torch.eye(3, device="cuda")
-        return ops.field_reflection_sequence(
+        return field_kernels.field_reflection_sequence(
             source @ matrix.T,
             target @ matrix.T,
             hits @ matrix.T,

@@ -7,9 +7,7 @@ from typing import Iterator, Protocol
 
 import torch
 
-from witwin.channel.propagation.topology.kernels import (
-    construction as topology_construction,
-)
+from witwin.channel.kernels import topology as topology_kernels
 
 _ORDER1_EXHAUSTIVE_GROUP_LIMIT = 4096
 _MAX_MULTIBOUNCE_FACE_SEQUENCES = 100_000
@@ -41,7 +39,7 @@ def _face_sequence_chunks(
     for start in range(0, total, chunk_size):
         end = min(start + chunk_size, total)
         if face_ids is None:
-            sequences = topology_construction.deterministic_face_sequence_chunk(
+            sequences = topology_kernels.deterministic_face_sequence_chunk(
                 reference,
                 face_count=face_count,
                 depth=depth,
@@ -50,7 +48,7 @@ def _face_sequence_chunks(
                 adjacent_distinct=adjacent_distinct,
             )
         else:
-            sequences = topology_construction.deterministic_mapped_face_sequence_chunk(
+            sequences = topology_kernels.deterministic_mapped_face_sequence_chunk(
                 face_ids,
                 depth=depth,
                 start=start,
@@ -117,7 +115,7 @@ def prepare_reflection_order1_plan(
 ) -> ReflectionOrder1Plan:
     exhaustive = group_count <= _ORDER1_EXHAUSTIVE_GROUP_LIMIT
     base_sequences = (
-        topology_construction.deterministic_mapped_face_sequence_chunk(
+        topology_kernels.deterministic_mapped_face_sequence_chunk(
             representative_faces,
             depth=1,
             start=0,
@@ -170,7 +168,7 @@ def iter_reflection_order1_epc_requests(
         rx_chunk_size = max(1, _MULTIBOUNCE_PAIR_CHUNK_SIZE // sequence_count)
         for rx_start in range(0, rx_count, rx_chunk_size):
             rx_end = min(rx_start + rx_chunk_size, rx_count)
-            epc_inputs = topology_construction.deterministic_reflection_epc_input_batch(
+            epc_inputs = topology_kernels.deterministic_reflection_epc_input_batch(
                 tx=tx,
                 rx_positions=rx_positions.contiguous(),
                 sequences=sequences.contiguous(),
@@ -246,7 +244,7 @@ def iter_reflection_multibounce_epc_requests(
                 for rx_start in range(0, rx_count, rx_chunk_size):
                     rx_end = min(rx_start + rx_chunk_size, rx_count)
                     for tx_index, tx in enumerate(tx_positions):
-                        epc_inputs = topology_construction.deterministic_reflection_epc_input_batch(
+                        epc_inputs = topology_kernels.deterministic_reflection_epc_input_batch(
                             tx=tx,
                             rx_positions=rx_positions.contiguous(),
                             sequences=sequences.contiguous(),
@@ -288,7 +286,7 @@ def iter_reflection_multibounce_epc_requests(
                     )
                     for rx_start in range(0, rx_count, rx_chunk_size):
                         rx_end = min(rx_start + rx_chunk_size, rx_count)
-                        epc_inputs = topology_construction.deterministic_reflection_epc_input_batch(
+                        epc_inputs = topology_kernels.deterministic_reflection_epc_input_batch(
                             tx=tx,
                             rx_positions=rx_positions.contiguous(),
                             sequences=sequences.contiguous(),

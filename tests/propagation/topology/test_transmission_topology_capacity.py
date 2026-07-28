@@ -8,10 +8,8 @@ import torch
 from witwin.channel.propagation.penetration import (
     SegmentPenetrationResult,
 )
-from witwin.channel.propagation.topology.kernels import (
-    transmission as transmission_kernels,
-)
-from witwin.channel.propagation.topology.kernels.transmission import (
+from witwin.channel.kernels import topology as transmission_kernels
+from witwin.channel.kernels.topology import (
     enumerated_transmission_topology_pack,
 )
 from witwin.channel.runtime import create_capacity_failure_state

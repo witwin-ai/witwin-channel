@@ -29,7 +29,7 @@ from witwin.channel.montecarlo.bdpt.autograd import (
 from witwin.channel.montecarlo.bdpt.autograd_accumulate import (
     bdpt_accumulate_connection_samples_ad,
 )
-from witwin.channel.montecarlo.bdpt.kernels.paths import (
+from witwin.channel.kernels.montecarlo import (
     bdpt_accumulate_connection_samples,
     bdpt_endpoint_connection_samples,
     bdpt_endpoint_subpath_state,

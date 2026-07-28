@@ -44,12 +44,7 @@ from witwin.channel.propagation.topology.export import (
     evaluated_paths_from_block,
     evaluated_paths_from_result,
 )
-from witwin.channel.propagation.topology.kernels import (
-    primitives as topology_primitives,
-)
-from witwin.channel.propagation.topology.kernels.canonical_compact import (
-    enumerated_exact_pair_metadata,
-)
+from witwin.channel.kernels import topology as topology_kernels
 from witwin.channel.runtime import (
     CapacityExecutionCounts,
     SolveCapacityTransaction,
@@ -421,7 +416,7 @@ def evaluate_enumerated_paths(
             execution=execution,
             capacity_execution=capacity_execution,
             capacity_transaction=capacity_transaction,
-            compact_metadata=enumerated_exact_pair_metadata(
+            compact_metadata=topology_kernels.enumerated_exact_pair_metadata(
                 evaluated.topology.tx_id,
                 evaluated.topology.rx_id,
                 pair_count=int(tx_positions.shape[0]) * int(rx_positions.shape[0]),
@@ -453,7 +448,7 @@ def evaluate_enumerated_paths(
         for block in blocks
     ]
     paths = concatenate_path_blocks(padded_blocks, device=device)
-    selected_edge_count = topology_primitives.deterministic_selected_edge_count(
+    selected_edge_count = topology_kernels.deterministic_selected_edge_count(
         paths["edge_id"]
     )
     evaluated, sidecars = evaluated_paths_from_block(

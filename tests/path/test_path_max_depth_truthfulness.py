@@ -1,6 +1,6 @@
 import pytest
 from witwin.channel.path import Config
-from witwin.channel.path.solver import _metadata
+from witwin.channel.path import _metadata
 
 
 def test_path_accepts_supported_reflection_depths_and_rejects_above_capability():

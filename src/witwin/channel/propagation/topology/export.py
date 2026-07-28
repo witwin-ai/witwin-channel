@@ -14,13 +14,7 @@ from witwin.channel.propagation.rows import (
 from witwin.channel.propagation.topology.concatenate import (
     _interaction_type_sequence,
 )
-from witwin.channel.propagation.topology.kernels.canonical_compact import (
-    ExactPairMetadata,
-    enumerated_canonical_compact,
-)
-from witwin.channel.propagation.topology.kernels import (
-    construction as topology_construction,
-)
+from witwin.channel.kernels import topology as topology_kernels
 from witwin.channel.runtime import CapacityExecutionCounts, SolveCapacityTransaction
 
 
@@ -45,7 +39,7 @@ class EvaluatedPathSidecars:
     diffraction_vector_field: torch.Tensor | None
     capacity_execution: CapacityExecutionCounts | None = None
     capacity_transaction: SolveCapacityTransaction | None = None
-    compact_metadata: ExactPairMetadata | None = None
+    compact_metadata: topology_kernels.ExactPairMetadata | None = None
 
 
 def evaluated_paths_from_result(
@@ -61,7 +55,7 @@ def evaluated_paths_from_result(
     def topology_defaults() -> dict[str, torch.Tensor]:
         nonlocal defaults
         if defaults is None:
-            defaults = topology_construction.deterministic_topology_default_fields(
+            defaults = topology_kernels.deterministic_topology_default_fields(
                 path_gain
             )
         return defaults
@@ -231,7 +225,7 @@ def evaluated_paths_from_block(
             interaction_positions=empty_vec3,
             interaction_normals=empty_vec3,
         )
-    compact = enumerated_canonical_compact(
+    compact = topology_kernels.enumerated_canonical_compact(
         paths,
         pair_count=tx_count * rx_count,
         num_tx=tx_count,
@@ -258,7 +252,7 @@ def evaluated_paths_from_block(
     )
     return evaluated, replace(
         sidecars,
-        compact_metadata=ExactPairMetadata(
+        compact_metadata=topology_kernels.ExactPairMetadata(
             pair_index=compact.pair_index,
             pair_offsets=compact.pair_offsets,
             source_id=compact.source_id,
@@ -291,7 +285,7 @@ def _ensure_topology_fields(
     def topology_defaults() -> dict[str, torch.Tensor]:
         nonlocal defaults
         if defaults is None:
-            defaults = topology_construction.deterministic_topology_default_fields(
+            defaults = topology_kernels.deterministic_topology_default_fields(
                 block["path_gain"].to(dtype=torch.float32).contiguous()
             )
         return defaults

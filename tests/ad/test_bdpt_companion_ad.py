@@ -29,7 +29,7 @@ normative):
   ``<forward>_jvp``, taking the forward's positional/keyword args plus
   ``grad_*`` / ``need_grad_*`` (backward) or ``tangent_*`` (jvp) keywords.
 * The plan-07 ``torch.autograd.Function`` wrappers live in
-  ``montecarlo.bdpt.kernels.autograd`` as ``<forward>_ad`` (fields/materials
+  ``montecarlo.bdpt.autograd`` as ``<forward>_ad`` (fields/materials
   ``autograd.py`` precedent).
 * The reflected-subpath differentiable material set is
   ``{eps_r, sigma_e, gain, thickness}`` with ``mu_r`` frozen (the
@@ -46,8 +46,7 @@ import torch
 from tests.ad._fd import relative_error
 from tests.ad._tolerances import ABS_TOL
 from tests.reference import bdpt_ad_oracles as O
-from witwin.channel.montecarlo.bdpt.kernels import maps as M
-from witwin.channel.montecarlo.bdpt.kernels import paths as P
+from witwin.channel.kernels import montecarlo as M
 from witwin.channel.montecarlo.bdpt import paths_ad as PA
 from witwin.channel import runtime
 
@@ -216,7 +215,7 @@ def _reflect_native(fx, *, origin=None):
 def test_reflected_forward_matches_oracle():
     fx = _reflect_fixture(11)
     light, inter, material = _reflect_native(fx)
-    out = P.bdpt_reflected_light_subpath_state(
+    out = M.bdpt_reflected_light_subpath_state(
         light, inter, **material, frequency_hz=_FREQ
     )
     freq = torch.tensor(_FREQ, dtype=torch.float64, device=fx["device"])
@@ -483,7 +482,7 @@ def _transmit_native(fx):
 def test_transmitted_forward_matches_oracle():
     fx = _transmit_fixture(13)
     light, inter, csr = _transmit_native(fx)
-    out = P.bdpt_transmitted_light_subpath_state(
+    out = M.bdpt_transmitted_light_subpath_state(
         light, inter, **csr, frequency_hz=_FREQ
     )
     freq = torch.tensor(_FREQ, dtype=torch.float64, device=fx["device"])
@@ -714,7 +713,7 @@ def test_endpoint_forward_matches_oracle():
     fx = _endpoint_fixture(37)
     light, sensor = _endpoint_native(fx)
     spt = 4
-    out = P.bdpt_endpoint_connection_samples(
+    out = M.bdpt_endpoint_connection_samples(
         light, sensor, frequency_hz=_FREQ, samples_per_tx=spt, mis="none",
     )
     freq = torch.tensor(_FREQ, dtype=torch.float64, device=fx["device"])
@@ -1138,7 +1137,7 @@ def test_fixed_inputs_reject_gradients_loudly():
 def test_ad_mode_none_reflected_has_no_tape():
     fx = _reflect_fixture(113)
     light, inter, material = _reflect_native(fx)
-    out = P.bdpt_reflected_light_subpath_state(
+    out = M.bdpt_reflected_light_subpath_state(
         light, inter, **material, frequency_hz=_FREQ
     )
     assert not out["field_real"].requires_grad

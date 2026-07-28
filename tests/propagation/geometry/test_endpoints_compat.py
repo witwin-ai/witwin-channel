@@ -6,7 +6,7 @@ import pytest
 import torch
 
 from tests.support.core_world import make_receiver_grid
-from witwin.channel.deterministic import accumulation, solver
+from witwin.channel import deterministic
 from witwin.channel.propagation.enumerated import scattering as enumerated
 from witwin.channel.propagation.geometry import endpoints
 from witwin.channel.scene.endpoints import ReceiverGrid as ReceiverGridView
@@ -26,11 +26,11 @@ def test_endpoint_helpers_have_canonical_owners():
 
         assert owner.__module__ == endpoints.__name__
 
-    assert accumulation.ReceiverLayout is endpoints.ReceiverLayout
-    assert accumulation.apply_receiver_layout is endpoints.apply_receiver_layout
-    assert solver.apply_receiver_layout is endpoints.apply_receiver_layout
+    assert deterministic.ReceiverLayout is endpoints.ReceiverLayout
+    assert deterministic.apply_receiver_layout is endpoints.apply_receiver_layout
     assert (
-        solver.receiver_positions_and_layout is endpoints.receiver_positions_and_layout
+        deterministic.receiver_positions_and_layout
+        is endpoints.receiver_positions_and_layout
     )
     assert enumerated.transmitter_tensors is endpoints.transmitter_tensors
     assert (

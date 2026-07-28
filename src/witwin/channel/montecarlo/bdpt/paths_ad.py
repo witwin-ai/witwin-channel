@@ -8,7 +8,7 @@ and ``montecarlo/bdpt/autograd_accumulate.py`` own the tape, the frozen-input
 rejection and the need-flag derivation; these facades are pure dispatch.
 
 The primal forward facades and their shared validation helpers live in
-``montecarlo/bdpt/kernels/paths.py``; this module imports the internal contract
+``kernels/montecarlo.py``; this module imports the internal contract
 validators from there so each contract keeps a single owner.
 """
 
@@ -21,7 +21,7 @@ from witwin.channel.runtime import (
     validate_cuda_tensor,
 )
 
-from .kernels.paths import (
+from witwin.channel.kernels.montecarlo import (
     _BDPT_COMPONENT_MATRIX_FIELDS,
     _BDPT_COMPONENT_MATRIX_ORDER,
     _bdpt_accumulate_bin_sum_args,

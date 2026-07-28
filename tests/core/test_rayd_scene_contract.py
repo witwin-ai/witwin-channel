@@ -160,7 +160,7 @@ def test_rayd_intersect_forward_uses_native_rayd_scene_bridge_when_available():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for RayD native intersection")
 
-    from witwin.channel.propagation.geometry.kernels.bridge import (
+    from witwin.channel.kernels.geometry import (
         rayd_intersect_forward,
     )
 

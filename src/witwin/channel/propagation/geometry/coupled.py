@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import torch
 
-from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel.kernels import geometry as geometry_kernels
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,7 +80,7 @@ class CoupledDdGeometry:
 
 
 def query_coupled_geometry(query: CoupledGeometryQuery) -> CoupledGeometry:
-    raw = geometry_bridge.coupled_rd_geometry_forward(
+    raw = geometry_kernels.coupled_rd_geometry_forward(
         query.rayd_resource,
         query.source,
         query.receiver,
@@ -116,7 +116,7 @@ def query_coupled_geometry(query: CoupledGeometryQuery) -> CoupledGeometry:
 
 
 def query_coupled_dd_geometry(query: CoupledDdGeometryQuery) -> CoupledDdGeometry:
-    raw = geometry_bridge.coupled_dd_geometry_forward(
+    raw = geometry_kernels.coupled_dd_geometry_forward(
         query.rayd_resource,
         query.source,
         query.receiver,

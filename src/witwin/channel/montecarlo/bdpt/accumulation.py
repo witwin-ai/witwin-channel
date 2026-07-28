@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import torch
 
-from witwin.channel.montecarlo.bdpt.kernels.maps import (
+from witwin.channel.kernels.montecarlo import (
     bdpt_los_component_maps_from_matrix,
 )
 

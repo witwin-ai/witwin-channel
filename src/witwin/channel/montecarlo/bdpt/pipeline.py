@@ -25,18 +25,16 @@ from witwin.channel.montecarlo.bdpt.autograd_accumulate import (
     bdpt_finalize_component_maps_ad,
     bdpt_finalize_point_components_ad,
 )
-from witwin.channel.montecarlo.bdpt.kernels.maps import (
-    bdpt_finalize_component_maps,
-    bdpt_finalize_point_components,
-    bdpt_los_component_maps_from_matrix,
-    bdpt_zero_matrix,
-)
-from witwin.channel.montecarlo.bdpt.kernels.paths import (
+from witwin.channel.kernels.montecarlo import (
     bdpt_compact_connection_samples,
     bdpt_concat_connection_samples,
     bdpt_connection_variance,
     bdpt_count_valid_connection_samples,
     bdpt_endpoint_connection_samples,
+    bdpt_finalize_component_maps,
+    bdpt_finalize_point_components,
+    bdpt_los_component_maps_from_matrix,
+    bdpt_zero_matrix,
 )
 from witwin.channel.montecarlo.events.scattering import rough_material_runtimes
 

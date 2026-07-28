@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import torch
 
-from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel.kernels import geometry as geometry_kernels
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,7 +24,7 @@ class VisibilityResult:
 
 def run_visibility_query(query: VisibilityQuery) -> VisibilityResult:
     return VisibilityResult(
-        visible=geometry_bridge.rayd_visibility_forward(
+        visible=geometry_kernels.rayd_visibility_forward(
             query.rayd.require_resource(),
             query.start,
             query.end,
@@ -38,7 +38,7 @@ def _rayd_visibility_mask(
 ) -> torch.Tensor:
     if start.shape[0] == 0:
         return torch.empty((0,), device=start.device, dtype=torch.bool)
-    return geometry_bridge.rayd_visibility_forward(
+    return geometry_kernels.rayd_visibility_forward(
         rayd.require_resource(), start.contiguous(), end.contiguous(), None
     )[0]
 

@@ -5,17 +5,20 @@ from typed evaluated paths into antenna-aware signal views. Topology discovery,
 geometry re-evaluation, and electromagnetic field evaluation remain owned by
 `propagation`.
 
+The domain is one module, `src/witwin/channel/path.py`, which is why this README
+lives under `docs/dev/`: a module has no directory to hold one.
+
 ## Ownership
 
-- `solver.py` and `pipeline.py` orchestrate one path solve and array
-  expansion; they do not own propagation algorithms.
-- `config.py` owns path-solver validation and feature limits.
-- `schema.py` owns the stable per-link ragged structure,
-  `RaggedPathSoA`.
-- `result.py` owns padded `PathResult` validation, interaction tags, and
-  signal views such as CIR, CFR, taps, filtering, and beamforming.
-- `arrays.py` owns synthetic far-field packing and explicit per-element scene
-  expansion. `metadata.py` owns truthful solver metadata.
+- `solve` and the `_pipeline_solve` / `_pipeline_solve_base` stages orchestrate
+  one path solve and array expansion; they do not own propagation algorithms.
+- `Config` owns path-solver validation and feature limits.
+- `RaggedPathSoA` owns the stable per-link ragged structure.
+- `PathResult` owns padded validation, interaction tags, and signal views such
+  as CIR, CFR, taps, filtering, and beamforming.
+- `pack_synthetic_arrays` / `explicit_array_scene` / `pack_explicit_arrays` own
+  synthetic far-field packing and explicit per-element scene expansion.
+  `_metadata` owns truthful solver metadata.
 - `propagation.enumerated.engine.evaluate_enumerated_paths` is the typed
   discovery/evaluation owner consumed by this package.
 - ADR-027 straight-transmission discovery reaches that owner as one pair-major

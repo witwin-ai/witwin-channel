@@ -5,15 +5,8 @@ from typing import TYPE_CHECKING
 import torch
 
 from witwin.channel.scene.endpoints import ReceiverPoint
-from witwin.channel.propagation.geometry.kernels import (
-    autograd as geometry_autograd,
-)
-from witwin.channel.propagation.geometry.kernels import (
-    primitives as geometry_primitives,
-)
-from witwin.channel.propagation.topology.kernels import (
-    construction as topology_construction,
-)
+from witwin.channel.kernels import geometry as geometry_kernels
+from witwin.channel.kernels import topology as topology_kernels
 
 if TYPE_CHECKING:
     from witwin.channel.scene.endpoints import SolverScene as Scene
@@ -25,7 +18,7 @@ _PLANE_GROUP_QUANTIZATION = 1.0e-4
 def _reflect_points(
     points: torch.Tensor, plane_points: torch.Tensor, normals: torch.Tensor
 ) -> torch.Tensor:
-    return geometry_primitives.deterministic_reflect_points(
+    return geometry_kernels.deterministic_reflect_points(
         points.contiguous(), plane_points.contiguous(), normals.contiguous()
     )
 
@@ -44,7 +37,7 @@ def _coplanar_face_groups(
     if surface_ids.ndim != 1 or surface_ids.shape[0] != tri_a.shape[0]:
         raise ValueError("surface_ids must have shape (face_count,)")
 
-    return geometry_primitives.deterministic_face_groups(
+    return geometry_kernels.deterministic_face_groups(
         tri_a.to(dtype=torch.float32).contiguous(),
         normals.to(dtype=torch.float32).contiguous(),
         surface_ids.to(device=tri_a.device, dtype=torch.long).contiguous(),
@@ -148,10 +141,10 @@ def reflection_epc_paths(
 
     rayd = compiled.rayd
     records = rayd.edge_records()
-    tri_a = topology_construction.deterministic_face_anchor_points(
+    tri_a = topology_kernels.deterministic_face_anchor_points(
         records.vertices.contiguous(), records.faces.contiguous()
     )
-    normals_table = geometry_primitives.deterministic_normalize_vec3(
+    normals_table = geometry_kernels.deterministic_normalize_vec3(
         records.face_normals.contiguous(), eps=1.0e-6
     )
     groups = _cached_coplanar_face_groups(
@@ -162,7 +155,7 @@ def reflection_epc_paths(
             device=face_id.device, dtype=torch.long
         ).contiguous(),
     )
-    epc = geometry_autograd.rayd_reflection_epc_paths_ad(
+    epc = geometry_kernels.rayd_reflection_epc_paths_ad(
         rayd.require_resource(),
         vertices,
         source,

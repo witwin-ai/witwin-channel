@@ -6,12 +6,10 @@ from pathlib import Path
 import torch
 
 from tests.path.test_path_evaluated_paths import _evaluated_paths_fixture
-from witwin.channel.deterministic import solver as deterministic_solver
-from witwin.channel.deterministic import pipeline as deterministic_pipeline
+from witwin.channel import deterministic as deterministic_module
 from witwin.channel.montecarlo.bdpt import pipeline as bdpt_pipeline
 from witwin.channel.montecarlo.bdpt import solver as bdpt_solver
-from witwin.channel.path import solver as path_solver
-from witwin.channel.path import pipeline as path_pipeline
+from witwin.channel import path as path_module
 from witwin.channel.propagation.enumerated import engine, scattering
 
 
@@ -37,7 +35,7 @@ def _call_line(definition: ast.FunctionDef, name: str) -> int:
 
 
 def test_path_and_deterministic_consume_typed_engine_and_scattering_directly():
-    for solver in (path_solver, deterministic_solver):
+    for solver in (path_module, deterministic_module):
         assert solver.evaluate_enumerated_paths is engine.evaluate_enumerated_paths
         assert (
             solver.append_scattering_evaluated_paths
@@ -79,8 +77,11 @@ def test_typed_engine_remains_before_optional_scattering_append():
     # both, the typed engine (``evaluate_enumerated_paths``) still runs before
     # the optional scattering append, and neither uses the legacy exports.
     cases = (
-        (_function(path_pipeline, "_solve_base"), "append_scattering_evaluated_paths"),
-        (_function(deterministic_pipeline, "solve"), "_append_scattering"),
+        (
+            _function(path_module, "_pipeline_solve_base"),
+            "append_scattering_evaluated_paths",
+        ),
+        (_function(deterministic_module, "_solve_pipeline"), "_append_scattering"),
     )
     for definition, append_call in cases:
         assert _call_line(definition, "evaluate_enumerated_paths") < _call_line(
@@ -96,7 +97,7 @@ def test_typed_engine_remains_before_optional_scattering_append():
 
 
 def test_capacity_sanitize_and_terminal_boundaries_follow_outer_result_work():
-    path_base = _function(path_pipeline, "_solve_base")
+    path_base = _function(path_module, "_pipeline_solve_base")
     assert _call_line(path_base, "append_scattering_evaluated_paths") < _call_line(
         path_base, "sanitize_enumerated_capacity_transaction"
     )
@@ -107,7 +108,7 @@ def test_capacity_sanitize_and_terminal_boundaries_follow_outer_result_work():
         path_base, "pack_evaluated_paths"
     )
 
-    path_solve = _function(path_pipeline, "solve")
+    path_solve = _function(path_module, "_pipeline_solve")
     path_calls = sorted(
         [
             node
@@ -122,9 +123,9 @@ def test_capacity_sanitize_and_terminal_boundaries_follow_outer_result_work():
     assert _call_line(path_solve, "pack_explicit_arrays") < path_calls[0].lineno
     assert _call_line(path_solve, "pack_synthetic_arrays") < path_calls[1].lineno
 
-    deterministic = _function(deterministic_pipeline, "solve")
+    deterministic = _function(deterministic_module, "_solve_pipeline")
     deterministic_terminal = _function(
-        deterministic_pipeline, "_terminal_check_capacity"
+        deterministic_module, "_terminal_check_capacity"
     )
     assert _call_line(deterministic, "_append_scattering") < _call_line(
         deterministic, "sanitize_enumerated_capacity_transaction"

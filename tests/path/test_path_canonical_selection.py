@@ -3,7 +3,7 @@ import torch
 
 from witwin.channel.propagation.topology import concatenate
 from witwin.channel.propagation.topology.export import evaluated_paths_from_block
-from witwin.channel.propagation.topology.kernels.canonical_compact import (
+from witwin.channel.kernels.topology import (
     enumerated_canonical_compact,
 )
 

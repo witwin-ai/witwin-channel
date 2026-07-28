@@ -38,12 +38,12 @@ def _fake_coupled_inputs(monkeypatch):
     )
     scene = SimpleNamespace(structures=[object()], metadata={})
     monkeypatch.setattr(
-        coupled.geometry_primitives,
+        coupled.geometry_kernels,
         "deterministic_normalize_vec3",
         lambda values, *, eps: values,
     )
     monkeypatch.setattr(
-        coupled.topology_construction,
+        coupled.topology_kernels,
         "deterministic_face_anchor_points",
         lambda vertices, faces: vertices[faces[:, 0].to(dtype=torch.int64)],
     )
@@ -83,7 +83,7 @@ def _fake_coupled_inputs(monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        coupled.topology_primitives,
+        coupled.topology_kernels,
         "mc_selected_edge_indices",
         lambda _selected: torch.tensor([0, 1], dtype=torch.int32),
     )

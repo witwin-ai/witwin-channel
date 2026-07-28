@@ -17,9 +17,7 @@ from witwin.channel.propagation.geometry.coupled import (
     query_coupled_dd_geometry,
     query_coupled_geometry,
 )
-from witwin.channel.propagation.geometry.kernels import (
-    primitives as geometry_primitives,
-)
+from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel.propagation.geometry.reevaluate import (
     _cached_coplanar_face_groups,
 )
@@ -35,12 +33,7 @@ from witwin.channel.propagation.topology.discovery.coupled import (
     prepare_coupled_candidate_plan,
 )
 from witwin.channel.propagation.topology.export import _ensure_topology_fields
-from witwin.channel.propagation.topology.kernels import (
-    construction as topology_construction,
-)
-from witwin.channel.propagation.topology.kernels import (
-    primitives as topology_primitives,
-)
+from witwin.channel.kernels import topology as topology_kernels
 
 if TYPE_CHECKING:
     from witwin.channel.scene.endpoints import SolverScene as Scene
@@ -100,10 +93,10 @@ def _prepare_coupled_topology_context(
     if int(faces.shape[0]) == 0:
         return None
     vertices = records.vertices.contiguous()
-    normals = geometry_primitives.deterministic_normalize_vec3(
+    normals = geometry_kernels.deterministic_normalize_vec3(
         records.face_normals.contiguous(), eps=1.0e-6
     )
-    tri_a = topology_construction.deterministic_face_anchor_points(vertices, faces)
+    tri_a = topology_kernels.deterministic_face_anchor_points(vertices, faces)
     groups = _cached_coplanar_face_groups(
         rayd,
         tri_a,
@@ -136,7 +129,7 @@ def _prepare_coupled_topology_context(
         if preserve_imported_edges
         else _cached_diffraction_edge_geometry(rayd)
     )
-    selected_edges = topology_primitives.mc_selected_edge_indices(selected)
+    selected_edges = topology_kernels.mc_selected_edge_indices(selected)
     candidates_per_pair = int(representative_faces.shape[0]) * int(
         selected_edges.shape[0]
     )

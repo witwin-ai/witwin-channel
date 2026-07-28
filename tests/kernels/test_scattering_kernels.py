@@ -3,7 +3,7 @@ import math
 import pytest
 import torch
 
-from witwin.channel.scattering.kernels import functional as ops
+from witwin.channel.kernels import scattering as ops
 from witwin.channel import runtime
 
 

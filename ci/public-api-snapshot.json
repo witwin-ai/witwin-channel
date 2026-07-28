@@ -52,32 +52,32 @@
         {
           "name": "Config",
           "kind": "class",
-          "target": "witwin.channel.path.config.Config",
-          "contract_sha256": "240be3e816b78c402a1108b84389967dc2e6938679c3f2d7b556cf4ea8e0d292"
+          "target": "witwin.channel.path.Config",
+          "contract_sha256": "a276cc4b7845f40c8bd280680c36d9e1920205e080a8187a8d0bae13abc95364"
         },
         {
           "name": "InteractionType",
           "kind": "class",
-          "target": "witwin.channel.path.result.InteractionType",
-          "contract_sha256": "e8ac6a982e058e94072050e9f5a0cd21d94e8360de271a6c95140416445f34ea"
+          "target": "witwin.channel.path.InteractionType",
+          "contract_sha256": "9f9530606daaf4415ecd0414704224543c61862f6a6be0ff2d29bf444cf54588"
         },
         {
           "name": "PathResult",
           "kind": "class",
-          "target": "witwin.channel.path.result.PathResult",
-          "contract_sha256": "be3dc40f8c44ee911acf9451560280bc041387dbea37a5cedcef6ada6e352ecc"
+          "target": "witwin.channel.path.PathResult",
+          "contract_sha256": "a35b121b218962c956327fb2e0c3459dbe216416e5a9a843b17fbd0a2da58cc0"
         },
         {
           "name": "RaggedPathSoA",
           "kind": "class",
-          "target": "witwin.channel.path.schema.RaggedPathSoA",
-          "contract_sha256": "b89e31657c5a87cadb410ee327ba8d91e61ed5434bf65fc4698f1e21cde4fe03"
+          "target": "witwin.channel.path.RaggedPathSoA",
+          "contract_sha256": "a494dcbe0569112fef0d2893d025cd7ed01308a7e5b52710cc98475d4d4c219c"
         },
         {
           "name": "solve",
           "kind": "function",
-          "target": "witwin.channel.path.solver.solve",
-          "contract_sha256": "e6790b37cb464a5b74e5d966ff1866a134e3b0a547a9fd6a3f2300c60ee52295",
+          "target": "witwin.channel.path.solve",
+          "contract_sha256": "aabe8ec066b03039ee3464733eae07b535cd86eb7629317e0013e4f4a3a4d377",
           "signature": "(scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz)"
         }
       ]
@@ -88,26 +88,26 @@
         {
           "name": "Config",
           "kind": "class",
-          "target": "witwin.channel.deterministic.config.Config",
-          "contract_sha256": "78d560d417ae8b1a85d008cd7707dd896b0473ed7ffa755089df89a61e9b06b1"
+          "target": "witwin.channel.deterministic.Config",
+          "contract_sha256": "86da4b8002ae5380f36b34ca23bf4bd602caf4943dc3113e45b71be9a239cc5b"
         },
         {
           "name": "PathTable",
           "kind": "class",
-          "target": "witwin.channel.deterministic.result.PathTable",
-          "contract_sha256": "3a4b01fa7fd4a009f38e57c5082132ed60f7508f53d284e5d45265d082be53cc"
+          "target": "witwin.channel.deterministic.PathTable",
+          "contract_sha256": "b3d55198e6b29afdd747ae09e695769adcb4a9d40c83b83110e38209b2a6b5ab"
         },
         {
           "name": "Result",
           "kind": "class",
-          "target": "witwin.channel.deterministic.result.Result",
-          "contract_sha256": "97cf9bc94d64622139b8ded30d69bb49698a07fc85b84778ffccb960811922dd"
+          "target": "witwin.channel.deterministic.Result",
+          "contract_sha256": "ec52a4ac2292a862e40826a1180aef97f2327ee703d36c1bff222d8b7b6272c7"
         },
         {
           "name": "solve",
           "kind": "function",
-          "target": "witwin.channel.deterministic.solver.solve",
-          "contract_sha256": "dbcd65f17fafbccb04d06f529ffb92f8c08eb40ad0e8fc8b68ab3f810660964c",
+          "target": "witwin.channel.deterministic.solve",
+          "contract_sha256": "8f4af64cea0abb6707651803287c7610516b4ea4367ed334e206b9c000e9ccf7",
           "signature": "(scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz)"
         }
       ]

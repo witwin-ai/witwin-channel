@@ -34,8 +34,13 @@ def test_deterministic_import_does_not_import_forbidden_solver_stacks():
 
 
 def test_solver_facade_delegates_to_pipeline_owner():
-    from witwin.channel.deterministic import pipeline, solver
+    from witwin.channel import deterministic
 
-    assert solver._metadata is pipeline._metadata
-    assert solver.solve.__module__ == solver.__name__
-    assert pipeline.solve.__module__ == pipeline.__name__
+    # The solver collapsed into one module, so the facade and the pipeline
+    # owner are two functions in it rather than two modules. The public entry
+    # still only compiles the scene and hands off; the pipeline owner is the
+    # one that does the work, and neither is re-exported from elsewhere.
+    assert deterministic.solve.__module__ == deterministic.__name__
+    assert deterministic._solve_pipeline.__module__ == deterministic.__name__
+    assert deterministic._metadata.__module__ == deterministic.__name__
+    assert deterministic.__all__ == ["Config", "PathTable", "Result", "solve"]

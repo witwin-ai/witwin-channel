@@ -85,9 +85,9 @@ from typing import Any
 import torch
 from witwin.channel.tensor_math import normalize_vec3
 
-from witwin.channel.scattering.kernels.autograd import scattering_table_eval_ad
-from witwin.channel.scattering.kernels.functional import (
+from witwin.channel.kernels.scattering import (
     scattering_event_probabilities,
+    scattering_table_eval_ad,
     scattering_table_sample,
 )
 from witwin.core import SurfaceRoughness  # noqa: F401
@@ -97,7 +97,7 @@ from witwin.channel.scene.resources import RoughMaterialRuntime
 from witwin.channel.scene.endpoints import require_compiled
 
 from witwin.channel.materials import face_material_field_bundle
-from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel.kernels import geometry as geometry_kernels
 
 from .transmission import (
     _EVENT_PROBABILITY_FLOOR,
@@ -552,7 +552,7 @@ def scattering_nee_connection_samples(
     )
     start = flat(expand_rows(position)) + wo_flat * epsilon[:, None]
     end = flat(rx_origin[None, :, :].expand(vertex_count, sensor_count, 3)).contiguous()
-    visible = geometry_bridge.rayd_visibility_forward(
+    visible = geometry_kernels.rayd_visibility_forward(
         rayd.require_resource(),
         start.contiguous(),
         end,
@@ -825,7 +825,7 @@ def scattering_map_matrix(
         # Unobstructed tx->point requirement (v1): binary visibility on the
         # segment shortened off the surface by the scale-aware epsilon.
         candidates = cos_i > 1.0e-6
-        visible_tx = geometry_bridge.rayd_visibility_forward(
+        visible_tx = geometry_kernels.rayd_visibility_forward(
             handle,
             tx_pos[tx_index][None, :].expand(count, 3).contiguous(),
             (points + normal_flipped * epsilon[:, None]).contiguous(),
@@ -868,7 +868,7 @@ def scattering_map_matrix(
                 ledger=ledger,
             )
             f_unpol = 0.5 * (f_te + f_tm)
-            visible_rx = geometry_bridge.rayd_visibility_forward(
+            visible_rx = geometry_kernels.rayd_visibility_forward(
                 handle,
                 (points[:, None, :] + wo_world * epsilon[:, None, None])
                 .reshape(count * block, 3)

@@ -84,16 +84,12 @@ def test_dormant_adr029_and_adr030_producers_have_no_production_caller() -> None
 
 
 def test_public_path_exports_retain_actual_row_compaction() -> None:
-    path_pipeline_relative = "src/witwin/channel/path/pipeline.py"
-    deterministic_pipeline = _source(
-        "src/witwin/channel/deterministic/pipeline.py"
-    )
-    path_result = _source("src/witwin/channel/path/result.py")
-    path_table = ast.parse(
-        _source("src/witwin/channel/deterministic/result.py")
-    )
+    path_relative = "src/witwin/channel/path.py"
+    deterministic_pipeline = _source("src/witwin/channel/deterministic.py")
+    path_result = _source("src/witwin/channel/path.py")
+    path_table = ast.parse(_source("src/witwin/channel/deterministic.py"))
 
-    solve_calls = _function_calls(path_pipeline_relative, "_solve_base")
+    solve_calls = _function_calls(path_relative, "_pipeline_solve_base")
     assert max(solve_calls["sanitize_enumerated_capacity_transaction"]) < min(
         solve_calls["compact_evaluated_paths"]
     )
@@ -126,8 +122,8 @@ def test_public_configs_do_not_expose_retired_capacity_controls() -> None:
         "reflection_candidate_capacity_per_pair",
     }
     for relative in (
-        "src/witwin/channel/path/config.py",
-        "src/witwin/channel/deterministic/config.py",
+        "src/witwin/channel/path.py",
+        "src/witwin/channel/deterministic.py",
         "src/witwin/channel/montecarlo/basic/config.py",
         "src/witwin/channel/montecarlo/bdpt/config.py",
     ):

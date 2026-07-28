@@ -7,7 +7,7 @@ from tests.support.scenes import (
     single_wall_reflection_scene,
     wedge_diffraction_scene,
 )
-from witwin.channel.propagation.topology.kernels import blocks as topology_blocks
+from witwin.channel.kernels import topology as topology_kernels
 from witwin.channel.deployment import build_info
 from witwin.channel.path import Config, InteractionType, PathResult, solve
 
@@ -128,13 +128,13 @@ def test_path_solver_calls_kernel_facade(monkeypatch):
         pytest.skip("CUDA is required for path solver")
 
     calls = []
-    original = topology_blocks.path_los_export
+    original = topology_kernels.path_los_export
 
     def wrapped(*args, **kwargs):
         calls.append((args, kwargs))
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(topology_blocks, "path_los_export", wrapped)
+    monkeypatch.setattr(topology_kernels, "path_los_export", wrapped)
 
     solve(
         empty_space_los_scene(),

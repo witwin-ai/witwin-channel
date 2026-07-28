@@ -98,7 +98,7 @@ from witwin.channel.propagation.rows import (
     PathGeometry,
     PathTopology,
 )
-from witwin.channel.propagation.topology.kernels import (
+from witwin.channel.kernels.topology import (
     evaluated_paths_compact_finalize_backward,
     evaluated_paths_compact_finalize_jvp,
 )
@@ -865,15 +865,13 @@ def excited_field(
     differentiable entry points. No amplitude is computed here.
     """
 
-    from witwin.channel.propagation.fields.kernels import (
-        source_amplitude as field_amplitude,
-    )
+    from witwin.channel.kernels import fields as field_kernels
 
     if ad_mode == "none":
-        return field_amplitude.field_source_amplitude_scale(
+        return field_kernels.field_source_amplitude_scale(
             field_vector, tx_power
         )["path_field_vector"]
-    return field_amplitude.field_source_amplitude_scale_ad(field_vector, tx_power)
+    return field_kernels.field_source_amplitude_scale_ad(field_vector, tx_power)
 
 
 # --- Composed source-basis to sink-basis Jones operator --------------------
@@ -925,11 +923,9 @@ def _project(
     direction: torch.Tensor,
     sink_vector: torch.Tensor,
 ) -> torch.Tensor:
-    from witwin.channel.propagation.fields.kernels import (
-        autograd_projection as field_projection,
-    )
+    from witwin.channel.kernels import fields as field_kernels
 
-    return field_projection.field_project_complex3_ad(
+    return field_kernels.field_project_complex3_ad(
         field_vector, direction, sink_vector
     )["coefficient"]
 
@@ -1245,12 +1241,7 @@ def _field_op(
     geometry_live: GeometryLiveness | None,
     ledger: object | None = None,
 ) -> Callable[[torch.Tensor, torch.Tensor], dict[str, torch.Tensor]]:
-    from witwin.channel.propagation.fields.kernels import (
-        autograd as field_autograd,
-    )
-    from witwin.channel.propagation.fields.kernels import (
-        functional as field_functional,
-    )
+    from witwin.channel.kernels import fields as field_kernels
 
     differentiable = ad_mode != "none"
 
@@ -1281,9 +1272,9 @@ def _field_op(
         )
         if differentiable:
             operator = (
-                field_autograd.field_free_space_ad
+                field_kernels.field_free_space_ad
                 if inputs.depth == 0
-                else field_autograd.field_reflection_sequence_ad
+                else field_kernels.field_reflection_sequence_ad
             )
             if ledger is not None:
                 ledger.add(*arguments)
@@ -1297,9 +1288,9 @@ def _field_op(
                 ),
             )
         operator = (
-            field_functional.field_free_space
+            field_kernels.field_free_space
             if inputs.depth == 0
-            else field_functional.field_reflection_sequence
+            else field_kernels.field_reflection_sequence
         )
         return operator(*arguments, frequency_hz=frequency_value)
 

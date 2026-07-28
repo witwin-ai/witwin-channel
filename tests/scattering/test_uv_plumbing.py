@@ -157,7 +157,7 @@ def test_scene_with_uv_builds_and_traces(with_uv):
     if not _source_linked_rayd_available():
         pytest.skip("RayD native extension is not built")
 
-    from witwin.channel.propagation.geometry.kernels.bridge import (
+    from witwin.channel.kernels.geometry import (
         rayd_intersect_forward,
     )
 

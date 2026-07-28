@@ -293,12 +293,7 @@ def test_reevaluate_reuses_frozen_topology_without_discovery(
         reevaluate,
     )
     from witwin.channel.propagation.consumer import replay
-    from witwin.channel.propagation.fields.kernels import (
-        autograd as field_autograd,
-    )
-    from witwin.channel.propagation.fields.kernels import (
-        functional as field_functional,
-    )
+    from witwin.channel.kernels import fields as field_kernels
 
     sources, sinks = _endpoints()
     topology = _fixed_topology()
@@ -347,8 +342,8 @@ def test_reevaluate_reuses_frozen_topology_without_discovery(
         raise AssertionError("AD field owner must not run")
 
     monkeypatch.setattr(replay, "fixed_los_gather", fake_gather)
-    monkeypatch.setattr(field_functional, "field_free_space", fake_field)
-    monkeypatch.setattr(field_autograd, "field_free_space_ad", forbidden)
+    monkeypatch.setattr(field_kernels, "field_free_space", fake_field)
+    monkeypatch.setattr(field_kernels, "field_free_space_ad", forbidden)
     request = FixedTopologyRequest(
         sources=sources,
         sinks=sinks,

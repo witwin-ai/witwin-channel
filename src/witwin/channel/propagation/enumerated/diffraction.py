@@ -26,15 +26,7 @@ from witwin.channel.propagation.topology.discovery.diffraction import (
     prepare_diffraction_order1_plan,
 )
 from witwin.channel.propagation.topology.export import _ensure_topology_fields
-from witwin.channel.propagation.topology.kernels import (
-    compaction as topology_compaction,
-)
-from witwin.channel.propagation.topology.kernels import (
-    construction as topology_construction,
-)
-from witwin.channel.propagation.topology.kernels import (
-    primitives as topology_primitives,
-)
+from witwin.channel.kernels import topology as topology_kernels
 from witwin.channel.runtime import (
     CudaProfileRange,
     cuda_profile_range,
@@ -57,8 +49,8 @@ def _deterministic_diffraction_states(
         rayd,
         preserve_imported_edges=preserve_imported_edges,
     )
-    return topology_primitives.deterministic_diffraction_state_pack(
-        topology_primitives.mc_selected_edge_indices(edges.selected),
+    return topology_kernels.deterministic_diffraction_state_pack(
+        topology_kernels.mc_selected_edge_indices(edges.selected),
         edges.edge_position,
         edges.edge_direction,
         edges.line_min,
@@ -85,9 +77,7 @@ def _diffraction_topology_order1(
     frequency_hz: float,
     isb_boundary_taper_width: float = 0.0,
 ) -> tuple[dict[str, torch.Tensor], int, torch.Tensor]:
-    from witwin.channel.propagation.fields.kernels import (
-        deterministic as field_kernels,
-    )
+    from witwin.channel.kernels import fields as field_kernels
 
     device = tx_positions.device
     rayd = compiled.rayd
@@ -197,7 +187,7 @@ def _diffraction_topology_order1(
             launch_count += 1
             with cuda_profile_range(CudaProfileRange.DIFFRACTION_TOPOLOGY_PACKING):
                 compacted = (
-                    topology_compaction.deterministic_diffraction_order1_compact(
+                    topology_kernels.deterministic_diffraction_order1_compact(
                         valid=out.valid,
                         rx_id=out.rx_id,
                         depth=out.depth,
@@ -252,7 +242,7 @@ def _diffraction_topology_order1(
             empty_i32 = torch.empty((0,), device=device, dtype=torch.int32)
             blocks.append(
                 _ensure_topology_fields(
-                    topology_construction.deterministic_topology_base_fields(
+                    topology_kernels.deterministic_topology_base_fields(
                         rx_id=compacted["rx_id"],
                         path_length_m=path_length,
                         delay_s=delay,

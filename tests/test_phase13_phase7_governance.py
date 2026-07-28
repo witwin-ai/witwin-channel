@@ -211,11 +211,11 @@ def test_phase7_freezes_native_tx_visibility_selection_requirements() -> None:
     assert selection["activation_status"] == "active"  # type: ignore[index]
     assert selection["state_capacity"] == 4_194_304  # type: ignore[index]
     assert "def plan_tx_visible_diffraction_states(" in source
-    assert "geometry_bridge.diffraction_tx_visible_state_plan(" in source
+    assert "geometry_kernels.diffraction_tx_visible_state_plan(" in source
     for forbidden in (
         "_DIFFRACTION_PREFILTER_EDGE_FRACTIONS",
         "for fraction in",
-        "geometry_bridge.rayd_visibility_forward(",
+        "geometry_kernels.rayd_visibility_forward(",
         "bool(visible.all())",
         "tensor[visible]",
     ):

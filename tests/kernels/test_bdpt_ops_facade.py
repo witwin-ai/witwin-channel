@@ -2,9 +2,8 @@ import pytest
 import torch
 import math
 
-from witwin.channel.montecarlo.bdpt.kernels import paths as ops
-from witwin.channel.materials.kernels import functional as material_functional
-from witwin.channel.montecarlo.bdpt.kernels import maps as bdpt_maps
+from witwin.channel.kernels import montecarlo as ops
+from witwin.channel.kernels import materials as material_functional
 from witwin.channel import runtime
 
 
@@ -902,7 +901,7 @@ def test_bdpt_los_component_maps_from_matrix_uses_native_grid_layout():
 
     los = torch.arange(6, device="cuda", dtype=torch.float32).reshape(1, 6).contiguous()
 
-    maps = bdpt_maps.bdpt_los_component_maps_from_matrix(los, rows=2, cols=3)
+    maps = ops.bdpt_los_component_maps_from_matrix(los, rows=2, cols=3)
 
     assert maps.shape == (1, 3, 2)
     expected = torch.tensor([[[0.0, 3.0], [1.0, 4.0], [2.0, 5.0]]], device="cuda")

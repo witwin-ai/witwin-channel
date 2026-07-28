@@ -8,14 +8,13 @@ import sys
 import pytest
 
 from witwin.core import scene as core_scene
-from witwin.channel.materials.kernels import contracts as material_contracts
+from witwin.channel.kernels import materials as material_contracts
 from witwin.channel.montecarlo.bdpt import endpoints
-from witwin.channel.montecarlo.bdpt import kernels
 from witwin.channel.montecarlo.bdpt import solver as bdpt_solver
-from witwin.channel.montecarlo.bdpt.kernels import maps, paths, sampling
+from witwin.channel.kernels import montecarlo
 from witwin.channel.montecarlo.bdpt.solver import _BDPTTopologyOptions
 from witwin.channel.propagation import geometry
-from witwin.channel.propagation.geometry.kernels import bridge
+from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel import runtime
 
 
@@ -69,60 +68,57 @@ _SAMPLING_OWNER_NAMES = (
 
 @pytest.mark.parametrize("name", _OWNER_NAMES)
 def test_bdpt_paths_is_the_single_object_owner(name: str):
-    owner = getattr(paths, name)
+    owner = getattr(montecarlo, name)
 
-    assert owner.__module__ == paths.__name__
-    assert not hasattr(kernels, name)
+    assert owner.__module__ == montecarlo.__name__
 
 
 def test_bdpt_paths_uses_canonical_dependencies():
     # The raw accessor is not a solver dependency: every probe goes through
     # runtime.required_symbol, and ci/check_import_graph.py rejects a solver
     # that imports ``native_extension`` at all.
-    assert not hasattr(paths, "native_extension")
-    assert paths._required_native_op is runtime.required_symbol
-    assert paths.validate_cuda_tensor is runtime.validate_cuda_tensor
-    assert paths._validate_layer_csr is material_contracts._validate_layer_csr
-    assert paths._BDPT_INTERSECTION_FIELDS is geometry.BDPT_INTERSECTION_FIELDS
-    assert geometry.BDPT_INTERSECTION_FIELDS is bridge._BDPT_INTERSECTION_FIELDS
-    assert "BDPT_INTERSECTION_FIELDS" not in getattr(geometry, "__all__", ())
-    assert paths._BDPT_SUBPATH_SCHEMA
-    assert paths._BDPT_CONNECTION_SCHEMA
+    assert not hasattr(montecarlo, "native_extension")
+    assert montecarlo._required_native_op is runtime.required_symbol
+    assert montecarlo.validate_cuda_tensor is runtime.validate_cuda_tensor
+    assert montecarlo._validate_layer_csr is material_contracts._validate_layer_csr
+    assert montecarlo._BDPT_INTERSECTION_FIELDS is geometry.BDPT_INTERSECTION_FIELDS
+    assert geometry.BDPT_INTERSECTION_FIELDS is geometry_kernels._BDPT_INTERSECTION_FIELDS
+    assert "BDPT_INTERSECTION_FIELDS" not in getattr(geometry_kernels, "__all__", ())
+    assert montecarlo._BDPT_SUBPATH_SCHEMA
+    assert montecarlo._BDPT_CONNECTION_SCHEMA
 
 
 @pytest.mark.parametrize("name", _MAP_OWNER_NAMES)
 def test_bdpt_maps_is_the_single_object_owner(name: str):
-    owner = getattr(maps, name)
+    owner = getattr(montecarlo, name)
 
-    assert owner.__module__ == maps.__name__
-    assert not hasattr(kernels, name)
+    assert owner.__module__ == montecarlo.__name__
 
 
 def test_bdpt_maps_uses_canonical_runtime_dependencies():
-    assert not hasattr(maps, "native_extension")
-    assert maps._required_native_op is runtime.required_symbol
-    assert maps.validate_cuda_tensor is runtime.validate_cuda_tensor
+    assert not hasattr(montecarlo, "native_extension")
+    assert montecarlo._required_native_op is runtime.required_symbol
+    assert montecarlo.validate_cuda_tensor is runtime.validate_cuda_tensor
 
 
 def test_bdpt_zero_matrix_has_one_neutral_owner():
     owner = runtime.bdpt_zero_matrix
 
     assert owner.__module__ == runtime.__name__
-    assert maps.bdpt_zero_matrix is owner
+    assert montecarlo.bdpt_zero_matrix is owner
     assert not hasattr(core_scene, "bdpt_zero_matrix")
 
 
 @pytest.mark.parametrize("name", _SAMPLING_OWNER_NAMES)
 def test_bdpt_sampling_is_the_single_object_owner(name: str):
-    owner = getattr(sampling, name)
+    owner = getattr(montecarlo, name)
 
-    assert owner.__module__ == sampling.__name__
-    assert not hasattr(kernels, name)
+    assert owner.__module__ == montecarlo.__name__
 
 
 def test_bdpt_sampling_uses_canonical_runtime_dependencies():
-    assert sampling._required_native_op is runtime.required_symbol
-    assert sampling.validate_cuda_tensor is runtime.validate_cuda_tensor
+    assert montecarlo._required_native_op is runtime.required_symbol
+    assert montecarlo.validate_cuda_tensor is runtime.validate_cuda_tensor
 
 
 def test_bdpt_solver_uses_canonical_sampling_owners():
@@ -130,23 +126,23 @@ def test_bdpt_solver_uses_canonical_sampling_owners():
         "bdpt_reflection_launch_inputs",
         "bdpt_sample_directions",
     ):
-        assert getattr(bdpt_solver, name) is getattr(sampling, name)
+        assert getattr(bdpt_solver, name) is getattr(montecarlo, name)
 
 
 def test_bdpt_host_vec3_resolves_canonical_transmitter_helper():
-    assert maps.bdpt_host_vec3_tensor.__globals__ is maps.__dict__
+    assert montecarlo.bdpt_host_vec3_tensor.__globals__ is montecarlo.__dict__
     assert (
-        maps.bdpt_host_vec3_tensor.__globals__["bdpt_transmitter_tensors"]
-        is maps.bdpt_transmitter_tensors
+        montecarlo.bdpt_host_vec3_tensor.__globals__["bdpt_transmitter_tensors"]
+        is montecarlo.bdpt_transmitter_tensors
     )
 
 
 def test_bdpt_callers_use_canonical_map_owners():
-    assert endpoints.bdpt_host_vec3_tensor is maps.bdpt_host_vec3_tensor
-    assert endpoints.bdpt_receiver_grid_points is maps.bdpt_receiver_grid_points
-    assert endpoints.bdpt_transmitter_tensors is maps.bdpt_transmitter_tensors
-    assert bdpt_solver.bdpt_component_map_buffer is maps.bdpt_component_map_buffer
-    assert bdpt_solver.bdpt_store_component_map is maps.bdpt_store_component_map
+    assert endpoints.bdpt_host_vec3_tensor is montecarlo.bdpt_host_vec3_tensor
+    assert endpoints.bdpt_receiver_grid_points is montecarlo.bdpt_receiver_grid_points
+    assert endpoints.bdpt_transmitter_tensors is montecarlo.bdpt_transmitter_tensors
+    assert bdpt_solver.bdpt_component_map_buffer is montecarlo.bdpt_component_map_buffer
+    assert bdpt_solver.bdpt_store_component_map is montecarlo.bdpt_store_component_map
     assert "mc_component_map_buffer" not in bdpt_solver.__dict__
     assert "mc_store_component_map" not in bdpt_solver.__dict__
 

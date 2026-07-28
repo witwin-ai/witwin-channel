@@ -30,8 +30,7 @@ from witwin.channel.materials import (
     face_material_thickness,
 )
 from witwin.core import PhaseScreen
-from witwin.channel.scattering.kernels import autograd as scattering_autograd
-from witwin.channel.scattering.kernels import functional_chain as scattering_chain_kernels
+from witwin.channel.kernels import scattering as scattering_kernels
 from witwin.channel.propagation.enumerated.contracts import TopologyConfig
 from witwin.channel.propagation.enumerated.scattering import (
     _stable_tangent,
@@ -67,6 +66,16 @@ if TYPE_CHECKING:
     from witwin.channel.scene.endpoints import SolverScene as Scene
 
 __all__ = ["append_chain_scattering_paths"]
+
+# ADR-021 D5 has never been reachable from this append path. Before the kernel
+# facades were lifted into ``witwin.channel.kernels``, the Op A ``_ad`` probe
+# below read the single-bounce ``scattering/kernels/autograd.py`` namespace,
+# which never carried a chain symbol, so ``ad_mode != "none"`` always refused
+# here and the AD dispatch a few lines further down was unreachable. The
+# facades are one module now, so that refusal is stated instead of implied.
+# Turning it on is an ADR-021 D5 numerical decision with its own acceptance
+# evidence, not a layout move.
+_ADR021_D5_CHAIN_AD_WIRED = False
 
 
 def _ensemble_scatter_faces(
@@ -168,15 +177,20 @@ def _chain_ensemble_evaluate(
     convention (with the ``1/(L1^2 L2^2)`` spreading applied in-kernel).
     """
 
-    op_a = getattr(scattering_chain_kernels, "scattering_chain_ensemble_eval", None)
-    op_a_ad = getattr(scattering_autograd, "scattering_chain_ensemble_eval_ad", None)
+    op_a = getattr(scattering_kernels, "scattering_chain_ensemble_eval", None)
+    op_a_ad = (
+        getattr(scattering_kernels, "scattering_chain_ensemble_eval_ad", None)
+        if _ADR021_D5_CHAIN_AD_WIRED
+        else None
+    )
     if op_a is None or (ad_mode != "none" and op_a_ad is None):
         raise RuntimeError(
             "ADR-021 D1 requires the native Op A chain facade "
             "'scattering_chain_ensemble_eval' (and its '_ad' companion under "
             "ad_mode != 'none'); it is owned by the ADR-021 D2 native chain "
-            "kernels (scattering/kernels/) and is not yet registered. Enable "
-            "scattering_chain_max_depth only once the D2 wave has landed."
+            "kernels (witwin.channel.kernels.scattering) and is not yet wired "
+            "into this append path. Enable scattering_chain_max_depth only "
+            "once the D5 wave has landed."
         )
 
     ad_enabled = ad_mode != "none"

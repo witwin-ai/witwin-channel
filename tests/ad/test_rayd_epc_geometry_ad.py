@@ -26,14 +26,8 @@ from tests.ad._tolerances import (
     REL_TOL_PATH,
 )
 from witwin.core import Mesh, Scene, Structure
-from witwin.channel.propagation.geometry.kernels import autograd as ops
-from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
-from witwin.channel.propagation.geometry.kernels import (
-    primitives as geometry_primitives,
-)
-from witwin.channel.propagation.topology.kernels import (
-    construction as topology_construction,
-)
+from witwin.channel.kernels import geometry as ops
+from witwin.channel.kernels import topology as topology_kernels
 from witwin.channel.scene import compile as compile_scene
 from witwin.core import PhysicalMaterial
 
@@ -94,10 +88,10 @@ def _plane_inputs(
     """Direct-plane arrays exactly as the solver seam builds them."""
 
     records = rayd.edge_records()
-    tri_a = topology_construction.deterministic_face_anchor_points(
+    tri_a = topology_kernels.deterministic_face_anchor_points(
         records.vertices.contiguous(), records.faces.contiguous()
     )
-    normals = geometry_primitives.deterministic_normalize_vec3(
+    normals = ops.deterministic_normalize_vec3(
         records.face_normals.contiguous(), eps=1.0e-6
     )
     face_id = sequence.to(dtype=torch.int64)
@@ -171,7 +165,7 @@ def _epc_forward(case: dict[str, object], rayd=None, source=None, receiver=None)
     receiver = case["receiver"] if receiver is None else receiver
     plane_points, plane_normals = _plane_inputs(rayd, case["sequence"])
     group_id, group_size, group_members = case["groups"]
-    out = geometry_bridge.rayd_reflection_epc_paths_forward(
+    out = ops.rayd_reflection_epc_paths_forward(
         rayd.require_resource(),
         source.contiguous(),
         receiver.contiguous(),
@@ -579,7 +573,7 @@ def test_face_normals_companions_match_fd_and_duality():
     def rebuild_table(perturbed_vertices: torch.Tensor) -> torch.Tensor:
         rebuilt = _build_rayd_scene(perturbed_vertices, case["faces"])
         rebuilt_records = rebuilt.edge_records()
-        return geometry_primitives.deterministic_normalize_vec3(
+        return ops.deterministic_normalize_vec3(
             rebuilt_records.face_normals.contiguous(), eps=1.0e-6
         )
 
@@ -601,7 +595,7 @@ def test_face_normals_ad_function_routes_vertex_gradients():
         case["rayd"], vertices_ad, records.face_normals.contiguous()
     )
     assert table.requires_grad
-    expected = geometry_primitives.deterministic_normalize_vec3(
+    expected = ops.deterministic_normalize_vec3(
         records.face_normals.contiguous(), eps=1.0e-6
     )
     assert torch.allclose(table.detach(), expected)
@@ -672,7 +666,7 @@ def test_face_normals_companions_follow_sliver_clamp_branch():
 
     def rebuild_loss(perturbed_vertices: torch.Tensor) -> torch.Tensor:
         rebuilt = _build_rayd_scene(perturbed_vertices, _SLIVER_FACES)
-        rebuilt_table = geometry_primitives.deterministic_normalize_vec3(
+        rebuilt_table = ops.deterministic_normalize_vec3(
             rebuilt.edge_records().face_normals.contiguous(), eps=1.0e-6
         )
         return (w.double().cpu() * rebuilt_table.double().cpu()).sum()

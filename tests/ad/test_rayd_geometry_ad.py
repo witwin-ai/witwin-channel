@@ -24,8 +24,7 @@ from tests.ad._tolerances import (
     REL_TOL_PATH,
 )
 from witwin.core import Mesh, PhysicalMaterial, Scene, Structure
-from witwin.channel.propagation.geometry.kernels import autograd as ops
-from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel.kernels import geometry as ops
 from witwin.channel.scene import compile as compile_scene
 
 pytestmark = pytest.mark.skipif(
@@ -125,7 +124,7 @@ def _intersect_fd_loss(
     w_t: torch.Tensor,
     w_p: torch.Tensor,
 ) -> torch.Tensor:
-    hit = geometry_bridge.rayd_intersect_forward(
+    hit = ops.rayd_intersect_forward(
         rayd, ray_o.contiguous(), ray_d, _empty_tmax(), None, flags=7
     )
     loss = (w_t.double() * hit["t"].double()).sum()
@@ -185,7 +184,7 @@ def test_intersect_jvp_matches_fd_wrt_ray_origin():
     rayd, vertices = _triangle_scene()
     del vertices
     ray_o, ray_d = _triangle_rays()
-    hit = geometry_bridge.rayd_intersect_forward(rayd, ray_o, ray_d, _empty_tmax(), None, flags=7)
+    hit = ops.rayd_intersect_forward(rayd, ray_o, ray_d, _empty_tmax(), None, flags=7)
 
     generator = torch.Generator(device="cpu").manual_seed(13)
     direction = torch.randn(ray_o.shape, generator=generator).to("cuda")
@@ -200,12 +199,12 @@ def test_intersect_jvp_matches_fd_wrt_ray_origin():
     )
 
     def forward_t(x: torch.Tensor) -> torch.Tensor:
-        return geometry_bridge.rayd_intersect_forward(
+        return ops.rayd_intersect_forward(
             rayd, x.contiguous(), ray_d, _empty_tmax(), None, flags=7
         )["t"]
 
     def forward_p(x: torch.Tensor) -> torch.Tensor:
-        return geometry_bridge.rayd_intersect_forward(
+        return ops.rayd_intersect_forward(
             rayd, x.contiguous(), ray_d, _empty_tmax(), None, flags=7
         )["p"]
 
@@ -218,7 +217,7 @@ def test_intersect_jvp_matches_fd_wrt_ray_origin():
 def test_intersect_jvp_matches_fd_wrt_vertices():
     rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()
-    hit = geometry_bridge.rayd_intersect_forward(rayd, ray_o, ray_d, _empty_tmax(), None, flags=7)
+    hit = ops.rayd_intersect_forward(rayd, ray_o, ray_d, _empty_tmax(), None, flags=7)
 
     generator = torch.Generator(device="cpu").manual_seed(17)
     direction = torch.randn(vertices.shape, generator=generator).to("cuda")
@@ -234,13 +233,13 @@ def test_intersect_jvp_matches_fd_wrt_vertices():
 
     def rebuild_t(perturbed_vertices: torch.Tensor) -> torch.Tensor:
         rebuilt, _ = _build_rayd_scene(perturbed_vertices, _TRIANGLE_FACES)
-        return geometry_bridge.rayd_intersect_forward(
+        return ops.rayd_intersect_forward(
             rebuilt, ray_o, ray_d, _empty_tmax(), None, flags=7
         )["t"]
 
     def rebuild_p(perturbed_vertices: torch.Tensor) -> torch.Tensor:
         rebuilt, _ = _build_rayd_scene(perturbed_vertices, _TRIANGLE_FACES)
-        return geometry_bridge.rayd_intersect_forward(
+        return ops.rayd_intersect_forward(
             rebuilt, ray_o, ray_d, _empty_tmax(), None, flags=7
         )["p"]
 
@@ -257,7 +256,7 @@ def test_intersect_jvp_matches_fd_wrt_vertices():
 def test_intersect_forward_mode_dual_matches_native_jvp():
     rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()
-    hit = geometry_bridge.rayd_intersect_forward(rayd, ray_o, ray_d, _empty_tmax(), None, flags=7)
+    hit = ops.rayd_intersect_forward(rayd, ray_o, ray_d, _empty_tmax(), None, flags=7)
 
     generator = torch.Generator(device="cpu").manual_seed(19)
     direction = torch.randn(ray_o.shape, generator=generator).to("cuda")
@@ -285,7 +284,7 @@ def test_intersect_forward_mode_dual_matches_native_jvp():
 def test_intersect_jvp_vjp_inner_product_duality():
     rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()
-    hit = geometry_bridge.rayd_intersect_forward(rayd, ray_o, ray_d, _empty_tmax(), None, flags=7)
+    hit = ops.rayd_intersect_forward(rayd, ray_o, ray_d, _empty_tmax(), None, flags=7)
 
     generator = torch.Generator(device="cpu").manual_seed(23)
     u_t = torch.randn(ray_o.shape[0], generator=generator).to("cuda")
@@ -501,7 +500,7 @@ def test_intersect_vjp_matches_fd_wrt_normal_and_barycentric_cotangents():
 
     def rebuild_loss(perturbed_vertices: torch.Tensor) -> torch.Tensor:
         rebuilt, _ = _build_rayd_scene(perturbed_vertices, _TRIANGLE_FACES)
-        hit = geometry_bridge.rayd_intersect_forward(
+        hit = ops.rayd_intersect_forward(
             rebuilt, ray_o, ray_d, _empty_tmax(), None, flags=7
         )
         loss = (w_n.double() * hit["n"].double()).sum()
@@ -579,7 +578,7 @@ def test_reflection_chain_functional_jvp_matches_native():
 def test_jvp_facades_reject_wrong_shaped_tangents():
     rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()
-    hit = geometry_bridge.rayd_intersect_forward(rayd, ray_o, ray_d, _empty_tmax(), None, flags=7)
+    hit = ops.rayd_intersect_forward(rayd, ray_o, ray_d, _empty_tmax(), None, flags=7)
 
     bad_width = torch.zeros(
         (ray_o.shape[0], 2), dtype=torch.float32, device="cuda"
@@ -629,7 +628,7 @@ def test_jvp_facades_reject_wrong_shaped_tangents():
 def test_backward_and_jvp_facades_reject_mismatched_tape_batch():
     rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()
-    hit = geometry_bridge.rayd_intersect_forward(rayd, ray_o, ray_d, _empty_tmax(), None, flags=7)
+    hit = ops.rayd_intersect_forward(rayd, ray_o, ray_d, _empty_tmax(), None, flags=7)
     grad_t = torch.ones(ray_o.shape[0], dtype=torch.float32, device="cuda")
 
     with pytest.raises(ValueError):

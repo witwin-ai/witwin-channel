@@ -5,8 +5,7 @@ import inspect
 
 import pytest
 
-from witwin.channel.scattering import kernels
-from witwin.channel.scattering.kernels import functional
+from witwin.channel.kernels import scattering as kernels
 from witwin.channel import runtime
 
 
@@ -34,19 +33,19 @@ _VALID_FIRST_NAMES = (
 
 @pytest.mark.parametrize("name", _OWNER_NAMES)
 def test_scattering_functional_is_the_single_object_owner(name: str):
-    owner = getattr(functional, name)
+    owner = getattr(kernels, name)
 
-    assert owner.__module__ == functional.__name__
-    assert getattr(kernels, name) is owner
+    assert owner.__module__ == kernels.__name__
+    assert kernels.__all__.count(name) == 1
 
 
 @pytest.mark.parametrize("name", _VALID_FIRST_NAMES)
 def test_non_chain_row_operations_require_explicit_valid_first(name: str):
-    parameters = inspect.signature(getattr(functional, name)).parameters
+    parameters = inspect.signature(getattr(kernels, name)).parameters
 
     assert next(iter(parameters)) == "valid"
 
 
 def test_scattering_functional_uses_canonical_runtime_dependencies():
-    assert functional._required_native_op is runtime.required_symbol
-    assert functional.validate_cuda_tensor is runtime.validate_cuda_tensor
+    assert kernels._required_native_op is runtime.required_symbol
+    assert kernels.validate_cuda_tensor is runtime.validate_cuda_tensor

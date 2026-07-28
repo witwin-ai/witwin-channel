@@ -6,7 +6,7 @@ from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config as DeterministicConfig
 from witwin.channel.deterministic import solve as solve_deterministic
 from witwin.channel.path import Config, solve
-from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel.kernels import geometry as geometry_kernels
 
 
 def _require_native() -> None:
@@ -104,7 +104,7 @@ def test_flat_solve_exports_finite_coupled_power():
 def test_coupled_topology_rejects_candidate_space_before_kernel_launch(monkeypatch):
     _require_native()
     monkeypatch.setattr(
-        geometry_bridge,
+        geometry_kernels,
         "coupled_rd_geometry_forward",
         lambda *_args, **_kwargs: pytest.fail("coupled kernel launched before guard"),
     )

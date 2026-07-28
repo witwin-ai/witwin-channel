@@ -347,7 +347,7 @@ def test_engine_observes_shared_failure_once_after_field_sanitization(
         lambda blocks, *, device: (events.append("concatenate"), blocks[0])[1],
     )
     monkeypatch.setattr(
-        engine.topology_primitives,
+        engine.topology_kernels,
         "deterministic_selected_edge_count",
         lambda edge_id: 0,
     )

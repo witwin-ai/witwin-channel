@@ -16,7 +16,7 @@ import pytest
 import torch
 import torch.autograd.forward_ad as forward_ad
 
-from witwin.channel.propagation.fields.kernels import autograd as field_autograd
+from witwin.channel.kernels import fields as field_kernels
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="native field companions require CUDA"
@@ -54,7 +54,7 @@ def test_forward_only_dual_carries_geometry_tangents_matching_fd():
     ).to("cuda", torch.float32)
 
     def path_length(target: torch.Tensor) -> torch.Tensor:
-        out = field_autograd.field_free_space_ad(
+        out = field_kernels.field_free_space_ad(
             batch["source"],
             target,
             batch["tx_power"],
@@ -74,7 +74,7 @@ def test_forward_only_dual_carries_geometry_tangents_matching_fd():
     assert not any(value.requires_grad for value in batch.values())
     with forward_ad.dual_level():
         dual_target = forward_ad.make_dual(batch["target"], tangent)
-        out = field_autograd.field_free_space_ad(
+        out = field_kernels.field_free_space_ad(
             batch["source"],
             dual_target,
             batch["tx_power"],
@@ -109,7 +109,7 @@ def test_forward_only_dual_and_requires_grad_convention_agree():
     def run(target_primal: torch.Tensor) -> torch.Tensor:
         with forward_ad.dual_level():
             dual = forward_ad.make_dual(target_primal, tangent)
-            out = field_autograd.field_free_space_ad(
+            out = field_kernels.field_free_space_ad(
                 batch["source"],
                 dual,
                 batch["tx_power"],
@@ -138,7 +138,7 @@ def test_materials_only_request_keeps_geometry_detached():
     frequency = torch.tensor(
         _FREQUENCY_HZ, dtype=torch.float32, device="cuda", requires_grad=True
     )
-    out = field_autograd.field_free_space_ad(
+    out = field_kernels.field_free_space_ad(
         batch["source"],
         batch["target"],
         batch["tx_power"],
@@ -156,7 +156,7 @@ def test_reverse_mode_geometry_gradients_are_unchanged():
 
     batch = _batch()
     target = batch["target"].clone().requires_grad_()
-    out = field_autograd.field_free_space_ad(
+    out = field_kernels.field_free_space_ad(
         batch["source"],
         target,
         batch["tx_power"],

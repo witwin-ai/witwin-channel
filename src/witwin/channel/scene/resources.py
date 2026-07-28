@@ -675,7 +675,7 @@ def _maybe_differentiate_table(
     if not _ad_geometry_live(sigma_h, corr_x, corr_y, thickness, eps_r, sigma_e, frequency):
         return table
 
-    from witwin.channel.scattering.kernels.table_build_ad import (
+    from witwin.channel.kernels.scattering import (
         kirchhoff_table_build_ad,
     )
 

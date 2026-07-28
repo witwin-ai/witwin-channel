@@ -21,7 +21,7 @@ Convention sources of truth:
   ``exp(-j (q'.x + q_n' h))`` with ``q' = -q``, the prefactor
   ``q_norm^2/(4pi q_n)`` and the carrier are ported from
   ``tests/reference/phase_screen_realization.py`` (ADR-010 op 2) and
-  ``scattering/kernels/functional.py::_duffy_nodes``.
+  ``kernels/scattering.py::_duffy_nodes``.
 * The per-bounce specular Jones chain transport (``A_1``/``A_2``) reuses
   :func:`chain_ensemble.transport_chain`, i.e. the ``reflection_chain_eval``
   conventions in ``field_transport_reflection.cu`` / ``field_transport.cuh``.

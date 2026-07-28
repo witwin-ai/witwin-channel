@@ -19,7 +19,7 @@ import pytest
 import torch
 
 from witwin.channel import runtime
-from witwin.channel.deterministic.kernels import accumulation as ops
+from witwin.channel.kernels import deterministic as ops
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for accumulator AD"

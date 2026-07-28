@@ -71,9 +71,9 @@ def _reflection_arguments(compiled, result, sources, sinks):
 
 
 def _transport(arguments, tx_polarization, rx_polarization):
-    from witwin.channel.propagation.fields.kernels import functional
+    from witwin.channel.kernels import fields as field_kernels
 
-    return functional.field_reflection_sequence(
+    return field_kernels.field_reflection_sequence(
         arguments["source"],
         arguments["target"],
         arguments["positions"],

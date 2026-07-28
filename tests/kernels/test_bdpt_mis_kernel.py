@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from witwin.channel import runtime
-from witwin.channel.montecarlo.bdpt.kernels import paths as ops
+from witwin.channel.kernels import montecarlo as ops
 
 
 def test_bdpt_mis_kernel_matches_expected_constants():

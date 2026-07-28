@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 
 from witwin.channel.propagation.geometry.endpoints import ReceiverLayout
-from witwin.channel.deterministic import accumulation
+from witwin.channel import deterministic
 from witwin.channel.propagation.rows import (
     EvaluatedPaths,
     PathFields,
@@ -57,14 +57,16 @@ def test_accumulation_consumes_split_evaluated_path_contract(monkeypatch):
         complex_scalar = torch.ones(1, dtype=torch.complex64)
         return scalar, complex_scalar, {"los": scalar}, {"los": complex_scalar}
 
-    monkeypatch.setattr(accumulation, "accumulate_flat_components", fake_accumulate)
     monkeypatch.setattr(
-        accumulation,
+        deterministic, "accumulate_flat_components", fake_accumulate
+    )
+    monkeypatch.setattr(
+        deterministic,
         "apply_layout_to_accumulation",
         lambda **_kwargs: sentinel,
     )
 
-    result = accumulation.accumulate_path_result(
+    result = deterministic.accumulate_path_result(
         paths,
         frequency_hz=1.0,
         num_tx=1,

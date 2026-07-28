@@ -152,7 +152,7 @@ def test_tx_visibility_plan_preserves_state_aliases_and_uses_separate_tx(monkeyp
         return active
 
     monkeypatch.setattr(
-        diffraction.geometry_bridge,
+        diffraction.geometry_kernels,
         "diffraction_tx_visible_state_plan",
         fake_plan,
     )
@@ -249,7 +249,7 @@ def test_order1_query_consumes_visible_plan_and_preserves_state_identity(
         return raw
 
     monkeypatch.setattr(
-        diffraction.geometry_bridge,
+        diffraction.geometry_kernels,
         "rayd_diffraction_paths_order1_forward",
         fake_forward,
     )

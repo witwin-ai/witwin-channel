@@ -346,7 +346,7 @@ def test_the_budget_is_flat_in_the_frequency_column_count() -> None:
 def test_the_launch_count_follows_the_published_law() -> None:
     """``launches = (1 + F) * buckets``, asserted rather than asserted-about."""
 
-    from witwin.channel.propagation.fields.kernels import functional
+    from witwin.channel.kernels import fields as field_kernels
 
     compiled = compiled_world()
     prepared = frozen_topology(compiled)
@@ -357,7 +357,7 @@ def test_the_launch_count_follows_the_published_law() -> None:
 
     counted: list[int] = [0]
     originals = {
-        name: getattr(functional, name)
+        name: getattr(field_kernels, name)
         for name in ("field_free_space", "field_reflection_sequence")
     }
 
@@ -370,7 +370,7 @@ def test_the_launch_count_follows_the_published_law() -> None:
 
     try:
         for name, original in originals.items():
-            setattr(functional, name, counting(original))
+            setattr(field_kernels, name, counting(original))
         measured = {}
         for count in (None, 1, 8, 64):
             offsets = (
@@ -383,7 +383,7 @@ def test_the_launch_count_follows_the_published_law() -> None:
             measured[count] = counted[0]
     finally:
         for name, original in originals.items():
-            setattr(functional, name, original)
+            setattr(field_kernels, name, original)
 
     assert measured[None] == buckets
     for count in (1, 8, 64):

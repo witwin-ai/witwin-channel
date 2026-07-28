@@ -10,8 +10,8 @@ import math
 import pytest
 import torch
 
-from witwin.channel.propagation.fields.kernels import functional as ops
-from witwin.channel.materials.kernels import functional as material_functional
+from witwin.channel.kernels import fields as field_kernels
+from witwin.channel.kernels import materials as material_functional
 
 C0 = 299792458.0
 
@@ -56,7 +56,7 @@ def _transmission(
     material_index: int = 0,
     path_valid: bool = True,
 ) -> dict[str, torch.Tensor]:
-    return ops.field_transmission_sequence(
+    return field_kernels.field_transmission_sequence(
         torch.tensor([path_valid], device="cuda", dtype=torch.bool),
         torch.tensor([source], device="cuda", dtype=torch.float32),
         torch.tensor([target], device="cuda", dtype=torch.float32),
@@ -95,7 +95,7 @@ def _free_space(
     polarization: list[float],
     frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
-    return ops.field_free_space(
+    return field_kernels.field_free_space(
         torch.tensor([source], device="cuda", dtype=torch.float32),
         torch.tensor([target], device="cuda", dtype=torch.float32),
         torch.tensor([1.0], device="cuda", dtype=torch.float32),

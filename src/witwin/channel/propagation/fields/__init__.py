@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .kernels import (
+from witwin.channel.kernels.fields import (
     _CoupledRdPrepareAdFunction,
     _FieldCoupledRdAdFunction,
     _FieldDiffractionWedgeAdFunction,
@@ -9,6 +9,16 @@ from .kernels import (
     _FieldReflectionSequenceAdFunction,
     _FieldTransmissionSequenceAdFunction,
     coupled_rd_prepare_ad,
+    deterministic_delay_to_path_length as deterministic_delay_to_path_length,
+    deterministic_diffraction_vector_field as deterministic_diffraction_vector_field,
+    deterministic_field_from_power_phase as deterministic_field_from_power_phase,
+    deterministic_los_field as deterministic_los_field,
+    deterministic_pack_complex as deterministic_pack_complex,
+    deterministic_phase_from_field as deterministic_phase_from_field,
+    deterministic_phase_from_length as deterministic_phase_from_length,
+    deterministic_reflection_field as deterministic_reflection_field,
+    deterministic_reflection_sequence_field as deterministic_reflection_sequence_field,
+    deterministic_zero_field_phase as deterministic_zero_field_phase,
     field_coupled_rd,
     field_coupled_rd_ad,
     field_diffraction_wedge,
@@ -27,18 +37,6 @@ from .kernels import (
     field_transmission_sequence_ad,
     field_transmission_sequence_backward,
     field_transmission_sequence_jvp,
-)
-from .kernels.deterministic import (
-    deterministic_delay_to_path_length as deterministic_delay_to_path_length,
-    deterministic_diffraction_vector_field as deterministic_diffraction_vector_field,
-    deterministic_field_from_power_phase as deterministic_field_from_power_phase,
-    deterministic_los_field as deterministic_los_field,
-    deterministic_pack_complex as deterministic_pack_complex,
-    deterministic_phase_from_field as deterministic_phase_from_field,
-    deterministic_phase_from_length as deterministic_phase_from_length,
-    deterministic_reflection_field as deterministic_reflection_field,
-    deterministic_reflection_sequence_field as deterministic_reflection_sequence_field,
-    deterministic_zero_field_phase as deterministic_zero_field_phase,
 )
 
 

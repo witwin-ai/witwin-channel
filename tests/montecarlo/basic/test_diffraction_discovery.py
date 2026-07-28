@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from witwin.channel.montecarlo.basic.kernels import sampling as ops
+from witwin.channel.kernels import montecarlo as ops
 from witwin.channel import runtime
 
 

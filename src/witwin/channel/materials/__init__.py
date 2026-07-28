@@ -5,7 +5,7 @@ owns the finite encodings consumed by native Channel kernels, the per-face
 tensor export the solvers hand to those kernels, and the compile-time
 transfer-matrix precompute that produces planar layer-stack coefficients.
 
-``witwin.channel.materials.kernels`` remains the native facade package; only
+:mod:`witwin.channel.kernels.materials` is the native facade; only
 ``validate_layer_csr`` is re-exported here, and it is the single public name.
 """
 
@@ -18,10 +18,10 @@ import numpy as np
 import torch
 
 from witwin.channel.constants import C0, EPS0, MU0
-from witwin.channel.materials.kernels import (
+from witwin.channel.kernels.materials import (
+    mc_face_material_tensors,
     validate_layer_csr as validate_layer_csr,
 )
-from witwin.channel.materials.kernels.functional import mc_face_material_tensors
 from witwin.channel.runtime import _frequency_participates_in_ad
 
 if TYPE_CHECKING:

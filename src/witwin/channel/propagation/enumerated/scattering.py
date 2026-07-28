@@ -55,11 +55,9 @@ from witwin.channel.field_state import (
     receiver_polarizations,
     transmitter_polarizations,
 )
-from witwin.channel.materials.kernels import autograd as material_autograd
-from witwin.channel.materials.kernels import functional as material_kernels
-from witwin.channel.scattering.kernels import autograd as scattering_autograd
-from witwin.channel.scattering.kernels import functional as scattering_kernels
-from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
+from witwin.channel.kernels import materials as material_kernels
+from witwin.channel.kernels import scattering as scattering_kernels
+from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel.propagation.geometry.endpoints import (
     receiver_positions_and_layout,
     transmitter_tensors,
@@ -148,7 +146,7 @@ def _visible(
     for lo in range(0, count, _VISIBILITY_CHUNK):
         hi = min(lo + _VISIBILITY_CHUNK, count)
         masks.append(
-            geometry_bridge.rayd_visibility_forward(
+            geometry_kernels.rayd_visibility_forward(
                 handle, start[lo:hi].contiguous(), end[lo:hi].contiguous(), None
             )[0]
         )
@@ -404,7 +402,7 @@ def _ensemble_rows(
                 stack.material_slot,
             )
             if ad_enabled:
-                evaluated = scattering_autograd.scattering_ensemble_eval_ad(
+                evaluated = scattering_kernels.scattering_ensemble_eval_ad(
                     *ensemble_args,
                     coef=float(tx_power[tx_index]) * coef_scale_t,
                     threshold=max(threshold, 0.0),
@@ -648,7 +646,7 @@ def _realization_rows(
                     # r_te/r_tm carry material and frequency gradients. Frequency
                     # threads as the Torch scalar the AD branch already builds
                     # (mirrors montecarlo/events/transmission.py).
-                    stack = material_autograd.em_layer_stack_ad(
+                    stack = material_kernels.em_layer_stack_ad(
                         *stack_args,
                         frequency=frequency_t,
                     )
@@ -689,7 +687,7 @@ def _realization_rows(
                     runtime.heights_m,
                 )
                 if ad_enabled:
-                    evaluated = scattering_autograd.scattering_patch_integral_eval_ad(
+                    evaluated = scattering_kernels.scattering_patch_integral_eval_ad(
                         *patch_args,
                         k0=k0_t,
                     )

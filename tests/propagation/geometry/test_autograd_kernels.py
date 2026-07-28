@@ -4,9 +4,7 @@ import inspect
 
 import pytest
 
-from witwin.channel.propagation.geometry.kernels import autograd as ops
-from witwin.channel.propagation.geometry import kernels
-from witwin.channel.propagation.geometry.kernels import autograd, primitives
+from witwin.channel.kernels import geometry
 from witwin.channel import runtime
 
 
@@ -34,21 +32,19 @@ _OWNER_NAMES = (
 
 @pytest.mark.parametrize("name", _OWNER_NAMES)
 def test_geometry_autograd_is_the_single_object_owner(name: str):
-    owner = getattr(autograd, name)
+    owner = getattr(geometry, name)
 
-    assert owner.__module__ == autograd.__name__
-    assert getattr(kernels, name) is owner
-    assert getattr(ops, name) is owner
+    assert owner.__module__ == geometry.__name__
 
 
 def test_geometry_autograd_uses_canonical_runtime_and_scene_dependencies():
-    assert autograd._required_native_op is runtime.required_symbol
-    assert autograd.validate_cuda_tensor is runtime.validate_cuda_tensor
-    assert autograd.disable_functorch is runtime.disable_functorch
-    assert "_rayd_resource" not in autograd.__dict__
-    assert autograd._rayd_scene_resource is runtime._rayd_scene_resource
+    assert geometry._required_native_op is runtime.required_symbol
+    assert geometry.validate_cuda_tensor is runtime.validate_cuda_tensor
+    assert geometry.disable_functorch is runtime.disable_functorch
+    assert "_rayd_resource" not in geometry.__dict__
+    assert geometry._rayd_scene_resource is runtime._rayd_scene_resource
     assert (
-        autograd.deterministic_normalize_vec3 is primitives.deterministic_normalize_vec3
+        geometry.deterministic_normalize_vec3.__module__ == geometry.__name__
     )
     for name in (
         "_ad_active_ctx",
@@ -60,59 +56,59 @@ def test_geometry_autograd_uses_canonical_runtime_and_scene_dependencies():
         "_ad_native_tangent_or_none",
         "_ad_native_tensor",
     ):
-        assert getattr(autograd, name) is getattr(runtime, name)
+        assert getattr(geometry, name) is getattr(runtime, name)
 
 
 def test_autograd_methods_resolve_companions_in_the_canonical_owner():
     assert (
-        autograd._RaydFaceNormalsAdFunction.forward.__globals__[
+        geometry._RaydFaceNormalsAdFunction.forward.__globals__[
             "deterministic_normalize_vec3"
         ]
-        is primitives.deterministic_normalize_vec3
+        is geometry.deterministic_normalize_vec3
     )
     assert (
-        inspect.unwrap(autograd._RaydFaceNormalsAdFunction.backward).__globals__[
+        inspect.unwrap(geometry._RaydFaceNormalsAdFunction.backward).__globals__[
             "rayd_scene_face_normals_backward"
         ]
-        is autograd.rayd_scene_face_normals_backward
+        is geometry.rayd_scene_face_normals_backward
     )
     assert (
-        autograd._RaydFaceNormalsAdFunction.jvp.__globals__[
+        geometry._RaydFaceNormalsAdFunction.jvp.__globals__[
             "rayd_scene_face_normals_jvp"
         ]
-        is autograd.rayd_scene_face_normals_jvp
+        is geometry.rayd_scene_face_normals_jvp
     )
     assert (
-        inspect.unwrap(autograd._RaydIntersectAdFunction.backward).__globals__[
+        inspect.unwrap(geometry._RaydIntersectAdFunction.backward).__globals__[
             "rayd_intersect_backward"
         ]
-        is autograd.rayd_intersect_backward
+        is geometry.rayd_intersect_backward
     )
     assert (
-        autograd._RaydIntersectAdFunction.jvp.__globals__["rayd_intersect_jvp"]
-        is autograd.rayd_intersect_jvp
+        geometry._RaydIntersectAdFunction.jvp.__globals__["rayd_intersect_jvp"]
+        is geometry.rayd_intersect_jvp
     )
     assert (
-        inspect.unwrap(autograd._RaydTraceReflectionsAdFunction.backward).__globals__[
+        inspect.unwrap(geometry._RaydTraceReflectionsAdFunction.backward).__globals__[
             "rayd_trace_reflections_backward"
         ]
-        is autograd.rayd_trace_reflections_backward
+        is geometry.rayd_trace_reflections_backward
     )
     assert (
-        autograd._RaydTraceReflectionsAdFunction.jvp.__globals__[
+        geometry._RaydTraceReflectionsAdFunction.jvp.__globals__[
             "rayd_trace_reflections_jvp"
         ]
-        is autograd.rayd_trace_reflections_jvp
+        is geometry.rayd_trace_reflections_jvp
     )
     assert (
         inspect.unwrap(
-            autograd._RaydReflectionEpcPathsAdFunction.backward
+            geometry._RaydReflectionEpcPathsAdFunction.backward
         ).__globals__["rayd_reflection_epc_paths_backward"]
-        is autograd.rayd_reflection_epc_paths_backward
+        is geometry.rayd_reflection_epc_paths_backward
     )
     assert (
-        autograd._RaydReflectionEpcPathsAdFunction.jvp.__globals__[
+        geometry._RaydReflectionEpcPathsAdFunction.jvp.__globals__[
             "rayd_reflection_epc_paths_jvp"
         ]
-        is autograd.rayd_reflection_epc_paths_jvp
+        is geometry.rayd_reflection_epc_paths_jvp
     )

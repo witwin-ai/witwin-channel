@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from witwin.channel.montecarlo.basic.kernels import sampling as mc_sampling
-from witwin.channel.propagation.geometry.kernels import bridge as ops
+from witwin.channel.kernels import montecarlo as mc_sampling
+from witwin.channel.kernels import geometry as ops
 from witwin.channel import runtime
 from witwin.channel.scene import resources as rayd_scene
 
@@ -215,7 +215,7 @@ def test_mc_bdpt_hot_paths_do_not_make_python_layout_copies():
 def test_path_solver_uses_the_typed_enumerated_engine():
     repo = Path(__file__).resolve().parents[2]
     source = (
-        repo / "src" / "witwin" / "channel" / "path" / "solver.py"
+        repo / "src" / "witwin" / "channel" / "path.py"
     ).read_text()
 
     assert "propagation.enumerated.engine import" in source

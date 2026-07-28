@@ -45,7 +45,7 @@ def test_coupled_query_names_raw_geometry_and_preserves_identity(monkeypatch):
         return raw
 
     monkeypatch.setattr(
-        coupled.geometry_bridge,
+        coupled.geometry_kernels,
         "coupled_rd_geometry_forward",
         fake_forward,
     )
@@ -148,7 +148,7 @@ def test_coupled_dd_query_names_raw_geometry_and_preserves_identity(monkeypatch)
         return raw
 
     monkeypatch.setattr(
-        coupled.geometry_bridge,
+        coupled.geometry_kernels,
         "coupled_dd_geometry_forward",
         fake_forward,
     )

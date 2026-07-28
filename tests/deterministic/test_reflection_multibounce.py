@@ -8,9 +8,7 @@ from tests.support.core_world import (
 )
 from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
-from witwin.channel.propagation.fields.kernels import (
-    deterministic as deterministic_fields,
-)
+from witwin.channel.kernels import fields as field_kernels
 from witwin.channel.propagation.enumerated import reflection as topology
 from witwin.channel.propagation.geometry import reevaluate as topology_geometry
 from witwin.channel.propagation.topology.export import evaluated_paths_from_block
@@ -326,7 +324,7 @@ def test_two_bounce_reflection_uses_native_sequence_field(monkeypatch):
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native reflection is not built")
 
-    original = deterministic_fields.deterministic_reflection_sequence_field
+    original = field_kernels.deterministic_reflection_sequence_field
     calls = 0
 
     def count_native_sequence_field(**kwargs):
@@ -335,7 +333,7 @@ def test_two_bounce_reflection_uses_native_sequence_field(monkeypatch):
         return original(**kwargs)
 
     monkeypatch.setattr(
-        deterministic_fields,
+        field_kernels,
         "deterministic_reflection_sequence_field",
         count_native_sequence_field,
     )
@@ -377,18 +375,16 @@ def test_two_bounce_reflection_uses_rayd_epc_path_export(monkeypatch):
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native reflection is not built")
 
-    from witwin.channel.propagation.geometry.kernels import (
-        bridge as geometry_bridge,
-    )
+    from witwin.channel.kernels import geometry as geometry_kernels
 
-    original = geometry_bridge.rayd_reflection_epc_paths_forward
+    original = geometry_kernels.rayd_reflection_epc_paths_forward
     calls = {"count": 0}
 
     def counted(*args, **kwargs):
         calls["count"] += 1
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(geometry_bridge, "rayd_reflection_epc_paths_forward", counted)
+    monkeypatch.setattr(geometry_kernels, "rayd_reflection_epc_paths_forward", counted)
     result = solve(
         two_wall_multibounce_scene(),
         Config(

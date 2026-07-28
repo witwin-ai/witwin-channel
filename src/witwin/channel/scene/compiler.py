@@ -56,9 +56,7 @@ from witwin.channel.materials import (
     PEC_EFFECTIVE_SIGMA_E,
     PEC_MODEL_ID,
 )
-from witwin.channel.propagation.topology.kernels import (
-    primitives as topology_primitives,
-)
+from witwin.channel.kernels import topology as topology_kernels
 from witwin.channel.runtime import (
     bdpt_zero_matrix,
     mc_receiver_grid_points,
@@ -972,8 +970,8 @@ def _compile_geometry(
         vertices=records.vertices,
         faces=records.faces,
         face_normals=records.face_normals,
-        edges=topology_primitives.core_pack_int2(records.edge_v0, records.edge_v1),
-        edge_adj_faces=topology_primitives.core_pack_int2(records.face0, records.face1),
+        edges=topology_kernels.core_pack_int2(records.edge_v0, records.edge_v1),
+        edge_adj_faces=topology_kernels.core_pack_int2(records.face0, records.face1),
         edge_param_range=bdpt_zero_matrix(
             records.vertices, rows=records.edge_v0.shape[0], cols=2
         ),
@@ -1574,7 +1572,7 @@ def receiver_positions(
         return host_vec3_tensor(())
     if len(blocks) == 1:
         return blocks[0]
-    return topology_primitives.path_concat_vec3(blocks)
+    return topology_kernels.path_concat_vec3(blocks)
 
 
 def transmitter_positions(

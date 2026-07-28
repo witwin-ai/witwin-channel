@@ -3,8 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from witwin.channel.propagation.topology import kernels
-from witwin.channel.propagation.topology.kernels import blocks, candidates
+from witwin.channel.kernels import topology
 from witwin.channel import runtime
 
 
@@ -15,19 +14,14 @@ _OWNER_NAMES = (
 
 @pytest.mark.parametrize("name", _OWNER_NAMES)
 def test_topology_candidates_is_the_single_object_owner(name: str):
-    owner = getattr(candidates, name)
+    owner = getattr(topology, name)
 
-    assert owner.__module__ == candidates.__name__
-    assert getattr(kernels, name) is owner
+    assert owner.__module__ == topology.__name__
 
 
 def test_topology_candidates_use_only_canonical_dependencies():
-    assert candidates._required_native_op is runtime.required_symbol
-    assert candidates.validate_cuda_tensor is runtime.validate_cuda_tensor
-    assert (
-        candidates._validate_path_reflection_candidates
-        is blocks._validate_path_reflection_candidates
-    )
+    assert topology._required_native_op is runtime.required_symbol
+    assert topology.validate_cuda_tensor is runtime.validate_cuda_tensor
     for name in _OWNER_NAMES:
-        assert getattr(candidates, name).__globals__ is candidates.__dict__
-    assert "ops" not in candidates.__dict__
+        assert getattr(topology, name).__globals__ is topology.__dict__
+    assert "ops" not in topology.__dict__

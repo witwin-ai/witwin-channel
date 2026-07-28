@@ -14,6 +14,19 @@ SOLVER_ROOTS = (
 )
 
 
+def _solver_sources(root: Path) -> tuple[Path, ...]:
+    """Every source file that owns one solver.
+
+    A solver is either a collapsed single module beside its former package
+    directory, or a package whose facade delegates to a pipeline owner.
+    """
+
+    module = root.with_suffix(".py")
+    if module.is_file():
+        return (module,)
+    return (root / "solver.py", root / "pipeline.py")
+
+
 def _imports(path: Path) -> set[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"))
     modules = {
@@ -32,8 +45,14 @@ def _imports(path: Path) -> set[str]:
 
 def test_solver_facades_remain_thin_and_have_pipeline_owners() -> None:
     for root in SOLVER_ROOTS:
-        facade = root / "solver.py"
-        pipeline = root / "pipeline.py"
+        sources = _solver_sources(root)
+        if len(sources) == 1:
+            # A collapsed solver owns its whole pipeline in one module, so
+            # there is no second file for a facade to stay thin against.
+            assert sources[0].is_file()
+            assert not root.is_dir()
+            continue
+        facade, pipeline = sources
 
         assert pipeline.is_file()
         assert len(facade.read_text(encoding="utf-8").splitlines()) <= 200
@@ -41,11 +60,14 @@ def test_solver_facades_remain_thin_and_have_pipeline_owners() -> None:
 
 def test_monte_carlo_pipelines_do_not_depend_on_enumerated_engine() -> None:
     for root in SOLVER_ROOTS[2:]:
-        imports = _imports(root / "pipeline.py")
-        assert not any(
-            module.startswith("witwin.channel.propagation.enumerated")
-            for module in imports
-        )
+        for source in _solver_sources(root):
+            if source.name == "solver.py":
+                continue
+            imports = _imports(source)
+            assert not any(
+                module.startswith("witwin.channel.propagation.enumerated")
+                for module in imports
+            )
 
 
 def test_solver_modules_do_not_import_another_solver() -> None:
@@ -56,7 +78,7 @@ def test_solver_modules_do_not_import_another_solver() -> None:
         "witwin.channel.montecarlo.bdpt",
     )
     for owner, root in zip(solver_prefixes, SOLVER_ROOTS, strict=True):
-        for path in (root / "solver.py", root / "pipeline.py"):
+        for path in _solver_sources(root):
             imports = _imports(path)
             assert not any(
                 module.startswith(prefix)

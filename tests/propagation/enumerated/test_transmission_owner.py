@@ -5,18 +5,15 @@ import inspect
 from pathlib import Path
 
 from ci import check_import_graph as graph
-from witwin.channel.deterministic import pipeline as deterministic_pipeline
+from witwin.channel import deterministic as deterministic_module
 from witwin.channel.montecarlo.bdpt import pipeline as bdpt_pipeline
-from witwin.channel.path import pipeline as path_pipeline
+from witwin.channel import path as path_module
 from witwin.channel.propagation.enumerated import engine, transmission
-from witwin.channel.propagation.geometry.kernels import bridge
-from witwin.channel.propagation.geometry.kernels import penetration_autograd
+from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel.propagation.penetration import (
     SegmentPenetrationPolicy,
 )
-from witwin.channel.propagation.topology.kernels import (
-    transmission as topology_pack,
-)
+from witwin.channel.kernels import topology as topology_pack
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -55,10 +52,10 @@ def _calls(definition: ast.AST) -> dict[str, list[ast.Call]]:
 def test_transmission_owner_uses_one_stable_native_operation_family() -> None:
     assert transmission.SegmentPenetrationPolicy is SegmentPenetrationPolicy
     assert transmission.rayd_segment_penetration_forward is (
-        bridge.rayd_segment_penetration_forward
+        geometry_kernels.rayd_segment_penetration_forward
     )
     assert transmission.rayd_segment_penetration_ad is (
-        penetration_autograd.rayd_segment_penetration_ad
+        geometry_kernels.rayd_segment_penetration_ad
     )
     assert transmission.enumerated_transmission_topology_pack is (
         topology_pack.enumerated_transmission_topology_pack
@@ -123,16 +120,16 @@ def test_enumerated_engine_owns_one_transaction_and_terminal_observer() -> None:
 
 
 def test_path_deterministic_and_adr008_oracle_share_the_engine_entry() -> None:
-    assert path_pipeline.evaluate_enumerated_paths is engine.evaluate_enumerated_paths
+    assert path_module.evaluate_enumerated_paths is engine.evaluate_enumerated_paths
     assert (
-        deterministic_pipeline.evaluate_enumerated_paths
+        deterministic_module.evaluate_enumerated_paths
         is engine.evaluate_enumerated_paths
     )
     assert bdpt_pipeline.evaluate_enumerated_paths is engine.evaluate_enumerated_paths
 
     bdpt_source = Path(bdpt_pipeline.__file__).read_text(encoding="utf-8")
     assert "propagation.enumerated.transmission" not in bdpt_source
-    assert "propagation.geometry.kernels" not in bdpt_source
+    assert "kernels.geometry" not in bdpt_source
 
 
 def test_retired_depth_march_sources_and_references_are_deleted() -> None:

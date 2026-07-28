@@ -399,9 +399,7 @@ def test_reflection_transport_is_finite_on_the_inert_zero_geometry() -> None:
     shared material tensors.
     """
 
-    from witwin.channel.propagation.fields.kernels import (
-        autograd as field_autograd,
-    )
+    from witwin.channel.kernels import fields as field_kernels
 
     source = torch.tensor(
         [[0.0, -0.5, 0.0]], device="cuda", requires_grad=True
@@ -412,7 +410,7 @@ def test_reflection_transport_is_finite_on_the_inert_zero_geometry() -> None:
         torch.full((1, 1), value, device="cuda")
         for value in (4.0, 0.01, 1.0, 1.0, 0.1)
     )
-    out = field_autograd.field_reflection_sequence_ad(
+    out = field_kernels.field_reflection_sequence_ad(
         source,
         target,
         zeros,

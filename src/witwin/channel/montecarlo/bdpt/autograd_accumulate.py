@@ -23,7 +23,7 @@ from witwin.channel.runtime import (
     disable_functorch,
 )
 
-from .kernels.maps import (
+from witwin.channel.kernels.montecarlo import (
     bdpt_finalize_component_maps,
     bdpt_finalize_component_maps_backward,
     bdpt_finalize_component_maps_jvp,

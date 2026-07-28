@@ -3,7 +3,7 @@ import torch
 
 from witwin.core import Mesh, Scene, Structure
 from witwin.channel.scene import compile as compile_scene
-from witwin.channel.propagation.geometry.kernels import bridge as ops
+from witwin.channel.kernels import geometry as ops
 from witwin.core import PhysicalMaterial
 from witwin.channel import runtime
 

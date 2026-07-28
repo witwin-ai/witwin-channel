@@ -5,7 +5,7 @@ import torch
 
 from tests.support.core_world import make_receiver, make_transmitter
 from witwin.channel.deterministic import Config
-from witwin.channel.deterministic import solver
+from witwin.channel import deterministic
 from witwin.core import Scene
 
 
@@ -22,7 +22,7 @@ def test_array_fails_before_cuda() -> None:
     )
 
     with pytest.raises(ValueError, match="does not support antenna arrays"):
-        solver.solve(
+        deterministic.solve(
             scene,
             Config(components={"los"}),
             reference_frequency_hz=1.0e9,

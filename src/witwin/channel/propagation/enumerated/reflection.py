@@ -7,10 +7,7 @@ from typing import TYPE_CHECKING
 import torch
 
 from witwin.channel.materials import face_material_tensors
-from witwin.channel.propagation.geometry.kernels import bridge as geometry_bridge
-from witwin.channel.propagation.geometry.kernels import (
-    primitives as geometry_primitives,
-)
+from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel.propagation.geometry.reevaluate import (
     _cached_coplanar_face_groups,
 )
@@ -31,13 +28,8 @@ from witwin.channel.propagation.topology.discovery.reflection import (
     prepare_reflection_multibounce_plan,
 )
 from witwin.channel.propagation.topology.export import _ensure_topology_fields
-from witwin.channel.propagation.topology.kernels import (
-    compaction as topology_compaction,
-)
-from witwin.channel.propagation.topology.kernels import (
-    construction as topology_construction,
-)
-from witwin.channel.propagation.topology.kernels.sampling import (
+from witwin.channel.kernels import topology as topology_kernels
+from witwin.channel.kernels.topology import (
     mc_sample_directions,
 )
 
@@ -54,9 +46,7 @@ def _reflection_topology_order1(
     *,
     frequency_hz: float,
 ) -> tuple[dict[str, torch.Tensor], int]:
-    from witwin.channel.propagation.fields.kernels import (
-        deterministic as field_kernels,
-    )
+    from witwin.channel.kernels import fields as field_kernels
 
     device = tx_positions.device
     rayd = compiled.rayd
@@ -83,7 +73,7 @@ def _reflection_topology_order1(
     records = rayd.edge_records()
     vertices = records.vertices
     faces = records.faces.contiguous()
-    normals = geometry_primitives.deterministic_normalize_vec3(
+    normals = geometry_kernels.deterministic_normalize_vec3(
         records.face_normals.contiguous(), eps=1.0e-6
     )
     if faces.shape[0] == 0:
@@ -102,7 +92,7 @@ def _reflection_topology_order1(
             }
         ), 0
 
-    tri_a = topology_construction.deterministic_face_anchor_points(
+    tri_a = topology_kernels.deterministic_face_anchor_points(
         vertices.contiguous(), faces
     )
     face_eps_r, face_sigma_e, face_mu_r, face_gain, _face_valid = face_material_tensors(
@@ -180,7 +170,7 @@ def _reflection_topology_order1(
             )
         )
         launch_count += 1
-        selected = topology_compaction.deterministic_reflection_order1_compact(
+        selected = topology_kernels.deterministic_reflection_order1_compact(
             visible=epc.visible,
             epc_faces=epc.resolved_prim_ids,
             epc_hits=epc.hit_positions,
@@ -221,7 +211,7 @@ def _reflection_topology_order1(
         delay = field_result["delay_s"].to(dtype=torch.float32).contiguous()
         blocks.append(
             _ensure_topology_fields(
-                topology_construction.deterministic_topology_base_fields(
+                topology_kernels.deterministic_topology_base_fields(
                     rx_id=selected["selected_rx_id"],
                     path_length_m=path_length.to(dtype=torch.float32).contiguous(),
                     delay_s=delay,
@@ -266,7 +256,7 @@ def _discovered_group_chains(
     ray_o = tx.reshape(1, 3).expand(ray_count, 3).contiguous()
     ray_d = mc_sample_directions(ray_count, tx.reshape(1, 3))
     ray_tmax = torch.empty((0,), device=device, dtype=torch.float32)
-    out = geometry_bridge.rayd_trace_reflections_forward(
+    out = geometry_kernels.rayd_trace_reflections_forward(
         rayd.require_resource(),
         ray_o,
         ray_d,
@@ -293,9 +283,7 @@ def _reflection_topology_multibounce(
     max_depth: int,
     max_paths: int | None,
 ) -> tuple[dict[str, torch.Tensor], int, int]:
-    from witwin.channel.propagation.fields.kernels import (
-        deterministic as field_kernels,
-    )
+    from witwin.channel.kernels import fields as field_kernels
 
     device = tx_positions.device
     rayd = compiled.rayd
@@ -328,7 +316,7 @@ def _reflection_topology_multibounce(
     records = rayd.edge_records()
     vertices = records.vertices
     faces = records.faces.contiguous()
-    normals = geometry_primitives.deterministic_normalize_vec3(
+    normals = geometry_kernels.deterministic_normalize_vec3(
         records.face_normals.contiguous(), eps=1.0e-6
     )
     face_count = int(faces.shape[0])
@@ -354,7 +342,7 @@ def _reflection_topology_multibounce(
             0,
         )
 
-    tri_a = topology_construction.deterministic_face_anchor_points(
+    tri_a = topology_kernels.deterministic_face_anchor_points(
         vertices.contiguous(), faces
     )
     face_eps_r, face_sigma_e, face_mu_r, face_gain, _face_valid = face_material_tensors(
@@ -434,7 +422,7 @@ def _reflection_topology_multibounce(
             )
         )
         launch_count += 1
-        selected = topology_compaction.deterministic_reflection_sequence_compact(
+        selected = topology_kernels.deterministic_reflection_sequence_compact(
             visible=epc.visible,
             epc_sequences=epc.resolved_prim_ids,
             epc_hits=epc.hit_positions,
@@ -475,7 +463,7 @@ def _reflection_topology_multibounce(
         empty_i32 = torch.empty((0,), device=device, dtype=torch.int32)
         blocks.append(
             _ensure_topology_fields(
-                topology_construction.deterministic_topology_base_fields(
+                topology_kernels.deterministic_topology_base_fields(
                     rx_id=selected["selected_rx_id"],
                     path_length_m=path_length,
                     delay_s=delay,

@@ -36,6 +36,15 @@ _SOLVER_PREFIXES = (
     f"{PACKAGE}.montecarlo.basic",
     f"{PACKAGE}.montecarlo.bdpt",
 )
+# The rule these name is about a public *init*: a package ``__init__.py`` that
+# publishes a domain's surface must stay a re-export facade and may not reach
+# into kernels, runtime or propagation itself. It is therefore conditioned on
+# the source actually being a package init (``ImportEdge.source_is_package``).
+# A solver that has collapsed into a single module - ``deterministic.py`` rather
+# than ``deterministic/__init__.py`` - is the solver body, not a facade over it,
+# so the facade rule cannot apply to it and does not. What that solver may
+# import is still bounded by the solver-to-solver, raw-extension and
+# propagation-ordering rules below, none of which is relaxed here.
 _PUBLIC_INIT_MODULES = frozenset({PACKAGE, *_SOLVER_PREFIXES})
 _RAW_EXTENSION_MODULES = frozenset({f"{PACKAGE}._channel"})
 # ``witwin.channel.runtime`` is a single module, so the raw accessor it exports
@@ -59,6 +68,7 @@ class ImportEdge:
     kind: str
     imported_name: str = ""
     relative_level: int = 0
+    source_is_package: bool = False
 
 
 @dataclass(frozen=True, order=True, slots=True)
@@ -147,6 +157,8 @@ def _parse_file(
                     alias.name,
                     "import",
                     alias.name,
+                    0,
+                    is_package,
                 )
                 for alias in node.names
             )
@@ -171,6 +183,7 @@ def _parse_file(
                     "from",
                     alias.name,
                     node.level,
+                    is_package,
                 )
                 for alias in node.names
             )
@@ -408,7 +421,7 @@ def _basic_boundary_violations(edge: ImportEdge) -> list[Violation]:
     )
     if target in deleted_modules or imported_target in deleted_modules:
         violations.append(_violation(edge, "deleted_module_dependency"))
-    if source in _PUBLIC_INIT_MODULES and (
+    if edge.source_is_package and source in _PUBLIC_INIT_MODULES and (
         _is_kernels_module(target)
         or _matches(target, f"{PACKAGE}.runtime")
         or _matches(target, f"{PACKAGE}.propagation")

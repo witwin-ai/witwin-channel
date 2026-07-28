@@ -33,7 +33,7 @@ from witwin.channel.propagation.enumerated import (
     scattering_chain_append as scattering_append,
 )
 from witwin.channel.deterministic import Config as DeterministicConfig
-from witwin.channel.path.config import Config as PathConfig
+from witwin.channel.path import Config as PathConfig
 
 
 _D = sc.KMAX_AD_DEPTH
@@ -395,7 +395,9 @@ def test_solver_chain_enabled_end_to_end():
     """
 
     _require_cuda_rayd()
-    if getattr(scattering_mod.scattering_kernels, "scattering_chain_ensemble_eval", None) is None:
+    if getattr(
+        scattering_append.scattering_kernels, "scattering_chain_ensemble_eval", None
+    ) is None:
         pytest.skip("ADR-021 D2 Op A facade not yet registered")
     from witwin.channel.runtime import native_extension
 
@@ -428,8 +430,8 @@ def test_solver_chain_ad_mode_requires_companion():
     """AD-mode chain solve fails loudly until the D5 Op A ``_ad`` companion lands."""
 
     _require_cuda_rayd()
-    if getattr(scattering_mod.scattering_autograd, "scattering_chain_ensemble_eval_ad", None) is not None:
-        pytest.skip("ADR-021 D5 Op A _ad companion is available")
+    if scattering_append._ADR021_D5_CHAIN_AD_WIRED:
+        pytest.skip("ADR-021 D5 Op A _ad companion is wired into the append path")
     from witwin.channel.deterministic import solve
 
     scene = _two_wall_scene()

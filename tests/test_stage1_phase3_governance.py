@@ -246,15 +246,9 @@ def test_compact_autograd_native_companions_have_one_topology_owner() -> None:
             ):
                 owners[node.args[0].value].append(path)
 
-    facade = (
-        PACKAGE_ROOT
-        / "propagation"
-        / "topology"
-        / "kernels"
-        / "compact_autograd.py"
-    )
+    facade = PACKAGE_ROOT / "kernels" / "topology.py"
     assert owners == {symbol: [facade] for symbol in symbols}
-    assert "witwin.channel.propagation.topology.kernels" in _top_level_imports(
+    assert "witwin.channel.kernels.topology" in _top_level_imports(
         CONSUMER_ROOT / "replay.py"
     )
 
