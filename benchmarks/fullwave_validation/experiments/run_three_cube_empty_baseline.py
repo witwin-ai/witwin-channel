@@ -65,7 +65,9 @@ deterministic_result = solve(
         return_field=True,
         export_paths=False,
         diagnostics=True,
+        isb_boundary_taper=False,
     ),
+    reference_frequency_hz=spec.frequency_hz,
 )
 deterministic_field = deterministic_result.field.detach().cpu().numpy()[0]
 FieldMap(

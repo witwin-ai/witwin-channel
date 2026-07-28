@@ -4,10 +4,12 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
+import torch
 
 from benchmarks.fullwave_validation.backends import (
     build_tidy3d_simulation,
     extract_tidy3d_field_map,
+    solve_deterministic,
 )
 from benchmarks.fullwave_validation.metrics import (
     analyze_boundaries,
@@ -143,6 +145,10 @@ def test_channel_scene_matches_case_geometry_and_material(
     )
     assert isinstance(receivers[0], ReceiverGrid)
     assert receivers[0].shape == (spec.x.size, spec.y.size)
+    assert receivers[0].origin.dtype == torch.float32
+    assert receivers[0].x_axis.dtype == torch.float32
+    assert receivers[0].y_axis.dtype == torch.float32
+    assert receivers[0].polarization.dtype == torch.float32
     assert all(
         isinstance(structure.material, PhysicalMaterial)
         for structure in scene.structures
@@ -154,6 +160,40 @@ def test_channel_scene_matches_case_geometry_and_material(
         )
     else:
         assert all(structure.material.layers for structure in scene.structures)
+
+
+def test_deterministic_backend_passes_explicit_reference_frequency(monkeypatch):
+    import witwin.channel.deterministic as deterministic_module
+
+    spec = replace(load_case("single_cube", "metal"), receiver_shape=(3, 2))
+    sentinel_scene = object()
+    observed: dict[str, object] = {}
+
+    class Result:
+        field = torch.zeros((1, spec.y.size, spec.x.size), dtype=torch.complex64)
+        component_fields: dict[str, torch.Tensor] = {}
+        metadata = {"counts": {"path_count": 0}}
+
+    def fake_solve(scene, config, *, reference_frequency_hz):
+        observed["scene"] = scene
+        observed["config"] = config
+        observed["reference_frequency_hz"] = reference_frequency_hz
+        return Result()
+
+    monkeypatch.setattr(
+        "benchmarks.fullwave_validation.backends.build_channel_scene",
+        lambda _spec: sentinel_scene,
+    )
+    monkeypatch.setattr(deterministic_module, "solve", fake_solve)
+
+    result = solve_deterministic(spec)
+
+    assert observed["scene"] is sentinel_scene
+    assert observed["reference_frequency_hz"] == spec.frequency_hz
+    assert observed["config"].isb_boundary_taper is False
+    assert result.field.shape == (spec.y.size, spec.x.size)
+    assert result.metadata["isb_boundary_taper"] is False
+    assert result.metadata["isb_boundary_taper_effective_width"] == 0.0
 
 
 def test_tidy3d_scene_uses_true_pec_and_dielectric_volumes():

@@ -7,6 +7,7 @@
 
 #include "../tensor_checks.h"
 
+#include <cfloat>
 #include <cmath>
 #include <vector>
 
@@ -199,12 +200,70 @@ __global__ void coupled_active_mask_kernel(
     }
 }
 
-// Double-diffraction (cid 7) discovery: alternating-projection Fermat solve of
-// the two-edge Keller point pair, mirroring the eps/inside semantics of
-// coupled_rd_prepare_kernel. No CPU/Torch recomputation and no heuristic clamping:
-// each iteration takes the raw closed-form single-edge projection and the row
-// is validated (or dropped) purely by the strict-inside test on both segments.
-constexpr int kDoubleDiffractionIterations = 16;
+// Double-diffraction (cid 7) discovery.  Eliminating Q1 with RayD's closed-form
+// line solve leaves a convex one-dimensional path-length objective on edge 2.
+// A signed derivative bracket plus fixed bisection replaces the unverified
+// sixteen-step alternating projection (ADR-045).
+constexpr int kDoubleDiffractionBisectionIterations = 32;
+constexpr float kDoubleDiffractionPositionUlps = 8.0f;
+
+struct ReducedDdState {
+    float parameter1;
+    float3 q1;
+    float3 q2;
+    float derivative;
+    bool regular;
+};
+
+__device__ __forceinline__ ReducedDdState reduced_dd_state(
+    float parameter2,
+    float3 tx,
+    float3 rx,
+    float3 origin1,
+    float3 dir1,
+    float3 origin2,
+    float3 dir2) {
+    // Solve and differentiate in edge-1 local coordinates. Reconstructing an
+    // absolute Q and subtracting it again can lose the direction of a short
+    // middle leg even when the stationary parameters are well resolved.
+    const float3 source_from_origin1 = sub3(tx, origin1);
+    const float3 edge2_origin_from_origin1 = sub3(origin2, origin1);
+    const float3 q2_from_origin1 = add3(
+        edge2_origin_from_origin1, mul3(dir2, parameter2));
+    const float3 q2 = add3(origin2, mul3(dir2, parameter2));
+    const float parameter1 = utd::first_order_diffraction_parameter(
+        to_utd(source_from_origin1),
+        to_utd(q2_from_origin1),
+        to_utd(make_float3(0.0f, 0.0f, 0.0f)),
+        to_utd(dir1));
+    const float3 q1_from_origin1 = mul3(dir1, parameter1);
+    const float3 q1 = add3(origin1, mul3(dir1, parameter1));
+    const float3 incoming = sub3(q1_from_origin1, source_from_origin1);
+    const float3 middle = sub3(q2_from_origin1, q1_from_origin1);
+    const float3 outgoing = add3(sub3(origin2, rx), mul3(dir2, parameter2));
+    const float incoming_length = length3(incoming);
+    const float middle_length = length3(middle);
+    const float outgoing_length = length3(outgoing);
+    // These lengths guard only the reduced numerical derivative.  RayD's
+    // larger UTD_MIN_DISTANCE is a field-publication domain check below; using
+    // it while searching h'(v) could discard a regular root elsewhere in the
+    // bracket merely because one intermediate sample passes near an edge.
+    const bool regular =
+        isfinite(parameter1) &&
+        isfinite(q1.x) && isfinite(q1.y) && isfinite(q1.z) &&
+        isfinite(q2.x) && isfinite(q2.y) && isfinite(q2.z) &&
+        isfinite(incoming_length) && incoming_length > kGeometryEpsilon &&
+        isfinite(middle_length) && middle_length > kGeometryEpsilon &&
+        isfinite(outgoing_length) && outgoing_length > kGeometryEpsilon;
+    const float derivative = regular
+        ? dot3(
+              dir2,
+              add3(
+                  mul3(middle, 1.0f / middle_length),
+                  mul3(outgoing, 1.0f / outgoing_length)))
+        : NAN;
+    return {parameter1, q1, q2, derivative, regular && isfinite(derivative)};
+}
 
 __global__ void coupled_dd_prepare_kernel(
     int64_t count,
@@ -239,6 +298,8 @@ __global__ void coupled_dd_prepare_kernel(
         const bool finite_inputs =
             isfinite(tx.x) && isfinite(tx.y) && isfinite(tx.z) &&
             isfinite(rx.x) && isfinite(rx.y) && isfinite(rx.z) &&
+            isfinite(origin1.x) && isfinite(origin1.y) && isfinite(origin1.z) &&
+            isfinite(origin2.x) && isfinite(origin2.y) && isfinite(origin2.z) &&
             length3(dir1) > 0.0f && length3(dir2) > 0.0f &&
             isfinite(length1) && length1 > kGeometryEpsilon &&
             isfinite(length2) && length2 > kGeometryEpsilon;
@@ -264,22 +325,79 @@ __global__ void coupled_dd_prepare_kernel(
             continue;
         }
 
-        // Alternating projection: seed Q2 at edge 2's midpoint, then for a
-        // fixed number of deterministic float32 iterations project Q1 onto
-        // edge 1 for the (tx, Q2) diffraction and Q2 onto edge 2 for the
-        // (Q1, rx) diffraction. Deterministic order, identical every launch.
-        float3 q1 = make_float3(NAN, NAN, NAN);
-        float3 q2 = add3(origin2, mul3(dir2, 0.5f * length2));
-        float parameter1 = NAN;
-        float parameter2 = NAN;
-        for (int iteration = 0; iteration < kDoubleDiffractionIterations; ++iteration) {
-            parameter1 = utd::first_order_diffraction_parameter(
-                to_utd(tx), to_utd(q2), to_utd(origin1), to_utd(dir1));
-            q1 = add3(origin1, mul3(dir1, parameter1));
-            parameter2 = utd::first_order_diffraction_parameter(
-                to_utd(q1), to_utd(rx), to_utd(origin2), to_utd(dir2));
-            q2 = add3(origin2, mul3(dir2, parameter2));
+        // h(v) = min_u |tx-Q1(u)| + |Q1(u)-Q2(v)| + |Q2(v)-rx| is convex.
+        // The envelope derivative below is therefore monotone, and a strict
+        // sign change over the finite-edge interior is the physical existence
+        // test for one interior stationary pair.  Endpoint equality belongs to
+        // vertex/endpoint physics and is rejected by the strict signs.
+        float lower = kGeometryEpsilon;
+        float upper = length2 - kGeometryEpsilon;
+        const ReducedDdState lower_state = reduced_dd_state(
+            lower, tx, rx, origin1, dir1, origin2, dir2);
+        const ReducedDdState upper_state = reduced_dd_state(
+            upper, tx, rx, origin1, dir1, origin2, dir2);
+        bool bracketed =
+            upper > lower && lower_state.regular && upper_state.regular &&
+            lower_state.derivative < 0.0f && upper_state.derivative > 0.0f;
+        for (int iteration = 0;
+             iteration < kDoubleDiffractionBisectionIterations && bracketed;
+             ++iteration) {
+            const float midpoint = lower + 0.5f * (upper - lower);
+            if (midpoint == lower || midpoint == upper) {
+                break;
+            }
+            const ReducedDdState midpoint_state = reduced_dd_state(
+                midpoint, tx, rx, origin1, dir1, origin2, dir2);
+            if (!midpoint_state.regular) {
+                bracketed = false;
+            } else if (midpoint_state.derivative > 0.0f) {
+                upper = midpoint;
+            } else if (midpoint_state.derivative < 0.0f) {
+                lower = midpoint;
+            } else {
+                // Preserve a strict signed bracket around an isolated FP32
+                // zero.  A zero plateau has no unique ordinary D-D stationary
+                // pair and is rejected rather than selected arbitrarily.
+                const float left = nextafterf(midpoint, lower);
+                const float right = nextafterf(midpoint, upper);
+                const ReducedDdState left_state = reduced_dd_state(
+                    left, tx, rx, origin1, dir1, origin2, dir2);
+                const ReducedDdState right_state = reduced_dd_state(
+                    right, tx, rx, origin1, dir1, origin2, dir2);
+                bracketed =
+                    left < midpoint && midpoint < right &&
+                    left_state.regular && right_state.regular &&
+                    left_state.derivative < 0.0f &&
+                    right_state.derivative > 0.0f;
+                if (bracketed) {
+                    lower = left;
+                    upper = right;
+                }
+                break;
+            }
         }
+
+        const ReducedDdState final_lower_state = reduced_dd_state(
+            lower, tx, rx, origin1, dir1, origin2, dir2);
+        const ReducedDdState final_upper_state = reduced_dd_state(
+            upper, tx, rx, origin1, dir1, origin2, dir2);
+        const bool conservative_bracket =
+            bracketed &&
+            lower > kGeometryEpsilon && upper < length2 - kGeometryEpsilon &&
+            lower < upper &&
+            final_lower_state.regular && final_upper_state.regular &&
+            final_lower_state.derivative < 0.0f &&
+            final_upper_state.derivative > 0.0f &&
+            final_lower_state.parameter1 > kGeometryEpsilon &&
+            final_lower_state.parameter1 < length1 - kGeometryEpsilon &&
+            final_upper_state.parameter1 > kGeometryEpsilon &&
+            final_upper_state.parameter1 < length1 - kGeometryEpsilon;
+        const float parameter2 = lower + 0.5f * (upper - lower);
+        const ReducedDdState solution_state = reduced_dd_state(
+            parameter2, tx, rx, origin1, dir1, origin2, dir2);
+        const float parameter1 = solution_state.parameter1;
+        const float3 q1 = solution_state.q1;
+        const float3 q2 = solution_state.q2;
 
         const bool inside1 = isfinite(parameter1) && parameter1 > kGeometryEpsilon &&
                              parameter1 < length1 - kGeometryEpsilon;
@@ -288,13 +406,51 @@ __global__ void coupled_dd_prepare_kernel(
         const bool finite_points =
             isfinite(q1.x) && isfinite(q1.y) && isfinite(q1.z) &&
             isfinite(q2.x) && isfinite(q2.y) && isfinite(q2.z);
-        // All three segment directions (tx->Q1, Q1->Q2, Q2->rx) must be
-        // well-defined; a degenerate zero-length leg has no diffraction cone.
-        const bool segments_defined =
-            length3(sub3(q1, tx)) > kGeometryEpsilon &&
-            length3(sub3(q2, q1)) > kGeometryEpsilon &&
-            length3(sub3(rx, q2)) > kGeometryEpsilon;
-        const bool valid = inside1 && inside2 && finite_points && segments_defined;
+        // The three sequential UTD operators share RayD's ordinary-leg domain.
+        // kGeometryEpsilon remains solely the finite-edge interior tolerance;
+        // visibility owns its own trace bias downstream.
+        const float incoming_length = length3(sub3(q1, tx));
+        const float middle_length = length3(sub3(q2, q1));
+        const float outgoing_length = length3(sub3(rx, q2));
+        const bool legs_in_utd_domain =
+            isfinite(incoming_length) &&
+            incoming_length > utd::UTD_MIN_DISTANCE &&
+            isfinite(middle_length) &&
+            middle_length > utd::UTD_MIN_DISTANCE &&
+            isfinite(outgoing_length) &&
+            outgoing_length > utd::UTD_MIN_DISTANCE;
+        const float local_scale = fmaxf(
+            fmaxf(length1, length2),
+            fmaxf(incoming_length, fmaxf(middle_length, outgoing_length)));
+        const float position_tolerance =
+            kDoubleDiffractionPositionUlps * FLT_EPSILON * local_scale;
+        const float edge1_bracket_span = length3(
+            sub3(final_upper_state.q1, final_lower_state.q1));
+        const float edge2_bracket_span = upper - lower;
+        // A signed convex bracket proves that the root exists; its image width
+        // gives a direct bound on the two physical interaction positions.  It
+        // is not replaced by a replay through the sequential line maps: that
+        // replay has its own FP32 error and is not a root-location certificate.
+        const bool position_resolved =
+            isfinite(position_tolerance) && position_tolerance > 0.0f &&
+            isfinite(edge1_bracket_span) &&
+            edge1_bracket_span <= position_tolerance &&
+            isfinite(edge2_bracket_span) &&
+            edge2_bracket_span <= position_tolerance;
+        const bool stationary_root_certified = position_resolved;
+        const bool physical_domain =
+            conservative_bracket && inside1 && inside2 && finite_points &&
+            solution_state.regular && legs_in_utd_domain;
+        if (physical_domain && !stationary_root_certified) {
+            active[index] = false;
+            store3(edge1_point, index, make_float3(NAN, NAN, NAN));
+            store3(edge2_point, index, make_float3(NAN, NAN, NAN));
+            CUDA_KERNEL_ASSERT(
+                false &&
+                "coupled D-D bisection violated stationary-root certificate");
+            continue;
+        }
+        const bool valid = physical_domain && stationary_root_certified;
         active[index] = valid;
         store3(edge1_point, index, valid ? q1 : make_float3(NAN, NAN, NAN));
         store3(edge2_point, index, valid ? q2 : make_float3(NAN, NAN, NAN));

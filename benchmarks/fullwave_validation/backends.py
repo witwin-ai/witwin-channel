@@ -33,7 +33,11 @@ def solve_deterministic(spec: CaseSpec) -> FieldMap:
             # _COMPONENTS), so degenerate low-depth cases stay valid.
             coupled_paths=spec.max_depth >= 2,
             coupled_candidate_limit=1_000_000,
+            # Boundary audit contract: ADR-017's visual taper must not hide
+            # an ISB/RSB topology or coefficient discontinuity.
+            isb_boundary_taper=False,
         ),
+        reference_frequency_hz=spec.frequency_hz,
     )
     field = result.field.detach().cpu().numpy()
     if field.shape != (1, spec.y.size, spec.x.size):
@@ -55,6 +59,8 @@ def solve_deterministic(spec: CaseSpec) -> FieldMap:
             "frequency_hz": spec.frequency_hz,
             "components": sorted(_COMPONENTS),
             "max_depth": spec.max_depth,
+            "isb_boundary_taper": False,
+            "isb_boundary_taper_effective_width": 0.0,
             "path_count": int(result.metadata["counts"]["path_count"]),
         },
     )
