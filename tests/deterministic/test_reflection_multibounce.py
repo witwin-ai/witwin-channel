@@ -9,7 +9,7 @@ from tests.support.core_world import (
 from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
 from witwin.channel.kernels import fields as field_kernels
-from witwin.channel.propagation.enumerated import reflection as topology
+from witwin.channel.interactions import reflection as topology
 from witwin.channel.propagation.geometry import reevaluate as topology_geometry
 from witwin.channel.propagation.topology.export import evaluated_paths_from_block
 from witwin.channel.path import Config as PathConfig

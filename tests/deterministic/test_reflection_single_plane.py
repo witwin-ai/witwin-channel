@@ -6,7 +6,7 @@ from tests.support.scenes import same_side_wall_reflection_scene
 from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
 from witwin.channel.kernels import fields as field_kernels
-from witwin.channel.propagation.enumerated import reflection as topology
+from witwin.channel.interactions import reflection as topology
 from witwin.channel.path import Config as PathConfig
 from witwin.channel.path import solve as solve_paths
 

@@ -5,13 +5,7 @@ import hashlib
 from pathlib import Path
 
 from ci import check_import_graph as graph
-from witwin.channel.propagation.enumerated import diffraction
-from witwin.channel.propagation.geometry import (
-    diffraction as geometry_diffraction,
-)
-from witwin.channel.propagation.topology.discovery import (
-    diffraction as discovery,
-)
+from witwin.channel.interactions import diffraction
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -20,10 +14,15 @@ PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
 # ``witwin.channel.kernels.geometry``: the only AST difference is the module
 # alias the native plan call is spelled through (``geometry_bridge`` ->
 # ``geometry_kernels``). Control flow, arguments and evaluation order are
-# unchanged.
+# unchanged. The concept-axis move that merged the discovery, geometry and
+# enumerated halves into ``witwin.channel.interactions.diffraction`` is pure
+# code motion, so the digest carries over untouched.
 _DIGESTS = {
     "plan_tx_visible_diffraction_states": "77cc58aea3a87b52b1d039624fc85c5f61e2ad435ab6d66424f578098727a271",
 }
+
+# The single concept module that must define every diffraction owner below.
+OWNER_MODULE = "witwin.channel.interactions.diffraction"
 
 
 def _digest(module, name: str) -> str:
@@ -39,39 +38,28 @@ def _digest(module, name: str) -> str:
 
 
 def test_diffraction_owner_identity_module_and_constant():
-    assert diffraction._deterministic_diffraction_states.__module__ == (
-        diffraction.__name__
-    )
-    assert diffraction._diffraction_topology_order1.__module__ == diffraction.__name__
-    assert diffraction.plan_tx_visible_diffraction_states is (
-        geometry_diffraction.plan_tx_visible_diffraction_states
-    )
-    assert geometry_diffraction.plan_tx_visible_diffraction_states.__module__ == (
-        geometry_diffraction.__name__
-    )
+    assert diffraction.__name__ == OWNER_MODULE
+    # Discovery, geometry and enumerated orchestration are one module now, so
+    # "exactly one owner" is checked by defining module rather than by object
+    # identity across three modules. A resurrected duplicate definition in any
+    # other module would fail this the same way the old identity check did.
+    for name in (
+        "_deterministic_diffraction_states",
+        "_diffraction_topology_order1",
+        "plan_tx_visible_diffraction_states",
+        "prepare_diffraction_order1_plan",
+        "iter_diffraction_tx_requests",
+        "iter_diffraction_rx_chunk_requests",
+        "query_diffraction_edges",
+        "query_diffraction_order1",
+    ):
+        assert getattr(diffraction, name).__module__ == OWNER_MODULE
     assert (
-        _digest(geometry_diffraction, "plan_tx_visible_diffraction_states")
+        _digest(diffraction, "plan_tx_visible_diffraction_states")
         == _DIGESTS["plan_tx_visible_diffraction_states"]
     )
     assert not hasattr(diffraction, "_tx_visible_diffraction_states")
-    assert not hasattr(geometry_diffraction, "_tx_visible_diffraction_states")
     assert not hasattr(diffraction, "_DIFFRACTION_PREFILTER_EDGE_FRACTIONS")
-    assert not hasattr(geometry_diffraction, "_DIFFRACTION_PREFILTER_EDGE_FRACTIONS")
-    assert diffraction.prepare_diffraction_order1_plan is (
-        discovery.prepare_diffraction_order1_plan
-    )
-    assert diffraction.iter_diffraction_tx_requests is (
-        discovery.iter_diffraction_tx_requests
-    )
-    assert diffraction.iter_diffraction_rx_chunk_requests is (
-        discovery.iter_diffraction_rx_chunk_requests
-    )
-    assert diffraction.query_diffraction_edges is (
-        geometry_diffraction.query_diffraction_edges
-    )
-    assert diffraction.query_diffraction_order1 is (
-        geometry_diffraction.query_diffraction_order1
-    )
 
 
 def test_diffraction_consumers_use_named_geometry_and_canonical_event_order():
@@ -141,14 +129,8 @@ def test_diffraction_owner_has_no_core_path_dependency_or_scc():
     adjacency: dict[str, set[str]] = {}
     for edge in edges:
         adjacency.setdefault(edge.source, set()).add(edge.target)
-    owners = {
-        "witwin.channel.propagation.enumerated.diffraction",
-        "witwin.channel.propagation.geometry.diffraction",
-        "witwin.channel.propagation.topology.discovery.diffraction",
-    }
-    discovery_owner = (
-        "witwin.channel.propagation.topology.discovery.diffraction"
-    )
+    owners = {OWNER_MODULE}
+    assert owners <= set(adjacency), "the diffraction owner module vanished"
     for owner in owners:
         assert core not in adjacency.get(owner, set())
         pending = [owner]
@@ -160,6 +142,4 @@ def test_diffraction_owner_has_no_core_path_dependency_or_scc():
             seen.add(current)
             pending.extend(adjacency.get(current, ()))
         assert core not in seen
-        if owner == "witwin.channel.propagation.geometry.diffraction":
-            assert discovery_owner not in seen
     assert not hasattr(diffraction, "_rayd_visibility_mask")

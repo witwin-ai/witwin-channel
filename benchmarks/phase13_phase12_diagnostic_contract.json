@@ -32,7 +32,7 @@
       "arrays": ["distance", "penetrated", "transmittance", "wall_count"]
     },
     "diffraction": {
-      "callable": "witwin.channel.propagation.enumerated.diffraction._diffraction_topology_order1",
+      "callable": "witwin.channel.interactions.diffraction._diffraction_topology_order1",
       "variants": {
         "baseline": {"mode": "old_compact_atomic_target", "source_lane_available": false},
         "candidate": {"mode": "source_lane_pair_reduce", "source_lane_available": true}

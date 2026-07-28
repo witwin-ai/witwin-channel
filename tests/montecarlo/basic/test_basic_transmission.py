@@ -28,7 +28,7 @@ from witwin.core import (
 )
 from witwin.channel.deployment import build_info
 from witwin.channel.montecarlo.basic import Config, solve as solve_basic
-from witwin.channel.montecarlo.basic import pipeline as basic_pipeline
+from witwin.channel.montecarlo import basic as mc_basic
 from tests.reference.em_oracle import layer_stack_rt
 from witwin.channel.runtime import CapacityFailureBit, SolveCapacityTransaction
 
@@ -304,8 +304,8 @@ def test_transmission_solve_shares_exact_failure_state_through_final_terminal(
     monkeypatch: pytest.MonkeyPatch,
 ):
     _require_native()
-    original_component = basic_pipeline.transmission_component_map
-    original_sanitize = basic_pipeline.mc_capacity_failure_component_maps_sanitize
+    original_component = mc_basic.transmission_component_map
+    original_sanitize = mc_basic.mc_capacity_failure_component_maps_sanitize
     observed = {}
 
     def component(*args, failure_state, **kwargs):
@@ -319,9 +319,9 @@ def test_transmission_solve_shares_exact_failure_state_through_final_terminal(
     def terminal(transaction: SolveCapacityTransaction) -> None:
         observed["terminal"] = transaction.failure_state
 
-    monkeypatch.setattr(basic_pipeline, "transmission_component_map", component)
+    monkeypatch.setattr(mc_basic, "transmission_component_map", component)
     monkeypatch.setattr(
-        basic_pipeline,
+        mc_basic,
         "mc_capacity_failure_component_maps_sanitize",
         sanitize,
     )

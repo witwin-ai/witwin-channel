@@ -85,8 +85,8 @@ field_source_amplitude_scale_jvp(tx_power, tangent_field_vector)
 ```
 
 in `native/channel/kernels/field_source_amplitude.cu`, with the Python owner
-`witwin.channel.propagation.fields.kernels.source_amplitude`, which holds both
-the three native facades and the differentiable wrapper.
+`witwin.channel.kernels.fields`, which holds both the three native facades and
+the differentiable wrapper.
 
 Two properties make this a contained addition rather than a second physics
 owner:

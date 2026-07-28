@@ -6,9 +6,10 @@ from pathlib import Path
 
 from ci import check_import_graph as graph
 from witwin.channel import deterministic as deterministic_module
-from witwin.channel.montecarlo.bdpt import pipeline as bdpt_pipeline
+from witwin.channel.montecarlo import bdpt as bdpt_pipeline
 from witwin.channel import path as path_module
-from witwin.channel.propagation.enumerated import engine, transmission
+from witwin.channel.interactions import transmission
+from witwin.channel.propagation.enumerated import engine
 from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel.propagation.penetration import (
     SegmentPenetrationPolicy,

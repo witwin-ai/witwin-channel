@@ -87,15 +87,15 @@ _LIVE_TOP_LEVEL = (
 )
 _TRIANGLE_VERTEX_V2_LINES = {
     (
-        "src/witwin/channel/montecarlo/events/scattering.py",
+        "src/witwin/channel/interactions/scattering.py",
         "v2 = vertices.index_select(0, faces[:, 2])",
     ),
     (
-        "src/witwin/channel/montecarlo/events/scattering.py",
+        "src/witwin/channel/interactions/scattering.py",
         "areas = 0.5 * torch.linalg.cross(v1 - v0, v2 - v0).norm(dim=-1)",
     ),
     (
-        "src/witwin/channel/montecarlo/events/scattering.py",
+        "src/witwin/channel/interactions/scattering.py",
         "+ b2 * v2.index_select(0, chosen)",
     ),
     (

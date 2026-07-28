@@ -7,7 +7,7 @@ so gradients reach frequency, the resident Kirchhoff BSDF table values, and the
 phase-screen heights, and the total gradient stops silently dropping the
 scattering component.
 
-The wiring under test (``propagation/enumerated/scattering.py`` building ``coef``
+The wiring under test (``interactions/scattering.py`` building ``coef``
 / ``k0`` / ``amplitude_scale`` as Torch scalars and selecting the ``_ad``
 wrappers when ``ad_mode != "none"``) is authored in parallel; these tests fail
 loudly if it is missing or detaches a differentiable input. FD steps/tolerances

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from ci import check_import_graph
 from witwin.channel.kernels import montecarlo as mc_sampling
-from witwin.channel.propagation.enumerated import reflection
+from witwin.channel.interactions import reflection
 from witwin.channel.propagation import topology
 from witwin.channel.kernels import topology as topology_kernels
 from witwin.channel import runtime

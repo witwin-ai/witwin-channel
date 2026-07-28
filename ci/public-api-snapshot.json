@@ -118,20 +118,20 @@
         {
           "name": "Config",
           "kind": "class",
-          "target": "witwin.channel.montecarlo.basic.config.Config",
-          "contract_sha256": "92fce6826e4b8bf4b5f56b518aba28a69a8961dc52fa09c509fd537c27a65ee6"
+          "target": "witwin.channel.montecarlo.basic.Config",
+          "contract_sha256": "f14655e0720f7eea08382272eac5163c13acee66a117c61f45551e22a91dcc8d"
         },
         {
           "name": "Result",
           "kind": "class",
-          "target": "witwin.channel.montecarlo.basic.result.Result",
-          "contract_sha256": "7c2670bba43b9e4918d6e55adcdfd616c8c0238d89e9170ad0d5ca0846cf3008"
+          "target": "witwin.channel.montecarlo.basic.Result",
+          "contract_sha256": "b1a09b4335e1156f2b36b15b29b9619eda6facd00d1e83f387efaa045bfaec5f"
         },
         {
           "name": "solve",
           "kind": "function",
-          "target": "witwin.channel.montecarlo.basic.solver.solve",
-          "contract_sha256": "dcef2cb4f297c00b8dd7fdb0d6873da7e212eafa4264fee6616a64c71846112c",
+          "target": "witwin.channel.montecarlo.basic.solve",
+          "contract_sha256": "ad954d94f4023d6dd77ad7cdc766650e3268ae39e93c2c6bc2727f64738a9ec3",
           "signature": "(scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz)"
         }
       ]
@@ -142,26 +142,26 @@
         {
           "name": "BDPTPathSamples",
           "kind": "class",
-          "target": "witwin.channel.montecarlo.bdpt.result.BDPTPathSamples",
-          "contract_sha256": "36540bc086fac430b23fed36e9ae817db006f4ea3200d6fbcc599173ca5a1b83"
+          "target": "witwin.channel.montecarlo.bdpt.BDPTPathSamples",
+          "contract_sha256": "b2be9b6999d33f082208a6978d4a233a51903818c98230126636be4daee6dec6"
         },
         {
           "name": "Config",
           "kind": "class",
-          "target": "witwin.channel.montecarlo.bdpt.config.Config",
-          "contract_sha256": "ffbbbe270c9c01f54e0ae1d0568019e75311a095bf16e13e862c4cc5f7f74ae2"
+          "target": "witwin.channel.montecarlo.bdpt.Config",
+          "contract_sha256": "2373e516e1444532b6ae8d497d2d4c87e0b74d111d645bf883a396b2f5c737b8"
         },
         {
           "name": "Result",
           "kind": "class",
-          "target": "witwin.channel.montecarlo.bdpt.result.Result",
-          "contract_sha256": "b4e97fa73c7267e567d09942f6c16980d423d5de522077c41dcc9720e32f9f02"
+          "target": "witwin.channel.montecarlo.bdpt.Result",
+          "contract_sha256": "7ac7d1827cca37ddb33f69db9182ed750f4fc9c8b9bc2b80bc395bd69248c48f"
         },
         {
           "name": "solve",
           "kind": "function",
-          "target": "witwin.channel.montecarlo.bdpt.solver.solve",
-          "contract_sha256": "732b997661c0817ff6130d6dbeda8f6dce41cca0be2515f21d1b1e8ff472c9db",
+          "target": "witwin.channel.montecarlo.bdpt.solve",
+          "contract_sha256": "fb1e94860091be8697499679c05711daadd4a752ae2dd052874ba2745b48956b",
           "signature": "(scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz)"
         }
       ]

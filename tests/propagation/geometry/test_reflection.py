@@ -5,7 +5,7 @@ from dataclasses import FrozenInstanceError, fields
 import pytest
 import torch
 
-from witwin.channel.propagation.geometry import (
+from witwin.channel.interactions import (
     reflection as geometry_reflection,
 )
 

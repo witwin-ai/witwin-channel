@@ -9,7 +9,7 @@ import pytest
 import torch
 
 from witwin.channel import materials as materials_package
-from witwin.channel.montecarlo.basic import solver as mc_solver
+from witwin.channel.montecarlo import basic as mc_basic
 from witwin.channel import runtime
 
 
@@ -40,7 +40,7 @@ def test_frequency_and_material_guards_have_canonical_owners():
     frequency_guard = runtime._frequency_participates_in_ad
     material_guard = materials_package._require_frequency_ad_constant_materials
 
-    assert mc_solver._require_frequency_ad_constant_materials is material_guard
+    assert mc_basic._require_frequency_ad_constant_materials is material_guard
     assert frequency_guard.__module__ == runtime.__name__
     assert material_guard.__module__ == materials_package.__name__
     assert (
@@ -113,7 +113,6 @@ def test_material_guard_rejects_dependent_materials_for_forward_mode_frequency()
 
 def test_mc_frequency_material_guard_runs_before_build_info_and_native(monkeypatch):
     from witwin.core import Scene
-    from witwin.channel.montecarlo.basic import pipeline as mc_pipeline
 
     events: list[str] = []
     compiled = object()
@@ -141,25 +140,25 @@ def test_mc_frequency_material_guard_runs_before_build_info_and_native(monkeypat
         return call
 
     monkeypatch.setattr(
-        mc_solver, "validate_scalar_endpoint_features", lambda *a, **k: None
+        mc_basic, "validate_scalar_endpoint_features", lambda *a, **k: None
     )
-    monkeypatch.setattr(mc_solver, "_endpoint_views", lambda scene: ())
+    monkeypatch.setattr(mc_basic, "_endpoint_views", lambda scene: ())
     monkeypatch.setattr(
-        mc_solver, "_validate_scalar_endpoint_boundary", lambda views: None
+        mc_basic, "_validate_scalar_endpoint_boundary", lambda views: None
     )
     monkeypatch.setattr(
-        mc_solver,
+        mc_basic,
         "compile_scene",
         lambda *args, **kwargs: events.append("compile") or compiled,
     )
-    monkeypatch.setattr(mc_solver, "bind_solver_scene", lambda value: bound)
-    monkeypatch.setattr(mc_pipeline, "require_compiled", lambda scene: compiled)
+    monkeypatch.setattr(mc_basic, "bind_solver_scene", lambda value: bound)
+    monkeypatch.setattr(mc_basic, "require_compiled", lambda scene: compiled)
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
-    monkeypatch.setattr(mc_solver, "_require_frequency_ad_constant_materials", guard)
-    monkeypatch.setattr(mc_solver, "build_info", forbidden("build_info"))
-    monkeypatch.setattr(mc_solver, "make_cuda_generator", forbidden("native"))
+    monkeypatch.setattr(mc_basic, "_require_frequency_ad_constant_materials", guard)
+    monkeypatch.setattr(mc_basic, "build_info", forbidden("build_info"))
+    monkeypatch.setattr(mc_basic, "make_cuda_generator", forbidden("native"))
 
     with pytest.raises(NotImplementedError, match="frequency material guard"):
-        mc_solver.solve(Scene(), config, reference_frequency_hz=3.0e9)
+        mc_basic.solve(Scene(), config, reference_frequency_hz=3.0e9)
 
     assert events == ["compile", "guard"]

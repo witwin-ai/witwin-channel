@@ -7,10 +7,10 @@ import torch
 
 from tests.path.test_path_evaluated_paths import _evaluated_paths_fixture
 from witwin.channel import deterministic as deterministic_module
-from witwin.channel.montecarlo.bdpt import pipeline as bdpt_pipeline
-from witwin.channel.montecarlo.bdpt import solver as bdpt_solver
+from witwin.channel.montecarlo import bdpt as bdpt_pipeline
 from witwin.channel import path as path_module
-from witwin.channel.propagation.enumerated import engine, scattering
+from witwin.channel.interactions import scattering
+from witwin.channel.propagation.enumerated import engine
 
 
 def _function(module, name: str) -> ast.FunctionDef:
@@ -140,7 +140,7 @@ def test_capacity_sanitize_and_terminal_boundaries_follow_outer_result_work():
 
 
 def test_bdpt_consumes_the_typed_engine_without_a_mixed_export():
-    assert not hasattr(bdpt_solver, "export_topology")
+    assert not hasattr(bdpt_pipeline, "export_topology")
     tree = ast.parse(Path(bdpt_pipeline.__file__).read_text(encoding="utf-8"))
     imported_modules = {
         node.module

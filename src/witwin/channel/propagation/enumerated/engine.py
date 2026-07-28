@@ -12,21 +12,21 @@ from witwin.channel.scene.endpoints import require_compiled
 from witwin.channel.materials import (
     _require_frequency_ad_constant_materials,
 )
-from witwin.channel.propagation.enumerated.coupled import (
+from witwin.channel.interactions.coupled import (
     coupled_reflection_diffraction_topology,
 )
 from witwin.channel.propagation.enumerated.capacity import (
     sanitize_enumerated_capacity_transaction,
 )
-from witwin.channel.propagation.enumerated.diffraction import (
+from witwin.channel.interactions.diffraction import (
     _diffraction_topology_order1,
 )
-from witwin.channel.propagation.enumerated.los import _los_topology
-from witwin.channel.propagation.enumerated.reflection import (
+from witwin.channel.interactions.los import _los_topology
+from witwin.channel.interactions.reflection import (
     _reflection_topology_multibounce,
     _reflection_topology_order1,
 )
-from witwin.channel.propagation.enumerated.transmission import (
+from witwin.channel.interactions.transmission import (
     _transmission_topology,
 )
 from witwin.channel.propagation.fields.evaluation import evaluate_path_fields

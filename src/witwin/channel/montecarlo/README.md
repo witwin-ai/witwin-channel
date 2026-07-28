@@ -1,15 +1,16 @@
 # Monte Carlo domain
 
-This package contains the two Monte Carlo solver families and the event
-contracts they share. It is not itself a solver API: callers select either
-`witwin.channel.montecarlo.basic` or
+This package contains the two Monte Carlo solver families. It is not itself a
+solver API: callers select either `witwin.channel.montecarlo.basic` or
 `witwin.channel.montecarlo.bdpt`.
 
 ## Ownership
 
-- `basic/` owns the incoherent Monte Carlo power-map solver, including its
-  configuration, result type, orchestration, sampling, metadata, and
-  solver-local kernel facades.
+- `basic.py` owns the incoherent Monte Carlo power-map solver, including its
+  configuration, result type, orchestration, sampling, and metadata. It is one
+  module: the former package's `__init__` re-export facade is gone with the
+  package that held it, and its native facades live in
+  `witwin.channel.kernels`.
   Its live ADR-027 wall-product primal/VJP/JVP facade consumes fixed RayD
   penetration storage and the solve-owned failure state after one flattened
   `MonteCarloTargetInset` traversal batch.
@@ -24,11 +25,18 @@ contracts they share. It is not itself a solver API: callers select either
   scalar reads, is measurement-required optimization debt: compare E2E
   latency, peak memory, steady throughput, synchronization cost, and result
   exactness before changing production semantics.
-- `bdpt/` owns bidirectional path tracing, including subpaths, connections,
-  MIS, optional path-sample export, accumulation, and its solver-local kernel
-  facades. Its package loads `solve` lazily to keep the public import light.
-- `events/` (`transmission.py`, `scattering.py`) owns only event rules
-  genuinely shared by both solvers. It must not become a second solver
+- `bdpt.py` owns bidirectional path tracing, including subpaths, connections,
+  MIS, optional path-sample export, accumulation, and the per-solve workspace.
+  It is one module: the former package's lazy `solve` re-export is gone with
+  the `__init__` that held it, and its native facades live in
+  `witwin.channel.kernels`.
+- The event rules both solvers share are NOT owned here. The former `events/`
+  package held specular-transmission and Kirchhoff scattering event physics
+  that an enumerated caller consumed as well, so it was never a Monte Carlo
+  concept; it now lives with its concepts, in
+  `witwin.channel.interactions.transmission` and
+  `witwin.channel.interactions.scattering`. Both solvers import those helpers
+  read-only. Neither that package nor this one may grow a second solver
   pipeline.
 - Scene compilation, material encoding, propagation primitives, and native
   symbol loading remain owned by their respective top-level domains.
@@ -45,18 +53,20 @@ The stable, snapshotted entry points are:
 - `witwin.channel.montecarlo.bdpt.Result`
 - `witwin.channel.montecarlo.bdpt.solve(scene, config)`
 
-`pipeline.py`, `backend.py`, `endpoints.py`, `connections.py`,
-`accumulation.py`, `subpaths.py`, `mis.py`, `sampling.py`, and each `kernels/`
-package are internal entry points. Their
-names may be used by focused contract tests, but are not compatibility
-promises. The parent `montecarlo` package exports no solver symbols.
+Everything else each solver defines is internal. `basic.py` and `bdpt.py` are
+each one module now, so the former `pipeline.py`, `backend.py`, `endpoints.py`,
+`connections.py`, `accumulation.py`, `subpaths.py`, `mis.py`, `sampling.py` and
+per-solver `kernels/` packages no longer exist as import paths; the names they
+defined are still there, as members of the collapsed module. Those names may be
+used by focused contract tests, but are not compatibility promises. The parent
+`montecarlo` package exports no solver symbols.
 
 ## Dependency rules
 
 - Basic and BDPT are sibling owners. Neither solver may import the other or
   any other solver package.
 - Basic must not call `witwin.channel.propagation.enumerated`. Under the
-  narrow ADR-008 exception, `montecarlo.bdpt.pipeline` may call only the public
+  narrow ADR-008 exception, `montecarlo.bdpt` may call only the public
   `evaluate_enumerated_paths` entry read-only as an opaque discrete-path oracle;
   it must not import enumerated internals or add BDPT policy to that engine.
 - Orchestration may use public scene, material, geometry, topology, and field

@@ -5,7 +5,8 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from witwin.channel.propagation.enumerated import engine, transmission
+from witwin.channel.interactions import transmission
+from witwin.channel.propagation.enumerated import engine
 from witwin.channel.propagation.penetration import (
     SegmentPenetrationPolicy,
 )

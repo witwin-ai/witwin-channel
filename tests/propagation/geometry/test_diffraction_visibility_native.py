@@ -5,10 +5,10 @@ import torch
 
 from tests.support.scenes import wedge_diffraction_scene
 from witwin.channel.deployment import build_info
-from witwin.channel.propagation.enumerated.diffraction import (
+from witwin.channel.interactions import diffraction
+from witwin.channel.interactions.diffraction import (
     _deterministic_diffraction_states,
 )
-from witwin.channel.propagation.geometry import diffraction
 from witwin.channel.kernels import geometry
 from witwin.channel.scene import compile as compile_scene
 

@@ -177,12 +177,10 @@ def _montecarlo() -> tuple[dict[str, torch.Tensor], dict[str, object]]:
 def _diffraction(
     variant: str, munich_scene_xml: Path, sionna_source_root: Path
 ) -> tuple[dict[str, torch.Tensor], dict[str, object]]:
-    from witwin.channel.propagation.enumerated.diffraction import (
+    from witwin.channel.interactions.diffraction import (
+        DiffractionOrder1Query,
         _deterministic_diffraction_states,
         _diffraction_topology_order1,
-    )
-    from witwin.channel.propagation.geometry.diffraction import (
-        DiffractionOrder1Query,
         plan_tx_visible_diffraction_states,
         query_diffraction_order1,
     )
@@ -191,7 +189,7 @@ def _diffraction(
         receiver_positions,
         transmitter_positions,
     )
-    from witwin.channel.propagation.topology.discovery.diffraction import (
+    from witwin.channel.interactions.diffraction import (
         prepare_diffraction_order1_plan,
     )
 
@@ -211,7 +209,7 @@ def _diffraction(
 
     from witwin.channel.field_state import transmitter_polarizations as field_polarizations
     from witwin.channel.materials import face_material_tensors
-    from witwin.channel.propagation.geometry.diffraction import DiffractionPathLayout
+    from witwin.channel.interactions.diffraction import DiffractionPathLayout
     from witwin.channel.runtime import create_capacity_failure_state
 
     face_eps_r, face_sigma_e, face_mu_r, material_gain, material_valid = (

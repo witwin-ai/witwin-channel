@@ -22,7 +22,7 @@ from tests.support.core_world import (
 from witwin.channel.deployment import build_info
 from witwin.core import MaterialLayer, PhysicalMaterial, SurfaceRoughness
 from witwin.channel.montecarlo.bdpt import Config, solve
-from witwin.channel.montecarlo.events.scattering import (
+from witwin.channel.interactions.scattering import (
     sample_scatter_directions,
     scatter_direction_uniforms,
 )

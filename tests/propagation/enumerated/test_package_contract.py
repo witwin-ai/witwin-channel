@@ -8,8 +8,9 @@ from types import SimpleNamespace
 import pytest
 import torch
 
+from witwin.channel.interactions import scattering
 from witwin.channel.propagation import enumerated
-from witwin.channel.propagation.enumerated import contracts, scattering
+from witwin.channel.propagation.enumerated import contracts
 from witwin.channel.propagation.rows import (
     EvaluatedPaths,
     PathFields,
@@ -174,7 +175,37 @@ def _install_row_collector(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_enumerated_package_has_no_scattering_barrel_facade():
     assert enumerated.__all__ == []
     assert not hasattr(enumerated, "append_scattering_paths")
-    assert scattering.__all__ == ["append_scattering_evaluated_paths"]
+    # The concept axis merged the four former enumerated scattering modules and
+    # the shared MC scattering events into one owner, so this module's __all__
+    # is the union of the names those files already published. No name was
+    # added, renamed or dropped.
+    assert scattering.__all__ == [
+        "ChainSamples",
+        "KMAX_AD_DEPTH",
+        "MASK_SCATTERING",
+        "SCATTERING_COMPONENT_ID",
+        "SCATTERING_EVENT_TYPE",
+        "RoughMaterialRuntime",
+        "ScatterChainDiscovery",
+        "append_chain_scattering_paths",
+        "append_scattering_evaluated_paths",
+        "build_chain_samples",
+        "discover_scatter_chains",
+        "eval_bsdf_rows",
+        "local_frames",
+        "solid_angle_to_area_jacobian",
+        "local_to_world",
+        "rough_material_runtimes",
+        "sample_scatter_directions",
+        "scatter_carried_incident_power",
+        "scatter_direction_uniforms",
+        "scattered_subpath_state",
+        "scattering_map_matrix",
+        "scattering_nee_connection_samples",
+        "te_tm_incident_power",
+        "three_way_rough_probabilities",
+        "world_to_local",
+    ]
 
 
 def test_scattering_has_one_typed_concatenation_owner():

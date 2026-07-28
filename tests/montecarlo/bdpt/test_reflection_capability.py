@@ -3,7 +3,7 @@ import torch
 
 from tests.support.scenes import single_wall_reflection_scene
 from witwin.channel.montecarlo.bdpt import Config, solve
-import witwin.channel.montecarlo.bdpt.solver as bdpt_solver
+import witwin.channel.montecarlo.bdpt as bdpt_solver
 
 
 def test_bdpt_reflection_errors_when_capability_missing(monkeypatch):

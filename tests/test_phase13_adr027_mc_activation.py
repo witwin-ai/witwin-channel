@@ -31,6 +31,22 @@ def _json(path: Path) -> dict[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _basic_section(title: str) -> str:
+    """One section of the collapsed Monte Carlo basic solver module.
+
+    ``montecarlo/basic.py`` concatenates the former package's modules behind
+    ``# --- <title> ---`` rules, so an assertion that used to bound one file
+    bounds the corresponding section instead.
+    """
+
+    source = (ROOT / "src/witwin/channel/montecarlo/basic.py").read_text(
+        encoding="utf-8"
+    )
+    start = source.index(f"\n# --- {title} ")
+    end = source.find("\n# --- ", start + 1)
+    return source[start : end if end != -1 else len(source)]
+
+
 def test_phase_m_native_symbols_have_live_owners_and_complete_coverage() -> None:
     binding = _json(BINDING_MANIFEST)
     coverage = _json(COVERAGE_MANIFEST)
@@ -63,13 +79,26 @@ def test_phase_m_native_symbols_have_live_owners_and_complete_coverage() -> None
         assert "wip" not in symbol.casefold()
 
 
+def _transmission_events_section() -> str:
+    """The shared Monte Carlo event section of the merged transmission owner.
+
+    The concept axis merged ``montecarlo/events/transmission.py`` into
+    ``interactions/transmission.py``, so the assertions that used to bound that
+    whole file bound the section it became. Slicing keeps the enumerated
+    discovery owner above it out of scope, exactly as a separate file did.
+    """
+
+    source = (ROOT / "src/witwin/channel/interactions/transmission.py").read_text(
+        encoding="utf-8"
+    )
+    return source[
+        source.index("# Shared Monte Carlo specular-transmission events (was") :
+    ]
+
+
 def test_phase_m_removes_python_torch_penetration_and_wall_product_route() -> None:
-    events = (
-        ROOT / "src/witwin/channel/montecarlo/events/transmission.py"
-    ).read_text(encoding="utf-8")
-    component = (
-        ROOT / "src/witwin/channel/montecarlo/basic/rayd_components.py"
-    ).read_text(encoding="utf-8")
+    events = _transmission_events_section()
+    component = _basic_section("RayD component maps")
 
     assert events.count("rayd_segment_penetration_forward(") == 1
     assert events.count("rayd_segment_penetration_ad(") == 1
@@ -95,9 +124,7 @@ def test_phase_m_removes_python_torch_penetration_and_wall_product_route() -> No
 
 
 def test_phase_m_pipeline_has_one_transaction_sanitizer_and_terminal_order() -> None:
-    source = (
-        ROOT / "src/witwin/channel/montecarlo/basic/pipeline.py"
-    ).read_text(encoding="utf-8")
+    source = _basic_section("Shared solve pipeline")
 
     create = source.index("create_solve_capacity_transaction(")
     transmission = source.index("transmission_component_map(")
@@ -120,9 +147,7 @@ def test_phase_m_pipeline_has_one_transaction_sanitizer_and_terminal_order() -> 
     ):
         assert forbidden not in source
 
-    metadata = (
-        ROOT / "src/witwin/channel/montecarlo/basic/metadata.py"
-    ).read_text(encoding="utf-8")
+    metadata = _basic_section("Solver metadata")
     assert "per transmitter" not in metadata
     assert (
         "per layer-stack evaluation inside the transmission chain march" not in metadata

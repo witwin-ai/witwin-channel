@@ -23,17 +23,16 @@ from tests.support.core_world import (
 from witwin.channel.scene import compile as compile_scene
 from witwin.channel.scene.endpoints import bind_solver_scene
 from tests.support.scenes import rough_wall_structure
-from witwin.channel.propagation.enumerated import scattering as scattering_mod
-from witwin.channel.propagation.enumerated import scattering_chain as sc
-
-# ADR-021 refactor: the chain-append path (topology slots, ensemble scatter face
-# selection) moved out of scattering.py into scattering_chain_append.py to meet
-# the file-size maintenance budget; the single-bounce path stays in scattering.
-from witwin.channel.propagation.enumerated import (
-    scattering_chain_append as scattering_append,
-)
+from witwin.channel.interactions import scattering as scattering_mod
 from witwin.channel.deterministic import Config as DeterministicConfig
 from witwin.channel.path import Config as PathConfig
+
+# Plan-15 phase 5 gathered the single-bounce path, the ADR-021 D1 chain
+# discovery and the chain append path into one concept module. The two aliases
+# below still name the stage each assertion belongs to; they are the same
+# module object.
+sc = scattering_mod
+scattering_append = scattering_mod
 
 
 _D = sc.KMAX_AD_DEPTH

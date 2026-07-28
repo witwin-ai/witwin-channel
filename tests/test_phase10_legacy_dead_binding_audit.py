@@ -205,10 +205,7 @@ def test_phase10_bdpt_native_diffraction_component_maps_is_removed_exactly() -> 
         for item in audit["zero_reference_candidates"]
         if item["name"] == "_native_diffraction_component_maps"
     )
-    pipeline_path = (
-        REPOSITORY_ROOT
-        / "src/witwin/channel/montecarlo/bdpt/pipeline.py"
-    )
+    pipeline_path = REPOSITORY_ROOT / "src/witwin/channel/montecarlo/bdpt.py"
     tree = ast.parse(pipeline_path.read_text(encoding="utf-8-sig"))
     top_level_names = {
         node.name

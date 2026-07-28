@@ -92,7 +92,7 @@ outside the hot path (result assembly, refusal checks); it is never physics.
 |---|---|---|---|---|---|---|---|
 | discovery/diffraction | every leaf | jvp | REF | host-declaration | src/witwin/channel/propagation/consumer/contracts.py:766 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_diffraction_ad_is_refused_before_any_native_work | refusal |
 | discovery/diffraction | every leaf | vjp | REF | host-declaration | src/witwin/channel/propagation/consumer/contracts.py:766 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_diffraction_ad_is_refused_before_any_native_work | refusal |
-| discovery/diffraction | primal reachability | none | REF | host-declaration | src/witwin/channel/propagation/enumerated/diffraction.py:177 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_the_diffraction_primal_defect_is_pinned_rather_than_fixed | refusal |
+| discovery/diffraction | primal reachability | none | REF | host-declaration | src/witwin/channel/interactions/diffraction.py:469 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_the_diffraction_primal_defect_is_pinned_rather_than_fixed | refusal |
 
 ### 2.6 Higher order
 
@@ -163,7 +163,7 @@ Each entry is a `DECL` or a recorded gap, with the reason and the follow-up.
 - **Diffraction through `consumer.evaluate` (primal).**
   `service._solver_scene` builds `SolverScene(transmitters=(), receivers=())`
   because the consumer takes explicit endpoint batches, while
-  `enumerated/diffraction.py:177` indexes `tx_polarizations[tx_index]`. The
+  `interactions/diffraction.py:469` indexes `tx_polarizations[tx_index]`. The
   result is an `IndexError` at every AD mode including `none`. ADR-043
   deliberately does not fix it: it is a primal reachability defect, and fixing
   it would silently re-open an AD column nobody has validated. The failure is

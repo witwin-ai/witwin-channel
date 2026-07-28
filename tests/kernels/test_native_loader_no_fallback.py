@@ -1,3 +1,4 @@
+import ast
 import inspect
 from pathlib import Path
 
@@ -196,15 +197,18 @@ def test_native_kernels_do_not_use_aten_compute_or_cpu_tensor_readback():
 
 def test_mc_bdpt_hot_paths_do_not_make_python_layout_copies():
     repo = Path(__file__).resolve().parents[2]
+    # Each solver is either a collapsed single module or a package directory;
+    # a missing directory would make this gate pass vacuously.
     roots = (
-        repo / "src" / "witwin" / "channel" / "montecarlo" / "basic",
-        repo / "src" / "witwin" / "channel" / "montecarlo" / "bdpt",
+        repo / "src" / "witwin" / "channel" / "montecarlo" / "basic.py",
+        repo / "src" / "witwin" / "channel" / "montecarlo" / "bdpt.py",
     )
     forbidden = (".contiguous(", ".reshape(")
 
     offenders: list[str] = []
     for root in roots:
-        for path in root.rglob("*.py"):
+        assert root.exists(), root
+        for path in (root,) if root.is_file() else root.rglob("*.py"):
             source = path.read_text()
             for token in forbidden:
                 if token in source:
@@ -227,44 +231,49 @@ def test_path_solver_uses_the_typed_enumerated_engine():
 
 def test_mc_bdpt_hot_paths_do_not_make_python_empty_wedge_sentinels():
     repo = Path(__file__).resolve().parents[2]
+    montecarlo = repo / "src" / "witwin" / "channel" / "montecarlo"
+    basic = montecarlo / "basic.py"
+    bdpt = montecarlo / "bdpt.py"
+    # BDPT is one module now. This gate is about its endpoint subpath and
+    # workspace stage - the former ``bdpt/workspace.py`` - so it reads exactly
+    # the definitions that file owned rather than the whole module, which
+    # legitimately builds an empty exported path-sample result elsewhere.
+    workspace_members = frozenset(
+        {
+            "_SolvePrep",
+            "_EndpointWorkspace",
+            "_accumulate_connection_samples",
+            "_reduced_light_endpoint_state",
+            "_live_tx_power",
+            "_build_endpoint_subpaths",
+        }
+    )
+    bdpt_source = bdpt.read_text()
+    selected = [
+        ast.get_source_segment(bdpt_source, node)
+        for node in ast.parse(bdpt_source).body
+        if getattr(node, "name", None) in workspace_members
+    ]
+    assert len(selected) == len(workspace_members)
+
     targets = (
-        repo
-        / "src"
-        / "witwin"
-        / "channel"
-        / "montecarlo"
-        / "basic"
-        / "backend.py",
-        repo
-        / "src"
-        / "witwin"
-        / "channel"
-        / "montecarlo"
-        / "basic"
-        / "rayd_components.py",
-        repo
-        / "src"
-        / "witwin"
-        / "channel"
-        / "montecarlo"
-        / "bdpt"
-        / "workspace.py",
+        (basic.relative_to(repo), basic.read_text()),
+        (bdpt.relative_to(repo), "\n".join(selected)),
     )
 
     offenders: list[str] = []
-    for path in targets:
-        source = path.read_text()
+    for path, source in targets:
         for token in ("_empty_wedge_events", "torch.empty((0,"):
             if token in source:
-                offenders.append(f"{path.relative_to(repo)}: {token}")
+                offenders.append(f"{path}: {token}")
     assert offenders == []
 
 
 def test_mc_basic_solver_uses_native_scene_and_store_material_paths():
-    from witwin.channel.montecarlo.basic import pipeline as mc_basic_pipeline
+    from witwin.channel.montecarlo import basic as mc_basic
 
-    solve_source = inspect.getsource(mc_basic_pipeline.solve_pipeline)
-    module_source = inspect.getsource(mc_basic_pipeline)
+    solve_source = inspect.getsource(mc_basic.solve_pipeline)
+    module_source = inspect.getsource(mc_basic)
 
     # Plan 07 AD-3: materials come from the compiled store in BOTH
     # ad_mode="none" and the AD modes (one source, same values); the old
@@ -276,7 +285,7 @@ def test_mc_basic_solver_uses_native_scene_and_store_material_paths():
 
 
 def test_bdpt_pipeline_does_not_use_derived_variance_or_component_map_path_export():
-    from witwin.channel.montecarlo.bdpt import pipeline as bdpt_pipeline
+    from witwin.channel.montecarlo import bdpt as bdpt_pipeline
 
     source = inspect.getsource(bdpt_pipeline)
 
@@ -289,8 +298,12 @@ def test_bdpt_pipeline_does_not_use_derived_variance_or_component_map_path_expor
 
 
 def test_bdpt_package_does_not_reintroduce_python_los_visibility_helpers():
+    # The BDPT solver is one module now, so the former package walk is a single
+    # file read. The kernels/maps.py carve-out the walk carried is gone with the
+    # file it named: those two visibility facades live in kernels/montecarlo.py,
+    # which this scan does not cover.
     repo = Path(__file__).resolve().parents[2]
-    root = repo / "src" / "witwin" / "channel" / "montecarlo" / "bdpt"
+    module = repo / "src" / "witwin" / "channel" / "montecarlo" / "bdpt.py"
     forbidden = (
         "direct_los_path_gain",
         "visible_los_path_gain",
@@ -300,16 +313,10 @@ def test_bdpt_package_does_not_reintroduce_python_los_visibility_helpers():
     )
 
     offenders: list[str] = []
-    for path in root.rglob("*.py"):
-        source = path.read_text()
-        for token in forbidden:
-            if path == root / "kernels" / "maps.py" and token in {
-                "bdpt_los_visibility_inputs",
-                "bdpt_apply_los_visibility",
-            }:
-                continue
-            if token in source:
-                offenders.append(f"{path.relative_to(repo)}: {token}")
+    source = module.read_text()
+    for token in forbidden:
+        if token in source:
+            offenders.append(f"{module.relative_to(repo)}: {token}")
     assert offenders == []
 
 

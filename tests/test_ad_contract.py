@@ -9,11 +9,11 @@ from witwin.channel import capabilities
 from witwin.channel.deterministic import Config as DeterministicConfig
 from witwin.channel.deterministic import _metadata as deterministic_metadata
 from witwin.channel.montecarlo.basic import Config as BasicConfig
-from witwin.channel.montecarlo.basic.metadata import (
+from witwin.channel.montecarlo.basic import (
     make_solver_metadata as basic_metadata,
 )
 from witwin.channel.montecarlo.bdpt import Config as BdptConfig
-from witwin.channel.montecarlo.bdpt.metadata import (
+from witwin.channel.montecarlo.bdpt import (
     make_solver_metadata as bdpt_metadata,
 )
 from witwin.channel.path import Config as PathConfig

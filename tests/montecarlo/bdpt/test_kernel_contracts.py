@@ -9,10 +9,9 @@ import pytest
 
 from witwin.core import scene as core_scene
 from witwin.channel.kernels import materials as material_contracts
-from witwin.channel.montecarlo.bdpt import endpoints
-from witwin.channel.montecarlo.bdpt import solver as bdpt_solver
+from witwin.channel.montecarlo import bdpt as bdpt_solver
 from witwin.channel.kernels import montecarlo
-from witwin.channel.montecarlo.bdpt.solver import _BDPTTopologyOptions
+from witwin.channel.montecarlo.bdpt import _BDPTTopologyOptions
 from witwin.channel.propagation import geometry
 from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel import runtime
@@ -138,9 +137,9 @@ def test_bdpt_host_vec3_resolves_canonical_transmitter_helper():
 
 
 def test_bdpt_callers_use_canonical_map_owners():
-    assert endpoints.bdpt_host_vec3_tensor is montecarlo.bdpt_host_vec3_tensor
-    assert endpoints.bdpt_receiver_grid_points is montecarlo.bdpt_receiver_grid_points
-    assert endpoints.bdpt_transmitter_tensors is montecarlo.bdpt_transmitter_tensors
+    assert bdpt_solver.bdpt_host_vec3_tensor is montecarlo.bdpt_host_vec3_tensor
+    assert bdpt_solver.bdpt_receiver_grid_points is montecarlo.bdpt_receiver_grid_points
+    assert bdpt_solver.bdpt_transmitter_tensors is montecarlo.bdpt_transmitter_tensors
     assert bdpt_solver.bdpt_component_map_buffer is montecarlo.bdpt_component_map_buffer
     assert bdpt_solver.bdpt_store_component_map is montecarlo.bdpt_store_component_map
     assert "mc_component_map_buffer" not in bdpt_solver.__dict__
@@ -148,6 +147,10 @@ def test_bdpt_callers_use_canonical_map_owners():
 
 
 def test_bdpt_public_solve_lazy_import_preserves_identity_and_pickle():
+    # The solver collapsed into one module, so there is no longer a
+    # ``.solver`` submodule to import lazily. What the pickle contract needs
+    # survives the collapse: the public ``solve`` is defined in the module a
+    # caller imports, so it round-trips by qualified name.
     code = (
         "import importlib, pickle, sys; "
         "sys.meta_path=[finder for finder in sys.meta_path "
@@ -155,9 +158,8 @@ def test_bdpt_public_solve_lazy_import_preserves_identity_and_pickle():
         "package=importlib.import_module('witwin.channel.montecarlo.bdpt'); "
         "assert 'witwin.channel.montecarlo.bdpt.solver' not in sys.modules; "
         "from witwin.channel.montecarlo.bdpt import solve; "
-        "solver=importlib.import_module('witwin.channel.montecarlo.bdpt.solver'); "
-        "assert solve is solver.solve; "
-        "assert package.solve is solver.solve; "
+        "assert package.solve is solve; "
+        "assert solve.__module__ == 'witwin.channel.montecarlo.bdpt'; "
         "assert pickle.loads(pickle.dumps(solve)) is solve"
     )
     environment = os.environ.copy()

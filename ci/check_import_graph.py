@@ -19,8 +19,34 @@ DEFAULT_ALLOWLIST_PATH = Path("ci/import_graph_allowlist.json")
 # allowlist, but relocating or replacing an entry is rejected. The universe was
 # extended once to admit the ADR-008 BDPT enumerated-oracle dependency that the
 # re-export canonicalization made visible.
+#
+# Re-baselined 2026-07-27 by owner decision, as a strict reduction. Two things
+# had made the frozen universe wrong rather than protective:
+#
+#   * All eight ``existing_boundary`` entries named a path or a module that no
+#     longer exists. Seven of them (boundary-001, -002, -004, -005, -006, -007,
+#     -008) reached through ``witwin.channel.core``, the namespace this checker
+#     itself rejects via ``_DISSOLVED_PREFIXES``; boundary-003 named
+#     ``witwin.channel.runtime.extension``, gone since ``runtime`` collapsed
+#     into a single module. Freezing entries that cannot be produced protects
+#     nothing, so they were deleted. The group itself is kept with an empty
+#     baseline so a future ``existing_boundary`` violation still reports as an
+#     unallowlisted violation rather than a missing debt group.
+#   * mc-enum-001, the single *active* entry, was keyed on
+#     ``montecarlo/bdpt/pipeline.py``. Collapsing that package into
+#     ``montecarlo/bdpt.py`` relocates the sanctioned ADR-008 edge without
+#     changing it, which the digest rejects by design. The entry was re-keyed
+#     ahead of that collapse: only ``path`` and ``source`` moved, and the rule,
+#     target, ADR and justification are untouched. Its ``line``/``column``
+#     still carried the pre-collapse 23/0; the concept-axis sealing step that
+#     landed the collapse corrected ``line`` to the real position in the
+#     collapsed module, 105, leaving ``column`` at 0, and recomputed this digest
+#     for that single-field correction. Nothing else in the universe moved.
+#
+# Nothing was added: the new universe is the old one minus those eight entries,
+# with mc-enum-001 re-keyed and solver-001 unchanged.
 FROZEN_BASELINE_DIGEST = (
-    "d8aafde5ab47c17de341cf4fad8e1b3da77f34d0ab138d89188da7576fd39a45"
+    "9edd7c8c5e4af25d94a49fe9b25fe12447a7a64370f49651cde1e457e901ba76"
 )
 
 _DEBT_GROUP_BY_RULE = {

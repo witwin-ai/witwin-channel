@@ -5,14 +5,8 @@ import hashlib
 from pathlib import Path
 
 from ci import check_import_graph as graph
-from witwin.channel.propagation.enumerated import reflection
-from witwin.channel.propagation.geometry import (
-    reflection as geometry_reflection,
-)
+from witwin.channel.interactions import reflection
 from witwin.channel.propagation.geometry import reevaluate
-from witwin.channel.propagation.topology.discovery import (
-    reflection as discovery,
-)
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -26,6 +20,9 @@ PACKAGE_ROOT = REPOSITORY_ROOT / "src" / "witwin" / "channel"
 # ``witwin.channel.kernels.geometry`` and the
 # ``geometry_bridge``/``geometry_primitives`` aliases collapsed into
 # ``geometry_kernels``.
+# All four digests survive the concept-axis gather unchanged: moving a
+# definition between modules does not touch its AST, and ``ast.dump`` here is
+# taken without attributes, so position is not part of the pin.
 _DIGESTS = {
     "_face_sequence_count": "d7932ea0ae0bb7b781b5113800044489b7b5356129ccd0169d305749a1dbf121",
     "_face_sequence_chunks": "58d450d46c6e15f13176972c3996ec222d7a9b218fdb53ffc9529d0fd4370220",
@@ -48,37 +45,43 @@ def _digest(module, name: str) -> str:
     ).hexdigest()
 
 
+OWNER = "witwin.channel.interactions.reflection"
+
+
 def test_reflection_owners_and_discovery_constants_preserve_identity():
-    assert (
-        reflection._face_sequence_count
-        is discovery._face_sequence_count
-    )
-    assert (
-        reflection._face_sequence_chunks
-        is discovery._face_sequence_chunks
-    )
-    assert discovery._face_sequence_count.__module__ == discovery.__name__
-    assert discovery._face_sequence_chunks.__module__ == discovery.__name__
+    # The concept-axis gather put reflection discovery, EPC geometry and
+    # enumerated orchestration in one module. The previous version of this test
+    # pinned that the three former modules published the SAME objects, so a
+    # copy could not appear in two places. With one module that identity claim
+    # is vacuous, so the equivalent pin is stronger: every name must be DEFINED
+    # here. A re-export layer or a resurrected second owner shows up as a
+    # foreign ``__module__``.
+    assert reflection.__name__ == OWNER
+    for name in (
+        "_face_sequence_count",
+        "_face_sequence_chunks",
+        "prepare_reflection_order1_plan",
+        "iter_reflection_order1_epc_requests",
+        "prepare_reflection_multibounce_plan",
+        "iter_reflection_multibounce_epc_requests",
+        "query_reflection_epc",
+        "_discovered_group_chains",
+        "_reflection_topology_order1",
+        "_reflection_topology_multibounce",
+        "ReflectionEpcQuery",
+        "ReflectionEpcGeometry",
+        "ReflectionOrder1Plan",
+        "ReflectionOrder1EpcRequest",
+        "ReflectionMultibouncePlan",
+        "ReflectionMultibounceEpcRequest",
+    ):
+        assert getattr(reflection, name).__module__ == OWNER
     globals_ = reflection._reflection_topology_multibounce.__globals__
-    assert globals_["_face_sequence_count"] is discovery._face_sequence_count
-    assert globals_["_face_sequence_chunks"] is discovery._face_sequence_chunks
-    assert discovery._ORDER1_EXHAUSTIVE_GROUP_LIMIT == 4096
-    assert discovery._MULTIBOUNCE_PAIR_CHUNK_SIZE == 4_194_304
-    assert discovery._MULTIBOUNCE_DISCOVERY_RAYS == 262_144
-    assert reflection.prepare_reflection_order1_plan is (
-        discovery.prepare_reflection_order1_plan
-    )
-    assert reflection.iter_reflection_order1_epc_requests is (
-        discovery.iter_reflection_order1_epc_requests
-    )
-    assert reflection.prepare_reflection_multibounce_plan is (
-        discovery.prepare_reflection_multibounce_plan
-    )
-    assert reflection.iter_reflection_multibounce_epc_requests is (
-        discovery.iter_reflection_multibounce_epc_requests
-    )
-    assert reflection.ReflectionEpcQuery is geometry_reflection.ReflectionEpcQuery
-    assert reflection.query_reflection_epc is geometry_reflection.query_reflection_epc
+    assert globals_["_face_sequence_count"] is reflection._face_sequence_count
+    assert globals_["_face_sequence_chunks"] is reflection._face_sequence_chunks
+    assert reflection._ORDER1_EXHAUSTIVE_GROUP_LIMIT == 4096
+    assert reflection._MULTIBOUNCE_PAIR_CHUNK_SIZE == 4_194_304
+    assert reflection._MULTIBOUNCE_DISCOVERY_RAYS == 262_144
     assert reevaluate._reflect_points.__module__ == reevaluate.__name__
 
 
@@ -88,10 +91,11 @@ def test_unmodified_reflection_helpers_keep_frozen_ast():
         == _DIGESTS["_discovered_group_chains"]
     )
     assert (
-        _digest(discovery, "_face_sequence_count") == _DIGESTS["_face_sequence_count"]
+        _digest(reflection, "_face_sequence_count") == _DIGESTS["_face_sequence_count"]
     )
     assert (
-        _digest(discovery, "_face_sequence_chunks") == _DIGESTS["_face_sequence_chunks"]
+        _digest(reflection, "_face_sequence_chunks")
+        == _DIGESTS["_face_sequence_chunks"]
     )
     assert _digest(reevaluate, "_reflect_points") == _DIGESTS["_reflect_points"]
 
@@ -138,41 +142,49 @@ def test_reflection_consumers_use_only_named_epc_geometry():
 
 def test_reflection_owner_has_no_core_path_dependency_or_scc():
     edges = graph.collect_import_edges(PACKAGE_ROOT)
-    owner = "witwin.channel.propagation.enumerated.reflection"
     core = "witwin.channel.core.path_topology"
-    owner_targets = {edge.target for edge in edges if edge.source == owner}
+    owner_targets = {edge.target for edge in edges if edge.source == OWNER}
     assert core not in owner_targets
 
     adjacency: dict[str, set[str]] = {}
     for edge in edges:
         adjacency.setdefault(edge.source, set()).add(edge.target)
-    pending = [owner]
-    seen: set[str] = set()
-    while pending:
-        current = pending.pop()
-        if current in seen:
-            continue
-        seen.add(current)
-        pending.extend(adjacency.get(current, ()))
-    assert core not in seen
 
-    geometry_owner = "witwin.channel.propagation.geometry.reflection"
-    discovery_owner = "witwin.channel.propagation.topology.discovery.reflection"
-    pending = [geometry_owner]
-    seen = set()
-    while pending:
-        current = pending.pop()
-        if current in seen:
-            continue
-        seen.add(current)
-        pending.extend(adjacency.get(current, ()))
-    assert core not in seen
-    assert discovery_owner not in seen
+    def reachable(start: str) -> set[str]:
+        pending = [start]
+        seen: set[str] = set()
+        while pending:
+            current = pending.pop()
+            if current in seen:
+                continue
+            seen.add(current)
+            pending.extend(adjacency.get(current, ()))
+        return seen
+
+    assert core not in reachable(OWNER)
+
+    # The three former reflection modules (topology discovery, geometry EPC,
+    # enumerated orchestration) are one module now, so the old "geometry must
+    # not reach discovery" layering pin has no two endpoints left to name. The
+    # cycle it really ruled out is still ruled out, and now for the whole
+    # concept: nothing the single owner imports may import the owner back.
+    downstream: set[str] = set()
+    for target in adjacency.get(OWNER, ()):
+        downstream |= reachable(target)
+    assert OWNER not in downstream
+    assert core not in downstream
 
 
 def test_enumerated_public_all_is_unchanged_and_discovery_init_is_empty():
+    import importlib.util
+
     import witwin.channel.propagation.enumerated as enumerated
-    import witwin.channel.propagation.topology.discovery as package
 
     assert enumerated.__all__ == []
-    assert not hasattr(package, "_reflection_topology_order1")
+    # The concept axis emptied ``propagation.topology.discovery`` completely, so
+    # the package was deleted rather than left as an empty namespace. "Empty"
+    # is now "absent": nothing may recreate it as a discovery owner.
+    assert (
+        importlib.util.find_spec("witwin.channel.propagation.topology.discovery")
+        is None
+    )

@@ -130,16 +130,36 @@ Organize code by RF domain capability, with a single owner for each operation:
 - `scene`: scene lifecycle, compilation, immutable native resources, RayD
   handles, endpoint/antenna/receiver geometry, diffraction edge policy and
   selection, and the scene-leaf AD geometry seam.
-- `materials`: material contracts and native material evaluation facades.
-- `scattering`: scattering models, resident tables, phase screens, and their
-  native kernel facades.
-- `propagation.topology`: discrete path rows, IDs, winners, and interaction
-  sequences.
-- `propagation.geometry`: continuous positions, lengths, delays, directions,
-  and normals.
+- `kernels`: the single home of every native facade, one package with one
+  module per domain - `fields`, `geometry`, `topology`, `montecarlo`,
+  `scattering`, `materials`, and `deterministic`. It sits above the RF domains,
+  so a facade may import `runtime` and the shared row contracts but never a
+  solver and never a domain that imports it back.
+- `materials`: material ABI, per-face encoding, and offline layer-stack
+  evaluation. Its native facade is `kernels.materials`.
+- `scattering`: scattering models, resident tables, and phase screens. Its
+  native facades are `kernels.scattering`.
+- `interactions`: one module per RF interaction concept - `los`, `reflection`,
+  `diffraction`, `transmission`, `scattering`, `coupled`. A concept module owns
+  its topology discovery, its path geometry, and its enumerated orchestration
+  together, because those three were never an ownership boundary: they were one
+  concept split across three stage packages. `interactions.transmission` and
+  `interactions.scattering` also own the specular-transmission and Kirchhoff
+  scattering event helpers both Monte Carlo solvers share; those helpers had a
+  third, enumerated consumer, so they were never a Monte Carlo concept and
+  `montecarlo.events` no longer exists. A concept module owns no native math -
+  it calls the `kernels` facades - publishes no barrel surface, and must never
+  import a solver. Cross-concept imports inside the package are allowed and
+  must stay acyclic.
+- `propagation.topology`: the stage-shared discrete row machinery - export,
+  concatenation, and the IDs, winners, and interaction sequences it packs.
+- `propagation.geometry`: the stage-shared continuous geometry helpers -
+  endpoints, visibility, edge state, silhouette clearance, and reevaluation.
 - `propagation.fields`: RF field evaluation and native derivative companions.
-- `propagation.enumerated`: shared deterministic path evaluation for Path and
-  Deterministic solvers.
+- `propagation.enumerated`: the concept-agnostic enumerated engine, its typed
+  config contract, and its capacity sanitizer - the shared deterministic path
+  evaluation for the Path and Deterministic solvers. The per-concept discovery
+  it drives lives in `interactions`.
 - `propagation.rows`: the typed internal row contracts those stages exchange.
   One path table is four zero-copy views keyed on one opaque row-identity
   token, and they live in one module rather than one per stage because
@@ -227,18 +247,22 @@ Organize code by RF domain capability, with a single owner for each operation:
   gap with a pinned regression test, not something to fix as a side effect.
 - `path`, `deterministic`, `montecarlo.basic`, and `montecarlo.bdpt`: thin
   solver-owned configuration, orchestration, accumulation, result, and metadata
-  layers. Solvers must never import another solver. `path` and `deterministic`
-  are each one module, `path.py` and `deterministic.py`; their owner documents
-  are `docs/dev/path/README.md` and `docs/dev/deterministic/README.md`, for the
-  same reason `runtime` keeps its README outside the package - a module has no
-  directory to hold one. The collapse moved definition sites only: every public
-  name is still imported from `witwin.channel.path` and
-  `witwin.channel.deterministic`, and the deleted submodules were never public
-  API, so no alias or re-export replaced them.
+  layers. Solvers must never import another solver. A solver owner is named by
+  its import path - `witwin.channel.path`, `witwin.channel.deterministic`,
+  `witwin.channel.montecarlo.basic`, `witwin.channel.montecarlo.bdpt` - and
+  that path is the contract. Whether an owner is one module or a package of
+  private submodules is internal layout: collapsing one moves definition sites
+  only, every public name keeps its import path, and the deleted submodules
+  were never public API, so no alias or re-export replaces them. An owner that
+  is a single module keeps its owner document outside the package, for the same
+  reason `runtime` does - a module has no directory to hold a README - which is
+  why `path` and `deterministic` document themselves in
+  `docs/dev/path/README.md` and `docs/dev/deterministic/README.md`.
 
 Four package-root modules hold cross-domain values that the public root and
 several domains all need, and that therefore cannot live under `runtime`,
-`propagation`, or a `kernels` package without tripping the public-init boundary:
+`propagation`, or the `kernels` package without tripping the public-init
+boundary:
 
 - `constants`: electromagnetic constants and the package-wide phase convention.
   It is the single owner of the phasor, time-dependence, and narrowband
@@ -268,17 +292,17 @@ The logical world model is owned by `witwin.core` and must be imported from
 there. Channel does not re-export it, so each world type has exactly one import
 path.
 
-The only enumerated/Monte Carlo exception is ADR-008: `montecarlo.bdpt.pipeline`
-may call the public `evaluate_enumerated_paths` entry read-only as an opaque
-discrete-path oracle. It must not import `propagation.enumerated.*` internals,
-mutate the result, or add BDPT policy to the enumerated engine.
+The only enumerated/Monte Carlo exception is ADR-008: the `montecarlo.bdpt`
+pipeline may call the public `evaluate_enumerated_paths` entry read-only as an
+opaque discrete-path oracle. It must not import `propagation.enumerated.*`
+internals, mutate the result, or add BDPT policy to the enumerated engine.
 `montecarlo.basic` has no enumerated dependency.
 
 Internal enumerated propagation uses the typed, zero-copy contracts
 `PathTopology`, `PathGeometry`, `PathFields`, and `EvaluatedPaths`. Preserve row
 identity, row order, tensor object/storage aliasing, stride, dtype, device, and
 gradient state. Do not reintroduce `TopologyBatch`, `core.path_topology`,
-`core.kernels.ops`, raw native tuples outside domain kernel facades, or
+`core.kernels.ops`, raw native tuples outside the `kernels` facades, or
 compatibility re-export layers.
 
 The package root and the four solver entry points are the stable public API.
@@ -316,9 +340,14 @@ requires them.
   coupled RD/DD geometry uses neutral `coupled_*` owner names even when it
   invokes RayD primitives; do not blanket-rename composed operations to
   `rayd_*` or retain historical `RayDN/raydn` aliases.
-- Python domain `kernels/` packages are thin facades: validate contracts,
-  request a required symbol through `runtime`, dispatch the native operation,
-  and convert its result to a named typed contract.
+- `witwin.channel.kernels` is the single home of every native facade. There are
+  no per-domain `kernels/` packages: the one package holds one module per
+  domain - `fields`, `geometry`, `topology`, `montecarlo`, `scattering`,
+  `materials`, and `deterministic` - and each module is the single owner of its
+  facades. Every facade stays thin: validate contracts, request a required
+  symbol through `runtime`, dispatch the native operation, and convert its
+  result to a named typed contract. A facade owns no physics, and importing one
+  must not become a way to reach a domain package.
 - C++ Torch bridges validate tensor/shape/dtype/device/ABI state and launch
   kernels. They must not contain a second host implementation of RF physics.
 - Every supported native ABI symbol has one Python owner and must appear in

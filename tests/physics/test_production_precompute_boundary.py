@@ -96,7 +96,7 @@ def test_production_and_reference_precompute_have_static_zero_dependency() -> No
         root / "constants.py",
         root / "materials" / "__init__.py",
         root / "scattering" / "__init__.py",
-        root / "propagation" / "enumerated" / "scattering.py",
+        root / "interactions" / "scattering.py",
     )
     for path in production_paths:
         assert "tests.reference.em_oracle" not in _imports(path), path

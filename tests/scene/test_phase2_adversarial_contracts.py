@@ -16,7 +16,7 @@ from witwin.core import (
 )
 from witwin.channel.scene.endpoints import pattern_field_response
 from witwin.channel.montecarlo.basic import Config as MonteCarloBasicConfig
-from witwin.channel.montecarlo.basic import solver as montecarlo_basic_solver
+from witwin.channel.montecarlo import basic as montecarlo_basic_solver
 from witwin.channel.scene.endpoints import (
     _endpoint_views,
     _validate_scalar_endpoint_boundary,

@@ -6,8 +6,8 @@
   "core_files": [
     "src/witwin/channel/deterministic.py",
     "src/witwin/channel/kernels/materials.py",
-    "src/witwin/channel/montecarlo/basic/pipeline.py",
-    "src/witwin/channel/montecarlo/bdpt/pipeline.py",
+    "src/witwin/channel/montecarlo/basic.py",
+    "src/witwin/channel/montecarlo/bdpt.py",
     "src/witwin/channel/path.py",
     "src/witwin/channel/kernels/fields.py",
     "src/witwin/channel/kernels/scattering.py"
@@ -16,16 +16,85 @@
     {
       "path": "src/witwin/channel/kernels/materials.py",
       "owner": "materials",
-      "reason": "Native material contract branches need dedicated negative-path fixtures.",
+      "reason": "Native material contract branches need dedicated negative-path fixtures. The phase-6 consolidation merged the former materials/kernels/functional.py, autograd.py and contracts.py into this module, so this percentage now bounds the merged module only; the ratchet on the former functional boundary lives in section_floors.",
       "expires_on": "2027-01-31",
       "minimum_statement_percent": 61.5
     },
     {
       "path": "src/witwin/channel/kernels/fields.py",
       "owner": "propagation-fields",
-      "reason": "Optional AD field facades need isolated unsupported-mode scenarios.",
+      "reason": "Optional AD field facades need isolated unsupported-mode scenarios. The phase-6 consolidation merged the whole former propagation/fields/kernels/ package into this module, so this percentage now bounds the merged module only; the ratchet on the former functional boundary lives in section_floors.",
       "expires_on": "2027-01-31",
       "minimum_statement_percent": 75.5
+    }
+  ],
+  "section_floors": [
+    {
+      "path": "src/witwin/channel/kernels/materials.py",
+      "section": "materials/kernels/functional.py",
+      "owner": "materials",
+      "reason": "Restores the narrow ratchet the phase-6 kernel consolidation diluted. At 277d8dc these six members were the whole of src/witwin/channel/materials/kernels/functional.py and carried a 61.5% file floor; that file was 88 statements, 6 of them module level, so the identical constraint over the 82 member statements is 58.68%. The file exemption on kernels/materials.py now only bounds the merged module and is no longer the ratchet.",
+      "members": [
+        "bdpt_face_material_tensors",
+        "bdpt_face_material_tensors_from_host",
+        "em_layer_stack_backward",
+        "em_layer_stack_eval",
+        "em_layer_stack_jvp",
+        "mc_face_material_tensors"
+      ],
+      "minimum_statement_percent": 58.68
+    },
+    {
+      "path": "src/witwin/channel/kernels/fields.py",
+      "section": "propagation/fields/kernels/functional.py",
+      "owner": "propagation-fields",
+      "reason": "Restores the narrow ratchet the phase-6 kernel consolidation diluted. At 277d8dc these eighteen members were the whole of src/witwin/channel/propagation/fields/kernels/functional.py and carried a 75.5% file floor; that file was 223 statements, 12 of them module level, so the identical constraint over the 211 member statements is 74.1%. The file exemption on kernels/fields.py now only bounds the merged module and is no longer the ratchet.",
+      "members": [
+        "_validate_enumerated_field_result",
+        "_validate_wedge_valid",
+        "field_coupled_dd",
+        "field_coupled_rd",
+        "field_diffraction_wedge",
+        "field_free_space",
+        "field_free_space_backward",
+        "field_free_space_jvp",
+        "field_project_complex3",
+        "field_reflection_sequence",
+        "field_reflection_sequence_backward",
+        "field_reflection_sequence_jvp",
+        "field_rough_reflection_scale",
+        "field_rough_reflection_scale_backward",
+        "field_rough_reflection_scale_jvp",
+        "field_transmission_sequence",
+        "field_transmission_sequence_backward",
+        "field_transmission_sequence_jvp"
+      ],
+      "minimum_statement_percent": 74.1
+    },
+    {
+      "path": "src/witwin/channel/kernels/scattering.py",
+      "section": "scattering/kernels/functional.py",
+      "owner": "scattering",
+      "reason": "Restores the narrow ratchet the phase-6 kernel consolidation diluted. At 277d8dc these sixteen members were the whole of src/witwin/channel/scattering/kernels/functional.py, which took no exemption and therefore met the 90% core target directly; that file was 152 statements, 15 of them module level, so the identical constraint over the 137 member statements is 88.9%. The 90% core-file target on kernels/scattering.py now only bounds the merged module and is no longer the ratchet.",
+      "members": [
+        "_duffy_nodes",
+        "_validate_ensemble_inputs",
+        "_validate_patch_inputs",
+        "_validate_table_eval_inputs",
+        "scattering_ensemble_eval",
+        "scattering_ensemble_eval_backward",
+        "scattering_ensemble_eval_jvp",
+        "scattering_event_probabilities",
+        "scattering_patch_integral_eval",
+        "scattering_patch_integral_eval_backward",
+        "scattering_patch_integral_eval_jvp",
+        "scattering_table_eval",
+        "scattering_table_eval_backward",
+        "scattering_table_eval_jvp",
+        "scattering_table_pdf",
+        "scattering_table_sample"
+      ],
+      "minimum_statement_percent": 88.9
     }
   ],
   "accepted_observation": {

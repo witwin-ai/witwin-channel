@@ -1,7 +1,7 @@
 """Reference Torch realization-coherent patch-integral total (ADR-010 op 2).
 
 The previous production per-row assembly and host per-patch loop of
-``propagation/enumerated/scattering.py::_realization_rows`` (jones, prefactor,
+``interactions/scattering.py::_realization_rows`` (jones, prefactor,
 carrier, per-patch ``patch_phase_integral`` quadrature, weighted total).
 ``patch_phase_integral`` itself remains a public utility in
 ``witwin.channel.scattering`` (its only production caller was this

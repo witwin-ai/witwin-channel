@@ -2,10 +2,23 @@
 
 ## Ownership
 
-This package owns row-aligned topology, continuous geometry, RF fields, and
-the enumerated propagation stages shared by Path and Deterministic solvers.
-`EvaluatedPaths` is the internal composition boundary; solver accumulation and
-public result types remain solver-owned. Under ADR-024 and the completed Phase
+This package owns the row-aligned topology machinery, the shared continuous
+geometry helpers, RF fields, and the concept-agnostic enumerated engine that
+Path and Deterministic solvers share. `EvaluatedPaths` is the internal
+composition boundary; solver accumulation and public result types remain
+solver-owned.
+
+What this package no longer owns is any single RF interaction. Per-concept
+topology discovery, path geometry, and enumerated orchestration were never
+three owners: they were one concept split across three stage packages. They now
+live one module per concept in `witwin.channel.interactions` — `los`,
+`reflection`, `diffraction`, `transmission`, `scattering`, `coupled` — and
+`propagation.topology.discovery` was deleted rather than left as an empty
+namespace. `propagation.enumerated.engine` is the only production caller of
+those concept modules; it drives them and owns none of their physics. The stage
+packages here keep exactly the pieces more than one concept shares: row export
+and concatenation, endpoint/visibility/edge-state/reevaluate geometry, the
+penetration and row contracts, and field evaluation. Under ADR-024 and the completed Phase
 6B pin/switch, RayD is the numerical source owner of the complete-row
 transmission primal/backward/JVP family, while row contracts, field facades, AD
 dispatch, topology, and result assembly remain owned here.
@@ -172,9 +185,11 @@ Everything else here is internal. The internal package export surface is
 `propagation.rows` holds the typed row contracts behind them.
 `propagation.penetration` holds the typed segment-penetration contracts that
 the topology and geometry stages both consume.
-`propagation.enumerated` owns shared component stages; solver-specific result
-conversion stays outside. Path and Deterministic keep using the internal
-contracts directly rather than routing through the consumer façade.
+`propagation.enumerated` owns the shared engine, its typed config contract, and
+its capacity sanitizer; the per-concept stages it drives live in
+`witwin.channel.interactions`, and solver-specific result conversion stays
+outside. Path and Deterministic keep using the internal contracts directly
+rather than routing through the consumer façade.
 
 ## Dependency rules
 

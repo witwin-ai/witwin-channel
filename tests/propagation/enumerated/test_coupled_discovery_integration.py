@@ -5,10 +5,8 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from witwin.channel.propagation.enumerated import coupled
-from witwin.channel.propagation.topology.discovery import (
-    coupled as discovery_coupled,
-)
+from witwin.channel.interactions import coupled
+from witwin.channel.interactions import coupled as discovery_coupled
 
 
 def _fake_coupled_inputs(monkeypatch):

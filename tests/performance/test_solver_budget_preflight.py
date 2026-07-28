@@ -15,11 +15,11 @@ from witwin.channel.scene.compiler import compile as compile_scene
     ("module_name", "config"),
     [
         (
-            "witwin.channel.montecarlo.basic.solver",
+            "witwin.channel.montecarlo.basic",
             BasicConfig(samples=1, components={"los"}, workspace_limit_bytes=0),
         ),
         (
-            "witwin.channel.montecarlo.bdpt.solver",
+            "witwin.channel.montecarlo.bdpt",
             BDPTConfig(samples=1, components={"los"}, workspace_limit_bytes=0),
         ),
     ],
@@ -46,7 +46,7 @@ def test_budget_failure_precedes_cuda_native_and_tensor_work(
     monkeypatch.setattr(solver.torch.cuda, "is_available", unexpected("cuda"))
     monkeypatch.setattr(solver, "build_info", unexpected("native"))
     monkeypatch.setattr(solver, "compile_scene", lambda *_args, **_kwargs: compiled)
-    if module_name.endswith("basic.solver"):
+    if module_name.endswith("montecarlo.basic"):
         monkeypatch.setattr(solver, "make_cuda_generator", unexpected("allocation"))
     else:
         monkeypatch.setattr(solver, "transmitter_tensors", unexpected("allocation"))

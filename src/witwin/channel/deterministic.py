@@ -27,7 +27,7 @@ from witwin.channel.scene.endpoints import bind_solver_scene
 from witwin.channel.propagation.enumerated.engine import (
     evaluate_enumerated_paths,
 )
-from witwin.channel.propagation.enumerated.scattering import (
+from witwin.channel.interactions.scattering import (
     append_scattering_evaluated_paths,
 )
 from witwin.channel.propagation.geometry.endpoints import (

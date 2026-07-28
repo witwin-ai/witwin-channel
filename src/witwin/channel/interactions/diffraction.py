@@ -1,7 +1,20 @@
-"""Enumerated first-order diffraction topology discovery."""
+"""The diffraction interaction: discovery planning, geometry, and enumerated orchestration.
+
+This module gathers what used to be three files - the lazy first-order
+discovery plan (``propagation.topology.discovery.diffraction``), the typed edge
+and first-order path geometry queries (``propagation.geometry.diffraction``),
+and the enumerated topology owner (``propagation.enumerated.diffraction``) - so
+one file holds the whole concept. The native facades it dispatches through stay
+in :mod:`witwin.channel.kernels`; the shared edge-state helpers stay in
+:mod:`witwin.channel.propagation.geometry.edge_state`, and the shared receiver
+chunk size stays with its owner in
+:mod:`witwin.channel.interactions.reflection`.
+"""
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import torch
@@ -11,30 +24,320 @@ from witwin.channel.materials import face_material_tensors
 from witwin.channel.scene.compiler import (
     LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,
 )
-from witwin.channel.propagation.geometry.diffraction import (
-    DiffractionOrder1Query,
-    plan_tx_visible_diffraction_states,
-    query_diffraction_edges,
-    query_diffraction_order1,
+from witwin.channel.propagation.geometry.edge_state import (
+    cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
+    diffraction_edge_geometry as _diffraction_edge_geometry,
 )
 from witwin.channel.propagation.topology.concatenate import (
     concatenate_path_blocks,
 )
-from witwin.channel.propagation.topology.discovery.diffraction import (
-    iter_diffraction_rx_chunk_requests,
-    iter_diffraction_tx_requests,
-    prepare_diffraction_order1_plan,
+from witwin.channel.interactions.reflection import (
+    _MULTIBOUNCE_PAIR_CHUNK_SIZE,
 )
 from witwin.channel.propagation.topology.export import _ensure_topology_fields
+from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel.kernels import topology as topology_kernels
 from witwin.channel.runtime import (
+    CudaProfileMark,
     CudaProfileRange,
+    cuda_profile_mark,
     cuda_profile_range,
     profiled_cuda_range,
 )
 
 if TYPE_CHECKING:
     from witwin.channel.scene.endpoints import SolverScene as Scene
+
+
+@dataclass(frozen=True, slots=True)
+class DiffractionOrder1Plan:
+    preserve_imported_edges: bool
+    tx_count: int
+    rx_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class DiffractionTxRequest:
+    tx_index: int
+    tx: torch.Tensor
+
+
+@dataclass(frozen=True, slots=True)
+class DiffractionRxChunkRequest:
+    rx_start: int
+    rx_end: int
+    capacity: int
+
+
+def prepare_diffraction_order1_plan(
+    *,
+    metadata: Mapping[str, object],
+    tx_count: int,
+    rx_count: int,
+) -> DiffractionOrder1Plan:
+    mitsuba_metadata = metadata.get("mitsuba", {})
+    # Channel's merge_shapes import keeps the selected boundary-edge table
+    # intact. The synthetic-scene path instead merges coincident structure
+    # boundaries into one physical wedge (the single-wedge test contract).
+    preserve_imported_edges = isinstance(mitsuba_metadata, dict) and bool(
+        mitsuba_metadata.get("merge_shapes", False)
+    )
+    return DiffractionOrder1Plan(
+        preserve_imported_edges=preserve_imported_edges,
+        tx_count=int(tx_count),
+        rx_count=int(rx_count),
+    )
+
+
+def iter_diffraction_tx_requests(
+    plan: DiffractionOrder1Plan,
+    *,
+    tx_positions: torch.Tensor,
+) -> Iterator[DiffractionTxRequest]:
+    for tx_index in range(plan.tx_count):
+        yield DiffractionTxRequest(tx_index=tx_index, tx=tx_positions[tx_index])
+
+
+def iter_diffraction_rx_chunk_requests(
+    plan: DiffractionOrder1Plan,
+    *,
+    state_count: int,
+) -> Iterator[DiffractionRxChunkRequest]:
+    rx_chunk_size = max(1, _MULTIBOUNCE_PAIR_CHUNK_SIZE // state_count)
+    for rx_start in range(0, plan.rx_count, rx_chunk_size):
+        rx_end = min(rx_start + rx_chunk_size, plan.rx_count)
+        yield DiffractionRxChunkRequest(
+            rx_start=rx_start,
+            rx_end=rx_end,
+            capacity=(rx_end - rx_start) * state_count,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class DiffractionEdgeGeometry:
+    selected: torch.Tensor
+    edge_position: torch.Tensor
+    edge_direction: torch.Tensor
+    edge_length: torch.Tensor
+    line_min: torch.Tensor
+    line_max: torch.Tensor
+    n0: torch.Tensor
+    n1: torch.Tensor
+    face0: torch.Tensor
+    face1: torch.Tensor
+    exterior_angle: torch.Tensor
+
+
+def query_diffraction_edges(
+    rayd: object,
+    *,
+    preserve_imported_edges: bool,
+) -> DiffractionEdgeGeometry:
+    raw = (
+        _diffraction_edge_geometry(rayd.edge_records())
+        if preserve_imported_edges
+        else _cached_diffraction_edge_geometry(rayd)
+    )
+    return DiffractionEdgeGeometry(
+        selected=raw[0],
+        edge_position=raw[1],
+        edge_direction=raw[2],
+        edge_length=raw[3],
+        line_min=raw[4],
+        line_max=raw[5],
+        n0=raw[6],
+        n1=raw[7],
+        face0=raw[8],
+        face1=raw[9],
+        exterior_angle=raw[10],
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class DiffractionStateGeometry:
+    edge_index: torch.Tensor
+    edge_position: torch.Tensor
+    edge_direction: torch.Tensor
+    edge_t_min: torch.Tensor
+    edge_t_max: torch.Tensor
+    n0: torch.Tensor
+    n1: torch.Tensor
+    prim0: torch.Tensor
+    prim1: torch.Tensor
+    exterior_angle: torch.Tensor
+    source: torch.Tensor
+    source_power: torch.Tensor
+
+
+def name_diffraction_states(
+    states: tuple[torch.Tensor, ...],
+) -> DiffractionStateGeometry:
+    if len(states) != 12:
+        raise ValueError("diffraction state tuple must contain exactly 12 tensors")
+    return DiffractionStateGeometry(
+        edge_index=states[0],
+        edge_position=states[1],
+        edge_direction=states[2],
+        edge_t_min=states[3],
+        edge_t_max=states[4],
+        n0=states[5],
+        n1=states[6],
+        prim0=states[7],
+        prim1=states[8],
+        exterior_angle=states[9],
+        source=states[10],
+        source_power=states[11],
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class DiffractionVisibleStatePlan:
+    edge_index: torch.Tensor
+    edge_position: torch.Tensor
+    edge_direction: torch.Tensor
+    edge_t_min: torch.Tensor
+    edge_t_max: torch.Tensor
+    n0: torch.Tensor
+    n1: torch.Tensor
+    prim0: torch.Tensor
+    prim1: torch.Tensor
+    exterior_angle: torch.Tensor
+    source: torch.Tensor
+    source_power: torch.Tensor
+    active: torch.Tensor
+
+
+def plan_tx_visible_diffraction_states(
+    rayd: object,
+    states: tuple[torch.Tensor, ...],
+    tx: torch.Tensor,
+) -> DiffractionVisibleStatePlan:
+    named = name_diffraction_states(states)
+    active = geometry_kernels.diffraction_tx_visible_state_plan(
+        rayd.require_resource(),
+        tx,
+        named.edge_index,
+        named.edge_position,
+        named.edge_direction,
+        named.edge_t_min,
+        named.edge_t_max,
+        named.n0,
+        named.n1,
+        named.prim0,
+        named.prim1,
+        named.exterior_angle,
+        named.source,
+        named.source_power,
+    )
+    return DiffractionVisibleStatePlan(
+        edge_index=named.edge_index,
+        edge_position=named.edge_position,
+        edge_direction=named.edge_direction,
+        edge_t_min=named.edge_t_min,
+        edge_t_max=named.edge_t_max,
+        n0=named.n0,
+        n1=named.n1,
+        prim0=named.prim0,
+        prim1=named.prim1,
+        exterior_angle=named.exterior_angle,
+        source=named.source,
+        source_power=named.source_power,
+        active=active,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class DiffractionOrder1Query:
+    handle: object
+    tx_position: torch.Tensor
+    tx_polarization: torch.Tensor
+    rx_positions: torch.Tensor
+    active: torch.Tensor
+    states: DiffractionVisibleStatePlan
+    material_eta_r: torch.Tensor
+    material_sigma: torch.Tensor
+    material_mu_r: torch.Tensor
+    material_gain: torch.Tensor
+    material_valid: torch.Tensor
+    state_count: int
+    capacity: int
+    wavelength: float
+    # ISB boundary taper (ADR-017), D member. 0.0 (default) reproduces the hard
+    # RayD GO step; > 0 notches the incident-boundary odd part over the congruent
+    # window inside the shared UTD header (pair.isbTaperWidthScale).
+    isb_taper_width_scale: float = 0.0
+
+    def __post_init__(self) -> None:
+        if self.active is not self.states.active:
+            raise ValueError("diffraction query active must alias the visible state plan")
+        if self.state_count != int(self.states.edge_index.shape[0]):
+            raise ValueError("diffraction query state_count must equal plan capacity N")
+
+
+@dataclass(frozen=True, slots=True)
+class DiffractionOrder1Geometry:
+    valid: torch.Tensor
+    rx_id: torch.Tensor
+    depth: torch.Tensor
+    edge_id: torch.Tensor
+    delay_s: torch.Tensor
+    x_re: torch.Tensor
+    x_im: torch.Tensor
+    y_re: torch.Tensor
+    y_im: torch.Tensor
+    z_re: torch.Tensor
+    z_im: torch.Tensor
+    interaction_position: torch.Tensor
+
+
+def query_diffraction_order1(
+    query: DiffractionOrder1Query,
+) -> DiffractionOrder1Geometry:
+    states = query.states
+    cuda_profile_mark(CudaProfileMark.OPTIX_TRAVERSAL)
+    cuda_profile_mark(CudaProfileMark.DIFFRACTION_EXPORTER_REQUEST)
+    raw = geometry_kernels.rayd_diffraction_paths_order1_forward(
+        query.handle,
+        query.tx_position,
+        query.tx_polarization,
+        query.rx_positions,
+        query.active,
+        states.edge_index,
+        states.edge_position,
+        states.edge_direction,
+        states.edge_t_min,
+        states.edge_t_max,
+        states.n0,
+        states.n1,
+        states.prim0,
+        states.prim1,
+        states.exterior_angle,
+        states.source,
+        states.source_power,
+        query.material_eta_r,
+        query.material_sigma,
+        query.material_mu_r,
+        query.material_gain,
+        query.material_valid,
+        query.state_count,
+        query.capacity,
+        query.wavelength,
+        query.isb_taper_width_scale,
+    )
+    return DiffractionOrder1Geometry(
+        valid=raw[1],
+        rx_id=raw[3],
+        depth=raw[4],
+        edge_id=raw[5],
+        delay_s=raw[8],
+        x_re=raw[9],
+        x_im=raw[10],
+        y_re=raw[11],
+        y_im=raw[12],
+        z_re=raw[13],
+        z_im=raw[14],
+        interaction_position=raw[15],
+    )
 
 
 def _deterministic_diffraction_states(

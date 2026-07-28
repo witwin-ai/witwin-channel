@@ -6,8 +6,8 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from witwin.channel.montecarlo.events import transmission
-from witwin.channel.montecarlo.basic import rayd_components
+from witwin.channel.interactions import transmission
+from witwin.channel.montecarlo import basic as mc_basic
 from witwin.channel.propagation.penetration import (
     SegmentPenetrationPolicy,
 )
@@ -172,27 +172,27 @@ def test_transmission_component_map_flattens_pair_major_and_shares_state(
     product_calls: list[tuple[object, ...]] = []
 
     monkeypatch.setattr(
-        rayd_components,
+        mc_basic,
         "_grid_los_matrix",
         lambda *args, **kwargs: base_power,
     )
     monkeypatch.setattr(
-        rayd_components,
+        mc_basic,
         "transmitter_positions",
         lambda *args, **kwargs: (tx, torch.ones(2)),
     )
     monkeypatch.setattr(
-        rayd_components,
+        mc_basic,
         "receiver_grid_points",
         lambda *args, **kwargs: rx,
     )
     monkeypatch.setattr(
-        rayd_components,
+        mc_basic,
         "face_material_field_bundle",
         lambda *args, **kwargs: bundle,
     )
     monkeypatch.setattr(
-        rayd_components,
+        mc_basic,
         "transmitter_polarizations",
         lambda *args, **kwargs: polarization,
     )
@@ -205,15 +205,15 @@ def test_transmission_component_map_flattens_pair_major_and_shares_state(
         product_calls.append((*args, kwargs))
         return SimpleNamespace(scaled_power=scaled_power)
 
-    monkeypatch.setattr(rayd_components, "straight_transmission_chains", trace)
-    monkeypatch.setattr(rayd_components, "mc_transmission_wall_product", wall_product)
+    monkeypatch.setattr(mc_basic, "straight_transmission_chains", trace)
+    monkeypatch.setattr(mc_basic, "mc_transmission_wall_product", wall_product)
     monkeypatch.setattr(
-        rayd_components,
+        mc_basic,
         "mc_los_component_maps_from_matrix",
         lambda matrix, **kwargs: matrix,
     )
 
-    result = rayd_components.transmission_component_map(
+    result = mc_basic.transmission_component_map(
         scene,
         rayd,
         grid,

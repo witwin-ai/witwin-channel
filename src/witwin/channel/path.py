@@ -13,7 +13,7 @@ import math
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, cast
 
 import torch
 
@@ -35,7 +35,7 @@ from witwin.core import Scene, SceneSnapshot
 from witwin.channel.propagation.enumerated.engine import (
     evaluate_enumerated_paths,
 )
-from witwin.channel.propagation.enumerated.scattering import (
+from witwin.channel.interactions.scattering import (
     append_scattering_evaluated_paths,
 )
 from witwin.channel.constants import UNIT_EXCITATION_PHASE_CONVENTION
@@ -413,25 +413,28 @@ class PathResult:
                 raise ValueError(f"{name} must match the vector depth shape")
         if self.num_paths.shape != self.path_count_shape:
             raise ValueError("num_paths must match the endpoint-pair shape")
-        if self.field_xyz is None:
-            object.__setattr__(
-                self,
-                "field_xyz",
-                torch.zeros((*path_shape, 3), device=self.a.device, dtype=torch.complex64),
+        # Bind the defaulted tensors to locals as well as to the frozen slots:
+        # ``object.__setattr__`` is invisible to a type checker, so the checks
+        # below read the same object through a name that is known non-optional.
+        field_xyz = self.field_xyz
+        if field_xyz is None:
+            field_xyz = torch.zeros(
+                (*path_shape, 3), device=self.a.device, dtype=torch.complex64
             )
-        if self.field_direction is None:
-            object.__setattr__(
-                self,
-                "field_direction",
-                torch.zeros((*path_shape, 3), device=self.a.device, dtype=torch.float32),
+            object.__setattr__(self, "field_xyz", field_xyz)
+        field_direction = self.field_direction
+        if field_direction is None:
+            field_direction = torch.zeros(
+                (*path_shape, 3), device=self.a.device, dtype=torch.float32
             )
-        if self.field_xyz.shape != (*path_shape, 3):  # type: ignore[union-attr]
+            object.__setattr__(self, "field_direction", field_direction)
+        if field_xyz.shape != (*path_shape, 3):
             raise ValueError("field_xyz must match the path shape with a complex3 tail")
-        if self.field_direction.shape != (*path_shape, 3):  # type: ignore[union-attr]
+        if field_direction.shape != (*path_shape, 3):
             raise ValueError("field_direction must match the path shape with a vec3 tail")
-        if self.field_xyz.dtype != torch.complex64:  # type: ignore[union-attr]
+        if field_xyz.dtype != torch.complex64:
             raise ValueError("field_xyz must use complex64")
-        if self.field_direction.dtype != torch.float32:  # type: ignore[union-attr]
+        if field_direction.dtype != torch.float32:
             raise ValueError("field_direction must use float32")
         if self.tx_weights is not None:
             if self.tx_weights.shape != (self.num_tx, self.num_tx_ant):
@@ -477,10 +480,10 @@ class PathResult:
             self.position,
             self.normal,
             self.num_paths,
-            self.field_xyz,
-            self.field_direction,
+            field_xyz,
+            field_direction,
         )
-        if any(tensor.device != self.a.device for tensor in tensors):  # type: ignore[union-attr]
+        if any(tensor.device != self.a.device for tensor in tensors):
             raise ValueError("all PathResult tensors must share one device")
         # Device-selected cardinality is already reflected in the compact native
         # result. Construction is metadata-only and must not recompute it.
@@ -515,11 +518,20 @@ class PathResult:
 
     @property
     def path_shape(self) -> tuple[int, int, int, int, int]:
-        return tuple(int(value) for value in self.a.shape[:-1])  # type: ignore[return-value]
+        # ``__post_init__`` rejects any ``a`` that is not 6-D, so the leading
+        # five dimensions always exist and the generator yields exactly five.
+        return cast(
+            "tuple[int, int, int, int, int]",
+            tuple(int(value) for value in self.a.shape[:-1]),
+        )
 
     @property
     def path_count_shape(self) -> tuple[int, int, int, int]:
-        return tuple(int(value) for value in self.a.shape[:4])  # type: ignore[return-value]
+        # Same 6-D ``a`` invariant: the first four dimensions always exist.
+        return cast(
+            "tuple[int, int, int, int]",
+            tuple(int(value) for value in self.a.shape[:4]),
+        )
 
     @property
     def rx_id(self) -> torch.Tensor:
@@ -1143,8 +1155,26 @@ def _flatten_receivers(receivers: Sequence[Receiver]) -> list[Receiver]:
     return flattened
 
 
+class _AntennaEndpoint(Protocol):
+    """Structural view of the endpoint attributes synthetic packing reads.
+
+    Both ``_TransmitterView`` and the receiver views expose ``array``,
+    ``orientation`` and ``pattern``; this states that shared shape without
+    importing a concrete endpoint class or widening the parameter to ``Any``.
+    """
+
+    @property
+    def array(self) -> Any: ...
+
+    @property
+    def orientation(self) -> torch.Tensor: ...
+
+    @property
+    def pattern(self) -> Any: ...
+
+
 def _synthetic_endpoint_factor(
-    endpoints: Sequence[object],
+    endpoints: Sequence[_AntennaEndpoint],
     directions: torch.Tensor,
     *,
     num_ant: int,
@@ -1169,16 +1199,16 @@ def _synthetic_endpoint_factor(
     for index, endpoint in enumerate(endpoints):
         groups.setdefault(id(endpoint), []).append(index)
 
-    def _weights(endpoint: object, sub: torch.Tensor) -> torch.Tensor:
+    def _weights(endpoint: _AntennaEndpoint, sub: torch.Tensor) -> torch.Tensor:
         steering = steering_vector(
-            endpoint.array,  # type: ignore[attr-defined]
+            endpoint.array,
             sub,
             frequency_hz=frequency_hz,
-            orientation=endpoint.orientation,  # type: ignore[attr-defined]
+            orientation=endpoint.orientation,
         )
         pattern = pattern_field_response(
-            endpoint.pattern,  # type: ignore[attr-defined]
-            _local_direction(sub, endpoint.orientation),  # type: ignore[attr-defined]
+            endpoint.pattern,
+            _local_direction(sub, endpoint.orientation),
         )
         if conjugate_pattern:
             pattern = pattern.conj()
@@ -1536,7 +1566,13 @@ def _stable_endpoint_id_lookups(
 
 
 def _transmitter_tensors(scene: Scene) -> tuple[torch.Tensor, torch.Tensor]:
-    return _shared_transmitter_positions(scene, device=torch.device("cuda"))  # type: ignore[no-any-return]
+    # ``follow_imports = "skip"`` hides the compiler module, so the shared
+    # helper is typed ``Any`` here; it declares the (positions, power) tensor
+    # pair returned by witwin.channel.scene.compiler.transmitter_positions.
+    return cast(
+        "tuple[torch.Tensor, torch.Tensor]",
+        _shared_transmitter_positions(scene, device=torch.device("cuda")),
+    )
 
 
 def _receiver_positions(scene: Scene, *, reference: torch.Tensor) -> torch.Tensor:
@@ -1728,6 +1764,11 @@ def _solve_base(scene: SolverScene, config: Config) -> _DeferredPathResult:
     )
 
 
+# ``reference_frequency_hz`` is deliberately unannotated: it accepts a Python
+# float or a Torch scalar, and its rendered text is part of the frozen public
+# signature in ci/public-api-snapshot.json, so annotating it would break the
+# recorded contract hash. mypy only sees this function now that the solver is
+# one module, so the pre-existing shape is silenced here rather than changed.
 def solve(  # type: ignore[no-untyped-def]
     scene: Scene | SceneSnapshot,
     config: Config,

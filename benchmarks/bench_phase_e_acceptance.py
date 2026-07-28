@@ -441,7 +441,7 @@ def preflight_rows(
                 )
             else:
                 from witwin.channel.montecarlo.bdpt import Config
-                from witwin.channel.montecarlo.bdpt.solver import (
+                from witwin.channel.montecarlo.bdpt import (
                     _estimate_workspace_bytes,
                 )
 

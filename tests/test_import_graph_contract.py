@@ -369,7 +369,7 @@ def test_reexport_canonicalization_exposes_real_bdpt_enumerated_edge():
     # tests rely on ...
     raw = graph.collect_import_edges(PACKAGE_ROOT)
     assert any(
-        edge.source == f"{package}.montecarlo.bdpt.pipeline"
+        edge.source == f"{package}.montecarlo.bdpt"
         and edge.target == f"{package}.propagation"
         and edge.imported_name == "evaluate_enumerated_paths"
         for edge in raw
@@ -384,11 +384,11 @@ def test_reexport_canonicalization_exposes_real_bdpt_enumerated_edge():
     ]
     assert enumerated == [
         graph.Violation(
-            "src/witwin/channel/montecarlo/bdpt/pipeline.py",
-            23,
+            "src/witwin/channel/montecarlo/bdpt.py",
+            105,
             0,
             "mc_enumerated_dependency",
-            f"{package}.montecarlo.bdpt.pipeline",
+            f"{package}.montecarlo.bdpt",
             f"{package}.propagation.enumerated.engine",
         )
     ]
@@ -404,7 +404,10 @@ def test_bdpt_enumerated_allowlist_entry_is_exact_and_adr_bound():
     entry = group["baseline"][0]
     assert entry["id"] == "mc-enum-001"
     assert entry["rule"] == "mc_enumerated_dependency"
-    assert entry["source"] == "witwin.channel.montecarlo.bdpt.pipeline"
+    # The 2026-07-27 re-baseline re-keyed this entry onto the collapsed
+    # ``montecarlo/bdpt.py`` module ahead of that collapse landing. The rule,
+    # target and ADR binding did not move; only the source module did.
+    assert entry["source"] == "witwin.channel.montecarlo.bdpt"
     assert entry["target"] == "witwin.channel.propagation.enumerated.engine"
     assert "ADR-008" in (entry.get("adr", "") + entry.get("justification", ""))
 
@@ -419,7 +422,7 @@ def test_bdpt_enumerated_allowlist_entry_is_exact_and_adr_bound():
         if violation.rule == "mc_enumerated_dependency"
     ]
     assert len(bound) == 1
-    assert bound[0].source == "witwin.channel.montecarlo.bdpt.pipeline"
+    assert bound[0].source == "witwin.channel.montecarlo.bdpt"
 
 
 def test_public_init_forbids_every_internal_kernels_package(tmp_path: Path):

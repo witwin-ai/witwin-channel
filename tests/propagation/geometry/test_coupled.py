@@ -5,7 +5,7 @@ from dataclasses import FrozenInstanceError, fields
 import pytest
 import torch
 
-from witwin.channel.propagation.geometry import coupled
+from witwin.channel.interactions import coupled
 
 
 def test_coupled_query_names_raw_geometry_and_preserves_identity(monkeypatch):

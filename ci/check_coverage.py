@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 from datetime import date
 from pathlib import Path
@@ -11,6 +12,9 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_POLICY = ROOT / "ci" / "coverage-policy.json"
+SECTION_FIELDS = frozenset(
+    {"path", "section", "members", "owner", "reason", "minimum_statement_percent"}
+)
 
 
 def _load(path: Path) -> dict[str, Any]:
@@ -22,6 +26,87 @@ def _normalized_files(report: dict[str, Any]) -> dict[str, dict[str, Any]]:
         path.replace("\\", "/"): payload
         for path, payload in report.get("files", {}).items()
     }
+
+
+def _member_spans(source: str) -> dict[str, tuple[int, int]]:
+    """Return the inclusive line span of every top-level definition in ``source``.
+
+    A decorated definition starts at its first decorator, so the decorator
+    statements belong to the member they decorate rather than to module level.
+    """
+
+    spans: dict[str, tuple[int, int]] = {}
+    for node in ast.parse(source).body:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            continue
+        start = node.lineno
+        for decorator in node.decorator_list:
+            start = min(start, decorator.lineno)
+        end = node.end_lineno
+        assert end is not None
+        spans[node.name] = (start, end)
+    return spans
+
+
+def section_line_numbers(path: str, members: list[str]) -> set[int]:
+    """Return every source line covered by the named top-level members.
+
+    The section is resolved against the working tree rather than the coverage
+    report so that a renamed or deleted member fails loudly instead of silently
+    shrinking the guarded statement set.
+    """
+
+    spans = _member_spans((ROOT / path).read_text(encoding="utf-8"))
+    unknown = sorted(set(members) - set(spans))
+    if unknown:
+        raise KeyError(f"{path} has no top-level member {unknown}")
+    lines: set[int] = set()
+    for member in members:
+        start, end = spans[member]
+        lines.update(range(start, end + 1))
+    return lines
+
+
+def _evaluate_sections(
+    files: dict[str, dict[str, Any]], policy: dict[str, Any]
+) -> list[str]:
+    """Return violations of the per-section statement floors.
+
+    A section floor guards one named group of members inside a consolidated
+    module, so well-covered neighbours in the same file cannot lift a section
+    that has lost coverage.
+    """
+
+    errors: list[str] = []
+    for section in policy.get("section_floors", ()):
+        missing = SECTION_FIELDS - set(section)
+        if missing:
+            errors.append(f"section floor entry missing {sorted(missing)}")
+            continue
+        path = section["path"]
+        label = f"{path}::{section['section']}"
+        if path not in files:
+            errors.append(f"section coverage entry missing: {label}")
+            continue
+        try:
+            lines = section_line_numbers(path, list(section["members"]))
+        except (KeyError, OSError, SyntaxError) as error:
+            errors.append(f"section {label} cannot be resolved: {error}")
+            continue
+        payload = files[path]
+        if "executed_lines" not in payload or "missing_lines" not in payload:
+            errors.append(f"section {label} needs per-line coverage data")
+            continue
+        executed = lines & set(payload["executed_lines"])
+        statements = executed | (lines & set(payload["missing_lines"]))
+        if not statements:
+            errors.append(f"section {label} measures no statements")
+            continue
+        percent = 100.0 * len(executed) / len(statements)
+        floor = float(section["minimum_statement_percent"])
+        if percent < floor:
+            errors.append(f"section {label} is {percent:.6f}% < {floor:.6f}%")
+    return errors
 
 
 def evaluate(
@@ -78,6 +163,8 @@ def evaluate(
         floor = float(exemption["minimum_statement_percent"])
         if percent < floor:
             errors.append(f"core file {path} regressed: {percent:.6f}% < {floor:.6f}%")
+
+    errors.extend(_evaluate_sections(files, policy))
 
     stale = set(exemptions) - below_target
     for path in sorted(stale):

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from witwin.channel.propagation.topology.discovery import reflection
+from witwin.channel.interactions import reflection
 
 
 def _inputs():
@@ -151,10 +151,27 @@ def test_contract_fields_and_forbidden_imports():
         for node in ast.walk(tree)
         if isinstance(node, ast.ImportFrom) and node.module
     }
-    assert not any(
-        "core" in module or "geometry" in module or "fields" in module
-        for module in imports
-    )
+    # This used to read "no ``core``/``geometry``/``fields`` import at all",
+    # which pinned the discovery planner's position under
+    # ``propagation.topology`` - a package the import graph forbids from
+    # reaching geometry or fields. The concept-axis gather moved the planner
+    # out of that package and put reflection's geometry and field orchestration
+    # in the same file on purpose, so that phrasing can no longer be true.
+    # Pinning the exact import set keeps the same protection against unreviewed
+    # dependency creep without pretending the concept has no geometry.
+    assert imports == {
+        "__future__",
+        "dataclasses",
+        "typing",
+        "witwin.channel.materials",
+        "witwin.channel.kernels",
+        "witwin.channel.kernels.topology",
+        "witwin.channel.propagation.geometry.reevaluate",
+        "witwin.channel.propagation.topology.concatenate",
+        "witwin.channel.propagation.topology.export",
+        "witwin.channel.scene.endpoints",
+    }
+    assert not any(module.startswith("witwin.channel.core") for module in imports)
 
 
 @pytest.mark.parametrize(("groups", "exhaustive"), [(316, True), (317, False)])

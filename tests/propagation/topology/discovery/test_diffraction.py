@@ -5,7 +5,7 @@ from dataclasses import FrozenInstanceError, fields
 import pytest
 import torch
 
-from witwin.channel.propagation.topology.discovery import diffraction
+from witwin.channel.interactions import diffraction
 
 
 @pytest.mark.parametrize(

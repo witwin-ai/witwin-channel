@@ -69,7 +69,7 @@ from witwin.channel.deployment import build_info
 from witwin.core import MaterialLayer, PhysicalMaterial
 from witwin.channel.montecarlo.bdpt import Config as BDPTConfig
 from witwin.channel.montecarlo.bdpt import solve as bdpt_solve
-from witwin.channel.montecarlo.events.scattering import rough_material_runtimes
+from witwin.channel.interactions.scattering import rough_material_runtimes
 from witwin.channel.scene import compile as compile_scene
 
 pytestmark = pytest.mark.skipif(

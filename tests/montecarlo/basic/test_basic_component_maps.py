@@ -7,8 +7,10 @@ from witwin.core import ReceiverGrid, Scene
 from witwin.channel.deployment import build_info
 from witwin.channel.montecarlo.basic import Config, solve as solve_basic
 from witwin.channel.scene import compile as compile_scene
-import witwin.channel.montecarlo.basic.backend as basic_backend
-import witwin.channel.montecarlo.basic.rayd_components as rayd_components
+from witwin.channel.montecarlo import basic as mc_basic
+from witwin.channel.propagation.geometry.edge_state import (
+    diffraction_edge_geometry,
+)
 
 _REFERENCE_EDGE_INFO_PLANE_TOL = 1.34e-5
 _FREQUENCY_HZ = 3.0e9
@@ -311,14 +313,14 @@ def test_basic_solver_reuses_los_export_for_single_receiver_grid(monkeypatch):
         structures=[],
     )
     call_count = 0
-    original = basic_backend.path_los_export
+    original = mc_basic.path_los_export
 
     def counted(*args, **kwargs):
         nonlocal call_count
         call_count += 1
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(basic_backend, "path_los_export", counted)
+    monkeypatch.setattr(mc_basic, "path_los_export", counted)
 
     _solve(scene, Config(samples=128, seed=3, components={"los"}))
 
@@ -412,7 +414,7 @@ def test_diffraction_edge_geometry_native_matches_torch_reference():
     ).rayd.edge_records()
 
     reference = _torch_diffraction_edge_geometry(records)
-    native = rayd_components._diffraction_edge_geometry(records)
+    native = diffraction_edge_geometry(records)
 
     torch.testing.assert_close(native[0], reference[0], rtol=0.0, atol=0.0)
     torch.testing.assert_close(native[8], reference[8], rtol=0.0, atol=0.0)
@@ -440,7 +442,7 @@ def test_solver_diffraction_wedge_candidates_are_built_once_for_multiple_transmi
         ],
     )
     call_count = 0
-    original = rayd_components._native_surface_group_edge_candidates
+    original = mc_basic._native_surface_group_edge_candidates
 
     def counted(*args, **kwargs):
         nonlocal call_count
@@ -448,7 +450,7 @@ def test_solver_diffraction_wedge_candidates_are_built_once_for_multiple_transmi
         return original(*args, **kwargs)
 
     monkeypatch.setattr(
-        rayd_components, "_native_surface_group_edge_candidates", counted
+        mc_basic, "_native_surface_group_edge_candidates", counted
     )
 
     _solve(
@@ -468,7 +470,7 @@ def test_solver_diffraction_wedge_candidates_are_cached_across_solves(monkeypatc
     source = wedge_diffraction_scene()
     scene = _replace_receivers(source, _grid_at_x(3.0))
     call_count = 0
-    original = rayd_components._native_surface_group_edge_candidates
+    original = mc_basic._native_surface_group_edge_candidates
 
     def counted(*args, **kwargs):
         nonlocal call_count
@@ -476,7 +478,7 @@ def test_solver_diffraction_wedge_candidates_are_cached_across_solves(monkeypatc
         return original(*args, **kwargs)
 
     monkeypatch.setattr(
-        rayd_components, "_native_surface_group_edge_candidates", counted
+        mc_basic, "_native_surface_group_edge_candidates", counted
     )
 
     _solve(

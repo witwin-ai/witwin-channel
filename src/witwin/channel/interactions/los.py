@@ -1,7 +1,18 @@
-"""Enumerated line-of-sight topology discovery."""
+"""Line-of-sight: discrete candidate planning and enumerated orchestration.
+
+One file holds the whole LoS concept: the discrete candidate plan that names
+the (tx, rx) pairs a LoS solve enumerates, and the enumerated stage that
+exports the pair rows, gates them on visibility (or the ADR-017 ISB boundary
+taper), and packs them into a topology block.
+
+The native facades this calls stay in ``witwin.channel.kernels``; the visibility
+query and the ISB clearance facade stay under ``propagation.geometry`` because
+other concepts and the consumer replay path share them.
+"""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import torch
@@ -14,14 +25,33 @@ from witwin.channel.propagation.geometry.visibility import (
     VisibilityQuery,
     run_visibility_query,
 )
-from witwin.channel.propagation.topology.discovery.los import (
-    prepare_los_candidates,
-)
 from witwin.channel.propagation.topology.export import _ensure_topology_fields
 from witwin.channel.kernels import topology as topology_kernels
 
 if TYPE_CHECKING:
     from witwin.channel.scene.endpoints import SolverScene as Scene
+
+
+@dataclass(frozen=True, slots=True)
+class LosCandidatePlan:
+    tx_id: torch.Tensor
+    rx_id: torch.Tensor
+    sequence_width: int
+    candidate_count: int
+
+
+def prepare_los_candidates(
+    *,
+    tx_id: torch.Tensor,
+    rx_id: torch.Tensor,
+    sequence_width: int,
+) -> LosCandidatePlan:
+    return LosCandidatePlan(
+        tx_id=tx_id,
+        rx_id=rx_id,
+        sequence_width=int(sequence_width),
+        candidate_count=int(tx_id.numel()),
+    )
 
 
 def _los_topology(

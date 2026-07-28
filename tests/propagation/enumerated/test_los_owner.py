@@ -7,7 +7,7 @@ import pytest
 import torch
 
 from ci import check_import_graph as graph
-from witwin.channel.propagation.enumerated import los
+from witwin.channel.interactions import los
 from witwin.channel.propagation.geometry import visibility
 
 
@@ -182,9 +182,8 @@ def test_los_topology_skips_visibility_for_structure_free_scene(monkeypatch):
 
 def test_los_owners_have_no_core_path_dependency_or_scc():
     owners = {
-        "witwin.channel.propagation.enumerated.los",
+        "witwin.channel.interactions.los",
         "witwin.channel.propagation.geometry.visibility",
-        "witwin.channel.propagation.topology.discovery.los",
     }
     core = "witwin.channel.core.path_topology"
     edges = graph.collect_import_edges(PACKAGE_ROOT)

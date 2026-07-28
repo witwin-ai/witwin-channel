@@ -5,11 +5,10 @@ import hashlib
 from pathlib import Path
 
 from ci import check_import_graph as graph
-from witwin.channel.propagation.enumerated import coupled, engine
-from witwin.channel.propagation.geometry import coupled as geometry_coupled
-from witwin.channel.propagation.topology.discovery import (
-    coupled as discovery_coupled,
-)
+from witwin.channel.propagation.enumerated import engine
+from witwin.channel.interactions import coupled
+from witwin.channel.interactions import coupled as geometry_coupled
+from witwin.channel.interactions import coupled as discovery_coupled
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -119,7 +118,7 @@ def test_export_component_stage_order_remains_canonical():
 
 
 def test_coupled_owner_has_no_core_path_dependency_or_scc():
-    owner = "witwin.channel.propagation.enumerated.coupled"
+    owner = "witwin.channel.interactions.coupled"
     core = "witwin.channel.core.path_topology"
     edges = graph.collect_import_edges(PACKAGE_ROOT)
     adjacency: dict[str, set[str]] = {}

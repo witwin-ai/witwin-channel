@@ -7,7 +7,7 @@ import torch
 
 from tests.support.core_world import make_receiver_grid
 from witwin.channel import deterministic
-from witwin.channel.propagation.enumerated import scattering as enumerated
+from witwin.channel.interactions import scattering as enumerated
 from witwin.channel.propagation.geometry import endpoints
 from witwin.channel.scene.endpoints import ReceiverGrid as ReceiverGridView
 

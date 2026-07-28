@@ -24,12 +24,12 @@ under-specified for the Python facade spelling; the native ABI symbol names are
 normative):
 
 * The ``_backward`` / ``_jvp`` FACADES live beside their forwards in
-  ``montecarlo.bdpt.paths_ad`` / ``.maps`` (the ``scattering`` chain
+  ``montecarlo.bdpt`` / ``kernels.montecarlo`` (the ``scattering`` chain
   precedent: ``functional.*_backward``), named ``<forward>_backward`` /
   ``<forward>_jvp``, taking the forward's positional/keyword args plus
   ``grad_*`` / ``need_grad_*`` (backward) or ``tangent_*`` (jvp) keywords.
 * The plan-07 ``torch.autograd.Function`` wrappers live in
-  ``montecarlo.bdpt.autograd`` as ``<forward>_ad`` (fields/materials
+  ``montecarlo.bdpt`` as ``<forward>_ad`` (fields/materials
   ``autograd.py`` precedent).
 * The reflected-subpath differentiable material set is
   ``{eps_r, sigma_e, gain, thickness}`` with ``mu_r`` frozen (the
@@ -47,7 +47,7 @@ from tests.ad._fd import relative_error
 from tests.ad._tolerances import ABS_TOL
 from tests.reference import bdpt_ad_oracles as O
 from witwin.channel.kernels import montecarlo as M
-from witwin.channel.montecarlo.bdpt import paths_ad as PA
+from witwin.channel.montecarlo import bdpt as PA
 from witwin.channel import runtime
 
 pytestmark = pytest.mark.skipif(
@@ -1121,7 +1121,7 @@ def test_fixed_inputs_reject_gradients_loudly():
     geometry are frozen; requesting their gradient raises.
     """
 
-    from witwin.channel.montecarlo.bdpt import autograd as bdpt_autograd
+    from witwin.channel.montecarlo import bdpt as bdpt_autograd
 
     fx = _reflect_fixture(111)
     light, inter, material = _reflect_native(fx)

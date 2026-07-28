@@ -5,7 +5,7 @@ from dataclasses import FrozenInstanceError, fields
 import pytest
 import torch
 
-from witwin.channel.propagation.topology.discovery import coupled
+from witwin.channel.interactions import coupled
 
 
 def test_prepare_coupled_candidate_plan_freezes_counts_and_tensor_identity():

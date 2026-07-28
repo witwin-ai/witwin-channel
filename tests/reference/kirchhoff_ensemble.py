@@ -1,7 +1,7 @@
 """Reference Torch Kirchhoff ensemble row physics (ADR-010 op 1).
 
 The previous production per-row physics of
-``propagation/enumerated/scattering.py::_ensemble_rows`` after the RayD
+``interactions/scattering.py::_ensemble_rows`` after the RayD
 visibility filter (frame projections, table lookup, radiometric gain). The
 Kirchhoff table lookup itself was already native (``eval_bsdf`` ->
 ``scattering_table_eval``) and is reused unchanged. Test-only: MUST NOT be

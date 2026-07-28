@@ -5,8 +5,8 @@ import torch
 
 from tests.support.core_world import make_receiver, make_transmitter
 from witwin.core import AntennaPattern, Scene
+from witwin.channel.montecarlo import basic as solver
 from witwin.channel.montecarlo.basic import Config
-from witwin.channel.montecarlo.basic import solver
 
 
 def _scene(feature: str) -> Scene:

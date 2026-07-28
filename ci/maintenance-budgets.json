@@ -12,19 +12,19 @@
       "owner": "deterministic maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
-    "src/witwin/channel/montecarlo/basic/pipeline.py::solve_pipeline": {
+    "src/witwin/channel/montecarlo/basic.py::solve_pipeline": {
       "ceiling": 52,
       "expires_on": "2027-01-31",
       "owner": "montecarlo/basic maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
-    "src/witwin/channel/montecarlo/basic/rayd_components.py::diffraction_component_map": {
+    "src/witwin/channel/montecarlo/basic.py::diffraction_component_map": {
       "ceiling": 19,
       "expires_on": "2027-01-31",
       "owner": "montecarlo/basic maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
-    "src/witwin/channel/montecarlo/bdpt/config.py::Config.__post_init__": {
+    "src/witwin/channel/montecarlo/bdpt.py::Config.__post_init__": {
       "ceiling": 19,
       "expires_on": "2027-01-31",
       "owner": "montecarlo/bdpt maintainers",
@@ -36,13 +36,13 @@
       "owner": "montecarlo/bdpt maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
-    "src/witwin/channel/montecarlo/bdpt/pipeline.py::_collect_connection_samples": {
+    "src/witwin/channel/montecarlo/bdpt.py::_collect_connection_samples": {
       "ceiling": 36,
       "expires_on": "2027-01-31",
       "owner": "montecarlo/bdpt maintainers",
       "reason": "Per-strategy connection-sample orchestration extracted verbatim from the former solve() monolith; each component branch stays inside this single stage."
     },
-    "src/witwin/channel/montecarlo/bdpt/pipeline.py::_prepare_workspace_and_capabilities": {
+    "src/witwin/channel/montecarlo/bdpt.py::_prepare_workspace_and_capabilities": {
       "ceiling": 16,
       "expires_on": "2027-01-31",
       "owner": "montecarlo/bdpt maintainers",

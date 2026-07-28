@@ -49,8 +49,12 @@ def _native_imports() -> dict[str, Any]:
         mc_store_scaled_component_map,
     )
     from witwin.channel.core.material_runtime import face_material_tensors
-    from witwin.channel.montecarlo.basic.backend import _LIGHT_SPEED_M_PER_S, transmitter_positions
-    from witwin.channel.montecarlo.basic.raydn_components import _sample_directions, grid_spec
+    from witwin.channel.montecarlo.basic import (
+        _LIGHT_SPEED_M_PER_S,
+        _sample_directions,
+        grid_spec,
+        transmitter_positions,
+    )
 
     return {
         "torch": torch,

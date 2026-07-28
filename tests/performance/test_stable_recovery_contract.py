@@ -55,10 +55,10 @@ def _evidence() -> dict[str, object]:
 
 def test_live_reflection_and_diffraction_producers_remain_compact() -> None:
     reflection_calls = _called_attributes(
-        "src/witwin/channel/propagation/enumerated/reflection.py"
+        "src/witwin/channel/interactions/reflection.py"
     )
     diffraction_calls = _called_attributes(
-        "src/witwin/channel/propagation/enumerated/diffraction.py"
+        "src/witwin/channel/interactions/diffraction.py"
     )
 
     assert {
@@ -124,8 +124,8 @@ def test_public_configs_do_not_expose_retired_capacity_controls() -> None:
     for relative in (
         "src/witwin/channel/path.py",
         "src/witwin/channel/deterministic.py",
-        "src/witwin/channel/montecarlo/basic/config.py",
-        "src/witwin/channel/montecarlo/bdpt/config.py",
+        "src/witwin/channel/montecarlo/basic.py",
+        "src/witwin/channel/montecarlo/bdpt.py",
     ):
         tree = ast.parse(_source(relative), filename=relative)
         config = next(

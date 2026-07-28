@@ -5,8 +5,8 @@ import torch
 
 from witwin.core import AntennaPattern, Scene
 from tests.support.core_world import make_receiver, make_transmitter
+from witwin.channel.montecarlo import bdpt as bdpt_solver
 from witwin.channel.montecarlo.bdpt import Config
-from witwin.channel.montecarlo.bdpt import solver
 
 
 def _scene(feature: str) -> Scene:
@@ -42,10 +42,10 @@ def test_unsupported_endpoint_features_fail_before_cuda(
         cuda_calls += 1
         raise AssertionError("CUDA capability queried before endpoint preflight")
 
-    monkeypatch.setattr(solver.torch.cuda, "is_available", unexpected_cuda)
+    monkeypatch.setattr(bdpt_solver.torch.cuda, "is_available", unexpected_cuda)
 
     with pytest.raises(ValueError, match="does not support"):
-        solver.solve(
+        bdpt_solver.solve(
             _scene(feature),
             Config(samples=1, components={"los"}),
             reference_frequency_hz=1.0e9,

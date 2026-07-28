@@ -5,9 +5,11 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from witwin.channel.propagation.enumerated import diffraction
+from witwin.channel.interactions import diffraction
 from witwin.channel.kernels import fields as field_kernels
-from witwin.channel.propagation.geometry import (
+# The discovery, geometry and enumerated halves of diffraction are one module
+# now; the alias is kept so the geometry-facing assertions still read as such.
+from witwin.channel.interactions import (
     diffraction as geometry_diffraction,
 )
 

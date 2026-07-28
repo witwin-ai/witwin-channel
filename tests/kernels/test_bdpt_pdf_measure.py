@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from witwin.channel.kernels import montecarlo as ops
-from witwin.channel.montecarlo.events.scattering import (
+from witwin.channel.interactions.scattering import (
     solid_angle_to_area_jacobian,
 )
 

@@ -70,7 +70,7 @@ def load_diagnostic_contract() -> dict[str, object]:
             "witwin.channel.montecarlo.events.transmission.straight_transmission_chains"
         ),
         "diffraction": (
-            "witwin.channel.propagation.enumerated.diffraction._diffraction_topology_order1"
+            "witwin.channel.interactions.diffraction._diffraction_topology_order1"
         ),
     }
     for group, callable_name in expected_callables.items():
