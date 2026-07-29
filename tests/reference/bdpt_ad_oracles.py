@@ -27,15 +27,15 @@ convention for every op is pinned to the native forward it mirrors, cited inline
   compensation phase ``exp(-j (k_par*lateral - k0*jump))``; the throughput proxy is
   ``sqrt(cap_t_TE*w_s + cap_t_TM*w_p)`` with the full-stack power transmittance.
 * Endpoint connection mirrors ``bdpt_endpoint_connection_samples_kernel``
-  (``native/channel/kernels/bdpt_connect_samples.cu``):
+  (``native/channel/kernels/bdpt_connect.cu``):
   ``contribution = P_src * |proj(F)|^2 * (1/(2 k L))^2 / N`` with ``proj`` the frozen
   transverse receiver projection and ``L`` the frozen unfolded length.
 * Accumulate mirrors ``bdpt_accumulate_connection_samples_*_kernel``
-  (``native/channel/kernels/bdpt_connect_accumulation.cu``): power domain bins
+  (``native/channel/kernels/bdpt_connect.cu``): power domain bins
   ``contribution*mis``; coherent domain bins the complex coefficient and finalizes
   ``|sum|^2``.
 * Finalize mirrors ``bdpt_finalize_point_components_kernel`` /
-  ``bdpt_finalize_component_maps`` (``native/channel/kernels/bdpt_accum.cu``).
+  ``bdpt_finalize_component_maps`` (``native/channel/kernels/montecarlo_common.cu``).
 
 Test-only: MUST NOT be imported from production packages. Imports only ``torch`` and
 the sibling ``tests.reference`` / ``tests.ad`` helpers, so it stays import-clean

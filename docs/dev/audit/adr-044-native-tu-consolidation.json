@@ -1,0 +1,329 @@
+{
+  "schema_version": 1,
+  "adr": "ADR-044",
+  "baseline_git_sha": "b1ca43a801fbff97a0a84e802eaa7ab5f02653b5f",
+  "baseline_cuda_translation_units": 45,
+  "target_cuda_translation_units": 15,
+  "target_cuda_total_lines": 30073,
+  "invariants": [
+    "abi_symbol_multiset",
+    "kernel_launch_multiset",
+    "explicit_sync_count",
+    "compile_mode",
+    "numerical_expression_order",
+    "stream_semantics",
+    "tape_lifetime",
+    "row_identity"
+  ],
+  "private_symbol_renames": {
+    "reason": "Resolve only anonymous-namespace collisions created by co-location; no ABI, kernel entry, launch, stream, or numerical expression changed.",
+    "mechanism": "Provenance-section-scoped preprocessor aliases, undefined at the next section boundary, preserve raw function-body tokens while giving the compiler unique private names.",
+    "symbols": [
+      "path_compaction.cu: channel_neg_kd_phase -> channel_neg_kd_phase_compaction",
+      "path_compaction.cu: kLightSpeedMetersPerSecond -> kCompactionLightSpeedMetersPerSecond",
+      "path_compaction.cu: kPi -> kCompactionPi",
+      "enumerated_canonical_capacity_select.cu: launch_blocks -> canonical_select_launch_blocks",
+      "enumerated_transmission_topology_pack.cu: launch_blocks -> transmission_pack_launch_blocks",
+      "enumerated_transmission_topology_pack.cu: kBlockSize -> kTransmissionPackBlockSize",
+      "evaluated_paths_capacity_pack_ad.cu: launch_blocks -> evaluated_paths_ad_launch_blocks",
+      "field_transport.cu: launch_blocks -> field_transport_launch_blocks",
+      "field_transport.cu: kBlockSize -> kFieldTransportBlockSize",
+      "field_rough_scale.cu: launch_blocks -> rough_scale_launch_blocks",
+      "field_rough_scale.cu: kBlockSize -> kRoughScaleBlockSize",
+      "field_rough_scale.cu: zero_filled -> rough_scale_zero_filled",
+      "field_source_amplitude.cu: launch_blocks -> source_amplitude_launch_blocks",
+      "field_source_amplitude.cu: kBlockSize -> kSourceAmplitudeBlockSize",
+      "coupled_topology.cu: launch_blocks -> coupled_topology_launch_blocks",
+      "coupled_topology.cu: kBlockSize -> kCoupledTopologyBlockSize",
+      "mc_capacity_failure_component_maps_sanitize.cu: kBlockSize -> kMcSanitizeBlockSize",
+      "bdpt_subpaths_ad.cu: kSubpathEps -> kSubpathAdEps",
+      "bdpt_subpaths_ad.cu: kSubpathEpsilon0 -> kSubpathAdEpsilon0",
+      "consumer_fixed_los_gather.cu: kBlockSize -> kFixedLosGatherBlockSize",
+      "deterministic_accum.cu: kBlockSize -> kAccumBlockSize",
+      "accum.cu: check_component_map -> check_shared_component_map",
+      "bdpt_accum.cu: check_component_map -> check_bdpt_point_component_map"
+    ]
+  },
+  "include_order_repairs": [
+    {
+      "target": "evaluated_paths.cu",
+      "action": "undefine Windows RPC small macro before the later Torch CUDAGuard include",
+      "numerical_effect": "none; outside all function bodies"
+    }
+  ],
+  "groups": [
+    {
+      "target": "path_topology.cu",
+      "sources": [
+        "path_trace.cu",
+        "path_compaction.cu",
+        "deterministic_topology.cu"
+      ],
+      "baseline_lines": 4123,
+      "compile_mode": "default",
+      "baseline_launch_sites": 51,
+      "baseline_explicit_sync_sites": 4,
+      "baseline_device_trap_sites": 0
+    },
+    {
+      "target": "evaluated_paths.cu",
+      "sources": [
+        "enumerated_canonical_capacity_select.cu",
+        "enumerated_transmission_topology_pack.cu",
+        "evaluated_paths_compact_finalize.cu",
+        "evaluated_paths_capacity_pack_ad.cu"
+      ],
+      "baseline_lines": 2599,
+      "compile_mode": "default",
+      "baseline_launch_sites": 29,
+      "baseline_explicit_sync_sites": 1,
+      "baseline_device_trap_sites": 0
+    },
+    {
+      "target": "deterministic.cu",
+      "sources": [
+        "deterministic_field.cu",
+        "deterministic_accum.cu"
+      ],
+      "baseline_lines": 1999,
+      "compile_mode": "default",
+      "baseline_launch_sites": 20,
+      "baseline_explicit_sync_sites": 3,
+      "baseline_device_trap_sites": 0
+    },
+    {
+      "target": "field_transport.cu",
+      "sources": [
+        "field_transport.cu",
+        "field_transport_free_space.cu",
+        "field_transport_reflection.cu",
+        "field_rough_scale.cu",
+        "field_source_amplitude.cu"
+      ],
+      "baseline_lines": 3481,
+      "compile_mode": "default",
+      "baseline_launch_sites": 16,
+      "baseline_explicit_sync_sites": 0,
+      "baseline_device_trap_sites": 0
+    },
+    {
+      "target": "field_wedge_coupled.cu",
+      "sources": [
+        "field_wedge_ad_coupled.cu",
+        "field_wedge_ad_prepare.cu",
+        "field_wedge_ad_project.cu",
+        "coupled_topology.cu"
+      ],
+      "baseline_lines": 2801,
+      "compile_mode": "default_precise",
+      "baseline_launch_sites": 13,
+      "baseline_explicit_sync_sites": 0,
+      "baseline_device_trap_sites": 0
+    },
+    {
+      "target": "los_consumer.cu",
+      "sources": [
+        "los.cu",
+        "los_silhouette_clearance.cu",
+        "consumer_fixed_los_gather.cu",
+        "consumer_los_jones.cu"
+      ],
+      "baseline_lines": 2136,
+      "compile_mode": "default",
+      "baseline_launch_sites": 17,
+      "baseline_explicit_sync_sites": 1,
+      "baseline_device_trap_sites": 0
+    },
+    {
+      "target": "capacity_failure.cu",
+      "sources": [
+        "capacity_failure_state.cu",
+        "capacity_failure_terminal.cu",
+        "enumerated_capacity_failure_sanitize.cu",
+        "mc_capacity_failure_component_maps_sanitize.cu"
+      ],
+      "baseline_lines": 404,
+      "compile_mode": "default",
+      "baseline_launch_sites": 4,
+      "baseline_explicit_sync_sites": 0,
+      "baseline_device_trap_sites": 0
+    },
+    {
+      "target": "montecarlo_common.cu",
+      "sources": [
+        "accum.cu",
+        "bdpt_accum.cu",
+        "sampling.cu",
+        "material.cu",
+        "scattering.cu"
+      ],
+      "baseline_lines": 955,
+      "compile_mode": "default",
+      "baseline_launch_sites": 11,
+      "baseline_explicit_sync_sites": 1,
+      "baseline_device_trap_sites": 0
+    },
+    {
+      "target": "reflection.cu",
+      "sources": [
+        "reflection.cu"
+      ],
+      "baseline_lines": 850,
+      "compile_mode": "default_precise",
+      "baseline_launch_sites": 5,
+      "baseline_explicit_sync_sites": 0,
+      "baseline_device_trap_sites": 0
+    },
+    {
+      "target": "diffraction.cu",
+      "sources": [
+        "diffraction.cu",
+        "diffraction_discovery.cu"
+      ],
+      "baseline_lines": 1927,
+      "compile_mode": "default_precise",
+      "baseline_launch_sites": 16,
+      "baseline_explicit_sync_sites": 2,
+      "baseline_device_trap_sites": 0
+    },
+    {
+      "target": "mc_transmission_wall_product.cu",
+      "sources": [
+        "mc_transmission_wall_product.cu"
+      ],
+      "baseline_lines": 1342,
+      "compile_mode": "fmad_false",
+      "baseline_launch_sites": 7,
+      "baseline_explicit_sync_sites": 0,
+      "baseline_device_trap_sites": 0
+    },
+    {
+      "target": "kirchhoff_table_ad.cu",
+      "sources": [
+        "kirchhoff_table_ad.cu"
+      ],
+      "baseline_lines": 1293,
+      "compile_mode": "fmad_false",
+      "baseline_launch_sites": 21,
+      "baseline_explicit_sync_sites": 0,
+      "baseline_device_trap_sites": 0
+    },
+    {
+      "target": "bdpt_connect.cu",
+      "sources": [
+        "bdpt_connect_mis.cu",
+        "bdpt_connect_samples.cu",
+        "bdpt_connect_visibility.cu",
+        "bdpt_connect_accumulation.cu",
+        "bdpt_connect_ad.cu"
+      ],
+      "baseline_lines": 2851,
+      "compile_mode": "default",
+      "baseline_launch_sites": 23,
+      "baseline_explicit_sync_sites": 2,
+      "baseline_device_trap_sites": 0
+    },
+    {
+      "target": "bdpt_subpaths.cu",
+      "sources": [
+        "bdpt_subpaths.cu",
+        "bdpt_subpaths_ad.cu"
+      ],
+      "baseline_lines": 2629,
+      "compile_mode": "default",
+      "baseline_launch_sites": 8,
+      "baseline_explicit_sync_sites": 0,
+      "baseline_device_trap_sites": 0
+    },
+    {
+      "target": "bdpt_support.cu",
+      "sources": [
+        "bdpt_sampling.cu",
+        "bdpt_maps.cu"
+      ],
+      "baseline_lines": 492,
+      "compile_mode": "default",
+      "baseline_launch_sites": 4,
+      "baseline_explicit_sync_sites": 0,
+      "baseline_device_trap_sites": 0
+    }
+  ],
+  "validation": {
+    "date": "2026-07-28",
+    "scope": "user-directed local sm_120-real only; no PTX, virtual-architecture, or multi-architecture validation claim",
+    "environment": {
+      "python_environment": "witwin2",
+      "python_executable": "C:\\Users\\Asixa\\miniconda3\\envs\\witwin2\\python.exe",
+      "generator": "Ninja",
+      "build_type": "Release",
+      "cuda_architectures": "120-real",
+      "ptx_or_virtual_architecture": false,
+      "rayd_source_dir": "C:\\tmp\\channel_adr044_rayd",
+      "rayd_commit": "94cf6eaf39f3625af482bb3fd8cba1377a804ecc"
+    },
+    "build": {
+      "status": "passed",
+      "task_count": 62,
+      "full_rebuild_after_architecture_change": true,
+      "elapsed_seconds": 1373.078,
+      "error_marker_count": 0,
+      "per_unit_compile_time": "not emitted by the Ninja log",
+      "compiler_peak_memory": "not emitted by the toolchain",
+      "ptxas_diagnostics": "not emitted by the current compiler flags; no resource-change claim is made",
+      "warnings": "existing toolchain code-page, conversion, and unused private-symbol warnings only"
+    },
+    "artifact": {
+      "path": "build/cmake_adr044/_channel.cp311-win_amd64.pyd",
+      "size_bytes": 34934784,
+      "sha256": "c555b237323743a8b228983d9c8d388db0af86c087f31cb1889efc2b4b88f599",
+      "build_fingerprint": "efc19ddfeadbb3196e9f0f0afbe74ae338cce2124ca07d80f2ba3584c79bf3e0"
+    },
+    "tests": [
+      {
+        "scope": "focused capacity, compact-path, field, scattering-chain, and BDPT primal/JVP/VJP",
+        "passed": 117,
+        "failed": 0,
+        "warnings": 21,
+        "elapsed_seconds": 6.26
+      },
+      {
+        "scope": "direct Python/native AD wrapper control-flow coverage",
+        "passed": 11,
+        "failed": 0
+      },
+      {
+        "scope": "zero-debt native-symbol owner, runtime, and facade contracts",
+        "passed": 344,
+        "failed": 0,
+        "warnings": 18,
+        "elapsed_seconds": 15.95
+      },
+      {
+        "scope": "full pytest suite",
+        "passed": 2678,
+        "failed": 0,
+        "skipped": 8,
+        "xfailed": 1,
+        "warnings": 21,
+        "elapsed_seconds": 297.51
+      }
+    ],
+    "governance": {
+      "applicable_checks": "passed",
+      "static_regression_tests_passed": 85,
+      "duplication_current_regions": 152,
+      "duplication_unclassified_regions": 0,
+      "duplication_stale_regions": 0,
+      "duplication_coverage_percent": 9.090609,
+      "frozen_duplication_coverage_percent": 10.211512,
+      "coverage_policy": "passed",
+      "statement_coverage_percent": 87.481429,
+      "branch_coverage_percent": 67.113665,
+      "core_statement_coverage_percent": 90.468785,
+      "coverage_threshold_or_exemption_changes": "none",
+      "single_definition_recorded_duplicates": 0,
+      "single_definition_historical_duplicates_repaid": 19
+    },
+    "backward_compatibility": "none; deleted source paths survive only as historical evidence names and provenance labels, never as build inputs, aliases, or re-exports"
+  }
+}

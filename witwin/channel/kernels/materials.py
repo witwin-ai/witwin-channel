@@ -22,7 +22,6 @@ from witwin.channel.runtime import (
     _ad_reject_fixed_inputs,
     _ad_reject_fixed_tangents,
     disable_functorch,
-    native_extension,
     required_symbol as _required_native_op,
     validate_cuda_tensor,
 )
@@ -317,12 +316,7 @@ def mc_face_material_tensors(
     if material_mu_r.shape != material_eps_r.shape:
         raise ValueError("material_mu_r must match material_eps_r shape")
 
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_face_material_tensors"):
-        raise RuntimeError(
-            "_channel.mc_face_material_tensors CUDA kernel is required"
-        )
-    exported = native.mc_face_material_tensors(
+    exported = _required_native_op("mc_face_material_tensors")(
         material_eps_r,
         material_sigma_e,
         material_mu_r,

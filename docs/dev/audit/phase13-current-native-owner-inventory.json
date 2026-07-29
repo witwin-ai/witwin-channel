@@ -12210,9 +12210,9 @@
       },
       "target_source_evidence": [
         {
-          "path": "native/channel/kernels/enumerated_canonical_capacity_select.cu",
+          "path": "native/channel/kernels/evaluated_paths.cu",
           "lines": [
-            917
+            890
           ],
           "count": 1
         }
@@ -12256,9 +12256,9 @@
       },
       "target_source_evidence": [
         {
-          "path": "native/channel/kernels/enumerated_canonical_capacity_select.cu",
+          "path": "native/channel/kernels/evaluated_paths.cu",
           "lines": [
-            1021
+            996
           ],
           "count": 1
         }
@@ -12302,9 +12302,9 @@
       },
       "target_source_evidence": [
         {
-          "path": "native/channel/kernels/evaluated_paths_compact_finalize.cu",
+          "path": "native/channel/kernels/evaluated_paths.cu",
           "lines": [
-            1
+            2011
           ],
           "count": 1
         }
@@ -12348,9 +12348,9 @@
       },
       "target_source_evidence": [
         {
-          "path": "native/channel/kernels/evaluated_paths_compact_finalize.cu",
+          "path": "native/channel/kernels/evaluated_paths.cu",
           "lines": [
-            1
+            2442
           ],
           "count": 1
         }
@@ -12398,9 +12398,9 @@
       },
       "target_source_evidence": [
         {
-          "path": "native/channel/kernels/evaluated_paths_compact_finalize.cu",
+          "path": "native/channel/kernels/evaluated_paths.cu",
           "lines": [
-            1
+            2502
           ],
           "count": 1
         }
@@ -12448,9 +12448,9 @@
       },
       "target_source_evidence": [
         {
-          "path": "native/channel/kernels/consumer_los_jones.cu",
+          "path": "native/channel/kernels/los_consumer.cu",
           "lines": [
-            1
+            2086
           ],
           "count": 1
         }
@@ -12494,9 +12494,9 @@
       },
       "target_source_evidence": [
         {
-          "path": "native/channel/kernels/consumer_fixed_los_gather.cu",
+          "path": "native/channel/kernels/los_consumer.cu",
           "lines": [
-            1
+            1643
           ],
           "count": 1
         }
@@ -12540,9 +12540,9 @@
       },
       "target_source_evidence": [
         {
-          "path": "native/channel/kernels/consumer_fixed_los_gather.cu",
+          "path": "native/channel/kernels/los_consumer.cu",
           "lines": [
-            1
+            1789
           ],
           "count": 1
         }
@@ -12586,9 +12586,9 @@
       },
       "target_source_evidence": [
         {
-          "path": "native/channel/kernels/consumer_fixed_los_gather.cu",
+          "path": "native/channel/kernels/los_consumer.cu",
           "lines": [
-            1
+            1860
           ],
           "count": 1
         }
@@ -12818,5 +12818,11 @@
       "removed": 19,
       "after": 234
     }
+  },
+  "adr044_translation_unit_consolidation": {
+    "status": "current source evidence refreshed",
+    "translation_units_before": 45,
+    "translation_units_after": 15,
+    "scope": "The nine post-ADR-032 symbols already recorded with current channel paths now point at their exact merged definition lines; earlier phase snapshots remain historical evidence."
   }
 }

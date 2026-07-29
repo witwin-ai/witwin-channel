@@ -17,7 +17,7 @@ mirrors so the lockstep companion stays honest):
 
 * Per-bounce specular Jones transport (frame, Fresnel, s/p projection, field
   update) mirrors ``reflection_chain_eval`` in
-  ``native/channel/kernels/field_transport_reflection.cu`` and the
+  ``native/channel/kernels/field_transport.cu`` and the
   device primitives ``reflect_frame`` / ``slab_fresnel`` / ``reflect_complex3``
   in ``native/channel/field_transport.cuh``.
 * Rough per-bounce ``C_r = exp(-2*(k0*cos_b*sigma_b)^2)`` attenuation follows

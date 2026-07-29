@@ -21,7 +21,7 @@ reevaluate |coefficient| ratio : [1.0, 1.0]   expected 2.0
 
 Not a selection bug and not a regression. The field transport kernels publish
 both families on one launch
-(`native/channel/kernels/field_transport_free_space.cu:36-44`):
+(`native/channel/kernels/field_transport.cu:1222-1230`):
 
 ```text
 field_vector = carrier * tx_axis              unit excitation
@@ -46,7 +46,7 @@ is.
   compute, no new saved tensor, no new launch.
 - `Complex3Transport.field` publishes a new native output
   `path_field_vector = field_vector * sqrt(max(tx_power, 0))` from
-  `native/channel/kernels/field_source_amplitude.cu`, with backward and JVP
+  `native/channel/kernels/field_transport.cu`, with backward and JVP
   companions. One elementwise launch, only on a `complex3_transport` request.
 - `JonesTransport`, `PathFields`, `PathResult`, `deterministic.Result`,
   `deterministic.PathTable`, `montecarlo.basic.Result` and the BDPT

@@ -86,7 +86,7 @@ def test_current_baseline_is_exact_and_passes() -> None:
     }
 
 
-def test_repository_budget_retires_the_python_file_size_gate() -> None:
+def test_repository_budget_retires_all_file_size_gates() -> None:
     config = budgets.load_budgets(BUDGET_PATH)
 
     # There is no maximum Python file length, so the limit and the three
@@ -96,12 +96,11 @@ def test_repository_budget_retires_the_python_file_size_gate() -> None:
     # The reason is recorded in the config itself, next to what survived.
     assert "Retired 2026-07-27" in config["limits_policy"]["file_lines"]
     assert "Retired" not in config["limits_policy"]["function_complexity"]
-    # Complexity and native size stay mandatory and keep their exact values.
+    # Native TU size was retired separately under ADR-044; complexity remains.
     assert config["limits"]["function_complexity"] == {"recommended": 15}
-    assert config["limits"]["native_file_lines"] == {
-        "recommended": 2000,
-        "hard": 3000,
-    }
+    assert "native_file_lines" not in config["limits"]
+    assert "native_file_exemptions" not in config
+    assert "Retired 2026-07-28" in config["limits_policy"]["native_file_lines"]
     # Retiring the file-size gate must not disturb the complexity waivers: the
     # section survives, is still enforced, and every surviving entry is live.
     # Asserting a fixed count instead would be brittle and would say nothing -
@@ -159,9 +158,7 @@ def test_absent_file_line_limit_ignores_a_leftover_file_exemption(
     assert budgets.check_budgets(tmp_path, config) == []
 
 
-def test_function_complexity_and_native_limits_stay_mandatory(
-    tmp_path: Path,
-) -> None:
+def test_function_complexity_stays_mandatory(tmp_path: Path) -> None:
     _write_source(tmp_path)
 
     missing_complexity = _config(file_lines=False)
@@ -174,25 +171,31 @@ def test_function_complexity_and_native_limits_stay_mandatory(
     with pytest.raises(ValueError, match="function_exemptions"):
         budgets.check_budgets(tmp_path, missing_function_exemptions)
 
-    missing_native = _config(file_lines=False)
-    missing_native["native_source_root"] = "native/channel"
-    with pytest.raises(ValueError, match="limits.native_file_lines"):
-        budgets.check_budgets(tmp_path, missing_native)
+    retired_native = _config(file_lines=False)
+    retired_native["native_source_root"] = "native/channel"
+    assert [
+        (item.kind, item.subject)
+        for item in budgets.check_budgets(tmp_path, retired_native)
+    ] == [("unbudgeted-debt", "src/product/module.py::branch")]
 
 
-def test_native_translation_units_are_within_budget() -> None:
-    config = budgets.load_budgets(BUDGET_PATH)
-    native_files = budgets.measure_native_files(ROOT, config["native_source_root"])
-    recommended = config["limits"]["native_file_lines"]["recommended"]
-    hard = config["limits"]["native_file_lines"]["hard"]
+def test_absent_native_line_limit_skips_native_size_checks(tmp_path: Path) -> None:
+    _write_source(tmp_path)
+    native_dir = tmp_path / "native" / "channel"
+    native_dir.mkdir(parents=True)
+    unit = native_dir / "kernel.cu"
+    unit.write_text(
+        "\n".join(f"// line {index}" for index in range(5000)),
+        encoding="utf-8",
+    )
 
-    assert native_files, "expected native translation units to be measured"
-    largest = max(native_files, key=lambda metric: metric.lines)
-    # The largest native unit stays below the recommendation, so no native
-    # waiver entry is required; keep the exemption map empty to prove it.
-    assert largest.lines < recommended
-    assert all(metric.lines <= hard for metric in native_files)
-    assert config["native_file_exemptions"] == {}
+    config = _config(file_lines=False, complexity_recommended=10)
+    config["native_source_root"] = "native/channel"
+    config["native_file_exemptions"] = {
+        "native/channel/kernel.cu": _exemption(1)
+    }
+
+    assert budgets.check_budgets(tmp_path, config) == []
 
 
 def test_native_hard_limit_and_waiver_growth_are_enforced(tmp_path: Path) -> None:

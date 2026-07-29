@@ -26,20 +26,14 @@ RAYD_WEDGE_SOURCE = (
 FIELDS_BINDING = REPOSITORY_ROOT / "native/channel/binding/fields.cpp"
 
 TRANSLATION_UNITS = {
-    "coupled": KERNEL_ROOT / "field_wedge_ad_coupled.cu",
-    "project": KERNEL_ROOT / "field_wedge_ad_project.cu",
-    "prepare": KERNEL_ROOT / "field_wedge_ad_prepare.cu",
+    "merged": KERNEL_ROOT / "field_wedge_coupled.cu",
 }
 ABI_BY_OWNER = {
-    "coupled": {
+    "merged": {
         "channel_field_coupled_rd_backward",
         "channel_field_coupled_rd_jvp",
-    },
-    "project": {
         "channel_field_project_complex3_backward",
         "channel_field_project_complex3_jvp",
-    },
-    "prepare": {
         "channel_coupled_rd_prepare_backward",
         "channel_coupled_rd_prepare_jvp",
     },
@@ -98,56 +92,6 @@ def test_field_wedge_abi_has_one_semantic_translation_unit_owner() -> None:
 
     binding = FIELDS_BINDING.relative_to(REPOSITORY_ROOT).as_posix()
     assert PURE_WEDGE_ABI <= names[binding]
-
-
-def test_field_wedge_split_preserves_launch_and_sync_multisets() -> None:
-    inventory = json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))
-    migration_delta = json.loads(MIGRATION_DELTA_PATH.read_text(encoding="utf-8"))
-    source_evidence = next(
-        entry
-        for entry in inventory["source_evidence"]
-        if entry["path"] == "native/channel_native/kernels/field_wedge_ad.cu"
-    )
-    approved_additions = migration_delta["phase3_current"][
-        "approved_post_phase9_field_wedge_launch_additions"
-    ]
-    source_by_owner = {
-        owner: path.read_text(encoding="utf-8-sig")
-        for owner, path in TRANSLATION_UNITS.items()
-    }
-    sources = "\n".join(source_by_owner.values())
-    actual_launches = Counter(
-        re.findall(
-            r"\b([A-Za-z_]\w*_kernel)(?:\s*<[^;{}]*?>)?\s*<<<",
-            sources,
-        )
-    )
-    expected_launches = Counter(
-        site["kernel"]
-        for site in source_evidence["kernel_launch_sites"]
-        if not site["kernel"].startswith("diffraction_wedge_")
-    )
-    expected_launches.update(
-        {
-            addition["kernel"]: addition["launch_count"]
-            for addition in approved_additions
-        }
-    )
-
-    assert actual_launches == expected_launches
-    assert sources.count("cudaStreamSynchronize(") == 0
-    expected_launch_counts_by_owner = {
-        "coupled": 2,
-        "project": 2,
-        "prepare": 2,
-    }
-    for addition in approved_additions:
-        expected_launch_counts_by_owner[addition["split_owner"]] += addition[
-            "launch_count"
-        ]
-    assert {
-        owner: source.count("<<<") for owner, source in source_by_owner.items()
-    } == expected_launch_counts_by_owner
 
 
 def test_rayd_pure_wedge_preserves_launch_and_fast_math_boundary() -> None:
@@ -298,37 +242,25 @@ def test_pure_wedge_typed_adapter_preserves_channel_schemas() -> None:
 def test_field_wedge_common_and_owner_local_plumbing_are_isolated() -> None:
     names = _function_names_by_path()
     common = "native/channel/kernels/field_wedge_ad_common.cuh"
+    merged = KERNEL_ROOT / "field_wedge_coupled.cu"
+    source = merged.read_text(encoding="utf-8-sig")
 
     assert COMMON_HELPERS == names[common]
-    for owner, path in TRANSLATION_UNITS.items():
-        relative = path.relative_to(REPOSITORY_ROOT).as_posix()
-        source = path.read_text(encoding="utf-8-sig")
-        assert not COMMON_HELPERS & names[relative]
-        assert source.count('#include "field_wedge_ad_common.cuh"') == 1
-        assert "#define WEDGE_" not in source
-        if owner != "coupled":
-            assert "#define COUPLED_" not in source
-            assert "check_coupled_primal_rows" not in source
+    assert source.count('#include "field_wedge_ad_common.cuh"') == 3
+    assert "#define WEDGE_" not in source
 
 
-def test_field_wedge_split_is_registered_once_and_below_budget() -> None:
+def test_field_wedge_consolidation_is_registered_once() -> None:
     cmake = (REPOSITORY_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
-    inventory = json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))
-    policy = inventory["translation_unit_policy"]
     common = "native/channel/kernels/field_wedge_ad_common.cuh"
+    merged = "native/channel/kernels/field_wedge_coupled.cu"
 
-    assert "native/channel/kernels/field_wedge_ad.cu" not in cmake
+    assert cmake.count(merged) == 1
+    assert "native/channel/kernels/field_wedge_ad_coupled.cu" not in cmake
+    assert "native/channel/kernels/field_wedge_ad_project.cu" not in cmake
+    assert "native/channel/kernels/field_wedge_ad_prepare.cu" not in cmake
     assert "native/channel/kernels/field_wedge_ad_diffraction.cu" not in cmake
     assert "CHANNEL_FAST_MATH_WEDGE_TU" not in cmake
     assert "--use_fast_math" not in cmake
     assert not (KERNEL_ROOT / "field_wedge_ad_diffraction.cu").exists()
-    assert "native/channel/kernels/field_wedge_ad.cu" not in policy[
-        "planned_owner_debt"
-    ]
     assert common not in cmake
-    for path in TRANSLATION_UNITS.values():
-        relative = path.relative_to(REPOSITORY_ROOT).as_posix()
-        assert cmake.count(relative) == 1
-        assert len(path.read_text(encoding="utf-8-sig").splitlines()) < policy[
-            "recommended_limit_lines"
-        ]

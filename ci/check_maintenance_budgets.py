@@ -1,18 +1,16 @@
 """Enforce deterministic size and complexity budgets for production Python.
 
-``limits.file_lines`` is OPTIONAL. The Python file-size gate was retired on
-2026-07-27 by owner decision, recorded in
-``docs/dev/plans/15-concept-axis-layout-and-module-consolidation-plan.md`` (P2).
-The retired limit encoded "a person cannot hold more than N lines in their head
-at once", and this codebase is now read primarily by agents. That argument is
-about file SIZE only, which is why the two neighbouring budgets are unaffected:
+``limits.file_lines`` and ``limits.native_file_lines`` are OPTIONAL. The Python
+file-size gate was retired on 2026-07-27 by owner decision, recorded in
+``docs/dev/plans/15-concept-axis-layout-and-module-consolidation-plan.md`` (P2),
+and the native translation-unit size gate was retired on 2026-07-28 under
+ADR-044. File length is not an architecture or correctness boundary.
 ``limits.function_complexity`` stays MANDATORY because it is about testability
-and defect density rather than reading capacity, and ``limits.native_file_lines``
-stays MANDATORY and unchanged.
+and defect density rather than reading capacity.
 
-When ``limits.file_lines`` is absent, the Python file-line hard limit, the file
-debt/exemption checks, and the stale-file-exemption check are skipped entirely,
-and a ``file_exemptions`` section is neither required nor read. When it is
+When either optional file-size limit is absent, its hard limit,
+debt/exemption checks, and stale-exemption check are skipped entirely, and the
+corresponding exemption section is neither required nor read. When a limit is
 present, every one of those checks behaves exactly as before.
 """
 
@@ -367,6 +365,12 @@ def _check_python_file_budgets(
 def _check_native_budgets(
     root: Path, config: dict[str, Any], *, today: date
 ) -> list[Violation]:
+    limits = config.get("limits")
+    if not isinstance(limits, dict):
+        raise ValueError("limits must be a JSON object")
+    if "native_file_lines" not in limits:
+        return []
+
     native_source_root = config.get("native_source_root")
     if native_source_root is None:
         return []

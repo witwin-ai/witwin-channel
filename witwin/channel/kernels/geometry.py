@@ -68,7 +68,6 @@ from witwin.channel.runtime import (
     _ad_native_tensor,
     _rayd_scene_resource,
     disable_functorch,
-    native_extension,
     require_capacity_failure_state,
     required_symbol as _required_native_op,
     validate_cuda_tensor,
@@ -1154,12 +1153,7 @@ def mc_diffraction_edge_geometry(
         or face1.shape != edge_v0.shape
     ):
         raise ValueError("edge_v1, face0, and face1 must match edge_v0 shape")
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_diffraction_edge_geometry"):
-        raise RuntimeError(
-            "_channel.mc_diffraction_edge_geometry CUDA kernel is required"
-        )
-    geometry = native.mc_diffraction_edge_geometry(
+    geometry = _required_native_op("mc_diffraction_edge_geometry")(
         vertices,
         faces,
         face_normals,
@@ -1227,12 +1221,7 @@ def mc_surface_group_edge_candidates(
         raise ValueError("edge_v1, face0, and face1 must match edge_v0 shape")
     if selected.shape != edge_v0.shape:
         raise ValueError("selected must match edge_v0 shape")
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_surface_group_edge_candidates"):
-        raise RuntimeError(
-            "_channel.mc_surface_group_edge_candidates CUDA kernel is required"
-        )
-    candidates = native.mc_surface_group_edge_candidates(
+    candidates = _required_native_op("mc_surface_group_edge_candidates")(
         vertices,
         faces,
         face_normals,

@@ -223,19 +223,9 @@ def test_a_module_level_copy_is_rejected(real_facts):
 # --- The recorded-duplicate ledger only shrinks ---------------------------
 
 
-def test_the_recorded_duplicates_are_only_the_symbol_lookup_debt():
-    assert concept(AVAILABILITY).recorded_duplicates == frozenset()
-    assert concept(DEPTH).recorded_duplicates == frozenset()
-    # Started at 37 across 11 modules; the four solver domains repaid their 18
-    # sites by routing them through runtime.required_symbol. The ledger may
-    # only shrink further.
-    assert len(concept(SYMBOL).recorded_duplicates) == 19
-    # 5, not 6: the kernel lift merged the two topology facades that each held
-    # one probe (mc_sample_directions and mc_selected_edge_indices) into one
-    # module. No probe was repaid, so the 19-site ratchet above is unchanged;
-    # only the number of modules the debt is spread across went down.
-    assert len({module for module, _ in concept(SYMBOL).recorded_duplicates}) == 5
-    assert concept(SYMBOL).debt
+def test_the_recorded_duplicate_ledger_is_empty():
+    assert all(entry.recorded_duplicates == frozenset() for entry in single.CONCEPTS)
+    assert all(not entry.debt for entry in single.CONCEPTS)
 
 
 def test_every_recorded_duplicate_still_exists(real_facts):
@@ -275,7 +265,7 @@ def test_a_cleaned_up_duplicate_must_leave_the_ledger(real_facts):
     assert "witwin.channel.gone.already_fixed" in violations[0].detail
 
 
-def test_an_unrecorded_probe_fails_even_though_37_are_recorded(real_facts):
+def test_an_unrecorded_probe_fails_with_an_empty_ledger(real_facts):
     violations = single.concept_violations(
         concept(SYMBOL),
         real_facts + planted(SYMBOL_COPY, "witwin.channel.scene.compiler"),

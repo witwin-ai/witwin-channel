@@ -166,18 +166,13 @@
   "limits": {
     "function_complexity": {
       "recommended": 15
-    },
-    "native_file_lines": {
-      "hard": 3000,
-      "recommended": 2000
     }
   },
   "limits_policy": {
     "file_lines": "Retired 2026-07-27 by owner decision, recorded in docs/dev/plans/15-concept-axis-layout-and-module-consolidation-plan.md (P2). There is no maximum Python file length. The retired limit (hard 2000, recommended 1200) encoded 'a person cannot hold more than N lines in their head at once', and this codebase is now read primarily by agents. This is a deliberate policy amendment, not a budget weakened to make a change pass, and the three file_exemptions it waived were removed with it.",
     "function_complexity": "Mandatory. The retirement argument above is about file SIZE only. Complexity is about testability and defect density, not reading capacity, so agent-assisted reading does not weaken it.",
-    "native_file_lines": "Mandatory and unchanged. The Python retirement does not apply to native translation units."
+    "native_file_lines": "Retired 2026-07-28 by owner decision under ADR-044. There is no maximum native translation-unit length. Native ownership, ABI, compile-mode, launch/synchronization, tape-lifetime, numerical-order, exactness, build-resource, and performance gates remain mandatory."
   },
-  "native_file_exemptions": {},
   "native_source_root": "native/channel",
   "schema_version": 1,
   "source_root": "witwin/channel"

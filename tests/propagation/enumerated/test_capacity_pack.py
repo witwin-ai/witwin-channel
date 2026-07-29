@@ -293,11 +293,19 @@ def test_enumerated_failure_sanitizer_ad_owns_the_native_companions() -> None:
 def test_enumerated_failure_sanitizer_family_has_no_host_transfer() -> None:
     root = Path(__file__).resolve().parents[3]
     sanitizer = (
-        root / "native/channel/kernels/enumerated_capacity_failure_sanitize.cu"
+        root / "native/channel/kernels/capacity_failure.cu"
     ).read_text(encoding="utf-8")
+    sanitizer = sanitizer.split(
+        "// ---- Consolidated from enumerated_capacity_failure_sanitize.cu ----", 1
+    )[1].split(
+        "// ---- Consolidated from mc_capacity_failure_component_maps_sanitize.cu ----", 1
+    )[0]
     ad = (
-        root / "native/channel/kernels/evaluated_paths_capacity_pack_ad.cu"
+        root / "native/channel/kernels/evaluated_paths.cu"
     ).read_text(encoding="utf-8")
+    ad = ad.split(
+        "// ---- Consolidated from evaluated_paths_capacity_pack_ad.cu ----", 1
+    )[1]
     assert "failure_state[0] != 0" in sanitizer
     assert "if (!valid[destination])" in ad
     for source in (sanitizer, ad):

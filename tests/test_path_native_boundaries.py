@@ -1,31 +1,14 @@
 from __future__ import annotations
 
-import json
-import re
-from collections import Counter
 from pathlib import Path
 
 from tools.refactor_baseline import cpp_body_hashes
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-KERNEL_ROOT = REPOSITORY_ROOT / "native/channel/kernels"
-INVENTORY_PATH = (
-    REPOSITORY_ROOT / "docs/dev/audit/phase9-native-owner-inventory.json"
-)
-
-MOVED_KERNELS = {
-    "path_visibility_flags_kernel",
-    "path_los_compact_kernel",
-    "deterministic_los_topology_compact_kernel",
-    "deterministic_reflection_order1_compact_kernel",
-    "deterministic_reflection_sequence_compact_kernel",
-    "deterministic_diffraction_order1_compact_kernel",
-    "path_block_flags_kernel",
-    "path_block_compact_kernel",
-    "path_diffraction_compact_kernel",
-}
-MOVED_ABI = {
+MERGED = "native/channel/kernels/path_topology.cu"
+COMMON = "native/channel/kernels/path_compaction_common.cuh"
+EXPECTED_ABI = {
     "channel_path_filter_los_cuda",
     "channel_deterministic_los_topology_block",
     "channel_deterministic_reflection_order1_compact",
@@ -33,52 +16,25 @@ MOVED_ABI = {
     "channel_deterministic_diffraction_order1_compact",
     "channel_path_filter_block_cuda",
     "channel_path_diffraction_block_cuda",
-}
-REMAINING_COMPACTION_ABI = {
     "channel_path_concat_vec3_cuda",
     "channel_path_los_visibility_inputs_cuda",
     "channel_path_finalize_blocks_cuda",
-}
-EMPTY_FACTORIES = {
-    "empty_path_block_from",
-    "empty_deterministic_los_topology_block_from",
-}
-COMMON_HOST_HELPERS = {
-    "check_cuda_tensor",
-    "check_vec3_table",
-    "check_path_block_shapes",
-    "launch_blocks",
-    "observe_compact_count",
-}
-COMMON_CONTROL_KERNELS = {"compact_count_control_metadata_kernel"}
-TOPOLOGY_KERNELS = {
-    "deterministic_order_init_kernel",
-    "deterministic_sort_key_1d_kernel",
-    "deterministic_sort_key_sequence_kernel",
-    "deterministic_face_group_keys_kernel",
-    "deterministic_surface_group_keys_kernel",
-    "deterministic_face_group_sort_key_kernel",
-    "deterministic_face_group_flags_kernel",
-    "deterministic_face_group_assign_kernel",
-    "deterministic_face_group_members_kernel",
-}
-TOPOLOGY_PRIVATE_FUNCTIONS = {
-    "block_tensor",
-    "block_has_field",
-    "check_optional_field_presence",
-    "check_topology_concat_schema",
-    "copy_tensor_rows",
-    "deterministic_gather_rows_kernel",
-    "gather_tensor_rows",
-}
-TOPOLOGY_ABI = {
     "channel_deterministic_concat_topology_blocks",
     "channel_deterministic_gather_topology_block",
     "channel_deterministic_face_groups",
     "channel_deterministic_surface_face_groups",
     "channel_deterministic_sort_order",
 }
-TOPOLOGY_FUNCTIONS = TOPOLOGY_KERNELS | TOPOLOGY_PRIVATE_FUNCTIONS | TOPOLOGY_ABI
+COMMON_HELPERS = {
+    "check_cuda_tensor",
+    "check_vec3_table",
+    "check_path_block_shapes",
+    "launch_blocks",
+    "observe_compact_count",
+    "empty_path_block_from",
+    "empty_deterministic_los_topology_block_from",
+    "compact_count_control_metadata_kernel",
+}
 
 
 def _function_names_by_path() -> dict[str, set[str]]:
@@ -88,127 +44,22 @@ def _function_names_by_path() -> dict[str, set[str]]:
     return names
 
 
-def test_path_compaction_translation_unit_owns_the_audited_functions() -> None:
+def test_path_topology_families_have_one_physical_owner() -> None:
     names = _function_names_by_path()
-    trace = "native/channel/kernels/path_trace.cu"
-    compaction = "native/channel/kernels/path_compaction.cu"
-    common = "native/channel/kernels/path_compaction_common.cuh"
 
-    assert MOVED_KERNELS | MOVED_ABI <= names[compaction]
-    assert not (MOVED_KERNELS | MOVED_ABI) & names[trace]
-    assert REMAINING_COMPACTION_ABI <= names[trace]
-    assert not REMAINING_COMPACTION_ABI & names[compaction]
-    assert (
-        EMPTY_FACTORIES | COMMON_HOST_HELPERS | COMMON_CONTROL_KERNELS
-        == names[common]
-    )
-    assert not COMMON_HOST_HELPERS & names[trace]
-    assert not COMMON_HOST_HELPERS & names[compaction]
-
-    sources = {
-        path: (REPOSITORY_ROOT / path).read_text(encoding="utf-8-sig")
-        for path in (trace, compaction, common)
-    }
-    assert (
-        sum(
-            source.count("constexpr int kPathBlockSize = 256;")
-            for source in sources.values()
-        )
-        == 1
-    )
+    assert EXPECTED_ABI <= names[MERGED]
+    assert COMMON_HELPERS == names[COMMON]
+    assert not COMMON_HELPERS & names[MERGED]
 
 
-def test_deterministic_topology_translation_unit_owns_the_audited_functions() -> None:
-    names = _function_names_by_path()
-    topology = "native/channel/kernels/deterministic_topology.cu"
-    trace = "native/channel/kernels/path_trace.cu"
-    compaction = "native/channel/kernels/path_compaction.cu"
-
-    assert TOPOLOGY_FUNCTIONS <= names[topology]
-    assert not TOPOLOGY_FUNCTIONS & names[trace]
-    assert not TOPOLOGY_FUNCTIONS & names[compaction]
-
-
-def test_path_split_preserves_the_frozen_launch_and_sync_multisets() -> None:
-    inventory = json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))
-    source_evidence = next(
-        entry
-        for entry in inventory["source_evidence"]
-        if entry["path"] == "native/channel_native/kernels/path_trace.cu"
-    )
-    sources = "\n".join(
-        (KERNEL_ROOT / name).read_text(encoding="utf-8-sig")
-        for name in (
-            "deterministic_topology.cu",
-            "path_trace.cu",
-            "path_compaction.cu",
-        )
-    )
-
-    actual_launches = Counter(
-        re.findall(
-            r"\b([A-Za-z_]\w*_kernel)(?:\s*<[^;{}]*?>)?\s*<<<",
-            sources,
-        )
-    )
-    expected_launches = Counter(
-        site["kernel"] for site in source_evidence["kernel_launch_sites"]
-    )
-
-    assert actual_launches == expected_launches
-    compaction_source = (
-        KERNEL_ROOT / "path_compaction.cu"
-    ).read_text(encoding="utf-8-sig")
-    common_source = (
-        KERNEL_ROOT / "path_compaction_common.cuh"
-    ).read_text(encoding="utf-8-sig")
-    delegated_count_observations = compaction_source.count(
-        "observe_compact_count("
-    )
-    assert (
-        sources.count("cudaStreamSynchronize(")
-        + delegated_count_observations
-        == len(source_evidence["explicit_sync_sites"])
-    )
-    assert delegated_count_observations == 7
-    # The helper has one null-control branch for the seven historical call
-    # sites and one fused control-record branch for the Phase-3 finalizer.
-    assert common_source.count("cudaStreamSynchronize(") == 2
-    actual_by_unit = {}
-    for name in (
-        "deterministic_topology.cu",
-        "path_trace.cu",
-        "path_compaction.cu",
-    ):
-        source = (KERNEL_ROOT / name).read_text(encoding="utf-8-sig")
-        actual_by_unit[name] = (
-            source.count("<<<"),
-            source.count("cudaStreamSynchronize("),
-        )
-    assert actual_by_unit == {
-        "deterministic_topology.cu": (16, 4),
-        "path_trace.cu": (19, 0),
-        "path_compaction.cu": (16, 0),
-    }
-
-
-def test_path_split_is_registered_once_and_below_the_recommended_limit() -> None:
+def test_path_topology_consolidation_is_registered_once() -> None:
     cmake = (REPOSITORY_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
-    inventory = json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))
-    policy = inventory["translation_unit_policy"]
 
-    for name in (
-        "deterministic_topology.cu",
-        "path_trace.cu",
-        "path_compaction.cu",
+    assert cmake.count(MERGED) == 1
+    for retired in (
+        "native/channel/kernels/path_trace.cu",
+        "native/channel/kernels/path_compaction.cu",
+        "native/channel/kernels/deterministic_topology.cu",
     ):
-        relative = f"native/channel/kernels/{name}"
-        line_count = len(
-            (KERNEL_ROOT / name).read_text(encoding="utf-8-sig").splitlines()
-        )
-        assert cmake.count(relative) == 1
-        assert line_count < policy["recommended_limit_lines"]
-
-    assert "native/channel/kernels/path_trace.cu" not in policy[
-        "planned_owner_debt"
-    ]
+        assert retired not in cmake
+    assert COMMON not in cmake

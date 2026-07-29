@@ -53,7 +53,7 @@ def test_material_autograd_is_the_single_object_owner(name: str):
 
 def test_material_functional_uses_canonical_dependencies():
     assert kernels._required_native_op is runtime.required_symbol
-    assert kernels.native_extension is runtime.native_extension
+    assert not hasattr(kernels, "native_extension")
     assert kernels.validate_cuda_tensor is runtime.validate_cuda_tensor
 
 

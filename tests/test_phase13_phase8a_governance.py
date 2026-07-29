@@ -96,6 +96,8 @@ def test_phase8a_channel_is_a_typed_facade_without_numerical_fallback() -> None:
 def test_phase8a_launch_compile_and_dependency_boundaries_are_frozen() -> None:
     evidence = _json(AUDIT / "phase13-diffraction-phase8a-evidence.json")
     graph = _json(AUDIT / "phase13-shared-rf-dependency-graph.json")
+    consolidation = _json(AUDIT / "adr-044-native-tu-consolidation.json")
+
     rayd_source = (
         RAYD_ROOT / "backends/torch/src/torch_ext/rf/diffraction_wedge.cu"
     ).read_text(encoding="utf-8-sig")
@@ -115,7 +117,13 @@ def test_phase8a_launch_compile_and_dependency_boundaries_are_frozen() -> None:
     assert 'COMPILE_OPTIONS "$<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>"' in rayd_cmake
     for path in evidence["compile_contract"]["precise_channel_families"]:  # type: ignore[index]
         live = path.replace("native/channel_native/", "native/channel/")
-        assert (ROOT / live).is_file()
+        source_name = Path(live).name
+        target = next(
+            group["target"]  # type: ignore[index]
+            for group in consolidation["groups"]  # type: ignore[index]
+            if source_name in group["sources"]  # type: ignore[operator]
+        )
+        assert (ROOT / "native/channel/kernels" / target).is_file()
 
     codegen = evidence["codegen_resource_contract"]
     assert codegen["normalized_ptx_equal"] is True  # type: ignore[index]

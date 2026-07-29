@@ -71,7 +71,6 @@ from witwin.channel.runtime import (
     _ad_native_tangent_or_none,
     _ad_native_tensor,
     disable_functorch,
-    native_extension,
     require_capacity_failure_state,
     require_host_count,
     require_tensor,
@@ -1832,12 +1831,7 @@ def deterministic_diffraction_state_pack_selected(
 
 def mc_selected_edge_indices(selected: torch.Tensor) -> torch.Tensor:
     validate_cuda_tensor("selected", selected, dtype=torch.bool, ndim=1)
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_selected_edge_indices"):
-        raise RuntimeError(
-            "_channel.mc_selected_edge_indices CUDA kernel is required"
-        )
-    indices = native.mc_selected_edge_indices(selected)
+    indices = _required_native_op("mc_selected_edge_indices")(selected)
     if not isinstance(indices, torch.Tensor):
         raise TypeError("_channel.mc_selected_edge_indices must return a tensor")
     validate_cuda_tensor("indices", indices, dtype=torch.int32, ndim=1)
@@ -1866,12 +1860,7 @@ def mc_sample_directions(count: int, reference: torch.Tensor) -> torch.Tensor:
         raise ValueError("count must be non-negative")
     validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=2)
 
-    native = native_extension()
-    if native is None or not hasattr(native, "mc_sample_directions"):
-        raise RuntimeError(
-            "_channel.mc_sample_directions CUDA kernel is required"
-        )
-    directions = native.mc_sample_directions(int(count), reference)
+    directions = _required_native_op("mc_sample_directions")(int(count), reference)
     if not isinstance(directions, torch.Tensor):
         raise TypeError("_channel.mc_sample_directions must return a tensor")
     validate_cuda_tensor(

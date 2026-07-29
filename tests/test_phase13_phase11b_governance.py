@@ -69,6 +69,12 @@ _PHASE15_KERNEL_RELOCATIONS = {
     "witwin/channel/scattering/kernels/autograd_chain.py": (
         "witwin/channel/kernels/scattering.py"
     ),
+    "native/channel/kernels/bdpt_connect_visibility.cu": (
+        "native/channel/kernels/bdpt_connect.cu"
+    ),
+    "native/channel/kernels/los.cu": (
+        "native/channel/kernels/los_consumer.cu"
+    ),
 }
 
 _LIVE_FILE_SUFFIXES = {".cpp", ".cu", ".cuh", ".h", ".json", ".md", ".py", ".toml", ".yml"}
@@ -253,7 +259,7 @@ def test_phase11b_explicit_signatures_and_tu_local_macro_contract_are_preserved(
     assert autograd["scattering_chain_realization_eval_ad"].args.vararg is None
 
     macros = {
-        "native/channel/kernels/bdpt_connect_visibility.cu": (
+        "native/channel/kernels/bdpt_connect.cu": (
             "CHANNEL_BDPT_CHECK_CONNECTION_SAMPLE_TENSORS",
             "CHANNEL_BDPT_CHECK_CONNECTION_SAMPLE_ROWS",
             "CHANNEL_BDPT_CONNECTION_OUTPUT_POINTERS",
@@ -267,7 +273,7 @@ def test_phase11b_explicit_signatures_and_tu_local_macro_contract_are_preserved(
             "CHANNEL_DIFFRACTION_STATE_PACK_OUTPUT_POINTERS",
             "CHANNEL_DIFFRACTION_STATE_PACK_RESULTS",
         ),
-        "native/channel/kernels/los.cu": (
+        "native/channel/kernels/los_consumer.cu": (
             "CHANNEL_LOS_CHECK_VISIBILITY_APPLICATION",
             "CHANNEL_LOS_VISIBILITY_LAUNCH_ARGUMENTS",
         ),

@@ -78,7 +78,6 @@ from witwin.channel.runtime import (
     _ad_reject_fixed_inputs,
     _ad_reject_fixed_tangents,
     disable_functorch,
-    native_extension,
     required_symbol as _required_native_op,
     validate_cuda_tensor,
 )
@@ -3994,12 +3993,7 @@ def deterministic_los_field(
     if frequency_hz <= 0.0:
         raise ValueError("frequency_hz must be positive")
 
-    native = native_extension()
-    if native is None or not hasattr(native, "deterministic_los_field"):
-        raise RuntimeError(
-            "_channel.deterministic_los_field CUDA kernel is required"
-        )
-    exported = native.deterministic_los_field(
+    exported = _required_native_op("deterministic_los_field")(
         path_gain, path_length_m, float(frequency_hz)
     )
     if not isinstance(exported, dict):
@@ -4038,12 +4032,7 @@ def deterministic_diffraction_vector_field(
         if tensor.shape != x_re.shape:
             raise ValueError(f"{name} must match x_re")
 
-    native = native_extension()
-    if native is None or not hasattr(native, "deterministic_diffraction_vector_field"):
-        raise RuntimeError(
-            "_channel.deterministic_diffraction_vector_field CUDA kernel is required"
-        )
-    exported = native.deterministic_diffraction_vector_field(
+    exported = _required_native_op("deterministic_diffraction_vector_field")(
         x_re, x_im, y_re, y_im, z_re, z_im
     )
     if not isinstance(exported, dict):
@@ -4115,12 +4104,7 @@ def deterministic_reflection_field(
     if frequency_hz <= 0.0:
         raise ValueError("frequency_hz must be positive")
 
-    native = native_extension()
-    if native is None or not hasattr(native, "deterministic_reflection_field"):
-        raise RuntimeError(
-            "_channel.deterministic_reflection_field CUDA kernel is required"
-        )
-    exported = native.deterministic_reflection_field(
+    exported = _required_native_op("deterministic_reflection_field")(
         tx_position,
         rx_position,
         hit_position,
@@ -4205,12 +4189,7 @@ def deterministic_reflection_sequence_field(
     if frequency_hz <= 0.0:
         raise ValueError("frequency_hz must be positive")
 
-    native = native_extension()
-    if native is None or not hasattr(native, "deterministic_reflection_sequence_field"):
-        raise RuntimeError(
-            "_channel.deterministic_reflection_sequence_field CUDA kernel is required"
-        )
-    exported = native.deterministic_reflection_sequence_field(
+    exported = _required_native_op("deterministic_reflection_sequence_field")(
         tx_position,
         rx_position,
         hit_positions,
@@ -4250,12 +4229,7 @@ def deterministic_reflection_sequence_field(
 
 def deterministic_delay_to_path_length(delay_s: torch.Tensor) -> torch.Tensor:
     validate_cuda_tensor("delay_s", delay_s, dtype=torch.float32, ndim=1)
-    native = native_extension()
-    if native is None or not hasattr(native, "deterministic_delay_to_path_length"):
-        raise RuntimeError(
-            "_channel.deterministic_delay_to_path_length CUDA kernel is required"
-        )
-    path_length = native.deterministic_delay_to_path_length(delay_s)
+    path_length = _required_native_op("deterministic_delay_to_path_length")(delay_s)
     validate_cuda_tensor("path_length_m", path_length, dtype=torch.float32, ndim=1)
     if path_length.shape != delay_s.shape:
         raise ValueError(
@@ -4271,12 +4245,7 @@ def deterministic_pack_complex(
     validate_cuda_tensor("field_imag", field_imag, dtype=torch.float32, ndim=1)
     if field_imag.shape != field_real.shape:
         raise ValueError("field_imag must match field_real")
-    native = native_extension()
-    if native is None or not hasattr(native, "deterministic_pack_complex"):
-        raise RuntimeError(
-            "_channel.deterministic_pack_complex CUDA kernel is required"
-        )
-    field = native.deterministic_pack_complex(field_real, field_imag)
+    field = _required_native_op("deterministic_pack_complex")(field_real, field_imag)
     validate_cuda_tensor("field", field, dtype=torch.complex64, ndim=1)
     if field.shape != field_real.shape:
         raise ValueError(
@@ -4292,12 +4261,7 @@ def deterministic_phase_from_field(
     validate_cuda_tensor("field_imag", field_imag, dtype=torch.float32, ndim=1)
     if field_imag.shape != field_real.shape:
         raise ValueError("field_imag must match field_real")
-    native = native_extension()
-    if native is None or not hasattr(native, "deterministic_phase_from_field"):
-        raise RuntimeError(
-            "_channel.deterministic_phase_from_field CUDA kernel is required"
-        )
-    phase = native.deterministic_phase_from_field(field_real, field_imag)
+    phase = _required_native_op("deterministic_phase_from_field")(field_real, field_imag)
     validate_cuda_tensor("phase_rad", phase, dtype=torch.float32, ndim=1)
     if phase.shape != field_real.shape:
         raise ValueError(
@@ -4308,12 +4272,7 @@ def deterministic_phase_from_field(
 
 def deterministic_zero_field_phase(reference: torch.Tensor) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=1)
-    native = native_extension()
-    if native is None or not hasattr(native, "deterministic_zero_field_phase"):
-        raise RuntimeError(
-            "_channel.deterministic_zero_field_phase CUDA kernel is required"
-        )
-    exported = native.deterministic_zero_field_phase(reference)
+    exported = _required_native_op("deterministic_zero_field_phase")(reference)
     if not isinstance(exported, dict):
         raise TypeError(
             "_channel.deterministic_zero_field_phase must return a dict"
@@ -4340,12 +4299,7 @@ def deterministic_phase_from_length(
     validate_cuda_tensor("path_length_m", path_length_m, dtype=torch.float32, ndim=1)
     if frequency_hz <= 0.0:
         raise ValueError("frequency_hz must be positive")
-    native = native_extension()
-    if native is None or not hasattr(native, "deterministic_phase_from_length"):
-        raise RuntimeError(
-            "_channel.deterministic_phase_from_length CUDA kernel is required"
-        )
-    phase = native.deterministic_phase_from_length(path_length_m, float(frequency_hz))
+    phase = _required_native_op("deterministic_phase_from_length")(path_length_m, float(frequency_hz))
     validate_cuda_tensor("phase_rad", phase, dtype=torch.float32, ndim=1)
     if phase.shape != path_length_m.shape:
         raise ValueError(
@@ -4361,12 +4315,7 @@ def deterministic_field_from_power_phase(
     validate_cuda_tensor("phase_rad", phase_rad, dtype=torch.float32, ndim=1)
     if phase_rad.shape != path_gain.shape:
         raise ValueError("phase_rad must match path_gain")
-    native = native_extension()
-    if native is None or not hasattr(native, "deterministic_field_from_power_phase"):
-        raise RuntimeError(
-            "_channel.deterministic_field_from_power_phase CUDA kernel is required"
-        )
-    exported = native.deterministic_field_from_power_phase(path_gain, phase_rad)
+    exported = _required_native_op("deterministic_field_from_power_phase")(path_gain, phase_rad)
     if not isinstance(exported, dict):
         raise TypeError(
             "_channel.deterministic_field_from_power_phase must return a dict"

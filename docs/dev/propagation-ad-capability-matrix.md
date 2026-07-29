@@ -37,8 +37,8 @@ outside the hot path (result assembly, refusal checks); it is never physics.
 
 | route | leaf-or-output | mode | state | mechanism | owner | test | validation |
 |---|---|---|---|---|---|---|---|
-| reevaluate/prepared | out:field_direction | vjp | SUP | native-companion | native/channel/kernels/field_transport_free_space.cu:134, native/channel/kernels/field_transport_reflection.cu:222 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_the_arrival_direction_carries_a_reverse_gradient_matching_fd | fd |
-| reevaluate/prepared | out:field_direction | jvp | SUP | native-companion | native/channel/kernels/field_transport_free_space.cu:203, native/channel/kernels/field_transport_reflection.cu:585 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_the_arrival_direction_tangent_agrees_with_the_reverse_gradient | adjoint |
+| reevaluate/prepared | out:field_direction | vjp | SUP | native-companion | native/channel/kernels/field_transport.cu:1320, native/channel/kernels/field_transport.cu:1959 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_the_arrival_direction_carries_a_reverse_gradient_matching_fd | fd |
+| reevaluate/prepared | out:field_direction | jvp | SUP | native-companion | native/channel/kernels/field_transport.cu:1389, native/channel/kernels/field_transport.cu:2322 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_the_arrival_direction_tangent_agrees_with_the_reverse_gradient | adjoint |
 | kernel/free-space | out:field_direction | both | SUP | native-companion | src/witwin/channel/propagation/fields/kernels/functional.py:530 | tests/ad/test_field_em_ad.py::test_free_space_direction_seed_satisfies_the_adjoint_identity | adjoint |
 | kernel/reflection | out:field_direction | both | SUP | native-companion | src/witwin/channel/propagation/fields/kernels/functional.py:600 | tests/ad/test_field_em_ad.py::test_reflection_direction_seed_satisfies_the_adjoint_identity | adjoint |
 | reevaluate/prepared | out:field_direction | both | SUP | native-companion | src/witwin/channel/propagation/consumer/service.py:1006 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_direction_liveness_is_one_decision_for_the_whole_result | analytic |
@@ -71,7 +71,7 @@ outside the hot path (result assembly, refusal checks); it is never physics.
 
 | route | leaf-or-output | mode | state | mechanism | owner | test | validation |
 |---|---|---|---|---|---|---|---|
-| reevaluate/prepared | materials.eps_r (reflection) | vjp | SUP | native-companion | native/channel/kernels/field_transport_reflection.cu:283 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_a_reflection_scene_reads_the_per_face_material_leaves | analytic |
+| reevaluate/prepared | materials.eps_r (reflection) | vjp | SUP | native-companion | native/channel/kernels/field_transport.cu:2020 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_a_reflection_scene_reads_the_per_face_material_leaves | analytic |
 | reevaluate/prepared | materials.layer_eps_r (reflection) | vjp | ZERO | host-declaration | src/witwin/channel/propagation/consumer/contracts.py:76 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_a_layer_leaf_contributes_exactly_zero_to_a_reflection_scene | analytic |
 | reevaluate/prepared | structures[i].vertices | vjp | SUP | native-companion | src/witwin/channel/scene/ad_geometry.py | tests/propagation/consumer/test_phase9_ad_matrix.py::test_a_mesh_vertex_gradient_matches_the_image_source_closed_form | analytic |
 | reevaluate/prepared | materials.mu_r, materials.layer_mu_r | both | REF | torch-orchestration | src/witwin/channel/propagation/consumer/service.py:110 | tests/propagation/consumer/test_phase9_ad_matrix.py::test_a_primal_only_material_is_refused_before_any_native_work | refusal |

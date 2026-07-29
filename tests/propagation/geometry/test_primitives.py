@@ -27,7 +27,7 @@ def test_geometry_primitives_is_the_single_object_owner(name: str):
 
 def test_geometry_primitives_use_only_canonical_runtime_dependencies():
     assert geometry._required_native_op is runtime.required_symbol
-    assert geometry.native_extension is runtime.native_extension
+    assert not hasattr(geometry, "native_extension")
     assert geometry.validate_cuda_tensor is runtime.validate_cuda_tensor
     for name in _OWNER_NAMES:
         assert getattr(geometry, name).__globals__ is geometry.__dict__

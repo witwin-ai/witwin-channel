@@ -6,10 +6,10 @@ Status: Accepted.
 
 The `montecarlo.bdpt` solver accumulates real per-path POWER only. Every
 connection sample carries `contribution = |coeff|^2`
-(`native/channel/kernels/bdpt_connect_samples.cu:104-106,240,376`), and
+(`native/channel/kernels/bdpt_connect.cu:168-181`), and
 the accumulator atomic-adds `contribution * mis_weight` into per-(tx, rx,
 component) real matrices
-(`native/channel/kernels/bdpt_connect_accumulation.cu:32-33`). The
+(`native/channel/kernels/bdpt_connect.cu:964,1138,1189,1259`). The
 connection-sample schema (`_BDPT_CONNECTION_SCHEMA`) carries no complex
 coefficient, so paths that land in the same (tx, rx, component) bin combine
 INCOHERENTLY (their powers add).
@@ -72,7 +72,8 @@ connection-sample schema. Rationale:
    and the existing power-domain kernels are byte-for-byte unchanged.
 
 The coherent accumulator uses two new device kernels in
-`bdpt_connect_accumulation.cu`:
+the `bdpt_connect_accumulation.cu` provenance section of
+`bdpt_connect.cu`:
 `bdpt_accumulate_connection_samples_coherent_kernel` (atomic-double complex sum
 per bin) and `bdpt_finalize_coherent_accumulation_kernel` (`|sum|^2` per
 component, plus `path_gain = sum` of the coherent component powers). Because the

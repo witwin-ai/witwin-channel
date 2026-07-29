@@ -87,7 +87,8 @@ existing rx-streamed wrapper and the 1M cap govern the union. Depth = 2,
 ### D2: native discovery kernels (channel owned)
 
 New symbols alongside the coupled ones in
-`native/channel/kernels/coupled_topology.cu` and
+the `coupled_topology.cu` provenance section of
+`native/channel/kernels/field_wedge_coupled.cu` and
 `native/channel/rayd/geometry.cpp`:
 
 - `channel_coupled_dd_prepare_cuda`: per candidate (tx, rx, e1, e2) solve the
@@ -96,7 +97,7 @@ New symbols alongside the coupled ones in
   single-edge projection (fixed 16 iterations, deterministic order,
   float32). Validity: both parameters strictly inside their finite segments
   (same `kGeometryEpsilon` semantics as `coupled_rd_prepare_kernel`
-  `inside_edge`, coupled_topology.cu:103-106) and the three segment
+  `inside_edge`, `field_wedge_coupled.cu:2284-2288`) and the three segment
   directions well-defined. Emits Q1, Q2, per-leg lengths.
 - visibility: three segment queries (tx->Q1, Q1->Q2, Q2->rx) through the
   existing `raydn_visibility_forward` C-ABI batch call (geometry.cpp:291
@@ -152,7 +153,7 @@ leg-2 coefficient evaluation must stay a single call site so P4 can swap it.
 ### D4: AD companions
 
 `channel_field_coupled_dd_backward` / `channel_field_coupled_dd_jvp` twins (pattern:
-`field_wedge_ad_coupled.cu::coupled_rd_row_dual` after ADR-012 G4-3, which
+`field_wedge_coupled.cu::coupled_rd_row_dual` after ADR-012 G4-3, which
 calls `compute_pair_vector_contribution` directly so the truncation/mend
 derivatives flow in lockstep). tx/rx gradients flow through the live
 re-anchoring inside the kernels; Q1/Q2/bounds are frozen seeds (detached),
@@ -162,7 +163,7 @@ lockstep entries go into the duplication ledger.
 
 ### D5: accumulation and public surface
 
-- `accum_slot()` (deterministic_accum.cu:36-50) gains `cid 7 ->
+- `accum_slot()` (`deterministic.cu:921-935`) gains `cid 7 ->
   kCoupledSlot (5)`; all backward/jvp/fwd64 variants inherit via the shared
   helper. The public component list is unchanged ("coupled" now aggregates
   cids 3, 4, 7; path tables keep cid 7 distinct for audits).

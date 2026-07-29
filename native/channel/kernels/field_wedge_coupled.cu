@@ -1,3 +1,7 @@
+// ADR-044 consolidated CUDA translation unit.
+// Physical co-location only: ABI, launches, synchronization, and numerical order are unchanged.
+
+// ---- Consolidated from field_wedge_ad_coupled.cu ----
 #include "field_wedge_ad_common.cuh"
 
 // Plan 07 AD-4a: differentiable UTD wedge diffraction and coupled
@@ -1632,3 +1636,1183 @@ pybind11::dict channel_field_coupled_dd_jvp(
     out["tangent_path_gain"] = tangent_path_gain;
     return out;
 }
+
+// ---- Consolidated from field_wedge_ad_prepare.cu ----
+#include "field_wedge_ad_common.cuh"
+
+namespace {
+
+// ---------------------------------------------------------------------------
+// Coupled stationary-geometry companions (fixed winner): the interaction
+// points of a coupled path move with the endpoints. The primal re-solve is
+// channel_coupled_rd_prepare_cuda (coupled_topology.cu); these duals mirror its
+// row math with the wall plane and edge line frozen.
+// ---------------------------------------------------------------------------
+
+struct PrepareRowInputs {
+    field::float3a source;
+    field::float3a receiver;
+    field::float3a plane_point;
+    field::float3a plane_normal_unit;  // normalized like the primal kernel
+    field::float3a edge_origin;
+    field::float3a edge_dir_unit;
+};
+
+__device__ __forceinline__ PrepareRowInputs load_prepare_row(
+    int64_t index,
+    const float* source,
+    const float* receiver,
+    const float* plane_point,
+    const float* plane_normal,
+    const float* edge_pos,
+    const float* edge_dir,
+    const float* edge_t_min) {
+    PrepareRowInputs in;
+    in.source = load3f(source, index);
+    in.receiver = load3f(receiver, index);
+    in.plane_point = load3f(plane_point, index);
+    // Primal normalize3: v / |v| when |v| > 1e-6, else zero.
+    const field::float3a raw_n = load3f(plane_normal, index);
+    const float n_len = sqrtf(field::f3_dot(raw_n, raw_n));
+    in.plane_normal_unit = n_len > 1.0e-6f
+                               ? field::f3_mul(raw_n, 1.0f / n_len)
+                               : field::f3_zero();
+    const field::float3a raw_d = load3f(edge_dir, index);
+    const float d_len = sqrtf(field::f3_dot(raw_d, raw_d));
+    in.edge_dir_unit = d_len > 1.0e-6f ? field::f3_mul(raw_d, 1.0f / d_len)
+                                       : field::f3_zero();
+    in.edge_origin = field::f3_add(
+        load3f(edge_pos, index),
+        field::f3_mul(in.edge_dir_unit, edge_t_min[index]));
+    return in;
+}
+
+// Dual of one prepare row: edge stationary point and predicted reflection
+// point as functions of (source, receiver) with the plane and edge frozen.
+__device__ void prepare_row_dual(
+    const PrepareRowInputs& in,
+    field::float3a seed_source,
+    field::float3a seed_receiver,
+    DualV3& edge_point,
+    DualV3& reflection_point) {
+    const DualV3 src = field::dual_seed(in.source, seed_source);
+    const DualV3 rcv = field::dual_seed(in.receiver, seed_receiver);
+    const DualV3 normal = field::dual_const3(in.plane_normal_unit);
+    const DualV3 p0 = field::dual_const3(in.plane_point);
+    const DualV3 direction = field::dual_const3(in.edge_dir_unit);
+    const DualV3 origin = field::dual_const3(in.edge_origin);
+    const Dual signed_distance = field::f3_dot(field::f3_sub(src, p0), normal);
+    const DualV3 image = field::f3_sub(
+        src, field::f3_mul(normal, 2.0f * signed_distance));
+    const Dual parameter = field::first_order_diffraction_parameter(
+        image, rcv, origin, direction);
+    edge_point = field::f3_add(origin, field::f3_mul(direction, parameter));
+    const DualV3 image_to_edge = field::f3_sub(edge_point, image);
+    const Dual plane_denominator = field::f3_dot(image_to_edge, normal);
+    const Dual plane_parameter =
+        field::f3_dot(field::f3_sub(p0, image), normal) / plane_denominator;
+    reflection_point = field::f3_add(
+        image, field::f3_mul(image_to_edge, plane_parameter));
+}
+
+__global__ void coupled_prepare_backward_kernel(
+    int64_t count,
+    const float* source,
+    const float* receiver,
+    const float* plane_point,
+    const float* plane_normal,
+    const float* edge_pos,
+    const float* edge_dir,
+    const float* edge_t_min,
+    const float* grad_edge_point,
+    const float* grad_reflection_point,
+    float* grad_source,
+    float* grad_receiver) {
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
+        const PrepareRowInputs in = load_prepare_row(
+            index, source, receiver, plane_point, plane_normal, edge_pos,
+            edge_dir, edge_t_min);
+        const int64_t base = index * 3;
+        const field::float3a g_ep = grad_edge_point != nullptr
+                                        ? load3f(grad_edge_point, index)
+                                        : field::f3_zero();
+        const field::float3a g_rp = grad_reflection_point != nullptr
+                                        ? load3f(grad_reflection_point, index)
+                                        : field::f3_zero();
+        for (int slot = 0; slot < 2; ++slot) {
+            float* out = slot == 0 ? grad_source : grad_receiver;
+            if (out == nullptr)
+                continue;
+            for (int axis = 0; axis < 3; ++axis) {
+                field::float3a seed_src = field::f3_zero();
+                field::float3a seed_rcv = field::f3_zero();
+                float* seed = slot == 0
+                                  ? (axis == 0 ? &seed_src.x
+                                               : axis == 1 ? &seed_src.y : &seed_src.z)
+                                  : (axis == 0 ? &seed_rcv.x
+                                               : axis == 1 ? &seed_rcv.y : &seed_rcv.z);
+                *seed = 1.f;
+                DualV3 edge_point;
+                DualV3 reflection_point;
+                prepare_row_dual(in, seed_src, seed_rcv, edge_point, reflection_point);
+                out[base + axis] =
+                    g_ep.x * edge_point.x.d + g_ep.y * edge_point.y.d +
+                    g_ep.z * edge_point.z.d + g_rp.x * reflection_point.x.d +
+                    g_rp.y * reflection_point.y.d + g_rp.z * reflection_point.z.d;
+            }
+        }
+    }
+}
+
+__global__ void coupled_prepare_jvp_kernel(
+    int64_t count,
+    const float* source,
+    const float* receiver,
+    const float* plane_point,
+    const float* plane_normal,
+    const float* edge_pos,
+    const float* edge_dir,
+    const float* edge_t_min,
+    const float* tangent_source,
+    const float* tangent_receiver,
+    float* tangent_edge_point,
+    float* tangent_reflection_point) {
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
+        const PrepareRowInputs in = load_prepare_row(
+            index, source, receiver, plane_point, plane_normal, edge_pos,
+            edge_dir, edge_t_min);
+        const field::float3a seed_src = tangent_source != nullptr
+                                            ? load3f(tangent_source, index)
+                                            : field::f3_zero();
+        const field::float3a seed_rcv = tangent_receiver != nullptr
+                                            ? load3f(tangent_receiver, index)
+                                            : field::f3_zero();
+        DualV3 edge_point;
+        DualV3 reflection_point;
+        prepare_row_dual(in, seed_src, seed_rcv, edge_point, reflection_point);
+        const int64_t base = index * 3;
+        tangent_edge_point[base] = edge_point.x.d;
+        tangent_edge_point[base + 1] = edge_point.y.d;
+        tangent_edge_point[base + 2] = edge_point.z.d;
+        tangent_reflection_point[base] = reflection_point.x.d;
+        tangent_reflection_point[base + 1] = reflection_point.y.d;
+        tangent_reflection_point[base + 2] = reflection_point.z.d;
+    }
+}
+
+}  // namespace
+
+namespace {
+
+void check_prepare_rows(
+    const at::Tensor& source,
+    const at::Tensor& receiver,
+    const at::Tensor& plane_point,
+    const at::Tensor& plane_normal,
+    const at::Tensor& edge_pos,
+    const at::Tensor& edge_dir,
+    const at::Tensor& edge_t_min) {
+    using channel::check_flat_tensor;
+    using channel::check_vec3_table;
+    const int64_t count = source.size(0);
+    for (const auto& named : std::vector<std::pair<at::Tensor, const char*>>{
+             {source, "source"},
+             {receiver, "receiver"},
+             {plane_point, "plane_point"},
+             {plane_normal, "plane_normal"},
+             {edge_pos, "edge_pos"},
+             {edge_dir, "edge_dir"}}) {
+        check_vec3_table(named.first, named.second);
+        TORCH_CHECK(named.first.size(0) == count,
+                    named.second, " must match source rows");
+    }
+    check_flat_tensor(edge_t_min, "edge_t_min", at::kFloat);
+    TORCH_CHECK(edge_t_min.size(0) == count, "edge_t_min must match source rows");
+}
+
+}  // namespace
+
+pybind11::dict channel_coupled_rd_prepare_backward(
+    at::Tensor source,
+    at::Tensor receiver,
+    at::Tensor plane_point,
+    at::Tensor plane_normal,
+    at::Tensor edge_pos,
+    at::Tensor edge_dir,
+    at::Tensor edge_t_min,
+    pybind11::object grad_edge_point,
+    pybind11::object grad_reflection_point,
+    bool need_grad_source,
+    bool need_grad_receiver) {
+    check_prepare_rows(
+        source, receiver, plane_point, plane_normal, edge_pos, edge_dir,
+        edge_t_min);
+    const int64_t count = source.size(0);
+    at::Tensor grad_storage[2];
+    const at::Tensor* g_edge_point = optional_tensor_arg(
+        std::move(grad_edge_point), grad_storage[0], "grad_edge_point",
+        at::kFloat, {count, 3}, source);
+    const at::Tensor* g_reflection_point = optional_tensor_arg(
+        std::move(grad_reflection_point), grad_storage[1],
+        "grad_reflection_point", at::kFloat, {count, 3}, source);
+    at::Tensor grad_source;
+    at::Tensor grad_receiver;
+    at::Tensor* grad_source_ptr = nullptr;
+    at::Tensor* grad_receiver_ptr = nullptr;
+    if (need_grad_source) {
+        grad_source = at::empty({count, 3}, source.options());
+        grad_source_ptr = &grad_source;
+    }
+    if (need_grad_receiver) {
+        grad_receiver = at::empty({count, 3}, source.options());
+        grad_receiver_ptr = &grad_receiver;
+    }
+    if (count > 0 && (g_edge_point != nullptr || g_reflection_point != nullptr)) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
+        coupled_prepare_backward_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+            count,
+            source.data_ptr<float>(),
+            receiver.data_ptr<float>(),
+            plane_point.data_ptr<float>(),
+            plane_normal.data_ptr<float>(),
+            edge_pos.data_ptr<float>(),
+            edge_dir.data_ptr<float>(),
+            edge_t_min.data_ptr<float>(),
+            opt_ptr<float>(g_edge_point),
+            opt_ptr<float>(g_reflection_point),
+            opt_mut_ptr<float>(grad_source_ptr),
+            opt_mut_ptr<float>(grad_receiver_ptr));
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    } else {
+        if (grad_source_ptr != nullptr)
+            grad_source_ptr->zero_();
+        if (grad_receiver_ptr != nullptr)
+            grad_receiver_ptr->zero_();
+    }
+    pybind11::dict out;
+    out["grad_source"] = grad_source_ptr != nullptr
+                             ? pybind11::cast(grad_source)
+                             : pybind11::object(pybind11::none());
+    out["grad_receiver"] = grad_receiver_ptr != nullptr
+                               ? pybind11::cast(grad_receiver)
+                               : pybind11::object(pybind11::none());
+    return out;
+}
+
+pybind11::dict channel_coupled_rd_prepare_jvp(
+    at::Tensor source,
+    at::Tensor receiver,
+    at::Tensor plane_point,
+    at::Tensor plane_normal,
+    at::Tensor edge_pos,
+    at::Tensor edge_dir,
+    at::Tensor edge_t_min,
+    pybind11::object tangent_source,
+    pybind11::object tangent_receiver) {
+    check_prepare_rows(
+        source, receiver, plane_point, plane_normal, edge_pos, edge_dir,
+        edge_t_min);
+    const int64_t count = source.size(0);
+    at::Tensor storage[2];
+    const at::Tensor* t_source = optional_tensor_arg(
+        std::move(tangent_source), storage[0], "tangent_source", at::kFloat,
+        {count, 3}, source);
+    const at::Tensor* t_receiver = optional_tensor_arg(
+        std::move(tangent_receiver), storage[1], "tangent_receiver", at::kFloat,
+        {count, 3}, source);
+    auto tangent_edge_point = at::empty({count, 3}, source.options());
+    auto tangent_reflection_point = at::empty({count, 3}, source.options());
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
+        coupled_prepare_jvp_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+            count,
+            source.data_ptr<float>(),
+            receiver.data_ptr<float>(),
+            plane_point.data_ptr<float>(),
+            plane_normal.data_ptr<float>(),
+            edge_pos.data_ptr<float>(),
+            edge_dir.data_ptr<float>(),
+            edge_t_min.data_ptr<float>(),
+            opt_ptr<float>(t_source),
+            opt_ptr<float>(t_receiver),
+            tangent_edge_point.data_ptr<float>(),
+            tangent_reflection_point.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    pybind11::dict out;
+    out["tangent_edge_point"] = tangent_edge_point;
+    out["tangent_reflection_point"] = tangent_reflection_point;
+    return out;
+}
+
+// ---- Consolidated from field_wedge_ad_project.cu ----
+#include "field_wedge_ad_common.cuh"
+
+namespace {
+
+// ---------------------------------------------------------------------------
+// field_project_complex3 companions: coefficient = <field, axis(direction)>
+// with axis = project_to_wedge_plane(rx_pol, direction) (F1 unnormalized
+// transverse of p_rx); path_gain = |coeff|^2.
+// Linear in the field vector; direction feeds the axis.
+// ---------------------------------------------------------------------------
+
+__global__ void project_complex3_backward_kernel(
+    int64_t count,
+    const c10::complex<float>* field_vector,
+    const float* direction,
+    const float* rx_polarization,
+    const c10::complex<float>* grad_coefficient,
+    const float* grad_path_gain,
+    c10::complex<float>* grad_field_vector,
+    float* grad_direction) {
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
+        const int64_t base = index * 3;
+        const field::Complex3 value = {
+            from_c10(field_vector[base]),
+            from_c10(field_vector[base + 1]),
+            from_c10(field_vector[base + 2]),
+        };
+        const field::float3a dir = load3f(direction, index);
+        const field::float3a pol = load3f(rx_polarization, index);
+        // F1: coefficient = p_rx . E via the unnormalized transverse of p_rx.
+        const field::float3a axis = field::project_to_wedge_plane(pol, dir);
+        const field::Complex coefficient = transport::complex3_dot_real(value, axis);
+        field::Complex g_coeff = field::cplx_zero();
+        if (grad_coefficient != nullptr)
+            g_coeff = from_c10(grad_coefficient[index]);
+        if (grad_path_gain != nullptr) {
+            const float g_gain = grad_path_gain[index];
+            g_coeff.re += 2.0f * coefficient.re * g_gain;
+            g_coeff.im += 2.0f * coefficient.im * g_gain;
+        }
+        field::Complex3 g_value = field::c3_zero();
+        field::float3a g_axis = field::f3_zero();
+        field::adj_cplx_dot_real(value, axis, g_coeff, g_value, g_axis);
+        if (grad_field_vector != nullptr) {
+            grad_field_vector[base] = to_c10(g_value.x);
+            grad_field_vector[base + 1] = to_c10(g_value.y);
+            grad_field_vector[base + 2] = to_c10(g_value.z);
+        }
+        if (grad_direction != nullptr) {
+            field::float3a g_dir = field::f3_zero();
+            field::float3a g_pol = field::f3_zero();
+            ad::adj_transverse_project(dir, pol, g_axis, g_dir, g_pol);
+            grad_direction[base] = g_dir.x;
+            grad_direction[base + 1] = g_dir.y;
+            grad_direction[base + 2] = g_dir.z;
+        }
+    }
+}
+
+__global__ void project_complex3_jvp_kernel(
+    int64_t count,
+    const c10::complex<float>* field_vector,
+    const float* direction,
+    const float* rx_polarization,
+    const c10::complex<float>* tangent_field_vector,
+    const float* tangent_direction,
+    c10::complex<float>* tangent_coefficient,
+    float* tangent_path_gain) {
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
+        const int64_t base = index * 3;
+        const field::Complex3 value = {
+            from_c10(field_vector[base]),
+            from_c10(field_vector[base + 1]),
+            from_c10(field_vector[base + 2]),
+        };
+        const field::float3a dir = load3f(direction, index);
+        const field::float3a pol = load3f(rx_polarization, index);
+        ad::DualF3 dir_dual = {
+            dir,
+            tangent_direction != nullptr ? load3f(tangent_direction, index)
+                                         : field::f3_zero()};
+        const ad::DualF3 axis = ad::dual_transverse_project(
+            dir_dual, ad::df3_const(pol));
+        const field::Complex3 t_value = {
+            tangent_field_vector != nullptr ? from_c10(tangent_field_vector[base])
+                                            : field::cplx_zero(),
+            tangent_field_vector != nullptr
+                ? from_c10(tangent_field_vector[base + 1])
+                : field::cplx_zero(),
+            tangent_field_vector != nullptr
+                ? from_c10(tangent_field_vector[base + 2])
+                : field::cplx_zero(),
+        };
+        const field::Complex coefficient = transport::complex3_dot_real(value, axis.v);
+        const field::Complex t_coefficient = field::cplx_add(
+            transport::complex3_dot_real(t_value, axis.v),
+            transport::complex3_dot_real(value, axis.d));
+        tangent_coefficient[index] = to_c10(t_coefficient);
+        tangent_path_gain[index] = 2.0f * (coefficient.re * t_coefficient.re +
+                                           coefficient.im * t_coefficient.im);
+    }
+}
+
+
+}  // namespace
+
+pybind11::dict channel_field_project_complex3_backward(
+    at::Tensor field_vector,
+    at::Tensor direction,
+    at::Tensor rx_polarization,
+    pybind11::object grad_coefficient,
+    pybind11::object grad_path_gain,
+    bool need_grad_field_vector,
+    bool need_grad_direction) {
+    using channel::check_tensor;
+    using channel::check_vec3_table;
+    check_tensor(field_vector, "field_vector", at::kComplexFloat, 2);
+    TORCH_CHECK(field_vector.size(1) == 3, "field_vector must have shape (N, 3)");
+    check_vec3_table(direction, "direction");
+    check_vec3_table(rx_polarization, "rx_polarization");
+    const int64_t count = field_vector.size(0);
+    TORCH_CHECK(direction.size(0) == count && rx_polarization.size(0) == count,
+                "projection tensors must match field_vector rows");
+    at::Tensor grad_storage[2];
+    const at::Tensor* g_coefficient = optional_tensor_arg(
+        std::move(grad_coefficient), grad_storage[0], "grad_coefficient",
+        at::kComplexFloat, {count}, field_vector);
+    const at::Tensor* g_path_gain = optional_tensor_arg(
+        std::move(grad_path_gain), grad_storage[1], "grad_path_gain",
+        at::kFloat, {count}, field_vector);
+    at::Tensor grad_field_vector;
+    at::Tensor grad_direction;
+    at::Tensor* grad_field_ptr = nullptr;
+    at::Tensor* grad_direction_ptr = nullptr;
+    if (need_grad_field_vector) {
+        grad_field_vector = at::empty(
+            {count, 3}, field_vector.options());
+        grad_field_ptr = &grad_field_vector;
+    }
+    if (need_grad_direction) {
+        grad_direction = at::empty({count, 3}, direction.options());
+        grad_direction_ptr = &grad_direction;
+    }
+    if (count > 0 && (g_coefficient != nullptr || g_path_gain != nullptr)) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(direction.get_device()).stream();
+        project_complex3_backward_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+            count,
+            field_vector.data_ptr<c10::complex<float>>(),
+            direction.data_ptr<float>(),
+            rx_polarization.data_ptr<float>(),
+            opt_ptr<c10::complex<float>>(g_coefficient),
+            opt_ptr<float>(g_path_gain),
+            opt_mut_ptr<c10::complex<float>>(grad_field_ptr),
+            opt_mut_ptr<float>(grad_direction_ptr));
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    } else {
+        if (grad_field_ptr != nullptr)
+            grad_field_ptr->zero_();
+        if (grad_direction_ptr != nullptr)
+            grad_direction_ptr->zero_();
+    }
+    pybind11::dict out;
+    out["grad_field_vector"] = grad_field_ptr != nullptr
+                                   ? pybind11::cast(grad_field_vector)
+                                   : pybind11::object(pybind11::none());
+    out["grad_direction"] = grad_direction_ptr != nullptr
+                                ? pybind11::cast(grad_direction)
+                                : pybind11::object(pybind11::none());
+    return out;
+}
+
+pybind11::dict channel_field_project_complex3_jvp(
+    at::Tensor field_vector,
+    at::Tensor direction,
+    at::Tensor rx_polarization,
+    pybind11::object tangent_field_vector,
+    pybind11::object tangent_direction) {
+    using channel::check_tensor;
+    using channel::check_vec3_table;
+    check_tensor(field_vector, "field_vector", at::kComplexFloat, 2);
+    TORCH_CHECK(field_vector.size(1) == 3, "field_vector must have shape (N, 3)");
+    check_vec3_table(direction, "direction");
+    check_vec3_table(rx_polarization, "rx_polarization");
+    const int64_t count = field_vector.size(0);
+    TORCH_CHECK(direction.size(0) == count && rx_polarization.size(0) == count,
+                "projection tensors must match field_vector rows");
+    at::Tensor storage[2];
+    const at::Tensor* t_field = optional_tensor_arg(
+        std::move(tangent_field_vector), storage[0], "tangent_field_vector",
+        at::kComplexFloat, {count, 3}, field_vector);
+    const at::Tensor* t_direction = optional_tensor_arg(
+        std::move(tangent_direction), storage[1], "tangent_direction",
+        at::kFloat, {count, 3}, field_vector);
+    auto tangent_coefficient = at::empty({count}, field_vector.options());
+    auto tangent_path_gain = at::empty({count}, direction.options());
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(direction.get_device()).stream();
+        project_complex3_jvp_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+            count,
+            field_vector.data_ptr<c10::complex<float>>(),
+            direction.data_ptr<float>(),
+            rx_polarization.data_ptr<float>(),
+            opt_ptr<c10::complex<float>>(t_field),
+            opt_ptr<float>(t_direction),
+            tangent_coefficient.data_ptr<c10::complex<float>>(),
+            tangent_path_gain.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    pybind11::dict out;
+    out["tangent_coefficient"] = tangent_coefficient;
+    out["tangent_path_gain"] = tangent_path_gain;
+    return out;
+}
+
+// ---- Consolidated from coupled_topology.cu ----
+#include <ATen/ATen.h>
+#include <ATen/cuda/CUDAContext.h>
+#include <c10/cuda/CUDAException.h>
+#include <cuda_runtime_api.h>
+#include <rayd/shared/utd/utd_math.h>
+#include "torch_cuda_minimal.h"
+
+#include "../tensor_checks.h"
+
+#include <cmath>
+#include <vector>
+
+#define launch_blocks coupled_topology_launch_blocks
+#define kBlockSize kCoupledTopologyBlockSize
+
+namespace {
+
+constexpr int kBlockSize = 256;
+constexpr float kGeometryEpsilon = 1.0e-6f;
+constexpr float kSpeedOfLight = 299792458.0f;
+namespace utd = rayd::shared::utd;
+
+__device__ __forceinline__ float3 load3(const float *values, int64_t index) {
+    const int64_t base = index * 3;
+    return make_float3(values[base], values[base + 1], values[base + 2]);
+}
+
+__device__ __forceinline__ void store3(float *values, int64_t index, float3 value) {
+    const int64_t base = index * 3;
+    values[base] = value.x;
+    values[base + 1] = value.y;
+    values[base + 2] = value.z;
+}
+
+__device__ __forceinline__ float dot3(float3 a, float3 b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+__device__ __forceinline__ float3 add3(float3 a, float3 b) {
+    return make_float3(a.x + b.x, a.y + b.y, a.z + b.z);
+}
+
+__device__ __forceinline__ float3 sub3(float3 a, float3 b) {
+    return make_float3(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+
+__device__ __forceinline__ float3 mul3(float3 value, float scale) {
+    return make_float3(value.x * scale, value.y * scale, value.z * scale);
+}
+
+__device__ __forceinline__ float3 cross3(float3 a, float3 b) {
+    return make_float3(
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x);
+}
+
+__device__ __forceinline__ float length3(float3 value) {
+    return sqrtf(dot3(value, value));
+}
+
+__device__ __forceinline__ float3 normalize3(float3 value) {
+    const float length = length3(value);
+    return length > kGeometryEpsilon ? mul3(value, 1.0f / length) : make_float3(0.0f, 0.0f, 0.0f);
+}
+
+__device__ __forceinline__ utd::float3a to_utd(float3 value) {
+    return utd::make_f3(value.x, value.y, value.z);
+}
+
+__global__ void coupled_rd_prepare_kernel(
+    int64_t count,
+    const float *__restrict__ source,
+    const float *__restrict__ receiver,
+    const float *__restrict__ plane_point,
+    const float *__restrict__ plane_normal,
+    const float *__restrict__ edge_pos,
+    const float *__restrict__ edge_dir,
+    const float *__restrict__ edge_t_min,
+    const float *__restrict__ edge_t_max,
+    bool *__restrict__ active,
+    float *__restrict__ edge_point,
+    float *__restrict__ virtual_source,
+    float *__restrict__ predicted_reflection_point) {
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
+        const float3 src = load3(source, index);
+        const float3 rx = load3(receiver, index);
+        const float3 p0 = load3(plane_point, index);
+        const float3 normal = normalize3(load3(plane_normal, index));
+        const float3 direction = normalize3(load3(edge_dir, index));
+        const float t_min = edge_t_min[index];
+        const float t_max = edge_t_max[index];
+        const float edge_length = t_max - t_min;
+        const bool finite_inputs =
+            isfinite(src.x) && isfinite(src.y) && isfinite(src.z) &&
+            isfinite(rx.x) && isfinite(rx.y) && isfinite(rx.z) &&
+            isfinite(p0.x) && isfinite(p0.y) && isfinite(p0.z) &&
+            length3(normal) > 0.0f && length3(direction) > 0.0f &&
+            isfinite(edge_length) && edge_length > kGeometryEpsilon;
+        if (!finite_inputs) {
+            active[index] = false;
+            store3(edge_point, index, make_float3(NAN, NAN, NAN));
+            store3(virtual_source, index, make_float3(NAN, NAN, NAN));
+            store3(predicted_reflection_point, index, make_float3(NAN, NAN, NAN));
+            continue;
+        }
+
+        const float signed_distance = dot3(sub3(src, p0), normal);
+        const float3 image = sub3(src, mul3(normal, 2.0f * signed_distance));
+        const float3 edge_origin = add3(load3(edge_pos, index), mul3(direction, t_min));
+        const float parameter = utd::first_order_diffraction_parameter(
+            to_utd(image), to_utd(rx), to_utd(edge_origin), to_utd(direction));
+        const bool inside_edge = isfinite(parameter) && parameter > kGeometryEpsilon &&
+                                 parameter < edge_length - kGeometryEpsilon;
+        const float3 diffraction_point = add3(edge_origin, mul3(direction, parameter));
+
+        const float3 image_to_edge = sub3(diffraction_point, image);
+        const float plane_denominator = dot3(image_to_edge, normal);
+        const float plane_parameter =
+            fabsf(plane_denominator) > kGeometryEpsilon
+                ? dot3(sub3(p0, image), normal) / plane_denominator
+                : NAN;
+        const bool reflection_between = isfinite(plane_parameter) &&
+                                        plane_parameter > kGeometryEpsilon &&
+                                        plane_parameter < 1.0f - kGeometryEpsilon;
+        const float3 reflection_point = add3(image, mul3(image_to_edge, plane_parameter));
+        const bool valid = inside_edge && reflection_between;
+        active[index] = valid;
+        store3(edge_point, index, valid ? diffraction_point : make_float3(NAN, NAN, NAN));
+        store3(virtual_source, index, image);
+        store3(predicted_reflection_point, index, valid ? reflection_point : make_float3(NAN, NAN, NAN));
+    }
+}
+
+__global__ void coupled_rd_finalize_kernel(
+    int64_t count,
+    const bool *__restrict__ prefix_active,
+    const bool *__restrict__ suffix_visible,
+    const float *__restrict__ epc_path_length,
+    const int *__restrict__ resolved_face,
+    const int *__restrict__ edge_id,
+    const float *__restrict__ reflection_point,
+    const float *__restrict__ reflection_normal,
+    const float *__restrict__ edge_point,
+    const float *__restrict__ edge_direction,
+    const float *__restrict__ receiver,
+    bool reverse,
+    int *__restrict__ interaction_type_sequence,
+    int *__restrict__ primitive_sequence,
+    int *__restrict__ edge_sequence,
+    float *__restrict__ interaction_positions,
+    float *__restrict__ interaction_normals,
+    float *__restrict__ path_length,
+    float *__restrict__ delay,
+    bool *__restrict__ valid_out) {
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
+        const int reflection_slot = reverse ? 1 : 0;
+        const int diffraction_slot = reverse ? 0 : 1;
+        const int64_t sequence_base = index * 2;
+        interaction_type_sequence[sequence_base + reflection_slot] = 1;
+        interaction_type_sequence[sequence_base + diffraction_slot] = 2;
+        primitive_sequence[sequence_base] = -1;
+        primitive_sequence[sequence_base + 1] = -1;
+        primitive_sequence[sequence_base + reflection_slot] = resolved_face[index];
+        edge_sequence[sequence_base] = -1;
+        edge_sequence[sequence_base + 1] = -1;
+        edge_sequence[sequence_base + diffraction_slot] = edge_id[index];
+
+        const float3 hit = load3(reflection_point, index);
+        const float3 normal = load3(reflection_normal, index);
+        const float3 edge = load3(edge_point, index);
+        const float3 direction = normalize3(load3(edge_direction, index));
+        store3(interaction_positions, sequence_base + reflection_slot, hit);
+        store3(interaction_positions, sequence_base + diffraction_slot, edge);
+        store3(interaction_normals, sequence_base + reflection_slot, normal);
+        // A diffraction edge has an axis and two face normals, not one surface
+        // normal. Keep the generic normal slot explicitly unavailable.
+        store3(interaction_normals, sequence_base + diffraction_slot, make_float3(NAN, NAN, NAN));
+
+        const bool valid = prefix_active[index] && suffix_visible[index];
+        valid_out[index] = valid;
+        const float suffix = length3(sub3(load3(receiver, index), edge));
+        const float total = valid ? epc_path_length[index] + suffix : NAN;
+        path_length[index] = total;
+        delay[index] = valid ? total / kSpeedOfLight : NAN;
+    }
+}
+
+__global__ void coupled_active_mask_kernel(
+    int64_t count,
+    const bool *__restrict__ lhs,
+    const bool *__restrict__ rhs,
+    bool *__restrict__ out) {
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
+        out[index] = lhs[index] && rhs[index];
+    }
+}
+
+// Double-diffraction (cid 7) discovery: alternating-projection Fermat solve of
+// the two-edge Keller point pair, mirroring the eps/inside semantics of
+// coupled_rd_prepare_kernel. No CPU/Torch recomputation and no heuristic clamping:
+// each iteration takes the raw closed-form single-edge projection and the row
+// is validated (or dropped) purely by the strict-inside test on both segments.
+constexpr int kDoubleDiffractionIterations = 16;
+
+__global__ void coupled_dd_prepare_kernel(
+    int64_t count,
+    const float *__restrict__ source,
+    const float *__restrict__ receiver,
+    const float *__restrict__ edge1_pos,
+    const float *__restrict__ edge1_dir,
+    const float *__restrict__ edge1_t_min,
+    const float *__restrict__ edge1_t_max,
+    const float *__restrict__ edge2_pos,
+    const float *__restrict__ edge2_dir,
+    const float *__restrict__ edge2_t_min,
+    const float *__restrict__ edge2_t_max,
+    bool *__restrict__ active,
+    float *__restrict__ edge1_point,
+    float *__restrict__ edge2_point) {
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
+        const float3 tx = load3(source, index);
+        const float3 rx = load3(receiver, index);
+        const float3 dir1 = normalize3(load3(edge1_dir, index));
+        const float3 dir2 = normalize3(load3(edge2_dir, index));
+        const float t_min1 = edge1_t_min[index];
+        const float t_max1 = edge1_t_max[index];
+        const float t_min2 = edge2_t_min[index];
+        const float t_max2 = edge2_t_max[index];
+        const float length1 = t_max1 - t_min1;
+        const float length2 = t_max2 - t_min2;
+        const float3 origin1 = add3(load3(edge1_pos, index), mul3(dir1, t_min1));
+        const float3 origin2 = add3(load3(edge2_pos, index), mul3(dir2, t_min2));
+        const bool finite_inputs =
+            isfinite(tx.x) && isfinite(tx.y) && isfinite(tx.z) &&
+            isfinite(rx.x) && isfinite(rx.y) && isfinite(rx.z) &&
+            length3(dir1) > 0.0f && length3(dir2) > 0.0f &&
+            isfinite(length1) && length1 > kGeometryEpsilon &&
+            isfinite(length2) && length2 > kGeometryEpsilon;
+        if (!finite_inputs) {
+            active[index] = false;
+            store3(edge1_point, index, make_float3(NAN, NAN, NAN));
+            store3(edge2_point, index, make_float3(NAN, NAN, NAN));
+            continue;
+        }
+
+        // Collinear edge pairs lie on one physical line; they are duplicate
+        // representations of the same edge and cannot form a two-edge cascade.
+        // Same-line test uses the shared kGeometryEpsilon: parallel directions
+        // AND zero perpendicular offset of origin2 from edge 1's line.
+        const bool parallel = length3(cross3(dir1, dir2)) < kGeometryEpsilon;
+        const float3 delta = sub3(origin2, origin1);
+        const float3 perpendicular = sub3(delta, mul3(dir1, dot3(delta, dir1)));
+        const bool same_line = parallel && length3(perpendicular) < kGeometryEpsilon;
+        if (same_line) {
+            active[index] = false;
+            store3(edge1_point, index, make_float3(NAN, NAN, NAN));
+            store3(edge2_point, index, make_float3(NAN, NAN, NAN));
+            continue;
+        }
+
+        // Alternating projection: seed Q2 at edge 2's midpoint, then for a
+        // fixed number of deterministic float32 iterations project Q1 onto
+        // edge 1 for the (tx, Q2) diffraction and Q2 onto edge 2 for the
+        // (Q1, rx) diffraction. Deterministic order, identical every launch.
+        float3 q1 = make_float3(NAN, NAN, NAN);
+        float3 q2 = add3(origin2, mul3(dir2, 0.5f * length2));
+        float parameter1 = NAN;
+        float parameter2 = NAN;
+        for (int iteration = 0; iteration < kDoubleDiffractionIterations; ++iteration) {
+            parameter1 = utd::first_order_diffraction_parameter(
+                to_utd(tx), to_utd(q2), to_utd(origin1), to_utd(dir1));
+            q1 = add3(origin1, mul3(dir1, parameter1));
+            parameter2 = utd::first_order_diffraction_parameter(
+                to_utd(q1), to_utd(rx), to_utd(origin2), to_utd(dir2));
+            q2 = add3(origin2, mul3(dir2, parameter2));
+        }
+
+        const bool inside1 = isfinite(parameter1) && parameter1 > kGeometryEpsilon &&
+                             parameter1 < length1 - kGeometryEpsilon;
+        const bool inside2 = isfinite(parameter2) && parameter2 > kGeometryEpsilon &&
+                             parameter2 < length2 - kGeometryEpsilon;
+        const bool finite_points =
+            isfinite(q1.x) && isfinite(q1.y) && isfinite(q1.z) &&
+            isfinite(q2.x) && isfinite(q2.y) && isfinite(q2.z);
+        // All three segment directions (tx->Q1, Q1->Q2, Q2->rx) must be
+        // well-defined; a degenerate zero-length leg has no diffraction cone.
+        const bool segments_defined =
+            length3(sub3(q1, tx)) > kGeometryEpsilon &&
+            length3(sub3(q2, q1)) > kGeometryEpsilon &&
+            length3(sub3(rx, q2)) > kGeometryEpsilon;
+        const bool valid = inside1 && inside2 && finite_points && segments_defined;
+        active[index] = valid;
+        store3(edge1_point, index, valid ? q1 : make_float3(NAN, NAN, NAN));
+        store3(edge2_point, index, valid ? q2 : make_float3(NAN, NAN, NAN));
+    }
+}
+
+__global__ void coupled_dd_finalize_kernel(
+    int64_t count,
+    const bool *__restrict__ prefix_active,
+    const int *__restrict__ edge1_id,
+    const int *__restrict__ edge2_id,
+    const float *__restrict__ edge1_point,
+    const float *__restrict__ edge2_point,
+    const float *__restrict__ source,
+    const float *__restrict__ receiver,
+    int *__restrict__ interaction_type_sequence,
+    int *__restrict__ primitive_sequence,
+    int *__restrict__ edge_sequence,
+    float *__restrict__ interaction_positions,
+    float *__restrict__ interaction_normals,
+    float *__restrict__ path_length,
+    float *__restrict__ delay,
+    bool *__restrict__ valid_out) {
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
+        const int64_t sequence_base = index * 2;
+        // Two diffraction events; edge ids for BOTH edges live in edge_sequence
+        // (slot 0 = e1, slot 1 = e2). primitive_sequence is fully -1: a
+        // double-diffraction row touches no face.
+        interaction_type_sequence[sequence_base + 0] = 2;
+        interaction_type_sequence[sequence_base + 1] = 2;
+        primitive_sequence[sequence_base + 0] = -1;
+        primitive_sequence[sequence_base + 1] = -1;
+        edge_sequence[sequence_base + 0] = edge1_id[index];
+        edge_sequence[sequence_base + 1] = edge2_id[index];
+
+        const float3 q1 = load3(edge1_point, index);
+        const float3 q2 = load3(edge2_point, index);
+        store3(interaction_positions, sequence_base + 0, q1);
+        store3(interaction_positions, sequence_base + 1, q2);
+        // A diffraction edge has an axis and two face normals, not one surface
+        // normal. Mirror the coupled R/D finalize: both diffraction slots keep
+        // the generic normal slot explicitly unavailable.
+        store3(interaction_normals, sequence_base + 0, make_float3(NAN, NAN, NAN));
+        store3(interaction_normals, sequence_base + 1, make_float3(NAN, NAN, NAN));
+
+        const bool valid = prefix_active[index];
+        valid_out[index] = valid;
+        const float3 tx = load3(source, index);
+        const float3 rx = load3(receiver, index);
+        const float total = length3(sub3(q1, tx)) + length3(sub3(q2, q1)) +
+                            length3(sub3(rx, q2));
+        path_length[index] = valid ? total : NAN;
+        delay[index] = valid ? total / kSpeedOfLight : NAN;
+    }
+}
+
+int launch_blocks(int64_t count) {
+    return static_cast<int>((count + kBlockSize - 1) / kBlockSize);
+}
+
+}  // namespace
+
+std::vector<at::Tensor> channel_coupled_rd_prepare_cuda(
+    at::Tensor source,
+    at::Tensor receiver,
+    at::Tensor plane_point,
+    at::Tensor plane_normal,
+    at::Tensor edge_pos,
+    at::Tensor edge_dir,
+    at::Tensor edge_t_min,
+    at::Tensor edge_t_max) {
+    using channel::check_flat_tensor;
+    using channel::check_vec3_table;
+    check_vec3_table(source, "source");
+    check_vec3_table(receiver, "receiver");
+    check_vec3_table(plane_point, "plane_point");
+    check_vec3_table(plane_normal, "plane_normal");
+    check_vec3_table(edge_pos, "edge_pos");
+    check_vec3_table(edge_dir, "edge_dir");
+    check_flat_tensor(edge_t_min, "edge_t_min", at::kFloat);
+    check_flat_tensor(edge_t_max, "edge_t_max", at::kFloat);
+    const int64_t count = source.size(0);
+    for (const auto &tensor : {receiver, plane_point, plane_normal, edge_pos, edge_dir})
+        TORCH_CHECK(tensor.size(0) == count, "coupled geometry vector tables must have matching rows");
+    TORCH_CHECK(edge_t_min.size(0) == count && edge_t_max.size(0) == count,
+                "coupled geometry edge bounds must match source rows");
+
+    auto active = at::empty({count}, source.options().dtype(at::kBool));
+    auto edge_point = at::empty_like(source);
+    auto virtual_source = at::empty_like(source);
+    auto predicted_reflection_point = at::empty_like(source);
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
+        coupled_rd_prepare_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+            count,
+            source.data_ptr<float>(),
+            receiver.data_ptr<float>(),
+            plane_point.data_ptr<float>(),
+            plane_normal.data_ptr<float>(),
+            edge_pos.data_ptr<float>(),
+            edge_dir.data_ptr<float>(),
+            edge_t_min.data_ptr<float>(),
+            edge_t_max.data_ptr<float>(),
+            active.data_ptr<bool>(),
+            edge_point.data_ptr<float>(),
+            virtual_source.data_ptr<float>(),
+            predicted_reflection_point.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return {active, edge_point, virtual_source, predicted_reflection_point};
+}
+
+pybind11::dict channel_coupled_rd_finalize_cuda(
+    at::Tensor prefix_active,
+    at::Tensor suffix_visible,
+    at::Tensor epc_path_length,
+    at::Tensor resolved_face,
+    at::Tensor edge_id,
+    at::Tensor reflection_point,
+    at::Tensor reflection_normal,
+    at::Tensor edge_point,
+    at::Tensor edge_direction,
+    at::Tensor receiver,
+    bool reverse) {
+    using channel::check_flat_tensor;
+    using channel::check_vec3_table;
+    check_flat_tensor(prefix_active, "prefix_active", at::kBool);
+    check_flat_tensor(suffix_visible, "suffix_visible", at::kBool);
+    check_flat_tensor(epc_path_length, "epc_path_length", at::kFloat);
+    check_flat_tensor(resolved_face, "resolved_face", at::kInt);
+    check_flat_tensor(edge_id, "edge_id", at::kInt);
+    check_vec3_table(reflection_point, "reflection_point");
+    check_vec3_table(reflection_normal, "reflection_normal");
+    check_vec3_table(edge_point, "edge_point");
+    check_vec3_table(edge_direction, "edge_direction");
+    check_vec3_table(receiver, "receiver");
+    const int64_t count = prefix_active.size(0);
+    TORCH_CHECK(suffix_visible.size(0) == count, "suffix_visible must match prefix_active");
+    TORCH_CHECK(epc_path_length.size(0) == count && resolved_face.size(0) == count && edge_id.size(0) == count,
+                "coupled geometry scalar rows must match valid");
+    for (const auto &tensor : {reflection_point, reflection_normal, edge_point, edge_direction, receiver})
+        TORCH_CHECK(tensor.size(0) == count, "coupled geometry vector rows must match valid");
+
+    auto int_options = edge_id.options().dtype(at::kInt);
+    auto interaction_type_sequence = at::empty({count, 2}, int_options);
+    auto primitive_sequence = at::empty({count, 2}, int_options);
+    auto edge_sequence = at::empty({count, 2}, int_options);
+    auto interaction_positions = at::empty({count, 2, 3}, receiver.options());
+    auto interaction_normals = at::empty_like(interaction_positions);
+    auto path_length = at::empty({count}, receiver.options());
+    auto delay = at::empty_like(path_length);
+    auto valid = at::empty_like(prefix_active);
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(prefix_active.get_device()).stream();
+        coupled_rd_finalize_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+            count,
+            prefix_active.data_ptr<bool>(),
+            suffix_visible.data_ptr<bool>(),
+            epc_path_length.data_ptr<float>(),
+            resolved_face.data_ptr<int>(),
+            edge_id.data_ptr<int>(),
+            reflection_point.data_ptr<float>(),
+            reflection_normal.data_ptr<float>(),
+            edge_point.data_ptr<float>(),
+            edge_direction.data_ptr<float>(),
+            receiver.data_ptr<float>(),
+            reverse,
+            interaction_type_sequence.data_ptr<int>(),
+            primitive_sequence.data_ptr<int>(),
+            edge_sequence.data_ptr<int>(),
+            interaction_positions.data_ptr<float>(),
+            interaction_normals.data_ptr<float>(),
+            path_length.data_ptr<float>(),
+            delay.data_ptr<float>(),
+            valid.data_ptr<bool>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+
+    pybind11::dict out;
+    out["valid"] = valid;
+    out["interaction_type_sequence"] = interaction_type_sequence;
+    out["primitive_sequence"] = primitive_sequence;
+    out["edge_sequence"] = edge_sequence;
+    out["face_id"] = resolved_face;
+    out["edge_id"] = edge_id;
+    out["interaction_positions"] = interaction_positions;
+    out["interaction_normals"] = interaction_normals;
+    out["reflection_position"] = reflection_point;
+    out["reflection_normal"] = reflection_normal;
+    out["edge_position"] = edge_point;
+    out["edge_direction"] = edge_direction;
+    out["path_length_m"] = path_length;
+    out["delay_s"] = delay;
+    return out;
+}
+
+std::vector<at::Tensor> channel_coupled_dd_prepare_cuda(
+    at::Tensor source,
+    at::Tensor receiver,
+    at::Tensor edge1_pos,
+    at::Tensor edge1_dir,
+    at::Tensor edge1_t_min,
+    at::Tensor edge1_t_max,
+    at::Tensor edge2_pos,
+    at::Tensor edge2_dir,
+    at::Tensor edge2_t_min,
+    at::Tensor edge2_t_max) {
+    using channel::check_flat_tensor;
+    using channel::check_vec3_table;
+    check_vec3_table(source, "source");
+    check_vec3_table(receiver, "receiver");
+    check_vec3_table(edge1_pos, "edge1_pos");
+    check_vec3_table(edge1_dir, "edge1_dir");
+    check_flat_tensor(edge1_t_min, "edge1_t_min", at::kFloat);
+    check_flat_tensor(edge1_t_max, "edge1_t_max", at::kFloat);
+    check_vec3_table(edge2_pos, "edge2_pos");
+    check_vec3_table(edge2_dir, "edge2_dir");
+    check_flat_tensor(edge2_t_min, "edge2_t_min", at::kFloat);
+    check_flat_tensor(edge2_t_max, "edge2_t_max", at::kFloat);
+    const int64_t count = source.size(0);
+    for (const auto &tensor : {receiver, edge1_pos, edge1_dir, edge2_pos, edge2_dir})
+        TORCH_CHECK(tensor.size(0) == count,
+                    "coupled double-diffraction vector tables must have matching rows");
+    for (const auto &tensor : {edge1_t_min, edge1_t_max, edge2_t_min, edge2_t_max})
+        TORCH_CHECK(tensor.size(0) == count,
+                    "coupled double-diffraction edge bounds must match source rows");
+
+    auto active = at::empty({count}, source.options().dtype(at::kBool));
+    auto edge1_point = at::empty_like(source);
+    auto edge2_point = at::empty_like(source);
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
+        coupled_dd_prepare_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+            count,
+            source.data_ptr<float>(),
+            receiver.data_ptr<float>(),
+            edge1_pos.data_ptr<float>(),
+            edge1_dir.data_ptr<float>(),
+            edge1_t_min.data_ptr<float>(),
+            edge1_t_max.data_ptr<float>(),
+            edge2_pos.data_ptr<float>(),
+            edge2_dir.data_ptr<float>(),
+            edge2_t_min.data_ptr<float>(),
+            edge2_t_max.data_ptr<float>(),
+            active.data_ptr<bool>(),
+            edge1_point.data_ptr<float>(),
+            edge2_point.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return {active, edge1_point, edge2_point};
+}
+
+pybind11::dict channel_coupled_dd_finalize_cuda(
+    at::Tensor prefix_active,
+    at::Tensor edge1_id,
+    at::Tensor edge2_id,
+    at::Tensor edge1_point,
+    at::Tensor edge2_point,
+    at::Tensor source,
+    at::Tensor receiver) {
+    using channel::check_flat_tensor;
+    using channel::check_vec3_table;
+    check_flat_tensor(prefix_active, "prefix_active", at::kBool);
+    check_flat_tensor(edge1_id, "edge1_id", at::kInt);
+    check_flat_tensor(edge2_id, "edge2_id", at::kInt);
+    check_vec3_table(edge1_point, "edge1_point");
+    check_vec3_table(edge2_point, "edge2_point");
+    check_vec3_table(source, "source");
+    check_vec3_table(receiver, "receiver");
+    const int64_t count = prefix_active.size(0);
+    TORCH_CHECK(edge1_id.size(0) == count && edge2_id.size(0) == count,
+                "coupled double-diffraction edge ids must match valid");
+    for (const auto &tensor : {edge1_point, edge2_point, source, receiver})
+        TORCH_CHECK(tensor.size(0) == count,
+                    "coupled double-diffraction vector rows must match valid");
+
+    auto int_options = edge1_id.options().dtype(at::kInt);
+    auto interaction_type_sequence = at::empty({count, 2}, int_options);
+    auto primitive_sequence = at::empty({count, 2}, int_options);
+    auto edge_sequence = at::empty({count, 2}, int_options);
+    auto interaction_positions = at::empty({count, 2, 3}, receiver.options());
+    auto interaction_normals = at::empty_like(interaction_positions);
+    auto path_length = at::empty({count}, receiver.options());
+    auto delay = at::empty_like(path_length);
+    auto valid = at::empty_like(prefix_active);
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(prefix_active.get_device()).stream();
+        coupled_dd_finalize_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+            count,
+            prefix_active.data_ptr<bool>(),
+            edge1_id.data_ptr<int>(),
+            edge2_id.data_ptr<int>(),
+            edge1_point.data_ptr<float>(),
+            edge2_point.data_ptr<float>(),
+            source.data_ptr<float>(),
+            receiver.data_ptr<float>(),
+            interaction_type_sequence.data_ptr<int>(),
+            primitive_sequence.data_ptr<int>(),
+            edge_sequence.data_ptr<int>(),
+            interaction_positions.data_ptr<float>(),
+            interaction_normals.data_ptr<float>(),
+            path_length.data_ptr<float>(),
+            delay.data_ptr<float>(),
+            valid.data_ptr<bool>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+
+    pybind11::dict out;
+    out["valid"] = valid;
+    out["interaction_type_sequence"] = interaction_type_sequence;
+    out["primitive_sequence"] = primitive_sequence;
+    out["edge_sequence"] = edge_sequence;
+    out["edge1_id"] = edge1_id;
+    out["edge2_id"] = edge2_id;
+    out["interaction_positions"] = interaction_positions;
+    out["interaction_normals"] = interaction_normals;
+    out["edge1_position"] = edge1_point;
+    out["edge2_position"] = edge2_point;
+    out["path_length_m"] = path_length;
+    out["delay_s"] = delay;
+    return out;
+}
+
+at::Tensor channel_coupled_active_mask_cuda(at::Tensor lhs, at::Tensor rhs) {
+    using channel::check_flat_tensor;
+    check_flat_tensor(lhs, "lhs", at::kBool);
+    check_flat_tensor(rhs, "rhs", at::kBool);
+    TORCH_CHECK(rhs.size(0) == lhs.size(0), "rhs must match lhs");
+    auto out = at::empty_like(lhs);
+    const int64_t count = lhs.size(0);
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(lhs.get_device()).stream();
+        coupled_active_mask_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+            count,
+            lhs.data_ptr<bool>(),
+            rhs.data_ptr<bool>(),
+            out.data_ptr<bool>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return out;
+}
+
+#undef launch_blocks
+#undef kBlockSize
+

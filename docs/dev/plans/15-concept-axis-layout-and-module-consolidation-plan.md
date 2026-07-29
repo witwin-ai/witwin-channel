@@ -24,7 +24,7 @@ turns it into a target layout and a sequence.
 
 | Phase | Outcome |
 | --- | --- |
-| 0 Policy | `file_lines` retired as an optional gate (not a raised number). `function_complexity: 15` and `native_file_lines: 3000/2000` stay mandatory. +4 tests. |
+| 0 Policy | `file_lines` retired as an optional gate (not a raised number). `function_complexity: 15` stayed mandatory. Native `3000/2000` remained active at this plan's completion and was subsequently retired by ADR-044 on 2026-07-28. +4 tests. |
 | 1a Ceremony | `component_status` 4 sites → 1; component depth rule 4 copies → 1, both owned by `components.py`. A **fifth** copy of the count-refined transmission/scattering rule was found in `deterministic/pipeline.py` and absorbed. |
 | 1b Config | Shared bases for `path`/`deterministic` and `montecarlo.basic`/`bdpt`. Public config names, fields, defaults and messages unchanged; `ci/public-api-snapshot.json` untouched. |
 | 2a Governance | New `ci/check_single_definition.py`, wired into `quick`. 3 protected concepts, 37 pre-existing `required_symbol` duplicates recorded as a **ratchet that may only shrink**. +18 tests. |

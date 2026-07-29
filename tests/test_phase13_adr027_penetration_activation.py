@@ -69,11 +69,16 @@ def test_phase_e_deletes_old_depth_march_without_a_compatibility_alias() -> None
 
 def test_phase_e_sanitizers_are_async_current_stream_and_have_no_trap() -> None:
     source = (
-        ROOT / "native/channel/kernels/enumerated_capacity_failure_sanitize.cu"
+        ROOT / "native/channel/kernels/capacity_failure.cu"
     ).read_text(encoding="utf-8")
+    source = source.split(
+        "// ---- Consolidated from enumerated_capacity_failure_sanitize.cu ----", 1
+    )[1].split(
+        "// ---- Consolidated from mc_capacity_failure_component_maps_sanitize.cu ----", 1
+    )[0]
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
 
-    assert "enumerated_capacity_failure_sanitize.cu" in cmake
+    assert "native/channel/kernels/capacity_failure.cu" in cmake
     assert "getCurrentCUDAStream" in source
     assert "failure_state[0]" in source
     for forbidden in (

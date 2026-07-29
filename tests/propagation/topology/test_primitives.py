@@ -27,7 +27,7 @@ def test_topology_primitives_is_the_single_object_owner(name: str):
 
 def test_topology_primitives_use_only_canonical_runtime_dependencies():
     assert topology._required_native_op is runtime.required_symbol
-    assert topology.native_extension is runtime.native_extension
+    assert not hasattr(topology, "native_extension")
     assert topology.validate_cuda_tensor is runtime.validate_cuda_tensor
     for name in _OWNER_NAMES:
         assert getattr(topology, name).__globals__ is topology.__dict__

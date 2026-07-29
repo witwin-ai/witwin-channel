@@ -13,6 +13,14 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+def _consolidated_section(path: Path, source_name: str) -> str:
+    text = path.read_text(encoding="utf-8")
+    marker = f"// ---- Consolidated from {source_name} ----"
+    start = text.index(marker)
+    end = text.find("// ---- Consolidated from ", start + len(marker))
+    return text[start:] if end < 0 else text[start:end]
+
+
 def test_capacity_failure_state_is_native_zeroed_on_current_stream() -> None:
     reference = torch.empty(4, device="cuda")
     stream = torch.cuda.Stream()
@@ -40,14 +48,16 @@ def test_capacity_failure_state_rejects_bad_metadata() -> None:
 def test_capacity_intermediates_have_no_trap_or_host_synchronization() -> None:
     root = Path(__file__).resolve().parents[2]
     sources = (
-        "enumerated_capacity_failure_sanitize.cu",
-        "evaluated_paths_capacity_pack_ad.cu",
-        "mc_capacity_failure_component_maps_sanitize.cu",
+        ("capacity_failure.cu", "enumerated_capacity_failure_sanitize.cu"),
+        ("evaluated_paths.cu", "evaluated_paths_capacity_pack_ad.cu"),
+        (
+            "capacity_failure.cu",
+            "mc_capacity_failure_component_maps_sanitize.cu",
+        ),
     )
-    for name in sources:
-        source = (
-            root / "native" / "channel" / "kernels" / name
-        ).read_text(encoding="utf-8")
+    kernels = root / "native" / "channel" / "kernels"
+    for owner, source_name in sources:
+        source = _consolidated_section(kernels / owner, source_name)
         for forbidden in (
             "trap;",
             "cudaMemcpy",
@@ -55,14 +65,11 @@ def test_capacity_intermediates_have_no_trap_or_host_synchronization() -> None:
             ".item",
             ".cpu",
         ):
-            assert forbidden not in source, f"{name} contains {forbidden}"
+            assert forbidden not in source, f"{source_name} contains {forbidden}"
 
-    initializer = (
-        root
-        / "native"
-        / "channel"
-        / "kernels"
-        / "capacity_failure_state.cu"
-    ).read_text(encoding="utf-8")
+    initializer = _consolidated_section(
+        kernels / "capacity_failure.cu",
+        "capacity_failure_state.cu",
+    )
     assert "cudaMemsetAsync" in initializer
     assert "getCurrentCUDAStream" in initializer

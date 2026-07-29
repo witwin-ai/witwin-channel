@@ -21,8 +21,9 @@ Diffuse scattering is single-bounce and terminal in every solver:
   zero-phase POWER rows, and the only coherent evaluation (the phase-screen
   patch integral) is single-surface and REPLACES the specular+ensemble for
   that surface (contract 6.7.3).
-- The native accumulator special-cases scattering as an incoherent power slot
-  (`deterministic_accum.cu:41-48,119-142`).
+- The native accumulator defaults scattering to an incoherent power slot
+  (`deterministic.cu:1013-1031`); the accepted opt-in coherent branch is beside
+  it at `deterministic.cu:1014-1025`.
 - The BDPT shooting sampler allows specular PREFIXES before a scatter but
   kills the subpath at the scatter event
   (`montecarlo/bdpt/connections.py:454-456`, "v1 depth rule",
@@ -93,7 +94,8 @@ bounce, unfolded lengths `L1`, `L2`), sample data, and resident tables:
 
 1. Chain-1 coherent Jones transport of the tx polarization to `v_s` in the
    incident s/p basis (identical per-bounce math and expression order as
-   `field_transport_reflection.cu`, including per-bounce rough `C_r`
+   the `field_transport_reflection.cu` provenance section in
+   `field_transport.cu`, including per-bounce rough `C_r`
    attenuation), yielding the incident coherency diagonal
    `P_te = |E_s|^2, P_tm = |E_p|^2` and the incident direction `d_i` of the
    last C1 leg.

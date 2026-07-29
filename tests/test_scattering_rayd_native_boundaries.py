@@ -47,6 +47,14 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _consolidated_section(path: Path, source_name: str) -> str:
+    text = path.read_text(encoding="utf-8-sig")
+    marker = f"// ---- Consolidated from {source_name} ----"
+    start = text.index(marker)
+    end = text.find("// ---- Consolidated from ", start + len(marker))
+    return text[start:] if end < 0 else text[start:end]
+
+
 def test_current_build_uses_the_locked_rayd_scattering_surface() -> None:
     integration = RAYD_ROOT / "backends/torch/include/rayd/torch/integration.h"
     assert _sha256(integration) == (
@@ -82,7 +90,10 @@ def test_phase10b_channel_has_no_local_scattering_numerical_owner() -> None:
 
 
 def test_phase10b_retains_only_event_policy_in_scattering_tu() -> None:
-    source = (KERNELS / "scattering.cu").read_text(encoding="utf-8-sig")
+    source = _consolidated_section(
+        KERNELS / "montecarlo_common.cu",
+        "scattering.cu",
+    )
     assert source.count("scattering_event_kernel<<<") == 1
     assert source.count("channel_scattering_event_probabilities(") == 1
     for removed in (

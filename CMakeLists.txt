@@ -567,51 +567,21 @@ Python_add_library(
     native/channel/rayd/geometry.cpp
     native/channel/rayd/reflection.cpp
     native/channel/rayd/diffraction.cpp
-    native/channel/kernels/accum.cu
-    native/channel/kernels/bdpt_accum.cu
-    native/channel/kernels/bdpt_connect_mis.cu
-    native/channel/kernels/bdpt_connect_samples.cu
-    native/channel/kernels/bdpt_connect_visibility.cu
-    native/channel/kernels/bdpt_connect_accumulation.cu
-    native/channel/kernels/bdpt_connect_ad.cu
-    native/channel/kernels/bdpt_sampling.cu
-    native/channel/kernels/bdpt_subpaths.cu
-    native/channel/kernels/bdpt_subpaths_ad.cu
-    native/channel/kernels/bdpt_maps.cu
-    native/channel/kernels/capacity_failure_state.cu
-    native/channel/kernels/capacity_failure_terminal.cu
-    native/channel/kernels/coupled_topology.cu
+    native/channel/kernels/path_topology.cu
+    native/channel/kernels/evaluated_paths.cu
+    native/channel/kernels/deterministic.cu
     native/channel/kernels/field_transport.cu
-    native/channel/kernels/field_transport_free_space.cu
-    native/channel/kernels/field_transport_reflection.cu
-    native/channel/kernels/field_rough_scale.cu
-    native/channel/kernels/field_source_amplitude.cu
-    native/channel/kernels/field_wedge_ad_coupled.cu
-    native/channel/kernels/field_wedge_ad_project.cu
-    native/channel/kernels/field_wedge_ad_prepare.cu
-    native/channel/kernels/diffraction.cu
-    native/channel/kernels/diffraction_discovery.cu
-    native/channel/kernels/deterministic_accum.cu
-    native/channel/kernels/enumerated_canonical_capacity_select.cu
-    native/channel/kernels/enumerated_transmission_topology_pack.cu
-    native/channel/kernels/enumerated_capacity_failure_sanitize.cu
-    native/channel/kernels/evaluated_paths_capacity_pack_ad.cu
-    native/channel/kernels/evaluated_paths_compact_finalize.cu
-    native/channel/kernels/consumer_los_jones.cu
-    native/channel/kernels/consumer_fixed_los_gather.cu
-    native/channel/kernels/deterministic_field.cu
-    native/channel/kernels/deterministic_topology.cu
-    native/channel/kernels/los.cu
-    native/channel/kernels/los_silhouette_clearance.cu
-    native/channel/kernels/material.cu
-    native/channel/kernels/mc_capacity_failure_component_maps_sanitize.cu
-    native/channel/kernels/mc_transmission_wall_product.cu
-    native/channel/kernels/path_compaction.cu
-    native/channel/kernels/path_trace.cu
-    native/channel/kernels/kirchhoff_table_ad.cu
+    native/channel/kernels/field_wedge_coupled.cu
+    native/channel/kernels/los_consumer.cu
+    native/channel/kernels/capacity_failure.cu
+    native/channel/kernels/montecarlo_common.cu
     native/channel/kernels/reflection.cu
-    native/channel/kernels/scattering.cu
-    native/channel/kernels/sampling.cu
+    native/channel/kernels/diffraction.cu
+    native/channel/kernels/mc_transmission_wall_product.cu
+    native/channel/kernels/kirchhoff_table_ad.cu
+    native/channel/kernels/bdpt_connect.cu
+    native/channel/kernels/bdpt_subpaths.cu
+    native/channel/kernels/bdpt_support.cu
     native/channel/montecarlo_basic.cpp
     native/channel/path_solver.cpp
 )

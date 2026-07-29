@@ -1164,7 +1164,7 @@ def test_deterministic_reflection_field_requires_native_cuda_kernel(monkeypatch)
 
     tensor = torch.zeros((1, 3), device="cuda", dtype=torch.float32)
     one = torch.ones((1,), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(field_kernels, "native_extension", lambda: None)
+    monkeypatch.setattr(runtime, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="deterministic_reflection_field CUDA kernel is required"):
         field_kernels.deterministic_reflection_field(
@@ -1494,7 +1494,7 @@ def test_mc_sample_directions_requires_native_cuda_kernel(monkeypatch):
         pytest.skip("CUDA is required for MC sample directions")
 
     reference = torch.empty((1, 3), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(topology_kernels, "native_extension", lambda: None)
+    monkeypatch.setattr(runtime, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_sample_directions CUDA kernel is required"):
         topology_kernels.mc_sample_directions(1, reference)
@@ -1522,7 +1522,7 @@ def test_mc_transmitter_tensors_creates_cuda_positions_and_power():
 def test_mc_transmitter_tensors_requires_native_cuda_helper(monkeypatch):
     monkeypatch.setattr(runtime, "native_extension", lambda: None)
 
-    with pytest.raises(RuntimeError, match="mc_transmitter_tensors CUDA helper is required"):
+    with pytest.raises(RuntimeError, match="mc_transmitter_tensors CUDA kernel is required"):
         runtime.mc_transmitter_tensors((0.0, 0.0, 0.0), (1.0,))
 
 
@@ -1772,7 +1772,7 @@ def test_mc_selected_edge_indices_requires_native_cuda_kernel(monkeypatch):
         pytest.skip("CUDA is required for MC selected edge compaction")
 
     selected = torch.ones((1,), device="cuda", dtype=torch.bool)
-    monkeypatch.setattr(topology_kernels, "native_extension", lambda: None)
+    monkeypatch.setattr(runtime, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_selected_edge_indices CUDA kernel is required"):
         topology_kernels.mc_selected_edge_indices(selected)
@@ -2046,7 +2046,7 @@ def test_mc_face_material_tensors_requires_native_cuda_kernel(monkeypatch):
     sigma_e = torch.zeros((1,), device="cuda", dtype=torch.float32)
     mu_r = torch.ones((1,), device="cuda", dtype=torch.float32)
     face_material_id = torch.zeros((1,), device="cuda", dtype=torch.int32)
-    monkeypatch.setattr(material_functional, "native_extension", lambda: None)
+    monkeypatch.setattr(runtime, "native_extension", lambda: None)
 
     with pytest.raises(RuntimeError, match="mc_face_material_tensors CUDA kernel is required"):
         material_functional.mc_face_material_tensors(eps_r, sigma_e, mu_r, face_material_id)

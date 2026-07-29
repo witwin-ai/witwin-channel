@@ -150,22 +150,27 @@ def test_capacity_failure_terminal_trap_isolated_to_subprocess() -> None:
 def test_capacity_failure_terminal_source_has_one_async_device_observer() -> None:
     native = (
         REPOSITORY_ROOT
-        / "native/channel/kernels/capacity_failure_terminal.cu"
+        / "native/channel/kernels/capacity_failure.cu"
     ).read_text(encoding="utf-8")
     facade = (
         REPOSITORY_ROOT
         / "witwin/channel/runtime.py"
     ).read_text(encoding="utf-8")
+    terminal = native.split(
+        "// ---- Consolidated from capacity_failure_terminal.cu ----", 1
+    )[1].split(
+        "// ---- Consolidated from enumerated_capacity_failure_sanitize.cu ----", 1
+    )[0]
 
-    assert native.count('asm volatile("trap;")') == 1
-    assert "getCurrentCUDAStream" in native
-    assert "const int *__restrict__ failure_state" in native
-    assert "failure_state[0] != 0" in native
-    assert "failure_state[0] =" not in native
-    assert "at::empty" not in native
-    assert "C10_CUDA_KERNEL_LAUNCH_CHECK" not in native
-    assert "cudaGetLastError" not in native
-    assert "cudaPeekAtLastError" not in native
+    assert terminal.count('asm volatile("trap;")') == 1
+    assert "getCurrentCUDAStream" in terminal
+    assert "const int *__restrict__ failure_state" in terminal
+    assert "failure_state[0] != 0" in terminal
+    assert "failure_state[0] =" not in terminal
+    assert "at::empty" not in terminal
+    assert "C10_CUDA_KERNEL_LAUNCH_CHECK" not in terminal
+    assert "cudaGetLastError" not in terminal
+    assert "cudaPeekAtLastError" not in terminal
     for forbidden in (
         "cudaMemcpy",
         "cudaStreamSynchronize",
@@ -174,7 +179,7 @@ def test_capacity_failure_terminal_source_has_one_async_device_observer() -> Non
         ".cpu(",
         ".numpy(",
     ):
-        assert forbidden not in native
+        assert forbidden not in terminal
         assert forbidden not in facade
 
     trap_sources = sorted(
@@ -185,7 +190,7 @@ def test_capacity_failure_terminal_source_has_one_async_device_observer() -> Non
         and "trap;" in path.read_text(encoding="utf-8")
     )
     assert trap_sources == [
-        "native/channel/kernels/capacity_failure_terminal.cu"
+        "native/channel/kernels/capacity_failure.cu"
     ]
 
     production_mentions = sorted(

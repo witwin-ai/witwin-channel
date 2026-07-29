@@ -62,11 +62,13 @@ Two gaps keep this off the deterministic grid solver:
    `False` and no cid 3/4 rows are ever enumerated for a deterministic solve.
 2. **Accumulator drop.** Even if cid 3/4 rows existed and their fields were
    evaluated (they would be, through the shared engine), the deterministic flat
-   accumulator discards them. `kernels/deterministic_accum.cu::accum_slot`
-   (lines 32-43) maps cid 0/1/2 -> slot 0/1/2, cid 5 -> slot 3, cid 6 -> slot 4,
-   and returns **-1 for cid 3/4** ("consumed per path by the path API, never
-   materialized here"). Slot -1 rows are dropped by the scatter/gather gates. So
-   the coupled compensation is computed and then thrown away before it reaches
+   accumulator discarded them at ADR-011 acceptance: the former
+   `kernels/deterministic_accum.cu::accum_slot` mapped cid 0/1/2 -> slot
+   0/1/2, cid 5 -> slot 3, cid 6 -> slot 4, and returned **-1 for cid 3/4**
+   ("consumed per path by the path API, never materialized here"). The accepted
+   mapping now lives in `kernels/deterministic.cu:921-935`; slot -1 rows remain
+   dropped by the scatter/gather gates. Before that mapping, the coupled
+   compensation was computed and then thrown away before it reached
    `power_total` / `field_total` / `component_power`.
 
 The path solver avoids gap 2 because it exports per-row `PathResult` fields
@@ -105,7 +107,7 @@ The coupled coefficient is a coherent complex-3 Jones contribution
 (`_evaluate_coupled_fields` fills `path_field` = receiver-projected scalar,
 `field_xyz`, `path_gain`, exactly like reflection/diffraction). It must join the
 coherent field sum. Map cid 3 and cid 4 into **one new coupled field slot** in
-`kernels/deterministic_accum.cu`:
+`kernels/deterministic.cu`:
 
 - `kAccumSlotCount`: 5 -> 6; add `constexpr int kCoupledSlot = 5;`.
 - `accum_slot`: add `if (component_id == 3 || component_id == 4) return
@@ -354,10 +356,11 @@ Evidence summary:
 
 ## Risks
 
-- **Coupled legs do NOT inherit the stationary G2 mend.** The coupled diffraction
-  leg is evaluated with `selectStationaryPoint = 0` in both the primal
-  (`field_transport.cu::coupled_rd_field_kernel:490`) and AD
-  (`field_wedge_ad_coupled.cu:275`) kernels, using the plain
+- **At ADR-011 acceptance, coupled legs did NOT inherit the stationary G2
+  mend.** The coupled diffraction leg used `selectStationaryPoint = 0` in both
+  the primal and AD twins. ADR-012 subsequently changed the current AD owner
+  (`field_wedge_coupled.cu:287-303`) to stationary evaluation. The ADR-011
+  baseline used the plain
   `finite_wedge_truncation_factor`. The G2 odd-blend corner-mend and monotone
   even-part truncation (design F5c/d/e) are stationary-path-only
   (`selectStationaryPoint = 1`); the non-stationary path keeps gamma==1 semantics

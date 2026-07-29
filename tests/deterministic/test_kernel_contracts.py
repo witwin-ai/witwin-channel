@@ -41,7 +41,8 @@ def test_deterministic_fields_is_the_single_object_owner(name: str):
 
 
 def test_deterministic_fields_uses_canonical_runtime_dependencies():
-    assert field_kernels.native_extension is runtime.native_extension
+    assert field_kernels._required_native_op is runtime.required_symbol
+    assert not hasattr(field_kernels, "native_extension")
     assert field_kernels.validate_cuda_tensor is runtime.validate_cuda_tensor
 
 

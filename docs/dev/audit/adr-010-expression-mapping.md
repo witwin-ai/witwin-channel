@@ -29,7 +29,7 @@ Torch (structural).
 | `(wo_row * t1r[sc]).sum(-1)` | `dot3(wo, t1)` = `(p0 + p2) + p1` (Torch's 2-accumulator `sum(-1)` order) |
 | `(wo_row * t2r[sc]).sum(-1)` | `dot3(wo, t2)` (same order) |
 | `wo_local = stack((.., .., cos_o_row))` | `wo_local[3] = {dot3(wo,t1), dot3(wo,t2), cos_o}` |
-| `eval_bsdf(table, wi_local, wo_local)` per material mask | `st::eval_te_tm(fte+off, ftm+off, dims...)` on the stacked `[M]` tables via `material_slot[material_id[s]]`; device interpolation shared verbatim from `scattering.cu` through `scattering_table.cuh` |
+| `eval_bsdf(table, wi_local, wo_local)` per material mask | `st::eval_te_tm(fte+off, ftm+off, dims...)` on the stacked `[M]` tables via `material_slot[material_id[s]]`; device interpolation shared verbatim from the `scattering.cu` provenance section in `montecarlo_common.cu` through `scattering_table.cuh` |
 | `s = cross(n_o[sc], wo_row)` | `s_raw = cross3(n, wo)` |
 | `norm(s) < 1e-6 -> backup_axis[sc]` | `sn < 1e-6f -> load3(backup_axis, s)` |
 | `normalize_vec3(s)` = `s / norm.clamp_min(1e-12)` | `s_raw / fmaxf(sn, 1e-12f)` |
@@ -88,7 +88,7 @@ cell total rel 2.8e-6; coherent randomized cases <= 4.3e-6.
 
 Torch source: `_rough_reflection_factor` plus the Python-side application in
 `_evaluate_reflection_fields` (reference: `tests/reference/rough_reflection.py`).
-Kernel: `native/channel_native/kernels/field_rough_scale.cu`.
+Kernel: the `field_rough_scale.cu` provenance section in `native/channel/kernels/field_transport.cu`.
 
 | Torch expression | Kernel expression |
 |---|---|

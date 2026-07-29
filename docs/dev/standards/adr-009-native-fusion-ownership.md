@@ -2,6 +2,8 @@
 
 Status: accepted for Phase 9 of the modular architecture hardening migration.
 
+Supersession: ADR-044 retires only the translation-unit line-count budget; every ownership, fusion, numerical, and acceptance rule below remains active.
+
 ## Context
 
 Python packages express user-facing semantics, but they are not a safe template

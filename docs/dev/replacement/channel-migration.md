@@ -259,7 +259,8 @@ patch-integral families now dispatch through typed `rayd::torch` requests and
 results. Channel keeps all eleven `_channel` names, Python facades,
 resident-resource lifecycle, and solver policy. The five former dedicated
 Channel numerical TUs and private table helper header are deleted; the retained
-`scattering.cu` contains only `scattering_event_probabilities`. Remaining chain
+the `scattering.cu` provenance section in `montecarlo_common.cu` contains only
+`scattering_event_probabilities`. Remaining chain
 consumers include RayD's public table header directly, while
 `kirchhoff_table_ad.cu` gains no unused dependency.
 

@@ -24,7 +24,8 @@ def test_topology_sampling_is_the_single_object_owner():
 
 
 def test_topology_sampling_uses_canonical_runtime_dependencies():
-    assert topology_kernels.native_extension is runtime.native_extension
+    assert topology_kernels._required_native_op is runtime.required_symbol
+    assert not hasattr(topology_kernels, "native_extension")
     assert (
         topology_kernels.validate_cuda_tensor is runtime.validate_cuda_tensor
     )

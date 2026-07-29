@@ -12,14 +12,11 @@ never a redundant reimplementation.
 
 That gap is not hypothetical in this package:
 
-  - `runtime.py` exports `required_symbol`, and 11 modules hand-rolled the
+  - `runtime.py` exports `required_symbol`, but 11 modules once hand-rolled the
     same "probe the extension for a named attribute, raise if absent" guard at 37
-    call sites, two of them a few lines apart inside one module. Four of those
-    sites now sit in the owner module itself, because the ex-`native_buffers`
-    buffer constructors moved there with the rest of `runtime/`. The four solver
-    domains have since been repaid - 18 sites across 5 kernel facades now call
-    `required_symbol` - which is exactly the shrink this ratchet exists to force;
-    19 sites remain in the non-solver domains.
+    call sites. The solver domains first repaid 18 sites; ADR-044 governance
+    cleanup routed the remaining 19 through `required_symbol`, leaving the
+    canonical runtime owner as the only definition site.
   - `components.py` exports `component_availability_status`, and three solver
     metadata modules each defined their own until Phase 1a deleted them.
   - The component depth rule grew a FOURTH copy, in `deterministic/pipeline.py`,
@@ -61,14 +58,11 @@ its identity either way, so the ratchet does not lose a site to a file move.
 
 Recorded duplicates
 -------------------
-`native symbol lookup` ships with its remaining 19 pre-existing call sites
-recorded by (module, function). This is a ratchet, not an exemption: an
-unrecorded match fails the gate, and so does a recorded entry that no longer
-matches. The second half is the important half - it means the commit that
-finally routes those sites through `required_symbol` cannot land without
-shrinking this list, and the list can only ever get shorter. It started at 37
-and the solver-domain repayment took it to 19. Adding to it is a deliberate,
-reviewable act.
+The recorded-duplicate ledger is empty. It remains a ratchet mechanism rather
+than an exemption: an unrecorded match fails the gate, and any future temporary
+entry would also fail as stale once its duplicate disappears. The ledger began
+at 37 hand-rolled native symbol probes, shrank to 19, and reached zero during
+the ADR-044 governance cleanup.
 
 False negatives, stated honestly
 --------------------------------
@@ -203,38 +197,6 @@ CONCEPTS: tuple[Concept, ...] = (
             fragments=frozenset({"_channel."}),
             calls=frozenset({"hasattr"}),
             must_raise=True,
-        ),
-        debt=(
-            "19 pre-existing hand-rolled probes across 5 kernel facades, "
-            "recorded so they cannot grow. The list started at 37; the four "
-            "solver domains repaid their 18 sites by routing them through "
-            "runtime.required_symbol, which is also what closes the "
-            "solver_raw_extension boundary in ci/check_import_graph.py. The "
-            "rest are routed by a later change, which must shrink this list "
-            "again; a recorded entry that no longer matches fails this gate."
-        ),
-        recorded_duplicates=frozenset(
-            {
-                (f"{PACKAGE}.kernels.fields", "deterministic_delay_to_path_length"),
-                (f"{PACKAGE}.kernels.fields", "deterministic_diffraction_vector_field"),
-                (f"{PACKAGE}.kernels.fields", "deterministic_field_from_power_phase"),
-                (f"{PACKAGE}.kernels.fields", "deterministic_los_field"),
-                (f"{PACKAGE}.kernels.fields", "deterministic_pack_complex"),
-                (f"{PACKAGE}.kernels.fields", "deterministic_phase_from_field"),
-                (f"{PACKAGE}.kernels.fields", "deterministic_phase_from_length"),
-                (f"{PACKAGE}.kernels.fields", "deterministic_reflection_field"),
-                (f"{PACKAGE}.kernels.fields", "deterministic_reflection_sequence_field"),
-                (f"{PACKAGE}.kernels.fields", "deterministic_zero_field_phase"),
-                (f"{PACKAGE}.kernels.geometry", "mc_diffraction_edge_geometry"),
-                (f"{PACKAGE}.kernels.geometry", "mc_surface_group_edge_candidates"),
-                (f"{PACKAGE}.kernels.materials", "mc_face_material_tensors"),
-                (f"{PACKAGE}.kernels.topology", "mc_sample_directions"),
-                (f"{PACKAGE}.kernels.topology", "mc_selected_edge_indices"),
-                (f"{PACKAGE}.runtime", "bdpt_zero_matrix"),
-                (f"{PACKAGE}.runtime", "mc_pack_vec3"),
-                (f"{PACKAGE}.runtime", "mc_receiver_grid_points"),
-                (f"{PACKAGE}.runtime", "mc_transmitter_tensors"),
-            }
         ),
     ),
 )
