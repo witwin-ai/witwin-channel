@@ -38,11 +38,7 @@ def _db(values: np.ndarray) -> np.ndarray:
 
 
 def _image(
-    values: np.ndarray,
-    valid: np.ndarray,
-    lower: float,
-    upper: float,
-    colormap: str,
+    values: np.ndarray, valid: np.ndarray, lower: float, upper: float, colormap: str,
 ) -> Image.Image:
     lut = colormaps.get_cmap(colormap)
     normalized = np.clip((values - lower) / (upper - lower), 0.0, 1.0)
