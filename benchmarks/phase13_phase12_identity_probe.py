@@ -1,12 +1,7 @@
 # Copyright Xingyu Chen.
 # Runner-owned packaged-extension identity probe.
 
-"""Runner-owned packaged-extension identity probe.
-
-This probe performs no numerical measurement.  The parent runner retains its
-stdout, independently hashes the configured extension bytes, and binds the
-reported compiled identity to checkout and RayD lock state.
-"""
+"""Runner-owned packaged-extension identity probe."""
 
 from __future__ import annotations
 

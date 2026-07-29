@@ -1,18 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests ad matrix.
 
-"""Every Phase-9 consumer AD cell that ADR-043 decided, proved at the boundary.
-
-The survey that opened Phase 9 found 295 consumer cells, 122 of which produced a
-genuine derivative and only 28 of which had a named test at the surface that
-publishes them. This module closes the cells ADR-043 declares `SUP`, `ZERO`, or
-`REF`; the four target states and their required evidence are defined in
-`docs/dev/propagation-ad-capability-matrix.md`, and every row of that document
-cites a test in this file or beside it.
-
-Finite differences appear here and nowhere else. They are the oracle for a
-`SUP` row, exactly as CLAUDE.md allows under `tests/`.
-"""
+"""Tests ad matrix."""
 
 from __future__ import annotations
 
@@ -137,11 +126,11 @@ def _direction_loss(compiled, prepared, sources, weight):
 def test_the_arrival_direction_carries_a_reverse_gradient_matching_fd() -> None:
     """`field_direction` is live on the fixed-topology route and is correct.
 
-    Before ADR-043 this tensor was ``mark_non_differentiable`` in both branches
-    of both field companions, so an AoA or beam-steering loss differentiated
-    through it got an exact zero with no warning. The adjoint existed inside the
-    kernel and was dropped at the ABI boundary; the seed now reaches it.
-    """
+ Before first-order differentiation this tensor was ``mark_non_differentiable`` in both branches
+ of both field companions, so an AoA or beam-steering loss differentiated
+ through it got an exact zero with no warning. The adjoint existed inside the
+ kernel and was dropped at the ABI boundary; the seed now reaches it.
+ """
 
     compiled, sources, _, prepared = _direction_world()
     generator = torch.Generator(device="cuda").manual_seed(9)
@@ -190,9 +179,9 @@ def test_the_arrival_direction_tangent_agrees_with_the_reverse_gradient() -> Non
 def test_the_arrival_direction_stays_declared_dead_on_the_discovery_route() -> None:
     """Discovery re-solves the topology, so its direction is a DECL output.
 
-    The capability record says so per route rather than leaving a caller to
-    discover it from a zero. This pins the declaration against the behaviour.
-    """
+ The capability record says so per route rather than leaving a caller to
+ discover it from a zero. This pins the declaration against the behaviour.
+ """
 
     record = capabilities()
     assert "field_direction" not in record.differentiable_geometry_for("discovery")
@@ -227,10 +216,10 @@ def test_interaction_positions_are_declared_dead_on_the_discovery_route() -> Non
 def test_direction_liveness_is_one_decision_for_the_whole_result() -> None:
     """Never live for some rows and silently dead for others.
 
-    The batch below carries both a line-of-sight and a reflection bucket, and
-    both are inside the Channel-owned direction set, so the single decision is
-    "live" and it holds for every row of both buckets.
-    """
+ The batch below carries both a line-of-sight and a reflection bucket, and
+ both are inside the Channel-owned direction set, so the single decision is
+ "live" and it holds for every row of both buckets.
+ """
 
     compiled, sources, _, prepared = _direction_world()
     components = {bucket.component for bucket in prepared.buckets}
@@ -263,11 +252,7 @@ def test_direction_liveness_is_one_decision_for_the_whole_result() -> None:
 def test_a_primal_only_input_is_refused_before_discovery_produces_a_result(
     ad_mode: str, leaf: str
 ) -> None:
-    """REF, on the discovery route, in both modes, before any native work.
-
-    These used to publish a complete ``PropagationEvaluation`` and only raise
-    from inside ``backward()`` - a partial result for an unsupported request.
-    """
+    """Unsupported REF inputs fail during preflight in both discovery modes before native work."""
 
     compiled = smooth_wall_scene()
     sources, sinks = endpoints()
@@ -443,14 +428,13 @@ def test_diffraction_ad_is_refused_before_any_native_work(ad_mode: str) -> None:
 def test_the_diffraction_primal_defect_is_pinned_rather_than_fixed() -> None:
     """A recorded upstream gap, not an AD cell.
 
-    ``_solver_scene`` builds ``SolverScene(transmitters=(), receivers=())``
-    because the consumer takes explicit endpoint batches, while the order-1
-    diffraction topology owner indexes ``tx_polarizations[tx_index]``. That is a
-    primal reachability defect: it fires at ``ad_mode='none'`` too. ADR-043
-    deliberately does not fix it, because fixing it would silently re-open an AD
-    column nobody has validated. This test pins the failure by exception type
-    and site so a future fix is a deliberate decision rather than a side effect.
-    """
+ ``_solver_scene`` builds ``SolverScene(transmitters=, receivers=)``
+ because the consumer takes explicit endpoint batches, while the order-1
+ diffraction topology owner indexes ``tx_polarizations[tx_index]``. That is a
+ primal reachability defect: it fires at ``ad_mode='none'`` too. first-order differentiation not fix it, because fixing it would silently re-open an AD
+ column nobody has validated. This test pins the failure by exception type
+ and site so a future fix is a deliberate decision rather than a side effect.
+ """
 
     compiled = compile_scene(wedge_diffraction_scene(), reference_frequency_hz=3.0e9)
     sources, sinks = _wedge_endpoints()
@@ -472,11 +456,7 @@ def test_the_record_declares_that_no_route_supports_higher_order_ad() -> None:
 
 
 def test_create_graph_through_a_reevaluation_names_the_owner() -> None:
-    """Reverse-over-reverse fails inside the backward it asked to differentiate.
-
-    It used to return a silently detached first gradient and fail one step
-    later with a generic Torch message that named Torch, not Channel.
-    """
+    """Reverse-over-reverse fails at the requested backward boundary with a Channel error."""
 
     compiled, sources, _, prepared = _direction_world()
     leaf = _cuda(_SINK).clone().requires_grad_(True)
@@ -501,10 +481,10 @@ def test_create_graph_through_a_discovery_names_the_owner() -> None:
 def test_a_forward_over_reverse_request_is_refused_before_any_result() -> None:
     """The worst silent cell the survey found, now a pre-compute refusal.
 
-    A reverse gradient taken inside a dual level came back with the correct
-    first-order value and ``unpack_dual(grad).tangent is None``: a mixed second
-    derivative read as an exact zero, with no error anywhere.
-    """
+ A reverse gradient taken inside a dual level came back with the correct
+ first-order value and ``unpack_dual(grad).tangent is None``: a mixed second
+ derivative read as an exact zero, with no error anywhere.
+ """
 
     compiled = smooth_wall_scene()
     base = _cuda(_SINK)
@@ -532,12 +512,12 @@ def test_a_forward_over_reverse_reevaluation_is_refused_before_any_result() -> N
 def test_a_requires_grad_primal_under_a_forward_dual_stays_supported() -> None:
     """The symmetric rule was verified and deliberately NOT enforced.
 
-    ADR-038's declared convention is that a forward-only dual and a
-    ``requires_grad`` leaf agree bit for bit, and the field facades run one
-    Function for both modes. Refusing ``jvp`` + ``requires_grad`` would have
-    broken that convention, so reverse-over-reverse is caught where it becomes
-    wrong instead - inside the backward.
-    """
+ forward-mode liveness's declared convention is that a forward-only dual and a
+ ``requires_grad`` leaf agree bit for bit, and the field facades run one
+ Function for both modes. Refusing ``jvp`` + ``requires_grad`` would have
+ broken that convention, so reverse-over-reverse is caught where it becomes
+ wrong instead - inside the backward.
+ """
 
     compiled, sources, _, prepared = _direction_world()
     base = _cuda(_SINK).clone().requires_grad_(True)
@@ -637,26 +617,23 @@ def test_a_wideband_sweep_accounts_every_column_it_launches() -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# Previously untested but working cells: vertices, materials, combined inputs,
-# Jones forward mode, slots, time-varying reverse mode.
-# ---------------------------------------------------------------------------
+# The matrix covers vertices, materials, combined inputs, Jones forward mode, slots, and time-varying reverse mode.
 
 
 def test_a_mesh_vertex_gradient_matches_the_image_source_closed_form() -> None:
     """SUP: the vertex leaf is live on the reevaluate route, and it is right.
 
-    The oracle is analytic rather than a finite difference. For one planar wall
-    at ``x = w``, the specular path length from source ``S`` to sink ``R`` is
-    ``|S' - R|`` with the image ``S' = (2w - S_x, S_y, S_z)``, so
+ The oracle is analytic rather than a finite difference. For one planar wall
+ at ``x = w``, the specular path length from source ``S`` to sink ``R`` is
+ ``|S' - R|`` with the image ``S' = (2w - S_x, S_y, S_z)``, so
 
-        d|S' - R| / dw = 2 * (S'_x - R_x) / |S' - R|.
+ d|S' - R| / dw = 2 * (S'_x - R_x) / |S' - R|.
 
-    A rigid ``+x`` translation of the wall moves every vertex by the same
-    amount, so the analytic answer for that direction is the sum of the
-    per-vertex ``x`` gradients. That checks the accumulation across vertices as
-    well as the per-vertex value, and needs no recompiled scene.
-    """
+ A rigid ``+x`` translation of the wall moves every vertex by the same
+ amount, so the analytic answer for that direction is the sum of the
+ per-vertex ``x`` gradients. That checks the accumulation across vertices as
+ well as the per-vertex value, and needs no recompiled scene.
+ """
 
     compiled = smooth_wall_scene()
     sources, sinks = endpoints()
@@ -692,10 +669,10 @@ def test_a_mesh_vertex_gradient_matches_the_image_source_closed_form() -> None:
 def test_a_combined_request_equals_the_sum_of_its_single_leaf_gradients() -> None:
     """Several leaves live at once, checked against one leaf at a time.
 
-    A wrong accumulation, a shared buffer, or a leaf that silently stops
-    contributing once another one becomes live all fail here and nowhere else.
-    The endpoint half additionally carries a finite-difference oracle.
-    """
+ A wrong accumulation, a shared buffer, or a leaf that silently stops
+ contributing once another one becomes live all fail here and nowhere else.
+ The endpoint half additionally carries a finite-difference oracle.
+ """
 
     compiled = smooth_wall_scene()
     sources, sinks = endpoints()
@@ -717,9 +694,8 @@ def test_a_combined_request_equals_the_sum_of_its_single_leaf_gradients() -> Non
         eps.grad = None
 
         # The material pass runs while the leaf is still live: CompiledScene
-        # caches its scene-static tables only for a primal scene, so a primal
-        # pass in between would publish a cached table that the material leaf
-        # is no longer part of.
+        # The primal scene cache must keep the live material leaf attached to its
+        # scene-static table across an intervening primal pass.
         loss(sink_base).backward()
         alone_eps = eps.grad.clone()
 
@@ -769,7 +745,7 @@ def test_the_jones_operator_carries_forward_tangents() -> None:
 
 
 def _slot_world(slot_count: int):
-    """The Phase-7 multi-endpoint world, stacked slot-major with a leaf."""
+    """the consumer implementation multi-endpoint world, stacked slot-major with a leaf."""
 
     compiled = compiled_world()
     prepared = frozen_topology(compiled)
@@ -789,11 +765,7 @@ def _slot_world(slot_count: int):
 
 
 def test_a_slot_batched_replay_carries_reverse_gradients() -> None:
-    """Reverse mode across the block-diagonal slot layout, previously untested.
-
-    Only forward mode had a slot test, so nothing checked that a reverse pass
-    scatters its endpoint gradient back into the right slot.
-    """
+    """Verify reverse gradients scatter through the correct block-diagonal slot."""
 
     compiled, prepared, sources, sinks, leaf = _slot_world(3)
     result = replay(
@@ -828,7 +800,7 @@ def test_a_slot_batched_replay_carries_reverse_gradients() -> None:
 
 
 def test_a_time_varying_replay_carries_reverse_gradients() -> None:
-    """Reverse mode on the CIR route, previously covered in forward mode only."""
+    """Verify reverse gradients propagate through time-varying CIR replay."""
 
     compiled, prepared, sources, sinks, leaf = _slot_world(3)
     result = evaluate_time_varying(
@@ -924,12 +896,12 @@ def _transmission_loss(compiled):
 def test_a_transmission_scene_carries_a_reverse_gradient_matching_fd() -> None:
     """The one advertised component that had no consumer-boundary row.
 
-    `capabilities().ad_modes_for_component("transmission")` has always carried
-    `jvp` and `vjp`, and `response_components` reaches transmission from both
-    transport responses, but the only coverage sat one layer below the consumer
-    in the enumerated engine. An advertised cell whose only evidence is a
-    different surface is exactly the silent class this matrix exists to remove.
-    """
+ `capabilities.ad_modes_for_component("transmission")` has always carried
+ `jvp` and `vjp`, and `response_components` reaches transmission from both
+ transport responses, but the only coverage sat one layer below the consumer
+ in the enumerated engine. An advertised cell whose only evidence is a
+ different surface is exactly the silent class this matrix exists to remove.
+ """
 
     compiled = _transmission_world()
     loss = _transmission_loss(compiled)

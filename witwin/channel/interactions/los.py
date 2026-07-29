@@ -1,17 +1,7 @@
 # Copyright Xingyu Chen.
 # Line-of-sight: discrete candidate planning and enumerated orchestration.
 
-"""Line-of-sight: discrete candidate planning and enumerated orchestration.
-
-One file holds the whole LoS concept: the discrete candidate plan that names
-the (tx, rx) pairs a LoS solve enumerates, and the enumerated stage that
-exports the pair rows, gates them on visibility (or the ADR-017 ISB boundary
-taper), and packs them into a topology block.
-
-The native facades this calls stay in ``witwin.channel.kernels``; the visibility
-query and the ISB clearance facade stay under ``propagation.geometry`` because
-other concepts and the consumer replay path share them.
-"""
+"""Line-of-sight: discrete candidate planning and enumerated orchestration."""
 
 from __future__ import annotations
 
@@ -70,7 +60,7 @@ def _los_topology(
     isb_boundary_taper: bool = False,
     isb_boundary_taper_width: float = 0.5,
 ) -> tuple[dict[str, torch.Tensor], int, int, int]:
-    # R5: the per-transmitter polarization (threaded from the caller) drives the
+    # the per-transmitter polarization (threaded from the caller) drives the
     # LoS dipole sin^2 pattern in path_los_export.
     exported = topology_kernels.path_los_export(
         tx_positions,
@@ -87,7 +77,7 @@ def _los_topology(
     )
     visible = None
     if bool(scene.structures) and plan.candidate_count > 0:
-        # ISB boundary taper (ADR-017), LoS member. When on, the hard RayD
+        # ISB boundary taper (the boundary taper), LoS member. When on, the hard RayD
         # occlusion gate is replaced by the C1 membership predicate tau > 0: LoS
         # rows within one taper margin of the shadow boundary survive and carry
         # the clearance factor (re-derived and applied in the field stage). The

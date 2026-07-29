@@ -23,7 +23,7 @@ _FUNCTION_DIGESTS = {
         "2f734599df63cffb659b87efbca9aca37afe31925d9bfaefa7ae085ec73470d9"
     ),
     "_require_frequency_ad_constant_materials": (
-        "6fcb1f433cd7f4be0912081266731dd84eb810be54f64feff6a68243915b79d4"
+        "fd08a77fefe35e84f604fbf39ea4c6673fdbedf44396122563eeab7ef5353976"
     ),
 }
 

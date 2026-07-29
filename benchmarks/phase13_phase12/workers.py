@@ -934,7 +934,7 @@ def run_captured(
                 remaining_stdout = final.output or exc.output or b""
                 remaining_stderr = final.stderr or exc.stderr or b""
         # CPython may return the complete buffered stream from the second
-        # communicate call.  Prefer that stream so retained evidence cannot
+        # communicate call. Prefer that stream so retained evidence cannot
         # duplicate the timeout prefix.
         stdout = bytes(remaining_stdout or exc.output or b"")
         stderr = bytes(remaining_stderr or exc.stderr or b"")

@@ -1,41 +1,7 @@
 # Copyright Xingyu Chen.
 # Implements chain ensemble.
 
-"""Reference float64 Torch multi-bounce ensemble scattering (ADR-021 Op A).
-
-Fully differentiable float64 re-derivation of the ADR-021 ``D2`` Op A math
-(``scattering_chain_ensemble_eval``): a diffuse-scatter vertex ``v_s`` with a
-specular reflection chain ``C1`` before it and ``C2`` after it,
-
-    TX --C1 (d1 reflections)--> v_s --C2 (d2 reflections)--> RX
-
-in the power (coherency) domain. This module is the gradient oracle the future
-native Op A ``_backward`` / ``_jvp`` companions must match, and the degenerate
-``d1 = d2 = 0`` case reduces symbol-for-symbol to the ADR-010 op-1 oracle
-``kirchhoff_ensemble.kirchhoff_ensemble_gain_reference`` (pinned by the
-self-check gate). Test-only: MUST NOT be imported from production packages.
-
-Convention sources of truth (every choice below cites the native line it
-mirrors so the lockstep companion stays honest):
-
-* Per-bounce specular Jones transport (frame, Fresnel, s/p projection, field
-  update) mirrors ``reflection_chain_eval`` in
-  ``native/channel/kernels/field_transport.cu`` and the
-  device primitives ``reflect_frame`` / ``slab_fresnel`` / ``reflect_complex3``
-  in ``native/channel/field_transport.cuh``.
-* Rough per-bounce ``C_r = exp(-2*(k0*cos_b*sigma_b)^2)`` attenuation follows
-  ``tests/reference/rough_reflection.py::rough_reflection_factor`` (ADR-010
-  op 3), applied per specular bounce (ADR-021 section 2.6: the diffuse budget
-  at ``v_s`` is separate and lives inside the table).
-* The quadrilinear Kirchhoff BSDF table lookup and the transverse s/p basis are
-  imported unchanged from ``tests/reference/kirchhoff_ensemble.py`` so the table
-  interpolation is a single source of truth (ADR-014 cell-centered clamp /
-  relative-azimuth conventions).
-* ``PHASE_CONVENTION`` (``witwin/channel/constants.py``):
-  world-Cartesian complex field, receiver projection by transverse dot. The
-  ensemble object is a coherency diagonal, not a field, so no carrier appears
-  here (zero-phase power rows, ADR-021 section 2.3).
-"""
+"""Implements chain ensemble."""
 
 from __future__ import annotations
 
@@ -57,10 +23,10 @@ _C0 = 299792458.0
 def _safe_normalize(vec: torch.Tensor, fallback: torch.Tensor) -> torch.Tensor:
     """``safe_normalize`` (field_transport.cuh): unit ``vec`` else ``fallback``.
 
-    The native helper falls back to a supplied direction when the length
-    underflows; the fixtures keep every segment well above the threshold, so
-    the fallback only guards the exact-degenerate configuration.
-    """
+ The native helper falls back to a supplied direction when the length
+ underflows; the fixtures keep every segment well above the threshold, so
+ the fallback only guards the exact-degenerate configuration.
+ """
 
     norm = torch.linalg.vector_norm(vec, dim=-1, keepdim=True)
     unit = vec / norm.clamp_min(1.0e-30)
@@ -68,12 +34,7 @@ def _safe_normalize(vec: torch.Tensor, fallback: torch.Tensor) -> torch.Tensor:
 
 
 def _project_transverse(pol: torch.Tensor, direction: torch.Tensor) -> torch.Tensor:
-    """``project_to_wedge_plane``: unnormalized transverse projection (F1).
-
-    ``field_transport.cuh`` deliberately does NOT normalize this projection so
-    the short-dipole ``sin(theta)`` weight is preserved; the tx/rx polarization
-    axes both use it.
-    """
+    """Project a field axis transversely without normalizing its dipole weight."""
 
     return pol - (pol * direction).sum(-1, keepdim=True) * direction
 
@@ -101,9 +62,9 @@ def _reflect_frame(
 ) -> dict[str, torch.Tensor]:
     """``reflect_frame`` (field_transport.cuh:282): s/p basis of one bounce.
 
-    Returns ``s_axis`` / ``p_in`` / ``p_out`` / ``reflected`` / ``cos_theta``
-    with the same oriented-normal flip and cross-product order as the kernel.
-    """
+ Returns ``s_axis`` / ``p_in`` / ``p_out`` / ``reflected`` / ``cos_theta``
+ with the same oriented-normal flip and cross-product order as the kernel.
+ """
 
     ez = torch.zeros_like(incident)
     ez[..., 2] = 1.0
@@ -128,9 +89,9 @@ def _reflect_frame(
 def _fallback_perp(direction: torch.Tensor) -> torch.Tensor:
     """A deterministic unit vector perpendicular to ``direction``.
 
-    Stands in for ``stable_perp_basis``; only reached at the exact axial
-    degeneracy the fixtures avoid, so its exact value is not load-bearing.
-    """
+ Stands in for ``stable_perp_basis``; only reached at the exact axial
+ degeneracy the fixtures avoid, so its exact value is not load-bearing.
+ """
 
     ex = torch.zeros_like(direction)
     ex[..., 0] = 1.0
@@ -153,12 +114,12 @@ def _slab_fresnel(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """``slab_fresnel`` (field_transport.cuh:209): thin-sheet (r_te, r_tm).
 
-    Exact port of the device expression order (interface coefficients, the
-    ``exp(-2j q)`` slab phase, the geometric-series denominator). The complex
-    square root uses the principal branch (``torch.sqrt`` matches
-    ``utd::cplx_sqrt``: real part >= 0, and the passive medium's negative
-    imaginary permittivity lands on the decaying root).
-    """
+ Exact port of the device expression order (interface coefficients, the
+ ``exp(-2j q)`` slab phase, the geometric-series denominator). The complex
+ square root uses the principal branch (``torch.sqrt`` matches
+ ``utd::cplx_sqrt``: real part >= 0, and the passive medium's negative
+ imaginary permittivity lands on the decaying root).
+ """
 
     two_pi = 2.0 * math.pi
     eps0 = 8.8541878128e-12
@@ -194,9 +155,9 @@ def _cr_factor(
 ) -> torch.Tensor:
     """Per-bounce ``C_r = exp(-2*(k0*cos*sigma)^2)`` on rough bounces (1 else).
 
-    ``rough_reflection.py`` uses ``cos_b = |dot(seg_dir, n)|`` which equals the
-    reflect-frame ``cos_theta`` here.
-    """
+ ``rough_reflection.py`` uses ``cos_b = |dot(seg_dir, n)|`` which equals the
+ reflect-frame ``cos_theta`` here.
+ """
 
     attenuation = torch.exp(-2.0 * (k0 * cos_theta * sigma_b) ** 2)
     return torch.where(rough, attenuation, torch.ones_like(attenuation))
@@ -219,17 +180,17 @@ def transport_chain(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Transport a Complex3 field from ``start`` to ``end`` through the chain.
 
-    ``positions``/``normals`` are ``[N, D, 3]`` (D may be 0 for an empty chain);
-    the per-bounce material tensors are ``[N, D]``. Mirrors the bounce loop of
-    ``reflection_chain_eval`` (frame -> Fresnel -> s/p decomposition -> field
-    update), applying the rough ``C_r`` amplitude per bounce. Returns the field
-    arriving at ``end`` and the propagation direction of the final leg
-    (``end - previous`` normalized), i.e. the incident/outgoing direction the
-    vertex operator needs. The propagation phase and ``1/r`` spreading are NOT
-    applied here: they live in the radiometric carrier / ``L1,L2`` factors
-    (ADR-021 Op A step 5), exactly as op-1 keeps the Jones transfer separate
-    from the propagation scalar.
-    """
+ ``positions``/``normals`` are ``[N, D, 3]`` (D may be 0 for an empty chain);
+ the per-bounce material tensors are ``[N, D]``. Mirrors the bounce loop of
+ ``reflection_chain_eval`` (frame -> Fresnel -> s/p decomposition -> field
+ update), applying the rough ``C_r`` amplitude per bounce. Returns the field
+ arriving at ``end`` and the propagation direction of the final leg
+ (``end - previous`` normalized), i.e. the incident/outgoing direction the
+ vertex operator needs. The propagation phase and ``1/r`` spreading are NOT
+ applied here: they live in the radiometric carrier / ``L1,L2`` factors
+ (coherent scattering step 5), exactly as op-1 keeps the Jones transfer separate
+ from the propagation scalar.
+ """
 
     ez = torch.zeros_like(start)
     ez[..., 2] = 1.0
@@ -301,38 +262,38 @@ def chain_ensemble_gain_reference(
     frequency_hz: torch.Tensor,
     threshold: float,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable float64 ADR-021 Op A per-row power gain.
+    """Differentiable float64 coherent scattering per-row power gain.
 
-    ``c1``/``c2`` are dicts of chain tensors (keys ``positions``, ``normals``,
-    ``eps_r``, ``sigma_e``, ``mu_r``, ``gain``, ``thickness``, ``sigma_b``,
-    ``rough``; see :func:`transport_chain`); pass :func:`_empty_chain` for the
-    degenerate legs. ``f_te``/``f_tm`` are the dense ``[Nti, Npi, Nto, Npo]``
-    Kirchhoff table for the single test material.
+ ``c1``/``c2`` are dicts of chain tensors (keys ``positions``, ``normals``,
+ ``eps_r``, ``sigma_e``, ``mu_r``, ``gain``, ``thickness``, ``sigma_b``,
+ ``rough``; see:func:`transport_chain`); pass:func:`_empty_chain` for the
+ degenerate legs. ``f_te``/``f_tm`` are the dense ``[Nti, Npi, Nto, Npo]``
+ Kirchhoff table for the single test material.
 
-    Live (differentiable) leaves per ADR-021 D5 Op A: chain Fresnel inputs
-    (``eps_r``/``sigma_e``/``gain``/``thickness``), ``sigma_b`` (``C_r``),
-    per-row chain geometry (``positions``/``normals``, ``source``, ``vertex``,
-    ``target``, ``l1``, ``l2``), table values, ``coef``, ``frequency_hz``, and
-    the polarization vectors. Fixed: ``t1r``/``t2r`` (surface tangent frame),
-    ``backup_axis``, ``threshold``. The ``d1 = d2 = 0`` reduction returns the
-    op-1 gain (self-check gate ``a``).
+ Live (differentiable) leaves per coherent scattering: chain Fresnel inputs
+ (``eps_r``/``sigma_e``/``gain``/``thickness``), ``sigma_b`` (``C_r``),
+ per-row chain geometry (``positions``/``normals``, ``source``, ``vertex``,
+ ``target``, ``l1``, ``l2``), table values, ``coef``, ``frequency_hz``, and
+ the polarization vectors. Fixed: ``t1r``/``t2r`` (surface tangent frame),
+ ``backup_axis``, ``threshold``. The ``d1 = d2 = 0`` reduction returns the
+ op-1 gain (self-check gate ``a``).
 
-    Assembly (ADR-021 Op A steps 1-5):
+ Assembly (coherent scattering steps 1-5):
 
-    1. Chain-1 transports the tx field to ``v_s``; the incident coherency
-       diagonal is ``P_te = |E_s|^2``, ``P_tm = |E_p|^2`` in the local s/p basis
-       of the last C1 leg ``d_i``.
-    2. Quadrilinear table lookup ``(f_te, f_tm) = T(wi_local, wo_local)``.
-    3. Outgoing coherency diagonal ``J_out = diag(f_te*P_te, f_tm*P_tm)``.
-    4. Chain-2 sandwich ``J_rx = A_2 J_out A_2^dagger`` then ``p_rx^H J_rx p_rx``.
-       Because ``J_out`` is diagonal this equals ``f_te*P_te*|c_s|^2 +
-       f_tm*P_tm*|c_p|^2`` where ``c_s``/``c_p`` are the receiver responses to
-       unit outgoing ``s_o``/``p_o`` fields transported through C2 (columns of
-       ``A_2^H p_rx``); no cross term survives (v1 diagonal table contract).
-    5. ``gain = coef * (p^H J p) * cos_i * cos_o * A_patch / (L1^2 L2^2)`` with
-       ``coef`` bundling ``P_t*lambda^2/(4pi)^2`` and ``weights = A_patch`` so
-       the degenerate case matches op-1's ``coef``/``weights`` factoring.
-    """
+ 1. Chain-1 transports the tx field to ``v_s``; the incident coherency
+ diagonal is ``P_te = |E_s|^2``, ``P_tm = |E_p|^2`` in the local s/p basis
+ of the last C1 leg ``d_i``.
+ 2. Quadrilinear table lookup ``(f_te, f_tm) = T(wi_local, wo_local)``.
+ 3. Outgoing coherency diagonal ``J_out = diag(f_te*P_te, f_tm*P_tm)``.
+ 4. Chain-2 sandwich ``J_rx = A_2 J_out A_2^dagger`` then ``p_rx^H J_rx p_rx``.
+ Because ``J_out`` is diagonal this equals ``f_te*P_te*|c_s|^2 +
+ f_tm*P_tm*|c_p|^2`` where ``c_s``/``c_p`` are the receiver responses to
+ unit outgoing ``s_o``/``p_o`` fields transported through C2 (columns of
+ ``A_2^H p_rx``); no cross term survives (v1 diagonal table contract).
+ 5. ``gain = coef * (p^H J p) * cos_i * cos_o * A_patch / (L1^2 L2^2)`` with
+ ``coef`` bundling ``P_t*lambda^2/(4pi)^2`` and ``weights = A_patch`` so
+ the degenerate case matches op-1's ``coef``/``weights`` factoring.
+ """
 
     real_dtype = source.dtype
     complex_dtype = torch.complex128 if real_dtype == torch.float64 else torch.complex64

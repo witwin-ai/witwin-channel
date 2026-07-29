@@ -279,7 +279,7 @@ def test_basic_solver_los_component_map_uses_public_yx_grid_layout():
     diff = tx[None, :] - points
     distance = torch.linalg.vector_norm(diff, dim=1).clamp_min(1.0e-6)
     wavelength = 299_792_458.0 / _FREQUENCY_HZ
-    # R5 polarization consistency: the LoS deposit now carries the short-dipole
+    # polarization consistency: the LoS deposit now carries the short-dipole
     # sin^2(theta) pattern |p_t|^2 = |pol|^2 - (pol . k_hat)^2 (transverse
     # projection of the TX polarization onto the tx->rx direction), matching the
     # reflection/diffraction seed conventions. Fold it into the Friis expectation.

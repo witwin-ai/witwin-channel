@@ -1,7 +1,7 @@
 // Copyright Xingyu Chen.
 // Implements field transport CUDA operations.
 
-// ---- Consolidated from field_transport.cu ----
+// ==== Section: Core field transport ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
@@ -141,7 +141,7 @@ __global__ void reflection_sequence_kernel(
             interaction_positions, index, 0, depth);
         field::float3a incident = field::safe_normalize(
             field::f3_sub(first_hit, previous), field::make_f3(0.0f, 0.0f, 1.0f));
-        // F1: unnormalized transverse projection of the transmit polarization
+        // unnormalized transverse projection of the transmit polarization
         // (short-dipole sin(theta) weight); the Jones s/p bases stay orthonormal.
         field::float3a tx_axis = field::project_to_wedge_plane(
             channel::math::load_field_vec3(tx_polarization, index), incident);
@@ -290,7 +290,7 @@ __global__ void coupled_rd_field_kernel(
         } else {
             const field::float3a source_to_hit = field::safe_normalize(
                 field::f3_sub(hit, src), incident_direction);
-            // F1: unnormalized transverse projection of the transmit polarization.
+            // unnormalized transverse projection of the transmit polarization.
             const field::float3a tx_axis = field::project_to_wedge_plane(
                 channel::math::load_field_vec3(tx_polarization, index), source_to_hit);
             field::float3a reflected_direction;
@@ -323,9 +323,8 @@ __global__ void coupled_rd_field_kernel(
         pair.n0 = channel::math::load_field_vec3(edge_n0, index);
         pair.nn = channel::math::load_field_vec3(edge_n1, index);
         pair.wedgeN = exterior_angle[index] / field::UTD_PI;
-        // G4: real edge-segment bounds (offsets of the segment endpoints from the
-        // passed edge point along edge_axis) so the stationary machinery truncates
-        // and corner-mends the coupled leg. Replaces the former +-1e5 infinite edge.
+        // Real segment bounds let the stationary solver truncate the coupled leg
+        // and apply its corner correction around the supplied edge point.
         pair.edgeLineMin = edge_line_min[index];
         pair.edgeLineMax = edge_line_max[index];
         pair.sourcePos = diffraction_source;
@@ -361,7 +360,7 @@ __global__ void coupled_rd_field_kernel(
             outgoing_direction,
             input_edge_basis,
             output_edge_basis);
-        // G4: run the stationary-path continuity machinery (edge re-anchoring,
+        // run the stationary-path continuity machinery (edge re-anchoring,
         // monotone even truncation, corner_mend_gamma, boundary-distance blend)
         // on the coupled diffraction leg. stationaryExternalIncident tells the
         // header to re-extrapolate the frozen EXTERNAL incident (the coupled
@@ -407,28 +406,28 @@ __global__ void coupled_rd_field_kernel(
     }
 }
 
-// ADR-013 D3: coupled double diffraction (TX -> e1 -> e2 -> RX), component id 7.
+// coupled double diffraction: coupled double diffraction (TX -> e1 -> e2 -> RX), component id 7.
 //
 // Two sequential wedge operators in ONE launch. Both legs run the stationary
 // path so each inherits the full continuity machinery (edge re-anchoring,
-// monotone even truncation, corner-mend gamma, boundary blend) - the G3 lesson
+// monotone even truncation, corner-mend gamma, boundary blend) - the lesson
 // is honored from day one. Q1/Q2 are the frozen discovery Fermat seeds; the
 // per-leg edge bounds are frozen (detached) offsets from the passed Keller
 // point, exactly like the coupled R->D leg.
 //
 // Leg 1 (e1): direct spherical incident from tx (stationaryExternalIncident=0),
-//   observation at the frozen Q2. The single-edge stationary point on e1 between
-//   tx and Q2 reproduces Q1 (the two-edge Fermat point), so the re-anchor is a
-//   no-op at the discovered geometry. Output: the diffracted vector field at Q2.
+// observation at the frozen Q2. The single-edge stationary point on e1 between
+// tx and Q2 reproduces Q1 (the two-edge Fermat point), so the re-anchor is a
+// no-op at the discovered geometry. Output: the diffracted vector field at Q2.
 // Leg 2 (e2): sourcePos = frozen Q1, incidentJones = leg-1 output projected on
-//   e2's incident basis at the frozen Q2, stationaryExternalIncident=1 so the
-//   header re-extrapolates that frozen wave from Q2 to the re-anchored Q2*
-//   (sPrimeFrozen = |edgePos - sourcePos| = |Q1 - Q2| is captured internally),
-//   observation at rx. The re-extrapolation is EXACT at Q2* == Q2 and
-//   second-order in the re-anchor displacement (ADR-012 approximation class).
-//   The leg-2 coefficient evaluation is a SINGLE call site (compute_pair_
-//   contribution) so plan-09 P4 can swap it for the two-variable transition
-//   function without touching the surrounding transport.
+// e2's incident basis at the frozen Q2, stationaryExternalIncident=1 so the
+// header re-extrapolates that frozen wave from Q2 to the re-anchored Q2*
+// (sPrimeFrozen = |edgePos - sourcePos| = |Q1 - Q2| is captured internally),
+// observation at rx. The re-extrapolation is EXACT at Q2* == Q2 and
+// second-order in the re-anchor displacement (the coupled-path approximation approximation class).
+// The leg-2 coefficient evaluation is a SINGLE call site (compute_pair_
+// contribution) so the transition-coefficient isolation can swap it for the two-variable transition
+// function without touching the surrounding transport.
 __global__ void coupled_dd_field_kernel(
     int64_t count,
     const float* source,
@@ -610,7 +609,7 @@ __global__ void coupled_dd_field_kernel(
         pair2.stationaryExternalIncident = 1.0f;
         field::MaterialParams material2{};
         material2.omega = -1.0f;
-        // Single leg-2 coefficient call site (plan-09 P4 swaps this for the
+        // Single leg-2 coefficient call site (the transition-coefficient isolation swaps this for the
         // two-variable transition function). sPrimeFrozen = |Q1 - Q2| is
         // recaptured inside compute_pair_vector_contribution before the re-anchor.
         const field::Complex3 value = field::compute_pair_contribution(
@@ -980,7 +979,7 @@ pybind11::dict channel_field_coupled_rd(
     return out;
 }
 
-// ADR-013 D3: coupled double diffraction field (component id 7). Outputs are
+// coupled double diffraction: coupled double diffraction field (component id 7). Outputs are
 // identical in shape to channel_field_coupled_rd (no path_length/delay: the geometry
 // stage owns those for the DD row, matching the coupled contract).
 pybind11::dict channel_field_coupled_dd(
@@ -1181,13 +1180,13 @@ pybind11::dict channel_field_coupled_dd(
 #undef launch_blocks
 #undef kBlockSize
 
-// ---- Consolidated from field_transport_free_space.cu ----
+// ==== Section: Free-space transport ====
 #include "field_transport_ad_common.cuh"
 
 namespace {
 
 // ---------------------------------------------------------------------------
-// Free space (frequency is the only differentiable input in AD-1).
+// Free space (frequency is the only differentiable input in AD).
 // ---------------------------------------------------------------------------
 
 template <typename T>
@@ -1732,7 +1731,7 @@ pybind11::dict channel_field_free_space_jvp(
     return out;
 }
 
-// ---- Consolidated from field_transport_reflection.cu ----
+// ==== Section: Reflection transport ====
 #include "field_transport_ad_common.cuh"
 
 namespace {
@@ -1782,7 +1781,7 @@ __device__ void reflection_chain_eval(
         interaction_positions, index, 0, depth);
     field::float3a incident = field::safe_normalize(
         field::f3_sub(first_hit, previous), field::make_f3(0.0f, 0.0f, 1.0f));
-    // F1: unnormalized transverse projection of the transmit polarization.
+    // unnormalized transverse projection of the transmit polarization.
     const field::float3a tx_axis = field::project_to_wedge_plane(
         load3f(tx_polarization, index), incident);
     field::Complex3 value = field::cplx_scale_real(tx_axis, field::cplx(1.0f, 0.0f));
@@ -1837,7 +1836,7 @@ __device__ void reflection_chain_eval(
             transport::precise_neg_kd(wave_number, total_length)),
         amplitude);
     chain.value_chain = value;
-    // F1: receiver scalar = p_rx . E via the unnormalized transverse of p_rx.
+    // receiver scalar = p_rx . E via the unnormalized transverse of p_rx.
     chain.rx_axis = field::project_to_wedge_plane(
         load3f(rx_polarization, index), final_direction);
     chain.propagation = propagation;
@@ -1926,7 +1925,7 @@ __global__ void reflection_sequence_backward_kernel(
             g_chain.z, g_propagation);
         float g_freq = adj_dot(g_propagation, chain.propagation_dfreq);
 
-        // Geometry adjoint state (plan 07 AD-2): the total path length
+        // Geometry adjoint state (geometry AD): the total path length
         // cotangent, the cotangent flowing onto the `previous` endpoint of
         // the segment being processed, the alternate-branch cotangent on the
         // bounce's outgoing direction, and the final receive-segment terms.
@@ -2206,7 +2205,7 @@ __global__ void reflection_sequence_jvp_kernel(
         // Full forward-mode dual sweep mirroring reflection_sequence_kernel
         // (and reflection_chain_eval) step by step: the dual vector helpers
         // replay the same utd formulas, so material/frequency-only seeds
-        // reduce exactly to the AD-1 tangent chain while geometry seeds move
+        // reduce exactly to the AD tangent chain while geometry seeds move
         // the frames, the incidence cosines and the path length.
         const ad::DualF3 e_z = ad::df3_const(field::make_f3(0.0f, 0.0f, 1.0f));
         ad::DualF3 previous = load_dual3f(source, tangent_source, index);
@@ -2658,8 +2657,8 @@ pybind11::dict channel_field_reflection_sequence_jvp(
     return out;
 }
 
-// ---- Consolidated from field_rough_scale.cu ----
-// ADR-010 op 3: native rough-surface coherent attenuation C_r and its
+// ==== Section: Rough-reflection scaling ====
+// rough-surface scattering: native rough-surface coherent attenuation C_r and its
 // application onto the reflection field outputs.
 //
 // C_r = prod_b att_b with att_b = exp(-2*(k0*cos_b*sigma_b)^2) on rough
@@ -2800,7 +2799,7 @@ __device__ __forceinline__ float rough_bounces(
         const float s = sigma_b[row * depth + b];
         sigma[b] = s;
         if (r) {
-            // Match the Torch association exp(-2 * (k0*cos*sigma).square()):
+            // Match the Torch association exp(-2 * (k0*cos*sigma).square):
             // square first, then scale by -2.
             const float u = k0 * cb * s;
             factor *= expf(-2.0f * (u * u));
@@ -2922,7 +2921,7 @@ __global__ void rough_scale_backward_kernel(
                 float gn0 = 0.0f, gn1 = 0.0f, gn2 = 0.0f;
                 if (!rep && rough[b]) {
                     // A_b = grad_factor * d(factor)/d(cos_b)
-                    //     = grad_factor * factor * (-4 k0^2 sigma_b^2 cos_b).
+                    // = grad_factor * factor * (-4 k0^2 sigma_b^2 cos_b).
                     const float A = grad_factor * factor *
                         (-4.0f * k0 * k0 * sigma[b] * sigma[b] * cos_b[b]);
                     const float s = sign[b];
@@ -3372,8 +3371,8 @@ pybind11::dict channel_field_rough_reflection_scale_jvp(
 #undef kBlockSize
 #undef zero_filled
 
-// ---- Consolidated from field_source_amplitude.cu ----
-// ADR-039: source-amplitude application onto a transported complex3 field.
+// ==== Section: Source amplitude ====
+// source excitation: source-amplitude application onto a transported complex3 field.
 //
 // The field transport kernels publish two families on one launch: the
 // unit-excitation pair (``field_vector``, ``coefficient``) and the excited
@@ -3382,7 +3381,7 @@ pybind11::dict channel_field_rough_reflection_scale_jvp(
 // no power-carrying quantity to publish. This owner supplies exactly that
 // missing output:
 //
-//   path_field_vector = field_vector * sqrt(max(tx_power, 0))
+// path_field_vector = field_vector * sqrt(max(tx_power, 0))
 //
 // with the identical ``sqrtf(fmaxf(tx_power, 0))`` amplitude expression the
 // transport kernels use, so ``<path_field_vector, rx_axis>`` and

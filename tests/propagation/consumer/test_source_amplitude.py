@@ -1,15 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests source amplitude.
 
-"""ADR-039: what ``sources.powers_w`` does to every published surface.
-
-Before ADR-039 the consumer required ``powers_w`` and then published a value
-that could not depend on it. These tests pin the convention on both sides of
-the boundary: scalar and complex3 transport scale by ``sqrt(powers_w)`` per
-row and per source, while the Jones operator, the solver results, and the
-internal ``PathFields`` contract keep their own conventions. A change that
-applied the amplitude twice would fail here as loudly as one that dropped it.
-"""
+"""Tests source amplitude."""
 
 from __future__ import annotations
 
@@ -277,11 +269,11 @@ def test_prepared_reflection_reevaluation_scales_each_row_by_its_own_source(
 ) -> None:
     """Distinct powers on a reflection topology: one factor per row.
 
-    The uniform-power reflection case above cannot separate a per-row gather
-    from a single global amplitude, and the per-row discovery cases above carry
-    no reflection rows. Two sources with different declared powers, reevaluated
-    on a prepared topology that holds both components, pin both at once.
-    """
+ The uniform-power reflection case above cannot separate a per-row gather
+ from a single global amplitude, and the per-row discovery cases above carry
+ no reflection rows. Two sources with different declared powers, reevaluated
+ on a prepared topology that holds both components, pin both at once.
+ """
 
     compiled = world.smooth_wall_scene()
     sources, sinks = world.multi_endpoints()
@@ -496,6 +488,6 @@ def test_path_fields_and_solver_results_keep_their_own_conventions() -> None:
         DeterministicConfig(components=frozenset({"los"}), max_depth=0),
         reference_frequency_hz=_FREQUENCY_HZ,
     )
-    # Deterministic already published the excited field before ADR-039.
+    # Deterministic already published the excited field before source excitation.
     torch.testing.assert_close(excited_det.field, unit_det.field * 2.0)
     torch.testing.assert_close(excited_det.path_gain, unit_det.path_gain * 4.0)

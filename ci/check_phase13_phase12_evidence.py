@@ -1,7 +1,7 @@
 # Copyright Xingyu Chen.
 # Checks evidence.
 
-"""Replay raw artifacts and validate committed Plan 13 Phase 12 evidence."""
+"""Checks evidence."""
 
 from __future__ import annotations
 

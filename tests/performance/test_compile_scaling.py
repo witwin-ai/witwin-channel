@@ -1,18 +1,7 @@
 # Copyright Xingyu Chen.
 # Gate `scene.compile` cost against scene size.
 
-"""Gate `scene.compile` cost against scene size.
-
-`compile` reads all four Core version properties before it consults its cache,
-so a cache hit still walks the whole world model, and every `solve` calls
-`compile`. Nothing else covers this: the solver and consumer benchmarks compile
-one scene once, outside their timing loops, and the Stage-I Phase-3 evidence
-compiled an empty `Scene()`.
-
-The regression this gate exists for moved compile from an O(1) integer read to
-an O(N) walk. It was linear before and after, so the shape check alone would
-have missed it; `calibrated_per_structure` is the budget that catches it.
-"""
+"""Gate `scene.compile` cost against scene size."""
 
 from __future__ import annotations
 

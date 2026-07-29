@@ -1,8 +1,7 @@
 # Copyright Xingyu Chen.
 # BDPT specular transmission: straight endpoint chains plus the.
 
-"""BDPT specular transmission: straight endpoint chains plus the
-event-selected shooting sampler for mixed reflection+transmission chains."""
+"""BDPT specular transmission: straight endpoint chains plus the."""
 
 import pytest
 import torch
@@ -124,7 +123,7 @@ def test_bdpt_lossy_wall_transmission_power_ratio_matches_stack():
     )
 
     oracle = layer_stack_rt([(0.1, 4.0, 0.05, 1.0)], 1.0, _FREQUENCY)
-    # ADR-020: the transmission component is the full-Jones layer-stack field
+    # transmission polarization: the transmission component is the full-Jones layer-stack field
     # projected on the polarization, not the unpolarized TE/TM mean. At this
     # exact normal incidence the plane of incidence is degenerate and
     # T_te == T_tm, so the polarized value is simply T_te.
@@ -150,7 +149,7 @@ def test_bdpt_pec_wall_transmits_nothing():
 
 def test_bdpt_transmission_is_seed_reproducible_with_mixed_chains():
     """A lossy front wall plus a PEC back wall creates transmit->reflect
-    chains, exercising the event-selected shooting sampler end to end."""
+ chains, exercising the event-selected shooting sampler end to end."""
 
     _require_native()
     scene = _point_scene(
@@ -179,7 +178,7 @@ def test_bdpt_transmission_is_seed_reproducible_with_mixed_chains():
 
 def test_bdpt_results_unchanged_when_transmission_not_requested():
     """Regression guard: enabling transmission must not perturb the los and
-    reflection components (exclusive path classes never overlap)."""
+ reflection components (exclusive path classes never overlap)."""
 
     _require_native()
     scene = _point_scene([_wall(_lossy())])

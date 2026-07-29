@@ -1,21 +1,7 @@
 # Copyright Xingyu Chen.
 # Pure-torch complex128 reference implementations of the field kernels.
 
-"""Pure-torch complex128 reference implementations of the field kernels.
-
-Test-only mirrors of the exact formulas in ``native/channel/
-field_transport.cuh`` (free-space carrier, finite-slab Fresnel reflection
-chain) and ``native/channel/em/*.cuh`` (Rouard transmission stack),
-used for (a) forward parity against the native float32 kernels and (b) as a
-gradient oracle: torch autograd through these functions defines the exact
-Wirtinger-convention derivatives the native backward/jvp companions must
-reproduce (plan 07 section 9.1).
-
-Every function is differentiable with respect to the material tensors, the
-0-d ``frequency`` tensor and (since plan 07 AD-2) the continuous geometry
-arguments (source, target, interaction positions/normals); only the discrete
-winner (validity masks, material ids, normal-flip branches) is fixed.
-"""
+"""Pure-torch complex128 reference implementations of the field kernels."""
 
 from __future__ import annotations
 
@@ -50,13 +36,7 @@ def _stable_perp_basis(ray_dir: torch.Tensor, preferred: torch.Tensor) -> torch.
 def _transverse_project(
     ray_dir: torch.Tensor, preferred: torch.Tensor
 ) -> torch.Tensor:
-    """F1 unnormalized transverse projection of the TX/RX FIELD axis.
-
-    Mirror of utd::project_to_wedge_plane(preferred, ray_dir): the short-dipole
-    sin(theta) pattern weight is preserved (no safe_normalize) and the axis is
-    exactly zero at the axial null. Only the polarization field axes use this;
-    the Jones s/p bases keep the orthonormal _stable_perp_basis fallback.
-    """
+    """Project a field axis transversely without normalizing its dipole weight."""
 
     return preferred - ray_dir * (preferred * ray_dir).sum(-1, keepdim=True)
 
@@ -246,8 +226,8 @@ def stack_rt_reference(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Mirror of em::stack_rt (backward Rouard recursion, one wall).
 
-    ``layer_*`` are 1-d tensors ordered entry -> exit; returns (r, t).
-    """
+ ``layer_*`` are 1-d tensors ordered entry -> exit; returns (r, t).
+ """
 
     omega = (2.0 * torch.pi * frequency).clamp_min(_SMALL_EPS)
     ct = cos_theta.abs().clamp(_SMALL_EPS, 1.0)

@@ -73,7 +73,7 @@ def test_canonical_engine_has_no_legacy_batch_or_adapter_dependency():
 
 
 def test_typed_engine_remains_before_optional_scattering_append():
-    # ADR-021 budget refactor: the deterministic pipeline now routes the
+    # coherent scattering budget refactor: the deterministic pipeline now routes the
     # optional scattering append through a single-purpose ``_append_scattering``
     # stage (it wraps ``append_scattering_evaluated_paths`` and the coherent
     # combine gate), while the path pipeline still calls the append inline. In

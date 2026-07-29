@@ -1,33 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests chain scattering ad.
 
-"""AD lockstep for the ADR-021 chain scattering ops (plan 10a s3/s4).
-
-Native float32 companions of Op A (``scattering_chain_ensemble_eval``, power)
-and Op B (``scattering_chain_realization_eval``, coherent) versus the committed
-float64 Torch oracles ``tests.reference.chain_ensemble`` /
-``tests.reference.chain_realization``, plus native-only self-consistency
-(JVP-vs-VJP duality, JVP-vs-forward finite difference) and the plan-07 AD
-wrapper contract (loud rejection of fixed inputs, no tape under ``ad="none"``).
-These run after the supervisor rebuilds the extension with the ADR-021 kernels.
-
-Convention bridge (frozen plan 10a s3/s4 vs the oracle parametrization):
-
-* The oracle DERIVES the vertex directions ``d_i``/``d_o``, ``cos_i``/``cos_o``
-  and ``wi_local`` from the chain endpoints, while the native op takes them as
-  explicit fixed-winner inputs. The fixture builds the native inputs from the
-  same geometry so the forwards agree, but the gradients w.r.t. those derived
-  directions and w.r.t. ``L1``/``L2``/``sp1``/``sp2``/positions do NOT
-  correspond one-to-one between the two parametrizations; those are covered by
-  the native-forward finite-difference cross-check, not the oracle lockstep.
-* The oracle chain legs carry a per-bounce rough ``C_r`` (``sigma_b``/``rough``)
-  that the frozen native leg block omits; the fixture sets ``rough=False`` so
-  the two agree (open issue: the native Op A leg block has no ``sigma_b`` slot).
-* Op A carries no ``weights``/``A_patch`` input; the fixture sets the oracle
-  ``weights=1`` and ``sp = 1/L`` (planar image theory). The per-bounce material
-  lockstep uses the prefactor-cancelling ratio ``grad/gain`` so it is robust to
-  the exact spreading exponent the kernel applies.
-"""
+"""Tests chain scattering ad."""
 
 from __future__ import annotations
 

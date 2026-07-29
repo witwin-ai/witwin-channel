@@ -1,33 +1,7 @@
 # Copyright Xingyu Chen.
 # Build the locked Core wheel that the Channel wheel smoke installs beside it.
 
-"""Build the locked Core wheel that the Channel wheel smoke installs beside it.
-
-``ci/wheel_smoke.py`` requires ``--core-wheel``: the isolated ``pip install
---target`` it performs uses ``--no-deps``, so without Core in the same target
-``import witwin.core`` resolves to whatever the ambient environment has - or to
-nothing - and the smoke's "every origin is inside the target" assertions become
-untestable. That argument is why ``--core-wheel`` is ``required=True``.
-
-The tier runner had no way to satisfy it, so ``nightly.wheel-smoke-*`` and
-``release.fresh-checkout-wheel-smoke`` died in argparse before either could
-reach the gate they name. This script is the missing producer.
-
-Core lives outside this repository, so its checkout is resolved EXPLICITLY and
-fails loudly. ``WITWIN_CORE_SOURCE_DIR`` is authoritative when set - an invalid
-explicit path is an error and never falls back. Without it, exactly two layouts
-are tried, both of which are how this repository is actually checked out:
-
-* ``<repo>/../core`` - the sibling layout the release workflow creates when it
-  checks Core out next to Channel;
-* ``<repo>/../../core`` - the monorepo layout, which is also what a
-  ``.worktrees/<name>`` worktree sees.
-
-A candidate counts only if it is a directory whose ``pyproject.toml`` declares
-``name = "witwin"``. Nothing else is searched: no ``CONDA_PREFIX``, no
-site-packages, no CMake registry, no installed distribution. A wheel built from
-an unidentified directory would be a worse input than no wheel at all.
-"""
+"""Build the locked Core wheel that the Channel wheel smoke installs beside it."""
 
 from __future__ import annotations
 

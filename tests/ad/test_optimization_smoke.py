@@ -1,20 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests optimization smoke.
 
-"""End-to-end optimization smoke (plan 07 section 9.1, last bullet).
-
-Adam recovers a transmitter position through the deterministic solver's
-differentiable outputs from a perturbed start. AD-3 already demonstrated
-material recovery through the montecarlo.basic power map; this is the
-endpoint counterpart for the D/P track.
-
-The loss is a time-of-arrival (delay) match over four receivers -- a
-multilateration objective that is smooth and phase-wrap free, so it
-exercises the geometry chain (live endpoints -> differentiable path
-delays) without the lambda/2 local minima a complex-coefficient loss would
-add at 3 GHz. Path delays became differentiable outputs in AD-2 exactly for
-this class of loss.
-"""
+"""Tests optimization smoke."""
 
 from __future__ import annotations
 

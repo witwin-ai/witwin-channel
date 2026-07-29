@@ -1,14 +1,7 @@
 # Copyright Xingyu Chen.
 # The coupled reflection-diffraction interaction concept.
 
-"""The coupled reflection-diffraction interaction concept.
-
-One module holds the whole concept: the lazy candidate-plan discovery
-(cid 3/4 R->D and D->R, cid 7 D->D), the typed geometry queries over the native
-coupled facades, and the enumerated orchestration that turns those candidates
-into topology rows. The native kernels themselves stay in
-``witwin.channel.kernels``; this module only calls them.
-"""
+"""The coupled reflection-diffraction interaction concept."""
 
 from __future__ import annotations
 
@@ -43,7 +36,7 @@ if TYPE_CHECKING:
 
 _COUPLED_CANDIDATE_CHUNK_SIZE = 65_536
 # cid-7 (D->D) uses a larger chunk so the ~1260-ordered-pair stream collapses to
-# a single native launch per receiver block instead of ~8 (ADR-013 G-H runtime
+# a single native launch per receiver block instead of ~8 (coupled double diffraction
 # gate). The R->D / D->R stream stays at 65_536 so its cid-3/4 row identity is
 # byte-identical to the frozen P1 baseline; only the cid-7 order (not yet frozen)
 # depends on this constant, and it is preserved because the linear candidate
@@ -121,7 +114,7 @@ def prepare_coupled_candidate_plan(
     dd_base_candidate_count = tx_count * rx_count * dd_candidates_per_pair
     # The budget must count the whole coupled union that a block evaluates:
     # both R->D / D->R directions (x2) plus the one-direction D->D stream
-    # (ADR-013 D1: per-receiver = tx*(2*groups*edges + edges*(edges-1))).
+    # (coupled double diffraction: per-receiver = tx*(2*groups*edges + edges*(edges-1))).
     theoretical_candidate_count = base_candidate_count * 2 + dd_base_candidate_count
     effective_candidate_limit = min(candidate_limit, _MAX_COUPLED_CANDIDATES)
     if theoretical_candidate_count > effective_candidate_limit:
@@ -189,11 +182,11 @@ def iter_coupled_dd_candidate_requests(
 ) -> Iterator[CoupledDdCandidateRequest]:
     """Stream cid-7 ordered edge-pair candidates (e1 != e2 by index).
 
-    The candidate space is (tx, rx, e1, e2) with e1 != e2, giving
-    ``edge_count*(edge_count-1)`` ordered pairs per (tx, rx) pair and one
-    direction only. Geometric collinearity (edges on the same physical line) is
-    the native kernel's responsibility, not this index-level enumeration.
-    """
+ The candidate space is (tx, rx, e1, e2) with e1 != e2, giving
+ ``edge_count*(edge_count-1)`` ordered pairs per (tx, rx) pair and one
+ direction only. Geometric collinearity (edges on the same physical line) is
+ the native kernel's responsibility, not this index-level enumeration.
+ """
 
     stride = plan.edge_count - 1
     for start in range(0, plan.dd_base_candidate_count, plan.dd_chunk_size):
@@ -382,11 +375,11 @@ def query_coupled_dd_geometry(query: CoupledDdGeometryQuery) -> CoupledDdGeometr
 class _CoupledTopologyContext:
     """Receiver-independent coupled discovery inputs.
 
-    Every field is a function of the scene geometry and materials only, so a
-    single context is reused across all receiver blocks of a streamed
-    deterministic solve; ``candidates_per_pair`` (= coplanar groups x selected
-    edges) sizes the receiver blocks without re-running the geometry setup.
-    """
+ Every field is a function of the scene geometry and materials only, so a
+ single context is reused across all receiver blocks of a streamed
+ deterministic solve; ``candidates_per_pair`` (= coplanar groups x selected
+ edges) sizes the receiver blocks without re-running the geometry setup.
+ """
 
     device: torch.device
     rayd: object
@@ -413,12 +406,12 @@ def _prepare_coupled_topology_context(
 ) -> _CoupledTopologyContext | None:
     """Build the receiver-independent coupled context, or ``None`` when empty.
 
-    Returns ``None`` for every case the single-shot discovery would resolve to
-    an empty block (no structures, no endpoints, no faces, or zero
-    candidates-per-pair) and raises loudly when RayD native capability is
-    missing. No candidate budget is evaluated here; the per-block plan owns the
-    total-cap guard.
-    """
+ Returns ``None`` for every case the single-shot discovery would resolve to
+ an empty block (no structures, no endpoints, no faces, or zero
+ candidates-per-pair) and raises loudly when RayD native capability is
+ missing. No candidate budget is evaluated here; the per-block plan owns the
+ total-cap guard.
+ """
 
     device = tx_positions.device
     rayd = compiled.rayd
@@ -511,11 +504,11 @@ def _coupled_topology_rx_block(
 ) -> tuple[dict[str, torch.Tensor], int, int]:
     """Discover coupled rows for one receiver slice against a prepared context.
 
-    ``rx_id`` is local to ``rx_positions``; the streamed wrapper offsets it back
-    to the global receiver index. ``prepare_coupled_candidate_plan`` runs the
-    unchanged total-cap guard on this slice's candidate count, so a slice that
-    exceeds the budget fails loudly here.
-    """
+ ``rx_id`` is local to ``rx_positions``; the streamed wrapper offsets it back
+ to the global receiver index. ``prepare_coupled_candidate_plan`` runs the
+ unchanged total-cap guard on this slice's candidate count, so a slice that
+ exceeds the budget fails loudly here.
+ """
 
     device = context.device
     plan = prepare_coupled_candidate_plan(
@@ -730,16 +723,16 @@ def _coupled_reflection_diffraction_topology_order2(
 ) -> tuple[dict[str, torch.Tensor], int, int]:
     """Construct bounded 1R+1D and reciprocal 1D+1R geometry.
 
-    This phase deliberately exports no physical coefficient. Phase 3 applies
-    the shared complex/Jones transport to these canonical event sequences.
+ This deliberately exports no physical coefficient. the field evaluator applies
+ the shared complex/Jones transport to these canonical event sequences.
 
-    Single-shot discovery over the full receiver set: the whole receiver axis is
-    one candidate plan, so a scene whose total candidate count exceeds
-    ``candidate_limit`` fails loudly in ``prepare_coupled_candidate_plan``. The
-    path and Monte Carlo solvers keep this total-cap contract; the deterministic
-    grid solver streams over receiver blocks instead
-    (:func:`_coupled_reflection_diffraction_topology_rx_streamed`).
-    """
+ Single-shot discovery over the full receiver set: the whole receiver axis is
+ one candidate plan, so a scene whose total candidate count exceeds
+ ``candidate_limit`` fails loudly in ``prepare_coupled_candidate_plan``. The
+ path and Monte Carlo solvers keep this total-cap contract; the deterministic
+ grid solver streams over receiver blocks instead
+ (:func:`_coupled_reflection_diffraction_topology_rx_streamed`).
+ """
 
     context = _prepare_coupled_topology_context(
         scene, compiled, tx_positions, rx_positions
@@ -762,9 +755,9 @@ def coupled_reflection_diffraction_topology(
 ) -> tuple[dict[str, torch.Tensor], int, int]:
     """Dispatch coupled discovery: receiver-streamed grid vs single-shot.
 
-    The deterministic grid solver streams over receiver blocks (ADR-011); the
-    path and Monte Carlo callers use the single-shot total-cap discovery.
-    """
+ The deterministic grid solver streams over receiver blocks (coupled reflection and diffraction); the
+ path and Monte Carlo callers use the single-shot total-cap discovery.
+ """
 
     topology = (
         _coupled_reflection_diffraction_topology_rx_streamed
@@ -786,19 +779,19 @@ def _coupled_reflection_diffraction_topology_rx_streamed(
 ) -> tuple[dict[str, torch.Tensor], int, int]:
     """Stream coupled discovery over receiver blocks for the grid solver.
 
-    A full 65k-receiver grid needs far more than the 1M candidate budget in one
-    plan, so ``candidate_limit`` is treated as a per-block work/safety budget:
-    the receiver axis is split into blocks of ``block_rx`` receivers sized so
-    each block's candidate count stays under the (min-with-hard-cap) limit. Each
-    block runs the same order-2 discovery as the single-shot path, its local
-    ``rx_id`` is offset back to the global receiver index, and the compacted
-    blocks are concatenated in ascending receiver-block order. That
-    concatenation order IS the row identity and is deterministic across runs.
+ A full 65k-receiver grid needs far more than the 1M candidate budget in one
+ plan, so ``candidate_limit`` is treated as a per-block work/safety budget:
+ the receiver axis is split into blocks of ``block_rx`` receivers sized so
+ each block's candidate count stays under the (min-with-hard-cap) limit. Each
+ block runs the same order-2 discovery as the single-shot path, its local
+ ``rx_id`` is offset back to the global receiver index, and the compacted
+ blocks are concatenated in ascending receiver-block order. That
+ concatenation order IS the row identity and is deterministic across runs.
 
-    The shared ``_MAX_COUPLED_CANDIDATES`` guard and the discovery iterator are
-    untouched: a block that cannot fit even a single receiver under the budget
-    still fails loudly in ``prepare_coupled_candidate_plan``.
-    """
+ The shared ``_MAX_COUPLED_CANDIDATES`` guard and the discovery iterator are
+ untouched: a block that cannot fit even a single receiver under the budget
+ still fails loudly in ``prepare_coupled_candidate_plan``.
+ """
 
     device = tx_positions.device
     context = _prepare_coupled_topology_context(
@@ -812,7 +805,7 @@ def _coupled_reflection_diffraction_topology_rx_streamed(
     effective_limit = min(int(candidate_limit), _MAX_COUPLED_CANDIDATES)
     # The block budget counts the whole coupled union a receiver evaluates:
     # both R->D / D->R directions (x2 over groups*edges) plus the one-direction
-    # D->D ordered edge-pair stream (edges*(edges-1)) (ADR-013 D1).
+    # D->D ordered edge-pair stream (edges*(edges-1)) (coupled double diffraction).
     edge_count = int(context.selected_edges.shape[0])
     per_receiver_candidates = tx_count * (
         context.candidates_per_pair * 2 + edge_count * (edge_count - 1)

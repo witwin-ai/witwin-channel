@@ -318,9 +318,8 @@ __device__ int row_material(
 // Validate every device-selected slot before any continuous payload is read.
 // Ordinary blocking materials do not short-circuit later discrete contract
 // checks; a malformed later slot must still poison the complete transaction.
-// The numerical kernels use first_blocker only after this complete preflight,
-// and may stop earlier when an eligible wall is not strictly positive,
-// including NaN, matching the former `t_eff > 0` continuation rule.
+// Numerical kernels use first_blocker only after preflight and stop when an
+// eligible wall is not strictly positive; NaN also stops the row.
 struct RowMaterialPreflight {
     bool contract_valid;
     int first_blocker;

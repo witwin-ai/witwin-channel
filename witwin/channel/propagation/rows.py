@@ -1,21 +1,7 @@
 # Copyright Xingyu Chen.
 # Row-aligned propagation contracts shared by the propagation stages.
 
-"""Row-aligned propagation contracts shared by the propagation stages.
-
-One path table is described by four zero-copy views that all key on the same
-opaque ``_RowIdentity`` token: the discrete rows the topology stage produces,
-the continuous geometry the geometry stage fills in, the fields the field stage
-evaluates, and the composition of the three. The token is minted once, by
-``PathTopology``, and identity is checked with ``is`` rather than by value, so a
-view can never be paired with a table it was not built against.
-
-That shared token is why these four live in one module at the propagation root
-instead of one per stage: ``propagation.topology`` constructs all four
-together, and the import graph forbids the topology stage from reaching the
-geometry or field stage. Splitting them by stage would either invert that
-layering or duplicate the row identity.
-"""
+"""Row-aligned propagation contracts shared by the propagation stages."""
 
 from __future__ import annotations
 

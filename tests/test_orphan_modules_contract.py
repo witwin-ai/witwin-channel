@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
 # The orphan-module gate passes here, and FAILS on a planted violation.
 
-"""The orphan-module gate passes here, and FAILS on a planted violation.
-
-A gate asserted only against a clean tree proves the tree is clean today, not
-that the gate would notice tomorrow. So it runs against the checkout, against a
-mirror of the checkout, and against mirrors carrying exactly one resurrected
-dead module - the shape a Phase-11 deletion would regrow into.
-"""
+"""The orphan-module gate passes here, and FAILS on a planted violation."""
 
 from __future__ import annotations
 
@@ -61,13 +55,7 @@ def test_the_entry_points_are_the_public_surface():
 
 
 def test_a_resurrected_dead_module_is_unreachable(tmp_path: Path):
-    """`scattering/energy.py` is one of the modules Phase 11 deleted.
-
-    `scattering` is a module now, so resurrecting the file also resurrects the
-    directory it used to live in. The gate walks paths, not the import system,
-    so it still sees `witwin.channel.scattering.energy` and still has to answer
-    the same reachability question.
-    """
+    """A recreated ``scattering/energy.py`` module remains unreachable from every public entry point."""
 
     package_root = _mirror(tmp_path)
     (package_root / "scattering").mkdir()

@@ -1,20 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests coherent combine.
 
-"""ADR-019 acceptance: BDPT opt-in coherent combine (DEFAULT OFF).
-
-Gates:
-(a) DEFAULT OFF is bit-identical to today's power-domain incoherent estimate
-    (the coherent machinery is never touched when ``coherent=False``).
-(b) coherent ON on the WS1 wedge fixture converges toward the deterministic
-    coherent per-component power (within [0.5x, 2x]; in practice exact, because
-    both solvers sum the same enumerated first-order UTD complex field).
-(c) the three MIS modes stay consistent under coherent (MIS-invariant, since the
-    enumerated delta/UTD connections carry unit mass).
-
-The no-fallback / no-AD stance is covered by the config-level tests, which need
-no CUDA.
-"""
+"""Tests coherent combine."""
 
 import pytest
 import torch
@@ -86,7 +73,7 @@ def test_coherent_allows_los_reflection_diffraction():
 
 def test_coherent_refuses_ad_mode():
     # BDPT has no AD in this release, so ad_mode != 'none' is already refused;
-    # the coherent path documents the same stance (ADR-017 precedent).
+    # the coherent path documents the same stance (the boundary taper precedent).
     with pytest.raises((RuntimeError, ValueError)):
         BDPTConfig(components={"diffraction"}, coherent=True, ad_mode="reverse")
 
@@ -97,12 +84,12 @@ def test_coherent_refuses_ad_mode():
 def test_default_off_is_bit_identical_to_incoherent():
     """Gate (a): OFF path untouched, bitwise-equal to the incoherent reference.
 
-    The OFF path never enters the coherent kernel; it must be reproducible
-    bit-for-bit across runs and must reproduce the deterministic incoherent
-    component power exactly (both consume the same enumerated first-order UTD
-    evaluation and the same power accumulator). The single point receiver makes
-    the cross-solver reduction bit-exact.
-    """
+ The OFF path never enters the coherent kernel; it must be reproducible
+ bit-for-bit across runs and must reproduce the deterministic incoherent
+ component power exactly (both consume the same enumerated first-order UTD
+ evaluation and the same power accumulator). The single point receiver makes
+ the cross-solver reduction bit-exact.
+ """
 
     _skip_unless_native()
     scene = wedge_diffraction_scene()
@@ -186,8 +173,8 @@ def test_coherent_converges_to_deterministic_coherent():
 
 def test_coherent_is_below_incoherent_here():
     """The wedge fixture has 4 diffraction rows per bin that partially cancel,
-    so coherent combine is strictly below the incoherent estimate (proves the
-    phasor sum is active, not a relabelled incoherent accumulation)."""
+ so coherent combine is strictly below the incoherent estimate (proves the
+ phasor sum is active, not a relabelled incoherent accumulation)."""
 
     _skip_unless_native()
     scene = wedge_diffraction_scene()

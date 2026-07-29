@@ -18,57 +18,11 @@ PACKAGE = "witwin.channel"
 DEFAULT_PACKAGE_PATH = Path("witwin/channel")
 DEFAULT_ALLOWLIST_PATH = Path("ci/import_graph_allowlist.json")
 
-# This digest freezes the debt universe. Entries may be removed from the active
-# allowlist, but relocating or replacing an entry is rejected. The universe was
-# extended once to admit the ADR-008 BDPT enumerated-oracle dependency that the
-# re-export canonicalization made visible.
-#
-# Re-baselined 2026-07-27 by owner decision, as a strict reduction. Two things
-# had made the frozen universe wrong rather than protective:
-#
-#   * All eight ``existing_boundary`` entries named a path or a module that no
-#     longer exists. Seven of them (boundary-001, -002, -004, -005, -006, -007,
-#     -008) reached through ``witwin.channel.core``, the namespace this checker
-#     itself rejects via ``_DISSOLVED_PREFIXES``; boundary-003 named
-#     ``witwin.channel.runtime.extension``, gone since ``runtime`` collapsed
-#     into a single module. Freezing entries that cannot be produced protects
-#     nothing, so they were deleted. The group itself is kept with an empty
-#     baseline so a future ``existing_boundary`` violation still reports as an
-#     unallowlisted violation rather than a missing debt group.
-#   * mc-enum-001, the single *active* entry, was keyed on
-#     ``montecarlo/bdpt/pipeline.py``. Collapsing that package into
-#     ``montecarlo/bdpt.py`` relocates the sanctioned ADR-008 edge without
-#     changing it, which the digest rejects by design. The entry was re-keyed
-#     ahead of that collapse: only ``path`` and ``source`` moved, and the rule,
-#     target, ADR and justification are untouched. Its ``line``/``column``
-#     still carried the pre-collapse 23/0; the concept-axis sealing step that
-#     landed the collapse corrected ``line`` to the real position in the
-#     collapsed module, 105, leaving ``column`` at 0, and recomputed this digest
-#     for that single-field correction. Nothing else in the universe moved.
-#
-# Nothing was added: the new universe is the old one minus those eight entries,
-# with mc-enum-001 re-keyed and solver-001 unchanged.
-#
-# Re-keyed again when ``propagation/enumerated/`` collapsed into
-# ``propagation/enumerated.py``. mc-enum-001's ``target`` named the defining
-# submodule ``witwin.channel.propagation.enumerated.engine``, which stopped
-# existing; the re-export canonicalization now resolves the same BDPT edge to
-# ``witwin.channel.propagation.enumerated``. This is the mirror image of the
-# bdpt collapse above: the sanctioned ADR-008 edge did not move, its defining
-# module did. Only ``target`` changed, and the digest was recomputed for that
-# single field. The rule, source, line, column, ADR and justification are
-# untouched, and nothing was added to the universe.
-#
-# Re-keyed a third time when the ``src/`` layer was removed and ``src/witwin/``
-# became ``witwin/``, aligning Channel with the three sibling subprojects that
-# already declare their package at the checkout root. Baseline entries are keyed
-# on file paths, so a sanctioned directory move relocates them exactly as the
-# two collapses above did. Only ``path`` changed, on both entries, and the
-# digest was recomputed for that single field. The entry set is identical -
-# solver-001 and mc-enum-001, zero added, zero removed - and the rule, source,
-# target, line, column, ADR, justification and ``allowed`` lists are untouched.
+# This digest locks the exact baseline debt entries. Removing an active
+# allowance is valid, but adding or relocating one requires an intentional
+# baseline update. The current baseline contains solver-001 and mc-enum-001.
 FROZEN_BASELINE_DIGEST = (
-    "ed9cfe7950c1e61174c0434a7d8d0d837d17f8875d3aff53f4a545cc6d68947a"
+    "843b4d13686db168c791034e6af432c261cddbd0ae95a1d51480c0bdcd55dddf"
 )
 
 _DEBT_GROUP_BY_RULE = {
@@ -261,12 +215,12 @@ def collect_import_edges(package_root: Path) -> list[ImportEdge]:
 def build_reexport_map(package_root: Path) -> dict[tuple[str, str], str]:
     """Map ``(package module, exposed symbol)`` to the submodule that defines it.
 
-    A package ``__init__`` that re-exports a symbol with ``from .sub import name``
-    (or the absolute equivalent) publishes ``name`` from its own namespace while
-    the object lives in a submodule. This map lets the classifier resolve such
-    re-exports back to the defining module, so a boundary that is bypassed
-    through a package facade stays visible instead of hiding behind the package.
-    """
+ A package ``__init__`` that re-exports a symbol with ``from .sub import name``
+ (or the absolute equivalent) publishes ``name`` from its own namespace while
+ the object lives in a submodule. This map lets the classifier resolve such
+ re-exports back to the defining module, so a boundary that is bypassed
+ through a package facade stays visible instead of hiding behind the package.
+ """
 
     package_root = package_root.resolve()
     files, known_modules, _ = _collect_module_info(package_root)
@@ -383,12 +337,12 @@ def _canonical_target(
 ) -> str:
     """Follow package re-exports until reaching the defining module.
 
-    Resolution stops at a private ``kernels`` module: publishing a kernel symbol
-    through a package ``__all__`` is the sanctioned seam for consumers, so those
-    edges stay recorded at the public package target and remain governed by the
-    domain-kernel boundary rules rather than being rewritten into a private
-    cross-domain kernel import.
-    """
+ Resolution stops at a private ``kernels`` module: publishing a kernel symbol
+ through a package ``__all__`` is the sanctioned seam for consumers, so those
+ edges stay recorded at the public package target and remain governed by the
+ domain-kernel boundary rules rather than being rewritten into a private
+ cross-domain kernel import.
+ """
 
     seen = {target}
     for _ in range(max_depth):

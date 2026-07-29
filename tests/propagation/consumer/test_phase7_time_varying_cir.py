@@ -1,14 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests time varying cir.
 
-"""The time-varying channel impulse response consumer (ADR-041).
-
-A pair's ``delay_s`` and transport already were its impulse response; what was
-missing was a time axis that costs one launch rather than one per instant.
-These tests pin that the axis changes nothing about the answer - every instant
-is bit-for-bit the single-slot reevaluation of that instant - and that it
-changes everything about the cost.
-"""
+"""Tests time varying cir."""
 
 from __future__ import annotations
 
@@ -170,7 +163,7 @@ def test_time_varying_cir_is_a_valid_impulse_response() -> None:
 
     # The forward tangent is the analytic rate, and consecutive samples of the
     # published delay reproduce it. The finite difference is the ORACLE here;
-    # the tangent is the production number (ADR-038).
+    # the tangent is the production number (forward-mode liveness).
     analytic_rate = speed / C0
     rate = tangent[:, LOS_ROW].to(dtype=torch.float64)
     assert torch.allclose(
@@ -183,16 +176,16 @@ def test_time_varying_cir_is_a_valid_impulse_response() -> None:
 
 
 def test_time_varying_cir_does_not_reapply_transmit_power() -> None:
-    """ADR-039: the scalar transport carries sqrt(powers_w) exactly once.
+    """source excitation: the scalar transport carries sqrt(powers_w) exactly once.
 
-    The brief asked for a doubled power and a magnitude ratio of exactly 2.0,
-    which is the signature of applying the amplitude TWICE. Under ADR-039 the
-    amplitude is ``sqrt(powers_w)``, so the request that produces an exact
-    factor of two is a QUADRUPLED power; that is what is asserted, and the two
-    wrong answers the brief names are still the two this discriminates against:
-    1.0 means the declared power never reached the coefficient, 4.0 means it
-    reached it twice.
-    """
+ The brief asked for a doubled power and a magnitude ratio of exactly 2.0,
+ which is the signature of applying the amplitude TWICE. Under source excitation the
+ amplitude is ``sqrt(powers_w)``, so the request that produces an exact
+ factor of two is a QUADRUPLED power; that is what is asserted, and the two
+ wrong answers the brief names are still the two this discriminates against:
+ 1.0 means the declared power never reached the coefficient, 4.0 means it
+ reached it twice.
+ """
 
     compiled = compiled_world()
     prepared = frozen_topology(compiled)

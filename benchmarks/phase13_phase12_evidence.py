@@ -1,7 +1,7 @@
 # Copyright Xingyu Chen.
 # Benchmarks evidence.
 
-"""Canonical facade for the split Phase 12 evidence implementation."""
+"""Benchmarks evidence."""
 
 from __future__ import annotations
 

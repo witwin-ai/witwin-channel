@@ -575,7 +575,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 
     # The original BDPT diffraction estimator predates the path-gain map
     # normalization ((lambda/4pi)^2) and the per-state edge-measure fix
-    # (audit MC-2), so its absolute diffraction scale is not a valid
+    #, so its absolute diffraction scale is not a valid
     # reference. Gate the summed parity on LoS+reflection, and keep the
     # diffraction map gated by the scale-invariant correlation below.
     delta_enumerated = (
@@ -626,7 +626,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     for name, corr in component_correlation.items():
         if name == "diffraction" or (name == "reflection" and delta_enumerated):
             # The Keller-cone diffraction sampler currently has unbounded
-            # variance (audit DF-6): at benchmark sample counts the native
+            # variance: at benchmark sample counts the native
             # map is Monte Carlo noise and its correlation with the original
             # fossilizes one RNG outcome rather than gating correctness.
             continue

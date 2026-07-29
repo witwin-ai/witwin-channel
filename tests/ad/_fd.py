@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
 # Shared central finite-difference engine for the AD test suite.
 
-"""Shared central finite-difference engine for the AD test suite.
-
-Two-point central differences, ``(f(x + h) - f(x - h)) / (2 h)``, reusable by
-later AD phases. Callables receive a perturbed copy of ``x`` (same device and
-dtype) and must return a detached tensor; accumulation happens in float64 on
-the CPU to keep the FD noise floor below the comparison tolerances.
-"""
+"""Shared central finite-difference engine for the AD test suite."""
 
 from __future__ import annotations
 

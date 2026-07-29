@@ -1,29 +1,7 @@
 # Copyright Xingyu Chen.
 # Exact-token duplicate-region detector for channel production sources.
 
-"""Exact-token duplicate-region detector for channel production sources.
-
-The report is static-first: it tokenizes Python and C++/CUDA sources without
-importing ``witwin.channel`` or loading its native extension. Two
-metrics are produced side by side and never mixed:
-
-* duplicate *regions* are maximal token spans of at least ``MIN_TOKENS`` tokens
-  that occur two or more times (within or across files of the same corpus).
-  Each region carries a stable ``region_id`` derived from its token content and
-  the exact source spans of every occurrence. Regions are the unit that the
-  classification ledger (``docs/dev/audit/duplication-classification.json``)
-  and gate (``ci/check_duplication.py``) reason about.
-* duplicate *line coverage* is the union of physical source lines touched by any
-  repeated token window. Coverage is computed independently of region
-  enumeration so that nested or partially overlapping repeats are counted once
-  and never double counted.
-
-The Python tokenizer uses the standard library ``tokenize`` module, drops
-comment/indent/newline noise and statement-leading docstring strings, and keeps
-every remaining code token verbatim (exact-token metric, no identifier
-normalization). The native tokenizer strips comments and string/char contents
-and splits the remainder into identifiers, numbers, and operators.
-"""
+"""Exact-token duplicate-region detector for channel production sources."""
 
 from __future__ import annotations
 
@@ -119,11 +97,11 @@ _PY_STATEMENT_END = frozenset({tokenize.NEWLINE, tokenize.ENDMARKER})
 def python_code_tokens(source: str) -> list[tuple[str, int]]:
     """Return ``(token_value, line)`` pairs for real Python code tokens.
 
-    Comments, indentation, and newline bookkeeping tokens are dropped. Any
-    statement-leading string expression (module, class, and function
-    docstrings, and bare string statements) is dropped as well; every other
-    token is kept with its exact source text.
-    """
+ Comments, indentation, and newline bookkeeping tokens are dropped. Any
+ statement-leading string expression (module, class, and function
+ docstrings, and bare string statements) is dropped as well; every other
+ token is kept with its exact source text.
+ """
 
     tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
     result: list[tuple[str, int]] = []
@@ -158,10 +136,10 @@ def _consume_leading_string_run(
 ) -> int:
     """Handle a string that opens a logical line; return the next index.
 
-    A run of adjacent string literals that forms the entire statement is a
-    docstring or bare string statement and is dropped. Otherwise the strings
-    belong to an expression and are emitted verbatim.
-    """
+ A run of adjacent string literals that forms the entire statement is a
+ docstring or bare string statement and is dropped. Otherwise the strings
+ belong to an expression and are emitted verbatim.
+ """
 
     run: list[tokenize.TokenInfo] = []
     cursor = index
@@ -194,7 +172,7 @@ _NATIVE_TOKEN = re.compile(
 
 
 def _mask_native_comments(source: str) -> str:
-    """Replace ``//`` and ``/* */`` comments with spaces, preserving newlines."""
+    """Replace ``/`` and ``/* */`` comments with spaces, preserving newlines."""
 
     output = list(source)
     index = 0
@@ -235,9 +213,9 @@ def _mask_native_comments(source: str) -> str:
 def native_code_tokens(source: str) -> list[tuple[str, int]]:
     """Return ``(token_value, line)`` pairs for native code tokens.
 
-    Comments are removed and string/char literal contents are collapsed to a
-    single placeholder so that only structural duplication is measured.
-    """
+ Comments are removed and string/char literal contents are collapsed to a
+ single placeholder so that only structural duplication is measured.
+ """
 
     masked = _mask_native_comments(source)
     newline_offsets = [match.start() for match in re.finditer("\n", masked)]
@@ -407,9 +385,9 @@ def _coalesce_blocks(
 ) -> tuple[list[tuple[int, int]], list[int]]:
     """Merge covered token runs into contiguous same-file blocks.
 
-    Returns the block spans ``[start, end)`` and a per-token map from token
-    index to its owning block index (``-1`` when uncovered).
-    """
+ Returns the block spans ``[start, end)`` and a per-token map from token
+ index to its owning block index (``-1`` when uncovered).
+ """
 
     blocks: list[tuple[int, int]] = []
     block_of = [-1] * len(covered)

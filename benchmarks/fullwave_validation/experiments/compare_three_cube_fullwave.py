@@ -1,14 +1,7 @@
 # Copyright Xingyu Chen.
 # Coupled-OFF / coupled-ON versus FDTD comparison for ``three_cube_320``.
 
-"""Coupled-OFF / coupled-ON versus FDTD comparison for ``three_cube_320``.
-
-Loads the witwin-maxwell FDTD reference, the empty-scene calibration pair, and
-the two deterministic solves, then reports the P1 arbiter metrics: envelope
-NMSE, magnitude correlation, complex coherence (conjugate time convention, one
-global phase), ISB/RSB p95 excess jumps, deterministic-only jump statistics,
-and the flagship occlusion line scan at ``y = 0.457``.
-"""
+"""Coupled-OFF / coupled-ON versus FDTD comparison for ``three_cube_320``."""
 from __future__ import annotations
 
 import json
@@ -46,10 +39,10 @@ FLAGSHIP_Y = 0.457
 def coherence(candidate: FieldMap, reference: FieldMap, mask: np.ndarray) -> dict:
     """Complex coherence between deterministic h and Maxwell Ez over valid cells.
 
-    The two engines use opposite time-sign conventions, which appears as
-    complex conjugation; the reported coherence applies the conjugate
-    convention and removes one global phase (|gamma|).
-    """
+ The two engines use opposite time-sign conventions, which appears as
+ complex conjugation; the reported coherence applies the conjugate
+ convention and removes one global phase (|gamma|).
+ """
     aligned = resample_regular(reference, candidate.x, candidate.y)
     c = np.conj(candidate.field[mask])
     r = aligned.field[mask]

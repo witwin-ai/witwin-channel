@@ -42,7 +42,7 @@ def test_prepare_coupled_candidate_plan_freezes_counts_and_tensor_identity():
     assert plan.selected_edges is selected_edges
     assert plan.edge_count == 3
     assert plan.candidates_per_pair == 6
-    # ADR-013 D1: cid-7 ordered edge pairs e1 != e2 -> edges*(edges-1).
+    # coupled double diffraction: cid-7 ordered edge pairs e1 != e2 -> edges*(edges-1).
     assert plan.dd_candidates_per_pair == 6
     assert plan.base_candidate_count == 36
     assert plan.dd_base_candidate_count == 36
@@ -50,7 +50,7 @@ def test_prepare_coupled_candidate_plan_freezes_counts_and_tensor_identity():
     assert plan.theoretical_candidate_count == 36 * 2 + 36
     assert plan.chunk_size == 5
     # The D->D stream carries its own (larger) chunk so it collapses to one
-    # native launch per receiver block (ADR-013 G-H); the R->D / D->R stream
+    # native launch per receiver block (coupled double diffraction); the R->D / D->R stream
     # stays at chunk_size, keeping cid-3/4 row identity byte-identical.
     assert plan.dd_chunk_size == coupled._COUPLED_DD_CANDIDATE_CHUNK_SIZE
     with pytest.raises(FrozenInstanceError):

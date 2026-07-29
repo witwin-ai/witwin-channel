@@ -13,7 +13,7 @@
 #include "../tensor_checks.h"
 
 // Backward / JVP companion kernels for the field transport forwards
-// (plan 07 AD-1 materials/frequency, AD-2 geometry). Fixed-topology contract:
+// (material and frequency derivatives materials/frequency, AD geometry). Fixed-topology contract:
 // the discrete winner (face sequence, validity, normal flips, polarizations,
 // tx_power, material ids) is constant; the differentiable inputs are
 // eps_r / sigma_e / gain / thickness (per bounce or CSR layer), the carrier

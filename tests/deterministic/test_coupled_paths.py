@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests coupled paths.
 
-"""Deterministic coupled reflection-diffraction paths (ADR-011).
-
-Kernel-behaviour tests: they need the rebuilt native extension whose flat
-accumulator materialises six slots (the coupled field slot 5). Against a
-five-slot extension the accumulator facade's shape check fails before any
-assertion, so these run post-build.
-"""
+"""Tests coupled paths."""
 
 from __future__ import annotations
 
@@ -33,11 +27,11 @@ _BASE_COMPONENTS = frozenset({"los", "reflection", "diffraction"})
 def test_coupled_off_is_deterministic_and_omits_coupled():
     """Coupled-off solves keep slots 0-4 and never surface a coupled row.
 
-    A default config (coupled_paths defaults False) and an explicit
-    coupled_paths=False config produce byte-identical field/component tensors,
-    the coupled component is absent, and no cid 3/4 rows are enumerated. Adding
-    the sixth accumulator slot must not perturb the coupled-off result.
-    """
+ A default config (coupled_paths defaults False) and an explicit
+ coupled_paths=False config produce byte-identical field/component tensors,
+ the coupled component is absent, and no cid 3/4 rows are enumerated. Adding
+ the sixth accumulator slot must not perturb the coupled-off result.
+ """
 
     _require_native()
     scene = coupled_wall_wedge_scene()
@@ -84,10 +78,10 @@ def test_coupled_off_is_deterministic_and_omits_coupled():
 def test_coupled_on_exports_finite_nonzero_coupled_component():
     """Coupled-on grid solve materialises the compensator and keeps the total.
 
-    Coupled rows exist, the coupled component map is finite and non-zero, the
-    coherent field total equals the sum of the coherent field components
-    (including coupled), and nothing is NaN.
-    """
+ Coupled rows exist, the coupled component map is finite and non-zero, the
+ coherent field total equals the sum of the coherent field components
+ (including coupled), and nothing is NaN.
+ """
 
     _require_native()
     scene = coupled_wall_wedge_scene()
@@ -135,9 +129,9 @@ def test_coupled_on_exports_finite_nonzero_coupled_component():
 def test_coupled_on_runs_under_ad_modes(ad_mode):
     """AD dispatch through the coupled rows and the six-slot accumulator runs.
 
-    No scene input requires grad, so the coupled mesh-vertex refusal does not
-    trigger; the solve must complete and route the native companions.
-    """
+ No scene input requires grad, so the coupled mesh-vertex refusal does not
+ trigger; the solve must complete and route the native companions.
+ """
 
     _require_native()
     scene = coupled_wall_wedge_scene()
@@ -159,10 +153,10 @@ def test_coupled_on_runs_under_ad_modes(ad_mode):
 def test_coupled_candidate_budget_fails_loudly_before_launch(monkeypatch):
     """The per-block candidate guard fires without a Torch/CPU fallback.
 
-    A one-candidate budget cannot fit even a single receiver block, so the
-    shared plan raises before any coupled geometry kernel launches; nothing
-    silently falls back to a reduced result.
-    """
+ A one-candidate budget cannot fit even a single receiver block, so the
+ shared plan raises before any coupled geometry kernel launches; nothing
+ silently falls back to a reduced result.
+ """
 
     _require_native()
     monkeypatch.setattr(
@@ -185,12 +179,12 @@ def test_coupled_candidate_budget_fails_loudly_before_launch(monkeypatch):
 def test_coupled_dd_candidate_budget_fails_loudly_before_launch(monkeypatch):
     """The budget guard counts the D->D union and fires before any launch.
 
-    ADR-013 D1 folds the one-direction ordered edge-pair stream
-    (edges*(edges-1)) into the per-receiver candidate budget alongside the two
-    R->D / D->R directions. A one-candidate budget cannot fit that union, so the
-    shared plan raises before either the coupled R-D or the coupled D-D geometry
-    kernel launches; neither bridge may run as a reduced fallback.
-    """
+ coupled double diffraction folds the one-direction ordered edge-pair stream
+ (edges*(edges-1)) into the per-receiver candidate budget alongside the two
+ R->D / D->R directions. A one-candidate budget cannot fit that union, so the
+ shared plan raises before either the coupled R-D or the coupled D-D geometry
+ kernel launches; neither bridge may run as a reduced fallback.
+ """
 
     _require_native()
     monkeypatch.setattr(
@@ -220,12 +214,12 @@ def test_coupled_dd_candidate_budget_fails_loudly_before_launch(monkeypatch):
 def test_coupled_on_double_diffraction_keeps_coupled_component_finite_nonzero():
     """With D->D in the coupled union the coupled component stays finite/nonzero.
 
-    ADR-013 D5: cid 7 double-diffraction rows aggregate into the same coupled
-    slot as cid 3/4, and the path table keeps cid 7 distinct for audits. The
-    coupled component map must remain finite and non-zero, the coherent total
-    must still equal the sum of the coherent components, and any cid 7 rows the
-    scene produces must carry finite fields (never NaN, never a silent zero).
-    """
+ coupled double diffraction: cid 7 double-diffraction rows aggregate into the same coupled
+ slot as cid 3/4, and the path table keeps cid 7 distinct for audits. The
+ coupled component map must remain finite and non-zero, the coherent total
+ must still equal the sum of the coherent components, and any cid 7 rows the
+ scene produces must carry finite fields (never NaN, never a silent zero).
+ """
 
     _require_native()
     scene = coupled_wall_wedge_scene()

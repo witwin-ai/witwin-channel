@@ -98,10 +98,10 @@ def test_three_cube_320_shares_physical_scene_with_three_cube():
 def test_receiver_cells_are_yee_phase_locked(scenario):
     """Receiver cell centers must coincide with Maxwell Ez Yee nodes.
 
-    Ez nodes sit at integer x/y offsets and half-integer z offsets from the
-    domain origin on a uniform Yee grid; jump metrics must never come from a
-    half-cell-interpolated field.
-    """
+ Ez nodes sit at integer x/y offsets and half-integer z offsets from the
+ domain origin on a uniform Yee grid; jump metrics must never come from a
+ half-cell-interpolated field.
+ """
     spec = load_case(scenario, "metal")
     dl = spec.fullwave_dl_m
 
@@ -123,7 +123,7 @@ def test_receiver_cells_are_yee_phase_locked(scenario):
 
 def test_legacy_three_cube_256_is_not_yee_phase_locked():
     """The legacy 256-case pitch (7.8125 mm) is documented as NOT grid-
-    coincident; full-wave jump statistics must use three_cube_320 instead."""
+ coincident; full-wave jump statistics must use three_cube_320 instead."""
     spec = load_case("three_cube", "metal")
     assert spec.x[1] - spec.x[0] != pytest.approx(spec.fullwave_dl_m)
 

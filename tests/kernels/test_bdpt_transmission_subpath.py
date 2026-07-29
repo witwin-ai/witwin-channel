@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
-# Shooting-context specular transmission subpath op (contract section 4).
+# Test shooting-context specular transmission subpaths.
 
-"""Shooting-context specular transmission subpath op (contract section 4).
-
-Vacuum invariants: the exit point lies on the original ray, the combined
-Jones/phase factor is exactly 1, and the throughput amplitude proxy is
-unchanged; the component mask gains the transmission bit and the event is the
-specular-transmission delta event.
-"""
+"""Test shooting-context specular transmission subpaths."""
 
 import math
 
@@ -256,8 +250,8 @@ def _sensor_state() -> dict[str, torch.Tensor]:
 def test_connection_component_classification_uses_exclusive_priority(
     component_mask, expected_component
 ):
-    """Contract section 1: path_class priority is
-    scattering > diffraction > transmission > reflection > los."""
+    """component classification: path_class priority is
+ scattering > diffraction > transmission > reflection > los."""
 
     light = _light_state(
         [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], component_mask=component_mask

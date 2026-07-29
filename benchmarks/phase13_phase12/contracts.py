@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
 # Benchmarks contracts.
 
-"""Strict, versioned historical Phase 12 ADR-030 runner contracts.
-
-Measured execution remains fail-closed. ADR-032 superseded this production
-candidate after the capacity route regressed Munich E2E latency, peak memory,
-and throughput. Dry-run planning remains available to audit the historical
-contract; it cannot activate ADR-030 or manufacture missing evidence.
-"""
+"""Benchmarks contracts."""
 
 from __future__ import annotations
 
@@ -54,8 +48,7 @@ PYTHON_INJECTION_ENV = (
     "PYTHONUSERBASE",
 )
 
-# This historical runner cannot become a production switch by filling its
-# frozen inputs. ADR-032 keeps the compact route authoritative.
+# This evidence runner is permanently disabled as a production switch.
 ADDENDUM_ACCEPTED = False
 ADR030_PRODUCTION_CANDIDATE_SUPERSEDED = True
 

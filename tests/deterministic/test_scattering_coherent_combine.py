@@ -1,16 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests scattering coherent combine.
 
-"""Deterministic opt-in coherent scattering combine (ADR-021 D3).
-
-The combine sums the complex ``path_field`` of scattering rows per (tx, rx)
-and finalizes ``|sum|^2`` (the ADR-019 per-component phasor precedent), instead
-of the default incoherent ``SUM |field|^2`` power sum. It is opt-in via
-``Config.scattering_coherent`` and defaults OFF, keeping the scattering slot
-bit-identical to today. It is physical only for realization-coherent
-phase-screen rows (true complex field); ensemble rows are zero-phase power rows
-and an ensemble-only solve is refused loudly.
-"""
+"""Tests scattering coherent combine."""
 
 import pytest
 import torch
@@ -166,7 +157,7 @@ def test_single_row_coherent_equals_incoherent():
 @_needs_cuda
 def test_multi_row_coherent_differs_and_is_reproducible():
     """Two scattering rows per (tx, rx) interfere; the combine is bit-exact
-    run-to-run."""
+ run-to-run."""
 
     _require_rayd()
     structures = [
@@ -207,7 +198,7 @@ def test_multi_row_coherent_differs_and_is_reproducible():
 @_needs_cuda
 def test_pipeline_refuses_ensemble_only_scene():
     """A rough material without a realization phase screen is ensemble-only;
-    the coherent combine is refused loudly."""
+ the coherent combine is refused loudly."""
 
     _require_rayd()
     ensemble_wall = rough_wall_structure(
@@ -225,7 +216,7 @@ def test_pipeline_refuses_ensemble_only_scene():
 @_needs_cuda
 def test_pipeline_refuses_scene_without_scattering_surfaces():
     """Scattering requested but no rough/realization surface: nothing to
-    combine coherently."""
+ combine coherently."""
 
     _require_rayd()
     smooth_wall = rough_wall_structure(

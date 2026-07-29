@@ -20,8 +20,8 @@ def _with_grid(scene: Scene, grid: ReceiverGrid) -> Scene:
 
 
 def test_bdpt_radiomap_peak_memory_stays_bounded():
-    """Guards audit P-1/P-5: the LoS connection table must not materialize
-    light_count x rx rows (91 B x samples x cells grew to gigabytes)."""
+    """The LoS connection table must not materialize
+ light_count x rx rows (91 B x samples x cells grew to gigabytes)."""
 
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT memory measurement")

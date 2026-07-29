@@ -20,11 +20,11 @@ def test_config_defaults_match_public_contract():
     assert config.sort_key == "receiver_transmitter_depth_component"
     assert config.diagnostics is False
     assert config.ad_mode == "none"
-    # Coupled reflection-diffraction is opt-in (ADR-011); the default 1M limit
+    # Coupled reflection-diffraction is opt-in (coupled reflection and diffraction); the default 1M limit
     # matches the path solver.
     assert config.coupled_paths is False
     assert config.coupled_candidate_limit == 1_000_000
-    # ISB boundary taper (ADR-017) is DEFAULT-OFF; the width default is the
+    # ISB boundary taper (the boundary taper) is DEFAULT-OFF; the width default is the
     # projection-validated 0.5 but is inert while the switch is off.
     assert config.isb_boundary_taper is False
     assert config.isb_boundary_taper_width == 0.5

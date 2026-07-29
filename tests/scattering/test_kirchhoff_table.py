@@ -1,15 +1,7 @@
 # Copyright Xingyu Chen.
 # Kirchhoff ensemble table: energy, limits, reciprocity, applicability.
 
-"""Kirchhoff ensemble table: energy, limits, reciprocity, applicability.
-
-Reference material follows the contract test spec (eps 4 - 0.1j,
-sigma_h = 1 mm). The correlation length / frequency pairs are chosen inside
-the applicability domain ``k0*l >= 6``: at 6 GHz that requires
-l >= 4.8 cm (so l = 10 cm is used there); the l = 10 mm surface is tested
-at 60 GHz where k0*l = 12.6. The 6 GHz / l = 10 mm combination is the
-out-of-domain case and must raise.
-"""
+"""Kirchhoff ensemble table: energy, limits, reciprocity, applicability."""
 
 import math
 

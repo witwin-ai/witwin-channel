@@ -1,19 +1,7 @@
 # Copyright Xingyu Chen.
 # Implements kirchhoff table build.
 
-"""Reference float64 Torch Kirchhoff table build (ADR-015 Part C oracle).
-
-A self-contained, fully differentiable Torch re-derivation of
-``scattering.build_kirchhoff_table`` used ONLY as an autograd oracle
-for the native ``kirchhoff_table_build_backward`` / ``kirchhoff_table_build_jvp``
-companions. It mirrors the production numpy pipeline term by term (transfer-
-matrix stack reflectance, Beckmann diffuse-lobe series, reciprocity
-symmetrization, and the symmetric Sinkhorn energy balance) but keeps everything
-on the Torch graph so ``torch.autograd`` through it pins the exact VJP/JVP the
-native companions must match. The Sinkhorn balance is UNROLLED (finite damped
-half-steps) so differentiating through it validates the native implicit adjoint.
-Test-only: MUST NOT be imported from production packages.
-"""
+"""Implements kirchhoff table build."""
 
 from __future__ import annotations
 
@@ -36,9 +24,9 @@ def _stack_power_reflectance(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """``(|r_te|^2, |r_tm|^2)`` for the vacuum|layers|vacuum stack (float64).
 
-    ``layers`` is ``[L, 4]`` (thickness_m, eps_r, sigma_e, mu_r); ``cos_theta``
-    is a real tensor of incidence cosines. Mirrors ``materials``.
-    """
+ ``layers`` is ``[L, 4]`` (thickness_m, eps_r, sigma_e, mu_r); ``cos_theta``
+ is a real tensor of incidence cosines. Mirrors ``materials``.
+ """
 
     omega = 2.0 * math.pi * frequency
     cos_theta = cos_theta.to(torch.complex128)
@@ -172,9 +160,9 @@ def _sinkhorn_balance(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Unrolled symmetric Sinkhorn balance (differentiable, mirrors tables.py).
 
-    Returns ``(balanced_lobe, factor)`` where ``factor`` has shape
-    ``[n_ti, n_pi]``. ``iterations`` is fixed (tight convergence expected).
-    """
+ Returns ``(balanced_lobe, factor)`` where ``factor`` has shape
+ ``[n_ti, n_pi]``. ``iterations`` is fixed (tight convergence expected).
+ """
 
     n_ti, n_pi, n_to, n_po = s.shape
     d_omega = (1.0 / n_to) * (2.0 * math.pi / n_po)
@@ -226,11 +214,11 @@ def torch_build_table(
 ) -> dict[str, torch.Tensor]:
     """Differentiable float64 Kirchhoff table build (oracle).
 
-    Returns ``f_te``/``f_tm`` (balanced final tables) plus the pre-balance
-    symmetrized lobes ``s_te``/``s_tm``, balance factors ``a_te``/``a_tm`` and
-    diffuse budgets ``r_diff_te``/``r_diff_tm`` (the native saved intermediates).
-    All tensors are float64 and carry the autograd graph to the parameters.
-    """
+ Returns ``f_te``/``f_tm`` (balanced final tables) plus the pre-balance
+ symmetrized lobes ``s_te``/``s_tm``, balance factors ``a_te``/``a_tm`` and
+ diffuse budgets ``r_diff_te``/``r_diff_tm`` (the native saved intermediates).
+ All tensors are float64 and carry the autograd graph to the parameters.
+ """
 
     k0 = 2.0 * math.pi * frequency / _C0
     r_bar_te, r_bar_tm = _stack_power_reflectance(layers, cos_i, frequency)

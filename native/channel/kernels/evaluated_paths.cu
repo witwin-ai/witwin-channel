@@ -1,7 +1,7 @@
 // Copyright Xingyu Chen.
 // Implements evaluated paths CUDA operations.
 
-// ---- Consolidated from enumerated_canonical_capacity_select.cu ----
+// ==== Section: Canonical path selection ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
@@ -1037,7 +1037,7 @@ pybind11::dict channel_enumerated_exact_pair_metadata(
 
 #undef launch_blocks
 
-// ---- Consolidated from enumerated_transmission_topology_pack.cu ----
+// ==== Section: Transmission topology packing ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 // Windows RPC headers imported by the earlier CUB section define small as
@@ -1751,7 +1751,7 @@ pybind11::dict channel_enumerated_transmission_topology_pack_jvp(
 #undef launch_blocks
 #undef kBlockSize
 
-// ---- Consolidated from evaluated_paths_compact_finalize.cu ----
+// ==== Section: Compact path finalization ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
@@ -2215,7 +2215,7 @@ pybind11::dict channel_evaluated_paths_compact_finalize(
     return result;
 }
 
-// ---- Consolidated from evaluated_paths_capacity_pack_ad.cu ----
+// ==== Section: Capacity-pack AD ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>

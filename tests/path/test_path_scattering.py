@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests path scattering.
 
-"""Path solver export of Kirchhoff scattering paths (plan 05 wave 3).
-
-Scattering paths are INCOHERENT power paths: one path per contributing patch
-sample, ``a`` magnitude ``sqrt(power)`` with zero (non-physical) phase, tau
-from the tx->patch->rx geometric length, and the metadata flag
-``scattering_paths_incoherent`` documenting the phase semantics.
-"""
+"""Tests path scattering."""
 
 import pytest
 import torch

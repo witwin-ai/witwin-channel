@@ -1,7 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests the material solver acceptance matrix.
 
-"""Phase D material acceptance across all four public solver families."""
+"""Tests the material solver acceptance matrix."""
 
 from __future__ import annotations
 

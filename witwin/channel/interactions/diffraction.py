@@ -1,18 +1,7 @@
 # Copyright Xingyu Chen.
 # The diffraction interaction: discovery planning, geometry, and enumerated orchestration.
 
-"""The diffraction interaction: discovery planning, geometry, and enumerated orchestration.
-
-This module gathers what used to be three files - the lazy first-order
-discovery plan (``propagation.topology.discovery.diffraction``), the typed edge
-and first-order path geometry queries (``propagation.geometry.diffraction``),
-and the enumerated topology owner (``propagation.enumerated.diffraction``) - so
-one file holds the whole concept. The native facades it dispatches through stay
-in :mod:`witwin.channel.kernels`; the shared edge-state helpers stay in
-:mod:`witwin.channel.propagation.geometry`, and the shared receiver
-chunk size stays with its owner in
-:mod:`witwin.channel.interactions.reflection`.
-"""
+"""The diffraction interaction: discovery planning, geometry, and enumerated orchestration."""
 
 from __future__ import annotations
 
@@ -265,7 +254,7 @@ class DiffractionOrder1Query:
     state_count: int
     capacity: int
     wavelength: float
-    # ISB boundary taper (ADR-017), D member. 0.0 (default) reproduces the hard
+    # ISB boundary taper (the boundary taper), D member. 0.0 (default) reproduces the hard
     # RayD GO step; > 0 notches the incident-boundary odd part over the congruent
     # window inside the shared UTD header (pair.isbTaperWidthScale).
     isb_taper_width_scale: float = 0.0
@@ -420,7 +409,7 @@ def _diffraction_topology_order1(
     face_eps_r, face_sigma_e, face_mu_r, material_gain, material_valid = (
         face_material_tensors(compiled, device=device)
     )
-    # Per-transmitter polarization threaded into the RayD UTD op (R5 fix): the
+    # Per-transmitter polarization threaded into the RayD UTD op: the
     # incident field basis must use the real scene polarization, not a
     # fabricated z-axis vector.
     tx_polarizations = transmitter_polarizations_f32(scene, device=device)
@@ -457,7 +446,7 @@ def _diffraction_topology_order1(
         if state_count <= 0:
             continue
         # Chunk receivers so the rx x edge-state workspace stays bounded on
-        # city-scale scenes (audit P-2); the reflection paths already chunk.
+        # city-scale scenes; the reflection paths already chunk.
         for rx_request in iter_diffraction_rx_chunk_requests(
             plan,
             state_count=state_count,
@@ -484,7 +473,7 @@ def _diffraction_topology_order1(
                         state_count=state_count,
                         capacity=rx_request.capacity,
                         wavelength=float(wavelength),
-                        # ISB boundary taper (ADR-017), D member. 0.0 when the
+                        # ISB boundary taper (the boundary taper), D member. 0.0 when the
                         # switch is off keeps the RayD export bit-identical; the
                         # width notches the incident-boundary odd part in the header.
                         isb_taper_width_scale=float(isb_boundary_taper_width),

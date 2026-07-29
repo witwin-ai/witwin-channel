@@ -1,7 +1,7 @@
 // Copyright Xingyu Chen.
 // Implements los consumer CUDA operations.
 
-// ---- Consolidated from los.cu ----
+// ==== Section: LoS consumer kernels ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
@@ -99,7 +99,7 @@ __global__ void path_los_export_kernel(
         const float dz = tx_p[2] - rx_p[2];
         const float distance = fmaxf(sqrtf(dx * dx + dy * dy + dz * dz), 1.0e-6f);
         const float gain_base = wavelength / (12.566370614359172f * distance);
-        // R5 polarization consistency: short-dipole sin^2(theta) pattern via the
+        // polarization consistency: short-dipole sin^2(theta) pattern via the
         // squared transverse projection |p_t|^2 = |tx_pol|^2 - (tx_pol . k_hat)^2
         // of the true TX polarization onto the tx->rx direction. Matches the
         // reflection/diffraction seed conventions (and the deterministic field
@@ -159,7 +159,7 @@ __global__ void los_path_gain_backward_kernel(
         const float safe_distance = fmaxf(distance, 1.0e-6f);
         const float inv_distance = 1.0f / safe_distance;
         const float inv_d2 = inv_distance * inv_distance;
-        // R5 dipole pattern: gain = P * gain_scale(f) / d^2 * sin2, with
+        // dipole pattern: gain = P * gain_scale(f) / d^2 * sin2, with
         // sin2 = |p|^2 - (p . k_hat)^2 and k_hat = (tx - rx)/d.
         const float pol_dot =
             (tx_pol_p[0] * dx + tx_pol_p[1] * dy + tx_pol_p[2] * dz) * inv_distance;
@@ -230,7 +230,7 @@ __global__ void los_path_gain_jvp_kernel(
         const float safe_distance = fmaxf(distance, 1.0e-6f);
         const float inv_distance = 1.0f / safe_distance;
         const float inv_d2 = inv_distance * inv_distance;
-        // R5 dipole pattern sin2 = |p|^2 - (p . k_hat)^2, k_hat = (tx - rx)/d.
+        // dipole pattern sin2 = |p|^2 - (p . k_hat)^2, k_hat = (tx - rx)/d.
         const float pol_dot =
             (tx_pol_p[0] * dx + tx_pol_p[1] * dy + tx_pol_p[2] * dz) * inv_distance;
         const float pol_mag2 = tx_pol_p[0] * tx_pol_p[0] +
@@ -997,38 +997,38 @@ at::Tensor channel_bdpt_pack_vec3_cuda(at::Tensor x, at::Tensor y, at::Tensor z)
     return pack_vec3_cuda_impl(x, y, z);
 }
 
-// ---- Consolidated from los_silhouette_clearance.cu ----
-// ISB boundary taper (ADR-017), LoS member. Native, channel owned.
+// ==== Section: LoS silhouette clearance ====
+// ISB boundary taper (the boundary taper), LoS member. Native, channel owned.
 //
 // Two per-(tx,rx) CUDA operations that implement the DEFAULT-OFF joint ISB
 // taper's line-of-sight half:
 //
-//   channel_los_silhouette_clearance:  for each (source, target) segment, find the
-//     nearest occluding axis-aligned box the segment grazes, and return the
-//     C1 membership factor tau(c_plane / (width * w_F)) where
-//       - c   = signed clearance of the segment past the box silhouette
-//               (positive when the segment clears the box / lit, negative when
-//               it penetrates / shadow), taken as the signed AABB distance at
-//               the segment's closest-approach sample (measured at the
-//               occluder);
-//       - c_plane = c * (d1 + d2) / d1 magnifies that occluder-plane miss
-//               distance into the receiver plane, where the point-source shadow
-//               of the silhouette edge is enlarged by the same factor. The
-//               accepted projection (artifacts/isb-taper/stage2.py) scores the
-//               clearance as an in-receiver-plane distance transform, so the
-//               native band must cover the same receiver-plane extent;
-//       - w_F = sqrt(lambda * d1 * d2 / (d1 + d2)) is the Fresnel penumbra of
-//               the grazed edge (d1 = |grazing - source|, d2 = |target -
-//               grazing|); the exact form and the signed-distance / grazing
-//               conventions match artifacts/isb-taper/common.py + stage1_geom.py;
-//       - tau(w) = smoothstep01(0.5 * (w + 1)) is the C1 step through 1/2 at
-//               c = 0 (artifacts/isb-taper/stage2.py tau_smoothstep).
-//     A segment that grazes no box (empty scene) returns tau = 1 (fully lit).
+// channel_los_silhouette_clearance: for each (source, target) segment, find the
+// nearest occluding axis-aligned box the segment grazes, and return the
+// C1 membership factor tau(c_plane / (width * w_F)) where
+// - c = signed clearance of the segment past the box silhouette
+// (positive when the segment clears the box / lit, negative when
+// it penetrates / shadow), taken as the signed AABB distance at
+// the segment's closest-approach sample (measured at the
+// occluder);
+// - c_plane = c * (d1 + d2) / d1 magnifies that occluder-plane miss
+// distance into the receiver plane, where the point-source shadow
+// of the silhouette edge is enlarged by the same factor. The
+// accepted projection (artifacts/isb-taper/stage2.py) scores the
+// clearance as an in-receiver-plane distance transform, so the
+// native band must cover the same receiver-plane extent;
+// - w_F = sqrt(lambda * d1 * d2 / (d1 + d2)) is the Fresnel penumbra of
+// the grazed edge (d1 = |grazing - source|, d2 = |target -
+// grazing|); the exact form and the signed-distance / grazing
+// conventions match artifacts/isb-taper/common.py + stage1_geom.py;
+// - tau(w) = smoothstep01(0.5 * (w + 1)) is the C1 step through 1/2 at
+// c = 0 (artifacts/isb-taper/stage2.py tau_smoothstep).
+// A segment that grazes no box (empty scene) returns tau = 1 (fully lit).
 //
-//   channel_los_taper_apply: scale a LoS field bundle (complex3 vector, complex
-//     coefficient, complex path_field, real path_gain) by the real per-row
-//     factor tau. tau multiplies the field amplitude, so path_gain (a power)
-//     is scaled by tau*tau. No torch hot-path math; the scale runs in-kernel.
+// channel_los_taper_apply: scale a LoS field bundle (complex3 vector, complex
+// coefficient, complex path_field, real path_gain) by the real per-row
+// factor tau. tau multiplies the field amplitude, so path_gain (a power)
+// is scaled by tau*tau. No torch hot-path math; the scale runs in-kernel.
 //
 // Both ops are only ever launched when isb_boundary_taper is on; the off path
 // never reaches this translation unit, so the default solve is bit-identical.
@@ -1044,8 +1044,7 @@ at::Tensor channel_bdpt_pack_vec3_cuda(at::Tensor x, at::Tensor y, at::Tensor z)
 namespace {
 
 constexpr int kBlockSize = 256;
-// Segment samples used to locate the closest-approach point to each box.
-// Matches artifacts/isb-taper/stage1_geom.py occluding_edge_geom (400 samples).
+// Use 400 segment samples to estimate closest approach to each box.
 constexpr int kSegmentSamples = 400;
 
 __device__ __forceinline__ float smoothstep01(float t) {
@@ -1054,7 +1053,7 @@ __device__ __forceinline__ float smoothstep01(float t) {
 }
 
 // Signed distance of point p to an axis-aligned box [bmin, bmax]:
-//   q = max(bmin - p, p - bmax);  sd = ||max(q, 0)|| + min(max(q), 0)
+// q = max(bmin - p, p - bmax); sd = ||max(q, 0)|| + min(max(q), 0)
 // negative inside the box, positive outside. Matches common.py conventions.
 __device__ __forceinline__ float aabb_signed_distance(
     float px, float py, float pz,
@@ -1099,7 +1098,7 @@ __global__ void los_silhouette_clearance_kernel(
         float best_slack = 3.4e38f;
         float best_c = 1.0e30f;     // signed clearance at the closest approach
         float best_d1 = 0.0f;       // |grazing - source|
-        float best_d2 = 0.0f;       // |target  - grazing|
+        float best_d2 = 0.0f;       // |target - grazing|
         bool found = false;
         for (int64_t b = 0; b < box_count; ++b) {
             const float minx = box_min[b * 3 + 0];
@@ -1292,7 +1291,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_los_taper_app
     return {out_field_vector, out_coefficient, out_path_field, out_path_gain};
 }
 
-// ---- Consolidated from consumer_fixed_los_gather.cu ----
+// ==== Section: Fixed-LoS gathering ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
@@ -1939,7 +1938,7 @@ pybind11::dict channel_consumer_fixed_los_gather_jvp(
 
 #undef kBlockSize
 
-// ---- Consolidated from consumer_los_jones.cu ----
+// ==== Section: LoS Jones assembly ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>

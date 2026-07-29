@@ -1,16 +1,7 @@
 # Copyright Xingyu Chen.
-# AD-2/AD-4 solver-level tests: TX/RX position and mesh-vertex gradients.
+# AD/AD solver-level tests: TX/RX position and mesh-vertex gradients.
 
-"""AD-2/AD-4 solver-level tests: TX/RX position and mesh-vertex gradients.
-
-Covers the plan 07 section 9.3 geometry cells for D=deterministic and P=path:
-TX/RX position x (LoS, single reflection, transmission-multilayer), mesh
-vertex x (LoS, single reflection, transmission-multilayer) and the coupled
-mesh-vertex gap, each against central finite differences of the primal
-solve. Geometry FD steps stay well inside the linear regime of the carrier
-phase (k*h << 1 at 3 GHz), which is what forces a tighter step here than the
-material tests use.
-"""
+"""AD/AD solver-level tests: TX/RX position and mesh-vertex gradients."""
 
 from __future__ import annotations
 
@@ -45,9 +36,9 @@ _TX = (0.0, -1.0, 0.5)
 _RX = (0.0, 1.0, 0.5)
 # The wall quad is deliberately asymmetric in z (top edge at 2.4, not 2.0):
 # with a symmetric quad the specular point (2.5, 0, 0.5) falls EXACTLY on the
-# shared triangulation diagonal, where a +/-h vertex perturbation flips the
+# shared triangulation diagonal, where a /-h vertex perturbation flips the
 # native discovery between one and two duplicate winner paths. That is a path
-# birth/death discontinuity (plan 07 section 7, explicitly outside the
+# birth/death discontinuity (the AD contract, explicitly outside the
 # fixed-winner contract), and the central difference then measures the
 # |coefficient|/2h jump instead of the derivative. The 0.2 m diagonal
 # clearance keeps the winner topology stable across every FD probe so the FD
@@ -275,7 +266,7 @@ def test_forward_mode_endpoint_dual_matches_reverse(interaction):
 
 
 def test_geometry_ad_is_inert_without_geometry_leaves():
-    """Materials-only AD must not pay for the AD-2 reconstruction."""
+    """Materials-only AD must not pay for the AD reconstruction."""
 
     scene = _reflection_scene()
     primal = _solve(scene, "deterministic", frozenset({"reflection"}), "none")
@@ -285,18 +276,18 @@ def test_geometry_ad_is_inert_without_geometry_leaves():
 
 @pytest.mark.parametrize("solver", _SOLVERS)
 def test_mesh_vertex_transmission_grad_matches_fd(solver):
-    """Mesh vertex x transmission (plan 07 section 9.3).
+    """Mesh vertex x transmission (the derivative capability matrix).
 
-    A straight tx->rx penetration path never moves with the wall vertices
-    (the crossing point is not a path parameter) and its path length is
-    vertex-independent, but the incidence COSINE is not: the wall normal is
-    a function of the vertices, and the layer-stack response is evaluated
-    at that angle. Because no carrier phase rides on the vertices here, the
-    FD step is NOT bound by k*h << 1; it uses the coarser incoherent step,
-    which the tilt response needs to clear the float32 forward noise floor
-    (at 1e-3 the two-point difference of the ~1e-5-scale gradient is only
-    a few float32 ulps of the loss and reads reassociation noise).
-    """
+ A straight tx->rx penetration path never moves with the wall vertices
+ (the crossing point is not a path parameter) and its path length is
+ vertex-independent, but the incidence COSINE is not: the wall normal is
+ a function of the vertices, and the layer-stack response is evaluated
+ at that angle. Because no carrier phase rides on the vertices here, the
+ FD step is NOT bound by k*h << 1; it uses the coarser incoherent step,
+ which the tilt response needs to clear the float32 forward noise floor
+ (at 1e-3 the two-point difference of the ~1e-5-scale gradient is only
+ a few float32 ulps of the loss and reads reassociation noise).
+ """
 
     components = frozenset({"transmission"})
     base = torch.tensor(_TRANSMISSION_WALL_VERTICES, dtype=torch.float32)
@@ -321,14 +312,14 @@ def test_mesh_vertex_transmission_grad_matches_fd(solver):
 def test_mesh_vertex_los_grad_is_structurally_zero(solver):
     """Mesh vertex x LoS: the exact zero, pinned.
 
-    A LoS path touches no face: its coefficient depends on the endpoints and
-    the frequency only, and the wall's sole influence (blocking the path) is
-    a discrete frozen visibility winner. The true fixed-topology derivative
-    is therefore identically zero. No graph edge can reach the vertex leaf,
-    so the loss itself carries no graph (the endpoints are not live) and
-    the leaf's gradient is the structural zero. Anything else (a live loss
-    with a nonzero vertex gradient) would be a regression.
-    """
+ A LoS path touches no face: its coefficient depends on the endpoints and
+ the frequency only, and the wall's sole influence (blocking the path) is
+ a discrete frozen visibility winner. The true fixed-topology derivative
+ is therefore identically zero. No graph edge can reach the vertex leaf,
+ so the loss itself carries no graph (the endpoints are not live) and
+ the leaf's gradient is the structural zero. Anything else (a live loss
+ with a nonzero vertex gradient) would be a regression.
+ """
 
     wall_vertices = torch.tensor(_WALL_VERTICES, dtype=torch.float32)
     leaf = wall_vertices.clone().cuda().requires_grad_(True)

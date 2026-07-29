@@ -66,28 +66,22 @@ def test_reduced_munich_deterministic_parity_emits_artifacts():
     )
     assert saved["delta"]["max_abs_delta_db"] < 250.0
     assert saved["delta"]["median_abs_delta_db"] < 20.0
-    # F1/R5 (utd-continuity-fix-design): native LoS now carries the short-dipole
-    # sin(theta) pattern of the default z-hat source polarization, while the
-    # legacy Channel oracle uses a world-X source. The bulk of the grid still
-    # matches exactly (median ~0 dB), but steep near-axis links diverge by the
-    # pattern ratio (max ~9.8 dB), so the former max < 1e-3 exactness now only
-    # holds for the median.
+    # Native LoS uses each transmitter's z-axis dipole, while the reference uses
+    # a world-X source. Median grid error stays near zero, but near-axis links
+    # differ by the dipole-pattern ratio, so the exactness gate uses the median.
     assert saved["component_delta"]["los"]["median_abs_delta_db"] < 1.0e-3
     assert saved["component_delta"]["los"]["max_abs_delta_db"] < 12.0
     assert saved["component_delta"]["reflection"]["median_abs_delta_db"] < 1.0
-    # Native uses the default vertical (+z) source polarization while the legacy
-    # Channel oracle uses world-X. Geometry and K-P UTD still remain close after
-    # that intentional convention change; F1's dipole pattern plus the F5
-    # finite-edge truncation lift the median diffraction delta to ~3.1 dB (was
-    # < 2.0 before the continuity fixes).
+    # Native uses +z source polarization while the reference uses world-X.
+    # Geometry and K-P UTD remain close; the dipole pattern and finite-edge
+    # truncation keep the median diffraction delta below 4 dB.
     assert saved["component_delta"]["diffraction"]["median_abs_delta_db"] < 4.0
-    # ADR-032 restores the measured O(K) compact route. Its launch count is
-    # frozen exactly here; E2E latency, memory, throughput, and exactness remain
-    # the performance gates rather than treating a lower launch count as a win.
+    # The compact O(K) route has a pinned launch count; latency, memory,
+    # throughput, and exactness remain independent performance gates.
     assert saved["native"]["metadata"]["kernel"]["launch_count"] == 23
     # Gross-regression guardrail, not an A/B race: on this 32x32 scene the
     # native and legacy-oracle times are both ~25 ms and dominated by launch
-    # overhead, and the F5 finite-edge mend legitimately adds ~2 ms of
+    # overhead, and the finite-edge mend legitimately adds ~2 ms of
     # coefficient work, so a strict `native < original` pin flakes on wall
     # clock (it already failed ~1/3 of runs before the continuity fixes).
     assert (
@@ -176,7 +170,7 @@ def test_reduced_munich_native_depth_one_through_three_exports_reflection_paths(
     assert result.diagnostics["path_planning"]["guardrail_count"] == 0
     assert result.diagnostics["path_planning"]["candidate_count"] < 200_000
     # Diffraction chunks receivers to bound the rx x edge-state workspace
-    # (audit P-2). Freeze the stable compact route exactly so either an added
+    #. Freeze the stable compact route exactly so either an added
     # launch or an unreviewed fusion change is visible.
     assert result.diagnostics["native_launch_count"] == expected_launch_count
 

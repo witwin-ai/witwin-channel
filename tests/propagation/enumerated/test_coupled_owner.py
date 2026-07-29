@@ -16,7 +16,7 @@ from witwin.channel.interactions import coupled as discovery_coupled
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 PACKAGE_ROOT = REPOSITORY_ROOT / "witwin" / "channel"
-_COUPLED_DIGEST = "229a286fe971ea970efc5d2821234068a6ca7f0d428454f87e1e35d8450697b3"
+_COUPLED_DIGEST = "c1da3dec6a095f47c6704dc8930122b4f49aeaa588a2a0fa090ae679a7370568"
 
 
 def _digest(module, name: str) -> str:
@@ -49,7 +49,7 @@ def test_coupled_owner_preserves_function_and_constant_identity():
     assert coupled.iter_coupled_candidate_requests is (
         discovery_coupled.iter_coupled_candidate_requests
     )
-    # ADR-013 cid 7: the D->D discovery/geometry symbols share the same owners.
+    # D-to-D discovery and geometry symbols share the same owners.
     assert coupled.iter_coupled_dd_candidate_requests is (
         discovery_coupled.iter_coupled_dd_candidate_requests
     )
@@ -63,9 +63,8 @@ def test_coupled_owner_preserves_function_and_constant_identity():
 
 def test_enumerated_coupled_consumes_named_geometry_only():
     tree = ast.parse(Path(coupled.__file__).read_text(encoding="utf-8"))
-    # ADR-011 / G3: the per-receiver-block worker is where the shared named
-    # discovery/geometry is consumed after the rx-streaming refactor; the
-    # order-2 owner and its rx-streamed sibling delegate to it.
+    # The per-receiver-block worker consumes named discovery and geometry;
+    # both order-2 entry points delegate to it.
     definition = next(
         node
         for node in tree.body
@@ -87,7 +86,7 @@ def test_enumerated_coupled_consumes_named_geometry_only():
     }
     assert "prepare_coupled_candidate_plan" in call_names
     assert "iter_coupled_candidate_requests" in call_names
-    # ADR-013 cid 7: the D->D stream is consumed in the same block worker.
+    # The D-to-D stream is consumed in the same block worker.
     assert "iter_coupled_dd_candidate_requests" in call_names
     assert "query_coupled_dd_geometry" in call_names
     assert "arange" not in call_names
@@ -112,7 +111,7 @@ def test_export_component_stage_order_remains_canonical():
         "_reflection_topology_multibounce",
         "_diffraction_topology_order1",
         "_transmission_topology",
-        # ADR-011 / G3: the engine dispatches through the public coupled entry.
+        # The engine dispatches through the public coupled entry.
         "coupled_reflection_diffraction_topology",
     )
     assert [call_lines[name] for name in stages] == sorted(

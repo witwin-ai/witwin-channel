@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
 # Select an explicit development extension for tests and benchmarks.
 
-"""Select an explicit development extension for tests and benchmarks.
-
-The extensions live in out-of-tree CMake build directories under
-``artifacts/cmake-*``. This helper configures the production loader with the
-newest extension matching the running interpreter. It never makes a bare
-``_channel`` module globally importable.
-"""
+"""Select an explicit development extension for tests and benchmarks."""
 
 from __future__ import annotations
 

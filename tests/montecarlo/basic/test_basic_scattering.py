@@ -1,14 +1,7 @@
 # Copyright Xingyu Chen.
-# MC basic Kirchhoff scattering radiomap (wave 3).
+# Test Monte Carlo Basic Kirchhoff scattering radiomaps.
 
-"""MC basic Kirchhoff scattering radiomap (wave 3).
-
-The map area-samples rough faces and deposits the unpolarized Kirchhoff
-diffuse path gain per cell; acceptance follows the wave-2 style: a direct
-torch area-quadrature reference validates the normalization, the smooth
-limit and an energy bound guard the physics, and rough materials must be
-completely inert when scattering is not requested.
-"""
+"""Test Monte Carlo Basic Kirchhoff scattering radiomaps."""
 
 import math
 
@@ -186,14 +179,14 @@ def test_basic_scattering_map_matches_area_quadrature_reference():
 
 def test_basic_smooth_limit_and_energy_bound():
     """sigma_h -> 0 kills the diffuse map; at strong roughness the diffuse
-    map total stays below the SMOOTH reflection map total on the same grid
-    (R_diff <= R_bar, near-specular geometry). The reflection map itself is
-    unchanged by roughness in v1: the coherent C_r attenuation of the
-    specular estimators belongs to the deterministic-solver scattering wave,
-    so asserting the literal reflection+scattering sum bound would encode
-    the known-missing attenuation as correct; the quadrature-reference test
-    above is the exact normalization check.
-    """
+ map total stays below the SMOOTH reflection map total on the same grid
+ (R_diff <= R_bar, near-specular geometry). The reflection map itself is
+ unchanged by roughness in v1: the coherent C_r attenuation of the
+ specular estimators belongs to the deterministic-solver scattering wave,
+ so asserting the literal reflection+scattering sum bound would encode
+ the known-missing attenuation as correct; the quadrature-reference test
+ above is the exact normalization check.
+ """
 
     _require_native()
     scattering_config = Config(samples=32_768, seed=5, components={"scattering"})
@@ -249,10 +242,10 @@ def test_basic_scattering_is_seed_reproducible():
 
 def test_basic_results_unchanged_when_scattering_not_requested():
     """Regression guard: without the scattering component, roughness is
-    never read - a rough-material scene reproduces the smooth variant of
-    the same scene. Reruns of the SAME scene are bit-identical; across the
-    two Scene instances the reflection map is compared at float tolerance
-    because its atomic accumulation order varies with the BVH build."""
+ never read - a rough-material scene reproduces the smooth variant of
+ the same scene. Reruns of the SAME scene are bit-identical; across the
+ two Scene instances the reflection map is compared at float tolerance
+ because its atomic accumulation order varies with the BVH build."""
 
     _require_native()
     grid = make_receiver_grid(
@@ -285,8 +278,8 @@ def test_basic_results_unchanged_when_scattering_not_requested():
 
 def test_basic_scattering_requires_unobstructed_incident_segment():
     """v1 keeps the incident side simple: a blocking wall between the
-    transmitter and the rough face truthfully zeroes the map (no
-    through-wall incident paths)."""
+ transmitter and the rough face truthfully zeroes the map (no
+ through-wall incident paths)."""
 
     _require_native()
     blocker = _wall(

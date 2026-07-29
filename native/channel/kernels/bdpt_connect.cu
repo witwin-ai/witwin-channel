@@ -1,7 +1,7 @@
 // Copyright Xingyu Chen.
 // Implements bdpt connect CUDA operations.
 
-// ---- Consolidated from bdpt_connect_mis.cu ----
+// ==== Section: BDPT MIS ====
 #include "bdpt_connect_common.cuh"
 
 namespace {
@@ -61,7 +61,7 @@ at::Tensor channel_bdpt_mis_weights_cuda(
     return weights;
 }
 
-// ---- Consolidated from bdpt_connect_samples.cu ----
+// ==== Section: BDPT connection samples ====
 #include "bdpt_connect_common.cuh"
 
 namespace {
@@ -360,7 +360,7 @@ channel_bdpt_endpoint_connection_samples_cuda(
         path_length_m};
 }
 
-// ---- Consolidated from bdpt_connect_visibility.cu ----
+// ==== Section: BDPT visibility ====
 #include "bdpt_connect_common.cuh"
 
 #define CHANNEL_BDPT_CHECK_CONNECTION_SAMPLE_TENSORS()                                     \
@@ -929,7 +929,7 @@ channel_bdpt_concat_connection_samples_cuda(
 #undef CHANNEL_BDPT_CHECK_CONNECTION_SAMPLE_ROWS
 #undef CHANNEL_BDPT_CHECK_CONNECTION_SAMPLE_TENSORS
 
-// ---- Consolidated from bdpt_connect_accumulation.cu ----
+// ==== Section: BDPT connection accumulation ====
 #include "bdpt_connect_common.cuh"
 
 namespace {
@@ -976,7 +976,7 @@ __global__ void bdpt_accumulate_connection_samples_double_kernel(
     }
 }
 
-// ADR-019 coherent combine (opt-in, DEFAULT OFF). Sum the complex per-row
+// coherent combination (opt-in, DEFAULT OFF). Sum the complex per-row
 // projected field coefficient into per-(tx, rx, component) phasor bins, then
 // finalize |sum|^2. Coherent-eligible rows are the enumerated delta/UTD
 // discrete connections (los / reflection / diffraction / coupled->diffraction)
@@ -1075,7 +1075,7 @@ __global__ void bdpt_finalize_coherent_accumulation_kernel(
         scattering_imag[index] * scattering_imag[index];
     // Paths within one component combine coherently; components combine
     // incoherently into path_gain (matches the deterministic per-component
-    // coherent power the ADR-019 acceptance gate compares against).
+    // coherent power the coherent combination acceptance gate compares against).
     los[index] = static_cast<float>(los_power);
     reflection[index] = static_cast<float>(reflection_power);
     diffraction[index] = static_cast<float>(diffraction_power);
@@ -1287,7 +1287,7 @@ __global__ void bdpt_connection_variance_finalize_double_kernel(
 
 }  // namespace
 
-// ADR-022 ruling 6.4: the coherent forward (combine_domain == 1) returns the
+// Coherent BDPT accumulation: the coherent forward (combine_domain == 1) returns the
 // per-component complex bin-sum buffers (S_b) as ten extra non-differentiable
 // outputs so the accumulate backward reads them directly instead of re-reducing
 // the atomic-double phasor sum. combine_domain == 0 returns those ten trailing
@@ -1342,7 +1342,7 @@ channel_bdpt_accumulate_connection_samples_cuda(
     const int64_t count = contribution.numel();
     const int64_t out_count = tx_count * rx_count;
     if (combine_domain == 1) {
-        // ADR-019 coherent combine. accumulation_strategy is a power-domain
+        // coherent combination. accumulation_strategy is a power-domain
         // reduction perf axis and stays orthogonal: the coherent phasor sum
         // always uses the atomic-double reduction regardless of its value.
         check_float_cuda(coeff_real, "coeff_real", 1);
@@ -1648,16 +1648,16 @@ at::Tensor channel_bdpt_connection_variance_cuda(
 }
 
 // ===========================================================================
-// ADR-022 6.4: bdpt_accumulate_connection_samples backward + jvp companions.
+// BDPT AD: bdpt_accumulate_connection_samples backward + jvp companions.
 //
 // The accumulate op is linear per component; MIS weights, the connection
 // topology (tx_id/rx_id/component_id/valid), and combine_domain are frozen.
-//   * Power domain  M[b] = sum_r contribution_r * mis_r
-//         backward: grad_contribution_r = mis_r * (grad_path_gain[b] +
-//                   grad_<component_r>[b])   (a deterministic gather)
-//   * Coherent      P_c[b] = |S_c[b]|^2, path_gain[b] = sum_c P_c[b]
-//         backward: grad_coeff_r = 2 * (grad_<c>[b] + grad_path_gain[b]) * S_c[b]
-//                   reading the forward-retained bin sums S_c (ruling 6.4).
+// * Power domain M[b] = sum_r contribution_r * mis_r
+// backward: grad_contribution_r = mis_r * (grad_path_gain[b] +
+// grad_<component_r>[b]) (a deterministic gather)
+// * Coherent P_c[b] = |S_c[b]|^2, path_gain[b] = sum_c P_c[b]
+// backward: grad_coeff_r = 2 * (grad_<c>[b] + grad_path_gain[b]) * S_c[b]
+// reading the forward-retained bin sums S_c (retained forward bin sums).
 // The forward's per-component phasor bins are atomic-double (perf axis); the
 // JVP recomputes the tangent bin sums in fixed order so it stays deterministic
 // with no float atomics (the primal/JVP determinism rule).
@@ -2293,19 +2293,19 @@ pybind11::dict channel_bdpt_accumulate_connection_samples_jvp_cuda(
     return out;
 }
 
-// ---- Consolidated from bdpt_connect_ad.cu ----
+// ==== Section: BDPT connection AD ====
 #include "bdpt_connect_common.cuh"
 
 #include <rayd/torch/rf/field_transport_ad.cuh>
 
 #include <algorithm>
 
-// ADR-022 6.3: backward + jvp companions for bdpt_endpoint_connection_samples.
+// BDPT AD: backward + jvp companions for bdpt_endpoint_connection_samples.
 //
 // Forward (per connection row): the light endpoint field F and the sensor
 // polarization project through the frozen free-space carrier into
-//   contribution = P_src * |coeff|^2 / N,
-//   coeff = <F * propagation, rx_axis>,  rx_axis = project(sensor_pol, dir).
+// contribution = P_src * |coeff|^2 / N,
+// coeff = <F * propagation, rx_axis>, rx_axis = project(sensor_pol, dir).
 // Differentiable: the light field F, the sensor polarization (through rx_axis),
 // the carrier frequency (through the propagation amplitude and phase), and the
 // source power P_src (tx_power). Frozen: the connection geometry (distance,

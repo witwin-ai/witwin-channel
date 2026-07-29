@@ -1,61 +1,7 @@
 # Copyright Xingyu Chen.
 # Native discrete path-topology kernel facades.
 
-"""Native discrete path-topology kernel facades.
-
-Thin facades over the ``_channel`` topology ABI: the path/topology block
-schemas and their validators, the reflection candidate export, the native
-compaction owners, the topology construction primitives, the small packing
-primitives, the Monte Carlo direction sampler, the shared compact-autograd
-companions, the ADR-032 canonical exact-row owner, and the ADR-027
-component-5 transmission topology packer.
-
-blocks
-------
-The ``_PATH_BLOCK_SCHEMA`` / ``_DETERMINISTIC_TOPOLOGY_EXTRA_SCHEMA`` field
-contracts, the validators every other section reuses, and the LOS export,
-filter, merge and finalize block operations.
-
-candidates
-----------
-The reflection candidate export, which publishes a path block plus the two
-visibility segments the caller traces.
-
-compaction
-----------
-The native order-1 reflection, reflection-sequence and order-1 diffraction
-compaction owners plus the deterministic row sort order.
-
-construction
-------------
-The topology block constructors: LOS blocks, default and base fields,
-sequence padding, EPC input batches, and the face-sequence chunk generators.
-
-primitives
-----------
-Small native packing and counting primitives shared across the topology
-stage.
-
-sampling
---------
-The Monte Carlo direction sampler that ``propagation.topology`` publishes as
-its single sampling owner.
-
-compact autograd
-----------------
-Shared native companions for exact-row compact autograd.
-
-canonical compact
------------------
-ADR-032 canonical exact-row owner and pair segmentation.
-
-transmission
-------------
-Native component-5 topology packing for RayD segment penetration. This facade
-owns both the dispatch and the fixed-capacity row table it publishes:
-``TransmissionTopologyCapacity`` is the named typed contract this one native
-operation converts its result into, and it has no other producer.
-"""
+"""Native discrete path-topology kernel facades."""
 
 from __future__ import annotations
 
@@ -2479,7 +2425,7 @@ class _EnumeratedTransmissionTopologyPackFunction(torch.autograd.Function):
         if not any(ctx.needs_input_grad[index] for index in (5, 6, 7)):
             return none_grads
         topology_valid, hit_valid = ctx.saved_tensors
-        # Reductions commonly supply expanded stride-zero cotangents.  The
+        # Reductions commonly supply expanded stride-zero cotangents. The
         # typed CUDA companion consumes contiguous row-major buffers, so
         # normalize only live cotangent slots at the dispatch boundary.
         continuous_grads = tuple(

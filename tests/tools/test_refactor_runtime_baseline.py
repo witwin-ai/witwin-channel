@@ -260,7 +260,7 @@ def test_runtime_report_is_bound_to_sha_and_immutable(tmp_path: Path):
 
 
 # ---------------------------------------------------------------------------
-# Extended G0 backfill profile
+# Extended backfill profile
 # ---------------------------------------------------------------------------
 
 

@@ -1,7 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests scattering patch integral eval.
 
-"""Lockstep and contract tests for ADR-010 op 2 (phase-screen patch integral)."""
+"""Tests scattering patch integral eval."""
 
 import math
 
@@ -93,7 +93,7 @@ def test_patch_integral_total_matches_reference(seed):
     case = _random_case(48, 32, device="cuda", seed=seed)
     native = _native(case)
     ref_total, ref_integrals = _reference(case)
-    # Per-row integrals meet the ADR-010 1e-5 budget (with an absolute floor
+    # Per-row integrals meet the rough-surface scattering 1e-5 budget (with an absolute floor
     # for heavily cancelling individual rows).
     d = (native["integral"] - ref_integrals).abs()
     floor = 1.0e-5 * float(ref_integrals.abs().max())
@@ -190,7 +190,7 @@ def test_patch_integral_coherent_total_meets_strict_gate(seed):
     ref_total, _ref_integrals = _reference(case)
     total_n = complex(native["total"].item())
     total_r = complex(ref_total.item())
-    # ADR-010 op 2 gate: realization total max-rel <= 1e-5 in the coherent
+    # rough-surface scattering: realization total max-rel <= 1e-5 in the coherent
     # (production) regime.
     assert abs(total_n - total_r) <= 1.0e-5 * abs(total_r)
 

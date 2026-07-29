@@ -1,18 +1,7 @@
 # Copyright Xingyu Chen.
 # Direct AD checks of the native deterministic flat-accumulation Function.
 
-"""Direct AD checks of the native deterministic flat-accumulation Function.
-
-Strict float64 torch.autograd.gradcheck of
-ops.deterministic_accumulate_flat_ad on a small path fixture covering all
-six materialized slots (coherent |sum field|^2 totals over the los /
-reflection / diffraction / transmission / coupled field slots, the
-power-domain scattering slot, and incoherent power sums with the sqrt
-pseudo-field), a jvp-vs-vjp inner-product duality check, float32 forward
-parity against the primal native accumulator, and the frozen-gate contract:
-invalid capacity rows are skipped before poison IDs/numerical payloads, and
-invalid or out-of-range rows receive exactly zero gradient/tangent contribution.
-"""
+"""Direct AD checks of the native deterministic flat-accumulation Function."""
 
 from __future__ import annotations
 
@@ -46,7 +35,7 @@ _OUTPUT_FIELDS = (
 # transmission row (slot 3, part of the coherent field sum) and row 9 a
 # scattering row (slot 4, power-domain in both modes). Rows 10 (cid 3, R->D)
 # and 11 (cid 4, D->R) are coupled rows that both land in the coherent coupled
-# slot 5 and collide in cell (1, 1), exercising the E_RD + E_DR sum (ADR-011).
+# slot 5 and collide in cell (1, 1), exercising the E_RD + E_DR sum (coupled reflection and diffraction).
 # Row 6 has an out-of-range tx and row 7 an out-of-range rx: the accumulator
 # must drop both.
 _TX_ID = (0, 0, 0, 1, 1, 0, -1, 0, 0, 0, 1, 1)

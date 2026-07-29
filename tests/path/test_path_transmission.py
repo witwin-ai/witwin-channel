@@ -1,7 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests path transmission.
 
-"""Path solver specular transmission exports (plan 05 wave 2)."""
+"""Tests path transmission."""
 
 import math
 

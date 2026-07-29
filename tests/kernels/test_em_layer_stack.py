@@ -1,14 +1,7 @@
 # Copyright Xingyu Chen.
 # Analytic and oracle-parity tests for the shared em/ layer-stack core.
 
-"""Analytic and oracle-parity tests for the shared em/ layer-stack core.
-
-The complex128 transfer-matrix implementation below follows plan section 5.1
-(the mathematical oracle form) with the contract section 2 conventions:
-time factor e^{+j w t}, eps = eps0*(eps_r - j*sigma/(w*eps0)), passive-branch
-square root Re >= 0, Im <= 0, admittances Y_TE = k_z/(w*mu), Y_TM = w*eps/k_z,
-and interface amplitudes on the shared tangential electric field.
-"""
+"""Analytic and oracle-parity tests for the shared em/ layer-stack core."""
 
 import cmath
 import math

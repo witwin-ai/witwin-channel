@@ -306,7 +306,7 @@ def _nvtx_range_rows(connection: sqlite3.Connection) -> list[tuple[str, int, int
         raise EvidenceError("Nsight NVTX table lacks start/end timestamps")
     names = _nvtx_names(connection)
     # Resolve names and timestamp rows in the same SQLite order used by
-    # _nvtx_names.  NULL-text rows are excluded by both queries.
+    # _nvtx_names. NULL-text rows are excluded by both queries.
     if "text" in columns:
         rows = connection.execute(
             'SELECT "text", "start", "end" FROM "NVTX_EVENTS" '

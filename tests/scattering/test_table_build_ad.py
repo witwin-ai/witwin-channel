@@ -1,17 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests table build ad.
 
-"""ADR-015 Part C: differentiable Kirchhoff table construction.
-
-Lockstep of the native ``kirchhoff_table_build_backward`` / ``_jvp`` companions
-against the float64 Torch autograd oracle in
-``tests/reference/kirchhoff_table_build.py`` (which unrolls the symmetric
-Sinkhorn balance, so matching it validates the native implicit adjoint), plus
-FD cross-checks per parameter, the JVP-vs-VJP inner-product identity, fixed-input
-rejection, primal-bitwise invariance, and an end-to-end deterministic ensemble
-solve with a live roughness parameter. FD steps / tolerances follow the
-tests/ad conventions and may need calibration once the extension is rebuilt.
-"""
+"""Tests table build ad."""
 
 from __future__ import annotations
 

@@ -1,56 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests kernel ad contracts.
 
-"""Direct kernel-level AD contracts for the ADR-014 scattering companions.
-
-Covers the four native companions authored under ADR-014:
-
-* ``scattering_ensemble_eval_backward`` / ``_jvp`` (op 1, Kirchhoff ensemble),
-* ``scattering_patch_integral_eval_backward`` / ``_jvp`` (op 2, realization
-  phase-screen patch integral),
-
-plus the public ``_ad`` wrappers. Each is exercised against the extended
-float64 Torch oracles in ``tests.reference`` (lockstep VJP/JVP), for JVP-vs-VJP
-duality, against a finite-difference directional derivative of the native
-forward, and for the contract / negative / edge-case behavior in the ADR
-acceptance protocol.
-
-Assumed Python facade signatures (the C++ ABI is pinned by ADR-014; the thin
-Python facades are authored in parallel in ``kernels/scattering.py``).
-These tests assume the natural design
-that mirrors the existing forward facade and ``propagation/fields/kernels``:
-
-    scattering_ensemble_eval_backward(
-        <22 forward tensors, same order>, *, coef, threshold,
-        grad_gain=None, grad_amplitude=None, grad_length=None,
-        need_grad_rows, need_grad_samples, need_grad_tables, need_grad_coef,
-    ) -> dict(grad_wo_rows, grad_r2_rows, grad_cos_o_rows,
-              grad_n_o, grad_t1r, grad_t2r, grad_wi_local, grad_cos_i, grad_r1,
-              grad_a_te2, grad_a_tm2, grad_weights, grad_f_te, grad_f_tm,
-              grad_coef)   # None where the owning need flag is false
-
-    scattering_ensemble_eval_jvp(
-        <22 forward tensors>, *, coef, threshold,
-        tangent_wo_rows=None, ..., tangent_f_te_flat=None,
-        tangent_f_tm_flat=None, tangent_coef=0.0,
-    ) -> dict(tangent_gain, tangent_amplitude, tangent_length)
-
-    scattering_patch_integral_eval_backward(
-        <14 forward tensors>, *, k0, grad_total,
-        need_grad_heights, need_grad_jones, need_grad_geometry, need_grad_k0,
-    ) -> dict(grad_heights, grad_r_te, grad_r_tm, grad_d_i, grad_d_o,
-              grad_r1_rows, grad_r2_rows, grad_centroids, grad_k0)
-
-    scattering_patch_integral_eval_jvp(
-        <14 forward tensors>, *, k0, tangent_heights=None, tangent_r_te=None,
-        tangent_r_tm=None, tangent_d_i=None, tangent_d_o=None,
-        tangent_r1_rows=None, tangent_r2_rows=None, tangent_centroids=None,
-        tangent_k0=0.0,
-    ) -> dict(tangent_total)
-
-If the landed facade names differ, reconcile the calls below with the facade
-author; the return-dict keys are pinned by ADR-014.
-"""
+"""Tests kernel ad contracts."""
 
 from __future__ import annotations
 
@@ -72,7 +23,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 # Float32 native kernels (with run-to-run-nondeterministic atomic accumulation
-# for the shared per-sample/table/scalar buffers, ADR-014) versus the float64
+# for the shared per-sample/table/scalar buffers, scattering AD) versus the float64
 # Torch oracle. Row/geometry stores are direct; the accumulated groups get a
 # looser floor.
 _REL_TOL_DIRECT = REL_TOL_PATH          # 5e-3: per-row direct stores
@@ -1223,7 +1174,7 @@ def test_patch_ad_mode_none_has_no_autograd_function():
 
 
 # ---------------------------------------------------------------------------
-# ADR-015 op 1: resident Kirchhoff table lookup (scattering_table_eval)
+# scattering AD: resident Kirchhoff table lookup (scattering_table_eval)
 # backward / jvp companions. Lockstep against the float64 bsdf_table_interp
 # oracle in tests.reference.kirchhoff_ensemble (the same helper the ensemble
 # op-1 lockstep uses). The explicit valid mask is fixed; all four continuous

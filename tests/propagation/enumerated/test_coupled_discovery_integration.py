@@ -103,7 +103,7 @@ def test_consumer_uses_lazy_chunk_requests_and_preserves_launch_accounting(monke
         "prepare_coupled_candidate_plan",
         # Force both streams to chunk at 3 so the union launch/candidate
         # accounting is exercised across multiple chunks. In production the D->D
-        # stream uses a larger dd_chunk_size (ADR-013 G-H) and collapses to one
+        # stream uses a larger dd_chunk_size (coupled double diffraction) and collapses to one
         # launch per block; this test pins it small on purpose.
         lambda **kwargs: prepare(**kwargs, chunk_size=3, dd_chunk_size=3),
     )
@@ -117,7 +117,7 @@ def test_consumer_uses_lazy_chunk_requests_and_preserves_launch_accounting(monke
 
     monkeypatch.setattr(coupled, "query_coupled_geometry", query_geometry)
 
-    # cid 7 (ADR-013 D->D) shares the same plan and receiver block, so the slice
+    # cid 7 (coupled double diffraction>D) shares the same plan and receiver block, so the slice
     # worker also streams the ordered edge-pair candidates. Stub its geometry the
     # same way and record the launches so the union launch/candidate accounting
     # is asserted, not silently absorbed.
@@ -144,11 +144,11 @@ def test_consumer_uses_lazy_chunk_requests_and_preserves_launch_accounting(monke
     # base=tx*rx*groups*edges=8, dd_base=tx*rx*edges*(edges-1)=8. With chunk_size
     # 3 the base stream chunks to 3,3,2 (x2 reverse -> 6 launches, 16 candidates)
     # and the D->D stream chunks to 3,3,2 (3 launches, 8 candidates). The union
-    # budget is base*2 + dd_base = 24 (ADR-013 D1).
+    # budget is base*2 + dd_base = 24 (coupled double diffraction).
     assert launch_count == 9
     assert candidate_count == 24
     # The R->D/D->R loop requests the native handle once per chunk (3); the D->D
-    # loop hoists the handle out of its chunk loop and requests it once (ADR-013
+    # loop hoists the handle out of its chunk loop and requests it once (coupled double diffraction
     # G-H), so the total is 4 rather than one-per-DD-chunk.
     assert len(handle_calls) == 4
     assert [query.reverse for query in queries] == [False, True] * 3
@@ -181,7 +181,7 @@ def test_consumer_candidate_guard_precedes_handle_and_geometry_launch(monkeypatc
         lambda _query: pytest.fail("geometry launched before candidate guard"),
     )
 
-    # base*2 + dd_base = 8*2 + 8 = 24 union candidates (ADR-013 D1); the guard
+    # base*2 + dd_base = 8*2 + 8 = 24 union candidates (coupled double diffraction); the guard
     # must fire on the union count before any handle or geometry launch.
     with pytest.raises(
         RuntimeError,

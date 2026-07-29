@@ -103,10 +103,10 @@ def test_prepare_fixed_topology_rejects_malformed_interaction_padding() -> None:
 def test_fixed_reflection_reproduces_discovery_at_unchanged_endpoints() -> None:
     """The frozen route is the same owners on the same geometry, so it is exact.
 
-    Not ``assert_close``: a difference here would mean the reevaluation used a
-    different operator, a different stationary point, or different materials,
-    and any of those is a defect rather than a tolerance question.
-    """
+ Not ``assert_close``: a difference here would mean the reevaluation used a
+ different operator, a different stationary point, or different materials,
+ and any of those is a defect rather than a tolerance question.
+ """
 
     compiled = smooth_wall_scene()
     sources, sinks = endpoints()
@@ -135,10 +135,10 @@ def test_fixed_reflection_reproduces_discovery_at_unchanged_endpoints() -> None:
 def test_fixed_reflection_publishes_the_los_validation_budget_only() -> None:
     """What the published diagnostics claim about this route.
 
-    These numbers are constants the route reports about itself, so on their
-    own they only pin the declared budget and the absence of a compaction
-    stage. The measured half of the claim is the sibling test below; keep both.
-    """
+ These numbers are constants the route reports about itself, so on their
+ own they only pin the declared budget and the absence of a compaction
+ stage. The measured half of the claim is the sibling test below; keep both.
+ """
 
     compiled = smooth_wall_scene()
     sources, sinks = endpoints()
@@ -158,12 +158,12 @@ def test_fixed_reflection_publishes_the_los_validation_budget_only() -> None:
 def test_the_prepared_route_reads_exactly_one_device_value_per_call() -> None:
     """The measured budget, not the self-reported one.
 
-    ``validation_d2h_copies == 1`` is a constant the route publishes about
-    itself and cannot fail on a regression. This counts the host reads of CUDA
-    tensors that actually happen inside one warm reevaluation: the single
-    contract bitmask ``.item()`` and nothing else. A second count read, a
-    Boolean compaction, or a host-side row decision fails here.
-    """
+ ``validation_d2h_copies == 1`` is a constant the route publishes about
+ itself and cannot fail on a regression. This counts the host reads of CUDA
+ tensors that actually happen inside one warm reevaluation: the single
+ contract bitmask ``.item`` and nothing else. A second count read, a
+ Boolean compaction, or a host-side row decision fails here.
+ """
 
     compiled = smooth_wall_scene()
     sources, sinks = endpoints()
@@ -217,9 +217,9 @@ def test_a_frozen_topology_with_no_rows_reevaluates_to_an_empty_answer() -> None
 def test_a_dead_reflection_row_is_answered_not_raised() -> None:
     """A frozen path can stop existing; that is an answer, not a failure.
 
-    The mask is the sole authority. The surviving rows must be untouched, so a
-    caller does not have to rediscover the whole batch because one path died.
-    """
+ The mask is the sole authority. The surviving rows must be untouched, so a
+ caller does not have to rediscover the whole batch because one path died.
+ """
 
     compiled = smooth_wall_scene()
     sources, sinks = endpoints()
@@ -294,10 +294,10 @@ def test_an_invalid_row_contributes_exact_zero_to_every_gradient() -> None:
 def test_prepared_los_route_agrees_with_the_native_los_gather_route() -> None:
     """The prepared route must not change the answer for a LoS-only topology.
 
-    The raw-topology route keeps its fused native gather and its unchanged
-    all-or-nothing validation. This pins the new structural row selection to
-    that shipped behavior.
-    """
+ The raw-topology route keeps its fused native gather and its unchanged
+ all-or-nothing validation. This pins the new structural row selection to
+ that shipped behavior.
+ """
 
     compiled = smooth_wall_scene()
     sources, sinks = endpoints()
@@ -332,7 +332,7 @@ def test_prepared_los_route_agrees_with_the_native_los_gather_route() -> None:
         raw.paths.geometry.path_length_m, prepared.paths.geometry.path_length_m
     )
     assert raw.row_valid is None
-    # Deliberately updated with the ADR-037 amendment: a prepared LoS row is
+    # Deliberately updated with the fixed-topology replay amendment: a prepared LoS row is
     # now visibility-tested, so its validity is a published result rather than
     # a construction guarantee. The raw route keeps None.
     assert prepared.row_valid is not None
@@ -359,15 +359,15 @@ def test_prepared_gather_rejects_endpoint_identity_drift_before_native_work() ->
 def test_reevaluate_rejects_a_rough_scene_before_any_native_work() -> None:
     """Rough-surface attenuation belongs to the discovery field loop.
 
-    Reproducing that host-gated policy here would duplicate another owner, and
-    silently disagreeing with ``evaluate`` is worse than refusing.
-    """
+ Reproducing that host-gated policy here would duplicate another owner, and
+ silently disagreeing with ``evaluate`` is worse than refusing.
+ """
 
     rough = smooth_wall_scene(rms_height_m=0.01)
     sources, sinks = endpoints()
     # Freeze against the rough scene itself, so the only thing standing between
     # this call and native work is the smooth-scene gate. A topology frozen on
-    # a different scene would be refused first, by the ADR-040 freshness check.
+    # a different scene would be refused first, by the world-version validation freshness check.
     _, prepared = _prepared(rough, sources, sinks)
 
     with pytest.raises(NotImplementedError, match="requires a smooth scene"):
@@ -396,11 +396,11 @@ def test_raw_topology_with_interactions_points_at_prepare_fixed_topology() -> No
 def test_reflection_transport_is_finite_on_the_inert_zero_geometry() -> None:
     """The precondition the row-validity contract rests on.
 
-    An invalid row reaches the native transport with RayD's zeroed hit
-    geometry. Its outputs are never published, but they must stay finite so a
-    zero cotangent cannot become a NaN and poison a living row through the
-    shared material tensors.
-    """
+ An invalid row reaches the native transport with RayD's zeroed hit
+ geometry. Its outputs are never published, but they must stay finite so a
+ zero cotangent cannot become a NaN and poison a living row through the
+ shared material tensors.
+ """
 
     from witwin.channel.kernels import fields as field_kernels
 
@@ -436,16 +436,16 @@ def test_the_specular_point_moves_with_the_sink_and_that_motion_is_differentiabl
 ) -> None:
     """The term this whole capability exists to provide, pinned to a number.
 
-    A frozen reflection row is a face sequence, so at a new sink the
-    stationary point slides along the wall and everything downstream of it -
-    incidence angle, Fresnel coefficients, arrival direction - moves with it.
-    An implementation that detached the EPC hit geometry would still publish a
-    plausible finite gradient through the direct endpoint dependence, so
-    "finite and non-zero" proves nothing here. These are the exact image-source
-    values: the wall is at x = 2 with the source and sink both at x = 0, so the
-    stationary point is the midpoint in y and z, and the x sensitivity follows
-    from the image at ``4 - x_sink``.
-    """
+ A frozen reflection row is a face sequence, so at a new sink the
+ stationary point slides along the wall and everything downstream of it -
+ incidence angle, Fresnel coefficients, arrival direction - moves with it.
+ An implementation that detached the EPC hit geometry would still publish a
+ plausible finite gradient through the direct endpoint dependence, so
+ "finite and non-zero" proves nothing here. These are the exact image-source
+ values: the wall is at x = 2 with the source and sink both at x = 0, so the
+ stationary point is the midpoint in y and z, and the x sensitivity follows
+ from the image at ``4 - x_sink``.
+ """
 
     compiled = smooth_wall_scene()
     sink_positions = torch.tensor(
@@ -486,13 +486,13 @@ def test_the_specular_point_moves_with_the_sink_and_that_motion_is_differentiabl
 def test_depth_two_rows_reproduce_discovery_and_die_inertly() -> None:
     """Multibounce buckets, which a single-wall world never reaches.
 
-    Two facing walls give depth-2 rows, so this is the first thing that
-    exercises a second bucket launch, the ``[N, depth]`` material gather, the
-    interaction padding, and - once the rows die - a dead row whose two
-    coincident zeroed hit points form a zero-length middle segment. The
-    unmasked field outputs are published straight from the kernel, so a NaN
-    there would reach a caller.
-    """
+ Two facing walls give depth-2 rows, so this is the first thing that
+ exercises a second bucket launch, the ``[N, depth]`` material gather, the
+ interaction padding, and - once the rows die - a dead row whose two
+ coincident zeroed hit points form a zero-length middle segment. The
+ unmasked field outputs are published straight from the kernel, so a NaN
+ there would reach a caller.
+ """
 
     compiled = two_wall_scene()
     sources, sinks = endpoints()
@@ -535,12 +535,12 @@ def test_an_occluded_reflection_row_is_invalid_and_the_occluder_is_the_cause(
 ) -> None:
     """The other way a frozen row dies, and a control that isolates it.
 
-    Both shipped dead-row tests kill their row by sliding the stationary point
-    off its facet. This one keeps the stationary point at ``(2, 0.5, 0)``,
-    comfortably inside the facet, and blocks the arrival leg instead. The
-    control replays the identical frozen row and identical endpoints in a scene
-    without the plate: it stays valid there, so the plate is what killed it.
-    """
+ Both shipped dead-row tests kill their row by sliding the stationary point
+ off its facet. This one keeps the stationary point at ``(2, 0.5, 0)``,
+ comfortably inside the facet, and blocks the arrival leg instead. The
+ control replays the identical frozen row and identical endpoints in a scene
+ without the plate: it stays valid there, so the plate is what killed it.
+ """
 
     compiled = occluder_scene()
     sources, sinks = endpoints()
@@ -556,7 +556,7 @@ def test_an_occluded_reflection_row_is_invalid_and_the_occluder_is_the_cause(
     assert float(blocked.paths.transport.field[1].abs().max()) == 0.0
 
     # One control scene object for both the freeze and the replay: two
-    # independently built worlds are two different worlds under ADR-040.
+    # independently built worlds are two different worlds under world-version validation.
     control_scene = smooth_wall_scene()
     control = _reevaluate(
         control_scene,
@@ -582,15 +582,7 @@ def test_an_occluded_reflection_row_is_invalid_and_the_occluder_is_the_cause(
 
 
 def test_a_frozen_los_row_is_invalidated_when_occluded() -> None:
-    """Row validity now covers LoS: blockage is data, not a stale answer.
-
-    The prepared replay re-tests each frozen LoS row with the same native
-    visibility gate discovery applies to LoS candidates. A sink that moves
-    behind a wall publishes ``row_valid=False`` and exact zeros - previously it
-    published a full-strength free-space answer, a limit ADR-037 declared and
-    this test used to pin. The clear-path control stays valid and nonzero,
-    and agrees with what fresh discovery finds at the same endpoints.
-    """
+    """Verify frozen LoS rows become invalid and zero when a wall blocks them."""
 
     compiled = los_blocker_scene()
     clear_sinks = endpoints(
@@ -630,12 +622,12 @@ def test_a_frozen_los_row_is_invalidated_when_occluded() -> None:
 def test_a_multi_pair_batch_reproduces_discovery_row_for_row() -> None:
     """Twelve rows over six pairs, none of them interchangeable.
 
-    Every earlier test runs one source, one sink, and one row per bucket, so
-    the interleaved scatter back into frozen row order, the pair segmentation,
-    and the source/sink index roles are all unconstrained. Here the two sources
-    and three sinks are off-axis in different ways, so swapping any of that
-    changes values rather than permuting equal rows.
-    """
+ Every earlier test runs one source, one sink, and one row per bucket, so
+ the interleaved scatter back into frozen row order, the pair segmentation,
+ and the source/sink index roles are all unconstrained. Here the two sources
+ and three sinks are off-axis in different ways, so swapping any of that
+ changes values rather than permuting equal rows.
+ """
 
     compiled = smooth_wall_scene()
     sources, sinks = multi_endpoints()
@@ -670,10 +662,10 @@ def test_forward_mode_publishes_geometry_tangents_under_the_declared_convention(
 ) -> None:
     """The derivative family a Doppler consumer reads, checked against FD.
 
-    ``delay_rate`` comes from the forward-mode tangent of ``delay_s``, so this
-    is the one AD mode the capability record declares that nothing else
-    exercises. The reference is central differences of the same reevaluation.
-    """
+ ``delay_rate`` comes from the forward-mode tangent of ``delay_s``, so this
+ is the one AD mode the capability record declares that nothing else
+ exercises. The reference is central differences of the same reevaluation.
+ """
 
     import torch.autograd.forward_ad as forward_ad
 
@@ -737,13 +729,13 @@ def test_forward_mode_publishes_geometry_tangents_under_the_declared_convention(
 def test_a_forward_only_dual_carries_full_geometry_tangents() -> None:
     """A dual without requires_grad gets the same derivative, FD-verified.
 
-    ``Function.apply`` unpacks a dual before ``setup_context`` runs, so a
-    liveness check made there cannot see a forward-only tangent. ADR-038 moves
-    that check to the caller-facing wrapper, which still sees the dual, so
-    ``path_length_m`` and ``delay_s`` now carry tangents without the old
-    requires_grad-plus-dual convention. Radar's Doppler ``delay_rate`` reads
-    exactly these outputs.
-    """
+ ``Function.apply`` unpacks a dual before ``setup_context`` runs, so a
+ liveness check made there cannot see a forward-only tangent. forward-mode liveness moves
+ that check to the caller-facing wrapper, which still sees the dual, so
+ ``path_length_m`` and ``delay_s`` now carry tangents without the old
+ requires_grad-plus-dual convention. Radar's Doppler ``delay_rate`` reads
+ exactly these outputs.
+ """
 
     import torch.autograd.forward_ad as forward_ad
 
@@ -806,9 +798,9 @@ def test_reevaluate_rejects_a_realization_coherent_screen_before_native_work(
 ) -> None:
     """The second branch of the smooth-scene gate.
 
-    A flat realization_coherent screen leaves ``scatter_model_id`` at 0, so it
-    slips past the roughness check and has to be rejected on its own terms.
-    """
+ A flat realization_coherent screen leaves ``scatter_model_id`` at 0, so it
+ slips past the roughness check and has to be rejected on its own terms.
+ """
 
     screened = flat_phase_screen_wall_scene()
     sources, sinks = endpoints()
@@ -821,12 +813,12 @@ def test_reevaluate_rejects_a_realization_coherent_screen_before_native_work(
 
 
 def test_row_validity_capability_covers_los_and_reflection() -> None:
-    """Deliberately updated: the 2026-07-25 ADR-037 amendment adds ``los``.
+    """Deliberately updated: the 2026-07-25 fixed-topology replay amendment adds ``los``.
 
-    The prepared replay re-tests frozen LoS rows with the native visibility
-    gate, so LoS validity is now a test result rather than a construction
-    guarantee, and the capability record declares it.
-    """
+ The prepared replay re-tests frozen LoS rows with the native visibility
+ gate, so LoS validity is now a test result rather than a construction
+ guarantee, and the capability record declares it.
+ """
 
     record = capabilities()
 
@@ -839,12 +831,12 @@ def test_row_validity_capability_covers_los_and_reflection() -> None:
 def test_scene_static_tables_are_cached_per_compiled_instance() -> None:
     """The replay stages its scene-static tables once, not once per call.
 
-    A prepared reflection call was re-running the vertex concatenation and the
-    face-material host-to-device bundle every frame (~20 synchronizing torch
-    operations, ADR-037 "Residual cost"). The tables depend only on the
-    immutable compiled stores, so CompiledScene now owns them lazily, exactly
-    like the Plan-13 scattering resources. Replay output is bit-identical.
-    """
+ A prepared reflection call was re-running the vertex concatenation and the
+ face-material host-to-device bundle every frame (~20 synchronizing torch
+ operations, fixed-topology replay "Residual cost"). The tables depend only on the
+ immutable compiled stores, so CompiledScene now owns them lazily, exactly
+ like the other scene-static scattering resources. Replay output is bit-identical.
+ """
 
     compiled = smooth_wall_scene()
     sources, sinks = endpoints()
@@ -873,11 +865,11 @@ def test_scene_static_tables_are_cached_per_compiled_instance() -> None:
 def test_scene_static_table_cache_is_bypassed_for_graph_bearing_scenes() -> None:
     """A cached autograd node would be freed by the first backward.
 
-    With a differentiable mesh leaf the tables carry ``grad_fn``, and reusing
-    them across calls would make the second backward traverse a freed graph.
-    The cache therefore only publishes primal tables; graph-bearing scenes
-    stage per call, exactly as before the cache existed.
-    """
+ With a differentiable mesh leaf the tables carry ``grad_fn``, and reusing
+ them across calls would make the second backward traverse a freed graph.
+ The cache therefore only publishes primal tables; graph-bearing scenes
+ stage per call, exactly as before the cache existed.
+ """
 
     compiled = smooth_wall_scene()
     compiled.structures[0].vertices.requires_grad_()
@@ -918,14 +910,14 @@ def _material_and_endpoint_gradients(warm: bool) -> tuple[torch.Tensor, torch.Te
 def test_a_scene_leaf_marked_after_a_primal_replay_still_reaches_the_gradient() -> None:
     """Cache warm-up must not decide which leaves exist for the rest of the run.
 
-    The replay-table cache was populated on the first primal call and then
-    served unconditionally, so ``materials.eps_r`` marked AFTER that call was
-    severed from the graph: with a live endpoint leaf in the same loss,
-    ``backward()`` succeeded and ``eps_r.grad`` was silently ``None`` on a cell
-    the AD capability matrix advertises as supported. The cache is now keyed on
-    a host-only liveness signature of its source tensors, so the two orders
-    produce bitwise identical gradients.
-    """
+ The replay-table cache was populated on the first primal call and then
+ served unconditionally, so ``materials.eps_r`` marked AFTER that call was
+ severed from the graph: with a live endpoint leaf in the same loss,
+ ``backward`` succeeded and ``eps_r.grad`` was silently ``None`` on a cell
+ the AD capability matrix advertises as supported. The cache is now keyed on
+ a host-only liveness signature of its source tensors, so the two orders
+ produce bitwise identical gradients.
+ """
 
     cold_eps, cold_endpoint = _material_and_endpoint_gradients(warm=False)
     warm_eps, warm_endpoint = _material_and_endpoint_gradients(warm=True)
@@ -962,11 +954,11 @@ def test_a_mesh_leaf_marked_after_a_primal_replay_bypasses_the_warm_cache() -> N
 def test_an_in_place_material_edit_after_a_primal_replay_moves_the_primal() -> None:
     """A warm cache must not serve a stale primal either.
 
-    The cached bundle tracked neither ``requires_grad`` nor ``_version`` of its
-    sources, so an in-place edit of the compiled material values after the first
-    replay left the replayed coefficient unchanged. The signature covers the
-    mutation counter, so the edit is seen.
-    """
+ The cached bundle tracked neither ``requires_grad`` nor ``_version`` of its
+ sources, so an in-place edit of the compiled material values after the first
+ replay left the replayed coefficient unchanged. The signature covers the
+ mutation counter, so the edit is seen.
+ """
 
     compiled = smooth_wall_scene()
     sources, sinks = endpoints()

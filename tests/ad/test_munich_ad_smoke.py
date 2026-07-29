@@ -1,18 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests munich ad smoke.
 
-"""Real-scene AD smoke (plan 07 AD-4 final gate).
-
-After the analytic fixtures, one reduced-Munich deterministic solve must
-survive ad_mode="vjp" end to end: one backward through a material store leaf
-and one through a live transmitter position, each yielding finite, nonzero,
-NaN-free gradients. Kept CI-sized: depth 1, a 16x16 radiomap slice, los +
-reflection only.
-
-Follows the suite's CUDA gating convention (skipif, like every tests/ad
-module); additionally skips when the Munich reference scene asset is not
-checked out.
-"""
+"""Tests munich ad smoke."""
 
 from __future__ import annotations
 

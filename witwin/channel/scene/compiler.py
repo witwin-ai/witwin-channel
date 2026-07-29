@@ -1,34 +1,7 @@
 # Copyright Xingyu Chen.
 # Compile canonical Core world contracts into Channel runtime resources.
 
-"""Compile canonical Core world contracts into Channel runtime resources.
-
-This module is the single owner of the Channel side of the world boundary: the
-canonical geometry/material/assignment stores, the immutable
-:class:`CompiledScene` that holds them, the bounded compile registry that decides
-when a store can be reused, and the endpoint tensor exports every solver reads
-off a bound scene.
-
-They were six modules with one lifetime between them. A store existed only to be
-a :class:`CompiledScene` field, ``compiled`` existed only to be what ``compile``
-returns, and the tensor exports read the same endpoint collections the compile
-cache is keyed on, so a reader following one compiled scene had to walk six
-files.
-
-Under ADR-034 ``witwin.core`` owns the logical world - ``Scene``,
-``SceneSnapshot``, ``Structure``, stable IDs, material specifications, and the
-four version domains - and Channel owns everything below: the reference
-frequency the world is compiled at, the native resources, the stores, and the
-caches. Nothing here computes RF physics; it projects an already-owned world
-into the tensors a native kernel consumes.
-
-The immutable native resources this module holds - the typed RayD scene, the
-edge policy cached on it, and the lazy Kirchhoff and phase-screen resources -
-live in :mod:`witwin.channel.scene.resources`, and the endpoint views the tensor
-exports read live in :mod:`witwin.channel.scene.endpoints`. Both are imported
-here rather than the other way round, so that importing an endpoint view or a
-resource type does not drag in the compiler and everything it compiles against.
-"""
+"""Compile canonical Core world contracts into Channel runtime resources."""
 
 from __future__ import annotations
 
@@ -191,7 +164,7 @@ class MaterialStore:
     version: int
     # Keys of records whose material law changes with the carrier frequency
     # (records are frozen at the primal frequency at compile time). Consumed
-    # by the plan 07 AD-1 explicit-failure check for frequency AD.
+    # by the material and frequency derivatives explicit-failure check for frequency AD.
     frequency_dependent: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
@@ -386,7 +359,7 @@ class CompiledScene:
     # The SceneSnapshot instant this runtime was compiled from, or None for a
     # plain Scene. Reporting and cross-consumer correlation only: it records
     # which world instant a CompiledScene is, and it never gates a call. The
-    # four version domains above are the freshness authority (ADR-040).
+    # four version domains above are the freshness authority (world-version validation).
     time_s: float | torch.Tensor | None = None
     enumerated_penetration_scene_diagonal_m: float = 0.0
     montecarlo_penetration_scene_diagonal_m: float = 0.0
@@ -464,13 +437,13 @@ class CompiledScene:
     def _fixed_reevaluation_table_sources(self) -> tuple[torch.Tensor, ...]:
         """Every tensor the fixed-replay tables are built from.
 
-        The vertex table concatenates the live structure vertex tensors (or the
-        native table when the scene has no structures); the material bundle is
-        an index_select over the material and assignment stores. Enumerating the
-        stores by dataclass field keeps this a superset of whatever the bundle
-        builder reads, so a new store field cannot silently escape the liveness
-        signature below.
-        """
+ The vertex table concatenates the live structure vertex tensors (or the
+ native table when the scene has no structures); the material bundle is
+ an index_select over the material and assignment stores. Enumerating the
+ stores by dataclass field keeps this a superset of whatever the bundle
+ builder reads, so a new store field cannot silently escape the liveness
+ signature below.
+ """
 
         sources: list[torch.Tensor] = [self.geometry.vertices]
         for structure in self.structures:
@@ -487,11 +460,11 @@ class CompiledScene:
     def _fixed_reevaluation_table_state(self) -> tuple[tuple[bool, bool, bool, int], ...]:
         """Host-only autograd/mutation signature of the replay-table sources.
 
-        Reads tensor attributes only - ``requires_grad``, the presence of a
-        ``grad_fn`` or a forward-AD tangent, and the mutation ``_version``. It
-        touches no device memory, launches nothing, and never synchronizes, so
-        it is cheap enough to re-derive on every replay.
-        """
+ Reads tensor attributes only - ``requires_grad``, the presence of a
+ ``grad_fn`` or a forward-AD tangent, and the mutation ``_version``. It
+ touches no device memory, launches nothing, and never synchronizes, so
+ it is cheap enough to re-derive on every replay.
+ """
 
         state: list[tuple[bool, bool, bool, int]] = []
         for source in self._fixed_reevaluation_table_sources():
@@ -508,23 +481,23 @@ class CompiledScene:
     def fixed_reevaluation_tables(self) -> dict[str, object]:
         """Scene-static vertex and material tables for fixed-topology replay.
 
-        Built lazily per instance following the Plan-13 scene-static pattern:
-        both tables depend only on this CompiledScene's immutable stores and
-        structure tensors, and any world change produces a new instance through
-        the version-token compile cache. The cache is bypassed whenever a table
-        tensor participates in autograd - a cached graph node would be freed by
-        the first backward and fail the second - so differentiable-material or
-        differentiable-mesh loops pay the staging exactly as before, while the
-        primal per-frame replay (the Radar Doppler shape) stages once.
+ Built lazily per instance following the scene-static cache pattern:
+ both tables depend only on this CompiledScene's immutable stores and
+ structure tensors, and any world change produces a new instance through
+ the version-token compile cache. The cache is bypassed whenever a table
+ tensor participates in autograd - a cached graph node would be freed by
+ the first backward and fail the second - so differentiable-material or
+ differentiable-mesh loops pay the staging exactly as before, while the
+ primal per-frame replay (the Radar Doppler shape) stages once.
 
-        The bypass is decided per call, not once at population time: the cache
-        is keyed on the host-only liveness/mutation signature of the source
-        tensors, so marking ``materials.eps_r`` or a structure's vertices after
-        a primal replay has already warmed the cache rebuilds the tables and
-        keeps that leaf on the graph. Serving a stale cached table there would
-        drop the leaf's gradient silently, which the AD capability record
-        forbids.
-        """
+ The bypass is decided per call, not once at population time: the cache
+ is keyed on the host-only liveness/mutation signature of the source
+ tensors, so marking ``materials.eps_r`` or a structure's vertices after
+ a primal replay has already warmed the cache rebuilds the tables and
+ keeps that leaf on the graph. Serving a stale cached table there would
+ drop the leaf's gradient silently, which the AD capability record
+ forbids.
+ """
 
         signature = self._fixed_reevaluation_table_state()
         cached = self._fixed_reevaluation_tables_cache
@@ -562,10 +535,10 @@ class CompiledScene:
     def kirchhoff_resources(self) -> KirchhoffRuntimeResources:
         """Kirchhoff BSDF tables per material index (scatter_model_id == 1).
 
-        Built lazily from the MaterialStore CSR layers and roughness fields
-        at the store frequency; raises ``kirchhoff_domain_exceeded`` for
-        out-of-domain roughness (never silently degrades).
-        """
+ Built lazily from the MaterialStore CSR layers and roughness fields
+ at the store frequency; raises ``kirchhoff_domain_exceeded`` for
+ out-of-domain roughness (never silently degrades).
+ """
 
         key = self._scattering_resource_key()
         if (
@@ -1515,12 +1488,12 @@ LIGHT_SPEED_M_PER_S = 299_792_458.0
 def _frequency_scalar(scene: SolverScene) -> float:
     """Detached scalar carrier for non-differentiable consumers.
 
-    Topology discovery and metadata never differentiate with respect to
-    frequency (fixed-topology contract), so detach before float() to keep AD
-    solves with a requires_grad tensor frequency warning-free. The field
-    evaluation seam must NOT use this helper: it forwards the live tensor so
-    the frequency stays on the autograd graph.
-    """
+ Topology discovery and metadata never differentiate with respect to
+ frequency (fixed-topology contract), so detach before float to keep AD
+ solves with a requires_grad tensor frequency warning-free. The field
+ evaluation seam must NOT use this helper: it forwards the live tensor so
+ the frequency stays on the autograd graph.
+ """
 
     frequency = scene.frequency
     if isinstance(frequency, torch.Tensor):
@@ -1601,25 +1574,7 @@ def transmitter_positions(
 def transmitter_polarizations_as_stored(
     scene: object, *, device: torch.device
 ) -> torch.Tensor:
-    """Per-transmitter polarization unit vectors as a (N, 3) CUDA tensor.
-
-    Row order matches :func:`transmitter_positions`. The transmitter model
-    already normalizes and orients ``.polarization`` in ``__post_init__``, so
-    this is a straight device upload of the fixed physical vectors (frozen
-    winners of AD; the dipole sin^2 pattern they induce is differentiated
-    through the endpoint geometry, not through the polarization itself).
-    ``as_stored`` is the whole contract: the scene's dtype and layout are
-    preserved, and the empty case comes from the native transmitter builder
-    rather than from ``device``.
-
-    This is NOT
-    :func:`witwin.channel.scene.endpoints.transmitter_polarizations_f32`, which
-    casts to float32 and calls ``.contiguous()``. Both are live and both are
-    called by different solvers; the unfinished ownership migration between
-    them predates this consolidation and is deliberately left as it was, so the
-    two now carry names that state the difference rather than one shared name
-    that hides it.
-    """
+    """Return transmitter polarizations with the scene's stored dtype and layout."""
 
     if not scene.transmitters:
         return host_vec3_tensor(())

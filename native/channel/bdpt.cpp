@@ -647,7 +647,7 @@ pybind11::dict channel_bdpt_accumulate_connection_samples(
     out["diffraction"] = diffraction;
     out["transmission"] = transmission;
     out["scattering"] = scattering;
-    // ADR-022 ruling 6.4: the coherent forward additionally returns the per
+    // Coherent BDPT accumulation: the coherent forward additionally returns the per
     // component phasor bin sums S_b so the accumulate backward reads them as
     // explicit args. The power domain leaves them undefined; only publish them
     // on the coherent branch so combine_domain == 0 stays byte-identical.

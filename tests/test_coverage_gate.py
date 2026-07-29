@@ -77,7 +77,7 @@ def test_coverage_policy_rejects_core_file_regression() -> None:
 
 
 def test_every_section_floor_names_a_former_narrow_module() -> None:
-    """The three phase-6 consolidations each keep their pre-merge boundary."""
+    """Every merged module keeps an explicit coverage floor for each functional section."""
 
     assert {item["section"] for item in POLICY["section_floors"]} == {
         "materials/kernels/functional.py",
@@ -92,13 +92,7 @@ def test_every_section_floor_names_a_former_narrow_module() -> None:
 def test_section_floor_is_not_masked_by_the_rest_of_the_merged_module(
     path: str,
 ) -> None:
-    """A half-covered former functional section fails even at a 95% file total.
-
-    This is the regression the phase-6 consolidation introduced: the narrow
-    floors were re-pointed at far larger modules, so unrelated well-covered
-    neighbours could lift the merged percentage past the gate while the guarded
-    section rotted.
-    """
+    """A poorly covered section must fail even when its containing module clears the file threshold."""
 
     report = copy.deepcopy(_accepted_report())
     payload = report["files"][path]

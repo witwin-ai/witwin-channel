@@ -24,7 +24,7 @@ namespace transport = rayd::shared::rf::field_transport;
 constexpr float kLightSpeedMPerS = 299792458.0f;
 constexpr float kPi = 3.14159265358979323846f;
 
-// BDPT component_mask bits (contract section 1): 1=los, 2=reflection,
+// BDPT component_mask bits (component classification): 1=los, 2=reflection,
 // 4=diffraction, 8=transmission, 16=scattering.
 constexpr int kMaskReflection = 2;
 constexpr int kMaskDiffraction = 4;

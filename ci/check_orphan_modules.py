@@ -2,37 +2,7 @@
 # Copyright Xingyu Chen.
 # Reject a production module that no declared entry point can reach.
 
-"""Reject a production module that no declared entry point can reach.
-
-`check_import_graph` answers "may this module import that one". It cannot
-answer "does anything import this module at all", and ruff answers the same
-question one level too low: it reports an unused *import*, never an unused
-*module*. That gap is not hypothetical. The ADR-029/030/031 capacity artifacts
-sat in `witwin/` after their last caller went away, and the audit that found them
-was a one-time manual sweep - a snapshot, not a gate. A committed resurrection
-of any of those modules passes hygiene, the import graph, contract coverage and
-ruff without a word.
-
-The question here is REACHABILITY, not "does anyone import this". Two dead
-modules that import each other both have an importer, and a whole dead
-subpackage whose `__init__` imports its own members is entirely self-supporting.
-So the walk starts at the declared entry points:
-
-  - a module reaches every module it imports, absolute or relative;
-  - a module reaches its parent package, because importing `a.b.c` imports
-    `a.b` first - this keeps package `__init__.py` files honest instead of
-    blanket-exempt;
-  - a module reaches a sibling it names as a bare string constant, which is how
-    a lazy `importlib.import_module` export defers a submodule past import time.
-
-Anything left unvisited is an orphan. `ENTRY_POINTS` is the allowlist and it is
-exactly the stable public API that `CLAUDE.md` names: the package root plus the
-four solver entry points. Nothing else may be added without deciding that the
-public surface grew, which is why each entry carries its reason.
-
-Tests are not importers. A module kept alive only by its own tests is precisely
-what this gate exists to surface.
-"""
+"""Reject a production module that no declared entry point can reach."""
 
 from __future__ import annotations
 

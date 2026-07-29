@@ -1,19 +1,7 @@
 # Copyright Xingyu Chen.
-# Solver-level capability manifest for :mod:`witwin.channel`.
+# Solver-level capability manifest for:mod:`witwin.channel`.
 
-"""Solver-level capability manifest for :mod:`witwin.channel`.
-
-This describes what the four Channel solvers can do and is the manifest that
-solver metadata quotes. It is deliberately broader than the cross-package
-propagation contract: the solver ``components`` list includes ``scattering``,
-which the consumer contract does not expose because it is incoherent power
-under a non-canonical append rather than field transport.
-
-The narrower cross-package contract is owned by
-:func:`witwin.channel.propagation.consumer.capabilities`. This manifest embeds
-that record under ``propagation_consumer`` rather than restating it, so the two
-cannot drift apart.
-"""
+"""Solver-level capability manifest for:mod:`witwin.channel`."""
 
 from __future__ import annotations
 
@@ -54,7 +42,7 @@ _CAPABILITIES: dict[str, Any] = {
     "supports_polarization": True,
     "supports_arrays": True,
     "supports_ad": True,
-    # Plan 07 completion gate (AD-4b). Honest scope: fixed-topology forward
+    # the AD capability gate (AD). Honest scope: fixed-topology forward
     # and reverse mode through the frozen discrete winner (path topology,
     # sampling tapes, validity masks, polarization frames). No estimator for
     # visibility / topology discontinuities: path birth/death and shadow
@@ -84,7 +72,7 @@ _CAPABILITIES: dict[str, Any] = {
             "montecarlo_basic": ["scattering"],
             "montecarlo_bdpt": ["all"],
         },
-        # Wired into the montecarlo.basic LoS Function since AD-3; the
+        # Wired into the montecarlo.basic LoS Function since AD; the
         # standalone facades remain available.
         "low_level_primitives": [
             "mc_los_path_gain_backward",
@@ -129,7 +117,7 @@ _CAPABILITIES: dict[str, Any] = {
             "supports_reflection_diffraction_coupling_geometry": True,
             "reflection_diffraction_coupling_topology": "one_reflection_one_diffraction_both_orders",
             "max_reflections_in_coupled_path": 1,
-            # ADR-013 D5: coupled_paths=True is the uniform order-2 compensator
+            # coupled double diffraction: coupled_paths=True is the uniform order-2 compensator
             # family {R->D, D->R, D->D}; cid 7 double diffraction shares the
             # coupled gate, budget, and accumulator slot (no new Config field).
             "coupled_double_diffraction": True,
@@ -147,7 +135,7 @@ _CAPABILITIES: dict[str, Any] = {
         "deterministic": {
             "max_reflection_depth": 5,
             "max_diffraction_order": 1,
-            # Coupled reflection-diffraction on the grid solver (ADR-011). The
+            # Coupled reflection-diffraction on the grid solver (coupled reflection and diffraction). The
             # coupling keys mirror the path solver; the deterministic engine
             # streams coupled discovery over receiver blocks under the same
             # per-block candidate limit.
@@ -155,7 +143,7 @@ _CAPABILITIES: dict[str, Any] = {
             "supports_reflection_diffraction_coupling_geometry": True,
             "reflection_diffraction_coupling_topology": "one_reflection_one_diffraction_both_orders",
             "max_reflections_in_coupled_path": 1,
-            # ADR-013 D5: coupled_paths=True includes cid 7 double diffraction
+            # coupled double diffraction: coupled_paths=True includes cid 7 double diffraction
             # (D->D) on the grid solver, sharing the coupled gate and slot.
             "coupled_double_diffraction": True,
             "reflection_diffraction_coupling_candidate_limit": 1_000_000,
@@ -182,8 +170,8 @@ _CAPABILITIES: dict[str, Any] = {
         "montecarlo_bdpt": {
             "max_diffraction_order": 1,
             "supports_reflection_diffraction_coupling": True,
-            # ADR-013 D5: BDPT reads the shared enumerated coupled union
-            # (ADR-008 opaque oracle), which now includes cid 7 D->D rows.
+            # coupled double diffraction: BDPT reads the shared enumerated coupled union
+            # (the enumerated-path oracle), which now includes cid 7 D->D rows.
             "coupled_double_diffraction": True,
             "supports_complex_path_coefficients": True,
             "supports_polarization": True,
@@ -196,7 +184,7 @@ _CAPABILITIES: dict[str, Any] = {
             "pdf_measure": "proposal_density_excludes_geometry_jacobian",
             "endpoint_connection_strategies": 1,
             "diffraction_mis_strategies": ["direct", "keller"],
-            # ADR-019: opt-in coherent combine (DEFAULT OFF). When enabled, the
+            # coherent combination: opt-in coherent combine (DEFAULT OFF). When enabled, the
             # enumerable delta/UTD family (los / reflection / diffraction, plus
             # the coupled compensator folded into diffraction) is summed as a
             # complex phasor per (tx, rx, component) and finalized |sum|^2; the
@@ -219,11 +207,11 @@ _CAPABILITIES: dict[str, Any] = {
 def _propagation_consumer_capabilities() -> dict[str, Any]:
     """Project the consumer contract record into this manifest's shape.
 
-    The values are read from the consumer contract rather than restated, so the
-    solver manifest and the cross-package contract cannot drift apart. The
-    import is deferred to keep this module free of a package-level dependency
-    on ``propagation``.
-    """
+ The values are read from the consumer contract rather than restated, so the
+ solver manifest and the cross-package contract cannot drift apart. The
+ import is deferred to keep this module free of a package-level dependency
+ on ``propagation``.
+ """
 
     from witwin.channel.propagation.consumer import capabilities as consumer
 
@@ -254,11 +242,10 @@ def _propagation_consumer_capabilities() -> dict[str, Any]:
 def capabilities() -> dict[str, Any]:
     """Return the versioned semantic solver capability manifest.
 
-    ``components`` here is the solver-level set and includes ``scattering``.
-    The narrower cross-package field-transport contract is reported under
-    ``propagation_consumer`` and is owned by
-    :func:`witwin.channel.propagation.consumer.capabilities`.
-    """
+ ``components`` here is the solver-level set and includes ``scattering``.
+ The narrower cross-package field-transport contract is reported under
+ ``propagation_consumer`` and is owned by:func:`witwin.channel.propagation.consumer.capabilities`.
+ """
 
     manifest = deepcopy(_CAPABILITIES)
     manifest["propagation_consumer"] = _propagation_consumer_capabilities()

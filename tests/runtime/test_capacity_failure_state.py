@@ -16,11 +16,11 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _consolidated_section(path: Path, source_name: str) -> str:
+def _native_section(path: Path, section_name: str) -> str:
     text = path.read_text(encoding="utf-8")
-    marker = f"// ---- Consolidated from {source_name} ----"
+    marker = f"// ==== Section: {section_name} ===="
     start = text.index(marker)
-    end = text.find("// ---- Consolidated from ", start + len(marker))
+    end = text.find("// ==== Section: ", start + len(marker))
     return text[start:] if end < 0 else text[start:end]
 
 
@@ -51,16 +51,16 @@ def test_capacity_failure_state_rejects_bad_metadata() -> None:
 def test_capacity_intermediates_have_no_trap_or_host_synchronization() -> None:
     root = Path(__file__).resolve().parents[2]
     sources = (
-        ("capacity_failure.cu", "enumerated_capacity_failure_sanitize.cu"),
-        ("evaluated_paths.cu", "evaluated_paths_capacity_pack_ad.cu"),
+        ("capacity_failure.cu", "Enumerated capacity sanitization"),
+        ("evaluated_paths.cu", "Capacity-pack AD"),
         (
             "capacity_failure.cu",
-            "mc_capacity_failure_component_maps_sanitize.cu",
+            "Monte Carlo capacity sanitization",
         ),
     )
     kernels = root / "native" / "channel" / "kernels"
-    for owner, source_name in sources:
-        source = _consolidated_section(kernels / owner, source_name)
+    for owner, section_name in sources:
+        source = _native_section(kernels / owner, section_name)
         for forbidden in (
             "trap;",
             "cudaMemcpy",
@@ -68,11 +68,11 @@ def test_capacity_intermediates_have_no_trap_or_host_synchronization() -> None:
             ".item",
             ".cpu",
         ):
-            assert forbidden not in source, f"{source_name} contains {forbidden}"
+            assert forbidden not in source, f"{section_name} contains {forbidden}"
 
-    initializer = _consolidated_section(
+    initializer = _native_section(
         kernels / "capacity_failure.cu",
-        "capacity_failure_state.cu",
+        "Capacity failure state",
     )
     assert "cudaMemsetAsync" in initializer
     assert "getCurrentCUDAStream" in initializer

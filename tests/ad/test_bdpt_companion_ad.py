@@ -1,45 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests bdpt companion ad.
 
-"""ADR-022 per-op lockstep: BDPT AD companions vs the float64 Torch oracles.
-
-Each of the six BDPT-owned forward operations (plan 10a section 6) gains a native
-``_backward`` / ``_jvp`` companion; this module pins each one against the
-differentiable float64 oracle in ``tests.reference.bdpt_ad_oracles``:
-
-* forward parity (native float32 forward vs the oracle),
-* native VJP vs ``torch.autograd`` through the oracle,
-* native JVP vs the oracle forward-mode dual,
-* native JVP-vs-VJP inner-product duality,
-* need-flag gating (off groups return ``None``),
-* fixed-input loud rejection through the plan-07 autograd wrapper,
-* missing-symbol loud failure.
-
-These were introduced when ADR-022 raised ``EXPECTED_NATIVE_BINDING_COUNT`` to
-211; Plan 13 Phase 4 later removes nine audited-dead bindings, so the current
-count is 202. Every convention below is frozen by
-plan 10a section 6 and the ADR-022 derivative specs; the pair convention
-(``d/dF = 2 conj(F) rest`` for ``|F|^2``, pairwise real adjoints elsewhere) matches
-``fold_output_cotangents`` (ADR-014).
-
-Interface assumptions (documented deviations where plan 10a section 6 is
-under-specified for the Python facade spelling; the native ABI symbol names are
-normative):
-
-* The ``_backward`` / ``_jvp`` FACADES live beside their forwards in
-  ``montecarlo.bdpt`` / ``kernels.montecarlo`` (the ``scattering`` chain
-  precedent: ``functional.*_backward``), named ``<forward>_backward`` /
-  ``<forward>_jvp``, taking the forward's positional/keyword args plus
-  ``grad_*`` / ``need_grad_*`` (backward) or ``tangent_*`` (jvp) keywords.
-* The plan-07 ``torch.autograd.Function`` wrappers live in
-  ``montecarlo.bdpt`` as ``<forward>_ad`` (fields/materials
-  ``autograd.py`` precedent).
-* The reflected-subpath differentiable material set is
-  ``{eps_r, sigma_e, gain, thickness}`` with ``mu_r`` frozen (the
-  ``field_reflection_sequence`` precedent; resolves the section-6.1
-  ``material_mu_r`` vs ``grad_gain`` text inconsistency in favour of the
-  concrete need-flag output list).
-"""
+"""Tests bdpt companion ad."""
 
 from __future__ import annotations
 
@@ -923,7 +885,7 @@ def test_accumulate_coherent_backward_matches_oracle():
         for name in ("grad_path_gain", "grad_los", "grad_reflection",
                      "grad_diffraction", "grad_transmission", "grad_scattering")
     }
-    # ADR-022 spec 6.4: the coherent forward retains the ten phasor bin sums
+    # BDPT AD: the coherent forward retains the ten phasor bin sums
     # S_b; the backward reads them (no in-backward re-reduction, no sample
     # coefficients) to form grad_c_r = 2 grad_P[b] S_b.
     _matrices, bin_sums = PA.bdpt_accumulate_connection_samples_forward_ad(
@@ -992,7 +954,7 @@ def test_accumulate_coherent_jvp_vjp_duality():
     t_cr = torch.randn(fx["rows"], generator=g, device="cuda")
     t_ci = torch.randn(fx["rows"], generator=g, device="cuda")
     # Retain the coherent forward bin sums S_b; both the JVP and VJP read them
-    # (ADR-022 spec 6.4), so neither companion re-derives them from coeff.
+    # (BDPT AD), so neither companion re-derives them from coeff.
     _matrices, bin_sums = PA.bdpt_accumulate_connection_samples_forward_ad(
         samples, tx_count=fx["tx"], rx_count=fx["rx"],
         accumulation_strategy="atomic", combine_domain="coherent",
@@ -1117,12 +1079,12 @@ def test_finalize_point_components_jvp_vjp_duality():
 
 
 def test_fixed_inputs_reject_gradients_loudly():
-    """Frozen inputs fed through the plan-07 autograd wrappers fail loudly.
+    """Frozen inputs fed through the AD contract autograd wrappers fail loudly.
 
-    The wrappers ``_ad_reject_fixed_inputs`` any frozen slot instead of silently
-    detaching (ADR-014 / ADR-022). Reflected subpath: mu_r and the intersection
-    geometry are frozen; requesting their gradient raises.
-    """
+ The wrappers ``_ad_reject_fixed_inputs`` any frozen slot instead of silently
+ detaching (scattering AD / BDPT AD). Reflected subpath: mu_r and the intersection
+ geometry are frozen; requesting their gradient raises.
+ """
 
     from witwin.channel.montecarlo import bdpt as bdpt_autograd
 

@@ -1,14 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests scatter chain discovery.
 
-"""ADR-021 D1 enumerated scatter-chain discovery contract tests.
-
-The pure structural helpers (join / stable order / budget / padding / contract
-validation / multi-slot topology assembly) are exercised on CPU tensors with no
-scene. The end-to-end discovery on a two-wall scene, the default-off byte
-identity, and the loud D2-facade dependency require the built RayD extension and
-are CUDA-guarded.
-"""
+"""Tests scatter chain discovery."""
 
 from __future__ import annotations
 
@@ -30,7 +23,7 @@ from witwin.channel.interactions import scattering as scattering_mod
 from witwin.channel.deterministic import Config as DeterministicConfig
 from witwin.channel.path import Config as PathConfig
 
-# Plan-15 phase 5 gathered the single-bounce path, the ADR-021 D1 chain
+# source consolidation gathered the single-bounce path, the coherent scattering chain
 # discovery and the chain append path into one concept module. The two aliases
 # below still name the stage each assertion belongs to; they are the same
 # module object.
@@ -240,9 +233,9 @@ def _require_cuda_rayd() -> None:
 def _two_wall_scene():
     """Rough scatter wall (x=2.5) plus a specular reflector (z=-1 floor).
 
-    A transmitter and receiver above the floor admit chain rows such as
-    TX -> floor reflection -> rough-wall vertex -> RX.
-    """
+ A transmitter and receiver above the floor admit chain rows such as
+ TX -> floor reflection -> rough-wall vertex -> RX.
+ """
 
     rough = rough_wall_structure(
         2.5, rms_height_m=0.01, corr_length_m=0.15, half_size=2.0, surface_id=1
@@ -359,7 +352,7 @@ def test_discovery_depth_and_join_bounds():
     d1 = disc.d1.to(torch.int64)
     d2 = disc.d2.to(torch.int64)
     total = d1 + d2
-    # Depth bounds (ADR-021 D1): 1 <= d1 + d2 <= cap; each leg <= kMaxAdDepth.
+    # Depth bounds (coherent scattering): 1 <= d1 + d2 <= cap; each leg <= kMaxAdDepth.
     assert int(total.min()) >= 1
     assert int(total.max()) <= max_chain
     assert int(d1.max()) <= sc.KMAX_AD_DEPTH
@@ -390,11 +383,7 @@ def test_solver_default_off_appends_no_chain_rows():
 
 
 def test_solver_chain_enabled_end_to_end():
-    """Full chain solve: discovery -> Op A dispatch -> component_id=6 rows.
-
-    Requires the ADR-021 D2 native Op A facade; skips loudly if it is not yet
-    registered so the suite stays green while D2 lands.
-    """
+    """Exercise discovery, native scattering evaluation, and component-6 row assembly."""
 
     _require_cuda_rayd()
     if getattr(
@@ -429,7 +418,7 @@ def test_solver_chain_enabled_end_to_end():
 
 
 def test_solver_chain_ad_mode_requires_companion():
-    """AD-mode chain solve fails loudly until the D5 Op A ``_ad`` companion lands."""
+    """Require the native scattering derivative companion for AD-mode chain solves."""
 
     _require_cuda_rayd()
     if scattering_append._ADR021_D5_CHAIN_AD_WIRED:

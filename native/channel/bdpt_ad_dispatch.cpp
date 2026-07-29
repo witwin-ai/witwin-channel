@@ -7,13 +7,10 @@
 
 #include "bdpt_dict_helpers.h"
 
-// ADR-022 BDPT fixed-topology AD dict-unpacking dispatch wrappers. Split out of
-// bdpt.cpp to keep that translation unit within the native size budget. These
-// accumulate/dispatch wrappers unpack the subpath/connection dicts and forward
-// to the flat AD kernels defined in bdpt_subpaths_ad.cu / bdpt_connect_ad.cu /
-// bdpt_maps.cu; the forward primal wrappers and the pybind registration stay in
-// bdpt.cpp / binding/bdpt.cpp. tensor_from_dict lives in bdpt_dict_helpers.h so
-// both translation units share one owner.
+// These wrappers unpack BDPT subpath and connection dictionaries and dispatch
+// to the flat AD kernels. Primal wrappers and pybind registration stay in
+// bdpt.cpp and binding/bdpt.cpp. Both bridges share tensor_from_dict through
+// bdpt_dict_helpers.h.
 
 // Flat AD-kernel declarations consumed only by the accumulate wrappers below.
 pybind11::dict channel_bdpt_accumulate_connection_samples_backward_cuda(
@@ -161,7 +158,7 @@ pybind11::dict channel_bdpt_accumulate_connection_samples_jvp(
 }
 
 // ---------------------------------------------------------------------------
-// ADR-022 BDPT fixed-topology AD companions (plan 10a section 6). The flat
+// BDPT fixed-topology derivative dispatch. The flat
 // kernels live in bdpt_subpaths_ad.cu / bdpt_connect_ad.cu / bdpt_maps.cu and
 // consume unpacked tensor tables; the dispatch wrappers below mirror the
 // forward wrappers so the registered ABI symbols accept the same

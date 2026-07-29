@@ -277,7 +277,7 @@ def test_order1_query_consumes_visible_plan_and_preserves_state_identity(
     result = diffraction.query_diffraction_order1(query)
 
     assert len(calls) == 1
-    # tx_polarization is threaded in as argument index 2 (R5 fix), shifting the
+    # tx_polarization is threaded in as argument index 2, shifting the
     # state and receiver arguments down by one slot.
     assert calls[0][2] is tx_polarization
     assert calls[0][4] is states.active

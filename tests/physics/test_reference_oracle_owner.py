@@ -1,14 +1,7 @@
 # Copyright Xingyu Chen.
 # The NumPy reference oracle has exactly one owner, and it lives under tests.
 
-"""The NumPy reference oracle has exactly one owner, and it lives under tests.
-
-CLAUDE.md allows CPU/NumPy reference implementations only under ``tests/``.
-Before this module moved, the oracle shipped inside the production wheel behind
-a two-level facade whose objects rewrote ``__module__`` to impersonate the
-facade. Both the shipping and the impersonation are gone; what remains is a
-single module that production code structurally cannot reach.
-"""
+"""The NumPy reference oracle has exactly one owner, and it lives under tests."""
 
 from __future__ import annotations
 

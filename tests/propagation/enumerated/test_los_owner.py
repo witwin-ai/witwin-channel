@@ -50,7 +50,7 @@ def test_los_topology_preserves_fake_event_and_count_semantics(monkeypatch):
 
     def fake_export(*args, **kwargs):
         events.append("export")
-        # R5: path_los_export now also takes the per-transmitter polarization.
+        # path_los_export now also takes the per-transmitter polarization.
         assert len(args) == 4
         assert all(
             actual is expected

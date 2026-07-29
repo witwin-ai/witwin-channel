@@ -1,7 +1,7 @@
 // Copyright Xingyu Chen.
 // Implements montecarlo common CUDA operations.
 
-// ---- Consolidated from accum.cu ----
+// ==== Section: Monte Carlo accumulation ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
@@ -303,7 +303,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
 
 #undef check_component_map
 
-// ---- Consolidated from bdpt_accum.cu ----
+// ==== Section: BDPT accumulation ====
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
@@ -697,7 +697,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
 
 #undef check_component_map
 
-// ---- Consolidated from sampling.cu ----
+// ==== Section: Monte Carlo sampling ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
@@ -749,7 +749,7 @@ at::Tensor channel_mc_sample_directions_cuda(int64_t count, at::Tensor reference
     return directions;
 }
 
-// ---- Consolidated from material.cu ----
+// ==== Section: Monte Carlo material sampling ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
@@ -916,7 +916,7 @@ channel_bdpt_face_material_tensors_from_host_cuda(
         copy_int_vector_to_cuda(face_material_id));
 }
 
-// ---- Consolidated from scattering.cu ----
+// ==== Section: Monte Carlo scattering ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>

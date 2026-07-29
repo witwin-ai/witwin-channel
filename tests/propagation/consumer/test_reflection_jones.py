@@ -93,19 +93,19 @@ def _transport(arguments, tx_polarization, rx_polarization):
 def test_reflection_jones_matches_the_superposition_oracle(mixture) -> None:
     """The decisive test: excite a mixture the composition never evaluated.
 
-    The published operator claims that the native reflection transport is
-    linear in the transmit polarization and that its rows and columns are
-    indexed sink-then-source. Driving the SAME production transport with a
-    mixture of the two source basis vectors and comparing against the same
-    mixture of matrix entries falsifies a non-transverse basis and any scale
-    error, and - because the world reads the two ends out in two different
-    rotated frames - a transposed index convention as well.
+ The published operator claims that the native reflection transport is
+ linear in the transmit polarization and that its rows and columns are
+ indexed sink-then-source. Driving the SAME production transport with a
+ mixture of the two source basis vectors and comparing against the same
+ mixture of matrix entries falsifies a non-transverse basis and any scale
+ error, and - because the world reads the two ends out in two different
+ rotated frames - a transposed index convention as well.
 
-    The reference frame matters. With the reference basis aligned to the
-    incidence plane the operator is diagonal, and a transposed matrix is then
-    numerically identical to the correct one, so the same oracle proves
-    nothing. The guard below refuses to let that happen silently.
-    """
+ The reference frame matters. With the reference basis aligned to the
+ incidence plane the operator is diagonal, and a transposed matrix is then
+ numerically identical to the correct one, so the same oracle proves
+ nothing. The guard below refuses to let that happen silently.
+ """
 
     compiled = smooth_wall_scene()
     sources, sinks = rotated_endpoints()
@@ -153,11 +153,11 @@ def test_reflection_jones_matches_the_superposition_oracle(mixture) -> None:
 def test_composed_los_jones_reproduces_the_fused_native_operator() -> None:
     """A depth-0 row must land on the shipped native LoS Jones values exactly.
 
-    This is what pins the composed transverse bases to the native
-    endpoint-basis owner: the composition and the fused operator evaluate the
-    identical native expressions, so anything but equality means the composed
-    route built a different basis or a different direction.
-    """
+ This is what pins the composed transverse bases to the native
+ endpoint-basis owner: the composition and the fused operator evaluate the
+ identical native expressions, so anything but equality means the composed
+ route built a different basis or a different direction.
+ """
 
     compiled = smooth_wall_scene()
     sources, sinks = endpoints()
@@ -211,13 +211,13 @@ def test_jones_bases_are_transverse_to_their_own_leg_and_direction_is_frozen(
 ) -> None:
     """The invariant the whole operator rests on, tied to its AD consequence.
 
-    A reflection row launches on one direction and arrives on another. If a
-    basis stops being transverse to its own leg, the native projection
-    silently shortens it and the published operator stops being the operator
-    in the published basis - with no exception anywhere. The same invariant is
-    what makes the frozen ``direction`` edge exact: the dropped derivative term
-    carries a factor ``sink_basis . direction``, which is zero here.
-    """
+ A reflection row launches on one direction and arrives on another. If a
+ basis stops being transverse to its own leg, the native projection
+ silently shortens it and the published operator stops being the operator
+ in the published basis - with no exception anywhere. The same invariant is
+ what makes the frozen ``direction`` edge exact: the dropped derivative term
+ carries a factor ``sink_basis . direction``, which is zero here.
+ """
 
     compiled = smooth_wall_scene()
     sources, sinks = endpoints()
@@ -247,11 +247,11 @@ def test_jones_bases_are_transverse_to_their_own_leg_and_direction_is_frozen(
 def test_launch_direction_excitation_produces_no_field() -> None:
     """An analytic falsifier for the launch direction the basis is built on.
 
-    ``project_to_wedge_plane(d, d)`` is exactly zero, so exciting the frozen
-    transport with the launch direction itself must radiate nothing. If the
-    basis had been built on the arrival direction, or on the straight
-    source-to-sink direction, this would be a plausible non-zero number.
-    """
+ ``project_to_wedge_plane(d, d)`` is exactly zero, so exciting the frozen
+ transport with the launch direction itself must radiate nothing. If the
+ basis had been built on the arrival direction, or on the straight
+ source-to-sink direction, this would be a plausible non-zero number.
+ """
 
     compiled = smooth_wall_scene()
     sources, sinks = endpoints()
@@ -275,12 +275,12 @@ def test_launch_direction_excitation_produces_no_field() -> None:
 def test_single_mirror_jones_separates_the_two_polarizations() -> None:
     """One flat plate in the incidence plane gives a diagonal operator.
 
-    The reference basis is chosen so that ``u`` projects into the incidence
-    plane and ``v`` is the out-of-plane axis, which are the TM and TE
-    responses. They must not mix, and they must not be the same number: a
-    composition that accidentally published one polarization twice, or that
-    rotated one basis into the other, fails here.
-    """
+ The reference basis is chosen so that ``u`` projects into the incidence
+ plane and ``v`` is the out-of-plane axis, which are the TM and TE
+ responses. They must not mix, and they must not be the same number: a
+ composition that accidentally published one polarization twice, or that
+ rotated one basis into the other, fails here.
+ """
 
     compiled = smooth_wall_scene()
     sources, sinks = endpoints()
@@ -328,10 +328,10 @@ def test_polarization_basis_gradients_are_rejected_before_any_native_work(
 ) -> None:
     """The frozen-basis contract, enforced rather than documented.
 
-    The composition hands both bases to native companions that reject
-    gradients on the transmit and receive polarization, so a differentiable
-    basis can only ever produce a silently incomplete derivative.
-    """
+ The composition hands both bases to native companions that reject
+ gradients on the transmit and receive polarization, so a differentiable
+ basis can only ever produce a silently incomplete derivative.
+ """
 
     compiled = smooth_wall_scene()
     sources, sinks = endpoints()
@@ -369,12 +369,12 @@ def test_polarization_basis_gradients_are_rejected_before_any_native_work(
 def test_reflection_jones_reverse_mode_matches_central_differences() -> None:
     """Finite, non-zero, and correct are three different claims.
 
-    The direct source-and-target dependence of the native transport keeps a
-    reflection gradient finite and non-zero even if the moving stationary point
-    contributed nothing, so only a numeric reference can tell whether the
-    specular-motion term is really in the answer. Central differences of the
-    same reevaluation are that reference.
-    """
+ The direct source-and-target dependence of the native transport keeps a
+ reflection gradient finite and non-zero even if the moving stationary point
+ contributed nothing, so only a numeric reference can tell whether the
+ specular-motion term is really in the answer. Central differences of the
+ same reevaluation are that reference.
+ """
 
     compiled = smooth_wall_scene()
     sources, sinks = rotated_endpoints()
@@ -487,11 +487,11 @@ def test_multi_pair_jones_reproduces_the_single_pair_operator_row_for_row(
 ) -> None:
     """Two sources and three sinks, so the diagonal pair-index trick is used.
 
-    ``transverse_basis`` hands the native endpoint-basis owner per-row tables
-    and the index ``k * (N + 1)``. With one row that index is 0 and the trick
-    is untested; with twelve rows a mis-strided read lands on another row's
-    endpoints. The reference is the same rows evaluated one pair at a time.
-    """
+ ``transverse_basis`` hands the native endpoint-basis owner per-row tables
+ and the index ``k * (N + 1)``. With one row that index is 0 and the trick
+ is untested; with twelve rows a mis-strided read lands on another row's
+ endpoints. The reference is the same rows evaluated one pair at a time.
+ """
 
     compiled = smooth_wall_scene()
     sources, sinks = multi_endpoints()
@@ -523,13 +523,13 @@ def test_every_declared_frozen_polarimetric_input_is_enforced_on_evaluate(
 ) -> None:
     """A declared frozen input that nobody checks is not a contract.
 
-    ``polarimetric_frozen_ad_inputs`` names tx_power, the endpoint
-    polarizations, and both bases. The composed operator is excited by the two
-    basis vectors, so an endpoint polarization never reaches the transport and
-    tx_power reaches a companion that does not differentiate it - a request
-    carrying either could only ever get an empty gradient back. The discovery
-    entry point must refuse them, not just the fixed-topology one.
-    """
+ ``polarimetric_frozen_ad_inputs`` names tx_power, the endpoint
+ polarizations, and both bases. The composed operator is excited by the two
+ basis vectors, so an endpoint polarization never reaches the transport and
+ tx_power reaches a companion that does not differentiate it - a request
+ carrying either could only ever get an empty gradient back. The discovery
+ entry point must refuse them, not just the fixed-topology one.
+ """
 
     compiled = smooth_wall_scene()
     sources, sinks = endpoints()

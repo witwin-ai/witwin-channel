@@ -1,18 +1,7 @@
 # Copyright Xingyu Chen.
 # Implements constants.
 
-"""Electromagnetic constants and the package-wide phase convention.
-
-This module holds values only, so every layer may depend on it. It is the
-single source of truth for the sign and time conventions that solver metadata,
-the propagation consumer contract, and the reference oracle all quote.
-
-Note: Core carries its own ``witwin.core.material.VACUUM_PERMITTIVITY``
-(8.8541878128e-12, the CODATA measured value) while ``EPS0`` here derives from
-the pre-2019 exact definition ``1 / (MU0 * C0**2)``. The two differ in the
-ninth significant digit. Reconciling them changes solver output and therefore
-requires its own numerical ADR; do not silently align them here.
-"""
+"""Implements constants."""
 
 from __future__ import annotations
 
@@ -66,18 +55,18 @@ NARROWBAND_FREQUENCY_OFFSET_LAW = (
 # What the law above costs, quantified, so "narrowband" is a number rather than
 # an adjective. Three independent terms:
 #
-#   1. spreading - the free-space lambda/(4*pi*d) amplitude, exactly
-#      f_ref/(f_ref+df) in magnitude with zero phase;
-#   2. material - the frequency selectivity of the compiled material response,
-#      bounded by the slab fringe scale df_fringe below (a 0.1 m eps_r=4 slab at
-#      normal incidence fringes every 750 MHz);
-#   3. dispersion - d(eps_r)/df from a witwin.core DispersionSpec, which the law
-#      drops entirely because a compiled record freezes it at the primal
-#      frequency.
+# 1. spreading - the free-space lambda/(4*pi*d) amplitude, exactly
+# f_ref/(f_ref+df) in magnitude with zero phase;
+# 2. material - the frequency selectivity of the compiled material response,
+# bounded by the slab fringe scale df_fringe below (a 0.1 m eps_r=4 slab at
+# normal incidence fringes every 750 MHz);
+# 3. dispersion - d(eps_r)/df from a witwin.core DispersionSpec, which the law
+# drops entirely because a compiled record freezes it at the primal
+# frequency.
 #
 # The wideband frequency-offset capability removes terms 1 and 2 exactly, by
 # evaluating the same frozen rows natively at each absolute frequency, and
-# REFUSES term 3 rather than approximating it (ADR-042).
+# REFUSES term 3 rather than approximating it (wideband evaluation).
 NARROWBAND_FREQUENCY_OFFSET_ERROR_LAW = (
     "relative_error = O(df/f_ref) spreading"
     " + O(df/df_fringe) material"

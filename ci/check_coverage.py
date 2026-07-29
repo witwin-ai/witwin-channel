@@ -1,7 +1,7 @@
 # Copyright Xingyu Chen.
 # Checks coverage.
 
-"""Enforce the Phase 11 Python coverage policy against Coverage.py JSON."""
+"""Checks coverage."""
 
 from __future__ import annotations
 
@@ -34,9 +34,9 @@ def _normalized_files(report: dict[str, Any]) -> dict[str, dict[str, Any]]:
 def _member_spans(source: str) -> dict[str, tuple[int, int]]:
     """Return the inclusive line span of every top-level definition in ``source``.
 
-    A decorated definition starts at its first decorator, so the decorator
-    statements belong to the member they decorate rather than to module level.
-    """
+ A decorated definition starts at its first decorator, so the decorator
+ statements belong to the member they decorate rather than to module level.
+ """
 
     spans: dict[str, tuple[int, int]] = {}
     for node in ast.parse(source).body:
@@ -54,10 +54,10 @@ def _member_spans(source: str) -> dict[str, tuple[int, int]]:
 def section_line_numbers(path: str, members: list[str]) -> set[int]:
     """Return every source line covered by the named top-level members.
 
-    The section is resolved against the working tree rather than the coverage
-    report so that a renamed or deleted member fails loudly instead of silently
-    shrinking the guarded statement set.
-    """
+ The section is resolved against the working tree rather than the coverage
+ report so that a renamed or deleted member fails loudly instead of silently
+ shrinking the guarded statement set.
+ """
 
     spans = _member_spans((ROOT / path).read_text(encoding="utf-8"))
     unknown = sorted(set(members) - set(spans))
@@ -75,10 +75,10 @@ def _evaluate_sections(
 ) -> list[str]:
     """Return violations of the per-section statement floors.
 
-    A section floor guards one named group of members inside a consolidated
-    module, so well-covered neighbours in the same file cannot lift a section
-    that has lost coverage.
-    """
+ A section floor guards one named group of members inside a consolidated
+ module, so well-covered neighbours in the same file cannot lift a section
+ that has lost coverage.
+ """
 
     errors: list[str] = []
     for section in policy.get("section_floors", ()):

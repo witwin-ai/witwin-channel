@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
 # AD-A0: RayD fixed-winner geometry JVP/VJP versus central finite differences.
 
-"""AD-A0: RayD fixed-winner geometry JVP/VJP versus central finite differences.
-
-Small analytic scenes (a tilted triangle, a quad wall) exercised through the
-channel C-bridge AD entry points only. Vertex perturbations rebuild the
-native scene per FD evaluation; the winner primitive stays fixed by
-construction (hit points are far from triangle boundaries).
-"""
+"""AD-A0: RayD fixed-winner geometry JVP/VJP versus central finite differences."""
 
 from __future__ import annotations
 
@@ -486,7 +480,7 @@ def test_fixed_winner_tape_outputs_are_non_differentiable():
 
 def test_intersect_vjp_matches_fd_wrt_normal_and_barycentric_cotangents():
     """Nonzero cotangents on the n and barycentric outputs (the gn/gbary
-    adjoint kernel paths) versus scene-rebuild central FD."""
+ adjoint kernel paths) versus scene-rebuild central FD."""
 
     rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()
@@ -701,7 +695,7 @@ def test_reflection_facades_reject_mismatched_tape_batch():
 
 def test_composed_functorch_transforms_raise_not_implemented():
     """torch.func.grad over forward-mode jvp (the HVP recipe) must fail
-    loudly instead of silently returning zeros (plan 07 section 7)."""
+ loudly instead of silently returning zeros (the AD contract)."""
 
     rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()
@@ -731,12 +725,12 @@ def test_composed_functorch_transforms_raise_not_implemented():
 
 def test_double_backward_raises():
     """create_graph=True through the once-differentiable backwards must raise
-    instead of silently dropping second-order contributions.
+ instead of silently dropping second-order contributions.
 
-    ADR-043 moves the raise to the request itself: it now fires inside the
-    backward that ``create_graph=True`` asked to be differentiable, before any
-    native companion launches, and names the owner rather than Torch.
-    """
+ first-order differentiation moves the raise to the request itself: it now fires inside the
+ backward that ``create_graph=True`` asked to be differentiable, before any
+ native companion launches, and names the owner rather than Torch.
+ """
 
     rayd, vertices = _triangle_scene()
     ray_o, ray_d = _triangle_rays()

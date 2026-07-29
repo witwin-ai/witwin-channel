@@ -103,7 +103,7 @@ pybind11::dict channel_deterministic_los_field(
     torch::Tensor path_gain,
     torch::Tensor path_length_m,
     double frequency_hz);
-// ISB boundary taper (ADR-017) LoS member; both ops are launched only when the
+// ISB boundary taper (the boundary taper) LoS member; both ops are launched only when the
 // DEFAULT-OFF isb_boundary_taper switch is on.
 torch::Tensor channel_los_silhouette_clearance(
     torch::Tensor source,

@@ -142,12 +142,11 @@ def compare_magnitudes(
 ) -> MagnitudeMetrics:
     """Compare field envelopes after matching RMS amplitude.
 
-    Use this when the solvers do not export the same complex observable or
-    source normalization. The scale is real and positive, so spatial phase
-    disagreement cannot suppress the candidate field. By default it matches
-    RMS amplitude; pass a scale measured from an empty-scene baseline to keep
-    calibration independent of the scatterer under test.
-    """
+ Use this when the solvers do not export the same complex observable or
+ source normalization. The scale is real and positive, so spatial material and geometry acceptanceisagreement cannot suppress the candidate field. By default it matches
+ RMS amplitude; pass a scale measured from an empty-scene baseline to keep
+ calibration independent of the scatterer under test.
+ """
     aligned = resample_regular(reference, candidate.x, candidate.y)
     mask = _validated_mask(valid_mask, candidate.field.shape)
     cand = candidate.field[mask]

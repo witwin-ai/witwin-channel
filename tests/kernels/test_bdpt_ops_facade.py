@@ -837,7 +837,7 @@ def test_bdpt_accumulate_connection_samples_passes_strategy_id_to_native(monkeyp
     # Default combine domain is power (0) with no coefficient tensors.
     assert combine_calls == [(0, False), (0, False), (0, False)]
 
-    # ADR-019: coherent combine passes combine_domain=1 with row-aligned
+    # coherent combination: coherent combine passes combine_domain=1 with row-aligned
     # coefficient tensors; the accumulation_strategy axis stays orthogonal.
     coeff = torch.ones((1,), device="cuda", dtype=torch.float32)
     ops.bdpt_accumulate_connection_samples(

@@ -1,21 +1,7 @@
 # Copyright Xingyu Chen.
 # The single-definition gate passes here, and FAILS on a planted duplicate.
 
-"""The single-definition gate passes here, and FAILS on a planted duplicate.
-
-The gate's whole claim is that it survives the failure mode that actually
-happened: somebody needed a rule, did not know it existed, and wrote it again
-under a different name. So the planted duplicates here share *no identifier*
-with the canonical owner - not the function name, not a parameter, not a local -
-and several are assembled with different syntax as well. Anything that only
-proved "an exact copy is rejected" would be testing the wrong thing, so
-`test_detection_ignores_every_identifier` asserts the absence of the shared
-names directly rather than leaving it to the reader.
-
-Both ratchet directions are covered: an unrecorded duplicate fails, and a
-recorded duplicate that has been cleaned up also fails until it leaves the
-ledger.
-"""
+"""The single-definition gate passes here, and FAILS on a planted duplicate."""
 
 from __future__ import annotations
 

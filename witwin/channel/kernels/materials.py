@@ -1,14 +1,7 @@
 # Copyright Xingyu Chen.
 # Native material kernel facades.
 
-"""Native material kernel facades.
-
-Thin facades over the ``_channel`` material ABI: CSR layer-store validation,
-the per-face material tensor exports the solvers hand to native kernels, the
-planar layer-stack primal/backward/JVP entries, and the
-:class:`torch.autograd.Function` companion that dispatches them. Torch autograd
-may dispatch these companions but never reconstructs the numerical operation.
-"""
+"""Native material kernel facades."""
 
 from __future__ import annotations
 
@@ -238,7 +231,7 @@ def em_layer_stack_backward(
         )
     # Autograd may hand cotangents with arbitrary strides (e.g. slices of the
     # realization reflectance rows); the native ABI requires contiguous
-    # cotangents. contiguous() is a no-op when the stride is already dense.
+    # cotangents. contiguous is a no-op when the stride is already dense.
     grad_outputs = tuple(
         None if value is None else value.contiguous() for value in grad_outputs
     )
@@ -336,12 +329,12 @@ def mc_face_material_tensors(
 class _EmLayerStackAdFunction(torch.autograd.Function):
     """Differentiable layer-stack r/t coefficients and power budgets.
 
-    Differentiable inputs: cos_theta (per row), the CSR layer thickness /
-    eps_r / sigma_e and the carrier frequency. layer_mu_r and the CSR
-    topology stay fixed under the plan 07 contract; requesting the mu_r
-    gradient fails loudly. Layer gradients accumulate atomically because the
-    CSR store is shared by every row.
-    """
+ Differentiable inputs: cos_theta (per row), the CSR layer thickness /
+ eps_r / sigma_e and the carrier frequency. layer_mu_r and the CSR
+ topology stay fixed under the AD contract; requesting the mu_r
+ gradient fails loudly. Layer gradients accumulate atomically because the
+ CSR store is shared by every row.
+ """
 
     @staticmethod
     def forward(
@@ -503,13 +496,13 @@ def em_layer_stack_ad(
     frequency: torch.Tensor | float,
     frequency_value: float | None = None,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`em_layer_stack_eval` (plan 07 AD-3).
+    """Differentiable:func:`em_layer_stack_eval` (solver derivatives).
 
-    ``frequency_value`` is the precomputed host scalar of ``frequency``; a
-    seam that applies several Functions per solve reads the 0-d tensor once
-    and threads the float here so no Function re-reads it (audit M3). When
-    not supplied it is read here, exactly once per apply.
-    """
+ ``frequency_value`` is the precomputed host scalar of ``frequency``; a
+ seam that applies several Functions per solve reads the 0-d tensor once
+ and threads the float here so no Function re-reads it. When
+ not supplied it is read here, exactly once per apply.
+ """
 
     if frequency_value is None:
         frequency_value = _ad_frequency_value(frequency)

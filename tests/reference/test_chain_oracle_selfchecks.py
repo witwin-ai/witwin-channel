@@ -1,22 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests chain oracle selfchecks.
 
-"""Self-consistency gates for the ADR-021 chain scattering oracles.
-
-These run WITHOUT the witwin native extension (pure float64 Torch on CPU): they
-pin the reference oracles in ``chain_ensemble`` / ``chain_realization`` against
-independent references and physical invariants, so a later native lockstep
-starts from a trusted float64 ground truth. Gates (ADR-021 acceptance protocol):
-
-a. ``d1 = d2 = 0`` ensemble oracle reduces to the single-bounce op-1 oracle
-   ``kirchhoff_ensemble.kirchhoff_ensemble_gain_reference``.
-b. Specular-limit collapse: a smooth (h = 0) flat plate at the vertex makes the
-   realization aperture integral collapse to the closed-form triangle area
-   (``q_par = 0``), the image-source specular limit of the coherent oracle.
-c. Reciprocity: swapping TX/RX reproduces the same ensemble ``path_gain``.
-d. Energy: the hemispherical integral of the oracle BSDF stays within the
-   ``(1 - C_r^2)|R|^2`` diffuse budget on a canonical material.
-"""
+"""Tests chain oracle selfchecks."""
 
 from __future__ import annotations
 

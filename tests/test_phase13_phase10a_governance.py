@@ -1,7 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests governance.
 
-"""Immutable historical assertions for the completed Plan 13 Phase 10A cut."""
+"""Tests governance."""
 
 from __future__ import annotations
 

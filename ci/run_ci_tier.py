@@ -313,11 +313,11 @@ RELEASE_GATES = (
 def _tier(name: str, *gate_groups: tuple[Gate, ...]) -> tuple[Gate, ...]:
     """Compose a tier and append a trailing repository-hygiene re-check.
 
-    The quick tier already runs ``repository-hygiene`` first, so the tree is
-    proven clean before the tests. Re-running the same check last makes any
-    test that dirties the worktree (a stray artifact, an unrestored fixture)
-    fail its tier instead of leaking state into the next gate.
-    """
+ The quick tier already runs ``repository-hygiene`` first, so the tree is
+ proven clean before the tests. Re-running the same check last makes any
+ test that dirties the worktree (a stray artifact, an unrestored fixture)
+ fail its tier instead of leaking state into the next gate.
+ """
 
     gates = tuple(gate for group in gate_groups for gate in group)
     trailing = Gate(

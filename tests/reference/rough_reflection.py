@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
 # Implements rough reflection.
 
-"""Reference Torch rough-reflection C_r factor and application (ADR-010 op 3).
-
-The previous production implementation of
-``propagation/fields/evaluation.py::_rough_reflection_factor`` plus the
-Python-side application of the real factor onto the four reflection field
-outputs. Test-only: MUST NOT be imported from production packages.
-"""
+"""Implements rough reflection."""
 
 from __future__ import annotations
 
@@ -29,11 +23,11 @@ def rough_reflection_factor(
 ) -> torch.Tensor:
     """C_r = prod_b exp(-2*(k0*cos_b*sigma_b)^2) on rough bounces (1 else).
 
-    ``cos_b = |dot(seg_dir_b, n_b)|`` with ``seg_dir_b`` the unit direction of
-    the incoming segment (``pos_b - prev_b``, ``prev_0 = source``). Rows flagged
-    ``replaced`` are zeroed (contract 6.7.3). Mirrors the removed production
-    expression order exactly.
-    """
+ ``cos_b = |dot(seg_dir_b, n_b)|`` with ``seg_dir_b`` the unit direction of
+ the incoming segment (``pos_b - prev_b``, ``prev_0 = source``). Rows flagged
+ ``replaced`` are zeroed (contract 6.7.3). Mirrors the removed production
+ expression order exactly.
+ """
 
     depth = positions.shape[1]
     prev = torch.cat((source.unsqueeze(1), positions[:, : depth - 1]), dim=1)

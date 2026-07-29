@@ -1,10 +1,10 @@
 // Copyright Xingyu Chen.
 // Implements field wedge coupled CUDA operations.
 
-// ---- Consolidated from field_wedge_ad_coupled.cu ----
+// ==== Section: Coupled wedge AD ====
 #include "field_wedge_ad_common.cuh"
 
-// Plan 07 AD-4a: differentiable UTD wedge diffraction and coupled
+// diffraction AD: differentiable UTD wedge diffraction and coupled
 // reflection-diffraction.
 //
 // The wedge field is RayD's own templated forward
@@ -16,7 +16,7 @@
 // torch.autograd.Function layer in ops.py is dispatch only.
 //
 // The coupled row dual below mirrors coupled_rd_field_kernel
-// (field_transport.cu) step by step, reusing the validated AD-1/AD-2 duals
+// (field_transport.cu) step by step, reusing the validated AD/AD duals
 // (slab_fresnel_dual, dual_reflect_frame) for the slab legs and the RayD
 // templates for everything else. Edit the primal kernel and this mirror
 // TOGETHER.
@@ -24,7 +24,7 @@
 namespace {
 
 // ---------------------------------------------------------------------------
-// Bridges between the channel AD-1/2 dual types (DualC / DualF3) and
+// Bridges between the channel AD/2 dual types (DualC / DualF3) and
 // the RayD dual scalars, so the validated slab and frame duals feed the
 // templated pair math directly.
 // ---------------------------------------------------------------------------
@@ -88,14 +88,14 @@ __device__ DualC3 reflect_complex3_dual(
 // Coupled reflection-diffraction dual row (components 3/4). Mirrors
 // coupled_rd_field_kernel step by step on RayD duals.
 //
-// Truncation-factor policy (G4): the primal now evaluates the coupled leg on
+// Truncation-factor policy : the primal now evaluates the coupled leg on
 // the stationary path (selectStationaryPoint = 1, stationaryExternalIncident =
 // 1) with real edge-segment bounds, so the truncation lives INSIDE the pair
 // coefficient (monotone even T_mono + corner_mend_gamma + boundary blend). The
 // dual mirrors this by calling compute_pair_vector_contribution directly, and
-// those derivatives flow in lockstep with the primal (there is no longer a
-// pseudo-infinite factor to freeze). The edge geometry itself stays frozen
-// (ADR-011: coupled rows carry no mesh-vertex gradient).
+// those derivatives follow the same stationary-path computation as the primal.
+// The edge geometry itself stays frozen
+// (coupled reflection and diffraction: coupled rows carry no mesh-vertex gradient).
 // ---------------------------------------------------------------------------
 
 struct CoupledRowInputs {
@@ -247,9 +247,8 @@ __device__ CoupledRowTangents coupled_rd_row_dual(
     pair.n0 = field::dual_const3(in.n0);
     pair.nn = field::dual_const3(in.n1);
     pair.wedgeN = Dual(in.exterior_angle / field::UTD_PI);
-    // G4: real edge-segment bounds (frozen constants; the coupled leg does not
-    // differentiate the edge geometry per ADR-011) so the stationary machinery
-    // truncates and corner-mends. Replaces the former +-1e5 infinite edge.
+    // Real segment bounds stay constant because coupled rows do not differentiate
+    // edge geometry. The stationary solver applies truncation and corner correction.
     pair.edgeLineMin = Dual(in.edge_line_min);
     pair.edgeLineMax = Dual(in.edge_line_max);
     pair.sourcePos = diffraction_source;
@@ -284,7 +283,7 @@ __device__ CoupledRowTangents coupled_rd_row_dual(
         outgoing_direction,
         input_edge_basis,
         output_edge_basis);
-    // G4: run the stationary-path machinery (re-anchor + monotone even
+    // run the stationary-path machinery (re-anchor + monotone even
     // truncation + corner_mend_gamma + boundary-distance blend + external
     // incidence re-extrapolation) on the coupled leg, matching the primal.
     pair.selectStationaryPoint = 1.0f;
@@ -294,11 +293,9 @@ __device__ CoupledRowTangents coupled_rd_row_dual(
 
     // Evaluate through the shared RayD header template, identical in structure
     // to the primal's compute_pair_contribution and to the order-1 diffraction
-    // dual (RayD's typed pure-wedge family). The header owns edge re-anchoring,
-    // truncation and validity (it returns zero for a blocked/short geometry),
-    // so the former manual pre-check and frozen-finite-factor inline are gone;
-    // the T_mono / gamma / B derivatives now flow through the dual in lockstep
-    // with the primal.
+    // dual (RayD's typed pure-wedge family). RayD owns edge re-anchoring,
+    // truncation, and validity; zero marks blocked or short geometry. The dual
+    // carries the T_mono, gamma, and B derivatives in the primal order.
     DualC3 value = field::compute_pair_vector_contribution(
         pair, diffraction_target, wave_number, material);
 
@@ -603,14 +600,14 @@ __global__ void coupled_rd_jvp_kernel(
 }
 
 // ---------------------------------------------------------------------------
-// ADR-013 D4: coupled double-diffraction dual row (component 7). Mirrors
+// coupled double diffraction: coupled double-diffraction dual row (component 7). Mirrors
 // coupled_dd_field_kernel (field_transport.cu) step by step on RayD duals.
 //
 // Both legs run the stationary path so the truncation / corner-mend / boundary
 // blend derivatives flow through the dual in lockstep with the primal (the
 // dual calls compute_pair_vector_contribution directly, exactly like the
-// order-1 diffraction dual and the coupled R->D dual after ADR-012 G4-3). The
-// gradient contract (ADR-013 D4): tx (source) and rx (target) flow through the
+// order-1 diffraction dual and the coupled R->D dual after the coupled-path approximation). The
+// gradient contract (coupled double diffraction): tx (source) and rx (target) flow through the
 // live per-leg re-anchoring; Q1/Q2, the edge axes/normals/exterior, the edge
 // bounds and the polarizations are frozen seeds (detached), so they are loaded
 // as dual constants and carry no gradient. The wedge face materials and the
@@ -1378,7 +1375,7 @@ pybind11::dict channel_field_coupled_rd_jvp(
 }
 
 // ---------------------------------------------------------------------------
-// ADR-013 D4: coupled double-diffraction AD host companions. Twins of the RD
+// coupled double diffraction: coupled double-diffraction AD host companions. Twins of the RD
 // companions above (same output schema, same coupled_contract), driving the
 // coupled_dd_row_dual mirror. Q1/Q2/bounds/axes/normals/polarizations are
 // frozen (loaded as dual constants); tx/rx flow through live re-anchoring, the
@@ -1637,7 +1634,7 @@ pybind11::dict channel_field_coupled_dd_jvp(
     return out;
 }
 
-// ---- Consolidated from field_wedge_ad_prepare.cu ----
+// ==== Section: Wedge AD preparation ====
 #include "field_wedge_ad_common.cuh"
 
 namespace {
@@ -1949,14 +1946,14 @@ pybind11::dict channel_coupled_rd_prepare_jvp(
     return out;
 }
 
-// ---- Consolidated from field_wedge_ad_project.cu ----
+// ==== Section: Wedge AD projection ====
 #include "field_wedge_ad_common.cuh"
 
 namespace {
 
 // ---------------------------------------------------------------------------
 // field_project_complex3 companions: coefficient = <field, axis(direction)>
-// with axis = project_to_wedge_plane(rx_pol, direction) (F1 unnormalized
+// with axis = project_to_wedge_plane(rx_pol, direction) ( unnormalized
 // transverse of p_rx); path_gain = |coeff|^2.
 // Linear in the field vector; direction feeds the axis.
 // ---------------------------------------------------------------------------
@@ -1981,7 +1978,7 @@ __global__ void project_complex3_backward_kernel(
         };
         const field::float3a dir = load3f(direction, index);
         const field::float3a pol = load3f(rx_polarization, index);
-        // F1: coefficient = p_rx . E via the unnormalized transverse of p_rx.
+        // coefficient = p_rx . E via the unnormalized transverse of p_rx.
         const field::float3a axis = field::project_to_wedge_plane(pol, dir);
         const field::Complex coefficient = transport::complex3_dot_real(value, axis);
         field::Complex g_coeff = field::cplx_zero();
@@ -2168,7 +2165,7 @@ pybind11::dict channel_field_project_complex3_jvp(
     return out;
 }
 
-// ---- Consolidated from coupled_topology.cu ----
+// ==== Section: Coupled topology ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>

@@ -1,7 +1,7 @@
 // Copyright Xingyu Chen.
 // Implements path topology CUDA operations.
 
-// ---- Consolidated from path_trace.cu ----
+// ==== Section: Path tracing ====
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <c10/util/complex.h>
@@ -1645,7 +1645,7 @@ channel_path_finalize_blocks_cuda(
         out_path_gain};
 }
 
-// ---- Consolidated from path_compaction.cu ----
+// ==== Section: Path compaction ====
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <c10/util/complex.h>
@@ -3083,7 +3083,7 @@ channel_path_diffraction_block_cuda(
 #undef kLightSpeedMetersPerSecond
 #undef kPi
 
-// ---- Consolidated from deterministic_topology.cu ----
+// ==== Section: Deterministic topology ====
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <c10/util/complex.h>

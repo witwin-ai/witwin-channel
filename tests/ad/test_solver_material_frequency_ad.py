@@ -1,15 +1,7 @@
 # Copyright Xingyu Chen.
-# AD-1 solver-level tests: material/frequency gradients through solve().
+# AD solver-level tests: material/frequency gradients through solve.
 
-"""AD-1 solver-level tests: material/frequency gradients through solve().
-
-Covers the plan 07 section 9.3 cells delivered by AD-1 for D=deterministic and
-P=path: eps_r/sigma_e x single-reflection, eps_r/sigma_e/thickness x
-transmission-multilayer, and frequency x LoS/single-reflection/transmission.
-Also validates the zero-overhead ad_mode="none" contract, forward-mode duals
-through a full solve, and the explicit-failure policy for unsupported
-interactions.
-"""
+"""AD solver-level tests: material/frequency gradients through solve."""
 
 from __future__ import annotations
 
@@ -307,7 +299,7 @@ def test_ad_mode_none_keeps_primal_contract(solver):
     assert coefficient_vjp.requires_grad
     # Same forward values; primal mode keeps zero AD accounting while the
     # AD mode reports its real registered companions and retained tape
-    # (plan 07 AD-4 metadata contract).
+    # (diffraction AD metadata contract).
     torch.testing.assert_close(
         coefficient_none, coefficient_vjp.detach(), rtol=0.0, atol=0.0
     )

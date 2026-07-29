@@ -1,30 +1,7 @@
 # Copyright Xingyu Chen.
 # Stable solver-neutral propagation consumer facade.
 
-"""Stable solver-neutral propagation consumer facade.
-
-Call :func:`capabilities` to discover the supported components, responses,
-topology modes, and AD modes before building a request. Build a
-:class:`PropagationRequest` for discovery, or a :class:`FixedTopologyRequest`
-to reevaluate an already-discovered topology, then pass it to :func:`evaluate`
-or :func:`reevaluate` together with a compiled scene.
-
-A whole frame, pulse train, or symbol block is one call rather than one call
-per instant: declare ``slot_count`` on a :class:`FixedTopologyRequest` built
-over :func:`replicate_over_slots`, or use
-:func:`evaluate_time_varying`, which publishes the same rows at ``T`` instants
-as a ``[T, K]`` time-varying impulse response.
-
-A whole band is one call too: declare ``frequency_offsets_hz`` on a
-:class:`FixedTopologyRequest` and the same frozen rows are published at
-``F`` absolute frequencies as a ``[K, F]`` payload paired with the grid it
-was evaluated on. Call :func:`native_frequency_resolution_hz` first to check
-that the grid is resolvable.
-
-``docs/dev/consumer/README.md`` holds the full ownership contract; it lives in
-docs rather than beside the code because ``consumer`` is a module and no longer
-a package with a directory to hold its README.
-"""
+"""Stable solver-neutral propagation consumer facade."""
 
 from __future__ import annotations
 
@@ -63,9 +40,9 @@ if TYPE_CHECKING:
     from witwin.channel.scene.endpoints import SolverScene
 
 
-# --- Wideband frequency offsets (ADR-042) ---------------------------------
+# --- Wideband frequency offsets (wideband evaluation) ---------------------------------
 #
-# The wideband frequency-offset surface of the consumer contract (ADR-042).
+# The wideband frequency-offset surface of the consumer contract (wideband evaluation).
 #
 # A fixed-topology request may declare a grid of propagation-frequency offsets and
 # receive the same frozen rows evaluated at each absolute frequency. Everything
@@ -92,11 +69,11 @@ NATIVE_FREQUENCY_RESOLUTION_LAW = (
 def native_frequency_resolution_hz(reference_frequency_hz: float) -> float:
     """Smallest absolute frequency step the native launch grid resolves.
 
-    The value is one float32 unit in the last place at
-    ``reference_frequency_hz``. A caller computes the same number the
-    wideband refusal uses instead of rederiving it, which is the ADR-036 rule
-    that a declared limit is discoverable rather than learned from a rejection.
-    """
+ The value is one float32 unit in the last place at
+ ``reference_frequency_hz``. A caller computes the same number the
+ wideband refusal uses instead of rederiving it, which is the propagation consumer
+ that a declared limit is discoverable rather than learned from a rejection.
+ """
 
     value = abs(float(reference_frequency_hz))
     if not math.isfinite(value) or value == 0.0:
@@ -117,10 +94,10 @@ def native_frequency_resolution_hz(reference_frequency_hz: float) -> float:
 def require_frequency_offsets(value: object) -> tuple[float, ...] | None:
     """Structural validation of a wideband offset grid, before any native work.
 
-    The grid is a HOST DECLARATION in the same class as ``slot_count``: it
-    names which absolute frequencies the same frozen rows are evaluated at. It
-    is deliberately not a tensor and deliberately not differentiable.
-    """
+ The grid is a HOST DECLARATION in the same class as ``slot_count``: it
+ names which absolute frequencies the same frozen rows are evaluated at. It
+ is deliberately not a tensor and deliberately not differentiable.
+ """
 
     if value is None:
         return None
@@ -164,19 +141,19 @@ def require_wideband_payload(
     offsets: object,
     reference: torch.Tensor,
 ) -> None:
-    """Enforce the ADR-042 paired-presence and shape law on one transport.
+    """Enforce the wideband evaluation paired-presence and shape law on one transport.
 
-    The payload and the grid it was evaluated on are both present or both
-    absent. An unpaired payload is a column set nobody can label, and an
-    unpaired grid is a promise nobody kept; either one is a contract error
-    rather than something a reader should have to guess about.
+ The payload and the grid it was evaluated on are both present or both
+ absent. An unpaired payload is a column set nobody can label, and an
+ unpaired grid is a promise nobody kept; either one is a contract error
+ rather than something a reader should have to guess about.
 
-    ``reference`` is the single-frequency tensor the payload is the band of, so
-    its shape defines the payload's: the frequency axis is inserted after the
-    row axis and every trailing axis is preserved. Taking the shape from the
-    reference rather than restating it keeps one description of what a column
-    is.
-    """
+ ``reference`` is the single-frequency tensor the payload is the band of, so
+ its shape defines the payload's: the frequency axis is inserted after the
+ row axis and every trailing axis is preserved. Taking the shape from the
+ reference rather than restating it keeps one description of what a column
+ is.
+ """
 
     if payload is None and offsets is None:
         return
@@ -216,7 +193,7 @@ WIDEBAND_OFFSET_LAYOUT = (
 # Why an offset grid can be refused as unresolvable. Channel publishes the
 # resolution and the resulting phase bound; it does not evaluate the bound,
 # because that needs max(delay_s), which is a device reduction plus a host read
-# the ADR-032 budget does not have. The caller owns that check.
+# the compact output budget does not have. The caller owns that check.
 WIDEBAND_FREQUENCY_QUANTIZATION_LAW = (
     "launch_grid=float32;"
     " resolution_hz=ulp_float32(reference_frequency_hz);"
@@ -224,22 +201,11 @@ WIDEBAND_FREQUENCY_QUANTIZATION_LAW = (
 )
 
 
-# --- AD admission policy (ADR-043) ----------------------------------------
+# --- AD admission policy ---------------------------------------------------------------
 #
-# AD admission policy for the propagation consumer (ADR-043).
-#
-# Every rule here answers one question before any numerical work happens: may
-# this request carry this derivative at all? None of it is physics, none of it
-# touches a device, and all of it runs on the pre-flight of both routes, so an
-# unsupported AD request never reaches a native launch and never produces a
-# result object.
-#
-# The declaration tables the ADR-043 capability record is built from live here
-# too, beside the refusals that enforce them.
-# The vocabulary section below owns the record TYPE and the published
-# :func:`~witwin.channel.propagation.consumer.capabilities` accessor; what each
-# column of that record asserts about differentiability is a policy statement
-# and is written down once, here.
+# Host preflight validates first-order AD support before any native launch or
+# result allocation. The declarations here build the published capability
+# record and sit beside the refusals that enforce it.
 
 
 # Native component identifiers a frozen topology may carry into reevaluation.
@@ -250,11 +216,7 @@ _FIXED_TOPOLOGY_COMPONENT_IDS: tuple[tuple[str, int], ...] = (
     ("reflection", 1),
 )
 
-# Which compiled-material tensors each component actually reads (ADR-043).
-# Marking a tensor a component does not read is not an error - the zero it
-# produces is the true derivative - but that zero was previously
-# undiscoverable, so the split is published instead of inferred from a silent
-# result.
+# Publish the material tensors each component reads so structural zero derivatives are explicit.
 _COMPONENT_MATERIAL_LEAVES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("diffraction", ("eps_r", "sigma_e", "thickness_m", "gain")),
     ("los", ()),
@@ -262,7 +224,7 @@ _COMPONENT_MATERIAL_LEAVES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("transmission", ("layer_eps_r", "layer_sigma_e", "layer_thickness_m")),
 )
 
-# Which published geometry tensors carry a derivative, per route (ADR-043).
+# Which published geometry tensors carry a derivative, per route (first-order differentiation).
 # Discovery re-solves the topology, so its interaction table and arrival
 # direction are declared non-differentiable outputs rather than silently
 # detached ones; the supported differentiable geometry route is
@@ -284,7 +246,7 @@ _DIFFERENTIABLE_GEOMETRY_OUTPUTS: tuple[tuple[str, frozenset[str]], ...] = (
 
 # Inputs every response refuses before any native work, in every AD mode but
 # "none". The native field companions reject them by contract, so a request
-# that carries one fails at the boundary instead of inside backward().
+# that carries one fails at the boundary instead of inside backward.
 _PRIMAL_ONLY_AD_INPUTS: tuple[str, ...] = (
     "materials.layer_mu_r",
     "materials.mu_r",
@@ -319,13 +281,13 @@ def carries_ad(value: torch.Tensor | None) -> bool:
 def _primal_only_values(
     compiled: CompiledScene, request: object
 ) -> dict[str, torch.Tensor | None]:
-    """The tensors named by ``capabilities().primal_only_ad_inputs``.
+    """The tensors named by ``capabilities.primal_only_ad_inputs``.
 
-    Two of them live on the compiled scene rather than on the request: the
-    relative permeabilities reach the Fresnel companions as constants and are
-    rejected there, so they belong in the same pre-compute refusal as the
-    request-side constants.
-    """
+ Two of them live on the compiled scene rather than on the request: the
+ relative permeabilities reach the Fresnel companions as constants and are
+ rejected there, so they belong in the same pre-compute refusal as the
+ request-side constants.
+ """
 
     materials = compiled.materials
     return {
@@ -342,16 +304,7 @@ def _primal_only_values(
 def require_primal_only_ad_inputs(
     compiled: CompiledScene, request: object
 ) -> None:
-    """Reject AD on inputs the native field companions treat as constants.
-
-    The native forward/backward/JVP contracts reject every one of these by
-    name, but on the discovery route that rejection used to fire from inside
-    ``backward()`` - after a complete ``PropagationEvaluation`` had already been
-    published. That is a partial result for an unsupported request, so the same
-    refusal now runs on the pre-flight of every response and every route, driven
-    by the published ``primal_only_ad_inputs`` record rather than by a list
-    duplicated per route.
-    """
+    """Reject before native work any AD input that the field companions declare primal-only."""
 
     if request.ad_mode == "none":
         return
@@ -370,9 +323,9 @@ def _ad_leaf_tensors(
 ) -> tuple[tuple[str, torch.Tensor], ...]:
     """Every tensor a caller can seed on this call, named for a refusal.
 
-    Host attribute reads only: no device work, no allocation, and no
-    synchronization, so this is free to run on the pre-flight of every call.
-    """
+ Host attribute reads only: no device work, no allocation, and no
+ synchronization, so this is free to run on the pre-flight of every call.
+ """
 
     materials = compiled.materials
     candidates: list[tuple[str, object]] = [
@@ -401,19 +354,19 @@ def require_first_order_request(
 ) -> None:
     """Refuse a forward-over-reverse composition before any numerical work.
 
-    A reverse pass cannot carry a forward tangent through the native
-    companions: the gradient comes back with the correct first-order value and
-    ``unpack_dual(grad).tangent is None``, so a mixed second derivative reads as
-    an exact zero with no error anywhere. That is the worst shape a silent cell
-    can take, and it is refused here rather than answered wrongly.
+ A reverse pass cannot carry a forward tangent through the native
+ companions: the gradient comes back with the correct first-order value and
+ ``unpack_dual(grad).tangent is None``, so a mixed second derivative reads as
+ an exact zero with no error anywhere. That is the worst shape a silent cell
+ can take, and it is refused here rather than answered wrongly.
 
-    The symmetric rule ("jvp with a requires_grad input") is deliberately NOT
-    enforced: ADR-038's declared convention explicitly supports a dual built on
-    a ``requires_grad`` primal, and the field facades run the same Function for
-    both modes, so such a request is a legitimate first-order one.
-    Reverse-over-reverse is caught instead where it becomes wrong, by
-    ``_ad_first_order_only`` inside every backward.
-    """
+ The symmetric rule ("jvp with a requires_grad input") is deliberately NOT
+ enforced: forward-mode liveness's declared convention explicitly supports a dual built on
+ a ``requires_grad`` primal, and the field facades run the same Function for
+ both modes, so such a request is a legitimate first-order one.
+ Reverse-over-reverse is caught instead where it becomes wrong, by
+ ``_ad_first_order_only`` inside every backward.
+ """
 
     if request.ad_mode != "vjp":
         return
@@ -430,12 +383,12 @@ def require_first_order_request(
 def ad_ledger(ad_mode: str) -> object | None:
     """One AD ledger per reevaluation, or ``None`` for a primal call.
 
-    The discovery route already builds one inside its field loop and hands it
-    up through the execution sidecars. The fixed-topology route built none, so
-    the inner loop a per-frame consumer runs reported no AD accounting at all;
-    this is the same counter, constructed at the one place that owns the whole
-    call. A primal call constructs nothing and pays nothing.
-    """
+ The discovery route already builds one inside its field loop and hands it
+ up through the execution sidecars. The fixed-topology route built none, so
+ the inner loop a per-frame consumer runs reported no AD accounting at all;
+ this is the same counter, constructed at the one place that owns the whole
+ call. A primal call constructs nothing and pays nothing.
+ """
 
     if ad_mode == "none":
         return None
@@ -447,12 +400,12 @@ def ad_ledger(ad_mode: str) -> object | None:
 def tape_bytes(ledger_bytes: int, ad_mode: str) -> int:
     """Reproduce the solver-metadata tape gate rather than the raw counter.
 
-    ``AdLaunchLedger`` sums what every registered companion saved, and forward
-    mode retains none of it past the solve. The solver metadata layer applies
-    exactly this gate (``deterministic/pipeline.py``), so forwarding the raw
-    sidecar number here would report retained tape for a jvp call and
-    contradict the ledger's own contract.
-    """
+ ``AdLaunchLedger`` sums what every registered companion saved, and forward
+ mode retains none of it past the solve. The solver metadata layer applies
+ exactly this gate (``deterministic/pipeline.py``), so forwarding the raw
+ sidecar number here would report retained tape for a jvp call and
+ contradict the ledger's own contract.
+ """
 
     return int(ledger_bytes) if ad_mode == "vjp" else 0
 
@@ -463,7 +416,7 @@ def tape_bytes(ledger_bytes: int, ad_mode: str) -> int:
 #
 # This section is the single source of truth for the consumer vocabulary. The
 # accepted component, response, topology, and AD-mode values are declared here as
-# ``Literal`` aliases with matching frozen sets, and :func:`capabilities` returns
+# ``Literal`` aliases with matching frozen sets, and:func:`capabilities` returns
 # the frozen capability record. A consumer can therefore discover what the
 # contract supports before building a request instead of learning it from a
 # rejected call.
@@ -521,19 +474,19 @@ class _WorldVersionSource(Protocol):
 
 @dataclass(frozen=True, slots=True, eq=False)
 class WorldProvenance:
-    """Which world a discovered topology belongs to (ADR-040).
+    """Which world a discovered topology belongs to (world-version validation).
 
-    The four integers are the ``witwin.core`` version domains the compiled
-    scene was built from. They are content hashes, so equal versions mean equal
-    world content, which is exactly the condition under which replaying a
-    frozen topology is numerically meaningful. Comparison is by domain, never
-    by object identity.
+ The four integers are the ``witwin.core`` version domains the compiled
+ scene was built from. They are content hashes, so equal versions mean equal
+ world content, which is exactly the condition under which replaying a
+ frozen topology is numerically meaningful. Comparison is by domain, never
+ by object identity.
 
-    ``time_s`` is the compiled snapshot instant. It is carried for reporting
-    and cross-consumer correlation only: it is never compared and never gates
-    a call, because two different instants of a static world are the same
-    world.
-    """
+ ``time_s`` is the compiled snapshot instant. It is carried for reporting
+ and cross-consumer correlation only: it is never compared and never gates
+ a call, because two different instants of a static world are the same
+ world.
+ """
 
     topology_version: int
     geometry_version: int
@@ -558,9 +511,9 @@ class WorldProvenance:
     ) -> str | None:
         """Name the first version domain that differs, or ``None``.
 
-        Four host integer comparisons. No device work, no allocation, no
-        synchronization.
-        """
+ Four host integer comparisons. No device work, no allocation, no
+ synchronization.
+ """
 
         for name in WORLD_VERSION_DOMAINS:
             if allow_geometry and name == "geometry_version":
@@ -574,12 +527,12 @@ class WorldProvenance:
 class EndpointBatch:
     """Explicit point endpoints for one propagation request.
 
-    ``polarization_basis`` contains two world-Cartesian endpoint reference
-    vectors. The native Jones producer projects and orthonormalizes them for
-    each path direction and returns the actual row-aligned transverse bases.
-    ``powers_w`` is required for a source batch and must be absent from a sink
-    batch.
-    """
+ ``polarization_basis`` contains two world-Cartesian endpoint reference
+ vectors. The native Jones producer projects and orthonormalizes them for
+ each path direction and returns the actual row-aligned transverse bases.
+ ``powers_w`` is required for a source batch and must be absent from a sink
+ batch.
+ """
 
     stable_ids: torch.Tensor
     positions_m: torch.Tensor
@@ -682,11 +635,10 @@ def _require_endpoints(sources: object, sinks: object) -> None:
 class PropagationRequest:
     """A discovery request against a compiled scene.
 
-    Structural validity is enforced here. Capability compatibility that depends
-    on the compiled scene  -  reference-frequency match, response/component and
-    response/AD combinations, polarimetric basis requirements  -  is enforced by
-    :func:`witwin.channel.propagation.consumer.evaluate` before any native work.
-    """
+ Structural validity is enforced here. Capability compatibility that depends
+ on the compiled scene - reference-frequency match, response/component and
+ response/AD combinations, polarimetric basis requirements - is enforced by:func:`witwin.channel.propagation.consumer.evaluate` before any native work.
+ """
 
     sources: EndpointBatch
     sinks: EndpointBatch
@@ -716,13 +668,10 @@ class PropagationRequest:
 class PropagationTopology:
     """Compact discrete rows in stable pair-major order.
 
-    ``provenance`` records which world these rows were discovered against.
-    :func:`witwin.channel.propagation.consumer.evaluate` stamps it,
-    :func:`prepare_fixed_topology` forwards it verbatim, and
-    :func:`witwin.channel.propagation.consumer.reevaluate` refuses a frozen
-    replay against a world that moved out from under it. It is ``None`` on a
-    hand-built topology, which has no world to be stale against.
-    """
+ ``provenance`` records which world these rows were discovered against.:func:`witwin.channel.propagation.consumer.evaluate` stamps it:func:`prepare_fixed_topology` forwards it verbatim, and:func:`witwin.channel.propagation.consumer.reevaluate` refuses a frozen
+ replay against a world that moved out from under it. It is ``None`` on a
+ hand-built topology, which has no world to be stale against.
+ """
 
     source_index: torch.Tensor
     sink_index: torch.Tensor
@@ -859,19 +808,19 @@ class PropagationGeometry:
 class ScalarTransport:
     """Endpoint-projected complex scalar transport at the reference frequency.
 
-    The coefficient carries the declared source amplitude
-    ``sqrt(sources.powers_w)`` of the transmitting endpoint, so it is a
-    transported field value and not a unit-excitation transfer function
-    (ADR-039). Power/gain values are its squared magnitude.
+ The coefficient carries the declared source amplitude
+ ``sqrt(sources.powers_w)`` of the transmitting endpoint, so it is a
+ transported field value and not a unit-excitation transfer function
+ (source excitation). Power/gain values are its squared magnitude.
 
-    ``coefficient_offsets`` is the optional wideband payload (ADR-042):
-    ``[K, F]`` complex64, where column ``j`` is the SAME row evaluated at
-    ``reference_frequency_hz + frequency_offsets_hz[j]``. It is present exactly
-    when the request declared ``frequency_offsets_hz``, and the grid it was
-    evaluated on is echoed here so a column can never be read against the wrong
-    frequency. A ``0.0`` entry produces a column bit-identical to
-    ``coefficient``.
-    """
+ ``coefficient_offsets`` is the optional wideband payload (wideband evaluation):
+ ``[K, F]`` complex64, where column ``j`` is the SAME row evaluated at
+ ``reference_frequency_hz + frequency_offsets_hz[j]``. It is present exactly
+ when the request declared ``frequency_offsets_hz``, and the grid it was
+ evaluated on is echoed here so a column can never be read against the wrong
+ frequency. A ``0.0`` entry produces a column bit-identical to
+ ``coefficient``.
+ """
 
     coefficient: torch.Tensor
     coefficient_offsets: torch.Tensor | None = None
@@ -899,16 +848,14 @@ class ScalarTransport:
 class Complex3Transport:
     """World-Cartesian complex electric field and propagation direction.
 
-    The field carries the declared source amplitude
-    ``sqrt(sources.powers_w)`` of the transmitting endpoint, so projecting it
-    onto the receive polarization reproduces
-    :class:`ScalarTransport.coefficient` (ADR-039).
+ The field carries the declared source amplitude
+ ``sqrt(sources.powers_w)`` of the transmitting endpoint, so projecting it
+ onto the receive polarization reproduces:class:`ScalarTransport.coefficient` (source excitation).
 
-    ``field_offsets`` is the optional wideband payload (ADR-042): ``[K, F, 3]``
-    complex64 on the same grid law as
-    :attr:`ScalarTransport.coefficient_offsets`. ``direction`` stays ``[K, 3]``
-    because it is geometry, and geometry does not depend on frequency.
-    """
+ ``field_offsets`` is the optional wideband payload (wideband evaluation): ``[K, F, 3]``
+ complex64 on the same grid law as:attr:`ScalarTransport.coefficient_offsets`. ``direction`` stays ``[K, 3]``
+ because it is geometry, and geometry does not depend on frequency.
+ """
 
     field: torch.Tensor
     direction: torch.Tensor
@@ -943,12 +890,12 @@ class Complex3Transport:
 class JonesTransport:
     """Complete source-basis to sink-basis complex 2 x 2 operator.
 
-    The operator excludes transmitter power and endpoint antenna-pattern
-    factors; those are not part of a linear polarization-basis map. This is
-    deliberately unlike :class:`ScalarTransport` and :class:`Complex3Transport`,
-    which publish the excited transport: a caller that wants a powered response
-    applies ``sqrt(powers_w)`` to the source-basis excitation itself.
-    """
+ The operator excludes transmitter power and endpoint antenna-pattern
+ factors; those are not part of a linear polarization-basis map. This is
+ deliberately unlike:class:`ScalarTransport` and:class:`Complex3Transport`,
+ which publish the excited transport: a caller that wants a powered response
+ applies ``sqrt(powers_w)`` to the source-basis excitation itself.
+ """
 
     matrix: torch.Tensor
     source_basis: torch.Tensor
@@ -1091,7 +1038,7 @@ class PropagationCapabilities:
     supports_los_jones: bool
     # Components whose fixed-topology rows can stop existing at new endpoint
     # positions and are therefore published with a per-row validity mask
-    # instead of failing the whole batch (ADR-037).
+    # instead of failing the whole batch (fixed-topology replay).
     fixed_topology_row_validity_components: frozenset[str]
     # Inputs the composed Jones operator consumes as primal-only constants.
     # The native field companions reject gradients on them by contract, so a
@@ -1108,7 +1055,7 @@ class PropagationCapabilities:
     max_slot_count: int | None
     # Whether a FixedTopologyRequest may declare frequency_offsets_hz and
     # receive the same frozen rows evaluated at F absolute frequencies
-    # (ADR-042). The payload layout is
+    # (wideband evaluation). The payload layout is
     # PropagationConvention.wideband_offset_layout.
     supports_wideband_offsets: bool
     # Responses that carry a wideband payload. polarimetric_transport does not:
@@ -1170,7 +1117,7 @@ class PropagationCapabilities:
         return dict(self.component_ad_modes)[component]
 
     def material_leaves_for(self, component: str) -> tuple[str, ...]:
-        """Which compiled-material tensors ``component`` reads (ADR-043)."""
+        """Which compiled-material tensors ``component`` reads (first-order differentiation)."""
 
         return dict(self.component_material_leaves)[component]
 
@@ -1245,10 +1192,10 @@ _CAPABILITIES = PropagationCapabilities(
 def capabilities() -> PropagationCapabilities:
     """Return what this consumer contract version supports.
 
-    Call this before building a :class:`PropagationRequest` to check that a
-    component, response, and AD-mode combination is available. The record is
-    frozen and identical across calls.
-    """
+ Call this before building a:class:`PropagationRequest` to check that a
+ component, response, and AD-mode combination is available. The record is
+ frozen and identical across calls.
+ """
 
     return _CAPABILITIES
 
@@ -1272,7 +1219,7 @@ class PropagationDiagnostics:
     # row_valid, while the copy and synchronization counts above stay at one
     # whatever F is.
     frequency_column_count: int = 1
-    # ADR-043 AD accounting. One entry per registered differentiable native
+    # first-order differentiation AD accounting. One entry per registered differentiable native
     # companion this call launched, and the bytes those companions retained for
     # backward. Forward mode retains nothing past the solve, so a jvp call
     # reports zero tape however many companions it launched.
@@ -1292,10 +1239,10 @@ class PropagationEvaluation:
 class FixedTopologyBucket:
     """One host-known ``(component, depth)`` partition of a frozen topology.
 
-    ``rows`` holds ascending indices into the frozen ``K`` rows, so a bucket
-    preserves frozen row order. The component name and the depth are host
-    integers determined once, at freeze time.
-    """
+ ``rows`` holds ascending indices into the frozen ``K`` rows, so a bucket
+ preserves frozen row order. The component name and the depth are host
+ integers determined once, at freeze time.
+ """
 
     component: str
     depth: int
@@ -1316,17 +1263,17 @@ class FixedTopologyBucket:
 class PreparedFixedTopology:
     """A frozen topology partitioned once for repeated reevaluation.
 
-    Reflection field transport takes one uniform interaction depth per native
-    launch, so a mixed-depth frozen batch has to be partitioned before it can
-    be reevaluated. That partition is a property of the frozen topology alone,
-    so it is computed once here and reused by every later call.
+ Reflection field transport takes one uniform interaction depth per native
+ launch, so a mixed-depth frozen batch has to be partitioned before it can
+ be reevaluated. That partition is a property of the frozen topology alone,
+ so it is computed once here and reused by every later call.
 
-    The recorded host-observation counters describe THIS construction, not a
-    later :func:`witwin.channel.propagation.consumer.reevaluate` call. They are
-    deliberately not folded into per-call diagnostics: preparing the handle
-    once per frozen topology is the contract, and preparing it per frame gives
-    up the whole point of the capability.
-    """
+ The recorded host-observation counters describe THIS construction, not a
+ later:func:`witwin.channel.propagation.consumer.reevaluate` call. They are
+ deliberately not folded into per-call diagnostics: preparing the handle
+ once per frozen topology is the contract, and preparing it per frame gives
+ up the whole point of the capability.
+ """
 
     topology: PropagationTopology
     buckets: tuple[FixedTopologyBucket, ...]
@@ -1371,44 +1318,42 @@ def _require_slot_count(slot_count: object) -> int:
 class FixedTopologyRequest:
     """A reevaluation request against an already-discovered topology.
 
-    ``topology`` is a raw :class:`PropagationTopology` for the zero-interaction
-    LoS route, or a :class:`PreparedFixedTopology` for any route that carries
-    interactions. Structural validity is enforced here; scene-dependent
-    capability checks belong to
-    :func:`witwin.channel.propagation.consumer.reevaluate`.
+ ``topology`` is a raw:class:`PropagationTopology` for the zero-interaction
+ LoS route, or a:class:`PreparedFixedTopology` for any route that carries
+ interactions. Structural validity is enforced here; scene-dependent
+ capability checks belong to:func:`witwin.channel.propagation.consumer.reevaluate`.
 
-    ``world_motion`` declares what the caller expects of the world between
-    discovery and this replay. ``"frozen_world"`` is the safe default and
-    accepts only the world the rows were discovered against.
-    ``"fixed_winner_replay"`` additionally accepts a moved
-    ``geometry_version`` - a translated, rotated, or deformed structure - and
-    states that the caller deliberately holds the discrete winner set fixed
-    while the geometry moves. It never accepts a moved topology, material, or
-    assignment version: those respecify the labels the frozen rows carry.
+ ``world_motion`` declares what the caller expects of the world between
+ discovery and this replay. ``"frozen_world"`` is the safe default and
+ accepts only the world the rows were discovered against.
+ ``"fixed_winner_replay"`` additionally accepts a moved
+ ``geometry_version`` - a translated, rotated, or deformed structure - and
+ states that the caller deliberately holds the discrete winner set fixed
+ while the geometry moves. It never accepts a moved topology, material, or
+ assignment version: those respecify the labels the frozen rows carry.
 
-    ``slot_count`` declares that the frozen rows and the endpoint batches are
-    ``slot_count`` block-diagonal slots stacked slot-major, so one call replays
-    a whole frame, pulse train, or symbol block in one launch per bucket with
-    one validation copy and one synchronization for the whole set. The pairing
-    law is :attr:`PropagationConvention.slot_pair_layout`; build the topology
-    with :func:`replicate_over_slots`. It requires a
-    :class:`PreparedFixedTopology`: the raw zero-interaction route builds its
-    pair segmentation inside the native gather over the full source/sink outer
-    product and therefore cannot express a block-diagonal layout.
+ ``slot_count`` declares that the frozen rows and the endpoint batches are
+ ``slot_count`` block-diagonal slots stacked slot-major, so one call replays
+ a whole frame, pulse train, or symbol block in one launch per bucket with
+ one validation copy and one synchronization for the whole set. The pairing
+ law is:attr:`PropagationConvention.slot_pair_layout`; build the topology
+ with:func:`replicate_over_slots`. It requires a:class:`PreparedFixedTopology`: the raw zero-interaction route builds its
+ pair segmentation inside the native gather over the full source/sink outer
+ product and therefore cannot express a block-diagonal layout.
 
-    ``frequency_offsets_hz`` declares that the same frozen rows are wanted at
-    the ``F`` absolute frequencies ``reference_frequency_hz + df_j``, in the
-    declared order (ADR-042). ``None``, the default, is exactly the
-    single-frequency behaviour, bit for bit. The grid is a host tuple rather
-    than a tensor because it is a declaration in the same class as
-    ``slot_count``: it names which frequencies to evaluate, it is structurally
-    non-differentiable, and it is float64-exact. It is a PROPAGATION frequency
-    grid and nothing else - it never names a subcarrier count, an FFT size, or
-    a bandwidth. Scene-dependent limits (dispersive materials, rough materials
-    and phase screens, and the native float32 launch resolution) are enforced
-    by :func:`witwin.channel.propagation.consumer.reevaluate` before any native
-    work; see :func:`native_frequency_resolution_hz`.
-    """
+ ``frequency_offsets_hz`` declares that the same frozen rows are wanted at
+ the ``F`` absolute frequencies ``reference_frequency_hz + df_j``, in the
+ declared order (wideband evaluation). ``None``, the default, is exactly the
+ single-frequency behaviour, bit for bit. The grid is a host tuple rather
+ than a tensor because it is a declaration in the same class as
+ ``slot_count``: it names which frequencies to evaluate, it is structurally
+ non-differentiable, and it is float64-exact. It is a PROPAGATION frequency
+ grid and nothing else - it never names a subcarrier count, an FFT size, or
+ a bandwidth. Scene-dependent limits (dispersive materials, rough materials
+ and phase screens, and the native float32 launch resolution) are enforced
+ by:func:`witwin.channel.propagation.consumer.reevaluate` before any native
+ work; see:func:`native_frequency_resolution_hz`.
+ """
 
     sources: EndpointBatch
     sinks: EndpointBatch
@@ -1487,33 +1432,32 @@ class FixedTopologyRequest:
 class FixedTopologyEvaluation:
     """A reevaluated batch of frozen rows.
 
-    ``row_valid`` is ``None`` when every published row is valid by
-    construction, which is the case for a route whose rows cannot stop
-    existing. When it is present it is a CUDA ``bool`` mask over the frozen
-    rows in frozen row order and it is the SOLE authority on whether a row's
-    payload means anything: a geometrically valid row may legitimately carry a
-    zero coefficient, so validity can never be inferred from the payload.
+ ``row_valid`` is ``None`` when every published row is valid by
+ construction, which is the case for a route whose rows cannot stop
+ existing. When it is present it is a CUDA ``bool`` mask over the frozen
+ rows in frozen row order and it is the SOLE authority on whether a row's
+ payload means anything: a geometrically valid row may legitimately carry a
+ zero coefficient, so validity can never be inferred from the payload.
 
-    It covers exactly ``fixed_topology_row_validity_components``. A frozen
-    line-of-sight row IS re-tested against the passed scene with the same
-    native visibility gate discovery applies, so a sink that moves behind a
-    wall publishes ``row_valid=False`` and exact zeros rather than a stale
-    full-strength answer. A row keeps its ORIGINAL ``primitive_sequence``
-    label when the stationary point slides onto a coplanar twin triangle; the
-    numbers are exact, the discrete label is stale. Both are recorded in
-    ADR-037.
+ It covers exactly ``fixed_topology_row_validity_components``. A frozen
+ line-of-sight row IS re-tested against the passed scene with the same
+ native visibility gate discovery applies, so a sink that moves behind a
+ wall publishes ``row_valid=False`` and exact zeros rather than a stale
+ full-strength answer. A row keeps its ORIGINAL ``primitive_sequence``
+ label when the stationary point slides onto a coplanar twin triangle; the
+ numbers are exact, the discrete label is stale. Both are recorded in
+ fixed-topology replay.
 
-    **Replay is subtractive (ADR-040).** A frozen row can stop existing and is
-    published as ``row_valid=False``; a path that comes into existence at the
-    new endpoint or world state is NOT discovered here and is silently absent
-    from the batch. The rows that are published are exactly correct, and the
-    batch under-reports. There is no birth signal, by design: every candidate
-    detector costs either a full discovery or a device reduction plus a host
-    read the ADR-032 budget does not have. A caller whose scene can gain paths
-    owns the rediscovery cadence; poll
-    :func:`witwin.channel.propagation.consumer.rediscovery_required` for a
-    changed world and rediscover on a motion-event cadence.
-    """
+ **Replay is subtractive (world-version validation).** A frozen row can stop existing and is
+ published as ``row_valid=False``; a path that comes into existence at the
+ new endpoint or world state is NOT discovered here and is silently absent
+ from the batch. The rows that are published are exactly correct, and the
+ batch under-reports. There is no birth signal, by design: every candidate
+ detector costs either a full discovery or a device reduction plus a host
+ read the compact output budget does not have. A caller whose scene can gain paths
+ owns the rediscovery cadence; poll:func:`witwin.channel.propagation.consumer.rediscovery_required` for a
+ changed world and rediscover on a motion-event cadence.
+ """
 
     paths: PropagationPathBatch
     convention: PropagationConvention
@@ -1539,7 +1483,7 @@ class FixedTopologyEvaluation:
 # ``prepare_fixed_topology`` is the one place the consumer looks at frozen rows on
 # the host: it validates their depth/interaction padding and partitions them into
 # the ascending ``(component, depth)`` buckets a replay launches one at a time.
-# ``replicate_over_slots`` then tiles that partition over ADR-041 block-diagonal
+# ``replicate_over_slots`` then tiles that partition over slot batching block-diagonal
 # slots by index arithmetic alone.
 #
 # Both are vocabulary-level boundary work with no physics in them, and both sit
@@ -1587,16 +1531,15 @@ def prepare_fixed_topology(
 ) -> PreparedFixedTopology:
     """Partition a frozen topology by component and interaction depth.
 
-    This is the one place the consumer looks at a frozen topology on the host.
-    It validates the depth/interaction padding of every row, rejects any
-    component outside ``capabilities().fixed_topology_components``, and returns
-    the ascending ``(component, depth)`` buckets that
-    :func:`witwin.channel.propagation.consumer.reevaluate` replays.
+ This is the one place the consumer looks at a frozen topology on the host.
+ It validates the depth/interaction padding of every row, rejects any
+ component outside ``capabilities.fixed_topology_components``, and returns
+ the ascending ``(component, depth)`` buckets that:func:`witwin.channel.propagation.consumer.reevaluate` replays.
 
-    Call it once per frozen topology and reuse the handle. It synchronizes; a
-    per-frame call would reintroduce exactly the host observation the fixed
-    topology capability exists to avoid.
-    """
+ Call it once per frozen topology and reuse the handle. It synchronizes; a
+ per-frame call would reintroduce exactly the host observation the fixed
+ topology capability exists to avoid.
+ """
 
     if not isinstance(topology, PropagationTopology):
         raise TypeError("topology must be a PropagationTopology")
@@ -1649,24 +1592,24 @@ def replicate_over_slots(
 ) -> PreparedFixedTopology:
     """Tile a frozen topology over ``slot_count`` block-diagonal slots.
 
-    ``source_count`` and ``sink_count`` are the PER-SLOT endpoint counts of the
-    stacked batches the replicated topology will be replayed against. They are
-    required rather than inferred: an endpoint that publishes no frozen row
-    never appears in ``source_index``, so the largest index in a topology is
-    not the endpoint count and inferring one would silently mislabel every
-    later slot.
+ ``source_count`` and ``sink_count`` are the PER-SLOT endpoint counts of the
+ stacked batches the replicated topology will be replayed against. They are
+ required rather than inferred: an endpoint that publishes no frozen row
+ never appears in ``source_index``, so the largest index in a topology is
+ not the endpoint count and inferring one would silently mislabel every
+ later slot.
 
-    This is pure index arithmetic and bucket re-partitioning: row ``t*K + r``
-    names the same frozen row ``r`` shifted into slot ``t``, so the frozen row
-    order is preserved inside every slot and the ``(component, depth)`` bucket
-    COUNT is unchanged - only the bucket row counts grow. No compaction, no
-    physics, no native symbol, no host observation. ``slot_count == 1`` returns
-    the handle unchanged, so a single-slot replay is bit-identical to one that
-    never asked for slots.
+ This is pure index arithmetic and bucket re-partitioning: row ``t*K + r``
+ names the same frozen row ``r`` shifted into slot ``t``, so the frozen row
+ order is preserved inside every slot and the ``(component, depth)`` bucket
+ COUNT is unchanged - only the bucket row counts grow. No compaction, no
+ physics, no native symbol, no host observation. ``slot_count == 1`` returns
+ the handle unchanged, so a single-slot replay is bit-identical to one that
+ never asked for slots.
 
-    ``provenance`` is forwarded verbatim, so a replicated topology is checked
-    for staleness exactly like the topology it came from (ADR-040).
-    """
+ ``provenance`` is forwarded verbatim, so a replicated topology is checked
+ for staleness exactly like the topology it came from (world-version validation).
+ """
 
     if not isinstance(prepared, PreparedFixedTopology):
         raise TypeError("prepared must be a PreparedFixedTopology")
@@ -1761,7 +1704,7 @@ def replicate_over_slots(
 #
 # * ``project_to_wedge_plane(v, e) = v - e*(v.e)`` is linear in ``v``;
 # * a Fresnel bounce scales the s and p components by coefficients that depend on
-#   the incidence frame and the material, never on the field itself;
+# the incidence frame and the material, never on the field itself;
 # * the trailing free-space factor is a complex scalar;
 # * ``project_receiver(E, d, p) = E . project_to_wedge_plane(p, d)``.
 #
@@ -2311,13 +2254,13 @@ def fixed_los_gather(
 
 
 def fixed_los_geometry_live(rows: FixedLoSRows) -> bool:
-    """ADR-038 liveness for the raw frozen line-of-sight route.
+    """forward-mode liveness liveness for the raw frozen line-of-sight route.
 
-    A zero-interaction row is a function of its two gathered endpoints alone, so
-    this is the complete liveness question for that route. It is answered here,
-    once, from the gathered rows, above any frequency-column loop that replays
-    them.
-    """
+ A zero-interaction row is a function of its two gathered endpoints alone, so
+ this is the complete liveness question for that route. It is answered here,
+ once, from the gathered rows, above any frequency-column loop that replays
+ them.
+ """
 
     return _ad_geometry_live(rows.source, rows.target)
 
@@ -2325,10 +2268,10 @@ def fixed_los_geometry_live(rows: FixedLoSRows) -> bool:
 def require_fixed_los_geometry_live(rows: FixedLoSRows, decided: bool) -> None:
     """Fail loudly if one column disagrees with the hoisted decision.
 
-    The field facade keeps deciding liveness for itself - that is its ADR-038
-    contract - and this makes "every column decides the same thing" a checked
-    invariant instead of an assumption, before the operator runs.
-    """
+ The field facade keeps deciding liveness for itself - that is its forward-mode liveness
+ contract - and this makes "every column decides the same thing" a checked
+ invariant instead of an assumption, before the operator runs.
+ """
 
     if fixed_los_geometry_live(rows) != decided:
         raise RuntimeError(
@@ -2436,11 +2379,11 @@ def _slot_pairing(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Block-diagonal pair index, plus the rows that break the block law.
 
-    A row belongs to the slot its SOURCE lives in. Its sink must live in the
-    same slot, which is exactly the statement that the sink's within-slot index
-    lands in ``[0, slot_sinks)``; a row that pairs across slots would otherwise
-    silently land in another slot's pair segment.
-    """
+ A row belongs to the slot its SOURCE lives in. Its sink must live in the
+ same slot, which is exactly the statement that the sink's within-slot index
+ lands in ``[0, slot_sinks)``; a row that pairs across slots would otherwise
+ silently land in another slot's pair segment.
+ """
 
     slot = source_row_index.div(slot_sources, rounding_mode="floor")
     source_slot_index = source_row_index - slot * slot_sources
@@ -2477,13 +2420,13 @@ def prepared_row_gather(
 ) -> PreparedRows:
     """Validate frozen rows and bind them to the current endpoint batches.
 
-    ``slot_count`` selects the pairing law. One slot is the outer product the
-    consumer has always published; more than one is the block-diagonal layout
-    of :attr:`PropagationConvention.slot_pair_layout`, under which ``pair_count``
-    grows linearly rather than quadratically in the slot count. The validation
-    budget is unchanged: one four-byte copy and one synchronization for the
-    whole batch, whatever the slot count.
-    """
+ ``slot_count`` selects the pairing law. One slot is the outer product the
+ consumer has always published; more than one is the block-diagonal layout
+ of:attr:`PropagationConvention.slot_pair_layout`, under which ``pair_count``
+ grows linearly rather than quadratically in the slot count. The validation
+ budget is unchanged: one four-byte copy and one synchronization for the
+ whole batch, whatever the slot count.
+ """
 
     if topology.device != sources.device or topology.device != sinks.device:
         raise ValueError("topology and endpoint tensors must share one CUDA device")
@@ -2562,12 +2505,12 @@ def excited_field(
 ) -> torch.Tensor:
     """Return the source-excited complex3 field for a unit-excitation one.
 
-    The field transport kernels carry ``sqrt(tx_power)`` into ``path_field`` and
-    ``path_gain`` but leave their complex3 vector at unit excitation, so there
-    is no excited vector on that launch. ADR-039 adds the native owner of
-    exactly that quantity; this only chooses between its primal and
-    differentiable entry points. No amplitude is computed here.
-    """
+ The field transport kernels carry ``sqrt(tx_power)`` into ``path_field`` and
+ ``path_gain`` but leave their complex3 vector at unit excitation, so there
+ is no excited vector on that launch. source excitation adds the native owner of
+ exactly that quantity; this only chooses between its primal and
+ differentiable entry points. No amplitude is computed here.
+ """
 
     from witwin.channel.kernels import fields as field_kernels
 
@@ -2599,13 +2542,13 @@ def transverse_basis(
 ) -> torch.Tensor:
     """Row-aligned orthonormal basis transverse to ``leg_target - leg_origin``.
 
-    ``consumer_los_jones`` indexes its endpoint tables through ``pair_index``,
-    so handing it per-row tables and the diagonal pair index makes it evaluate
-    exactly one leg per row. The same reference basis is supplied for both
-    endpoints, which makes its two published bases identical, and the source
-    one is returned. This reuses the shipped native endpoint-basis owner
-    instead of restating its projection and orthonormalization in Torch.
-    """
+ ``consumer_los_jones`` indexes its endpoint tables through ``pair_index``,
+ so handing it per-row tables and the diagonal pair index makes it evaluate
+ exactly one leg per row. The same reference basis is supplied for both
+ endpoints, which makes its two published bases identical, and the source
+ one is returned. This reuses the shipped native endpoint-basis owner
+ instead of restating its projection and orthonormalization in Torch.
+ """
 
     rows = int(leg_origin.shape[0])
     pair_index = torch.arange(
@@ -2645,12 +2588,12 @@ def compose_jones(
 ) -> tuple[torch.Tensor, torch.Tensor, dict[str, torch.Tensor]]:
     """Build the ``(N, 2, 2)`` operator from two excitations of ``excite``.
 
-    ``matrix[k, i, j]`` is the response of sink basis vector ``i`` to source
-    basis vector ``j``, which is the index convention the native LoS Jones
-    owner publishes. Returns the operator, the sink basis, and the first
-    column's full field result so the caller can publish its geometry without
-    re-running the transport.
-    """
+ ``matrix[k, i, j]`` is the response of sink basis vector ``i`` to source
+ basis vector ``j``, which is the index convention the native LoS Jones
+ owner publishes. Returns the operator, the sink basis, and the first
+ column's full field result so the caller can publish its geometry without
+ re-running the transport.
+ """
 
     columns = tuple(
         excite(source_basis[:, index].contiguous()) for index in (0, 1)
@@ -2689,35 +2632,35 @@ _MATERIAL_FIELDS = ("eps_r", "sigma_e", "mu_r", "gain", "thickness")
 
 @dataclass(frozen=True, slots=True)
 class GeometryLiveness:
-    """ADR-038 liveness, decided once above every loop that reuses it.
+    """forward-mode liveness liveness, decided once above every loop that reuses it.
 
-    ADR-038 requires the conditional differentiability of ``path_length_m`` and
-    ``delay_s`` to be decided where forward duals are still visible, because
-    ``Function.apply`` unpacks them before ``setup_context`` runs. A wideband
-    request evaluates the same frozen rows at several frequencies, so it drives
-    the same field operators repeatedly over identical geometry inputs.
-    Deciding liveness inside that loop, or letting the first column decide for
-    the rest, is exactly the shape of the defect ADR-038 removed.
+ forward-mode liveness the conditional differentiability of ``path_length_m`` and
+ ``delay_s`` to be decided where forward duals are still visible, because
+ ``Function.apply`` unpacks them before ``setup_context`` runs. A wideband
+ request evaluates the same frozen rows at several frequencies, so it drives
+ the same field operators repeatedly over identical geometry inputs.
+ Deciding liveness inside that loop, or letting the first column decide for
+ the rest, is exactly the shape of the defect forward-mode liveness
 
-    So the decision is made ONCE here, above the column loop, from the inputs
-    every column shares, and :meth:`require` re-asserts it against the actual
-    operator inputs of every bucket of every column. The field facades keep
-    deciding for themselves - that is their ADR-038 contract and their frozen
-    surface - and this record makes it a checked invariant that they all decide
-    the same thing, rather than an assumption. A disagreement is a loud failure
-    before the operator runs, never a column that silently answers a different
-    question than its siblings.
+ So the decision is made ONCE here, above the column loop, from the inputs
+ every column shares, and:meth:`require` re-asserts it against the actual
+ operator inputs of every bucket of every column. The field facades keep
+ deciding for themselves - that is their forward-mode liveness contract and their frozen
+ surface - and this record makes it a checked invariant that they all decide
+ the same thing, rather than an assumption. A disagreement is a loud failure
+ before the operator runs, never a column that silently answers a different
+ question than its siblings.
 
-    Two flags rather than one because the two bucket kinds consume different
-    geometry: a zero-depth line-of-sight row is a function of the endpoints
-    alone, while a reflection row additionally resolves its stationary point
-    against the scene vertices, so a differentiable mesh makes the reflection
-    geometry live even when the endpoints are primal.
-    """
+ Two flags rather than one because the two bucket kinds consume different
+ geometry: a zero-depth line-of-sight row is a function of the endpoints
+ alone, while a reflection row additionally resolves its stationary point
+ against the scene vertices, so a differentiable mesh makes the reflection
+ geometry live even when the endpoints are primal.
+ """
 
     los: bool
     reflection: bool
-    # ADR-043: whether the published arrival direction carries a derivative.
+    # first-order differentiation: whether the published arrival direction carries a derivative.
     # This is a whole-result decision taken from the request's component set,
     # never a per-row one: a batch that carries a component whose direction
     # seam Channel does not own publishes a fully detached field_direction for
@@ -2747,11 +2690,11 @@ class GeometryLiveness:
     def direction_at_depth(self, depth: int) -> bool:
         """Direction liveness for one bucket, under both decisions.
 
-        A direction derivative is a geometry derivative, so it can only be live
-        where the geometry is. The component half is host-known and identical
-        for every bucket and every column, which is what makes the whole-result
-        rule hold without a second device observation.
-        """
+ A direction derivative is a geometry derivative, so it can only be live
+ where the geometry is. The component half is host-known and identical
+ for every bucket and every column, which is what makes the whole-result
+ rule hold without a second device observation.
+ """
 
         return self.at_depth(depth) and self.direction_components
 
@@ -2792,10 +2735,10 @@ class BucketInputs:
 class FixedRowOutputs:
     """Frozen-order ``K`` row outputs of one reevaluation.
 
-    ``path_field`` and ``path_field_vector`` are the source-excited transport,
-    matching what discovery publishes. ``path_field_vector`` is only produced
-    for the complex3 response, which is the only reader of it.
-    """
+ ``path_field`` and ``path_field_vector`` are the source-excited transport,
+ matching what discovery publishes. ``path_field_vector`` is only produced
+ for the complex3 response, which is the only reader of it.
+ """
 
     path_field: torch.Tensor
     path_field_vector: torch.Tensor | None
@@ -2813,12 +2756,12 @@ class FixedRowOutputs:
 def require_smooth_reflection_scene(compiled: CompiledScene) -> None:
     """Reject a scene whose reflection rows need rough-surface attenuation.
 
-    The coherent rough-reflection factor and the realization phase-screen delta
-    replacement are owned by the discovery-side field loop and are gated on
-    host material state there. Reproducing that gate here would duplicate
-    another owner's policy, and silently disagreeing with ``evaluate`` on a
-    rough scene is worse than refusing, so this route requires a smooth scene.
-    """
+ The coherent rough-reflection factor and the realization phase-screen delta
+ replacement are owned by the discovery-side field loop and are gated on
+ host material state there. Reproducing that gate here would duplicate
+ another owner's policy, and silently disagreeing with ``evaluate`` on a
+ rough scene is worse than refusing, so this route requires a smooth scene.
+ """
 
     if bool((compiled.materials.scatter_model_id == 1).any()):
         raise NotImplementedError(
@@ -2838,7 +2781,7 @@ def require_smooth_reflection_scene(compiled: CompiledScene) -> None:
 
 
 def _scene_tables(compiled: CompiledScene) -> dict[str, object]:
-    # CompiledScene owns the lazy scene-static cache (Plan-13 pattern); the
+    # CompiledScene owns the lazy scene-static cache ; the
     # replay just consumes it. The primal per-frame case stages host-to-device
     # once per compiled scene instead of once per call.
     return compiled.fixed_reevaluation_tables()
@@ -3004,11 +2947,11 @@ def _field_op(
 def _leg_endpoints(inputs: BucketInputs) -> tuple[torch.Tensor, torch.Tensor]:
     """Where the first leg ends and where the last leg starts.
 
-    A reflection row launches toward its first interaction and arrives from
-    its last one, so its transverse bases live in two different planes. Both
-    are read off the interaction table the native transport itself consumes;
-    neither direction is recomputed here.
-    """
+ A reflection row launches toward its first interaction and arrives from
+ its last one, so its transverse bases live in two different planes. Both
+ are read off the interaction table the native transport itself consumes;
+ neither direction is recomputed here.
+ """
 
     if inputs.depth == 0:
         return inputs.target, inputs.source
@@ -3181,12 +3124,12 @@ def evaluate_prepared(
 ) -> FixedRowOutputs:
     """Replay every host-known bucket of a prepared frozen topology.
 
-    ``geometry_live`` carries an ADR-038 liveness decision the caller took
-    before this call. A wideband caller runs this replay once per frequency
-    column over identical geometry inputs and passes the SAME record to every
-    column, which turns "every column answers the same liveness question" into a
-    checked invariant. A single-frequency caller leaves it ``None``.
-    """
+ ``geometry_live`` carries an forward-mode liveness liveness decision the caller took
+ before this call. A wideband caller runs this replay once per frequency
+ column over identical geometry inputs and passes the SAME record to every
+ column, which turns "every column answers the same liveness question" into a
+ checked invariant. A single-frequency caller leaves it ``None``.
+ """
 
     width = int(prepared.topology.primitive_sequence.shape[1])
     outputs = _allocate(rows, width, response)
@@ -3245,12 +3188,12 @@ def evaluate_prepared(
 def scene_vertex_table(compiled: CompiledScene) -> object:
     """The scene-static vertex tensor the reflection stationary point uses.
 
-    Exposed so a caller can decide ADR-038 geometry liveness before the first
-    bucket runs without reaching past this module into the compiled scene's
-    lazy table cache. Only a batch that actually carries a reflection bucket
-    should ask: the tables are built lazily, and a line-of-sight replay must not
-    start paying for them.
-    """
+ Exposed so a caller can decide forward-mode liveness liveness before the first
+ bucket runs without reaching past this module into the compiled scene's
+ lazy table cache. Only a batch that actually carries a reflection bucket
+ should ask: the tables are built lazily, and a line-of-sight replay must not
+ start paying for them.
+ """
 
     return _scene_tables(compiled)["vertices"]
 
@@ -3261,7 +3204,7 @@ def scene_vertex_table(compiled: CompiledScene) -> object:
 
 
 # ``_CAPABILITIES`` is the single frozen record built beside the vocabulary
-# above; ``capabilities()`` returns that same object, so the orchestration
+# above; ``capabilities`` returns that same object, so the orchestration
 # reads it directly rather than binding a second name to it.
 _CONVENTION = PropagationConvention()
 
@@ -3332,13 +3275,13 @@ def _preflight_evaluate(
 def _require_polarimetric_inputs(request: PropagationRequest) -> None:
     """Enforce the polarization-basis contract before any native work.
 
-    The two transverse bases are structurally frozen: they reach the native
-    field companions as the transmit and receive polarization, and those
-    companions reject gradients on both. The primal-only fused LoS operator
-    additionally rejects a differentiable endpoint or a tensor frequency, so
-    a caller that wants derivatives asks for an AD mode and gets the composed
-    operator instead.
-    """
+ The two transverse bases are structurally frozen: they reach the native
+ field companions as the transmit and receive polarization, and those
+ companions reject gradients on both. The primal-only fused LoS operator
+ additionally rejects a differentiable endpoint or a tensor frequency, so
+ a caller that wants derivatives asks for an AD mode and gets the composed
+ operator instead.
+ """
 
     if (
         request.sources.polarization_basis is None
@@ -3358,7 +3301,7 @@ def _require_polarimetric_inputs(request: PropagationRequest) -> None:
                 "is published in a frozen world-referenced transverse basis"
             )
     # The capability record declares tx_power and the endpoint polarizations
-    # frozen too, and a declaration nobody enforces is the ADR-036 pattern.
+    # frozen too, and a declaration nobody enforces is the propagation consumer pattern.
     # The composed operator excites the transport with the two basis vectors,
     # so an endpoint polarization never reaches it at all and a gradient on one
     # could only ever come back empty; tx_power reaches a companion that does
@@ -3483,11 +3426,11 @@ def _composed_los_jones(
 ) -> JonesTransport:
     """Differentiable operator composed from the native free-space owner.
 
-    Discovery restricts this response to line-of-sight rows, so every row has
-    the same single leg and one excitation pair covers the whole batch. The
-    fused primal operator above evaluates the identical native expressions in
-    one launch, and both routes are held to bit-identical agreement by test.
-    """
+ Discovery restricts this response to line-of-sight rows, so every row has
+ the same single leg and one excitation pair covers the whole batch. The
+ fused primal operator above evaluates the identical native expressions in
+ one launch, and both routes are held to bit-identical agreement by test.
+ """
 
     from witwin.channel.kernels import fields as field_kernels
 
@@ -3698,13 +3641,13 @@ def evaluate(
 def _require_current_world(
     compiled: CompiledScene, request: FixedTopologyRequest
 ) -> None:
-    """Refuse a frozen replay against a world that moved (ADR-040).
+    """Refuse a frozen replay against a world that moved (world-version validation).
 
-    Four host integer comparisons against the version domains the compiled
-    scene recorded. No device work, no allocation, no synchronization, and no
-    ADR-032 budget impact. A frozen topology with no provenance is hand-built
-    and has no world to be stale against, so it proceeds.
-    """
+ Four host integer comparisons against the version domains the compiled
+ scene recorded. No device work, no allocation, no synchronization, and no
+ compact output budget impact. A frozen topology with no provenance is hand-built
+ and has no world to be stale against, so it proceeds.
+ """
 
     provenance = request.frozen_topology.provenance
     if provenance is None:
@@ -3736,25 +3679,23 @@ def rediscovery_required(
 ) -> str | None:
     """Name the version domain that moved under a frozen topology, or ``None``.
 
-    This is the explicit rediscovery signal: poll it per frame and call
-    :func:`evaluate` plus
-    :func:`witwin.channel.propagation.consumer.prepare_fixed_topology` again
-    when it fires. The default comparison is four host integers against the
-    versions ``compiled_scene`` recorded, so it costs no device work, no
-    allocation, and no synchronization. ``"geometry_version"`` is reported
-    like any other domain; a caller replaying under
-    ``world_motion="fixed_winner_replay"`` deliberately ignores that one.
+ This is the explicit rediscovery signal: poll it per frame and call:func:`evaluate` plus:func:`witwin.channel.propagation.consumer.prepare_fixed_topology` again
+ when it fires. The default comparison is four host integers against the
+ versions ``compiled_scene`` recorded, so it costs no device work, no
+ allocation, and no synchronization. ``"geometry_version"`` is reported
+ like any other domain; a caller replaying under
+ ``world_motion="fixed_winner_replay"`` deliberately ignores that one.
 
-    ``revalidate_source=True`` additionally recomputes the four domains from
-    the live ``witwin.core`` world the compiled scene was built from, which
-    catches a scene mutated in place after compilation - the one staleness
-    class the recorded versions cannot see, because a compiled scene and the
-    rows discovered on it always agree with each other. That recomputation
-    walks the world and hashes it, so it is O(scene) host work and belongs on
-    a motion-event cadence, never in a per-frame replay loop.
+ ``revalidate_source=True`` additionally recomputes the four domains from
+ the live ``witwin.core`` world the compiled scene was built from, which
+ catches a scene mutated in place after compilation - the one staleness
+ class the recorded versions cannot see, because a compiled scene and the
+ rows discovered on it always agree with each other. That recomputation
+ walks the world and hashes it, so it is O(scene) host work and belongs on
+ a motion-event cadence, never in a per-frame replay loop.
 
-    Returns ``None`` when nothing moved.
-    """
+ Returns ``None`` when nothing moved.
+ """
 
     from witwin.channel.scene.compiler import CompiledScene
 
@@ -3778,21 +3719,21 @@ def rediscovery_required(
 def _require_wideband_dispersive_materials(compiled: CompiledScene) -> None:
     """W1: refuse an offset grid on a scene with a frozen dispersive record.
 
-    ``scene.compile`` evaluates a ``witwin.core`` ``DispersionSpec`` once, at
-    the primal frequency, and stores the result as a plain ``eps_r`` plus an
-    equivalent ``sigma_e``. Every other frequency dependence in the material
-    model - the conductivity loss tangent, the layer electrical thicknesses, the
-    whole Airy recursion - is re-derived natively from the frequency the launch
-    receives, so it is already exact at an offset. Dispersion is the one term
-    that is not, and re-evaluating it here would need either a recompile or a
-    second host-side dispersion evaluator, both of which the Channel guardrails
-    forbid inside the consumer.
+ ``scene.compile`` evaluates a ``witwin.core`` ``DispersionSpec`` once, at
+ the primal frequency, and stores the result as a plain ``eps_r`` plus an
+ equivalent ``sigma_e``. Every other frequency dependence in the material
+ model - the conductivity loss tangent, the layer electrical thicknesses, the
+ whole Airy recursion - is re-derived natively from the frequency the launch
+ receives, so it is already exact at an offset. Dispersion is the one term
+ that is not, and re-evaluating it here would need either a recompile or a
+ second host-side dispersion evaluator, both of which the Channel guardrails
+ forbid inside the consumer.
 
-    This fires at EVERY AD mode. The existing gate refuses a frequency GRADIENT
-    against a frozen record; the primal at an offset has the identical defect
-    and, until an offset grid existed, was unreachable only because the
-    compile-frequency mismatch rule forced a recompile.
-    """
+ This fires at EVERY AD mode. The existing gate refuses a frequency GRADIENT
+ against a frozen record; the primal at an offset has the identical defect
+ and, until an offset grid existed, was unreachable only because the
+ compile-frequency mismatch rule forced a recompile.
+ """
 
     dependent = tuple(compiled.materials.frequency_dependent)
     if not dependent:
@@ -3813,11 +3754,11 @@ def _require_resolvable_offsets(
 ) -> None:
     """W2: refuse an offset grid the native launch grid cannot resolve.
 
-    Every native field bridge casts the frequency to float32 at the launch, so
-    two absolute frequencies inside one float32 ULP are the same launch and
-    return bit-identical columns. Publishing them as distinct frequencies would
-    be a declaration nobody enforces.
-    """
+ Every native field bridge casts the frequency to float32 at the launch, so
+ two absolute frequencies inside one float32 ULP are the same launch and
+ return bit-identical columns. Publishing them as distinct frequencies would
+ be a declaration nobody enforces.
+ """
 
     resolution = native_frequency_resolution_hz(reference_frequency_hz)
     for offset in offsets:
@@ -3844,18 +3785,18 @@ def _require_resolvable_offsets(
 def _require_wideband_smooth_scene(compiled: CompiledScene) -> None:
     """W4: refuse an offset grid on a rough or phase-screen scene.
 
-    The Kirchhoff roughness tables and the phase-screen realization resources
-    are resident resources keyed on a material cache token that hashes the
-    compile frequency (ADR-026, Plan-13). Reusing a table built at ``f_ref`` at
-    ``f_ref + df`` freezes the scattering response the same way a
-    ``DispersionSpec`` record freezes the material law, so it is refused for the
-    same reason and until a decision that covers resident-table lifetime across
-    a band.
+ The Kirchhoff roughness tables and the phase-screen realization resources
+ are resident resources keyed on a material cache token that hashes the
+ compile frequency (RayD scattering ownership). Reusing a table built at ``f_ref`` at
+ ``f_ref + df`` freezes the scattering response the same way a
+ ``DispersionSpec`` record freezes the material law, so it is refused for the
+ same reason and until a decision that covers resident-table lifetime across
+ a band.
 
-    One device read: a single reduced bitmask over the two roughness columns,
-    in the preflight, before any native work. It is a refusal guard rather than
-    a hot-path transfer and it is not part of the per-call validation budget.
-    """
+ One device read: a single reduced bitmask over the two roughness columns,
+ in the preflight, before any native work. It is a refusal guard rather than
+ a hot-path transfer and it is not part of the per-call validation budget.
+ """
 
     materials = compiled.materials
     rough = bool(
@@ -3885,14 +3826,14 @@ def _require_wideband_smooth_scene(compiled: CompiledScene) -> None:
 def _preflight_wideband(
     compiled: CompiledScene, request: FixedTopologyRequest
 ) -> None:
-    """Scene-dependent wideband refusals, each independent (ADR-042).
+    """Scene-dependent wideband refusals, each independent (wideband evaluation).
 
-    Every check is reachable on its own: a dispersive smooth scene with a
-    resolvable grid trips only W1, a non-dispersive smooth scene with an
-    unresolvable grid trips only W2, and a rough non-dispersive scene with a
-    resolvable grid trips only W4. Folding any of them into another would make
-    one of the three limits undiscoverable.
-    """
+ Every check is reachable on its own: a dispersive smooth scene with a
+ resolvable grid trips only W1, a non-dispersive smooth scene with an
+ unresolvable grid trips only W2, and a rough non-dispersive scene with a
+ resolvable grid trips only W4. Folding any of them into another would make
+ one of the three limits undiscoverable.
+ """
 
     offsets = request.frequency_offsets_hz
     if offsets is None:
@@ -3954,11 +3895,11 @@ def _offset_frequency(
 ) -> float | torch.Tensor:
     """The AD-facing frequency of one wideband column.
 
-    A tensor reference frequency stays a tensor, so the seed a caller placed on
-    it reaches every column through the same native companion. ``offset == 0.0``
-    is the additive identity in both branches, which is what makes a zero entry
-    reproduce the reference column bit for bit.
-    """
+ A tensor reference frequency stays a tensor, so the seed a caller placed on
+ it reaches every column through the same native companion. ``offset == 0.0``
+ is the additive identity in both branches, which is what makes a zero entry
+ reproduce the reference column bit for bit.
+ """
 
     return frequency if offset == 0.0 else frequency + offset
 
@@ -3968,10 +3909,10 @@ def _wideband_columns(
 ) -> torch.Tensor:
     """Stack per-frequency native outputs into one payload axis.
 
-    Structural packing and nothing else: every value in the stack came out of
-    the native owner that computed it at its own absolute frequency, and no
-    offset-dependent phase, magnitude, or basis is applied here.
-    """
+ Structural packing and nothing else: every value in the stack came out of
+ the native owner that computed it at its own absolute frequency, and no
+ offset-dependent phase, magnitude, or basis is applied here.
+ """
 
     return torch.stack([column(offset) for offset in offsets], dim=1)
 
@@ -3979,11 +3920,11 @@ def _wideband_columns(
 def _column_payload(response: str, outputs: object) -> torch.Tensor:
     """The one tensor a wideband column contributes to the payload axis.
 
-    A column recomputes the geometry natively and discards it: the published
-    geometry is the reference column's, because path length, delay, direction,
-    and the interaction table are facts about where the path goes and do not
-    depend on the frequency it is evaluated at.
-    """
+ A column recomputes the geometry natively and discards it: the published
+ geometry is the reference column's, because path length, delay, direction,
+ and the interaction table are facts about where the path goes and do not
+ depend on the frequency it is evaluated at.
+ """
 
     if response == "scalar_transport":
         return outputs.path_field
@@ -4023,9 +3964,9 @@ def _fixed_transport(
 def _slot_pair_count(request: FixedTopologyRequest) -> int:
     """Pairs published by one call, under the declared slot layout.
 
-    One slot is the full source/sink outer product. More than one is block
-    diagonal, so the count is linear in the slot count rather than quadratic.
-    """
+ One slot is the full source/sink outer product. More than one is block
+ diagonal, so the count is linear in the slot count rather than quadratic.
+ """
 
     slot_count = request.slot_count
     return (
@@ -4047,7 +3988,7 @@ def _reevaluate_prepared(
         require_smooth_reflection_scene(compiled)
     # The row gather owns the one validation copy and the one synchronization,
     # and it runs ONCE here, above the frequency-column loop below. That is what
-    # holds the ADR-032 budget at 1/1 however many columns a wideband request
+    # holds the compact output budget at 1/1 however many columns a wideband request
     # declares.
     rows = prepared_row_gather(
         prepared.topology,
@@ -4063,8 +4004,8 @@ def _reevaluate_prepared(
         if request.response == "polarimetric_transport"
         else (None, None)
     )
-    # ADR-038: liveness is decided once, here, from the inputs every column
-    # shares, and the same record reaches every column. ADR-043 adds the
+    # forward-mode liveness: liveness is decided once, here, from the inputs every column
+    # shares, and the same record reaches every column. first-order differentiation adds the
     # arrival-direction half of the same decision, taken from the host-known
     # component set of the frozen batch: a batch that carries a component whose
     # direction seam RayD owns publishes a fully detached field_direction for
@@ -4172,10 +4113,10 @@ def reevaluate(
     tx_power = rows.tx_power.detach()
     tx_polarization = rows.tx_polarization.detach()
     rx_polarization = rows.rx_polarization.detach()
-    # ADR-038: one liveness decision, taken here from the gathered rows, and
+    # forward-mode liveness: one liveness decision, taken here from the gathered rows, and
     # re-asserted for every column against the inputs that column launches on.
     geometry_live = fixed_los_geometry_live(rows)
-    # ADR-043: this route carries line-of-sight rows only, so the direction
+    # first-order differentiation: this route carries line-of-sight rows only, so the direction
     # seam is Channel-owned for the whole result and its liveness is exactly
     # the geometry decision above.
     direction_live = geometry_live and frozenset({"los"}).issubset(
@@ -4297,7 +4238,7 @@ def reevaluate(
 # ``T`` block-diagonal slots, runs ONE reevaluation, and publishes ``[T, K]``
 # views over the storage that replay produced. It owns no physics, adds no
 # compaction, allocates no result, and introduces no native symbol. It also does
-# not compile scenes: one :class:`~witwin.channel.scene.compiler.CompiledScene`
+# not compile scenes: one:class:`~witwin.channel.scene.compiler.CompiledScene`
 # covers one structure-geometry epoch, and a world whose structures move is
 # ``T`` epochs, which is a motion-event cadence rather than an inner loop.
 
@@ -4305,44 +4246,17 @@ def reevaluate(
 def _slot_view(values: torch.Tensor, slot_count: int) -> torch.Tensor:
     """Split a slot-major row axis into ``[slot_count, K, ...]``.
 
-    ``view`` rather than ``reshape`` on purpose: the row axis is outermost and
-    the replay publishes contiguous storage, so a layout that needed a copy
-    here would be a silent regression rather than something to paper over.
-    """
+ ``view`` rather than ``reshape`` on purpose: the row axis is outermost and
+ the replay publishes contiguous storage, so a layout that needed a copy
+ here would be a silent regression rather than something to paper over.
+ """
 
     return values.view(slot_count, -1, *values.shape[1:])
 
 
 @dataclass(frozen=True, slots=True)
 class TimeVaryingRequest:
-    """A frozen topology replayed at a whole block of world instants.
-
-    ``sources`` and ``sinks`` are the per-instant endpoint batches stacked
-    slot-major: rows ``[t*S, (t+1)*S)`` are the sources at ``times_s[t]``.
-    Their ``stable_ids`` repeat per slot, because the slots are the same
-    physical endpoints observed at different instants, and the frozen rows name
-    those endpoints by identity.
-
-    ``topology`` is the PER-SLOT prepared topology, not a replicated one:
-    :func:`witwin.channel.propagation.consumer.evaluate_time_varying` performs
-    the replication so a caller cannot half-apply it.
-
-    ``times_s`` is float64 and carried verbatim into the result. It labels the
-    slots; it is never differenced, integrated, or otherwise used to compute a
-    published number. A delay RATE comes from the ADR-038 forward dual on the
-    endpoint positions, not from a finite difference across these samples.
-
-    Because they are labels, they are the caller's assertion and not a checked
-    fact, and the sharp edge is worth naming: nothing reconciles ``times_s``
-    against the world the ``CompiledScene`` was built from. Endpoint motion
-    legitimately runs many instants against one compiled scene, so
-    ``times_s != compiled.time_s`` cannot be refused - which means a caller who
-    labels slots ``t = 1, 2`` while the structures still stand at their
-    ``t = 0`` pose gets a result that claims to be a channel it is not, with
-    every row valid. One ``CompiledScene`` is one structure-geometry epoch;
-    keeping the labels inside it is the caller's obligation, and
-    ``CompiledScene.time_s`` is published so that obligation is checkable.
-    """
+    """Replay one prepared topology across slot-major endpoint batches. Time values label slots without driving computation; native forward AD supplies motion derivatives. Each compiled scene is one structure-geometry epoch, so callers keep labels consistent with that scene."""
 
     sources: EndpointBatch
     sinks: EndpointBatch
@@ -4376,9 +4290,9 @@ class TimeVaryingRequest:
 class TimeVaryingTransport:
     """Slot-shaped views over the transport one replay published.
 
-    Exactly the tensors of the requested response are present and the rest are
-    ``None``, so a reader cannot pick up a field the response never produced.
-    """
+ Exactly the tensors of the requested response are present and the rest are
+ ``None``, so a reader cannot pick up a field the response never produced.
+ """
 
     response: PropagationResponse
     coefficient: torch.Tensor | None = None
@@ -4415,21 +4329,21 @@ class TimeVaryingTransport:
 class TimeVaryingEvaluation:
     """One frozen topology evaluated at ``slot_count`` world instants.
 
-    Every published tensor is slot-major: index ``[t]`` is the complete frozen
-    row set at ``times_s[t]``, in frozen row order, so ``delay_s[t]`` and the
-    transport at ``[t]`` are the impulse response of that instant and
-    ``pair_offsets`` segments it by ``(source, sink)`` pair.
+ Every published tensor is slot-major: index ``[t]`` is the complete frozen
+ row set at ``times_s[t]``, in frozen row order, so ``delay_s[t]`` and the
+ transport at ``[t]`` are the impulse response of that instant and
+ ``pair_offsets`` segments it by ``(source, sink)`` pair.
 
-    ``pair_offsets`` and ``pair_count`` are PER SLOT. They are frozen: the same
-    rows are replayed at every instant, so every slot carries the same
-    segmentation, including the empty segments of pairs that publish no row.
+ ``pair_offsets`` and ``pair_count`` are PER SLOT. They are frozen: the same
+ rows are replayed at every instant, so every slot carries the same
+ segmentation, including the empty segments of pairs that publish no row.
 
-    ``row_valid`` keeps its ADR-037 meaning per slot and remains the sole
-    authority: a row that stops existing at instant ``t`` publishes exact zeros
-    at ``[t]`` and stays alive at the other instants. Replay is still
-    subtractive (ADR-040) - a path that comes into existence part way through
-    the block is not discovered here and is silently absent from every slot.
-    """
+ ``row_valid`` keeps its fixed-topology replay meaning per slot and remains the sole
+ authority: a row that stops existing at instant ``t`` publishes exact zeros
+ at ``[t]`` and stays alive at the other instants. Replay is still
+ subtractive (world-version validation) - a path that comes into existence part way through
+ the block is not discovered here and is silently absent from every slot.
+ """
 
     slot_count: int
     row_count: int
@@ -4483,16 +4397,16 @@ def evaluate_time_varying(
 ) -> TimeVaryingEvaluation:
     """Replay one frozen topology across a whole block of world instants.
 
-    One launch per ``(component, depth)`` bucket, one validation copy, and one
-    synchronization for the entire block, whatever ``len(times_s)`` is. That is
-    the point: a Python loop over instants keeps every individual call inside
-    the ADR-032 budget while multiplying the budget of the frame by the number
-    of instants.
+ One launch per ``(component, depth)`` bucket, one validation copy, and one
+ synchronization for the entire block, whatever ``len(times_s)`` is. That is
+ the point: a Python loop over instants keeps every individual call inside
+ the compact output budget while multiplying the budget of the frame by the number
+ of instants.
 
-    The instants must share one compiled scene, which is what makes them one
-    frame, pulse train, or symbol block. Structure motion changes the compiled
-    scene, so it is a new call with a new scene, not another slot.
-    """
+ The instants must share one compiled scene, which is what makes them one
+ frame, pulse train, or symbol block. Structure motion changes the compiled
+ scene, so it is a new call with a new scene, not another slot.
+ """
 
     if not isinstance(request, TimeVaryingRequest):
         raise TypeError("request must be a TimeVaryingRequest")

@@ -1,16 +1,7 @@
 # Copyright Xingyu Chen.
 # Implements phase screen realization.
 
-"""Reference Torch realization-coherent patch-integral total (ADR-010 op 2).
-
-The previous production per-row assembly and host per-patch loop of
-``interactions/scattering.py::_realization_rows`` (jones, prefactor,
-carrier, per-patch ``patch_phase_integral`` quadrature, weighted total).
-``patch_phase_integral`` itself remains a public utility in
-``witwin.channel.scene.resources`` (its only production caller was this
-loop); this module reproduces the removed loop around it. Test-only: MUST NOT
-be imported from production packages.
-"""
+"""Implements phase screen realization."""
 
 from __future__ import annotations
 
@@ -115,7 +106,7 @@ def realization_patch_total(
 
 
 # ---------------------------------------------------------------------------
-# Double-precision autograd oracle for the native ADR-014 op-2 VJP/JVP.
+# Double-precision autograd oracle for the native scattering AD VJP/JVP.
 #
 # ``realization_patch_total`` above is a faithful re-derivation but routes the
 # quadrature through ``patch_phase_integral`` (float32, and it reads heights
@@ -123,7 +114,7 @@ def realization_patch_total(
 # ``k0`` gradients in float64. The block below is a self-contained float64
 # re-implementation that takes ``heights`` as a differentiable leaf and the
 # same Duffy-mapped quadrature nodes the native op consumes, then reproduces
-# the ADR-014 op-2 assembly (bilinear height sampling, integral, prefactor,
+# the scattering AD assembly (bilinear height sampling, integral, prefactor,
 # jones, carrier) so ``torch.autograd`` through it pins the exact VJP/JVP the
 # native ``scattering_patch_integral_eval_backward``/``_jvp`` companions must
 # match. Test-only: MUST NOT be imported from production packages.
@@ -133,11 +124,10 @@ def realization_patch_total(
 def _sample_height_bilinear(heights: torch.Tensor, uv: torch.Tensor) -> torch.Tensor:
     """Cell-centered edge-clamp bilinear height sample (matches the runtime).
 
-    ``heights`` is ``[H, W]`` (row = v/y axis); ``uv`` is ``[..., 2]`` with
-    ``u`` along the columns. Differentiable w.r.t. ``heights``; the texel
-    indexing is detached (piecewise constant), exactly as
-    :meth:`PhaseScreenRuntime.sample_height`.
-    """
+ ``heights`` is ``[H, W]`` (row = v/y axis); ``uv`` is ``[..., 2]`` with
+ ``u`` along the columns. Differentiable w.r.t. ``heights``; the texel
+ indexing is detached (piecewise constant), exactly as:meth:`PhaseScreenRuntime.sample_height`.
+ """
 
     h_rows, w_cols = (int(size) for size in heights.shape)
     tx = (uv[..., 0] * w_cols - 0.5).clamp(0.0, float(w_cols - 1))
@@ -180,14 +170,14 @@ def realization_patch_eval_reference(
     quad_w: torch.Tensor,
     k0: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable re-derivation of ADR-014 op 2 from a ``heights`` leaf.
+    """Differentiable re-derivation of scattering AD from a ``heights`` leaf.
 
-    Live inputs: ``heights``, ``r_te``, ``r_tm``, ``d_i``, ``d_o``,
-    ``r1_rows``, ``r2_rows``, ``centroids`` and the scalar ``k0``. Fixed:
-    ``patch_tris``, ``patch_uvs``, ``rows``, ``n_rows``, ``pol_t``, ``pol_r``,
-    and the quadrature nodes. Returns ``total`` (0-dim complex), the per-row
-    ``integral`` and ``row_value`` buffers.
-    """
+ Live inputs: ``heights``, ``r_te``, ``r_tm``, ``d_i``, ``d_o``,
+ ``r1_rows``, ``r2_rows``, ``centroids`` and the scalar ``k0``. Fixed:
+ ``patch_tris``, ``patch_uvs``, ``rows``, ``n_rows``, ``pol_t``, ``pol_r``,
+ and the quadrature nodes. Returns ``total`` (0-dim complex), the per-row
+ ``integral`` and ``row_value`` buffers.
+ """
 
     real_dtype = heights.dtype
     patch = rows.long()

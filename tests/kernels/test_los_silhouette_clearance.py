@@ -1,14 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests los silhouette clearance.
 
-"""Native ISB-taper (ADR-017) LoS clearance kernel contract.
-
-Pins the native ``los_silhouette_clearance`` op to the exact reference formulas
-(signed-AABB clearance at the segment's closest-approach sample, Fresnel
-penumbra w_F = sqrt(lambda d1 d2 / (d1 + d2)), and the C1 tau smoothstep) from
-artifacts/isb-taper/common.py / stage2.py, and checks ``los_taper_apply`` scales
-a LoS field bundle by tau (power by tau^2).
-"""
+"""Tests los silhouette clearance."""
 
 from __future__ import annotations
 

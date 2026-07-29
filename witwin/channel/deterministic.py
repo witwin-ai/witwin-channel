@@ -79,8 +79,8 @@ if TYPE_CHECKING:
 # --- Configuration --------------------------------------------------------
 
 # Public component set. transmission carries specular wall-penetration paths
-# (wave 2); scattering carries single-bounce Kirchhoff rough-surface paths
-# (wave 3). transmission depth is capped like reflection (chains count wall
+# (transmission); scattering carries single-bounce Kirchhoff rough-surface paths
+# (rough scattering). transmission depth is capped like reflection (chains count wall
 # penetrations); scattering is single-bounce in v1.
 # Default component set is unchanged: the new components are strictly opt-in.
 _VALID_SORT_KEYS = frozenset({"receiver_transmitter_depth_component"})
@@ -90,10 +90,10 @@ _VALID_MAX_PATHS_SCOPES = frozenset({"global", "per_pair"})
 def _validate_scattering_coherent(
     *, scattering_coherent: bool, components: frozenset[str]
 ) -> None:
-    """Validate the ADR-021 D3 coherent-scattering combine precondition."""
+    """Validate the coherent scattering coherent-scattering combine precondition."""
 
     if scattering_coherent and "scattering" not in components:
-        # ADR-021 D3: the coherent combine only applies to scattering rows.
+        # coherent scattering: the coherent combine only applies to scattering rows.
         # The scene-level requirement (realization-coherent phase screens,
         # not ensemble surfaces) is enforced at solve time where the scene
         # is known; here we reject the config-level precondition loudly.
@@ -119,7 +119,7 @@ class Config:
     sort_key: str = "receiver_transmitter_depth_component"
     diagnostics: bool = False
     ad_mode: str = "none"
-    # Coupled reflection-diffraction paths (ADR-011). Opt-in; when set the
+    # Coupled reflection-diffraction paths (coupled reflection and diffraction). Opt-in; when set the
     # deterministic grid solver enumerates the R->D / D->R compensator rows
     # (component ids 3/4) and accumulates their coherent contribution into a
     # dedicated coupled field slot. coupled_candidate_limit is a per-receiver-
@@ -127,7 +127,7 @@ class Config:
     # discovery over receiver blocks sized so each block stays under it.
     coupled_paths: bool = False
     coupled_candidate_limit: int = 1_000_000
-    # Rough-surface scattering quadrature (wave 3). The patch density is a
+    # Rough-surface scattering quadrature (rough scattering). The patch density is a
     # fixed per-area sample count with a documented per-face cap of 4096
     # samples; per (tx, rx) pair only the strongest samples up to
     # scattering_max_paths_per_pair survive (dropped power is reported in the
@@ -136,15 +136,15 @@ class Config:
     scattering_samples_per_m2: float = 8.0
     scattering_max_paths_per_pair: int = 4096
     scattering_power_threshold: float = 0.0
-    # Coherent scattering combine (ADR-021 D3). DEFAULT-OFF opt-in. OFF keeps
+    # Coherent scattering combine (coherent scattering). DEFAULT-OFF opt-in. OFF keeps
     # the scattering slot an incoherent POWER sum bit-identical to today; ON
     # sums the complex path_field of scattering rows per (tx, rx) and finalizes
-    # |sum|^2 (the ADR-019 per-component phasor precedent). It is physical only
+    # |sum|^2 (the coherent combination per-component phasor precedent). It is physical only
     # for realization-coherent phase-screen rows, which carry a true complex
-    # field; ensemble rows are zero-phase power rows, so the pipeline refuses an
+    # field; ensemble rows are zero-the penetration implementationower rows, so the pipeline refuses an
     # ensemble-only solve loudly. Requires the 'scattering' component.
     scattering_coherent: bool = False
-    # Enumerated scatter-chain path class (ADR-021 D1). DEFAULT-OFF opt-in:
+    # Enumerated scatter-chain path class (coherent scattering). DEFAULT-OFF opt-in:
     # scattering_chain_max_depth = 0 disables chain discovery so the pipeline is
     # byte-identical to today. When >= 1 it is the cap on d1 + d2, the combined
     # specular reflection depth of the two legs around the single diffuse vertex
@@ -157,7 +157,7 @@ class Config:
     scattering_chain_max_depth: int = 0
     scattering_chain_samples_per_m2: float = 2.0
     scattering_chain_max_rows: int = 256
-    # ISB boundary taper (ADR-017). DEFAULT-OFF visual-continuity heuristic: the
+    # ISB boundary taper (the boundary taper). DEFAULT-OFF visual-continuity heuristic: the
     # hard LoS occlusion gate becomes a C1 membership taper tau(c / (width * w_F))
     # and the compensating order-1 diffraction odd step spreads over the same
     # congruent window. OFF (the default) is bit-identical to the hard gate and
@@ -264,7 +264,7 @@ class Result:
 
 # Component slots materialized by the native accumulator
 # (kAccumSlotCount=6 in kernels/deterministic_accum.cu); the path component
-# ids map to them as 0/1/2 -> 0/1/2, 5 -> 3, 6 -> 4, and 3/4 -> 5 (ADR-011:
+# ids map to them as 0/1/2 -> 0/1/2, 5 -> 3, 6 -> 4, and 3/4 -> 5 (coupled reflection and diffraction:
 # reflection->diffraction and diffraction->reflection are the coupled classes,
 # both summed coherently into the single coupled field slot). Under
 # ad_mode != "none" the same native forward runs inside a dispatch-only
@@ -272,13 +272,13 @@ class Result:
 # (accumulation_kernels.deterministic_accumulate_flat_ad), so the accumulated
 # result keeps the
 # autograd graph with no torch mirror of the kernel math. transmission
-# carries specular wall-penetration paths (wave 2) and joins the coherent
+# carries specular wall-penetration paths (transmission) and joins the coherent
 # field total like the first three slots; scattering carries Kirchhoff
-# rough-surface patch paths (wave 3) and is an incoherent POWER slot (plan
-# 05 sections 6.7.3 / 7.3): its rows always fold into the totals in the
+# rough-surface patch paths (rough scattering) and is an incoherent POWER slot (plan
+# the component layout): its rows always fold into the totals in the
 # power domain, never as zero-phase amplitudes, and its complex cell field
 # is a diagnostic only. coupled carries the reflection-diffraction
-# compensator (ADR-011) and is an ordinary coherent field slot that joins
+# compensator (coupled reflection and diffraction) and is an ordinary coherent field slot that joins
 # the coherent field total like the first three slots.
 _NATIVE_COMPONENT_SLOTS = {
     "los": 0,
@@ -313,14 +313,14 @@ def accumulate_flat_components(
 ) -> tuple[
     torch.Tensor, torch.Tensor, dict[str, torch.Tensor], dict[str, torch.Tensor]
 ]:
-    # ADR-021 D3 opt-in coherent scattering combine. Default OFF threads NO new
+    # coherent scattering coherent scattering combine. Default OFF threads NO new
     # argument to the native accumulator, so the call stays byte-identical to
     # today; ON requests the native scattering_combine_domain=1 path where the
     # scattering slot's summed complex field squares into its power instead of
-    # summing per-row powers (the ADR-019 per-component phasor precedent).
+    # summing per-row powers (the coherent combination per-component phasor precedent).
     combine_kwargs = {"scattering_combine_domain": 1} if scattering_coherent else {}
     if differentiable:
-        # AD modes (plan 07): the same native accumulator kernels run inside
+        # AD modes (the AD contract): the same native accumulator kernels run inside
         # a dispatch-only autograd.Function with native backward/jvp
         # companions, so Result.path_gain / field / component_power carry
         # the complete graph of the per-path fields and powers.
@@ -521,7 +521,7 @@ def build_path_table(
 
 def _validate_requested_components(config: Config) -> None:
     if config.isb_boundary_taper and config.ad_mode != "none":
-        # ISB boundary taper (ADR-017) gate 3: the C1 clearance-factor AD
+        # ISB boundary taper (the boundary taper) gate 3: the C1 clearance-factor AD
         # companion (d(tau)/d(endpoint)) is a documented follow-up. Until it
         # lands, taper + AD is rejected loudly rather than returning a silently
         # incomplete gradient. OFF-path AD stays bit-identical.
@@ -541,14 +541,14 @@ def _validate_requested_components(config: Config) -> None:
 
 
 def _validate_scattering_coherent_mode(scattering_info: dict[str, Any] | None) -> None:
-    """ADR-021 D3 solve-time gate for the coherent scattering combine.
+    """coherent scattering solve-time gate for the coherent scattering combine.
 
-    The combine sums the complex ``path_field`` of scattering rows and
-    finalizes ``|sum|^2``. Only realization-coherent phase-screen rows carry a
-    physical complex field; ensemble rows are zero-phase power rows, so an
-    ensemble-only (or empty-realization) solve would interfere meaningless
-    phases. Both cases are refused loudly rather than returning a wrong number.
-    """
+ The combine sums the complex ``path_field`` of scattering rows and
+ finalizes ``|sum|^2``. Only realization-coherent phase-screen rows carry a
+ physical complex field; ensemble rows are zero-the penetration implementationower rows, so an
+ ensemble-only (or empty-realization) solve would interfere meaningless
+ phases. Both cases are refused loudly rather than returning a wrong number.
+ """
 
     info = scattering_info or {}
     ensemble = int(info.get("ensemble_sample_count", 0))
@@ -574,13 +574,13 @@ def _validate_scattering_coherent_mode(scattering_info: dict[str, Any] | None) -
 def _scattering_metadata(
     scattering_info: dict[str, Any] | None, config: Config
 ) -> dict[str, Any] | None:
-    """Scattering metadata sub-dict for the deterministic result (plan 05 wave 3).
+    """Scattering metadata sub-dict for the deterministic result (the rough-scattering model).
 
-    Returns ``None`` when no scattering rows were requested. Extracted as a
-    sub-dict builder so ``_metadata`` stays within its complexity budget.
-    Incoherent Kirchhoff patch quadrature means per-path phases are NOT physical
-    for ensemble rows; ADR-021 D3 records how scattering rows combine together.
-    """
+ Returns ``None`` when no scattering rows were requested. Extracted as a
+ sub-dict builder so ``_metadata`` stays within its complexity budget.
+ Incoherent Kirchhoff patch quadrature means per-path phases are NOT physical
+ for ensemble rows; coherent scattering how scattering rows combine together.
+ """
 
     if scattering_info is None:
         return None
@@ -594,13 +594,13 @@ def _scattering_metadata(
 def _coupled_paths_metadata(
     config: Config, component_counts: dict[str, int] | None = None
 ) -> dict[str, Any]:
-    """Coupled higher-order compensator metadata block (ADR-011 + ADR-013).
+    """Coupled higher-order compensator metadata block (coupled reflection and diffraction + coupled double diffraction).
 
-    Mirrors the path solver's coupled_paths block. ``coupled_paths=True`` now
-    enables the uniform order-2 compensator family {R->D, D->R, D->D}; the DD
-    (component id 7) member is reported as its own row count for audits while it
-    aggregates into the single coherent coupled slot.
-    """
+ Mirrors the path solver's coupled_paths block. ``coupled_paths=True`` now
+ enables the uniform order-2 compensator family {R->D, D->R, D->D}; the DD
+ (component id 7) member is reported as its own row count for audits while it
+ aggregates into the single coherent coupled slot.
+ """
 
     if not config.coupled_paths:
         return {
@@ -627,13 +627,13 @@ def _register_coupled_component(
     component_counts: dict[str, int],
     extra_components: tuple[str, ...],
 ) -> tuple[str, ...]:
-    """Record the coupled component count and export name (ADR-011 + ADR-013).
+    """Record the coupled component count and export name (coupled reflection and diffraction + coupled double diffraction).
 
-    Coupled rows carry component ids 3 (R->D), 4 (D->R) and 7 (D->D, ADR-013);
-    all three accumulate into the single coupled slot. "coupled" is not a public
-    component name, so it is enabled by the coupled_paths gate rather than the
-    components set. The DD row count is recorded separately for audits.
-    """
+ Coupled rows carry component ids 3 (R->D), 4 (D->R) and 7 (D->D, coupled double diffraction);
+ all three accumulate into the single coupled slot. "coupled" is not a public
+ component name, so it is enabled by the coupled_paths gate rather than the
+ components set. The DD row count is recorded separately for audits.
+ """
 
     if not config.coupled_paths:
         return extra_components
@@ -652,11 +652,11 @@ def _append_scattering(
 ) -> tuple[Any, Any, dict[str, Any] | None]:
     """Append Kirchhoff scattering rows and gate the coherent combine.
 
-    Single-purpose solve stage (plan 05 wave 3 + ADR-021 D3). When scattering is
-    not requested it returns the inputs unchanged with ``scattering_info=None``.
-    When ``scattering_coherent`` is set, the D3 solve-time gate refuses an
-    ensemble-only or empty-realization solve before any accumulation runs.
-    """
+ Single-purpose solve stage (the rough-scattering model + coherent scattering). When scattering is
+ not requested it returns the inputs unchanged with ``scattering_info=None``.
+ When ``scattering_coherent`` is set, the coherent-scattering gate refuses an
+ ensemble-only or empty-realization solve before any accumulation runs.
+ """
 
     if "scattering" not in config.components:
         return evaluated, sidecars, None
@@ -697,8 +697,8 @@ def _metadata(
         reflection_error="deterministic reflection requires RayD native capability",
         diffraction_error="deterministic diffraction requires RayD native capability",
     )
-    # transmission carries specular wall-penetration paths since wave 2 and
-    # scattering carries Kirchhoff rough-surface patch paths since wave 3.
+    # transmission carries specular wall-penetration paths since transmission and
+    # scattering carries Kirchhoff rough-surface patch paths since rough scattering.
     # Both keep the truthful requested-but-empty status when no paths were
     # found (e.g. every surface in the scene is smooth).
     apply_exported_path_counts(
@@ -712,7 +712,7 @@ def _metadata(
             raise RuntimeError(
                 "deterministic transmission requires RayD native capability"
             )
-        # Endpoint-connection thin_sheet contract (plan 05 section 4).
+        # Endpoint-connection thin_sheet contract (the solver component layout).
         metadata_transmission = {
             "thin_sheet_straight_path_approximation": True,
             "group_delay": "geometric",
@@ -741,7 +741,7 @@ def _metadata(
             "components": component_counts,
         },
         "capability": capability,
-        # Plan 07 AD-4: the real registered-companion accounting. vjp retains
+        # diffraction AD: the real registered-companion accounting. vjp retains
         # tape and schedules its companions on the user's later backward; jvp
         # runs its dual companions inside this forward and retains no tape.
         "kernel": make_metadata(
@@ -764,7 +764,7 @@ def _metadata(
         "field_abi": "complex3_v1",
         "phase_convention": dict(PHASE_CONVENTION),
         "coefficient_semantics": "unit_excitation_dimensionless_receiver_projection",
-        # Coupled higher-order compensator family (ADR-011 R->D/D->R + ADR-013
+        # Coupled higher-order compensator family (coupled reflection and diffraction>D/D->R + coupled double diffraction
         # D->D); mirrors the path solver's coupled_paths metadata block.
         "coupled_paths": _coupled_paths_metadata(config, component_counts),
     }
@@ -801,7 +801,7 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
     if not torch.cuda.is_available():
         raise RuntimeError("witwin.channel.deterministic requires CUDA")
     # Solve-level wall time and CUDA high-water-mark delta for the kernel
-    # metadata (plan 07 AD-4). This is AD instrumentation only: the leading
+    # metadata (diffraction AD). This is AD instrumentation only: the leading
     # synchronize would stall the host on the caller's queued work and the
     # trailing one drains the solve before returning, which an optimization
     # loop over ad_mode="none" must not pay. none-mode reports zeros and takes
@@ -830,7 +830,7 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
     _, layout = receiver_positions_and_layout(scene, device=device)
     # One host read of a tensor frequency for the whole solve: topology
     # export, field evaluation, accumulation and path export share it
-        # (audit M3). Channel scene.compile() keeps its own read: the material cache
+        #. Channel scene.compile keeps its own read: the material cache
     # token must see the live value to stay correct under in-place
     # frequency mutation.
     frequency_hz = _frequency_scalar(scene)
@@ -839,7 +839,7 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
         config,
         frequency_value=frequency_hz,
         # Stream coupled discovery over receiver blocks so a full grid solve
-        # stays under the per-block candidate budget (ADR-011).
+        # stays under the per-block candidate budget (coupled reflection and diffraction).
         coupled_rx_streaming=config.coupled_paths,
         defer_capacity_terminal=True,
     )
@@ -873,7 +873,7 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
         # autograd.Function so Result.path_gain/field/component_power carry
         # the complete graph; none-mode keeps the bare zero-overhead kernel.
         differentiable=config.ad_mode != "none",
-        # ADR-021 D3: opt-in coherent scattering combine (default OFF is
+        # coherent scattering: opt-in coherent scattering combine (default OFF is
         # byte-identical). The solve-time gate above already rejected any
         # ensemble-only or empty-realization scene.
         scattering_coherent=config.scattering_coherent,

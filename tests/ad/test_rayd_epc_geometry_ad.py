@@ -1,15 +1,7 @@
 # Copyright Xingyu Chen.
-# AD-2 layer 1: RayD reflection EPC paths geometry JVP/VJP versus central FD.
+# AD layer 1: RayD reflection EPC paths geometry JVP/VJP versus central FD.
 
-"""AD-2 layer 1: RayD reflection EPC paths geometry JVP/VJP versus central FD.
-
-Exercises the new fixed-winner C-ABI directly (channel bridge facades
-only): d(hit points, emitted unit normals, path length) / d(vertices, source,
-receiver) for the direct-plane EPC forward, at a frozen winner sequence, plus
-jvp-vs-vjp inner-product duality and the face-normal table companions used by
-the transmission seam. Vertex probes rebuild the native scene per FD
-evaluation, exactly like the solver-side FD oracles do.
-"""
+"""AD layer 1: RayD reflection EPC paths geometry JVP/VJP versus central FD."""
 
 from __future__ import annotations
 
@@ -215,9 +207,9 @@ def _weighted_loss(out, weights) -> torch.Tensor:
 @pytest.mark.parametrize("case_builder", (_single_bounce_case, _two_bounce_case))
 def test_epc_paths_plane_contract_matches_scene_tables(case_builder):
     """Gate from the spec: the plane channel passes for prim P must be
-    the plane of that triangle in RayD's own scene tables (anchor = v0,
-    normal = normalize(cross(v1 - v0, v2 - v0))), and the emitted hits must
-    lie on it."""
+ the plane of that triangle in RayD's own scene tables (anchor = v0,
+ normal = normalize(cross(v1 - v0, v2 - v0))), and the emitted hits must
+ lie on it."""
 
     case = case_builder()
     records = case["rayd"].edge_records()
@@ -457,7 +449,7 @@ def test_epc_paths_jvp_vjp_inner_product_duality(case_builder):
 
 def test_epc_paths_ad_function_routes_reverse_and_forward_mode():
     """The thin autograd.Function: reverse-mode grads reach the leaves, the
-    frozen outputs stay detached, and torch.func.jvp matches the native jvp."""
+ frozen outputs stay detached, and torch.func.jvp matches the native jvp."""
 
     case = _single_bounce_case()
     records = case["rayd"].edge_records()
@@ -644,12 +636,12 @@ _SLIVER_FD_STEP = 1.0e-7
 
 def test_face_normals_companions_follow_sliver_clamp_branch():
     """Below the table's 1e-6 normalize clamp the primal is the constant
-    scale raw / 1e-6, so its exact derivative is that constant times the
-    identity: no projection (which would drop the radial component) and no
-    1/|raw| scale (which would blow up as the face degenerates). Adjoint and
-    tangent are FD-anchored against the true clamped primal via scene
-    rebuild; the healthy face in the same scene keeps its projection-branch
-    derivative."""
+ scale raw / 1e-6, so its exact derivative is that constant times the
+ identity: no projection (which would drop the radial component) and no
+ 1/|raw| scale (which would blow up as the face degenerates). Adjoint and
+ tangent are FD-anchored against the true clamped primal via scene
+ rebuild; the healthy face in the same scene keeps its projection-branch
+ derivative."""
 
     base = torch.tensor(_SLIVER_VERTICES, dtype=torch.float32)
     rayd = _build_rayd_scene(base, _SLIVER_FACES)

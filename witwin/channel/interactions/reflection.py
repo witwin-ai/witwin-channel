@@ -1,14 +1,7 @@
 # Copyright Xingyu Chen.
 # Reflection: discovery planning, EPC geometry, and enumerated orchestration.
 
-"""Reflection: discovery planning, EPC geometry, and enumerated orchestration.
-
-One concept, one file. This module holds the reflection discovery limits and
-plan iterators, the typed reflection endpoint-connection geometry query, and
-the enumerated first-order and multibounce reflection topology owners that
-compose them. It calls the native facades in ``witwin.channel.kernels`` and
-owns no physics of its own.
-"""
+"""Reflection: discovery planning, EPC geometry, and enumerated orchestration."""
 
 from __future__ import annotations
 
@@ -588,11 +581,11 @@ def _discovered_group_chains(
 ) -> torch.Tensor:
     """Trace specular chains from the transmitter and map them to plane groups.
 
-    Returns an (N, max_depth) long tensor of plane-group ids per bounce with
-    -1 past each ray's last hit. Only chains reachable from the transmitter
-    can host a valid specular path, so validating the unique chains found here
-    replaces the exhaustive plane-sequence product on large scenes.
-    """
+ Returns an (N, max_depth) long tensor of plane-group ids per bounce with
+ -1 past each ray's last hit. Only chains reachable from the transmitter
+ can host a valid specular path, so validating the unique chains found here
+ replaces the exhaustive plane-sequence product on large scenes.
+ """
 
     device = face_group_id.device
     ray_o = tx.reshape(1, 3).expand(ray_count, 3).contiguous()

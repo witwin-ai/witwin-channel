@@ -1,7 +1,7 @@
 // Copyright Xingyu Chen.
 // Implements bdpt subpaths CUDA operations.
 
-// ---- Consolidated from bdpt_subpaths.cu ----
+// ==== Section: BDPT subpaths ====
 #include "torch_cuda_minimal.h"
 #include "math.cuh"
 
@@ -76,10 +76,10 @@ __device__ void direction_from_seed(unsigned long long seed, float* dir) {
 // SubpathState tensor schema (see _BDPT_SUBPATH_SCHEMA in ops.py).
 //
 // throughput_real/imag semantics split at the first diffuse-scatter event
-// (component_mask MASK_SCATTERING bit, ADR-021 D4):
+// (component_mask MASK_SCATTERING bit, coherent scattering):
 //
-// PRE-scatter it is a REAL-VALUED diagnostic amplitude proxy (contract
-// section 5): at specular events it is scaled by the amplitude
+// Before scattering it is a real-valued diagnostic amplitude proxy. At
+// specular events it is scaled by the amplitude
 // sqrt(material_gain * R_eff) (reflection) or sqrt(T_eff) (transmission),
 // never by the power itself. It may only be used for event/Russian-roulette
 // probabilities and MUST NOT enter connection contributions - the Complex3
@@ -396,8 +396,8 @@ __global__ void bdpt_reflected_light_subpaths_kernel(
             material_mu_r[prim],
             frequency_hz);
         // Throughput is a real amplitude proxy: scale it by the AMPLITUDE
-        // sqrt(gain * R_eff), not the power reflectance itself (contract
-        // section 5).
+        // sqrt(gain * R_eff), not the power reflectance itself.
+
         amplitude = sqrtf(fmaxf(material_gain[prim], 0.0f) * reflectance);
     }
     float* dst_origin = origin + index * 3;
@@ -517,10 +517,10 @@ __device__ void sp_proxy_weights(
     w_p = e_p * e_p;
 }
 
-// Shooting-context specular transmission through a thin_sheet wall (contract
-// section 4). The outgoing direction equals the incident direction; the ray
+// Shooting-context specular transmission through a thin-sheet wall.
+// The outgoing direction equals the incident direction; the ray
 // restarts from the exact lateral exit point
-//   x_e = x_i - d_total*n_in + (sum_l d_l*tan(theta_l))*u_par
+// x_e = x_i - d_total*n_in + (sum_l d_l*tan(theta_l))*u_par
 // with n_in the surface normal flipped toward the incident side, u_par the
 // normalized tangential component of the incident direction, and theta_l the
 // per-layer Snell angle from the phase index Re(k_l)/k0.
@@ -535,8 +535,8 @@ __device__ void sp_proxy_weights(
 //
 // Vacuum-layer identity: theta_l = theta_i so x_e = x_i + (d/cos)*d_hat lies
 // ON the original ray with jump = d/cos(theta); the combined factor is
-//   t * exp(+j*k0*d/cos) * exp(-j*k0*sin*d*tan)
-//     = exp(-j*k0*d*(cos - 1/cos + sin^2/cos)) = exp(0) = 1
+// t * exp(+j*k0*d/cos) * exp(-j*k0*sin*d*tan)
+// = exp(-j*k0*d*(cos - 1/cos + sin^2/cos)) = exp(0) = 1
 // exactly, so a vacuum wall leaves field, ray, and throughput unchanged
 // while path_length grows by the interior chord (unit tested).
 __global__ void bdpt_transmitted_light_subpaths_kernel(
@@ -730,8 +730,8 @@ __global__ void bdpt_transmitted_light_subpaths_kernel(
     float w_s;
     float w_p;
     sp_proxy_weights(incident, normal_in, w_s, w_p);
-    // Amplitude proxy: sqrt of the pol-weighted power transmittance (contract
-    // section 5); T_eff mirrors the effective_power_reflectance construction.
+    // The amplitude proxy is the square root of polarization-weighted power.
+    // T_eff mirrors effective_power_reflectance.
     const float effective_transmittance =
         fmaxf(te.cap_t * w_s + tm.cap_t * w_p, 0.0f);
     const float amplitude = sqrtf(effective_transmittance);
@@ -1155,12 +1155,12 @@ std::vector<at::Tensor> channel_bdpt_reflected_light_subpath_state_cuda(
     return state;
 }
 
-// ---- Consolidated from bdpt_subpaths_ad.cu ----
+// ==== Section: BDPT subpath AD ====
 #include "field_transport_ad_common.cuh"
 
 #include <rayd/shared/rf/layer_stack.cuh>
 
-// ADR-022 6.1 / 6.2: backward + jvp companions for the BDPT light-subpath
+// BDPT AD: backward + jvp companions for the BDPT light-subpath
 // advance ops.
 //
 // A subpath advance multiplies the carried Complex3 Jones field by a per-hit
@@ -1651,7 +1651,7 @@ __global__ void reflected_subpath_jvp_kernel(
 // ---------------------------------------------------------------------------
 // Transmitted light subpath advance companions. The wall operator is the CSR
 // slab Jones response plus the exact lateral-shift compensation phase
-//   phi = k_par * lateral - k0 * jump.
+// phi = k_par * lateral - k0 * jump.
 // ---------------------------------------------------------------------------
 
 struct DFloat {

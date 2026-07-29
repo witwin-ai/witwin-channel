@@ -1,20 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests chain kernel contracts.
 
-"""Direct contract tests for the ADR-021 chain scattering native symbols.
-
-Covers the six symbols frozen by plan 10a sections 3 and 4:
-
-* ``scattering_chain_ensemble_eval`` / ``_backward`` / ``_jvp`` (Op A, power),
-* ``scattering_chain_realization_eval`` / ``_backward`` / ``_jvp`` (Op B,
-  coherent),
-
-exercising the facade key-set / shape / dtype contract, the ``keep`` and
-degenerate-row behavior, the need-flag gating and the loud missing-symbol
-failure. These run once the extension is rebuilt with the ADR-021 kernels; the
-Python facades are authored in parallel in ``kernels/scattering.py``.
-The padded per-leg block width is ``Dmax = kMaxAdDepth = 8`` (plan 10a s1).
-"""
+"""Tests chain kernel contracts."""
 
 from __future__ import annotations
 

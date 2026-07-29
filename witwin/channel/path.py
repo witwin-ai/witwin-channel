@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
 # Explicit path solver API for path export and diagnostics.
 
-"""Explicit path solver API for path export and diagnostics.
-
-``docs/dev/path/README.md`` holds the full ownership contract; a module has no
-directory to hold a README. The sections below follow the former package
-layout: configuration, ragged storage, padded results, metadata, antenna array
-packing, the shared solve pipeline, and the public entry point.
-"""
+"""Explicit path solver API for path export and diagnostics."""
 
 from __future__ import annotations
 
@@ -71,8 +65,8 @@ if TYPE_CHECKING:
 # --- Configuration --------------------------------------------------------
 
 # Public component set. transmission exports specular wall-penetration paths
-# (wave 2); scattering exports single-bounce incoherent Kirchhoff patch paths
-# (wave 3). transmission depth is capped like reflection (chains count wall
+# (transmission); scattering exports single-bounce incoherent Kirchhoff patch paths
+# (rough scattering). transmission depth is capped like reflection (chains count wall
 # penetrations); scattering is single-bounce in v1.
 # Default component set is unchanged: the new components are strictly opt-in.
 _VALID_MAX_PATHS_SCOPES = frozenset({"per_pair"})
@@ -89,13 +83,13 @@ class Config:
     ad_mode: str = "none"
     coupled_paths: bool = False
     coupled_candidate_limit: int = 1_000_000
-    # Rough-surface scattering quadrature (wave 3): fixed per-area sample
+    # Rough-surface scattering quadrature (rough scattering): fixed per-area sample
     # density (per-face cap of 4096 samples), a per-pair strongest-paths cap,
     # and an absolute path_gain floor for exported patch paths.
     scattering_samples_per_m2: float = 8.0
     scattering_max_paths_per_pair: int = 4096
     scattering_power_threshold: float = 0.0
-    # Enumerated scatter-chain path class (ADR-021 D1). DEFAULT-OFF opt-in:
+    # Enumerated scatter-chain path class (coherent scattering). DEFAULT-OFF opt-in:
     # scattering_chain_max_depth = 0 disables chain discovery so exported paths
     # are byte-identical to today. When >= 1 it caps d1 + d2, the combined
     # specular reflection depth of the two legs around the single diffuse vertex
@@ -107,7 +101,7 @@ class Config:
     scattering_chain_max_depth: int = 0
     scattering_chain_samples_per_m2: float = 2.0
     scattering_chain_max_rows: int = 256
-    # ISB boundary taper (ADR-017). DEFAULT-OFF visual-continuity heuristic: the
+    # ISB boundary taper (the boundary taper). DEFAULT-OFF visual-continuity heuristic: the
     # hard LoS occlusion gate becomes a C1 membership taper tau(c / (width * w_F))
     # and the compensating order-1 diffraction odd step spreads over the same
     # congruent window. OFF (the default) is bit-identical to the hard gate and
@@ -738,10 +732,10 @@ class PathResult:
     ) -> "BeamformedPathResult":
         """Return a signal view using complex per-endpoint antenna weights.
 
-        The raw antenna channel in this result is unchanged.  When weights are
-        omitted, the precoding/combining weights captured from the solved
-        scene are used.
-        """
+ The raw antenna channel in this result is unchanged. When weights are
+ omitted, the precoding/combining weights captured from the solved
+ scene are used.
+ """
 
         tx = self.tx_weights if tx_weights is None else tx_weights
         rx = self.rx_weights if rx_weights is None else rx_weights
@@ -824,7 +818,7 @@ class PathResult:
 
 @dataclass(frozen=True, slots=True)
 class BeamformedPathResult:
-    """Beamformed signal views backed by an immutable raw :class:`PathResult`."""
+    """Beamformed signal views backed by an immutable raw:class:`PathResult`."""
 
     source: PathResult
     tx_weights: torch.Tensor
@@ -1034,7 +1028,7 @@ def _metadata(
     peak_memory_bytes: int = 0,
     scattering_info: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    # Plan 07 AD-4: the real registered-companion accounting. vjp retains
+    # diffraction AD: the real registered-companion accounting. vjp retains
     # tape and schedules its companions on the user's later backward; jvp
     # runs its dual companions inside this forward and retains no tape.
     kernel = make_metadata(
@@ -1112,13 +1106,13 @@ def _metadata(
         },
     }
     if "transmission" in config.components:
-        # Endpoint-connection thin_sheet contract (plan 05 section 4).
+        # Endpoint-connection thin_sheet contract (the solver component layout).
         metadata["transmission"] = {
             "thin_sheet_straight_path_approximation": True,
             "group_delay": "geometric",
         }
     if scattering_info is not None:
-        # Incoherent Kirchhoff patch quadrature (plan 05 wave 3); the flag
+        # Incoherent Kirchhoff patch quadrature (the rough-scattering model); the flag
         # documents that per-path phases are NOT physical for ensemble rows.
         metadata["scattering"] = dict(scattering_info)
     return metadata
@@ -1161,10 +1155,10 @@ def _flatten_receivers(receivers: Sequence[Receiver]) -> list[Receiver]:
 class _AntennaEndpoint(Protocol):
     """Structural view of the endpoint attributes synthetic packing reads.
 
-    Both ``_TransmitterView`` and the receiver views expose ``array``,
-    ``orientation`` and ``pattern``; this states that shared shape without
-    importing a concrete endpoint class or widening the parameter to ``Any``.
-    """
+ Both ``_TransmitterView`` and the receiver views expose ``array``,
+ ``orientation`` and ``pattern``; this states that shared shape without
+ importing a concrete endpoint class or widening the parameter to ``Any``.
+ """
 
     @property
     def array(self) -> Any: ...
@@ -1186,17 +1180,17 @@ def _synthetic_endpoint_factor(
 ) -> torch.Tensor:
     """Batch steering/pattern weights over endpoints sharing the same object.
 
-    ``directions`` has shape ``(endpoint, *batch, 3)`` where ``directions[i]``
-    is the far-field direction for ``endpoints[i]``. ``steering_vector`` and
-    ``AntennaPattern.field_response`` are per-direction operations (the only
-    reductions are the fixed length-3 vec3 contractions inside each element),
-    so evaluating a group of endpoints in one batched launch is numerically
-    identical to evaluating them one at a time. Endpoints that reference the
-    same object (for example every element of one ``ReceiverGrid``) share
-    array/orientation/pattern and are batched together, collapsing a per-
-    endpoint Python loop into one native launch per distinct endpoint object.
-    Returns ``(endpoint, *batch, num_ant)``.
-    """
+ ``directions`` has shape ``(endpoint, *batch, 3)`` where ``directions[i]``
+ is the far-field direction for ``endpoints[i]``. ``steering_vector`` and
+ ``AntennaPattern.field_response`` are per-direction operations (the only
+ reductions are the fixed length-3 vec3 contractions inside each element),
+ so evaluating a group of endpoints in one batched launch is numerically
+ identical to evaluating them one at a time. Endpoints that reference the
+ same object (for example every element of one ``ReceiverGrid``) share
+ array/orientation/pattern and are batched together, collapsing a per-
+ endpoint Python loop into one native launch per distinct endpoint object.
+ Returns ``(endpoint, *batch, num_ant)``.
+ """
 
     groups: dict[int, list[int]] = {}
     for index, endpoint in enumerate(endpoints):
@@ -1280,10 +1274,10 @@ def pack_synthetic_arrays(
 ) -> PathResult:
     """Expand centre-reference paths using far-field array phase weighting.
 
-    Synthetic arrays share one geometric path set across their elements. An
-    explicit array must instead trace the element positions and is rejected
-    here so that a far-field approximation is never reported as explicit.
-    """
+ Synthetic arrays share one geometric path set across their elements. An
+ explicit array must instead trace the element positions and is rejected
+ here so that a far-field approximation is never reported as explicit.
+ """
 
     if frequency_hz <= 0.0:
         raise ValueError("frequency_hz must be positive")
@@ -1535,8 +1529,8 @@ _COMPONENT_ID = {
     "diffraction": 2,
     "reflection_diffraction": 3,
     "diffraction_reflection": 4,
-    # transmission exports specular wall-penetration paths since wave 2;
-    # scattering exports incoherent Kirchhoff patch paths since wave 3.
+    # transmission exports specular wall-penetration paths since transmission;
+    # scattering exports incoherent Kirchhoff patch paths since rough scattering.
     "transmission": 5,
     "scattering": 6,
 }
@@ -1588,7 +1582,7 @@ def _validate_runtime(config: Config) -> tuple[bool, bool, bool]:
     if not torch.cuda.is_available():
         raise RuntimeError("witwin.channel.path solver requires CUDA")
     if config.isb_boundary_taper and config.ad_mode != "none":
-        # ISB boundary taper (ADR-017) gate 3: the C1 clearance-factor AD
+        # ISB boundary taper (the boundary taper) gate 3: the C1 clearance-factor AD
         # companion is a documented follow-up; reject taper + AD loudly rather
         # than returning a silently incomplete gradient.
         raise RuntimeError(
@@ -1634,7 +1628,7 @@ def _pipeline_solve_base(
         validate_runtime(config)
     )
     # Solve-level wall time and CUDA high-water-mark delta for the kernel
-    # metadata (plan 07 AD-4). AD instrumentation only: the syncs would break
+    # metadata (diffraction AD). AD instrumentation only: the syncs would break
     # host/device overlap for a caller looping over ad_mode="none" solves, so
     # none-mode reports zeros and takes no sync (zero-overhead primal contract).
     ad_instrumented = config.ad_mode != "none"

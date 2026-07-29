@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests solver rough reflection ad.
 
-"""Solver-level AD through the native rough-reflection C_r scale (ADR-010).
-
-End-to-end callers for ``field_rough_reflection_scale_backward`` / ``_jvp``:
-the frequency derivative of a rough-wall specular solve flows through the
-coherent C_r attenuation (dC_r/df), mirroring the frozen rough-reflection-cr
-jvp/vjp baseline cells.
-"""
+"""Tests solver rough reflection ad."""
 
 from __future__ import annotations
 

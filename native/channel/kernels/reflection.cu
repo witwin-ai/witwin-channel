@@ -112,7 +112,7 @@ __global__ void slab_reflection_accumulate_kernel(
         float3 origin = cmath::vec3(ray_o[3*ray], ray_o[3*ray+1], ray_o[3*ray+2]);
         float3 direction = cmath::normalize_rsqrt_safe(cmath::vec3(ray_d[3*ray], ray_d[3*ray+1], ray_d[3*ray+2]));
         float3 vertical = cmath::vec3(0.0f, 0.0f, 1.0f);
-        // R5 polarization consistency: seed the transported field with the
+        // polarization consistency: seed the transported field with the
         // UNNORMALIZED transverse projection of the true TX polarization onto
         // the launch direction (short-dipole sin(theta) pattern). No axial-null
         // special case: a zero here is the correct physical null, and |field|^2
@@ -176,7 +176,7 @@ __global__ void slab_reflection_accumulate_kernel(
 
 // ---------------------------------------------------------------------------
 // Backward / JVP companions of slab_reflection_accumulate_kernel
-// (plan 07 AD-3). Fixed-winner contract: the RayD trace tape (valid / t /
+// (solver derivatives). Fixed-winner contract: the RayD trace tape (valid / t /
 // prim), the sampled directions and the ray origins are frozen constants of
 // the differentiation, so the deposit binning, the incidence cosines and the
 // polarization frames are all constant; every derivative flows through the
@@ -275,7 +275,7 @@ __global__ void slab_reflection_accumulate_backward_kernel(
         // per-bounce state the reverse sweep needs.
         float3 origin = cmath::vec3(ray_o[3*ray], ray_o[3*ray+1], ray_o[3*ray+2]);
         float3 direction = cmath::normalize_rsqrt_safe(cmath::vec3(ray_d[3*ray], ray_d[3*ray+1], ray_d[3*ray+2]));
-        // R5: unnormalized transverse projection of the true TX polarization
+        // unnormalized transverse projection of the true TX polarization
         // (see the forward kernel). The seed field is a frozen winner of the
         // material/frequency differentiation, but its sin^2(theta) magnitude
         // scales every deposit and hence every gradient, so it must match the
@@ -480,7 +480,7 @@ __global__ void slab_reflection_accumulate_jvp_kernel(
          ray < ray_count; ray += stride) {
         float3 origin = cmath::vec3(ray_o[3*ray], ray_o[3*ray+1], ray_o[3*ray+2]);
         float3 direction = cmath::normalize_rsqrt_safe(cmath::vec3(ray_d[3*ray], ray_d[3*ray+1], ray_d[3*ray+2]));
-        // R5: unnormalized transverse projection of the true TX polarization
+        // unnormalized transverse projection of the true TX polarization
         // (see the forward kernel). The seed field carries no material/frequency
         // tangent, so d_field starts at zero, but its sin^2(theta) magnitude
         // must match the forward.

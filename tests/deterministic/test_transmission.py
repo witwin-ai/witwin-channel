@@ -1,12 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests transmission.
 
-"""Deterministic endpoint-connection specular transmission (plan 05 wave 2).
-
-The decisive invariant: a thin_sheet wall made of a single vacuum layer must
-reproduce the empty-scene LoS complex field (amplitude AND phase) at normal
-and oblique incidence.
-"""
+"""Tests transmission."""
 
 import math
 import os

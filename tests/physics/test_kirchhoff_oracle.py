@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests kirchhoff oracle.
 
-"""Golden tests for the Kirchhoff/phase-screen oracle.
-
-Covers Beckmann-series vs direct quadrature agreement, smooth limits,
-phase-screen patch-integral identities (constant height, sinusoidal grating
-with Bessel harmonic amplitudes), quadrature convergence, and hemisphere
-energy sanity.
-"""
+"""Tests kirchhoff oracle."""
 
 import numpy as np
 import pytest
@@ -119,11 +113,11 @@ def test_phase_screen_constant_height():
 def test_phase_screen_sinusoidal_grating_orders(order):
     """Sinusoidal height gives (-1)^m * J_m(q_n*A) at the grating angles.
 
-    With h(x) = A*sin(kappa*x), Jacobi-Anger expands the phase screen into
-    harmonics exp(+j*p*kappa*x) with amplitudes J_p(-q_n*A); over an integer
-    number of periods only the order with q_x = m*kappa survives, so the
-    integral equals area * (-1)^m * J_m(q_n*A).
-    """
+ With h(x) = A*sin(kappa*x), Jacobi-Anger expands the phase screen into
+ harmonics exp(+j*p*kappa*x) with amplitudes J_p(-q_n*A); over an integer
+ number of periods only the order with q_x = m*kappa survives, so the
+ integral equals area * (-1)^m * J_m(q_n*A).
+ """
     period = 0.5
     kappa = 2.0 * np.pi / period
     n_periods = 8

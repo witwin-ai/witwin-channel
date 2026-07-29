@@ -1,12 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests em oracle.
 
-"""Golden tests for the complex128 EM oracle (plan section 11.1 items 1-8).
-
-All expected values are computed at runtime from independent closed-form
-expressions (impedance formulas, analytic TIR phases, exact periodicity),
-never from the oracle itself.
-"""
+"""Tests em oracle."""
 
 import numpy as np
 import pytest
@@ -93,8 +88,8 @@ def test_total_internal_reflection():
     assert abs(np.abs(complex(coeff.r_te)) - 1.0) < 1e-12
     assert abs(np.abs(complex(coeff.r_tm)) - 1.0) < 1e-12
     # Analytic phases for exp(+j*w*t), passive branch k_z2 = -j*k0*s:
-    #   TE: r = (n1*cos_i + j*s)/(n1*cos_i - j*s) -> arg = +2*atan(s/(n1*cos_i))
-    #   TM: r = (Y1 - j*c)/(Y1 + j*c) with c/Y1 = n1*cos_i/(eps1*s) -> arg < 0
+    # TE: r = (n1*cos_i + j*s)/(n1*cos_i - j*s) -> arg = +2*atan(s/(n1*cos_i))
+    # TM: r = (Y1 - j*c)/(Y1 + j*c) with c/Y1 = n1*cos_i/(eps1*s) -> arg < 0
     s = np.sqrt(n1 * n1 * sin_i * sin_i - 1.0)
     phase_te = 2.0 * np.arctan2(s, n1 * cos_i)
     phase_tm = -2.0 * np.arctan2(n1 * cos_i, eps1 * s)

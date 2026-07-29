@@ -1,14 +1,7 @@
 # Copyright Xingyu Chen.
 # Typed fixed-capacity contracts for RayD segment penetration.
 
-"""Typed fixed-capacity contracts for RayD segment penetration.
-
-ADR-027 makes RayD the sole numerical owner of batched straight-segment
-penetration geometry. These are the typed results its Channel facade publishes.
-They sit at the propagation root rather than under the geometry stage because
-the topology stage packs component-5 rows out of a ``SegmentPenetrationResult``
-and the import graph forbids topology from reaching geometry.
-"""
+"""Typed fixed-capacity contracts for RayD segment penetration."""
 
 from __future__ import annotations
 

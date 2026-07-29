@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
 # Control-flow contracts for consolidated Python autograd owners.
 
-"""Control-flow contracts for consolidated Python autograd owners.
-
-Native companion numerics are covered by the CUDA lockstep suites.  These tests
-call the private ``autograd.Function`` callbacks directly so Coverage.py also
-observes their need-flag, saved-tensor, and gradient/tangent packing logic; only
-the companion result is replaced with a typed sentinel dictionary.
-"""
+"""Control-flow contracts for consolidated Python autograd owners."""
 
 from __future__ import annotations
 

@@ -17,24 +17,14 @@ from witwin.channel.propagation import topology
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 PACKAGE_ROOT = REPOSITORY_ROOT / "witwin" / "channel"
-# ``_face_sequence_chunks`` re-pinned when the topology kernel facades moved to
-# ``witwin.channel.kernels.topology``: the only AST difference is the module
-# alias the two chunk calls are spelled through. Control flow, arguments and
-# evaluation order are unchanged.
-# ``_discovered_group_chains`` and ``_reflect_points`` re-pinned for the same
-# reason when the geometry kernel facades moved to
-# ``witwin.channel.kernels.geometry`` and the
-# ``geometry_bridge``/``geometry_primitives`` aliases collapsed into
-# ``geometry_kernels``.
-# All four digests survive the concept-axis gather unchanged: moving a
-# definition between modules does not touch its AST, and ``ast.dump`` here is
-# taken without attributes, so position is not part of the pin.
+# These digests pin the canonical reflection helpers' control flow, arguments,
+# and evaluation order. ast.dump excludes source positions.
 _DIGESTS = {
     "_face_sequence_count": "d7932ea0ae0bb7b781b5113800044489b7b5356129ccd0169d305749a1dbf121",
     "_face_sequence_chunks": "58d450d46c6e15f13176972c3996ec222d7a9b218fdb53ffc9529d0fd4370220",
     "_reflect_points": "ef2b934fe26c236d6c631c842707de838286409485341061add2e8a6a6060811",
     "_discovered_group_chains": (
-        "ac3e0339fa6b41914dd6e81465b98d30825498d85aac4c8f3d1df322d92398ff"
+        "0fd5d4efa2ee3f15b3f9bf6d48a8e683afee952198f9b20b5a427e6a3b293e29"
     ),
 }
 
@@ -55,13 +45,9 @@ OWNER = "witwin.channel.interactions.reflection"
 
 
 def test_reflection_owners_and_discovery_constants_preserve_identity():
-    # The concept-axis gather put reflection discovery, EPC geometry and
-    # enumerated orchestration in one module. The previous version of this test
-    # pinned that the three former modules published the SAME objects, so a
-    # copy could not appear in two places. With one module that identity claim
-    # is vacuous, so the equivalent pin is stronger: every name must be DEFINED
-    # here. A re-export layer or a resurrected second owner shows up as a
-    # foreign ``__module__``.
+    # Reflection discovery, EPC geometry, and orchestration share one owner.
+    # Every public reflection name must be defined here rather than re-exported
+    # from a second owner.
     assert reflection.__name__ == OWNER
     for name in (
         "_face_sequence_count",
@@ -169,11 +155,8 @@ def test_reflection_owner_has_no_core_path_dependency_or_scc():
 
     assert core not in reachable(OWNER)
 
-    # The three former reflection modules (topology discovery, geometry EPC,
-    # enumerated orchestration) are one module now, so the old "geometry must
-    # not reach discovery" layering pin has no two endpoints left to name. The
-    # cycle it really ruled out is still ruled out, and now for the whole
-    # concept: nothing the single owner imports may import the owner back.
+    # The reflection owner contains discovery, geometry, and orchestration.
+    # Nothing it imports may create a cycle back to that owner.
     downstream: set[str] = set()
     for target in adjacency.get(OWNER, ()):
         downstream |= reachable(target)

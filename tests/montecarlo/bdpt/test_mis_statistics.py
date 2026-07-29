@@ -36,10 +36,8 @@ def test_bdpt_diffraction_estimate_is_sample_count_and_seed_invariant():
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native diffraction is not built")
 
-    # ADR-018: standalone diffraction is now a deterministic enumerated estimate,
-    # so it no longer depends on the Monte Carlo sample budget or seed. Distinct
-    # sample counts and seeds collapse to the identical value, replacing the
-    # retired variance-shrinks-with-samples convergence check on the stochastic
+    # Standalone BDPT diffraction is deterministic. Sample budget and seed do
+    # not affect its value, so distinct configurations produce the same
     # Keller sampler.
     small = _estimates(samples=256, mis="power_heuristic")
     large = _estimates(samples=1024, mis="power_heuristic")

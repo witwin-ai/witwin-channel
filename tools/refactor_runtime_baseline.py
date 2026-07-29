@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
 # Collect reduced, exact runtime and performance refactor baselines.
 
-"""Collect reduced, exact runtime and performance refactor baselines.
-
-The parent process starts at least two independent child processes for every
-solver/scenario pair.  Each child delegates timing and CUDA-memory accounting
-to :mod:`benchmarks.harness`; result serialization happens after measurement
-and therefore does not contaminate the timing samples.
-"""
+"""Collect reduced, exact runtime and performance refactor baselines."""
 
 from __future__ import annotations
 
@@ -763,10 +757,10 @@ def collect_reduced(
 
 
 # ---------------------------------------------------------------------------
-# Extended G0 backfill profile (Plan 08 section 9). The reduced profile above
+# Extended backfill profile (the duplication policy). The reduced profile above
 # freezes only LoS and single-reflection with ad_mode=none. The extended
-# profile appends the section-9 component/scene/AD dimensions that a later
-# numerical PR (ADR-010: native Kirchhoff scattering + rough-reflection C_r
+# profile appends the extended component, scene, and derivative dimensions that a later
+# numerical PR (rough-surface scattering: native Kirchhoff scattering + rough-reflection C_r
 # kernels) will touch, so every affected public output has a pre-change exact
 # hash. Every construction below reuses the canonical scene builders and
 # solver configs of the existing acceptance/AD tests; no new physics config is
@@ -806,9 +800,9 @@ _EXTENDED_AD_SCENARIOS = (
     "rough-reflection-cr",
 )
 # Differentiable seed per (scenario, mode). eps_r/layer_eps_r duals mirror the
-# AD-1/AD-4 material cells; both rough-reflection modes use frequency so the
+# AD/AD material cells; both rough-reflection modes use frequency so the
 # derivative flows through the C_r coherent attenuation (dC_r/df in forward
-# and reverse mode), the exact quantity ADR-010 op 3 must reproduce. A
+# and reverse mode), the exact quantity rough-surface scattering must reproduce. A
 # layer_eps_r dual produces no forward tangent on the rough-reflection rows,
 # so frequency is the canonical jvp seed there.
 _EXTENDED_AD_SEEDS: dict[tuple[str, str], str] = {
@@ -832,7 +826,7 @@ _EXTENDED_MC_SEEDS: dict[str, int] = {
 }
 _EXTENDED_MC_SOLVERS = ("montecarlo-basic", "montecarlo-bdpt")
 
-# Documented section-9 combinations that are intentionally NOT frozen here,
+# Documented extended combinations that are intentionally NOT frozen here,
 # with the reason. These are covered by their own gates, not the runtime
 # exact-hash profile.
 _EXTENDED_UNSUPPORTED: tuple[dict[str, object], ...] = (
@@ -899,11 +893,9 @@ def extended_cells() -> tuple[tuple[str, str, str], ...]:
 class _GradientCapture:
     """Capturable AD output: exact gradient tensors plus solve accounting.
 
-    ``metadata`` is the full public solver metadata dict, so
-    :func:`result_manifest` strips only the allowlisted timing fields and
-    :func:`launch_ledger` reads the same aggregate launch/tape counters as a
-    forward result. The gradient tensor is hashed by the forward tensor scheme.
-    """
+ ``metadata`` is the full public solver metadata dict, so:func:`result_manifest` strips only the allowlisted timing fields and:func:`launch_ledger` reads the same aggregate launch/tape counters as a
+ forward result. The gradient tensor is hashed by the forward tensor scheme.
+ """
 
     mode: str
     seed: str
@@ -1559,11 +1551,11 @@ def collect_extended(
 ) -> dict[str, object]:
     """Freeze the extended profile, excluding non-reproducible/rejected cells.
 
-    Every kept cell is verified bitwise exact across ``processes`` independent
-    processes by :func:`aggregate_case`. A cell whose child rejects the
-    combination (capability refusal) or whose hashes differ across processes is
-    recorded in ``excluded`` with the exact error rather than aborting the run.
-    """
+ Every kept cell is verified bitwise exact across ``processes`` independent
+ processes by:func:`aggregate_case`. A cell whose child rejects the
+ combination (capability refusal) or whose hashes differ across processes is
+ recorded in ``excluded`` with the exact error rather than aborting the run.
+ """
 
     validate_measurement_policy(processes, warmup, repeats)
     script = Path(__file__).resolve()
@@ -1874,12 +1866,12 @@ def _project_extended_report(report: dict[str, object]) -> dict[str, dict[str, o
 def write_extended_report(report: dict[str, object], baselines_root: Path) -> Path:
     """Freeze the extended profile under ``<sha>/runtime/extended.json``.
 
-    The reduced writer owns a whole fresh ``<sha>`` directory; the extended
-    profile is a runtime backfill that lands in the ``runtime`` subdirectory of
-    the commit's baseline directory, so only the ``extended-*`` artifacts are
-    written and an existing sibling static/reduced baseline is preserved. The
-    extended index itself is immutable: refreeze against a new commit instead.
-    """
+ The reduced writer owns a whole fresh ``<sha>`` directory; the extended
+ profile is a runtime backfill that lands in the ``runtime`` subdirectory of
+ the commit's baseline directory, so only the ``extended-*`` artifacts are
+ written and an existing sibling static/reduced baseline is preserved. The
+ extended index itself is immutable: refreeze against a new commit instead.
+ """
 
     sha = str(report["git_sha"])
     baselines_root = baselines_root.resolve()

@@ -38,13 +38,9 @@ def test_single_wedge_diffraction_matches_path_reference():
     torch.testing.assert_close(
         result.paths.edge_id, reference.primitive_id[reference.valid, 0]
     )
-    # Real UTD paths (audit DF-1): one merged record for the shared wedge
-    # edge (audit D-6), Keller stationary-point delays, and K-P amplitudes.
-    # F2 admitted the weak horizontal edge 4 after the 5 cm gate removal, but
-    # the finite-edge truncation refinements (F5e monotone even part + F5f
-    # boundary-distance odd blend) legitimately push its field back below the
-    # 1e-30 existence floor, so the record set returns to edge ids 0, 1, 2, 5;
-    # the deterministic and path solvers still agree edge-for-edge.
+    # The shared wedge emits one row for each surviving edge. Finite-edge
+    # truncation and boundary blending push horizontal edge 4 below the 1e-30
+    # floor, leaving edge IDs 0, 1, 2, and 5 in both solvers.
     torch.testing.assert_close(
         result.paths.edge_id,
         torch.tensor(
@@ -61,7 +57,7 @@ def test_single_wedge_diffraction_matches_path_reference():
         device=result.paths.path_length_m.device,
         dtype=torch.float32,
     )
-    # F1/R5 + F5e/F5f: the diffracted field carries the z-hat short-dipole sin
+    # / /: the diffracted field carries the z-hat short-dipole sin
     # pattern (projected onto the rx polarization) and the monotone finite-edge
     # truncation with the boundary-distance odd blend, which reshape the
     # per-edge gains; edges 0/1 sit at near-null while edges 2/5 stay dominant.
@@ -90,7 +86,7 @@ def test_single_wedge_diffraction_matches_path_reference():
 
 
 def test_vertical_only_edge_policy_filters_horizontal_edges():
-    """The scene's edge policy must govern path generation (audit DF-4)."""
+    """The scene's edge policy must govern path generation."""
 
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic diffraction")
@@ -138,8 +134,8 @@ def test_vertical_only_edge_policy_filters_horizontal_edges():
         ),
         reference_frequency_hz=3.0e9,
     )
-    # F5e/F5f (utd-continuity-fix-design): the finite-edge truncation pushes
-    # the weak horizontal edge that F2 had admitted back below the existence
+    # the finite-edge truncation pushes
+    # the weak horizontal edge that had admitted back below the existence
     # floor, so the unfiltered baseline emits 4 paths; vertical_only keeps 3.
     assert int(baseline.paths.valid.numel()) == 4
 

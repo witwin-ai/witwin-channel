@@ -237,10 +237,8 @@ def test_mc_bdpt_hot_paths_do_not_make_python_empty_wedge_sentinels():
     montecarlo = repo / "witwin" / "channel" / "montecarlo"
     basic = montecarlo / "basic.py"
     bdpt = montecarlo / "bdpt.py"
-    # BDPT is one module now. This gate is about its endpoint subpath and
-    # workspace stage - the former ``bdpt/workspace.py`` - so it reads exactly
-    # the definitions that file owned rather than the whole module, which
-    # legitimately builds an empty exported path-sample result elsewhere.
+    # Inspect only the endpoint-subpath and workspace definitions in the BDPT
+    # module; other definitions legitimately build empty exported path samples.
     workspace_members = frozenset(
         {
             "_SolvePrep",
@@ -278,7 +276,7 @@ def test_mc_basic_solver_uses_native_scene_and_store_material_paths():
     solve_source = inspect.getsource(mc_basic.solve_pipeline)
     module_source = inspect.getsource(mc_basic)
 
-    # Plan 07 AD-3: materials come from the compiled store in BOTH
+    # solver derivatives: materials come from the compiled store in BOTH
     # ad_mode="none" and the AD modes (one source, same values); the old
     # host-float flattening cannot carry a gradient and is gone.
     assert "require_compiled(scene).rayd" in solve_source
@@ -301,9 +299,8 @@ def test_bdpt_pipeline_does_not_use_derived_variance_or_component_map_path_expor
 
 
 def test_bdpt_package_does_not_reintroduce_python_los_visibility_helpers():
-    # The BDPT solver is one module now, so the former package walk is a single
-    # file read. The kernels/maps.py carve-out the walk carried is gone with the
-    # file it named: those two visibility facades live in kernels/montecarlo.py,
+    # The BDPT solver module must not define Python LoS visibility helpers. The
+    # two visibility facades live in kernels/montecarlo.py,
     # which this scan does not cover.
     repo = Path(__file__).resolve().parents[2]
     module = repo / "witwin" / "channel" / "montecarlo" / "bdpt.py"

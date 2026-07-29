@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
-# BDPT Kirchhoff rough-surface scattering (wave 3).
+# Test BDPT Kirchhoff rough-surface scattering.
 
-"""BDPT Kirchhoff rough-surface scattering (wave 3).
-
-Covers the three-way {reflect, scatter, transmit} event selection, the
-torch-side scattering NEE connections (component 6), the smooth limit, the
-energy bound, seed reproducibility, the disabled-regression guard and the
-sampler/pdf consistency of the seeded direction stream.
-"""
+"""Test BDPT Kirchhoff rough-surface scattering."""
 
 import math
 
@@ -99,12 +93,12 @@ def _point_scene(material: PhysicalMaterial) -> Scene:
 def _quadrature_reference(*, polarized: bool) -> float:
     """Direct torch area quadrature of the scattering path gain at _RX.
 
-    g = Int_wall (P_te*f_te + P_tm*f_tm) cos_i cos_o (lambda/4pi)^2
-        / (r1^2 r2^2) dA
-    with (P_te, P_tm) the transverse projection of the z-polarized unit tx
-    field (matching the BDPT NEE weighting), or the unpolarized mean kernel
-    when ``polarized`` is False (matching MC basic).
-    """
+ g = Int_wall (P_te*f_te + P_tm*f_tm) cos_i cos_o (lambda/4pi)^2
+ / (r1^2 r2^2) dA
+ with (P_te, P_tm) the transverse projection of the z-polarized unit tx
+ field (matching the BDPT NEE weighting), or the unpolarized mean kernel
+ when ``polarized`` is False (matching MC basic).
+ """
 
     device = torch.device("cuda")
     table = build_kirchhoff_table(
@@ -210,19 +204,19 @@ def test_bdpt_scattering_variance_decreases_like_one_over_n():
 
 def test_bdpt_smooth_limit_and_energy_bound():
     """Near-zero roughness kills the diffuse component; at strong roughness
-    the diffuse power at a near-specular receiver stays below the SMOOTH
-    specular reflection there (R_diff <= R_bar and the lobe spreads energy).
+ the diffuse power at a near-specular receiver stays below the SMOOTH
+ specular reflection there (R_diff <= R_bar and the lobe spreads energy).
 
-    The literal contract inequality reflection_rough + scattering <=
-    reflection_smooth requires the coherent C_r attenuation of the DISCRETE
-    specular enumeration, which is owned by the deterministic-solver
-    scattering wave (path_topology gain evaluation). Until it lands the
-    discrete reflection is unattenuated, so this test asserts the two
-    robust halves: the scattering component obeys its budget bound, and the
-    reflection component never EXCEEDS the smooth value (equal now,
-    attenuated after integration). The shooting sampler's own reflect
-    branch already applies C_r.
-    """
+ The literal contract inequality reflection_rough + scattering <=
+ reflection_smooth requires the coherent C_r attenuation of the DISCRETE
+ specular enumeration, which is owned by the deterministic-solver
+ scattering wave (path_topology gain evaluation). Until it lands the
+ discrete reflection is unattenuated, so this test asserts the two
+ robust halves: the scattering component obeys its budget bound, and the
+ reflection component never EXCEEDS the smooth value (equal now,
+ attenuated after integration). The shooting sampler's own reflect
+ branch already applies C_r.
+ """
 
     _require_native()
     reflection_config = Config(
@@ -292,12 +286,12 @@ def test_bdpt_scattering_is_seed_reproducible():
 
 def test_bdpt_results_unchanged_when_scattering_not_requested():
     """Regression guard: solving without the scattering component must not
-    change the other components' machinery. A smooth-material scene is
-    bit-identical whether or not scattering support exists in the solver,
-    and a rough-material scene keeps the same reflection value with and
-    without the scattering component enabled (the coherent C_r specular
-    attenuation is a material property, applied regardless of which
-    components are requested)."""
+ change the other components' machinery. A smooth-material scene is
+ bit-identical whether or not scattering support exists in the solver,
+ and a rough-material scene keeps the same reflection value with and
+ without the scattering component enabled (the coherent C_r specular
+ attenuation is a material property, applied regardless of which
+ components are requested)."""
 
     _require_native()
     base_components = {"los", "reflection", "transmission"}
@@ -376,8 +370,8 @@ def test_bdpt_grid_scattering_component_map_matches_power():
 
 def test_scatter_direction_sampler_matches_table_pdf():
     """Chi-square consistency of the seeded solver sampling path against the
-    table pdf (coarser 8 x 16 binning than tests/scattering/test_sampling.py
-    because the seeded stream draws fewer samples)."""
+ table pdf (coarser 8 x 16 binning than tests/scattering/test_sampling.py
+ because the seeded stream draws fewer samples)."""
 
     device = torch.device("cuda")
     table = build_kirchhoff_table(

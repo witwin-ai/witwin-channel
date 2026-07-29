@@ -1,14 +1,7 @@
 # Copyright Xingyu Chen.
 # witwin-maxwell FDTD reference for the Yee-locked ``three_cube_320`` case.
 
-"""witwin-maxwell FDTD reference for the Yee-locked ``three_cube_320`` case.
-
-Mirrors ``run_maxwell_single_cube.py``: PEC cubes are voxelized with infinite
-permittivity (zero electric update coefficient), the monitor plane is the
-``Ez`` Yee plane at ``plane_z``, and the run aborts unless every receiver cell
-center coincides with a Maxwell ``Ez`` node and every cube interior is
-field-free.
-"""
+"""witwin-maxwell FDTD reference for the Yee-locked ``three_cube_320`` case."""
 from __future__ import annotations
 
 import os

@@ -40,7 +40,7 @@ EXPECTED_OWNER_IDS = {
     "bdpt.connection_storage",
     "legacy_slab.primal",
     "legacy_slab.dual",
-    # ADR-010 native scattering / rough-reflection kernel owners.
+    # rough-surface scattering native scattering / rough-reflection kernel owners.
     "scattering.ensemble_eval",
     "scattering.patch_integral",
 }
@@ -258,7 +258,7 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
         for entry in current_hashes
         if entry["name"] in shared_math_names
     )
-    # ADR-043 gave the two Channel-owned field transports an optional
+    # first-order differentiation the two Channel-owned field transports an optional
     # arrival-direction cotangent input and a direction tangent output. Eight
     # frozen bodies moved and nothing else did, so they are recorded here by
     # before/after hash rather than silently absorbed.
@@ -306,9 +306,7 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
         for entry in current_inventory["symbols"]
     }
 
-    # This is an immutable Phase-9 body-hash test.  Later phases advance the
-    # live cursor, so validate the recorded transformations rather than pinning
-    # the repository-wide current phase to the historical cut.
+    # Validate recorded body transformations against the immutable ownership snapshot.
     assert migration["phase11b_current"]["status"] == (
         "historical Phase 11B implementation snapshot; frozen duplication "
         "acceptance met and later release closure completed"
@@ -462,7 +460,7 @@ def test_source_launch_and_sync_snapshot_is_complete_and_specific() -> None:
         "native/channel_native/kernels/path_trace.cu": (4270, 51, 11),
         "native/channel_native/kernels/field_transport_ad.cu": (2496, 9, 0),
         "native/channel_native/kernels/field_wedge_ad.cu": (2473, 9, 0),
-        # ADR-019 coherent (2) + ADR-022 coherent/power AD (4) launch sites
+        # coherent combination (2) + BDPT AD coherent/power AD (4) launch sites
         # extended the frozen bdpt_connect.cu ledger from 17 to 23.
         "native/channel_native/kernels/bdpt_connect.cu": (2356, 23, 2),
     }

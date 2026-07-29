@@ -1,21 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests solver scattering ad.
 
-"""Solver-level AD through the native ADR-014 scattering companions.
-
-End-to-end callers for the deterministic/path scattering component
-(``component_id=6``): with ``ad_mode != "none"`` the ensemble and
-realization-coherent scattering contributions must join the plan-07 AD system
-so gradients reach frequency, the resident Kirchhoff BSDF table values, and the
-phase-screen heights, and the total gradient stops silently dropping the
-scattering component.
-
-The wiring under test (``interactions/scattering.py`` building ``coef``
-/ ``k0`` / ``amplitude_scale`` as Torch scalars and selecting the ``_ad``
-wrappers when ``ad_mode != "none"``) is authored in parallel; these tests fail
-loudly if it is missing or detaches a differentiable input. FD steps/tolerances
-follow ``tests/ad/_tolerances.py`` and may need calibration once runnable.
-"""
+"""Tests solver scattering ad."""
 
 from __future__ import annotations
 
@@ -237,7 +223,7 @@ def test_ensemble_table_value_grad_is_nonzero_and_fd_consistent():
 
 def test_realization_runtime_preserves_height_graph():
     # The autograd graph of a requires_grad height tensor must survive
-    # PhaseScreenRuntime construction (ADR-014 wiring note). If it detaches,
+    # PhaseScreenRuntime construction (scattering AD wiring note). If it detaches,
     # this fails loudly instead of the height-gradient test silently zeroing.
     _require_rayd()
     heights = _heights().requires_grad_(True)
@@ -315,10 +301,10 @@ def test_realization_frequency_grad_matches_fd():
 
 
 # ---------------------------------------------------------------------------
-# (b') Realization scattering: layer-stack material gradients (ADR-015 Part B).
+# (b') Realization scattering: layer-stack material gradients (scattering AD).
 #
 # The realization patch integral reads the smooth-stack Jones r_te/r_tm at the
-# mean plane. Under ADR-015 Part B that stack becomes the differentiable
+# mean plane. Under scattering AD that stack becomes the differentiable
 # em_layer_stack_ad, so the shared CSR layer leaves (the same tensors the MC
 # transmission AD targets) carry gradients through the coherent realization
 # solve.
@@ -495,7 +481,7 @@ def test_scattering_ad_mode_none_stays_primal(scene_kind):
 
 
 def test_ensemble_wrapper_rejects_fixed_receiver_polarization():
-    # rx_pol is a fixed ADR-014 op-1 input; requesting its gradient through the
+    # rx_pol is a fixed scattering AD input; requesting its gradient through the
     # public wrapper must fail loudly (no silent detach, no wrong gradient).
     from witwin.channel.kernels import scattering as scattering_autograd
 

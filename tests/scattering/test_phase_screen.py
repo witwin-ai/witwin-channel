@@ -1,12 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests phase screen.
 
-"""Phase-screen runtime vs the CPU complex128 oracle.
-
-The runtime samples heights from a texture (bilinear, edge clamp) and
-integrates the complex phasor over mean-plane triangles; the oracle
-integrates the analytic height function over the same parallelogram.
-"""
+"""Tests phase screen."""
 
 import math
 
@@ -33,10 +28,10 @@ K0 = 2.0 * math.pi * F0 / C0
 def _rect_patch(size: float):
     """Unit-square-parametrized rectangle in z = 0 split into 2 triangles.
 
-    Returns (oracle parallelogram corners [4,3], triangle vertices [2,3,3],
-    triangle uv [2,3,2]); uv equals the patch (u, v) parametrization so the
-    texture convention matches oracle ``height_fn(u, v)``.
-    """
+ Returns (oracle parallelogram corners [4,3], triangle vertices [2,3,3],
+ triangle uv [2,3,2]); uv equals the patch (u, v) parametrization so the
+ texture convention matches oracle ``height_fn(u, v)``.
+ """
 
     corners = np.array(
         [
@@ -65,7 +60,7 @@ def _rect_patch(size: float):
 
 def _wave_vectors():
     """Near-specular pair: the integral stays O(area), so the comparison is
-    not dominated by float32 rounding of a heavily cancelling carrier."""
+ not dominated by float32 rounding of a heavily cancelling carrier."""
 
     theta_i = math.radians(25.0)
     theta_s = math.radians(28.0)
@@ -180,7 +175,7 @@ def test_realization_seed_reproducible_and_decorrelated():
 
 def test_footprint_averaging_on_phasor_not_height():
     """Mip-averaging heights before exponentiation is WRONG; the runtime must
-    integrate phasors. For a high-variance patch the two differ strongly."""
+ integrate phasors. For a high-variance patch the two differ strongly."""
 
     size = 0.5
     _, tris, uv = _rect_patch(size)
@@ -242,7 +237,7 @@ def test_sample_height_bilinear_edges():
 
 
 def test_phasor_convention():
-    """phasor() implements exp(-j*q_n*h) under the e^{+jwt} convention."""
+    """phasor implements exp(-j*q_n*h) under the e^{+jwt} convention."""
 
     screen = PhaseScreen(height=torch.full((4, 4), 2.0), height_scale_m=1e-3)
     runtime = PhaseScreenRuntime(screen, device=DEVICE)

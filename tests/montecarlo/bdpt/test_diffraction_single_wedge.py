@@ -99,7 +99,7 @@ def test_bdpt_single_wedge_diffraction_fixed_seed_is_stable():
         reference_frequency_hz=3.0e9,
     )
 
-    # ADR-018: standalone diffraction routes through the deterministic
+    # BDPT diffraction: standalone diffraction routes through the deterministic
     # enumerated engine, so the estimate is seed-invariant. Distinct seeds must
     # produce the identical map, unlike the retired stochastic Keller sampler.
     torch.testing.assert_close(
@@ -135,7 +135,7 @@ def test_bdpt_single_wedge_point_diffraction_matches_deterministic_reference():
         .detach()
         .sum()
     )
-    # ADR-018: BDPT standalone diffraction now consumes the same first-order UTD
+    # BDPT diffraction: BDPT standalone diffraction now consumes the same first-order UTD
     # enumerated evaluation as the deterministic solver, so the point-receiver
     # estimate reproduces the deterministic reference. The retired crude power
     # heuristic over-counted this fixture by ~2175x (fossilized as 4.66e-05).
@@ -155,9 +155,9 @@ def test_bdpt_single_wedge_point_diffraction_matches_deterministic_reference():
 
 
 def test_bdpt_grid_diffraction_power_is_additive_over_disjoint_wedges():
-    """Guards audit MC-2: with the round-robin lane mapping the per-lane edge
-    measure must scale by the state count, otherwise adding a second wedge
-    halves each wedge's contribution (1/S underestimate)."""
+    """With the round-robin lane mapping the per-lane edge
+ measure must scale by the state count, otherwise adding a second wedge
+ halves each wedge's contribution (1/S underestimate)."""
 
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT diffraction")
@@ -214,8 +214,8 @@ def test_bdpt_grid_diffraction_power_is_additive_over_disjoint_wedges():
 
 
 def test_bdpt_grid_diffraction_is_seed_stable():
-    """Guards audit DF-6: without pdf compensation the Keller sampler had
-    unbounded variance (20x swings across seeds at this sample count)."""
+    """Without pdf compensation the Keller sampler had
+ unbounded variance (20x swings across seeds at this sample count)."""
 
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT diffraction")

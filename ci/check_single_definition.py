@@ -2,98 +2,7 @@
 # Copyright Xingyu Chen.
 # Reject a second definition site for a protected domain concept.
 
-"""Reject a second definition site for a protected domain concept.
-
-`check_orphan_modules` asks "can anything reach this module". It is a
-reachability gate, so it is blind by construction to the opposite failure: a
-concept that is reachable four times over because four modules each grew their
-own copy of it. Nothing else in `ci/` closes that gap either. `check_duplication`
-measures *text* similarity between whole files, so a twenty-line rule copied into
-a nine-hundred-line pipeline never moves its ratio; the import graph is happy as
-long as the copy imports nothing it should not; ruff reports an unused import,
-never a redundant reimplementation.
-
-That gap is not hypothetical in this package:
-
-  - `runtime.py` exports `required_symbol`, but 11 modules once hand-rolled the
-    same "probe the extension for a named attribute, raise if absent" guard at 37
-    call sites. The solver domains first repaid 18 sites; ADR-044 governance
-    cleanup routed the remaining 19 through `required_symbol`, leaving the
-    canonical runtime owner as the only definition site.
-  - `components.py` exports `component_availability_status`, and three solver
-    metadata modules each defined their own until Phase 1a deleted them.
-  - The component depth rule grew a FOURTH copy, in `deterministic/pipeline.py`,
-    between two drafts of the plan that was written to remove the other three.
-
-The last one is the shape that matters. Nobody copy-pasted a function and kept
-its name; somebody needed the rule, did not know it already existed, and wrote it
-again from scratch with a name that fit their module. A gate that greps for a
-function name would have watched that happen.
-
-Detection strategy: concept vocabulary, not identifiers
--------------------------------------------------------
-Every function in the package is reduced to a small bag of facts that survive
-renaming: the exact string constants it contains, substrings it contains, the
-numeric constants it contains, the names it calls, and whether it raises. A
-`Concept` then declares a `Signature` over those facts, and any function whose
-facts are a superset of the signature is a definition site of that concept.
-
-The reason this works is that the load-bearing part of each protected concept is
-*domain vocabulary the concept cannot avoid spelling out*. A second copy of the
-component depth rule can be called anything and can name its locals anything, but
-it has to write the five component names and it has to write the `-1` sentinel
-for "not requested" - those literals are the rule. A second native symbol lookup
-can be called anything, but it has to probe the extension (`hasattr`) and it has
-to name `_channel.` in the message it fails with. Identifiers are the part an
-author changes freely; vocabulary is the part they cannot.
-
-So the registry keys on vocabulary and deliberately ignores every identifier,
-including the function's own name. `component_availability_status` and a private
-`_status_for` in a solver module produce the same facts and are both reported.
-
-The rule is ONE definition site, counted package-wide - not one per module. Each
-concept declares its canonical owner module and how many matching functions that
-module is allowed to contain. A copy inside the owner module is a violation too,
-because "two of them twelve lines apart in one module" is one of the failures
-above - unless that copy is on the recorded ledger below, which is where a copy
-that moved into the owner module during a layout change lands. The ledger keeps
-its identity either way, so the ratchet does not lose a site to a file move.
-
-Recorded duplicates
--------------------
-The recorded-duplicate ledger is empty. It remains a ratchet mechanism rather
-than an exemption: an unrecorded match fails the gate, and any future temporary
-entry would also fail as stale once its duplicate disappears. The ledger began
-at 37 hand-rolled native symbol probes, shrank to 19, and reached zero during
-the ADR-044 governance cleanup.
-
-False negatives, stated honestly
---------------------------------
-This gate is a smoke detector, not a proof of non-duplication. It cannot decide
-semantic equivalence, and a determined or unlucky author still gets past it:
-
-  - **Vocabulary held elsewhere.** A copy that iterates a shared constant
-    (`for name in VALID_COMPONENTS: ...`) never writes the five literals and is
-    invisible. Ironically, the closer a copy gets to good factoring, the better
-    it hides.
-  - **Composed literals.** Names built by f-string, `.format`, `str.join`, or
-    concatenation are not constants in the AST and do not match.
-  - **Split across functions.** Facts are gathered per function scope. A concept
-    spread over a helper plus its caller may fail the superset test in both.
-  - **Sentinel drift.** The depth signature keys on `-1`; a copy that returns
-    `None` for "not requested" is a different, undetected rule.
-  - **Partial copies.** A copy that reimplements four of the five components,
-    or that never raises, is under the signature and passes.
-  - **Non-Python copies.** A rule reimplemented in CUDA/C++, in a JSON manifest,
-    or in a docstring is out of scope entirely.
-  - **Only what is registered.** Three concepts are protected. Every other
-    concept in the package is unguarded; this file is meant to grow.
-
-The false *positive* surface is the mirror image and is the reason each signature
-is tight: an unrelated function that happens to name all five components, both
-sentinels, and nothing else would be reported. That has not happened, and when it
-does the fix is to sharpen the signature, never to widen an exemption.
-"""
+"""Reject a second definition site for a protected domain concept."""
 
 from __future__ import annotations
 
@@ -115,9 +24,9 @@ _COMPONENT_NAMES = frozenset(
 class Signature:
     """A name-independent fingerprint of one concept.
 
-    A function matches when its facts are a superset of every declared field.
-    Empty fields are not constraints.
-    """
+ A function matches when its facts are a superset of every declared field.
+ Empty fields are not constraints.
+ """
 
     strings: frozenset[str] = frozenset()
     fragments: frozenset[str] = frozenset()
@@ -240,9 +149,9 @@ def _callee(node: ast.Call) -> str | None:
 class _ScopeCollector(ast.NodeVisitor):
     """Partition a module's nodes by their nearest enclosing function.
 
-    Module-level statements and class bodies land in a synthetic ``<module>``
-    scope, so a rule written as a top-level dict is still a definition site.
-    """
+ Module-level statements and class bodies land in a synthetic ``<module>``
+ scope, so a rule written as a top-level dict is still a definition site.
+ """
 
     def __init__(self, module: str) -> None:
         self.module = module

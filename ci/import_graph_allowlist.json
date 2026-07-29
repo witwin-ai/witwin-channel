@@ -24,7 +24,7 @@
         {
           "id": "mc-enum-001",
           "path": "witwin/channel/montecarlo/bdpt.py",
-          "line": 108,
+          "line": 99,
           "column": 0,
           "rule": "mc_enumerated_dependency",
           "source": "witwin.channel.montecarlo.bdpt",

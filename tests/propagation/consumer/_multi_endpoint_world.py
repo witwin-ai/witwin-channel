@@ -1,15 +1,7 @@
 # Copyright Xingyu Chen.
 # Implements multi endpoint world.
 
-"""The multi-endpoint fixture world shared by the Phase-7 slot-batching tests.
-
-One concrete wall at ``x = 4`` spanning ``y in [-1.2, 1.2]`` and
-``z in [-3, 3]``, two sources and two sinks, at 77 GHz. Discovery over
-``{los, reflection}`` at depth 1 publishes exactly three rows with
-``pair_offsets = [0, 2, 2, 3, 3]``: the second source publishes no row at all,
-which is why an endpoint count can never be inferred from the largest index a
-topology carries.
-"""
+"""Implements multi endpoint world."""
 
 from __future__ import annotations
 
@@ -141,9 +133,9 @@ def _batch(
 def stack_over_slots(base: torch.Tensor, offsets: torch.Tensor) -> torch.Tensor:
     """Slot-major stack of ``base`` displaced by one offset per slot.
 
-    ``offsets`` is ``[T, 3]``; the result is ``[T * base.shape[0], 3]`` with
-    slot ``t`` holding ``base + offsets[t]``.
-    """
+ ``offsets`` is ``[T, 3]``; the result is ``[T * base.shape[0], 3]`` with
+ slot ``t`` holding ``base + offsets[t]``.
+ """
 
     return (base.unsqueeze(0) + offsets.unsqueeze(1)).reshape(-1, 3).contiguous()
 

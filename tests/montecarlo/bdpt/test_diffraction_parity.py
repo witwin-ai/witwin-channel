@@ -1,16 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests diffraction parity.
 
-"""ADR-018 acceptance: BDPT standalone diffraction parity with deterministic.
-
-Ported from artifacts/ws1-alignment/spot_check2.py. Before ADR-018 the BDPT
-standalone diffraction component used a crude native power heuristic and was
-~434x (grid) / ~2175x (point) above the deterministic UTD reference on the WS1
-wedge fixture. Routing it through the shared enumerated engine as a unit-mass
-discrete connection (like reflection) brings it into the [0.5x, 2x] gate; in
-practice it reproduces the deterministic reference because both solvers consume
-the same first-order UTD evaluation.
-"""
+"""Tests diffraction parity."""
 
 import pytest
 import torch

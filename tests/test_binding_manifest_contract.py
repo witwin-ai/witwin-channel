@@ -11,8 +11,7 @@ from tools.refactor_baseline import binding_manifest
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-# Canonical live binding manifest. Historical binding counts remain frozen in
-# their phase audit artifacts; the live universe is derived from this manifest.
+# The live binding manifest is canonical; frozen audit artifacts retain their own counts.
 BASELINE_PATH = REPOSITORY_ROOT / "ci" / "native-binding-manifest.json"
 PHASE10_AUDIT_PATH = (
     REPOSITORY_ROOT / "docs" / "dev" / "audit" / "phase10-legacy-dead-binding.json"

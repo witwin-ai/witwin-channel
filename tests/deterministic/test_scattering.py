@@ -1,17 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests scattering.
 
-"""Deterministic Kirchhoff rough-surface scattering (plan 05 wave 3).
-
-Normalization cross-check used throughout: in the narrow-lobe limit the
-patch-quadrature plane sum collapses to the image-source correspondence
-``P_scatter -> R_diff * P_t * (lambda/(4*pi*(r1+r2)))^2``, so scattering plus
-the C_r-attenuated specular approaches the smooth-wall reflection power.
-The production table redistributes a peaked lobe on its fixed 32x64 grid
-(exact per-bin energy, interpolated eval), which costs ~10% of the
-image-correspondence value for near-smooth surfaces; the energy inequality
-(passivity) holds unconditionally.
-"""
+"""Tests scattering."""
 
 import math
 
@@ -131,12 +121,12 @@ def test_rough_wall_energy_budget_and_smooth_limit():
 def test_narrow_lobe_normalization_cross_check():
     """Image-source correspondence: scattering ~= R_diff * smooth reflection.
 
-    For a near-smooth surface the diffuse lobe is a narrow cone around the
-    specular direction and the patch sum must recover the R_diff share of the
-    smooth-wall image power. The fixed 32x64 table grid redistributes the
-    peaked lobe (exact bin energy, interpolated eval), which costs ~10%; the
-    band [0.75, 1.0] fails on any 4*pi / cos-factor / r^2 normalization slip.
-    """
+ For a near-smooth surface the diffuse lobe is a narrow cone around the
+ specular direction and the patch sum must recover the R_diff share of the
+ smooth-wall image power. The fixed 32x64 table grid redistributes the
+ peaked lobe (exact bin energy, interpolated eval), which costs ~10%; the
+ band [0.75, 1.0] fails on any 4*pi / cos-factor / r^2 normalization slip.
+ """
 
     _require_rayd()
     rough = solve(
@@ -184,10 +174,10 @@ def test_scattering_convergence_under_sample_doubling():
 
 def test_scattering_reciprocity():
     """Swapping tx/rx conserves the scattering power within quadrature
-    tolerance. The analytic kernel is exactly reciprocal; the residual comes
-    from the table's per-incidence-bin exact-energy normalization (the scale
-    factor is a function of the incidence bin, so the frozen table is
-    reciprocal only up to the bin-to-bin scale variation)."""
+ tolerance. The analytic kernel is exactly reciprocal; the residual comes
+ from the table's per-incidence-bin exact-energy normalization (the scale
+ factor is a function of the incidence bin, so the frozen table is
+ reciprocal only up to the bin-to-bin scale variation)."""
 
     _require_rayd()
     forward = solve(_scene(0.015), _config(), reference_frequency_hz=_FREQUENCY_HZ)
@@ -279,8 +269,8 @@ def _screen(realization_id: int, *, flat: bool = False) -> PhaseScreen:
 
 def test_realization_coherent_flat_screen_matches_smooth_reflection():
     """h = 0 phase screen reproduces the smooth specular power (stationary
-    phase of the patch quadrature -> image source), and it REPLACES the delta
-    specular for that surface (reflection component reports zero)."""
+ phase of the patch quadrature -> image source), and it REPLACES the delta
+ specular for that surface (reflection component reports zero)."""
 
     _require_rayd()
     smooth = solve(

@@ -95,8 +95,8 @@ def test_zero_transmission_stops_before_later_ordinary_blocker() -> None:
     assert result.wall_count.tolist() == [2]
     assert result.transmittance.tolist() == [0.0]
     assert result.scaled_power.tolist() == [0.0]
-    # The later blocker was preflighted but was never part of the effective
-    # numerical prefix, matching the former depth march.
+    # The later blocker is preflighted but lies outside the effective numerical
+    # prefix.
     assert result.penetrated.tolist() == [True]
 
     backward_state = create_capacity_failure_state(inputs[0])

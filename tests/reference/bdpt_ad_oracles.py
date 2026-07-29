@@ -1,49 +1,7 @@
 # Copyright Xingyu Chen.
 # Implements bdpt ad oracles.
 
-"""Reference float64 Torch oracles for the ADR-022 BDPT AD companions.
-
-Fully differentiable float64/complex128 re-derivations of the six BDPT-owned
-forward operations whose native ``_backward`` / ``_jvp`` companions ADR-022
-introduces (plan 10a section 6):
-
-1. ``reflected_subpath_advance_reference``  -- section 6.1 specular Jones advance.
-2. ``transmitted_subpath_advance_reference`` -- section 6.2 slab transmission advance.
-3. ``endpoint_connection_contribution_reference`` -- section 6.3 LoS/NEE contribution.
-4. ``accumulate_power_reference`` / ``accumulate_coherent_reference`` -- section 6.4.
-5. ``finalize_point_components_reference`` -- section 6.5 linear map finalize.
-6. ``finalize_component_maps_reference`` -- section 6.6 (3-D radiomap variant).
-
-These are the gradient oracles the native companions must match: ``torch.autograd``
-through them defines the exact derivatives (VJP) and forward duals (JVP) the
-lockstep test (``tests/ad/test_bdpt_companion_ad.py``) compares against. The
-convention for every op is pinned to the native forward it mirrors, cited inline:
-
-* Reflected advance mirrors ``bdpt_reflected_light_subpaths_kernel``
-  (``native/channel/kernels/bdpt_subpaths.cu``): the Complex3 field is
-  advanced by ``reflect_complex3`` (finite-slab Fresnel, ``slab_fresnel``), and the
-  real throughput amplitude proxy is ``sqrt(gain * R_interface)`` with the
-  single-INTERFACE reflectance ``effective_power_reflectance`` (no slab phase, no
-  thickness), projected onto the fixed x-hat transmit polarization.
-* Transmitted advance mirrors ``bdpt_transmitted_light_subpaths_kernel``: the
-  field is ``diag(t_TE, t_TM)`` in the wall s/p basis times the lateral/interior
-  compensation phase ``exp(-j (k_par*lateral - k0*jump))``; the throughput proxy is
-  ``sqrt(cap_t_TE*w_s + cap_t_TM*w_p)`` with the full-stack power transmittance.
-* Endpoint connection mirrors ``bdpt_endpoint_connection_samples_kernel``
-  (``native/channel/kernels/bdpt_connect.cu``):
-  ``contribution = P_src * |proj(F)|^2 * (1/(2 k L))^2 / N`` with ``proj`` the frozen
-  transverse receiver projection and ``L`` the frozen unfolded length.
-* Accumulate mirrors ``bdpt_accumulate_connection_samples_*_kernel``
-  (``native/channel/kernels/bdpt_connect.cu``): power domain bins
-  ``contribution*mis``; coherent domain bins the complex coefficient and finalizes
-  ``|sum|^2``.
-* Finalize mirrors ``bdpt_finalize_point_components_kernel`` /
-  ``bdpt_finalize_component_maps`` (``native/channel/kernels/montecarlo_common.cu``).
-
-Test-only: MUST NOT be imported from production packages. Imports only ``torch`` and
-the sibling ``tests.reference`` / ``tests.ad`` helpers, so it stays import-clean
-without the native extension.
-"""
+"""Implements bdpt ad oracles."""
 
 from __future__ import annotations
 
@@ -98,7 +56,7 @@ def _ez_like(reference: torch.Tensor) -> torch.Tensor:
 
 
 # ---------------------------------------------------------------------------
-# Section 6.1 -- reflected light subpath advance.
+# Reflected light-subpath advance.
 # ---------------------------------------------------------------------------
 
 
@@ -115,11 +73,11 @@ def _reflect_complex3(
 ) -> torch.Tensor:
     """One specular reflection Jones update (``transport::reflect_complex3``).
 
-    Identical per-bounce algebra to ``reflection_sequence_reference`` (finite-slab
-    ``slab_fresnel`` and the oriented s/p decomposition); ``field`` is the incoming
-    Complex3 Jones field, ``incident_dir`` the incoming ray direction (frozen),
-    ``normal`` the frozen hit normal.
-    """
+ Identical per-bounce algebra to ``reflection_sequence_reference`` (finite-slab
+ ``slab_fresnel`` and the oriented s/p decomposition); ``field`` is the incoming
+ Complex3 Jones field, ``incident_dir`` the incoming ray direction (frozen),
+ ``normal`` the frozen hit normal.
+ """
 
     ez = _ez_like(incident_dir)
     incident = _safe_normalize(incident_dir, ez)
@@ -159,11 +117,11 @@ def effective_power_reflectance(
 ) -> torch.Tensor:
     """``effective_power_reflectance`` (bdpt_subpaths.cu): interface-only reflectance.
 
-    ``|r_te*e_s|^2 + |r_tm*e_p|^2`` with single-INTERFACE Fresnel coefficients (no
-    slab phase, no thickness, no gain) and the fixed x-hat transmit polarization
-    projected transversely onto the wall s/p basis. This is the amplitude proxy the
-    throughput carries; gain multiplies it outside (``sqrt(gain * R)``).
-    """
+ ``|r_te*e_s|^2 + |r_tm*e_p|^2`` with single-INTERFACE Fresnel coefficients (no
+ slab phase, no thickness, no gain) and the fixed x-hat transmit polarization
+ projected transversely onto the wall s/p basis. This is the amplitude proxy the
+ throughput carries; gain multiplies it outside (``sqrt(gain * R)``).
+ """
 
     ez = _ez_like(incident_dir)
     incident = _safe_normalize(incident_dir, ez)
@@ -215,13 +173,13 @@ def reflected_subpath_advance_reference(
     thickness: torch.Tensor,
     frequency: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
-    """ADR-022 section 6.1 reflected-subpath advance (field + throughput proxy).
+    """Reflected-subpath derivatives reflected-subpath advance (field + throughput proxy).
 
-    Live leaves: ``eps_r``/``sigma_e``/``gain``/``thickness`` (per-hit single slab),
-    ``frequency``, and the upstream ``field_in``/``throughput_in``. Frozen:
-    ``incident_dir``/``normal`` geometry, ``mu_r``. Returns the advanced Complex3
-    field and the complex throughput (imag rides through the real amplitude).
-    """
+ Live leaves: ``eps_r``/``sigma_e``/``gain``/``thickness`` (per-hit single slab),
+ ``frequency``, and the upstream ``field_in``/``throughput_in``. Frozen:
+ ``incident_dir``/``normal`` geometry, ``mu_r``. Returns the advanced Complex3
+ field and the complex throughput (imag rides through the real amplitude).
+ """
 
     field_out = _reflect_complex3(
         field_in, incident_dir, normal, eps_r, sigma_e, mu_r, gain, thickness, frequency
@@ -235,7 +193,7 @@ def reflected_subpath_advance_reference(
 
 
 # ---------------------------------------------------------------------------
-# Section 6.2 -- transmitted light subpath advance.
+# Transmitted light-subpath advance.
 # ---------------------------------------------------------------------------
 
 
@@ -289,14 +247,14 @@ def transmitted_subpath_advance_reference(
     layer_mu_r: torch.Tensor,
     frequency: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
-    """ADR-022 section 6.2 transmitted-subpath advance (single wall, per-row layers).
+    """Transmitted-subpath derivatives transmitted-subpath advance (single wall, per-row layers).
 
-    ``layer_*`` are ``[N, L]`` per-row stacks (entry->exit) of the single wall each
-    row crosses. Live leaves: ``layer_thickness_m``/``layer_eps_r``/``layer_sigma_e``,
-    ``frequency``, upstream field/throughput. Frozen: geometry, ``layer_mu_r``.
-    Returns the advanced field (with the lateral/interior compensation phase) and the
-    complex throughput.
-    """
+ ``layer_*`` are ``[N, L]`` per-row stacks (entry->exit) of the single wall each
+ row crosses. Live leaves: ``layer_thickness_m``/``layer_eps_r``/``layer_sigma_e``,
+ ``frequency``, upstream field/throughput. Frozen: geometry, ``layer_mu_r``.
+ Returns the advanced field (with the lateral/interior compensation phase) and the
+ complex throughput.
+ """
 
     count, depth = layer_thickness_m.shape
     ez = _ez_like(incident_dir)
@@ -389,7 +347,7 @@ def transmitted_subpath_advance_reference(
 
 
 # ---------------------------------------------------------------------------
-# Section 6.3 -- endpoint (LoS / NEE) connection contribution.
+# Endpoint-connection contribution.
 # ---------------------------------------------------------------------------
 
 
@@ -403,14 +361,14 @@ def endpoint_connection_contribution_reference(
     frequency: torch.Tensor,
     samples_per_tx: int,
 ) -> torch.Tensor:
-    """ADR-022 section 6.3 per-row endpoint contribution.
+    """Endpoint-connection derivatives per-row endpoint contribution.
 
-    ``contribution = P_src * |proj(F)|^2 * (1/(2 k L))^2 / N``, ``L`` the unfolded
-    length ``|sensor-light| + light_path_length`` (frozen), ``proj`` the frozen
-    transverse receiver projection. Live leaves: ``light_field`` (Complex3),
-    ``source_power`` (tx_power), ``frequency``. Frozen: both origins, ``L``,
-    ``receiver_polarization``, ``samples_per_tx``.
-    """
+ ``contribution = P_src * |proj(F)|^2 * (1/(2 k L))^2 / N``, ``L`` the unfolded
+ length ``|sensor-light| + light_path_length`` (frozen), ``proj`` the frozen
+ transverse receiver projection. Live leaves: ``light_field`` (Complex3),
+ ``source_power`` (tx_power), ``frequency``. Frozen: both origins, ``L``,
+ ``receiver_polarization``, ``samples_per_tx``.
+ """
 
     offset = sensor_origin - light_origin
     distance = torch.linalg.vector_norm(offset, dim=-1).clamp_min(1.0e-6)
@@ -431,7 +389,7 @@ def endpoint_connection_contribution_reference(
 
 
 # ---------------------------------------------------------------------------
-# Section 6.4 -- accumulate connection samples (power and coherent domains).
+# Connection-sample accumulation for power and coherent domains.
 # ---------------------------------------------------------------------------
 
 
@@ -470,12 +428,12 @@ def accumulate_power_reference(
     tx_count: int,
     rx_count: int,
 ) -> dict[str, torch.Tensor]:
-    """ADR-022 section 6.4 power-domain accumulate. Live leaf: ``contribution``.
+    """Connection-accumulation derivatives power-domain accumulate. Live leaf: ``contribution``.
 
-    ``M[b] = sum_r contribution_r * mis_r`` binned by (tx, rx) per component, plus a
-    ``path_gain`` over every accumulable component. ``mis_weight`` and the id/valid
-    structure are frozen.
-    """
+ ``M[b] = sum_r contribution_r * mis_r`` binned by (tx, rx) per component, plus a
+ ``path_gain`` over every accumulable component. ``mis_weight`` and the id/valid
+ structure are frozen.
+ """
 
     flat, row_ok = _bin_index(
         tx_id, rx_id, component_id, valid, tx_count, rx_count
@@ -507,13 +465,13 @@ def accumulate_coherent_reference(
     tx_count: int,
     rx_count: int,
 ) -> dict[str, torch.Tensor]:
-    """ADR-022 section 6.4 coherent-domain accumulate. Live leaves: coeff_real/imag.
+    """Connection-accumulation derivatives coherent-domain accumulate. Live leaves: coeff_real/imag.
 
-    ``S_b = sum_r c_r`` per (tx, rx, component); ``P_comp = |S_b|^2``;
-    ``path_gain = sum_comp P_comp`` (components combine incoherently). Also returns
-    the per-component complex bin sums ``S_b`` (``*_sum``), which the native coherent
-    backward reads as the forward-retained buffers (supervisor ruling section 6.4).
-    """
+ ``S_b = sum_r c_r`` per (tx, rx, component); ``P_comp = |S_b|^2``;
+ ``path_gain = sum_comp P_comp`` (components combine incoherently). Also returns
+ the per-component complex bin sums ``S_b`` (``*_sum``), which the native coherent
+ backward reads as the forward-retained buffers (retained forward bin sums).
+ """
 
     flat, row_ok = _bin_index(
         tx_id, rx_id, component_id, valid, tx_count, rx_count
@@ -536,7 +494,7 @@ def accumulate_coherent_reference(
 
 
 # ---------------------------------------------------------------------------
-# Sections 6.5 / 6.6 -- finalize point components / component maps (linear map).
+# Linear finalization for point components and component maps.
 # ---------------------------------------------------------------------------
 
 
@@ -547,13 +505,12 @@ def finalize_components_reference(
     transmission: torch.Tensor,
     scattering: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
-    """ADR-022 sections 6.5 / 6.6 finalize (shape-agnostic linear map).
+    """Result-finalization derivatives finalize (shape-agnostic linear map).
 
-    ``path_gain = los + reflection + diffraction + transmission + scattering``
-    (elementwise) and each ``*_power`` is the scalar sum of that component over the
-    whole map. Live leaves: the five component tensors (2-D for section 6.5,
-    3-D for section 6.6; algebra identical).
-    """
+ ``path_gain = los + reflection + diffraction + transmission + scattering``
+ (elementwise) and each ``*_power`` is the scalar sum of that component over the
+ whole map. Live leaves: the five component tensors (2-D for point results and 3-D for maps; algebra identical).
+ """
 
     path_gain = los + reflection + diffraction + transmission + scattering
     return {

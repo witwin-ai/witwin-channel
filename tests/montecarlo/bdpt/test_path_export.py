@@ -49,7 +49,7 @@ def test_bdpt_path_export_is_capped_and_schema_stable():
         pytest.skip("CUDA is required for BDPT path export")
 
     # The deterministic LoS connection table holds tx * rx = 4 unique rows
-    # (audit P-1/P-5), so a cap of 3 must truncate it.
+    #, so a cap of 3 must truncate it.
     result = solve(
         empty_space_los_scene(),
         Config(samples=32, components={"los"}, export_paths=True, max_exported_paths=3),
@@ -188,7 +188,7 @@ def test_bdpt_grid_diffraction_path_export_is_deterministic_enumerated():
         pytest.skip("CUDA is required for BDPT diffraction path export")
 
     scene = _with_grid(wedge_diffraction_scene(), _reflection_grid())
-    # ADR-018: grid diffraction is exported from the deterministic enumerated
+    # BDPT diffraction: grid diffraction is exported from the deterministic enumerated
     # engine (first-order UTD), so the exported edge connections are
     # seed-invariant rather than seeded from a native direct tape.
     first = solve(

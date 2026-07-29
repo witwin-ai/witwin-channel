@@ -1,14 +1,7 @@
 # Copyright Xingyu Chen.
 # Shared worlds for the fixed-topology reflection consumer tests.
 
-"""Shared worlds for the fixed-topology reflection consumer tests.
-
-The single smooth wall is the reference world. The rest exist because a
-one-row, one-pair, depth-1, incidence-plane-aligned world hides real defects:
-a transposed Jones convention is invisible when the operator is diagonal, a
-row/pair scatter-back is invisible when every bucket holds one row, and a
-depth-2 launch is never reached at all.
-"""
+"""Shared worlds for the fixed-topology reflection consumer tests."""
 
 from __future__ import annotations
 
@@ -62,9 +55,9 @@ def smooth_wall_scene(
 def flat_phase_screen_wall_scene(*, frequency_hz: float = FREQUENCY_HZ):
     """Geometrically smooth wall carrying a realization_coherent screen.
 
-    ``rms_height_m == 0`` keeps ``scatter_model_id`` at 0, so this reaches the
-    phase-screen branch of the scene gate rather than the roughness branch.
-    """
+ ``rms_height_m == 0`` keeps ``scatter_model_id`` at 0, so this reaches the
+ phase-screen branch of the scene gate rather than the roughness branch.
+ """
 
     screen = PhaseScreen(
         height=torch.zeros(64, 64),
@@ -107,12 +100,12 @@ def two_wall_scene(*, frequency_hz: float = FREQUENCY_HZ):
 def occluder_scene(*, frequency_hz: float = FREQUENCY_HZ):
     """Reference wall plus a plate that blocks only a moved arrival leg.
 
-    The plate spans ``y`` in ``[0.6, 1.4]`` at ``x = 1``. At the reference
-    endpoints neither leg of the reflection nor the LoS segment reaches it; at
-    the moved sink the arrival leg crosses it while the stationary point is
-    still well inside the wall facet, which is the occlusion branch of row
-    validity rather than the off-facet branch.
-    """
+ The plate spans ``y`` in ``[0.6, 1.4]`` at ``x = 1``. At the reference
+ endpoints neither leg of the reflection nor the LoS segment reaches it; at
+ the moved sink the arrival leg crosses it while the stationary point is
+ still well inside the wall facet, which is the occlusion branch of row
+ validity rather than the off-facet branch.
+ """
 
     plate = make_mesh_structure(
         vertices=torch.tensor(
@@ -222,10 +215,10 @@ def rotated_endpoints(
 def multi_endpoints() -> tuple[EndpointBatch, EndpointBatch]:
     """Two sources and three sinks, none of them interchangeable.
 
-    Every position is off-axis in a different way, so a source/sink index
-    swap, a lost bucket scatter-back, or a broken pair segmentation changes
-    the answer instead of permuting equal rows.
-    """
+ Every position is off-axis in a different way, so a source/sink index
+ swap, a lost bucket scatter-back, or a broken pair segmentation changes
+ the answer instead of permuting equal rows.
+ """
 
     return endpoints(
         source_positions=_cuda([[0.0, -0.5, 0.0], [0.1, -0.7, 0.2]]),
@@ -267,11 +260,11 @@ def discover(
 class DeviceReadCounter:
     """Count host reads of CUDA tensors performed inside a block.
 
-    The published validation budget is a self-reported constant. This measures
-    the thing the constant claims: how many times the prepared route actually
-    pulls a device value to the host. It is the only way a regression that
-    adds a second count read can fail a test.
-    """
+ The published validation budget is a self-reported constant. This measures
+ the thing the constant claims: how many times the prepared route actually
+ pulls a device value to the host. It is the only way a regression that
+ adds a second count read can fail a test.
+ """
 
     _METHODS = ("item", "tolist", "cpu", "numpy", "__bool__")
 

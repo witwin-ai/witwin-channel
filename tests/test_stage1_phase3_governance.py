@@ -96,20 +96,20 @@ def test_consumer_contract_is_versioned_and_snapshot_frozen() -> None:
         "replicate_over_slots",
     ]
     contracts = CONSUMER_MODULE.read_text(encoding="utf-8")
-    # Version 5 (ADR-042): the same frozen rows can be evaluated at a declared
+    # Version 5 (wideband evaluation): the same frozen rows can be evaluated at a declared
     # grid of absolute frequencies. Additive behind
     # ``frequency_offsets_hz=None``, so every existing call and every published
     # number is unchanged; one export and one request field arrive with it.
-    # Version 4 covers all of Phase 7 and is bumped exactly once. ADR-041 is
+    # Version 4 covers all of the consumer implementation and is bumped exactly once. slot batching is
     # additive on top of it: slot batching arrives behind ``slot_count=1``, so
     # every existing call and every published number is unchanged, and the
     # time-varying surface is views over a replay rather than a new answer.
-    # Version 4 (ADR-040): a discovered topology now carries the world it was
+    # Version 4 (world-version validation): a discovered topology now carries the world it was
     # discovered against, a frozen replay against a moved world is refused by
     # name, and two exports plus one request field arrive with it. Version 3
-    # (ADR-039) made the scalar and complex3 transport carry the declared
+    # (source excitation) made the scalar and complex3 transport carry the declared
     # source amplitude ``sqrt(sources.powers_w)``, a semantic change to a
-    # published quantity. Version 2 (ADR-037) grew ``row_valid``, two
+    # published quantity. Version 2 (fixed-topology replay) grew ``row_valid``, two
     # capability fields, and three exports, and lifted the documented
     # "polarimetric_transport is primal-only" limit.
     assert "CONTRACT_VERSION = 6" in contracts
@@ -153,11 +153,7 @@ def test_consumer_has_exact_named_adr008_enumerated_edge() -> None:
         if edge.source.startswith("witwin.channel.propagation.consumer")
         and edge.target == "witwin.channel.propagation.enumerated"
     ]
-    # ``propagation/enumerated/`` is one module now, so the third name -
-    # ``sanitize_enumerated_capacity_transaction``, previously reached at the
-    # separate ``.capacity`` target - lands on the same edge target as the other
-    # two. The consumer still names every enumerated symbol it uses explicitly,
-    # at call time, and still imports no solver.
+    # All three enumerated symbols share one module target; the consumer names each explicitly and imports no solver.
     assert {(edge.source, edge.imported_name) for edge in consumer_edges} == {
         (
             "witwin.channel.propagation.consumer",
@@ -296,15 +292,7 @@ def test_consumer_vocabulary_has_one_source_of_truth() -> None:
 
 
 def test_consumer_frequency_offsets_are_implemented_not_merely_declared() -> None:
-    """A frequency-offset input exists, works, and publishes its own limits.
-
-    Version 4 carried no such field on purpose: a request field that is always
-    rejected is not part of a frozen contract. ADR-042 delivers the capability
-    instead of declaring it, so the inverse rule now binds. Every wideband flag
-    the capability record publishes must have a matching enforcement site, and
-    the narrowband law it supersedes stays on the convention next to the
-    quantified statement of what that law costs.
-    """
+    """A frequency-offset input works and every published wideband limit has an enforcement site."""
 
     from witwin.channel.constants import (
         NARROWBAND_FREQUENCY_OFFSET_ERROR_LAW,

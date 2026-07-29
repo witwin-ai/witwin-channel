@@ -1,14 +1,7 @@
 # Copyright Xingyu Chen.
 # Three-cube deterministic solves for the Yee-locked ``three_cube_320`` case.
 
-"""Three-cube deterministic solves for the Yee-locked ``three_cube_320`` case.
-
-Runs the deterministic solver twice on the versioned ``three_cube_320`` /
-``metal`` case: once with the coupled reflection-diffraction compensator
-(ADR-011) disabled and once enabled, matching the benchmark backend
-configuration in every other respect. Saves a FieldMap plus the full exported
-path table for each run so boundary metrics can be decomposed per path.
-"""
+"""Three-cube deterministic solves for the Yee-locked ``three_cube_320`` case."""
 from __future__ import annotations
 
 import json

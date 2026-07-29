@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
 # Freeze deterministic, immutable manifests for architecture refactors.
 
-"""Freeze deterministic, immutable manifests for architecture refactors.
-
-The collector is deliberately static-first: it parses Python and C++ sources
-without importing ``witwin.channel`` or loading its native extension.
-Solver outputs, launch ledgers, and performance measurements are produced by
-their existing harnesses and can be attached with ``--runtime-artifact``.
-"""
+"""Freeze deterministic, immutable manifests for architecture refactors."""
 
 from __future__ import annotations
 
@@ -1082,7 +1076,7 @@ _ADR033_SHORT_MACRO_SUFFIXES = frozenset(
 
 
 def _adr033_predecessor_identifier(identifier: str) -> str:
-    """Normalize only ADR-033 identity renames for frozen numerical hashes."""
+    """Normalize only the Channel product identity identity renames for frozen numerical hashes."""
 
     if identifier in _ADR033_UNCHANGED_CHANNEL_IDENTIFIERS:
         return identifier

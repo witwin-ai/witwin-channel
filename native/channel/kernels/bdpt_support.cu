@@ -1,7 +1,7 @@
 // Copyright Xingyu Chen.
 // Implements bdpt support CUDA operations.
 
-// ---- Consolidated from bdpt_sampling.cu ----
+// ==== Section: BDPT sampling ====
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
@@ -134,7 +134,7 @@ at::Tensor channel_bdpt_sample_directions_cuda(int64_t count, at::Tensor referen
     return directions;
 }
 
-// ---- Consolidated from bdpt_maps.cu ----
+// ==== Section: BDPT result maps ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
@@ -143,15 +143,15 @@ at::Tensor channel_bdpt_sample_directions_cuda(int64_t count, at::Tensor referen
 
 #include <vector>
 
-// ADR-022 6.5 / 6.6: backward + jvp companions for the BDPT finalize maps.
+// BDPT AD: backward + jvp companions for the BDPT finalize maps.
 //
 // Both finalize ops are linear:
-//   path_gain[i] = los[i] + reflection[i] + diffraction[i] + transmission[i] +
-//                  scattering[i]                                   (elementwise)
-//   <c>_power    = sum_i <c>[i]                                    (scalar sum)
+// path_gain[i] = los[i] + reflection[i] + diffraction[i] + transmission[i] +
+// scattering[i] (elementwise)
+// <c>_power = sum_i <c>[i] (scalar sum)
 // Backward is the transpose of that linear map (elementwise, deterministic):
-//   grad_<c>[i] = grad_path_gain[i] + grad_<c>_power   (the 0-dim power
-//                 cotangent broadcasts to every cell).
+// grad_<c>[i] = grad_path_gain[i] + grad_<c>_power (the 0-dim power
+// cotangent broadcasts to every cell).
 // JVP is the forward map on the tangents; the power tangents are fixed-order
 // sums (single-block tree reduction, no float atomics) so the JVP stays
 // deterministic run-to-run. 6.5 uses 2-D [tx, rx] maps, 6.6 uses 3-D

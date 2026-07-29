@@ -51,14 +51,13 @@ def test_public_ad_capability_advertises_fixed_topology_jvp_vjp():
         ],
         "ad_excluded": {
             "path": ["scattering", "coupled_paths_mesh_vertex"],
-            # ADR-011: the grid solver now carries coupled paths and shares the
+            # coupled reflection and diffraction: the grid solver now carries coupled paths and shares the
             # path solver's coupled mesh-vertex AD refusal.
             "deterministic": ["scattering", "coupled_paths_mesh_vertex"],
             "montecarlo_basic": ["scattering"],
             "montecarlo_bdpt": ["all"],
         },
-        # Wired into the montecarlo.basic LoS Function since AD-3; no longer
-        # experimental.
+        # Monte Carlo Basic exposes native LoS AD as a supported primitive.
         "low_level_primitives": [
             "mc_los_path_gain_backward",
             "mc_los_path_gain_jvp",
@@ -91,7 +90,7 @@ def test_every_solver_rejects_unknown_ad_modes(config_type, ad_mode):
 
 @pytest.mark.parametrize("ad_mode", ["jvp", "vjp"])
 def test_bdpt_now_accepts_fixed_topology_ad_modes(ad_mode):
-    # ADR-022 lifts the Plan 07 BDPT AD deferral: the solver wires native
+    # BDPT AD lifts the AD contract BDPT AD deferral: the solver wires native
     # fixed-topology jvp/vjp companions, so the config accepts these modes.
     # Unknown-mode rejection stays covered by
     # test_every_solver_rejects_unknown_ad_modes (BdptConfig is in
@@ -197,15 +196,15 @@ def test_ad_inventory_records_solver_ad_contract():
     audit = inventory["ad_audit"]
 
     assert audit["production_channel_ad_references"] == 0
-    # Plan 07 AD-1: the shared deterministic/path field seam calls the three
+    # material and frequency derivatives: the shared deterministic/path field seam calls the three
     # differentiable field entry points (LoS, reflection, transmission).
-    # Plan 07 AD-3 adds the six montecarlo.basic power-map entry points.
-    # Plan 07 AD-4 adds the wedge re-evaluation, receiver projection, coupled
-    # R-D transport and coupled stationary re-solve entry points; AD-4b adds
+    # solver derivatives adds the six montecarlo.basic power-map entry points.
+    # diffraction AD adds the wedge re-evaluation, receiver projection, coupled
+    # R-D transport and coupled stationary re-solve entry points; AD adds
     # the montecarlo.basic diffraction radiomap entry point.
     assert audit["native_public_solver_ad_callers"] == 14
     assert len(audit["native_public_solver_ad_call_sites"]) == 14
     assert audit["legacy_reference_files_with_explicit_ad"] == 19
     assert audit["decision"] == "fixed_topology_material_frequency_ad_t1"
-    # The plan 07 completion gate flipped the capability manifest (AD-4b).
+    # the AD capability gate flipped the capability manifest (AD).
     assert audit["supports_ad"] is True

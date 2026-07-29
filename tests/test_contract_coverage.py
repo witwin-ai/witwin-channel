@@ -65,7 +65,7 @@ def test_contract_matrix_rejects_missing_e2e_callers_and_bad_owners():
 
 
 def test_contract_matrix_has_no_dormant_or_caller_free_native_binding() -> None:
-    """Phase-11 acceptance: the dormant ADR-029/030/031 allowlist is empty."""
+    """The dormant native-binding allowlist must remain empty."""
 
     manifest = _manifest()
     assert coverage.DORMANT_SYMBOL_FACADES == {}

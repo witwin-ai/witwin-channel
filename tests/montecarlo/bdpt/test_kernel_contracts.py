@@ -150,9 +150,8 @@ def test_bdpt_callers_use_canonical_map_owners():
 
 
 def test_bdpt_public_solve_lazy_import_preserves_identity_and_pickle():
-    # The solver collapsed into one module, so there is no longer a
-    # ``.solver`` submodule to import lazily. What the pickle contract needs
-    # survives the collapse: the public ``solve`` is defined in the module a
+    # The public solve is defined directly in the canonical module, so identity
+    # and pickle lookup resolve through the same module a
     # caller imports, so it round-trips by qualified name.
     code = (
         "import importlib, pickle, sys; "

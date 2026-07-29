@@ -75,9 +75,9 @@ def test_phase_e_sanitizers_are_async_current_stream_and_have_no_trap() -> None:
         ROOT / "native/channel/kernels/capacity_failure.cu"
     ).read_text(encoding="utf-8")
     source = source.split(
-        "// ---- Consolidated from enumerated_capacity_failure_sanitize.cu ----", 1
+        "// ==== Section: Enumerated capacity sanitization ====", 1
     )[1].split(
-        "// ---- Consolidated from mc_capacity_failure_component_maps_sanitize.cu ----", 1
+        "// ==== Section: Monte Carlo capacity sanitization ====", 1
     )[0]
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
 

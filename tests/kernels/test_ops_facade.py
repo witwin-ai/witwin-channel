@@ -71,7 +71,7 @@ def test_path_los_export_returns_cuda_path_tensors_when_available():
     tx_positions = torch.tensor([[0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
     tx_power = torch.tensor([1.0], device="cuda", dtype=torch.float32)
     rx_positions = torch.tensor([[3.0, 4.0, 0.0]], device="cuda", dtype=torch.float32)
-    # R5: vertical polarization; k_hat lies in the xy-plane so sin^2(theta) = 1
+    # vertical polarization; k_hat lies in the xy-plane so sin^2(theta) = 1
     # (path_gain unchanged for this in-plane geometry).
     tx_polarizations = torch.tensor([[0.0, 0.0, 1.0]], device="cuda", dtype=torch.float32)
 
@@ -1290,7 +1290,7 @@ def test_mc_los_path_gain_backward_and_jvp_match_free_space_formula():
     )
     power_tangent = torch.tensor([0.25, -0.5], device="cuda", dtype=torch.float32)
     tx_tangent = torch.zeros_like(tx_positions)
-    # R5: distinct per-transmitter polarizations exercise a non-trivial dipole
+    # distinct per-transmitter polarizations exercise a non-trivial dipole
     # sin^2(theta) pattern (and its transverse-projection position derivative).
     tx_polarizations = torch.tensor(
         [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0]], device="cuda", dtype=torch.float32
@@ -1327,7 +1327,7 @@ def test_mc_los_path_gain_backward_and_jvp_match_free_space_formula():
     distance_sq = (diff * diff).sum(dim=-1)
     inv_d2 = 1.0 / distance_sq
     inv_d = inv_d2.sqrt()
-    # R5 dipole factor sin2 = |p|^2 - (p . k_hat)^2 and the transverse projection
+    # dipole factor sin2 = |p|^2 - (p . k_hat)^2 and the transverse projection
     # p_t = p - (p . k_hat) k_hat, k_hat = (tx - rx)/d.
     pol = tx_polarizations
     pol_dot = (pol[:, None, :] * diff).sum(dim=-1) * inv_d
@@ -2060,7 +2060,7 @@ def test_deterministic_accumulate_flat_matches_torch_reference():
         pytest.skip("CUDA is required for deterministic accumulation")
 
     # Component ids 0/1/2/5/6 map to slots 0/1/2/3/4 and 3/4/7 map to the coupled
-    # slot 5 (ADR-011 R->D/D->R + ADR-013 D->D). transmission (slot 3) and
+    # slot 5 (coupled reflection and diffraction>D/D->R + coupled double diffraction>D). transmission (slot 3) and
     # coupled (slot 5) join the coherent field sum; scattering (slot 4) folds
     # into the totals in the power domain and keeps its field as a diagnostic.
     # The last three rows are a coupled R->D (cid 3), its reciprocal D->R (cid 4)

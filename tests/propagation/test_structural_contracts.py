@@ -59,9 +59,8 @@ def test_structural_protocols_have_exact_fields():
 
 
 def test_topology_config_identity_and_canonical_introspection_owner():
-    # The two structural config views now live in one module, so ``__module__``
-    # no longer distinguishes them - but a Protocol is exactly its field set,
-    # and that is the property this test exists to hold. The engine reads a
+    # The two structural config views share a module but must retain distinct
+    # Protocol field sets. The engine reads a
     # four-field view; the enumerated scattering stages read a larger, differently
     # shaped one. They must stay two objects, and neither may silently absorb
     # the other by growing into a superset of it.

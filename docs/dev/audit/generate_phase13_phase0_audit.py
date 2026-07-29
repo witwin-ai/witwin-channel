@@ -1,15 +1,7 @@
 # Copyright Xingyu Chen.
 # Generates audit.
 
-"""Generate Plan 13 Phase 0 ownership and integration audit artifacts.
-
-This is a read-only source scanner.  It intentionally does not import the
-production package or load ``_channel_native``: Phase 0 must remain usable on a
-clean host before CUDA configuration.  Run from the repository root with the
-project-mandated environment::
-
-    conda run -n witwin2 python docs/dev/audit/generate_phase13_phase0_audit.py
-"""
+"""Generates audit."""
 
 from __future__ import annotations
 

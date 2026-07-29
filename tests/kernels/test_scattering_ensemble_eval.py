@@ -1,7 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests scattering ensemble eval.
 
-"""Lockstep and contract tests for ADR-010 op 1 (Kirchhoff ensemble rows)."""
+"""Tests scattering ensemble eval."""
 
 import pytest
 import torch
@@ -117,7 +117,7 @@ def test_scattering_ensemble_eval_matches_reference(seed):
         case["material_id"], case["backup_axis"], case["rx_positions"], case["rx_pol"],
         case["rc"], case["sc"], tables, coef, threshold,
     )
-    # ADR-010 gates: max-rel <= 1e-6 with an absolute floor of
+    # rough-surface scattering: max-rel <= 1e-6 with an absolute floor of
     # 1e-9 * max|baseline| absorbing denormal-scale rows.
     for name, rtol in (("gain", 1.0e-6), ("amplitude", 1.0e-6), ("length", 1.0e-6)):
         atol = 1.0e-9 * float(ref[name].abs().max())

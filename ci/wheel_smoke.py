@@ -37,7 +37,7 @@ _REQUIRED_RUNTIME_MEMBERS = {
 }
 _SPECIAL_PACKAGE_MEMBERS = frozenset({_NATIVE_MEMBER, *_REQUIRED_RUNTIME_MEMBERS})
 # The propagation consumer contract version has exactly one home, the checked-in
-# module below.  The smoke reads it from there rather than restating the integer,
+# module below. The smoke reads it from there rather than restating the integer,
 # because a restated literal goes stale silently and only fails a release run.
 _CONSUMER_CONTRACT_MEMBER = "witwin/channel/propagation/consumer.py"
 _CONSUMER_CONTRACT_SYMBOL = "CONTRACT_VERSION"
@@ -243,18 +243,18 @@ def _source_member_payload(member: str) -> bytes:
 def repository_consumer_contract_version() -> int:
     """Read ``CONTRACT_VERSION`` from the checked-in consumer contract module.
 
-    Parsed rather than imported: the smoke must not need an importable, natively
-    loadable ``witwin.channel`` in the parent process, and parsing keeps the
-    expected value tied to the source revision the wheel is built from.
+ Parsed rather than imported: the smoke must not need an importable, natively
+ loadable ``witwin.channel`` in the parent process, and parsing keeps the
+ expected value tied to the source revision the wheel is built from.
 
-    Public because it has a second caller by design. Any other gate that needs
-    the expected contract version CALLS THIS rather than restating the integer -
-    the Linux wheel-metadata smoke in ``publish-witwin-channel.yml`` now does.
-    That is the whole point: the literal 5 this replaced went stale silently and
-    failed every release wheel smoke, while the workflow carried an
-    independently stale 2 for the same constant. Two copies of one integer is
-    how both of them went wrong without anyone noticing.
-    """
+ Public because it has a second caller by design. Any other gate that needs
+ the expected contract version CALLS THIS rather than restating the integer -
+ the Linux wheel-metadata smoke in ``publish-witwin-channel.yml`` now does.
+ That is the whole point: the literal 5 this replaced went stale silently and
+ failed every release wheel smoke, while the workflow carried an
+ independently stale 2 for the same constant. Two copies of one integer is
+ how both of them went wrong without anyone noticing.
+ """
     payload = _source_member_payload(_CONSUMER_CONTRACT_MEMBER)
     try:
         module = ast.parse(payload.decode("utf-8"), filename=_CONSUMER_CONTRACT_MEMBER)

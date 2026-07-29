@@ -17,7 +17,7 @@ _COMPONENT_STAGES = (
     "_reflection_topology_multibounce",
     "_diffraction_topology_order1",
     "_transmission_topology",
-    # ADR-011 / G3: the engine now dispatches through the public coupled entry,
+    # coupled reflection and diffraction : the engine now dispatches through the public coupled entry,
     # which selects the single-shot or rx-streamed discovery internally.
     "coupled_reflection_diffraction_topology",
 )
@@ -68,7 +68,7 @@ def test_engine_signature_ownership_and_dependency_boundary():
         signature.parameters["frequency_value"].kind is inspect.Parameter.KEYWORD_ONLY
     )
     assert signature.parameters["frequency_value"].default is None
-    # ADR-011 / G3: the deterministic grid solver opts into receiver-block
+    # coupled reflection and diffraction : the deterministic grid solver opts into receiver-block
     # streaming of coupled discovery; path and MC keep the single-shot default.
     assert (
         signature.parameters["coupled_rx_streaming"].kind

@@ -1,48 +1,7 @@
 # Copyright Xingyu Chen.
 # Native geometry kernel facades.
 
-"""Native geometry kernel facades.
-
-Thin facades over the ``_channel`` geometry ABI: the RayD typed forward
-bridges (intersection, visibility, reflection tracing, EPC paths, diffraction
-sampling, coupled RD/DD geometry, ADR-027 segment penetration, and the
-ADR-028 device-resident diffraction state plan), the scene-static geometry
-primitives, and the :class:`torch.autograd.Function` companions that dispatch
-their registered native backward/JVP entries.
-
-bridge
-------
-Typed forward entries into the RayD-owned geometry operations. Every entry
-validates its contract, requests the required native symbol through
-:mod:`witwin.channel.runtime`, dispatches, and converts the native result into
-a named typed contract. The ADR-027 segment-penetration family shares the
-request/result validators ``_validate_segment_penetration_inputs``,
-``_segment_penetration_request_args``, and ``_segment_penetration_result``.
-
-primitives
-----------
-Scene-static geometry primitives: diffraction edge counting/selection, vector
-normalization, point reflection, and the deterministic/Monte Carlo face-group
-and edge-candidate exports.
-
-autograd
---------
-Differentiable geometry ops. Native ``torch.autograd.Function`` companions for
-ray intersection, reflection tracing, EPC reflection paths, and scene face
-normals: a plain forward, a ``once_differentiable`` VJP, and a forward-mode
-JVP that all dispatch registered native kernels. Torch autograd may dispatch
-these companions but never reconstructs the numerical operation. The adjoint
-and tangent of the triangle face-normal are owned by the native face-normal
-companions, not rebuilt here.
-
-penetration_autograd
---------------------
-The ADR-027 segment-penetration ``torch.autograd.Function``. It wraps the
-forward-tape bridge above and dispatches the registered native
-backward/JVP companions, reassembling the typed
-:class:`SegmentPenetrationResult` / :class:`SegmentPenetrationTapeResult`
-contracts from the flat native value tuple.
-"""
+"""Native geometry kernel facades."""
 
 from __future__ import annotations
 
@@ -619,12 +578,12 @@ def rayd_reflection_epc_paths_forward(*args: object) -> tuple[torch.Tensor, ...]
 def coupled_rd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
     """Construct reciprocal 1R+1D geometry without evaluating a coefficient.
 
-    The native operation uses image-source edge stationarity, RayD reflection
-    EPC, and RayD segment visibility. ``reverse=True`` constructs D->R by
-    exchanging endpoints and reversing the interaction sequence. The returned
-    dictionary intentionally has no ``path_gain`` or ``field`` entry; coupled
-    complex/Jones transport belongs to the unified field phase.
-    """
+ The native operation uses image-source edge stationarity, RayD reflection
+ EPC, and RayD segment visibility. ``reverse=True`` constructs D->R by
+ exchanging endpoints and reversing the interaction sequence. The returned
+ dictionary intentionally has no ``path_gain`` or ``field`` entry; coupled
+ complex/Jones transport belongs to the unified field phase.
+ """
 
     if not args:
         raise TypeError(
@@ -681,14 +640,14 @@ def coupled_rd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
 def coupled_dd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
     """Construct two-edge (double) diffraction geometry without a coefficient.
 
-    The native operation runs an alternating-projection Fermat solve for the
-    two-edge Keller point pair (Q1 on e1, Q2 on e2) and three RayD segment
-    visibility queries (tx->Q1, Q1->Q2, Q2->rx). Both edge ids are recoverable
-    from ``edge_sequence`` (slot 0 = e1, slot 1 = e2); ``primitive_sequence`` is
-    fully ``-1`` because a double-diffraction row touches no face. The returned
-    dictionary intentionally carries no ``path_gain``/``field`` entry; complex
-    transport belongs to the unified field phase.
-    """
+ The native operation runs an alternating-projection Fermat solve for the
+ two-edge Keller point pair (Q1 on e1, Q2 on e2) and three RayD segment
+ visibility queries (tx->Q1, Q1->Q2, Q2->rx). Both edge ids are recoverable
+ from ``edge_sequence`` (slot 0 = e1, slot 1 = e2); ``primitive_sequence`` is
+ fully ``-1`` because a double-diffraction row touches no face. The returned
+ dictionary intentionally carries no ``path_gain``/``field`` entry; complex
+ transport belongs to the unified field phase.
+ """
 
     if not args:
         raise TypeError(
@@ -1569,11 +1528,11 @@ def rayd_trace_reflections_jvp(
 class _RaydIntersectAdFunction(torch.autograd.Function):
     """Fixed-winner differentiable RayD intersect through the direct typed C++ boundary.
 
-    Inputs: (scene_resource, vertices, ray_o, ray_d, ray_tmax, active).
-    ``vertices`` must be the scene's global vertex table (single-structure
-    scenes in AD-A0); the forward reads geometry from the native scene and
-    the tensor only routes vertex gradients/tangents.
-    """
+ Inputs: (scene_resource, vertices, ray_o, ray_d, ray_tmax, active).
+ ``vertices`` must be the scene's global vertex table (single-structure
+ scenes in AD-A0); the forward reads geometry from the native scene and
+ the tensor only routes vertex gradients/tangents.
+ """
 
     @staticmethod
     def forward(scene_resource, vertices, ray_o, ray_d, ray_tmax, active):
@@ -1712,11 +1671,11 @@ def rayd_intersect_ad(
 ) -> dict[str, torch.Tensor]:
     """Differentiable RayD intersect under the fixed-winner contract.
 
-    Returns the same fields as :func:`rayd_intersect_forward`; ``t``/``p``/
-    ``n``/``geo_n``/``uv``/``barycentric`` participate in reverse- and
-    forward-mode torch AD with respect to ``vertices``, ``ray_o`` and
-    ``ray_d``. Winner ids stay detached.
-    """
+ Returns the same fields as:func:`rayd_intersect_forward`; ``t``/``p``/
+ ``n``/``geo_n``/``uv``/``barycentric`` participate in reverse- and
+ forward-mode torch AD with respect to ``vertices``, ``ray_o`` and
+ ``ray_d``. Winner ids stay detached.
+ """
 
     values = _RaydIntersectAdFunction.apply(
         _rayd_scene_resource(scene_resource), vertices, ray_o, ray_d, ray_tmax, active
@@ -1937,10 +1896,10 @@ def rayd_trace_reflections_ad(
 ) -> dict[str, torch.Tensor]:
     """Differentiable RayD reflection chain under the fixed-winner contract.
 
-    ``t`` and ``image_sources`` participate in reverse- and forward-mode
-    torch AD with respect to ``vertices``, ``ray_o`` and ``ray_d``; the
-    reflection chain (prim ids and tape tensors) stays detached.
-    """
+ ``t`` and ``image_sources`` participate in reverse- and forward-mode
+ torch AD with respect to ``vertices``, ``ray_o`` and ``ray_d``; the
+ reflection chain (prim ids and tape tensors) stays detached.
+ """
 
     values = _RaydTraceReflectionsAdFunction.apply(
         _rayd_scene_resource(scene_resource),
@@ -2087,12 +2046,12 @@ def rayd_reflection_epc_paths_jvp(
 class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
     """Fixed-winner differentiable RayD reflection EPC paths through the direct typed C++ boundary.
 
-    Forward IS the discovery entry (direct-plane mode) re-launched on the
-    frozen winner sequence, so the primal hit points, normals and path length
-    are the native discovery values, not a reconstruction. Backward/jvp call
-    RayD's chain geometry companions; ``vertices`` must be the scene's global
-    vertex table and only routes vertex gradients/tangents.
-    """
+ Forward IS the discovery entry (direct-plane mode) re-launched on the
+ frozen winner sequence, so the primal hit points, normals and path length
+ are the native discovery values, not a reconstruction. Backward/jvp call
+ RayD's chain geometry companions; ``vertices`` must be the scene's global
+ vertex table and only routes vertex gradients/tangents.
+ """
 
     @staticmethod
     def forward(
@@ -2317,13 +2276,13 @@ def rayd_reflection_epc_paths_ad(
 ) -> dict[str, torch.Tensor]:
     """Differentiable RayD reflection EPC paths under the fixed-winner contract.
 
-    ``hit_positions``, ``normals`` and ``path_length`` participate in
-    reverse- and forward-mode torch AD with respect to ``vertices``,
-    ``source`` and ``receiver``. ``sequence`` is the frozen winner face
-    sequence and ``plane_points`` / ``plane_normals`` are its detached plane
-    arrays (anchor + unit face normal, gathered per bounce); ``valid`` and
-    the resolved ids stay non-differentiable.
-    """
+ ``hit_positions``, ``normals`` and ``path_length`` participate in
+ reverse- and forward-mode torch AD with respect to ``vertices``,
+ ``source`` and ``receiver``. ``sequence`` is the frozen winner face
+ sequence and ``plane_points`` / ``plane_normals`` are its detached plane
+ arrays (anchor + unit face normal, gathered per bounce); ``valid`` and
+ the resolved ids stay non-differentiable.
+ """
 
     validate_cuda_tensor(
         "source", source, dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -2405,11 +2364,11 @@ def rayd_scene_face_normals_jvp(
 class _RaydFaceNormalsAdFunction(torch.autograd.Function):
     """Scene unit face-normal table with a graph to the vertex table.
 
-    Forward normalizes the native face-normal export with the same kernel the
-    reflection discovery uses; backward/jvp call RayD's face-normal table
-    companions (the adjoint/tangent of normalize(cross(v1 - v0, v2 - v0))
-    over the scene's global vertex and face tables).
-    """
+ Forward normalizes the native face-normal export with the same kernel the
+ reflection discovery uses; backward/jvp call RayD's face-normal table
+ companions (the adjoint/tangent of normalize(cross(v1 - v0, v2 - v0))
+ over the scene's global vertex and face tables).
+ """
 
     @staticmethod
     def forward(scene_resource, vertices, raw_face_normals):
@@ -2461,11 +2420,11 @@ def rayd_face_normals_ad(
 ) -> torch.Tensor:
     """Scene unit face-normal table, differentiable in the vertex table.
 
-    ``raw_face_normals`` is the detached native export (scene edge records);
-    the returned table is its normalization with vertex gradients/tangents
-    routed through RayD's face-normal companions under the fixed-winner
-    contract (which face a row consumes stays a frozen integer gather).
-    """
+ ``raw_face_normals`` is the detached native export (scene edge records);
+ the returned table is its normalization with vertex gradients/tangents
+ routed through RayD's face-normal companions under the fixed-winner
+ contract (which face a row consumes stays a frozen integer gather).
+ """
 
     validate_cuda_tensor(
         "raw_face_normals",

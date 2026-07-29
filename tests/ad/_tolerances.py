@@ -1,17 +1,13 @@
 # Copyright Xingyu Chen.
 # Shared AD gradient-test tolerances and finite-difference steps.
 
-"""Shared AD gradient-test tolerances and finite-difference steps.
-
-Single source of truth for the AD test suite (plan 07 section 9.2). Do not
-copy these constants into individual test files.
-"""
+"""Shared AD gradient-test tolerances and finite-difference steps."""
 
 # Central finite-difference steps, calibrated per parameter magnitude.
 FD_STEP_POSITION = 1.0e-2
 FD_STEP_GEOMETRY = 1.0e-3
 
-# Geometry steps for the complex-coefficient solvers (plan 07 AD-2). The
+# Geometry steps for the complex-coefficient solvers (geometry AD). The
 # carrier phase runs at k ~ 63 rad/m at 3 GHz, so the position step has to keep
 # k*h well below 1 for a two-point difference to stay in the linear regime;
 # 1e-2 m (the incoherent-power step above) would carry a 0.6 rad phase swing and
@@ -19,7 +15,7 @@ FD_STEP_GEOMETRY = 1.0e-3
 FD_STEP_POSITION_PHASE = 1.0e-3
 FD_STEP_VERTEX = 1.0e-3
 
-# Material FD steps (plan 07 AD-1), calibrated so the two-point difference
+# Material FD steps (material and frequency derivatives), calibrated so the two-point difference
 # clears the float32 forward noise floor for eps_r ~ 2..5, sigma_e ~ 0.01..0.1
 # and layer thickness ~ 0.05..0.2 m.
 FD_STEP_EPS_R = 1.0e-2

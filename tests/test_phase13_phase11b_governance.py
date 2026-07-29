@@ -55,10 +55,7 @@ _PHASE11B_SOURCE_SHA256 = {
     ),
 }
 
-# Plan-15 phase 6 lifted the per-domain kernel facades into the top-level
-# `witwin/channel/kernels/` package. The Phase-11b evidence records the paths
-# those regions had when it was captured, so the live-file check follows the
-# move instead of the evidence being rewritten.
+# Map frozen evidence paths to their current kernel-facade locations.
 _PHASE15_KERNEL_RELOCATIONS = {
     "witwin/channel/propagation/fields/kernels/functional.py": (
         "witwin/channel/kernels/fields.py"
@@ -173,9 +170,7 @@ def test_phase11b_duplication_budget_is_met_without_relaxation() -> None:
         "coverage_percent": refresh["coverage_percent"],
         "region_count": refresh["region_count"],
     }
-    # Phase 11B is an immutable historical snapshot. Later accepted phases add
-    # classified regions to the live ledger, whose completeness is enforced by
-    # ci/check_duplication.py rather than by rewriting this evidence record.
+    # This snapshot is immutable; the live duplication ledger owns current completeness.
     assert refresh["region_count"] == 143
     assert refresh["stale_region_count"] == 0
     assert refresh["unclassified_region_count"] == 0

@@ -1,7 +1,7 @@
 // Copyright Xingyu Chen.
 // Implements deterministic CUDA operations.
 
-// ---- Consolidated from deterministic_field.cu ----
+// ==== Section: Deterministic field ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
@@ -787,7 +787,7 @@ pybind11::dict channel_deterministic_field_from_power_phase(at::Tensor path_gain
     return out;
 }
 
-// ---- Consolidated from deterministic_accum.cu ----
+// ==== Section: Deterministic accumulation ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
@@ -811,10 +811,10 @@ constexpr int kBlockSize = 256;
 constexpr int kComponentCount = 3;
 // Slots materialized by the flat accumulator: los, reflection, diffraction,
 // transmission, scattering and coupled. Scattering is an incoherent POWER slot
-// (plan 05 sections 6.7.3 / 7.3): its rows fold into the totals in the power
+// (the solver component layout): its rows fold into the totals in the power
 // domain and never enter the coherent field sum; its complex cell field is
 // kept as a diagnostic only. Coupled is an ordinary coherent field slot
-// (ADR-011): reflection-diffraction and its reciprocal both land there and sum
+// (coupled reflection and diffraction): reflection-diffraction and its reciprocal both land there and sum
 // coherently in-cell, joining field_total / power_total like the first three
 // slots.
 constexpr int kAccumSlotCount = 6;
@@ -822,8 +822,8 @@ constexpr int kScatteringSlot = 4;
 constexpr int kCoupledSlot = 5;
 
 // Path component ids: 0=los, 1=reflection, 2=diffraction, 3/4=coupled
-// reflection-diffraction and its reciprocal (ADR-011), 7=coupled double
-// diffraction (ADR-013). Ids 3/4/7 all map to the single coherent coupled slot
+// reflection-diffraction and its reciprocal (coupled reflection and diffraction), 7=coupled double
+// diffraction (coupled double diffraction). Ids 3/4/7 all map to the single coherent coupled slot
 // 5 and sum in-cell. 5=transmission, 6=scattering. Ids without a slot return -1
 // and are dropped by the scatter/gather gates.
 __device__ __forceinline__ int accum_slot(int component_id) {
@@ -920,13 +920,13 @@ __global__ void deterministic_finalize_accumulation_kernel(
             if (coherent) {
                 if (slot == kScatteringSlot) {
                     if (scattering_coherent) {
-                        // ADR-021 D3 (opt-in): scattering rows combine
+                        // coherent scattering (opt-in): scattering rows combine
                         // coherently. The slot already holds the summed
                         // complex path field (scattered by the paths
                         // kernel); its |sum|^2 replaces the incoherent gain
                         // sum as the scattering component power and still
                         // folds into power_total as a power term (components
-                        // stay mutually incoherent, exactly the ADR-019
+                        // stay mutually incoherent, exactly the coherent combination
                         // per-component phasor precedent).
                         const T coherent_power = real * real + imag * imag;
                         component_power[out] = coherent_power;
@@ -943,7 +943,7 @@ __global__ void deterministic_finalize_accumulation_kernel(
                 component_power[out] = coherent_power;
             } else {
                 if (slot == kScatteringSlot && scattering_coherent) {
-                    // ADR-021 D3 in an incoherent solve: scattering rows
+                    // coherent scattering in an incoherent solve: scattering rows
                     // still interfere with each other, but the combined
                     // power adds incoherently to the other components.
                     const T coherent_power = real * real + imag * imag;
@@ -969,7 +969,7 @@ __global__ void deterministic_finalize_accumulation_kernel(
     }
 }
 
-// VJP of the flat accumulation (plan 07). Every output is either a linear
+// VJP of the flat accumulation (the AD contract). Every output is either a linear
 // scatter of the per-path field/power (adjoint: gather through the same
 // frozen slot/tx/rx gates) or a per-cell |.|^2 / sqrt nonlinearity
 // linearized at the saved forward cell values. One gather per path, no
@@ -1032,7 +1032,7 @@ __global__ void deterministic_accumulate_backward_kernel(
             g_imag += grad_component_field_imag[out];
         }
         if (scattering_coherent && slot == kScatteringSlot) {
-            // ADR-021 D3 / ADR-022 accumulate spec: the scattering slot's
+            // coherent scattering / BDPT AD accumulate spec: the scattering slot's
             // component_power and its contribution to power_total (and, in an
             // incoherent solve, to field_total via sqrt) are all |S|^2 with
             // S the summed complex field. d|S|^2 = 2 Re(S) dRe + 2 Im(S) dIm,
@@ -1156,7 +1156,7 @@ __global__ void deterministic_accumulate_tangent_scatter_kernel(
         const int64_t out = static_cast<int64_t>(slot) * cell_count + cell;
         // Gain tangents scatter into the power buffer only where the finalize
         // derives that slot's power from the gain sum. The scattering slot
-        // does so unless the ADR-021 D3 coherent combine is active, in which
+        // does so unless the coherent scattering coherent combine is active, in which
         // case its power comes from the summed field tangents instead.
         const bool scatter_gain = (slot == kScatteringSlot)
                                       ? !scattering_coherent
@@ -1208,7 +1208,7 @@ __global__ void deterministic_accumulate_jvp_finalize_kernel(
             if (coherent) {
                 if (slot == kScatteringSlot) {
                     if (scattering_coherent) {
-                        // ADR-021 D3: the scattering power is |S|^2 of the
+                        // coherent scattering: the scattering power is |S|^2 of the
                         // summed field, so its tangent is the linearized
                         // square 2 Re(conj(S) t_S), folded into the total as
                         // a power term (excluded from the coherent field sum).

@@ -1,21 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests transmission polarization.
 
-"""ADR-020 transmission polarization unification parity.
-
-The transmission MODEL for the montecarlo.basic and montecarlo.bdpt solvers is
-the same full-Jones layer-stack evaluation the deterministic/Path solvers use.
-On a polarized oblique-incidence wall the two Monte Carlo solvers must therefore
-reproduce the deterministic polarized transmittance (each in its own estimator
-domain), not the polarization-agnostic TE/TM mean.
-
-- BDPT routes pure transmission through the shared enumerated engine, so its
-  transmission component reproduces the deterministic value exactly (same native
-  full-Jones field, receiver-antenna projection included).
-- MC basic keeps its power-domain radiomap: its per-wall transmittance is the
-  Jones-derived power projected on the incident polarization (no receiver
-  projection), which equals f_te*T_te + f_tm*T_tm, not the mean.
-"""
+"""Tests transmission polarization."""
 
 import math
 
@@ -107,8 +93,8 @@ def _budgets() -> tuple[float, float]:
 
 def test_pure_te_oblique_all_solvers_match_polarized_te_not_mean():
     """Default z polarization is pure TE at this geometry: all three solvers
-    reproduce the deterministic polarized transmittance T_te, distinctly below
-    the retired unpolarized mean 0.5*(T_te+T_tm)."""
+ reproduce the deterministic polarized transmittance T_te, distinctly below
+ the retired unpolarized mean 0.5*(T_te+T_tm)."""
 
     _require_native()
     t_te, t_tm = _budgets()
@@ -156,8 +142,8 @@ def test_pure_te_oblique_all_solvers_match_polarized_te_not_mean():
 
 def test_mixed_polarization_bdpt_matches_deterministic_mc_is_incident_projected():
     """A mixed TE/TM polarization exposes the per-solver estimator domain: BDPT
-    matches the deterministic receiver-projected value, MC basic yields the
-    incident-projected power-domain transmittance f_te*T_te + f_tm*T_tm."""
+ matches the deterministic receiver-projected value, MC basic yields the
+ incident-projected power-domain transmittance f_te*T_te + f_tm*T_tm."""
 
     _require_native()
     t_te, t_tm = _budgets()

@@ -104,7 +104,7 @@ def test_wedge_gate_uses_adr018_deterministic_utd_reference():
         )
     )
 
-    # ADR-018 retired the crude stochastic estimate fossilized as 4.66e-05.
+    # BDPT diffraction the crude stochastic estimate fossilized as 4.66e-05.
     # Standalone BDPT diffraction now consumes the deterministic UTD oracle.
     assert gate["cases"]["bdpt_wedge_diffraction"]["reference"] == pytest.approx(
         2.1433029573358908e-08, rel=0.0, abs=0.0

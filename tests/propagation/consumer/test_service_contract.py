@@ -24,7 +24,7 @@ def _compiled(frequency: float = 77.0e9):
         SimpleNamespace(metadata={}, endpoints=("compiled-endpoint-must-not-run",)),
     )
     object.__setattr__(compiled, "structures", ())
-    # mu_r / layer_mu_r are named by capabilities().primal_only_ad_inputs, so
+    # mu_r / layer_mu_r are named by capabilities.primal_only_ad_inputs, so
     # the stand-in has to declare them even though this scene has no material
     # store; None is "this scene carries no such tensor", not "unset".
     object.__setattr__(
@@ -34,7 +34,7 @@ def _compiled(frequency: float = 77.0e9):
     )
     object.__setattr__(compiled, "reference_frequency_hz", frequency)
     object.__setattr__(compiled, "reference_frequency_revision", None)
-    # The four world version domains the ADR-040 freshness check reads, plus
+    # The four world version domains the world-version validation freshness check reads, plus
     # the compiled snapshot instant. A stand-in for a CompiledScene has to
     # carry them or `evaluate` cannot stamp the topology it publishes.
     for name in (
@@ -378,14 +378,7 @@ def test_reevaluate_reuses_frozen_topology_without_discovery(
 def test_unsupported_fixed_response_fails_at_request_construction(
     monkeypatch,
 ) -> None:
-    """A response with no fixed-topology provider is rejected at construction.
-
-    Contract version 2 gives every declared response a fixed-topology
-    provider, so ``polarimetric_transport`` is no longer the example: the
-    former limit was deliberately lifted by ADR-037. The enforcement point
-    itself is unchanged and is exercised here with a response that is outside
-    the vocabulary entirely, which is the only way the check can now fire.
-    """
+    """Construction rejects any response that declares no fixed-topology provider."""
 
     from witwin.channel.propagation.consumer import (
         FixedTopologyRequest,
@@ -413,13 +406,7 @@ def test_unsupported_fixed_response_fails_at_request_construction(
 
 
 def test_unsupported_fixed_component_fails_at_preparation() -> None:
-    """A frozen component with no fixed-topology owner is rejected at freeze.
-
-    ``fixed_topology_components`` used to be advisory: the real gate was the
-    zero-width interaction check in the service layer. Preparation is now the
-    enforcement point, and it names the capability field so a caller can
-    discover the supported set without a failed solve.
-    """
+    """Topology preparation rejects components without a fixed-topology owner."""
 
     from witwin.channel.propagation.consumer import (
         PropagationTopology,

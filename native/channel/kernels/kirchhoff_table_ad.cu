@@ -1,43 +1,39 @@
 // Copyright Xingyu Chen.
 // Implements kirchhoff table ad CUDA operations.
 
-// ADR-015 Part C: native JVP/VJP companions of the offline Kirchhoff table
-// build (scattering/tables.py::build_kirchhoff_table). The float64 numpy primal
-// is unchanged bit-for-bit and stays the sanctioned compile-time island; only
-// the derivative is native. These companions differentiate the resident table
-// values F = a S a w.r.t. the roughness statistics (sigma_h, corr_x, corr_y),
-// the CSR layer parameters (thickness / eps_r / sigma_e) and the carrier
-// frequency, given the f32 downcast structural intermediates the build exports
-// (pre-balance symmetrized lobe S, balance factors a, diffuse budgets r_diff).
+// Native JVP/VJP companions for the offline float64 Kirchhoff table builder.
+// They differentiate resident values F = a S a with respect to roughness,
+// CSR layer parameters, and carrier frequency. Inputs include the builder's
+// float32 structural intermediates: S, balance factors, and diffuse budgets.
 //
-// Derivative structure (ADR-015 "Derivative specification"), per polarization
+// Derivative structure for each polarization
 // channel c and final table F_ij = a_i S_ij a_j over directional states
 // i = (ti, pi), j = (to, po), w_j = cos_o(j) * dOmega:
 //
-//   1. Balanced-table adjoint: Gbar = grad_F ->
-//        abar_i = sum_j (Gbar_ij + Gbar_ji) S_ij a_j,  Sbar_ij += Gbar_ij a_i a_j.
-//   2. Implicit Sinkhorn adjoint at the converged factor a with
-//        phi_i(a) = a_i (S (w o a))_i - rhs_i = 0,
-//        J_ik = delta_ik (S (w o a))_i + a_i S_ik w_k.
-//      Solve J^T lambda = abar (dense LU via cuSOLVER; iso 32x32 per channel on
-//      the cos-collapsed system, aniso nti*npi square). Then rhsbar_i = lambda_i
-//      and Sbar_ij += -lambda_i a_i w_j a_j. Inactive rows (rhs_i <= 0, a_i = 0)
-//      are identity rows with zero adjoint.
-//   3. Budget chain: rhs = R_bar_c(cos_i) (1 - c_r^2), c_r = exp(-2 (k0 cos_i
-//      sigma_h)^2). d rhs feeds sigma_h / layer / frequency via stack_rt_dual
-//      seeded at cos_i (d|r|^2 = 2 Re(conj(r) dr)) plus the explicit k0 term of
-//      c_r for frequency.
-//   4. Raw-lobe adjoint over BOTH node sets (S = 0.5 (Raw + Raw_swap)):
-//        Raw = P(q) I(q; sigma_h, lx, ly) R_c(cos_h), q = k0 (wo + wi),
-//        P = |q|^4 / (16 pi^2 q_n^2 cos_i cos_o),
-//        cos_h = clamp((1 + wi.wo) k0 / |q|, 1e-6, 1) (k0-invariant),
-//        Beckmann series I = pi lx ly sum_m exp(T_m), recomputed in f32 with
-//        the build's n_terms. Scalar/CSR partials accumulate with atomicAdd.
-//   5. JVP mirrors 1-4 forward: parameter tangents -> dS, drhs; solve J da =
-//      drhs - a_i sum_k dS_ik w_k a_k; tangent_F = da_i S_ij a_j + a_i S_ij da_j
-//      + a_i dS_ij a_j.
+// 1. Balanced-table adjoint: Gbar = grad_F ->
+// abar_i = sum_j (Gbar_ij + Gbar_ji) S_ij a_j, Sbar_ij += Gbar_ij a_i a_j.
+// 2. Implicit Sinkhorn adjoint at the converged factor a with
+// phi_i(a) = a_i (S (w o a))_i - rhs_i = 0,
+// J_ik = delta_ik (S (w o a))_i + a_i S_ik w_k.
+// Solve J^T lambda = abar (dense LU via cuSOLVER; iso 32x32 per channel on
+// the cos-collapsed system, aniso nti*npi square). Then rhsbar_i = lambda_i
+// and Sbar_ij += -lambda_i a_i w_j a_j. Inactive rows (rhs_i <= 0, a_i = 0)
+// are identity rows with zero adjoint.
+// 3. Budget chain: rhs = R_bar_c(cos_i) (1 - c_r^2), c_r = exp(-2 (k0 cos_i
+// sigma_h)^2). d rhs feeds sigma_h / layer / frequency via stack_rt_dual
+// seeded at cos_i (d|r|^2 = 2 Re(conj(r) dr)) plus the explicit k0 term of
+// c_r for frequency.
+// 4. Raw-lobe adjoint over BOTH node sets (S = 0.5 (Raw + Raw_swap)):
+// Raw = P(q) I(q; sigma_h, lx, ly) R_c(cos_h), q = k0 (wo + wi),
+// P = |q|^4 / (16 pi^2 q_n^2 cos_i cos_o),
+// cos_h = clamp((1 + wi.wo) k0 / |q|, 1e-6, 1) (k0-invariant),
+// Beckmann series I = pi lx ly sum_m exp(T_m), recomputed in f32 with
+// the build's n_terms. Scalar/CSR partials accumulate with atomicAdd.
+// 5. JVP mirrors 1-4 forward: parameter tangents -> dS, drhs; solve J da =
+// drhs - a_i sum_k dS_ik w_k a_k; tangent_F = da_i S_ij a_j + a_i S_ij da_j
+// + a_i dS_ij a_j.
 //
-// The Beckmann series is recomputed in float32 (ADR requirement) and the stack
+// The Beckmann series is recomputed in float32 (numerical parity requirement) and the stack
 // reflectance derivatives reuse the shared field_transport_ad::stack_rt_dual
 // dual library (mirrors em::stack_rt clamp for clamp). Requires linking
 // cusolver (flag to the CMake owner).
@@ -146,8 +142,8 @@ struct TangentSeed {
 // Beckmann diffuse-lobe series and its parameter partials, recomputed in f32
 // with the build's n_terms. Returns I and dI/{sigma_h, lx, ly, k0}. Mirrors
 // scattering/tables.py::_kirchhoff_diffuse_lobe_series term by term:
-//   T_m = m ln g - ln m! - ln m - rho^2/(4m) - g,  g = (q_n sigma_h)^2,
-//   rho^2 = (qx lx)^2 + (qy ly)^2,  I = pi lx ly sum_m exp(T_m).
+// T_m = m ln g - ln m! - ln m - rho^2/(4m) - g, g = (q_n sigma_h)^2,
+// rho^2 = (qx lx)^2 + (qy ly)^2, I = pi lx ly sum_m exp(T_m).
 // The g = 0 horizon is guarded (all partials vanish, matching exp(T_m) -> 0).
 // --------------------------------------------------------------------------
 struct LobePartials {
@@ -192,7 +188,7 @@ __device__ LobePartials kirchhoff_lobe_partials(
     }
     out.value = pi_lxly * S0;
     out.d_sigma_h = pi_lxly * Sg * 2.0f * (qn * qn) * sigma_h;
-    // dI/dlx = I/lx - pi lx ly * lx * Sx  (Sx = sum e qx^2/(2m)).
+    // dI/dlx = I/lx - pi lx ly * lx * Sx (Sx = sum e qx^2/(2m)).
     out.d_lx = out.value / lx - pi_lxly * lx * Sx;
     out.d_ly = out.value / ly - pi_lxly * ly * Sy;
     // dT_m/dk0 = (2m - rho^2/(2m) - 2g) / k0.
@@ -236,11 +232,11 @@ __device__ __forceinline__ NodeGeom node_geometry(
 // Balance-state helpers. The balance system acts on states s = (cos, phi). For
 // isotropic tables (npi == 1) the reverse state collapses to cos only, so the
 // state count is nti and a state's phi index is always 0; for anisotropic
-// tables the state is the full (cos, phi) pair. af() reads the balance factor
+// tables the state is the full (cos, phi) pair. af reads the balance factor
 // with the isotropic collapse; the outgoing weight is cos_o * dOmega.
 // --------------------------------------------------------------------------
 // --------------------------------------------------------------------------
-// Kernel: Sbar direct term  Sbar_ij = grad_f_ij a_i a_j  (both iso and aniso;
+// Kernel: Sbar direct term Sbar_ij = grad_f_ij a_i a_j (both iso and aniso;
 // a_j uses the isotropic collapse when npi == 1).
 // --------------------------------------------------------------------------
 __global__ void sbar_direct_kernel(
@@ -265,10 +261,10 @@ __global__ void sbar_direct_kernel(
 
 // --------------------------------------------------------------------------
 // Kernel: abar (balanced-table adjoint), iso and aniso paths.
-//   aniso: abar_i = sum_{to,po} (grad_f[ti,pi,to,po] + grad_f[to,po,ti,pi])
-//                     S[ti,pi,to,po] a[to,po].
-//   iso:   abar_i = sum_{to,po} grad_f[i,0,to,po] S[i,0,to,po] a[to]
-//                 + sum_{i',po} grad_f[i',0,i,po] a[i'] S[i',0,i,po].
+// aniso: abar_i = sum_{to,po} (grad_f[ti,pi,to,po] + grad_f[to,po,ti,pi])
+// S[ti,pi,to,po] a[to,po].
+// iso: abar_i = sum_{to,po} grad_f[i,0,to,po] S[i,0,to,po] a[to]
+// + sum_{i',po} grad_f[i',0,i,po] a[i'] S[i',0,i,po].
 // One thread per balance state.
 // --------------------------------------------------------------------------
 __global__ void abar_kernel(
@@ -383,8 +379,8 @@ __global__ void diag_kernel(
 }
 
 // Assemble the dense system matrix in column-major order.
-//   transpose=true  -> A = J^T:  A[i,k] = delta_ik D_i + a_k Smat[k,i] w_i.
-//   transpose=false -> J:        J[i,k] = delta_ik D_i + a_i Smat[i,k] w_k.
+// transpose=true -> A = J^T: A[i,k] = delta_ik D_i + a_k Smat[k,i] w_i.
+// transpose=false -> J: J[i,k] = delta_ik D_i + a_i Smat[i,k] w_k.
 // Inactive rows i become identity rows.
 __global__ void assemble_matrix_kernel(
     int n, bool transpose,
@@ -550,7 +546,7 @@ __global__ void raw_lobe_backward_kernel(
     for (int64_t idx = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          idx < count; idx += static_cast<int64_t>(blockDim.x) * gridDim.x) {
         // Sbar (balanced-table adjoint) is the double a_i*a_j product; the
-        // Beckmann/stack partials below stay float32 (ADR-015).
+        // Beckmann/stack partials below stay float32 (scattering AD).
         const double w = 0.5 * sbar[idx];
         if (w == 0.0)
             continue;
@@ -714,7 +710,7 @@ __global__ void budget_chain_jvp_kernel(
         const float c_r = expf(-2.0f * ks * ks);
         const float c_r2 = c_r * c_r;
         // d(c_r^2) = c_r^2 (-8 (k0 ct)^2 sigma_h) dsigma_h
-        //          + c_r^2 (-8 k0 (ct sigma_h)^2) dk0;  dk0 = kDkDf t_frequency.
+        // + c_r^2 (-8 k0 (ct sigma_h)^2) dk0; dk0 = kDkDf t_frequency.
         const float dc_r2 =
             c_r2 * (-8.0f * (k0 * ct) * (k0 * ct) * sigma_h) * t_sigma_h +
             c_r2 * (-8.0f * k0 * (ct * sigma_h) * (ct * sigma_h)) *

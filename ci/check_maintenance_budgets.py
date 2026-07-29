@@ -1,21 +1,7 @@
 # Copyright Xingyu Chen.
 # Enforce deterministic size and complexity budgets for production Python.
 
-"""Enforce deterministic size and complexity budgets for production Python.
-
-``limits.file_lines`` and ``limits.native_file_lines`` are OPTIONAL. The Python
-file-size gate was retired on 2026-07-27 by owner decision, recorded in
-``docs/dev/plans/15-concept-axis-layout-and-module-consolidation-plan.md`` (P2),
-and the native translation-unit size gate was retired on 2026-07-28 under
-ADR-044. File length is not an architecture or correctness boundary.
-``limits.function_complexity`` stays MANDATORY because it is about testability
-and defect density rather than reading capacity.
-
-When either optional file-size limit is absent, its hard limit,
-debt/exemption checks, and stale-exemption check are skipped entirely, and the
-corresponding exemption section is neither required nor read. When a limit is
-present, every one of those checks behaves exactly as before.
-"""
+"""Enforce deterministic size and complexity budgets for production Python."""
 
 from __future__ import annotations
 
@@ -166,10 +152,10 @@ def measure_native_files(
 ) -> list[FileMetric]:
     """Line-count native translation units under ``native_root``.
 
-    Line counts use the same ``splitlines`` measure as Python sources so both
-    budgets stay comparable. Decoding tolerates non-UTF-8 bytes because native
-    sources may carry third-party edits; only the line count is needed here.
-    """
+ Line counts use the same ``splitlines`` measure as Python sources so both
+ budgets stay comparable. Decoding tolerates non-UTF-8 bytes because native
+ sources may carry third-party edits; only the line count is needed here.
+ """
 
     root = root.resolve()
     source = root / native_root
@@ -330,10 +316,10 @@ def _check_python_file_budgets(
 ) -> list[Violation]:
     """Apply the optional ``limits.file_lines`` gate to measured Python files.
 
-    Only reached when the caller has already seen ``limits.file_lines``; the
-    validation and the violation set are the same ones the gate applied before
-    it became optional.
-    """
+ Only reached when the caller has already seen ``limits.file_lines``; the
+ validation and the violation set are the same ones the gate applied before
+ it became optional.
+ """
 
     file_recommended = _limit(config, "file_lines", "recommended")
     file_hard = _limit(config, "file_lines", "hard")

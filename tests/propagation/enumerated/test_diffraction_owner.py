@@ -13,13 +13,8 @@ from witwin.channel.interactions import diffraction
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 PACKAGE_ROOT = REPOSITORY_ROOT / "witwin" / "channel"
-# Re-pinned when the geometry kernel facades moved to
-# ``witwin.channel.kernels.geometry``: the only AST difference is the module
-# alias the native plan call is spelled through (``geometry_bridge`` ->
-# ``geometry_kernels``). Control flow, arguments and evaluation order are
-# unchanged. The concept-axis move that merged the discovery, geometry and
-# enumerated halves into ``witwin.channel.interactions.diffraction`` is pure
-# code motion, so the digest carries over untouched.
+# This digest pins the canonical diffraction planner's control flow, arguments,
+# and evaluation order while ignoring source positions.
 _DIGESTS = {
     "plan_tx_visible_diffraction_states": "77cc58aea3a87b52b1d039624fc85c5f61e2ad435ab6d66424f578098727a271",
 }

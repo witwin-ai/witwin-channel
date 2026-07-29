@@ -1,67 +1,7 @@
 # Copyright Xingyu Chen.
 # Native RF field kernel facades.
 
-"""Native RF field kernel facades.
-
-Thin facades over the ``_channel`` field ABI: the enumerated field transports
-and their native derivative companions, the ``torch.autograd.Function``
-wrappers that dispatch those companions, the ADR-039 source-amplitude owner,
-and the deterministic single-component field owners. Every entry validates its
-contract, requests the required native symbol through
-:mod:`witwin.channel.runtime`, dispatches the native operation, and converts
-its result into a named typed contract.
-
-functional
-----------
-The plain forward transports - free space, receiver projection, reflection and
-transmission sequences, coupled RD/DD, the pure wedge, and the rough-surface
-``C_r`` scale - together with the registered native backward/JVP companions
-they publish and the shared output/tangent field tuples every wrapper reuses.
-
-liveness
---------
-Which conditional outputs of one field apply carry a derivative: the ADR-038
-geometry decision behind ``path_length_m``/``delay_s`` and the ADR-043
-direction decision behind ``field_direction``. Both are decided by the wrapper
-where forward duals are still visible and read back here, so the field
-Functions agree on what a dead output looks like.
-
-autograd
---------
-The ``torch.autograd.Function`` companions for free space, the reflection and
-transmission sequences, the pure wedge, coupled RD, and the coupled RD
-preparation seam.
-
-coupled DD autograd
--------------------
-The coupled double-diffraction ``torch.autograd.Function`` and its material
-grad-request index groups, kept beside the wedge-face column layout it mirrors.
-
-projection autograd
--------------------
-The differentiable receiver projection on a frozen polarization basis.
-
-rough scale
------------
-The differentiable rough-surface ``C_r`` reflection scale (ADR-010 op 3).
-
-source amplitude
-----------------
-Source-amplitude application onto a transported complex3 field (ADR-039). The
-field transport kernels publish a unit-excitation complex3 vector and an
-excited scalar ``path_field = coefficient * sqrt(tx_power)``, but no excited
-vector; this is the native facade for that missing output and its
-differentiable wrapper. The map is linear in the field vector and the
-amplitude is a real per-row constant, so the VJP and the JVP are the same
-native scale, and ``tx_power`` stays a frozen primal exactly as it is in every
-field transport companion.
-
-deterministic
--------------
-The deterministic solver's single-component field owners: the LoS,
-diffraction-vector, reflection and reflection-sequence field kernels plus the
-small delay/phase/pack primitives they share.
-"""
+"""Native RF field kernel facades."""
 
 from __future__ import annotations
 
@@ -543,9 +483,9 @@ def field_coupled_dd(
 ) -> dict[str, torch.Tensor]:
     """Coupled double-diffraction field (TX->e1->e2->RX), component id 7.
 
-    Two sequential wedge operators in one native launch (ADR-013 D3). Outputs
-    are identical in shape to :func:`field_coupled_rd`.
-    """
+ Two sequential wedge operators in one native launch (coupled double diffraction). Outputs
+ are identical in shape to:func:`field_coupled_rd`.
+ """
 
     vectors = (
         source,
@@ -665,7 +605,7 @@ _FIELD_AD_TANGENT_FIELDS = (
 
 
 # The two Channel-owned transports additionally publish the arrival-direction
-# tangent (ADR-043). Transmission and the wedge/coupled families forward to
+# tangent (first-order differentiation). Transmission and the wedge/coupled families forward to
 # rayd::torch, which owns their direction seam and does not publish it, so the
 # shared tuple above stays exactly what those families return.
 _FIELD_AD_DIRECTION_TANGENT_FIELDS = (*_FIELD_AD_TANGENT_FIELDS, "direction")
@@ -1124,11 +1064,11 @@ def field_rough_reflection_scale(
 ) -> dict[str, torch.Tensor]:
     """Native rough-surface C_r factor applied to the reflection outputs.
 
-    Computes ``C_r = prod_b exp(-2*(k0*cos_b*sigma_b)^2)`` on rough bounces
-    (``1`` otherwise), zeroes rows flagged ``replaced``, and scales the four
-    field outputs (``path_gain`` by ``C_r^2``). Returns the scaled outputs plus
-    the real ``factor`` per row.
-    """
+ Computes ``C_r = prod_b exp(-2*(k0*cos_b*sigma_b)^2)`` on rough bounces
+ (``1`` otherwise), zeroes rows flagged ``replaced``, and scales the four
+ field outputs (``path_gain`` by ``C_r^2``). Returns the scaled outputs plus
+ the real ``factor`` per row.
+ """
 
     validate_cuda_tensor("field_vector", field_vector, dtype=torch.complex64, ndim=2)
     validate_cuda_tensor("coefficient", coefficient, dtype=torch.complex64, ndim=1)
@@ -1182,7 +1122,7 @@ def field_rough_reflection_scale_backward(
     need_geometry: bool = False,
     need_frequency: bool = True,
 ) -> dict[str, torch.Tensor | None]:
-    """VJP of :func:`field_rough_reflection_scale` (frequency and geometry)."""
+    """VJP of:func:`field_rough_reflection_scale` (frequency and geometry)."""
 
     out = _required_native_op("field_rough_reflection_scale_backward")(
         field_vector,
@@ -1244,7 +1184,7 @@ def field_rough_reflection_scale_jvp(
     tangent_source: torch.Tensor | None = None,
     tangent_frequency: float = 0.0,
 ) -> dict[str, torch.Tensor]:
-    """JVP of :func:`field_rough_reflection_scale` (frequency and geometry)."""
+    """JVP of:func:`field_rough_reflection_scale` (frequency and geometry)."""
 
     out = _required_native_op("field_rough_reflection_scale_jvp")(
         field_vector,
@@ -1277,11 +1217,11 @@ def field_rough_reflection_scale_jvp(
 def ad_liveness(direction_live: bool, *geometry: object) -> tuple[bool, bool]:
     """The one liveness record an apply carries, decided by the wrapper.
 
-    A direction derivative is a geometry derivative, so the direction half can
-    only be live where the geometry half is. The other half of the direction
-    decision is the caller's host-known component set, which is why it arrives
-    as a flag rather than being inferred from a tensor.
-    """
+ A direction derivative is a geometry derivative, so the direction half can
+ only be live where the geometry half is. The other half of the direction
+ decision is the caller's host-known component set, which is why it arrives
+ as a flag rather than being inferred from a tensor.
+ """
 
     geometry_live = _ad_geometry_live(*geometry)
     return (geometry_live, geometry_live and bool(direction_live))
@@ -1290,10 +1230,10 @@ def ad_liveness(direction_live: bool, *geometry: object) -> tuple[bool, bool]:
 def mark_dead_outputs(ctx, output) -> None:
     """Declare the outputs of one apply that carry no derivative.
 
-    A dead output is marked exactly as it was before the direction seam
-    existed, so a caller that does not ask for a live direction sees the same
-    object graph it saw at contract version 5.
-    """
+ A dead output is marked exactly as it was before the direction seam
+ existed, so a caller that does not ask for a live direction sees the same
+ object graph it saw at contract version 5.
+ """
 
     dead = []
     if not ctx.geometry_live:
@@ -1307,10 +1247,10 @@ def mark_dead_outputs(ctx, output) -> None:
 def direction_cotangent(ctx, grad_direction):
     """The incoming direction cotangent, or ``None`` if it was declared dead.
 
-    Torch does not deliver a cotangent for an output marked non-differentiable,
-    so this is belt and braces; it is also the one place that says out loud that
-    a dead output's seed never reaches a native companion.
-    """
+ Torch does not deliver a cotangent for an output marked non-differentiable,
+ so this is belt and braces; it is also the one place that says out loud that
+ a dead output's seed never reaches a native companion.
+ """
 
     return grad_direction if ctx.direction_live else None
 
@@ -1318,12 +1258,12 @@ def direction_cotangent(ctx, grad_direction):
 def direction_tangents(ctx, out: dict[str, torch.Tensor]) -> tuple:
     """Publish one apply's output tangents under the two liveness decisions.
 
-    The native companion always computes the direction tangent - it is the dual
-    the transverse projection already needed - so this only decides whether it
-    is published. A dead output receives ``None`` rather than a zero tensor,
-    because a zero tangent on a declared-dead output is exactly the silent
-    answer ADR-043 removes.
-    """
+ The native companion always computes the direction tangent - it is the dual
+ the transverse projection already needed - so this only decides whether it
+ is published. A dead output receives ``None`` rather than a zero tensor,
+ because a zero tangent on a declared-dead output is exactly the silent
+ answer first-order differentiation
+ """
 
     tangents = tuple(out[name] for name in _FIELD_AD_DIRECTION_TANGENT_FIELDS)
     if not ctx.geometry_live:
@@ -1336,9 +1276,9 @@ def direction_tangents(ctx, out: dict[str, torch.Tensor]) -> tuple:
 class _FieldFreeSpaceAdFunction(torch.autograd.Function):
     """Fixed-topology differentiable free-space transport.
 
-    Frequency and endpoints are differentiable; power and polarizations are
-    fixed. Float64 inputs use the strict-double companion for gradcheck.
-    """
+ Frequency and endpoints are differentiable; power and polarizations are
+ fixed. Float64 inputs use the strict-double companion for gradcheck.
+ """
 
     @staticmethod
     def forward(
@@ -1531,12 +1471,12 @@ def field_free_space_ad(
     frequency_value: float | None = None,
     direction_live: bool = False,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`field_free_space` (frequency only in AD-1).
+    """Differentiable:func:`field_free_space` (frequency only in AD).
 
-    ``frequency_value`` optionally carries the precomputed host scalar of
-    ``frequency`` (one read per solve at the seam, audit M3); when not
-    supplied it is read here, exactly once per apply.
-    """
+ ``frequency_value`` optionally carries the precomputed host scalar of
+ ``frequency`` (one read per solve at the seam); when not
+ supplied it is read here, exactly once per apply.
+ """
 
     if frequency_value is None:
         frequency_value = _ad_frequency_value(frequency)
@@ -1556,9 +1496,9 @@ def field_free_space_ad(
 class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
     """Fixed-topology differentiable reflection transport.
 
-    Frequency, hit geometry, and per-bounce material scalars except ``mu_r``
-    are differentiable; power, polarizations, and ``mu_r`` stay fixed.
-    """
+ Frequency, hit geometry, and per-bounce material scalars except ``mu_r``
+ are differentiable; power, polarizations, and ``mu_r`` stay fixed.
+ """
 
     @staticmethod
     def forward(
@@ -1842,12 +1782,12 @@ def field_reflection_sequence_ad(
     frequency_value: float | None = None,
     direction_live: bool = False,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`field_reflection_sequence` (materials + frequency).
+    """Differentiable:func:`field_reflection_sequence` (materials + frequency).
 
-    ``frequency_value`` optionally carries the precomputed host scalar of
-    ``frequency`` (one read per solve at the seam, audit M3); when not
-    supplied it is read here, exactly once per apply.
-    """
+ ``frequency_value`` optionally carries the precomputed host scalar of
+ ``frequency`` (one read per solve at the seam); when not
+ supplied it is read here, exactly once per apply.
+ """
 
     if frequency_value is None:
         frequency_value = _ad_frequency_value(frequency)
@@ -1874,17 +1814,17 @@ def field_reflection_sequence_ad(
 
 
 class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
-    """Fixed-topology differentiable transmission transport (plan 07 AD-1/AD-2).
+    """Fixed-topology differentiable transmission transport (material and frequency derivatives/AD).
 
-    Differentiable inputs: CSR layer thickness / eps_r / sigma_e, frequency,
-    and the hit geometry (source, target, interaction_normals). The straight
-    transmission field is independent of the crossing points themselves, so
-    interaction_positions receives an exact zero gradient (None). tx_power,
-    the polarizations, layer_mu_r, material ids and valid masks are fixed;
-    requesting their gradient fails loudly. Layer gradients accumulate
-    atomically across paths because the CSR store is shared by every wall
-    crossing.
-    """
+ Differentiable inputs: CSR layer thickness / eps_r / sigma_e, frequency,
+ and the hit geometry (source, target, interaction_normals). The straight
+ transmission field is independent of the crossing points themselves, so
+ interaction_positions receives an exact zero gradient (None). tx_power,
+ the polarizations, layer_mu_r, material ids and valid masks are fixed;
+ requesting their gradient fails loudly. Layer gradients accumulate
+ atomically across paths because the CSR store is shared by every wall
+ crossing.
+ """
 
     @staticmethod
     def forward(
@@ -1945,7 +1885,7 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
         ctx.geometry_live = _ad_geometry_live(*inputs[1:5])
         ctx.save_for_backward(*primals)
         ctx.save_for_forward(*primals)
-        # ADR-043: RayD owns this family's direction seam, so the arrival
+        # first-order differentiation: RayD owns this family's direction seam, so the arrival
         # direction is a declared non-differentiable output on every route.
         ctx.direction_live = False
         mark_dead_outputs(ctx, output)
@@ -2155,12 +2095,12 @@ def field_transmission_sequence_ad(
     frequency: torch.Tensor | float,
     frequency_value: float | None = None,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`field_transmission_sequence` (layers + frequency).
+    """Differentiable:func:`field_transmission_sequence` (layers + frequency).
 
-    ``frequency_value`` optionally carries the precomputed host scalar of
-    ``frequency`` (one read per solve at the seam, audit M3); when not
-    supplied it is read here, exactly once per apply.
-    """
+ ``frequency_value`` optionally carries the precomputed host scalar of
+ ``frequency`` (one read per solve at the seam); when not
+ supplied it is read here, exactly once per apply.
+ """
 
     if frequency_value is None:
         frequency_value = _ad_frequency_value(frequency)
@@ -2188,15 +2128,15 @@ def field_transmission_sequence_ad(
 
 
 class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
-    """Fixed-topology differentiable UTD wedge field (plan 07 AD-4).
+    """Fixed-topology differentiable UTD wedge field (diffraction AD).
 
-    Differentiable inputs: both faces' eps_r / sigma_e / gain, frequency,
-    endpoints, and optional per-row winner vertices v0/v1 plus each face's
-    opposite vertex. The kernel rebuilds edge tables so mesh-vertex gradients
-    reach edge geometry. Frozen edge tables, valid masks, mu_r and tx_power
-    stay fixed and reject gradients. The stationary edge point is re-solved
-    inside the kernel, preserving its endpoint and vertex gradient motion.
-    """
+ Differentiable inputs: both faces' eps_r / sigma_e / gain, frequency,
+ endpoints, and optional per-row winner vertices v0/v1 plus each face's
+ opposite vertex. The kernel rebuilds edge tables so mesh-vertex gradients
+ reach edge geometry. Frozen edge tables, valid masks, mu_r and tx_power
+ stay fixed and reject gradients. The stationary edge point is re-solved
+ inside the kernel, preserving its endpoint and vertex gradient motion.
+ """
 
     @staticmethod
     def forward(
@@ -2257,7 +2197,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
             vertex_opp0,
             vertex_opp1,
             edge_boundary,
-            # ISB boundary taper (ADR-017), D member. Always 0.0: taper + AD is
+            # ISB boundary taper (the boundary taper), D member. Always 0.0: taper + AD is
             # refused by the deterministic/path pipelines (gate 3, C1 clearance
             # companion pending), so the differentiable twin never tapers. The
             # argument is threaded for lockstep completeness of the guarded path.
@@ -2345,7 +2285,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
             need_frequency,
             need_geometry,
             need_vertices,
-            # ADR-017 D-member width; always 0.0 (taper + AD is guarded off).
+            # the boundary taper width; always 0.0 (taper + AD is guarded off).
             0.0,
         )
         grad_frequency = (
@@ -2463,7 +2403,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
                 material_tangents["face1_gain"],
                 float(tangent_frequency),
                 *vertex_tangents,
-                # ADR-017 D-member width; always 0.0 (taper + AD is guarded off).
+                # the boundary taper width; always 0.0 (taper + AD is guarded off).
                 0.0,
             )
         return (out["tangent_field_vector"], out["tangent_direction"])
@@ -2496,16 +2436,15 @@ def field_diffraction_wedge_ad(
     frequency_value: float | None = None,
     vertices: tuple[torch.Tensor, ...] | None = None,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`field_diffraction_wedge`.
+    """Differentiable:func:`field_diffraction_wedge`.
 
-    ``vertices`` optionally supplies the winner edge vertices as
-    ``(v0, v1, opp0, opp1, edge_boundary)`` per row; the kernel then rebuilds
-    the edge tables from them so mesh-vertex gradients exist (plan 07 section
-    9.3 mesh-vertex x diffraction). ``frequency_value`` optionally carries
-    the precomputed host scalar of ``frequency`` (one read per solve at the
-    seam, audit M3); when not supplied it is read here, exactly once per
-    apply.
-    """
+ ``vertices`` optionally supplies the winner edge vertices as
+ ``(v0, v1, opp0, opp1, edge_boundary)`` per row; the kernel then rebuilds
+ the edge tables from them so mesh-vertex gradients exist (the derivative capability matrix mesh-vertex x diffraction). ``frequency_value`` optionally carries
+ the precomputed host scalar of ``frequency`` (one read per solve at the
+ seam); when not supplied it is read here, exactly once per
+ apply.
+ """
 
     _validate_wedge_valid(valid, source)
     if vertices is not None and len(vertices) != 5:
@@ -2545,16 +2484,16 @@ def field_diffraction_wedge_ad(
 
 
 class _FieldCoupledRdAdFunction(torch.autograd.Function):
-    """Fixed-topology differentiable coupled R-D transport (plan 07 AD-4).
+    """Fixed-topology differentiable coupled R-D transport (diffraction AD).
 
-    Differentiable inputs: eps_r / sigma_e / gain / thickness for the
-    reflection wall and both wedge faces (12 scalars per path), frequency,
-    and the continuous geometry (source, target, reflection_position,
-    edge_position). The wedge axis/normals/exterior angle, the reflection
-    normal (a frozen wall plane), mu_r, tx_power and the polarizations stay
-    fixed. The pseudo-infinite edge truncation factor is a frozen regularizer
-    of the differentiation (see kernels/field_wedge_ad.cu).
-    """
+ Differentiable inputs: eps_r / sigma_e / gain / thickness for the
+ reflection wall and both wedge faces (12 scalars per path), frequency,
+ and the continuous geometry (source, target, reflection_position,
+ edge_position). The wedge axis/normals/exterior angle, the reflection
+ normal (a frozen wall plane), mu_r, tx_power and the polarizations stay
+ fixed. The pseudo-infinite edge truncation factor is a frozen regularizer
+ of the differentiation (see kernels/field_wedge_ad.cu).
+ """
 
     @staticmethod
     def forward(
@@ -2635,7 +2574,7 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
             for value in inputs[:27]
         )
         # edge_line_min / edge_line_max (inputs[30], inputs[31]) are frozen edge
-        # bounds (G4): non-differentiable, but saved so the backward/jvp
+        # bounds: non-differentiable, but saved so the backward/jvp
         # companions can forward them to the native coupled kernels in the same
         # position as the primal.
         bounds = tuple(
@@ -2884,12 +2823,12 @@ def field_coupled_rd_ad(
     frequency_value: float | None = None,
     reverse: bool,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`field_coupled_rd` (12 material scalars + frequency + geometry).
+    """Differentiable:func:`field_coupled_rd` (12 material scalars + frequency + geometry).
 
-    ``frequency_value`` optionally carries the precomputed host scalar of
-    ``frequency`` (one read per solve at the seam, audit M3); when not
-    supplied it is read here, exactly once per apply.
-    """
+ ``frequency_value`` optionally carries the precomputed host scalar of
+ ``frequency`` (one read per solve at the seam); when not
+ supplied it is read here, exactly once per apply.
+ """
 
     if any(
         len(bundle) != 5
@@ -2926,13 +2865,13 @@ def field_coupled_rd_ad(
 
 
 class _CoupledRdPrepareAdFunction(torch.autograd.Function):
-    """Fixed-winner coupled stationary geometry (plan 07 AD-4).
+    """Fixed-winner coupled stationary geometry (diffraction AD).
 
-    Re-solves the image source, the stationary diffraction point on the edge
-    and the predicted wall crossing for the frozen winner (wall plane + edge
-    line), so the coupled interaction points move with the endpoints on the
-    autograd graph. Differentiable inputs: source and receiver.
-    """
+ Re-solves the image source, the stationary diffraction point on the edge
+ and the predicted wall crossing for the frozen winner (wall plane + edge
+ line), so the coupled interaction points move with the endpoints on the
+ autograd graph. Differentiable inputs: source and receiver.
+ """
 
     @staticmethod
     def forward(
@@ -3102,18 +3041,18 @@ def _dd_backward_is_noop(needs: dict[str, bool], grads: tuple) -> bool:
 
 
 class _FieldCoupledDdAdFunction(torch.autograd.Function):
-    """Fixed-topology differentiable coupled double-diffraction transport (ADR-013 D4).
+    """Fixed-topology differentiable coupled double-diffraction transport (coupled double diffraction).
 
-    Twin of :class:`_FieldCoupledRdAdFunction` for cid-7 (TX -> e1 -> e2 -> RX)
-    rows. Differentiable inputs: eps_r / sigma_e / gain / thickness for the four
-    wedge faces (16 scalars per path), frequency, and the tx/rx endpoints
-    (source, target), whose gradients flow through the native per-leg
-    re-anchoring. The frozen discovery seeds Q1/Q2 (edge1_position /
-    edge2_position), the edge axes/normals/exterior angles, the edge bounds,
-    mu_r, tx_power and the polarizations stay fixed; requesting their gradient
-    fails loudly. Mesh-vertex gradients are refused one layer up (evaluation.py
-    coupled block, ADR-013 D4).
-    """
+ Twin of:class:`_FieldCoupledRdAdFunction` for cid-7 (TX -> e1 -> e2 -> RX)
+ rows. Differentiable inputs: eps_r / sigma_e / gain / thickness for the four
+ wedge faces (16 scalars per path), frequency, and the tx/rx endpoints
+ (source, target), whose gradients flow through the native per-leg
+ re-anchoring. The frozen discovery seeds Q1/Q2 (edge1_position /
+ edge2_position), the edge axes/normals/exterior angles, the edge bounds,
+ mu_r, tx_power and the polarizations stay fixed; requesting their gradient
+ fails loudly. Mesh-vertex gradients are refused one layer up (evaluation.py
+ coupled block, coupled double diffraction).
+ """
 
     @staticmethod
     def forward(
@@ -3209,8 +3148,8 @@ class _FieldCoupledDdAdFunction(torch.autograd.Function):
         frequency = inputs[35]
         # The native backward/jvp take the 35 primal field tensors (source ..
         # wedge2 face1 thickness) followed by the four frozen edge bounds, then
-        # the host frequency scalar. Q1/Q2/bounds are non-differentiable (ADR-013
-        # D4) but saved so the companions forward them in the primal position.
+        # the host frequency scalar. Q1/Q2/bounds are non-differentiable (coupled double diffraction
+        # edge bounds) but saved so the companions forward them in the primal position.
         primals = tuple(
             torch.autograd.forward_ad.unpack_dual(value).primal
             for value in inputs[:35]
@@ -3462,12 +3401,12 @@ def field_coupled_dd_ad(
     frequency: torch.Tensor | float,
     frequency_value: float | None = None,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`field_coupled_dd` (16 material scalars + frequency + tx/rx).
+    """Differentiable:func:`field_coupled_dd` (16 material scalars + frequency + tx/rx).
 
-    ``frequency_value`` optionally carries the precomputed host scalar of
-    ``frequency`` (one read per solve at the seam); when not supplied it is read
-    here, exactly once per apply.
-    """
+ ``frequency_value`` optionally carries the precomputed host scalar of
+ ``frequency`` (one read per solve at the seam); when not supplied it is read
+ here, exactly once per apply.
+ """
 
     if any(
         len(bundle) != 5
@@ -3589,7 +3528,7 @@ def field_project_complex3_ad(
     direction: torch.Tensor,
     rx_polarization: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`field_project_complex3` (field vector + direction)."""
+    """Differentiable:func:`field_project_complex3` (field vector + direction)."""
 
     coefficient, path_gain = _FieldProjectComplex3AdFunction.apply(
         field_vector, direction, rx_polarization
@@ -3602,15 +3541,15 @@ def _grad_or_none(out: dict, key: str, needed: bool) -> torch.Tensor | None:
 
 
 class _FieldRoughReflectionScaleAdFunction(torch.autograd.Function):
-    """Fixed-topology differentiable rough-surface C_r scale (ADR-010 op 3).
+    """Fixed-topology differentiable rough-surface C_r scale (rough-surface scattering).
 
-    Differentiable inputs: the four reflection field outputs (field_vector,
-    coefficient, path_field, path_gain), frequency, and the hit geometry
-    (positions, normals, source). sigma_b, rough_b and the realization
-    ``replaced`` mask are fixed; requesting a sigma_b gradient fails loudly.
-    Positions/normals/source only carry a gradient when the fixed-winner
-    geometry AD path is live (matching the previous Torch factor's reach).
-    """
+ Differentiable inputs: the four reflection field outputs (field_vector,
+ coefficient, path_field, path_gain), frequency, and the hit geometry
+ (positions, normals, source). sigma_b, rough_b and the realization
+ ``replaced`` mask are fixed; requesting a sigma_b gradient fails loudly.
+ Positions/normals/source only carry a gradient when the fixed-winner
+ geometry AD path is live (matching the previous Torch factor's reach).
+ """
 
     @staticmethod
     def forward(
@@ -3803,12 +3742,12 @@ def field_rough_reflection_scale_ad(
     frequency: torch.Tensor | float,
     frequency_value: float | None = None,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`field_rough_reflection_scale` (frequency + geometry).
+    """Differentiable:func:`field_rough_reflection_scale` (frequency + geometry).
 
-    ``frequency_value`` optionally carries the precomputed host scalar of
-    ``frequency`` (one read per solve at the seam, audit M3); when not supplied
-    it is read here, exactly once per apply.
-    """
+ ``frequency_value`` optionally carries the precomputed host scalar of
+ ``frequency`` (one read per solve at the seam); when not supplied
+ it is read here, exactly once per apply.
+ """
 
     if frequency_value is None:
         frequency_value = _ad_frequency_value(frequency)
@@ -3872,12 +3811,12 @@ def field_source_amplitude_scale(
 ) -> dict[str, torch.Tensor]:
     """Apply ``sqrt(max(tx_power, 0))`` to a transported complex3 field.
 
-    The transport kernels publish ``field_vector`` for unit source amplitude
-    and ``path_field = coefficient * sqrt(tx_power)`` for the excited scalar,
-    but no excited vector. This is that missing output, evaluated natively with
-    the same amplitude expression, so its receiver projection reproduces
-    ``path_field``.
-    """
+ The transport kernels publish ``field_vector`` for unit source amplitude
+ and ``path_field = coefficient * sqrt(tx_power)`` for the excited scalar,
+ but no excited vector. This is that missing output, evaluated natively with
+ the same amplitude expression, so its receiver projection reproduces
+ ``path_field``.
+ """
 
     count = _validate_source_amplitude_inputs(
         field_vector, tx_power, field_name="field_vector"
@@ -3891,7 +3830,7 @@ def field_source_amplitude_scale(
 def field_source_amplitude_scale_backward(
     tx_power: torch.Tensor, grad_path_field_vector: torch.Tensor
 ) -> dict[str, torch.Tensor]:
-    """VJP of :func:`field_source_amplitude_scale`; ``tx_power`` is frozen."""
+    """VJP of:func:`field_source_amplitude_scale`; ``tx_power`` is frozen."""
 
     count = _validate_source_amplitude_inputs(
         grad_path_field_vector, tx_power, field_name="grad_path_field_vector"
@@ -3910,7 +3849,7 @@ def field_source_amplitude_scale_backward(
 def field_source_amplitude_scale_jvp(
     tx_power: torch.Tensor, tangent_field_vector: torch.Tensor
 ) -> dict[str, torch.Tensor]:
-    """JVP of :func:`field_source_amplitude_scale`; ``tx_power`` is frozen."""
+    """JVP of:func:`field_source_amplitude_scale`; ``tx_power`` is frozen."""
 
     count = _validate_source_amplitude_inputs(
         tangent_field_vector, tx_power, field_name="tangent_field_vector"
@@ -3978,7 +3917,7 @@ class _FieldSourceAmplitudeScaleAdFunction(torch.autograd.Function):
 def field_source_amplitude_scale_ad(
     field_vector: torch.Tensor, tx_power: torch.Tensor
 ) -> torch.Tensor:
-    """Differentiable :func:`field_source_amplitude_scale` (field vector only)."""
+    """Differentiable:func:`field_source_amplitude_scale` (field vector only)."""
 
     return _FieldSourceAmplitudeScaleAdFunction.apply(field_vector, tx_power)
 

@@ -168,8 +168,8 @@ def test_bdpt_single_plane_reflection_converges_to_maintained_reference(
 
 
 def test_bdpt_point_delta_reflection_uses_unfolded_distance_and_fresnel_bound():
-    """Guards audit MC-1: contributions must attenuate over the unfolded path
-    (tx -> surface -> rx), bounded by the |R| <= 1 free-space gain."""
+    """Contributions must attenuate over the unfolded path
+ (tx -> surface -> rx), bounded by the |R| <= 1 free-space gain."""
 
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT reflection")
@@ -213,7 +213,7 @@ def test_bdpt_point_delta_reflection_uses_unfolded_distance_and_fresnel_bound():
 
 
 def test_bdpt_grid_reflection_map_does_not_change_when_export_paths_enabled():
-    """Guards audit MC-1d: toggling export_paths must not switch the estimator."""
+    """Toggling export_paths must not switch the estimator."""
 
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT reflection")

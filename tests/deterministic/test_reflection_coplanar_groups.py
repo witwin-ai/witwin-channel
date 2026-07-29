@@ -1,7 +1,7 @@
 # Copyright Xingyu Chen.
-# Acceptance tests for coplanar-group reflection semantics (audit D-1/D-2).
+# Test coplanar grouping and occlusion in reflected paths.
 
-"""Acceptance tests for coplanar-group reflection semantics (audit D-1/D-2)."""
+"""Test coplanar grouping and occlusion in reflected paths."""
 
 import pytest
 import torch
@@ -67,7 +67,7 @@ def _wall_scene(splits: int) -> Scene:
 
 
 def test_coplanar_subdivision_invariance():
-    """Refining a wall's triangulation must not change the reflected field (D-1)."""
+    """Refining a wall triangulation must not change the reflected field."""
 
     _require_native()
     config = Config(components={"reflection"}, coherent=True, export_paths=True)
@@ -86,7 +86,7 @@ def test_coplanar_subdivision_invariance():
 
 
 def test_inner_corner_double_reflection_within_one_structure():
-    """Consecutive bounces on two walls of the same structure must survive (D-2d)."""
+    """Keep consecutive bounces on two walls of the same structure."""
 
     _require_native()
     corner = make_mesh_structure(
@@ -129,7 +129,7 @@ def test_inner_corner_double_reflection_within_one_structure():
     assert bool((result.paths.depth == 2).any())
 
 
-# F1/R5 (utd-continuity-fix-design): the reflected field carries the
+# the reflected field carries the
 # unnormalized transverse (short-dipole sin(theta)) projection of the default
 # z-hat transmit polarization and is projected onto the z-hat receiver
 # polarization, so path_gain = |E|^2 for |R| = 1 is the Friis free-space gain
@@ -156,12 +156,7 @@ def _specular_dipole_factor() -> float:
 
 
 def test_conductor_skew_reflection_preserves_friis_amplitude():
-    """|R| = 1 for a near-perfect conductor at skew incidence (audit D-4).
-
-    The historical scalar TE+TM sum gave |r_te*e_s + r_tm*e_p| which reaches
-    sqrt(2) (+3 dB) or 0 depending on the azimuth of the fixed x-hat transmit
-    polarization; the vector composition keeps |E| = |E_in| for |r| = 1.
-    """
+    """Keep unit reflection magnitude for a near-perfect conductor at skew incidence."""
 
     _require_native()
     wall = make_mesh_structure(
@@ -197,7 +192,7 @@ def test_conductor_skew_reflection_preserves_friis_amplitude():
     wavelength = 299_792_458.0 / _REFERENCE_FREQUENCY_HZ
     unfolded = torch.tensor([5.0, -1.0, 0.0]) - torch.tensor([0.0, 1.0, 2.0])
     expected_length = float(unfolded.norm())
-    # F1/R5: multiply the Friis free-space gain by the z-hat dipole coupling.
+    # multiply the Friis free-space gain by the z-hat dipole coupling.
     expected_gain = (
         wavelength / (4.0 * torch.pi * expected_length)
     ) ** 2 * _specular_dipole_factor()
@@ -217,7 +212,7 @@ def test_conductor_skew_reflection_preserves_friis_amplitude():
 
 def test_perfect_conductor_reflects_with_unit_magnitude():
     """PEC materials must reach the |R| = 1 Fresnel limit even though the
-    field kernels only receive (eps_r, sigma_e, mu_r)."""
+ field kernels only receive (eps_r, sigma_e, mu_r)."""
 
     _require_native()
 
@@ -253,7 +248,7 @@ def test_perfect_conductor_reflects_with_unit_magnitude():
     assert int(result.paths.valid.numel()) == 1
     wavelength = 299_792_458.0 / _REFERENCE_FREQUENCY_HZ
     unfolded = torch.tensor([5.0, -1.0, 0.0]) - torch.tensor([0.0, 1.0, 2.0])
-    # F1/R5: multiply the Friis free-space gain by the z-hat dipole coupling.
+    # multiply the Friis free-space gain by the z-hat dipole coupling.
     expected_gain = (
         wavelength / (4.0 * torch.pi * float(unfolded.norm()))
     ) ** 2 * _specular_dipole_factor()
@@ -266,7 +261,7 @@ def test_perfect_conductor_reflects_with_unit_magnitude():
 
 
 def test_back_wall_reflection_is_blocked_by_front_wall():
-    """A reflection off a hidden back wall must be occluded, even within one structure (D-2b)."""
+    """Occlude a reflection from a hidden back wall within the same structure."""
 
     _require_native()
     walls = make_mesh_structure(

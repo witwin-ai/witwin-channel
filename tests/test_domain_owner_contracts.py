@@ -28,8 +28,7 @@ OWNER_DOCS = (
 )
 
 
-# The owner documents are all named `README.md`, so the file stem no longer
-# identifies one. The parent directory is the domain name.
+# Owner document IDs use the parent directory because every file is README.md.
 @pytest.mark.parametrize("owner_doc", OWNER_DOCS, ids=lambda path: path.parent.name)
 def test_domain_owner_docs_freeze_required_boundaries(owner_doc: Path):
     content = owner_doc.read_text(encoding="utf-8")

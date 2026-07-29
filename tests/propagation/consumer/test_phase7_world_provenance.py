@@ -1,16 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests world provenance.
 
-"""World provenance and fixed-topology staleness (ADR-040).
-
-Before this contract, replaying a frozen topology against a world that had
-moved returned a full-strength old answer with ``row_valid=[True, True]`` and
-no warning at all. These tests pin the refusal, the one declared motion mode
-that is legitimate, and the two limitations that stay documented rather than
-fixed: a replay can never gain a row, and a compiled scene that is internally
-consistent but describes an older instant is indistinguishable from a current
-one unless the caller revalidates it against its live source world.
-"""
+"""Tests world provenance."""
 
 from __future__ import annotations
 
@@ -323,9 +314,9 @@ def test_material_and_assignment_mismatch_are_never_replayable() -> None:
 def test_an_unstamped_topology_is_replayable() -> None:
     """A hand-built topology has no world, so it can never be stale.
 
-    This is the one documented escape from the freshness rule. It is pinned so
-    it cannot silently widen to cover a discovery-produced topology.
-    """
+ This is the one documented escape from the freshness rule. It is pinned so
+ it cannot silently widen to cover a discovery-produced topology.
+ """
 
     scene, _mesh, _material = _wall_world()
     sources, sinks = _pair()
@@ -360,13 +351,13 @@ def test_an_unstamped_topology_is_replayable() -> None:
 def test_a_compiled_scene_that_drifted_from_its_live_world_is_reported() -> None:
     """The mutation staleness class, which the recorded versions cannot see.
 
-    A compiled scene and the rows discovered on it always agree with each
-    other, so mutating the live world in place leaves the pair internally
-    consistent and the default freshness check silent. ``revalidate_source``
-    is the caller-priced signal for exactly this case; it recomputes the four
-    domains from the live world, which is O(scene) host work and belongs on a
-    motion-event cadence rather than in a replay loop.
-    """
+ A compiled scene and the rows discovered on it always agree with each
+ other, so mutating the live world in place leaves the pair internally
+ consistent and the default freshness check silent. ``revalidate_source``
+ is the caller-priced signal for exactly this case; it recomputes the four
+ domains from the live world, which is O(scene) host work and belongs on a
+ motion-event cadence rather than in a replay loop.
+ """
 
     scene, mesh, _material = _wall_world()
     compiled = compile_scene(scene, reference_frequency_hz=FREQUENCY_HZ)
@@ -403,12 +394,12 @@ def test_a_compiled_scene_that_drifted_from_its_live_world_is_reported() -> None
 def test_an_old_compiled_scene_of_an_unmutated_world_is_not_detectable() -> None:
     """The documented limit: Channel is never told the caller moved on.
 
-    Driving motion through ``DynamicScene.at(t)`` leaves the source ``Scene``
-    untouched, so an old ``CompiledScene`` plus the rows discovered on it are a
-    complete, self-consistent world. Nothing in the request names the instant
-    the caller meant. The signal is the new compiled scene: once the caller
-    compiles the new snapshot, the default rule refuses the frozen replay.
-    """
+ Driving motion through ``DynamicScene.at(t)`` leaves the source ``Scene``
+ untouched, so an old ``CompiledScene`` plus the rows discovered on it are a
+ complete, self-consistent world. Nothing in the request names the instant
+ the caller meant. The signal is the new compiled scene: once the caller
+ compiles the new snapshot, the default rule refuses the frozen replay.
+ """
 
     scene, _mesh, _material = _wall_world()
     compiled = compile_scene(scene, reference_frequency_hz=FREQUENCY_HZ)
@@ -468,9 +459,9 @@ def test_the_adr032_budget_is_unchanged() -> None:
 def test_a_born_row_is_absent_from_a_replay() -> None:
     """Fixed-topology replay is subtractive: rows die, rows are never born.
 
-    A documented limitation with no birth signal, pinned so a later change
-    cannot quietly claim otherwise (ADR-040).
-    """
+ A documented limitation with no birth signal, pinned so a later change
+ cannot quietly claim otherwise (world-version validation).
+ """
 
     scene, _mesh, _material = _wall_world()
     sources, sinks = _multi_pair()
@@ -544,10 +535,10 @@ def test_time_s_round_trips_from_the_snapshot_to_the_compiled_scene() -> None:
 def test_compile_applies_rigid_motion_and_deformation_from_a_dynamic_scene() -> None:
     """The first Channel test that drives ``compile`` from a ``DynamicScene``.
 
-    The compile cache aliases every moving snapshot of one source scene to a
-    single RayD input identity and relies on Core's geometry hash to keep the
-    BVH honest. That coupling spans two repositories and had no test.
-    """
+ The compile cache aliases every moving snapshot of one source scene to a
+ single RayD input identity and relies on Core's geometry hash to keep the
+ BVH honest. That coupling spans two repositories and had no test.
+ """
 
     scene, _mesh, _material = _wall_world()
     moving = DynamicScene(

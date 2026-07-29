@@ -31,7 +31,7 @@ def test_current_import_debt_is_exact_and_allowlisted():
     assert graph.check_allowlist(violations, allowlist) == []
     # The ``existing_boundary`` group is fully repaid: the last live entry, the
     # relative ``deployment -> runtime.extension`` import, now uses the absolute
-    # cross-domain form the rest of the package uses. Only the ADR-008 BDPT
+    # cross-domain form the rest of the package uses. Only the enumerated-path oracle BDPT
     # enumerated oracle remains, and it is a sanctioned dependency, not debt to
     # be repaid.
     assert Counter(
@@ -226,9 +226,9 @@ def test_allowlist_cannot_add_or_relocate_debt():
 def test_allowlist_must_remove_stale_entries_with_resolved_debt():
     """An allowance whose violation disappeared must be deleted, not kept.
 
-    The group is the one that still carries a live allowance, so the check is
-    exercised against real data rather than a synthetic package.
-    """
+ The group is the one that still carries a live allowance, so the check is
+ exercised against real data rather than a synthetic package.
+ """
 
     violations = graph.scan_package(PACKAGE_ROOT)
     allowlist = graph.load_allowlist(ALLOWLIST)
@@ -388,7 +388,7 @@ def test_reexport_canonicalization_exposes_real_bdpt_enumerated_edge():
     assert enumerated == [
         graph.Violation(
             "witwin/channel/montecarlo/bdpt.py",
-            108,
+            99,
             0,
             "mc_enumerated_dependency",
             f"{package}.montecarlo.bdpt",
@@ -407,12 +407,8 @@ def test_bdpt_enumerated_allowlist_entry_is_exact_and_adr_bound():
     entry = group["baseline"][0]
     assert entry["id"] == "mc-enum-001"
     assert entry["rule"] == "mc_enumerated_dependency"
-    # The 2026-07-27 re-baseline re-keyed this entry onto the collapsed
-    # ``montecarlo/bdpt.py`` module ahead of that collapse landing, and the
-    # concept-axis collapse of ``propagation/enumerated/`` into one module
-    # re-keyed ``target`` onto that module. The rule and the ADR binding have
-    # never moved; only the two module spellings did, each when its own
-    # package became a module.
+    # This is the only allowed Monte Carlo dependency on enumerated
+    # propagation, and both canonical module names are exact.
     assert entry["source"] == "witwin.channel.montecarlo.bdpt"
     assert entry["target"] == "witwin.channel.propagation.enumerated"
     assert "ADR-008" in (entry.get("adr", "") + entry.get("justification", ""))
@@ -458,9 +454,9 @@ def test_public_init_forbids_every_internal_kernels_package(tmp_path: Path):
 def test_public_init_real_graph_has_no_internal_targets():
     """The root reaches ``build_info`` through ``deployment``, not a shim.
 
-    Deleting ``core.kernels.extension`` repaid the last ``public_init_internal``
-    debt the package root carried.
-    """
+ Deleting ``core.kernels.extension`` repaid the last ``public_init_internal``
+ debt the package root carried.
+ """
 
     violations = graph.scan_package(PACKAGE_ROOT)
     public_init_targets = {
@@ -474,12 +470,7 @@ def test_public_init_real_graph_has_no_internal_targets():
 
 
 def test_dissolved_namespaces_cannot_be_recreated(tmp_path: Path):
-    """``core`` was dissolved into real owners and must not come back.
-
-    The NumPy reference oracle that used to live in ``physics`` now sits in
-    ``tests/reference/em_oracle.py``, so its isolation is structural: this
-    checker only walks the shipped package and cannot reach it at all.
-    """
+    """The shipped package must not recreate the retired core or physics namespaces."""
 
     package_root = _synthetic_package(
         tmp_path,

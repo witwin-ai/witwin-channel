@@ -2,12 +2,18 @@
 
 Every tracked Python, C++, CUDA, and native header file begins with two comment
 lines: the exact copyright `Copyright Xingyu Chen.` and one plain sentence that
-says what the file does. The purpose sentence is at most 100 characters and
-must not describe architecture decisions, migration phases, plans, or history.
+says what the file does. The purpose sentence is at most 100 characters.
+All source comments and docstrings describe current behavior, a current
+constraint, or the reason for nearby code in plain language. They do not use
+ADR numbers, numbered plans, phases, waves, migration history, audit labels, or
+changelog prose. A Python module docstring, when present, is one sentence no
+longer than 120 characters and does not repeat an architecture narrative.
 Detailed rationale belongs in owner documentation; algorithm comments belong
-beside the code they explain. Living documentation names canonical files and symbols instead of
-brittle source line numbers; generated line-sensitive evidence is refreshed with the
-code that moves.
+beside the code they explain. Frozen identifiers and test data may keep required
+historical spellings, but prose does not use them as explanations. Living
+documentation names canonical files and symbols instead of brittle source line
+numbers; generated line-sensitive evidence is refreshed with the code that
+moves.
 
 Native kernels share ordinary vector and complex math through
 `native/channel/kernels/math.cuh`. That header owns `Vec3`, `Complex`,

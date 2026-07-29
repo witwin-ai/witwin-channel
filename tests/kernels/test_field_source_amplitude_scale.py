@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests field source amplitude scale.
 
-"""Direct contract tests for the ADR-039 source-amplitude scale.
-
-The operation is ``path_field_vector = field_vector * sqrt(max(tx_power, 0))``
-with the same amplitude expression the field transport kernels use. It is
-linear in the field vector and its amplitude is real, so the VJP and the JVP
-are the same scale, and ``tx_power`` carries no derivative.
-"""
+"""Tests field source amplitude scale."""
 
 from __future__ import annotations
 

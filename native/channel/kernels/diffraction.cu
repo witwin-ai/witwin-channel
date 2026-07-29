@@ -1,7 +1,7 @@
 // Copyright Xingyu Chen.
 // Implements diffraction CUDA operations.
 
-// ---- Consolidated from diffraction.cu ----
+// ==== Section: Diffraction kernels ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
@@ -131,7 +131,7 @@ __device__ __forceinline__ utd::JonesOperator slab_face_operator(
 }
 
 // Templated twin of the local slab_face_operator: the float instantiation IS
-// the primal operator; the Dual instantiation is the validated AD-1 slab
+// the primal operator; the Dual instantiation is the validated AD slab
 // response on RayD duals (field_transport_ad.cuh).
 template <typename T>
 __device__ __forceinline__ utd::JonesOperatorT<T> slab_face_operator_t(
@@ -172,7 +172,7 @@ __device__ __forceinline__ T component_t(utd::Vec3T<T> v, int axis) {
     return axis == 0 ? v.x : (axis == 1 ? v.y : v.z);
 }
 
-// Truncation-factor freeze (plan 07 AD-4a policy, same as the coupled row in
+// Truncation-factor freeze (diffraction AD policy, same as the coupled row in
 // field_wedge_ad.cu): the tape rows evaluate the pair with +/-1e5
 // pseudo-infinite edge bounds, where the Boersma endpoint ripple makes the
 // factor's derivative float32 noise amplified by the 1e5 lever arm (the true
@@ -187,8 +187,8 @@ __device__ __forceinline__ void freeze_complex_tangent<utd::Dual>(
 }
 
 // ---------------------------------------------------------------------------
-// Templated per-lane row of the UTD diffraction tape accumulator (plan 07
-// AD-4). The float instantiation is the primal deposit computed by
+// Templated per-lane row of the UTD diffraction tape accumulator (the AD contract
+// AD). The float instantiation is the primal deposit computed by
 // utd_diffraction_tape_accumulate_kernel below; the Dual instantiation
 // carries an exact directional derivative through the recomputed Keller-cone
 // geometry, the incident spherical wave, the stored slab face operators and
@@ -277,7 +277,7 @@ __device__ __forceinline__ TapeRowContext load_tape_row(
     c.gain1 = c.valid1 ? gain[c.prim1] : 1.f;
     c.thick1 = c.valid1 ? thickness[c.prim1] : 0.f;
     c.src = load_utd3(source, sidx);
-    // R5: the true per-transmitter polarization (launch-wide constant vector),
+    // the true per-transmitter polarization (launch-wide constant vector),
     // fed into direct_source_vector's incident basis in place of the fabricated
     // (0, 0, 1). All states in one launch share the same transmitter.
     c.tx_pol = utd::make_f3(tx_pol[0], tx_pol[1], tx_pol[2]);
@@ -1704,7 +1704,7 @@ at::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp_cuda(
 #undef CHANNEL_DIFFRACTION_CHECK_STATE_PACK_POWER
 #undef CHANNEL_DIFFRACTION_CHECK_STATE_PACK_TENSORS
 
-// ---- Consolidated from diffraction_discovery.cu ----
+// ==== Section: Diffraction discovery ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>

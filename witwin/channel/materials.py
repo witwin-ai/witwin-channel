@@ -1,16 +1,7 @@
 # Copyright Xingyu Chen.
 # Channel material ABI, per-face encoding, and offline layer-stack evaluation.
 
-"""Channel material ABI, per-face encoding, and offline layer-stack evaluation.
-
-Logical material specifications are owned by :mod:`witwin.core`; this module
-owns the finite encodings consumed by native Channel kernels, the per-face
-tensor export the solvers hand to those kernels, and the compile-time
-transfer-matrix precompute that produces planar layer-stack coefficients.
-
-:mod:`witwin.channel.kernels.materials` is the native facade; only
-``validate_layer_csr`` is re-exported here, and it is the single public name.
-"""
+"""Channel material ABI, per-face encoding, and offline layer-stack evaluation."""
 
 from __future__ import annotations
 
@@ -308,11 +299,11 @@ def _require_frequency_ad_constant_materials(
 ) -> None:
     """Explicit-failure contract for frequency AD over dispersive materials.
 
-    Channel ``scene.compile()`` freezes material records at the primal frequency, so
-    a frequency gradient through a scene with frequency-dependent material
-    laws would silently miss d(material)/d(frequency) (plan 07 section 7:
-    never return misleading gradients). Fail before any launch instead.
-    """
+ Channel ``scene.compile`` freezes material records at the primal frequency, so
+ a frequency gradient through a scene with frequency-dependent material
+ laws would silently miss d(material)/d(frequency) (the AD contract:
+ never return misleading gradients). Fail before any launch instead.
+ """
 
     dependent = tuple(compiled.materials.frequency_dependent)
     if not dependent or not _frequency_participates_in_ad(scene.frequency):

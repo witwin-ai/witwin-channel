@@ -23,8 +23,7 @@ from tools.refactor_baseline import binding_manifest  # noqa: E402
 
 DEFAULT_MANIFEST_PATH = Path("ci/contract-coverage-manifest.json")
 PUBLIC_SNAPSHOT_PATH = Path("ci/public-api-snapshot.json")
-# Live canonical manifest; the phase-0 copy under docs/dev/baselines/
-# 0892d855.../static/ is immutable history and is never rewritten.
+# The live manifest is canonical; frozen baseline copies are never rewritten.
 BINDING_BASELINE_PATH = Path("ci/native-binding-manifest.json")
 PHASE10_AUDIT_PATH = Path("docs/dev/audit/phase10-legacy-dead-binding.json")
 PYTHON_PACKAGE_PATH = Path("witwin/channel")
@@ -45,9 +44,7 @@ OWNER_KINDS = frozenset(
         "dormant_native_call_site",
     }
 )
-# ADR-029/030/031 dormant caller-free artifacts were removed in the Phase-11
-# cutover. The gate keeps its dormant branch so a future caller-free binding
-# still needs a named, explicitly recorded decision before it can land.
+# Caller-free bindings still require a named decision recorded in the dormant-symbol branch.
 DORMANT_SYMBOL_FACADES: dict[str, str] = {}
 DORMANT_EXPERIMENT_SYMBOLS = frozenset(DORMANT_SYMBOL_FACADES)
 DORMANT_FACADE_OWNERS: dict[str, str] = {}

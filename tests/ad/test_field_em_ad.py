@@ -1,14 +1,7 @@
 # Copyright Xingyu Chen.
-# AD-1 kernel-level tests: EM-response derivatives of the field kernels.
+# AD kernel-level tests: EM-response derivatives of the field kernels.
 
-"""AD-1 kernel-level tests: EM-response derivatives of the field kernels.
-
-Covers forward parity of the native float32 kernels against the pure-torch
-complex128 references, the gradient oracle (torch autograd through the
-reference versus the native backward/jvp companions, which pins the Wirtinger
-convention), JVP-vs-VJP duality, torch.autograd.gradcheck, and the explicit
-failure contract for fixed inputs (geometry, mu_r).
-"""
+"""AD kernel-level tests: EM-response derivatives of the field kernels."""
 
 from __future__ import annotations
 
@@ -624,12 +617,12 @@ def test_reflection_gain_jvp_matches_fd():
 
 
 def _direction_adjoint_identity(jvp_call, backward_call, seeds, tangents) -> None:
-    """``<w, J v> == <J^T w, v>`` for the arrival-direction seam (ADR-043).
+    """``<w, J v> == <J^T w, v>`` for the arrival-direction seam (first-order differentiation).
 
-    An adjoint identity, not a finite difference: it is exact up to float32
-    rounding and it falsifies a transposed, dropped, or double-counted seed,
-    which is precisely what a hand-added cotangent input can get wrong.
-    """
+ An adjoint identity, not a finite difference: it is exact up to float32
+ rounding and it falsifies a transposed, dropped, or double-counted seed,
+ which is precisely what a hand-added cotangent input can get wrong.
+ """
 
     forward = jvp_call()
     reverse = backward_call()
@@ -735,11 +728,7 @@ def test_a_direction_seed_of_the_wrong_shape_fails_loudly():
 
 
 def test_a_direction_seed_alone_still_launches_the_geometry_adjoint():
-    """The seed is a real cotangent input, not a passenger of another one.
-
-    With every other cotangent absent the launch used to be skipped entirely,
-    so a direction-only loss would have come back as an exact zero.
-    """
+    """The direction cotangent launches native backward work even when every other cotangent is absent."""
 
     batch = _free_space_batch()
     seeds = torch.ones(4, 3, device="cuda")
@@ -887,7 +876,7 @@ def test_forward_dual_free_space_matches_native_jvp():
 
 
 def test_fixed_inputs_fail_loudly():
-    """tx_power and the polarizations stay fixed under AD-2 (plan 07)."""
+    """tx_power and the polarizations stay fixed under AD (the AD contract)."""
 
     batch = _free_space_batch()
     tx_power = batch["tx_power"].clone().requires_grad_(True)
@@ -955,14 +944,14 @@ def test_non_differentiable_outputs_stay_detached():
 
 
 def test_double_backward_raises():
-    """ADR-043: the second-order request fails at the request, by owner name.
+    """first-order differentiation: the second-order request fails at the request, by owner name.
 
-    Before ADR-043 this returned a silently detached first gradient and only
-    failed one step later, with a generic Torch message that named Torch rather
-    than the owner that cannot answer. The raise now happens inside the very
-    backward that ``create_graph=True`` asked to be differentiable, before any
-    native companion launches, so no partial second-order result exists.
-    """
+ Before first-order differentiation this returned a silently detached first gradient and only
+ failed one step later, with a generic Torch message that named Torch rather
+ than the owner that cannot answer. The raise now happens inside the very
+ backward that ``create_graph=True`` asked to be differentiable, before any
+ native companion launches, so no partial second-order result exists.
+ """
 
     batch = _reflection_batch(depth=1)
     eps_r = batch["eps_r"].clone().requires_grad_(True)
@@ -998,7 +987,7 @@ def test_composed_functorch_transforms_raise():
 
 
 # ---------------------------------------------------------------------------
-# Geometry gradients (plan 07 AD-2): source / target / interaction_positions /
+# Geometry gradients (geometry AD): source / target / interaction_positions /
 # interaction_normals against the complex128 reference oracle, forward-mode
 # tangents against the oracle jvp, inner-product duality on geometry seeds,
 # and the differentiable path_length_m / delay_s outputs.
@@ -1223,11 +1212,11 @@ def test_reflection_geometry_jvp_matches_reference_oracle(depth):
 def test_transmission_geometry_jvp_matches_reference_oracle():
     """Native geometry jvp against the oracle through random projections.
 
-    The transmission reference reads discrete winner data with Python scalar
-    conversions, so instead of torch.func.jvp the oracle directional
-    derivative is evaluated as <grad(loss_u), v> for a random output
-    projection u; the native side is the same projection of the jvp output.
-    """
+ The transmission reference reads discrete winner data with Python scalar
+ conversions, so instead of torch.func.jvp the oracle directional
+ derivative is evaluated as <grad(loss_u), v> for a random output
+ projection u; the native side is the same projection of the jvp output.
+ """
 
     batch = _transmission_batch()
     generator = torch.Generator(device="cpu").manual_seed(97)

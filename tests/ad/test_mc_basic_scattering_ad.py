@@ -1,31 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests mc basic scattering ad.
 
-"""ADR-015 Part A: montecarlo.basic Kirchhoff scattering-map gradients.
-
-The MC-basic scattering radiomap is an area-sampling estimator whose only
-native physics op in the contribution weight is the resident Kirchhoff table
-lookup ``scattering_table_eval`` (ADR-015 op 1). This file pins the three
-gradient chains ADR-015 Part A adds and the frozen-winner / no-graph contracts:
-
-- BSDF table values (``f_te``/``f_tm``) through the native table companions;
-- transmitter power, a linear scale on the whole map;
-- frequency, which Part A carries ONLY through the ``(lambda/4pi)^2``
-  amplitude factor. The resident table is a compile-time float64 island built
-  at a detached frequency (ScatteringResourceKey does not depend on frequency,
-  so a compiled scene reuses one table), and the ADR-014/015 Part C
-  table-frequency chain is a separate change. The frequency finite difference
-  here therefore reuses ONE compiled scene (table pinned) and moves only the
-  amplitude carrier, matching the Part A partial derivative. A full-scene
-  frequency FD that rebuilt the table would also measure the table's frequency
-  dependence and is out of scope until Part C lands. DEVIATION flagged.
-
-The area-sample set, both binary visibility masks (tx->point, point->rx) and
-the incidence gate stay frozen winners in AD (plan-07 fixed-topology contract);
-the map is exactly linear in the table values and in tx power, so those two
-finite differences are analytic up to float noise. FD parity uses the shared
-``tests/ad/_fd`` engine on the same seeded topology as the AD pass.
-"""
+"""Tests mc basic scattering ad."""
 
 from __future__ import annotations
 
@@ -273,7 +249,7 @@ def test_scattering_tx_power_grad_matches_fd():
 
 
 # ---------------------------------------------------------------------------
-# Frequency gradient (the amplitude^2 carrier only; table pinned, Part A).
+# Frequency gradient (the amplitude^2 carrier only; table pinned, the ensemble path).
 # ---------------------------------------------------------------------------
 
 
@@ -282,7 +258,7 @@ def test_scattering_frequency_grad_matches_fd():
     frequency = torch.tensor(_FREQUENCY_HZ, device="cuda").requires_grad_(True)
     scene = _scene()
     # Compile once so the Kirchhoff table is pinned at the base frequency; the
-    # FD below moves only the amplitude carrier, matching Part A.
+    # FD below moves only the amplitude carrier, matching the ensemble path.
     device, solver_scene, rayd, tx_pos, tx_power, rx_pos = _map_handles(
         scene,
         reference_frequency_hz=frequency,

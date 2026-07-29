@@ -430,7 +430,7 @@ def build_scenario(
     receiver_count: int | None = None,
     grid_shape: tuple[int, int] | None = None,
 ) -> ScenarioBundle:
-    """Build one versioned Phase E scenario without hidden reduced fallbacks."""
+    """Build one versioned performance acceptance scenario without hidden reduced fallbacks."""
 
     spec = _scenario_spec(name)
     tx = int(spec["default_tx_count"] if tx_count is None else tx_count)

@@ -1,22 +1,7 @@
 # Copyright Xingyu Chen.
 # The native field-state ABI contracts.
 
-"""The native field-state ABI contracts.
-
-Two frozen dataclasses and nothing else: the world-Cartesian
-:class:`Complex3State` and the transverse-basis :class:`JonesState` that every
-native field kernel reads and writes. They live at the package root because
-:mod:`witwin.channel` exports them and the ``public_init_internal`` boundary
-forbids the root ``__init__`` from importing ``runtime``, ``propagation``, or a
-``kernels`` package to reach them.
-
-This module used to be called ``field_state`` and also held the scene-derived
-transmitter/receiver polarization tensors. Those were never an ABI contract -
-they read a logical scene and build endpoint tensors - so they moved to
-:mod:`witwin.channel.scene.endpoints`, which owns endpoint geometry. What is
-left here depends on ``torch`` alone, so importing the public root no longer
-drags the scene package in behind it.
-"""
+"""The native field-state ABI contracts."""
 
 from __future__ import annotations
 

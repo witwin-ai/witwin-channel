@@ -28,13 +28,13 @@ def test_basic_primal_metadata_reports_no_ad_by_default():
 
 @pytest.mark.parametrize("ad_mode", ["vjp", "jvp"])
 def test_basic_metadata_reports_registered_ad_companions(ad_mode):
-    """Plan 07 AD-3: counters report the companion launches actually wired.
+    """solver derivatives: counters report the companion launches actually wired.
 
-    A point-receiver LoS solve registers exactly one AD Function (the LoS
-    path-gain matrix), whose companion is one native launch; reverse mode
-    retains its saved endpoint tensors as tape, forward mode retains nothing
-    past the solve.
-    """
+ A point-receiver LoS solve registers exactly one AD Function (the LoS
+ path-gain matrix), whose companion is one native launch; reverse mode
+ retains its saved endpoint tensors as tape, forward mode retains nothing
+ past the solve.
+ """
 
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic metadata")

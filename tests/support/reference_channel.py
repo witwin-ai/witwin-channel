@@ -70,7 +70,7 @@ def los_path_gain_reference(
     khat = delta / distances[..., None]
     wavelength = _LIGHT_SPEED_M_PER_S / float(reference_frequency_hz)
     free_space_gain = (wavelength / (4.0 * torch.pi * distances)).square()
-    # F1/R5 (utd-continuity-fix-design): the LoS field carries the short-dipole
+    # the LoS field carries the short-dipole
     # sin(theta) pattern of the transmit polarization (unnormalized transverse
     # projection p_tx - (p_tx.khat) khat), and the exported LoS scalar projects
     # it onto the receiver polarization. path_gain = |scalar|^2 therefore folds

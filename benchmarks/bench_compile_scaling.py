@@ -1,36 +1,7 @@
 # Copyright Xingyu Chen.
 # Measure `scene.compile` cost against scene size.
 
-"""Measure `scene.compile` cost against scene size.
-
-`compile` reads all four Core version properties before it consults its cache,
-so a cache hit still walks the whole world model, and every `solve` pays it
-again. That cost is linear in structure count and entirely host-side, which
-makes it invisible to the solver benchmarks: they compile one scene once,
-outside the timing loop.
-
-This harness measures the warm-cache path, which is what an optimization loop
-solving repeatedly against one unchanged scene actually pays.
-
-Three budgets are reported, and they fail for different reasons. The regression
-that motivated this harness moved compile from an O(1) integer read to an O(N)
-walk, so it was linear both before and after; a scaling check alone would have
-missed it entirely. The constant factor is what needed a gate.
-
-- `scaling_ratio` compares 4N structures against N. Linear is 4.0; a quadratic
-  regression is 16.0. Machine independent, so it gates everywhere. Catches an
-  algorithmic regression, not a constant-factor one.
-- `calibrated_per_structure` is the per-structure cost divided by a fixed
-  Python workload timed in the same process. Dividing out host CPU speed makes
-  a constant-factor ceiling portable, which is the check that would have caught
-  the original regression.
-- `version_share` is the warm compile time divided by the cost of reading the
-  four version properties alone. It catches a second O(N) pass being added to
-  compile, independently of how fast either one is.
-
-`per_structure_us` is also recorded as a raw number. It depends on host CPU and
-Python build, so it is reported rather than gated.
-"""
+"""Measure `scene.compile` cost against scene size."""
 
 from __future__ import annotations
 
@@ -120,10 +91,10 @@ class _CalibrationNode:
 def _calibration_us(*, repeats: int) -> float:
     """Time a fixed Python workload so the constant-factor budget is portable.
 
-    This is deliberately not the traversal under test. It is a stable mix of
-    attribute access, dict lookups, and type checks, so dividing by it removes
-    host CPU speed from the budget without tracking the thing being measured.
-    """
+ This is deliberately not the traversal under test. It is a stable mix of
+ attribute access, dict lookups, and type checks, so dividing by it removes
+ host CPU speed from the budget without tracking the thing being measured.
+ """
 
     nodes = [_CalibrationNode() for _ in range(64)]
     atomic = frozenset({type(None), bool, int, float, str})

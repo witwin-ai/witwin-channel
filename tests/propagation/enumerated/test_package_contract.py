@@ -177,9 +177,8 @@ def _install_row_collector(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_enumerated_package_has_no_scattering_barrel_facade():
     assert enumerated.__all__ == []
     assert not hasattr(enumerated, "append_scattering_paths")
-    # The concept axis merged the four former enumerated scattering modules and
-    # the shared MC scattering events into one owner, so this module's __all__
-    # is the union of the names those files already published. No name was
+    # The scattering owner publishes every enumerated scattering name exactly
+    # once. No name is
     # added, renamed or dropped.
     assert scattering.__all__ == [
         "ChainSamples",
@@ -237,7 +236,7 @@ def test_scattering_config_contract_is_minimal_protocol():
         "scattering_samples_per_m2",
         "scattering_power_threshold",
         "scattering_max_paths_per_pair",
-        # ADR-021 D1 enumerated scatter-chain path class (intentional
+        # coherent scattering enumerated scatter-chain path class (intentional
         # protocol extension; public-api snapshot updated in the same change).
         "scattering_chain_max_depth",
         "scattering_chain_samples_per_m2",

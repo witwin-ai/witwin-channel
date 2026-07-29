@@ -565,10 +565,17 @@ add a fallback; surface the mismatch and resolve it explicitly.
 Every tracked Python, C++, CUDA, and native header file starts with exactly two
 plain-language comment lines: `Copyright Xingyu Chen.` followed by one concise
 sentence saying what the file does. Keep that sentence under 100 characters.
-Do not put ADR numbers, phase or plan names, migration history, design
-justification, or a changelog in the opening header. Put durable design detail
-in the owner documentation and put local algorithm detail beside the code it
-explains. Living documentation references canonical files and symbol names instead of brittle source line numbers; refresh any generated line-sensitive evidence in the same change.
+Every source comment and docstring uses plain language to describe current
+behavior, a current constraint, or the reason for nearby code. Do not put ADR
+numbers, numbered plans, phases, waves, migration history, audit labels, or
+changelog prose anywhere in source comments or docstrings. A Python module
+docstring, when present, is one sentence no longer than 120 characters and does
+not repeat an architecture narrative. Put durable design detail in the owner
+documentation and local algorithm detail beside the code it explains. Frozen
+identifiers and test data may retain required historical spellings, but prose
+may not use them as explanations. Living documentation references canonical
+files and symbol names instead of brittle source line numbers; refresh any
+generated line-sensitive evidence in the same change.
 
 `native/channel/kernels/math.cuh` is the single Channel owner of ordinary native
 `Vec3`, `Complex`, and `Complex3` values and their basic load, store, arithmetic,

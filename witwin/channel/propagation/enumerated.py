@@ -1,22 +1,7 @@
 # Copyright Xingyu Chen.
 # Enumerated propagation: the shared engine, its typed config protocols, and.
 
-"""Enumerated propagation: the shared engine, its typed config protocols, and
-its capacity failure sanitizers.
-
-This is one module. The former ``enumerated/`` package split the same owner
-across ``contracts.py`` (the scattering-stage config view), ``engine.py`` (the
-canonical typed engine) and ``capacity.py`` (the final failure sanitizers);
-``engine`` imported ``capacity`` and nothing else imported across the split, so
-the three files were one unit already.
-
-``__all__`` stays empty, exactly as the former package ``__init__`` published
-it: this module is not a barrel facade, and in particular it publishes no
-scattering surface. The former ``capacity.py`` carried its own ``__all__``
-listing the five names it defined; that list only governed ``import *`` from a
-submodule that no longer exists, and every one of those names is still a module
-attribute reached by the same import path minus the ``.capacity`` segment.
-"""
+"""Enumerated propagation: the shared engine, its typed config protocols, and."""
 
 from __future__ import annotations
 
@@ -105,7 +90,7 @@ class TopologyConfig(Protocol):
     scattering_samples_per_m2: float
     scattering_power_threshold: float
     scattering_max_paths_per_pair: int
-    # ADR-021 D1 enumerated scatter-chain path class. DEFAULT-OFF: 0 disables
+    # coherent scattering enumerated scatter-chain path class. DEFAULT-OFF: 0 disables
     # chain discovery entirely (the pipeline stays byte-identical). When >= 1 it
     # is the cap on d1 + d2, the combined reflection depth of the two specular
     # legs around the single diffuse vertex; each leg is independently bounded by
@@ -113,9 +98,9 @@ class TopologyConfig(Protocol):
     scattering_chain_max_depth: int
     # Chain-sample vertex density (samples / m^2). Documented lower density than
     # the single-bounce scattering sampler (scattering_samples_per_m2) because a
-    # chain vertex is joined against two specular legs (ADR-021 D1).
+    # chain vertex is joined against two specular legs (coherent scattering).
     scattering_chain_samples_per_m2: float
-    # Per-(tx, rx) keep-strongest cap on joined chain rows (ADR-021 D1 budget).
+    # Per-(tx, rx) keep-strongest cap on joined chain rows (coherent scattering budget).
     scattering_chain_max_rows: int
 
 
@@ -513,12 +498,12 @@ def _path_components(config: EnumeratedPathConfig) -> set[str]:
 
 
 def _resolve_isb_taper(config: EnumeratedPathConfig) -> tuple[bool, float, float]:
-    """Resolve the ADR-017 ISB boundary taper flag and per-stage widths.
+    """Resolve the ISB boundary taper flag and per-stage widths.
 
-    DEFAULT-OFF: when the taper is disabled the field/diffraction stages receive
-    width 0.0 (every existing call path untouched) and the LoS membership stage
-    receives the default 0.5, preserving the pre-ADR-017 calls byte-for-byte.
-    """
+ DEFAULT-OFF: when the taper is disabled the field/diffraction stages receive
+ width 0.0 (every existing call path untouched) and the LoS membership stage
+ receives the default 0.5, preserving the pre-the boundary taper calls byte-for-byte.
+ """
 
     enabled = bool(getattr(config, "isb_boundary_taper", False))
     configured_width = float(getattr(config, "isb_boundary_taper_width", 0.5))
@@ -584,17 +569,16 @@ def evaluate_enumerated_paths(
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     """Discover, select, and evaluate canonical enumerated propagation rows.
 
-    ``coupled_rx_streaming`` streams coupled reflection-diffraction discovery
-    over receiver blocks so a full grid solve stays under the per-block
-    candidate budget (ADR-011). The deterministic grid solver sets it; the path
-    and Monte Carlo callers keep the single-shot total-cap discovery, so their
-    coupled behavior is unchanged.
+ ``coupled_rx_streaming`` streams coupled reflection-diffraction discovery
+ over receiver blocks so a full grid solve stays under the per-block
+ candidate budget (coupled reflection and diffraction). The deterministic grid solver sets it; the path
+ and Monte Carlo callers keep the single-shot total-cap discovery, so their
+ coupled behavior is unchanged.
 
-    ``defer_capacity_terminal`` is reserved for Path and Deterministic outer
-    solvers, which must sanitize scattering-appended rows and enqueue the one
-    terminal observer only after their public result/array packing. ADR-008
-    opaque oracle callers keep the default and complete the transaction here.
-    """
+ ``defer_capacity_terminal`` is reserved for Path and Deterministic outer
+ solvers, which must sanitize scattering-appended rows and enqueue the one
+ terminal observer only after their public result/array packing. the enumerated-path oracle callers keep the default and complete the transaction here.
+ """
 
     _require_defer_capacity_terminal(defer_capacity_terminal)
     device = torch.device("cuda")
@@ -616,7 +600,7 @@ def evaluate_enumerated_paths(
     )
     compiled = require_compiled(scene)
     # One host read of a tensor frequency for the whole export: discovery and
-    # the field seam below share this detached scalar (audit M3). Callers
+    # the field seam below share this detached scalar. Callers
     # that already read it (the solver seams) pass it in.
     frequency_hz = (
         _frequency_scalar(scene) if frequency_value is None else float(frequency_value)
@@ -625,7 +609,7 @@ def evaluate_enumerated_paths(
     if ad_mode != "none":
         _require_frequency_ad_constant_materials(scene, compiled, ad_mode=ad_mode)
     components = _path_components(config)
-    # ISB boundary taper (ADR-017): DEFAULT-OFF. When off, width 0.0 flows to the
+    # ISB boundary taper (the boundary taper): DEFAULT-OFF. When off, width 0.0 flows to the
     # field/diffraction stages and every existing call path is untouched.
     isb_boundary_taper, isb_boundary_taper_width, isb_los_width = _resolve_isb_taper(
         config

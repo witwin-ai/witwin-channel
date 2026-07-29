@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
 # Monte Carlo basic primal solver.
 
-"""Monte Carlo basic primal solver.
-
-``docs/dev/montecarlo/README.md`` holds the ownership contract for
-both Monte Carlo solvers. The sections below follow the former package layout:
-configuration, result, sampling, solver metadata, the LoS backend, the RayD
-component maps, the shared solve pipeline, and the public entry point.
-"""
+"""Monte Carlo basic primal solver."""
 
 from __future__ import annotations
 
@@ -175,7 +169,7 @@ def make_cuda_generator(seed: int) -> torch.Generator:
 
 # --- Solver metadata ------------------------------------------------------
 
-# One AdLaunchLedger shape for every solver (plan 07 AD-4): montecarlo.basic
+# One AdLaunchLedger shape for every solver (diffraction AD): montecarlo.basic
 # counts one companion per LoS matrix, per grid-map layout Function, per
 # transmitter for the reflection/diffraction accumulators. Straight
 # transmission registers one flattened RayD geometry companion, one native
@@ -191,7 +185,7 @@ def make_solver_metadata(
     ad_ledger: AdLaunchLedger | None = None,
 ) -> dict[str, Any]:
     forward_launch_count = 1 if contribution_capacity else 0
-    # Plan 07 AD-3: report the companion launches this solve actually
+    # solver derivatives: report the companion launches this solve actually
     # registered (see AdLaunchLedger), not the pre-design fused-launch
     # placeholder. ad_mode="none" wires no companions and retains no tape.
     ledger = ad_ledger if ad_ledger is not None else AdLaunchLedger()
@@ -264,12 +258,12 @@ def los_path_gain(
     rx_pos = receiver_positions(scene, device=device, reference=tx_pos)
     if tx_pos.shape[0] == 0 or rx_pos.shape[0] == 0:
         return mc_zero_matrix(tx_pos, rows=tx_pos.shape[0], cols=rx_pos.shape[0])
-    # R5: the true per-transmitter polarization drives the LoS dipole sin^2
+    # the true per-transmitter polarization drives the LoS dipole sin^2
     # pattern (frozen winner of AD; the pattern moves through the endpoints).
     tx_pol = transmitter_polarizations_as_stored(scene, device=device)
 
     if ad:
-        # Plan 07 AD-3: swap the host-float endpoint tensors for the live
+        # solver derivatives: swap the host-float endpoint tensors for the live
         # scene leaves (same float32 values) and route through the LoS AD
         # Function so tx/rx position and frequency gradients survive. Grid
         # receiver points stay native: a grid exposes no position leaf.
@@ -453,20 +447,20 @@ def transmission_component_map(
     ad: bool = False,
     ledger: object | None = None,
 ) -> torch.Tensor:
-    """Straight-penetration transmission radiomap (contract section 4,
-    endpoint-connection context).
+    """Straight-penetration transmission radiomap (the transmission behavior,
+ endpoint-connection context).
 
-    Mirrors the LoS map's geometric convention exactly: the analytic per-cell
-    Friis gain along the straight tx->cell segment, with the binary LoS
-    visibility mask replaced by the native ADR-020 incident-polarized TE/TM
-    wall product, evaluated in ascending resident-hit order. Cells whose
-    segment crosses no wall belong to the exclusive los
-    path class and stay zero here, so los + transmission never double counts.
-    A single eps_r=1 vacuum wall has unit power transmittance, which makes
-    this map reproduce the unobstructed LoS map exactly (acceptance test);
-    the mandatory ``max_depth + 1`` probe makes over-capacity chains poison the
-    shared solve transaction instead of returning a truncated map.
-    """
+ Mirrors the LoS map's geometric convention exactly: the analytic per-cell
+ Friis gain along the straight tx->cell segment, with the binary LoS
+ visibility mask replaced by the native transmission polarization incident-polarized TE/TM
+ wall product, evaluated in ascending resident-hit order. Cells whose
+ segment crosses no wall belong to the exclusive los
+ path class and stay zero here, so los + transmission never double counts.
+ A single eps_r=1 vacuum wall has unit power transmittance, which makes
+ this map reproduce the unobstructed LoS map exactly (acceptance test);
+ the mandatory ``max_depth + 1`` probe makes over-capacity chains poison the
+ shared solve transaction instead of returning a truncated map.
+ """
 
     if not scene.structures:
         tx_pos, _ = transmitter_positions(scene, device=device)
@@ -483,7 +477,7 @@ def transmission_component_map(
     # Live transmitter origins in AD mode: the straight-line incidence cosine
     # (and with it every per-wall transmittance) moves with the transmitter,
     # so the chain march must see the graph, not the detached native table
-    # (plan 07 section 9.3 TX x transmission for M).
+    # (the derivative capability matrix TX x transmission for M).
     tx_march = transmitter_positions_ad(scene, tx_pos, device=device) if ad else tx_pos
     rx_pos = receiver_grid_points(grid, reference=tx_pos)
     if ad:
@@ -576,20 +570,19 @@ def scattering_component_map(
 ) -> tuple[torch.Tensor, dict[str, int]]:
     """Kirchhoff diffuse scattering radiomap from area-sampled rough faces.
 
-    Thin grid wrapper around
-    :func:`witwin.channel.interactions.scattering.scattering_map_matrix`
-    (which documents the estimator and its v1 simplifications): the matrix
-    holds the per-cell scattering PATH GAIN at the cell center times the
-    transmitter power, mirroring the LoS / transmission map conventions, so
-    component_power equals the map sum.
+ Thin grid wrapper around:func:`witwin.channel.interactions.scattering.scattering_map_matrix`
+ (which documents the estimator and its v1 simplifications): the matrix
+ holds the per-cell scattering PATH GAIN at the cell center times the
+ transmitter power, mirroring the LoS / transmission map conventions, so
+ component_power equals the map sum.
 
-    Under ``ad`` the matrix keeps its graph (table values, frequency and tx
-    power gradients, ADR-015 op 1) and the grid layout runs behind the same
-    ``mc_los_grid_maps_ad`` autograd Function the LoS/transmission maps use;
-    the area-sample set, both visibility masks and the incidence gates stay
-    frozen winners (they are folded into the matrix before layout, so the layout
-    carries no separate visibility mask).
-    """
+ Under ``ad`` the matrix keeps its graph (table values, frequency and tx
+ power gradients, scattering AD) and the grid layout runs behind the same
+ ``mc_los_grid_maps_ad`` autograd Function the LoS/transmission maps use;
+ the area-sample set, both visibility masks and the incidence gates stay
+ frozen winners (they are folded into the matrix before layout, so the layout
+ carries no separate visibility mask).
+ """
 
     tx_pos, tx_power = transmitter_positions(scene, device=device)
     dim0, dim1 = component_grid_shape(grid)
@@ -662,7 +655,7 @@ def reflection_component_maps_with_wedges(
     handle = rayd.require_resource()
     tx_pos, tx_power = transmitter_positions(scene, device=device)
     tx_live = transmitter_positions_ad(scene, tx_pos, device=device) if ad else tx_pos
-    # R5: per-transmitter polarization seeds the reflection field's unnormalized
+    # per-transmitter polarization seeds the reflection field's unnormalized
     # transverse projection (short-dipole sin(theta) pattern).
     tx_pol = transmitter_polarizations_as_stored(scene, device=device)
     wavelength = _LIGHT_SPEED_M_PER_S / _frequency_scalar(scene)
@@ -1016,7 +1009,7 @@ def diffraction_component_map(
     handle = rayd.require_resource()
     tx_pos, tx_power = transmitter_positions(scene, device=device)
     tx_live = transmitter_positions_ad(scene, tx_pos, device=device) if ad else tx_pos
-    # R5: per-transmitter polarization fed into direct_source_vector's incident
+    # per-transmitter polarization fed into direct_source_vector's incident
     # basis (replaces the fabricated z-axis).
     tx_pol = transmitter_polarizations_as_stored(scene, device=device)
     (
@@ -1173,7 +1166,7 @@ def diffraction_component_map(
         )
         if ad:
             # Same tape-accumulate kernel behind the autograd Function
-            # (plan 07 AD-4): the RayD sampling tape and the packed edge
+            # (diffraction AD): the RayD sampling tape and the packed edge
             # states are frozen winners; the anchor keeps the transmitter
             # graph, the store leaves keep the material graph and the live
             # frequency carries the carrier graph.
@@ -1305,12 +1298,11 @@ def _face_material_tensors(
 ) -> tuple[torch.Tensor, ...]:
     """Per-face material tensors from the compiled material store.
 
-    One material source for both ad_mode="none" and the AD modes (plan 07
-    AD-3): the compiled store leaves (``scene.compiled.materials``) are the values the
-    kernels see, so a finite difference taken on the store measures the same
-    function the AD modes differentiate. The primal path reads under no_grad
-    so it never builds a graph.
-    """
+ One material source for both ad_mode="none" and the AD modes (solver derivatives): the compiled store leaves (``scene.compiled.materials``) are the values the
+ kernels see, so a finite difference taken on the store measures the same
+ function the AD modes differentiate. The primal path reads under no_grad
+ so it never builds a graph.
+ """
 
     def build() -> tuple[torch.Tensor, ...]:
         bundle = face_material_field_bundle(scene, device=device)
@@ -1342,10 +1334,10 @@ def _mc_scattering_component(  # type: ignore[no-untyped-def]
 ) -> tuple[torch.Tensor, dict[str, int] | None, int, int]:
     """Scattering component map and (path, capacity) row-count deltas.
 
-    Grid receivers with structures carry the native scattering map; otherwise the
-    component is a zero map with no row-count contribution. Preserves the exact
-    call semantics and ad/ledger threading of the inline dispatch it replaces.
-    """
+ Grid receivers with structures carry the native scattering map; otherwise the
+ component is a zero map with no row-count contribution. Preserves the exact
+ call semantics and ad/ledger threading of the inline dispatch it replaces.
+ """
 
     if scene.structures:
         component_map, stats = scattering_component_map(

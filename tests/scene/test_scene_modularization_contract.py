@@ -73,12 +73,7 @@ def test_core_scene_has_no_channel_compile_or_frequency_facades():
 
 
 def test_deleted_legacy_owner_modules_do_not_resolve():
-    """The whole ``witwin.channel.core`` namespace is gone, not just its leaves.
-
-    ``find_spec`` on a child of a missing package raises rather than returning
-    ``None``, so assert the parent is absent and that every historical leaf is
-    unreachable through it.
-    """
+    """Verify ``witwin.channel.core`` and all child modules are unreachable."""
 
     assert importlib.util.find_spec("witwin.channel.core") is None
     for module_name in (

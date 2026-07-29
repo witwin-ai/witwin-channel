@@ -166,7 +166,7 @@ pybind11::dict channel_bdpt_face_material_tensors_from_host(
     pybind11::sequence material_mu_r,
     pybind11::sequence face_material_id);
 
-// ADR-022 BDPT fixed-topology AD companions. The dispatch wrappers unpack the
+// BDPT AD companions. The dispatch wrappers unpack the
 // subpath/intersection/light/sensor dicts; the accumulate pair unpacks the
 // connection-sample dict directly. All are defined in bdpt.cpp.
 pybind11::dict channel_bdpt_reflected_light_subpath_state_backward_dispatch(

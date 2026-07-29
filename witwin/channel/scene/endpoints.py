@@ -1,44 +1,7 @@
 # Copyright Xingyu Chen.
 # Endpoint geometry, antenna response, and the scene-leaf AD seam.
 
-"""Endpoint geometry, antenna response, and the scene-leaf AD seam.
-
-This module is the single owner of everything Channel knows about an endpoint:
-the internal views that project one ``witwin.core`` antenna state (plus any
-snapshot rigid motion) into the shape the solvers consume, the antenna pattern
-and array response those views feed, the axis-aligned receiver-grid geometry the
-grid ABI needs, the endpoint polarization tensors solvers hand to the native
-kernels, and the live scene tensors that anchor the plan 07 AD-2 geometry seam.
-
-They were four modules with one subject between them. ``receiver_geometry``
-existed only to describe a :class:`ReceiverGrid` view defined here, ``antenna``
-only to evaluate the pattern and array those views expose, and ``ad_geometry``
-only to hand back the live tensors behind the same endpoint positions, so a
-reader following one endpoint had to walk four files.
-
-Topology discovery stays native and detached: RayD finds the winner (face
-sequence, validity, visibility) and Channel freezes it. Geometry derivatives
-under that frozen winner come from RayD's own fixed-winner chain companions
-(``ops.rayd_reflection_epc_paths_ad`` for reflection hit geometry,
-``ops.rayd_face_normals_ad`` for the transmission wall normals), so no hit
-geometry is ever re-derived on the torch side. What the AD seam here does is
-pure tensor passing: the live scene tensors (mesh vertices, transmitter and
-receiver positions) that anchor the autograd graph the native kernels route
-gradients and tangents to.
-
-``transmitter_polarizations_f32`` and ``receiver_polarizations_f32`` moved here
-from the root ``field_state`` module, which mixed them with the native field
-ABI contracts. They read a logical scene and build endpoint tensors, so they are
-endpoint geometry, not an ABI contract. The root now holds the two dataclasses
-alone, in :mod:`witwin.channel.abi`.
-
-This module must not import :mod:`witwin.channel.scene.compiler` at module
-scope. The dependency runs the other way - the compiler imports these views for
-its endpoint tensor exports - and an edge back into the compiler would pull the
-whole compile-time dependency set into a cold import of every consumer of the
-endpoint views. :func:`require_compiled` resolves ``CompiledScene`` inside the
-call for that reason.
-"""
+"""Endpoint geometry, antenna response, and the scene-leaf AD seam."""
 
 from __future__ import annotations
 
@@ -79,9 +42,9 @@ def _vector3(name: str, value: torch.Tensor) -> torch.Tensor:
 def orientation_matrix(orientation: torch.Tensor) -> torch.Tensor:
     """Return the local-to-world yaw/pitch/roll rotation matrix.
 
-    The orientation vector is ``(yaw, pitch, roll)`` in radians and uses the
-    intrinsic Z-Y-X convention.
-    """
+ The orientation vector is ``(yaw, pitch, roll)`` in radians and uses the
+ intrinsic Z-Y-X convention.
+ """
 
     if orientation.shape == (4,):
         from witwin.core.math import quat_to_rotation_matrix
@@ -145,7 +108,7 @@ def steering_vector(
     if isinstance(frequency_hz, torch.Tensor):
         # Synthetic-array steering is evaluated at the primal frequency; its
         # frequency derivative is exactly zero for single-element centre
-        # arrays and detached otherwise (plan 07 AD-1 fixed-array contract).
+        # arrays and detached otherwise (material and frequency derivatives fixed-array contract).
         frequency_hz = float(frequency_hz.detach())
     if frequency_hz <= 0.0:
         raise ValueError("frequency_hz must be positive")
@@ -193,10 +156,10 @@ def apply_endpoint_weights(
 ) -> torch.Tensor:
     """Combine ``(rx, rx_ant, tx, tx_ant, ...)`` endpoint channels.
 
-    The leading endpoint and antenna dimensions match :class:`PathResult`.
-    Any trailing signal dimensions (path, time, frequency, or tap) are
-    preserved.  Receiver weights follow the usual conjugating convention.
-    """
+ The leading endpoint and antenna dimensions match:class:`PathResult`.
+ Any trailing signal dimensions (path, time, frequency, or tap) are
+ preserved. Receiver weights follow the usual conjugating convention.
+ """
 
     if coefficients.ndim < 4:
         raise ValueError(
@@ -615,11 +578,11 @@ def axis_aligned_grid_spec(grid: ReceiverGrid) -> AxisAlignedGridSpec:
 def scene_vertex_table(scene: object, compiled: object) -> torch.Tensor:
     """Live global vertex table matching ``compiled.geometry.vertices``.
 
-    RayD concatenates structure meshes in scene order, so the live table is
-    the concatenation of the structure vertex tensors. Returning the live
-    tensors (rather than the native export) is what lets mesh-vertex
-    gradients exist at all.
-    """
+ RayD concatenates structure meshes in scene order, so the live table is
+ the concatenation of the structure vertex tensors. Returning the live
+ tensors (rather than the native export) is what lets mesh-vertex
+ gradients exist at all.
+ """
 
     native = compiled.geometry.vertices
     if not scene.structures:
@@ -660,10 +623,10 @@ def receiver_positions_ad(
 ) -> torch.Tensor:
     """Live receiver positions for point receivers.
 
-    Grid receivers are generated natively from origin/axes/spacing and stay
-    detached: a grid exposes no per-receiver position tensor for a user to
-    mark requires_grad, so nothing is silently zeroed here.
-    """
+ Grid receivers are generated natively from origin/axes/spacing and stay
+ detached: a grid exposes no per-receiver position tensor for a user to
+ mark requires_grad, so nothing is silently zeroed here.
+ """
 
     if not scene.receivers or not all(
         isinstance(receiver, ReceiverPoint) for receiver in scene.receivers
@@ -683,16 +646,16 @@ def transmitter_polarizations_f32(
 ) -> torch.Tensor:
     """Transmitter polarizations as a contiguous float32 ``(N, 3)`` tensor.
 
-    Row order matches the transmitter order of the logical scene. The vectors
-    are already unit and oriented by the Core transmitter model, so this only
-    stacks them, casts to float32, and makes the result contiguous.
+ Row order matches the transmitter order of the logical scene. The vectors
+ are already unit and oriented by the Core transmitter model, so this only
+ stacks them, casts to float32, and makes the result contiguous.
 
-    This is NOT :func:`witwin.channel.scene.compiler.transmitter_polarizations_as_stored`,
-    which is a straight device upload: it keeps whatever dtype and layout the
-    scene stored, and its empty case comes from the native transmitter builder
-    rather than ``device``. Both are live and each has its own callers; the two
-    names record the difference instead of hiding it behind one spelling.
-    """
+ This is NOT:func:`witwin.channel.scene.compiler.transmitter_polarizations_as_stored`,
+ which is a straight device upload: it keeps whatever dtype and layout the
+ scene stored, and its empty case comes from the native transmitter builder
+ rather than ``device``. Both are live and each has its own callers; the two
+ names record the difference instead of hiding it behind one spelling.
+ """
 
     values = [tx.polarization for tx in scene.transmitters]
     if not values:
@@ -708,10 +671,10 @@ def receiver_polarizations_f32(
 ) -> torch.Tensor:
     """Receiver polarizations as a contiguous float32 ``(N, 3)`` tensor.
 
-    With ``grid``, one grid polarization is broadcast over that grid's points.
-    Without it, the scene's receivers are expanded in order: a grid contributes
-    one row per point, a point receiver one row.
-    """
+ With ``grid``, one grid polarization is broadcast over that grid's points.
+ Without it, the scene's receivers are expanded in order: a grid contributes
+ one row per point, a point receiver one row.
+ """
 
     if grid is not None:
         return (

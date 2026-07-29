@@ -35,12 +35,7 @@ def _json(path: Path) -> dict[str, object]:
 
 
 def _basic_section(title: str) -> str:
-    """One section of the collapsed Monte Carlo basic solver module.
-
-    ``montecarlo/basic.py`` concatenates the former package's modules behind
-    ``# --- <title> ---`` rules, so an assertion that used to bound one file
-    bounds the corresponding section instead.
-    """
+    """Return one named section of the Monte Carlo basic solver module."""
 
     source = (ROOT / "witwin/channel/montecarlo/basic.py").read_text(
         encoding="utf-8"
@@ -83,13 +78,7 @@ def test_phase_m_native_symbols_have_live_owners_and_complete_coverage() -> None
 
 
 def _transmission_events_section() -> str:
-    """The shared Monte Carlo event section of the merged transmission owner.
-
-    The concept axis merged ``montecarlo/events/transmission.py`` into
-    ``interactions/transmission.py``, so the assertions that used to bound that
-    whole file bound the section it became. Slicing keeps the enumerated
-    discovery owner above it out of scope, exactly as a separate file did.
-    """
+    """Return the transmission event section owned by interactions.transmission."""
 
     source = (ROOT / "witwin/channel/interactions/transmission.py").read_text(
         encoding="utf-8"

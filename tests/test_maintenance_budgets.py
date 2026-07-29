@@ -33,9 +33,9 @@ def _config(
 ) -> dict:
     """Build a synthetic budget config.
 
-    ``file_lines=False`` produces the retired-gate shape: no
-    ``limits.file_lines`` and no ``file_exemptions`` section at all.
-    """
+ ``file_lines=False`` produces the retired-gate shape: no
+ ``limits.file_lines`` and no ``file_exemptions`` section at all.
+ """
 
     config: dict = {
         "schema_version": 1,
@@ -92,14 +92,13 @@ def test_current_baseline_is_exact_and_passes() -> None:
 def test_repository_budget_retires_all_file_size_gates() -> None:
     config = budgets.load_budgets(BUDGET_PATH)
 
-    # There is no maximum Python file length, so the limit and the three
-    # waivers it used to justify are gone rather than raised to a large number.
+    # Python files have no line-count limit or exemptions.
     assert "file_lines" not in config["limits"]
     assert "file_exemptions" not in config
     # The reason is recorded in the config itself, next to what survived.
     assert "Retired 2026-07-27" in config["limits_policy"]["file_lines"]
     assert "Retired" not in config["limits_policy"]["function_complexity"]
-    # Native TU size was retired separately under ADR-044; complexity remains.
+    # Native TU size was retired separately under CUDA source consolidation; complexity remains.
     assert config["limits"]["function_complexity"] == {"recommended": 15}
     assert "native_file_lines" not in config["limits"]
     assert "native_file_exemptions" not in config
@@ -108,7 +107,7 @@ def test_repository_budget_retires_all_file_size_gates() -> None:
     # section survives, is still enforced, and every surviving entry is live.
     # Asserting a fixed count instead would be brittle and would say nothing -
     # a refactor that simplifies an exempted function correctly retires its
-    # waiver, which is exactly what happened to four of them in plan 15 phase 1.
+    # waiver, which is exactly what happened to four of them in source consolidation the initial implementation.
     _, functions = budgets.measure_repository(ROOT, config["source_root"])
     complexity = {metric.key: metric.complexity for metric in functions}
     recommended = config["limits"]["function_complexity"]["recommended"]

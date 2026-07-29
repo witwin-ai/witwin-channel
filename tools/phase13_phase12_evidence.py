@@ -1,7 +1,7 @@
 # Copyright Xingyu Chen.
 # Builds evidence artifacts.
 
-"""Canonical CLI for Plan 13 Phase 12 evidence generation and replay."""
+"""Builds evidence artifacts."""
 
 from __future__ import annotations
 

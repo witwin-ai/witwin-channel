@@ -1,17 +1,7 @@
 # Copyright Xingyu Chen.
 # Scan tracked files for committed credentials and high-entropy secrets.
 
-"""Scan tracked files for committed credentials and high-entropy secrets.
-
-The gate reads the git index (tracked files only), skips known binary assets,
-and reports any line that matches a credential pattern or contains a
-high-entropy base64 token. Findings can be suppressed with an allowlist file
-that pins each false positive by ``(path, rule, fingerprint)`` so an unrelated
-match cannot silently reuse an exemption.
-
-The scan is intentionally cheap: a handful of compiled patterns run line by
-line over text blobs below a size cap, so the quick CI tier stays fast.
-"""
+"""Scan tracked files for committed credentials and high-entropy secrets."""
 
 from __future__ import annotations
 

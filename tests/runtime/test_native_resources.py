@@ -13,18 +13,7 @@ from witwin.channel import runtime
 
 
 def test_native_resource_normalizer_is_a_pure_stdlib_runtime_owner():
-    """The normalizer reaches for builtins and the caller's object, nothing else.
-
-    This used to be read off the whole file, back when the normalizer had a
-    module to itself. The merged runtime module cannot state it that way, so
-    the same claim is now read off the one function it was ever about, which
-    is also the tighter reading: an import or a torch call anywhere in the
-    body fails here, and a second definition site fails the unpacking.
-
-    The old ``__all__ == ["_rayd_scene_resource"]`` half described a module that
-    held one function and cannot survive the merge; the unpacking above carries
-    the part of it that mattered, and the name stays private.
-    """
+    """The normalizer uses only builtins and the caller object; imports, Torch calls, or duplicate definitions fail."""
 
     source_path = Path(runtime.__file__)
     tree = ast.parse(source_path.read_text(encoding="utf-8"))

@@ -1,15 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests isb boundary taper.
 
-"""ISB boundary taper (ADR-017) LoS-member solver tests.
-
-Gate 1 (OFF bit-identical) is exercised without a build-time baseline by
-comparing the flag-absent default solve to an explicit ``isb_boundary_taper=
-False`` solve: both take the untouched hard-gate path and must be byte-identical.
-Gate 2 (ON softens the LoS shadow boundary) checks that the tapered solve adds
-intermediate LoS amplitudes across a blocked boundary that the hard gate never
-produces, and that the D-side window only engages when the flag is on.
-"""
+"""Tests isb boundary taper."""
 
 from __future__ import annotations
 
@@ -106,13 +98,13 @@ def test_isb_boundary_taper_off_is_bit_identical():
     components = {"los", "reflection", "diffraction"}
     # Flag absent (the default) vs explicit False: both take the untouched hard
     # occlusion gate and the unchanged order-1 diffraction window, so the taper
-    # must be a perfect no-op (ADR-017 gate 1). The OFF reproducibility contract
-    # has the two tiers spelled out in ADR-013's "bitwise-off note": the
+    # must be a perfect no-op (the boundary taper 1). The OFF reproducibility contract
+    # has the two tiers spelled out in coupled double diffraction's "bitwise-off note": the
     # deterministic per-row path table and the LoS/reflection component
     # accumulators are byte-identical, but the folded *total* field carries the
     # pre-existing float32-ULP atomic-order noise of the diffraction accumulation
     # (up to ~1e-9 run-to-run for a single build; auditing that reduction's
-    # atomic-order determinism is the plan-09 P5 chore). We therefore assert the
+    # atomic-order determinism is the deterministic reduction ordering chore). We therefore assert the
     # per-row and LoS/reflection contracts bitwise and bound the total-field
     # delta to the documented 5e-10 band, rather than over-fitting to a
     # nondeterministic atomic sum (the old torch.equal on the total field / total
@@ -152,8 +144,8 @@ def test_isb_boundary_taper_off_is_bit_identical():
         )
 
     # (c) The total field folds the diffraction contribution through an
-    # atomic-add reduction whose ordering is not run-to-run stable (ADR-013
-    # bitwise-off note; plan-09 P5 chore). Bound its delta to the documented
+    # atomic-add reduction whose ordering is not run-to-run stable (coupled double diffraction
+    # bitwise-off note; deterministic reduction ordering chore). Bound its delta to the documented
     # 5e-10 absolute band instead of demanding exact equality.
     field_delta = (default_result.field - explicit_off.field).abs().max()
     assert field_delta <= 5e-10, (
@@ -192,7 +184,7 @@ def test_isb_boundary_taper_on_softens_los_shadow_boundary():
     # penumbra cells whose power is strictly between the shadow floor and the
     # neighbouring lit level: at least one cell that is exactly zero off becomes
     # a small-but-nonzero survivor on, or a lit cell is attenuated below its off
-    # value. Either way the boundary is no longer a single-cell cliff.
+    # value. This keeps the boundary wider than a single-cell cliff.
     lit_level = float(los_off.max())
     assert lit_level > 0.0
     newly_survived = ((los_off == 0.0) & (los_on > 0.0)).any()

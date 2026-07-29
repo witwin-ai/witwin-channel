@@ -20,10 +20,10 @@ ROOT = Path(__file__).resolve().parents[1]
 def _entropy_token(seed: int = 20260716, length: int = 48) -> str:
     """Build a high-entropy base64 token at runtime.
 
-    Constructing the token dynamically keeps this source file free of any
-    literal credential, so the repository-wide scan never trips over the test
-    fixtures themselves.
-    """
+ Constructing the token dynamically keeps this source file free of any
+ literal credential, so the repository-wide scan never trips over the test
+ fixtures themselves.
+ """
 
     rng = random.Random(seed)
     alphabet = string.ascii_letters + string.digits

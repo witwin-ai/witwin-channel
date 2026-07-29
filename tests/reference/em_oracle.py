@@ -1,22 +1,7 @@
 # Copyright Xingyu Chen.
 # CPU complex128 electromagnetic reference oracle (numpy-only, no torch).
 
-"""CPU complex128 electromagnetic reference oracle (numpy-only, no torch).
-
-Binding conventions (docs/dev/plans/05-implementation-contract.md, section 2):
-
-- Time factor ``exp(+j*w*t)``, propagation ``exp(-j*k*r)``.
-- Complex relative permittivity ``eps = eps_r' - j*sigma_e/(w*eps0)``.
-- Passive sqrt branch: ``Re >= 0, Im <= 0`` so ``exp(-j*k*z)`` decays.
-- Admittances ``Y_TE = k_z/(w*mu)``, ``Y_TM = w*eps/k_z`` (absolute eps/mu).
-- Interface amplitudes ``r = (Y1-Y2)/(Y1+Y2)``, ``t = 2*Y1/(Y1+Y2)`` defined
-  on the shared tangential electric field; TM uses the same formula (no
-  hand-flipped signs).
-- Powers ``R = |r|^2``, ``T = Re(Y2)/Re(Y1)*|t|^2``, ``A = 1 - R - T``.
-
-Everything here is a slow, explicit float64/complex128 reference used as the
-ground truth for torch/CUDA production code. No clamping, no silent degradation.
-"""
+"""CPU complex128 electromagnetic reference oracle (numpy-only, no torch)."""
 
 from __future__ import annotations
 
@@ -54,13 +39,13 @@ __all__ = [
 def complex_sqrt_passive(z):
     """Complex sqrt with the passive-medium branch ``Re >= 0, Im <= 0``.
 
-    Takes the principal sqrt (numpy: ``Re >= 0``) and negates results with
-    ``Im > 0``. For arguments reachable from passive media
-    (``arg(z) in (-pi, 0]``) the principal sqrt already satisfies both branch
-    conditions; the negation only fires on the negative real axis
-    (evanescent case, e.g. total internal reflection), where it selects the
-    decaying root ``-j*sqrt(|z|)``. Vectorized; always returns complex128.
-    """
+ Takes the principal sqrt (numpy: ``Re >= 0``) and negates results with
+ ``Im > 0``. For arguments reachable from passive media
+ (``arg(z) in (-pi, 0]``) the principal sqrt already satisfies both branch
+ conditions; the negation only fires on the negative real axis
+ (evanescent case, e.g. total internal reflection), where it selects the
+ decaying root ``-j*sqrt(|z|)``. Vectorized; always returns complex128.
+ """
     w = np.sqrt(np.asarray(z, dtype=np.complex128))
     return np.where(w.imag > 0.0, -w, w)
 
@@ -69,10 +54,10 @@ def complex_sqrt_passive(z):
 class Medium:
     """Homogeneous isotropic medium at a single frequency.
 
-    ``eps``/``mu`` are the ABSOLUTE complex permittivity/permeability
-    (eps0/mu0 included); ``k`` is the complex wavenumber on the passive
-    branch (``Re >= 0, Im <= 0``).
-    """
+ ``eps``/``mu`` are the ABSOLUTE complex permittivity/permeability
+ (eps0/mu0 included); ``k`` is the complex wavenumber on the passive
+ branch (``Re >= 0, Im <= 0``).
+ """
 
     frequency_hz: float
     eps: complex
@@ -85,12 +70,12 @@ class Medium:
 
 
 def medium_params(eps_r, sigma_e, mu_r, frequency_hz) -> Medium:
-    """Build a :class:`Medium` from real material parameters.
+    """Build a:class:`Medium` from real material parameters.
 
-    ``eps = eps0*(eps_r - j*sigma_e/(w*eps0))`` (conductivity folded into the
-    imaginary part, ``exp(+j*w*t)`` convention), ``mu = mu0*mu_r`` (complex
-    ``mu_r`` accepted), ``k = k0*sqrt(eps_rel*mu_rel)`` on the passive branch.
-    """
+ ``eps = eps0*(eps_r - j*sigma_e/(w*eps0))`` (conductivity folded into the
+ imaginary part, ``exp(+j*w*t)`` convention), ``mu = mu0*mu_r`` (complex
+ ``mu_r`` accepted), ``k = k0*sqrt(eps_rel*mu_rel)`` on the passive branch.
+ """
     omega = 2.0 * np.pi * float(frequency_hz)
     eps_rel = complex(eps_r) - 1j * float(sigma_e) / (omega * EPS0)
     mu_rel = complex(mu_r)
@@ -105,7 +90,7 @@ def medium_params(eps_r, sigma_e, mu_r, frequency_hz) -> Medium:
 
 
 def vacuum_medium(frequency_hz) -> Medium:
-    """Vacuum :class:`Medium` at ``frequency_hz``."""
+    """Vacuum:class:`Medium` at ``frequency_hz``."""
     return medium_params(1.0, 0.0, 1.0, frequency_hz)
 
 
@@ -113,10 +98,10 @@ def vacuum_medium(frequency_hz) -> Medium:
 class RTCoefficients:
     """Polarized reflection/transmission amplitudes and power coefficients.
 
-    Amplitudes are tangential-E ratios (contract section 2); powers include
-    the ``Re(Y2)/Re(Y1)`` flux factor in T. Fields are complex128/float64
-    scalars or arrays (broadcast over the incidence angle input).
-    """
+ Amplitudes are tangential-E ratios (the field convention); powers include
+ the ``Re(Y2)/Re(Y1)`` flux factor in T. Fields are complex128/float64
+ scalars or arrays (broadcast over the incidence angle input).
+ """
 
     r_te: np.ndarray
     r_tm: np.ndarray
@@ -151,11 +136,11 @@ def _power_coefficients(r, t, y1, y2):
 def fresnel_interface(cos_theta_i, medium1, medium2) -> RTCoefficients:
     """Fresnel coefficients for a single planar interface, medium1 -> medium2.
 
-    ``cos_theta_i`` is the REAL cosine of the incidence angle measured in
-    medium1 (scalar or array, in ``(0, 1]``). The tangential wavenumber
-    ``k_par = k1*sin(theta_i)`` is conserved; ``k_z,m`` uses the passive
-    sqrt branch. Both media must share the same frequency.
-    """
+ ``cos_theta_i`` is the REAL cosine of the incidence angle measured in
+ medium1 (scalar or array, in ``(0, 1]``). The tangential wavenumber
+ ``k_par = k1*sin(theta_i)`` is conserved; ``k_z,m`` uses the passive
+ sqrt branch. Both media must share the same frequency.
+ """
     if medium1.frequency_hz != medium2.frequency_hz:
         raise ValueError("media must be evaluated at the same frequency")
     cos_i = np.asarray(cos_theta_i, dtype=np.float64)
@@ -177,15 +162,15 @@ def fresnel_interface(cos_theta_i, medium1, medium2) -> RTCoefficients:
 
 
 def _stack_rt_one_pol(y_out, y_layers, deltas, y_back):
-    """Transfer-matrix stack solve for one polarization (plan section 5.1).
+    """Transfer-matrix stack solve for one polarization (the transfer-matrix model).
 
-    Each layer matrix ``[[cos d, j sin d / Y], [j Y sin d, cos d]]`` is
-    accumulated in incidence order. To stay finite for thick lossy layers
-    (``Im(delta) << 0``) every layer matrix is scaled by ``exp(-a)`` with
-    ``a = -Im(delta) >= 0``; the accumulated ``log_scale = sum(a)`` is
-    reapplied only to ``t`` (as ``exp(-log_scale)``, which underflows cleanly
-    to 0 for opaque stacks). ``r`` is scale-invariant.
-    """
+ Each layer matrix ``[[cos d, j sin d / Y], [j Y sin d, cos d]]`` is
+ accumulated in incidence order. To stay finite for thick lossy layers
+ (``Im(delta) << 0``) every layer matrix is scaled by ``exp(-a)`` with
+ ``a = -Im(delta) >= 0``; the accumulated ``log_scale = sum(a)`` is
+ reapplied only to ``t`` (as ``exp(-log_scale)``, which underflows cleanly
+ to 0 for opaque stacks). ``r`` is scale-invariant.
+ """
     m11 = np.ones_like(y_out)
     m12 = np.zeros_like(y_out)
     m21 = np.zeros_like(y_out)
@@ -225,12 +210,12 @@ def layer_stack_rt(
 ) -> RTCoefficients:
     """Reflection/transmission of a planar layer stack, both polarizations.
 
-    ``layers`` is a sequence of ``(thickness_m, eps_r, sigma_e, mu_r)`` in
-    incidence order (first tuple is hit first). ``outside``/``backing``
-    default to vacuum. ``cos_theta_i`` is the real incidence cosine in the
-    outside medium. Zero layers reduce to the bare outside->backing Fresnel
-    interface; a zero-thickness layer is an exact identity.
-    """
+ ``layers`` is a sequence of ``(thickness_m, eps_r, sigma_e, mu_r)`` in
+ incidence order (first tuple is hit first). ``outside``/``backing``
+ default to vacuum. ``cos_theta_i`` is the real incidence cosine in the
+ outside medium. Zero layers reduce to the bare outside->backing Fresnel
+ interface; a zero-thickness layer is an exact identity.
+ """
     if outside is None:
         outside = vacuum_medium(frequency_hz)
     if backing is None:
@@ -269,14 +254,14 @@ def layer_stack_rt(
 
 
 def refraction_direction(d_i, n, n1_over_n2):
-    """Vector Snell refraction (plan section 4.2); ``None`` on TIR.
+    """Vector Snell refraction (the refraction model); ``None`` on TIR.
 
-    ``d_i`` is the unit incident propagation direction, ``n`` the unit
-    normal pointing INTO the incident medium (so ``n . d_i < 0``),
-    ``n1_over_n2`` the real phase-index ratio ``Re(k1)/Re(k2)``. Returns the
-    unit transmitted direction, or ``None`` when the discriminant is
-    negative (total internal reflection).
-    """
+ ``d_i`` is the unit incident propagation direction, ``n`` the unit
+ normal pointing INTO the incident medium (so ``n . d_i < 0``),
+ ``n1_over_n2`` the real phase-index ratio ``Re(k1)/Re(k2)``. Returns the
+ unit transmitted direction, or ``None`` when the discriminant is
+ negative (total internal reflection).
+ """
     d = np.asarray(d_i, dtype=np.float64)
     d = d / np.linalg.norm(d)
     normal = np.asarray(n, dtype=np.float64)
@@ -295,10 +280,10 @@ def refraction_direction(d_i, n, n1_over_n2):
 def coherent_attenuation(sigma_h, k_z1):
     """Coherent specular field attenuation ``exp(-2*(k_z1*sigma_h)^2)``.
 
-    ``k_z1 = k0*cos(theta_i)`` is the (real) normal wavenumber in the
-    incidence medium, ``sigma_h`` the RMS height [m] of a Gaussian surface.
-    ``sigma_h = 0`` gives exactly 1.
-    """
+ ``k_z1 = k0*cos(theta_i)`` is the (real) normal wavenumber in the
+ incidence medium, ``sigma_h`` the RMS height [m] of a Gaussian surface.
+ ``sigma_h = 0`` gives exactly 1.
+ """
     return np.exp(-2.0 * (np.asarray(k_z1) * sigma_h) ** 2)
 
 
@@ -307,16 +292,16 @@ def kirchhoff_diffuse_lobe_series(
 ):
     """Beckmann series for the Gaussian-correlation Kirchhoff diffuse lobe.
 
-    Evaluates (contract section 6)
-    ``I(q) = pi*lx*ly*exp(-g) * sum_{m>=1} g^m/(m!*m)
-    * exp(-(qx^2*lx^2 + qy^2*ly^2)/(4m))`` with ``g = q_n^2*sigma_h^2``,
-    i.e. the 2D Fourier transform of ``exp(-g)*(exp(q_n^2*C(rho)) - 1)``
-    for ``C(x,y) = sigma_h^2*exp(-(x/lx)^2 - (y/ly)^2)``.
+ Evaluates (the scattering model)
+ ``I(q) = pi*lx*ly*exp(-g) * sum_{m>=1} g^m/(m!*m)
+ * exp(-(qx^2*lx^2 + qy^2*ly^2)/(4m))`` with ``g = q_n^2*sigma_h^2``,
+ i.e. the 2D Fourier transform of ``exp(-g)*(exp(q_n^2*C(rho)) - 1)``
+ for ``C(x,y) = sigma_h^2*exp(-(x/lx)^2 - (y/ly)^2)``.
 
-    Each term is computed in log space, so large ``g`` (up to ~50 with
-    enough ``n_terms``; the term peak sits near ``m ~ g``) never overflows.
-    ``sigma_h = 0`` returns exactly 0. Broadcasts over the q inputs.
-    """
+ Each term is computed in log space, so large ``g`` (up to ~50 with
+ enough ``n_terms``; the term peak sits near ``m ~ g``) never overflows.
+ ``sigma_h = 0`` returns exactly 0. Broadcasts over the q inputs.
+ """
     qx, qy, qn = np.broadcast_arrays(
         np.asarray(q_par_x, dtype=np.float64),
         np.asarray(q_par_y, dtype=np.float64),
@@ -349,13 +334,12 @@ def kirchhoff_diffuse_lobe_quadrature(
 ):
     """Kirchhoff diffuse lobe via direct 2D Fourier quadrature (cross-check).
 
-    Computes ``I(q) = exp(-g) * Int exp(-j*q_par.rho)*(exp(q_n^2*C(rho))-1)
-    d^2 rho`` by Gauss-Legendre quadrature over one quadrant (the integrand
-    is even in x and y separately, so ``exp(-j q.rho)`` reduces to
-    ``4*cos(qx*x)*cos(qy*y)``). Integration extends to ``half_width`` times
-    the correlation length per axis. Must agree with
-    :func:`kirchhoff_diffuse_lobe_series` (same quantity, same conventions).
-    """
+ Computes ``I(q) = exp(-g) * Int exp(-j*q_par.rho)*(exp(q_n^2*C(rho))-1)
+ d^2 rho`` by Gauss-Legendre quadrature over one quadrant (the integrand
+ is even in x and y separately, so ``exp(-j q.rho)`` reduces to
+ ``4*cos(qx*x)*cos(qy*y)``). Integration extends to ``half_width`` times
+ the correlation length per axis. Must agree with:func:`kirchhoff_diffuse_lobe_series` (same quantity, same conventions).
+ """
     qx, qy, qn = np.broadcast_arrays(
         np.asarray(q_par_x, dtype=np.float64),
         np.asarray(q_par_y, dtype=np.float64),
@@ -387,20 +371,19 @@ def phase_screen_patch_integral(
 ):
     """Direct complex Kirchhoff phase integral over a planar patch.
 
-    Evaluates ``Int_A exp(-j*(k_s - k_i).x) * exp(-j*q_n*h(u,v)) dA`` with
-    scalar Kirchhoff kernel 1 and ``q_n = (k_s - k_i).n_hat``; heights enter
-    ONLY through the phase (positions stay on the mean plane, per plan
-    section 6.7).
+ Evaluates ``Int_A exp(-j*(k_s - k_i).x) * exp(-j*q_n*h(u,v)) dA`` with
+ scalar Kirchhoff kernel 1 and ``q_n = (k_s - k_i).n_hat``; heights enter
+ ONLY through the phase (positions stay on the mean plane, per the mean-plane convention).
 
-    ``patch_corners`` is a (4, 3) array ``[p00, p10, p11, p01]`` describing a
-    planar parallelogram with ``p(u, v) = p00 + u*(p10-p00) + v*(p01-p00)``,
-    ``u, v in [0, 1]``; the patch normal is ``normalize(e_u x e_v)``.
-    ``height_fn(u, v)`` must accept broadcast arrays and return metric height
-    [m] along the patch normal. ``k_i_vec``/``k_s_vec`` are wave vectors
-    [rad/m] whose magnitudes must match ``2*pi*frequency_hz/c0`` (checked).
-    ``n_quad`` is a Gauss-Legendre point count per axis (int or (nu, nv)).
-    Returns a complex scalar.
-    """
+ ``patch_corners`` is a (4, 3) array ``[p00, p10, p11, p01]`` describing a
+ planar parallelogram with ``p(u, v) = p00 + u*(p10-p00) + v*(p01-p00)``,
+ ``u, v in [0, 1]``; the patch normal is ``normalize(e_u x e_v)``.
+ ``height_fn(u, v)`` must accept broadcast arrays and return metric height
+ [m] along the patch normal. ``k_i_vec``/``k_s_vec`` are wave vectors
+ [rad/m] whose magnitudes must match ``2*pi*frequency_hz/c0`` (checked).
+ ``n_quad`` is a Gauss-Legendre point count per axis (int or (nu, nv)).
+ Returns a complex scalar.
+ """
     corners = np.asarray(patch_corners, dtype=np.float64)
     if corners.shape != (4, 3):
         raise ValueError("patch_corners must have shape (4, 3): [p00, p10, p11, p01]")
@@ -441,11 +424,11 @@ def phase_screen_patch_integral(
 def hemisphere_integral(f: Callable, n_theta: int = 64, n_phi: int = 128):
     """Integrate ``f(cos_theta, phi)`` over the upper hemisphere solid angle.
 
-    ``Int f dOmega = Int_0^{2pi} dphi Int_0^1 f d(cos_theta)``:
-    Gauss-Legendre in ``mu = cos_theta`` over (0, 1], uniform midpoint rule
-    in ``phi`` (spectrally accurate for periodic integrands). ``f`` receives
-    broadcastable arrays ``(mu[n_theta, 1], phi[1, n_phi])``.
-    """
+ ``Int f dOmega = Int_0^{2pi} dphi Int_0^1 f d(cos_theta)``:
+ Gauss-Legendre in ``mu = cos_theta`` over (0, 1], uniform midpoint rule
+ in ``phi`` (spectrally accurate for periodic integrands). ``f`` receives
+ broadcastable arrays ``(mu[n_theta, 1], phi[1, n_phi])``.
+ """
     nodes, weights = np.polynomial.legendre.leggauss(n_theta)
     mu = 0.5 * (nodes + 1.0)
     w_mu = 0.5 * weights
@@ -456,5 +439,4 @@ def hemisphere_integral(f: Callable, n_theta: int = 64, n_phi: int = 128):
     return float((values * w_mu[:, None]).sum() * (2.0 * np.pi / n_phi))
 
 
-# Preserve the historical public import/pickle path for one compatibility
-# cycle while this implementation is owned by ``physics.reference``.
+# Keep this import path available for pickled test fixtures.

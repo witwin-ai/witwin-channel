@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
 # Empty-scene calibration pair for the ``three_cube_320`` case.
 
-"""Empty-scene calibration pair for the ``three_cube_320`` case.
-
-Runs the deterministic LoS-only solve and the witwin-maxwell FDTD on the same
-empty domain/grid as the three-cube reference. The pair yields the frozen
-positive amplitude scale ``s_empty = sqrt(sum|Ez_empty|^2 / sum|h_empty|^2)``
-used by the metal comparison without refitting.
-"""
+"""Empty-scene calibration pair for the ``three_cube_320`` case."""
 from __future__ import annotations
 
 import os

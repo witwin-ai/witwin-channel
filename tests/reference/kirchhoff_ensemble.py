@@ -1,15 +1,7 @@
 # Copyright Xingyu Chen.
 # Implements kirchhoff ensemble.
 
-"""Reference Torch Kirchhoff ensemble row physics (ADR-010 op 1).
-
-The previous production per-row physics of
-``interactions/scattering.py::_ensemble_rows`` after the RayD
-visibility filter (frame projections, table lookup, radiometric gain). The
-Kirchhoff table lookup itself was already native (``eval_bsdf`` ->
-``scattering_table_eval``) and is reused unchanged. Test-only: MUST NOT be
-imported from production packages.
-"""
+"""Implements kirchhoff ensemble."""
 
 from __future__ import annotations
 
@@ -108,7 +100,7 @@ def kirchhoff_ensemble_rows(
 
 
 # ---------------------------------------------------------------------------
-# Double-precision autograd oracle for the native ADR-014 op-1 VJP/JVP.
+# Double-precision autograd oracle for the native scattering AD VJP/JVP.
 #
 # The block above reproduces the removed production Torch physics but leans on
 # the *native* ``eval_bsdf`` table lookup (float32, non-differentiable), so it
@@ -119,7 +111,7 @@ def kirchhoff_ensemble_rows(
 # per-material tables, so ``torch.autograd`` through it pins the exact VJP/JVP
 # the native ``scattering_ensemble_eval_backward``/``_jvp`` companions must
 # match. The multilinear table interpolation mirrors the cell-centered
-# clamp/periodic conventions documented in ADR-014's derivative spec
+# clamp/periodic conventions documented in scattering AD's derivative spec
 # (``t = coord*n - 0.5`` clamp for the cos axes, ``n/(2*pi)`` for the periodic
 # phi axes, ``npi == 1`` relative-azimuth coupling ``phi_o' = wrap(phi_o -
 # phi_i)``). Test-only: MUST NOT be imported from production packages.
@@ -136,12 +128,12 @@ def _axis_clamp_weights(
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Cell-centered non-periodic axis (centers ``(k+0.5)/n``) with edge clamp.
 
-    Returns ``(i0, i1, frac)`` so the interpolated value is
-    ``(1-frac)*table[i0] + frac*table[i1]``. The gradient of ``frac`` w.r.t.
-    ``coord`` is ``n`` when ``t = coord*n - 0.5`` lies in ``(0, n-1)`` and 0
-    outside (the clamp saturates), matching the ADR-014 spec. An axis with
-    ``n == 1`` contributes a constant (zero partial).
-    """
+ Returns ``(i0, i1, frac)`` so the interpolated value is
+ ``(1-frac)*table[i0] + frac*table[i1]``. The gradient of ``frac`` w.r.t.
+ ``coord`` is ``n`` when ``t = coord*n - 0.5`` lies in ``(0, n-1)`` and 0
+ outside (the clamp saturates), matching the scattering AD spec. An axis with
+ ``n == 1`` contributes a constant (zero partial).
+ """
 
     if n == 1:
         index = torch.zeros_like(coord, dtype=torch.long)
@@ -159,8 +151,8 @@ def _axis_periodic_weights(
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Cell-centered periodic axis over ``[0, 2*pi)`` (centers ``(k+0.5)*2*pi/n``).
 
-    ``d frac/d phi = n/(2*pi)`` everywhere (no clamp); indices wrap modulo ``n``.
-    """
+ ``d frac/d phi = n/(2*pi)`` everywhere (no clamp); indices wrap modulo ``n``.
+ """
 
     t = phi * (float(n) / (2.0 * math.pi)) - 0.5
     base = torch.floor(t.detach())
@@ -178,12 +170,12 @@ def bsdf_table_interp(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Differentiable multilinear Kirchhoff-table lookup (float64-capable).
 
-    ``f_te``/``f_tm`` are dense ``[Nti, Npi, Nto, Npo]`` tables for one
-    material; ``wi_local``/``wo_local`` are ``[N, 3]`` local-frame directions.
-    Below-horizon pairs (``wi[2] <= 0`` or ``wo[2] <= 0``) return 0 with zero
-    partials. For the production isotropic table (``Npi == 1``) the outgoing
-    azimuth is measured relative to the incident azimuth.
-    """
+ ``f_te``/``f_tm`` are dense ``[Nti, Npi, Nto, Npo]`` tables for one
+ material; ``wi_local``/``wo_local`` are ``[N, 3]`` local-frame directions.
+ Below-horizon pairs (``wi[2] <= 0`` or ``wo[2] <= 0``) return 0 with zero
+ partials. For the production isotropic table (``Npi == 1``) the outgoing
+ azimuth is measured relative to the incident azimuth.
+ """
 
     nti, npi, nto, npo = (int(size) for size in f_te.shape)
     cos_i = wi_local[..., 2]
@@ -241,16 +233,16 @@ def kirchhoff_ensemble_gain_reference(
     f_tm: torch.Tensor,
     coef: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable re-derivation of ADR-014 op 1 from *gathered* inputs.
+    """Differentiable re-derivation of scattering AD from *gathered* inputs.
 
-    Mirrors ``scattering_ensemble_eval``'s per-row physics exactly, taking the
-    already-gathered ``wo_rows``/``r2_rows``/``cos_o_rows`` and the per-sample
-    ``n_o``/``t1r``/``t2r``/``wi_local``/``cos_i``/``r1``/``a_te2``/``a_tm2``/
-    ``weights`` indexed by ``sc_idx``, the dense ``f_te``/``f_tm`` tables for
-    the single test material, and the radiometric scalar ``coef``. Every listed
-    tensor is a differentiable leaf; ``backup_axis``/``rx_pol``/``rc_idx``/
-    ``sc_idx`` are fixed. ``keep``/``threshold`` are outside the AD contract.
-    """
+ Mirrors ``scattering_ensemble_eval``'s per-row physics exactly, taking the
+ already-gathered ``wo_rows``/``r2_rows``/``cos_o_rows`` and the per-sample
+ ``n_o``/``t1r``/``t2r``/``wi_local``/``cos_i``/``r1``/``a_te2``/``a_tm2``/
+ ``weights`` indexed by ``sc_idx``, the dense ``f_te``/``f_tm`` tables for
+ the single test material, and the radiometric scalar ``coef``. Every listed
+ tensor is a differentiable leaf; ``backup_axis``/``rx_pol``/``rc_idx``/
+ ``sc_idx`` are fixed. ``keep``/``threshold`` are outside the AD contract.
+ """
 
     sample = sc_idx.long()
     receiver = rc_idx.long()

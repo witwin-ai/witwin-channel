@@ -50,11 +50,11 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _consolidated_section(path: Path, source_name: str) -> str:
+def _native_section(path: Path, section_name: str) -> str:
     text = path.read_text(encoding="utf-8-sig")
-    marker = f"// ---- Consolidated from {source_name} ----"
+    marker = f"// ==== Section: {section_name} ===="
     start = text.index(marker)
-    end = text.find("// ---- Consolidated from ", start + len(marker))
+    end = text.find("// ==== Section: ", start + len(marker))
     return text[start:] if end < 0 else text[start:end]
 
 
@@ -93,9 +93,9 @@ def test_phase10b_channel_has_no_local_scattering_numerical_owner() -> None:
 
 
 def test_phase10b_retains_only_event_policy_in_scattering_tu() -> None:
-    source = _consolidated_section(
+    source = _native_section(
         KERNELS / "montecarlo_common.cu",
-        "scattering.cu",
+        "Monte Carlo scattering",
     )
     assert source.count("scattering_event_kernel<<<") == 1
     assert source.count("channel_scattering_event_probabilities(") == 1

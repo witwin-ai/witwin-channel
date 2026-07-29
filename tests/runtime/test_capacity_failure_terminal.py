@@ -160,9 +160,9 @@ def test_capacity_failure_terminal_source_has_one_async_device_observer() -> Non
         / "witwin/channel/runtime.py"
     ).read_text(encoding="utf-8")
     terminal = native.split(
-        "// ---- Consolidated from capacity_failure_terminal.cu ----", 1
+        "// ==== Section: Capacity failure terminal check ====", 1
     )[1].split(
-        "// ---- Consolidated from enumerated_capacity_failure_sanitize.cu ----", 1
+        "// ==== Section: Enumerated capacity sanitization ====", 1
     )[0]
 
     assert terminal.count('asm volatile("trap;")') == 1

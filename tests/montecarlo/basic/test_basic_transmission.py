@@ -1,12 +1,7 @@
 # Copyright Xingyu Chen.
-# MC basic straight-penetration transmission radiomap (contract section 4).
+# Test Monte Carlo Basic straight-penetration radiomaps.
 
-"""MC basic straight-penetration transmission radiomap (contract section 4).
-
-Acceptance: a single eps_r=1 vacuum wall reproduces the unobstructed LoS map
-exactly (within float tolerance), a lossy wall attenuates it by the stack
-power transmittance, and a PEC wall transmits nothing.
-"""
+"""Test Monte Carlo Basic straight-penetration radiomaps."""
 
 import os
 from pathlib import Path
@@ -151,7 +146,7 @@ def test_lossy_wall_attenuates_by_stack_power_transmittance():
     empty = _solve(_scene([], grid_shape=(1, 1)), {"los"})
 
     oracle = layer_stack_rt([(thickness, eps_r, sigma_e, 1.0)], 1.0, _FREQUENCY)
-    # ADR-020: the per-wall transmittance is the Jones-derived power projected on
+    # transmission polarization: the per-wall transmittance is the Jones-derived power projected on
     # the incident polarization, not the unpolarized TE/TM mean. At this exact
     # normal incidence the plane of incidence is degenerate and T_te == T_tm, so
     # the polarized projection is simply T_te.

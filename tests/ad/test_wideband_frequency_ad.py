@@ -1,28 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests wideband frequency ad.
 
-"""Frequency AD at every wideband column, not only at the reference (ADR-042).
-
-``frequency_offsets_hz`` is a host declaration and carries no tangent of its
-own: a derivative with respect to one grid point IS the
-``reference_frequency_hz`` derivative evaluated at that point. That claim is
-only worth making if it holds at every column, so these tests validate each
-column independently against central finite differences in float64, on both
-the line-of-sight and reflection routes, in forward and reverse mode.
-
-Two further things are pinned here because they are the ways this could be
-quietly wrong.
-
-Forward and reverse must agree with each other exactly, column by column. They
-run different native companions over the same launch, so a disagreement is a
-companion defect rather than a tolerance question.
-
-ADR-038 liveness must be one decision for the whole call. The wideband loop
-computes it once, above the columns, so a forward-only dual on the ENDPOINTS
-must produce a ``delay_s`` tangent while every column of the payload is
-present. A per-column decision, or a first-column decision, would show up as a
-missing geometry tangent on exactly the requests Radar's Doppler chain uses.
-"""
+"""Tests wideband frequency ad."""
 
 from __future__ import annotations
 
@@ -167,11 +146,11 @@ def _column_loss(payload: torch.Tensor, column: int) -> torch.Tensor:
 def _fd_column_gradients(component: str) -> list[float]:
     """Central difference of every column with respect to the reference.
 
-    The scene is recompiled at ``f +- h`` and replayed against the SAME frozen
-    topology. That is legal precisely because frequency is not one of the four
-    world version domains, so a frequency-only recompile leaves the provenance
-    the frozen rows were discovered against unchanged.
-    """
+ The scene is recompiled at ``f +- h`` and replayed against the SAME frozen
+ topology. That is legal precisely because frequency is not one of the four
+ world version domains, so a frequency-only recompile leaves the provenance
+ the frozen rows were discovered against unchanged.
+ """
 
     step = FD_STEP_HZ
     values = []
@@ -277,9 +256,9 @@ def test_forward_and_reverse_agree_column_by_column(component) -> None:
 def test_the_columns_are_not_the_same_derivative(component) -> None:
     """A per-column claim is only meaningful if the columns differ.
 
-    Without this the three tests above would pass on an implementation that
-    evaluated every column at the reference frequency.
-    """
+ Without this the three tests above would pass on an implementation that
+ evaluated every column at the reference frequency.
+ """
 
     reverse = _reverse_column_gradients(component)
     baseline = reverse[OFFSETS.index(0.0)]
@@ -294,13 +273,13 @@ def test_the_columns_are_not_the_same_derivative(component) -> None:
 
 @pytest.mark.parametrize("component", ("los", "reflection"))
 def test_geometry_liveness_is_one_decision_for_the_whole_sweep(component) -> None:
-    """ADR-038 through a wideband loop: endpoint duals, every column live.
+    """forward-mode liveness through a wideband loop: endpoint duals, every column live.
 
-    A forward-only dual on the sink positions - no ``requires_grad`` anywhere -
-    must produce the geometry tangents AND a complete payload. Deciding
-    liveness inside the column loop, or letting the first column decide for the
-    rest, is the defect ADR-038 removed and is what this asserts against.
-    """
+ A forward-only dual on the sink positions - no ``requires_grad`` anywhere -
+ must produce the geometry tangents AND a complete payload. Deciding
+ liveness inside the column loop, or letting the first column decide for the
+ rest, is the defect forward-mode liveness and is what this asserts against.
+ """
 
     compiled, sources, sinks, prepared = _frozen(component, FREQUENCY_HZ)
     velocity = torch.tensor(

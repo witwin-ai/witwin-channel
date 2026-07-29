@@ -18,11 +18,7 @@ SOLVER_ROOTS = (
 
 
 def _solver_sources(root: Path) -> tuple[Path, ...]:
-    """Every source file that owns one solver.
-
-    A solver is either a collapsed single module beside its former package
-    directory, or a package whose facade delegates to a pipeline owner.
-    """
+    """Return every source file that owns a solver entry point."""
 
     module = root.with_suffix(".py")
     if module.is_file():

@@ -1,42 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests bdpt solver ad.
 
-"""ADR-022 solver-level acceptance gates for BDPT full fixed-topology AD.
-
-Drives the public ``montecarlo.bdpt`` solver with ``ad_mode`` in
-``{"none","jvp","vjp"}`` and pins the ADR-022 acceptance protocol:
-
-1. ``ad_mode="none"`` bitwise (seed-deterministic self-comparison run-to-run) with
-   ``ad_status == "none"`` metadata, on a wedge+rough fixture.
-2. Primal-under-ad bitwise equals the ``"none"`` primal (the AD wrappers call the
-   same forward symbols).
-3. Central-difference cross-checks at FIXED seed for the differentiable parameter
-   set -- layer ``eps_r``/``sigma_e``/``thickness``, resident table values,
-   carrier ``frequency``, ``tx_power`` -- on (a) an enumerated-dominated
-   reflection fixture, (b) a mixed-chain shooting (transmission) fixture, (c) a
-   scattering NEE fixture, (d) a coherent-combine fixture.
-4. Unbiased-gradient sanity: the mean of per-seed AD gradients converges to the FD
-   gradient of the seed-mean (validates the frozen-pdf estimator commutation).
-5. Geometry-gradient refusal through the stochastic sampler
-   (``ad_geometry == "enumerated_blocks_only"``; requesting a mesh/endpoint
-   gradient that only reaches the shooting walk fails loudly).
-6. JVP-vs-VJP consistency at the solver level.
-
-Every FD uses the shared ``tests/ad/_fd`` engine with FIXED seed, so the frozen
-sampling / masks / seeds make the estimator differentiable in the material / EM /
-frequency / power leaves (ADR-022 fixed-topology contract). No tolerance is
-weakened. These run after the supervisor rebuilds the extension with the
-ADR-022 companions and threads ``ad_mode`` through the BDPT config.
-
-Interface assumptions (documented; resolved by the ADR-022 section 7 wiring):
-
-* ``tx_power`` becomes a live graph leaf under ``ad != "none"`` (today
-  ``endpoints.transmitter_tensors`` reads ``float(power_w)``); the fixture puts a
-  ``requires_grad`` tensor in ``Transmitter.power_w`` and expects the solver to
-  thread it.
-* ``result.metadata["ad_geometry"] == "enumerated_blocks_only"`` and geometry
-  gradients that only reach the shooting sampler are refused loudly.
-"""
+"""Tests bdpt solver ad."""
 
 from __future__ import annotations
 
@@ -553,7 +518,7 @@ def test_seed_gradient_mean_matches_fd_of_mean():
 def test_shooting_metadata_reports_enumerated_blocks_only():
     _require_native()
     # A transmission-only fixture contributes solely through the shooting sampler,
-    # whose hit-point geometry is frozen in v1 (ADR-022 stochastic-sampler stance).
+    # whose hit-point geometry is frozen in v1 (BDPT AD stochastic-sampler stance).
     scene = _transmission_scene()
     result = _solve(scene, _COMPONENTS["transmission"], "vjp")
     assert result.metadata.get("ad_geometry") == "enumerated_blocks_only"

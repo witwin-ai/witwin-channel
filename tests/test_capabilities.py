@@ -18,8 +18,8 @@ def test_capability_manifest_is_versioned_serializable_and_defensive():
         "transmission",
         "scattering",
     ]
-    # transmission is integrated in all four solvers as of wave 2; Kirchhoff
-    # scattering is integrated in all four solvers as of wave 3.
+    # transmission is integrated in all four solvers as of transmission; Kirchhoff
+    # scattering is integrated in all four solvers as of rough scattering.
     integration = manifest["component_solver_integration"]
     assert set(integration) == {"transmission", "scattering"}
     assert integration["transmission"] == {
@@ -45,7 +45,7 @@ def test_capability_manifest_is_versioned_serializable_and_defensive():
     )
     assert path["max_reflections_in_coupled_path"] == 1
     assert path["reflection_diffraction_coupling_candidate_limit"] == 1_000_000
-    # ADR-013 D5: coupled_paths=True now enables the uniform order-2
+    # coupled double diffraction: coupled_paths=True now enables the uniform order-2
     # compensator family including cid 7 double diffraction (D->D). The key is
     # exposed on every solver block that declares coupling support.
     assert path["coupled_double_diffraction"] is True

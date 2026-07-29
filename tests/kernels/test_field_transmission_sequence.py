@@ -1,12 +1,7 @@
 # Copyright Xingyu Chen.
-# Endpoint-connection specular transmission (contract section 4).
+# Test endpoint-connection specular transmission fields.
 
-"""Endpoint-connection specular transmission (contract section 4).
-
-The decisive invariant: a thin_sheet wall made of a single vacuum layer must
-reproduce the no-wall free-space complex field (amplitude AND phase) at normal
-and oblique incidence.
-"""
+"""Test endpoint-connection specular transmission fields."""
 
 import math
 

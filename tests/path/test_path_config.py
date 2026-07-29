@@ -16,7 +16,7 @@ def test_path_config_defaults_are_explicit():
     assert config.max_paths_scope == "per_pair"
     assert config.coupled_candidate_limit == 1_000_000
     assert config.ad_mode == "none"
-    # ISB boundary taper (ADR-017) is DEFAULT-OFF with the projection-validated
+    # ISB boundary taper (the boundary taper) is DEFAULT-OFF with the projection-validated
     # width default; the switch never defaults on.
     assert config.isb_boundary_taper is False
     assert config.isb_boundary_taper_width == 0.5
@@ -50,7 +50,7 @@ def test_path_config_validates_inputs():
 
     with pytest.raises(ValueError, match="ad_mode"):
         Config(ad_mode="forward")
-    # Fixed-topology material/frequency AD (plan 07 AD-1).
+    # Fixed-topology material/frequency AD (material and frequency derivatives).
     assert Config(ad_mode="vjp").ad_mode == "vjp"
     assert Config(ad_mode="jvp").ad_mode == "jvp"
 

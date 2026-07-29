@@ -182,8 +182,7 @@ def test_two_bounce_reflection_exports_depth_two_fields():
     )
 
     assert result.paths is not None
-    # One specular path per coplanar wall: the historical expectation carried
-    # a twin path per wall triangle (D-1 double counting, +6 dB coherent).
+    # Coplanar triangles form one wall and must produce one specular path.
     torch.testing.assert_close(
         result.paths.depth,
         torch.tensor([1, 1, 2], device=result.paths.depth.device, dtype=torch.int32),

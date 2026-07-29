@@ -1,13 +1,7 @@
 # Copyright Xingyu Chen.
 # Root conftest: configure the validated native extension for the test suite.
 
-"""Root conftest: configure the validated native extension for the test suite.
-
-When the packaged extension is absent, search ``artifacts/cmake-*`` for a pyd
-and build-fingerprint sidecar matching the running interpreter. Configure the
-explicit developer loader variables and abort collection when no validated
-build exists.
-"""
+"""Root conftest: configure the validated native extension for the test suite."""
 
 from __future__ import annotations
 

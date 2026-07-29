@@ -44,7 +44,7 @@ def test_bdpt_config_defaults_match_public_contract():
         ({"accumulation_strategy": "python_loop"}, "accumulation_strategy"),
         ({"sample_streams": 0}, "sample_streams"),
         ({"max_exported_paths": -1}, "max_exported_paths"),
-        # ADR-022 lifted the vjp/jvp rejection (they are supported AD modes now),
+        # BDPT AD lifted the vjp/jvp rejection (they are supported AD modes now),
         # so an unknown ad_mode is the invalid case that must still be rejected.
         ({"ad_mode": "bogus"}, "ad_mode"),
         ({"workspace_limit_bytes": -1}, "workspace_limit_bytes"),
@@ -57,7 +57,7 @@ def test_bdpt_config_rejects_invalid_values(kwargs, message):
 
 @pytest.mark.parametrize("ad_mode", ["vjp", "jvp"])
 def test_bdpt_config_accepts_adr022_ad_modes(ad_mode):
-    # ADR-022 wires native BDPT AD companions, so vjp/jvp are accepted AD modes
+    # BDPT AD wires native BDPT AD companions, so vjp/jvp are accepted AD modes
     # and the solver metadata reports the active mode as ad_status.
     from witwin.channel.runtime import AdLaunchLedger
     from witwin.channel.montecarlo.bdpt import make_solver_metadata

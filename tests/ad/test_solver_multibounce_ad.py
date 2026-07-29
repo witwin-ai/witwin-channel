@@ -1,22 +1,7 @@
 # Copyright Xingyu Chen.
 # Solver-level multi-reflection (depth >= 2) AD tests for deterministic/path.
 
-"""Solver-level multi-reflection (depth >= 2) AD tests for deterministic/path.
-
-Covers the plan 07 section 9.3 multi-reflection column for D and P: eps_r /
-sigma_e / frequency / TX/RX position / mesh vertex, each against a central
-finite difference of the primal solve. The loss keeps ONLY the depth-2 rows
-so a passing test cannot ride on the single-bounce paths of the same solve;
-the kernels are general-depth (kernel-level depth-2 coverage lives in
-test_field_em_ad.py) and this file closes the solver-level gap.
-
-The two parallel walls are z-asymmetric (top edges at 2.4 m and 2.3 m) and
-the endpoints sit off every symmetry plane, for the same reason the AD-2
-reflection fixture uses an asymmetric wall: a specular point on a shared
-triangulation diagonal or a symmetry axis makes the discovered winner set
-flip under the FD probes, which is a path birth/death discontinuity outside
-the fixed-winner contract.
-"""
+"""Solver-level multi-reflection (depth >= 2) AD tests for deterministic/path."""
 
 from __future__ import annotations
 

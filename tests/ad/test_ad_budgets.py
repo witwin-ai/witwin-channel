@@ -1,22 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests ad budgets.
 
-"""CI budget gates for the AD suite (plan 07 section 10).
-
-Two families of budgets, both of which fail the suite on regression instead
-of drifting silently:
-
-- The gradient-error tolerances and FD steps of tests/ad/_tolerances.py are
-  pinned to their agreed values. Loosening a tolerance to make a failing
-  gradient pass is the failure mode this gate exists to catch; tightening is
-  fine but must be done here and in _tolerances.py together.
-- The AD execution overhead relative to the primal solve is bounded: forward
-  time in the AD modes, the wall time of one reverse pass, the retained tape
-  and the CUDA peak-memory high-water mark. The budgets carry generous CI
-  headroom (measured medians sit several times below them); they are meant
-  to catch order-of-magnitude regressions (an accidental sync storm, a
-  Python re-solve on the hot path, tape blow-up), not scheduler noise.
-"""
+"""Tests ad budgets."""
 
 from __future__ import annotations
 
@@ -40,7 +25,7 @@ _FREQUENCY_HZ = 3.0e9
 
 
 def test_gradient_tolerances_are_pinned():
-    """Section 9.2 constants, frozen. Change them HERE and in _tolerances.py."""
+    """Keep these tolerance constants synchronized with ``_tolerances.py``."""
 
     assert _tolerances.REL_TOL_PATH == 5.0e-3
     assert _tolerances.REL_TOL_GENERAL == 5.0e-2

@@ -1,30 +1,7 @@
 # Copyright Xingyu Chen.
-# Deterministic-field continuity regression guards (design doc Tier 3 / F6).
+# Test deterministic field continuity across visibility boundaries.
 
-"""Deterministic-field continuity regression guards (design doc Tier 3 / F6).
-
-Companion to ``docs/dev/audit/utd-continuity-fix-design.md`` (section F6) and
-``docs/dev/audit/fullwave-deterministic-discontinuity-audit.md``. These are
-deterministic-only, GPU, no-fullwave-reference tests over the single-cube PEC
-scene (cube center (0,0,0.15), size 0.2 m, PEC; TX (-0.2,-0.5,0.42) z-pol;
-receiver plane z=0.10 m; 5 GHz). They pin the R1-R5 continuity fixes so a
-future regression that re-introduces a hard gate (R1), a dominant-component
-export collapse (R2), a receiver-side coefficient branch (R3), a vertex
-double-count (R4) or a polarization-model mismatch (R5) fails loudly.
-
-Every threshold is calibrated from the verified E1e build metrics
-(``artifacts/fullwave-fix/verify-e1e/verify_e1e_metrics.json`` and the
-``check{1..4}_*`` scripts, pyd fingerprint
-ec59cfbf202c921b8cff4dc827a38db201fa3926a62cfc1f53d756c19dade90a) and set with
-margin over the value measured on each test's own (small) grid; the per-test
-provenance is documented inline. The deterministic solver is reproducible
-(bit-identical across repeated solves), so these thresholds are not flaky.
-
-Cells inside the cube footprint (|x| <= 0.1 and |y| <= 0.1) lie inside the PEC
-on the z=0.10 plane and legitimately carry no field; they are excluded from the
-continuity statistics via ``_footprint_valid`` exactly as the verify-e1e full-
-grid checks do (``check3_fullgrid.footprint_valid``).
-"""
+"""Test deterministic field continuity across visibility boundaries."""
 
 from __future__ import annotations
 
@@ -99,10 +76,10 @@ def _cube_mesh() -> tuple[torch.Tensor, torch.Tensor]:
 def _build_scene(x_values: np.ndarray, y_values: np.ndarray) -> Scene:
     """Single-cube PEC scene with an explicit axis-aligned receiver grid.
 
-    Mirrors ``benchmarks/fullwave_validation/scenarios.build_channel_scene`` and
-    the verify-e1e ``_env.build_scene`` helper, but takes explicit 1-D receiver
-    x/y arrays so each test can use a small grid.
-    """
+ Mirrors ``benchmarks/fullwave_validation/scenarios.build_channel_scene`` and
+ the verify-e1e ``_env.build_scene`` helper, but takes explicit 1-D receiver
+ x/y arrays so each test can use a small grid.
+ """
     x = np.asarray(x_values, dtype=np.float64)
     y = np.asarray(y_values, dtype=np.float64)
     vertices, faces = _cube_mesh()
@@ -144,11 +121,11 @@ def _solve_maps(
 ) -> tuple[np.ndarray, dict[str, np.ndarray]]:
     """Return the (ny, nx) total field map and per-component z-projected maps.
 
-    ``result.field`` and ``result.component_fields[*]`` are the coherent scalar
-    already projected onto the receiver polarization (z), so with z-polarized
-    receivers they are exactly the z-components of the total / per-component
-    field vectors (the physical observable compared against Maxwell Ez).
-    """
+ ``result.field`` and ``result.component_fields[*]`` are the coherent scalar
+ already projected onto the receiver polarization (z), so with z-polarized
+ receivers they are exactly the z-components of the total / per-component
+ field vectors (the physical observable compared against Maxwell Ez).
+ """
     result = solve(
         _build_scene(x_values, y_values),
         Config(
@@ -174,9 +151,9 @@ def _solve_maps(
 def _footprint_valid(x_values: np.ndarray, y_values: np.ndarray) -> np.ndarray:
     """(ny, nx) mask that is False for receivers inside the cube footprint.
 
-    The z=0.10 plane cuts the PEC cube (|x| <= 0.1, |y| <= 0.1); those receivers
-    are inside the conductor and carry no field. Same predicate as verify-e1e.
-    """
+ The z=0.10 plane cuts the PEC cube (|x| <= 0.1, |y| <= 0.1); those receivers
+ are inside the conductor and carry no field. Same predicate as verify-e1e.
+ """
     x_inside = np.abs(np.asarray(x_values))[None, :] <= 0.1
     y_inside = np.abs(np.asarray(y_values))[:, None] <= 0.1
     return ~(x_inside & y_inside)
@@ -196,20 +173,7 @@ def _db(magnitude: np.ndarray) -> np.ndarray:
 
 
 def test_t1_isb_rsb_toggle_continuity() -> None:
-    """F1/F3/F4/F5 (R2/R3/R4): the total field is continuous across GO toggles.
-
-    At every LoS-support toggle (ISB) and reflection-support toggle (RSB) the
-    diffracted field must compensate the geometrical-optics step, so the total
-    |field| dB jump across the toggle pair stays small.
-
-    Provenance: verify-e1e G1 measured on the 256x256 grid ISB median 1.146 dB /
-    p90 2.85 dB, RSB median 0.687 dB / p90 3.10 dB
-    (verify_e1e_metrics.json G1_los_refl_toggle_fullgrid, check2). On this
-    coarser 64x64 grid the combined ISB+RSB toggle set measures median 1.097 dB
-    and p90 3.85 dB (reproducible). Thresholds 1.5 dB / 5.0 dB keep ~27% / ~23%
-    margin. A regression to the R1 hard gate or the R2 dominant-component
-    collapse re-inflates these by many dB.
-    """
+    """Assert total-field continuity across LoS and reflection visibility boundaries."""
     _require_cuda()
     x = np.linspace(-0.4, 0.4, 64)
     y = np.linspace(-0.4, 0.4, 64)
@@ -244,17 +208,7 @@ def test_t1_isb_rsb_toggle_continuity() -> None:
 
 
 def test_t2_extension_plane_continuity() -> None:
-    """F5c (R3a): the total field is continuous across an extended-face plane.
-
-    Line y=0.6840, x in [-0.010, 0.004] at 0.5 mm (2 rows). The NW-vertical edge
-    diffraction crosses its extension plane at x~-0.00267; the closed-form
-    corner mend keeps the LoS+diffraction total continuous there.
-
-    Provenance: verify-e1e G2 (check1) measured 0.651 dB on this exact line
-    (gate was <2.0 dB; E1d without the corner mend was 3.585 dB). This 2-row
-    grid measures 0.654 dB. Threshold 2.5 dB keeps ~3.8x margin over the
-    measured step while still failing the 3.585 dB pre-mend regression.
-    """
+    """Assert total-field continuity where diffraction crosses an extended-face plane."""
     _require_cuda()
     x = np.round(np.arange(-0.010, 0.0041, 0.0005), 6)
     y = np.round(np.array([0.6840, 0.6840 + 0.0005]), 6)
@@ -269,19 +223,7 @@ def test_t2_extension_plane_continuity() -> None:
 
 
 def test_t3_near_edge_sliver_is_alive() -> None:
-    """F2 (R1): removing the 5 cm gate keeps near-edge diffraction finite.
-
-    Patch x in [0.098, 0.132], y in [-0.102, -0.046] at 1.5 mm, just east of the
-    +x cube face where the old UTD_MIN_DISTANCE=5e-2 gate hard-zeroed the
-    stationary-point contribution. The diffraction component must stay finite
-    over the valid (footprint-excluded) cells.
-
-    Provenance: verify-e1e G3 (check3) dead-sliver min |diffraction| 1.159e-3
-    (pre-fix baseline 2.2e-10). On this patch the footprint-excluded minimum is
-    2.34e-4. Threshold 1e-5 keeps >20x margin over the measured floor and >4
-    orders of magnitude over the pre-fix hard zero. Footprint-interior cells are
-    inside the PEC and legitimately zero, so they are excluded.
-    """
+    """Assert near-edge diffraction stays finite without a hard distance cutoff."""
     _require_cuda()
     x = np.round(np.arange(0.098, 0.1321, 0.0015), 6)
     y = np.round(np.arange(-0.102, -0.0459, 0.0015), 6)
@@ -299,22 +241,7 @@ def test_t3_near_edge_sliver_is_alive() -> None:
 
 
 def test_t4_vertex_ray_no_double_count() -> None:
-    """F5 (R4): a vertex-generated shadow-boundary ray is not double-counted.
-
-    Patch x in [-0.03, 0.03], y in [0.66, 0.72] at 1.5 mm, over the corner-cone
-    ridge cast by the NW-top cube vertex. With the truncated-edge sum each edge
-    contributes ~E_i/4 and the ridge ratio |diffraction_z|/|los_z| sits near
-    E_i/4..E_i/2 rather than ~1 (the pre-fix fake null where diffraction ~= los
-    in antiphase, or a >1 double count).
-
-    Provenance: verify-e1e check4 vertex ridge ratio median 0.344
-    (require [0.25, 0.75]) and worst adjacent |total_z| jump 4.903 dB at 0.5 mm
-    (documented corner-zone residual, F5c future work). On this 1.5 mm grid the
-    ridge ratio is 0.343 (min 0.305, max 0.346) and the worst adjacent total-z
-    jump is 1.76 dB. Ratio band [0.2, 0.8] brackets the corner limit without a
-    double count; the 8 dB adjacent-jump allowance documents the residual
-    corner-cone step (still far below a fake-null collapse).
-    """
+    """Assert a vertex shadow-boundary ray is counted once."""
     _require_cuda()
     x = np.round(np.arange(-0.03, 0.0301, 0.0015), 6)
     y = np.round(np.arange(0.66, 0.7201, 0.0015), 6)
@@ -348,18 +275,7 @@ def test_t4_vertex_ray_no_double_count() -> None:
 
 
 def test_t5_no_dead_cells() -> None:
-    """R1/R2: no spuriously dead cell next to a live one on the full grid.
-
-    Full 64x64 grid: no valid (footprint-excluded) receiver may collapse below
-    1e-9 while an orthogonal valid neighbour exceeds 1e-4. Such a pair is the
-    signature of a hard gate (R1) or an export collapse (R2) zeroing an
-    otherwise-lit cell; a genuine coherent null is never that deep on this grid.
-
-    Provenance: verify-e1e full grid has zero NaN/Inf and the deepest physical
-    null cell sits at |E|~1.5e-4 (verify_e1e full_grid_jumps_seams), while the
-    pre-fix dead sliver was ~2.2e-10. On this grid the minimum valid magnitude
-    is 2.25e-5 (>> 1e-9), so the detector finds no dead-zero/live-neighbour pair.
-    """
+    """Assert no valid cell collapses while an adjacent valid cell remains strongly lit."""
     _require_cuda()
     x = np.linspace(-0.4, 0.4, 64)
     y = np.linspace(-0.4, 0.4, 64)

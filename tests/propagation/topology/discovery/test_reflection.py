@@ -154,14 +154,8 @@ def test_contract_fields_and_forbidden_imports():
         for node in ast.walk(tree)
         if isinstance(node, ast.ImportFrom) and node.module
     }
-    # This used to read "no ``core``/``geometry``/``fields`` import at all",
-    # which pinned the discovery planner's position under
-    # ``propagation.topology`` - a package the import graph forbids from
-    # reaching geometry or fields. The concept-axis gather moved the planner
-    # out of that package and put reflection's geometry and field orchestration
-    # in the same file on purpose, so that phrasing can no longer be true.
-    # Pinning the exact import set keeps the same protection against unreviewed
-    # dependency creep without pretending the concept has no geometry.
+    # Pin the reflection owner's exact import set so discovery, geometry, and
+    # field orchestration do not acquire unreviewed dependencies.
     assert imports == {
         "__future__",
         "dataclasses",

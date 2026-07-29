@@ -1,17 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests forward mode liveness.
 
-"""ADR-038: forward-mode geometry liveness is decided at the wrapper.
-
-``torch.autograd.Function.apply`` unpacks forward duals before
-``setup_context`` runs, so a liveness check made there sees only primals. The
-wrapper computes ``geometry_live`` where the dual is still visible and passes
-it in explicitly. These tests pin the observable contract on the free-space
-facade: a forward-only dual (no ``requires_grad`` anywhere) receives full
-geometry tangents that match central finite differences, and a request with no
-geometry AD at all keeps ``path_length_m`` and ``delay_s`` detached exactly as
-before.
-"""
+"""Tests forward mode liveness."""
 
 from __future__ import annotations
 
@@ -102,7 +92,7 @@ def test_forward_only_dual_carries_geometry_tangents_matching_fd():
 
 
 def test_forward_only_dual_and_requires_grad_convention_agree():
-    """The ADR-037 interim convention resolves to the identical tangent."""
+    """The fixed-topology replay interim convention resolves to the identical tangent."""
 
     batch = _batch()
     tangent = torch.randn(
@@ -130,12 +120,12 @@ def test_forward_only_dual_and_requires_grad_convention_agree():
 
 
 def test_materials_only_request_keeps_geometry_detached():
-    """The AD-1 exactness contract survives the liveness move.
+    """The AD exactness contract survives the liveness move.
 
-    With no geometry gradient or tangent requested anywhere, the conditional
-    outputs stay detached so a materials-only graph never pays for geometry
-    adjoints it did not ask for.
-    """
+ With no geometry gradient or tangent requested anywhere, the conditional
+ outputs stay detached so a materials-only graph never pays for geometry
+ adjoints it did not ask for.
+ """
 
     batch = _batch()
     frequency = torch.tensor(

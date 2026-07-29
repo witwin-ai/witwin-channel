@@ -1,7 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests field rough reflection scale.
 
-"""Lockstep and contract tests for ADR-010 op 3 (rough-reflection C_r scale)."""
+"""Tests field rough reflection scale."""
 
 import pytest
 import torch
@@ -26,7 +26,7 @@ def _random_case(
     source = randn(rows, 3)
     # Physical roughness scale: the frozen rough-reflection-cr cell uses
     # rms_height ~ 0.015 m; keep sigma in that band so the exp(-2u^2) factor
-    # stays in the ADR 1e-6 float32 envelope.
+    # stays in the native contract 1e-6 float32 envelope.
     sigma_b = randn(rows, depth).abs() * sigma_scale
     rough_b = (
         torch.rand(rows, depth, generator=generator, device=device) < rough_fraction
@@ -56,7 +56,7 @@ def _random_case(
 @pytest.mark.parametrize("depth", [1, 2, 3, 5])
 @pytest.mark.parametrize("frequency_hz", [1.0e9, 3.0e9])
 def test_rough_reflection_scale_forward_matches_reference(depth, frequency_hz):
-    # The ADR-010 C_r gate (max-rel <= 1e-6) is validated at the frozen-cell
+    # The rough-surface scattering C_r gate (max-rel <= 1e-6) is validated at the frozen-cell
     # operating point (~GHz carriers, physical roughness). Deep into the
     # exp(-2u^2) tail (tens of GHz and/or large roughness) the single-precision
     # exp intrinsic vs Torch's exp can amplify above 1e-6; that regime is

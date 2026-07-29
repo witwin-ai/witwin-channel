@@ -1,7 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests rigid-transform invariance.
 
-"""Phase D global translation and nontrivial rotation acceptance."""
+"""Tests rigid-transform invariance."""
 
 from __future__ import annotations
 

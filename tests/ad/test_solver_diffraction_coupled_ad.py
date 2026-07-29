@@ -1,15 +1,7 @@
 # Copyright Xingyu Chen.
-# AD-4 solver-level tests: UTD diffraction and coupled R-D gradients.
+# AD solver-level tests: UTD diffraction and coupled R-D gradients.
 
-"""AD-4 solver-level tests: UTD diffraction and coupled R-D gradients.
-
-Covers the plan 07 section 9.3 cells delivered by AD-4 for D=deterministic
-and P=path: eps_r / sigma_e / frequency / TX/RX position x wedge diffraction
-(component 2, re-evaluated from the frozen topology), and the same parameters
-x coupled reflection-diffraction (components 3/4, path solver: coupled paths
-are a path-solver feature). The wedge re-evaluation forward-parity gate pins
-the re-evaluated field against RayD's order-1 export.
-"""
+"""AD solver-level tests: UTD diffraction and coupled R-D gradients."""
 
 from __future__ import annotations
 
@@ -52,14 +44,12 @@ _WEDGE_TX = (0.0, -1.0, 0.5)
 # the near-null diffracted field (~100x below the dominant paths) flickers
 # between branches under codegen differences (OptiX fast-math raygen vs the CUDA
 # AD kernel) and central differences of the primal never converge. Perturbing
-# RX_y off the exact symmetry (1.0 -> 1.07) takes the observation off the branch
-# cut and puts every path in a well-conditioned regime; the wedge stays welded
-# and all previously exercised code paths still fire.
+# Move RX_y off symmetry to avoid the branch cut while keeping every path well conditioned.
 _WEDGE_RX = (3.0, 1.07, 0.5)
 # Off the scene's x = 0 symmetry axis: exactly on it, the ground specular
 # point and the wedge stationary points ride degenerate loci where tiny
 # endpoint perturbations flip discrete winners, so a central difference of
-# the primal never converges (the same reason the AD-2 reflection fixture
+# the primal never converges (the same reason the AD reflection fixture
 # uses an asymmetric wall).
 _COUPLED_TX = (0.4, -2.2, 1.15)
 _COUPLED_RX = (0.55, 2.3, 4.8)
@@ -206,11 +196,11 @@ def test_wedge_reevaluation_forward_parity(solver, material):
 def test_coupled_forward_stays_primal_without_geometry_leaves():
     """Materials-only coupled AD keeps the exact primal coupled coefficients.
 
-    The coupled Function forward is dispatch only (same native kernel, same
-    inputs), so the coupled rows must match bit-for-bit. The pure-diffraction
-    rows of the same solve are re-evaluated from the frozen topology in AD
-    mode and are held to the float32 parity gate instead.
-    """
+ The coupled Function forward is dispatch only (same native kernel, same
+ inputs), so the coupled rows must match bit-for-bit. The pure-diffraction
+ rows of the same solve are re-evaluated from the frozen topology in AD
+ mode and are held to the float32 parity gate instead.
+ """
 
     scene = _coupled_scene()
     primal = _solve_coupled(scene, "none")
@@ -357,15 +347,15 @@ def _welded_wedge_scene(vertices: torch.Tensor | None = None) -> Scene:
 
 @pytest.mark.parametrize("solver", _SOLVERS)
 def test_wedge_mesh_vertex_grad_matches_fd(solver):
-    """Mesh vertex x diffraction (plan 07 section 9.3).
+    """Mesh vertex x diffraction (the derivative capability matrix).
 
-    The wedge kernel rebuilds the edge tables (edge anchor/direction/bounds,
-    face normals, exterior angle) from the winner vertices on the dual row,
-    so moving an edge vertex moves the stationary point, the wedge angle and
-    the incidence angles. FD parity of the primal is the gate for the
-    rebuilt-tables convention (sign/plane assignment against the frozen
-    discovery tables).
-    """
+ The wedge kernel rebuilds the edge tables (edge anchor/direction/bounds,
+ face normals, exterior angle) from the winner vertices on the dual row,
+ so moving an edge vertex moves the stationary point, the wedge angle and
+ the incidence angles. FD parity of the primal is the gate for the
+ rebuilt-tables convention (sign/plane assignment against the frozen
+ discovery tables).
+ """
 
     base = torch.tensor(_WELDED_WEDGE_VERTICES, dtype=torch.float32)
     leaf = base.clone().cuda().requires_grad_(True)
@@ -387,11 +377,11 @@ def test_wedge_mesh_vertex_grad_matches_fd(solver):
 def test_wedge_vertex_mode_forward_stays_on_parity():
     """The vertex-rebuilt edge tables must reproduce the discovery tables.
 
-    With a live vertex leaf the AD forward evaluates the wedge from tables
-    rebuilt inside the kernel; any convention drift (normal winding, plane
-    assignment, exterior angle) would move the primal value away from the
-    frozen-table evaluation and fail this float32 parity gate.
-    """
+ With a live vertex leaf the AD forward evaluates the wedge from tables
+ rebuilt inside the kernel; any convention drift (normal winding, plane
+ assignment, exterior angle) would move the primal value away from the
+ frozen-table evaluation and fail this float32 parity gate.
+ """
 
     scene_primal = _welded_wedge_scene()
     primal = _solve_wedge(scene_primal, "deterministic", "none")
@@ -528,7 +518,7 @@ def test_coupled_endpoint_position_grad_matches_fd(endpoint):
 
 
 # ---------------------------------------------------------------------------
-# Coupled double diffraction (component 7, ADR-013 D4). The coupled fixture
+# Coupled double diffraction (component 7, coupled double diffraction). The coupled fixture
 # (an off-mirror-symmetry box, _COUPLED_TX/_COUPLED_RX asymmetric, see the
 # _COUPLED_TX note and trap 8) produces cid-7 rows: both interactions along a
 # path are diffraction (type 2). These tests isolate the DD rows so the
@@ -557,7 +547,7 @@ def _dd_loss(result) -> torch.Tensor:
 
 
 # Same box geometry as coupled_wall_wedge_scene, but with a live vertices leaf
-# so the coupled mesh-vertex refusal (ADR-013 D4) can be exercised. Kept off any
+# so the coupled mesh-vertex refusal (coupled double diffraction) can be exercised. Kept off any
 # mirror symmetry via the asymmetric TX/RX (trap 8).
 _COUPLED_VERTICES = (
     (-5.0, -5.0, 0.0),
@@ -620,9 +610,9 @@ def test_coupled_dd_runs_under_ad_modes(ad_mode):
 def test_coupled_dd_endpoint_position_grad_matches_fd(endpoint):
     """DD-only endpoint (tx AND rx) grads vs central differences of the primal.
 
-    tx/rx gradients flow through the native per-leg re-anchoring inside the
-    coupled_dd field kernel; Q1/Q2 and the edge bounds are frozen (ADR-013 D4).
-    """
+ tx/rx gradients flow through the native per-leg re-anchoring inside the
+ coupled_dd field kernel; Q1/Q2 and the edge bounds are frozen (coupled double diffraction).
+ """
 
     base = torch.tensor(
         _COUPLED_TX if endpoint == "tx" else _COUPLED_RX, dtype=torch.float32
@@ -646,9 +636,9 @@ def test_coupled_dd_endpoint_position_grad_matches_fd(endpoint):
 def test_coupled_dd_forward_mode_matches_reverse():
     """JVP-vs-VJP inner-product duality on the wedge eps_r seed for cid-7 rows.
 
-    Fires channel_field_coupled_dd_jvp (forward dual) and channel_field_coupled_dd_backward
-    (reverse) and checks they agree on the DD-only loss.
-    """
+ Fires channel_field_coupled_dd_jvp (forward dual) and channel_field_coupled_dd_backward
+ (reverse) and checks they agree on the DD-only loss.
+ """
 
     scene = _coupled_scene()
     compiled = compile_scene(scene, reference_frequency_hz=_FREQUENCY_HZ)
@@ -681,12 +671,12 @@ def test_coupled_dd_forward_mode_matches_reverse():
 
 
 def test_coupled_dd_mesh_vertex_grad_raises_loudly():
-    """A live mesh-vertex leaf through the coupled family fails loudly (ADR-013 D4).
+    """A live mesh-vertex leaf through the coupled family fails loudly (coupled double diffraction).
 
-    The coupled stationary re-solve and the coupled/DD field adjoints treat the
-    edge tables as frozen winners, so d(coupled)/d(vertices) would be silently
-    missing; evaluation.py refuses instead of returning an incomplete gradient.
-    """
+ The coupled stationary re-solve and the coupled/DD field adjoints treat the
+ edge tables as frozen winners, so d(coupled)/d(vertices) would be silently
+ missing; evaluation.py refuses instead of returning an incomplete gradient.
+ """
 
     vertices = (
         torch.tensor(_COUPLED_VERTICES, dtype=torch.float32).cuda().requires_grad_(True)

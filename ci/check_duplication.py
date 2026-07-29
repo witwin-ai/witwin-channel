@@ -1,27 +1,7 @@
 # Copyright Xingyu Chen.
 # Gate exact-token duplicate regions against the classification ledger.
 
-"""Gate exact-token duplicate regions against the classification ledger.
-
-The gate recomputes the duplicate-region report from the working tree and
-enforces three governance invariants for Plan 08 G7:
-
-1. Every duplicate region of at least ``min_tokens`` tokens has a ledger entry
-   (no unclassified duplication).
-2. The combined duplicate line coverage never rises above the frozen baseline
-   (monotonic non-increase).
-3. The ledger contains no stale region ids that the current tree no longer
-   produces (stale entries must be pruned).
-
-It also validates ledger integrity: every category is one of the allowed
-values, and every ``numeric_sensitive_exempt`` region names its lockstep
-tests, matching G7's requirement that numeric primal/AD duplicates stay exempt
-only with lockstep coverage and owner comments.
-
-Run without arguments to gate; pass ``--print-current`` to print the current
-statistics for humans. The gate runs in the nightly tier of
-``ci/run_ci_tier.py`` (``nightly.duplication``).
-"""
+"""Gate exact-token duplicate regions against the classification ledger."""
 
 from __future__ import annotations
 

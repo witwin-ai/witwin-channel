@@ -1,19 +1,7 @@
 # Copyright Xingyu Chen.
 # Continuous propagation geometry and native facade ownership.
 
-"""Continuous propagation geometry and native facade ownership.
-
-Merged owner of the endpoint layout, RayD visibility and edge-state facades,
-the ISB boundary taper (ADR-017) line-of-sight facades, and the frozen-winner
-reevaluation geometry. The ISB facades are only ever invoked when the
-DEFAULT-OFF ``isb_boundary_taper`` switch is on, so the off solve never
-launches anything here and stays bit-identical.
-
-``occluder_boxes`` builds the per-structure axis-aligned box table once from the
-compiled geometry vertices. That is a compile-time structural reduction over the
-scene's handful of structures (not a per-(tx, rx) hot path); the per-pair
-clearance physics runs entirely in the native kernel.
-"""
+"""Continuous propagation geometry and native facade ownership."""
 
 from __future__ import annotations
 
@@ -170,7 +158,7 @@ def _cached_coplanar_face_groups(
     surface_ids: torch.Tensor,
 ) -> dict[str, torch.Tensor | int]:
     """Coplanar face groups are geometry-only; cache them per RayD scene so
-    the union-find does not rerun for every component of every solve."""
+ the union-find does not rerun for every component of every solve."""
 
     cache = getattr(rayd, "runtime_cache", None)
     if cache is None:
@@ -196,10 +184,10 @@ def _participates_in_ad(value: object) -> bool:
 def _geometry_participates_in_ad(scene: Scene) -> bool:
     """True when a geometry leaf (mesh vertices, TX/RX position) is on the graph.
 
-    Materials-only AD (plan 07 AD-1) keeps the detached native hit geometry
-    and skips the fixed-winner reconstruction entirely, so AD-2 adds no work
-    to a solve that does not ask for geometry gradients.
-    """
+ Materials-only AD (material and frequency derivatives) keeps the detached native hit geometry
+ and skips the fixed-winner reconstruction entirely, so AD adds no work
+ to a solve that does not ask for geometry gradients.
+ """
 
     leaves: list[object] = [tx.position for tx in scene.transmitters]
     leaves += [
@@ -224,9 +212,9 @@ def _opposite_vertex_ids(
 ) -> torch.Tensor:
     """Per-row id of the triangle vertex opposite the (v0, v1) edge.
 
-    Frozen-winner integer extraction on detached tables (the same class of
-    winner bookkeeping as the validity masks around it).
-    """
+ Frozen-winner integer extraction on detached tables (the same class of
+ winner bookkeeping as the validity masks around it).
+ """
 
     shared = (faces == v0_ids[:, None]) | (faces == v1_ids[:, None])
     opposite_slot = (~shared).to(dtype=torch.int64).argmax(dim=1)
@@ -243,19 +231,19 @@ def reflection_epc_paths(
 ) -> dict[str, torch.Tensor]:
     """Frozen-winner reflection EPC re-solve, published with its validity.
 
-    Re-launches the native EPC discovery (direct-plane mode) on the winner
-    face sequence, so the primal hit points and normals ARE the discovery
-    values, and RayD's fixed-winner chain companions provide
-    d(hits, normals)/d(vertices, source, target). The plane arrays handed to
-    RayD are pure gathers of the same anchor/normal tables the discovery
-    consumed; RayD chains the plane cotangents to the winner triangle's
-    vertices itself, so nothing geometric is re-derived here.
+ Re-launches the native EPC discovery (direct-plane mode) on the winner
+ face sequence, so the primal hit points and normals ARE the discovery
+ values, and RayD's fixed-winner chain companions provide
+ d(hits, normals)/d(vertices, source, target). The plane arrays handed to
+ RayD are pure gathers of the same anchor/normal tables the discovery
+ consumed; RayD chains the plane cotangents to the winner triangle's
+ vertices itself, so nothing geometric is re-derived here.
 
-    This is the single implementation of the re-solve. What a caller does with
-    ``valid`` is the caller's policy: the enumerated fixed-winner path below
-    requires every row to survive, while fixed-topology reevaluation publishes
-    the mask per row.
-    """
+ This is the single implementation of the re-solve. What a caller does with
+ ``valid`` is the caller's policy: the enumerated fixed-winner path below
+ requires every row to survive, while fixed-topology reevaluation publishes
+ the mask per row.
+ """
 
     rayd = compiled.rayd
     records = rayd.edge_records()
@@ -300,11 +288,11 @@ def _reflection_geometry_ad(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """All-or-nothing fixed-winner reflection hit geometry.
 
-    The enumerated path evaluates a winner it has just discovered under the
-    same scene tensors, so a row that stops reproducing is a contract failure,
-    not an answer. Reevaluation at NEW endpoint positions is a different
-    operation with a different contract and lives in the consumer.
-    """
+ The enumerated path evaluates a winner it has just discovered under the
+ same scene tensors, so a row that stops reproducing is a contract failure,
+ not an answer. Reevaluation at NEW endpoint positions is a different
+ operation with a different contract and lives in the consumer.
+ """
 
     epc = reflection_epc_paths(compiled, vertices, source, target, face_id, depth)
     if not bool(epc["valid"].all()):
@@ -324,11 +312,11 @@ _C0 = 299792458.0
 def occluder_boxes(compiled: object) -> tuple[torch.Tensor, torch.Tensor] | None:
     """Per-structure axis-aligned box table (box_min, box_max) or ``None``.
 
-    Reduces the compiled geometry vertices to one [min, max] box per structure
-    that owns at least one face. Structures with no faces are dropped. Returns
-    ``None`` when the scene has no boxed occluder so the caller keeps the
-    fully-lit fast path.
-    """
+ Reduces the compiled geometry vertices to one [min, max] box per structure
+ that owns at least one face. Structures with no faces are dropped. Returns
+ ``None`` when the scene has no boxed occluder so the caller keeps the
+ fully-lit fast path.
+ """
 
     geometry = compiled.geometry
     # The box reduction is a per-structure amin/amax scatter that must run on the
@@ -375,17 +363,17 @@ def los_clearance_factor(
     frequency_hz: float,
     width: float,
 ) -> torch.Tensor:
-    """Native per-pair ISB membership factor tau in [0, 1] (ADR-017).
+    """Native per-pair ISB membership factor tau in [0, 1] (the boundary taper).
 
-    tau = smoothstep01(0.5 * (c_plane / (width * w_F) + 1)) with c the signed
-    clearance of the source->target segment past the nearest occluding box
-    silhouette (measured at the occluder), c_plane = c * (d1 + d2) / d1 that
-    clearance magnified into the receiver plane by the point-source shadow
-    factor, and w_F the grazed-edge Fresnel penumbra. The receiver-plane
-    magnification matches the accepted projection's in-plane distance transform
-    (artifacts/isb-taper/stage2.py); exact conventions live in the CUDA kernel.
-    tau > 0 is the membership predicate; tau < 1 is the amplitude factor.
-    """
+ tau = smoothstep01(0.5 * (c_plane / (width * w_F) + 1)) with c the signed
+ clearance of the source->target segment past the nearest occluding box
+ silhouette (measured at the occluder), c_plane = c * (d1 + d2) / d1 that
+ clearance magnified into the receiver plane by the point-source shadow
+ factor, and w_F the grazed-edge Fresnel penumbra. The receiver-plane
+ magnification matches the accepted projection's in-plane distance transform
+ (artifacts/isb-taper/stage2.py); exact conventions live in the CUDA kernel.
+ tau > 0 is the membership predicate; tau < 1 is the amplitude factor.
+ """
 
     validate_cuda_tensor("source", source, dtype=torch.float32, ndim=2, trailing_shape=(3,))
     validate_cuda_tensor("target", target, dtype=torch.float32, ndim=2, trailing_shape=(3,))
@@ -421,10 +409,10 @@ def apply_los_taper(
     path_gain: torch.Tensor,
     tau: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
-    """Native scale of a LoS field bundle by the per-row factor tau (ADR-017).
+    """Native scale of a LoS field bundle by the per-row factor tau (the boundary taper).
 
-    tau multiplies the field amplitude; path_gain (a power) is scaled by tau^2.
-    """
+ tau multiplies the field amplitude; path_gain (a power) is scaled by tau^2.
+ """
 
     validate_cuda_tensor("tau", tau, dtype=torch.float32, ndim=1)
     out = _required_native_op("los_taper_apply")(

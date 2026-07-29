@@ -1,17 +1,7 @@
 # Copyright Xingyu Chen.
 # Runtime ownership for the compiled Channel extension and symbols.
 
-"""Runtime ownership for the compiled Channel extension and symbols.
-
-`runtime` owns extension selection, symbol/bootstrap validation, immutable
-build identity, tensor/AD call contracts, native buffers, kernel metadata,
-memory budgets, the shared capacity failure protocol, profiler annotations,
-and pure-stdlib native handle normalization. It does not own solver policy,
-scene construction, materials, propagation algorithms, or RF numerical
-kernels. ``docs/dev/runtime/README.md`` holds the full ownership contract;
-it lives in docs rather than beside the code because ``runtime`` is a module
-and no longer a package with a directory to hold its README.
-"""
+"""Runtime ownership for the compiled Channel extension and symbols."""
 
 from __future__ import annotations
 
@@ -131,13 +121,13 @@ def require_tensor(
 ) -> torch.Tensor:
     """Validate one declared tensor field of a typed row or capacity contract.
 
-    This is the single owner of that check. The row contracts, the capacity
-    contracts, and the consumer contracts each carried their own copy; the only
-    behaviour that ever differed between them is which exception a dtype
-    mismatch raises, which ``dtype_error`` keeps caller-declared. The checks run
-    in the order the copies used, so every rejected input still fails on the
-    same clause with the same message.
-    """
+ This is the single owner of that check. The row contracts, the capacity
+ contracts, and the consumer contracts each carried their own copy; the only
+ behaviour that ever differed between them is which exception a dtype
+ mismatch raises, which ``dtype_error`` keeps caller-declared. The checks run
+ in the order the copies used, so every rejected input still fails on the
+ same clause with the same message.
+ """
 
     if not isinstance(value, torch.Tensor):
         raise TypeError(f"{name} must be a torch.Tensor")
@@ -597,7 +587,7 @@ def _required_native_op(name: str) -> object:
 
 
 def required_symbol(name: str) -> object:
-    """Return a required symbol or raise :class:`NativeSymbolError`."""
+    """Return a required symbol or raise:class:`NativeSymbolError`."""
 
     return _required_symbol(native_extension(), name)
 
@@ -743,7 +733,7 @@ def _ad_still_wrapped(value: torch.Tensor) -> bool:
 
 
 def _ad_raise_composed_transforms() -> None:
-    # Plan 07 section 7 contract: fail loudly instead of feeding the native
+    # the AD contract: fail loudly instead of feeding the native
     # kernels an unwrapped tensor that has silently lost its transform
     # tracking (which would produce exact-zero tangents/gradients).
     raise NotImplementedError(
@@ -796,9 +786,9 @@ def _ad_checked_tangent(
 ) -> torch.Tensor | None:
     """Validate an unwrapped jvp tangent against its primal contract.
 
-    Strided tangents are passed through unchanged: the native kernels consume
-    explicit strides, so no Python-side layout copy or staging is needed.
-    """
+ Strided tangents are passed through unchanged: the native kernels consume
+ explicit strides, so no Python-side layout copy or staging is needed.
+ """
 
     if tangent is None:
         return None
@@ -855,10 +845,10 @@ def _ad_check_tangent_vec3(
 ) -> None:
     """Validate a facade-level jvp tangent.
 
-    ``rows=None`` checks only the ``(V, 3)`` layout; the native entry point
-    enforces that a vertex tangent matches the scene's global vertex table.
-    Strided tangents are allowed: the native kernels consume explicit strides.
-    """
+ ``rows=None`` checks only the ``(V, 3)`` layout; the native entry point
+ enforces that a vertex tangent matches the scene's global vertex table.
+ Strided tangents are allowed: the native kernels consume explicit strides.
+ """
 
     if tangent is None:
         return
@@ -883,13 +873,13 @@ def _ad_active_ctx(active: torch.Tensor | None, like: torch.Tensor) -> torch.Ten
 def _ad_frequency_value(frequency: torch.Tensor | float) -> float:
     """Read the scalar carrier frequency once per solve.
 
-    A 0-d CUDA tensor frequency costs one device-to-host synchronization per
-    read (documented plan 07 AD-1 decision: one sync per solve, never per
-    path); the native entry points keep a double scalar. The solve seams
-    call this once and thread the float to every ``field_*_ad`` facade as
-    ``frequency_value`` so no Function pays a second read (audit M3); a
-    facade called without it reads here exactly once.
-    """
+ A 0-d CUDA tensor frequency costs one device-to-host synchronization per
+ read (documented material and frequency derivatives decision: one sync per solve, never per
+ path); the native entry points keep a double scalar. The solve seams
+ call this once and thread the float to every ``field_*_ad`` facade as
+ ``frequency_value`` so no Function pays a second read; a
+ facade called without it reads here exactly once.
+ """
 
     if isinstance(frequency, torch.Tensor):
         if frequency.ndim != 0:
@@ -946,11 +936,11 @@ def _ad_reject_fixed_tangents(
 def _ad_geometry_live(*values: object) -> bool:
     """True when any geometry input participates in AD (grad or tangent).
 
-    Drives the AD-2 need_grad_geometry plumbing and the conditional
-    differentiability of path_length_m / delay_s: a materials-only graph
-    keeps them detached exactly as in AD-1, so it never pays for geometry
-    adjoints it did not request.
-    """
+ Drives the AD need_grad_geometry plumbing and the conditional
+ differentiability of path_length_m / delay_s: a materials-only graph
+ keeps them detached exactly as in AD, so it never pays for geometry
+ adjoints it did not request.
+ """
 
     for value in values:
         if not isinstance(value, torch.Tensor):
@@ -994,20 +984,20 @@ def _ad_geometry_tangent(
 def _ad_first_order_only(backward: Callable[..., Any]) -> Callable[..., Any]:
     """The one backward decorator: first-order guard over ``once_differentiable``.
 
-    ADR-043: Channel publishes first derivatives only. ``create_graph=True`` is
-    precisely what leaves grad mode enabled while a backward runs, so the check
-    below is an exact detector that fires before any native launch, names the
-    owner, and produces no partial second-order result. Without it the first
-    gradient comes back silently detached and the failure surfaces one step
-    later as a generic Torch message that names Torch, not the owner that
-    cannot answer.
+ first-order differentiation: Channel publishes first derivatives only. ``create_graph=True`` is
+ precisely what leaves grad mode enabled while a backward runs, so the check
+ below is an exact detector that fires before any native launch, names the
+ owner, and produces no partial second-order result. Without it the first
+ gradient comes back silently detached and the failure surfaces one step
+ later as a generic Torch message that names Torch, not the owner that
+ cannot answer.
 
-    ``torch.autograd.function.once_differentiable`` is applied underneath, as
-    defence in depth, from here rather than from every call site. It cannot
-    replace the check: it runs the backward body inside ``torch.no_grad()``, so
-    the grad-mode signal is gone by the time the body executes, and it only
-    fails when the detached gradient is later used.
-    """
+ ``torch.autograd.function.once_differentiable`` is applied underneath, as
+ defence in depth, from here rather than from every call site. It cannot
+ replace the check: it runs the backward body inside ``torch.no_grad``, so
+ the grad-mode signal is gone by the time the body executes, and it only
+ fails when the detached gradient is later used.
+ """
 
     once = torch.autograd.function.once_differentiable(backward)
 
@@ -1030,15 +1020,15 @@ def _ad_first_order_only(backward: Callable[..., Any]) -> Callable[..., Any]:
 
 @dataclass
 class AdLaunchLedger:
-    """Per-solve accounting of the plan 07 AD companion kernels.
+    """Per-solve accounting of AD companion kernels.
 
-    ``launches`` counts the native backward/jvp companion launches one full
-    reverse pass (vjp) or forward-dual pass (jvp) performs for this solve:
-    one per registered differentiable Function. ``tape_bytes`` sums the
-    tensors the reverse pass retains via ``save_for_backward``; forward mode
-    retains nothing past the solve, so jvp reports zero tape. One ledger
-    shape for every solver (montecarlo.basic, deterministic, path).
-    """
+ ``launches`` counts the native backward/jvp companion launches one full
+ reverse pass (vjp) or forward-dual pass (jvp) performs for this solve:
+ one per registered differentiable Function. ``tape_bytes`` sums the
+ tensors the reverse pass retains via ``save_for_backward``; forward mode
+ retains nothing past the solve, so jvp reports zero tape. One ledger
+ shape for every solver (montecarlo.basic, deterministic, path).
+ """
 
     launches: int = 0
     tape_bytes: int = 0
@@ -1282,9 +1272,9 @@ def estimate_monte_carlo_memory(
 ) -> MemoryEstimate:
     """Conservative, allocation-free estimate for MC/BDPT scale sweeps.
 
-    The per-path default covers two complex3 states, geometry/PDF state, and
-    compaction indices. Callers may override it with a measured solver value.
-    """
+ The per-path default covers two complex3 states, geometry/PDF state, and
+ compaction indices. Callers may override it with a measured solver value.
+ """
 
     for name, value in {
         "samples": samples,
@@ -1363,9 +1353,9 @@ class CapacityFailureBit(enum.IntFlag):
 class CapacityFailureState:
     """One solve-owned CUDA ``int32[1]`` failure bitmask.
 
-    Construction is metadata-only. Intermediate native operations atomically
-    accumulate bits on the active CUDA stream and never read them on the host.
-    """
+ Construction is metadata-only. Intermediate native operations atomically
+ accumulate bits on the active CUDA stream and never read them on the host.
+ """
 
     bits: torch.Tensor
 
@@ -1393,10 +1383,10 @@ def require_host_count(name: str, value: object) -> int:
 class CapacityExecutionCounts:
     """Host capacity plus CUDA-resident actual diagnostic counts.
 
-    Public metadata may expose ``candidate_capacity``. The actual candidate
-    and guardrail counts remain device sidecars so result assembly never hides
-    a device-to-host synchronization behind metadata construction.
-    """
+ Public metadata may expose ``candidate_capacity``. The actual candidate
+ and guardrail counts remain device sidecars so result assembly never hides
+ a device-to-host synchronization behind metadata construction.
+ """
 
     candidate_capacity: int
     failure_state: CapacityFailureState
@@ -1435,10 +1425,10 @@ class CapacityExecutionCounts:
 class SolveCapacityTransaction:
     """Solve-scoped owner of one failure state and one terminal observation.
 
-    The transaction is orchestration state only. It never reads the CUDA
-    bitmask. Solvers pass ``failure_state`` unchanged to every capacity
-    intermediate and call ``terminal_check`` once after result sanitization.
-    """
+ The transaction is orchestration state only. It never reads the CUDA
+ bitmask. Solvers pass ``failure_state`` unchanged to every capacity
+ intermediate and call ``terminal_check`` once after result sanitization.
+ """
 
     failure_state: CapacityFailureState
     _terminal_enqueued: bool = False

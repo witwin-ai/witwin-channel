@@ -1,21 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests multiorder scattering.
 
-"""ADR-021 D4 BDPT multi-order diffuse scattering.
-
-Covers the ``max_scattering_order`` config contract (default 1, validation,
-coherent refusal unchanged), the bitwise default regression (order 1 keeps the
-single-bounce terminal rule), seed-stream isolation (an order-2 solve does not
-perturb an order-1 rerun), the order-2 >= order-1 scattered-power bound on a
-two-wall corner where a double-scatter path exists, and the metadata depth-rule
-reporting.
-
-Note: the end-to-end multi-order behaviour additionally requires the pipeline to
-thread ``config.max_scattering_order`` into the shooting sampler and the
-per-scattering metadata block (see the change's open issues). The >= bound and
-the isolation/bitwise assertions hold either way; they tighten to a strict gain
-once that wiring lands.
-"""
+"""Tests multiorder scattering."""
 
 import pytest
 import torch
@@ -94,7 +80,7 @@ def _single_wall_scene() -> Scene:
 
 def _corner_scene() -> Scene:
     """Two mutually visible rough walls so a tx->wall->wall->rx double-scatter
-    path exists."""
+ path exists."""
 
     return Scene(
         structures=[_wall_x(_material()), _wall_y(_material())],
@@ -137,7 +123,7 @@ def test_max_scattering_order_rejects_below_one(bad):
 
 
 def test_coherent_refuses_scattering_regardless_of_order():
-    # The ADR-019 refusal (coherent combine supports only los/reflection/
+    # The coherent combination (coherent combine supports only los/reflection/
     # diffraction) stays intact and applies whatever the scattering order is.
     for order in (1, 2, 3):
         with pytest.raises(RuntimeError, match="coherent"):
@@ -168,7 +154,7 @@ def test_coherent_allowed_without_scattering_even_at_high_order():
 
 def test_default_order_matches_explicit_order_one_bitwise():
     """The new config field is a pure default: an unspecified order and an
-    explicit order 1 solve are bit-identical (single-bounce terminal rule)."""
+ explicit order 1 solve are bit-identical (single-bounce terminal rule)."""
 
     _require_native()
     scene = _single_wall_scene()
@@ -199,8 +185,8 @@ def test_default_order_matches_explicit_order_one_bitwise():
 
 def test_order_two_does_not_perturb_an_order_one_rerun():
     """Seed-stream isolation: the multi-order continuation draws from the same
-    per-bounce salted direction stream, so interleaving an order-2 solve leaves
-    an order-1 solve bit-identical."""
+ per-bounce salted direction stream, so interleaving an order-2 solve leaves
+ an order-1 solve bit-identical."""
 
     _require_native()
     scene = _single_wall_scene()
@@ -225,8 +211,8 @@ def test_order_two_does_not_perturb_an_order_one_rerun():
 
 def test_order_two_scattered_power_at_least_order_one():
     """On a two-wall corner (a tx->wall->wall->rx double-scatter path exists),
-    order 2 adds nonnegative multi-bounce NEE contributions on top of every
-    order-1 row, so its scattered power never drops below order 1."""
+ order 2 adds nonnegative multi-bounce NEE contributions on top of every
+ order-1 row, so its scattered power never drops below order 1."""
 
     _require_native()
     scene = _corner_scene()

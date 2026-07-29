@@ -1,39 +1,7 @@
 # Copyright Xingyu Chen.
-# AD-3 solver-level tests: montecarlo.basic real power-map gradients.
+# AD solver-level tests: montecarlo.basic real power-map gradients.
 
-"""AD-3 solver-level tests: montecarlo.basic real power-map gradients.
-
-The M column of the plan 07 section 9.3 matrix. Unlike deterministic/path,
-montecarlo.basic emits an incoherent REAL power map, so these check the power
-gain rather than a complex coefficient.
-
-Two contracts this file pins, both of which the implementation has to honor:
-
-- Materials come from the compiled material store in BOTH ad_mode="none" and
-  the AD modes. The solver used to flatten materials to host floats
-  (_host_material_tensors -> bdpt_face_material_tensors_from_host), which
-  cannot carry a gradient and, worse, would make a finite difference taken on
-  the store measure exactly zero. One material source, same values.
-- Receiver-position gradients only exist for point receivers. A ReceiverGrid is
-  generated natively from origin/axes/spacing and exposes no per-receiver
-  position leaf, and for a radiomap the grid is the output, not a parameter.
-
-The reflection/diffraction maps bin contributions into grid cells by hit
-position, so a moving transmitter changes cell assignment discretely. Those
-assignments are part of the frozen winner (plan 07 section 4): the gradient
-describes the continuous part only. For the slab reflection radiomap
-the continuous part with respect to the transmitter is IDENTICALLY ZERO: the
-per-ray deposit weight is |Gamma|^2 * solid_angle * (lambda/4pi)^2 /
-(A_cell * |cos|), whose factors depend only on the frozen sampled direction,
-the face normal and the materials; the 1/d^2 spreading lives in the frozen
-ray density and the binning. Measured on this scene at seed 7, the primal
-map total is piecewise constant in tx: central differences read single-ray
-binning jumps at h = 1e-2 (about 7e-7, one deposit's worth per 2h) and only
-float32 reassociation noise (about 6e-11) at h <= 1e-3, with no continuous
-component at any step. The transmitter test below therefore pins the exact
-analytic contract (zero VJP gradient and zero JVP tangent through a live
-graph) instead of comparing against sampling-jump noise.
-"""
+"""AD solver-level tests: montecarlo.basic real power-map gradients."""
 
 from __future__ import annotations
 
@@ -283,14 +251,14 @@ def test_frequency_grad_matches_fd(builder, components):
 
 
 def test_transmission_transmitter_position_grad_matches_fd():
-    """TX position through the transmission radiomap (plan 07 section 9.3).
+    """TX position through the transmission radiomap (the derivative capability matrix).
 
-    Both factors of the map move with the transmitter: the analytic per-cell
-    Friis matrix (through the LoS Function) and every per-wall power
-    transmittance (the straight-line incidence cosine is a function of the
-    live march origin). The wall-crossing set is the frozen winner and stays
-    stable across the FD probes on this fixture.
-    """
+ Both factors of the map move with the transmitter: the analytic per-cell
+ Friis matrix (through the LoS Function) and every per-wall power
+ transmittance (the straight-line incidence cosine is a function of the
+ live march origin). The wall-crossing set is the frozen winner and stays
+ stable across the FD probes on this fixture.
+ """
 
     components = frozenset({"los", "transmission"})
     base = torch.tensor([0.0, 0.0, 0.0])
@@ -330,16 +298,16 @@ def test_los_endpoint_position_grad_matches_fd(endpoint):
 def test_reflection_transmitter_position_grad_is_the_exact_continuous_part():
     """TX position on a binned power map: frozen cell assignment, continuous part only.
 
-    The continuous part is identically zero for this estimator (module
-    docstring): the deposit weight carries no ray-origin dependence, and the
-    origin's only influence (which cell, whether the deposit lands) is a
-    frozen discrete winner. A finite difference here measures nothing but
-    single-ray binning jumps (measured 7e-7-scale at the h = 1e-2 spec step,
-    float32 reassociation noise below h = 1e-3), so the assertion pins the
-    analytic contract deterministically in BOTH modes: backward must reach
-    the transmitter leaf and deliver the exact zero, and a forward-mode
-    transmitter tangent must produce an exactly zero loss tangent.
-    """
+ The continuous part is identically zero for this estimator (module
+ docstring): the deposit weight carries no ray-origin dependence, and the
+ origin's only influence (which cell, whether the deposit lands) is a
+ frozen discrete winner. A finite difference here measures nothing but
+ single-ray binning jumps (measured 7e-7-scale at the h = 1e-2 spec step,
+ float32 reassociation noise below h = 1e-3), so the assertion pins the
+ analytic contract deterministically in BOTH modes: backward must reach
+ the transmitter leaf and deliver the exact zero, and a forward-mode
+ transmitter tangent must produce an exactly zero loss tangent.
+ """
 
     components = frozenset({"reflection"})
     base = torch.tensor(_TX)
@@ -423,11 +391,11 @@ def test_transmission_forward_mode_layer_dual_matches_reverse():
 def test_gradient_is_stable_across_seeds():
     """MC gradients are random: the spread across seeds must stay bounded.
 
-    The plan 07 section 9.4 cross-seed check the original channel never had.
-    Reflection sampling is seed-independent by construction (deterministic
-    Fibonacci directions), so its cross-seed spread is a numerical floor;
-    the genuinely seeded component (diffraction) gets its own check below.
-    """
+ the AD cross-seed check the original channel never had.
+ Reflection sampling is seed-independent by construction (deterministic
+ Fibonacci directions), so its cross-seed spread is a numerical floor;
+ the genuinely seeded component (diffraction) gets its own check below.
+ """
 
     scene = _reflection_scene()
     components = frozenset({"reflection"})
@@ -462,7 +430,7 @@ def test_gradient_is_stable_across_seeds():
 
 
 # ---------------------------------------------------------------------------
-# Diffraction map (plan 07 AD-4b): the M x diffraction column. The map is
+# Diffraction map (diffraction AD): the M x diffraction column. The map is
 # assembled from RayD's frozen Keller-cone sampling tape; the differentiable
 # inputs are the wedge-face slab materials, the carrier frequency and the
 # transmitter position (the incident spherical wave, the incidence angles and
@@ -598,23 +566,23 @@ def _captured_diffraction_tape(monkeypatch, tx: torch.Tensor) -> tuple:
 def test_diffraction_transmitter_position_grad_matches_fixed_tape_fd(monkeypatch):
     """TX position through the diffraction map: fixed-tape FD parity.
 
-    Unlike the reflection radiomap (whose deposit weight is analytically
-    origin-independent), the diffraction deposit carries the incident
-    spherical wave from the source, so its continuous source derivative is
-    genuinely nonzero. A FULL-SOLVE central difference is NOT a valid oracle
-    for this cell, measured on this fixture: moving the transmitter churns
-    the discrete winners at every step size (the wedge-event discovery rays,
-    the RayD sampling tape, and the per-lane Keller-cone acceptance test
-    `phi <= exterior_angle` whose phi rotates with the source), so the FD
-    never converges in h (probed h = 3e-4 .. 3e-2, both full-solve and
-    frozen-tape map sums; sign flips throughout). The valid oracle is the
-    fixed-winner contract itself: freeze the tape, keep only lanes whose
-    accept decisions survive the +/-h probes, and compare the aggregated
-    per-lane central differences against the aggregated dual. Aggregation
-    over many lanes averages away the per-lane float32 deposit noise and
-    the frozen pseudo-infinite truncation-factor ripple that ride on the
-    single-lane FD (measured ~10-15% per lane at the converged step).
-    """
+ Unlike the reflection radiomap (whose deposit weight is analytically
+ origin-independent), the diffraction deposit carries the incident
+ spherical wave from the source, so its continuous source derivative is
+ genuinely nonzero. A FULL-SOLVE central difference is NOT a valid oracle
+ for this cell, measured on this fixture: moving the transmitter churns
+ the discrete winners at every step size (the wedge-event discovery rays,
+ the RayD sampling tape, and the per-lane Keller-cone acceptance test
+ `phi <= exterior_angle` whose phi rotates with the source), so the FD
+ never converges in h (probed h = 3e-4 .. 3e-2, both full-solve and
+ frozen-tape map sums; sign flips throughout). The valid oracle is the
+ fixed-winner contract itself: freeze the tape, keep only lanes whose
+ accept decisions survive the /-h probes, and compare the aggregated
+ per-lane central differences against the aggregated dual. Aggregation
+ over many lanes averages away the per-lane float32 deposit noise and
+ the frozen pseudo-infinite truncation-factor ripple that ride on the
+ single-lane FD (measured ~10-15% per lane at the converged step).
+ """
 
     from witwin.channel.kernels import montecarlo as _ops
 
@@ -722,7 +690,7 @@ def test_diffraction_transmitter_position_grad_matches_fixed_tape_fd(monkeypatch
         if one_lane_sum(lane, src0) <= 0.0:
             continue
         # Two-step consistency filter: a lane riding a UTD transition-region
-        # kink (or an acceptance boundary that survives +/-h without
+        # kink (or an acceptance boundary that survives /-h without
         # zeroing) shows an FD that scales like 1/h instead of converging;
         # such lanes are not a valid derivative oracle and are excluded, the
         # same way the reflection fixtures avoid specular points on
@@ -794,12 +762,12 @@ def test_diffraction_forward_mode_material_dual_matches_reverse():
 
 
 def test_diffraction_gradient_is_stable_across_seeds():
-    """Cross-seed spread of the genuinely seeded component (plan 07 9.4).
+    """Cross-seed spread of the genuinely seeded component (the AD contract).
 
-    The diffraction map resamples its edge points and cone azimuths per
-    seed, so this is the real Monte Carlo gradient-variance check; the bound
-    reflects the sampling noise of the estimator at this sample count.
-    """
+ The diffraction map resamples its edge points and cone azimuths per
+ seed, so this is the real Monte Carlo gradient-variance check; the bound
+ reflects the sampling noise of the estimator at this sample count.
+ """
 
     scene = _diffraction_scene()
     leaf = _material_leaf(scene, "eps_r")
@@ -834,17 +802,17 @@ def test_diffraction_gradient_is_stable_across_seeds():
 def test_ad_mode_none_keeps_primal_contract():
     """The AD-mode forward is the primal computation, not a reimplementation.
 
-    The AD path runs the exact same native kernels (accumulate, layout,
-    finalize) behind dispatch-only autograd Functions, so the only admissible
-    difference between two solves is the reflection kernel's own atomicAdd
-    scheduling: measured on this scene, two ad_mode="none" solves of the same
-    Scene object already differ in a few cells by up to two float32 ulp
-    (about 1e-7 relative), and none-vs-vjp shows the same envelope with no
-    systematic offset. The comparison therefore allows that measured
-    reordering envelope and nothing more; cells with no deposits are exactly
-    zero in both modes (the deposit SET is deterministic, only the intra-cell
-    summation order floats), which atol=0 pins.
-    """
+ The AD path runs the exact same native kernels (accumulate, layout,
+ finalize) behind dispatch-only autograd Functions, so the only admissible
+ difference between two solves is the reflection kernel's own atomicAdd
+ scheduling: measured on this scene, two ad_mode="none" solves of the same
+ Scene object already differ in a few cells by up to two float32 ulp
+ (about 1e-7 relative), and none-vs-vjp shows the same envelope with no
+ systematic offset. The comparison therefore allows that measured
+ reordering envelope and nothing more; cells with no deposits are exactly
+ zero in both modes (the deposit SET is deterministic, only the intra-cell
+ summation order floats), which atol=0 pins.
+ """
 
     scene = _reflection_scene()
     components = frozenset({"reflection"})

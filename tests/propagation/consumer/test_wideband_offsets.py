@@ -1,39 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests wideband offsets.
 
-"""Wideband frequency offsets on the fixed-topology consumer route (ADR-042).
-
-Version 4 published one coefficient at the compiled reference frequency and a
-narrowband law a caller could apply to shift it. These tests pin the capability
-that replaces that law with an evaluation: the same frozen rows, evaluated
-natively at ``F`` declared absolute frequencies, published as a ``[K, F]``
-payload paired with the grid it was evaluated on.
-
-Four things are worth stating about what is asserted here, because each one is
-a claim the design rests on.
-
-The reference identity is BITWISE, not a tolerance. A ``0.0`` entry re-launches
-at the same float32 frequency with the same inputs, so it must reproduce the
-reference column exactly; anything less would mean the wideband route is a
-different evaluation wearing the same name.
-
-The material comparisons are against closed forms, not oracles in the loose
-sense. ``fresnel_interface`` and ``layer_stack_rt`` are the analytic
-half-space and transfer-matrix expressions, and the free-space factor
-``(c/f)/(4*pi*L)*exp(-j*2*pi*f*L/c)`` is exact. The fixture geometry is
-deliberately arranged so the source and sink polarizations are both the
-out-of-plane axis, which makes the row a pure TE response with a unit
-projection and removes every basis convention from the comparison.
-
-The multilayer sweep is the fixture that FALSIFIES a narrowband
-implementation. A 0.1 m eps_r=4 slab fringes every 755 MHz at this incidence,
-so a grid spanning 2.4 GHz crosses three nulls that a narrowband law cannot
-express at all.
-
-The three scene-dependent refusals are each reached by a case that trips only
-that one. A refusal that is only reachable through another refusal is not a
-discoverable limit.
-"""
+"""Tests wideband offsets."""
 
 from __future__ import annotations
 
@@ -192,10 +160,10 @@ def _sweep(
 def _incidence_cosine(geometry, source_position: torch.Tensor, row: int = 0) -> float:
     """Read the incidence cosine off the geometry the replay published.
 
-    Taken from the interaction table the native transport itself consumed
-    rather than rederived from the wall equation, so the closed form is
-    compared against the geometry the coefficient was actually evaluated on.
-    """
+ Taken from the interaction table the native transport itself consumed
+ rather than rederived from the wall equation, so the closed form is
+ compared against the geometry the coefficient was actually evaluated on.
+ """
 
     hit = geometry.interaction_positions_m[row, 0].detach().cpu().numpy()
     normal = geometry.interaction_normals[row, 0].detach().cpu().numpy()
@@ -312,10 +280,10 @@ def test_row_validity_stays_one_mask_over_rows_and_zeroes_every_column() -> None
 def test_the_budget_is_flat_in_the_frequency_column_count() -> None:
     """One validation copy and one synchronization, whatever ``F`` is.
 
-    The row gather owns both and runs once, above the column loop. The launch
-    count is the thing that grows, and the diagnostics field reports it rather
-    than hiding it.
-    """
+ The row gather owns both and runs once, above the column loop. The launch
+ count is the thing that grows, and the diagnostics field reports it rather
+ than hiding it.
+ """
 
     compiled = compiled_world()
     prepared = frozen_topology(compiled)
@@ -487,10 +455,10 @@ def test_line_of_sight_offsets_match_the_free_space_closed_form() -> None:
 def test_half_space_sweep_matches_the_fresnel_closed_form() -> None:
     """A layer thick enough to hide its backing IS the single interface.
 
-    ``sigma_e`` alone makes ``eps_c(f)`` frequency dependent, with no
-    ``DispersionSpec`` anywhere, which is what separates genuine frequency
-    dependence from the dispersion term the contract refuses.
-    """
+ ``sigma_e`` alone makes ``eps_c(f)`` frequency dependent, with no
+ ``DispersionSpec`` anywhere, which is what separates genuine frequency
+ dependence from the dispersion term the contract refuses.
+ """
 
     frequency_hz = 1.0e9
     compiled, sources, sinks, prepared = _reflection_world(frequency_hz, HALF_SPACE)
@@ -600,10 +568,10 @@ def test_multilayer_sweep_crosses_fringes_and_falsifies_the_narrowband_law() -> 
 def test_the_narrowband_law_is_measurably_wrong_at_one_megahertz() -> None:
     """Why the wideband route exists, as a number rather than an adjective.
 
-    A 1 MHz offset at 77 GHz is a fractional shift of 1.3e-5. The spreading
-    term is negligible there; the whole error is the slab's frequency
-    selectivity, which is exactly the term the wideband route removes.
-    """
+ A 1 MHz offset at 77 GHz is a fractional shift of 1.3e-5. The spreading
+ term is negligible there; the whole error is the slab's frequency
+ selectivity, which is exactly the term the wideband route removes.
+ """
 
     frequency_hz = 77.0e9
     compiled, sources, sinks, prepared = _reflection_world(
@@ -813,11 +781,11 @@ def test_the_capability_record_publishes_the_wideband_contract() -> None:
 def test_the_grid_is_a_propagation_frequency_grid_and_nothing_else() -> None:
     """No waveform parameter enters the Channel contract with the grid.
 
-    ``frequency_offsets_hz`` names absolute frequencies at which a field is
-    evaluated. It is not a subcarrier count, an FFT size, a bandwidth, or a
-    sample count, and no field with such a meaning may ride in with it: that
-    is the boundary criterion this capability is most likely to erode.
-    """
+ ``frequency_offsets_hz`` names absolute frequencies at which a field is
+ evaluated. It is not a subcarrier count, an FFT size, a bandwidth, or a
+ sample count, and no field with such a meaning may ride in with it: that
+ is the boundary criterion this capability is most likely to erode.
+ """
 
     import dataclasses
 

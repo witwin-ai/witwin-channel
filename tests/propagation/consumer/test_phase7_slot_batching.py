@@ -1,20 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests slot batching.
 
-"""Block-diagonal slot batching for fixed-topology reevaluation (ADR-041).
-
-Before this contract a caller who needed the same frozen rows at ``T`` world
-instants had two options, and both were wrong. A Python loop over instants pays
-``T`` validation copies and ``T`` synchronizations for a capability whose whole
-point is to pay one. Stacking the instants into the endpoint batches under the
-old pairing law makes ``pair_count`` the full ``(T*S) x (T*K)`` outer product,
-which is quadratic in the number of instants and pairs endpoints that never
-coexist.
-
-These tests pin the third option: one launch per bucket, one validation copy,
-one synchronization, and a pair count linear in the slot count - and pin that
-it is bit-for-bit the answer the loop would have given.
-"""
+"""Tests slot batching."""
 
 from __future__ import annotations
 
@@ -262,11 +249,11 @@ def _unit(vector: torch.Tensor) -> torch.Tensor:
 
 
 def test_forward_duals_survive_slot_replication() -> None:
-    """ADR-038: a dead tangent looks exactly like a correct lateral zero.
+    """forward-mode liveness: a dead tangent looks exactly like a correct lateral zero.
 
-    The radial slot exists so the test can tell those two apart at all; the
-    lateral slot exists so a tangent that is merely noisy cannot pass.
-    """
+ The radial slot exists so the test can tell those two apart at all; the
+ lateral slot exists so a tangent that is merely noisy cannot pass.
+ """
 
     forward_ad = torch.autograd.forward_ad
     compiled = compiled_world()
@@ -357,7 +344,7 @@ def test_slot_count_validation_fails_before_native_work() -> None:
 
 def test_the_raw_route_refuses_slot_batching_by_name() -> None:
     """The raw LoS pairing law lives inside a native gather this stage owns no
-    change to, so slot batching is refused there rather than approximated."""
+ change to, so slot batching is refused there rather than approximated."""
 
     compiled = compiled_world()
     sources = source_batch(cuda_positions(SOURCE_POSITIONS))

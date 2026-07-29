@@ -85,7 +85,7 @@ pybind11::tuple channel_rayd_diffraction_paths_order1_forward(
     double wavelength,
     double isb_taper_width_scale) {
     // tx_pol is the scene transmitter polarization threaded from the caller
-    // (R5 fix). The RayD UTD op consumes it as the incident field basis.
+    // . The RayD UTD op consumes it as the incident field basis.
     TORCH_CHECK(
         tx_pol.sizes() == tx_pos.sizes(),
         "tx_pol must match tx_pos shape (N, 3)");

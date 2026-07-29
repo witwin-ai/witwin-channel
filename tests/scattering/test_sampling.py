@@ -45,10 +45,10 @@ def _all_valid(rows: int, *, device: torch.device) -> torch.Tensor:
 def test_sample_matches_pdf_binned(table):
     """Binned frequencies of 2e5 samples match the sampling masses.
 
-    The outgoing grid (32 x 64) aggregates exactly into coarse 16 x 16 bins
-    (2 x 4 fine bins each); a chi-square test against the expected bin
-    masses must not reject at p = 0.001.
-    """
+ The outgoing grid (32 x 64) aggregates exactly into coarse 16 x 16 bins
+ (2 x 4 fine bins each); a chi-square test against the expected bin
+ masses must not reject at p = 0.001.
+ """
 
     n = 200_000
     ti = 20

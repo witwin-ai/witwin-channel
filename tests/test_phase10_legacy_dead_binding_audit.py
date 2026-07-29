@@ -23,8 +23,7 @@ PYTHON_ROOT = REPOSITORY_ROOT / "witwin" / "channel"
 PHASE12_RETIRED_EVIDENCE_TESTS = frozenset(
     {"tests/propagation/geometry/test_reevaluate_compat.py"}
 )
-# Phase-11 cutover: the zero-importer BDPT MIS facade and its only test were
-# deleted with the ADR-029/030/031 dormant sweep.
+# The retired zero-importer BDPT MIS facade has no surviving evidence test.
 PHASE11_RETIRED_EVIDENCE_TESTS = frozenset(
     {"tests/montecarlo/bdpt/test_mis_weights.py"}
 )
@@ -78,14 +77,14 @@ def test_phase10_binding_inventory_remains_a_self_consistent_archive() -> None:
     assert isinstance(ownership, dict)
     audited_names = ownership["symbols"]
 
-    # + 2 ADR-013 coupled double-diffraction forward symbols + the two ADR-013
-    # AD companions (field_coupled_dd_backward/_jvp) + 2 ADR-017 ISB-taper LoS
+    # + 2 coupled double diffraction forward symbols + the two coupled double diffraction
+    # AD companions (field_coupled_dd_backward/_jvp) + 2 the boundary taper ISB-taper LoS
     # symbols (los_silhouette_clearance, los_taper_apply) = 185.
-    # + 4 ADR-014 scattering JVP/VJP companions
-    # + 4 ADR-015 scattering table-eval / table-build JVP/VJP companions = 193.
-    # + 6 ADR-021 multi-bounce chain scattering symbols (Op A/Op B forwards plus
+    # + 4 scattering derivative JVP/VJP companions
+    # + 4 scattering derivative table-eval / table-build JVP/VJP companions = 193.
+    # + 6 coherent scattering multi-bounce chain scattering symbols (Op A/Op B forwards plus
     # their _backward/_jvp companions) = 199.
-    # + 12 ADR-022 BDPT fixed-topology AD companions (subpath reflect/transmit
+    # + 12 BDPT AD companions (subpath reflect/transmit
     # state, endpoint connection, accumulate, finalize point/maps, each
     # _backward + _jvp) = 211.
     assert ownership["expected_count"] == 211

@@ -1,7 +1,7 @@
 # Copyright Xingyu Chen.
-# Reject predecessor Channel product identities outside frozen history.
+# Reject outdated Channel product identities outside frozen baselines.
 
-"""Reject predecessor Channel product identities outside frozen history."""
+"""Reject outdated Channel product identities outside frozen baselines."""
 
 from __future__ import annotations
 

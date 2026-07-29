@@ -1,18 +1,7 @@
 # Copyright Xingyu Chen.
 # Make the AD capability matrix authoritative instead of decorative.
 
-"""Make the AD capability matrix authoritative instead of decorative.
-
-A checked-in matrix that nothing parses rots the first time a test is renamed.
-This module parses `docs/dev/propagation-ad-capability-matrix.md`, rejects any
-row outside the four accepted target states, rejects an empty `test` cell, and
-resolves every cited test node id by importing its module and looking the
-function up. It then pins the document against the live capability record, so
-the two halves of ADR-043 cannot drift apart.
-
-No CUDA and no solver: this is a document/record contract, and it must stay
-runnable on a machine with no GPU.
-"""
+"""Make the AD capability matrix authoritative instead of decorative."""
 
 from __future__ import annotations
 
@@ -145,13 +134,13 @@ def test_the_matrix_agrees_with_the_live_capability_record() -> None:
 def test_every_advertised_component_has_a_row_that_names_it() -> None:
     """An advertised component with no row is the silent class, not a gap.
 
-    `component_ad_modes` is the machine-readable half of ADR-043; a component it
-    admits for `jvp`/`vjp` while this document rows nothing for it advertises a
-    derivative whose only evidence lives on some other surface. Transmission was
-    exactly that: admitted on both modes, reachable from both transport
-    responses, and covered only one layer down in the enumerated engine. A
-    component restricted to `none` must instead carry a refusal row.
-    """
+ `component_ad_modes` is the machine-readable half of first-order differentiation; a component it
+ admits for `jvp`/`vjp` while this document rows nothing for it advertises a
+ derivative whose only evidence lives on some other surface. Transmission was
+ exactly that: admitted on both modes, reachable from both transport
+ responses, and covered only one layer down in the enumerated engine. A
+ component restricted to `none` must instead carry a refusal row.
+ """
 
     for component, modes in capabilities().component_ad_modes:
         mentioning = [

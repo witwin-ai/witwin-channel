@@ -37,11 +37,11 @@ def rough_wall_structure(
 ) -> Structure:
     """Axis-aligned wall in the x = ``x_m`` plane with front-surface roughness.
 
-    ``rms_height_m == 0`` compiles as a smooth wall with the same layer stack
-    (scatter_model_id 0). ``phase_screen`` wraps the material in a
-    ``SurfaceAssignment``; ``with_uv`` adds a planar unit-square UV chart
-    (u along +y, v along +z), required for realization_coherent screens.
-    """
+ ``rms_height_m == 0`` compiles as a smooth wall with the same layer stack
+ (scatter_model_id 0). ``phase_screen`` wraps the material in a
+ ``SurfaceAssignment``; ``with_uv`` adds a planar unit-square UV chart
+ (u along +y, v along +z), required for realization_coherent screens.
+ """
 
     vertices = torch.tensor(
         [

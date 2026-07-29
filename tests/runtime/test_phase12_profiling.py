@@ -92,11 +92,11 @@ def test_cuda_profile_mark_emits_only_the_semantic_payload(monkeypatch) -> None:
 def test_profiling_owner_has_no_tensor_or_cuda_execution_calls() -> None:
     """The three annotation emitters call NVTX and nothing else.
 
-    The profiling owner shares a module with the rest of runtime now, so the
-    claim is read off the three functions that own the annotations instead of
-    off the whole file. The file-wide reading would have been vacuous here,
-    not stricter: every other runtime function would have had to be listed.
-    """
+ The profiling owner shares a module with the rest of runtime now, so the
+ claim is read off the three functions that own the annotations instead of
+ off the whole file. The file-wide reading would have been vacuous here,
+ not stricter: every other runtime function would have had to be listed.
+ """
 
     source = (
         _ROOT / "witwin" / "channel" / "runtime.py"

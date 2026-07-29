@@ -1,77 +1,7 @@
 # Copyright Xingyu Chen.
 # Native scattering kernel facades.
 
-"""Native scattering kernel facades.
-
-Thin facades over the ADR-010 / ADR-014 / ADR-015 / ADR-021 scattering ABI: the
-Kirchhoff table eval/sample/PDF ops, the ensemble and phase-screen patch
-integrals, the multi-bounce chain ops, the differentiable Kirchhoff table
-build, and the :class:`torch.autograd.Function` companions that dispatch their
-registered native backward/JVP entries. The Duffy quadrature-node owner
-``_duffy_nodes`` is shared by the single-bounce patch integral and the chain
-realization op.
-
-functional_chain
-----------------
-Native ADR-021 multi-bounce chain scattering kernel facades (plan 10a).
-
-Op A (:func:`scattering_chain_ensemble_eval`) generalizes the single-bounce
-ensemble op to a specular reflection chain in the power domain; Op B
-(:func:`scattering_chain_realization_eval`) generalizes the phase-screen patch
-integral to the coherent 2x2 Jones sandwich with a realization at the vertex.
-Both are thin facades over the required native symbols and share the Duffy
-quadrature-node owner ``_duffy_nodes`` with the single-bounce ops above.
-
-autograd
---------
-Differentiable deterministic scattering ops (ADR-014).
-
-Native ``torch.autograd.Function`` companions for the two forward scattering
-ops (ADR-010 op 1 Kirchhoff ensemble rows, op 2 realization-coherent
-phase-screen patch integral). Both mirror the plan-07 field companion pattern
-in the ``kernels/fields.py`` rough-scale section: a plain forward, a
-``once_differentiable`` VJP, and a forward-mode JVP that all dispatch registered
-native kernels. Torch autograd may dispatch these companions but never
-reconstructs the numerical operation.
-
-autograd_chain
---------------
-Differentiable ADR-021 multi-bounce chain scattering ops (plan 10a).
-
-Native ``torch.autograd.Function`` companions for the two forward chain
-scattering ops (Op A ``scattering_chain_ensemble_eval`` power-domain rows, Op B
-``scattering_chain_realization_eval`` coherent phase-screen realization). Both
-mirror the plan-07 pattern already used by
-the single-bounce companions above: a plain forward, a
-``once_differentiable`` VJP and a forward-mode JVP that all dispatch registered native kernels. Torch
-autograd may dispatch these companions but never reconstructs the numerical
-operation.
-
-The two AD-live scalars of each op cross the graph as 0-dim tensors (so their
-gradients flow) while their numerical values cross the native ABI as ``double``
-positionals (ADR-014 / ``field_free_space`` precedent): ``coef`` + ``frequency``
-for Op A, ``k0`` + ``frequency`` for Op B.
-
-table_build_ad
---------------
-Differentiable Kirchhoff table construction (ADR-015 Part C).
-
-The float64 numpy build (``scattering.build_kirchhoff_table``) stays
-the sanctioned compile-time island and is unchanged bit-for-bit. This module
-adds the native derivative: a ``torch.autograd.Function`` whose forward passes
-the numpy-built ``f_te``/``f_tm`` through unchanged and whose backward / jvp
-dispatch the registered native companions
-(``kirchhoff_table_build_backward`` / ``kirchhoff_table_build_jvp``) against the
-f32 downcast structural intermediates the build exports (pre-balance
-symmetrized lobe ``S``, balance factors ``a``, diffuse budgets ``r_diff``).
-
-Differentiable inputs: ``rough_sigma_h_m`` / ``rough_corr_x_m`` /
-``rough_corr_y_m`` and the material CSR ``layer_thickness_m`` / ``layer_eps_r``
-/ ``layer_sigma_e`` slices, plus the carrier frequency. Fixed (reject loudly):
-``layer_mu_r``, the directional grids (``cos_i`` / ``phi_i`` / ``cos_o`` /
-``phi_o``) and ``principal_axis_rad`` (not a table input). Its native
-companions are independent of the eval/sample ops above.
-"""
+"""Native scattering kernel facades."""
 
 from __future__ import annotations
 
@@ -141,10 +71,10 @@ _duffy_cache: dict[torch.device, tuple[torch.Tensor, torch.Tensor, torch.Tensor]
 def _duffy_nodes(device: torch.device) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Duffy-mapped 16x16 Gauss-Legendre nodes (float64 leggauss -> float32).
 
-    The unit square ``(xi, eta)`` maps to barycentric ``(a, b) =
-    (xi, eta * (1 - xi))`` with Jacobian ``(1 - xi)`` - the same construction
-    as ``scattering.patch_phase_integral``.
-    """
+ The unit square ``(xi, eta)`` maps to barycentric ``(a, b) =
+ (xi, eta * (1 - xi))`` with Jacobian ``(1 - xi)`` - the same construction
+ as ``scattering.patch_phase_integral``.
+ """
 
     cached = _duffy_cache.get(device)
     if cached is not None:
@@ -216,12 +146,12 @@ def scattering_table_eval_backward(
     need_grad_dirs: bool = False,
     need_grad_tables: bool = False,
 ) -> dict[str, torch.Tensor | None]:
-    """VJP of :func:`scattering_table_eval` (ADR-015 op 1).
+    """VJP of:func:`scattering_table_eval` (scattering AD).
 
-    ``grad_wi``/``grad_wo`` are ``[N, 3]`` direct stores (``need_grad_dirs``);
-    ``grad_f_te``/``grad_f_tm`` are the table-shaped 16-corner atomicAdd scatter
-    (``need_grad_tables``). Entries are ``None`` when their owning flag is off.
-    """
+ ``grad_wi``/``grad_wo`` are ``[N, 3]`` direct stores (``need_grad_dirs``);
+ ``grad_f_te``/``grad_f_tm`` are the table-shaped 16-corner atomicAdd scatter
+ (``need_grad_tables``). Entries are ``None`` when their owning flag is off.
+ """
 
     _validate_table_eval_inputs(valid, wi, wo, f_te, f_tm)
     out = _required_native_op("scattering_table_eval_backward")(
@@ -254,12 +184,12 @@ def scattering_table_eval_jvp(
     tangent_f_te: torch.Tensor | None = None,
     tangent_f_tm: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
-    """JVP of :func:`scattering_table_eval` (ADR-015 op 1).
+    """JVP of:func:`scattering_table_eval` (scattering AD).
 
-    Elementwise per-row tangents ``tangent_f_te``/``tangent_f_tm`` ``[N]`` from
-    the live tangents of ``wi``, ``wo`` and the two tables; a missing tangent is
-    a zero tangent.
-    """
+ Elementwise per-row tangents ``tangent_f_te``/``tangent_f_tm`` ``[N]`` from
+ the live tangents of ``wi``, ``wo`` and the two tables; a missing tangent is
+ a zero tangent.
+ """
 
     _validate_table_eval_inputs(valid, wi, wo, f_te, f_tm)
     out = _required_native_op("scattering_table_eval_jvp")(
@@ -408,14 +338,14 @@ def scattering_ensemble_eval(
     coef: float,
     threshold: float,
 ) -> dict[str, torch.Tensor]:
-    """Native Kirchhoff ensemble scattering row physics (ADR-010 op 1).
+    """Native Kirchhoff ensemble scattering row physics (rough-surface scattering).
 
-    ``wo_rows`` / ``r2_rows`` / ``cos_o_rows`` are the surviving rows gathered
-    from the Torch candidate grid (which stays Torch per the ADR). Per row the
-    kernel owns wo_local, the stacked-table lookup, the outgoing s/p basis and
-    receiver projections, and the radiometric gain/keep/amplitude/length.
-    One launch per (tx, rx-chunk); required native op.
-    """
+ ``wo_rows`` / ``r2_rows`` / ``cos_o_rows`` are the surviving rows gathered
+ from the Torch candidate grid (which stays Torch under the native contract). Per row the
+ kernel owns wo_local, the stacked-table lookup, the outgoing s/p basis and
+ receiver projections, and the radiometric gain/keep/amplitude/length.
+ One launch per (tx, rx-chunk); required native op.
+ """
 
     _validate_ensemble_inputs(locals())
     out = _required_native_op("scattering_ensemble_eval")(
@@ -488,17 +418,17 @@ def scattering_patch_integral_eval(
     *,
     k0: float,
 ) -> dict[str, torch.Tensor]:
-    """Native realization-coherent phase-screen patch integral (ADR-010 op 2).
+    """Native realization-coherent phase-screen patch integral (rough-surface scattering).
 
-    One fused launch per (tx, rx, structure) plus a fixed-order deterministic
-    reduce: per selected patch row the kernel evaluates the Duffy-mapped 16x16
-    Gauss-Legendre Kirchhoff phase integral over the phase-screen heights
-    (half-texel edge-clamp bilinear sampling) and assembles the row
-    coefficient (prefactor * jones * carrier / (r1 * r2)); the weighted total
-    is a two-stage tree reduction (no float atomics). Returns the 0-dim
-    complex64 ``total`` plus the per-row ``integral`` and ``row_value``
-    buffers for tests. Required native op.
-    """
+ One fused launch per (tx, rx, structure) plus a fixed-order deterministic
+ reduce: per selected patch row the kernel evaluates the Duffy-mapped 16x16
+ Gauss-Legendre Kirchhoff phase integral over the phase-screen heights
+ (half-texel edge-clamp bilinear sampling) and assembles the row
+ coefficient (prefactor * jones * carrier / (r1 * r2)); the weighted total
+ is a two-stage tree reduction (no float atomics). Returns the 0-dim
+ complex64 ``total`` plus the per-row ``integral`` and ``row_value``
+ buffers for tests. Required native op.
+ """
 
     _validate_patch_inputs(locals())
     quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
@@ -599,7 +529,7 @@ def scattering_ensemble_eval_backward(
     need_grad_tables: bool = False,
     need_grad_coef: bool = False,
 ) -> dict[str, torch.Tensor | None]:
-    """VJP of :func:`scattering_ensemble_eval` (ADR-014 op 1)."""
+    """VJP of:func:`scattering_ensemble_eval` (scattering AD)."""
 
     _validate_ensemble_inputs(locals())
     out = _required_native_op("scattering_ensemble_eval_backward")(
@@ -686,7 +616,7 @@ def scattering_ensemble_eval_jvp(
     tangent_f_tm_flat: torch.Tensor | None = None,
     tangent_coef: float = 0.0,
 ) -> dict[str, torch.Tensor]:
-    """JVP of :func:`scattering_ensemble_eval` (ADR-014 op 1)."""
+    """JVP of:func:`scattering_ensemble_eval` (scattering AD)."""
 
     _validate_ensemble_inputs(locals())
     out = _required_native_op("scattering_ensemble_eval_jvp")(
@@ -762,7 +692,7 @@ def scattering_patch_integral_eval_backward(
     need_grad_geometry: bool = False,
     need_grad_k0: bool = False,
 ) -> dict[str, torch.Tensor | None]:
-    """VJP of :func:`scattering_patch_integral_eval` (ADR-014 op 2)."""
+    """VJP of:func:`scattering_patch_integral_eval` (scattering AD)."""
 
     _validate_patch_inputs(locals())
     quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
@@ -828,7 +758,7 @@ def scattering_patch_integral_eval_jvp(
     tangent_centroids: torch.Tensor | None = None,
     tangent_k0: float = 0.0,
 ) -> dict[str, torch.Tensor]:
-    """JVP of :func:`scattering_patch_integral_eval` (ADR-014 op 2)."""
+    """JVP of:func:`scattering_patch_integral_eval` (scattering AD)."""
 
     _validate_patch_inputs(locals())
     quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
@@ -873,14 +803,14 @@ def scattering_patch_integral_eval_jvp(
 # functional_chain
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
-# ADR-021 chain scattering ops (plan 10a sections 3 and 4).
+# Coherent scattering-chain kernels.
 #
 # Op A (``scattering_chain_ensemble_eval``) generalizes op 1 to a specular
 # reflection chain C1 -> diffuse vertex v_s -> chain C2 in the power domain;
 # Op B (``scattering_chain_realization_eval``) generalizes op 2 to the coherent
 # 2x2 Jones sandwich with a phase-screen realization at the vertex. Both carry
 # two padded per-leg blocks ``[R, Dmax, ...]`` with ``Dmax = kMaxAdDepth = 8``
-# (plan 10a section 1). The facades are thin: validate the spec tables, dispatch
+#. The facades are thin: validate the spec tables, dispatch
 # the required native symbol, and assert the returned key-set exactly.
 # ---------------------------------------------------------------------------
 
@@ -991,12 +921,11 @@ def _validate_chain_leg(
 ) -> int:
     """Validate one padded specular leg block and return its ``Dmax`` width.
 
-    The padded block is ``[R, Dmax, 3]`` positions/normals and ``[R, Dmax]``
-    per-bounce Fresnel inputs with an ``[R]`` int32 per-row depth. ``Dmax`` is
-    the static padded width and must not exceed ``kMaxAdDepth = 8`` (plan 10a
-    section 1); the per-row ``depth`` values are trusted structural winners and
-    are not read on the host (that would force a device sync).
-    """
+ The padded block is ``[R, Dmax, 3]`` positions/normals and ``[R, Dmax]``
+ per-bounce Fresnel inputs with an ``[R]`` int32 per-row depth. ``Dmax`` is
+ the static padded width and must not exceed ``kMaxAdDepth = 8``; the per-row ``depth`` values are trusted structural winners and
+ are not read on the host (that would force a device sync).
+ """
 
     validate_cuda_tensor(
         f"{prefix}_positions", positions, dtype=torch.float32, ndim=3, trailing_shape=(3,)
@@ -1042,7 +971,7 @@ def _validate_chain_valid(
 
 
 def _require_same_device(named: tuple[tuple[str, torch.Tensor], ...]) -> None:
-    """Assert every named tensor shares one CUDA device (plan 10a contract)."""
+    """Assert every named tensor shares one CUDA device (the current contract)."""
 
     device = None
     for name, tensor in named:
@@ -1102,18 +1031,18 @@ def scattering_chain_ensemble_eval(
     threshold: float,
     frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
-    """Native ADR-021 Op A multi-bounce ensemble scattering rows (plan 10a s3).
+    """Native multi-bounce ensemble scattering rows.
 
-    Power-domain generalization of :func:`scattering_ensemble_eval`: C1 coherent
-    Jones transport of ``tx_pol`` from ``source`` to the diffuse ``vertex`` yields
-    the incident coherency diagonal, the resident Kirchhoff table gives the
-    outgoing diagonal, and the C2 power-domain sandwich to ``target`` plus the
-    receiver projection assemble the radiometric row gain (per-vertex ``weights``
-    = ``A_patch`` and ``1/(L1^2 L2^2)`` spreading, op-1 convention). The incident
-    coherency is computed in-kernel from the C1 transport (supervisor ruling: no
-    ``a_te2``/``a_tm2`` projection pair, no cross-pol slots). One launch per
-    (tx, rx-chunk); required native op.
-    """
+ Power-domain generalization of:func:`scattering_ensemble_eval`: C1 coherent
+ Jones transport of ``tx_pol`` from ``source`` to the diffuse ``vertex`` yields
+ the incident coherency diagonal, the resident Kirchhoff table gives the
+ outgoing diagonal, and the C2 power-domain sandwich to ``target`` plus the
+ receiver projection assemble the radiometric row gain (per-vertex ``weights``
+ = ``A_patch`` and ``1/(L1^2 L2^2)`` spreading, op-1 convention). The incident
+ coherency is computed in-kernel from the C1 transport (retained forward bin sums: no
+ ``a_te2``/``a_tm2`` projection pair, no cross-pol slots). One launch per
+ (tx, rx-chunk); required native op.
+ """
 
     rows = int(tx_pol.shape[0])
     _validate_chain_valid(valid, rows, tx_pol)
@@ -1240,15 +1169,15 @@ def scattering_chain_ensemble_eval_backward(
     need_grad_coef: bool = False,
     need_grad_frequency: bool = False,
 ) -> dict[str, torch.Tensor | None]:
-    """VJP of :func:`scattering_chain_ensemble_eval` (ADR-021 Op A, plan 10a s3.2).
+    """VJP of:func:`scattering_chain_ensemble_eval` (coherent scattering, the code).
 
-    Per-bounce chain-Fresnel grads are direct stores; the table grads use the
-    16-corner atomicAdd scatter and ``grad_coef`` / ``grad_frequency`` are scalar
-    atomicAdd reductions. Reverse-mode continuous chain geometry
-    (``need_grad_geometry``) is a staged follow-up wave and is rejected loudly by
-    the native bridge; the ``_jvp`` companion covers geometry in forward mode. The
-    returned dict is exactly the twelve native VJP fields.
-    """
+ Per-bounce chain-Fresnel grads are direct stores; the table grads use the
+ 16-corner atomicAdd scatter and ``grad_coef`` / ``grad_frequency`` are scalar
+ atomicAdd reductions. Reverse-mode continuous chain geometry
+ (``need_grad_geometry``) is a staged follow-up wave and is rejected loudly by
+ the native bridge; the ``_jvp`` companion covers geometry in forward mode. The
+ returned dict is exactly the twelve native VJP fields.
+ """
 
     rows = int(tx_pol.shape[0])
     _validate_chain_valid(valid, rows, tx_pol)
@@ -1358,14 +1287,14 @@ def scattering_chain_ensemble_eval_jvp(
     tangent_coef: float = 0.0,
     tangent_frequency: float = 0.0,
 ) -> dict[str, torch.Tensor]:
-    """JVP of :func:`scattering_chain_ensemble_eval` (ADR-021 Op A, plan 10a s3.3).
+    """JVP of:func:`scattering_chain_ensemble_eval` (coherent scattering, the code).
 
-    Deterministic forward-mode dual sweep (fixed-order, no atomics). Forward-mode
-    supports geometry tangents (positions/normals/d_i/d_o/n_o/L1/L2/cos_i/cos_o);
-    the endpoint positions, the vertex frame axes, ``weights``, ``wi_local`` and
-    the table metadata carry no tangent. A missing tangent is a zero tangent;
-    ``keep`` is non-differentiable so it has no tangent output.
-    """
+ Deterministic forward-mode dual sweep (fixed-order, no atomics). Forward-mode
+ supports geometry tangents (positions/normals/d_i/d_o/n_o/L1/L2/cos_i/cos_o);
+ the endpoint positions, the vertex frame axes, ``weights``, ``wi_local`` and
+ the table metadata carry no tangent. A missing tangent is a zero tangent;
+ ``keep`` is non-differentiable so it has no tangent output.
+ """
 
     rows = int(tx_pol.shape[0])
     _validate_chain_valid(valid, rows, tx_pol)
@@ -1454,16 +1383,16 @@ def scattering_chain_realization_eval(
     k0: float,
     frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
-    """Native ADR-021 Op B coherent chain realization rows (plan 10a s4).
+    """Native coherent scattering-chain realization rows.
 
-    Coherent generalization of :func:`scattering_patch_integral_eval`: the full
-    2x2 Jones sandwich ``E_rx = A_2 . S_patch(d_i, d_o; h) . A_1 . e_tx`` with
-    the carrier over the image-unfolded lengths, the planar spreading, the
-    ``r_te/r_tm`` computed in-kernel from the resident CSR layer stack at
-    ``cos_spec``, and the same Duffy 16x16 GL quadrature and two-stage
-    fixed-order tree reduction as op 2. The Duffy nodes are appended by the
-    facade (op-2 parity); required native op.
-    """
+ Coherent generalization of:func:`scattering_patch_integral_eval`: the full
+ 2x2 Jones sandwich ``E_rx = A_2 . S_patch(d_i, d_o; h) . A_1 . e_tx`` with
+ the carrier over the image-unfolded lengths, the planar spreading, the
+ ``r_te/r_tm`` computed in-kernel from the resident CSR layer stack at
+ ``cos_spec``, and the same Duffy 16x16 GL quadrature and two-stage
+ fixed-order tree reduction as op 2. The Duffy nodes are appended by the
+ facade (op-2 parity); required native op.
+ """
 
     n = int(d_i.shape[0])
     _validate_chain_valid(valid, n, d_i)
@@ -1599,14 +1528,14 @@ def scattering_chain_realization_eval_backward(
     need_grad_k0: bool = False,
     need_grad_frequency: bool = False,
 ) -> dict[str, torch.Tensor | None]:
-    """VJP of :func:`scattering_chain_realization_eval` (ADR-021 Op B, plan 10a s4.2).
+    """VJP of:func:`scattering_chain_realization_eval` (coherent scattering, the code).
 
-    ``grad_total`` is the required 0-dim complex cotangent (op-2 parity);
-    ``grad_path_field`` / ``grad_path_gain`` are the optional per-row cotangents
-    the deterministic coherent combine (D3) backprops through. ``grad_heights``
-    and the CSR layer grads use atomicAdd scatter; per-row / per-bounce grads are
-    direct stores. Off-flag keys are ``None``.
-    """
+ ``grad_total`` is the required 0-dim complex cotangent (op-2 parity);
+ ``grad_path_field`` / ``grad_path_gain`` are the optional per-row cotangents
+ the deterministic coherent combine backpropagates through. ``grad_heights``
+ and the CSR layer grads use atomicAdd scatter; per-row / per-bounce grads are
+ direct stores. Off-flag keys are ``None``.
+ """
 
     n = int(d_i.shape[0])
     _validate_chain_valid(valid, n, d_i)
@@ -1725,11 +1654,11 @@ def scattering_chain_realization_eval_jvp(
     tangent_k0: float = 0.0,
     tangent_frequency: float = 0.0,
 ) -> dict[str, torch.Tensor]:
-    """JVP of :func:`scattering_chain_realization_eval` (ADR-021 Op B, plan 10a s4.3).
+    """JVP of:func:`scattering_chain_realization_eval` (coherent scattering, the code).
 
-    Deterministic fixed-order dual sweep (no atomics). A missing tangent is a
-    zero tangent. Returns the per-row and total field tangents D3 consumes.
-    """
+ Deterministic fixed-order dual sweep (no atomics). A missing tangent is a
+ zero tangent. Returns the per-row and total field tangents consumed by coherent combination.
+ """
 
     n = int(d_i.shape[0])
     _validate_chain_valid(valid, n, d_i)
@@ -1784,7 +1713,7 @@ def _grad_or_none(out: dict, key: str, needed: bool) -> torch.Tensor | None:
 
 
 # Fixed inputs of the ensemble op: rejecting a gradient/tangent here fails
-# loudly instead of silently detaching (ADR-014 differentiable-input set).
+# loudly instead of silently detaching (scattering AD).
 _ENSEMBLE_FIXED = (
     (0, "valid"),
     (13, "material_id"),
@@ -1811,18 +1740,18 @@ _PATCH_FIXED = (
 
 
 class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
-    """Fixed-topology differentiable Kirchhoff ensemble rows (ADR-014 op 1).
+    """Fixed-topology differentiable Kirchhoff ensemble rows (scattering AD).
 
-    Differentiable inputs: the surviving-row geometry (``wo_rows``, ``r2_rows``,
-    ``cos_o_rows``), the per-sample geometry/radiometry (``n_o``, ``t1r``,
-    ``t2r``, ``wi_local``, ``cos_i``, ``r1``, ``a_te2``, ``a_tm2``,
-    ``weights``), the resident BSDF tables (``f_te_flat``, ``f_tm_flat``) and
-    the radiometric scale ``coef`` (a 0-d scalar tensor). ``material_id``,
-    ``backup_axis``, ``rx_pol``, the ``rc``/``sc`` indices, the table metadata
-    and ``threshold`` stay fixed; requesting their gradient fails loudly. The
-    ``gain``/``amplitude``/``length`` outputs are differentiable; ``keep`` is
-    marked non-differentiable.
-    """
+ Differentiable inputs: the surviving-row geometry (``wo_rows``, ``r2_rows``,
+ ``cos_o_rows``), the per-sample geometry/radiometry (``n_o``, ``t1r``,
+ ``t2r``, ``wi_local``, ``cos_i``, ``r1``, ``a_te2``, ``a_tm2``,
+ ``weights``), the resident BSDF tables (``f_te_flat``, ``f_tm_flat``) and
+ the radiometric scale ``coef`` (a 0-d scalar tensor). ``material_id``,
+ ``backup_axis``, ``rx_pol``, the ``rc``/``sc`` indices, the table metadata
+ and ``threshold`` stay fixed; requesting their gradient fails loudly. The
+ ``gain``/``amplitude``/``length`` outputs are differentiable; ``keep`` is
+ marked non-differentiable.
+ """
 
     @staticmethod
     def forward(
@@ -2098,12 +2027,12 @@ def scattering_ensemble_eval_ad(
     coef: torch.Tensor,
     threshold: float,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`scattering_ensemble_eval` (ADR-014 op 1).
+    """Differentiable:func:`scattering_ensemble_eval` (scattering AD).
 
-    ``coef`` is the radiometric scale as a 0-d scalar tensor so frequency (and
-    tx power) gradients flow through the ensemble rows; its host value is read
-    once per apply at this seam (audit M3), never per row.
-    """
+ ``coef`` is the radiometric scale as a 0-d scalar tensor so frequency (and
+ tx power) gradients flow through the ensemble rows; its host value is read
+ once per apply at this seam, never per row.
+ """
 
     coef_value = _ad_frequency_value(coef)
     values = _ScatteringEnsembleEvalAdFunction.apply(
@@ -2141,15 +2070,15 @@ _TABLE_EVAL_OUTPUT_FIELDS = ("f_te", "f_tm")
 
 
 class _ScatteringTableEvalAdFunction(torch.autograd.Function):
-    """Differentiable resident Kirchhoff BSDF table lookup (ADR-015 op 1).
+    """Differentiable resident Kirchhoff BSDF table lookup (scattering AD).
 
-    Every input is live: the local-frame directions ``wi``/``wo`` and the two
-    4-D tables ``f_te``/``f_tm``. There is no fixed-input reject list. Both
-    ``f_te_row``/``f_tm_row`` outputs are differentiable; a below-horizon row
-    carries zero value and zero gradient (the shared quadrilinear helper gates
-    it). Used by the MC-basic scattering map so table values, and through the
-    surrounding Torch arithmetic frequency and tx power, keep their gradients.
-    """
+ Every input is live: the local-frame directions ``wi``/``wo`` and the two
+ 4-D tables ``f_te``/``f_tm``. There is no fixed-input reject list. Both
+ ``f_te_row``/``f_tm_row`` outputs are differentiable; a below-horizon row
+ carries zero value and zero gradient (the shared quadrilinear helper gates
+ it). Used by the MC-basic scattering map so table values, and through the
+ surrounding Torch arithmetic frequency and tx power, keep their gradients.
+ """
 
     @staticmethod
     def forward(valid, wi, wo, f_te, f_tm):
@@ -2227,27 +2156,27 @@ def scattering_table_eval_ad(
     f_te: torch.Tensor,
     f_tm: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Differentiable :func:`scattering_table_eval` (ADR-015 op 1).
+    """Differentiable:func:`scattering_table_eval` (scattering AD).
 
-    Returns the ``(f_te_row, f_tm_row)`` pair like the plain forward, so the
-    MC-basic scattering map can drop it in behind ``ad``.
-    """
+ Returns the ``(f_te_row, f_tm_row)`` pair like the plain forward, so the
+ MC-basic scattering map can drop it in behind ``ad``.
+ """
 
     return _ScatteringTableEvalAdFunction.apply(valid, wi, wo, f_te, f_tm)
 
 
 class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
-    """Fixed-topology differentiable phase-screen patch integral (ADR-014 op 2).
+    """Fixed-topology differentiable phase-screen patch integral (scattering AD).
 
-    Differentiable inputs: the phase-screen ``heights``, the smooth-stack Jones
-    coefficients ``r_te``/``r_tm``, the per-row geometry (``d_i``, ``d_o``,
-    ``r1_rows``, ``r2_rows``, ``centroids``) and the scalar ``k0`` (a 0-d
-    tensor). The patch mesh (``patch_tris``, ``patch_uvs``), the row index,
-    ``n_rows``, the polarizations and the quadrature nodes/weights stay fixed;
-    requesting their gradient fails loudly. The complex ``total`` output is
-    differentiable; ``integral`` and ``row_value`` are marked
-    non-differentiable test buffers.
-    """
+ Differentiable inputs: the phase-screen ``heights``, the smooth-stack Jones
+ coefficients ``r_te``/``r_tm``, the per-row geometry (``d_i``, ``d_o``,
+ ``r1_rows``, ``r2_rows``, ``centroids``) and the scalar ``k0`` (a 0-d
+ tensor). The patch mesh (``patch_tris``, ``patch_uvs``), the row index,
+ ``n_rows``, the polarizations and the quadrature nodes/weights stay fixed;
+ requesting their gradient fails loudly. The complex ``total`` output is
+ differentiable; ``integral`` and ``row_value`` are marked
+ non-differentiable test buffers.
+ """
 
     @staticmethod
     def forward(
@@ -2518,13 +2447,13 @@ def scattering_patch_integral_eval_ad(
     *,
     k0: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`scattering_patch_integral_eval` (ADR-014 op 2).
+    """Differentiable:func:`scattering_patch_integral_eval` (scattering AD).
 
-    ``k0`` is the wavenumber as a 0-d scalar tensor so frequency gradients flow
-    through the phase and prefactor; its host value is read once per apply at
-    this seam (audit M3). The Duffy-mapped quadrature nodes/weights are gathered
-    from the shared cache and threaded to the companions as fixed inputs.
-    """
+ ``k0`` is the wavenumber as a 0-d scalar tensor so frequency gradients flow
+ through the phase and prefactor; its host value is read once per apply at
+ this seam. The Duffy-mapped quadrature nodes/weights are gathered
+ from the shared cache and threaded to the companions as fixed inputs.
+ """
 
     quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
     k0_value = _ad_frequency_value(k0)
@@ -2611,21 +2540,21 @@ _CHAIN_ENSEMBLE_FIXED = _CHAIN_ENSEMBLE_FIXED_TANGENTS + _CHAIN_ENSEMBLE_FIXED_G
 
 
 class _ScatteringChainEnsembleEvalAdFunction(torch.autograd.Function):
-    """Fixed-topology differentiable multi-bounce ensemble rows (ADR-021 Op A).
+    """Fixed-topology differentiable multi-bounce ensemble rows (coherent scattering).
 
-    Reverse-mode differentiable inputs: the two padded specular legs' Fresnel
-    parameters (``c1/c2 eps_r/sigma_e/gain/thickness``), the resident BSDF tables
-    (``f_te_flat``/``f_tm_flat``) and the two 0-dim AD scalars ``coef`` and
-    ``frequency``. The continuous chain geometry
-    (positions/normals/``n_o``/``d_i``/``d_o``/``l1``/``l2``/``cos_i``/``cos_o``)
-    is a staged follow-up in reverse mode and fails loudly if requested; the
-    forward-mode ``jvp`` still forwards its tangents. The endpoints
-    (``source``/``vertex``/``target``), ``tx_pol``/``rx_pol``, the depths,
-    ``mu_r``, the vertex frame axes ``t1r``/``t2r``/``backup_axis``,
-    ``wi_local``, ``weights``, the material ids and the table metadata stay fixed
-    in both modes. ``gain``/``amplitude``/``length`` are differentiable; ``keep``
-    is marked non-differentiable.
-    """
+ Reverse-mode differentiable inputs: the two padded specular legs' Fresnel
+ parameters (``c1/c2 eps_r/sigma_e/gain/thickness``), the resident BSDF tables
+ (``f_te_flat``/``f_tm_flat``) and the two 0-dim AD scalars ``coef`` and
+ ``frequency``. The continuous chain geometry
+ (positions/normals/``n_o``/``d_i``/``d_o``/``l1``/``l2``/``cos_i``/``cos_o``)
+ is a staged follow-up in reverse mode and fails loudly if requested; the
+ forward-mode ``jvp`` still forwards its tangents. The endpoints
+ (``source``/``vertex``/``target``), ``tx_pol``/``rx_pol``, the depths,
+ ``mu_r``, the vertex frame axes ``t1r``/``t2r``/``backup_axis``,
+ ``wi_local``, ``weights``, the material ids and the table metadata stay fixed
+ in both modes. ``gain``/``amplitude``/``length`` are differentiable; ``keep``
+ is marked non-differentiable.
+ """
 
     @staticmethod
     def forward(
@@ -3014,12 +2943,12 @@ def scattering_chain_ensemble_eval_ad(
     threshold: float,
     frequency: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`scattering_chain_ensemble_eval` (ADR-021 Op A).
+    """Differentiable:func:`scattering_chain_ensemble_eval` (coherent scattering).
 
-    ``coef`` and ``frequency`` are the two AD-live scalars as 0-dim tensors so
-    the radiometric-scale and frequency chains keep their gradients; their host
-    values are read once per apply at this seam (audit M3), never per row.
-    """
+ ``coef`` and ``frequency`` are the two AD-live scalars as 0-dim tensors so
+ the radiometric-scale and frequency chains keep their gradients; their host
+ values are read once per apply at this seam, never per row.
+ """
 
     primal_args = _ordered_primal_args(locals(), _CHAIN_ENSEMBLE_PRIMAL_NAMES)
     coef_value = _ad_frequency_value(coef)
@@ -3119,9 +3048,9 @@ def _required_chain_realization_forward(
 ):
     """Raw Op B forward dispatch with explicit quadrature nodes (autograd seam).
 
-    The Function holds the Duffy nodes as fixed inputs, so it dispatches the
-    native op directly (the public facade appends the cached nodes itself).
-    """
+ The Function holds the Duffy nodes as fixed inputs, so it dispatches the
+ native op directly (the public facade appends the cached nodes itself).
+ """
 
     out = _required_native_op("scattering_chain_realization_eval")(
         valid,
@@ -3181,19 +3110,19 @@ def _required_chain_realization_forward(
 
 
 class _ScatteringChainRealizationEvalAdFunction(torch.autograd.Function):
-    """Fixed-topology differentiable coherent chain realization (ADR-021 Op B).
+    """Fixed-topology differentiable coherent chain realization (coherent scattering).
 
-    Differentiable inputs: the phase-screen ``heights``, the CSR layer stack
-    (``layer_thickness_m``/``layer_eps_r``/``layer_sigma_e``), the two padded
-    specular legs' Fresnel parameters and geometry, the vertex directions
-    ``d_i``/``d_o``, the unfolded lengths/spreading, the ``centroids`` and the
-    two 0-dim AD scalars ``k0`` and ``frequency``. The patch mesh, ``rows``,
-    ``n_rows``, the depths, ``mu_r``, ``cos_spec`` (derived-frozen), the
-    material/CSR-index arrays, the endpoint polarizations and the quadrature
-    nodes stay fixed; requesting their gradient fails loudly. ``total`` /
-    ``path_field`` / ``path_gain`` are differentiable; ``integral`` and
-    ``row_value`` are marked non-differentiable test buffers.
-    """
+ Differentiable inputs: the phase-screen ``heights``, the CSR layer stack
+ (``layer_thickness_m``/``layer_eps_r``/``layer_sigma_e``), the two padded
+ specular legs' Fresnel parameters and geometry, the vertex directions
+ ``d_i``/``d_o``, the unfolded lengths/spreading, the ``centroids`` and the
+ two 0-dim AD scalars ``k0`` and ``frequency``. The patch mesh, ``rows``,
+ ``n_rows``, the depths, ``mu_r``, ``cos_spec`` (derived-frozen), the
+ material/CSR-index arrays, the endpoint polarizations and the quadrature
+ nodes stay fixed; requesting their gradient fails loudly. ``total`` /
+ ``path_field`` / ``path_gain`` are differentiable; ``integral`` and
+ ``row_value`` are marked non-differentiable test buffers.
+ """
 
     @staticmethod
     def forward(
@@ -3349,7 +3278,7 @@ class _ScatteringChainRealizationEvalAdFunction(torch.autograd.Function):
             return none_grads
         saved = ctx.saved_tensors
         if grad_total is None:
-            # path_field-only cotangents (D3 coherent combine) leave the scalar
+            # path_field-only cotangents from coherent combination leave the scalar
             # total ungraded; the required ABI slot takes a zero cotangent.
             grad_total = torch.zeros((), dtype=torch.complex64, device=saved[1].device)
         out = scattering_chain_realization_eval_backward(
@@ -3605,14 +3534,14 @@ def scattering_chain_realization_eval_ad(
     k0: torch.Tensor,
     frequency: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`scattering_chain_realization_eval` (ADR-021 Op B).
+    """Differentiable:func:`scattering_chain_realization_eval` (coherent scattering).
 
-    ``k0`` and ``frequency`` are the two AD-live scalars as 0-dim tensors so the
-    carrier/prefactor and the in-kernel layer stack keep their gradients; their
-    host values are read once per apply at this seam (audit M3). The Duffy
-    quadrature nodes are gathered from the shared cache and threaded to the
-    companions as fixed inputs.
-    """
+ ``k0`` and ``frequency`` are the two AD-live scalars as 0-dim tensors so the
+ carrier/prefactor and the in-kernel layer stack keep their gradients; their
+ host values are read once per apply at this seam. The Duffy
+ quadrature nodes are gathered from the shared cache and threaded to the
+ companions as fixed inputs.
+ """
 
     primal_args = _ordered_primal_args(locals(), _CHAIN_REALIZATION_PRIMAL_NAMES)
     quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
@@ -3685,7 +3614,7 @@ def kirchhoff_table_build_backward(
     need_grad_layers: bool,
     need_grad_frequency: bool,
 ) -> dict[str, torch.Tensor | None]:
-    """Native table-build VJP facade (ADR-015 op 3)."""
+    """Native table-build VJP facade (scattering AD)."""
 
     s_te = _check_table_tensor("s_te", s_te, 4)
     s_tm = _check_table_tensor("s_tm", s_tm, 4)
@@ -3751,7 +3680,7 @@ def kirchhoff_table_build_jvp(
     t_corr_y: float,
     t_frequency: float,
 ) -> dict[str, torch.Tensor]:
-    """Native table-build JVP facade (ADR-015 op 4)."""
+    """Native table-build JVP facade (scattering AD)."""
 
     s_te = _check_table_tensor("s_te", s_te, 4)
     s_tm = _check_table_tensor("s_tm", s_tm, 4)
@@ -3800,7 +3729,7 @@ def _scalar_tangent(tensor: torch.Tensor | None) -> float:
     return float(value.reshape(()).detach())
 
 
-# Fixed inputs of the build op (ADR-015 Part C): grads/tangents here fail loudly
+# Fixed inputs of the build op (scattering AD): grads/tangents here fail loudly
 # instead of silently detaching.
 _FIXED = (
     (6, "layer_mu_r"),
@@ -3880,16 +3809,16 @@ def _backward_grad_tuple(out, ctx, needed, *, need_frequency: bool) -> tuple:
 
 
 class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
-    """Differentiable Kirchhoff table build (ADR-015 Part C).
+    """Differentiable Kirchhoff table build (scattering AD).
 
-    Forward passes the numpy-built ``f_te``/``f_tm`` through unchanged;
-    backward/jvp dispatch the native companions against the exported f32
-    structural intermediates. Differentiable inputs: ``rough_sigma_h_m`` /
-    ``rough_corr_x_m`` / ``rough_corr_y_m`` and the CSR ``layer_thickness_m`` /
-    ``layer_eps_r`` / ``layer_sigma_e`` slices plus the frequency scalar tensor.
-    ``layer_mu_r``, the directional grids and the balance/budget intermediates
-    stay fixed; requesting a fixed gradient/tangent fails loudly.
-    """
+ Forward passes the numpy-built ``f_te``/``f_tm`` through unchanged;
+ backward/jvp dispatch the native companions against the exported f32
+ structural intermediates. Differentiable inputs: ``rough_sigma_h_m`` /
+ ``rough_corr_x_m`` / ``rough_corr_y_m`` and the CSR ``layer_thickness_m`` /
+ ``layer_eps_r`` / ``layer_sigma_e`` slices plus the frequency scalar tensor.
+ ``layer_mu_r``, the directional grids and the balance/budget intermediates
+ stay fixed; requesting a fixed gradient/tangent fails loudly.
+ """
 
     @staticmethod
     def forward(
@@ -4064,12 +3993,12 @@ def kirchhoff_table_build_ad(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Attach the native build adjoint to a numpy-built ``KirchhoffTable``.
 
-    ``table`` is the float64-numpy-built :class:`KirchhoffTable` (already carries
-    the primal ``f_te``/``f_tm`` and the exported ``pre_balance_lobe_*`` /
-    ``normalization_applied`` / ``r_diff_*`` intermediates). The build itself is
-    not re-run: the returned ``f_te``/``f_tm`` are the primal values with a
-    graph node connecting them to the differentiable leaf inputs.
-    """
+ ``table`` is the float64-numpy-built:class:`KirchhoffTable` (already carries
+ the primal ``f_te``/``f_tm`` and the exported ``pre_balance_lobe_*`` /
+ ``normalization_applied`` / ``r_diff_*`` intermediates). The build itself is
+ not re-run: the returned ``f_te``/``f_tm`` are the primal values with a
+ graph node connecting them to the differentiable leaf inputs.
+ """
 
     if table.pre_balance_lobe_te is None or table.pre_balance_lobe_tm is None:
         raise ValueError(

@@ -1,7 +1,7 @@
 // Copyright Xingyu Chen.
 // Implements capacity failure CUDA operations.
 
-// ---- Consolidated from capacity_failure_state.cu ----
+// ==== Section: Capacity failure state ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
@@ -33,7 +33,7 @@ at::Tensor channel_capacity_failure_state_create(at::Tensor reference) {
     return failure_state;
 }
 
-// ---- Consolidated from capacity_failure_terminal.cu ----
+// ==== Section: Capacity failure terminal check ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <cuda_runtime_api.h>
@@ -66,7 +66,7 @@ void channel_capacity_failure_terminal_check(at::Tensor failure_state) {
     // before the caller's next normal synchronization boundary.
 }
 
-// ---- Consolidated from enumerated_capacity_failure_sanitize.cu ----
+// ==== Section: Enumerated capacity sanitization ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
@@ -227,7 +227,7 @@ at::Tensor channel_enumerated_capacity_failure_vector_sanitize(
     return output;
 }
 
-// ---- Consolidated from mc_capacity_failure_component_maps_sanitize.cu ----
+// ==== Section: Monte Carlo capacity sanitization ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>

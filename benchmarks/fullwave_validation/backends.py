@@ -30,7 +30,7 @@ def solve_deterministic(spec: CaseSpec) -> FieldMap:
             export_paths=True,
             diagnostics=True,
             # Full physics: the coupled reflection-diffraction compensator
-            # (ADR-011). "coupled" is not a Config component; it is enabled by
+            # (coupled reflection and diffraction). "coupled" is not a Config component; it is enabled by
             # this gate and exported as its own component map. Requires
             # max_depth >= 2 plus reflection + diffraction (both in
             # _COMPONENTS), so degenerate low-depth cases stay valid.
