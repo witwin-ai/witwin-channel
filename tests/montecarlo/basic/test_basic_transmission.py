@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# MC basic straight-penetration transmission radiomap (contract section 4).
+
 """MC basic straight-penetration transmission radiomap (contract section 4).
 
 Acceptance: a single eps_r=1 vacuum wall reproduces the unobstructed LoS map

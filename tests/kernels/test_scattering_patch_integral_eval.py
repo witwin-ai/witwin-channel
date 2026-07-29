@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests scattering patch integral eval.
+
 """Lockstep and contract tests for ADR-010 op 2 (phase-screen patch integral)."""
 
 import math

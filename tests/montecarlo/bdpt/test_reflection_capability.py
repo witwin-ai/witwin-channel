@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests reflection capability.
+
 import pytest
 import torch
 

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks bdpt basic.
+
 from __future__ import annotations
 
 import argparse

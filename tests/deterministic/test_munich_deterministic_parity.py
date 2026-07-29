@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests munich deterministic parity.
+
 import json
 from pathlib import Path
 import subprocess

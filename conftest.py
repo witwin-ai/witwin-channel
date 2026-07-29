@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Root conftest: configure the validated native extension for the test suite.
+
 """Root conftest: configure the validated native extension for the test suite.
 
 When the packaged extension is absent, search ``artifacts/cmake-*`` for a pyd

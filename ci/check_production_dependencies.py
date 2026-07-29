@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Reject legacy Channel Python stacks from production source trees.
+
 """Reject legacy Channel Python stacks from production source trees."""
 
 from __future__ import annotations

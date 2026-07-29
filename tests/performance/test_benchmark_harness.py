@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests benchmark harness.
+
 from __future__ import annotations
 
 import json

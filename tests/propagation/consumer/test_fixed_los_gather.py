@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests fixed los gather.
+
 from __future__ import annotations
 
 import pytest

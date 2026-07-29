@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks native reflection accumulation.
+
 from __future__ import annotations
 
 import argparse

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests scatter chain discovery.
+
 """ADR-021 D1 enumerated scatter-chain discovery contract tests.
 
 The pure structural helpers (join / stable order / budget / padding / contract

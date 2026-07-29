@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Implements geometry native integration.
+
 #include "resource.h"
 #include "../tensor_checks.h"
 

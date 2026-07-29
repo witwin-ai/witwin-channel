@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Exact-token duplicate-region detector for channel production sources.
+
 """Exact-token duplicate-region detector for channel production sources.
 
 The report is static-first: it tokenizes Python and C++/CUDA sources without

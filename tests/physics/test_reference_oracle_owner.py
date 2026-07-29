@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# The NumPy reference oracle has exactly one owner, and it lives under tests.
+
 """The NumPy reference oracle has exactly one owner, and it lives under tests.
 
 CLAUDE.md allows CPU/NumPy reference implementations only under ``tests/``.

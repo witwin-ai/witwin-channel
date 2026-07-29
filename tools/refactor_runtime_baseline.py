@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Collect reduced, exact runtime and performance refactor baselines.
+
 """Collect reduced, exact runtime and performance refactor baselines.
 
 The parent process starts at least two independent child processes for every

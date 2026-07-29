@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests metadata.
+
 import pytest
 import torch
 

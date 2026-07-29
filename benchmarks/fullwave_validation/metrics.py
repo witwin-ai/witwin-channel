@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks metrics.
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass

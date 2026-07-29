@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests los.
+
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, fields

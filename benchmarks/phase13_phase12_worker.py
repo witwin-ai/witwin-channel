@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks worker.
+
 """Canonical public-API workload worker for Plan 13 Phase 12 evidence."""
 
 from __future__ import annotations

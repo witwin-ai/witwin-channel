@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests path no python rayd.
+
 import sys
 
 import pytest

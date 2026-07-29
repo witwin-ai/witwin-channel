@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks path solver threeway.
+
 from __future__ import annotations
 
 import argparse

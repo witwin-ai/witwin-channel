@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks deterministic munich.
+
 from __future__ import annotations
 
 import argparse

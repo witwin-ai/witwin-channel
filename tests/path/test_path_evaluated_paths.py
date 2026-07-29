@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests path evaluated paths.
+
 from __future__ import annotations
 
 from types import SimpleNamespace

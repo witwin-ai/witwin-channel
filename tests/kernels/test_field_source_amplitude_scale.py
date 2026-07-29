@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests field source amplitude scale.
+
 """Direct contract tests for the ADR-039 source-amplitude scale.
 
 The operation is ``path_field_vector = field_vector * sqrt(max(tx_power, 0))``

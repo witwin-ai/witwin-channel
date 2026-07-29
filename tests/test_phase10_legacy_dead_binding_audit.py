@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests legacy dead binding audit.
+
 from __future__ import annotations
 
 import ast

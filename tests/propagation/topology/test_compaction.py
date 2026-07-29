@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests compaction.
+
 from __future__ import annotations
 
 

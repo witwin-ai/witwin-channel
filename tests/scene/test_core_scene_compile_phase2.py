@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests core scene compile.
+
 from __future__ import annotations
 
 import importlib

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests optimization smoke.
+
 """End-to-end optimization smoke (plan 07 section 9.1, last bullet).
 
 Adam recovers a transmitter position through the deterministic solver's

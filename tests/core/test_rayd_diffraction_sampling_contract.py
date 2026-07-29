@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests rayd diffraction sampling contract.
+
 import pytest
 import torch
 

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests path solver smoke.
+
 import pytest
 import torch
 

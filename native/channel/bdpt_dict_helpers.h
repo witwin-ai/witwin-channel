@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Declares bdpt dict helpers native contracts.
+
 #pragma once
 
 #include <torch/extension.h>

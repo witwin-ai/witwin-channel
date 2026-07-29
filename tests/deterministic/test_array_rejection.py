@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests array rejection.
+
 from __future__ import annotations
 
 import pytest

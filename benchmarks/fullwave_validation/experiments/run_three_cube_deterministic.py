@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Three-cube deterministic solves for the Yee-locked ``three_cube_320`` case.
+
 """Three-cube deterministic solves for the Yee-locked ``three_cube_320`` case.
 
 Runs the deterministic solver twice on the versioned ``three_cube_320`` /

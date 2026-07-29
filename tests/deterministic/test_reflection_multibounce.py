@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests reflection multibounce.
+
 import pytest
 import torch
 

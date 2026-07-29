@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Analytic and oracle-parity tests for the shared em/ layer-stack core.
+
 """Analytic and oracle-parity tests for the shared em/ layer-stack core.
 
 The complex128 transfer-matrix implementation below follows plan section 5.1

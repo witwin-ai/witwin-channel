@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests evaluated paths contract.
+
 from __future__ import annotations
 
 import torch

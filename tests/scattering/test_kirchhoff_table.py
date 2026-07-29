@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Kirchhoff ensemble table: energy, limits, reciprocity, applicability.
+
 """Kirchhoff ensemble table: energy, limits, reciprocity, applicability.
 
 Reference material follows the contract test spec (eps 4 - 0.1j,

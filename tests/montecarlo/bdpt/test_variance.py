@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests variance.
+
 import pytest
 import torch
 

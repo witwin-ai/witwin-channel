@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Defines the reference package.
+
 """Test-only reference implementations for ADR-010 numerical-kernel lockstep.
 
 These modules hold the previous Torch implementations that the native CUDA

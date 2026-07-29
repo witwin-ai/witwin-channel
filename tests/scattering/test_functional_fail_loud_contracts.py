@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests functional fail loud contracts.
+
 from __future__ import annotations
 
 from collections.abc import Callable

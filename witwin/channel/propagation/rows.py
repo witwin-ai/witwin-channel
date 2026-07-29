@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Row-aligned propagation contracts shared by the propagation stages.
+
 """Row-aligned propagation contracts shared by the propagation stages.
 
 One path table is described by four zero-copy views that all key on the same

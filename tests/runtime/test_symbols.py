@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests symbols.
+
 from __future__ import annotations
 
 import ast

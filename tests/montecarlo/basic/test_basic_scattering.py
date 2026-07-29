@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# MC basic Kirchhoff scattering radiomap (wave 3).
+
 """MC basic Kirchhoff scattering radiomap (wave 3).
 
 The map area-samples rough faces and deposits the unpolarized Kirchhoff

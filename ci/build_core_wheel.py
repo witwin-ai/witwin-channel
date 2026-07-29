@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Build the locked Core wheel that the Channel wheel smoke installs beside it.
+
 """Build the locked Core wheel that the Channel wheel smoke installs beside it.
 
 ``ci/wheel_smoke.py`` requires ``--core-wheel``: the isolated ``pip install

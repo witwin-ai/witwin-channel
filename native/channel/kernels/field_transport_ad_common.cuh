@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Shares field transport ad common CUDA helpers.
+
 #pragma once
 
 #include <ATen/ATen.h>

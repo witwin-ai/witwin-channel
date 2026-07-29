@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests path threeway reduced gate.
+
 from __future__ import annotations
 
 import math

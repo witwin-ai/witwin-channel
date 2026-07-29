@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Implements chain realization.
+
 """Reference float64 Torch multi-bounce coherent scattering (ADR-021 Op B).
 
 Fully differentiable float64 re-derivation of the ADR-021 ``D2`` Op B math

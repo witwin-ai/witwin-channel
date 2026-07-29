@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests path angles geometry.
+
 import math
 
 import torch

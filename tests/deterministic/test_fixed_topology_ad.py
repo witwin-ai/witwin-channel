@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests fixed topology ad.
+
 import pytest
 import torch
 

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Deterministic-versus-full-wave validation harness.
+
 """Deterministic-versus-full-wave validation harness."""
 
 from .metrics import (

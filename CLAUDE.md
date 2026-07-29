@@ -560,3 +560,29 @@ is the authoritative production cardinality decision.
 When detailed behavior is unclear, consult the accepted ADR and the owning
 domain README. If an ADR and current implementation disagree, do not guess or
 add a fallback; surface the mismatch and resolve it explicitly.
+## Source headers and shared math
+
+Every tracked Python, C++, CUDA, and native header file starts with exactly two
+plain-language comment lines: `Copyright Xingyu Chen.` followed by one concise
+sentence saying what the file does. Keep that sentence under 100 characters.
+Do not put ADR numbers, phase or plan names, migration history, design
+justification, or a changelog in the opening header. Put durable design detail
+in the owner documentation and put local algorithm detail beside the code it
+explains. Living documentation references canonical files and symbol names instead of brittle source line numbers; refresh any generated line-sensitive evidence in the same change.
+
+`native/channel/kernels/math.cuh` is the single Channel owner of ordinary native
+`Vec3`, `Complex`, and `Complex3` values and their basic load, store, arithmetic,
+dot, cross, length, normalization, complex division, square-root, and power
+operations. A translation unit must not redeclare those simple types or repeat
+those helpers. Numerically distinct policies such as an epsilon floor, fallback
+vector, zero fallback, explicit round-to-nearest order, or `rsqrt` floor stay as
+separately named functions in that shared header; a cleanup must not erase the
+difference or reorder arithmetic. Algorithm-specific derivative or tape state,
+such as `DualVec3`, remains with its algorithm when it is not a general-purpose
+math type.
+
+Generic Python vector and quaternion math comes from `witwin.core.math`, as
+exported by `witwin.core`; Channel must not create `tensor_math.py` or another
+Python owner. Domain-specific offline material math stays with its domain owner.
+Independent test-reference math remains under `tests/` and must never become a
+production backend or import target.

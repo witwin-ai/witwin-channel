@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Implements rayd native integration.
+
 #include <torch/extension.h>
 
 #include "../rayd/resource.h"

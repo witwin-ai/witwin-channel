@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Canonical worker execution and source/build identity verification.
+
 """Canonical worker execution and source/build identity verification."""
 
 from __future__ import annotations

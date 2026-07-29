@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Implements bdpt ad oracles.
+
 """Reference float64 Torch oracles for the ADR-022 BDPT AD companions.
 
 Fully differentiable float64/complex128 re-derivations of the six BDPT-owned

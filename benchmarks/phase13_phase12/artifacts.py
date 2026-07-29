@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Immutable, root-relative raw evidence artifacts.
+
 """Immutable, root-relative raw evidence artifacts."""
 
 from __future__ import annotations

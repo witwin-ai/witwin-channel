@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests ad errors.
+
 import pytest
 import torch
 

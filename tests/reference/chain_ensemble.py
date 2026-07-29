@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Implements chain ensemble.
+
 """Reference float64 Torch multi-bounce ensemble scattering (ADR-021 Op A).
 
 Fully differentiable float64 re-derivation of the ADR-021 ``D2`` Op A math

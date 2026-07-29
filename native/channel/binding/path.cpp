@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Implements path native integration.
+
 #include <torch/extension.h>
 #include <pybind11/stl.h>
 

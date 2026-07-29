@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks builds.
+
 """Fresh, commit-bound Channel builds used by formal Phase 12 evidence."""
 
 from __future__ import annotations

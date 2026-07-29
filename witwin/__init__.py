@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Top-level Witwin namespace package.
+
 """Top-level Witwin namespace package."""
 
 from __future__ import annotations

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Compile canonical Core world contracts into Channel runtime resources.
+
 """Compile canonical Core world contracts into Channel runtime resources.
 
 This module is the single owner of the Channel side of the world boundary: the

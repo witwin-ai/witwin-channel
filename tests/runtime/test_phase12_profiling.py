@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests profiling.
+
 from __future__ import annotations
 
 import ast

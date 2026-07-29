@@ -1,11 +1,12 @@
-// ADR-044 consolidated CUDA translation unit.
-// Physical co-location only: ABI, launches, synchronization, and numerical order are unchanged.
+// Copyright Xingyu Chen.
+// Implements montecarlo common CUDA operations.
 
 // ---- Consolidated from accum.cu ----
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
+#include "math.cuh"
 
 #include <tuple>
 
@@ -306,6 +307,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
+#include "math.cuh"
 #include "torch_cuda_minimal.h"
 
 #include <algorithm>
@@ -351,16 +353,7 @@ __device__ int opposite_vertex(const int* face, int shared0, int shared1) {
     return face[2];
 }
 
-__device__ float3 normalized3(const float* values, int index, float eps) {
-    float3 v{
-        values[static_cast<int64_t>(index) * 3 + 0],
-        values[static_cast<int64_t>(index) * 3 + 1],
-        values[static_cast<int64_t>(index) * 3 + 2],
-    };
-    float length = sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
-    length = fmaxf(length, eps);
-    return {v.x / length, v.y / length, v.z / length};
-}
+
 
 __global__ void diffraction_edge_count_kernel(
     int64_t count,
@@ -406,8 +399,8 @@ __global__ void diffraction_edge_count_kernel(
 
     const int safe0 = max(f0, 0);
     const int safe1 = max(f1, 0);
-    const float3 n0 = normalized3(face_normals, safe0, kEpsilon);
-    const float3 n1 = normalized3(face_normals, safe1, kEpsilon);
+    const float3 n0 = channel::math::load_normalized_min_length(face_normals, safe0, kEpsilon);
+    const float3 n1 = channel::math::load_normalized_min_length(face_normals, safe1, kEpsilon);
     const float normal_dot = n0.x * n1.x + n0.y * n1.y + n0.z * n1.z;
     bool coplanar = false;
     if (interior && fabsf(normal_dot) >= kNormalCosTol) {
@@ -709,6 +702,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
+#include "math.cuh"
 
 namespace {
 
@@ -760,6 +754,7 @@ at::Tensor channel_mc_sample_directions_cuda(int64_t count, at::Tensor reference
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
+#include "math.cuh"
 
 #include "../tensor_checks.h"
 

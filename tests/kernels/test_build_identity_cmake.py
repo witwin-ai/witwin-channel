@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests build identity cmake.
+
 from __future__ import annotations
 
 import hashlib

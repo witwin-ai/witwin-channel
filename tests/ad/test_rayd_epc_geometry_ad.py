@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# AD-2 layer 1: RayD reflection EPC paths geometry JVP/VJP versus central FD.
+
 """AD-2 layer 1: RayD reflection EPC paths geometry JVP/VJP versus central FD.
 
 Exercises the new fixed-winner C-ABI directly (channel bridge facades

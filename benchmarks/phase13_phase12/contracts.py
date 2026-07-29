@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks contracts.
+
 """Strict, versioned historical Phase 12 ADR-030 runner contracts.
 
 Measured execution remains fail-closed. ADR-032 superseded this production

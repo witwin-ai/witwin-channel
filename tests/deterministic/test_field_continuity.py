@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Deterministic-field continuity regression guards (design doc Tier 3 / F6).
+
 """Deterministic-field continuity regression guards (design doc Tier 3 / F6).
 
 Companion to ``docs/dev/audit/utd-continuity-fix-design.md`` (section F6) and

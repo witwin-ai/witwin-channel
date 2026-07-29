@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks diagnostics.
+
 """Non-timed direct-facade correctness capture for Phase 12 evidence."""
 
 from __future__ import annotations

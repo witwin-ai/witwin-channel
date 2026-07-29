@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests rayd coupled topology.
+
 import math
 
 import pytest

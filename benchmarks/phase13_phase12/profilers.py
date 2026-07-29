@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Runner-owned Nsight Systems/Compute capture and semantic validation.
+
 """Runner-owned Nsight Systems/Compute capture and semantic validation."""
 
 from __future__ import annotations

@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Implements materials native integration.
+
 #include <torch/extension.h>
 #include <rayd/torch/integration.h>
 

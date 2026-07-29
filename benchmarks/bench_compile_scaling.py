@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Measure `scene.compile` cost against scene size.
+
 """Measure `scene.compile` cost against scene size.
 
 `compile` reads all four Core version properties before it consults its cache,

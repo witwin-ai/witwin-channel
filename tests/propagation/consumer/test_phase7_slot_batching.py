@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests slot batching.
+
 """Block-diagonal slot batching for fixed-topology reevaluation (ADR-041).
 
 Before this contract a caller who needed the same frozen rows at ``T`` world

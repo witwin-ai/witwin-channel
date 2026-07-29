@@ -59,7 +59,7 @@ RECORD 归属与逐文件 source manifest digest，然后 `add_subdirectory`。
 1. **该路径当前无任何真实构建在使用。**
    - [publish-witwin-channel.yml:273](../../../../.github/workflows/publish-witwin-channel.yml)
      与 `:451` 都从独立 git checkout 传 `RAYD_SOURCE_DIR`。
-   - `benchmarks/phase13_phase12/builds.py:234,496` 与 `release.py:287,1115`
+   - `benchmarks/phase13_phase12/builds.py,496` 与 `release.py:287,1115`
      同样传 `RAYD_SOURCE_DIR`。
    - [README.md:83-88](../../../README.md) 自述：已发布的 `rayd-torch 0.7.0`
      bundle **不满足 release guard**，Channel 0.4.0 源码构建必须设置

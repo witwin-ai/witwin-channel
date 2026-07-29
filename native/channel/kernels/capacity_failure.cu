@@ -1,5 +1,5 @@
-// ADR-044 consolidated CUDA translation unit.
-// Physical co-location only: ABI, launches, synchronization, and numerical order are unchanged.
+// Copyright Xingyu Chen.
+// Implements capacity failure CUDA operations.
 
 // ---- Consolidated from capacity_failure_state.cu ----
 #include <ATen/ATen.h>

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Implements reference channel.
+
 from __future__ import annotations
 
 import torch

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests material abi v2.
+
 from __future__ import annotations
 
 import importlib.util

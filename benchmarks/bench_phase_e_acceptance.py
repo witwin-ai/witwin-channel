@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks performance acceptance behavior.
+
 from __future__ import annotations
 
 import argparse

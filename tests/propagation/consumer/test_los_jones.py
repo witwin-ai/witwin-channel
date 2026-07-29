@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests los jones.
+
 from __future__ import annotations
 
 import math

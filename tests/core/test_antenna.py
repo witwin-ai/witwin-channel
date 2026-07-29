@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests antenna.
+
 import math
 from types import SimpleNamespace
 

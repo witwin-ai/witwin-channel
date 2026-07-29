@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# AD-1 kernel-level tests: EM-response derivatives of the field kernels.
+
 """AD-1 kernel-level tests: EM-response derivatives of the field kernels.
 
 Covers forward parity of the native float32 kernels against the pure-torch

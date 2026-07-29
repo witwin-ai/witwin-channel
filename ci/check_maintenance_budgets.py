@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Enforce deterministic size and complexity budgets for production Python.
+
 """Enforce deterministic size and complexity budgets for production Python.
 
 ``limits.file_lines`` and ``limits.native_file_lines`` are OPTIONAL. The Python

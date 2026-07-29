@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests rayd scene kernels.
+
 from __future__ import annotations
 
 import ast

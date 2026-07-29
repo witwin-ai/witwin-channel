@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests scattering kernels.
+
 import math
 
 import pytest

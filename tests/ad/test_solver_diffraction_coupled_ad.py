@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# AD-4 solver-level tests: UTD diffraction and coupled R-D gradients.
+
 """AD-4 solver-level tests: UTD diffraction and coupled R-D gradients.
 
 Covers the plan 07 section 9.3 cells delivered by AD-4 for D=deterministic

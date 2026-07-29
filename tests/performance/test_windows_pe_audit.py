@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests windows pe audit.
+
 from __future__ import annotations
 
 from pathlib import Path

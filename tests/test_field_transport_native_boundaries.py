@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests field transport native boundaries.
+
 from __future__ import annotations
 
 import json

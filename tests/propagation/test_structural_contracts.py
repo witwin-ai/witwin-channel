@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests structural contracts.
+
 from __future__ import annotations
 
 import ast

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests native loader no fallback.
+
 import ast
 import inspect
 from pathlib import Path

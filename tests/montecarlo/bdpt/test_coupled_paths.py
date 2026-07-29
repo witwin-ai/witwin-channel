@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests coupled paths.
+
 import pytest
 import torch
 

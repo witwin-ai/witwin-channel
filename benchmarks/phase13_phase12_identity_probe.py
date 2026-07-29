@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Runner-owned packaged-extension identity probe.
+
 """Runner-owned packaged-extension identity probe.
 
 This probe performs no numerical measurement.  The parent runner retains its

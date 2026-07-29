@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Shares bdpt connect common CUDA helpers.
+
 #pragma once
 
 #include <ATen/cuda/CUDAContext.h>
@@ -123,39 +126,7 @@ __device__ float bdpt_free_space_gain(float tx_power, float distance, float freq
     return tx_power / fmaxf(denom * denom, 1.0e-30f);
 }
 
-__device__ float3 bdpt_make_float3(float x, float y, float z) {
-    float3 out;
-    out.x = x;
-    out.y = y;
-    out.z = z;
-    return out;
-}
 
-__device__ float3 bdpt_add3(float3 a, float3 b) {
-    return bdpt_make_float3(a.x + b.x, a.y + b.y, a.z + b.z);
-}
-
-__device__ float3 bdpt_sub3(float3 a, float3 b) {
-    return bdpt_make_float3(a.x - b.x, a.y - b.y, a.z - b.z);
-}
-
-__device__ float3 bdpt_scale3(float3 a, float s) {
-    return bdpt_make_float3(a.x * s, a.y * s, a.z * s);
-}
-
-__device__ float bdpt_norm3(float3 a) {
-    return sqrtf(a.x * a.x + a.y * a.y + a.z * a.z);
-}
-
-__device__ float3 bdpt_normalize3(float3 a) {
-    const float inv = 1.0f / fmaxf(bdpt_norm3(a), 1.0e-12f);
-    return bdpt_scale3(a, inv);
-}
-
-__device__ float3 bdpt_vec3_at(const float* values, int index) {
-    const float* row = values + static_cast<int64_t>(index) * 3;
-    return bdpt_make_float3(row[0], row[1], row[2]);
-}
 
 std::tuple<
     at::Tensor,

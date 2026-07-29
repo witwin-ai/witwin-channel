@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests public scene.
+
 import torch
 
 from tests.support.core_world import (

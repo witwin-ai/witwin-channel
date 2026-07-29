@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests scattering.
+
 """Deterministic Kirchhoff rough-surface scattering (plan 05 wave 3).
 
 Normalization cross-check used throughout: in the narrow-lobe limit the

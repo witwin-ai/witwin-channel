@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests diffraction visibility native.
+
 from __future__ import annotations
 
 import pytest

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests component layout.
+
 import pytest
 import torch
 

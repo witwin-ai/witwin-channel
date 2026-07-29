@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Implements path solver native integration.
+
 #include <torch/extension.h>
 
 #include "path_block.h"

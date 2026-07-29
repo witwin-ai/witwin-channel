@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests product identity.
+
 from __future__ import annotations
 
 from pathlib import Path

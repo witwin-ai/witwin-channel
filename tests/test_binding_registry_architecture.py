@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests binding registry architecture.
+
 from __future__ import annotations
 
 import re
@@ -34,10 +37,11 @@ def test_binding_module_is_the_unique_pybind_module_owner() -> None:
 def test_binding_module_only_sets_doc_and_calls_registrars() -> None:
     source = MODULE_PATH.read_text(encoding="utf-8")
     registry_header = REGISTRY_HEADER_PATH.read_text(encoding="utf-8")
+    source_without_header = "\n".join(source.splitlines()[3:])
     module_body = re.fullmatch(
         r'#include "registry\.h"\s*'
         r"PYBIND11_MODULE\(_channel, module\)\s*\{(?P<body>.*?)\}\s*",
-        source,
+        source_without_header,
         flags=re.DOTALL,
     )
 

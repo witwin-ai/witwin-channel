@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Structure UV fields, planar_uv helper, and RayD forwarding.
+
 """Structure UV fields, planar_uv helper, and RayD forwarding."""
 
 import math

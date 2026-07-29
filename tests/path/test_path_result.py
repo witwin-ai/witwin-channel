@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests path result.
+
 from dataclasses import replace
 
 import pytest

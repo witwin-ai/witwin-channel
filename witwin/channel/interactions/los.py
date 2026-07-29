@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Line-of-sight: discrete candidate planning and enumerated orchestration.
+
 """Line-of-sight: discrete candidate planning and enumerated orchestration.
 
 One file holds the whole LoS concept: the discrete candidate plan that names

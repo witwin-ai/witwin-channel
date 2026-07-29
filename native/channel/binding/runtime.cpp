@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Implements runtime native integration.
+
 #include <torch/extension.h>
 
 #include "registry.h"

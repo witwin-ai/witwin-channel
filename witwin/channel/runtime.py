@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Runtime ownership for the compiled Channel extension and symbols.
+
 """Runtime ownership for the compiled Channel extension and symbols.
 
 `runtime` owns extension selection, symbol/bootstrap validation, immutable

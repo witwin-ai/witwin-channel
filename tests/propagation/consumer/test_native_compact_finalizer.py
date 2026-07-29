@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests native compact finalizer.
+
 from __future__ import annotations
 
 import pytest

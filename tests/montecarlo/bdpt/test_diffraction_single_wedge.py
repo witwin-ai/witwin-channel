@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests diffraction single wedge.
+
 import pytest
 import torch
 

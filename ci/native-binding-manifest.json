@@ -6,7 +6,7 @@
       "name": "bdpt_accumulate_connection_samples",
       "target": "channel_bdpt_accumulate_connection_samples",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 412,
+      "line": 415,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -82,7 +82,7 @@
       "name": "bdpt_accumulate_connection_samples_backward",
       "target": "channel_bdpt_accumulate_connection_samples_backward",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 431,
+      "line": 434,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -204,7 +204,7 @@
       "name": "bdpt_accumulate_connection_samples_jvp",
       "target": "channel_bdpt_accumulate_connection_samples_jvp",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 435,
+      "line": 438,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -301,7 +301,7 @@
       "name": "bdpt_apply_los_visibility",
       "target": "channel_bdpt_apply_los_visibility",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 538,
+      "line": 541,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -333,7 +333,7 @@
       "name": "bdpt_compact_connection_samples",
       "target": "channel_bdpt_compact_connection_samples",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 447,
+      "line": 450,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -355,7 +355,7 @@
       "name": "bdpt_component_map_buffer",
       "target": "channel_bdpt_component_map_buffer",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 506,
+      "line": 509,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -387,7 +387,7 @@
       "name": "bdpt_concat_connection_samples",
       "target": "channel_bdpt_concat_connection_samples",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 451,
+      "line": 454,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -404,7 +404,7 @@
       "name": "bdpt_connection_variance",
       "target": "channel_bdpt_connection_variance",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 455,
+      "line": 458,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -436,7 +436,7 @@
       "name": "bdpt_count_valid_connection_samples",
       "target": "channel_bdpt_count_valid_connection_samples",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 443,
+      "line": 446,
       "return_type": "int64_t",
       "return_arity": 1,
       "parameters": [
@@ -453,7 +453,7 @@
       "name": "bdpt_empty_subpath_state",
       "target": "channel_bdpt_empty_subpath_state",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 365,
+      "line": 368,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -470,7 +470,7 @@
       "name": "bdpt_endpoint_connection_samples",
       "target": "channel_bdpt_endpoint_connection_samples",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 404,
+      "line": 407,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -522,7 +522,7 @@
       "name": "bdpt_endpoint_connection_samples_backward",
       "target": "channel_bdpt_endpoint_connection_samples_backward_dispatch",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 423,
+      "line": 426,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -594,7 +594,7 @@
       "name": "bdpt_endpoint_connection_samples_jvp",
       "target": "channel_bdpt_endpoint_connection_samples_jvp_dispatch",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 427,
+      "line": 430,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -676,7 +676,7 @@
       "name": "bdpt_endpoint_connection_visibility_inputs",
       "target": "channel_bdpt_endpoint_connection_visibility_inputs",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 408,
+      "line": 411,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -703,7 +703,7 @@
       "name": "bdpt_endpoint_subpath_state",
       "target": "channel_bdpt_endpoint_subpath_state",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 369,
+      "line": 372,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -750,7 +750,7 @@
       "name": "bdpt_face_material_tensors",
       "target": "channel_bdpt_face_material_tensors",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 560,
+      "line": 563,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -782,7 +782,7 @@
       "name": "bdpt_face_material_tensors_from_host",
       "target": "channel_bdpt_face_material_tensors_from_host",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 564,
+      "line": 567,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -814,7 +814,7 @@
       "name": "bdpt_filter_connection_samples",
       "target": "channel_bdpt_filter_connection_samples",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 439,
+      "line": 442,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -836,7 +836,7 @@
       "name": "bdpt_finalize_component_maps",
       "target": "channel_bdpt_finalize_component_maps",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 486,
+      "line": 489,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -873,7 +873,7 @@
       "name": "bdpt_finalize_component_maps_backward",
       "target": "channel_bdpt_finalize_component_maps_backward_dispatch",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 498,
+      "line": 501,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -945,7 +945,7 @@
       "name": "bdpt_finalize_component_maps_jvp",
       "target": "channel_bdpt_finalize_component_maps_jvp_dispatch",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 502,
+      "line": 505,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1007,7 +1007,7 @@
       "name": "bdpt_finalize_point_components",
       "target": "channel_bdpt_finalize_point_components",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 478,
+      "line": 481,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1044,7 +1044,7 @@
       "name": "bdpt_finalize_point_components_backward",
       "target": "channel_bdpt_finalize_point_components_backward_dispatch",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 490,
+      "line": 493,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1116,7 +1116,7 @@
       "name": "bdpt_finalize_point_components_jvp",
       "target": "channel_bdpt_finalize_point_components_jvp_dispatch",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 494,
+      "line": 497,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1178,7 +1178,7 @@
       "name": "bdpt_launch_state",
       "target": "channel_bdpt_launch_state",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 361,
+      "line": 364,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1215,7 +1215,7 @@
       "name": "bdpt_los_component_maps",
       "target": "channel_bdpt_los_component_maps",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 530,
+      "line": 533,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -1232,7 +1232,7 @@
       "name": "bdpt_los_component_maps_from_matrix",
       "target": "channel_bdpt_los_component_maps_from_matrix",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 534,
+      "line": 537,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -1259,7 +1259,7 @@
       "name": "bdpt_los_export",
       "target": "channel_bdpt_los_export",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 482,
+      "line": 485,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1296,7 +1296,7 @@
       "name": "bdpt_los_visibility_inputs",
       "target": "channel_bdpt_los_visibility_inputs",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 542,
+      "line": 545,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1323,7 +1323,7 @@
       "name": "bdpt_mis_weights",
       "target": "channel_bdpt_mis_weights",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 459,
+      "line": 462,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -1355,7 +1355,7 @@
       "name": "bdpt_pack_vec3",
       "target": "channel_bdpt_pack_vec3",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 526,
+      "line": 529,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -1382,7 +1382,7 @@
       "name": "bdpt_point_component_power",
       "target": "channel_bdpt_point_component_power",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 470,
+      "line": 473,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1404,7 +1404,7 @@
       "name": "bdpt_receiver_grid_points",
       "target": "channel_bdpt_receiver_grid_points",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 549,
+      "line": 552,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -1486,7 +1486,7 @@
       "name": "bdpt_reflected_light_subpath_state",
       "target": "channel_bdpt_reflected_light_subpath_state",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 377,
+      "line": 380,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1543,7 +1543,7 @@
       "name": "bdpt_reflected_light_subpath_state_backward",
       "target": "channel_bdpt_reflected_light_subpath_state_backward_dispatch",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 385,
+      "line": 388,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1635,7 +1635,7 @@
       "name": "bdpt_reflected_light_subpath_state_jvp",
       "target": "channel_bdpt_reflected_light_subpath_state_jvp_dispatch",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 389,
+      "line": 392,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1737,7 +1737,7 @@
       "name": "bdpt_reflection_launch_inputs",
       "target": "channel_bdpt_reflection_launch_inputs",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 553,
+      "line": 556,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1764,7 +1764,7 @@
       "name": "bdpt_sample_directions",
       "target": "channel_bdpt_sample_directions",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 518,
+      "line": 521,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -1791,7 +1791,7 @@
       "name": "bdpt_store_component_map",
       "target": "channel_bdpt_store_component_map",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 510,
+      "line": 513,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -1818,7 +1818,7 @@
       "name": "bdpt_store_point_component_column",
       "target": "channel_bdpt_store_point_component_column",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 474,
+      "line": 477,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -1845,7 +1845,7 @@
       "name": "bdpt_store_scaled_component_map",
       "target": "channel_bdpt_store_scaled_component_map",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 514,
+      "line": 517,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -1882,7 +1882,7 @@
       "name": "bdpt_subpath_intersection_inputs",
       "target": "channel_bdpt_subpath_intersection_inputs",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 373,
+      "line": 376,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1899,7 +1899,7 @@
       "name": "bdpt_transmitted_light_subpath_state",
       "target": "channel_bdpt_transmitted_light_subpath_state",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 381,
+      "line": 384,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -1961,7 +1961,7 @@
       "name": "bdpt_transmitted_light_subpath_state_backward",
       "target": "channel_bdpt_transmitted_light_subpath_state_backward_dispatch",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 393,
+      "line": 396,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2058,7 +2058,7 @@
       "name": "bdpt_transmitted_light_subpath_state_jvp",
       "target": "channel_bdpt_transmitted_light_subpath_state_jvp_dispatch",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 397,
+      "line": 400,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2160,7 +2160,7 @@
       "name": "bdpt_transmitter_tensors",
       "target": "channel_bdpt_transmitter_tensors",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 522,
+      "line": 525,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2182,7 +2182,7 @@
       "name": "bdpt_zero_matrix",
       "target": "channel_bdpt_zero_matrix",
       "path": "native/channel/binding/bdpt.cpp",
-      "line": 463,
+      "line": 466,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -2209,7 +2209,7 @@
       "name": "build_info",
       "target": "channel_build_info",
       "path": "native/channel/binding/build.cpp",
-      "line": 12,
+      "line": 15,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [],
@@ -2220,7 +2220,7 @@
       "name": "capacity_failure_state_create",
       "target": "channel_capacity_failure_state_create",
       "path": "native/channel/binding/runtime.cpp",
-      "line": 9,
+      "line": 12,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -2242,7 +2242,7 @@
       "name": "capacity_failure_terminal_check",
       "target": "channel_capacity_failure_terminal_check",
       "path": "native/channel/binding/runtime.cpp",
-      "line": 14,
+      "line": 17,
       "return_type": "void",
       "return_arity": 0,
       "parameters": [
@@ -2264,7 +2264,7 @@
       "name": "consumer_fixed_los_gather",
       "target": "channel_consumer_fixed_los_gather",
       "path": "native/channel/binding/path.cpp",
-      "line": 841,
+      "line": 844,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2341,7 +2341,7 @@
       "name": "consumer_fixed_los_gather_backward",
       "target": "channel_consumer_fixed_los_gather_backward",
       "path": "native/channel/binding/path.cpp",
-      "line": 845,
+      "line": 848,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2398,7 +2398,7 @@
       "name": "consumer_fixed_los_gather_jvp",
       "target": "channel_consumer_fixed_los_gather_jvp",
       "path": "native/channel/binding/path.cpp",
-      "line": 849,
+      "line": 852,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2455,7 +2455,7 @@
       "name": "consumer_los_jones",
       "target": "channel_consumer_los_jones",
       "path": "native/channel/binding/path.cpp",
-      "line": 837,
+      "line": 840,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2497,7 +2497,7 @@
       "name": "core_diffraction_edge_count",
       "target": "channel_core_diffraction_edge_count",
       "path": "native/channel/binding/path.cpp",
-      "line": 535,
+      "line": 538,
       "return_type": "int64_t",
       "return_arity": 1,
       "parameters": [
@@ -2564,7 +2564,7 @@
       "name": "core_pack_int2",
       "target": "channel_core_pack_int2",
       "path": "native/channel/binding/path.cpp",
-      "line": 531,
+      "line": 534,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -2586,7 +2586,7 @@
       "name": "coupled_dd_geometry_forward",
       "target": "channel_coupled_dd_geometry_forward",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 443,
+      "line": 446,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2663,7 +2663,7 @@
       "name": "coupled_rd_geometry_forward",
       "target": "channel_coupled_rd_geometry_forward",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 439,
+      "line": 442,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2750,7 +2750,7 @@
       "name": "coupled_rd_prepare",
       "target": "channel_coupled_rd_prepare_cuda",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1105,
+      "line": 1108,
       "return_type": "std::vector<at::Tensor>",
       "return_arity": 1,
       "parameters": [
@@ -2802,7 +2802,7 @@
       "name": "coupled_rd_prepare_backward",
       "target": "channel_coupled_rd_prepare_backward",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1109,
+      "line": 1112,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2869,7 +2869,7 @@
       "name": "coupled_rd_prepare_jvp",
       "target": "channel_coupled_rd_prepare_jvp",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1113,
+      "line": 1116,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -2926,7 +2926,7 @@
       "name": "deterministic_accumulate_flat",
       "target": "channel_deterministic_accumulate_flat",
       "path": "native/channel/binding/path.cpp",
-      "line": 861,
+      "line": 864,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3038,7 +3038,7 @@
       "name": "deterministic_accumulate_flat_backward",
       "target": "channel_deterministic_accumulate_flat_backward",
       "path": "native/channel/binding/path.cpp",
-      "line": 891,
+      "line": 894,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3222,7 +3222,7 @@
       "name": "deterministic_accumulate_flat_fwd64",
       "target": "channel_deterministic_accumulate_flat_fwd64",
       "path": "native/channel/binding/path.cpp",
-      "line": 876,
+      "line": 879,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3334,7 +3334,7 @@
       "name": "deterministic_accumulate_flat_jvp",
       "target": "channel_deterministic_accumulate_flat_jvp",
       "path": "native/channel/binding/path.cpp",
-      "line": 914,
+      "line": 917,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3473,7 +3473,7 @@
       "name": "deterministic_component_counts",
       "target": "channel_deterministic_component_counts",
       "path": "native/channel/binding/path.cpp",
-      "line": 589,
+      "line": 592,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3490,7 +3490,7 @@
       "name": "deterministic_concat_topology_blocks",
       "target": "channel_deterministic_concat_topology_blocks",
       "path": "native/channel/binding/path.cpp",
-      "line": 781,
+      "line": 784,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3512,7 +3512,7 @@
       "name": "deterministic_delay_to_path_length",
       "target": "channel_deterministic_delay_to_path_length",
       "path": "native/channel/binding/path.cpp",
-      "line": 626,
+      "line": 629,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -3529,7 +3529,7 @@
       "name": "deterministic_diffraction_order1_compact",
       "target": "channel_deterministic_diffraction_order1_compact",
       "path": "native/channel/binding/path.cpp",
-      "line": 769,
+      "line": 772,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3601,7 +3601,7 @@
       "name": "deterministic_diffraction_state_pack",
       "target": "channel_deterministic_diffraction_state_pack",
       "path": "native/channel/binding/path.cpp",
-      "line": 542,
+      "line": 545,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -3678,7 +3678,7 @@
       "name": "deterministic_diffraction_state_pack_selected",
       "target": "channel_deterministic_diffraction_state_pack_selected",
       "path": "native/channel/binding/path.cpp",
-      "line": 546,
+      "line": 549,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -3755,7 +3755,7 @@
       "name": "deterministic_diffraction_vector_field",
       "target": "channel_deterministic_diffraction_vector_field",
       "path": "native/channel/binding/path.cpp",
-      "line": 614,
+      "line": 617,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3797,7 +3797,7 @@
       "name": "deterministic_face_anchor_points",
       "target": "channel_deterministic_face_anchor_points",
       "path": "native/channel/binding/path.cpp",
-      "line": 674,
+      "line": 677,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -3819,7 +3819,7 @@
       "name": "deterministic_face_groups",
       "target": "channel_deterministic_face_groups",
       "path": "native/channel/binding/path.cpp",
-      "line": 789,
+      "line": 792,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3851,7 +3851,7 @@
       "name": "deterministic_face_sequence_chunk",
       "target": "channel_deterministic_face_sequence_chunk",
       "path": "native/channel/binding/path.cpp",
-      "line": 682,
+      "line": 685,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -3893,7 +3893,7 @@
       "name": "deterministic_field_from_power_phase",
       "target": "channel_deterministic_field_from_power_phase",
       "path": "native/channel/binding/path.cpp",
-      "line": 646,
+      "line": 649,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3915,7 +3915,7 @@
       "name": "deterministic_gather_topology_block",
       "target": "channel_deterministic_gather_topology_block",
       "path": "native/channel/binding/path.cpp",
-      "line": 785,
+      "line": 788,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3947,7 +3947,7 @@
       "name": "deterministic_los_field",
       "target": "channel_deterministic_los_field",
       "path": "native/channel/binding/path.cpp",
-      "line": 600,
+      "line": 603,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -3974,7 +3974,7 @@
       "name": "deterministic_los_topology_block",
       "target": "channel_deterministic_los_topology_block",
       "path": "native/channel/binding/path.cpp",
-      "line": 650,
+      "line": 653,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4026,7 +4026,7 @@
       "name": "deterministic_los_topology_block_all_visible",
       "target": "channel_deterministic_los_topology_block_all_visible",
       "path": "native/channel/binding/path.cpp",
-      "line": 654,
+      "line": 657,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4073,7 +4073,7 @@
       "name": "deterministic_mapped_face_sequence_chunk",
       "target": "channel_deterministic_mapped_face_sequence_chunk",
       "path": "native/channel/binding/path.cpp",
-      "line": 686,
+      "line": 689,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4110,7 +4110,7 @@
       "name": "deterministic_normalize_vec3",
       "target": "channel_deterministic_normalize_vec3",
       "path": "native/channel/binding/path.cpp",
-      "line": 773,
+      "line": 776,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4132,7 +4132,7 @@
       "name": "deterministic_pack_complex",
       "target": "channel_deterministic_pack_complex",
       "path": "native/channel/binding/path.cpp",
-      "line": 630,
+      "line": 633,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4154,7 +4154,7 @@
       "name": "deterministic_pad_topology_sequences",
       "target": "channel_deterministic_pad_topology_sequences",
       "path": "native/channel/binding/path.cpp",
-      "line": 662,
+      "line": 665,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4216,7 +4216,7 @@
       "name": "deterministic_phase_from_field",
       "target": "channel_deterministic_phase_from_field",
       "path": "native/channel/binding/path.cpp",
-      "line": 634,
+      "line": 637,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4238,7 +4238,7 @@
       "name": "deterministic_phase_from_length",
       "target": "channel_deterministic_phase_from_length",
       "path": "native/channel/binding/path.cpp",
-      "line": 642,
+      "line": 645,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4260,7 +4260,7 @@
       "name": "deterministic_reflect_points",
       "target": "channel_deterministic_reflect_points",
       "path": "native/channel/binding/path.cpp",
-      "line": 777,
+      "line": 780,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4287,7 +4287,7 @@
       "name": "deterministic_reflection_epc_input_batch",
       "target": "channel_deterministic_reflection_epc_input_batch",
       "path": "native/channel/binding/path.cpp",
-      "line": 678,
+      "line": 681,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4334,7 +4334,7 @@
       "name": "deterministic_reflection_field",
       "target": "channel_deterministic_reflection_field",
       "path": "native/channel/binding/path.cpp",
-      "line": 618,
+      "line": 621,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4396,7 +4396,7 @@
       "name": "deterministic_reflection_order1_compact",
       "target": "channel_deterministic_reflection_order1_compact",
       "path": "native/channel/binding/path.cpp",
-      "line": 690,
+      "line": 693,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4488,7 +4488,7 @@
       "name": "deterministic_reflection_sequence_compact",
       "target": "channel_deterministic_reflection_sequence_compact",
       "path": "native/channel/binding/path.cpp",
-      "line": 694,
+      "line": 697,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4575,7 +4575,7 @@
       "name": "deterministic_reflection_sequence_field",
       "target": "channel_deterministic_reflection_sequence_field",
       "path": "native/channel/binding/path.cpp",
-      "line": 622,
+      "line": 625,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4637,7 +4637,7 @@
       "name": "deterministic_repeat_range",
       "target": "channel_deterministic_repeat_range",
       "path": "native/channel/binding/path.cpp",
-      "line": 670,
+      "line": 673,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4669,7 +4669,7 @@
       "name": "deterministic_selected_edge_count",
       "target": "channel_deterministic_selected_edge_count",
       "path": "native/channel/binding/path.cpp",
-      "line": 593,
+      "line": 596,
       "return_type": "int64_t",
       "return_arity": 1,
       "parameters": [
@@ -4686,7 +4686,7 @@
       "name": "deterministic_sort_order",
       "target": "channel_deterministic_sort_order",
       "path": "native/channel/binding/path.cpp",
-      "line": 797,
+      "line": 800,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4738,7 +4738,7 @@
       "name": "deterministic_surface_face_groups",
       "target": "channel_deterministic_surface_face_groups",
       "path": "native/channel/binding/path.cpp",
-      "line": 793,
+      "line": 796,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4755,7 +4755,7 @@
       "name": "deterministic_topology_base_fields",
       "target": "channel_deterministic_topology_base_fields",
       "path": "native/channel/binding/path.cpp",
-      "line": 666,
+      "line": 669,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4827,7 +4827,7 @@
       "name": "deterministic_topology_default_fields",
       "target": "channel_deterministic_topology_default_fields",
       "path": "native/channel/binding/path.cpp",
-      "line": 658,
+      "line": 661,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4844,7 +4844,7 @@
       "name": "deterministic_zero_field_phase",
       "target": "channel_deterministic_zero_field_phase",
       "path": "native/channel/binding/path.cpp",
-      "line": 638,
+      "line": 641,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4861,7 +4861,7 @@
       "name": "diffraction_tx_visible_state_plan",
       "target": "channel_diffraction_tx_visible_state_plan",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 447,
+      "line": 450,
       "return_type": "at::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -4903,7 +4903,7 @@
       "name": "em_layer_stack_backward",
       "target": "channel_em_layer_stack_backward",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1125,
+      "line": 1128,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -4980,7 +4980,7 @@
       "name": "em_layer_stack_eval",
       "target": "channel_em_layer_stack_eval",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1121,
+      "line": 1124,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5037,7 +5037,7 @@
       "name": "em_layer_stack_jvp",
       "target": "channel_em_layer_stack_jvp",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1129,
+      "line": 1132,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5119,7 +5119,7 @@
       "name": "enumerated_canonical_compact",
       "target": "channel_enumerated_canonical_compact",
       "path": "native/channel/binding/path.cpp",
-      "line": 801,
+      "line": 804,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5213,7 +5213,7 @@
       "name": "enumerated_capacity_failure_sanitize",
       "target": "channel_enumerated_capacity_failure_sanitize",
       "path": "native/channel/binding/path.cpp",
-      "line": 736,
+      "line": 739,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5433,7 +5433,7 @@
       "name": "enumerated_capacity_failure_vector_sanitize",
       "target": "channel_enumerated_capacity_failure_vector_sanitize",
       "path": "native/channel/binding/path.cpp",
-      "line": 763,
+      "line": 766,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -5464,7 +5464,7 @@
       "name": "enumerated_exact_pair_metadata",
       "target": "channel_enumerated_exact_pair_metadata",
       "path": "native/channel/binding/path.cpp",
-      "line": 814,
+      "line": 817,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5540,7 +5540,7 @@
       "name": "enumerated_transmission_topology_pack",
       "target": "channel_enumerated_transmission_topology_pack",
       "path": "native/channel/binding/path.cpp",
-      "line": 698,
+      "line": 701,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5670,7 +5670,7 @@
       "name": "enumerated_transmission_topology_pack_backward",
       "target": "channel_enumerated_transmission_topology_pack_backward",
       "path": "native/channel/binding/path.cpp",
-      "line": 715,
+      "line": 718,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5755,7 +5755,7 @@
       "name": "enumerated_transmission_topology_pack_jvp",
       "target": "channel_enumerated_transmission_topology_pack_jvp",
       "path": "native/channel/binding/path.cpp",
-      "line": 727,
+      "line": 730,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5813,7 +5813,7 @@
       "name": "evaluated_paths_capacity_pack_backward",
       "target": "channel_evaluated_paths_capacity_pack_backward",
       "path": "native/channel/binding/path.cpp",
-      "line": 853,
+      "line": 856,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5900,7 +5900,7 @@
       "name": "evaluated_paths_capacity_pack_jvp",
       "target": "channel_evaluated_paths_capacity_pack_jvp",
       "path": "native/channel/binding/path.cpp",
-      "line": 857,
+      "line": 860,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -5987,7 +5987,7 @@
       "name": "evaluated_paths_compact_finalize",
       "target": "channel_evaluated_paths_compact_finalize",
       "path": "native/channel/binding/path.cpp",
-      "line": 825,
+      "line": 828,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6124,7 +6124,7 @@
       "name": "evaluated_paths_compact_finalize_backward",
       "target": "channel_evaluated_paths_compact_finalize_backward",
       "path": "native/channel/binding/path.cpp",
-      "line": 829,
+      "line": 832,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6211,7 +6211,7 @@
       "name": "evaluated_paths_compact_finalize_jvp",
       "target": "channel_evaluated_paths_compact_finalize_jvp",
       "path": "native/channel/binding/path.cpp",
-      "line": 833,
+      "line": 836,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6298,7 +6298,7 @@
       "name": "field_coupled_dd",
       "target": "channel_field_coupled_dd",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1005,
+      "line": 1008,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6510,7 +6510,7 @@
       "name": "field_coupled_dd_backward",
       "target": "channel_field_coupled_dd_backward",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1062,
+      "line": 1065,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -6772,7 +6772,7 @@
       "name": "field_coupled_dd_jvp",
       "target": "channel_field_coupled_dd_jvp",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1067,
+      "line": 1070,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7019,7 +7019,7 @@
       "name": "field_coupled_rd",
       "target": "channel_field_coupled_rd",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1001,
+      "line": 1004,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7186,7 +7186,7 @@
       "name": "field_coupled_rd_backward",
       "target": "channel_field_coupled_rd_backward",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1054,
+      "line": 1057,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7403,7 +7403,7 @@
       "name": "field_coupled_rd_jvp",
       "target": "channel_field_coupled_rd_jvp",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1058,
+      "line": 1061,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7615,7 +7615,7 @@
       "name": "field_diffraction_wedge",
       "target": "channel_field_diffraction_wedge",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1042,
+      "line": 1045,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7767,7 +7767,7 @@
       "name": "field_diffraction_wedge_backward",
       "target": "channel_field_diffraction_wedge_backward",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1046,
+      "line": 1049,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -7949,7 +7949,7 @@
       "name": "field_diffraction_wedge_jvp",
       "target": "channel_field_diffraction_wedge_jvp",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1050,
+      "line": 1053,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -8166,7 +8166,7 @@
       "name": "field_free_space",
       "target": "channel_field_free_space",
       "path": "native/channel/binding/fields.cpp",
-      "line": 985,
+      "line": 988,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -8208,7 +8208,7 @@
       "name": "field_free_space_backward",
       "target": "channel_field_free_space_backward",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1014,
+      "line": 1017,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -8295,7 +8295,7 @@
       "name": "field_free_space_fwd64",
       "target": "channel_field_free_space_fwd64",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1010,
+      "line": 1013,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -8337,7 +8337,7 @@
       "name": "field_free_space_jvp",
       "target": "channel_field_free_space_jvp",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1019,
+      "line": 1022,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -8394,7 +8394,7 @@
       "name": "field_project_complex3",
       "target": "channel_field_project_complex3",
       "path": "native/channel/binding/fields.cpp",
-      "line": 989,
+      "line": 992,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -8421,7 +8421,7 @@
       "name": "field_project_complex3_backward",
       "target": "channel_field_project_complex3_backward",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1072,
+      "line": 1075,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -8468,7 +8468,7 @@
       "name": "field_project_complex3_jvp",
       "target": "channel_field_project_complex3_jvp",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1076,
+      "line": 1079,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -8505,7 +8505,7 @@
       "name": "field_reflection_sequence",
       "target": "channel_field_reflection_sequence",
       "path": "native/channel/binding/fields.cpp",
-      "line": 993,
+      "line": 996,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -8582,7 +8582,7 @@
       "name": "field_reflection_sequence_backward",
       "target": "channel_field_reflection_sequence_backward",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1024,
+      "line": 1027,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -8724,7 +8724,7 @@
       "name": "field_reflection_sequence_jvp",
       "target": "channel_field_reflection_sequence_jvp",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1029,
+      "line": 1032,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -8846,7 +8846,7 @@
       "name": "field_rough_reflection_scale",
       "target": "channel_field_rough_reflection_scale",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1093,
+      "line": 1096,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -8913,7 +8913,7 @@
       "name": "field_rough_reflection_scale_backward",
       "target": "channel_field_rough_reflection_scale_backward",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1097,
+      "line": 1100,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -9015,7 +9015,7 @@
       "name": "field_rough_reflection_scale_jvp",
       "target": "channel_field_rough_reflection_scale_jvp",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1101,
+      "line": 1104,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -9122,7 +9122,7 @@
       "name": "field_source_amplitude_scale",
       "target": "channel_field_source_amplitude_scale",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1080,
+      "line": 1083,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -9144,7 +9144,7 @@
       "name": "field_source_amplitude_scale_backward",
       "target": "channel_field_source_amplitude_scale_backward",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1085,
+      "line": 1088,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -9166,7 +9166,7 @@
       "name": "field_source_amplitude_scale_jvp",
       "target": "channel_field_source_amplitude_scale_jvp",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1089,
+      "line": 1092,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -9188,7 +9188,7 @@
       "name": "field_transmission_sequence",
       "target": "channel_field_transmission_sequence",
       "path": "native/channel/binding/fields.cpp",
-      "line": 997,
+      "line": 1000,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -9285,7 +9285,7 @@
       "name": "field_transmission_sequence_backward",
       "target": "channel_field_transmission_sequence_backward",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1034,
+      "line": 1037,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -9437,7 +9437,7 @@
       "name": "field_transmission_sequence_jvp",
       "target": "channel_field_transmission_sequence_jvp",
       "path": "native/channel/binding/fields.cpp",
-      "line": 1038,
+      "line": 1041,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -9574,7 +9574,7 @@
       "name": "kirchhoff_table_build_backward",
       "target": "channel_kirchhoff_table_build_backward",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1169,
+      "line": 1172,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -9701,7 +9701,7 @@
       "name": "kirchhoff_table_build_jvp",
       "target": "channel_kirchhoff_table_build_jvp",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1171,
+      "line": 1174,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -9838,7 +9838,7 @@
       "name": "los_silhouette_clearance",
       "target": "channel_los_silhouette_clearance",
       "path": "native/channel/binding/path.cpp",
-      "line": 604,
+      "line": 607,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -9880,7 +9880,7 @@
       "name": "los_taper_apply",
       "target": "channel_los_taper_apply",
       "path": "native/channel/binding/path.cpp",
-      "line": 609,
+      "line": 612,
       "return_type": "std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>",
       "return_arity": 4,
       "parameters": [
@@ -9917,7 +9917,7 @@
       "name": "mc_apply_los_visibility",
       "target": "channel_mc_apply_los_visibility",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 298,
+      "line": 301,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -9949,7 +9949,7 @@
       "name": "mc_capacity_failure_component_maps_sanitize",
       "target": "channel_mc_capacity_failure_component_maps_sanitize",
       "path": "native/channel/binding/montecarlo_transmission.cpp",
-      "line": 72,
+      "line": 75,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -9991,7 +9991,7 @@
       "name": "mc_capacity_failure_component_maps_sanitize_backward",
       "target": "channel_mc_capacity_failure_component_maps_sanitize_backward",
       "path": "native/channel/binding/montecarlo_transmission.cpp",
-      "line": 76,
+      "line": 79,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -10038,7 +10038,7 @@
       "name": "mc_capacity_failure_component_maps_sanitize_jvp",
       "target": "channel_mc_capacity_failure_component_maps_sanitize_jvp",
       "path": "native/channel/binding/montecarlo_transmission.cpp",
-      "line": 80,
+      "line": 83,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -10085,7 +10085,7 @@
       "name": "mc_component_map_buffer",
       "target": "channel_mc_component_map_buffer",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 246,
+      "line": 249,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -10117,7 +10117,7 @@
       "name": "mc_diffraction_discover_edges",
       "target": "channel_mc_diffraction_discover_edges",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 262,
+      "line": 265,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -10204,7 +10204,7 @@
       "name": "mc_diffraction_discover_edges_counted",
       "target": "channel_mc_diffraction_discover_edges_counted",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 266,
+      "line": 269,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -10296,7 +10296,7 @@
       "name": "mc_diffraction_edge_geometry",
       "target": "channel_mc_diffraction_edge_geometry",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 354,
+      "line": 357,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -10348,7 +10348,7 @@
       "name": "mc_diffraction_state_pack",
       "target": "channel_mc_diffraction_state_pack",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 350,
+      "line": 353,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -10420,7 +10420,7 @@
       "name": "mc_diffraction_state_wi",
       "target": "channel_mc_diffraction_state_wi",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 330,
+      "line": 333,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -10442,7 +10442,7 @@
       "name": "mc_face_material_tensors",
       "target": "channel_mc_face_material_tensors",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 362,
+      "line": 365,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -10474,7 +10474,7 @@
       "name": "mc_finalize_component_maps",
       "target": "channel_mc_finalize_component_maps",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 234,
+      "line": 237,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -10511,7 +10511,7 @@
       "name": "mc_los_component_maps",
       "target": "channel_mc_los_component_maps",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 278,
+      "line": 281,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -10528,7 +10528,7 @@
       "name": "mc_los_component_maps_adjoint",
       "target": "channel_mc_los_component_maps_adjoint",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 294,
+      "line": 297,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -10550,7 +10550,7 @@
       "name": "mc_los_component_maps_from_matrix",
       "target": "channel_mc_los_component_maps_from_matrix",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 282,
+      "line": 285,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -10577,7 +10577,7 @@
       "name": "mc_los_path_gain_backward",
       "target": "channel_mc_los_path_gain_backward",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 286,
+      "line": 289,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -10619,7 +10619,7 @@
       "name": "mc_los_path_gain_jvp",
       "target": "channel_mc_los_path_gain_jvp",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 290,
+      "line": 293,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -10691,7 +10691,7 @@
       "name": "mc_los_visibility_inputs",
       "target": "channel_mc_los_visibility_inputs",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 302,
+      "line": 305,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -10718,7 +10718,7 @@
       "name": "mc_pack_vec3",
       "target": "channel_mc_pack_vec3",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 274,
+      "line": 277,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -10745,7 +10745,7 @@
       "name": "mc_point_component_power",
       "target": "channel_bdpt_point_component_power",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 242,
+      "line": 245,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -10767,7 +10767,7 @@
       "name": "mc_receiver_grid_points",
       "target": "channel_mc_receiver_grid_points",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 306,
+      "line": 309,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -10849,7 +10849,7 @@
       "name": "mc_reflection_ad_max_depth",
       "target": "channel_mc_reflection_ad_max_depth_cuda",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 318,
+      "line": 321,
       "return_type": "int64_t",
       "return_arity": 1,
       "parameters": [],
@@ -10860,7 +10860,7 @@
       "name": "mc_reflection_launch_inputs",
       "target": "channel_mc_reflection_launch_inputs",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 310,
+      "line": 313,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -10887,7 +10887,7 @@
       "name": "mc_sample_directions",
       "target": "channel_mc_sample_directions",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 258,
+      "line": 261,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -10909,7 +10909,7 @@
       "name": "mc_selected_edge_indices",
       "target": "channel_mc_selected_edge_indices",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 346,
+      "line": 349,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -10926,7 +10926,7 @@
       "name": "mc_slab_reflection_accumulate",
       "target": "channel_mc_slab_reflection_accumulate",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 314,
+      "line": 317,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -11058,7 +11058,7 @@
       "name": "mc_slab_reflection_accumulate_backward",
       "target": "channel_mc_slab_reflection_accumulate_backward",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 322,
+      "line": 325,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -11210,7 +11210,7 @@
       "name": "mc_slab_reflection_accumulate_jvp",
       "target": "channel_mc_slab_reflection_accumulate_jvp",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 326,
+      "line": 329,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -11387,7 +11387,7 @@
       "name": "mc_store_component_map",
       "target": "channel_mc_store_component_map",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 250,
+      "line": 253,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -11414,7 +11414,7 @@
       "name": "mc_store_scaled_component_map",
       "target": "channel_mc_store_scaled_component_map",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 254,
+      "line": 257,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -11451,7 +11451,7 @@
       "name": "mc_surface_group_edge_candidates",
       "target": "channel_mc_surface_group_edge_candidates",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 358,
+      "line": 361,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -11508,7 +11508,7 @@
       "name": "mc_transmission_wall_product",
       "target": "channel_mc_transmission_wall_product",
       "path": "native/channel/binding/montecarlo_transmission.cpp",
-      "line": 84,
+      "line": 87,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -11615,7 +11615,7 @@
       "name": "mc_transmission_wall_product_backward",
       "target": "channel_mc_transmission_wall_product_backward",
       "path": "native/channel/binding/montecarlo_transmission.cpp",
-      "line": 88,
+      "line": 91,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -11732,7 +11732,7 @@
       "name": "mc_transmission_wall_product_jvp",
       "target": "channel_mc_transmission_wall_product_jvp",
       "path": "native/channel/binding/montecarlo_transmission.cpp",
-      "line": 92,
+      "line": 95,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -11874,7 +11874,7 @@
       "name": "mc_transmitter_tensors",
       "target": "channel_mc_transmitter_tensors",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 270,
+      "line": 273,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -11896,7 +11896,7 @@
       "name": "mc_utd_diffraction_tape_accumulate",
       "target": "channel_mc_utd_diffraction_tape_accumulate",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 334,
+      "line": 337,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -12078,7 +12078,7 @@
       "name": "mc_utd_diffraction_tape_accumulate_backward",
       "target": "channel_mc_utd_diffraction_tape_accumulate_backward",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 338,
+      "line": 341,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -12265,7 +12265,7 @@
       "name": "mc_utd_diffraction_tape_accumulate_jvp",
       "target": "channel_mc_utd_diffraction_tape_accumulate_jvp",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 342,
+      "line": 345,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -12482,7 +12482,7 @@
       "name": "mc_zero_matrix",
       "target": "channel_bdpt_zero_matrix",
       "path": "native/channel/binding/montecarlo.cpp",
-      "line": 238,
+      "line": 241,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -12509,7 +12509,7 @@
       "name": "path_concat_vec3",
       "target": "channel_path_concat_vec3",
       "path": "native/channel/binding/path.cpp",
-      "line": 557,
+      "line": 560,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -12526,7 +12526,7 @@
       "name": "path_diffraction_block",
       "target": "channel_path_diffraction_block",
       "path": "native/channel/binding/path.cpp",
-      "line": 577,
+      "line": 580,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12548,7 +12548,7 @@
       "name": "path_filter_block",
       "target": "channel_path_filter_block",
       "path": "native/channel/binding/path.cpp",
-      "line": 573,
+      "line": 576,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12575,7 +12575,7 @@
       "name": "path_filter_los",
       "target": "channel_path_filter_los",
       "path": "native/channel/binding/path.cpp",
-      "line": 565,
+      "line": 568,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12617,7 +12617,7 @@
       "name": "path_finalize_blocks",
       "target": "channel_path_finalize_blocks",
       "path": "native/channel/binding/path.cpp",
-      "line": 585,
+      "line": 588,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12659,7 +12659,7 @@
       "name": "path_los_export",
       "target": "channel_path_los_export",
       "path": "native/channel/binding/path.cpp",
-      "line": 553,
+      "line": 556,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12696,7 +12696,7 @@
       "name": "path_los_visibility_inputs",
       "target": "channel_path_los_visibility_inputs",
       "path": "native/channel/binding/path.cpp",
-      "line": 561,
+      "line": 564,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12728,7 +12728,7 @@
       "name": "path_merge_blocks",
       "target": "channel_path_merge_blocks",
       "path": "native/channel/binding/path.cpp",
-      "line": 581,
+      "line": 584,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12755,7 +12755,7 @@
       "name": "path_reflection_candidates",
       "target": "channel_path_reflection_candidates",
       "path": "native/channel/binding/path.cpp",
-      "line": 569,
+      "line": 572,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -12807,7 +12807,7 @@
       "name": "rayd_diffraction_paths_order1_forward",
       "target": "channel_rayd_diffraction_paths_order1_forward",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 454,
+      "line": 457,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -12949,7 +12949,7 @@
       "name": "rayd_diffraction_sample_tape_forward",
       "target": "channel_rayd_diffraction_sample_tape_forward",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 458,
+      "line": 461,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -13221,7 +13221,7 @@
       "name": "rayd_intersect_backward",
       "target": "channel_rayd_intersect_backward",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 403,
+      "line": 406,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -13318,7 +13318,7 @@
       "name": "rayd_intersect_forward",
       "target": "channel_rayd_intersect_forward",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 371,
+      "line": 374,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -13360,7 +13360,7 @@
       "name": "rayd_intersect_jvp",
       "target": "channel_rayd_intersect_jvp",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 407,
+      "line": 410,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -13422,7 +13422,7 @@
       "name": "rayd_reflection_epc_paths_backward",
       "target": "channel_rayd_reflection_epc_paths_backward",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 423,
+      "line": 426,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -13504,7 +13504,7 @@
       "name": "rayd_reflection_epc_paths_forward",
       "target": "channel_rayd_reflection_epc_paths_forward",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 399,
+      "line": 402,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -13576,7 +13576,7 @@
       "name": "rayd_reflection_epc_paths_jvp",
       "target": "channel_rayd_reflection_epc_paths_jvp",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 427,
+      "line": 430,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -13643,7 +13643,7 @@
       "name": "rayd_scene_create",
       "target": "channel_rayd_scene_create",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 363,
+      "line": 366,
       "return_type": "std::shared_ptr<RayDSceneResource>",
       "return_arity": 1,
       "parameters": [
@@ -13690,7 +13690,7 @@
       "name": "rayd_scene_edge_records",
       "target": "channel_rayd_scene_edge_records",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 367,
+      "line": 370,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -13707,7 +13707,7 @@
       "name": "rayd_scene_face_normals_backward",
       "target": "channel_rayd_scene_face_normals_backward",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 431,
+      "line": 434,
       "return_type": "at::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -13729,7 +13729,7 @@
       "name": "rayd_scene_face_normals_jvp",
       "target": "channel_rayd_scene_face_normals_jvp",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 435,
+      "line": 438,
       "return_type": "at::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -13751,7 +13751,7 @@
       "name": "rayd_segment_penetration_backward",
       "target": "channel_rayd_segment_penetration_backward",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 387,
+      "line": 390,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -13943,7 +13943,7 @@
       "name": "rayd_segment_penetration_forward",
       "target": "channel_rayd_segment_penetration_forward",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 379,
+      "line": 382,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -14005,7 +14005,7 @@
       "name": "rayd_segment_penetration_forward_tape",
       "target": "channel_rayd_segment_penetration_forward_tape",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 383,
+      "line": 386,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -14067,7 +14067,7 @@
       "name": "rayd_segment_penetration_jvp",
       "target": "channel_rayd_segment_penetration_jvp",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 391,
+      "line": 394,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -14229,7 +14229,7 @@
       "name": "rayd_trace_reflections_backward",
       "target": "channel_rayd_trace_reflections_backward",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 415,
+      "line": 418,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -14301,7 +14301,7 @@
       "name": "rayd_trace_reflections_forward",
       "target": "channel_rayd_trace_reflections_forward",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 395,
+      "line": 398,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -14343,7 +14343,7 @@
       "name": "rayd_trace_reflections_forward_tape",
       "target": "channel_rayd_trace_reflections_forward_tape",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 411,
+      "line": 414,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -14385,7 +14385,7 @@
       "name": "rayd_trace_reflections_jvp",
       "target": "channel_rayd_trace_reflections_jvp",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 419,
+      "line": 422,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -14457,7 +14457,7 @@
       "name": "rayd_visibility_forward",
       "target": "channel_rayd_visibility_forward",
       "path": "native/channel/binding/rayd.cpp",
-      "line": 375,
+      "line": 378,
       "return_type": "pybind11::tuple",
       "return_arity": 1,
       "parameters": [
@@ -14489,7 +14489,7 @@
       "name": "scattering_chain_ensemble_eval",
       "target": "channel_scattering_chain_ensemble_eval",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1157,
+      "line": 1160,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -14716,7 +14716,7 @@
       "name": "scattering_chain_ensemble_eval_backward",
       "target": "channel_scattering_chain_ensemble_eval_backward",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1159,
+      "line": 1162,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -14988,7 +14988,7 @@
       "name": "scattering_chain_ensemble_eval_jvp",
       "target": "channel_scattering_chain_ensemble_eval_jvp",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1161,
+      "line": 1164,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -15330,7 +15330,7 @@
       "name": "scattering_chain_realization_eval",
       "target": "channel_scattering_chain_realization_eval",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1163,
+      "line": 1166,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -15577,7 +15577,7 @@
       "name": "scattering_chain_realization_eval_backward",
       "target": "channel_scattering_chain_realization_eval_backward",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1165,
+      "line": 1168,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -15874,7 +15874,7 @@
       "name": "scattering_chain_realization_eval_jvp",
       "target": "channel_scattering_chain_realization_eval_jvp",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1167,
+      "line": 1170,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -16246,7 +16246,7 @@
       "name": "scattering_ensemble_eval",
       "target": "channel_scattering_ensemble_eval",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1141,
+      "line": 1144,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -16383,7 +16383,7 @@
       "name": "scattering_ensemble_eval_backward",
       "target": "channel_scattering_ensemble_eval_backward",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1145,
+      "line": 1148,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -16555,7 +16555,7 @@
       "name": "scattering_ensemble_eval_jvp",
       "target": "channel_scattering_ensemble_eval_jvp",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1147,
+      "line": 1150,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -16767,7 +16767,7 @@
       "name": "scattering_event_probabilities",
       "target": "channel_scattering_event_probabilities",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1139,
+      "line": 1142,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -16829,7 +16829,7 @@
       "name": "scattering_patch_integral_eval",
       "target": "channel_scattering_patch_integral_eval",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1143,
+      "line": 1146,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -16936,7 +16936,7 @@
       "name": "scattering_patch_integral_eval_backward",
       "target": "channel_scattering_patch_integral_eval_backward",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1149,
+      "line": 1152,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -17068,7 +17068,7 @@
       "name": "scattering_patch_integral_eval_jvp",
       "target": "channel_scattering_patch_integral_eval_jvp",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1151,
+      "line": 1154,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -17220,7 +17220,7 @@
       "name": "scattering_table_eval",
       "target": "channel_scattering_table_eval",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1133,
+      "line": 1136,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -17257,7 +17257,7 @@
       "name": "scattering_table_eval_backward",
       "target": "channel_scattering_table_eval_backward",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1153,
+      "line": 1156,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -17314,7 +17314,7 @@
       "name": "scattering_table_eval_jvp",
       "target": "channel_scattering_table_eval_jvp",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1155,
+      "line": 1158,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [
@@ -17371,7 +17371,7 @@
       "name": "scattering_table_pdf",
       "target": "channel_scattering_table_pdf",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1135,
+      "line": 1138,
       "return_type": "torch::Tensor",
       "return_arity": 1,
       "parameters": [
@@ -17408,7 +17408,7 @@
       "name": "scattering_table_sample",
       "target": "channel_scattering_table_sample",
       "path": "native/channel/binding/materials.cpp",
-      "line": 1137,
+      "line": 1140,
       "return_type": "pybind11::dict",
       "return_arity": 1,
       "parameters": [

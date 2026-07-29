@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests path signal views.
+
 import math
 
 import torch

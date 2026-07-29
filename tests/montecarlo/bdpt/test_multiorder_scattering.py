@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests multiorder scattering.
+
 """ADR-021 D4 BDPT multi-order diffuse scattering.
 
 Covers the ``max_scattering_order`` config contract (default 1, validation,

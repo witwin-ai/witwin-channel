@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests transmission integration.
+
 from __future__ import annotations
 
 from types import SimpleNamespace

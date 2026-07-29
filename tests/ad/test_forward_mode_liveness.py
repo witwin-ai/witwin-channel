@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests forward mode liveness.
+
 """ADR-038: forward-mode geometry liveness is decided at the wrapper.
 
 ``torch.autograd.Function.apply`` unpacks forward duals before

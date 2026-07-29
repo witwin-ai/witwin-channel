@@ -1,5 +1,5 @@
-// ADR-044 consolidated CUDA translation unit.
-// Physical co-location only: ABI, launches, synchronization, and numerical order are unchanged.
+// Copyright Xingyu Chen.
+// Implements diffraction CUDA operations.
 
 // ---- Consolidated from diffraction.cu ----
 #include <ATen/ATen.h>
@@ -9,6 +9,7 @@
 #include <rayd/shared/utd/utd_math.h>
 
 #include "../tensor_checks.h"
+#include "math.cuh"
 #include <rayd/shared/rf/field_transport.cuh>
 #include <rayd/torch/rf/field_transport_ad.cuh>
 #include <algorithm>
@@ -772,63 +773,16 @@ __global__ void diffraction_state_pack_selected_kernel(
     }
 }
 
-__device__ __forceinline__ float3 load_vec3(const float *data, int64_t index) {
-    const float *ptr = data + index * 3;
-    return make_float3(ptr[0], ptr[1], ptr[2]);
-}
 
-__device__ __forceinline__ void store_vec3(float *data, int64_t index, float3 value) {
-    float *ptr = data + index * 3;
-    ptr[0] = value.x;
-    ptr[1] = value.y;
-    ptr[2] = value.z;
-}
-
-__device__ __forceinline__ float3 add3(float3 a, float3 b) {
-    return make_float3(a.x + b.x, a.y + b.y, a.z + b.z);
-}
-
-__device__ __forceinline__ float3 sub3(float3 a, float3 b) {
-    return make_float3(a.x - b.x, a.y - b.y, a.z - b.z);
-}
-
-__device__ __forceinline__ float3 mul3(float3 a, float s) {
-    return make_float3(a.x * s, a.y * s, a.z * s);
-}
-
-__device__ __forceinline__ float dot3(float3 a, float3 b) {
-    const float xz = __fadd_rn(__fmul_rn(a.x, b.x), __fmul_rn(a.z, b.z));
-    return __fadd_rn(xz, __fmul_rn(a.y, b.y));
-}
-
-__device__ __forceinline__ float3 cross3(float3 a, float3 b) {
-    return make_float3(
-        a.y * b.z - a.z * b.y,
-        a.z * b.x - a.x * b.z,
-        a.x * b.y - a.y * b.x);
-}
-
-__device__ __forceinline__ float norm3(float3 value) {
-    return sqrtf(dot3(value, value));
-}
-
-__device__ __forceinline__ float3 normalize3(float3 value, float eps) {
-    const float norm = norm3(value);
-    const float denom = fmaxf(norm, eps);
-    return make_float3(
-        __fdiv_rn(value.x, denom),
-        __fdiv_rn(value.y, denom),
-        __fdiv_rn(value.z, denom));
-}
 
 __device__ __forceinline__ float signf_like_torch(float value) {
     return (value > 0.0f) ? 1.0f : ((value < 0.0f) ? -1.0f : 0.0f);
 }
 
 __device__ __forceinline__ float unsigned_angle(float3 a, float3 b, float3 axis) {
-    const float3 cross = cross3(a, b);
-    const float signed_norm = signf_like_torch(dot3(cross, axis)) * norm3(cross);
-    float angle = atan2f(signed_norm, dot3(a, b));
+    const float3 cross = channel::math::cross(a, b);
+    const float signed_norm = signf_like_torch(channel::math::dot_rn_xzy(cross, axis)) * channel::math::length_rn_xzy(cross);
+    float angle = atan2f(signed_norm, channel::math::dot_rn_xzy(a, b));
     return angle < 0.0f ? angle + 6.28318530717958647692f : angle;
 }
 
@@ -884,59 +838,59 @@ __global__ void diffraction_edge_geometry_kernel(
         const int safe0 = f0 >= 0 ? f0 : 0;
         const int safe1 = f1 >= 0 ? f1 : 0;
 
-        const float3 start = load_vec3(vertices, v0);
-        const float3 end = load_vec3(vertices, v1);
-        const float3 vector = sub3(end, start);
-        const float length = fmaxf(norm3(vector), 1.0e-12f);
+        const float3 start = channel::math::load_vec3(vertices, v0);
+        const float3 end = channel::math::load_vec3(vertices, v1);
+        const float3 vector = channel::math::sub(end, start);
+        const float length = fmaxf(channel::math::length_rn_xzy(vector), 1.0e-12f);
         const float3 dir = make_float3(
             __fdiv_rn(vector.x, length),
             __fdiv_rn(vector.y, length),
             __fdiv_rn(vector.z, length));
         const float half_length = 0.5f * length;
 
-        const float3 n0_cand = normalize3(load_vec3(face_normals, safe0), edge_epsilon);
-        const float3 n1_cand = normalize3(load_vec3(face_normals, safe1), edge_epsilon);
-        const float3 to1 = normalize3(cross3(n0_cand, dir), edge_epsilon);
-        const float3 tn1 = normalize3(cross3(n1_cand, dir), edge_epsilon);
-        const float3 to2 = normalize3(cross3(n1_cand, dir), edge_epsilon);
-        const float3 tn2 = normalize3(cross3(n0_cand, dir), edge_epsilon);
+        const float3 n0_cand = channel::math::normalize_rn_xzy(channel::math::load_vec3(face_normals, safe0), edge_epsilon);
+        const float3 n1_cand = channel::math::normalize_rn_xzy(channel::math::load_vec3(face_normals, safe1), edge_epsilon);
+        const float3 to1 = channel::math::normalize_rn_xzy(channel::math::cross(n0_cand, dir), edge_epsilon);
+        const float3 tn1 = channel::math::normalize_rn_xzy(channel::math::cross(n1_cand, dir), edge_epsilon);
+        const float3 to2 = channel::math::normalize_rn_xzy(channel::math::cross(n1_cand, dir), edge_epsilon);
+        const float3 tn2 = channel::math::normalize_rn_xzy(channel::math::cross(n0_cand, dir), edge_epsilon);
         const bool choose_first = unsigned_angle(to1, tn1, dir) < unsigned_angle(to2, tn2, dir);
         const float3 ordered_n0 = choose_first ? n0_cand : n1_cand;
         const float3 ordered_n1 = choose_first ? n1_cand : n0_cand;
         float3 out_n0 = interior ? ordered_n0 : n0_cand;
         float3 out_n1 = interior ? ordered_n1 : n1_cand;
         if (f1 < 0) {
-            out_n1 = mul3(n0_cand, -1.0f);
+            out_n1 = channel::math::scale(n0_cand, -1.0f);
         }
-        const float output_normal_dot = dot3(out_n0, out_n1);
+        const float output_normal_dot = channel::math::dot_rn_xzy(out_n0, out_n1);
         const float output_clamped_neg_dot = fminf(fmaxf(-output_normal_dot, -1.0f), 1.0f);
         const float output_interior_angle = acosf(output_clamped_neg_dot);
         const float out_exterior_angle = interior ? (two_pi - output_interior_angle) : two_pi;
 
         bool coplanar = false;
         if (interior) {
-            const float selected_normal_dot = dot3(n0_cand, n1_cand);
+            const float selected_normal_dot = channel::math::dot_rn_xzy(n0_cand, n1_cand);
             const bool aligned = fabsf(selected_normal_dot) >= normal_cos_tol;
             const int opp0 = opposite_vertex(faces, safe0, v0, v1);
             const int opp1 = opposite_vertex(faces, safe1, v0, v1);
-            const float3 point_a = load_vec3(vertices, opp0);
-            const float3 point_b = load_vec3(vertices, opp1);
-            const float plane_dist_a = fabsf(dot3(sub3(point_a, start), n0_cand));
-            const float plane_dist_b = fabsf(dot3(sub3(point_b, start), n0_cand));
+            const float3 point_a = channel::math::load_vec3(vertices, opp0);
+            const float3 point_b = channel::math::load_vec3(vertices, opp1);
+            const float plane_dist_a = fabsf(channel::math::dot_rn_xzy(channel::math::sub(point_a, start), n0_cand));
+            const float plane_dist_b = fabsf(channel::math::dot_rn_xzy(channel::math::sub(point_b, start), n0_cand));
             coplanar = aligned && plane_dist_a <= plane_tol && plane_dist_b <= plane_tol;
         }
-        const float selected_normal_dot = dot3(n0_cand, n1_cand);
+        const float selected_normal_dot = channel::math::dot_rn_xzy(n0_cand, n1_cand);
         const bool selected_wedge_angle = boundary || (interior && selected_normal_dot < 1.0f);
         selected[edge] =
             (interior || boundary) && !coplanar && length > edge_epsilon && selected_wedge_angle;
 
-        store_vec3(edge_pos, edge, mul3(add3(start, end), 0.5f));
-        store_vec3(edge_dir, edge, dir);
+        channel::math::store_vec3(edge_pos, edge, channel::math::scale(channel::math::add(start, end), 0.5f));
+        channel::math::store_vec3(edge_dir, edge, dir);
         lengths[edge] = length;
         line_min[edge] = -half_length;
         line_max[edge] = half_length;
-        store_vec3(n0, edge, out_n0);
-        store_vec3(n1, edge, out_n1);
+        channel::math::store_vec3(n0, edge, out_n0);
+        channel::math::store_vec3(n1, edge, out_n1);
         exterior_angle[edge] = out_exterior_angle;
     }
 }
@@ -1769,36 +1723,23 @@ constexpr int kBlockSize = 256;
 constexpr float kEps = 1.0e-6f;
 constexpr float kHalfPiMinusOffset = 1.52079632679f;
 
-struct Vec3 { float x, y, z; };
-
-__device__ __forceinline__ Vec3 v3(float x, float y, float z) { return {x, y, z}; }
-__device__ __forceinline__ Vec3 add(Vec3 a, Vec3 b) { return v3(a.x+b.x,a.y+b.y,a.z+b.z); }
-__device__ __forceinline__ Vec3 sub(Vec3 a, Vec3 b) { return v3(a.x-b.x,a.y-b.y,a.z-b.z); }
-__device__ __forceinline__ Vec3 mul(Vec3 a, float s) { return v3(a.x*s,a.y*s,a.z*s); }
-__device__ __forceinline__ float dot(Vec3 a, Vec3 b) { return a.x*b.x+a.y*b.y+a.z*b.z; }
-__device__ __forceinline__ Vec3 cross(Vec3 a, Vec3 b) {
-    return v3(a.y*b.z-a.z*b.y, a.z*b.x-a.x*b.z, a.x*b.y-a.y*b.x);
-}
-__device__ __forceinline__ float norm(Vec3 a) { return sqrtf(fmaxf(dot(a,a),0.f)); }
-__device__ __forceinline__ Vec3 normalize(Vec3 a, Vec3 default_value=v3(0.f,0.f,1.f)) {
-    const float n=norm(a); return n>kEps?mul(a,1.f/n):default_value;
-}
-__device__ __forceinline__ Vec3 load3(const float *p,int i) { return v3(p[i*3],p[i*3+1],p[i*3+2]); }
+using Vec3 = channel::math::Vec3;
+namespace cmath = channel::math;
 
 __device__ __forceinline__ Vec3 silhouette_viewpoint(
     Vec3 hit_p, Vec3 shading_n, Vec3 geometric_n, Vec3 ray_dir) {
-    Vec3 geo = norm(geometric_n)>kEps ? geometric_n : shading_n;
+    Vec3 geo = cmath::length(geometric_n)>kEps ? geometric_n : shading_n;
     // Mitsuba's primitive_silhouette_projection uses the unmodified
     // geometric interaction normal (si.n), not a face-forward normal.
     Vec3 surface_n = geo;
-    Vec3 tangent = sub(ray_dir,mul(surface_n,dot(ray_dir,surface_n)));
-    if (norm(tangent)<=kEps) {
-        Vec3 fx=cross(surface_n,v3(1.f,0.f,0.f));
-        Vec3 fy=cross(surface_n,v3(0.f,1.f,0.f));
-        tangent=norm(fx)>kEps?fx:fy;
+    Vec3 tangent = cmath::sub(ray_dir,cmath::scale(surface_n,cmath::dot(ray_dir,surface_n)));
+    if (cmath::length(tangent)<=kEps) {
+        Vec3 fx=cmath::cross(surface_n,cmath::vec3(1.f,0.f,0.f));
+        Vec3 fy=cmath::cross(surface_n,cmath::vec3(0.f,1.f,0.f));
+        tangent=cmath::length(fx)>kEps?fx:fy;
     }
-    tangent=normalize(tangent,v3(1.f,0.f,0.f));
-    Vec3 d=add(mul(surface_n,cosf(kHalfPiMinusOffset)),mul(tangent,sinf(kHalfPiMinusOffset)));
+    tangent=cmath::normalize_or(tangent, kEps, cmath::vec3(1.f, 0.f, 0.f));
+    Vec3 d=cmath::add(cmath::scale(surface_n,cosf(kHalfPiMinusOffset)),cmath::scale(tangent,sinf(kHalfPiMinusOffset)));
     // Fixed 0.1 scene-unit viewpoint displacement, deliberately absolute and
     // not scaled by primitive or scene size. Together with kHalfPiMinusOffset
     // (pi/2 - 0.05 rad, so `d` is the surface tangent lifted 0.05 rad off the
@@ -1807,13 +1748,13 @@ __device__ __forceinline__ Vec3 silhouette_viewpoint(
     // see the primitive's perimeter edges. Both constants select which edges
     // are discovered, so they are pinned to these values rather than tuned.
     const float offset=0.1f;
-    return add(hit_p,mul(d,offset));
+    return cmath::add(hit_p,cmath::scale(d,offset));
 }
 
 __device__ __forceinline__ bool wedge_exterior(Vec3 from_edge,Vec3 edge_dir,Vec3 n0,Vec3 n1) {
-    Vec3 eh=normalize(edge_dir);
-    Vec3 projected=sub(from_edge,mul(eh,dot(from_edge,eh)));
-    return norm(projected)>kEps && (dot(projected,n0)>=-kEps || dot(projected,n1)>=-kEps);
+    Vec3 eh=cmath::normalize_or(edge_dir, kEps, cmath::vec3(0.0f, 0.0f, 1.0f));
+    Vec3 projected=cmath::sub(from_edge,cmath::scale(eh,cmath::dot(from_edge,eh)));
+    return cmath::length(projected)>kEps && (cmath::dot(projected,n0)>=-kEps || cmath::dot(projected,n1)>=-kEps);
 }
 
 __device__ int sampled_edge(
@@ -1828,12 +1769,12 @@ __device__ int sampled_edge(
     int valid_count=0;
     for(int s=0;s<count;++s){
         int e=tri_edges[prim*slots+s]; if(e<0||e>=edge_n) continue;
-        Vec3 ep=load3(edge_pos,e), ed=load3(edge_dir,e), eh=normalize(ed);
-        float ell=fminf(fmaxf(dot(sub(viewpoint,ep),eh),tminp[e]),tmaxp[e]);
-        Vec3 point=add(ep,mul(eh,ell));
-        Vec3 n0=load3(n0p,e),n1=load3(n1p,e);
-        bool flip=dot(ray_dir,n0)>0.f;
-        if(!wedge_exterior(sub(tx,point),ed,flip?n1:n0,flip?n0:n1)) continue;
+        Vec3 ep=cmath::load_vec3(edge_pos,e), ed=cmath::load_vec3(edge_dir,e), eh=cmath::normalize_or(ed, kEps, cmath::vec3(0.0f, 0.0f, 1.0f));
+        float ell=fminf(fmaxf(cmath::dot(cmath::sub(viewpoint,ep),eh),tminp[e]),tmaxp[e]);
+        Vec3 point=cmath::add(ep,cmath::scale(eh,ell));
+        Vec3 n0=cmath::load_vec3(n0p,e),n1=cmath::load_vec3(n1p,e);
+        bool flip=cmath::dot(ray_dir,n0)>0.f;
+        if(!wedge_exterior(cmath::sub(tx,point),ed,flip?n1:n0,flip?n0:n1)) continue;
         ++valid_count;
     }
     if(valid_count<=0) return -1;
@@ -1843,11 +1784,11 @@ __device__ int sampled_edge(
     int ordinal=0;
     for(int s=0;s<count;++s){
         int e=tri_edges[prim*slots+s]; if(e<0||e>=edge_n) continue;
-        Vec3 ep=load3(edge_pos,e), ed=load3(edge_dir,e), eh=normalize(ed);
-        float ell=fminf(fmaxf(dot(sub(viewpoint,ep),eh),tminp[e]),tmaxp[e]);
-        Vec3 point=add(ep,mul(eh,ell)); Vec3 en0=load3(n0p,e),en1=load3(n1p,e);
-        bool flip=dot(ray_dir,en0)>0.f;
-        if(!wedge_exterior(sub(tx,point),ed,flip?en1:en0,flip?en0:en1)) continue;
+        Vec3 ep=cmath::load_vec3(edge_pos,e), ed=cmath::load_vec3(edge_dir,e), eh=cmath::normalize_or(ed, kEps, cmath::vec3(0.0f, 0.0f, 1.0f));
+        float ell=fminf(fmaxf(cmath::dot(cmath::sub(viewpoint,ep),eh),tminp[e]),tmaxp[e]);
+        Vec3 point=cmath::add(ep,cmath::scale(eh,ell)); Vec3 en0=cmath::load_vec3(n0p,e),en1=cmath::load_vec3(n1p,e);
+        bool flip=cmath::dot(ray_dir,en0)>0.f;
+        if(!wedge_exterior(cmath::sub(tx,point),ed,flip?en1:en0,flip?en0:en1)) continue;
         if(ordinal++==wanted) return e;
     }
     return -1;
@@ -1865,8 +1806,8 @@ __global__ void discover_kernel(
     // Discovery stores support, not a per-path contribution. Select one
     // exterior primitive-perimeter candidate per first hit with a reproducible
     // uniform draw; the subsequent estimator samples edge length explicitly.
-    int e=sampled_edge(load3(tx,0),load3(ray_dir,i),load3(hit_p,i),load3(hit_n,i),
-        load3(hit_geo_n,i),prim[i],i,tri_count,tri_edges,slots,tri_n,edge_pos,edge_dir,
+    int e=sampled_edge(cmath::load_vec3(tx,0),cmath::load_vec3(ray_dir,i),cmath::load_vec3(hit_p,i),cmath::load_vec3(hit_n,i),
+        cmath::load_vec3(hit_geo_n,i),prim[i],i,tri_count,tri_edges,slots,tri_n,edge_pos,edge_dir,
         n0,n1,tmin,tmax,face1,edge_n);
     if(e>=0) atomicExch(seen+e,1);
 }

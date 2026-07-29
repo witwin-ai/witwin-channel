@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Native deterministic RF solver public API.
+
 """Native deterministic RF solver public API."""
 
 from __future__ import annotations

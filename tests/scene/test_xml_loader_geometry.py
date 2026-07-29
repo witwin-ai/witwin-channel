@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests xml loader geometry.
+
 import importlib.util
 
 from witwin.core import Scene

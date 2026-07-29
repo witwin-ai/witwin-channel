@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Implements deployment.
+
 from __future__ import annotations
 
 import hashlib

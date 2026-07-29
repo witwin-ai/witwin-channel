@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests path synthetic arrays.
+
 import math
 
 import pytest

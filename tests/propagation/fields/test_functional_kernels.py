@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests functional kernels.
+
 from __future__ import annotations
 
 import inspect

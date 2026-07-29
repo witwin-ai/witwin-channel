@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests the analytic acceptance matrix.
+
 import pytest
 import torch
 

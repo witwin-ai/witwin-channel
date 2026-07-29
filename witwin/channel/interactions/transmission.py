@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Transmission: enumerated topology discovery and the shared event helpers.
+
 """Transmission: enumerated topology discovery and the shared event helpers.
 
 One concept, one file. This module owns the enumerated straight-segment

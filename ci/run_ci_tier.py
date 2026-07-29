@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# List or execute the repository's four fail-fast CI tiers.
+
 """List or execute the repository's four fail-fast CI tiers."""
 
 from __future__ import annotations
@@ -25,6 +28,8 @@ QUICK_GATES = (
     Gate("quick.contract-coverage", ("ci/check_contract_coverage.py",)),
     Gate("quick.orphan-modules", ("ci/check_orphan_modules.py",)),
     Gate("quick.single-definition", ("ci/check_single_definition.py",)),
+    Gate("quick.shared-math", ("ci/check_shared_math.py",)),
+    Gate("quick.source-headers", ("ci/check_source_headers.py",)),
     Gate(
         "quick.public-api-binding-contract-manifests",
         (

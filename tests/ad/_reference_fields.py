@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Pure-torch complex128 reference implementations of the field kernels.
+
 """Pure-torch complex128 reference implementations of the field kernels.
 
 Test-only mirrors of the exact formulas in ``native/channel/

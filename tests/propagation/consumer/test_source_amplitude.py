@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests source amplitude.
+
 """ADR-039: what ``sources.powers_w`` does to every published surface.
 
 Before ADR-039 the consumer required ``powers_w`` and then published a value

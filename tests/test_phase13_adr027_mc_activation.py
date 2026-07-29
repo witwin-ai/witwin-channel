@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests mc activation.
+
 from __future__ import annotations
 
 import json

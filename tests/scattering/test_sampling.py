@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Kirchhoff table direction sampling: sampler/pdf consistency and measure.
+
 """Kirchhoff table direction sampling: sampler/pdf consistency and measure."""
 
 import math

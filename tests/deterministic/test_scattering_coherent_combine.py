@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests scattering coherent combine.
+
 """Deterministic opt-in coherent scattering combine (ADR-021 D3).
 
 The combine sums the complex ``path_field`` of scattering rows per (tx, rx)

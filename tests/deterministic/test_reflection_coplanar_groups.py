@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Acceptance tests for coplanar-group reflection semantics (audit D-1/D-2).
+
 """Acceptance tests for coplanar-group reflection semantics (audit D-1/D-2)."""
 
 import pytest

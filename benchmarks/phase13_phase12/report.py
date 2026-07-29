@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Three-group measured report construction and raw-evidence replay.
+
 """Three-group measured report construction and raw-evidence replay."""
 
 from __future__ import annotations

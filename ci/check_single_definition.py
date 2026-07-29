@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# Copyright Xingyu Chen.
+# Reject a second definition site for a protected domain concept.
+
 """Reject a second definition site for a protected domain concept.
 
 `check_orphan_modules` asks "can anything reach this module". It is a

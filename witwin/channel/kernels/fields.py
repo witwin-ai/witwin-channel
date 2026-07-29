@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Native RF field kernel facades.
+
 """Native RF field kernel facades.
 
 Thin facades over the ``_channel`` field ABI: the enumerated field transports

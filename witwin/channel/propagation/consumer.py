@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Stable solver-neutral propagation consumer facade.
+
 """Stable solver-neutral propagation consumer facade.
 
 Call :func:`capabilities` to discover the supported components, responses,

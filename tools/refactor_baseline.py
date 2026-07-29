@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Freeze deterministic, immutable manifests for architecture refactors.
+
 """Freeze deterministic, immutable manifests for architecture refactors.
 
 The collector is deliberately static-first: it parses Python and C++ sources

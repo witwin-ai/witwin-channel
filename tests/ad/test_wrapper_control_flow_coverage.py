@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Control-flow contracts for consolidated Python autograd owners.
+
 """Control-flow contracts for consolidated Python autograd owners.
 
 Native companion numerics are covered by the CUDA lockstep suites.  These tests

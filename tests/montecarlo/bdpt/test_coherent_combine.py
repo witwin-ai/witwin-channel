@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests coherent combine.
+
 """ADR-019 acceptance: BDPT opt-in coherent combine (DEFAULT OFF).
 
 Gates:

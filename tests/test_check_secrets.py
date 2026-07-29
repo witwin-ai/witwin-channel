@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests check secrets.
+
 from __future__ import annotations
 
 import json

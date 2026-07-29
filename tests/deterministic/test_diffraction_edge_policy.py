@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests diffraction edge policy.
+
 import pytest
 import torch
 

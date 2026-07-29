@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests peak memory artifact.
+
 from __future__ import annotations
 
 import argparse

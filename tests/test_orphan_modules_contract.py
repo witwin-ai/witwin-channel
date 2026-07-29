@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# The orphan-module gate passes here, and FAILS on a planted violation.
+
 """The orphan-module gate passes here, and FAILS on a planted violation.
 
 A gate asserted only against a clean tree proves the tree is clean today, not

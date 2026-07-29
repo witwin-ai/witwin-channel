@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests solver scattering ad.
+
 """Solver-level AD through the native ADR-014 scattering companions.
 
 End-to-end callers for the deterministic/path scattering component

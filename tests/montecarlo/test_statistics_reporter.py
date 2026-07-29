@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests statistics reporter.
+
 from __future__ import annotations
 
 import json

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests release contract performance evidence.
+
 from __future__ import annotations
 
 import io

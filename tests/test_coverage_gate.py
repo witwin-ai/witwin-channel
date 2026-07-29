@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests coverage gate.
+
 from __future__ import annotations
 
 import copy

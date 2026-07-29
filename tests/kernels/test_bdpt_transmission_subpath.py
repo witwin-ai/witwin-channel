@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Shooting-context specular transmission subpath op (contract section 4).
+
 """Shooting-context specular transmission subpath op (contract section 4).
 
 Vacuum invariants: the exit point lies on the original ray, the combined

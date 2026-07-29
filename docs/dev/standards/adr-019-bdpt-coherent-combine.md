@@ -6,10 +6,10 @@ Status: Accepted.
 
 The `montecarlo.bdpt` solver accumulates real per-path POWER only. Every
 connection sample carries `contribution = |coeff|^2`
-(`native/channel/kernels/bdpt_connect.cu:168-181`), and
+(`native/channel/kernels/bdpt_connect.cu`), and
 the accumulator atomic-adds `contribution * mis_weight` into per-(tx, rx,
 component) real matrices
-(`native/channel/kernels/bdpt_connect.cu:964,1138,1189,1259`). The
+(`native/channel/kernels/bdpt_connect.cu,1138,1189,1259`). The
 connection-sample schema (`_BDPT_CONNECTION_SCHEMA`) carries no complex
 coefficient, so paths that land in the same (tx, rx, component) bin combine
 INCOHERENTLY (their powers add).

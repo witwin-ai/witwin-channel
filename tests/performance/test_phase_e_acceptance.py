@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests performance acceptance behavior.
+
 from __future__ import annotations
 
 import json

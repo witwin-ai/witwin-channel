@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Implements benchmark munich deterministic native vs original.
+
 from __future__ import annotations
 
 import argparse

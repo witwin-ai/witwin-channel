@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Shared central finite-difference engine for the AD test suite.
+
 """Shared central finite-difference engine for the AD test suite.
 
 Two-point central differences, ``(f(x + h) - f(x - h)) / (2 h)``, reusable by

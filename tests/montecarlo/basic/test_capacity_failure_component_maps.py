@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests capacity failure component maps.
+
 from __future__ import annotations
 
 import inspect

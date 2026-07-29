@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Explicit path solver API for path export and diagnostics.
+
 """Explicit path solver API for path export and diagnostics.
 
 ``docs/dev/path/README.md`` holds the full ownership contract; a module has no

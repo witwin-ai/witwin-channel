@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Solver-level multi-reflection (depth >= 2) AD tests for deterministic/path.
+
 """Solver-level multi-reflection (depth >= 2) AD tests for deterministic/path.
 
 Covers the plan 07 section 9.3 multi-reflection column for D and P: eps_r /

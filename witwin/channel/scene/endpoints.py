@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Endpoint geometry, antenna response, and the scene-leaf AD seam.
+
 """Endpoint geometry, antenna response, and the scene-leaf AD seam.
 
 This module is the single owner of everything Channel knows about an endpoint:

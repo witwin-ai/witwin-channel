@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# The native field-state ABI contracts.
+
 """The native field-state ABI contracts.
 
 Two frozen dataclasses and nothing else: the world-Cartesian

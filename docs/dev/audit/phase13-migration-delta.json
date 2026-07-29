@@ -1320,7 +1320,85 @@
     "historical_munich_evidence_mutated": false,
     "full_architecture_local_build_deferred": true
   },
-  "adr043_current": {
+  "shared_math_current": {
+    "status": "accepted shared native math consolidation",
+    "owner": "native/channel/kernels/math.cuh",
+    "approved_phase9_body_hash_deletions": [
+      {
+        "name": "dot3",
+        "token_count": 31,
+        "signature_sha256": "c498693ee9551a8beea598d561b7c01ce19092a5e4555ff5abf62082fa4919ca",
+        "body_sha256": "ac6fec66b4f2171c00eb6fe9012abb2086d349752a046d03320081af75181211"
+      },
+      {
+        "name": "norm3",
+        "token_count": 16,
+        "signature_sha256": "3a80c60ecddf95393cd96f9789a3f3a6f942ed6e81d5a6b2778e2222d0f16275",
+        "body_sha256": "70be950c92e8334a009c7f44d20f141660eb67d86ff4d662780315e567ff854b"
+      },
+      {
+        "name": "bdpt_make_float3",
+        "token_count": 24,
+        "signature_sha256": "343b84c6f008b628939a07567827d92e2c0d8270f35111799bf44b73f516c24d",
+        "body_sha256": "0ad5694ab39d3b19ac23de6344a0ba0fc1ac281d1d4fab9ffde088f09e28fb70"
+      },
+      {
+        "name": "bdpt_add3",
+        "token_count": 28,
+        "signature_sha256": "e0dd512e14ddb35ef8f5bda07cd17dd24013ba8277bfee50191362d305cff66c",
+        "body_sha256": "6e5c6548dacaa766eb9b31a78567dc5e08b6a66df0223d5bdb49f61748535acd"
+      },
+      {
+        "name": "bdpt_sub3",
+        "token_count": 28,
+        "signature_sha256": "7ff635b6b18e85f2b418f483dcc7ea9bba58f5ae3ea9d2cbc50cb3e097d45fad",
+        "body_sha256": "1a56400368d672fb48939f679725545d26c920f46a21616449b5049cca8ff68e"
+      },
+      {
+        "name": "bdpt_scale3",
+        "token_count": 22,
+        "signature_sha256": "63218b2d541fecf4208c613b8cf5486aa58da551659aea2763d2c206a73333da",
+        "body_sha256": "de86f9ca59061ad150cc14e8101ab2fe5d3a77b4c6c536a2e6f5683a9c385729"
+      },
+      {
+        "name": "bdpt_norm3",
+        "token_count": 28,
+        "signature_sha256": "ec35888425520e610085b5679041300dd95a9aa03c2026d829d2d2cc9a473096",
+        "body_sha256": "551df86a00cf443e0bbd4b185d02697b7a71a3d333cd34546bbc0d6a19e551fe"
+      },
+      {
+        "name": "bdpt_normalize3",
+        "token_count": 24,
+        "signature_sha256": "951256a56c769a180885b8dd04c35eb9aa34120be316a7201a8538adafd1fcef",
+        "body_sha256": "addb9f3bf19cff2ef7828fa3248a3cd35483a27abdb4a3eef5813be394d8027e"
+      },
+      {
+        "name": "bdpt_vec3_at",
+        "token_count": 36,
+        "signature_sha256": "c6c45aa8cbd52cf6c9468b119c79622de5e6f90367595a79ebe415a55f05db88",
+        "body_sha256": "914308c867ef1acb4beb9a0247d3360e10e0e7012f66e6e14b3093151f3b9651"
+      }
+    ],
+    "approved_phase9_body_hash_transformations": [
+      {
+        "owner_before": "Channel Native",
+        "owner_after": "Channel Native",
+        "transformation_kind": "replaced file-local dot and length helpers with shared equivalents without changing launch or reduction order",
+        "before": {
+          "name": "path_reflection_candidates_kernel",
+          "token_count": 1089,
+          "signature_sha256": "e91859b46135ffefe92036299672d60c9020a966969094d7812667f870762cd0",
+          "body_sha256": "5e8dcca757e0c7bf7c40d87ead049099e060f5e3948e6525dc5e7ea0d40cdc73"
+        },
+        "after": {
+          "name": "path_reflection_candidates_kernel",
+          "token_count": 1113,
+          "signature_sha256": "e91859b46135ffefe92036299672d60c9020a966969094d7812667f870762cd0",
+          "body_sha256": "47200e631109b36bea3897dccd5eddb1d7f41ce5c0c41a1fd15ae2cb33a41249"
+        }
+      }
+    ]
+  },  "adr043_current": {
     "status": "ADR-043 direction-seam transformation; the two Channel-owned field transports gained an optional grad_direction cotangent input and a direction tangent output, and nothing else about them moved",
     "approved_phase9_body_hash_transformations": [
       {

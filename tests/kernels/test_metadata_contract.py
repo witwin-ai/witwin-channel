@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests metadata contract.
+
 import pytest
 
 from witwin.channel.runtime import (

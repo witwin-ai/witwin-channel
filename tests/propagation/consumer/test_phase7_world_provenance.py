@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests world provenance.
+
 """World provenance and fixed-topology staleness (ADR-040).
 
 Before this contract, replaying a frozen topology against a world that had

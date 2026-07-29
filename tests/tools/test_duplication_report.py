@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests duplication report.
+
 from __future__ import annotations
 
 from ci import check_duplication

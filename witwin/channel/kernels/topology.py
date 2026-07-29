@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Native discrete path-topology kernel facades.
+
 """Native discrete path-topology kernel facades.
 
 Thin facades over the ``_channel`` topology ABI: the path/topology block

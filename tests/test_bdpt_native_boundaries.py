@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests bdpt native boundaries.
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -39,7 +42,7 @@ def test_bdpt_connection_family_has_one_physical_owner() -> None:
 
     assert EXPECTED_ABI <= names[MERGED]
     assert source.count('#include "bdpt_connect_common.cuh"') == 5
-    assert common.startswith("#pragma once\n")
+    assert common.splitlines()[3] == "#pragma once"
     assert "namespace {" in common
     assert common.rstrip().endswith("}  // namespace")
 

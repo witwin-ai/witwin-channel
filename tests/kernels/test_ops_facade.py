@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests ops facade.
+
 import math
 
 import pytest

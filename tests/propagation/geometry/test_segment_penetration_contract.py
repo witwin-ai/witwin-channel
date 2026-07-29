@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests segment penetration contract.
+
 from __future__ import annotations
 
 import inspect

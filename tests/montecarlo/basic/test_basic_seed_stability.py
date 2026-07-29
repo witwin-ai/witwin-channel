@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests basic seed stability.
+
 import pytest
 import torch
 

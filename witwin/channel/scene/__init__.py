@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Core-world to Channel-runtime compilation boundary.
+
 """Core-world to Channel-runtime compilation boundary."""
 
 from __future__ import annotations

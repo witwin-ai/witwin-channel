@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests path export.
+
 import pytest
 import torch
 

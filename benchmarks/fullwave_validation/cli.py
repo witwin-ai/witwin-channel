@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks cli.
+
 from __future__ import annotations
 
 import argparse

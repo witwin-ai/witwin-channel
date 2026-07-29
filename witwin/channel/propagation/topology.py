@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Discrete propagation topology ownership boundary.
+
 """Discrete propagation topology ownership boundary."""
 
 from __future__ import annotations

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests bdpt solver ad.
+
 """ADR-022 solver-level acceptance gates for BDPT full fixed-topology AD.
 
 Drives the public ``montecarlo.bdpt`` solver with ``ad_mode`` in

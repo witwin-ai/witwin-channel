@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests rayd bridge boundaries.
+
 import re
 from pathlib import Path
 

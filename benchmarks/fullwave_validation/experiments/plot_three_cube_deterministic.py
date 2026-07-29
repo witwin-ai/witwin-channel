@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks plot three cube deterministic.
+
 from __future__ import annotations
 
 import argparse

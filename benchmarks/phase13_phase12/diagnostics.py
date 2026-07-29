@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Independent non-timed correctness diagnostics and deterministic replay.
+
 """Independent non-timed correctness diagnostics and deterministic replay."""
 
 from __future__ import annotations

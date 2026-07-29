@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests wideband frequency ad.
+
 """Frequency AD at every wideband column, not only at the reference (ADR-042).
 
 ``frequency_offsets_hz`` is a host declaration and carries no tangent of its

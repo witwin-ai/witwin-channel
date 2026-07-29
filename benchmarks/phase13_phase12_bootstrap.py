@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Execute one canonical evidence script against a runner-built installation.
+
 """Execute one canonical evidence script against a runner-built installation."""
 
 from __future__ import annotations

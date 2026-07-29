@@ -39,7 +39,7 @@ reference on the grid fixture (the audit reports 430x grid / 2175x point).
 Root cause: BDPT's standalone diffraction did not evaluate UTD/Fresnel edge
 physics. It called a crude native power heuristic,
 `bdpt_diffraction_contribution` in
-`native/channel/kernels/bdpt_connect_common.cuh:226-243`, which forms the
+`native/channel/kernels/bdpt_connect_common.cuh`, which forms the
 per-connection power as
 
 ```

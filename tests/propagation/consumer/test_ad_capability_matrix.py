@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Make the AD capability matrix authoritative instead of decorative.
+
 """Make the AD capability matrix authoritative instead of decorative.
 
 A checked-in matrix that nothing parses rots the first time a test is renamed.

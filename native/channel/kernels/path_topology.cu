@@ -1,5 +1,5 @@
-// ADR-044 consolidated CUDA translation unit.
-// Physical co-location only: ABI, launches, synchronization, and numerical order are unchanged.
+// Copyright Xingyu Chen.
+// Implements path topology CUDA operations.
 
 // ---- Consolidated from path_trace.cu ----
 #include <ATen/cuda/CUDAContext.h>
@@ -7,6 +7,7 @@
 #include <c10/util/complex.h>
 #include <cuda_runtime_api.h>
 #include "torch_cuda_minimal.h"
+#include "math.cuh"
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
 #include <thrust/extrema.h>
@@ -448,13 +449,7 @@ __global__ void deterministic_reflect_points_kernel(
     }
 }
 
-__device__ float dot3(const float* a, const float* b) {
-    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-}
 
-__device__ float norm3(float x, float y, float z) {
-    return sqrtf(x * x + y * y + z * z);
-}
 
 __device__ bool inside_triangle3(
     const float* p,
@@ -544,23 +539,23 @@ __global__ void path_reflection_candidates_kernel(
         const float* tx_p = tx_positions + static_cast<int64_t>(tx) * 3;
         const float* rx_p = rx_positions + static_cast<int64_t>(rx) * 3;
         const float* raw_n = face_normals + static_cast<int64_t>(face) * 3;
-        const float n_len = fmaxf(norm3(raw_n[0], raw_n[1], raw_n[2]), 1.0e-12f);
+        const float n_len = fmaxf(channel::math::length_values(raw_n[0], raw_n[1], raw_n[2]), 1.0e-12f);
         const float n[3] = {raw_n[0] / n_len, raw_n[1] / n_len, raw_n[2] / n_len};
 
         const float tx_vec[3] = {tx_p[0] - a[0], tx_p[1] - a[1], tx_p[2] - a[2]};
-        const float tx_to_plane = dot3(tx_vec, n);
+        const float tx_to_plane = channel::math::dot_values(tx_vec, n);
         const float image[3] = {
             tx_p[0] - 2.0f * tx_to_plane * n[0],
             tx_p[1] - 2.0f * tx_to_plane * n[1],
             tx_p[2] - 2.0f * tx_to_plane * n[2],
         };
         const float line[3] = {rx_p[0] - image[0], rx_p[1] - image[1], rx_p[2] - image[2]};
-        const float denom = dot3(line, n);
+        const float denom = channel::math::dot_values(line, n);
         if (fabsf(denom) <= 1.0e-8f) {
             continue;
         }
         const float plane_vec[3] = {a[0] - image[0], a[1] - image[1], a[2] - image[2]};
-        const float s = dot3(plane_vec, n) / denom;
+        const float s = channel::math::dot_values(plane_vec, n) / denom;
         if (s <= 1.0e-6f || s >= 1.0f - 1.0e-6f) {
             continue;
         }
@@ -579,8 +574,8 @@ __global__ void path_reflection_candidates_kernel(
         const float rx_dx = rx_p[0] - p[0];
         const float rx_dy = rx_p[1] - p[1];
         const float rx_dz = rx_p[2] - p[2];
-        const float d0_len = norm3(tx_dx, tx_dy, tx_dz);
-        const float d1_len = norm3(rx_dx, rx_dy, rx_dz);
+        const float d0_len = channel::math::length_values(tx_dx, tx_dy, tx_dz);
+        const float d1_len = channel::math::length_values(rx_dx, rx_dy, rx_dz);
         if (d0_len <= 1.0e-6f || d1_len <= 1.0e-6f) {
             continue;
         }
@@ -1656,6 +1651,7 @@ channel_path_finalize_blocks_cuda(
 #include <c10/util/complex.h>
 #include <cuda_runtime_api.h>
 #include "torch_cuda_minimal.h"
+#include "math.cuh"
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
 #include <thrust/scan.h>
@@ -3093,6 +3089,7 @@ channel_path_diffraction_block_cuda(
 #include <c10/util/complex.h>
 #include <cuda_runtime_api.h>
 #include "torch_cuda_minimal.h"
+#include "math.cuh"
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
 #include <thrust/extrema.h>

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests solver rough reflection ad.
+
 """Solver-level AD through the native rough-reflection C_r scale (ADR-010).
 
 End-to-end callers for ``field_rough_reflection_scale_backward`` / ``_jvp``:

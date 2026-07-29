@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Implements kirchhoff table ad CUDA operations.
+
 // ADR-015 Part C: native JVP/VJP companions of the offline Kirchhoff table
 // build (scattering/tables.py::build_kirchhoff_table). The float64 numpy primal
 // is unchanged bit-for-bit and stays the sanctioned compile-time island; only

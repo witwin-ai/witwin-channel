@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests compile owner.
+
 import importlib
 import inspect
 

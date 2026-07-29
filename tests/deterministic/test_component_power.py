@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests component power.
+
 import pytest
 import torch
 

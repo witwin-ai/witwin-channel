@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# CPU complex128 electromagnetic reference oracle (numpy-only, no torch).
+
 """CPU complex128 electromagnetic reference oracle (numpy-only, no torch).
 
 Binding conventions (docs/dev/plans/05-implementation-contract.md, section 2):

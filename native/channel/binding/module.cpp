@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Implements module native integration.
+
 #include "registry.h"
 
 PYBIND11_MODULE(_channel, module) {

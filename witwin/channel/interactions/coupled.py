@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# The coupled reflection-diffraction interaction concept.
+
 """The coupled reflection-diffraction interaction concept.
 
 One module holds the whole concept: the lazy candidate-plan discovery

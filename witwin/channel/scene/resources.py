@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Immutable native resources a compiled scene owns.
+
 """Immutable native resources a compiled scene owns.
 
 This module is the single owner of everything a :class:`CompiledScene` holds

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Endpoint-connection specular transmission (contract section 4).
+
 """Endpoint-connection specular transmission (contract section 4).
 
 The decisive invariant: a thin_sheet wall made of a single vacuum layer must

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests transmission wall product.
+
 from __future__ import annotations
 
 import inspect

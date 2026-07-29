@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Native geometry kernel facades.
+
 """Native geometry kernel facades.
 
 Thin facades over the ``_channel`` geometry ABI: the RayD typed forward

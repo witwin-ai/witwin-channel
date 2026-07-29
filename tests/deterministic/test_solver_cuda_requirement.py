@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests solver cuda requirement.
+
 import pytest
 import torch
 

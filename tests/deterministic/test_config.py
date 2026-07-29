@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests config.
+
 import pytest
 
 from witwin.channel.deterministic import Config

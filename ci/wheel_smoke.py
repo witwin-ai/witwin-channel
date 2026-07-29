@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Supports wheel smoke tooling.
+
 from __future__ import annotations
 
 import argparse

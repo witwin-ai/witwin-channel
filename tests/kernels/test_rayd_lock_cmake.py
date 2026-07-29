@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests rayd lock cmake.
+
 import json
 import os
 import shutil

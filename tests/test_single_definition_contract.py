@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# The single-definition gate passes here, and FAILS on a planted duplicate.
+
 """The single-definition gate passes here, and FAILS on a planted duplicate.
 
 The gate's whole claim is that it survives the failure mode that actually

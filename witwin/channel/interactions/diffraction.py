@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# The diffraction interaction: discovery planning, geometry, and enumerated orchestration.
+
 """The diffraction interaction: discovery planning, geometry, and enumerated orchestration.
 
 This module gathers what used to be three files - the lazy first-order

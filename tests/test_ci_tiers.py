@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests ci tiers.
+
 from __future__ import annotations
 
 import json

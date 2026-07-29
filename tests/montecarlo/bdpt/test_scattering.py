@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# BDPT Kirchhoff rough-surface scattering (wave 3).
+
 """BDPT Kirchhoff rough-surface scattering (wave 3).
 
 Covers the three-way {reflect, scatter, transmit} event selection, the

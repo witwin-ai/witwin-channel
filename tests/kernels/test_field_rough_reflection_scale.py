@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests field rough reflection scale.
+
 """Lockstep and contract tests for ADR-010 op 3 (rough-reflection C_r scale)."""
 
 import pytest

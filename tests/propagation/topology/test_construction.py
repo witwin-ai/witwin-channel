@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests construction.
+
 from __future__ import annotations
 
 

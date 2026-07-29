@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests rayd native link.
+
 from witwin.channel.deployment import build_info
 
 

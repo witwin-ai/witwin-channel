@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests binding manifest contract.
+
 from __future__ import annotations
 
 import json

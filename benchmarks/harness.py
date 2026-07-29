@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks harness.
+
 from __future__ import annotations
 
 from collections.abc import Callable

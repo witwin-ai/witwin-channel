@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Continuous propagation geometry and native facade ownership.
+
 """Continuous propagation geometry and native facade ownership.
 
 Merged owner of the endpoint layout, RayD visibility and edge-state facades,

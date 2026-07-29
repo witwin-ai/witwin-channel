@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests material abi v3.
+
 import math
 from dataclasses import dataclass
 

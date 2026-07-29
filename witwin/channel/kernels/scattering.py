@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Native scattering kernel facades.
+
 """Native scattering kernel facades.
 
 Thin facades over the ADR-010 / ADR-014 / ADR-015 / ADR-021 scattering ABI: the

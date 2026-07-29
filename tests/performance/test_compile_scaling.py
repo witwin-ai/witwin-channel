@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Gate `scene.compile` cost against scene size.
+
 """Gate `scene.compile` cost against scene size.
 
 `compile` reads all four Core version properties before it consults its cache,

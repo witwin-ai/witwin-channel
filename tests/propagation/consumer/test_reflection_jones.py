@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests reflection jones.
+
 from __future__ import annotations
 
 import pytest

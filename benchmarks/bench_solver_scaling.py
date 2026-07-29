@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks solver scaling.
+
 from __future__ import annotations
 
 import argparse

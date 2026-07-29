@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Scan tracked files for committed credentials and high-entropy secrets.
+
 """Scan tracked files for committed credentials and high-entropy secrets.
 
 The gate reads the git index (tracked files only), skips known binary assets,

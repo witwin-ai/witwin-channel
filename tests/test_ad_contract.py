@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests ad contract.
+
 import json
 import math
 from pathlib import Path

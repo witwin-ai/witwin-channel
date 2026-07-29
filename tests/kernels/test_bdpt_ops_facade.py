@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests bdpt ops facade.
+
 import pytest
 import torch
 import math

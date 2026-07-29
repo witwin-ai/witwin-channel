@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Declares evaluated paths payload plumbing native contracts.
+
 #pragma once
 
 #include <ATen/ATen.h>

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Direct AD checks of the native deterministic flat-accumulation Function.
+
 """Direct AD checks of the native deterministic flat-accumulation Function.
 
 Strict float64 torch.autograd.gradcheck of

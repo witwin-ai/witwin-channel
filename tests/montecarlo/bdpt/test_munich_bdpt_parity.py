@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests munich bdpt parity.
+
 import pytest
 import torch
 

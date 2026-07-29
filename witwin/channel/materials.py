@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Channel material ABI, per-face encoding, and offline layer-stack evaluation.
+
 """Channel material ABI, per-face encoding, and offline layer-stack evaluation.
 
 Logical material specifications are owned by :mod:`witwin.core`; this module

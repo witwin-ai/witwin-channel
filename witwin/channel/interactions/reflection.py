@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Reflection: discovery planning, EPC geometry, and enumerated orchestration.
+
 """Reflection: discovery planning, EPC geometry, and enumerated orchestration.
 
 One concept, one file. This module holds the reflection discovery limits and

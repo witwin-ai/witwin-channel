@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Declares resource native contracts.
+
 #pragma once
 
 #include <rayd/torch/integration.h>

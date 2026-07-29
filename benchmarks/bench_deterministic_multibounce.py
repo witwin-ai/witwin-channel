@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks deterministic multibounce.
+
 from __future__ import annotations
 
 import argparse

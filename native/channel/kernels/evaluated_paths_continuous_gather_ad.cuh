@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Shares evaluated paths continuous gather ad CUDA helpers.
+
 #pragma once
 
 #include <ATen/ATen.h>

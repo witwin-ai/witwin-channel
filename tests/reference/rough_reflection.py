@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Implements rough reflection.
+
 """Reference Torch rough-reflection C_r factor and application (ADR-010 op 3).
 
 The previous production implementation of

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Implements constants.
+
 """Electromagnetic constants and the package-wide phase convention.
 
 This module holds values only, so every layer may depend on it. It is the

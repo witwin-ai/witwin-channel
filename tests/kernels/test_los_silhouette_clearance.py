@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests los silhouette clearance.
+
 """Native ISB-taper (ADR-017) LoS clearance kernel contract.
 
 Pins the native ``los_silhouette_clearance`` op to the exact reference formulas

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests em oracle.
+
 """Golden tests for the complex128 EM oracle (plan section 11.1 items 1-8).
 
 All expected values are computed at runtime from independent closed-form

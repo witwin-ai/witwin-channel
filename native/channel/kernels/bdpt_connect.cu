@@ -1,5 +1,5 @@
-// ADR-044 consolidated CUDA translation unit.
-// Physical co-location only: ABI, launches, synchronization, and numerical order are unchanged.
+// Copyright Xingyu Chen.
+// Implements bdpt connect CUDA operations.
 
 // ---- Consolidated from bdpt_connect_mis.cu ----
 #include "bdpt_connect_common.cuh"

@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Declares path block native contracts.
+
 #pragma once
 
 #include <torch/extension.h>

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Solver-level capability manifest for :mod:`witwin.channel`.
+
 """Solver-level capability manifest for :mod:`witwin.channel`.
 
 This describes what the four Channel solvers can do and is the manifest that

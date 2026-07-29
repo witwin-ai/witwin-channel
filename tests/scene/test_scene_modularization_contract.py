@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests scene modularization contract.
+
 import importlib.util
 
 import pytest

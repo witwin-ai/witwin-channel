@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests bdpt pdf measure.
+
 from __future__ import annotations
 
 import pytest

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Internal propagation namespace with lazy owner exports.
+
 """Internal propagation namespace with lazy owner exports."""
 
 from __future__ import annotations

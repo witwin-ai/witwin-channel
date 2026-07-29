@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Resolve and verify the lock-pinned RayD source bundle in a Python package.
+
 """Resolve and verify the lock-pinned RayD source bundle in a Python package."""
 
 from __future__ import annotations

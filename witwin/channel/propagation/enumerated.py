@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Enumerated propagation: the shared engine, its typed config protocols, and.
+
 """Enumerated propagation: the shared engine, its typed config protocols, and
 its capacity failure sanitizers.
 

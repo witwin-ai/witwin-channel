@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests basic performance gate.
+
 import json
 from pathlib import Path
 import subprocess

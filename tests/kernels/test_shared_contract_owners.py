@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests shared contract owners.
+
 from __future__ import annotations
 
 import ast

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests transmission.
+
 """Deterministic endpoint-connection specular transmission (plan 05 wave 2).
 
 The decisive invariant: a thin_sheet wall made of a single vacuum layer must

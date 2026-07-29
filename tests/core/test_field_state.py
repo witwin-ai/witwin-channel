@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests field state.
+
 import pytest
 import torch
 

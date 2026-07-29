@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests evaluation compat.
+
 from __future__ import annotations
 
 import ast

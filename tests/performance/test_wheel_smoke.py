@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests wheel smoke.
+
 from __future__ import annotations
 
 import base64

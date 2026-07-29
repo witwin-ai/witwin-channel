@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests rayd package discovery.
+
 import importlib.util
 import json
 import os

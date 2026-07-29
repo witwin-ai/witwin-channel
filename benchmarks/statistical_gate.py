@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks statistical gate.
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass

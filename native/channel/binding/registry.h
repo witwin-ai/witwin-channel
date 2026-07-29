@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Declares registry native contracts.
+
 #pragma once
 
 #include <pybind11/pybind11.h>

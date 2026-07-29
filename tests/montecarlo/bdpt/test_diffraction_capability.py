@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests diffraction capability.
+
 import pytest
 import torch
 

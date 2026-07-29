@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests transmission polarization.
+
 """ADR-020 transmission polarization unification parity.
 
 The transmission MODEL for the montecarlo.basic and montecarlo.bdpt solvers is

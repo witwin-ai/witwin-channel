@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests solver config metadata.
+
 import importlib
 from dataclasses import fields
 

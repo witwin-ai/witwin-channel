@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Native Monte Carlo kernel facades.
+
 """Native Monte Carlo kernel facades.
 
 Thin facades over the ``_channel`` Monte Carlo ABI for both Monte Carlo

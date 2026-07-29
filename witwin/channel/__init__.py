@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# GPU-accelerated differentiable wireless propagation simulation.
+
 """GPU-accelerated differentiable wireless propagation simulation.
 
 The package root exports only what Channel owns: build and runtime reporting,

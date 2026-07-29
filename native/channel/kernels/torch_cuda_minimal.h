@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Declares torch cuda minimal native contracts.
+
 #pragma once
 
 // CUDA translation units need ATen and PyTorch's pybind tensor caster, not the

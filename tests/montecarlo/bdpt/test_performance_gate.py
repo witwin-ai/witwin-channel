@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests performance gate.
+
 import pytest
 import torch
 

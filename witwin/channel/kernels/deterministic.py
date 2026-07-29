@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Native deterministic accumulation kernel facades.
+
 """Native deterministic accumulation kernel facades.
 
 Thin facades over the ``_channel`` deterministic flat-accumulation ABI: the

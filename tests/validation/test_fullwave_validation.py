@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests fullwave validation.
+
 from __future__ import annotations
 
 from dataclasses import replace

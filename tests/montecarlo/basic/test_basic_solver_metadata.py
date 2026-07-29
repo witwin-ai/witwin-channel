@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests basic solver metadata.
+
 import pytest
 import torch
 

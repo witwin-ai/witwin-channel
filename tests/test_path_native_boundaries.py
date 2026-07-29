@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests path native boundaries.
+
 from __future__ import annotations
 
 from pathlib import Path

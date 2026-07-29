@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Typed fixed-capacity contracts for RayD segment penetration.
+
 """Typed fixed-capacity contracts for RayD segment penetration.
 
 ADR-027 makes RayD the sole numerical owner of batched straight-segment

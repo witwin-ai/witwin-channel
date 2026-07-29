@@ -1,5 +1,5 @@
-// ADR-044 consolidated CUDA translation unit.
-// Physical co-location only: ABI, launches, synchronization, and numerical order are unchanged.
+// Copyright Xingyu Chen.
+// Implements evaluated paths CUDA operations.
 
 // ---- Consolidated from enumerated_canonical_capacity_select.cu ----
 #include <ATen/ATen.h>

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests capabilities.
+
 import json
 from pathlib import Path
 

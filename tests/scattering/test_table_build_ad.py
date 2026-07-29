@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests table build ad.
+
 """ADR-015 Part C: differentiable Kirchhoff table construction.
 
 Lockstep of the native ``kirchhoff_table_build_backward`` / ``_jvp`` companions

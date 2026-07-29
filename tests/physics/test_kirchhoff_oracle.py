@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests kirchhoff oracle.
+
 """Golden tests for the Kirchhoff/phase-screen oracle.
 
 Covers Beckmann-series vs direct quadrature agreement, smooth limits,

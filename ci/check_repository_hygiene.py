@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Reject tracked build artifacts, oversized blobs, and dirty worktrees.
+
 """Reject tracked build artifacts, oversized blobs, and dirty worktrees."""
 
 from __future__ import annotations

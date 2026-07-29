@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests compiled penetration diagonals.
+
 from __future__ import annotations
 
 from types import SimpleNamespace

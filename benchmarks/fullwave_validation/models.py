@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks models.
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field

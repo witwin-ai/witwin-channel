@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks scenarios.
+
 from __future__ import annotations
 
 import json

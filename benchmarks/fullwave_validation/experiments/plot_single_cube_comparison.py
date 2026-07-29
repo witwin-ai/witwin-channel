@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks plot single cube comparison.
+
 from __future__ import annotations
 
 from dataclasses import asdict

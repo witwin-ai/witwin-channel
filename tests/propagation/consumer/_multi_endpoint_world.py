@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Implements multi endpoint world.
+
 """The multi-endpoint fixture world shared by the Phase-7 slot-batching tests.
 
 One concrete wall at ``x = 4`` spanning ``y in [-1.2, 1.2]`` and

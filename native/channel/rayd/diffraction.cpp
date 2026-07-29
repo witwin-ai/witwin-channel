@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Implements diffraction native integration.
+
 #include "resource.h"
 
 #include <cstdint>

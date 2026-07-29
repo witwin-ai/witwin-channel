@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests rayd scene contract.
+
 import sys
 
 import pytest

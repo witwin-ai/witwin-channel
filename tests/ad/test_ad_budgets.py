@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests ad budgets.
+
 """CI budget gates for the AD suite (plan 07 section 10).
 
 Two families of budgets, both of which fail the suite on regression instead

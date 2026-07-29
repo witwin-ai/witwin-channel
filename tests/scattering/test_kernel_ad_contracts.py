@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests kernel ad contracts.
+
 """Direct kernel-level AD contracts for the ADR-014 scattering companions.
 
 Covers the four native companions authored under ADR-014:

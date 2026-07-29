@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests domain owner contracts.
+
 from __future__ import annotations
 
 from pathlib import Path

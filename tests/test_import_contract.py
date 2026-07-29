@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests import contract.
+
 import sys
 
 

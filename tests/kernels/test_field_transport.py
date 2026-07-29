@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests field transport.
+
 import cmath
 import math
 

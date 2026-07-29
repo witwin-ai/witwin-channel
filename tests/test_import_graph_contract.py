@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests import graph contract.
+
 from __future__ import annotations
 
 from collections import Counter
@@ -385,7 +388,7 @@ def test_reexport_canonicalization_exposes_real_bdpt_enumerated_edge():
     assert enumerated == [
         graph.Violation(
             "witwin/channel/montecarlo/bdpt.py",
-            105,
+            108,
             0,
             "mc_enumerated_dependency",
             f"{package}.montecarlo.bdpt",

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests build info.
+
 import hashlib
 import json
 import re

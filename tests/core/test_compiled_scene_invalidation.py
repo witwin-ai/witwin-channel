@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests compiled scene invalidation.
+
 import torch
 
 from tests.support.core_world import make_receiver, make_transmitter

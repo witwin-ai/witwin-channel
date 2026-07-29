@@ -1,9 +1,13 @@
+// Copyright Xingyu Chen.
+// Implements reflection CUDA operations.
+
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
 
 #include "../tensor_checks.h"
+#include "math.cuh"
 #include <rayd/shared/rf/field_transport.cuh>
 #include <rayd/torch/rf/field_transport_ad.cuh>
 
@@ -35,50 +39,9 @@ constexpr float kReflectionEpsilon = 1.0e-6f;
 namespace transport = rayd::shared::rf::field_transport;
 namespace ad = rayd::torch::rf::field_transport_ad;
 
-struct Complex {
-    float r;
-    float i;
-};
-
-struct Complex3 {
-    Complex x;
-    Complex y;
-    Complex z;
-};
-
-__device__ __forceinline__ Complex c_make(float r, float i) { return {r, i}; }
-__device__ __forceinline__ Complex c_add(Complex a, Complex b) { return {a.r + b.r, a.i + b.i}; }
-__device__ __forceinline__ Complex c_mul(Complex a, Complex b) {
-    return {a.r * b.r - a.i * b.i, a.r * b.i + a.i * b.r};
-}
-__device__ __forceinline__ Complex c_scale(Complex a, float s) { return {a.r * s, a.i * s}; }
-__device__ __forceinline__ float c_abs2(Complex a) { return a.r * a.r + a.i * a.i; }
-
-__device__ __forceinline__ float3 f3(float x, float y, float z) { return make_float3(x, y, z); }
-__device__ __forceinline__ float dot3(float3 a, float3 b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
-__device__ __forceinline__ float3 cross3(float3 a, float3 b) {
-    return f3(a.y*b.z-a.z*b.y, a.z*b.x-a.x*b.z, a.x*b.y-a.y*b.x);
-}
-__device__ __forceinline__ float3 normalize3(float3 v) {
-    const float inv = rsqrtf(fmaxf(dot3(v, v), 1.0e-30f));
-    return f3(v.x*inv, v.y*inv, v.z*inv);
-}
-__device__ __forceinline__ float3 add3(float3 a, float3 b) { return f3(a.x+b.x, a.y+b.y, a.z+b.z); }
-__device__ __forceinline__ float3 scale3(float3 a, float s) { return f3(a.x*s, a.y*s, a.z*s); }
-__device__ __forceinline__ Complex c3_dot(Complex3 a, float3 b) {
-    return {a.x.r*b.x+a.y.r*b.y+a.z.r*b.z, a.x.i*b.x+a.y.i*b.y+a.z.i*b.z};
-}
-__device__ __forceinline__ Complex3 c3_axis(float3 axis, Complex value) {
-    return {{axis.x*value.r, axis.x*value.i},
-            {axis.y*value.r, axis.y*value.i},
-            {axis.z*value.r, axis.z*value.i}};
-}
-__device__ __forceinline__ Complex3 c3_add(Complex3 a, Complex3 b) {
-    return {c_add(a.x,b.x), c_add(a.y,b.y), c_add(a.z,b.z)};
-}
-__device__ __forceinline__ float c3_power(Complex3 a) {
-    return c_abs2(a.x) + c_abs2(a.y) + c_abs2(a.z);
-}
+using channel::math::Complex;
+using channel::math::Complex3;
+namespace cmath = channel::math;
 
 __device__ __forceinline__ float component3(float3 v, int axis) {
     return axis == 0 ? v.x : (axis == 1 ? v.y : v.z);
@@ -110,8 +73,8 @@ __device__ __forceinline__ void slab_coefficients(
         wavelength,
         shared_te,
         shared_tm);
-    r_te = c_make(shared_te.re, shared_te.im);
-    r_tm = c_make(shared_tm.re, shared_tm.im);
+    r_te = cmath::complex(shared_te.re, shared_te.im);
+    r_tm = cmath::complex(shared_tm.re, shared_tm.im);
 }
 
 __global__ void slab_reflection_accumulate_kernel(
@@ -143,19 +106,19 @@ __global__ void slab_reflection_accumulate_kernel(
     float cell_area,
     const float *__restrict__ tx_pol) {
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
-    const float3 tx_polarization = f3(tx_pol[0], tx_pol[1], tx_pol[2]);
+    const float3 tx_polarization = cmath::vec3(tx_pol[0], tx_pol[1], tx_pol[2]);
     for (int64_t ray = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          ray < ray_count; ray += stride) {
-        float3 origin = f3(ray_o[3*ray], ray_o[3*ray+1], ray_o[3*ray+2]);
-        float3 direction = normalize3(f3(ray_d[3*ray], ray_d[3*ray+1], ray_d[3*ray+2]));
-        float3 vertical = f3(0.0f, 0.0f, 1.0f);
+        float3 origin = cmath::vec3(ray_o[3*ray], ray_o[3*ray+1], ray_o[3*ray+2]);
+        float3 direction = cmath::normalize_rsqrt_safe(cmath::vec3(ray_d[3*ray], ray_d[3*ray+1], ray_d[3*ray+2]));
+        float3 vertical = cmath::vec3(0.0f, 0.0f, 1.0f);
         // R5 polarization consistency: seed the transported field with the
         // UNNORMALIZED transverse projection of the true TX polarization onto
         // the launch direction (short-dipole sin(theta) pattern). No axial-null
         // special case: a zero here is the correct physical null, and |field|^2
         // carries the sin^2(theta) weight to match LoS/diffraction.
-        float3 initial = add3(tx_polarization, scale3(direction, -dot3(tx_polarization, direction)));
-        Complex3 field = {c_make(initial.x, 0.0f), c_make(initial.y, 0.0f), c_make(initial.z, 0.0f)};
+        float3 initial = cmath::add(tx_polarization, cmath::scale(direction, -cmath::dot(tx_polarization, direction)));
+        Complex3 field = {cmath::complex(initial.x, 0.0f), cmath::complex(initial.y, 0.0f), cmath::complex(initial.z, 0.0f)};
 
         for (int depth = 0; depth < contribution_depth; ++depth) {
             const int64_t slot = ray * static_cast<int64_t>(trace_depth) + depth;
@@ -163,25 +126,25 @@ __global__ void slab_reflection_accumulate_kernel(
             const int prim = trace_prim[slot];
             if (prim < 0 || !material_valid[prim]) break;
             const float t_hit = trace_t[slot];
-            float3 hit = add3(origin, scale3(direction, t_hit));
-            float3 normal = normalize3(f3(face_normals[3*prim], face_normals[3*prim+1], face_normals[3*prim+2]));
-            if (dot3(direction, normal) > 0.0f) normal = scale3(normal, -1.0f);
+            float3 hit = cmath::add(origin, cmath::scale(direction, t_hit));
+            float3 normal = cmath::normalize_rsqrt_safe(cmath::vec3(face_normals[3*prim], face_normals[3*prim+1], face_normals[3*prim+2]));
+            if (cmath::dot(direction, normal) > 0.0f) normal = cmath::scale(normal, -1.0f);
 
-            float3 s_hat = cross3(normal, direction);
-            if (dot3(s_hat, s_hat) < 1.0e-12f)
-                s_hat = normalize3(cross3(fabsf(direction.z) < 0.9f ? vertical : f3(0.0f,1.0f,0.0f), direction));
+            float3 s_hat = cmath::cross(normal, direction);
+            if (cmath::dot(s_hat, s_hat) < 1.0e-12f)
+                s_hat = cmath::normalize_rsqrt_safe(cmath::cross(fabsf(direction.z) < 0.9f ? vertical : cmath::vec3(0.0f,1.0f,0.0f), direction));
             else
-                s_hat = normalize3(s_hat);
-            const float3 p_in = normalize3(cross3(s_hat, direction));
-            const float3 reflected = normalize3(add3(direction, scale3(normal, -2.0f*dot3(direction, normal))));
-            const float3 p_out = normalize3(cross3(s_hat, reflected));
+                s_hat = cmath::normalize_rsqrt_safe(s_hat);
+            const float3 p_in = cmath::normalize_rsqrt_safe(cmath::cross(s_hat, direction));
+            const float3 reflected = cmath::normalize_rsqrt_safe(cmath::add(direction, cmath::scale(normal, -2.0f*cmath::dot(direction, normal))));
+            const float3 p_out = cmath::normalize_rsqrt_safe(cmath::cross(s_hat, reflected));
             Complex r_te, r_tm;
-            slab_coefficients(fabsf(dot3(direction, normal)), eta_r[prim], sigma[prim],
+            slab_coefficients(fabsf(cmath::dot(direction, normal)), eta_r[prim], sigma[prim],
                               gain[prim], thickness[prim], wavelength, r_te, r_tm);
-            const Complex e_s = c3_dot(field, s_hat);
-            const Complex e_p = c3_dot(field, p_in);
-            field = c3_add(c3_axis(s_hat, c_mul(r_te, e_s)),
-                           c3_axis(p_out, c_mul(r_tm, e_p)));
+            const Complex e_s = cmath::complex3_dot_real(field, s_hat);
+            const Complex e_p = cmath::complex3_dot_real(field, p_in);
+            field = cmath::complex3_add(cmath::complex3_axis(s_hat, cmath::complex_mul(r_te, e_s)),
+                           cmath::complex3_axis(p_out, cmath::complex_mul(r_tm, e_p)));
             direction = reflected;
             origin = hit;
 
@@ -195,7 +158,7 @@ __global__ void slab_reflection_accumulate_kernel(
                 if (trace_valid[next_slot]) blocker_t = trace_t[next_slot];
             }
             if (!(t_plane > 1.0e-4f && t_plane < blocker_t)) continue;
-            const float3 target = add3(origin, scale3(direction, t_plane));
+            const float3 target = cmath::add(origin, cmath::scale(direction, t_plane));
             float coord0, coord1;
             plane_coords(target, axis, coord0, coord1);
             if (coord0 < coord0_min || coord0 >= coord0_max ||
@@ -204,7 +167,7 @@ __global__ void slab_reflection_accumulate_kernel(
             const int i1 = min(max(static_cast<int>((coord1-coord1_min)/(coord1_max-coord1_min)*resolution1),0),resolution1-1);
             const float norm = (wavelength/(4.0f*kPi))*(wavelength/(4.0f*kPi)) /
                                fmaxf(cell_area, kReflectionEpsilon);
-            const float power = c3_power(field) * solid_angle_per_ray * norm /
+            const float power = cmath::complex3_power(field) * solid_angle_per_ray * norm /
                                 fmaxf(fabsf(axis_direction), kReflectionEpsilon);
             if (power > 0.0f && isfinite(power)) atomicAdd(output + i1*resolution0+i0, power);
         }
@@ -240,23 +203,23 @@ __device__ __forceinline__ ReflectionBounceFrame reflection_bounce_frame(
     int prim,
     float3 direction) {
     ReflectionBounceFrame frame;
-    const float3 vertical = f3(0.0f, 0.0f, 1.0f);
-    frame.normal = normalize3(
-        f3(face_normals[3 * prim], face_normals[3 * prim + 1], face_normals[3 * prim + 2]));
-    if (dot3(direction, frame.normal) > 0.0f)
-        frame.normal = scale3(frame.normal, -1.0f);
-    float3 s_hat = cross3(frame.normal, direction);
-    if (dot3(s_hat, s_hat) < 1.0e-12f)
-        s_hat = normalize3(cross3(
-            fabsf(direction.z) < 0.9f ? vertical : f3(0.0f, 1.0f, 0.0f), direction));
+    const float3 vertical = cmath::vec3(0.0f, 0.0f, 1.0f);
+    frame.normal = cmath::normalize_rsqrt_safe(
+        cmath::vec3(face_normals[3 * prim], face_normals[3 * prim + 1], face_normals[3 * prim + 2]));
+    if (cmath::dot(direction, frame.normal) > 0.0f)
+        frame.normal = cmath::scale(frame.normal, -1.0f);
+    float3 s_hat = cmath::cross(frame.normal, direction);
+    if (cmath::dot(s_hat, s_hat) < 1.0e-12f)
+        s_hat = cmath::normalize_rsqrt_safe(cmath::cross(
+            fabsf(direction.z) < 0.9f ? vertical : cmath::vec3(0.0f, 1.0f, 0.0f), direction));
     else
-        s_hat = normalize3(s_hat);
+        s_hat = cmath::normalize_rsqrt_safe(s_hat);
     frame.s_hat = s_hat;
-    frame.p_in = normalize3(cross3(s_hat, direction));
-    frame.reflected = normalize3(
-        add3(direction, scale3(frame.normal, -2.0f * dot3(direction, frame.normal))));
-    frame.p_out = normalize3(cross3(s_hat, frame.reflected));
-    frame.cos_theta = fabsf(dot3(direction, frame.normal));
+    frame.p_in = cmath::normalize_rsqrt_safe(cmath::cross(s_hat, direction));
+    frame.reflected = cmath::normalize_rsqrt_safe(
+        cmath::add(direction, cmath::scale(frame.normal, -2.0f * cmath::dot(direction, frame.normal))));
+    frame.p_out = cmath::normalize_rsqrt_safe(cmath::cross(s_hat, frame.reflected));
+    frame.cos_theta = fabsf(cmath::dot(direction, frame.normal));
     return frame;
 }
 
@@ -305,21 +268,21 @@ __global__ void slab_reflection_accumulate_backward_kernel(
     const bool need_materials = grad_eta_r != nullptr;
     const bool need_frequency = grad_frequency != nullptr;
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
-    const float3 tx_polarization = f3(tx_pol[0], tx_pol[1], tx_pol[2]);
+    const float3 tx_polarization = cmath::vec3(tx_pol[0], tx_pol[1], tx_pol[2]);
     for (int64_t ray = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          ray < ray_count; ray += stride) {
         // Forward replay of slab_reflection_accumulate_kernel, recording the
         // per-bounce state the reverse sweep needs.
-        float3 origin = f3(ray_o[3*ray], ray_o[3*ray+1], ray_o[3*ray+2]);
-        float3 direction = normalize3(f3(ray_d[3*ray], ray_d[3*ray+1], ray_d[3*ray+2]));
+        float3 origin = cmath::vec3(ray_o[3*ray], ray_o[3*ray+1], ray_o[3*ray+2]);
+        float3 direction = cmath::normalize_rsqrt_safe(cmath::vec3(ray_d[3*ray], ray_d[3*ray+1], ray_d[3*ray+2]));
         // R5: unnormalized transverse projection of the true TX polarization
         // (see the forward kernel). The seed field is a frozen winner of the
         // material/frequency differentiation, but its sin^2(theta) magnitude
         // scales every deposit and hence every gradient, so it must match the
         // forward exactly.
-        float3 initial = add3(tx_polarization, scale3(direction, -dot3(tx_polarization, direction)));
+        float3 initial = cmath::add(tx_polarization, cmath::scale(direction, -cmath::dot(tx_polarization, direction)));
         const Complex3 initial_field = {
-            c_make(initial.x, 0.0f), c_make(initial.y, 0.0f), c_make(initial.z, 0.0f)};
+            cmath::complex(initial.x, 0.0f), cmath::complex(initial.y, 0.0f), cmath::complex(initial.z, 0.0f)};
         Complex3 field = initial_field;
 
         Complex3 field_after[kReflectionAdMaxDepth];
@@ -335,16 +298,16 @@ __global__ void slab_reflection_accumulate_backward_kernel(
             const int prim = trace_prim[slot];
             if (prim < 0 || !material_valid[prim]) break;
             const float t_hit = trace_t[slot];
-            float3 hit = add3(origin, scale3(direction, t_hit));
+            float3 hit = cmath::add(origin, cmath::scale(direction, t_hit));
             const ReflectionBounceFrame frame =
                 reflection_bounce_frame(face_normals, prim, direction);
             Complex r_te, r_tm;
             slab_coefficients(frame.cos_theta, eta_r[prim], sigma[prim],
                               gain[prim], thickness[prim], wavelength, r_te, r_tm);
-            const Complex e_s = c3_dot(field, frame.s_hat);
-            const Complex e_p = c3_dot(field, frame.p_in);
-            field = c3_add(c3_axis(frame.s_hat, c_mul(r_te, e_s)),
-                           c3_axis(frame.p_out, c_mul(r_tm, e_p)));
+            const Complex e_s = cmath::complex3_dot_real(field, frame.s_hat);
+            const Complex e_p = cmath::complex3_dot_real(field, frame.p_in);
+            field = cmath::complex3_add(cmath::complex3_axis(frame.s_hat, cmath::complex_mul(r_te, e_s)),
+                           cmath::complex3_axis(frame.p_out, cmath::complex_mul(r_tm, e_p)));
             dir_in[depth] = direction;
             prim_at[depth] = prim;
             field_after[depth] = field;
@@ -364,7 +327,7 @@ __global__ void slab_reflection_accumulate_backward_kernel(
                 if (trace_valid[next_slot]) blocker_t = trace_t[next_slot];
             }
             if (!(t_plane > 1.0e-4f && t_plane < blocker_t)) continue;
-            const float3 target = add3(origin, scale3(direction, t_plane));
+            const float3 target = cmath::add(origin, cmath::scale(direction, t_plane));
             float coord0, coord1;
             plane_coords(target, axis, coord0, coord1);
             if (coord0 < coord0_min || coord0 >= coord0_max ||
@@ -375,7 +338,7 @@ __global__ void slab_reflection_accumulate_backward_kernel(
                                fmaxf(cell_area, kReflectionEpsilon);
             const float coeff = solid_angle_per_ray * norm /
                                 fmaxf(fabsf(axis_direction), kReflectionEpsilon);
-            const float power = c3_power(field) * coeff;
+            const float power = cmath::complex3_power(field) * coeff;
             if (power > 0.0f && isfinite(power)) {
                 deposit_cell[depth] = i1 * resolution0 + i0;
                 deposit_coeff[depth] = coeff;
@@ -385,7 +348,7 @@ __global__ void slab_reflection_accumulate_backward_kernel(
         // Reverse sweep: fold deposit cotangents into the field chain, pull
         // them through each bounce, and dot the Fresnel cotangents against
         // per-parameter forward duals of the frozen legacy slab response.
-        Complex3 g_field = {c_make(0.0f, 0.0f), c_make(0.0f, 0.0f), c_make(0.0f, 0.0f)};
+        Complex3 g_field = {cmath::complex(0.0f, 0.0f), cmath::complex(0.0f, 0.0f), cmath::complex(0.0f, 0.0f)};
         float g_lambda = 0.0f;
         for (int depth = bounce_count - 1; depth >= 0; --depth) {
             if (deposit_cell[depth] >= 0) {
@@ -394,39 +357,39 @@ __global__ void slab_reflection_accumulate_backward_kernel(
                 const float g_dep = grad_output[i1 * grad_stride0 + i0 * grad_stride1];
                 const float scale = 2.0f * g_dep * deposit_coeff[depth];
                 const Complex3 f = field_after[depth];
-                g_field.x = c_add(g_field.x, c_scale(f.x, scale));
-                g_field.y = c_add(g_field.y, c_scale(f.y, scale));
-                g_field.z = c_add(g_field.z, c_scale(f.z, scale));
+                g_field.x = cmath::complex_add(g_field.x, cmath::complex_scale(f.x, scale));
+                g_field.y = cmath::complex_add(g_field.y, cmath::complex_scale(f.y, scale));
+                g_field.z = cmath::complex_add(g_field.z, cmath::complex_scale(f.z, scale));
                 // The deposit weight carries (lambda / 4 pi)^2: its direct
                 // wavelength derivative is 2 * power / lambda.
-                g_lambda += g_dep * c3_power(f) * deposit_coeff[depth] * 2.0f / wavelength;
+                g_lambda += g_dep * cmath::complex3_power(f) * deposit_coeff[depth] * 2.0f / wavelength;
             }
             const int prim = prim_at[depth];
             const ReflectionBounceFrame frame =
                 reflection_bounce_frame(face_normals, prim, dir_in[depth]);
             const Complex3 field_before =
                 depth == 0 ? initial_field : field_after[depth - 1];
-            const Complex e_s = c3_dot(field_before, frame.s_hat);
-            const Complex e_p = c3_dot(field_before, frame.p_in);
+            const Complex e_s = cmath::complex3_dot_real(field_before, frame.s_hat);
+            const Complex e_p = cmath::complex3_dot_real(field_before, frame.p_in);
             Complex r_te, r_tm;
             slab_coefficients(frame.cos_theta, eta_r[prim], sigma[prim],
                               gain[prim], thickness[prim], wavelength, r_te, r_tm);
             // field_after = s_hat * (r_te * e_s) + p_out * (r_tm * e_p); the
             // axis expansions are real-linear, so their adjoints are the same
             // real-axis dots.
-            const Complex g_w_te = c3_dot(g_field, frame.s_hat);
-            const Complex g_w_tm = c3_dot(g_field, frame.p_out);
+            const Complex g_w_te = cmath::complex3_dot_real(g_field, frame.s_hat);
+            const Complex g_w_tm = cmath::complex3_dot_real(g_field, frame.p_out);
             // Real-pair adjoint of the complex products w = r * e.
-            const Complex g_r_te = c_make(
+            const Complex g_r_te = cmath::complex(
                 g_w_te.r * e_s.r + g_w_te.i * e_s.i,
                 -g_w_te.r * e_s.i + g_w_te.i * e_s.r);
-            const Complex g_r_tm = c_make(
+            const Complex g_r_tm = cmath::complex(
                 g_w_tm.r * e_p.r + g_w_tm.i * e_p.i,
                 -g_w_tm.r * e_p.i + g_w_tm.i * e_p.r);
-            const Complex g_e_s = c_make(
+            const Complex g_e_s = cmath::complex(
                 g_w_te.r * r_te.r + g_w_te.i * r_te.i,
                 -g_w_te.r * r_te.i + g_w_te.i * r_te.r);
-            const Complex g_e_p = c_make(
+            const Complex g_e_p = cmath::complex(
                 g_w_tm.r * r_tm.r + g_w_tm.i * r_tm.i,
                 -g_w_tm.r * r_tm.i + g_w_tm.i * r_tm.r);
             if (need_materials || need_frequency) {
@@ -470,7 +433,7 @@ __global__ void slab_reflection_accumulate_backward_kernel(
                                 adj_dot_local(g_r_tm, dual_tm.d);
                 }
             }
-            g_field = c3_add(c3_axis(frame.s_hat, g_e_s), c3_axis(frame.p_in, g_e_p));
+            g_field = cmath::complex3_add(cmath::complex3_axis(frame.s_hat, g_e_s), cmath::complex3_axis(frame.p_in, g_e_p));
         }
         if (need_frequency && g_lambda != 0.0f) {
             atomicAdd(grad_frequency, g_lambda * wavelength_dfreq);
@@ -512,18 +475,18 @@ __global__ void slab_reflection_accumulate_jvp_kernel(
     float wavelength_tangent,
     const float *__restrict__ tx_pol) {
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
-    const float3 tx_polarization = f3(tx_pol[0], tx_pol[1], tx_pol[2]);
+    const float3 tx_polarization = cmath::vec3(tx_pol[0], tx_pol[1], tx_pol[2]);
     for (int64_t ray = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          ray < ray_count; ray += stride) {
-        float3 origin = f3(ray_o[3*ray], ray_o[3*ray+1], ray_o[3*ray+2]);
-        float3 direction = normalize3(f3(ray_d[3*ray], ray_d[3*ray+1], ray_d[3*ray+2]));
+        float3 origin = cmath::vec3(ray_o[3*ray], ray_o[3*ray+1], ray_o[3*ray+2]);
+        float3 direction = cmath::normalize_rsqrt_safe(cmath::vec3(ray_d[3*ray], ray_d[3*ray+1], ray_d[3*ray+2]));
         // R5: unnormalized transverse projection of the true TX polarization
         // (see the forward kernel). The seed field carries no material/frequency
         // tangent, so d_field starts at zero, but its sin^2(theta) magnitude
         // must match the forward.
-        float3 initial = add3(tx_polarization, scale3(direction, -dot3(tx_polarization, direction)));
-        Complex3 field = {c_make(initial.x, 0.0f), c_make(initial.y, 0.0f), c_make(initial.z, 0.0f)};
-        Complex3 d_field = {c_make(0.0f, 0.0f), c_make(0.0f, 0.0f), c_make(0.0f, 0.0f)};
+        float3 initial = cmath::add(tx_polarization, cmath::scale(direction, -cmath::dot(tx_polarization, direction)));
+        Complex3 field = {cmath::complex(initial.x, 0.0f), cmath::complex(initial.y, 0.0f), cmath::complex(initial.z, 0.0f)};
+        Complex3 d_field = {cmath::complex(0.0f, 0.0f), cmath::complex(0.0f, 0.0f), cmath::complex(0.0f, 0.0f)};
 
         for (int depth = 0; depth < contribution_depth; ++depth) {
             const int64_t slot = ray * static_cast<int64_t>(trace_depth) + depth;
@@ -531,7 +494,7 @@ __global__ void slab_reflection_accumulate_jvp_kernel(
             const int prim = trace_prim[slot];
             if (prim < 0 || !material_valid[prim]) break;
             const float t_hit = trace_t[slot];
-            float3 hit = add3(origin, scale3(direction, t_hit));
+            float3 hit = cmath::add(origin, cmath::scale(direction, t_hit));
             const ReflectionBounceFrame frame =
                 reflection_bounce_frame(face_normals, prim, direction);
             // Primal coefficients from the frozen legacy helper (bit-exact
@@ -548,18 +511,18 @@ __global__ void slab_reflection_accumulate_jvp_kernel(
                 tangent_gain != nullptr ? tangent_gain[prim] : 0.0f,
                 tangent_thickness != nullptr ? tangent_thickness[prim] : 0.0f,
                 wavelength_tangent, dual_te, dual_tm);
-            const Complex d_r_te = c_make(dual_te.d.re, dual_te.d.im);
-            const Complex d_r_tm = c_make(dual_tm.d.re, dual_tm.d.im);
-            const Complex e_s = c3_dot(field, frame.s_hat);
-            const Complex e_p = c3_dot(field, frame.p_in);
-            const Complex d_e_s = c3_dot(d_field, frame.s_hat);
-            const Complex d_e_p = c3_dot(d_field, frame.p_in);
-            const Complex d_w_te = c_add(c_mul(d_r_te, e_s), c_mul(r_te, d_e_s));
-            const Complex d_w_tm = c_add(c_mul(d_r_tm, e_p), c_mul(r_tm, d_e_p));
-            field = c3_add(c3_axis(frame.s_hat, c_mul(r_te, e_s)),
-                           c3_axis(frame.p_out, c_mul(r_tm, e_p)));
-            d_field = c3_add(c3_axis(frame.s_hat, d_w_te),
-                             c3_axis(frame.p_out, d_w_tm));
+            const Complex d_r_te = cmath::complex(dual_te.d.re, dual_te.d.im);
+            const Complex d_r_tm = cmath::complex(dual_tm.d.re, dual_tm.d.im);
+            const Complex e_s = cmath::complex3_dot_real(field, frame.s_hat);
+            const Complex e_p = cmath::complex3_dot_real(field, frame.p_in);
+            const Complex d_e_s = cmath::complex3_dot_real(d_field, frame.s_hat);
+            const Complex d_e_p = cmath::complex3_dot_real(d_field, frame.p_in);
+            const Complex d_w_te = cmath::complex_add(cmath::complex_mul(d_r_te, e_s), cmath::complex_mul(r_te, d_e_s));
+            const Complex d_w_tm = cmath::complex_add(cmath::complex_mul(d_r_tm, e_p), cmath::complex_mul(r_tm, d_e_p));
+            field = cmath::complex3_add(cmath::complex3_axis(frame.s_hat, cmath::complex_mul(r_te, e_s)),
+                           cmath::complex3_axis(frame.p_out, cmath::complex_mul(r_tm, e_p)));
+            d_field = cmath::complex3_add(cmath::complex3_axis(frame.s_hat, d_w_te),
+                             cmath::complex3_axis(frame.p_out, d_w_tm));
             direction = frame.reflected;
             origin = hit;
 
@@ -573,7 +536,7 @@ __global__ void slab_reflection_accumulate_jvp_kernel(
                 if (trace_valid[next_slot]) blocker_t = trace_t[next_slot];
             }
             if (!(t_plane > 1.0e-4f && t_plane < blocker_t)) continue;
-            const float3 target = add3(origin, scale3(direction, t_plane));
+            const float3 target = cmath::add(origin, cmath::scale(direction, t_plane));
             float coord0, coord1;
             plane_coords(target, axis, coord0, coord1);
             if (coord0 < coord0_min || coord0 >= coord0_max ||
@@ -584,7 +547,7 @@ __global__ void slab_reflection_accumulate_jvp_kernel(
                                fmaxf(cell_area, kReflectionEpsilon);
             const float coeff = solid_angle_per_ray * norm /
                                 fmaxf(fabsf(axis_direction), kReflectionEpsilon);
-            const float power = c3_power(field) * coeff;
+            const float power = cmath::complex3_power(field) * coeff;
             if (power > 0.0f && isfinite(power)) {
                 float d_power = 2.0f * (field.x.r * d_field.x.r + field.x.i * d_field.x.i +
                                         field.y.r * d_field.y.r + field.y.i * d_field.y.i +

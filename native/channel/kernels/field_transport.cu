@@ -1,5 +1,5 @@
-// ADR-044 consolidated CUDA translation unit.
-// Physical co-location only: ABI, launches, synchronization, and numerical order are unchanged.
+// Copyright Xingyu Chen.
+// Implements field transport CUDA operations.
 
 // ---- Consolidated from field_transport.cu ----
 #include <ATen/ATen.h>
@@ -8,6 +8,7 @@
 #include <c10/util/complex.h>
 #include "torch_cuda_minimal.h"
 
+#include "math.cuh"
 #include <rayd/shared/rf/field_transport.cuh>
 #include "../tensor_checks.h"
 
@@ -22,10 +23,7 @@ constexpr int kBlockSize = 256;
 namespace field = rayd::shared::utd;
 namespace transport = rayd::shared::rf::field_transport;
 
-__device__ __forceinline__ field::float3a load3(const float* values, int64_t index) {
-    const int64_t base = index * 3;
-    return field::make_f3(values[base], values[base + 1], values[base + 2]);
-}
+
 
 __device__ __forceinline__ c10::complex<float> to_complex(field::Complex value) {
     return c10::complex<float>(value.re, value.im);
@@ -53,13 +51,13 @@ __global__ void free_space_kernel(
     for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count;
          index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
-        const field::float3a source_value = load3(source, index);
-        const field::float3a target_value = load3(target, index);
+        const field::float3a source_value = channel::math::load_field_vec3(source, index);
+        const field::float3a target_value = channel::math::load_field_vec3(target, index);
         const field::float3a offset = field::f3_sub(target_value, source_value);
         const float distance = field::safe_length(offset);
         const field::float3a direction = field::safe_normalize(
             offset, field::make_f3(0.0f, 0.0f, 1.0f));
-        const field::float3a tx_pol = load3(tx_polarization, index);
+        const field::float3a tx_pol = channel::math::load_field_vec3(tx_polarization, index);
         const float wave_number =
             2.0f * field::UTD_PI * frequency_hz / transport::kSpeedOfLight;
         const float source_amplitude = sqrtf(fmaxf(tx_power[index], 0.0f));
@@ -70,7 +68,7 @@ __global__ void free_space_kernel(
         field_vector[base + 1] = to_complex(value.y);
         field_vector[base + 2] = to_complex(value.z);
         const field::Complex scalar = transport::project_receiver(
-            value, direction, load3(rx_polarization, index));
+            value, direction, channel::math::load_field_vec3(rx_polarization, index));
         coefficient[index] = to_complex(scalar);
         const field::Complex received = field::cplx_mul_real(scalar, source_amplitude);
         path_field[index] = to_complex(received);
@@ -100,7 +98,7 @@ __global__ void project_complex3_kernel(
             from_complex(field_vector[base + 2]),
         };
         const field::Complex scalar = transport::project_receiver(
-            value, load3(direction, index), load3(rx_polarization, index));
+            value, channel::math::load_field_vec3(direction, index), channel::math::load_field_vec3(rx_polarization, index));
         coefficient[index] = to_complex(scalar);
         path_gain[index] = field::cplx_abs_sqr(scalar);
     }
@@ -138,7 +136,7 @@ __global__ void reflection_sequence_kernel(
     for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count;
          index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
-        field::float3a previous = load3(source, index);
+        field::float3a previous = channel::math::load_field_vec3(source, index);
         field::float3a first_hit = load_sequence3(
             interaction_positions, index, 0, depth);
         field::float3a incident = field::safe_normalize(
@@ -146,7 +144,7 @@ __global__ void reflection_sequence_kernel(
         // F1: unnormalized transverse projection of the transmit polarization
         // (short-dipole sin(theta) weight); the Jones s/p bases stay orthonormal.
         field::float3a tx_axis = field::project_to_wedge_plane(
-            load3(tx_polarization, index), incident);
+            channel::math::load_field_vec3(tx_polarization, index), incident);
         field::Complex3 value = field::cplx_scale_real(
             tx_axis, field::cplx(1.0f, 0.0f));
         float total_length = 0.0f;
@@ -171,7 +169,7 @@ __global__ void reflection_sequence_kernel(
                 outgoing);
             previous = hit;
         }
-        const field::float3a target_value = load3(target, index);
+        const field::float3a target_value = channel::math::load_field_vec3(target, index);
         const field::float3a final_offset = field::f3_sub(target_value, previous);
         const field::float3a final_direction = field::safe_normalize(
             final_offset, outgoing);
@@ -191,7 +189,7 @@ __global__ void reflection_sequence_kernel(
         field_vector[base + 1] = to_complex(value.y);
         field_vector[base + 2] = to_complex(value.z);
         const field::Complex scalar = transport::project_receiver(
-            value, final_direction, load3(rx_polarization, index));
+            value, final_direction, channel::math::load_field_vec3(rx_polarization, index));
         coefficient[index] = to_complex(scalar);
         const field::Complex received = field::cplx_mul_real(
             scalar, sqrtf(fmaxf(tx_power[index], 0.0f)));
@@ -257,13 +255,13 @@ __global__ void coupled_rd_field_kernel(
     for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count;
          index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
-        const field::float3a src = load3(source, index);
-        const field::float3a dst = load3(target, index);
-        const field::float3a hit = load3(reflection_position, index);
-        const field::float3a normal = load3(reflection_normal, index);
-        const field::float3a edge = load3(edge_position, index);
+        const field::float3a src = channel::math::load_field_vec3(source, index);
+        const field::float3a dst = channel::math::load_field_vec3(target, index);
+        const field::float3a hit = channel::math::load_field_vec3(reflection_position, index);
+        const field::float3a normal = channel::math::load_field_vec3(reflection_normal, index);
+        const field::float3a edge = channel::math::load_field_vec3(edge_position, index);
         const field::float3a edge_axis = field::safe_normalize(
-            load3(edge_direction, index), field::make_f3(0.0f, 0.0f, 1.0f));
+            channel::math::load_field_vec3(edge_direction, index), field::make_f3(0.0f, 0.0f, 1.0f));
         const float wave_number =
             2.0f * field::UTD_PI * frequency_hz / transport::kSpeedOfLight;
 
@@ -288,13 +286,13 @@ __global__ void coupled_rd_field_kernel(
                 src,
                 edge,
                 wave_number,
-                load3(tx_polarization, index));
+                channel::math::load_field_vec3(tx_polarization, index));
         } else {
             const field::float3a source_to_hit = field::safe_normalize(
                 field::f3_sub(hit, src), incident_direction);
             // F1: unnormalized transverse projection of the transmit polarization.
             const field::float3a tx_axis = field::project_to_wedge_plane(
-                load3(tx_polarization, index), source_to_hit);
+                channel::math::load_field_vec3(tx_polarization, index), source_to_hit);
             field::float3a reflected_direction;
             field::Complex3 reflected = transport::reflect_complex3(
                 field::cplx_scale_real(tx_axis, field::cplx(1.0f, 0.0f)),
@@ -322,8 +320,8 @@ __global__ void coupled_rd_field_kernel(
         field::PairInputs pair{};
         pair.edgePos = edge;
         pair.edgeDir = edge_axis;
-        pair.n0 = load3(edge_n0, index);
-        pair.nn = load3(edge_n1, index);
+        pair.n0 = channel::math::load_field_vec3(edge_n0, index);
+        pair.nn = channel::math::load_field_vec3(edge_n1, index);
         pair.wedgeN = exterior_angle[index] / field::UTD_PI;
         // G4: real edge-segment bounds (offsets of the segment endpoints from the
         // passed edge point along edge_axis) so the stationary machinery truncates
@@ -397,7 +395,7 @@ __global__ void coupled_rd_field_kernel(
         field_vector[base + 1] = to_complex(value.y);
         field_vector[base + 2] = to_complex(value.z);
         const field::Complex scalar = transport::project_receiver(
-            value, final_direction, load3(rx_polarization, index));
+            value, final_direction, channel::math::load_field_vec3(rx_polarization, index));
         coefficient[index] = to_complex(scalar);
         const field::Complex received = field::cplx_mul_real(
             scalar, sqrtf(fmaxf(tx_power[index], 0.0f)));
@@ -481,14 +479,14 @@ __global__ void coupled_dd_field_kernel(
     for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count;
          index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
-        const field::float3a src = load3(source, index);
-        const field::float3a dst = load3(target, index);
-        const field::float3a q1 = load3(edge1_position, index);
-        const field::float3a q2 = load3(edge2_position, index);
+        const field::float3a src = channel::math::load_field_vec3(source, index);
+        const field::float3a dst = channel::math::load_field_vec3(target, index);
+        const field::float3a q1 = channel::math::load_field_vec3(edge1_position, index);
+        const field::float3a q2 = channel::math::load_field_vec3(edge2_position, index);
         const field::float3a e1_axis = field::safe_normalize(
-            load3(edge1_direction, index), field::make_f3(0.0f, 0.0f, 1.0f));
+            channel::math::load_field_vec3(edge1_direction, index), field::make_f3(0.0f, 0.0f, 1.0f));
         const field::float3a e2_axis = field::safe_normalize(
-            load3(edge2_direction, index), field::make_f3(0.0f, 0.0f, 1.0f));
+            channel::math::load_field_vec3(edge2_direction, index), field::make_f3(0.0f, 0.0f, 1.0f));
         const float wave_number =
             2.0f * field::UTD_PI * frequency_hz / transport::kSpeedOfLight;
 
@@ -505,8 +503,8 @@ __global__ void coupled_dd_field_kernel(
         field::PairInputs pair1{};
         pair1.edgePos = q1;
         pair1.edgeDir = e1_axis;
-        pair1.n0 = load3(edge1_n0, index);
-        pair1.nn = load3(edge1_n1, index);
+        pair1.n0 = channel::math::load_field_vec3(edge1_n0, index);
+        pair1.nn = channel::math::load_field_vec3(edge1_n1, index);
         pair1.wedgeN = edge1_exterior[index] / field::UTD_PI;
         pair1.edgeLineMin = edge1_line_min[index];
         pair1.edgeLineMax = edge1_line_max[index];
@@ -545,7 +543,7 @@ __global__ void coupled_dd_field_kernel(
             output_edge_basis1);
         pair1.selectStationaryPoint = 1.0f;
         pair1.stationaryExternalIncident = 0.0f;
-        const field::float3a tx_pol = load3(tx_polarization, index);
+        const field::float3a tx_pol = channel::math::load_field_vec3(tx_polarization, index);
         field::MaterialParams material1{};
         // omega < 0 keeps the stored (frozen-at-Keller) slab face operators; the
         // direct incident spherical wave still uses the transmitter polarization.
@@ -569,8 +567,8 @@ __global__ void coupled_dd_field_kernel(
         field::PairInputs pair2{};
         pair2.edgePos = q2;
         pair2.edgeDir = e2_axis;
-        pair2.n0 = load3(edge2_n0, index);
-        pair2.nn = load3(edge2_n1, index);
+        pair2.n0 = channel::math::load_field_vec3(edge2_n0, index);
+        pair2.nn = channel::math::load_field_vec3(edge2_n1, index);
         pair2.wedgeN = edge2_exterior[index] / field::UTD_PI;
         pair2.edgeLineMin = edge2_line_min[index];
         pair2.edgeLineMax = edge2_line_max[index];
@@ -624,7 +622,7 @@ __global__ void coupled_dd_field_kernel(
         field_vector[base + 1] = to_complex(value.y);
         field_vector[base + 2] = to_complex(value.z);
         const field::Complex scalar = transport::project_receiver(
-            value, final_direction, load3(rx_polarization, index));
+            value, final_direction, channel::math::load_field_vec3(rx_polarization, index));
         coefficient[index] = to_complex(scalar);
         const field::Complex received = field::cplx_mul_real(
             scalar, sqrtf(fmaxf(tx_power[index], 0.0f)));

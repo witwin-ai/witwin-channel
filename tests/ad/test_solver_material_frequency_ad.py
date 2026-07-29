@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# AD-1 solver-level tests: material/frequency gradients through solve().
+
 """AD-1 solver-level tests: material/frequency gradients through solve().
 
 Covers the plan 07 section 9.3 cells delivered by AD-1 for D=deterministic and

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Native CUDA/OptiX BDPT Monte Carlo solver with Torch tensor storage.
+
 """Native CUDA/OptiX BDPT Monte Carlo solver with Torch tensor storage.
 
 ``docs/dev/montecarlo/README.md`` holds the ownership contract for

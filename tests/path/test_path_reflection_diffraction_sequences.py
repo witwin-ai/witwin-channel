@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests path reflection diffraction sequences.
+
 import pytest
 import torch
 

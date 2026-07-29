@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Implements mc transmission wall product CUDA operations.
+
 #include "field_transport_ad_common.cuh"
 
 #include <rayd/shared/rf/layer_stack.cuh>

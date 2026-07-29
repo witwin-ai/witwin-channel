@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests los empty space.
+
 import pytest
 import torch
 

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests sampling compat.
+
 from __future__ import annotations
 
 from pathlib import Path

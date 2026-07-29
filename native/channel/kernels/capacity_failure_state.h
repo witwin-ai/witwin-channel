@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Declares capacity failure state native contracts.
+
 #pragma once
 
 #include <ATen/ATen.h>

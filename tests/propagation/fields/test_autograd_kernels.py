@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests autograd kernels.
+
 from __future__ import annotations
 
 import inspect

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests path scattering.
+
 """Path solver export of Kirchhoff scattering paths (plan 05 wave 3).
 
 Scattering paths are INCOHERENT power paths: one path per contributing patch

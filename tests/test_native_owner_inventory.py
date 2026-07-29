@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests native owner inventory.
+
 from __future__ import annotations
 
 import hashlib
@@ -195,6 +198,7 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
     phase10a = migration["phase10a_current"]
     phase10b = migration["phase10b_current"]
     phase11b = migration["phase11b_current"]
+    shared_math = migration["shared_math_current"]
     deleted_bindings = set(phase4["deleted_bindings"])
     approved_deletions = Counter(
         _hash_tuple(entry)
@@ -205,6 +209,7 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
                 + phase8a["approved_phase9_body_hash_deletions"]
                 + phase10a["approved_phase9_body_hash_deletions"]
                 + phase10b["approved_phase9_body_hash_deletions"]
+                + shared_math["approved_phase9_body_hash_deletions"]
         )
     )
     live_transfers = [
@@ -233,6 +238,26 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
         transformation["before"]["name"]
         for transformation in phase11b_transformations
     }
+    shared_math_transformations = shared_math[
+        "approved_phase9_body_hash_transformations"
+    ]
+    shared_math_before = Counter(
+        _hash_tuple(transformation["before"])
+        for transformation in shared_math_transformations
+    )
+    shared_math_after = Counter(
+        _hash_tuple(transformation["after"])
+        for transformation in shared_math_transformations
+    )
+    shared_math_names = {
+        transformation["before"]["name"]
+        for transformation in shared_math_transformations
+    }
+    actual_shared_math = Counter(
+        _hash_tuple(entry)
+        for entry in current_hashes
+        if entry["name"] in shared_math_names
+    )
     # ADR-043 gave the two Channel-owned field transports an optional
     # arrival-direction cotangent input and a direction tangent output. Eight
     # frozen bodies moved and nothing else did, so they are recorded here by
@@ -298,7 +323,29 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
         + phase11b_before
         + compact_count_helper_before
         + adr043_before
+        + shared_math_before
     )
+    assert actual_shared_math == shared_math_after
+    assert shared_math["owner"] == "native/channel/kernels/math.cuh"
+    assert len(shared_math_transformations) == len(shared_math_names) == 1
+    for transformation in shared_math_transformations:
+        assert set(transformation) == {
+            "owner_before",
+            "owner_after",
+            "transformation_kind",
+            "before",
+            "after",
+        }
+        assert set(transformation["before"]) == set(HASH_FIELDS)
+        assert set(transformation["after"]) == set(HASH_FIELDS)
+        assert transformation["before"]["name"] == transformation["after"]["name"]
+        assert (
+            transformation["before"]["signature_sha256"]
+            == transformation["after"]["signature_sha256"]
+        )
+        assert transformation["owner_before"] == transformation["owner_after"] == (
+            "Channel Native"
+        )
     assert actual_adr043 == adr043_after
     assert len(adr043_transformations) == len(adr043_names) == 8
     for transformation in adr043_transformations:

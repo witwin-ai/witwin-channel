@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests accumulation strategy.
+
 import pytest
 import torch
 

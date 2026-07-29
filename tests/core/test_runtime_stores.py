@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests runtime stores.
+
 import importlib.util
 import inspect
 from dataclasses import replace

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests scattering rayd native boundaries.
+
 from __future__ import annotations
 
 import hashlib

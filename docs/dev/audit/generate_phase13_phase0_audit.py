@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Generates audit.
+
 """Generate Plan 13 Phase 0 ownership and integration audit artifacts.
 
 This is a read-only source scanner.  It intentionally does not import the

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Runner-owned release checks from fresh build directories and retained facts.
+
 """Runner-owned release checks from fresh build directories and retained facts."""
 
 from __future__ import annotations

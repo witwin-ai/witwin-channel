@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Shared AD gradient-test tolerances and finite-difference steps.
+
 """Shared AD gradient-test tolerances and finite-difference steps.
 
 Single source of truth for the AD test suite (plan 07 section 9.2). Do not

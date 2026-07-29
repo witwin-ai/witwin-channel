@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Implements bdpt native integration.
+
 #include <torch/extension.h>
 
 #include <array>

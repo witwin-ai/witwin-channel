@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Implements reflection native integration.
+
 #include "resource.h"
 
 #include <cstdint>

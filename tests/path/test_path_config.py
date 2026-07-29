@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests path config.
+
 import pytest
 
 from witwin.channel.path import Config

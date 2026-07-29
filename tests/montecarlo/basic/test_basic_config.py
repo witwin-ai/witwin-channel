@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests basic config.
+
 import pytest
 
 from witwin.channel.montecarlo.basic import Config

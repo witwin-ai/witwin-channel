@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests path array shapes.
+
 import torch
 
 from witwin.channel.path import PathResult, RaggedPathSoA

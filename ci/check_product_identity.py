@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Reject predecessor Channel product identities outside frozen history.
+
 """Reject predecessor Channel product identities outside frozen history."""
 
 from __future__ import annotations

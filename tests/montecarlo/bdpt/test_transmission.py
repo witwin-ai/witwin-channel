@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# BDPT specular transmission: straight endpoint chains plus the.
+
 """BDPT specular transmission: straight endpoint chains plus the
 event-selected shooting sampler for mixed reflection+transmission chains."""
 

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks run empty baseline.
+
 from __future__ import annotations
 
 from dataclasses import replace

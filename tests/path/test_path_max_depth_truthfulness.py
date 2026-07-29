@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests path max depth truthfulness.
+
 import pytest
 from witwin.channel.path import Config
 from witwin.channel.path import _metadata

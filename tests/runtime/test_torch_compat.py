@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests torch compat.
+
 from pathlib import Path
 import tomllib
 from types import SimpleNamespace

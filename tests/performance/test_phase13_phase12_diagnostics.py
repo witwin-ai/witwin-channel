@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests diagnostics performance evidence.
+
 from __future__ import annotations
 
 import numpy as np

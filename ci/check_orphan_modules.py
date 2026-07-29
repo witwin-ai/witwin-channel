@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# Copyright Xingyu Chen.
+# Reject a production module that no declared entry point can reach.
+
 """Reject a production module that no declared entry point can reach.
 
 `check_import_graph` answers "may this module import that one". It cannot

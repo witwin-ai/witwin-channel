@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Implements kirchhoff ensemble.
+
 """Reference Torch Kirchhoff ensemble row physics (ADR-010 op 1).
 
 The previous production per-row physics of

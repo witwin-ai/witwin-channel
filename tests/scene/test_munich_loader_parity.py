@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests munich loader parity.
+
 from witwin.channel.scene.resources import EdgePolicy
 from witwin.core import Scene
 

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests memory guardrails.
+
 import pytest
 import torch
 

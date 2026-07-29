@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests chain kernel contracts.
+
 """Direct contract tests for the ADR-021 chain scattering native symbols.
 
 Covers the six symbols frozen by plan 10a sections 3 and 4:

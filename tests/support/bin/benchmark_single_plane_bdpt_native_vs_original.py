@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Implements benchmark single plane bdpt native vs original.
+
 from __future__ import annotations
 
 import argparse

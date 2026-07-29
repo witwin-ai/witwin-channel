@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests munich ad smoke.
+
 """Real-scene AD smoke (plan 07 AD-4 final gate).
 
 After the analytic fixtures, one reduced-Munich deterministic solve must

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests ad matrix.
+
 """Every Phase-9 consumer AD cell that ADR-043 decided, proved at the boundary.
 
 The survey that opened Phase 9 found 295 consumer cells, 122 of which produced a

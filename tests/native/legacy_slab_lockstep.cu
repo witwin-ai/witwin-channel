@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Exercises legacy slab lockstep native behavior.
+
 #include <rayd/torch/rf/field_transport_ad.cuh>
 
 #include <cuda_runtime.h>

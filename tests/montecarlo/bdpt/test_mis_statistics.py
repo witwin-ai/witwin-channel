@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests mis statistics.
+
 import statistics
 
 import pytest

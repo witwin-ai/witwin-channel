@@ -1,8 +1,9 @@
-// ADR-044 consolidated CUDA translation unit.
-// Physical co-location only: ABI, launches, synchronization, and numerical order are unchanged.
+// Copyright Xingyu Chen.
+// Implements bdpt subpaths CUDA operations.
 
 // ---- Consolidated from bdpt_subpaths.cu ----
 #include "torch_cuda_minimal.h"
+#include "math.cuh"
 
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
@@ -126,37 +127,8 @@ std::vector<at::Tensor> allocate_subpath_state(const at::Tensor& reference, int6
 constexpr float kSubpathEps = 1.0e-9f;
 constexpr float kSubpathEpsilon0 = 8.8541878128e-12f;
 
-struct SubpathComplex {
-    float r;
-    float i;
-};
-
-__device__ SubpathComplex sp_c_make(float r, float i) { return {r, i}; }
-
-__device__ SubpathComplex sp_c_add(SubpathComplex a, SubpathComplex b) { return {a.r + b.r, a.i + b.i}; }
-
-__device__ SubpathComplex sp_c_sub(SubpathComplex a, SubpathComplex b) { return {a.r - b.r, a.i - b.i}; }
-
-__device__ SubpathComplex sp_c_mul(SubpathComplex a, SubpathComplex b) {
-    return {a.r * b.r - a.i * b.i, a.r * b.i + a.i * b.r};
-}
-
-__device__ SubpathComplex sp_c_scale(SubpathComplex a, float s) { return {a.r * s, a.i * s}; }
-
-__device__ SubpathComplex sp_c_div(SubpathComplex a, SubpathComplex b) {
-    const float denom = fmaxf(b.r * b.r + b.i * b.i, kSubpathEps);
-    return {(a.r * b.r + a.i * b.i) / denom, (a.i * b.r - a.r * b.i) / denom};
-}
-
-__device__ SubpathComplex sp_c_sqrt(SubpathComplex z) {
-    const float magnitude = hypotf(z.r, z.i);
-    const float real = sqrtf(fmaxf(0.0f, 0.5f * (magnitude + z.r)));
-    const float imag_sign = z.i < 0.0f ? -1.0f : 1.0f;
-    const float imag = imag_sign * sqrtf(fmaxf(0.0f, 0.5f * (magnitude - z.r)));
-    return {real, imag};
-}
-
-__device__ float sp_c_abs2(SubpathComplex a) { return a.r * a.r + a.i * a.i; }
+using SubpathComplex = channel::math::Complex;
+namespace cmath = channel::math;
 
 /// Effective power reflectance for the fixed x-hat transmit polarization:
 /// |r_te * e_s|^2 + |r_tm * e_p|^2 with e_s/e_p from the transverse-projected
@@ -192,13 +164,13 @@ __device__ float effective_power_reflectance(
     const float cos_theta = fminf(fmaxf(-dot_in, kSubpathEps), 1.0f);
     const float sin2 = fmaxf(0.0f, 1.0f - cos_theta * cos_theta);
     const float omega = fmaxf(static_cast<float>(2.0 * kPi) * frequency_hz, kSubpathEps);
-    const SubpathComplex eta = sp_c_make(fmaxf(eps_r, kSubpathEps), -fmaxf(sigma_e, 0.0f) / (omega * kSubpathEpsilon0));
+    const SubpathComplex eta = cmath::complex(fmaxf(eps_r, kSubpathEps), -fmaxf(sigma_e, 0.0f) / (omega * kSubpathEpsilon0));
     const float mu_value = fmaxf(mu_r, kSubpathEps);
-    const SubpathComplex root = sp_c_sqrt(sp_c_sub(sp_c_scale(eta, mu_value), sp_c_make(sin2, 0.0f)));
-    const SubpathComplex mu_cos = sp_c_make(mu_value * cos_theta, 0.0f);
-    const SubpathComplex eta_cos = sp_c_scale(eta, cos_theta);
-    const SubpathComplex r_te = sp_c_div(sp_c_sub(mu_cos, root), sp_c_add(mu_cos, root));
-    const SubpathComplex r_tm = sp_c_div(sp_c_sub(eta_cos, root), sp_c_add(eta_cos, root));
+    const SubpathComplex root = cmath::complex_sqrt_passive(cmath::complex_sub(cmath::complex_scale(eta, mu_value), cmath::complex(sin2, 0.0f)));
+    const SubpathComplex mu_cos = cmath::complex(mu_value * cos_theta, 0.0f);
+    const SubpathComplex eta_cos = cmath::complex_scale(eta, cos_theta);
+    const SubpathComplex r_te = cmath::complex_div_floor(cmath::complex_sub(mu_cos, root), cmath::complex_add(mu_cos, root), kSubpathEps);
+    const SubpathComplex r_tm = cmath::complex_div_floor(cmath::complex_sub(eta_cos, root), cmath::complex_add(eta_cos, root), kSubpathEps);
 
     // s basis = n x incident; p basis = s x incident.
     float sx = ny * iz - nz * iy;
@@ -207,7 +179,7 @@ __device__ float effective_power_reflectance(
     const float s_len = sqrtf(fmaxf(sx * sx + sy * sy + sz * sz, 0.0f));
     if (s_len <= kSubpathEps) {
         // Normal incidence: r_te == r_tm.
-        return sp_c_abs2(r_te);
+        return cmath::complex_abs2(r_te);
     }
     sx /= s_len;
     sy /= s_len;
@@ -229,7 +201,7 @@ __device__ float effective_power_reflectance(
         e_s = (tx_ * sx + ty * sy + tz * sz) / t_len;
         e_p = (tx_ * px + ty * py + tz * pz) / t_len;
     }
-    return sp_c_abs2(r_te) * e_s * e_s + sp_c_abs2(r_tm) * e_p * e_p;
+    return cmath::complex_abs2(r_te) * e_s * e_s + cmath::complex_abs2(r_tm) * e_p * e_p;
 }
 
 __global__ void bdpt_light_endpoint_subpaths_kernel(
@@ -1222,29 +1194,8 @@ constexpr float kSubpathEpsilon0 = 8.8541878128e-12f;
 // mirrors the primal SubpathComplex operations for lockstep.
 // ---------------------------------------------------------------------------
 
-struct SubC {
-    float r;
-    float i;
-};
-
-__device__ __forceinline__ SubC subc(float r, float i) { return {r, i}; }
-__device__ __forceinline__ SubC subc_add(SubC a, SubC b) { return {a.r + b.r, a.i + b.i}; }
-__device__ __forceinline__ SubC subc_sub(SubC a, SubC b) { return {a.r - b.r, a.i - b.i}; }
-__device__ __forceinline__ SubC subc_mul(SubC a, SubC b) {
-    return {a.r * b.r - a.i * b.i, a.r * b.i + a.i * b.r};
-}
-__device__ __forceinline__ SubC subc_scale(SubC a, float s) { return {a.r * s, a.i * s}; }
-__device__ __forceinline__ SubC subc_div(SubC a, SubC b) {
-    const float denom = fmaxf(b.r * b.r + b.i * b.i, kSubpathEps);
-    return {(a.r * b.r + a.i * b.i) / denom, (a.i * b.r - a.r * b.i) / denom};
-}
-__device__ __forceinline__ SubC subc_sqrt(SubC z) {
-    const float magnitude = hypotf(z.r, z.i);
-    const float real = sqrtf(fmaxf(0.0f, 0.5f * (magnitude + z.r)));
-    const float imag_sign = z.i < 0.0f ? -1.0f : 1.0f;
-    const float imag = imag_sign * sqrtf(fmaxf(0.0f, 0.5f * (magnitude - z.r)));
-    return {real, imag};
-}
+using SubC = channel::math::Complex;
+namespace cmath = channel::math;
 
 struct DualSC {
     SubC v;
@@ -1256,28 +1207,28 @@ __device__ __forceinline__ DualSC dsc_make(float re, float im, float dre, float 
 }
 __device__ __forceinline__ DualSC dsc_const(SubC value) { return {value, {0.0f, 0.0f}}; }
 __device__ __forceinline__ DualSC dsc_add(DualSC a, DualSC b) {
-    return {subc_add(a.v, b.v), subc_add(a.d, b.d)};
+    return {cmath::complex_add(a.v, b.v), cmath::complex_add(a.d, b.d)};
 }
 __device__ __forceinline__ DualSC dsc_sub(DualSC a, DualSC b) {
-    return {subc_sub(a.v, b.v), subc_sub(a.d, b.d)};
+    return {cmath::complex_sub(a.v, b.v), cmath::complex_sub(a.d, b.d)};
 }
 __device__ __forceinline__ DualSC dsc_mul(DualSC a, DualSC b) {
-    return {subc_mul(a.v, b.v), subc_add(subc_mul(a.d, b.v), subc_mul(a.v, b.d))};
+    return {cmath::complex_mul(a.v, b.v), cmath::complex_add(cmath::complex_mul(a.d, b.v), cmath::complex_mul(a.v, b.d))};
 }
 __device__ __forceinline__ DualSC dsc_scale(DualSC a, float s) {
-    return {subc_scale(a.v, s), subc_scale(a.d, s)};
+    return {cmath::complex_scale(a.v, s), cmath::complex_scale(a.d, s)};
 }
 // Dual of subc_div (regularized denom; clamped branch keeps constant denom).
 __device__ __forceinline__ DualSC dsc_div(DualSC a, DualSC b) {
     const float mag2 = b.v.r * b.v.r + b.v.i * b.v.i;
     const float denom = fmaxf(mag2, kSubpathEps);
     DualSC out;
-    out.v = subc_div(a.v, b.v);
+    out.v = cmath::complex_div_floor(a.v, b.v, kSubpathEps);
     const float d_denom = mag2 > kSubpathEps ? 2.0f * (b.v.r * b.d.r + b.v.i * b.d.i) : 0.0f;
     // d(a*conj(b)) = a.d*conj(b) + a.v*conj(b.d)
     const SubC conj_b = {b.v.r, -b.v.i};
     const SubC conj_bd = {b.d.r, -b.d.i};
-    const SubC d_num = subc_add(subc_mul(a.d, conj_b), subc_mul(a.v, conj_bd));
+    const SubC d_num = cmath::complex_add(cmath::complex_mul(a.d, conj_b), cmath::complex_mul(a.v, conj_bd));
     out.d = {
         (d_num.r - out.v.r * d_denom) / denom,
         (d_num.i - out.v.i * d_denom) / denom};
@@ -1286,7 +1237,7 @@ __device__ __forceinline__ DualSC dsc_div(DualSC a, DualSC b) {
 // Dual of subc_sqrt: dw = dz/(2w) (withheld at the branch point).
 __device__ __forceinline__ DualSC dsc_sqrt(DualSC a) {
     DualSC out;
-    out.v = subc_sqrt(a.v);
+    out.v = cmath::complex_sqrt_passive(a.v);
     const float w2 = out.v.r * out.v.r + out.v.i * out.v.i;
     if (w2 <= kSubpathEps) {
         out.d = {0.0f, 0.0f};

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Defines performance benchmark scenarios.
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass

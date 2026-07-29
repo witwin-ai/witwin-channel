@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Checks coverage.
+
 """Enforce the Phase 11 Python coverage policy against Coverage.py JSON."""
 
 from __future__ import annotations

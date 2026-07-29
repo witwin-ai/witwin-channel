@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks solver cold start.
+
 from __future__ import annotations
 
 import argparse

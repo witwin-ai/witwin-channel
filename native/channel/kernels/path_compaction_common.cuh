@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Shares path compaction common CUDA helpers.
+
 #pragma once
 
 #include <c10/cuda/CUDAException.h>

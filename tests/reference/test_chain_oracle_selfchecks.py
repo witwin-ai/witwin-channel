@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests chain oracle selfchecks.
+
 """Self-consistency gates for the ADR-021 chain scattering oracles.
 
 These run WITHOUT the witwin native extension (pure float64 Torch on CPU): they

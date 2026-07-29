@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests reflection integration.
+
 from __future__ import annotations
 
 from types import SimpleNamespace

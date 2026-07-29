@@ -1,5 +1,5 @@
-// ADR-044 consolidated CUDA translation unit.
-// Physical co-location only: ABI, launches, synchronization, and numerical order are unchanged.
+// Copyright Xingyu Chen.
+// Implements los consumer CUDA operations.
 
 // ---- Consolidated from los.cu ----
 #include <ATen/ATen.h>
@@ -1946,6 +1946,7 @@ pybind11::dict channel_consumer_fixed_los_gather_jvp(
 #include <c10/util/complex.h>
 #include "torch_cuda_minimal.h"
 
+#include "math.cuh"
 #include <rayd/shared/rf/field_transport.cuh>
 
 #include "../tensor_checks.h"
@@ -1959,13 +1960,7 @@ constexpr int kJonesBlockSize = 256;
 namespace field = rayd::shared::utd;
 namespace transport = rayd::shared::rf::field_transport;
 
-__device__ __forceinline__ field::float3a load3(
-    const float *values,
-    int64_t row) {
-    const int64_t base = row * 3;
-    return field::make_f3(
-        values[base], values[base + 1], values[base + 2]);
-}
+
 
 __device__ __forceinline__ field::Basis3 endpoint_basis(
     const float *values,
@@ -2026,8 +2021,8 @@ __global__ void consumer_los_jones_kernel(
         CUDA_KERNEL_ASSERT(pair >= 0 && pair < pair_count);
         const int64_t tx = pair % num_tx;
         const int64_t rx = pair / num_tx;
-        const field::float3a source = load3(source_positions, tx);
-        const field::float3a sink = load3(sink_positions, rx);
+        const field::float3a source = channel::math::load_field_vec3(source_positions, tx);
+        const field::float3a sink = channel::math::load_field_vec3(sink_positions, rx);
         const field::float3a direction = field::safe_normalize(
             field::f3_sub(sink, source),
             field::make_f3(0.0f, 0.0f, 1.0f));

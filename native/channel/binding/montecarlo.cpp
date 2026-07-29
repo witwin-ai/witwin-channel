@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Implements montecarlo native integration.
+
 #include <torch/extension.h>
 
 #include "registry.h"

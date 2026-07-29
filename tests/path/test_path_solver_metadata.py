@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests path solver metadata.
+
 import pytest
 import torch
 

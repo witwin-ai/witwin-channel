@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests isb boundary taper.
+
 """ISB boundary taper (ADR-017) LoS-member solver tests.
 
 Gate 1 (OFF bit-identical) is exercised without a build-time baseline by

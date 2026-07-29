@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Rough-surface scattering: discovery, geometry and enumerated orchestration.
+
 """Rough-surface scattering: discovery, geometry and enumerated orchestration.
 
 One concept, one file. This module is the single owner of enumerated

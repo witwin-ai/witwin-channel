@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Shares field wedge ad common CUDA helpers.
+
 #pragma once
 
 #include <ATen/ATen.h>

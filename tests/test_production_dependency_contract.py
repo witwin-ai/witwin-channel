@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests production dependency contract.
+
 from __future__ import annotations
 
 import importlib.util

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Monte Carlo basic primal solver.
+
 """Monte Carlo basic primal solver.
 
 ``docs/dev/montecarlo/README.md`` holds the ownership contract for

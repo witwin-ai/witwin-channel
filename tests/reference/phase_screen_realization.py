@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Implements phase screen realization.
+
 """Reference Torch realization-coherent patch-integral total (ADR-010 op 2).
 
 The previous production per-row assembly and host per-patch loop of

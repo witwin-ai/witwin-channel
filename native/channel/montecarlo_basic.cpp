@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Implements montecarlo basic native integration.
+
 #include <torch/extension.h>
 #include "tensor_checks.h"
 #include <vector>

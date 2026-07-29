@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Native material kernel facades.
+
 """Native material kernel facades.
 
 Thin facades over the ``_channel`` material ABI: CSR layer-store validation,

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests solver pipeline boundaries.
+
 from __future__ import annotations
 
 import ast

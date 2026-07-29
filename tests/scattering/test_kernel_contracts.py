@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests kernel contracts.
+
 from __future__ import annotations
 
 

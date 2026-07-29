@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Select an explicit development extension for tests and benchmarks.
+
 """Select an explicit development extension for tests and benchmarks.
 
 The extensions live in out-of-tree CMake build directories under

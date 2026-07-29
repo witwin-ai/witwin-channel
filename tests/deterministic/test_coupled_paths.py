@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests coupled paths.
+
 """Deterministic coupled reflection-diffraction paths (ADR-011).
 
 Kernel-behaviour tests: they need the rebuilt native extension whose flat

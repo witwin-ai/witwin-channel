@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests basic solver smoke.
+
 import sys
 
 import pytest

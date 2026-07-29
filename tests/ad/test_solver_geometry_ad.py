@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# AD-2/AD-4 solver-level tests: TX/RX position and mesh-vertex gradients.
+
 """AD-2/AD-4 solver-level tests: TX/RX position and mesh-vertex gradients.
 
 Covers the plan 07 section 9.3 geometry cells for D=deterministic and P=path:

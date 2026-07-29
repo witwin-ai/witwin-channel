@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests basic parity small scene.
+
 import pytest
 import torch
 

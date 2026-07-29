@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests diffraction owner.
+
 from __future__ import annotations
 
 import ast

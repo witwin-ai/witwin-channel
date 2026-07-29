@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests path canonical selection.
+
 import pytest
 import torch
 

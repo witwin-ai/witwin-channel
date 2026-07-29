@@ -7,7 +7,7 @@ standalone CMake (Ninja, Release, `CMAKE_CUDA_ARCHITECTURES=120`).
 ## 1. Defect
 
 `EndpointBatch.powers_w` is required for a source batch
-(`propagation/consumer/contracts.py`), reaches
+(`witwin/channel/propagation/consumer.py`), reaches
 `EnumeratedEndpointTensors.tx_power` and then every field kernel, and could
 not change any value the consumer published. Measured before the change
 (source at P=1 W versus P=4 W, identical geometry, depths 0 and 1):
@@ -21,7 +21,7 @@ reevaluate |coefficient| ratio : [1.0, 1.0]   expected 2.0
 
 Not a selection bug and not a regression. The field transport kernels publish
 both families on one launch
-(`native/channel/kernels/field_transport.cu:1222-1230`):
+(`native/channel/kernels/field_transport.cu`):
 
 ```text
 field_vector = carrier * tx_axis              unit excitation
@@ -33,7 +33,7 @@ path_gain    = |path_field|^2                 excited
 The consumer selected the unit-excitation pair, deliberately: the same commit
 that introduced the selection (`88f8a35`) also wrote the "for unit source
 amplitude" sentence into ADR-034 and the contract doc, and
-`propagation/fields/evaluation.py` divides `sqrt(tx_power)` back out of the
+`witwin/channel/propagation/fields.py` divides `sqrt(tx_power)` back out of the
 already-powered diffraction field to keep `PathFields.coefficient`
 unit-excitation. The convention was real; the defect was that a required
 input had no effect and that two published surfaces on one contract disagreed

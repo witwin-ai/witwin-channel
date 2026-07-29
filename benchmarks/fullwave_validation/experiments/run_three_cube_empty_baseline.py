@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Empty-scene calibration pair for the ``three_cube_320`` case.
+
 """Empty-scene calibration pair for the ``three_cube_320`` case.
 
 Runs the deterministic LoS-only solve and the witwin-maxwell FDTD on the same

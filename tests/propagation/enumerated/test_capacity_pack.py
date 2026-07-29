@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests capacity pack.
+
 from __future__ import annotations
 
 from pathlib import Path

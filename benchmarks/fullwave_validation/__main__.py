@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Runs the fullwave validation command-line entry point.
+
 from .cli import main
 
 

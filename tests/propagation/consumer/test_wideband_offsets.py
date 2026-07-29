@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests wideband offsets.
+
 """Wideband frequency offsets on the fixed-topology consumer route (ADR-042).
 
 Version 4 published one coefficient at the compiled reference frequency and a

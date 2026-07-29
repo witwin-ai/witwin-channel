@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests rayd reflection contract.
+
 import pytest
 import torch
 

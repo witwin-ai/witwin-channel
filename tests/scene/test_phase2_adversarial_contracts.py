@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests adversarial contracts.
+
 from __future__ import annotations
 
 import importlib

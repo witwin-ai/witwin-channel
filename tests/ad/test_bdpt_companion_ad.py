@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests bdpt companion ad.
+
 """ADR-022 per-op lockstep: BDPT AD companions vs the float64 Torch oracles.
 
 Each of the six BDPT-owned forward operations (plan 10a section 6) gains a native

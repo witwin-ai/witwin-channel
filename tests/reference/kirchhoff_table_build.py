@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Implements kirchhoff table build.
+
 """Reference float64 Torch Kirchhoff table build (ADR-015 Part C oracle).
 
 A self-contained, fully differentiable Torch re-derivation of

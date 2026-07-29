@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Gate exact-token duplicate regions against the classification ledger.
+
 """Gate exact-token duplicate regions against the classification ledger.
 
 The gate recomputes the duplicate-region report from the working tree and

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# witwin-maxwell FDTD reference for the Yee-locked ``three_cube_320`` case.
+
 """witwin-maxwell FDTD reference for the Yee-locked ``three_cube_320`` case.
 
 Mirrors ``run_maxwell_single_cube.py``: PEC cubes are voxelized with infinite

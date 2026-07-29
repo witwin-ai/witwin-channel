@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests time varying cir.
+
 """The time-varying channel impulse response consumer (ADR-041).
 
 A pair's ``delay_s`` and transport already were its impulse response; what was

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests chain scattering ad.
+
 """AD lockstep for the ADR-021 chain scattering ops (plan 10a s3/s4).
 
 Native float32 companions of Op A (``scattering_chain_ensemble_eval``, power)

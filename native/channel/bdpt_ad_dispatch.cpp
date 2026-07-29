@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Implements bdpt ad dispatch native integration.
+
 #include <torch/extension.h>
 
 #include <utility>

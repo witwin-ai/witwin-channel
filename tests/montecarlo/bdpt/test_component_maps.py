@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests component maps.
+
 import pytest
 import torch
 

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests native resources.
+
 from __future__ import annotations
 
 import ast

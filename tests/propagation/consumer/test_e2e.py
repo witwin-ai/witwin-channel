@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests e2e.
+
 from __future__ import annotations
 
 import pytest

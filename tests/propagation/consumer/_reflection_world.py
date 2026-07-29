@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Shared worlds for the fixed-topology reflection consumer tests.
+
 """Shared worlds for the fixed-topology reflection consumer tests.
 
 The single smooth wall is the reference world. The rest exist because a

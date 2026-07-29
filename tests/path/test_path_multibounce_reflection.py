@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests path multibounce reflection.
+
 import pytest
 import torch
 

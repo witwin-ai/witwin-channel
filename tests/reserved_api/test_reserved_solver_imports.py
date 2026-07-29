@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests reserved solver imports.
+
 def test_reserved_solver_packages_import():
     import witwin.channel.deterministic as deterministic
     import witwin.channel.montecarlo.bdpt as bdpt

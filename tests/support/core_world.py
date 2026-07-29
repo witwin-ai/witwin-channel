@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Implements core world.
+
 from __future__ import annotations
 
 import torch

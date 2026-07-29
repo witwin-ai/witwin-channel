@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Strict worker validation, statistics, correctness, and resource gates.
+
 """Strict worker validation, statistics, correctness, and resource gates."""
 
 from __future__ import annotations

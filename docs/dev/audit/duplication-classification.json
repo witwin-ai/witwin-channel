@@ -294,21 +294,6 @@
       "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
       "token_count": 134
     },
-    "20469b8ba1e2057d": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "deterministic.cu"
-      ],
-      "lockstep_tests": [
-        "tests/test_native_owner_inventory.py",
-        "tests/ad/test_deterministic_accum_ad.py"
-      ],
-      "owner": "deterministic-field",
-      "provenance": "ADR-044 full current-tree refresh",
-      "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
-      "token_count": 157
-    },
     "2452c606f1151c92": {
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
@@ -323,22 +308,6 @@
       "provenance": "ADR-044 full current-tree refresh",
       "reason": "Deterministic double-precision accumulation; reduction order must not change.",
       "token_count": 102
-    },
-    "24a9b2a79222fdd8": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "field_transport.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "propagation.fields",
-      "provenance": "ADR-044 full current-tree refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 162
     },
     "24ac75de500e84ef": {
       "category": "numeric_sensitive_exempt",
@@ -651,22 +620,6 @@
       "provenance": "ADR-044 full current-tree refresh",
       "token_count": 124
     },
-    "5a869cd26cfde7b0": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "diffraction.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "propagation.fields",
-      "provenance": "ADR-044 full current-tree refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 115
-    },
     "5b13f8cb8d030e64": {
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
@@ -878,22 +831,6 @@
       "provenance": "ADR-044 full current-tree refresh",
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 340
-    },
-    "704e20e8bd10c483": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "reflection.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "propagation.fields",
-      "provenance": "ADR-044 full current-tree refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 140
     },
     "715e1903cf45425d": {
       "category": "numeric_sensitive_exempt",
@@ -1233,17 +1170,6 @@
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 108
     },
-    "9784fbe2276bac31": {
-      "category": "other",
-      "owner": "path and deterministic topology",
-      "reason": "Co-located provenance sections retain repeated include and namespace prologues so each moved owner remains auditable.",
-      "corpus": "native",
-      "files": [
-        "path_topology.cu"
-      ],
-      "provenance": "ADR-044 full current-tree refresh",
-      "token_count": 129
-    },
     "99d66c5a4047c077": {
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
@@ -1421,22 +1347,6 @@
       "provenance": "ADR-044 full current-tree refresh",
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 124
-    },
-    "ae6c3286b7940564": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "reflection.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "propagation.fields",
-      "provenance": "ADR-044 full current-tree refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 166
     },
     "aea7560c3511850d": {
       "category": "numeric_sensitive_exempt",
@@ -1617,21 +1527,6 @@
       "provenance": "ADR-044 full current-tree refresh",
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 112
-    },
-    "c054ffde843f8e08": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "reflection.cu"
-      ],
-      "lockstep_tests": [
-        "tests/test_native_owner_inventory.py",
-        "tests/ad/test_mc_basic_ad.py"
-      ],
-      "owner": "montecarlo-basic-reflection",
-      "provenance": "ADR-044 full current-tree refresh",
-      "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
-      "token_count": 312
     },
     "c45fcff4c3314070": {
       "category": "other",
@@ -2007,22 +1902,6 @@
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 136
     },
-    "f34ec15d3420e882": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "field_transport.cu",
-        "field_wedge_coupled.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_solver_diffraction_coupled_ad.py",
-        "tests/test_native_owner_inventory.py"
-      ],
-      "owner": "field-transport",
-      "provenance": "ADR-044 full current-tree refresh",
-      "reason": "Coupled double-diffraction primal kernel and its AD dual mirror share pair setup and index bookkeeping in lockstep (ADR-013 D4); the floating-point physics lives in the shared RayD header.",
-      "token_count": 309
-    },
     "f4cacba1764ffda8": {
       "category": "indexing_packing",
       "corpus": "native",
@@ -2124,6 +2003,142 @@
       "provenance": "ADR-044 zero-symbol-debt refresh",
       "reason": "The MC and BDPT receiver-grid facades repeat scalar ABI argument packing and result type validation for distinct native symbols; no production numerical fallback.",
       "token_count": 117
+    },
+    "69c2184ee056b9bc": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "deterministic.cu"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/ad/test_deterministic_accum_ad.py"
+      ],
+      "owner": "deterministic-field",
+      "provenance": "shared math consolidation refresh",
+      "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
+      "token_count": 167
+    },
+    "a1f7f77a0ec6237d": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "shared math consolidation refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 166
+    },
+    "ca1af73e66c26344": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "diffraction.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "shared math consolidation refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 142
+    },
+    "6ff2871dfc710a7f": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "reflection.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "shared math consolidation refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 144
+    },
+    "9a34ae6cc26abe50": {
+      "category": "other",
+      "owner": "path and deterministic topology",
+      "reason": "Co-located provenance sections retain repeated include and namespace prologues so each moved owner remains auditable.",
+      "corpus": "native",
+      "files": [
+        "path_topology.cu"
+      ],
+      "provenance": "shared math consolidation refresh",
+      "token_count": 132
+    },
+    "adf26de6db83b6b2": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "reflection.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "owner": "propagation.fields",
+      "provenance": "shared math consolidation refresh",
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "token_count": 180
+    },
+    "74a02fb0e47de757": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "reflection.cu"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/ad/test_mc_basic_ad.py"
+      ],
+      "owner": "montecarlo-basic-reflection",
+      "provenance": "shared math consolidation refresh",
+      "reason": "Fixed-topology primal/AD field math kept duplicated to preserve floating-point evaluation order.",
+      "token_count": 318
+    },
+    "e301ba7c78570825": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "field_transport.cu",
+        "field_wedge_coupled.cu"
+      ],
+      "lockstep_tests": [
+        "tests/ad/test_solver_diffraction_coupled_ad.py",
+        "tests/test_native_owner_inventory.py"
+      ],
+      "owner": "field-transport",
+      "provenance": "shared math consolidation refresh",
+      "reason": "Coupled double-diffraction primal kernel and its AD dual mirror share pair setup and index bookkeeping in lockstep (ADR-013 D4); the floating-point physics lives in the shared RayD header.",
+      "token_count": 317
+    },
+    "b7f3152cc367a589": {
+      "category": "numeric_sensitive_exempt",
+      "corpus": "native",
+      "files": [
+        "deterministic.cu"
+      ],
+      "lockstep_tests": [
+        "tests/test_native_owner_inventory.py",
+        "tests/ad/test_deterministic_accum_ad.py"
+      ],
+      "owner": "deterministic-field",
+      "provenance": "shared math consolidation refresh",
+      "reason": "Fixed-topology reflection kernels keep repeated launch and field setup to preserve floating-point evaluation order.",
+      "token_count": 103
     }
   },
   "schema_version": 1,
@@ -2242,5 +2257,14 @@
     "region_count": 152,
     "status": "all current regions classified; no stale entries; frozen coverage budget unchanged; single-definition recorded debt is zero",
     "note": "Full current-tree refresh after the 45-to-15 native translation-unit consolidation and repayment of the remaining 19 hand-rolled native-symbol probes; every file field was regenerated from current occurrences."
+  },
+  "shared_math_refresh": {
+    "combined_duplicate_lines": 8295,
+    "combined_total_lines": 91092,
+    "coverage_percent": 9.106178,
+    "frozen_coverage_percent": 10.211512,
+    "note": "Shared vector and complex primitives removed file-local helpers; changed region ids were reclassified without weakening the frozen budget.",
+    "region_count": 153,
+    "status": "all current regions classified and duplicate coverage remains below the frozen budget"
   }
 }

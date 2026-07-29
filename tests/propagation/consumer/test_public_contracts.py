@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests public contracts.
+
 from __future__ import annotations
 
 import importlib

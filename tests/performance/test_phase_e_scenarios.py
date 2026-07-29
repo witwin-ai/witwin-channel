@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests performance scenario definitions.
+
 from __future__ import annotations
 
 import json

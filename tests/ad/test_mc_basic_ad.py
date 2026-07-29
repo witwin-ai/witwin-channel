@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# AD-3 solver-level tests: montecarlo.basic real power-map gradients.
+
 """AD-3 solver-level tests: montecarlo.basic real power-map gradients.
 
 The M column of the plan 07 section 9.3 matrix. Unlike deterministic/path,

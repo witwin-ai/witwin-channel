@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Declares tensor checks native contracts.
+
 #pragma once
 
 #include "kernels/torch_cuda_minimal.h"

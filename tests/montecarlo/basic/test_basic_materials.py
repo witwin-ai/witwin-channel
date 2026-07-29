@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests basic materials.
+
 from __future__ import annotations
 
 import pytest

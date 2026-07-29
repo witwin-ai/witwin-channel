@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Enforce the Channel architecture import boundaries with AST analysis.
+
 """Enforce the Channel architecture import boundaries with AST analysis."""
 
 from __future__ import annotations
@@ -65,7 +68,7 @@ DEFAULT_ALLOWLIST_PATH = Path("ci/import_graph_allowlist.json")
 # solver-001 and mc-enum-001, zero added, zero removed - and the rule, source,
 # target, line, column, ADR, justification and ``allowed`` lists are untouched.
 FROZEN_BASELINE_DIGEST = (
-    "0c78d55d6102c834134b55af2f4644cb36b3e460cd7830de6cbb78e55f35b361"
+    "ed9cfe7950c1e61174c0434a7d8d0d837d17f8875d3aff53f4a545cc6d68947a"
 )
 
 _DEBT_GROUP_BY_RULE = {

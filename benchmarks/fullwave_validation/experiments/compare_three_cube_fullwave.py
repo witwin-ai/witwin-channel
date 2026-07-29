@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Coupled-OFF / coupled-ON versus FDTD comparison for ``three_cube_320``.
+
 """Coupled-OFF / coupled-ON versus FDTD comparison for ``three_cube_320``.
 
 Loads the witwin-maxwell FDTD reference, the empty-scene calibration pair, and

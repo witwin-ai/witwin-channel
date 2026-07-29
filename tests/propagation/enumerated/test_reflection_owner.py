@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests reflection owner.
+
 from __future__ import annotations
 
 import ast

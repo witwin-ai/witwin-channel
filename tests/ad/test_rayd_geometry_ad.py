@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# AD-A0: RayD fixed-winner geometry JVP/VJP versus central finite differences.
+
 """AD-A0: RayD fixed-winner geometry JVP/VJP versus central finite differences.
 
 Small analytic scenes (a tilted triangle, a quad wall) exercised through the

@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests hot path contract.
+
 import pytest
 import torch
 

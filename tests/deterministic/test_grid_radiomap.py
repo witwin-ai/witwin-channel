@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests grid radiomap.
+
 import pytest
 import torch
 

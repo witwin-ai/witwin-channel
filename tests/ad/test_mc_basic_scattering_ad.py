@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests mc basic scattering ad.
+
 """ADR-015 Part A: montecarlo.basic Kirchhoff scattering-map gradients.
 
 The MC-basic scattering radiomap is an area-sampling estimator whose only

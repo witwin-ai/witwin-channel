@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks statistical acceptance behavior.
+
 from __future__ import annotations
 
 # ruff: noqa: E402 -- source/build paths must be injected before project imports

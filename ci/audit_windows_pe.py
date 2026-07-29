@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Supports audit windows pe tooling.
+
 from __future__ import annotations
 
 import argparse

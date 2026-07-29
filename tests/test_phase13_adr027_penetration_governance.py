@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests penetration governance.
+
 from __future__ import annotations
 
 import json
@@ -127,14 +130,14 @@ def test_phase_p_live_duplication_refresh_is_closed_without_budget_relaxation() 
             "acceptance remains met"
         ),
     }
-    current = duplication["adr044_refresh"]
-    assert len(duplication["regions"]) == current["region_count"] == 152
-    assert current["coverage_percent"] == 9.090609
-    assert current["combined_total_lines"] == 90962
+    current = duplication["shared_math_refresh"]
+    assert len(duplication["regions"]) == current["region_count"] == 153
+    assert current["coverage_percent"] == 9.106178
+    assert current["combined_total_lines"] == 91092
     assert current["coverage_percent"] < current["frozen_coverage_percent"]
     assert current["status"] == (
-        "all current regions classified; no stale entries; frozen coverage "
-        "budget unchanged; single-definition recorded debt is zero"
+        "all current regions classified and duplicate coverage remains below "
+        "the frozen budget"
     )
     assert refresh["coverage_percent"] < refresh["frozen_coverage_percent"]
     assert duplication["phase11a_refresh"]["region_count"] == 155

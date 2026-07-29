@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests public api snapshot.
+
 from __future__ import annotations
 
 import hashlib

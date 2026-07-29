@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Benchmarks deterministic radiomap.
+
 from __future__ import annotations
 
 import argparse

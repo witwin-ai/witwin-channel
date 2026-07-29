@@ -1,3 +1,6 @@
+// Copyright Xingyu Chen.
+// Implements build info native integration.
+
 #include <torch/extension.h>
 
 #include <torch/cuda.h>

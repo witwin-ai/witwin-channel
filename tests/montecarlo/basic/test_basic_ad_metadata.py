@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests basic ad metadata.
+
 import pytest
 import torch
 

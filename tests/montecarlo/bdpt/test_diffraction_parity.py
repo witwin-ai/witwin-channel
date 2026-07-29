@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests diffraction parity.
+
 """ADR-018 acceptance: BDPT standalone diffraction parity with deterministic.
 
 Ported from artifacts/ws1-alignment/spot_check2.py. Before ADR-018 the BDPT

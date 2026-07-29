@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests scattering ensemble eval.
+
 """Lockstep and contract tests for ADR-010 op 1 (Kirchhoff ensemble rows)."""
 
 import pytest

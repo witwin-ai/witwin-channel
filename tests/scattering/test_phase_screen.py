@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests phase screen.
+
 """Phase-screen runtime vs the CPU complex128 oracle.
 
 The runtime samples heights from a texture (bilinear, edge clamp) and

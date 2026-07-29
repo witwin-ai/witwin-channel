@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests benchmark diffraction selector.
+
 from __future__ import annotations
 
 import argparse

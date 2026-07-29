@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Validate public/API native contracts, live E2E, and dormant caller-zero rows.
+
 """Validate public/API native contracts, live E2E, and dormant caller-zero rows."""
 
 from __future__ import annotations

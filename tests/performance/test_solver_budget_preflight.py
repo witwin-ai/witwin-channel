@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests solver budget preflight.
+
 from __future__ import annotations
 
 import importlib

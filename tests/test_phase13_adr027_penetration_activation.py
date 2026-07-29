@@ -1,3 +1,6 @@
+# Copyright Xingyu Chen.
+# Tests penetration activation.
+
 from __future__ import annotations
 
 import json
