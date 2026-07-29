@@ -15,10 +15,21 @@ from pathlib import Path
 
 import torch
 
-from witwin.channel.scene import compile as compile_scene
-from witwin.channel.scene.compiler import clear_compile_cache
-from witwin.core import AntennaState, Mesh, PhysicalMaterial, Scene, Structure
-from witwin.core.identity import reserve_antenna_id
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+
+from witwin.channel.scene import (  # noqa: E402
+    clear_compile_cache,
+    compile as compile_scene,
+)
+from witwin.core import (  # noqa: E402
+    AntennaState,
+    Mesh,
+    PhysicalMaterial,
+    Scene,
+    Structure,
+)
+from witwin.core.identity import reserve_antenna_id  # noqa: E402
 
 SCHEMA_NAME = "witwin.channel.compile_scaling"
 SCHEMA_VERSION = "1.0.0"

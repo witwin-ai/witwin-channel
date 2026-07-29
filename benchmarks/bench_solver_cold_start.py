@@ -13,6 +13,7 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+REFERENCE_FREQUENCY_HZ = 3.0e9
 
 
 def _child(solver: str) -> dict[str, Any]:
@@ -25,6 +26,7 @@ def _child(solver: str) -> dict[str, Any]:
     inject_native_paths()
     import_started = time.perf_counter()
     import witwin.channel  # noqa: F401
+    from witwin.channel.scene import compile as compile_scene
 
     import_ms = (time.perf_counter() - import_started) * 1000.0
     from tests.support.scenes import same_side_wall_reflection_scene
@@ -35,12 +37,12 @@ def _child(solver: str) -> dict[str, Any]:
     torch.cuda.synchronize()
     optix_free_before, device_total = torch.cuda.mem_get_info()
     optix_started = time.perf_counter()
-    scene.rayd_scene()
+    compile_scene(scene, reference_frequency_hz=REFERENCE_FREQUENCY_HZ)
     torch.cuda.synchronize()
     optix_scene_build_ms = (time.perf_counter() - optix_started) * 1000.0
     optix_free_after, _ = torch.cuda.mem_get_info()
     compile_started = time.perf_counter()
-    scene.compile()
+    compile_scene(scene, reference_frequency_hz=REFERENCE_FREQUENCY_HZ)
     torch.cuda.synchronize()
     scene_compile_ms = (time.perf_counter() - compile_started) * 1000.0
 
@@ -68,7 +70,11 @@ def _child(solver: str) -> dict[str, Any]:
         raise ValueError(f"unknown solver: {solver}")
 
     def operation():
-        return solve_fn(scene, config)
+        return solve_fn(
+            scene,
+            config,
+            reference_frequency_hz=REFERENCE_FREQUENCY_HZ,
+        )
 
     torch.cuda.reset_peak_memory_stats()
     solve_started = time.perf_counter()
