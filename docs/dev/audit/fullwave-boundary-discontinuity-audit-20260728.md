@@ -50,7 +50,7 @@ RayD:
   `sin(theta)`, axial null, Dual `cos(theta)` tangent, the removed Mend cutoff,
   and the existing native JVP/VJP contraction test.
 - `test_cuda_multipath_parity`: 5/5 pass.
-- Correctly isolated API6 full unittest discovery: 160 run, 19 explicit external
+- Correctly isolated API6 Torch unittest discovery: 146 run, 19 explicit external
   parity skips, zero failures/errors.
 
 Channel regression evidence from the clean implementation lineage:
