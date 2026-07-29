@@ -13,6 +13,6 @@
     "distribution": "rayd-torch",
     "distribution_version": "0.7.0",
     "metadata_path": "rayd/torch/_source/rayd-source.json",
-    "manifest_sha256": "b959e60ec986ad17eb7e2d9298580874dd58675fe69b04d31f68e69ece8444c2"
+    "manifest_sha256": "61af830bfa98d7806aaf2eaa171890623f86ad99c36ca7927d26c359d718acfb"
   }
 }
