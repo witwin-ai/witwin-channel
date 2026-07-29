@@ -7,10 +7,12 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
+import torch
 
 from benchmarks.fullwave_validation.backends import (
     build_tidy3d_simulation,
     extract_tidy3d_field_map,
+    solve_deterministic,
 )
 from benchmarks.fullwave_validation.metrics import (
     analyze_boundaries,
@@ -144,6 +146,10 @@ def test_channel_scene_matches_case_geometry_and_material(scenario, cube_count, 
     )
     assert isinstance(receivers[0], ReceiverGrid)
     assert receivers[0].shape == (spec.x.size, spec.y.size)
+    assert receivers[0].origin.dtype == torch.float32
+    assert receivers[0].x_axis.dtype == torch.float32
+    assert receivers[0].y_axis.dtype == torch.float32
+    assert receivers[0].polarization.dtype == torch.float32
     assert all(
         isinstance(structure.material, PhysicalMaterial)
         for structure in scene.structures
@@ -155,6 +161,40 @@ def test_channel_scene_matches_case_geometry_and_material(scenario, cube_count, 
         )
     else:
         assert all(structure.material.layers for structure in scene.structures)
+
+
+def test_deterministic_backend_passes_explicit_reference_frequency(monkeypatch):
+    import witwin.channel.deterministic as deterministic_module
+
+    spec = replace(load_case("single_cube", "metal"), receiver_shape=(3, 2))
+    sentinel_scene = object()
+    observed: dict[str, object] = {}
+
+    class Result:
+        field = torch.zeros((1, spec.y.size, spec.x.size), dtype=torch.complex64)
+        component_fields: dict[str, torch.Tensor] = {}
+        metadata = {"counts": {"path_count": 0}}
+
+    def fake_solve(scene, config, *, reference_frequency_hz):
+        observed["scene"] = scene
+        observed["config"] = config
+        observed["reference_frequency_hz"] = reference_frequency_hz
+        return Result()
+
+    monkeypatch.setattr(
+        "benchmarks.fullwave_validation.backends.build_channel_scene",
+        lambda _spec: sentinel_scene,
+    )
+    monkeypatch.setattr(deterministic_module, "solve", fake_solve)
+
+    result = solve_deterministic(spec)
+
+    assert observed["scene"] is sentinel_scene
+    assert observed["reference_frequency_hz"] == spec.frequency_hz
+    assert observed["config"].isb_boundary_taper is False
+    assert result.field.shape == (spec.y.size, spec.x.size)
+    assert result.metadata["isb_boundary_taper"] is False
+    assert result.metadata["isb_boundary_taper_effective_width"] == 0.0
 
 
 def test_tidy3d_scene_uses_true_pec_and_dielectric_volumes():
@@ -244,13 +284,24 @@ def test_field_map_npz_round_trip(tmp_path):
     assert restored.metadata == original.metadata
 
 
-def test_three_cube_deterministic_plot_draws_scene_and_writes_png(tmp_path):
+def test_three_cube_deterministic_plot_draws_scene_and_writes_png(
+    tmp_path, monkeypatch: pytest.MonkeyPatch,
+):
     pytest.importorskip("matplotlib")
     from benchmarks.fullwave_validation.experiments.plot_three_cube_deterministic import (
         _add_scene_overlay,
         plot_three_cube_deterministic,
     )
     import matplotlib.pyplot as plt
+
+    requested_colormaps: list[str] = []
+    original_get_cmap = plt.get_cmap
+
+    def capture_colormap(name: str):
+        requested_colormaps.append(name)
+        return original_get_cmap(name)
+
+    monkeypatch.setattr(plt, "get_cmap", capture_colormap)
 
     spec = load_case("three_cube", "metal")
     x = np.linspace(-1.0, 1.0, 21)
@@ -277,6 +328,7 @@ def test_three_cube_deterministic_plot_draws_scene_and_writes_png(tmp_path):
 
     output = plot_three_cube_deterministic(field_map, tmp_path / "three-cube.png")
 
+    assert requested_colormaps == ["inferno"]
     assert output.is_file()
     assert output.stat().st_size > 0
     figure, axis = plt.subplots()
@@ -285,6 +337,133 @@ def test_three_cube_deterministic_plot_draws_scene_and_writes_png(tmp_path):
     assert len(axis.collections) == 1
     plt.close(figure)
 
+
+def test_single_cube_comparison_uses_inferno_and_writes_png(
+    tmp_path, monkeypatch: pytest.MonkeyPatch,
+):
+    pytest.importorskip("matplotlib")
+    from benchmarks.fullwave_validation.experiments import (
+        plot_single_cube_comparison as plot_module,
+    )
+    import matplotlib.pyplot as plt
+    from matplotlib.figure import Figure
+    from PIL import Image
+
+    x = np.linspace(-1.0, 1.0, 21)
+    y = np.linspace(-1.0, 1.0, 19)
+    yy, xx = np.meshgrid(y, x, indexing="ij")
+    base = (1.0 + 0.1 * xx - 0.05 * yy) * np.exp(1j * (0.2 * xx + 0.3 * yy))
+    components = {
+        "los": np.where(xx < -0.25, base, 0.0),
+        "reflection": np.where(yy > 0.25, 0.2j * base, 0.0),
+    }
+    deterministic = FieldMap(x, y, base, components=components)
+    fullwave = FieldMap(x, y, 1.1j * base)
+    empty_deterministic = FieldMap(x, y, np.ones_like(base))
+    empty_fullwave = FieldMap(x, y, 1.1j * np.ones_like(base))
+    inputs = {
+        "DETERMINISTIC_PATH": (
+            "visual-deterministic-metal-centered-5ghz-256.npz",
+            deterministic,
+        ),
+        "FULLWAVE_PATH": (
+            "visual-maxwell-metal-centered-5ghz-256.npz",
+            fullwave,
+        ),
+        "EMPTY_DETERMINISTIC_PATH": (
+            "visual-deterministic-empty-5ghz-256.npz",
+            empty_deterministic,
+        ),
+        "EMPTY_FULLWAVE_PATH": (
+            "visual-maxwell-empty-5ghz-256.npz",
+            empty_fullwave,
+        ),
+    }
+    for attribute, (filename, field_map) in inputs.items():
+        path = field_map.save(tmp_path / filename)
+        monkeypatch.setattr(plot_module, attribute, path)
+    output = tmp_path / "single-comparison.png"
+    monkeypatch.setattr(plot_module, "OUTPUT_PATH", output)
+
+    requested_colormaps: list[str] = []
+    original_get_cmap = plt.get_cmap
+
+    def capture_colormap(name: str):
+        requested_colormaps.append(name)
+        return original_get_cmap(name)
+
+    original_savefig = Figure.savefig
+
+    def save_small_png(self, filename, *args, **kwargs):
+        kwargs["dpi"] = 40
+        return original_savefig(self, filename, *args, **kwargs)
+
+    monkeypatch.setattr(plt, "get_cmap", capture_colormap)
+    monkeypatch.setattr(Figure, "savefig", save_small_png)
+
+    plot_module.main()
+
+    assert requested_colormaps[0] == "inferno"
+    assert output.is_file()
+    with Image.open(output) as image:
+        assert image.format == "PNG"
+
+
+def test_three_cube_comparison_uses_inferno_and_writes_png(
+    tmp_path, monkeypatch: pytest.MonkeyPatch,
+):
+    pytest.importorskip("matplotlib")
+    from benchmarks.fullwave_validation.experiments import (
+        plot_three_cube_comparison as plot_module,
+    )
+    from PIL import Image
+
+    spec = load_case("three_cube_320", "metal")
+    x = np.linspace(-1.0, 1.0, 21)
+    y = np.linspace(-1.0, 1.0, 19)
+    yy, xx = np.meshgrid(y, x, indexing="ij")
+    base = (1.0 + 0.1 * xx - 0.05 * yy) * np.exp(1j * (0.2 * xx + 0.3 * yy))
+    metadata = {
+        "backend": "synthetic",
+        "case_id": spec.case_id,
+        "case_fingerprint": spec.fingerprint,
+        "frequency_hz": spec.frequency_hz,
+    }
+    FieldMap(x, y, 1.1j * base, metadata=metadata).save(
+        tmp_path / "visual-maxwell-metal-three-cube-5ghz-320.npz"
+    )
+    FieldMap(x, y, base, metadata=metadata).save(
+        tmp_path / "three_cube_320_coupled_off.npz"
+    )
+    FieldMap(x, y, 1.02 * base, metadata=metadata).save(
+        tmp_path / "three_cube_320_coupled_on.npz"
+    )
+    (tmp_path / "three_cube_320_comparison.json").write_text(
+        '{"s_empty": 1.1}',
+        encoding="utf-8",
+    )
+
+    requested_colormaps: list[str] = []
+    original_get_cmap = plot_module.colormaps.get_cmap
+
+    def capture_colormap(name: str):
+        requested_colormaps.append(name)
+        return original_get_cmap(name)
+
+    monkeypatch.setattr(plot_module.colormaps, "get_cmap", capture_colormap)
+
+    output = plot_module.plot_three_cube_comparison(tmp_path)
+
+    assert requested_colormaps == [
+        "inferno",
+        "inferno",
+        "inferno",
+        "coolwarm",
+        "coolwarm",
+    ]
+    assert output.is_file()
+    with Image.open(output) as image:
+        assert image.format == "PNG"
 
 def test_complex_calibration_removes_source_amplitude_and_phase_offset():
     y, x = np.mgrid[0:5, 0:6]

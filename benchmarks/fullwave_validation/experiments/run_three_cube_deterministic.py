@@ -68,14 +68,19 @@ def run(coupled: bool) -> dict[str, object]:
         diagnostics=True,
         coupled_paths=coupled,
         coupled_candidate_limit=1_000_000,
+        isb_boundary_taper=False,
     )
-    result = solve(build_channel_scene(spec), config)
+    result = solve(
+        build_channel_scene(spec),
+        config,
+        reference_frequency_hz=spec.frequency_hz,
+    )
     torch.cuda.synchronize()
 
     scene = build_channel_scene(spec)
     torch.cuda.synchronize()
     start = time.perf_counter()
-    warm = solve(scene, config)
+    warm = solve(scene, config, reference_frequency_hz=spec.frequency_hz)
     _ = warm.field.detach()
     torch.cuda.synchronize()
     warm_seconds = time.perf_counter() - start

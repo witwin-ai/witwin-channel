@@ -446,7 +446,7 @@ void register_rayd_geometry(pybind11::module_ &module) {
     module.def(
         "coupled_dd_geometry_forward",
         &channel_coupled_dd_geometry_forward,
-        "Construct two-edge diffraction geometry with an alternating-projection Fermat solve and typed RayD segment visibility; no field coefficient is evaluated.");
+        "Construct two-edge diffraction geometry with a convex bracketed Fermat solve and typed RayD segment visibility; no field coefficient is evaluated.");
     module.def(
         "diffraction_tx_visible_state_plan",
         &channel_diffraction_tx_visible_state_plan,

@@ -47,9 +47,7 @@ print(f"case {spec.case_id} fingerprint {spec.fingerprint}")
 channel_scene = build_channel_scene(spec)
 empty_channel_scene = Scene(
     structures=[],
-    transmitters=channel_scene.transmitters,
-    receivers=channel_scene.receivers,
-    frequency=channel_scene.frequency,
+    endpoints=channel_scene.endpoints,
     metadata=channel_scene.metadata,
 )
 deterministic_result = solve(
@@ -61,7 +59,9 @@ deterministic_result = solve(
         return_field=True,
         export_paths=False,
         diagnostics=True,
+        isb_boundary_taper=False,
     ),
+    reference_frequency_hz=spec.frequency_hz,
 )
 deterministic_field = deterministic_result.field.detach().cpu().numpy()[0]
 FieldMap(

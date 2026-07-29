@@ -2657,7 +2657,7 @@
         }
       ],
       "pybind_arguments": [],
-      "doc": "Construct two-edge diffraction geometry with an alternating-projection Fermat solve and typed RayD segment visibility; no field coefficient is evaluated."
+      "doc": "Construct two-edge diffraction geometry with a convex bracketed Fermat solve and typed RayD segment visibility; no field coefficient is evaluated."
     },
     {
       "name": "coupled_rd_geometry_forward",

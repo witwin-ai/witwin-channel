@@ -26,6 +26,7 @@ from witwin.channel.deterministic import Config as DeterministicConfig
 from witwin.channel.deterministic import solve as deterministic_solve
 from witwin.channel.path import Config as PathConfig
 from witwin.channel.path import solve as path_solve
+from witwin.channel.kernels import fields as field_kernels
 from witwin.channel.scene import compile as compile_scene
 
 pytestmark = pytest.mark.skipif(
@@ -591,12 +592,18 @@ def test_coupled_dd_runs_under_ad_modes(ad_mode):
 
 
 @pytest.mark.parametrize("endpoint", ("tx", "rx"))
-def test_coupled_dd_endpoint_position_grad_matches_fd(endpoint):
-    """DD-only endpoint (tx AND rx) grads vs central differences of the primal.
+def test_coupled_dd_endpoint_position_grad_matches_frozen_seed_fd(
+    endpoint, monkeypatch: pytest.MonkeyPatch,
+):
+    """DD endpoint grads vs central differences with Q1/Q2 held fixed.
 
- tx/rx gradients flow through the native per-leg re-anchoring inside the
- coupled_dd field kernel; Q1/Q2 and the edge bounds are frozen (coupled double diffraction).
- """
+    tx/rx gradients flow through the native per-leg re-anchoring inside the
+    coupled_dd field kernel; Q1/Q2 and the edge bounds are frozen. A finite
+    difference that rediscovers topology at every perturbation moves those
+    seeds and differentiates a different function. Capture the primal native
+    field arguments once, then perturb only the declared endpoint tensor so the
+    oracle exercises the same fixed-topology contract as VJP/JVP.
+    """
 
     base = torch.tensor(
         _COUPLED_TX if endpoint == "tx" else _COUPLED_RX, dtype=torch.float32
@@ -609,9 +616,39 @@ def test_coupled_dd_endpoint_position_grad_matches_fd(endpoint):
     assert leaf.grad is not None
     assert float(leaf.grad.abs().max()) > 0.0
 
+    native_calls: list[
+        tuple[tuple[object, ...], dict[str, object]]
+    ] = []
+    primal_field_coupled_dd = field_kernels.field_coupled_dd
+
+    def capture_fixed_seed_call(*args: object, **kwargs: object):
+        native_calls.append((args, kwargs))
+        return primal_field_coupled_dd(*args, **kwargs)
+
+    monkeypatch.setattr(
+        field_kernels, "field_coupled_dd", capture_fixed_seed_call
+    )
+    primal = _solve_coupled(_coupled_scene(), "none")
+    _assert_dd_rows(primal)
+    assert len(native_calls) == 1
+    fixed_args, fixed_kwargs = native_calls[0]
+    endpoint_arg = 0 if endpoint == "tx" else 1
+    endpoint_template = fixed_args[endpoint_arg]
+    assert isinstance(endpoint_template, torch.Tensor)
+
     def evaluate(values: torch.Tensor) -> torch.Tensor:
-        fd_scene = _coupled_scene(**{endpoint: values.clone()})
-        return _dd_loss(_solve_coupled(fd_scene, "none")).detach()
+        args = list(fixed_args)
+        args[endpoint_arg] = (
+            values.to(
+                device=endpoint_template.device,
+                dtype=endpoint_template.dtype,
+            )
+            .expand_as(endpoint_template)
+            .contiguous()
+        )
+        evaluated = primal_field_coupled_dd(*args, **fixed_kwargs)
+        coefficient = evaluated["coefficient"]
+        return (coefficient.real.sum() + 0.5 * coefficient.imag.sum()).detach()
 
     expected = central_difference_gradient(evaluate, base, FD_STEP_POSITION_PHASE)
     assert relative_error(leaf.grad, expected, abs_floor=ABS_TOL) <= REL_TOL_GENERAL

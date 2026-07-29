@@ -131,7 +131,7 @@ def plot_three_cube_deterministic(deterministic: FieldMap, output: str | Path) -
         "Coupled R↔D |Ez|",
     )
     extent = _image_extent(deterministic.x, deterministic.y)
-    colormap = plt.get_cmap("viridis").copy()
+    colormap = plt.get_cmap("inferno").copy()
     colormap.set_bad("0.72")
 
     figure, axes = plt.subplots(2, 3, figsize=(17.4, 10.4), constrained_layout=True)

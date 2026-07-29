@@ -580,8 +580,8 @@ def coupled_rd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
 def coupled_dd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
     """Construct two-edge (double) diffraction geometry without a coefficient.
 
- The native operation runs an alternating-projection Fermat solve for the
- two-edge Keller point pair (Q1 on e1, Q2 on e2) and three RayD segment
+ The native operation runs a convex bracketed Fermat solve for the two-edge
+ Keller point pair (Q1 on e1, Q2 on e2) and three RayD segment
  visibility queries (tx->Q1, Q1->Q2, Q2->rx). Both edge ids are recoverable
  from ``edge_sequence`` (slot 0 = e1, slot 1 = e2); ``primitive_sequence`` is
  fully ``-1`` because a double-diffraction row touches no face. The returned

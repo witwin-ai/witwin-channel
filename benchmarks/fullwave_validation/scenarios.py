@@ -153,17 +153,21 @@ def build_channel_scene(spec: CaseSpec) -> Scene:
             AntennaState(
                 new_antenna_id(),
                 "tx",
-                torch.tensor(spec.tx_position),
-                polarization=torch.tensor([0.0, 0.0, 1.0]),
+                torch.tensor(spec.tx_position, dtype=torch.float32),
+                polarization=torch.tensor([0.0, 0.0, 1.0], dtype=torch.float32),
             ),
             ReceiverGrid(
                 new_antenna_id(),
-                origin=torch.tensor([x[0], y[0], spec.plane_z]),
-                x_axis=torch.tensor([1.0, 0.0, 0.0]),
-                y_axis=torch.tensor([0.0, 1.0, 0.0]),
+                origin=torch.tensor(
+                    [x[0], y[0], spec.plane_z], dtype=torch.float32
+                ),
+                x_axis=torch.tensor([1.0, 0.0, 0.0], dtype=torch.float32),
+                y_axis=torch.tensor([0.0, 1.0, 0.0], dtype=torch.float32),
                 shape=(x.size, y.size),
                 spacing=(float(x[1] - x[0]), float(y[1] - y[0])),
-                polarization=torch.tensor([0.0, 0.0, 1.0]),
+                polarization=torch.tensor(
+                    [0.0, 0.0, 1.0], dtype=torch.float32
+                ),
             )
         ],
         metadata={

@@ -140,7 +140,7 @@ def main() -> None:
     grid = figure.add_gridspec(2, 3, height_ratios=(1.05, 0.95))
 
     field_axes = [figure.add_subplot(grid[0, index]) for index in range(3)]
-    deterministic_cmap = plt.get_cmap("viridis").copy()
+    deterministic_cmap = plt.get_cmap("inferno").copy()
     deterministic_cmap.set_bad("0.72")
     residual_cmap = plt.get_cmap("magma").copy()
     residual_cmap.set_bad("0.72")
@@ -153,7 +153,7 @@ def main() -> None:
             "witwin-maxwell FDTD |Ez|",
             "Magnitude residual ||s·h| − |Ez||",
         ),
-        (deterministic_cmap, "viridis", residual_cmap),
+        (deterministic_cmap, "inferno", residual_cmap),
         strict=True,
     ):
         image = axis.imshow(
