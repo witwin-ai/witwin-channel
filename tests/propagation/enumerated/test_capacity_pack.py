@@ -291,7 +291,7 @@ def test_enumerated_failure_sanitizer_ad_owns_the_native_companions() -> None:
 def test_enumerated_failure_sanitizer_family_has_no_host_transfer() -> None:
     root = Path(__file__).resolve().parents[3]
     sanitizer = (
-        root / "native/channel/kernels/capacity_failure.cu"
+        root / "native/channel/kernels/capacity.cu"
     ).read_text(encoding="utf-8")
     sanitizer = sanitizer.split(
         "// ==== Section: Enumerated capacity sanitization ====", 1

@@ -1,5 +1,5 @@
 // Copyright Xingyu Chen.
-// Shares field transport ad common CUDA helpers.
+// Shares field transport derivative helpers.
 
 #pragma once
 
@@ -7,7 +7,7 @@
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <c10/util/complex.h>
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 
 #include <rayd/torch/rf/field_transport_ad.cuh>
 #include "../tensor_checks.h"

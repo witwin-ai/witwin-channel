@@ -321,7 +321,7 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
         if "#include <torch/extension.h>" in path.read_text(encoding="utf-8")
     ]
     assert extension_includes == []
-    minimal_header = (kernels / "torch_cuda_minimal.h").read_text(encoding="utf-8")
+    minimal_header = (kernels / "torch_cuda.h").read_text(encoding="utf-8")
     assert "#include <ATen/ATen.h>" in minimal_header
     assert "#include <torch/csrc/utils/pybind.h>" in minimal_header
     assert "#include <torch/types.h>" not in minimal_header

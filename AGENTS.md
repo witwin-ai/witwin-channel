@@ -467,6 +467,13 @@ re-exports to hide a move. The import graph, orphan-module check, public API
 snapshot, binding manifests, and native translation-unit inventory enforce the
 current structure.
 
+Native source names are short owner nouns, not encoded function names, algorithm
+steps, or implementation notes. A `.cuh` or `.h` remains separate only when it
+has multiple production consumers or owns an explicit shared device contract; a
+single-consumer helper is merged into its owner `.cu`. Do not add `common`,
+`plumbing`, AD-mode, or gather-step suffixes to recover a deleted split. The
+native translation-unit ledger and header inventory test enforce the exact set.
+
 Every tracked Python, C++, CUDA, and native header starts with `Copyright Xingyu
 Chen.` and one plain sentence saying what the file does. All later comments and
 docstrings also describe current behavior or a nearby reason in plain language;

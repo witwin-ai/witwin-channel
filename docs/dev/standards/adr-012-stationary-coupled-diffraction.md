@@ -21,8 +21,8 @@ closed the dominant RSB class (the *missing* compensator). Its "Risks" section
 recorded a residual: the coupled diffraction leg ran with
 `selectStationaryPoint = 0` and pseudo-infinite edge bounds
 (`edgeLineMin/Max = -/+1e5`) in both the primal
-(`field_transport.cu::coupled_rd_field_kernel`) and the AD twin
-(`field_wedge_coupled.cu::coupled_rd_row_dual`). On that path the E1c/d/e
+(`fields.cu::coupled_rd_field_kernel`) and the AD twin
+(`coupled.cu::coupled_rd_row_dual`). On that path the E1c/d/e
 corner-mend, the G1 monotone even truncation, and the G2 boundary-distance blend
 are all inert (they are stationary-path-only), so the coupled leg carried the
 plain truncated infinite-wedge coefficient and injected its own extension-plane

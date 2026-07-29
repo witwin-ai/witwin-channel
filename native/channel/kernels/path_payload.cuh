@@ -1,11 +1,11 @@
 // Copyright Xingyu Chen.
-// Declares evaluated paths payload plumbing native contracts.
+// Shares evaluated path payload storage and row-copy helpers.
 
 #pragma once
 
 #include <ATen/ATen.h>
 #include <c10/util/complex.h>
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 
 #include "../tensor_checks.h"
 

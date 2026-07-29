@@ -9,8 +9,8 @@ from tools.refactor_baseline import cpp_body_hashes
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-MERGED = "native/channel/kernels/path_topology.cu"
-COMMON = "native/channel/kernels/path_compaction_common.cuh"
+MERGED = "native/channel/kernels/paths.cu"
+COMMON = "native/channel/kernels/path_compaction.cuh"
 EXPECTED_ABI = {
     "channel_path_filter_los_cuda",
     "channel_deterministic_los_topology_block",

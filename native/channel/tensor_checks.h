@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "kernels/torch_cuda_minimal.h"
+#include "kernels/torch_cuda.h"
 
 namespace channel {
 

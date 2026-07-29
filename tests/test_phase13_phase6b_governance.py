@@ -108,7 +108,7 @@ def test_phase6b_is_a_complete_source_owner_move_without_a_fallback() -> None:
         ROOT / "native/channel/binding/fields.cpp"
     ).read_text(encoding="utf-8-sig")
     retained = (
-        ROOT / "native/channel/kernels/field_transport.cu"
+        ROOT / "native/channel/kernels/fields.cu"
     ).read_text(encoding="utf-8-sig")
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8-sig")
     graph = _json(AUDIT / "phase13-shared-rf-dependency-graph.json")

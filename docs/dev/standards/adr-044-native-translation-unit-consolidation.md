@@ -37,7 +37,7 @@ co-location is not kernel fusion and does not change semantic ownership:
 3. body moves preserve numerical expressions; private-name collision repairs
    are limited to owner-local detail names and are recorded;
 4. default precise CUDA sources remain precise;
-5. `kirchhoff_table_ad.cu` and `mc_transmission_wall_product.cu` remain separate
+5. `kirchhoff.cu` and `mc_transmission.cu` remain separate
    and retain `--fmad=false`;
 6. RayD's pure-wedge `--use_fast_math` translation unit is untouched;
 7. consolidation may not add compatibility symbols, dormant bindings, a second
@@ -54,6 +54,13 @@ Shared `.cuh` files survive only while they have more than one production
 consumer or own an explicit lockstep device contract. The consolidation must
 move bodies into the owning `.cu`; it must not merely rename old `.cu` files to
 include fragments.
+
+The physical source names are short owner names. The three single-consumer helper
+headers formerly used by BDPT connection, coupled wedge AD, and evaluated-path
+continuous gather now live directly in `bdpt_connect.cu`, `coupled.cu`, and
+`evaluated_paths.cu`. The surviving shared headers are `capacity.h`,
+`field_ad.cuh`, `math.cuh`, `path_compaction.cuh`, `path_payload.cuh`, and
+`torch_cuda.h`; deleted header paths have no forwarding aliases.
 
 ## Acceptance
 
@@ -100,5 +107,19 @@ Windows code-page, conversion, and unused private-symbol warnings. Deleted
 source paths remain only as historical evidence names and provenance labels;
 they are not compatibility build inputs, aliases, re-exports, or dormant
 owners.
+### Filename and header layout validation
 
+The short owner-name refresh keeps all 15 CUDA translation units and both
+`--fmad=false` boundaries. Three single-consumer headers moved into their owner
+files, leaving six shared headers and 21 native kernel files total. The longest
+filename is 19 characters. No deleted filename has an alias or build entry.
 
+Local validation used `witwin2`, Release mode, and `sm_120-real` only. The build
+passed and produced a 34,909,184-byte extension with SHA-256
+`96c27327aeeb4ceadcb1acc4bd921a6db93db4fa481043bf5fc85fd1c4e20153` and build
+fingerprint `7b6720a82a1c32958e1b0841614b50ca140c562815caca52a5254cc042825194`.
+Seventy layout and ownership tests passed, 218 focused path/BDPT/field/coupled
+primal/JVP/VJP tests passed, and the complete suite passed 2,682 tests with 8
+declared skips and 1 declared expected failure. The duplication ledger contains
+148 classified regions, no stale or unclassified entries, and 8.734658% coverage
+against the unchanged 10.211512% ceiling.

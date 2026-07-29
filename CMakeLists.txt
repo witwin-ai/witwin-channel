@@ -567,20 +567,20 @@ Python_add_library(
     native/channel/rayd/geometry.cpp
     native/channel/rayd/reflection.cpp
     native/channel/rayd/diffraction.cpp
-    native/channel/kernels/path_topology.cu
+    native/channel/kernels/paths.cu
     native/channel/kernels/evaluated_paths.cu
     native/channel/kernels/deterministic.cu
-    native/channel/kernels/field_transport.cu
-    native/channel/kernels/field_wedge_coupled.cu
-    native/channel/kernels/los_consumer.cu
-    native/channel/kernels/capacity_failure.cu
-    native/channel/kernels/montecarlo_common.cu
+    native/channel/kernels/fields.cu
+    native/channel/kernels/coupled.cu
+    native/channel/kernels/los.cu
+    native/channel/kernels/capacity.cu
+    native/channel/kernels/montecarlo.cu
     native/channel/kernels/reflection.cu
     native/channel/kernels/diffraction.cu
-    native/channel/kernels/mc_transmission_wall_product.cu
-    native/channel/kernels/kirchhoff_table_ad.cu
+    native/channel/kernels/mc_transmission.cu
+    native/channel/kernels/kirchhoff.cu
     native/channel/kernels/bdpt_connect.cu
-    native/channel/kernels/bdpt_subpaths.cu
+    native/channel/kernels/bdpt_paths.cu
     native/channel/kernels/bdpt_support.cu
     native/channel/montecarlo_basic.cpp
     native/channel/path_solver.cpp
@@ -609,17 +609,17 @@ if(WIN32)
 endif()
 
 target_compile_features(_channel PRIVATE cxx_std_17)
-# ADR-010 lockstep kernels replicate Torch per-op float rounding. Implicit
+# These lockstep kernels preserve Torch per-operation float rounding. Implicit
 # fma contraction would change the rounding of their mul/add chains, so it is
 # disabled for these TUs (explicit fmaf calls, e.g. the shared table
 # interpolation, are unaffected).
 set_source_files_properties(
-    native/channel/kernels/kirchhoff_table_ad.cu
+    native/channel/kernels/kirchhoff.cu
     PROPERTIES COMPILE_OPTIONS "--fmad=false")
-# ADR-027 freezes the former per-wall Torch multiply/add sequence and its
+# The Monte Carlo transmission estimator preserves the per-wall multiply/add sequence and its
 # continuous derivative companions for the MC straight-penetration estimator.
 set_source_files_properties(
-    native/channel/kernels/mc_transmission_wall_product.cu
+    native/channel/kernels/mc_transmission.cu
     PROPERTIES COMPILE_OPTIONS "--fmad=false")
 target_link_libraries(
     _channel
@@ -628,7 +628,7 @@ target_link_libraries(
         "${TORCH_LIBRARIES}"
         "${TORCH_PYTHON_LIBRARY}"
         "${CHANNEL_PYTHON_LIBRARY}"
-        # ADR-015 kirchhoff_table_ad.cu solves the implicit Sinkhorn adjoint
+        # The Kirchhoff table derivative solves the implicit Sinkhorn adjoint
         # with cuSOLVER dense LU (Sgetrf/Sgetrs). The CUDA:: imported targets
         # are provided by the CUDAToolkit package that Torch already discovers
         # (CUDA::cudart is linked by the BUILD_TESTING lockstep target below).

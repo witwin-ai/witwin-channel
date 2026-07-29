@@ -1,5 +1,5 @@
 // Copyright Xingyu Chen.
-// Declares capacity failure state native contracts.
+// Declares the shared capacity failure contract.
 
 #pragma once
 

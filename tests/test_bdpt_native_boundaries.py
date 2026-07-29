@@ -10,7 +10,7 @@ from tools.refactor_baseline import cpp_body_hashes
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 MERGED = "native/channel/kernels/bdpt_connect.cu"
-COMMON = "native/channel/kernels/bdpt_connect_common.cuh"
+RETIRED_COMMON = "native/channel/kernels/bdpt_connect_common.cuh"
 EXPECTED_ABI = {
     "channel_bdpt_mis_weights_cuda",
     "channel_bdpt_endpoint_connection_samples_cuda",
@@ -38,13 +38,16 @@ def _function_names_by_path() -> dict[str, set[str]]:
 def test_bdpt_connection_family_has_one_physical_owner() -> None:
     names = _function_names_by_path()
     source = (REPOSITORY_ROOT / MERGED).read_text(encoding="utf-8-sig")
-    common = (REPOSITORY_ROOT / COMMON).read_text(encoding="utf-8-sig")
-
     assert EXPECTED_ABI <= names[MERGED]
-    assert source.count('#include "bdpt_connect_common.cuh"') == 5
-    assert common.splitlines()[3] == "#pragma once"
-    assert "namespace {" in common
-    assert common.rstrip().endswith("}  // namespace")
+    assert not (REPOSITORY_ROOT / RETIRED_COMMON).exists()
+    assert '#include "bdpt_connect_common.cuh"' not in source
+    for helper in (
+        "bdpt_component_from_mask",
+        "bdpt_component_accumulable",
+        "bdpt_connection_mis_weight_from_sums",
+        "allocate_connection_samples",
+    ):
+        assert helper in names[MERGED]
 
 
 def test_bdpt_connection_consolidation_is_registered_once() -> None:
@@ -59,4 +62,4 @@ def test_bdpt_connection_consolidation_is_registered_once() -> None:
         "native/channel/kernels/bdpt_connect_ad.cu",
     ):
         assert retired not in cmake
-    assert COMMON not in cmake
+    assert RETIRED_COMMON not in cmake

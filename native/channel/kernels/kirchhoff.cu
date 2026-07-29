@@ -1,5 +1,5 @@
 // Copyright Xingyu Chen.
-// Implements kirchhoff table ad CUDA operations.
+// Implements Kirchhoff table derivative CUDA operations.
 
 // Native JVP/VJP companions for the offline float64 Kirchhoff table builder.
 // They differentiate resident values F = a S a with respect to roughness,
@@ -43,7 +43,7 @@
 #include <c10/cuda/CUDAException.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <cusolverDn.h>
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 
 #include <rayd/shared/rf/layer_stack.cuh>
 #include <rayd/torch/rf/field_transport_ad.cuh>

@@ -25,7 +25,7 @@ _EPS = 1.0e-10
 _POL_TE = 0
 _POL_TM = 1
 
-# BDPT accumulable component ids (bdpt_connect_common.cuh kComponent*).
+# BDPT accumulable component ids (bdpt_connect.cu kComponent*).
 # Transmission and scattering are 5 and 6 in the native encoding (3 and 4 are
 # unused), so the oracle must use the same ids the accumulate kernels route on.
 COMPONENT_LOS = 0
@@ -105,7 +105,7 @@ def effective_power_reflectance(
     incident_dir: torch.Tensor, normal: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor,
     mu_r: torch.Tensor, frequency: torch.Tensor,
 ) -> torch.Tensor:
-    """``effective_power_reflectance`` (bdpt_subpaths.cu): interface-only reflectance.
+    """``effective_power_reflectance`` (bdpt_paths.cu): interface-only reflectance.
 
  ``|r_te*e_s|^2 + |r_tm*e_p|^2`` with single-INTERFACE Fresnel coefficients (no
  slab phase, no thickness, no gain) and the fixed x-hat transmit polarization
@@ -183,7 +183,7 @@ def reflected_subpath_advance_reference(
 def _sp_proxy_weights(
     incident: torch.Tensor, normal_in: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """``sp_proxy_weights`` (bdpt_subpaths.cu): x-hat power weights onto the s/p basis."""
+    """``sp_proxy_weights`` (bdpt_paths.cu): x-hat power weights onto the s/p basis."""
 
     s_raw = torch.cross(normal_in, incident, dim=-1)
     s_len = torch.linalg.vector_norm(s_raw, dim=-1, keepdim=True)

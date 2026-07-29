@@ -237,7 +237,7 @@ def test_later_discrete_corruption_is_preflighted_before_prefix_evaluation(
 
 def test_wall_product_source_uses_full_preflight_and_effective_prefix() -> None:
     source = (
-        _ROOT / "native/channel/kernels/mc_transmission_wall_product.cu"
+        _ROOT / "native/channel/kernels/mc_transmission.cu"
     ).read_text(encoding="utf-8")
 
     assert source.count("for (int slot = 0; slot < count; ++slot)") == 1

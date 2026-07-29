@@ -359,7 +359,7 @@ Evidence summary:
 - **At ADR-011 acceptance, coupled legs did NOT inherit the stationary G2
   mend.** The coupled diffraction leg used `selectStationaryPoint = 0` in both
   the primal and AD twins. ADR-012 subsequently changed the current AD owner
-  (`field_wedge_coupled.cu:287-303`) to stationary evaluation. The ADR-011
+  (`coupled.cu`) to stationary evaluation. The ADR-011
   baseline used the plain
   `finite_wedge_truncation_factor`. The G2 odd-blend corner-mend and monotone
   even-part truncation (design F5c/d/e) are stationary-path-only

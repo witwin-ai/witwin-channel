@@ -14,6 +14,13 @@ domain, shared `propagation` stages, four solver entry points, and the native
 operation-family translation units recorded by the native source inventory.
 The structure gates are the executable source of truth.
 
+Native files use short owner nouns. A filename does not repeat a function name,
+algorithm step, AD mode, or temporary implementation detail. Shared `.h` and
+`.cuh` files require multiple production consumers or one explicit shared device
+contract; otherwise their contents live in the owning `.cu`. Names such as
+`common`, `plumbing`, and operation-step chains are rejected by the exact native
+translation-unit and header inventory tests.
+
 ## Function signatures
 
 Python and native code use a 100-column target and pack as many complete

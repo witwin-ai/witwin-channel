@@ -1,7 +1,7 @@
 // Copyright Xingyu Chen.
-// Implements mc transmission wall product CUDA operations.
+// Implements the Monte Carlo transmission wall product.
 
-#include "field_transport_ad_common.cuh"
+#include "field_ad.cuh"
 
 #include <rayd/shared/rf/layer_stack.cuh>
 

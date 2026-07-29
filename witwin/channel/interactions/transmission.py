@@ -222,7 +222,7 @@ def _splitmix64(value: int) -> int:
 
 def event_selection_seed(seed: int, tx_index: int, depth: int) -> int:
     """Deterministic per-(seed, tx, depth) generator seed via the native
- splitmix64 mixing pattern (matches bdpt_subpaths.cu)."""
+ splitmix64 mixing pattern (matches bdpt_paths.cu)."""
 
     mixed = _splitmix64(int(seed))
     mixed = _splitmix64(mixed ^ (((int(tx_index) + 1) * 0xD1B54A32D192ED03) & _MASK64))

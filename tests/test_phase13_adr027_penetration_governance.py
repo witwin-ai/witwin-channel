@@ -130,14 +130,17 @@ def test_phase_p_live_duplication_refresh_is_closed_without_budget_relaxation() 
             "acceptance remains met"
         ),
     }
-    current = duplication["source_style_dedup_refresh"]
+    current = duplication["native_layout_refresh"]
     assert len(duplication["regions"]) == current["region_count"] == 148
-    assert current["coverage_percent"] == 8.7352
-    assert current["combined_total_lines"] == 86627
+    assert current["coverage_percent"] == 8.734658
+    assert current["combined_total_lines"] == 86609
     assert current["coverage_percent"] < current["frozen_coverage_percent"]
+    assert current["translation_unit_count"] == 15
+    assert current["shared_header_count"] == 6
+    assert current["merged_single_consumer_headers"] == 3
     assert current["status"] == (
-        "all current regions classified; no stale entries; duplicate coverage "
-        "and long-signature counts tightened"
+        "all current regions classified; no stale entries; native owner names "
+        "and header boundaries are current"
     )
     assert refresh["coverage_percent"] < refresh["frozen_coverage_percent"]
     assert duplication["phase11a_refresh"]["region_count"] == 155

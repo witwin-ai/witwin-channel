@@ -29,7 +29,7 @@ RAYD_WEDGE_SOURCE = (
 FIELDS_BINDING = REPOSITORY_ROOT / "native/channel/binding/fields.cpp"
 
 TRANSLATION_UNITS = {
-    "merged": KERNEL_ROOT / "field_wedge_coupled.cu",
+    "merged": KERNEL_ROOT / "coupled.cu",
 }
 ABI_BY_OWNER = {
     "merged": {
@@ -244,19 +244,21 @@ def test_pure_wedge_typed_adapter_preserves_channel_schemas() -> None:
 
 def test_field_wedge_common_and_owner_local_plumbing_are_isolated() -> None:
     names = _function_names_by_path()
-    common = "native/channel/kernels/field_wedge_ad_common.cuh"
-    merged = KERNEL_ROOT / "field_wedge_coupled.cu"
+    retired_common = "native/channel/kernels/field_wedge_ad_common.cuh"
+    merged = KERNEL_ROOT / "coupled.cu"
+    merged_relative = "native/channel/kernels/coupled.cu"
     source = merged.read_text(encoding="utf-8-sig")
 
-    assert COMMON_HELPERS == names[common]
-    assert source.count('#include "field_wedge_ad_common.cuh"') == 3
+    assert COMMON_HELPERS <= names[merged_relative]
+    assert not (REPOSITORY_ROOT / retired_common).exists()
+    assert '#include "field_wedge_ad_common.cuh"' not in source
     assert "#define WEDGE_" not in source
 
 
 def test_field_wedge_consolidation_is_registered_once() -> None:
     cmake = (REPOSITORY_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
-    common = "native/channel/kernels/field_wedge_ad_common.cuh"
-    merged = "native/channel/kernels/field_wedge_coupled.cu"
+    retired_common = "native/channel/kernels/field_wedge_ad_common.cuh"
+    merged = "native/channel/kernels/coupled.cu"
 
     assert cmake.count(merged) == 1
     assert "native/channel/kernels/field_wedge_ad_coupled.cu" not in cmake
@@ -266,4 +268,4 @@ def test_field_wedge_consolidation_is_registered_once() -> None:
     assert "CHANNEL_FAST_MATH_WEDGE_TU" not in cmake
     assert "--use_fast_math" not in cmake
     assert not (KERNEL_ROOT / "field_wedge_ad_diffraction.cu").exists()
-    assert common not in cmake
+    assert retired_common not in cmake

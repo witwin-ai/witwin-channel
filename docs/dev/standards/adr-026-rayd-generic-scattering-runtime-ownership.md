@@ -151,7 +151,7 @@ axis behavior, 16-corner index/weight order, and primal/dual relationship are
 frozen. After Channel activates 10A, every remaining Channel consumer includes
 the public RayD header and the private
 `native/channel/kernels/scattering_table.cuh` is deleted. RayD never
-includes a Channel-private header. `kirchhoff_table_ad.cu` has no current
+includes a Channel-private header. `kirchhoff.cu` has no current
 dependency on this header and must not gain a decorative or unused include.
 
 ### Fusion, launch, tape, reduction, and atomic contracts
@@ -234,7 +234,7 @@ The following do not move:
 
 - `scattering_event_probabilities`, because it owns MC/BDPT event-selection
   policy rather than a generic BSDF primitive;
-- Kirchhoff table construction, `kirchhoff_table_ad.cu`, CPU/NumPy test
+- Kirchhoff table construction, `kirchhoff.cu`, CPU/NumPy test
   oracles, cache/version/validation, `KirchhoffTable`,
   `KirchhoffRuntimeResources`, and `KirchhoffTableStack` lifecycle;
 - `PhaseScreenRuntime`, realization seed/generation, structure assignment,

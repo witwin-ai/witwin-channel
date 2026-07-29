@@ -73,7 +73,7 @@ _PHASE15_KERNEL_RELOCATIONS = {
         "native/channel/kernels/bdpt_connect.cu"
     ),
     "native/channel/kernels/los.cu": (
-        "native/channel/kernels/los_consumer.cu"
+        "native/channel/kernels/los.cu"
     ),
 }
 
@@ -271,7 +271,7 @@ def test_phase11b_explicit_signatures_and_tu_local_macro_contract_are_preserved(
             "CHANNEL_DIFFRACTION_STATE_PACK_OUTPUT_POINTERS",
             "CHANNEL_DIFFRACTION_STATE_PACK_RESULTS",
         ),
-        "native/channel/kernels/los_consumer.cu": (
+        "native/channel/kernels/los.cu": (
             "CHANNEL_LOS_CHECK_VISIBILITY_APPLICATION",
             "CHANNEL_LOS_VISIBILITY_LAUNCH_ARGUMENTS",
         ),

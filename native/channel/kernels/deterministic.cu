@@ -6,7 +6,7 @@
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <c10/util/complex.h>
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 
 #include "../tensor_checks.h"
 #include "math.cuh"
@@ -791,7 +791,7 @@ pybind11::dict channel_deterministic_field_from_power_phase(at::Tensor path_gain
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
 #include <thrust/scan.h>

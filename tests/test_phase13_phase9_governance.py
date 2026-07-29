@@ -101,7 +101,7 @@ def test_phase9_freezes_resource_header_and_channel_policy_owners() -> None:
     ):
         assert owner in text
     assert "RayD never\nincludes a Channel-private header" in text
-    assert "kirchhoff_table_ad.cu" in text
+    assert "kirchhoff.cu" in text
 
 
 def test_phase9_freezes_per_tu_flags_and_family_specific_geometry_ad() -> None:

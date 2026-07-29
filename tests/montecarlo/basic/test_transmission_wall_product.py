@@ -707,7 +707,7 @@ def test_transmission_wall_product_has_one_owner_and_no_fallback(monkeypatch) ->
 
 def test_transmission_wall_product_source_freezes_residency_and_reduction() -> None:
     source = (
-        _ROOT / "native/channel/kernels/mc_transmission_wall_product.cu"
+        _ROOT / "native/channel/kernels/mc_transmission.cu"
     ).read_text(encoding="utf-8")
     live_route = (
         _ROOT / "witwin/channel/montecarlo/basic.py"

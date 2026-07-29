@@ -8,7 +8,7 @@
 #include <cuda_runtime_api.h>
 
 #include "../tensor_checks.h"
-#include "capacity_failure_state.h"
+#include "capacity.h"
 
 void channel::capacity::validate_failure_state(
     const at::Tensor& failure_state,
@@ -73,11 +73,11 @@ void channel_capacity_failure_terminal_check(at::Tensor failure_state) {
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/util/complex.h>
 #include <cuda_runtime_api.h>
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 
 #include "../tensor_checks.h"
-#include "capacity_failure_state.h"
-#include "evaluated_paths_payload_plumbing.h"
+#include "capacity.h"
+#include "path_payload.cuh"
 
 #include <cstdint>
 
@@ -233,10 +233,10 @@ at::Tensor channel_enumerated_capacity_failure_vector_sanitize(
 #include <c10/cuda/CUDAException.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <cuda_runtime_api.h>
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 
 #include "../tensor_checks.h"
-#include "capacity_failure_state.h"
+#include "capacity.h"
 
 #include <array>
 #include <cstdint>

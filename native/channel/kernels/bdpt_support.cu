@@ -1,11 +1,11 @@
 // Copyright Xingyu Chen.
-// Implements bdpt support CUDA operations.
+// Implements BDPT support CUDA operations.
 
 // ==== Section: BDPT sampling ====
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 
 namespace {
 
@@ -139,7 +139,7 @@ at::Tensor channel_bdpt_sample_directions_cuda(int64_t count, at::Tensor referen
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 
 #include <vector>
 

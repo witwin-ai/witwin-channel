@@ -58,7 +58,7 @@ visibility calls. One launch per (tx, rx-chunk).
   per-expression in the migration PR): `to_rx`, `r2`, `wo_w`, `cos_o`, `wo_local`,
   bilinear table lookup (MUST reuse the existing device interpolation primitive
   from the `scattering.cu` provenance section in
-  `kernels/montecarlo_common.cu` - shared device header, not a copy), outgoing s/p
+  `kernels/montecarlo.cu` - shared device header, not a copy), outgoing s/p
   basis, receiver co-pol projections, `f_eff`, radiometric `gain`, `keep`
   threshold, `amplitude = sqrt(max(gain, 0))`, `length = r1 + r2`.
 - Outputs `[R]`: `gain` (f32), `amplitude` (f32), `length` (f32), `wo_w` (f32x3),

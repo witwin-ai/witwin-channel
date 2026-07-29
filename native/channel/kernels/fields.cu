@@ -6,7 +6,7 @@
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <c10/util/complex.h>
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 
 #include "math.cuh"
 #include <rayd/shared/rf/field_transport.cuh>
@@ -1181,7 +1181,7 @@ pybind11::dict channel_field_coupled_dd(
 #undef kBlockSize
 
 // ==== Section: Free-space transport ====
-#include "field_transport_ad_common.cuh"
+#include "field_ad.cuh"
 
 namespace {
 
@@ -1732,7 +1732,7 @@ pybind11::dict channel_field_free_space_jvp(
 }
 
 // ==== Section: Reflection transport ====
-#include "field_transport_ad_common.cuh"
+#include "field_ad.cuh"
 
 namespace {
 
@@ -2679,7 +2679,7 @@ pybind11::dict channel_field_reflection_sequence_jvp(
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <c10/util/complex.h>
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 
 #include "../tensor_checks.h"
 
@@ -3401,7 +3401,7 @@ pybind11::dict channel_field_rough_reflection_scale_jvp(
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <c10/util/complex.h>
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 
 #include "../tensor_checks.h"
 

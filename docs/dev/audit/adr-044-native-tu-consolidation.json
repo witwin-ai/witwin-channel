@@ -4,7 +4,7 @@
   "baseline_git_sha": "b1ca43a801fbff97a0a84e802eaa7ab5f02653b5f",
   "baseline_cuda_translation_units": 45,
   "target_cuda_translation_units": 15,
-  "target_cuda_total_lines": 30073,
+  "target_cuda_total_lines": 30168,
   "invariants": [
     "abi_symbol_multiset",
     "kernel_launch_multiset",
@@ -53,7 +53,7 @@
   ],
   "groups": [
     {
-      "target": "path_topology.cu",
+      "target": "paths.cu",
       "sources": [
         "path_trace.cu",
         "path_compaction.cu",
@@ -92,7 +92,7 @@
       "baseline_device_trap_sites": 0
     },
     {
-      "target": "field_transport.cu",
+      "target": "fields.cu",
       "sources": [
         "field_transport.cu",
         "field_transport_free_space.cu",
@@ -107,7 +107,7 @@
       "baseline_device_trap_sites": 0
     },
     {
-      "target": "field_wedge_coupled.cu",
+      "target": "coupled.cu",
       "sources": [
         "field_wedge_ad_coupled.cu",
         "field_wedge_ad_prepare.cu",
@@ -121,7 +121,7 @@
       "baseline_device_trap_sites": 0
     },
     {
-      "target": "los_consumer.cu",
+      "target": "los.cu",
       "sources": [
         "los.cu",
         "los_silhouette_clearance.cu",
@@ -135,7 +135,7 @@
       "baseline_device_trap_sites": 0
     },
     {
-      "target": "capacity_failure.cu",
+      "target": "capacity.cu",
       "sources": [
         "capacity_failure_state.cu",
         "capacity_failure_terminal.cu",
@@ -149,7 +149,7 @@
       "baseline_device_trap_sites": 0
     },
     {
-      "target": "montecarlo_common.cu",
+      "target": "montecarlo.cu",
       "sources": [
         "accum.cu",
         "bdpt_accum.cu",
@@ -187,7 +187,7 @@
       "baseline_device_trap_sites": 0
     },
     {
-      "target": "mc_transmission_wall_product.cu",
+      "target": "mc_transmission.cu",
       "sources": [
         "mc_transmission_wall_product.cu"
       ],
@@ -198,7 +198,7 @@
       "baseline_device_trap_sites": 0
     },
     {
-      "target": "kirchhoff_table_ad.cu",
+      "target": "kirchhoff.cu",
       "sources": [
         "kirchhoff_table_ad.cu"
       ],
@@ -224,7 +224,7 @@
       "baseline_device_trap_sites": 0
     },
     {
-      "target": "bdpt_subpaths.cu",
+      "target": "bdpt_paths.cu",
       "sources": [
         "bdpt_subpaths.cu",
         "bdpt_subpaths_ad.cu"
@@ -325,5 +325,65 @@
       "single_definition_historical_duplicates_repaid": 19
     },
     "backward_compatibility": "none; deleted source paths survive only as historical evidence names and provenance labels, never as build inputs, aliases, or re-exports"
+  },
+  "source_layout": {
+    "date": "2026-07-29",
+    "rule": "Translation units use short owner names; implementation steps stay inside the owner file.",
+    "merged_headers": [
+      "bdpt_connect_common.cuh -> bdpt_connect.cu",
+      "field_wedge_ad_common.cuh -> coupled.cu",
+      "evaluated_paths_continuous_gather_ad.cuh -> evaluated_paths.cu"
+    ],
+    "shared_headers": [
+      "capacity.h",
+      "field_ad.cuh",
+      "math.cuh",
+      "path_compaction.cuh",
+      "path_payload.cuh",
+      "torch_cuda.h"
+    ],
+    "compatibility_aliases": [],
+    "validation": {
+      "scope": "witwin2 Release sm_120-real only; no PTX, virtual-architecture, or multi-architecture claim",
+      "build_status": "passed",
+      "cuda_translation_units": 15,
+      "shared_headers": 6,
+      "artifact": {
+        "path": "build/cmake_adr044/_channel.cp311-win_amd64.pyd",
+        "size_bytes": 34909184,
+        "sha256": "96c27327aeeb4ceadcb1acc4bd921a6db93db4fa481043bf5fc85fd1c4e20153",
+        "build_fingerprint": "7b6720a82a1c32958e1b0841614b50ca140c562815caca52a5254cc042825194"
+      },
+      "tests": [
+        {
+          "scope": "native layout, owner, launch, sync, trap, and governance",
+          "passed": 70,
+          "failed": 0
+        },
+        {
+          "scope": "path, BDPT, field, coupled primal/JVP/VJP",
+          "passed": 218,
+          "failed": 0,
+          "warnings": 21
+        },
+        {
+          "scope": "complete repository suite",
+          "passed": 2682,
+          "failed": 0,
+          "skipped": 8,
+          "xfailed": 1,
+          "warnings": 21,
+          "elapsed_seconds": 401.26
+        }
+      ],
+      "duplication": {
+        "regions": 148,
+        "unclassified": 0,
+        "stale": 0,
+        "coverage_percent": 8.734658,
+        "frozen_coverage_percent": 10.211512
+      },
+      "compatibility_aliases": []
+    }
   }
 }

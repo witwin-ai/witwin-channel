@@ -80,10 +80,10 @@ declaration is a defect.
 
 The adjoint and the dual already existed inside the two Channel-owned kernels
 and were dropped at the ABI boundary. The `field_transport_free_space.cu`
-provenance section in `field_transport.cu` already
+provenance section in `fields.cu` already
 built an internal `g_direction` accumulator and pushed it through
 `adj_v3_safe_normalize`; the `field_transport_reflection.cu` provenance
-section in `field_transport.cu` already built
+section in `fields.cu` already built
 `g_final_direction` and `DualF3 final_direction`. This ADR adds an optional
 `grad_direction` cotangent input that seeds those accumulators, and a
 `direction` tangent output that publishes the dual that was already computed.

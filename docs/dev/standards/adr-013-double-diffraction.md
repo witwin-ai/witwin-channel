@@ -88,7 +88,7 @@ existing rx-streamed wrapper and the 1M cap govern the union. Depth = 2,
 
 New symbols alongside the coupled ones in
 the `coupled_topology.cu` provenance section of
-`native/channel/kernels/field_wedge_coupled.cu` and
+`native/channel/kernels/coupled.cu` and
 `native/channel/rayd/geometry.cpp`:
 
 - `channel_coupled_dd_prepare_cuda`: per candidate (tx, rx, e1, e2) solve the
@@ -97,7 +97,7 @@ the `coupled_topology.cu` provenance section of
   single-edge projection (fixed 16 iterations, deterministic order,
   float32). Validity: both parameters strictly inside their finite segments
   (same `kGeometryEpsilon` semantics as `coupled_rd_prepare_kernel`
-  `inside_edge`, `field_wedge_coupled.cu:2284-2288`) and the three segment
+  `inside_edge` in `coupled.cu`) and the three segment
   directions well-defined. Emits Q1, Q2, per-leg lengths.
 - visibility: three segment queries (tx->Q1, Q1->Q2, Q2->rx) through the
   existing `raydn_visibility_forward` C-ABI batch call (geometry.cpp:291
@@ -116,12 +116,12 @@ wedge materials, resolved by the field stage exactly as coupled rows do).
 ### D3: native field kernel (two sequential wedge operators, one launch)
 
 New `coupled_dd_field_kernel` in
-`native/channel/kernels/field_transport.cu` (pattern:
-`coupled_rd_field_kernel`, field_transport.cu:348-537):
+`native/channel/kernels/fields.cu` (pattern:
+`coupled_rd_field_kernel` in the same file):
 
 - **Leg 1** (e1): `PairInputs` with `sourcePos = tx`,
   spherical incident from tx (same `free_space_complex3` construction as the
-  coupled reverse branch, field_transport.cu:415-420),
+  coupled reverse branch in `fields.cu`),
   `selectStationaryPoint = 1`, real `edge_line_min/max` for e1,
   `stationaryExternalIncident = 0` (the incident IS the direct source),
   observation point = Q2_frozen (from discovery). Output: complex vector
@@ -153,7 +153,7 @@ leg-2 coefficient evaluation must stay a single call site so P4 can swap it.
 ### D4: AD companions
 
 `channel_field_coupled_dd_backward` / `channel_field_coupled_dd_jvp` twins (pattern:
-`field_wedge_coupled.cu::coupled_rd_row_dual` after ADR-012 G4-3, which
+`coupled.cu::coupled_rd_row_dual` after ADR-012 G4-3, which
 calls `compute_pair_vector_contribution` directly so the truncation/mend
 derivatives flow in lockstep). tx/rx gradients flow through the live
 re-anchoring inside the kernels; Q1/Q2/bounds are frozen seeds (detached),

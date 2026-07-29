@@ -1,8 +1,8 @@
 // Copyright Xingyu Chen.
-// Implements bdpt subpaths CUDA operations.
+// Implements BDPT path CUDA operations.
 
 // ==== Section: BDPT subpaths ====
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 #include "math.cuh"
 
 #include <ATen/cuda/CUDAContext.h>
@@ -1156,7 +1156,7 @@ std::vector<at::Tensor> channel_bdpt_reflected_light_subpath_state_cuda(
 }
 
 // ==== Section: BDPT subpath AD ====
-#include "field_transport_ad_common.cuh"
+#include "field_ad.cuh"
 
 #include <rayd/shared/rf/layer_stack.cuh>
 

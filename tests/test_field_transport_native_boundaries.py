@@ -31,7 +31,7 @@ RAYD_TRANSMISSION_SOURCES = (
 FIELDS_BINDING = REPOSITORY_ROOT / "native/channel/binding/fields.cpp"
 
 TRANSLATION_UNITS = {
-    "merged": KERNEL_ROOT / "field_transport.cu",
+    "merged": KERNEL_ROOT / "fields.cu",
 }
 ABI_BY_OWNER = {
     "merged": {
@@ -187,18 +187,18 @@ def test_transmission_sequence_typed_adapter_preserves_channel_schemas() -> None
 
 def test_field_transport_common_helpers_have_one_source() -> None:
     names = _function_names_by_path()
-    common = "native/channel/kernels/field_transport_ad_common.cuh"
-    merged = KERNEL_ROOT / "field_transport.cu"
+    common = "native/channel/kernels/field_ad.cuh"
+    merged = KERNEL_ROOT / "fields.cu"
 
     assert COMMON_HELPERS == names[common]
     assert merged.read_text(encoding="utf-8-sig").count(
-        '#include "field_transport_ad_common.cuh"'
+        '#include "field_ad.cuh"'
     ) == 2
 
 
 def test_output_chain_ad_helpers_are_defined_only_in_locked_rayd_header() -> None:
     common_source = (
-        KERNEL_ROOT / "field_transport_ad_common.cuh"
+        KERNEL_ROOT / "field_ad.cuh"
     ).read_text(encoding="utf-8-sig")
     rayd_source = RAYD_FIELD_TRANSPORT_AD.read_text(encoding="utf-8-sig")
 
@@ -213,8 +213,8 @@ def test_output_chain_ad_helpers_are_defined_only_in_locked_rayd_header() -> Non
 
 def test_field_transport_consolidation_is_registered_once() -> None:
     cmake = (REPOSITORY_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
-    common = "native/channel/kernels/field_transport_ad_common.cuh"
-    merged = "native/channel/kernels/field_transport.cu"
+    common = "native/channel/kernels/field_ad.cuh"
+    merged = "native/channel/kernels/fields.cu"
 
     assert cmake.count(merged) == 1
     assert "native/channel/kernels/field_transport_free_space.cu" not in cmake

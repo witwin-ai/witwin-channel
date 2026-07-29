@@ -1,5 +1,5 @@
 // Copyright Xingyu Chen.
-// Declares torch cuda minimal native contracts.
+// Includes the minimal Torch and CUDA declarations used by native kernels.
 
 #pragma once
 

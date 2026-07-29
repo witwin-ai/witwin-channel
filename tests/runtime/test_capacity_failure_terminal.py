@@ -149,7 +149,7 @@ def test_capacity_failure_terminal_trap_isolated_to_subprocess() -> None:
 def test_capacity_failure_terminal_source_has_one_async_device_observer() -> None:
     native = (
         REPOSITORY_ROOT
-        / "native/channel/kernels/capacity_failure.cu"
+        / "native/channel/kernels/capacity.cu"
     ).read_text(encoding="utf-8")
     facade = (
         REPOSITORY_ROOT
@@ -189,7 +189,7 @@ def test_capacity_failure_terminal_source_has_one_async_device_observer() -> Non
         and "trap;" in path.read_text(encoding="utf-8")
     )
     assert trap_sources == [
-        "native/channel/kernels/capacity_failure.cu"
+        "native/channel/kernels/capacity.cu"
     ]
 
     production_mentions = sorted(

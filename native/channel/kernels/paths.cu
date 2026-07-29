@@ -1,12 +1,12 @@
 // Copyright Xingyu Chen.
-// Implements path topology CUDA operations.
+// Implements path topology and compaction CUDA operations.
 
 // ==== Section: Path tracing ====
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <c10/util/complex.h>
 #include <cuda_runtime_api.h>
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 #include "math.cuh"
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
@@ -22,7 +22,7 @@
 #include <tuple>
 #include <vector>
 
-#include "path_compaction_common.cuh"
+#include "path_compaction.cuh"
 
 namespace {
 
@@ -1650,7 +1650,7 @@ channel_path_finalize_blocks_cuda(
 #include <c10/cuda/CUDAException.h>
 #include <c10/util/complex.h>
 #include <cuda_runtime_api.h>
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 #include "math.cuh"
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
@@ -1661,7 +1661,7 @@ channel_path_finalize_blocks_cuda(
 #include <limits>
 #include <tuple>
 
-#include "path_compaction_common.cuh"
+#include "path_compaction.cuh"
 
 #define channel_neg_kd_phase channel_neg_kd_phase_compaction
 #define kLightSpeedMetersPerSecond kCompactionLightSpeedMetersPerSecond
@@ -3078,7 +3078,7 @@ channel_path_diffraction_block_cuda(
 #include <c10/cuda/CUDAException.h>
 #include <c10/util/complex.h>
 #include <cuda_runtime_api.h>
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 #include "math.cuh"
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
@@ -3094,7 +3094,7 @@ channel_path_diffraction_block_cuda(
 #include <tuple>
 #include <vector>
 
-#include "path_compaction_common.cuh"
+#include "path_compaction.cuh"
 
 namespace {
 

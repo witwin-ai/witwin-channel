@@ -163,7 +163,7 @@ def test_phase10b_channel_is_typed_facade_without_duplicate_or_fallback() -> Non
     materials = (ROOT / "native/channel/binding/materials.cpp").read_text(
         encoding="utf-8-sig"
     )
-    event_source = (ROOT / "native/channel/kernels/montecarlo_common.cu").read_text(
+    event_source = (ROOT / "native/channel/kernels/montecarlo.cu").read_text(
         encoding="utf-8-sig"
     )
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8-sig")

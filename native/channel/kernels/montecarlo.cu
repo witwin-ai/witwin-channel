@@ -1,5 +1,5 @@
 // Copyright Xingyu Chen.
-// Implements montecarlo common CUDA operations.
+// Implements shared Monte Carlo CUDA operations.
 
 // ==== Section: Monte Carlo accumulation ====
 #include <ATen/ATen.h>
@@ -308,7 +308,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
 #include "math.cuh"
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 
 #include <algorithm>
 
@@ -920,7 +920,7 @@ channel_bdpt_face_material_tensors_from_host_cuda(
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 
 #include "../tensor_checks.h"
 

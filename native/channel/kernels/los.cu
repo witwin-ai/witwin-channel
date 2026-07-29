@@ -1,5 +1,5 @@
 // Copyright Xingyu Chen.
-// Implements los consumer CUDA operations.
+// Implements line-of-sight and consumer CUDA operations.
 
 // ==== Section: LoS consumer kernels ====
 #include <ATen/ATen.h>
@@ -1296,7 +1296,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_los_taper_app
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
 #include <thrust/scan.h>
@@ -1943,7 +1943,7 @@ pybind11::dict channel_consumer_fixed_los_gather_jvp(
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <c10/util/complex.h>
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 
 #include "math.cuh"
 #include <rayd/shared/rf/field_transport.cuh>

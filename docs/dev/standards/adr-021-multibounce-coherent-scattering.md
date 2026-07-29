@@ -95,7 +95,7 @@ bounce, unfolded lengths `L1`, `L2`), sample data, and resident tables:
 1. Chain-1 coherent Jones transport of the tx polarization to `v_s` in the
    incident s/p basis (identical per-bounce math and expression order as
    the `field_transport_reflection.cu` provenance section in
-   `field_transport.cu`, including per-bounce rough `C_r`
+   `fields.cu`, including per-bounce rough `C_r`
    attenuation), yielding the incident coherency diagonal
    `P_te = |E_s|^2, P_tm = |E_p|^2` and the incident direction `d_i` of the
    last C1 leg.

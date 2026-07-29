@@ -45,6 +45,24 @@ def test_cuda_translation_units_match_the_adr044_ledger() -> None:
     assert actual == expected
 
 
+def test_native_headers_are_shared_contracts_with_short_owner_names() -> None:
+    expected = {
+        "capacity.h",
+        "field_ad.cuh",
+        "math.cuh",
+        "path_compaction.cuh",
+        "path_payload.cuh",
+        "torch_cuda.h",
+    }
+    actual = {
+        path.name
+        for path in KERNEL_ROOT.iterdir()
+        if path.suffix in {".h", ".cuh"}
+    }
+
+    assert actual == expected
+    assert all("common" not in name and "plumbing" not in name for name in actual)
+
 def test_consolidated_units_are_registered_once() -> None:
     ledger = _ledger()
     cmake = (REPOSITORY_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
@@ -85,8 +103,8 @@ def test_special_compile_modes_remain_narrow() -> None:
     }
 
     assert fmad_false == {
-        "kirchhoff_table_ad.cu",
-        "mc_transmission_wall_product.cu",
+        "kirchhoff.cu",
+        "mc_transmission.cu",
     }
     assert cmake.count('PROPERTIES COMPILE_OPTIONS "--fmad=false"') == 2
     assert "--use_fast_math" not in cmake

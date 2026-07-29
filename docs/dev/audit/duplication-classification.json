@@ -15,8 +15,8 @@
   "adr039_lockstep_duplicates": [
     {
       "owner": "consumer complex3 source amplitude (ADR-039)",
-      "source": "native/channel/kernels/field_transport.cu::source_amplitude_scale_kernel",
-      "lockstep_with": "native/channel/kernels/field_transport.cu::source_amplitude",
+      "source": "native/channel/kernels/fields.cu::source_amplitude_scale_kernel",
+      "lockstep_with": "native/channel/kernels/fields.cu::source_amplitude",
       "reason": "ADR-039 requires path_field_vector to apply the identical sqrtf(fmaxf(tx_power, 0.0f)) amplitude the field transport kernels apply to path_field, so the projected complex3 response and the scalar response remain the same physical quantity. The shared region is one expression, far below the 100-token gate threshold, so it is recorded here by hand; removing the duplicate would move the amplitude across the transport fusion boundary and requires its own numerical change.",
       "lockstep_tests": [
         "tests/kernels/test_field_source_amplitude_scale.py::test_source_amplitude_scale_applies_the_transport_amplitude",
@@ -105,7 +105,7 @@
       "corpus": "native",
       "files": [
         "bdpt_ad_dispatch.cpp",
-        "bdpt_subpaths.cu"
+        "bdpt_paths.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -121,7 +121,7 @@
       "category": "indexing_packing",
       "corpus": "native",
       "files": [
-        "bdpt_subpaths.cu"
+        "bdpt_paths.cu"
       ],
       "owner": "bdpt",
       "provenance": "ADR-044 full current-tree refresh",
@@ -143,7 +143,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "bdpt_subpaths.cu"
+        "bdpt_paths.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -182,7 +182,7 @@
       "category": "indexing_packing",
       "corpus": "native",
       "files": [
-        "field_transport.cu"
+        "fields.cu"
       ],
       "owner": "field_transport_free_space",
       "provenance": "ADR-044 full current-tree refresh",
@@ -205,7 +205,7 @@
       "category": "indexing_packing",
       "corpus": "native",
       "files": [
-        "los_consumer.cu"
+        "los.cu"
       ],
       "owner": "montecarlo-basic",
       "provenance": "ADR-044 full current-tree refresh",
@@ -216,7 +216,7 @@
       "category": "host_check",
       "corpus": "native",
       "files": [
-        "path_topology.cu"
+        "paths.cu"
       ],
       "owner": "path",
       "provenance": "ADR-044 full current-tree refresh",
@@ -254,7 +254,7 @@
       "category": "indexing_packing",
       "corpus": "native",
       "files": [
-        "field_wedge_coupled.cu"
+        "coupled.cu"
       ],
       "owner": "field-transport",
       "provenance": "ADR-044 full current-tree refresh",
@@ -291,7 +291,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "bdpt_subpaths.cu"
+        "bdpt_paths.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -307,8 +307,8 @@
       "category": "indexing_packing",
       "corpus": "native",
       "files": [
-        "evaluated_paths_continuous_gather_ad.cuh",
-        "evaluated_paths_payload_plumbing.h"
+        "evaluated_paths.cu",
+        "path_payload.cuh"
       ],
       "owner": "propagation.enumerated typed allocation plumbing",
       "provenance": "ADR-044 full current-tree refresh",
@@ -319,8 +319,8 @@
       "category": "other",
       "corpus": "native",
       "files": [
-        "field_transport.cu",
-        "fields.cpp"
+        "fields.cpp",
+        "fields.cu"
       ],
       "owner": "bindings",
       "provenance": "ADR-044 full current-tree refresh",
@@ -342,7 +342,7 @@
       "category": "indexing_packing",
       "corpus": "native",
       "files": [
-        "field_wedge_coupled.cu"
+        "coupled.cu"
       ],
       "owner": "field_wedge_ad_project",
       "provenance": "ADR-044 full current-tree refresh",
@@ -353,8 +353,8 @@
       "category": "other",
       "corpus": "native",
       "files": [
-        "montecarlo.cpp",
-        "montecarlo_basic.cpp"
+        "montecarlo_basic.cpp",
+        "montecarlo.cpp"
       ],
       "owner": "bindings",
       "provenance": "ADR-044 full current-tree refresh",
@@ -376,7 +376,7 @@
       "category": "indexing_packing",
       "corpus": "native",
       "files": [
-        "path_topology.cu"
+        "paths.cu"
       ],
       "owner": "path",
       "provenance": "ADR-044 full current-tree refresh",
@@ -387,8 +387,8 @@
       "category": "other",
       "corpus": "native",
       "files": [
-        "bdpt.cpp",
-        "bdpt_connect.cu"
+        "bdpt_connect.cu",
+        "bdpt.cpp"
       ],
       "owner": "bdpt",
       "provenance": "ADR-044 full current-tree refresh",
@@ -448,7 +448,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "montecarlo_common.cu"
+        "montecarlo.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -497,7 +497,7 @@
       "category": "other",
       "corpus": "native",
       "files": [
-        "kirchhoff_table_ad.cu",
+        "kirchhoff.cu",
         "materials.cpp"
       ],
       "owner": "bindings",
@@ -509,7 +509,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "bdpt_subpaths.cu"
+        "bdpt_paths.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -532,7 +532,7 @@
       ],
       "corpus": "native",
       "files": [
-        "field_transport.cu"
+        "fields.cu"
       ],
       "provenance": "ADR-044 full current-tree refresh",
       "token_count": 147
@@ -541,7 +541,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "field_wedge_coupled.cu"
+        "coupled.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -591,7 +591,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "montecarlo_common.cu"
+        "montecarlo.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -607,7 +607,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "los_consumer.cu"
+        "los.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -625,7 +625,7 @@
       "reason": "Repeated compact-output allocation, stable row selection, and launch bookkeeping contains no floating-point physics expression.",
       "corpus": "native",
       "files": [
-        "path_topology.cu"
+        "paths.cu"
       ],
       "provenance": "ADR-044 full current-tree refresh",
       "token_count": 285
@@ -634,7 +634,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "field_transport.cu"
+        "fields.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -661,7 +661,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "path_topology.cu"
+        "paths.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -677,8 +677,8 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "path_compaction_common.cuh",
-        "path_topology.cu"
+        "path_compaction.cuh",
+        "paths.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -694,7 +694,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "path_topology.cu"
+        "paths.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -711,7 +711,7 @@
       "corpus": "native",
       "files": [
         "bdpt_support.cu",
-        "montecarlo_common.cu"
+        "montecarlo.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -743,7 +743,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "field_transport.cu"
+        "fields.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -759,8 +759,8 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "bdpt.cpp",
-        "bdpt_connect.cu"
+        "bdpt_connect.cu",
+        "bdpt.cpp"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -803,8 +803,8 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "bdpt.cpp",
-        "bdpt_connect.cu"
+        "bdpt_connect.cu",
+        "bdpt.cpp"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -836,7 +836,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "field_transport.cu"
+        "fields.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -852,7 +852,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "bdpt_subpaths.cu"
+        "bdpt_paths.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -879,8 +879,8 @@
       "category": "other",
       "corpus": "native",
       "files": [
-        "montecarlo.cpp",
-        "montecarlo_basic.cpp"
+        "montecarlo_basic.cpp",
+        "montecarlo.cpp"
       ],
       "owner": "bindings",
       "provenance": "ADR-044 full current-tree refresh",
@@ -891,7 +891,7 @@
       "category": "other",
       "corpus": "native",
       "files": [
-        "kirchhoff_table_ad.cu",
+        "kirchhoff.cu",
         "materials.cpp"
       ],
       "owner": "bindings",
@@ -915,8 +915,8 @@
       "category": "other",
       "corpus": "native",
       "files": [
-        "montecarlo.cpp",
-        "montecarlo_basic.cpp"
+        "montecarlo_basic.cpp",
+        "montecarlo.cpp"
       ],
       "owner": "bindings",
       "provenance": "ADR-044 full current-tree refresh",
@@ -967,7 +967,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "field_wedge_coupled.cu"
+        "coupled.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -994,7 +994,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "los_consumer.cu"
+        "los.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1010,8 +1010,8 @@
       "category": "other",
       "corpus": "native",
       "files": [
-        "field_transport.cu",
-        "fields.cpp"
+        "fields.cpp",
+        "fields.cu"
       ],
       "owner": "bindings",
       "provenance": "ADR-044 full current-tree refresh",
@@ -1022,7 +1022,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "field_wedge_coupled.cu"
+        "coupled.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1038,7 +1038,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "path_topology.cu"
+        "paths.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1065,7 +1065,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "path_topology.cu"
+        "paths.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1092,7 +1092,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "kirchhoff_table_ad.cu"
+        "kirchhoff.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1125,7 +1125,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "field_transport.cu"
+        "fields.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1157,7 +1157,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "bdpt_subpaths.cu",
+        "bdpt_paths.cu",
         "bdpt_support.cu"
       ],
       "lockstep_tests": [
@@ -1174,8 +1174,8 @@
       "category": "other",
       "corpus": "native",
       "files": [
-        "montecarlo.cpp",
-        "montecarlo_basic.cpp"
+        "montecarlo_basic.cpp",
+        "montecarlo.cpp"
       ],
       "owner": "bindings",
       "provenance": "ADR-044 full current-tree refresh",
@@ -1224,9 +1224,9 @@
       "category": "other",
       "corpus": "native",
       "files": [
-        "bdpt.cpp",
         "bdpt_ad_dispatch.cpp",
-        "bdpt_connect.cu"
+        "bdpt_connect.cu",
+        "bdpt.cpp"
       ],
       "owner": "bindings",
       "provenance": "ADR-044 full current-tree refresh",
@@ -1259,7 +1259,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "bdpt_subpaths.cu"
+        "bdpt_paths.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1275,8 +1275,8 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "bdpt.cpp",
-        "bdpt_connect.cu"
+        "bdpt_connect.cu",
+        "bdpt.cpp"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1320,7 +1320,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "path_topology.cu"
+        "paths.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1353,7 +1353,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "field_transport.cu"
+        "fields.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1419,7 +1419,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "path_topology.cu"
+        "paths.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1435,7 +1435,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "los_consumer.cu"
+        "los.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1485,7 +1485,7 @@
       "reason": "Independent sanitizer and compact-finalize typed boundaries repeat the complete evaluated-path payload signature; no payload physics is duplicated.",
       "corpus": "native",
       "files": [
-        "capacity_failure.cu",
+        "capacity.cu",
         "evaluated_paths.cu"
       ],
       "provenance": "ADR-044 full current-tree refresh",
@@ -1495,7 +1495,7 @@
       "category": "indexing_packing",
       "corpus": "native",
       "files": [
-        "evaluated_paths_payload_plumbing.h"
+        "path_payload.cuh"
       ],
       "owner": "propagation.enumerated shared payload plumbing",
       "provenance": "ADR-044 full current-tree refresh",
@@ -1506,7 +1506,7 @@
       "category": "indexing_packing",
       "corpus": "native",
       "files": [
-        "field_wedge_coupled.cu"
+        "coupled.cu"
       ],
       "owner": "field-transport",
       "provenance": "ADR-044 full current-tree refresh",
@@ -1533,7 +1533,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "field_transport.cu"
+        "fields.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1565,7 +1565,7 @@
       "category": "indexing_packing",
       "corpus": "native",
       "files": [
-        "path_topology.cu"
+        "paths.cu"
       ],
       "owner": "path",
       "provenance": "ADR-044 full current-tree refresh",
@@ -1576,7 +1576,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "field_transport.cu"
+        "fields.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1592,7 +1592,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "kirchhoff_table_ad.cu"
+        "kirchhoff.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1608,7 +1608,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "kirchhoff_table_ad.cu"
+        "kirchhoff.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1626,11 +1626,11 @@
       "files": [
         "bdpt_connect.cu",
         "bdpt_support.cu",
+        "coupled.cu",
         "deterministic.cu",
-        "field_transport.cu",
-        "field_transport_ad_common.cuh",
-        "field_wedge_ad_common.cuh",
-        "kirchhoff_table_ad.cu"
+        "field_ad.cuh",
+        "fields.cu",
+        "kirchhoff.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1646,7 +1646,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "bdpt_subpaths.cu"
+        "bdpt_paths.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1662,7 +1662,7 @@
       "category": "indexing_packing",
       "corpus": "native",
       "files": [
-        "mc_transmission_wall_product.cu"
+        "mc_transmission.cu"
       ],
       "owner": "montecarlo.basic",
       "provenance": "ADR-044 full current-tree refresh",
@@ -1696,7 +1696,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "bdpt_subpaths.cu"
+        "bdpt_paths.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1791,7 +1791,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "mc_transmission_wall_product.cu"
+        "mc_transmission.cu"
       ],
       "lockstep_tests": [
         "tests/montecarlo/basic/test_transmission_wall_product.py::test_transmission_wall_product_jvp_vjp_duality_and_determinism",
@@ -1846,7 +1846,7 @@
       "category": "indexing_packing",
       "corpus": "native",
       "files": [
-        "field_wedge_coupled.cu"
+        "coupled.cu"
       ],
       "owner": "field-transport",
       "provenance": "ADR-044 full current-tree refresh",
@@ -1857,7 +1857,7 @@
       "category": "indexing_packing",
       "corpus": "native",
       "files": [
-        "field_wedge_coupled.cu"
+        "coupled.cu"
       ],
       "owner": "field-transport",
       "provenance": "ADR-044 full current-tree refresh",
@@ -1868,8 +1868,8 @@
       "category": "indexing_packing",
       "corpus": "native",
       "files": [
-        "bdpt.cpp",
-        "bdpt_subpaths.cu"
+        "bdpt_paths.cu",
+        "bdpt.cpp"
       ],
       "owner": "bdpt",
       "provenance": "ADR-044 full current-tree refresh",
@@ -1881,7 +1881,7 @@
       "corpus": "native",
       "files": [
         "path_solver.cpp",
-        "path_topology.cu"
+        "paths.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -1892,22 +1892,6 @@
       "provenance": "ADR-044 full current-tree refresh",
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 111
-    },
-    "faff68686e2f71c6": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "field_wedge_coupled.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "propagation.fields",
-      "provenance": "ADR-044 full current-tree refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 134
     },
     "fd7cb085e22f6cfb": {
       "category": "other",
@@ -1963,7 +1947,7 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "field_transport.cu"
+        "fields.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_field_em_ad.py",
@@ -2013,7 +1997,7 @@
       "reason": "Co-located provenance sections retain repeated include and namespace prologues so each moved owner remains auditable.",
       "corpus": "native",
       "files": [
-        "path_topology.cu"
+        "paths.cu"
       ],
       "provenance": "shared math consolidation refresh",
       "token_count": 132
@@ -2053,8 +2037,8 @@
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
-        "field_transport.cu",
-        "field_wedge_coupled.cu"
+        "coupled.cu",
+        "fields.cu"
       ],
       "lockstep_tests": [
         "tests/ad/test_solver_diffraction_coupled_ad.py",
@@ -2079,6 +2063,22 @@
       "provenance": "shared math consolidation refresh",
       "reason": "Fixed-topology reflection kernels keep repeated launch and field setup to preserve floating-point evaluation order.",
       "token_count": 103
+    },
+    "8e89bcae3ac23cff": {
+      "token_count": 133,
+      "owner": "propagation.fields",
+      "lockstep_tests": [
+        "tests/ad/test_field_em_ad.py",
+        "tests/ad/test_bdpt_companion_ad.py",
+        "tests/ad/test_chain_scattering_ad.py"
+      ],
+      "files": [
+        "coupled.cu"
+      ],
+      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
+      "corpus": "native",
+      "provenance": "Native owner filename refresh",
+      "category": "numeric_sensitive_exempt"
     }
   },
   "schema_version": 1,
@@ -2233,5 +2233,25 @@
     },
     "note": "Compact signature formatting preserved every existing Python AST. Shared Python and native contract validators removed five exact-token regions; one unchanged numerical region received a new maximal-region id after adjacent validation moved behind a helper.",
     "status": "all current regions classified; no stale entries; duplicate coverage and long-signature counts tightened"
+  },
+  "native_layout_refresh": {
+    "date": "2026-07-29",
+    "combined_duplicate_lines": 7565,
+    "combined_total_lines": 86609,
+    "coverage_percent": 8.734658,
+    "frozen_coverage_percent": 10.211512,
+    "region_count": 148,
+    "category_counts": {
+      "host_check": 7,
+      "indexing_packing": 22,
+      "numeric_sensitive_exempt": 70,
+      "fixture_boilerplate": 24,
+      "other": 25
+    },
+    "translation_unit_count": 15,
+    "shared_header_count": 6,
+    "merged_single_consumer_headers": 3,
+    "note": "Short owner filenames replaced implementation-detail names. Three single-consumer headers moved into their owning translation units without changing ABI, launches, synchronization, compile mode, or numerical order.",
+    "status": "all current regions classified; no stale entries; native owner names and header boundaries are current"
   }
 }

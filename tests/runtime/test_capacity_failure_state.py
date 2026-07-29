@@ -51,10 +51,10 @@ def test_capacity_failure_state_rejects_bad_metadata() -> None:
 def test_capacity_intermediates_have_no_trap_or_host_synchronization() -> None:
     root = Path(__file__).resolve().parents[2]
     sources = (
-        ("capacity_failure.cu", "Enumerated capacity sanitization"),
+        ("capacity.cu", "Enumerated capacity sanitization"),
         ("evaluated_paths.cu", "Capacity-pack AD"),
         (
-            "capacity_failure.cu",
+            "capacity.cu",
             "Monte Carlo capacity sanitization",
         ),
     )
@@ -71,7 +71,7 @@ def test_capacity_intermediates_have_no_trap_or_host_synchronization() -> None:
             assert forbidden not in source, f"{section_name} contains {forbidden}"
 
     initializer = _native_section(
-        kernels / "capacity_failure.cu",
+        kernels / "capacity.cu",
         "Capacity failure state",
     )
     assert "cudaMemsetAsync" in initializer

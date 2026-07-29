@@ -1222,7 +1222,7 @@ def append_scattering_evaluated_paths(
 # facades; hit points, normals, and face IDs remain RayD-owned.
 
 
-# Native on-stack ReflectionChain capacity (field_transport_ad_common.cuh
+# Native on-stack ReflectionChain capacity (field_ad.cuh
 # kMaxAdDepth). Each specular leg is padded to this width independently.
 KMAX_AD_DEPTH = 8
 

@@ -1,11 +1,11 @@
 // Copyright Xingyu Chen.
-// Shares path compaction common CUDA helpers.
+// Shares path compaction count and allocation helpers.
 
 #pragma once
 
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
-#include "torch_cuda_minimal.h"
+#include "torch_cuda.h"
 
 #include <tuple>
 

@@ -94,7 +94,7 @@ def test_phase10b_channel_has_no_local_scattering_numerical_owner() -> None:
 
 def test_phase10b_retains_only_event_policy_in_scattering_tu() -> None:
     source = _native_section(
-        KERNELS / "montecarlo_common.cu",
+        KERNELS / "montecarlo.cu",
         "Monte Carlo scattering",
     )
     assert source.count("scattering_event_kernel<<<") == 1
