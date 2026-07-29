@@ -176,9 +176,7 @@ def _fixed_request(sources, sinks, topology, response: str, ad_mode: str = "none
 @pytest.mark.parametrize(
     "response", ["scalar_transport", "complex3_transport"]
 )
-def test_raw_fixed_los_reevaluation_scales_by_each_row_own_source(
-    response: str,
-) -> None:
+def test_raw_fixed_los_reevaluation_scales_by_each_row_own_source(response: str) -> None:
     compiled = compile(Scene(), reference_frequency_hz=_FREQUENCY_HZ)
     sources, sinks = _endpoints(_POWERS_W)
     topology = evaluate(
@@ -208,9 +206,7 @@ def test_raw_fixed_los_reevaluation_scales_by_each_row_own_source(
 @pytest.mark.parametrize(
     "response", ["scalar_transport", "complex3_transport"]
 )
-def test_prepared_reflection_reevaluation_scales_by_the_source_amplitude(
-    response: str,
-) -> None:
+def test_prepared_reflection_reevaluation_scales_by_the_source_amplitude(response: str) -> None:
     """A reflection row carries the amplitude through the whole bounce chain."""
 
     compiled = world.smooth_wall_scene()
@@ -264,9 +260,7 @@ def test_prepared_reflection_reevaluation_scales_by_the_source_amplitude(
 @pytest.mark.parametrize(
     "response", ["scalar_transport", "complex3_transport"]
 )
-def test_prepared_reflection_reevaluation_scales_each_row_by_its_own_source(
-    response: str,
-) -> None:
+def test_prepared_reflection_reevaluation_scales_each_row_by_its_own_source(response: str) -> None:
     """Distinct powers on a reflection topology: one factor per row.
 
  The uniform-power reflection case above cannot separate a per-row gather
@@ -329,9 +323,7 @@ def test_prepared_reflection_reevaluation_scales_each_row_by_its_own_source(
 @pytest.mark.parametrize(
     "response", ["scalar_transport", "complex3_transport"]
 )
-def test_every_ad_mode_publishes_the_same_excited_primal(
-    ad_mode: str, response: str
-) -> None:
+def test_every_ad_mode_publishes_the_same_excited_primal(ad_mode: str, response: str) -> None:
     compiled = compile(Scene(), reference_frequency_hz=_FREQUENCY_HZ)
     sources, sinks = _endpoints(_POWERS_W)
     topology = evaluate(

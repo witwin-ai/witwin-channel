@@ -13,11 +13,7 @@ if TYPE_CHECKING:
     from .compiler import CompiledScene
 
 
-def compile(
-    scene_or_snapshot: Scene | SceneSnapshot,
-    *,
-    reference_frequency_hz,
-) -> "CompiledScene":
+def compile(scene_or_snapshot: Scene | SceneSnapshot, *, reference_frequency_hz) -> "CompiledScene":
     from .compiler import compile as compile_scene
 
     return compile_scene(

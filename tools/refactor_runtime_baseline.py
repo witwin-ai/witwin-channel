@@ -290,7 +290,7 @@ def value_manifest(value: object) -> dict[str, object]:
 
 
 def _strip_volatile_metadata_snapshot(
-    snapshot: object, path: str = "$.metadata"
+    snapshot: object, path: str = "$.metadata",
 ) -> tuple[object, list[dict[str, object]]]:
     volatile = []
     if isinstance(snapshot, dict):
@@ -329,9 +329,7 @@ def _strip_volatile_metadata_snapshot(
     return snapshot, volatile
 
 
-def _semantic_result_snapshot(
-    snapshot: object,
-) -> tuple[object, object, list[dict[str, object]]]:
+def _semantic_result_snapshot(snapshot: object) -> tuple[object, object, list[dict[str, object]]]:
     if not isinstance(snapshot, dict) or snapshot.get("kind") != "dataclass":
         raise RuntimeBaselineError("public solver Result must be a dataclass")
     stable_fields = []
@@ -519,13 +517,7 @@ def _child_environment(torch: Any) -> dict[str, object]:
 
 
 def run_child(
-    *,
-    repo: Path,
-    solver: str,
-    scenario: str,
-    process_index: int,
-    warmup: int,
-    repeats: int,
+    *, repo: Path, solver: str, scenario: str, process_index: int, warmup: int, repeats: int,
 ) -> dict[str, object]:
     validate_measurement_policy(MIN_PROCESSES, warmup, repeats)
     sys.path[:0] = [str(repo)]
@@ -655,13 +647,7 @@ def aggregate_case(rows: Sequence[dict[str, object]]) -> dict[str, object]:
 
 
 def _child_command(
-    script: Path,
-    *,
-    solver: str,
-    scenario: str,
-    process_index: int,
-    warmup: int,
-    repeats: int,
+    script: Path, *, solver: str, scenario: str, process_index: int, warmup: int, repeats: int,
 ) -> list[str]:
     return [
         sys.executable,
@@ -681,14 +667,8 @@ def _child_command(
 
 
 def collect_reduced(
-    repo: Path,
-    *,
-    solvers: Sequence[str],
-    scenarios: Sequence[str],
-    processes: int,
-    warmup: int,
-    repeats: int,
-    timeout_seconds: int,
+    repo: Path, *, solvers: Sequence[str], scenarios: Sequence[str], processes: int, warmup: int,
+    repeats: int, timeout_seconds: int,
 ) -> dict[str, object]:
     validate_measurement_policy(processes, warmup, repeats)
     unknown_solvers = sorted(set(solvers) - set(SOLVERS))
@@ -966,12 +946,7 @@ def _extended_scene_and_config(solver: str, scenario: str):
         ), solve
 
     def _mc_bdpt(
-        components,
-        *,
-        max_depth,
-        samples,
-        receiver_strategy,
-        coupled=False,
+        components, *, max_depth, samples, receiver_strategy, coupled=False,
         accumulation_strategy="auto",
     ):
         from witwin.channel.montecarlo.bdpt import Config, solve
@@ -1452,13 +1427,7 @@ def _load_extended_case(solver: str, scenario: str, ad_mode: str):
 
 
 def run_extended_child(
-    *,
-    repo: Path,
-    solver: str,
-    scenario: str,
-    ad_mode: str,
-    process_index: int,
-    warmup: int,
+    *, repo: Path, solver: str, scenario: str, ad_mode: str, process_index: int, warmup: int,
     repeats: int,
 ) -> dict[str, object]:
     validate_measurement_policy(MIN_PROCESSES, warmup, repeats)
@@ -1510,13 +1479,7 @@ def _aggregate_extended_case(rows: Sequence[dict[str, object]]) -> dict[str, obj
 
 
 def _extended_child_command(
-    script: Path,
-    *,
-    solver: str,
-    scenario: str,
-    ad_mode: str,
-    process_index: int,
-    warmup: int,
+    script: Path, *, solver: str, scenario: str, ad_mode: str, process_index: int, warmup: int,
     repeats: int,
 ) -> list[str]:
     return [
@@ -1541,12 +1504,7 @@ def _extended_child_command(
 
 
 def collect_extended(
-    repo: Path,
-    *,
-    cells: Sequence[tuple[str, str, str]],
-    processes: int,
-    warmup: int,
-    repeats: int,
+    repo: Path, *, cells: Sequence[tuple[str, str, str]], processes: int, warmup: int, repeats: int,
     timeout_seconds: int,
 ) -> dict[str, object]:
     """Freeze the extended profile, excluding non-reproducible/rejected cells.

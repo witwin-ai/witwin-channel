@@ -180,7 +180,7 @@ def forbidden_path_reason(path: str) -> str | None:
 
 
 def scan_repository(
-    root: Path, *, max_tracked_bytes: int = DEFAULT_MAX_TRACKED_BYTES
+    root: Path, *, max_tracked_bytes: int = DEFAULT_MAX_TRACKED_BYTES,
 ) -> list[Violation]:
     violations: list[Violation] = []
     for tracked_file in tracked_files(root):

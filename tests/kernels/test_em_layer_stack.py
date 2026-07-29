@@ -46,10 +46,8 @@ def _csr(materials: list[list[tuple[float, float, float, float]]]) -> dict[str, 
 
 
 def _eval(
-    cos_thetas: list[float],
-    material_ids: list[int],
-    materials: list[list[tuple[float, float, float, float]]],
-    frequency_hz: float,
+    cos_thetas: list[float], material_ids: list[int],
+    materials: list[list[tuple[float, float, float, float]]], frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
     return ops.em_layer_stack_eval(
         torch.tensor(cos_thetas, device="cuda", dtype=torch.float32),
@@ -68,9 +66,7 @@ def _passive_sqrt(z: complex) -> complex:
 
 
 def _transfer_matrix_rt(
-    layers: list[tuple[float, float, float, float]],
-    cos_theta_i: float,
-    frequency_hz: float,
+    layers: list[tuple[float, float, float, float]], cos_theta_i: float, frequency_hz: float,
     pol: str,
 ) -> tuple[complex, complex]:
     omega = 2.0 * math.pi * frequency_hz

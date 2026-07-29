@@ -101,11 +101,7 @@ _SCENE_BUILDERS = {
 
 
 def _solve(
-    scene: Scene,
-    solver: str,
-    components: frozenset[str],
-    ad_mode: str,
-    *,
+    scene: Scene, solver: str, components: frozenset[str], ad_mode: str, *,
     reference_frequency_hz: float | torch.Tensor = _FREQUENCY_HZ,
 ):
     if solver == "path":
@@ -138,11 +134,7 @@ def _loss(result, solver: str) -> torch.Tensor:
 
 
 def _fd_gradient_via_store(
-    scene: Scene,
-    solver: str,
-    components: frozenset[str],
-    leaf: torch.Tensor,
-    step: float,
+    scene: Scene, solver: str, components: frozenset[str], leaf: torch.Tensor, step: float,
 ) -> torch.Tensor:
     base = leaf.detach().clone()
 

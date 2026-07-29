@@ -113,9 +113,7 @@ def test_native_extension_prefers_packaged_module(monkeypatch: pytest.MonkeyPatc
     assert calls == [("._channel", "witwin.channel")]
 
 
-def test_native_extension_never_imports_a_global_module(
-    monkeypatch: pytest.MonkeyPatch,
-):
+def test_native_extension_never_imports_a_global_module(monkeypatch: pytest.MonkeyPatch):
     calls: list[tuple[str, str | None]] = []
 
     def import_module(name: str, package: str | None = None):
@@ -151,7 +149,7 @@ def test_native_extension_preserves_packaged_dependency_import_errors(
     (("1", None), (None, "C:/native/_channel.pyd"), ("yes", "C:/x.pyd")),
 )
 def test_developer_override_requires_switch_and_path(
-    monkeypatch: pytest.MonkeyPatch, enabled: str | None, path: str | None
+    monkeypatch: pytest.MonkeyPatch, enabled: str | None, path: str | None,
 ):
     monkeypatch.setattr(runtime.util, "find_spec", lambda _name: None)
     if enabled is not None:
@@ -165,7 +163,7 @@ def test_developer_override_requires_switch_and_path(
 
 
 def test_developer_override_loads_only_the_exact_absolute_path(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ):
     suffix = runtime.machinery.EXTENSION_SUFFIXES[0]
     path = tmp_path / f"_channel{suffix}"
@@ -190,7 +188,7 @@ def test_developer_override_loads_only_the_exact_absolute_path(
 
 
 def test_packaged_module_origin_cannot_resolve_to_global_extension(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ):
     global_extension = tmp_path / "_channel.pyd"
     global_extension.touch()
@@ -258,9 +256,7 @@ def test_tampered_build_fingerprint_is_rejected(monkeypatch: pytest.MonkeyPatch)
         runtime._validate_build_info(info)
 
 
-def test_developer_expected_fingerprint_mismatch_is_rejected(
-    monkeypatch: pytest.MonkeyPatch,
-):
+def test_developer_expected_fingerprint_mismatch_is_rejected(monkeypatch: pytest.MonkeyPatch):
     _configure_identity_checks(monkeypatch)
     module = SimpleNamespace(build_info=lambda: _valid_build_info())
 
@@ -275,9 +271,7 @@ def test_valid_complete_identity_is_accepted(monkeypatch: pytest.MonkeyPatch):
     assert runtime._validate_build_info(_valid_build_info()) == _valid_build_info()
 
 
-def test_build_info_validates_once_and_returns_fresh_mappings(
-    monkeypatch: pytest.MonkeyPatch,
-):
+def test_build_info_validates_once_and_returns_fresh_mappings(monkeypatch: pytest.MonkeyPatch):
     _configure_identity_checks(monkeypatch)
     calls = 0
 

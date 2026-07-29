@@ -73,11 +73,7 @@ def _scene() -> tuple[object, torch.Tensor]:
 
 
 def _request(
-    rayd: object,
-    origins: torch.Tensor,
-    targets: torch.Tensor,
-    *,
-    hit_capacity: int = 2,
+    rayd: object, origins: torch.Tensor, targets: torch.Tensor, *, hit_capacity: int = 2,
     policy: SegmentPenetrationPolicy = SegmentPenetrationPolicy.EnumeratedFullDistance,
 ):
     failure_state = create_capacity_failure_state(origins)

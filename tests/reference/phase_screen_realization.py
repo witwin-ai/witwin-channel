@@ -22,7 +22,7 @@ def _stable_tangent(n: torch.Tensor) -> torch.Tensor:
 
 
 def _sp_basis(
-    n: torch.Tensor, d: torch.Tensor, backup_axis: torch.Tensor
+    n: torch.Tensor, d: torch.Tensor, backup_axis: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     s = torch.cross(n, d, dim=-1)
     degenerate = torch.linalg.vector_norm(s, dim=-1, keepdim=True) < 1.0e-6
@@ -32,22 +32,10 @@ def _sp_basis(
 
 
 def realization_patch_total(
-    runtime: object,
-    patch_tris: torch.Tensor,
-    patch_uvs: torch.Tensor,
-    rows: torch.Tensor,
-    d_i: torch.Tensor,
-    d_o: torch.Tensor,
-    n_rows: torch.Tensor,
-    r_te: torch.Tensor,
-    r_tm: torch.Tensor,
-    pol_t: torch.Tensor,
-    pol_r: torch.Tensor,
-    r1_rows: torch.Tensor,
-    r2_rows: torch.Tensor,
-    centroids: torch.Tensor,
-    k0: float,
-    frequency_hz: float,
+    runtime: object, patch_tris: torch.Tensor, patch_uvs: torch.Tensor, rows: torch.Tensor,
+    d_i: torch.Tensor, d_o: torch.Tensor, n_rows: torch.Tensor, r_te: torch.Tensor,
+    r_tm: torch.Tensor, pol_t: torch.Tensor, pol_r: torch.Tensor, r1_rows: torch.Tensor,
+    r2_rows: torch.Tensor, centroids: torch.Tensor, k0: float, frequency_hz: float,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Removed production loop: returns (total, per-row integral buffer)."""
 
@@ -151,24 +139,11 @@ def _sample_height_bilinear(heights: torch.Tensor, uv: torch.Tensor) -> torch.Te
 
 
 def realization_patch_eval_reference(
-    heights: torch.Tensor,
-    patch_tris: torch.Tensor,
-    patch_uvs: torch.Tensor,
-    rows: torch.Tensor,
-    d_i: torch.Tensor,
-    d_o: torch.Tensor,
-    n_rows: torch.Tensor,
-    r_te: torch.Tensor,
-    r_tm: torch.Tensor,
-    pol_t: torch.Tensor,
-    pol_r: torch.Tensor,
-    r1_rows: torch.Tensor,
-    r2_rows: torch.Tensor,
-    centroids: torch.Tensor,
-    quad_a: torch.Tensor,
-    quad_b: torch.Tensor,
-    quad_w: torch.Tensor,
-    k0: torch.Tensor,
+    heights: torch.Tensor, patch_tris: torch.Tensor, patch_uvs: torch.Tensor, rows: torch.Tensor,
+    d_i: torch.Tensor, d_o: torch.Tensor, n_rows: torch.Tensor, r_te: torch.Tensor,
+    r_tm: torch.Tensor, pol_t: torch.Tensor, pol_r: torch.Tensor, r1_rows: torch.Tensor,
+    r2_rows: torch.Tensor, centroids: torch.Tensor, quad_a: torch.Tensor, quad_b: torch.Tensor,
+    quad_w: torch.Tensor, k0: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Differentiable re-derivation of scattering AD from a ``heights`` leaf.
 

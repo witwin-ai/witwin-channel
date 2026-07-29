@@ -18,9 +18,7 @@ def _as_cpu_double(value: torch.Tensor) -> torch.Tensor:
 
 
 def central_difference_gradient(
-    f: Callable[[torch.Tensor], torch.Tensor],
-    x: torch.Tensor,
-    step: float,
+    f: Callable[[torch.Tensor], torch.Tensor], x: torch.Tensor, step: float,
 ) -> torch.Tensor:
     """Full gradient of a scalar-valued ``f`` at ``x`` (one FD pair per coordinate)."""
 
@@ -40,9 +38,7 @@ def central_difference_gradient(
 
 
 def central_difference_directional(
-    f: Callable[[torch.Tensor], torch.Tensor],
-    x: torch.Tensor,
-    direction: torch.Tensor,
+    f: Callable[[torch.Tensor], torch.Tensor], x: torch.Tensor, direction: torch.Tensor,
     step: float,
 ) -> torch.Tensor:
     """Directional derivative of tensor-valued ``f`` at ``x`` along ``direction``."""
@@ -54,12 +50,7 @@ def central_difference_directional(
     return (f_plus - f_minus) / (2.0 * step)
 
 
-def relative_error(
-    actual: torch.Tensor,
-    expected: torch.Tensor,
-    *,
-    abs_floor: float,
-) -> float:
+def relative_error(actual: torch.Tensor, expected: torch.Tensor, *, abs_floor: float) -> float:
     """Relative L2 error with an absolute floor on the normalization scale."""
 
     actual_flat = _as_cpu_double(actual).reshape(-1)

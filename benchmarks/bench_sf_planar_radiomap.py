@@ -62,7 +62,9 @@ def _sionna_scene() -> Any:
     return scene
 
 
-def run_sionna_planar_benchmark(*, samples: int, repeats: int, components: set[str]) -> dict[str, Any]:
+def run_sionna_planar_benchmark(
+    *, samples: int, repeats: int, components: set[str],
+) -> dict[str, Any]:
     sys.path.insert(0, str(_SIONNA_SOURCE_ROOT))
     import drjit as dr
     from sionna.rt import RadioMapSolver
@@ -123,7 +125,9 @@ def run_sionna_planar_benchmark(*, samples: int, repeats: int, components: set[s
     }
 
 
-def _run_sionna_in_child(*, samples: int, repeats: int, json_path: pathlib.Path, components: set[str]) -> dict[str, Any]:
+def _run_sionna_in_child(
+    *, samples: int, repeats: int, json_path: pathlib.Path, components: set[str],
+) -> dict[str, Any]:
     child_json = json_path.with_name(f"{json_path.stem}.sionna_child{json_path.suffix}")
     if child_json.exists():
         child_json.unlink()
@@ -181,10 +185,7 @@ def _native_scene() -> Any:
 
 
 def run_native_planar_benchmark(
-    *,
-    samples: int,
-    repeats: int,
-    components: set[str],
+    *, samples: int, repeats: int, components: set[str],
 ) -> dict[str, Any]:
     sys.path.insert(0, str(_REPO_ROOT))
     import torch

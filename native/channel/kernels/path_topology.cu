@@ -2343,31 +2343,10 @@ pybind11::dict channel_deterministic_los_topology_block(
     return out;
 }
 
-pybind11::dict channel_deterministic_reflection_order1_compact(
-    at::Tensor visible,
-    at::Tensor epc_faces,
-    at::Tensor epc_hits,
-    at::Tensor epc_normals,
-    at::Tensor sequence_batch,
-    at::Tensor rx_indices,
-    at::Tensor tx,
-    at::Tensor rx_positions,
-    at::Tensor tx_power,
-    int64_t tx_index,
-    at::Tensor face_eps_r,
-    at::Tensor face_sigma_e,
-    at::Tensor face_mu_r,
-    at::Tensor face_gain,
-    at::Tensor face_material_id,
-    bool grouped_export) {
-    check_cuda_tensor(visible, "visible", at::kBool, 1);
-    TORCH_CHECK(epc_faces.is_cuda(), "epc_faces must be a CUDA tensor");
-    TORCH_CHECK(epc_faces.is_contiguous(), "epc_faces must be contiguous");
-    TORCH_CHECK(epc_faces.dim() == 2, "epc_faces must have shape (N, depth)");
-    TORCH_CHECK(epc_faces.scalar_type() == at::kInt || epc_faces.scalar_type() == at::kLong, "epc_faces must be int32 or int64");
-    check_cuda_tensor(epc_hits, "epc_hits", at::kFloat, 3);
-    check_cuda_tensor(epc_normals, "epc_normals", at::kFloat, 3);
-    check_cuda_tensor(sequence_batch, "sequence_batch", at::kInt, 2);
+static void check_reflection_compact_tensors(
+    const at::Tensor& rx_indices, const at::Tensor& tx, const at::Tensor& rx_positions,
+    const at::Tensor& tx_power, const at::Tensor& face_eps_r, const at::Tensor& face_sigma_e,
+    const at::Tensor& face_mu_r, const at::Tensor& face_gain, const at::Tensor& face_material_id) {
     check_cuda_tensor(rx_indices, "rx_indices", at::kInt, 1);
     check_cuda_tensor(tx, "tx", at::kFloat, 1);
     TORCH_CHECK(tx.size(0) == 3, "tx must have shape (3,)");
@@ -2378,25 +2357,27 @@ pybind11::dict channel_deterministic_reflection_order1_compact(
     check_cuda_tensor(face_mu_r, "face_mu_r", at::kFloat, 1);
     check_cuda_tensor(face_gain, "face_gain", at::kFloat, 1);
     check_cuda_tensor(face_material_id, "face_material_id", at::kInt, 1);
-    const int64_t count = visible.size(0);
-    TORCH_CHECK(epc_faces.size(0) == count, "epc_faces must match visible");
-    TORCH_CHECK(epc_faces.size(1) >= 1, "epc_faces must include the first bounce");
-    TORCH_CHECK(epc_hits.size(0) == count, "epc_hits must match visible");
-    TORCH_CHECK(epc_normals.sizes() == epc_hits.sizes(), "epc_normals must match epc_hits");
-    TORCH_CHECK(epc_hits.size(1) >= 1 && epc_hits.size(2) == 3, "epc_hits must have shape (N, depth, 3)");
-    TORCH_CHECK(sequence_batch.size(0) == count, "sequence_batch must match visible");
-    TORCH_CHECK(sequence_batch.size(1) >= 1, "sequence_batch must include the first bounce");
+}
+
+static void check_reflection_compact_shapes(
+    const at::Tensor& rx_indices, const at::Tensor& tx_power, int64_t tx_index,
+    const at::Tensor& face_eps_r, const at::Tensor& face_sigma_e, const at::Tensor& face_mu_r,
+    const at::Tensor& face_gain, const at::Tensor& face_material_id, int64_t count) {
     TORCH_CHECK(rx_indices.size(0) == count, "rx_indices must match visible");
     TORCH_CHECK(tx_index >= 0 && tx_index < tx_power.size(0), "tx_index is out of range");
     TORCH_CHECK(face_sigma_e.size(0) == face_eps_r.size(0), "face_sigma_e must match face_eps_r");
     TORCH_CHECK(face_mu_r.size(0) == face_eps_r.size(0), "face_mu_r must match face_eps_r");
     TORCH_CHECK(face_gain.size(0) == face_eps_r.size(0), "face_gain must match face_eps_r");
-    TORCH_CHECK(face_material_id.size(0) == face_eps_r.size(0), "face_material_id must match face_eps_r");
-    const int device = visible.get_device();
-    TORCH_CHECK(epc_faces.get_device() == device, "epc_faces must share visible device");
-    TORCH_CHECK(epc_hits.get_device() == device, "epc_hits must share visible device");
-    TORCH_CHECK(epc_normals.get_device() == device, "epc_normals must share visible device");
-    TORCH_CHECK(sequence_batch.get_device() == device, "sequence_batch must share visible device");
+    TORCH_CHECK(face_material_id.size(0) == face_eps_r.size(0),
+                "face_material_id must match face_eps_r");
+}
+
+static void
+check_reflection_compact_device(const at::Tensor& rx_indices, const at::Tensor& tx,
+                                const at::Tensor& rx_positions, const at::Tensor& tx_power,
+                                const at::Tensor& face_eps_r, const at::Tensor& face_sigma_e,
+                                const at::Tensor& face_mu_r, const at::Tensor& face_gain,
+                                const at::Tensor& face_material_id, int device) {
     TORCH_CHECK(rx_indices.get_device() == device, "rx_indices must share visible device");
     TORCH_CHECK(tx.get_device() == device, "tx must share visible device");
     TORCH_CHECK(rx_positions.get_device() == device, "rx_positions must share visible device");
@@ -2405,7 +2386,44 @@ pybind11::dict channel_deterministic_reflection_order1_compact(
     TORCH_CHECK(face_sigma_e.get_device() == device, "face_sigma_e must share visible device");
     TORCH_CHECK(face_mu_r.get_device() == device, "face_mu_r must share visible device");
     TORCH_CHECK(face_gain.get_device() == device, "face_gain must share visible device");
-    TORCH_CHECK(face_material_id.get_device() == device, "face_material_id must share visible device");
+    TORCH_CHECK(face_material_id.get_device() == device,
+                "face_material_id must share visible device");
+}
+
+pybind11::dict channel_deterministic_reflection_order1_compact(
+    at::Tensor visible, at::Tensor epc_faces, at::Tensor epc_hits, at::Tensor epc_normals,
+    at::Tensor sequence_batch, at::Tensor rx_indices, at::Tensor tx, at::Tensor rx_positions,
+    at::Tensor tx_power, int64_t tx_index, at::Tensor face_eps_r, at::Tensor face_sigma_e,
+    at::Tensor face_mu_r, at::Tensor face_gain, at::Tensor face_material_id, bool grouped_export) {
+    check_cuda_tensor(visible, "visible", at::kBool, 1);
+    TORCH_CHECK(epc_faces.is_cuda(), "epc_faces must be a CUDA tensor");
+    TORCH_CHECK(epc_faces.is_contiguous(), "epc_faces must be contiguous");
+    TORCH_CHECK(epc_faces.dim() == 2, "epc_faces must have shape (N, depth)");
+    TORCH_CHECK(epc_faces.scalar_type() == at::kInt || epc_faces.scalar_type() == at::kLong,
+                "epc_faces must be int32 or int64");
+    check_cuda_tensor(epc_hits, "epc_hits", at::kFloat, 3);
+    check_cuda_tensor(epc_normals, "epc_normals", at::kFloat, 3);
+    check_cuda_tensor(sequence_batch, "sequence_batch", at::kInt, 2);
+    check_reflection_compact_tensors(rx_indices, tx, rx_positions, tx_power, face_eps_r,
+                                     face_sigma_e, face_mu_r, face_gain, face_material_id);
+    const int64_t count = visible.size(0);
+    TORCH_CHECK(epc_faces.size(0) == count, "epc_faces must match visible");
+    TORCH_CHECK(epc_faces.size(1) >= 1, "epc_faces must include the first bounce");
+    TORCH_CHECK(epc_hits.size(0) == count, "epc_hits must match visible");
+    TORCH_CHECK(epc_normals.sizes() == epc_hits.sizes(), "epc_normals must match epc_hits");
+    TORCH_CHECK(epc_hits.size(1) >= 1 && epc_hits.size(2) == 3,
+                "epc_hits must have shape (N, depth, 3)");
+    TORCH_CHECK(sequence_batch.size(0) == count, "sequence_batch must match visible");
+    TORCH_CHECK(sequence_batch.size(1) >= 1, "sequence_batch must include the first bounce");
+    check_reflection_compact_shapes(rx_indices, tx_power, tx_index, face_eps_r, face_sigma_e,
+                                    face_mu_r, face_gain, face_material_id, count);
+    const int device = visible.get_device();
+    TORCH_CHECK(epc_faces.get_device() == device, "epc_faces must share visible device");
+    TORCH_CHECK(epc_hits.get_device() == device, "epc_hits must share visible device");
+    TORCH_CHECK(epc_normals.get_device() == device, "epc_normals must share visible device");
+    TORCH_CHECK(sequence_batch.get_device() == device, "sequence_batch must share visible device");
+    check_reflection_compact_device(rx_indices, tx, rx_positions, tx_power, face_eps_r,
+                                    face_sigma_e, face_mu_r, face_gain, face_material_id, device);
 
     auto int_options = visible.options().dtype(at::kInt);
     auto float_options = visible.options().dtype(at::kFloat);
@@ -2546,65 +2564,37 @@ pybind11::dict channel_deterministic_reflection_order1_compact(
 }
 
 pybind11::dict channel_deterministic_reflection_sequence_compact(
-    at::Tensor visible,
-    at::Tensor epc_sequences,
-    at::Tensor epc_hits,
-    at::Tensor epc_normals,
-    at::Tensor rx_indices,
-    at::Tensor tx,
-    at::Tensor rx_positions,
-    at::Tensor tx_power,
-    int64_t tx_index,
-    at::Tensor face_eps_r,
-    at::Tensor face_sigma_e,
-    at::Tensor face_mu_r,
-    at::Tensor face_gain,
-    at::Tensor face_material_id,
-    int64_t max_count) {
+    at::Tensor visible, at::Tensor epc_sequences, at::Tensor epc_hits, at::Tensor epc_normals,
+    at::Tensor rx_indices, at::Tensor tx, at::Tensor rx_positions, at::Tensor tx_power,
+    int64_t tx_index, at::Tensor face_eps_r, at::Tensor face_sigma_e, at::Tensor face_mu_r,
+    at::Tensor face_gain, at::Tensor face_material_id, int64_t max_count) {
     check_cuda_tensor(visible, "visible", at::kBool, 1);
     TORCH_CHECK(epc_sequences.is_cuda(), "epc_sequences must be a CUDA tensor");
     TORCH_CHECK(epc_sequences.is_contiguous(), "epc_sequences must be contiguous");
     TORCH_CHECK(epc_sequences.dim() == 2, "epc_sequences must have shape (N, depth)");
-    TORCH_CHECK(epc_sequences.scalar_type() == at::kInt || epc_sequences.scalar_type() == at::kLong, "epc_sequences must be int32 or int64");
+    TORCH_CHECK(epc_sequences.scalar_type() == at::kInt || epc_sequences.scalar_type() == at::kLong,
+                "epc_sequences must be int32 or int64");
     check_cuda_tensor(epc_hits, "epc_hits", at::kFloat, 3);
     check_cuda_tensor(epc_normals, "epc_normals", at::kFloat, 3);
-    check_cuda_tensor(rx_indices, "rx_indices", at::kInt, 1);
-    check_cuda_tensor(tx, "tx", at::kFloat, 1);
-    TORCH_CHECK(tx.size(0) == 3, "tx must have shape (3,)");
-    check_vec3_table(rx_positions, "rx_positions");
-    check_cuda_tensor(tx_power, "tx_power", at::kFloat, 1);
-    check_cuda_tensor(face_eps_r, "face_eps_r", at::kFloat, 1);
-    check_cuda_tensor(face_sigma_e, "face_sigma_e", at::kFloat, 1);
-    check_cuda_tensor(face_mu_r, "face_mu_r", at::kFloat, 1);
-    check_cuda_tensor(face_gain, "face_gain", at::kFloat, 1);
-    check_cuda_tensor(face_material_id, "face_material_id", at::kInt, 1);
+    check_reflection_compact_tensors(rx_indices, tx, rx_positions, tx_power, face_eps_r,
+                                     face_sigma_e, face_mu_r, face_gain, face_material_id);
     TORCH_CHECK(max_count >= -1, "max_count must be -1 or non-negative");
     const int64_t count = visible.size(0);
     const int64_t depth = epc_sequences.size(1);
     TORCH_CHECK(depth > 0, "epc_sequences must have positive depth");
     TORCH_CHECK(epc_sequences.size(0) == count, "epc_sequences must match visible");
     TORCH_CHECK(epc_hits.size(0) == count, "epc_hits must match visible");
-    TORCH_CHECK(epc_hits.size(1) == depth && epc_hits.size(2) == 3, "epc_hits must have shape (N, depth, 3)");
+    TORCH_CHECK(epc_hits.size(1) == depth && epc_hits.size(2) == 3,
+                "epc_hits must have shape (N, depth, 3)");
     TORCH_CHECK(epc_normals.sizes() == epc_hits.sizes(), "epc_normals must match epc_hits");
-    TORCH_CHECK(rx_indices.size(0) == count, "rx_indices must match visible");
-    TORCH_CHECK(tx_index >= 0 && tx_index < tx_power.size(0), "tx_index is out of range");
-    TORCH_CHECK(face_sigma_e.size(0) == face_eps_r.size(0), "face_sigma_e must match face_eps_r");
-    TORCH_CHECK(face_mu_r.size(0) == face_eps_r.size(0), "face_mu_r must match face_eps_r");
-    TORCH_CHECK(face_gain.size(0) == face_eps_r.size(0), "face_gain must match face_eps_r");
-    TORCH_CHECK(face_material_id.size(0) == face_eps_r.size(0), "face_material_id must match face_eps_r");
+    check_reflection_compact_shapes(rx_indices, tx_power, tx_index, face_eps_r, face_sigma_e,
+                                    face_mu_r, face_gain, face_material_id, count);
     const int device = visible.get_device();
     TORCH_CHECK(epc_sequences.get_device() == device, "epc_sequences must share visible device");
     TORCH_CHECK(epc_hits.get_device() == device, "epc_hits must share visible device");
     TORCH_CHECK(epc_normals.get_device() == device, "epc_normals must share visible device");
-    TORCH_CHECK(rx_indices.get_device() == device, "rx_indices must share visible device");
-    TORCH_CHECK(tx.get_device() == device, "tx must share visible device");
-    TORCH_CHECK(rx_positions.get_device() == device, "rx_positions must share visible device");
-    TORCH_CHECK(tx_power.get_device() == device, "tx_power must share visible device");
-    TORCH_CHECK(face_eps_r.get_device() == device, "face_eps_r must share visible device");
-    TORCH_CHECK(face_sigma_e.get_device() == device, "face_sigma_e must share visible device");
-    TORCH_CHECK(face_mu_r.get_device() == device, "face_mu_r must share visible device");
-    TORCH_CHECK(face_gain.get_device() == device, "face_gain must share visible device");
-    TORCH_CHECK(face_material_id.get_device() == device, "face_material_id must share visible device");
+    check_reflection_compact_device(rx_indices, tx, rx_positions, tx_power, face_eps_r,
+                                    face_sigma_e, face_mu_r, face_gain, face_material_id, device);
 
     auto int_options = visible.options().dtype(at::kInt);
     auto float_options = visible.options().dtype(at::kFloat);

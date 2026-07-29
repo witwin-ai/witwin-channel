@@ -43,9 +43,7 @@ def _endpoints() -> tuple[
     return source_positions, sink_positions, source_basis, sink_basis
 
 
-def _free_space_scalar(
-    *, frequency_hz: float, distance_m: float
-) -> complex:
+def _free_space_scalar(*, frequency_hz: float, distance_m: float) -> complex:
     wave_number = torch.tensor(
         2.0 * math.pi * frequency_hz / _SPEED_OF_LIGHT_M_S,
         dtype=torch.float32,

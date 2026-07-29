@@ -43,11 +43,8 @@ _CONTINUOUS = (
 
 
 def _paths(
-    valid_values: list[bool],
-    *,
-    tx_values: list[int] | None = None,
-    rx_values: list[int] | None = None,
-    differentiable: bool = False,
+    valid_values: list[bool], *, tx_values: list[int] | None = None,
+    rx_values: list[int] | None = None, differentiable: bool = False,
 ) -> EvaluatedPaths:
     count = len(valid_values)
     rows = torch.arange(count, device="cuda", dtype=torch.float32)
@@ -130,9 +127,7 @@ def _continuous(paths: EvaluatedPaths) -> dict[str, torch.Tensor]:
     }
 
 
-def _with_continuous(
-    paths: EvaluatedPaths, values: dict[str, torch.Tensor]
-) -> EvaluatedPaths:
+def _with_continuous(paths: EvaluatedPaths, values: dict[str, torch.Tensor]) -> EvaluatedPaths:
     topology = paths.topology
     return EvaluatedPaths(
         topology=topology,

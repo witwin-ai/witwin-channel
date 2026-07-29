@@ -10,15 +10,8 @@ from witwin.core.identity import new_antenna_id
 
 
 def make_transmitter(
-    position,
-    *,
-    orientation=None,
-    polarization=None,
-    element_positions=None,
-    weights=None,
-    synthetic_array: bool = True,
-    pattern: str = "isotropic",
-    power_w=1.0,
+    position, *, orientation=None, polarization=None, element_positions=None, weights=None,
+    synthetic_array: bool = True, pattern: str = "isotropic", power_w=1.0,
 ) -> AntennaState:
     return AntennaState(
         new_antenna_id(),
@@ -35,14 +28,8 @@ def make_transmitter(
 
 
 def make_receiver(
-    position,
-    *,
-    orientation=None,
-    polarization=None,
-    element_positions=None,
-    weights=None,
-    synthetic_array: bool = True,
-    pattern: str = "isotropic",
+    position, *, orientation=None, polarization=None, element_positions=None, weights=None,
+    synthetic_array: bool = True, pattern: str = "isotropic",
 ) -> AntennaState:
     return AntennaState(
         new_antenna_id(),
@@ -58,18 +45,8 @@ def make_receiver(
 
 
 def make_receiver_grid(
-    *,
-    origin,
-    x_axis,
-    y_axis,
-    shape,
-    spacing,
-    orientation=None,
-    polarization=None,
-    element_positions=None,
-    weights=None,
-    synthetic_array: bool = True,
-    pattern: str = "isotropic",
+    *, origin, x_axis, y_axis, shape, spacing, orientation=None, polarization=None,
+    element_positions=None, weights=None, synthetic_array: bool = True, pattern: str = "isotropic",
 ) -> ReceiverGrid:
     return ReceiverGrid(
         new_antenna_id(),
@@ -88,13 +65,8 @@ def make_receiver_grid(
 
 
 def make_mesh_structure(
-    *,
-    vertices: torch.Tensor,
-    faces: torch.Tensor,
-    material,
-    recenter: bool = False,
-    fill_mode: str = "surface",
-    **kwargs,
+    *, vertices: torch.Tensor, faces: torch.Tensor, material, recenter: bool = False,
+    fill_mode: str = "surface", **kwargs,
 ) -> Structure:
     geometry = Mesh(
         vertices,
@@ -107,11 +79,7 @@ def make_mesh_structure(
 
 
 def planar_uv(
-    vertices: torch.Tensor,
-    *,
-    axis_u: torch.Tensor,
-    axis_v: torch.Tensor,
-    origin: torch.Tensor,
+    vertices: torch.Tensor, *, axis_u: torch.Tensor, axis_v: torch.Tensor, origin: torch.Tensor,
     scale: float,
 ) -> torch.Tensor:
     relative = vertices - origin.to(device=vertices.device, dtype=vertices.dtype)

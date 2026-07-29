@@ -314,11 +314,7 @@ def _load_case_scene(spec: CaseSpec, asset_root: Path | None):
 
 
 def run_case(
-    spec: CaseSpec,
-    *,
-    asset_root: Path | None,
-    warmup: int,
-    repeats: int,
+    spec: CaseSpec, *, asset_root: Path | None, warmup: int, repeats: int,
 ) -> dict[str, Any]:
     scene_load_started = time.perf_counter()
     bundle = _load_case_scene(spec, asset_root)
@@ -426,9 +422,7 @@ def run_case(
 
 
 def preflight_rows(
-    *,
-    budget_bytes: int = 16 << 30,
-    headroom_bytes: int = 1 << 30,
+    *, budget_bytes: int = 16 << 30, headroom_bytes: int = 1 << 30,
 ) -> list[dict[str, Any]]:
     rows = []
     for solver in ("basic", "bdpt"):
@@ -507,9 +501,7 @@ def _device_sm(environment: dict[str, Any]) -> int | None:
 
 
 def evaluate_budget(
-    measurements: list[dict[str, Any]],
-    environment: dict[str, Any],
-    budget: dict[str, Any],
+    measurements: list[dict[str, Any]], environment: dict[str, Any], budget: dict[str, Any],
 ) -> dict[str, Any]:
     actual_sm = _device_sm(environment)
     target_sm = int(budget["environment"]["sm"])
@@ -588,11 +580,7 @@ def evaluate_budget(
 
 
 def run_profile(
-    *,
-    profile: str,
-    asset_root: Path | None,
-    warmup: int,
-    repeats: int,
+    *, profile: str, asset_root: Path | None, warmup: int, repeats: int,
     budget_path: Path = DEFAULT_BUDGET,
 ) -> dict[str, Any]:
     if not torch.cuda.is_available():

@@ -64,8 +64,7 @@ def orientation_matrix(orientation: torch.Tensor) -> torch.Tensor:
 
 
 def pattern_field_response(
-    pattern: _CoreAntennaPattern,
-    local_direction: torch.Tensor,
+    pattern: _CoreAntennaPattern, local_direction: torch.Tensor,
 ) -> torch.Tensor:
     """Evaluate one canonical Core antenna pattern in the endpoint-local frame."""
 
@@ -97,10 +96,7 @@ def pattern_field_response(
 
 
 def steering_vector(
-    array: object,
-    direction: torch.Tensor,
-    *,
-    frequency_hz: float,
+    array: object, direction: torch.Tensor, *, frequency_hz: float,
     orientation: torch.Tensor | None = None,
 ) -> torch.Tensor:
     """Return ``exp(+j k r·u)`` under the package's ``exp(-j k d)`` convention."""
@@ -130,10 +126,7 @@ def steering_vector(
 
 
 def apply_precoding_combining(
-    coefficients: torch.Tensor,
-    *,
-    tx_weights: torch.Tensor,
-    rx_weights: torch.Tensor,
+    coefficients: torch.Tensor, *, tx_weights: torch.Tensor, rx_weights: torch.Tensor,
 ) -> torch.Tensor:
     """Combine ``(..., rx_ant, tx_ant)`` channel coefficients into one stream."""
 
@@ -149,10 +142,7 @@ def apply_precoding_combining(
 
 
 def apply_endpoint_weights(
-    coefficients: torch.Tensor,
-    *,
-    tx_weights: torch.Tensor,
-    rx_weights: torch.Tensor,
+    coefficients: torch.Tensor, *, tx_weights: torch.Tensor, rx_weights: torch.Tensor,
 ) -> torch.Tensor:
     """Combine ``(rx, rx_ant, tx, tx_ant, ...)`` endpoint channels.
 
@@ -180,10 +170,7 @@ def apply_endpoint_weights(
 
 
 def validate_scalar_endpoint_features(
-    transmitters: Sequence[object],
-    receivers: Sequence[object],
-    *,
-    solver: str,
+    transmitters: Sequence[object], receivers: Sequence[object], *, solver: str,
 ) -> None:
     """Reject endpoint features that a scalar/power solver cannot consume."""
 
@@ -211,9 +198,7 @@ class _AntennaArrayView:
     def num_antennas(self) -> int:
         return int(self.positions.shape[0])
 
-    def world_positions(
-        self, origin: torch.Tensor, orientation: torch.Tensor
-    ) -> torch.Tensor:
+    def world_positions(self, origin: torch.Tensor, orientation: torch.Tensor) -> torch.Tensor:
         rotation = antenna_orientation_matrix(
             orientation, reference=self.positions
         )
@@ -365,9 +350,7 @@ def _as_quaternion(orientation: torch.Tensor) -> torch.Tensor:
     )
 
 
-def _endpoint_views(
-    scene_or_snapshot: Scene | SceneSnapshot,
-) -> tuple[_EndpointView, ...]:
+def _endpoint_views(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[_EndpointView, ...]:
     if isinstance(scene_or_snapshot, Scene):
         states = tuple((endpoint, None) for endpoint in scene_or_snapshot.endpoints)
     else:
@@ -518,9 +501,7 @@ def component_grid_shape(grid: ReceiverGrid) -> tuple[int, int]:
     return (grid.shape[1], grid.shape[0])
 
 
-def _axis_index(
-    values: tuple[float, float, float], *, name: str
-) -> tuple[int, float]:
+def _axis_index(values: tuple[float, float, float], *, name: str) -> tuple[int, float]:
     nonzero = [idx for idx, value in enumerate(values) if abs(value) > 1.0e-6]
     if len(nonzero) != 1:
         raise ValueError(f"{name} must be axis-aligned")
@@ -603,7 +584,7 @@ def scene_vertex_table(scene: object, compiled: object) -> torch.Tensor:
 
 
 def transmitter_positions_ad(
-    scene: object, native: torch.Tensor, *, device: torch.device
+    scene: object, native: torch.Tensor, *, device: torch.device,
 ) -> torch.Tensor:
     """Live transmitter positions (the native builder flattens to host floats)."""
 
@@ -619,7 +600,7 @@ def transmitter_positions_ad(
 
 
 def receiver_positions_ad(
-    scene: object, native: torch.Tensor, *, device: torch.device
+    scene: object, native: torch.Tensor, *, device: torch.device,
 ) -> torch.Tensor:
     """Live receiver positions for point receivers.
 
@@ -641,9 +622,7 @@ def receiver_positions_ad(
     )
 
 
-def transmitter_polarizations_f32(
-    scene: object, *, device: torch.device
-) -> torch.Tensor:
+def transmitter_polarizations_f32(scene: object, *, device: torch.device) -> torch.Tensor:
     """Transmitter polarizations as a contiguous float32 ``(N, 3)`` tensor.
 
  Row order matches the transmitter order of the logical scene. The vectors
@@ -664,10 +643,7 @@ def transmitter_polarizations_f32(
 
 
 def receiver_polarizations_f32(
-    scene: object,
-    *,
-    device: torch.device,
-    grid: ReceiverGrid | None = None,
+    scene: object, *, device: torch.device, grid: ReceiverGrid | None = None,
 ) -> torch.Tensor:
     """Receiver polarizations as a contiguous float32 ``(N, 3)`` tensor.
 

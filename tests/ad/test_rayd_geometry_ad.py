@@ -115,11 +115,7 @@ def _intersect_loss_weights(ray_count: int) -> tuple[torch.Tensor, torch.Tensor]
 
 
 def _intersect_fd_loss(
-    rayd: object,
-    ray_o: torch.Tensor,
-    ray_d: torch.Tensor,
-    w_t: torch.Tensor,
-    w_p: torch.Tensor,
+    rayd: object, ray_o: torch.Tensor, ray_d: torch.Tensor, w_t: torch.Tensor, w_p: torch.Tensor,
 ) -> torch.Tensor:
     hit = ops.rayd_intersect_forward(
         rayd, ray_o.contiguous(), ray_d, _empty_tmax(), None, flags=7
@@ -330,11 +326,7 @@ def _reflection_loss_weights() -> tuple[torch.Tensor, torch.Tensor]:
 
 
 def _reflection_fd_loss(
-    rayd: object,
-    ray_o: torch.Tensor,
-    ray_d: torch.Tensor,
-    w_t: torch.Tensor,
-    w_img: torch.Tensor,
+    rayd: object, ray_o: torch.Tensor, ray_d: torch.Tensor, w_t: torch.Tensor, w_img: torch.Tensor,
 ) -> torch.Tensor:
     forward = ops.rayd_trace_reflections_forward_tape(
         rayd, ray_o.contiguous(), ray_d, _empty_tmax(), None, 1

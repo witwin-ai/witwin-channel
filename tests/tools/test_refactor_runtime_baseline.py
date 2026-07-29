@@ -180,7 +180,7 @@ def test_semantic_fingerprint_excludes_only_allowlisted_runtime_metadata():
     ],
 )
 def test_measurement_policy_cannot_lower_plan_minimums(
-    processes: int, warmup: int, repeats: int, message: str
+    processes: int, warmup: int, repeats: int, message: str,
 ):
     with pytest.raises(runtime.RuntimeBaselineError, match=message):
         runtime.validate_measurement_policy(processes, warmup, repeats)

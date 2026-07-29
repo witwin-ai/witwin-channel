@@ -58,13 +58,9 @@ __all__ = [
 
 
 def rayd_scene_create(
-    vertices: list[torch.Tensor],
-    faces: list[torch.Tensor],
-    uv: list[torch.Tensor],
-    face_uv: list[torch.Tensor],
-    to_world_left: list[torch.Tensor],
-    to_world_right: list[torch.Tensor],
-    mesh_flags: list[int],
+    vertices: list[torch.Tensor], faces: list[torch.Tensor], uv: list[torch.Tensor],
+    face_uv: list[torch.Tensor], to_world_left: list[torch.Tensor],
+    to_world_right: list[torch.Tensor], mesh_flags: list[int],
 ) -> object:
     resource = _required_native_op("rayd_scene_create")(
         vertices,
@@ -154,7 +150,7 @@ class RayDSceneResource:
 
 
 def _empty_tensor(
-    shape: tuple[int, ...], *, dtype: torch.dtype, device: torch.device
+    shape: tuple[int, ...], *, dtype: torch.dtype, device: torch.device,
 ) -> torch.Tensor:
     return torch.empty(shape, dtype=dtype, device=device)
 
@@ -312,7 +308,9 @@ def resolve_scene_edge_policy(scene: object) -> EdgePolicy:
     return policy if isinstance(policy, EdgePolicy) else DEFAULT_EDGE_POLICY
 
 
-def _lexicographic_min_first(p0: torch.Tensor, p1: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+def _lexicographic_min_first(
+    p0: torch.Tensor, p1: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
     le = (
         (p0[:, 0] < p1[:, 0])
         | ((p0[:, 0] == p1[:, 0]) & (p0[:, 1] < p1[:, 1]))
@@ -322,8 +320,7 @@ def _lexicographic_min_first(p0: torch.Tensor, p1: torch.Tensor) -> tuple[torch.
 
 
 def _duplicate_boundary_pairs(
-    records: object,
-    candidate: torch.Tensor,
+    records: object, candidate: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Group boundary edges by quantized endpoints.
 
@@ -357,10 +354,7 @@ def _duplicate_boundary_pairs(
 
 
 def refine_edge_geometry(
-    rayd: object,
-    geometry: tuple[torch.Tensor, ...],
-    *,
-    policy: EdgePolicy | None = None,
+    rayd: object, geometry: tuple[torch.Tensor, ...], *, policy: EdgePolicy | None = None,
 ) -> tuple[torch.Tensor, ...]:
     """Return the geometry tuple with policy filtering and shared-edge merges."""
 
@@ -471,11 +465,7 @@ class KirchhoffRuntimeResources:
 
 
 def _require_phase_screen_tensor(
-    name: str,
-    tensor: torch.Tensor,
-    *,
-    dtype: torch.dtype,
-    shape: tuple[int, ...],
+    name: str, tensor: torch.Tensor, *, dtype: torch.dtype, shape: tuple[int, ...],
     device: torch.device,
 ) -> None:
     if tensor.device != device or tensor.dtype != dtype or tuple(tensor.shape) != shape:
@@ -542,7 +532,7 @@ class PhaseScreenRuntimeResources:
 
 
 def realization_phase_screens(
-    materials: MaterialStore, assignments: AssignmentStore
+    materials: MaterialStore, assignments: AssignmentStore,
 ) -> dict[int, PhaseScreen]:
     """Resolve mutually exclusive realization assignments at the scene boundary."""
 
@@ -573,7 +563,7 @@ def realization_phase_screens(
 
 
 def build_kirchhoff_resources(
-    store: MaterialStore, key: ScatteringResourceKey
+    store: MaterialStore, key: ScatteringResourceKey,
 ) -> KirchhoffRuntimeResources:
     """Build all rough-material resources without publishing partial state."""
 
@@ -624,11 +614,7 @@ def build_kirchhoff_resources(
 
 
 def _maybe_differentiate_table(
-    store: MaterialStore,
-    index: int,
-    offset: int,
-    count: int,
-    table: KirchhoffTable,
+    store: MaterialStore, index: int, offset: int, count: int, table: KirchhoffTable,
     key: ScatteringResourceKey,
 ) -> KirchhoffTable:
     """Attach the native build adjoint when store leaves participate in AD.
@@ -678,9 +664,7 @@ def _maybe_differentiate_table(
 
 
 def build_kirchhoff_table_stack(
-    tables: dict[int, KirchhoffTable],
-    material_count: int,
-    device: torch.device,
+    tables: dict[int, KirchhoffTable], material_count: int, device: torch.device,
 ) -> KirchhoffTableStack:
     """Stack per-material tables into flat device buffers (rough-surface scattering)."""
 
@@ -722,9 +706,7 @@ def build_kirchhoff_table_stack(
 
 
 def build_phase_screen_resources(
-    materials: MaterialStore,
-    assignments: AssignmentStore,
-    rayd: RayDSceneResource,
+    materials: MaterialStore, assignments: AssignmentStore, rayd: RayDSceneResource,
     key: PhaseScreenResourceKey,
 ) -> PhaseScreenRuntimeResources:
     """Build immutable phase-screen resources without publishing partial state.
@@ -857,7 +839,7 @@ def build_phase_screen_resources(
 
 
 def _require_phase_screen_rayd_identity(
-    rayd: RayDSceneResource, key: PhaseScreenResourceKey
+    rayd: RayDSceneResource, key: PhaseScreenResourceKey,
 ) -> None:
     if id(rayd) != key.rayd_scene_identity:
         raise RuntimeError(
@@ -865,9 +847,7 @@ def _require_phase_screen_rayd_identity(
         )
 
 
-def _require_phase_screen_uv_presence(
-    key: PhaseScreenResourceKey, structure_index: int
-) -> None:
+def _require_phase_screen_uv_presence(key: PhaseScreenResourceKey, structure_index: int) -> None:
     uv_present, face_uv_present = key.structure_uv_presence[structure_index]
     if not uv_present or not face_uv_present:
         raise RuntimeError(
@@ -877,7 +857,7 @@ def _require_phase_screen_uv_presence(
 
 
 def _phase_screen_rms_slope(
-    runtime: PhaseScreenRuntime, uv_scale_m: float, structure_index: int
+    runtime: PhaseScreenRuntime, uv_scale_m: float, structure_index: int,
 ) -> float:
     """Validate the static tangent-plane applicability guard exactly once."""
 
@@ -1035,9 +1015,7 @@ MIN_K0_CORR_LENGTH = 6.0
 MAX_RMS_SLOPE = 0.5
 
 
-def _kirchhoff_diffuse_lobe_series(
-    q_par_x, q_par_y, q_n, sigma_h, lx, ly, n_terms: int = 64
-):
+def _kirchhoff_diffuse_lobe_series(q_par_x, q_par_y, q_n, sigma_h, lx, ly, n_terms: int = 64):
     """Production Beckmann series for the Gaussian-correlation lobe."""
 
     qx, qy, qn = np.broadcast_arrays(
@@ -1135,7 +1113,7 @@ def _phi_centers(n: int) -> np.ndarray:
 
 
 def _stack_power_reflectances(
-    layers: Sequence[tuple], cos_theta: np.ndarray, frequency_hz: float
+    layers: Sequence[tuple], cos_theta: np.ndarray, frequency_hz: float,
 ) -> tuple[np.ndarray, np.ndarray]:
     """``(|r_te_stack|^2, |r_tm_stack|^2)`` at real incidence cosines."""
 
@@ -1144,16 +1122,8 @@ def _stack_power_reflectances(
 
 
 def _raw_lobe_grid(
-    layers: Sequence[tuple],
-    frequency_hz: float,
-    k0: float,
-    sigma_h: float,
-    lx: float,
-    ly: float,
-    n_terms: int,
-    inc_cos: np.ndarray,
-    inc_phi: np.ndarray,
-    out_cos: np.ndarray,
+    layers: Sequence[tuple], frequency_hz: float, k0: float, sigma_h: float, lx: float, ly: float,
+    n_terms: int, inc_cos: np.ndarray, inc_phi: np.ndarray, out_cos: np.ndarray,
     out_phi: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Raw (un-normalized) TE/TM lobe on an (incidence x outgoing) grid.
@@ -1205,13 +1175,8 @@ def _raw_lobe_grid(
 
 
 def _symmetric_energy_balance(
-    symmetric_lobe: np.ndarray,
-    target: np.ndarray,
-    cos_o: np.ndarray,
-    *,
-    isotropic: bool,
-    tolerance: float = 1e-11,
-    max_iterations: int = 256,
+    symmetric_lobe: np.ndarray, target: np.ndarray, cos_o: np.ndarray, *, isotropic: bool,
+    tolerance: float = 1e-11, max_iterations: int = 256,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Balance a reciprocal nonnegative kernel without breaking symmetry.
 
@@ -1281,10 +1246,7 @@ def _symmetric_energy_balance(
 
 
 def build_kirchhoff_table(
-    roughness,
-    layers: Sequence[tuple],
-    frequency_hz: float,
-    device: torch.device | str = "cuda",
+    roughness, layers: Sequence[tuple], frequency_hz: float, device: torch.device | str = "cuda",
 ) -> KirchhoffTable:
     """Precompute the Kirchhoff ensemble BSDF table for one material.
 
@@ -1462,10 +1424,7 @@ def build_kirchhoff_table(
 
 
 def eval_bsdf(
-    table: KirchhoffTable,
-    valid: torch.Tensor,
-    wi: torch.Tensor,
-    wo: torch.Tensor,
+    table: KirchhoffTable, valid: torch.Tensor, wi: torch.Tensor, wo: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Bilinear (multilinear) lookup of ``(f_te, f_tm)`` for batched pairs.
 
@@ -1483,10 +1442,7 @@ def eval_bsdf(
 
 
 def sample_directions(
-    table: KirchhoffTable,
-    valid: torch.Tensor,
-    wi: torch.Tensor,
-    u1: torch.Tensor,
+    table: KirchhoffTable, valid: torch.Tensor, wi: torch.Tensor, u1: torch.Tensor,
     u2: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Sample outgoing directions by CDF inversion; returns ``(wo, pdf)``.
@@ -1515,10 +1471,7 @@ def sample_directions(
 
 
 def pdf(
-    table: KirchhoffTable,
-    valid: torch.Tensor,
-    wi: torch.Tensor,
-    wo: torch.Tensor,
+    table: KirchhoffTable, valid: torch.Tensor, wi: torch.Tensor, wo: torch.Tensor,
 ) -> torch.Tensor:
     """Solid-angle sampling density of:func:`sample_directions`.
 
@@ -1539,10 +1492,7 @@ def pdf(
 
 
 def pdf_reverse(
-    table: KirchhoffTable,
-    valid: torch.Tensor,
-    wo: torch.Tensor,
-    wi: torch.Tensor,
+    table: KirchhoffTable, valid: torch.Tensor, wo: torch.Tensor, wi: torch.Tensor,
 ) -> torch.Tensor:
     """Reverse-direction PDF: the SAME table evaluated with swapped args.
 
@@ -1639,11 +1589,8 @@ def realization_seed(scene_seed: int, surface_id: int, realization_id: int) -> i
 
 
 def generate_gaussian_realization(
-    roughness: SurfaceRoughness,
-    extent_m: tuple[float, float] | float,
-    resolution: tuple[int, int] | int,
-    seed: int,
-    device: torch.device | str = "cuda",
+    roughness: SurfaceRoughness, extent_m: tuple[float, float] | float,
+    resolution: tuple[int, int] | int, seed: int, device: torch.device | str = "cuda",
 ) -> torch.Tensor:
     """Periodic Gaussian random height field with Gaussian correlation.
 
@@ -1699,13 +1646,8 @@ def generate_gaussian_realization(
 
 
 def patch_phase_integral(
-    runtime: PhaseScreenRuntime,
-    patch_vertices: torch.Tensor,
-    uv_vertices: torch.Tensor,
-    k_i_vec: torch.Tensor,
-    k_s_vec: torch.Tensor,
-    frequency_hz: float,
-    n_quad: int = 16,
+    runtime: PhaseScreenRuntime, patch_vertices: torch.Tensor, uv_vertices: torch.Tensor,
+    k_i_vec: torch.Tensor, k_s_vec: torch.Tensor, frequency_hz: float, n_quad: int = 16,
 ) -> torch.Tensor:
     """Triangle-domain quadrature of the Kirchhoff phase integral (GPU).
 

@@ -85,10 +85,7 @@ def _measure_once(operation: Callable[[], T], sync: Callable[[T], None]) -> tupl
 
 
 def benchmark_operation(
-    operation: Callable[[], T],
-    *,
-    warmup: int = 1,
-    repeats: int = 5,
+    operation: Callable[[], T], *, warmup: int = 1, repeats: int = 5,
     sync: Callable[[T], None] | None = None,
 ) -> tuple[T, BenchmarkMeasurement]:
     """Measure first call and steady state with wall/CUDA clocks and peak memory."""
@@ -162,7 +159,7 @@ def benchmark_operation(
 
 
 def measure_cold_import(
-    module: str = "witwin.channel", *, timeout_s: float = 120.0
+    module: str = "witwin.channel", *, timeout_s: float = 120.0,
 ) -> dict[str, Any]:
     """Measure a source-tree fresh import; this is not an installed-wheel smoke."""
 

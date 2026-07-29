@@ -117,9 +117,7 @@ def _module_name(package_root: Path, path: Path) -> tuple[str, bool]:
     return (f"{PACKAGE}.{suffix}" if suffix else PACKAGE), is_package
 
 
-def _resolve_from_module(
-    source: str, *, is_package: bool, level: int, module: str | None
-) -> str:
+def _resolve_from_module(source: str, *, is_package: bool, level: int, module: str | None) -> str:
     if level == 0:
         return module or ""
     package_parts = source.split(".") if is_package else source.split(".")[:-1]
@@ -138,10 +136,7 @@ def _target_module(base: str, alias: str, known_modules: frozenset[str]) -> str:
 
 
 def _parse_file(
-    package_root: Path,
-    path: Path,
-    *,
-    known_modules: frozenset[str],
+    package_root: Path, path: Path, *, known_modules: frozenset[str],
 ) -> list[ImportEdge]:
     source, is_package = _module_name(package_root, path)
     tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
@@ -192,9 +187,7 @@ def _parse_file(
     return edges
 
 
-def _collect_module_info(
-    package_root: Path,
-) -> tuple[list[Path], frozenset[str], frozenset[str]]:
+def _collect_module_info(package_root: Path) -> tuple[list[Path], frozenset[str], frozenset[str]]:
     files = sorted(package_root.rglob("*.py"))
     named = [_module_name(package_root, path) for path in files]
     known_modules = frozenset(module for module, _ in named)
@@ -328,12 +321,8 @@ def build_reexport_map(package_root: Path) -> dict[tuple[str, str], str]:
 
 
 def _canonical_target(
-    target: str,
-    imported_name: str,
-    reexports: dict[tuple[str, str], str],
-    known_packages: frozenset[str],
-    *,
-    max_depth: int = 8,
+    target: str, imported_name: str, reexports: dict[tuple[str, str], str],
+    known_packages: frozenset[str], *, max_depth: int = 8,
 ) -> str:
     """Follow package re-exports until reaching the defining module.
 
@@ -357,9 +346,7 @@ def _canonical_target(
 
 
 def _canonicalize_edge(
-    edge: ImportEdge,
-    reexports: dict[tuple[str, str], str],
-    known_packages: frozenset[str],
+    edge: ImportEdge, reexports: dict[tuple[str, str], str], known_packages: frozenset[str],
 ) -> ImportEdge:
     if edge.kind != "from" or edge.imported_name in {"", "*"}:
         return edge
@@ -633,9 +620,7 @@ def _partition_violations(
 
 
 def _check_debt_group(
-    name: str,
-    group: object,
-    actual: set[tuple[str, int, int, str, str, str]],
+    name: str, group: object, actual: set[tuple[str, int, int, str, str, str]],
 ) -> list[str]:
     if not isinstance(group, dict):
         return [f"debt group {name!r} must be an object"]
@@ -682,9 +667,7 @@ def _check_debt_group(
     return issues
 
 
-def check_allowlist(
-    violations: list[Violation], allowlist: dict[str, Any]
-) -> list[str]:
+def check_allowlist(violations: list[Violation], allowlist: dict[str, Any]) -> list[str]:
     debts = allowlist["debts"]
     issues: list[str] = []
     digest = _baseline_digest(debts)

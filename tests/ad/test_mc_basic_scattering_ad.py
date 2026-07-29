@@ -109,11 +109,7 @@ def _scene() -> Scene:
     )
 
 
-def _map_handles(
-    scene: Scene,
-    *,
-    reference_frequency_hz: float | torch.Tensor = _FREQUENCY_HZ,
-):
+def _map_handles(scene: Scene, *, reference_frequency_hz: float | torch.Tensor = _FREQUENCY_HZ):
     device = torch.device("cuda")
     compiled = compile_scene(
         scene,

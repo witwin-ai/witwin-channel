@@ -124,7 +124,7 @@ def _reject_native_call(_name: str) -> Callable[..., object]:
     ),
 )
 def test_facades_reject_invalid_native_result_fields(
-    operation: str, monkeypatch: pytest.MonkeyPatch
+    operation: str, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
         functional,
@@ -176,9 +176,7 @@ def test_table_eval_rejects_valid_row_mismatch_before_dispatch(
         functional.scattering_table_eval(*args)
 
 
-def test_table_pdf_rejects_row_mismatch_before_dispatch(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_table_pdf_rejects_row_mismatch_before_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(functional, "_required_native_op", _reject_native_call)
     valid, wi, wo, sample_density, _ = _table_args()
     valid = torch.ones(3, dtype=torch.bool)
@@ -209,9 +207,7 @@ def test_ensemble_rejects_valid_row_mismatch_before_dispatch(
         functional.scattering_ensemble_eval(*args, coef=1.0, threshold=0.0)
 
 
-def test_patch_rejects_valid_row_mismatch_before_dispatch(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_patch_rejects_valid_row_mismatch_before_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(functional, "_required_native_op", _reject_native_call)
     args = _patch_args()
     args[0] = torch.ones(3, dtype=torch.bool)

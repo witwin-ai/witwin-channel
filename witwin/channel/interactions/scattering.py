@@ -138,7 +138,7 @@ def frequency_tensor(scene: Scene, device: torch.device) -> torch.Tensor:
 
 
 def ensemble_coef_scale(
-    scene: Scene, device: torch.device, *, ad_enabled: bool
+    scene: Scene, device: torch.device, *, ad_enabled: bool,
 ) -> torch.Tensor | None:
     """AD radiometric ``coef`` scale for ensemble rows, or ``None`` when AD is off.
 
@@ -154,7 +154,7 @@ def ensemble_coef_scale(
 
 
 def realization_scalars(
-    scene: Scene, device: torch.device
+    scene: Scene, device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """AD ``(frequency_t, k0_t, amplitude_scale_t)`` for realization rows.
 
@@ -244,7 +244,7 @@ def _stable_tangent(n: torch.Tensor) -> torch.Tensor:
 
 
 def _sp_basis(
-    n: torch.Tensor, d: torch.Tensor, backup_axis: torch.Tensor
+    n: torch.Tensor, d: torch.Tensor, backup_axis: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Local ``s = normalize(n x d)``, ``p = s x d`` with a deterministic
  backup axis at normal incidence (the field convention)."""
@@ -264,9 +264,7 @@ def _offset_eps(points: torch.Tensor, scene_diagonal: torch.Tensor) -> torch.Ten
     ).clamp_min(1.0e-6)
 
 
-def _visible(
-    rayd: object, start: torch.Tensor, end: torch.Tensor
-) -> tuple[torch.Tensor, int]:
+def _visible(rayd: object, start: torch.Tensor, end: torch.Tensor) -> tuple[torch.Tensor, int]:
     """Chunked segment visibility; returns (mask, launch_count)."""
 
     count = int(start.shape[0])
@@ -287,7 +285,7 @@ def _visible(
 
 
 def _r2_barycentric(
-    counts: torch.Tensor, device: torch.device
+    counts: torch.Tensor, device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Deterministic per-face R2 sample coordinates.
 
@@ -314,12 +312,7 @@ def _r2_barycentric(
 
 
 def _keep_strongest_per_pair(
-    tx_id: torch.Tensor,
-    rx_id: torch.Tensor,
-    gain: torch.Tensor,
-    *,
-    num_rx: int,
-    cap: int,
+    tx_id: torch.Tensor, rx_id: torch.Tensor, gain: torch.Tensor, *, num_rx: int, cap: int,
 ) -> torch.Tensor:
     """Row indices of the strongest <= cap samples per (tx, rx) pair."""
 
@@ -368,20 +361,10 @@ class _RowCollector:
 
 
 def _ensemble_rows(
-    scene: Scene,
-    compiled: object,
-    config: TopologyConfig,
-    collector: _RowCollector,
-    *,
-    tx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    rx_positions: torch.Tensor,
-    tx_pol: torch.Tensor,
-    rx_pol: torch.Tensor,
-    ensemble_faces: torch.Tensor,
-    scene_diagonal: torch.Tensor,
-    info: dict[str, Any],
-    ad_mode: str = "none",
+    scene: Scene, compiled: object, config: TopologyConfig, collector: _RowCollector, *,
+    tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor,
+    tx_pol: torch.Tensor, rx_pol: torch.Tensor, ensemble_faces: torch.Tensor,
+    scene_diagonal: torch.Tensor, info: dict[str, Any], ad_mode: str = "none",
 ) -> None:
     device = tx_positions.device
     ad_enabled = ad_mode != "none"
@@ -574,7 +557,7 @@ def _ensemble_rows(
 
 
 def _subdivide_face(
-    tri: torch.Tensor, uv: torch.Tensor, m: int
+    tri: torch.Tensor, uv: torch.Tensor, m: int,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Uniform barycentric m^2 subdivision of one triangle (+ matching UV)."""
 
@@ -613,20 +596,10 @@ def _subdivide_face(
 
 
 def _realization_rows(
-    scene: Scene,
-    compiled: object,
-    config: TopologyConfig,
-    collector: _RowCollector,
-    *,
-    tx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    rx_positions: torch.Tensor,
-    tx_pol: torch.Tensor,
-    rx_pol: torch.Tensor,
-    screens: dict[int, PhaseScreen],
-    scene_diagonal: torch.Tensor,
-    info: dict[str, Any],
-    ad_mode: str = "none",
+    scene: Scene, compiled: object, config: TopologyConfig, collector: _RowCollector, *,
+    tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor,
+    tx_pol: torch.Tensor, rx_pol: torch.Tensor, screens: dict[int, PhaseScreen],
+    scene_diagonal: torch.Tensor, info: dict[str, Any], ad_mode: str = "none",
 ) -> None:
     device = tx_positions.device
     ad_enabled = ad_mode != "none"
@@ -911,8 +884,7 @@ class _ExtendedScatteringRows(TypedDict):
 
 
 def _extended_scattering_rows(
-    source: EvaluatedPaths,
-    rows: dict[str, torch.Tensor],
+    source: EvaluatedPaths, rows: dict[str, torch.Tensor],
 ) -> _ExtendedScatteringRows:
     """Single 22-tensor concatenation owner for typed path contracts."""
 
@@ -1001,13 +973,8 @@ def _extended_scattering_rows(
 
 
 def _extend_evaluated_paths(
-    evaluated: EvaluatedPaths,
-    sidecars: EvaluatedPathSidecars,
-    rows: dict[str, torch.Tensor],
-    *,
-    launch_count_delta: int,
-    candidate_count_delta: int,
-    guardrail_count_delta: int,
+    evaluated: EvaluatedPaths, sidecars: EvaluatedPathSidecars, rows: dict[str, torch.Tensor], *,
+    launch_count_delta: int, candidate_count_delta: int, guardrail_count_delta: int,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     extended = _extended_scattering_rows(evaluated, rows)
     topology = PathTopology(
@@ -1079,13 +1046,8 @@ def _scattering_info() -> dict[str, Any]:
 
 
 def _collect_scattering_rows(
-    scene: Scene,
-    config: TopologyConfig,
-    *,
-    device: torch.device,
-    info: dict[str, Any],
-    ad_mode: str = "none",
-    endpoint_tensors: object | None = None,
+    scene: Scene, config: TopologyConfig, *, device: torch.device, info: dict[str, Any],
+    ad_mode: str = "none", endpoint_tensors: object | None = None,
 ) -> tuple[dict[str, torch.Tensor] | None, int, int, int]:
     compiled = require_compiled(scene)
     screens = realization_phase_screens(compiled.materials, compiled.assignments)
@@ -1201,12 +1163,8 @@ def _collect_scattering_rows(
 
 
 def append_scattering_evaluated_paths(
-    scene: Scene,
-    config: TopologyConfig,
-    evaluated: EvaluatedPaths,
-    sidecars: EvaluatedPathSidecars,
-    *,
-    endpoint_tensors: object | None = None,
+    scene: Scene, config: TopologyConfig, evaluated: EvaluatedPaths,
+    sidecars: EvaluatedPathSidecars, *, endpoint_tensors: object | None = None,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars, dict[str, Any]]:
     """Append scattering rows to canonical typed path contracts."""
 
@@ -1413,7 +1371,7 @@ def _normalize(vec: torch.Tensor, eps: float = 1.0e-12) -> torch.Tensor:
 
 
 def _pad_bounce_block(
-    values: torch.Tensor, depth: int, dmax: int, fill: float | int
+    values: torch.Tensor, depth: int, dmax: int, fill: float | int,
 ) -> torch.Tensor:
     """Right-pad the bounce axis (axis 1) of a ``[M, depth, ...]`` block to Dmax."""
 
@@ -1429,7 +1387,7 @@ def _pad_bounce_block(
 
 
 def _equi_join_indices(
-    a_key: torch.Tensor, b_key: torch.Tensor
+    a_key: torch.Tensor, b_key: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Vectorized equi-join: return ``(ai, bi)`` with ``a_key[ai] == b_key[bi]``.
 
@@ -1475,10 +1433,7 @@ def _equi_join_indices(
 
 
 def _stable_chain_order(
-    tx_id: torch.Tensor,
-    rx_id: torch.Tensor,
-    sample_index: torch.Tensor,
-    d1: torch.Tensor,
+    tx_id: torch.Tensor, rx_id: torch.Tensor, sample_index: torch.Tensor, d1: torch.Tensor,
     d2: torch.Tensor,
 ) -> torch.Tensor:
     """Deterministic row order: stable sort on (tx, rx, sample, d1, d2).
@@ -1517,12 +1472,7 @@ def _stable_chain_order(
 
 
 def _budget_chain_rows(
-    tx_id: torch.Tensor,
-    rx_id: torch.Tensor,
-    strength: torch.Tensor,
-    *,
-    num_rx: int,
-    cap: int,
+    tx_id: torch.Tensor, rx_id: torch.Tensor, strength: torch.Tensor, *, num_rx: int, cap: int,
 ) -> torch.Tensor:
     """Row indices of the strongest ``<= cap`` chain rows per (tx, rx) pair.
 
@@ -1550,10 +1500,7 @@ def _budget_chain_rows(
 
 
 def build_chain_samples(
-    compiled: object,
-    config: "TopologyConfig",
-    ensemble_faces: torch.Tensor,
-    *,
+    compiled: object, config: "TopologyConfig", ensemble_faces: torch.Tensor, *,
     device: torch.device,
 ) -> ChainSamples | None:
     """Draw the chain-sample vertex set on the ensemble scatter faces.
@@ -1655,10 +1602,7 @@ def _reflection_geometry(compiled: object, device: torch.device) -> _ReflectionG
 
 
 def _polyline_length(
-    source: torch.Tensor,
-    hits: torch.Tensor,
-    endpoint: torch.Tensor,
-    depth: int,
+    source: torch.Tensor, hits: torch.Tensor, endpoint: torch.Tensor, depth: int,
 ) -> torch.Tensor:
     """Unfolded chain length source -> hits[0..depth-1] -> endpoint (structural).
 
@@ -1675,9 +1619,7 @@ def _polyline_length(
     return seg
 
 
-def _visibility(
-    rayd: object, start: torch.Tensor, end: torch.Tensor
-) -> torch.Tensor:
+def _visibility(rayd: object, start: torch.Tensor, end: torch.Tensor) -> torch.Tensor:
     count = int(start.shape[0])
     if count == 0:
         return torch.empty((0,), device=start.device, dtype=torch.bool)
@@ -1708,15 +1650,8 @@ def _empty_leg(device: torch.device) -> dict[str, torch.Tensor]:
 
 
 def _leg_batch(
-    *,
-    sample_index: torch.Tensor,
-    depth: int,
-    hits: torch.Tensor,
-    normals: torch.Tensor,
-    primitive: torch.Tensor,
-    material: torch.Tensor,
-    source: torch.Tensor,
-    endpoint: torch.Tensor,
+    *, sample_index: torch.Tensor, depth: int, hits: torch.Tensor, normals: torch.Tensor,
+    primitive: torch.Tensor, material: torch.Tensor, source: torch.Tensor, endpoint: torch.Tensor,
     reverse: bool,
 ) -> dict[str, torch.Tensor]:
     """Pack one same-depth EPC batch into a padded leg record.
@@ -1779,14 +1714,8 @@ def _leg_batch(
 
 
 def _gather_leg(
-    *,
-    compiled: object,
-    geom: _ReflectionGeometry,
-    source: torch.Tensor,
-    samples: ChainSamples,
-    scene_diagonal: torch.Tensor,
-    max_leg_depth: int,
-    reverse: bool,
+    *, compiled: object, geom: _ReflectionGeometry, source: torch.Tensor, samples: ChainSamples,
+    scene_diagonal: torch.Tensor, max_leg_depth: int, reverse: bool,
 ) -> dict[str, torch.Tensor]:
     """Enumerate specular reflection chains ``source -> {samples}`` at every leg
  depth ``0..max_leg_depth`` and pack them into a concatenated padded leg table.
@@ -1864,14 +1793,8 @@ def _gather_leg(
 
 
 def _gather_leg_order1(
-    *,
-    compiled: object,
-    geom: _ReflectionGeometry,
-    source: torch.Tensor,
-    samples: ChainSamples,
-    tx_power_ref: torch.Tensor,
-    reverse: bool,
-    batches: list[dict[str, torch.Tensor]],
+    *, compiled: object, geom: _ReflectionGeometry, source: torch.Tensor, samples: ChainSamples,
+    tx_power_ref: torch.Tensor, reverse: bool, batches: list[dict[str, torch.Tensor]],
 ) -> None:
     groups = geom.groups
     group_count = int(groups["group_count"])
@@ -1948,14 +1871,8 @@ def _gather_leg_order1(
 
 
 def _gather_leg_multibounce(
-    *,
-    compiled: object,
-    geom: _ReflectionGeometry,
-    source: torch.Tensor,
-    samples: ChainSamples,
-    tx_power_ref: torch.Tensor,
-    max_leg_depth: int,
-    reverse: bool,
+    *, compiled: object, geom: _ReflectionGeometry, source: torch.Tensor, samples: ChainSamples,
+    tx_power_ref: torch.Tensor, max_leg_depth: int, reverse: bool,
     batches: list[dict[str, torch.Tensor]],
 ) -> None:
     groups = geom.groups
@@ -2037,11 +1954,7 @@ def _gather_leg_multibounce(
 
 
 def _trace_group_chains(
-    rayd: object,
-    tx: torch.Tensor,
-    *,
-    face_group_id: torch.Tensor,
-    max_depth: int,
+    rayd: object, tx: torch.Tensor, *, face_group_id: torch.Tensor, max_depth: int,
     ray_count: int = 262_144,
 ) -> torch.Tensor:
     """Trace specular chains from a source and map hits to plane-group ids.
@@ -2074,13 +1987,8 @@ def _trace_group_chains(
 
 
 def discover_scatter_chains(
-    compiled: object,
-    config: "TopologyConfig",
-    *,
-    tx_positions: torch.Tensor,
-    rx_positions: torch.Tensor,
-    samples: ChainSamples,
-    scene_diagonal: torch.Tensor,
+    compiled: object, config: "TopologyConfig", *, tx_positions: torch.Tensor,
+    rx_positions: torch.Tensor, samples: ChainSamples, scene_diagonal: torch.Tensor,
 ) -> ScatterChainDiscovery | None:
     """Enumerate and join C1/C2 specular chains around each chain vertex.
 
@@ -2129,13 +2037,8 @@ def discover_scatter_chains(
 
 
 def _enumerate_leg_tables(
-    *,
-    compiled: object,
-    geom: "_ReflectionGeometry",
-    tx_positions: torch.Tensor,
-    rx_positions: torch.Tensor,
-    samples: ChainSamples,
-    scene_diagonal: torch.Tensor,
+    *, compiled: object, geom: "_ReflectionGeometry", tx_positions: torch.Tensor,
+    rx_positions: torch.Tensor, samples: ChainSamples, scene_diagonal: torch.Tensor,
     max_leg_depth: int,
 ) -> tuple[list[dict[str, torch.Tensor]], list[dict[str, torch.Tensor]]]:
     """Trace the per-source specular legs tagged by endpoint id (tx C1, rx C2)."""
@@ -2168,14 +2071,8 @@ def _enumerate_leg_tables(
 
 
 def _join_leg_tables(
-    *,
-    c1_tables: list[dict[str, torch.Tensor]],
-    c2_tables: list[dict[str, torch.Tensor]],
-    num_tx: int,
-    num_rx: int,
-    max_chain_depth: int,
-    samples: ChainSamples,
-    device: torch.device,
+    *, c1_tables: list[dict[str, torch.Tensor]], c2_tables: list[dict[str, torch.Tensor]],
+    num_tx: int, num_rx: int, max_chain_depth: int, samples: ChainSamples, device: torch.device,
 ) -> list[dict[str, torch.Tensor]]:
     """Join C1/C2 legs per (tx, rx) on the sample index into chain-row blocks.
 
@@ -2218,10 +2115,7 @@ def _join_leg_tables(
 
 
 def _budget_and_assemble(
-    rows: list[dict[str, torch.Tensor]],
-    *,
-    num_rx: int,
-    max_rows: int,
+    rows: list[dict[str, torch.Tensor]], *, num_rx: int, max_rows: int,
 ) -> ScatterChainDiscovery:
     """Merge chain rows, budget per (tx, rx), sort deterministically, and freeze."""
 
@@ -2246,15 +2140,8 @@ def _budget_and_assemble(
 
 
 def _join_pair_rows(
-    *,
-    tx_index: int,
-    rx_index: int,
-    c1: dict[str, torch.Tensor],
-    c2: dict[str, torch.Tensor],
-    ai: torch.Tensor,
-    bi: torch.Tensor,
-    samples: ChainSamples,
-    device: torch.device,
+    *, tx_index: int, rx_index: int, c1: dict[str, torch.Tensor], c2: dict[str, torch.Tensor],
+    ai: torch.Tensor, bi: torch.Tensor, samples: ChainSamples, device: torch.device,
 ) -> dict[str, torch.Tensor]:
     n = int(ai.numel())
     sample_index = c1["sample_index"][ai]
@@ -2353,7 +2240,7 @@ _ADR021_D5_CHAIN_AD_WIRED = False
 
 
 def _ensemble_scatter_faces(
-    compiled: object, screens: dict[int, PhaseScreen], *, device: torch.device
+    compiled: object, screens: dict[int, PhaseScreen], *, device: torch.device,
 ) -> torch.Tensor:
     """Ensemble (non-realization) rough scatter faces (single-bounce parity)."""
 
@@ -2374,7 +2261,7 @@ def _ensemble_scatter_faces(
 
 
 def _chain_bounce_material(
-    face_param: torch.Tensor, primitive: torch.Tensor, pad: float
+    face_param: torch.Tensor, primitive: torch.Tensor, pad: float,
 ) -> torch.Tensor:
     """Gather a per-face Fresnel parameter onto a padded ``[R, Dmax]`` leg block.
 
@@ -2389,7 +2276,7 @@ def _chain_bounce_material(
 
 
 def _chain_vertex_frame(
-    discovery: ScatterChainDiscovery, rough_axis_rad: torch.Tensor
+    discovery: ScatterChainDiscovery, rough_axis_rad: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Vertex roughness frame + incident local coords (single-bounce parity).
 
@@ -2426,18 +2313,9 @@ def _chain_vertex_frame(
 
 
 def _chain_ensemble_evaluate(
-    scene: Scene,
-    compiled: object,
-    config: TopologyConfig,
-    discovery: ScatterChainDiscovery,
-    *,
-    tx_pol: torch.Tensor,
-    rx_pol: torch.Tensor,
-    tx_positions: torch.Tensor,
-    rx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    device: torch.device,
-    ad_mode: str,
+    scene: Scene, compiled: object, config: TopologyConfig, discovery: ScatterChainDiscovery, *,
+    tx_pol: torch.Tensor, rx_pol: torch.Tensor, tx_positions: torch.Tensor,
+    rx_positions: torch.Tensor, tx_power: torch.Tensor, device: torch.device, ad_mode: str,
 ) -> dict[str, torch.Tensor]:
     """Dispatch the native coherent scattering chain-ensemble kernel per transmitter.
 
@@ -2591,9 +2469,7 @@ def _chain_ensemble_evaluate(
 
 
 def _chain_topology_slots(
-    discovery: ScatterChainDiscovery,
-    vertex_face: torch.Tensor,
-    vertex_normal: torch.Tensor,
+    discovery: ScatterChainDiscovery, vertex_face: torch.Tensor, vertex_normal: torch.Tensor,
     width: int,
 ) -> dict[str, torch.Tensor]:
     """Build the multi-slot interaction sequence of every chain row.
@@ -2662,13 +2538,8 @@ def _chain_topology_slots(
 
 
 def _extend_evaluated_paths_chain(
-    evaluated: EvaluatedPaths,
-    sidecars: EvaluatedPathSidecars,
-    discovery: ScatterChainDiscovery,
-    physics: dict[str, torch.Tensor],
-    vertex_face: torch.Tensor,
-    *,
-    tx_power: torch.Tensor,
+    evaluated: EvaluatedPaths, sidecars: EvaluatedPathSidecars, discovery: ScatterChainDiscovery,
+    physics: dict[str, torch.Tensor], vertex_face: torch.Tensor, *, tx_power: torch.Tensor,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     """Append component_id=6 multi-slot scatter-chain rows to typed contracts."""
 
@@ -2780,9 +2651,7 @@ def _extend_evaluated_paths_chain(
     )
 
 
-def _index_discovery(
-    discovery: ScatterChainDiscovery, idx: torch.Tensor
-) -> ScatterChainDiscovery:
+def _index_discovery(discovery: ScatterChainDiscovery, idx: torch.Tensor) -> ScatterChainDiscovery:
     return ScatterChainDiscovery(
         **{
             spec: getattr(discovery, spec)[idx].contiguous()
@@ -2817,13 +2686,8 @@ def _index_discovery(
 
 
 def append_chain_scattering_paths(
-    scene: Scene,
-    config: TopologyConfig,
-    evaluated: EvaluatedPaths,
-    sidecars: EvaluatedPathSidecars,
-    info: dict[str, Any],
-    *,
-    ad_mode: str,
+    scene: Scene, config: TopologyConfig, evaluated: EvaluatedPaths,
+    sidecars: EvaluatedPathSidecars, info: dict[str, Any], *, ad_mode: str,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     """coherent scattering: discover and append enumerated scatter-chain rows.
 
@@ -3003,7 +2867,7 @@ def rough_material_runtimes(compiled: Any) -> dict[int, RoughMaterialRuntime]:
 
 
 def scatter_direction_uniforms(
-    count: int, *, seed: int, tx_index: int, depth: int, device: torch.device
+    count: int, *, seed: int, tx_index: int, depth: int, device: torch.device,
 ) -> torch.Tensor:
     """Reproducible ``[count, 2]`` uniforms for Kirchhoff direction sampling.
 
@@ -3021,13 +2885,8 @@ def scatter_direction_uniforms(
 
 
 def three_way_rough_probabilities(
-    cos_theta: torch.Tensor,
-    material_id: torch.Tensor,
-    material_bundle: dict[str, torch.Tensor],
-    stack: dict[str, torch.Tensor],
-    *,
-    frequency_hz: float,
-    floor: float = _EVENT_PROBABILITY_FLOOR,
+    cos_theta: torch.Tensor, material_id: torch.Tensor, material_bundle: dict[str, torch.Tensor],
+    stack: dict[str, torch.Tensor], *, frequency_hz: float, floor: float = _EVENT_PROBABILITY_FLOOR,
 ) -> dict[str, torch.Tensor]:
     """Rough-face three-way event probabilities (surface-event selection).
 
@@ -3058,9 +2917,7 @@ def three_way_rough_probabilities(
     )
 
 
-def local_frames(
-    normal: torch.Tensor, axis_rad: torch.Tensor
-) -> tuple[torch.Tensor, torch.Tensor]:
+def local_frames(normal: torch.Tensor, axis_rad: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     """Deterministic tangent frame ``(t1, t2)`` of unit normals ``[N, 3]``.
 
  ``t1`` is the table's local x axis (roughness principal axis): the
@@ -3088,7 +2945,7 @@ def local_frames(
 
 
 def world_to_local(
-    w: torch.Tensor, t1: torch.Tensor, t2: torch.Tensor, normal: torch.Tensor
+    w: torch.Tensor, t1: torch.Tensor, t2: torch.Tensor, normal: torch.Tensor,
 ) -> torch.Tensor:
     return torch.stack(
         (
@@ -3101,23 +2958,19 @@ def world_to_local(
 
 
 def local_to_world(
-    w: torch.Tensor, t1: torch.Tensor, t2: torch.Tensor, normal: torch.Tensor
+    w: torch.Tensor, t1: torch.Tensor, t2: torch.Tensor, normal: torch.Tensor,
 ) -> torch.Tensor:
     return w[:, 0:1] * t1 + w[:, 1:2] * t2 + w[:, 2:3] * normal
 
 
-def solid_angle_to_area_jacobian(
-    cosine: torch.Tensor, distance: torch.Tensor
-) -> torch.Tensor:
+def solid_angle_to_area_jacobian(cosine: torch.Tensor, distance: torch.Tensor) -> torch.Tensor:
     """Return ``|cos(theta)|/r^2`` without folding it into a proposal PDF."""
 
     return cosine.clamp_min(0.0) / distance.clamp_min(1.0e-6).square()
 
 
 def te_tm_incident_power(
-    field_real: torch.Tensor,
-    field_imag: torch.Tensor,
-    direction: torch.Tensor,
+    field_real: torch.Tensor, field_imag: torch.Tensor, direction: torch.Tensor,
     normal: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Incident Jones powers ``(P_te, P_tm)`` in the local s/p basis.
@@ -3148,7 +3001,7 @@ def te_tm_incident_power(
 
 
 def scatter_carried_incident_power(
-    throughput_real: torch.Tensor, throughput_imag: torch.Tensor
+    throughput_real: torch.Tensor, throughput_imag: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Unpolarized incident ``(P_te, P_tm)`` of an already-scattered subpath.
 
@@ -3167,9 +3020,7 @@ def scatter_carried_incident_power(
 
 
 def _grouped_rows(
-    valid: torch.Tensor,
-    material_id: torch.Tensor,
-    runtimes: dict[int, RoughMaterialRuntime],
+    valid: torch.Tensor, material_id: torch.Tensor, runtimes: dict[int, RoughMaterialRuntime],
 ) -> list[tuple[RoughMaterialRuntime, torch.Tensor, torch.Tensor]]:
     groups = []
     for index, runtime in runtimes.items():
@@ -3183,10 +3034,7 @@ def _grouped_rows(
 
 
 def sample_scatter_directions(
-    valid: torch.Tensor,
-    material_id: torch.Tensor,
-    wi_local: torch.Tensor,
-    uniforms: torch.Tensor,
+    valid: torch.Tensor, material_id: torch.Tensor, wi_local: torch.Tensor, uniforms: torch.Tensor,
     runtimes: dict[int, RoughMaterialRuntime],
 ) -> dict[str, torch.Tensor]:
     """Per-material Kirchhoff CDF sampling of local outgoing directions.
@@ -3223,14 +3071,8 @@ def sample_scatter_directions(
 
 
 def eval_bsdf_rows(
-    valid: torch.Tensor,
-    material_id: torch.Tensor,
-    wi_local: torch.Tensor,
-    wo_local: torch.Tensor,
-    runtimes: dict[int, RoughMaterialRuntime],
-    *,
-    ad: bool = False,
-    ledger: object | None = None,
+    valid: torch.Tensor, material_id: torch.Tensor, wi_local: torch.Tensor, wo_local: torch.Tensor,
+    runtimes: dict[int, RoughMaterialRuntime], *, ad: bool = False, ledger: object | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Batched ``(f_te, f_tm)`` lookups grouped by rough material.
 
@@ -3267,28 +3109,12 @@ def eval_bsdf_rows(
 
 
 def scattering_nee_connection_samples(
-    rayd: Any,
-    sensor: dict[str, torch.Tensor],
-    runtimes: dict[int, Any],
-    *,
-    position: torch.Tensor,
-    normal: torch.Tensor,
-    frame_t1: torch.Tensor,
-    frame_t2: torch.Tensor,
-    wi_local: torch.Tensor,
-    p_te: torch.Tensor,
-    p_tm: torch.Tensor,
-    p_scatter: torch.Tensor,
-    material_id: torch.Tensor,
-    source_power: torch.Tensor,
-    tx_id: torch.Tensor,
-    light_depth: torch.Tensor,
-    path_length_at_vertex: torch.Tensor,
-    frequency_hz: float | torch.Tensor,
-    samples: int,
-    scene_diagonal: float,
-    ad: bool = False,
-    ledger: object | None = None,
+    rayd: Any, sensor: dict[str, torch.Tensor], runtimes: dict[int, Any], *, position: torch.Tensor,
+    normal: torch.Tensor, frame_t1: torch.Tensor, frame_t2: torch.Tensor, wi_local: torch.Tensor,
+    p_te: torch.Tensor, p_tm: torch.Tensor, p_scatter: torch.Tensor, material_id: torch.Tensor,
+    source_power: torch.Tensor, tx_id: torch.Tensor, light_depth: torch.Tensor,
+    path_length_at_vertex: torch.Tensor, frequency_hz: float | torch.Tensor, samples: int,
+    scene_diagonal: float, ad: bool = False, ledger: object | None = None,
 ) -> dict[str, torch.Tensor] | None:
     """NEE connection rows from scatter-selected vertices (component 6).
 
@@ -3452,22 +3278,10 @@ def scattering_nee_connection_samples(
 
 
 def scattered_subpath_state(
-    state: dict[str, torch.Tensor],
-    hit: dict[str, torch.Tensor],
-    *,
-    choose_scatter: torch.Tensor,
-    normal: torch.Tensor,
-    frame_t1: torch.Tensor,
-    frame_t2: torch.Tensor,
-    wi_local: torch.Tensor,
-    p_te: torch.Tensor,
-    p_tm: torch.Tensor,
-    p_scatter: torch.Tensor,
-    material_id: torch.Tensor,
-    runtimes: dict[int, Any],
-    uniforms: torch.Tensor,
-    scene_diagonal: float,
-    ad: bool = False,
+    state: dict[str, torch.Tensor], hit: dict[str, torch.Tensor], *, choose_scatter: torch.Tensor,
+    normal: torch.Tensor, frame_t1: torch.Tensor, frame_t2: torch.Tensor, wi_local: torch.Tensor,
+    p_te: torch.Tensor, p_tm: torch.Tensor, p_scatter: torch.Tensor, material_id: torch.Tensor,
+    runtimes: dict[int, Any], uniforms: torch.Tensor, scene_diagonal: float, ad: bool = False,
     ledger: object | None = None,
 ) -> dict[str, torch.Tensor]:
     """Continued light subpath after a Kirchhoff scattering event.
@@ -3551,17 +3365,8 @@ def scattered_subpath_state(
 
 
 def scattering_map_matrix(
-    scene: Any,
-    rayd: Any,
-    tx_pos: torch.Tensor,
-    tx_power: torch.Tensor,
-    rx_pos: torch.Tensor,
-    *,
-    samples: int,
-    seed: int,
-    device: torch.device,
-    ad: bool = False,
-    ledger: object | None = None,
+    scene: Any, rayd: Any, tx_pos: torch.Tensor, tx_power: torch.Tensor, rx_pos: torch.Tensor, *,
+    samples: int, seed: int, device: torch.device, ad: bool = False, ledger: object | None = None,
 ) -> tuple[torch.Tensor, dict[str, int]]:
     """(tx, rx) matrix of the MC basic Kirchhoff scattering path gain.
 

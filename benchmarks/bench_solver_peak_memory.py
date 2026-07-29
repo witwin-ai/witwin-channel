@@ -23,7 +23,7 @@ from witwin.channel.runtime import (  # noqa: E402
 
 
 def _artifact(
-    *, samples: int, tx: int, rx: int, depth: int, gpu_budget_gib: float
+    *, samples: int, tx: int, rx: int, depth: int, gpu_budget_gib: float,
 ) -> dict[str, Any]:
     estimate = estimate_monte_carlo_memory(
         samples=samples,

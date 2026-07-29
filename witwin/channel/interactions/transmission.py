@@ -37,8 +37,7 @@ if TYPE_CHECKING:
 
 
 def _pair_major_endpoints(
-    tx_positions: torch.Tensor,
-    rx_positions: torch.Tensor,
+    tx_positions: torch.Tensor, rx_positions: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Structurally expand endpoints as ``tx * rx_count + rx`` rows."""
 
@@ -57,14 +56,8 @@ def _pair_major_endpoints(
 
 @profiled_cuda_range(CudaProfileRange.ENUMERATED_PENETRATION_DISCOVERY)
 def _transmission_topology(
-    scene: Scene,
-    compiled: object,
-    tx_positions: torch.Tensor,
-    rx_positions: torch.Tensor,
-    *,
-    max_depth: int,
-    ad_mode: str,
-    failure_state: CapacityFailureState | None,
+    scene: Scene, compiled: object, tx_positions: torch.Tensor, rx_positions: torch.Tensor, *,
+    max_depth: int, ad_mode: str, failure_state: CapacityFailureState | None,
 ) -> tuple[dict[str, torch.Tensor], int, CapacityExecutionCounts | None]:
     """Trace and pack one pair-major RayD penetration batch.
 
@@ -213,9 +206,7 @@ def scene_diagonal_m(scene: Any) -> float:
     return float((maximum - minimum).norm())
 
 
-def scale_aware_epsilon(
-    position: torch.Tensor, *, scene_diagonal: float
-) -> torch.Tensor:
+def scale_aware_epsilon(position: torch.Tensor, *, scene_diagonal: float) -> torch.Tensor:
     """Per-row restart offset ``max(|p|*1e-6, diag*1e-6, 1e-6 m)`` (the transmission behavior)."""
 
     floor = max(_MIN_EPSILON_M, float(scene_diagonal) * _RELATIVE_EPSILON)
@@ -240,7 +231,7 @@ def event_selection_seed(seed: int, tx_index: int, depth: int) -> int:
 
 
 def event_uniforms(
-    count: int, *, seed: int, tx_index: int, depth: int, device: torch.device
+    count: int, *, seed: int, tx_index: int, depth: int, device: torch.device,
 ) -> torch.Tensor:
     """Reproducible per-sample uniforms for reflect/transmit event selection."""
 
@@ -249,9 +240,7 @@ def event_uniforms(
     return torch.rand((int(count),), device=device, generator=generator)
 
 
-def unpolarized_power_budgets(
-    stack: dict[str, torch.Tensor],
-) -> tuple[torch.Tensor, torch.Tensor]:
+def unpolarized_power_budgets(stack: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
     """(R_eff, T_eff) as the unpolarized TE/TM mean of the smooth-stack power
  budgets. The mean is acceptable for EVENT PROBABILITIES only; the selected
  branch's kernel applies the exact polarized Jones coefficients."""
@@ -262,10 +251,7 @@ def unpolarized_power_budgets(
 
 
 def transmission_event_probability(
-    r_eff: torch.Tensor,
-    t_eff: torch.Tensor,
-    *,
-    floor: float = _EVENT_PROBABILITY_FLOOR,
+    r_eff: torch.Tensor, t_eff: torch.Tensor, *, floor: float = _EVENT_PROBABILITY_FLOOR,
 ) -> torch.Tensor:
     """Event probability p_t = T/(R+T) with a minimum-probability floor when
  both budgets are nonzero (surface-event selection). Absorption 1-R-T terminates
@@ -279,15 +265,8 @@ def transmission_event_probability(
 
 @profiled_cuda_range(CudaProfileRange.MONTECARLO_BASIC_PENETRATION_DISCOVERY)
 def straight_transmission_chains(
-    rayd: Any,
-    origins: torch.Tensor,
-    targets: torch.Tensor,
-    *,
-    vertices: torch.Tensor | None,
-    max_depth: int,
-    scene_diagonal: float,
-    failure_state: CapacityFailureState,
-    ad: bool = False,
+    rayd: Any, origins: torch.Tensor, targets: torch.Tensor, *, vertices: torch.Tensor | None,
+    max_depth: int, scene_diagonal: float, failure_state: CapacityFailureState, ad: bool = False,
 ) -> SegmentPenetrationResult:
     """Trace one flattened fixed-capacity target-inset penetration batch."""
 

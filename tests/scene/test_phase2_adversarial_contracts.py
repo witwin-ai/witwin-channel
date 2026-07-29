@@ -33,12 +33,7 @@ from witwin.channel.scene.resources import (
 compile_module = importlib.import_module("witwin.channel.scene.compiler")
 
 
-def _world(
-    *,
-    x_offset: float,
-    eps_r: float,
-    geometry: Mesh | None = None,
-) -> Scene:
+def _world(*, x_offset: float, eps_r: float, geometry: Mesh | None = None) -> Scene:
     resolved_geometry = geometry or Mesh(
         torch.tensor(
             [
@@ -116,9 +111,7 @@ def _install_compile_seams(monkeypatch):
     return builds
 
 
-def test_cache_never_equates_unrelated_worlds_with_the_same_stable_ids(
-    monkeypatch,
-):
+def test_cache_never_equates_unrelated_worlds_with_the_same_stable_ids(monkeypatch):
     builds = _install_compile_seams(monkeypatch)
     compile_module.clear_compile_cache()
 
@@ -142,9 +135,7 @@ def test_cache_never_equates_unrelated_worlds_with_the_same_stable_ids(
     assert right.materials.eps_r.tolist() == [7.0]
 
 
-def test_cache_reuses_shared_geometry_across_immutable_material_update(
-    monkeypatch,
-):
+def test_cache_reuses_shared_geometry_across_immutable_material_update(monkeypatch):
     builds = _install_compile_seams(monkeypatch)
     compile_module.clear_compile_cache()
     geometry = _world(x_offset=0.0, eps_r=2.5).structures[0].geometry

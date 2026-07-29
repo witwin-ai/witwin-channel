@@ -19,12 +19,8 @@ _SAMPLES = 400
 
 
 def _reference_tau(
-    source: np.ndarray,
-    target: np.ndarray,
-    box_min: np.ndarray,
-    box_max: np.ndarray,
-    wavelength: float,
-    width: float,
+    source: np.ndarray, target: np.ndarray, box_min: np.ndarray, box_max: np.ndarray,
+    wavelength: float, width: float,
 ) -> float:
     ts = np.linspace(0.0, 1.0, _SAMPLES)
     pts = source[None, :] + ts[:, None] * (target - source)[None, :]

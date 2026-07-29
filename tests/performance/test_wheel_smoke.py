@@ -232,9 +232,7 @@ def test_wheel_content_audit_rejects_casefold_duplicate(tmp_path: Path):
         "witwin_channel-0.1.0.dist-info/entry_points.txt",
     ],
 )
-def test_wheel_content_audit_rejects_nonallowlisted_members(
-    tmp_path: Path, member: str
-):
+def test_wheel_content_audit_rejects_nonallowlisted_members(tmp_path: Path, member: str):
     wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
     with zipfile.ZipFile(wheel, "a") as archive:
@@ -244,9 +242,7 @@ def test_wheel_content_audit_rejects_nonallowlisted_members(
         wheel_smoke._audit_wheel_contents(wheel)
 
 
-def test_wheel_content_audit_rejects_record_coverage_and_digest_mismatch(
-    tmp_path: Path,
-):
+def test_wheel_content_audit_rejects_record_coverage_and_digest_mismatch(tmp_path: Path):
     wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
     record = "witwin_channel-0.1.0.dist-info/RECORD"
@@ -305,7 +301,7 @@ def test_wheel_content_audit_rejects_any_extra_dso(tmp_path: Path, member: str):
     ],
 )
 def test_wheel_content_audit_rejects_build_leaks(
-    tmp_path: Path, member: str, payload: bytes, match: str
+    tmp_path: Path, member: str, payload: bytes, match: str,
 ):
     wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
@@ -444,9 +440,7 @@ def _parse_evidence(payload: str, target: Path) -> dict[str, object]:
     )
 
 
-def test_smoke_evidence_parser_requires_exact_independently_verified_schema(
-    tmp_path: Path,
-):
+def test_smoke_evidence_parser_requires_exact_independently_verified_schema(tmp_path: Path):
     evidence = _smoke_evidence(tmp_path)
     assert _parse_evidence(__import__("json").dumps(evidence), tmp_path) == evidence
     with pytest.raises(ValueError, match="one JSON object"):
@@ -464,7 +458,7 @@ def test_smoke_evidence_parser_requires_exact_independently_verified_schema(
     ],
 )
 def test_smoke_evidence_parser_rejects_duplicate_keys_and_nonfinite_json(
-    tmp_path: Path, payload: str
+    tmp_path: Path, payload: str,
 ):
     with pytest.raises(ValueError, match="one JSON object"):
         _parse_evidence(payload, tmp_path)
@@ -488,7 +482,7 @@ def test_smoke_evidence_parser_rejects_duplicate_keys_and_nonfinite_json(
     ],
 )
 def test_smoke_evidence_parser_rejects_identity_or_schema_mismatch(
-    tmp_path: Path, mutation, match: str
+    tmp_path: Path, mutation, match: str,
 ):
     evidence = _smoke_evidence(tmp_path)
     mutation(evidence)
@@ -518,9 +512,7 @@ def test_smoke_evidence_parser_rejects_elsewhere_origins_inside_target(tmp_path:
         _parse_evidence(json.dumps(evidence), target)
 
 
-def test_smoke_evidence_parser_requires_distribution_root_exactly_target(
-    tmp_path: Path,
-):
+def test_smoke_evidence_parser_requires_distribution_root_exactly_target(tmp_path: Path):
     target = tmp_path / "target"
     evidence = _smoke_evidence(target)
     nested = target / "nested"
@@ -538,9 +530,7 @@ def test_smoke_evidence_parser_requires_distribution_root_exactly_target(
         b'{"schema_version":1,"repository_url":NaN}',
     ],
 )
-def test_wheel_runtime_identity_rejects_non_strict_lock_json(
-    tmp_path: Path, payload: bytes
-):
+def test_wheel_runtime_identity_rejects_non_strict_lock_json(tmp_path: Path, payload: bytes):
     wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
     _replace_member(wheel, "witwin/channel/rayd.lock.json", payload)

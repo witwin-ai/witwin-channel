@@ -75,9 +75,7 @@ def test_native_extension_preserves_loader_cache(monkeypatch: pytest.MonkeyPatch
     assert imports == [("._channel", "witwin.channel")]
 
 
-def test_required_symbol_keeps_lookup_order_and_single_loader_call(
-    monkeypatch: pytest.MonkeyPatch,
-):
+def test_required_symbol_keeps_lookup_order_and_single_loader_call(monkeypatch: pytest.MonkeyPatch):
     kernel = object()
     loads: list[None] = []
     accesses: list[str] = []
@@ -100,9 +98,7 @@ def test_required_symbol_keeps_lookup_order_and_single_loader_call(
     assert accesses == ["kernel", "kernel"]
 
 
-def test_required_symbol_uses_the_existing_error_contract(
-    monkeypatch: pytest.MonkeyPatch,
-):
+def test_required_symbol_uses_the_existing_error_contract(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(runtime, "native_extension", lambda: SimpleNamespace())
 
     with pytest.raises(
@@ -122,9 +118,7 @@ def test_optional_symbol_is_not_cached(monkeypatch: pytest.MonkeyPatch):
     assert runtime.optional_symbol("feature") is feature
 
 
-def test_has_symbol_observes_each_monkeypatched_extension(
-    monkeypatch: pytest.MonkeyPatch,
-):
+def test_has_symbol_observes_each_monkeypatched_extension(monkeypatch: pytest.MonkeyPatch):
     native = SimpleNamespace(feature=object())
     monkeypatch.setattr(runtime, "native_extension", lambda: native)
     assert runtime.has_symbol("feature") is True
@@ -171,9 +165,7 @@ def test_required_native_op_preserves_runtime_monkeypatch_and_call_count(
     assert loads == [None]
 
 
-def test_required_native_op_preserves_missing_kernel_text(
-    monkeypatch: pytest.MonkeyPatch,
-):
+def test_required_native_op_preserves_missing_kernel_text(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(runtime, "native_extension", lambda: None)
 
     with pytest.raises(

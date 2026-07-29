@@ -250,7 +250,7 @@ def test_direction_liveness_is_one_decision_for_the_whole_result() -> None:
     "leaf", ["sources.powers_w", "sources.polarizations", "sinks.polarizations"]
 )
 def test_a_primal_only_input_is_refused_before_discovery_produces_a_result(
-    ad_mode: str, leaf: str
+    ad_mode: str, leaf: str,
 ) -> None:
     """Unsupported REF inputs fail during preflight in both discovery modes before native work."""
 
@@ -283,9 +283,7 @@ def test_a_primal_only_input_is_refused_before_discovery_produces_a_result(
 
 
 @pytest.mark.parametrize("ad_mode", ["jvp", "vjp"])
-def test_a_primal_only_material_is_refused_before_any_native_work(
-    ad_mode: str,
-) -> None:
+def test_a_primal_only_material_is_refused_before_any_native_work(ad_mode: str) -> None:
     """`mu_r` is named by the capability record and refused by that record."""
 
     compiled = smooth_wall_scene()

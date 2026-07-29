@@ -104,7 +104,7 @@ def test_dispersive_multilayer_oracle_changes_and_is_passive() -> None:
 @pytest.mark.parametrize("solver_name", [adapter.name for adapter in SOLVERS])
 @pytest.mark.parametrize("frequency_hz", _FREQUENCIES_HZ)
 def test_multilayer_transmission_is_finite_passive_and_matches_oracle(
-    solver_name: str, frequency_hz: float
+    solver_name: str, frequency_hz: float,
 ) -> None:
     _require_native()
     adapter = _adapter(solver_name)
@@ -134,9 +134,7 @@ def test_multilayer_transmission_is_finite_passive_and_matches_oracle(
 
 
 @pytest.mark.parametrize("solver_name", [adapter.name for adapter in SOLVERS])
-def test_multilayer_transmission_changes_with_frequency_and_is_reciprocal(
-    solver_name: str,
-) -> None:
+def test_multilayer_transmission_changes_with_frequency_and_is_reciprocal(solver_name: str) -> None:
     _require_native()
     adapter = _adapter(solver_name)
     forward = [_transmission_ratio(adapter, frequency) for frequency in _FREQUENCIES_HZ]

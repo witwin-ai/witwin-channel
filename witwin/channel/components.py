@@ -29,9 +29,7 @@ MAX_COUPLED_CANDIDATES = 1_000_000
 MAX_SCATTER_CHAIN_DEPTH = 16
 
 
-def validated_components(
-    components: Iterable[str], *, error_message: str
-) -> frozenset[str]:
+def validated_components(components: Iterable[str], *, error_message: str) -> frozenset[str]:
     normalized = frozenset(components)
     if not normalized or not normalized.issubset(VALID_COMPONENTS):
         raise ValueError(error_message.format(valid=sorted(VALID_COMPONENTS)))
@@ -39,15 +37,9 @@ def validated_components(
 
 
 def component_availability_status(
-    components: Iterable[str],
-    *,
-    reflection_available: bool,
-    diffraction_available: bool,
-    reflection_error: str,
-    diffraction_error: str,
-    depth_available: bool = True,
-    reflection_depth_error: str = "",
-    diffraction_depth_error: str = "",
+    components: Iterable[str], *, reflection_available: bool, diffraction_available: bool,
+    reflection_error: str, diffraction_error: str, depth_available: bool = True,
+    reflection_depth_error: str = "", diffraction_depth_error: str = "",
 ) -> dict[str, str]:
     """Report the status of every component against what this solve can run.
 
@@ -87,10 +79,7 @@ def component_availability_status(
 
 
 def apply_exported_path_counts(
-    status: dict[str, str],
-    components: Iterable[str],
-    *,
-    transmission_path_count: int,
+    status: dict[str, str], components: Iterable[str], *, transmission_path_count: int,
     scattering_path_count: int,
 ) -> dict[str, str]:
     """Refine transmission/scattering status with what the solve exported.
@@ -115,10 +104,7 @@ def apply_exported_path_counts(
 
 
 def component_max_depth(
-    components: Iterable[str],
-    *,
-    chain_depth: int,
-    single_bounce_depth: int,
+    components: Iterable[str], *, chain_depth: int, single_bounce_depth: int,
 ) -> dict[str, int]:
     """Per-component interaction depth, ``-1`` for a component not requested.
 
@@ -185,7 +171,7 @@ def validate_workspace_limit_bytes(workspace_limit_bytes: int | None) -> None:
 
 
 def validate_bounce_depth(
-    max_depth: int, components: frozenset[str], *, error_message: str
+    max_depth: int, components: frozenset[str], *, error_message: str,
 ) -> None:
     """Refuse a bounce-requiring component with no bounce budget.
 
@@ -205,11 +191,7 @@ def validate_isb_boundary_taper(width: float) -> None:
 
 
 def validate_scatter_chain(
-    *,
-    max_depth: int,
-    samples_per_m2: float,
-    max_rows: int,
-    components: frozenset[str],
+    *, max_depth: int, samples_per_m2: float, max_rows: int, components: frozenset[str],
 ) -> None:
     """Validate the coherent scattering enumerated scatter-chain config (shared)."""
 
@@ -232,7 +214,7 @@ def validate_scatter_chain(
 
 
 def validate_coupled_gate(
-    *, coupled_paths: bool, max_depth: int, components: frozenset[str]
+    *, coupled_paths: bool, max_depth: int, components: frozenset[str],
 ) -> None:
     """Validate the coupled reflection-diffraction opt-in gate (coupled reflection and diffraction).
 

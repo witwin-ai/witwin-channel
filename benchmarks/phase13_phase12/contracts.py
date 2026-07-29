@@ -102,10 +102,7 @@ def read_json(path: Path) -> dict[str, object]:
 
 
 def exact_keys(
-    value: object,
-    expected: set[str] | frozenset[str],
-    *,
-    label: str,
+    value: object, expected: set[str] | frozenset[str], *, label: str,
 ) -> dict[str, object]:
     if not isinstance(value, dict):
         raise EvidenceError(f"{label} must be an object")
@@ -118,9 +115,7 @@ def exact_keys(
     return value
 
 
-def schema_identity(
-    value: object, *, name: str, version: int, label: str
-) -> dict[str, object]:
+def schema_identity(value: object, *, name: str, version: int, label: str) -> dict[str, object]:
     row = exact_keys(value, {"name", "version"}, label=label)
     if row != {"name": name, "version": version}:
         raise EvidenceError(f"{label} identity is not accepted")
@@ -156,7 +151,7 @@ def require_sha256(value: object, *, label: str) -> str:
 
 
 def finite_number(
-    value: object, *, label: str, positive: bool = False, non_negative: bool = False
+    value: object, *, label: str, positive: bool = False, non_negative: bool = False,
 ) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise EvidenceError(f"{label} must be a number")
@@ -176,9 +171,7 @@ def finite_samples(value: object, *, label: str, count: int = 7) -> list[float]:
     return [finite_number(item, label=label, positive=True) for item in value]
 
 
-def reject_developer_override_environment(
-    environment: Mapping[str, str] | None = None,
-) -> None:
+def reject_developer_override_environment(environment: Mapping[str, str] | None = None) -> None:
     values = os.environ if environment is None else environment
     present = [name for name in DEVELOPER_OVERRIDE_ENV if name in values]
     if present:
@@ -188,9 +181,7 @@ def reject_developer_override_environment(
 
 
 def sanitized_subprocess_environment(
-    environment: Mapping[str, str] | None = None,
-    *,
-    runtime_search_paths: Sequence[Path] = (),
+    environment: Mapping[str, str] | None = None, *, runtime_search_paths: Sequence[Path] = (),
 ) -> dict[str, str]:
     source = os.environ if environment is None else environment
     allowed = (
@@ -527,9 +518,7 @@ def require_measured_policy_ready(gate: Mapping[str, object]) -> None:
         )
 
 
-def process_schedule(
-    gate: Mapping[str, object], group: str
-) -> list[dict[str, object]]:
+def process_schedule(gate: Mapping[str, object], group: str) -> list[dict[str, object]]:
     if group not in COMPARISON_GROUPS:
         raise EvidenceError(f"unknown comparison group: {group}")
     policy = gate["measurement_policy"]
@@ -548,7 +537,9 @@ def process_schedule(
     ]
 
 
-def validate_exact_schedule(pairs: Sequence[Mapping[str, object]], gate: Mapping[str, object]) -> None:
+def validate_exact_schedule(
+    pairs: Sequence[Mapping[str, object]], gate: Mapping[str, object],
+) -> None:
     if not pairs:
         raise EvidenceError("comparison group has no process pairs")
     group = pairs[0].get("group")

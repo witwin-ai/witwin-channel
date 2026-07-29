@@ -223,28 +223,6 @@
       "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
       "token_count": 116
     },
-    "18ccbc6a61c763d8": {
-      "category": "host_check",
-      "corpus": "python",
-      "files": [
-        "montecarlo.py"
-      ],
-      "owner": "paths",
-      "provenance": "ADR-044 full current-tree refresh",
-      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
-      "token_count": 161
-    },
-    "190b2f1a5403dd8b": {
-      "category": "host_check",
-      "corpus": "native",
-      "files": [
-        "path_topology.cu"
-      ],
-      "owner": "path",
-      "provenance": "ADR-044 full current-tree refresh",
-      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
-      "token_count": 184
-    },
     "1c108704c3bb7df7": {
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
@@ -416,17 +394,6 @@
       "provenance": "ADR-044 full current-tree refresh",
       "reason": "Repeated ABI function signature and tensor parameter declaration at the binding boundary.",
       "token_count": 174
-    },
-    "3242436a74c0e86c": {
-      "category": "host_check",
-      "owner": "kernels.topology",
-      "reason": "Repeated CUDA tensor dtype, rank, shape, and contiguity validation at two topology facade boundaries.",
-      "corpus": "python",
-      "files": [
-        "topology.py"
-      ],
-      "provenance": "ADR-044 full current-tree refresh",
-      "token_count": 167
     },
     "329271e17c8918f2": {
       "category": "fixture_boilerplate",
@@ -723,7 +690,7 @@
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
       "token_count": 172
     },
-    "63472b1e830460ad": {
+    "57462302d76253fb": {
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
       "files": [
@@ -737,7 +704,7 @@
       "owner": "domain owner",
       "provenance": "ADR-044 full current-tree refresh",
       "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 365
+      "token_count": 362
     },
     "67cdf649eb910c3c": {
       "category": "numeric_sensitive_exempt",
@@ -1332,22 +1299,6 @@
       "reason": "Repeated explicit field facade signatures and valid-mask validation preserve functional/autograd boundary semantics and dispatch only to native companions.",
       "token_count": 129
     },
-    "ab2fbf32bbed57d6": {
-      "category": "numeric_sensitive_exempt",
-      "corpus": "native",
-      "files": [
-        "path_topology.cu"
-      ],
-      "lockstep_tests": [
-        "tests/ad/test_field_em_ad.py",
-        "tests/ad/test_bdpt_companion_ad.py",
-        "tests/ad/test_chain_scattering_ad.py"
-      ],
-      "owner": "domain owner",
-      "provenance": "ADR-044 full current-tree refresh",
-      "reason": "Repeated native primal/AD or solver-family numerical structure remains order-sensitive and is covered by lockstep tests.",
-      "token_count": 124
-    },
     "aea7560c3511850d": {
       "category": "numeric_sensitive_exempt",
       "corpus": "native",
@@ -1740,17 +1691,6 @@
       "provenance": "ADR-044 full current-tree refresh",
       "reason": "Repeated domain facade validation, argument packing, or result assembly; no production numerical fallback.",
       "token_count": 176
-    },
-    "e3baf626b3c6e751": {
-      "category": "host_check",
-      "corpus": "native",
-      "files": [
-        "path_topology.cu"
-      ],
-      "owner": "path",
-      "provenance": "ADR-044 full current-tree refresh",
-      "reason": "Repeated tensor shape/dtype/device validation guards; shareable without touching numerics.",
-      "token_count": 127
     },
     "e40d096024fb7437": {
       "category": "numeric_sensitive_exempt",
@@ -2266,5 +2206,32 @@
     "note": "Shared vector and complex primitives removed file-local helpers; changed region ids were reclassified without weakening the frozen budget.",
     "region_count": 153,
     "status": "all current regions classified and duplicate coverage remains below the frozen budget"
+  },
+  "source_style_dedup_refresh": {
+    "date": "2026-07-29",
+    "combined_duplicate_lines": 7567,
+    "combined_total_lines": 86627,
+    "coverage_percent": 8.7352,
+    "frozen_coverage_percent": 10.211512,
+    "region_count": 148,
+    "category_counts": {
+      "fixture_boilerplate": 24,
+      "host_check": 7,
+      "indexing_packing": 22,
+      "numeric_sensitive_exempt": 70,
+      "other": 25
+    },
+    "python_signature_metrics": {
+      "head_multiline": 1266,
+      "current_multiline": 1040,
+      "head_over_8_lines": 345,
+      "current_over_8_lines": 75,
+      "head_over_12_lines": 185,
+      "current_over_12_lines": 24,
+      "head_max_lines": 72,
+      "current_max_lines": 30
+    },
+    "note": "Compact signature formatting preserved every existing Python AST. Shared Python and native contract validators removed five exact-token regions; one unchanged numerical region received a new maximal-region id after adjacent validation moved behind a helper.",
+    "status": "all current regions classified; no stale entries; duplicate coverage and long-signature counts tightened"
   }
 }

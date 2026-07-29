@@ -33,9 +33,7 @@ def _stable_perp_basis(ray_dir: torch.Tensor, preferred: torch.Tensor) -> torch.
     return _safe_normalize(proj, alt_proj)
 
 
-def _transverse_project(
-    ray_dir: torch.Tensor, preferred: torch.Tensor
-) -> torch.Tensor:
+def _transverse_project(ray_dir: torch.Tensor, preferred: torch.Tensor) -> torch.Tensor:
     """Project a field axis transversely without normalizing its dipole weight."""
 
     return preferred - ray_dir * (preferred * ray_dir).sum(-1, keepdim=True)
@@ -50,9 +48,7 @@ def _project(value: torch.Tensor, axis: torch.Tensor) -> torch.Tensor:
 
 
 def _outputs(
-    value: torch.Tensor,
-    rx_axis: torch.Tensor,
-    tx_power: torch.Tensor,
+    value: torch.Tensor, rx_axis: torch.Tensor, tx_power: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     coefficient = _project(value, rx_axis)
     amplitude = tx_power.clamp_min(0.0).sqrt()
@@ -66,12 +62,8 @@ def _outputs(
 
 
 def free_space_reference(
-    source: torch.Tensor,
-    target: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    frequency: torch.Tensor,
+    source: torch.Tensor, target: torch.Tensor, tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, frequency: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Mirror of free_space_complex3 + project_receiver (float64/complex128)."""
 
@@ -91,13 +83,8 @@ def free_space_reference(
 
 
 def slab_fresnel_reference(
-    cos_theta: torch.Tensor,
-    eps_r: torch.Tensor,
-    sigma_e: torch.Tensor,
-    mu_r: torch.Tensor,
-    gain: torch.Tensor,
-    thickness: torch.Tensor,
-    frequency: torch.Tensor,
+    cos_theta: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor,
+    gain: torch.Tensor, thickness: torch.Tensor, frequency: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Mirror of field_transport::slab_fresnel (thin-slab interior Fabry-Perot)."""
 
@@ -129,19 +116,10 @@ def slab_fresnel_reference(
 
 
 def reflection_sequence_reference(
-    source: torch.Tensor,
-    target: torch.Tensor,
-    interaction_positions: torch.Tensor,
-    interaction_normals: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    eps_r: torch.Tensor,
-    sigma_e: torch.Tensor,
-    mu_r: torch.Tensor,
-    gain: torch.Tensor,
-    thickness: torch.Tensor,
-    frequency: torch.Tensor,
+    source: torch.Tensor, target: torch.Tensor, interaction_positions: torch.Tensor,
+    interaction_normals: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor,
+    gain: torch.Tensor, thickness: torch.Tensor, frequency: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Mirror of reflection_sequence_kernel (general depth)."""
 
@@ -216,13 +194,8 @@ def _sqrt_passive(z: torch.Tensor) -> torch.Tensor:
 
 
 def stack_rt_reference(
-    cos_theta: torch.Tensor,
-    layer_thickness: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    frequency: torch.Tensor,
-    pol: int,
+    cos_theta: torch.Tensor, layer_thickness: torch.Tensor, layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, frequency: torch.Tensor, pol: int,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Mirror of em::stack_rt (backward Rouard recursion, one wall).
 
@@ -294,21 +267,11 @@ def stack_rt_reference(
 
 
 def transmission_sequence_reference(
-    source: torch.Tensor,
-    target: torch.Tensor,
-    interaction_normals: torch.Tensor,
-    interaction_material_id: torch.Tensor,
-    interaction_valid: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    layer_offset: torch.Tensor,
-    layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    frequency: torch.Tensor,
+    source: torch.Tensor, target: torch.Tensor, interaction_normals: torch.Tensor,
+    interaction_material_id: torch.Tensor, interaction_valid: torch.Tensor, tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, layer_offset: torch.Tensor,
+    layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, frequency: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Mirror of transmission_sequence_kernel (straight thin-sheet chain)."""
 

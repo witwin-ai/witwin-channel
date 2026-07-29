@@ -82,25 +82,17 @@ REFERENCE_BASIS = ((0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
 
 
 def source_batch(
-    positions: torch.Tensor,
-    *,
-    power_w: float = SOURCE_POWER_W,
-    with_basis: bool = False,
+    positions: torch.Tensor, *, power_w: float = SOURCE_POWER_W, with_basis: bool = False,
 ) -> EndpointBatch:
     return _batch(positions, SOURCE_IDS, power_w=power_w, with_basis=with_basis)
 
 
-def sink_batch(
-    positions: torch.Tensor, *, with_basis: bool = False
-) -> EndpointBatch:
+def sink_batch(positions: torch.Tensor, *, with_basis: bool = False) -> EndpointBatch:
     return _batch(positions, SINK_IDS, power_w=None, with_basis=with_basis)
 
 
 def _batch(
-    positions: torch.Tensor,
-    ids: tuple[int, ...],
-    *,
-    power_w: float | None,
+    positions: torch.Tensor, ids: tuple[int, ...], *, power_w: float | None,
     with_basis: bool = False,
 ) -> EndpointBatch:
     device = torch.device("cuda")
@@ -174,14 +166,8 @@ def frozen_topology(compiled):
 
 
 def replay(
-    compiled,
-    topology,
-    sources: EndpointBatch,
-    sinks: EndpointBatch,
-    *,
-    slot_count: int = 1,
-    response: str = "scalar_transport",
-    ad_mode: str = "none",
+    compiled, topology, sources: EndpointBatch, sinks: EndpointBatch, *, slot_count: int = 1,
+    response: str = "scalar_transport", ad_mode: str = "none",
     frequency_offsets_hz: tuple[float, ...] | None = None,
 ):
     return reevaluate(

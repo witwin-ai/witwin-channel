@@ -25,10 +25,7 @@ def branch(value):
 
 
 def _config(
-    *,
-    file_recommended: int = 100,
-    file_hard: int = 200,
-    complexity_recommended: int = 2,
+    *, file_recommended: int = 100, file_hard: int = 200, complexity_recommended: int = 2,
     file_lines: bool = True,
 ) -> dict:
     """Build a synthetic budget config.
@@ -119,9 +116,7 @@ def test_repository_budget_retires_all_file_size_gates() -> None:
     )
 
 
-def test_absent_file_line_limit_skips_every_file_size_check(
-    tmp_path: Path,
-) -> None:
+def test_absent_file_line_limit_skips_every_file_size_check(tmp_path: Path) -> None:
     # A file far past the retired hard limit of 2000 lines, whose only real
     # violation is control-flow complexity.
     padding = "".join(f"# pad {index}\n" for index in range(5000))
@@ -146,9 +141,7 @@ def test_absent_file_line_limit_skips_every_file_size_check(
     }
 
 
-def test_absent_file_line_limit_ignores_a_leftover_file_exemption(
-    tmp_path: Path,
-) -> None:
+def test_absent_file_line_limit_ignores_a_leftover_file_exemption(tmp_path: Path) -> None:
     # A stale file_exemptions section must not resurrect the gate, and must not
     # be reported as a stale exemption either: with no limit there is nothing
     # for it to be stale against.

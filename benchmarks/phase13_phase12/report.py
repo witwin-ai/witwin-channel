@@ -67,7 +67,7 @@ def _gate_policy() -> dict[str, object]:
 
 
 def build_dry_run(
-    config: RunnerConfig, gate: Mapping[str, object], *, gate_path: Path
+    config: RunnerConfig, gate: Mapping[str, object], *, gate_path: Path,
 ) -> dict[str, object]:
     reject_developer_override_environment()
     implementation = verify_checkouts(config, require_clean_rayd=False)
@@ -110,10 +110,7 @@ def build_dry_run(
 
 
 def _normalize_pairs(
-    pairs: Sequence[Mapping[str, object]],
-    gate: Mapping[str, object],
-    *,
-    group: str,
+    pairs: Sequence[Mapping[str, object]], gate: Mapping[str, object], *, group: str,
 ) -> list[dict[str, object]]:
     schedule = process_schedule(gate, group)
     if len(pairs) != len(schedule):
@@ -147,13 +144,8 @@ def _normalize_pairs(
 
 
 def _group_checks(
-    group: str,
-    *,
-    comparisons: Sequence[Mapping[str, object]],
-    correctness: Mapping[str, object],
-    resources: Mapping[str, object],
-    nsys: Mapping[str, object],
-    diagnostics: Mapping[str, object],
+    group: str, *, comparisons: Sequence[Mapping[str, object]], correctness: Mapping[str, object],
+    resources: Mapping[str, object], nsys: Mapping[str, object], diagnostics: Mapping[str, object],
     compiler_resources: Mapping[str, object],
 ) -> list[dict[str, object]]:
     rows = [
@@ -186,11 +178,7 @@ def _group_checks(
 
 
 def build_measured_report(
-    config: RunnerConfig,
-    gate: Mapping[str, object],
-    *,
-    gate_path: Path,
-    timeout_seconds: int,
+    config: RunnerConfig, gate: Mapping[str, object], *, gate_path: Path, timeout_seconds: int,
     bootstrap_resamples: int,
 ) -> dict[str, object]:
     reject_developer_override_environment()
@@ -338,11 +326,7 @@ def _artifact_key(row: Mapping[str, object]) -> tuple[str, str, int]:
 
 
 def _replay_worker_pairs(
-    reported_pairs: object,
-    gate: Mapping[str, object],
-    store: ArtifactStore,
-    *,
-    group: str,
+    reported_pairs: object, gate: Mapping[str, object], store: ArtifactStore, *, group: str,
 ) -> list[dict[str, object]]:
     if not isinstance(reported_pairs, list):
         raise EvidenceError(f"{group} process_pairs must be an array")
@@ -414,11 +398,7 @@ def _replay_worker_pairs(
 
 
 def _replay_nsys(
-    section: Mapping[str, object],
-    gate: Mapping[str, object],
-    store: ArtifactStore,
-    *,
-    group: str,
+    section: Mapping[str, object], gate: Mapping[str, object], store: ArtifactStore, *, group: str,
 ) -> dict[str, object]:
     captures = section.get("captures")
     if not isinstance(captures, list):
@@ -502,7 +482,7 @@ def _replay_ncu(section: object, store: ArtifactStore) -> dict[str, object]:
 
 
 def replay_measured_report(
-    report: Mapping[str, object], *, raw_root: Path, repository: Path = ROOT
+    report: Mapping[str, object], *, raw_root: Path, repository: Path = ROOT,
 ) -> dict[str, object]:
     gate = load_gate(DEFAULT_GATE, measured=True)
     require_measured_policy_ready(gate)

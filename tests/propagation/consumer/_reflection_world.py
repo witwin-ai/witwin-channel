@@ -39,9 +39,7 @@ def _cuda(values) -> torch.Tensor:
     return torch.tensor(values, device="cuda", dtype=torch.float32)
 
 
-def smooth_wall_scene(
-    *, rms_height_m: float = 0.0, frequency_hz: float = FREQUENCY_HZ
-):
+def smooth_wall_scene(*, rms_height_m: float = 0.0, frequency_hz: float = FREQUENCY_HZ):
     scene = Scene(
         structures=(
             rough_wall_structure(
@@ -161,14 +159,9 @@ def _basis(values, count: int) -> torch.Tensor:
 
 
 def endpoints(
-    *,
-    source_positions: torch.Tensor | None = None,
-    sink_positions: torch.Tensor | None = None,
-    with_basis: bool = True,
-    source_basis=REFERENCE_BASIS,
-    sink_basis=REFERENCE_BASIS,
-    source_ids: tuple[int, ...] = (101,),
-    sink_ids: tuple[int, ...] = (707,),
+    *, source_positions: torch.Tensor | None = None, sink_positions: torch.Tensor | None = None,
+    with_basis: bool = True, source_basis=REFERENCE_BASIS, sink_basis=REFERENCE_BASIS,
+    source_ids: tuple[int, ...] = (101,), sink_ids: tuple[int, ...] = (707,),
 ) -> tuple[EndpointBatch, EndpointBatch]:
     source_count = len(source_ids)
     sink_count = len(sink_ids)
@@ -199,8 +192,7 @@ def endpoints(
 
 
 def rotated_endpoints(
-    *, source_positions: torch.Tensor | None = None,
-    sink_positions: torch.Tensor | None = None,
+    *, source_positions: torch.Tensor | None = None, sink_positions: torch.Tensor | None = None,
 ) -> tuple[EndpointBatch, EndpointBatch]:
     """Reference geometry read out in two differently rotated frames."""
 
@@ -233,13 +225,8 @@ def multi_endpoints() -> tuple[EndpointBatch, EndpointBatch]:
 
 
 def discover(
-    compiled,
-    sources: EndpointBatch,
-    sinks: EndpointBatch,
-    *,
-    response: str = "scalar_transport",
-    components: frozenset[str] = frozenset({"los", "reflection"}),
-    max_depth: int = 1,
+    compiled, sources: EndpointBatch, sinks: EndpointBatch, *, response: str = "scalar_transport",
+    components: frozenset[str] = frozenset({"los", "reflection"}), max_depth: int = 1,
     ad_mode: str = "none",
 ):
     return evaluate(

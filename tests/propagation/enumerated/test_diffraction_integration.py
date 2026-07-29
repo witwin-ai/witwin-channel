@@ -39,7 +39,7 @@ def _states_with_rows(rows: int) -> tuple[torch.Tensor, ...]:
 
 
 def _visible_plan(
-    states: tuple[torch.Tensor, ...], active: torch.Tensor
+    states: tuple[torch.Tensor, ...], active: torch.Tensor,
 ) -> geometry_diffraction.DiffractionVisibleStatePlan:
     named = geometry_diffraction.name_diffraction_states(states)
     return geometry_diffraction.DiffractionVisibleStatePlan(

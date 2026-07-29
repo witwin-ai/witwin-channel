@@ -124,8 +124,7 @@ def _parse_stdout(stdout: bytes) -> dict[str, object]:
 
 
 def _validate_subprocess_capture(
-    capture: object, *, group: str, variant: str, process_index: int,
-    artifact_path: str,
+    capture: object, *, group: str, variant: str, process_index: int, artifact_path: str,
 ) -> dict[str, object]:
     row = exact_keys(
         capture,
@@ -178,8 +177,7 @@ def _expected_arrays(contract: Mapping[str, object], group: str, variant: str) -
 
 
 def _validate_record(
-    record: object, contract: Mapping[str, object], *, group: str, variant: str,
-    process_index: int,
+    record: object, contract: Mapping[str, object], *, group: str, variant: str, process_index: int,
 ) -> dict[str, object]:
     row = exact_keys(
         record,
@@ -265,9 +263,7 @@ def _semantic_hash(arrays: Mapping[str, np.ndarray]) -> str:
     return digest.hexdigest()
 
 
-def _load_arrays(
-    store: ArtifactStore, row: Mapping[str, object]
-) -> dict[str, np.ndarray]:
+def _load_arrays(store: ArtifactStore, row: Mapping[str, object]) -> dict[str, np.ndarray]:
     reference = row["arrays_artifact"]
     store.verify_reference(reference, label="diagnostic NPZ before replay")
     assert isinstance(reference, dict)
@@ -330,7 +326,9 @@ def _error_metrics(actual: np.ndarray, reference: np.ndarray) -> dict[str, objec
     }
 
 
-def _diffraction_oracle(arrays: Mapping[str, np.ndarray], metadata: Mapping[str, object]) -> dict[str, object]:
+def _diffraction_oracle(
+    arrays: Mapping[str, np.ndarray], metadata: Mapping[str, object],
+) -> dict[str, object]:
     pair_count = int(metadata["pair_count"])
     state_capacity = int(metadata["state_capacity"])
     valid = arrays["valid"].reshape(pair_count, state_capacity)
@@ -495,8 +493,8 @@ def _analyze(
 
 
 def collect_diagnostics(
-    config: RunnerConfig, gate: Mapping[str, object], *, group: str,
-    timeout_seconds: int, store: ArtifactStore,
+    config: RunnerConfig, gate: Mapping[str, object], *, group: str, timeout_seconds: int,
+    store: ArtifactStore,
 ) -> dict[str, object]:
     contract = load_diagnostic_contract()
     rows: list[dict[str, object]] = []

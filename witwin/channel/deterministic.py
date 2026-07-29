@@ -87,9 +87,7 @@ _VALID_SORT_KEYS = frozenset({"receiver_transmitter_depth_component"})
 _VALID_MAX_PATHS_SCOPES = frozenset({"global", "per_pair"})
 
 
-def _validate_scattering_coherent(
-    *, scattering_coherent: bool, components: frozenset[str]
-) -> None:
+def _validate_scattering_coherent(*, scattering_coherent: bool, components: frozenset[str]) -> None:
     """Validate the coherent scattering coherent-scattering combine precondition."""
 
     if scattering_coherent and "scattering" not in components:
@@ -461,7 +459,7 @@ def accumulate_path_result(
 
 
 def build_path_table(
-    paths: EvaluatedPaths, *, frequency_hz: float, include_fields: bool = True
+    paths: EvaluatedPaths, *, frequency_hz: float, include_fields: bool = True,
 ) -> PathTable:
     topology = paths.topology
     geometry = paths.geometry
@@ -572,7 +570,7 @@ def _validate_scattering_coherent_mode(scattering_info: dict[str, Any] | None) -
 
 
 def _scattering_metadata(
-    scattering_info: dict[str, Any] | None, config: Config
+    scattering_info: dict[str, Any] | None, config: Config,
 ) -> dict[str, Any] | None:
     """Scattering metadata sub-dict for the deterministic result (the rough-scattering model).
 
@@ -592,7 +590,7 @@ def _scattering_metadata(
 
 
 def _coupled_paths_metadata(
-    config: Config, component_counts: dict[str, int] | None = None
+    config: Config, component_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     """Coupled higher-order compensator metadata block (coupled reflection and diffraction + coupled double diffraction).
 
@@ -622,9 +620,7 @@ def _coupled_paths_metadata(
 
 
 def _register_coupled_component(
-    config: Config,
-    topology: Any,
-    component_counts: dict[str, int],
+    config: Config, topology: Any, component_counts: dict[str, int],
     extra_components: tuple[str, ...],
 ) -> tuple[str, ...]:
     """Record the coupled component count and export name (coupled reflection and diffraction + coupled double diffraction).
@@ -648,7 +644,7 @@ def _register_coupled_component(
 
 
 def _append_scattering(
-    scene: SolverScene, config: Config, evaluated: Any, sidecars: Any
+    scene: SolverScene, config: Config, evaluated: Any, sidecars: Any,
 ) -> tuple[Any, Any, dict[str, Any] | None]:
     """Append Kirchhoff scattering rows and gate the coherent combine.
 
@@ -672,16 +668,9 @@ def _append_scattering(
 
 
 def _metadata(
-    *,
-    config: Config,
-    native_info: dict[str, Any],
-    path_count: int,
-    component_counts: dict[str, int],
-    launch_count: int,
-    ad_companion_launches: int = 0,
-    ad_tape_bytes: int = 0,
-    forward_time_ms: float = 0.0,
-    peak_memory_bytes: int = 0,
+    *, config: Config, native_info: dict[str, Any], path_count: int,
+    component_counts: dict[str, int], launch_count: int, ad_companion_launches: int = 0,
+    ad_tape_bytes: int = 0, forward_time_ms: float = 0.0, peak_memory_bytes: int = 0,
     scattering_info: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     capability = {

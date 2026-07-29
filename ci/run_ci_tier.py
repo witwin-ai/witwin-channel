@@ -22,7 +22,20 @@ class Gate:
 
 
 QUICK_GATES = (
-    Gate("quick.ruff", ("-m", "ruff", "check", "witwin", "tests", "benchmarks", "ci")),
+    Gate(
+        "quick.ruff",
+        (
+            "-m",
+            "ruff",
+            "check",
+            "witwin",
+            "tests",
+            "benchmarks",
+            "ci",
+            "tools",
+            "docs/dev/audit/generate_phase13_phase0_audit.py",
+        ),
+    ),
     Gate("quick.mypy", ("-m", "mypy")),
     Gate("quick.import-graph", ("ci/check_import_graph.py",)),
     Gate("quick.contract-coverage", ("ci/check_contract_coverage.py",)),
@@ -30,6 +43,7 @@ QUICK_GATES = (
     Gate("quick.single-definition", ("ci/check_single_definition.py",)),
     Gate("quick.shared-math", ("ci/check_shared_math.py",)),
     Gate("quick.source-headers", ("ci/check_source_headers.py",)),
+    Gate("quick.compact-signatures", ("tools/compact_signatures.py", "--check")),
     Gate(
         "quick.public-api-binding-contract-manifests",
         (
@@ -340,9 +354,7 @@ def format_gate(gate: Gate, python: str) -> str:
     return subprocess.list2cmdline(gate.argv(python))
 
 
-def run_gates(
-    gates: tuple[Gate, ...], *, python: str, root: Path, dry_run: bool = False
-) -> int:
+def run_gates(gates: tuple[Gate, ...], *, python: str, root: Path, dry_run: bool = False) -> int:
     for gate in gates:
         command = format_gate(gate, python)
         prefix = "DRY-RUN" if dry_run else "RUN"

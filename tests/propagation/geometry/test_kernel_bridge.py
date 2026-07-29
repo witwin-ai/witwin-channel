@@ -36,9 +36,7 @@ def test_geometry_bridge_uses_canonical_runtime_and_scene_dependencies():
     assert geometry._rayd_scene_resource is runtime._rayd_scene_resource
 
 
-def test_intersection_returns_the_named_tensor_contract(
-    monkeypatch: pytest.MonkeyPatch,
-):
+def test_intersection_returns_the_named_tensor_contract(monkeypatch: pytest.MonkeyPatch):
     ray_o = torch.zeros((2, 3), dtype=torch.float32)
     ray_d = torch.ones((2, 3), dtype=torch.float32)
     ray_tmax = torch.empty((0,), dtype=torch.float32)

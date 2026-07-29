@@ -130,14 +130,14 @@ def test_phase_p_live_duplication_refresh_is_closed_without_budget_relaxation() 
             "acceptance remains met"
         ),
     }
-    current = duplication["shared_math_refresh"]
-    assert len(duplication["regions"]) == current["region_count"] == 153
-    assert current["coverage_percent"] == 9.106178
-    assert current["combined_total_lines"] == 91092
+    current = duplication["source_style_dedup_refresh"]
+    assert len(duplication["regions"]) == current["region_count"] == 148
+    assert current["coverage_percent"] == 8.7352
+    assert current["combined_total_lines"] == 86627
     assert current["coverage_percent"] < current["frozen_coverage_percent"]
     assert current["status"] == (
-        "all current regions classified and duplicate coverage remains below "
-        "the frozen budget"
+        "all current regions classified; no stale entries; duplicate coverage "
+        "and long-signature counts tightened"
     )
     assert refresh["coverage_percent"] < refresh["frozen_coverage_percent"]
     assert duplication["phase11a_refresh"]["region_count"] == 155

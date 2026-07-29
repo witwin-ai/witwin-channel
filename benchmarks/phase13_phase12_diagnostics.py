@@ -178,7 +178,7 @@ def _montecarlo() -> tuple[dict[str, torch.Tensor], dict[str, object]]:
 
 
 def _diffraction(
-    variant: str, munich_scene_xml: Path, sionna_source_root: Path
+    variant: str, munich_scene_xml: Path, sionna_source_root: Path,
 ) -> tuple[dict[str, torch.Tensor], dict[str, object]]:
     from witwin.channel.interactions.diffraction import (
         DiffractionOrder1Query,

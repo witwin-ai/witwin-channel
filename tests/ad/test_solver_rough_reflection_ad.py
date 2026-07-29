@@ -41,10 +41,7 @@ def _rough_scene() -> Scene:
 
 
 def _solve(
-    scene: Scene,
-    solver: str,
-    ad_mode: str,
-    *,
+    scene: Scene, solver: str, ad_mode: str, *,
     reference_frequency_hz: float | torch.Tensor = _FREQUENCY_HZ,
 ):
     if solver == "path":

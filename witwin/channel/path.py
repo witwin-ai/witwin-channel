@@ -200,28 +200,12 @@ class RaggedPathSoA:
 
     @classmethod
     def from_flat(
-        cls,
-        *,
-        num_rx: int,
-        num_rx_ant: int,
-        num_tx: int,
-        num_tx_ant: int,
-        rx_id: torch.Tensor,
-        tx_id: torch.Tensor,
-        field: torch.Tensor,
-        delay_s: torch.Tensor,
-        theta_t: torch.Tensor,
-        phi_t: torch.Tensor,
-        theta_r: torch.Tensor,
-        phi_r: torch.Tensor,
-        interaction_type: torch.Tensor,
-        primitive_id: torch.Tensor,
-        material_id: torch.Tensor,
-        position: torch.Tensor,
-        normal: torch.Tensor,
-        rx_ant_id: torch.Tensor | None = None,
-        tx_ant_id: torch.Tensor | None = None,
-        max_paths_per_pair: int | None = None,
+        cls, *, num_rx: int, num_rx_ant: int, num_tx: int, num_tx_ant: int, rx_id: torch.Tensor,
+        tx_id: torch.Tensor, field: torch.Tensor, delay_s: torch.Tensor, theta_t: torch.Tensor,
+        phi_t: torch.Tensor, theta_r: torch.Tensor, phi_r: torch.Tensor,
+        interaction_type: torch.Tensor, primitive_id: torch.Tensor, material_id: torch.Tensor,
+        position: torch.Tensor, normal: torch.Tensor, rx_ant_id: torch.Tensor | None = None,
+        tx_ant_id: torch.Tensor | None = None, max_paths_per_pair: int | None = None,
     ) -> "RaggedPathSoA":
         count = int(delay_s.shape[0])
         device = delay_s.device
@@ -311,9 +295,7 @@ class RaggedPathSoA:
             )
         )
 
-        def select(
-            value: torch.Tensor, *, dtype: torch.dtype | None = None
-        ) -> torch.Tensor:
+        def select(value: torch.Tensor, *, dtype: torch.dtype | None = None) -> torch.Tensor:
             selected = value.to(device=device, dtype=dtype or value.dtype)[order]
             return selected.contiguous()
 
@@ -563,12 +545,8 @@ class PathResult:
 
     @classmethod
     def from_ragged(
-        cls,
-        ragged: RaggedPathSoA,
-        *,
-        max_paths_per_pair: int | None = None,
-        minimum_path_width: int = 0,
-        metadata: dict[str, Any] | None = None,
+        cls, ragged: RaggedPathSoA, *, max_paths_per_pair: int | None = None,
+        minimum_path_width: int = 0, metadata: dict[str, Any] | None = None,
     ) -> "PathResult":
         counts = ragged.pair_offsets[1:] - ragged.pair_offsets[:-1]
         if max_paths_per_pair is None:
@@ -611,7 +589,7 @@ class PathResult:
             return out.reshape(path_shape)
 
         def padded_tail(
-            source: torch.Tensor, tail: tuple[int, ...], fill: float | int
+            source: torch.Tensor, tail: tuple[int, ...], fill: float | int,
         ) -> torch.Tensor:
             out = torch.full(
                 (ragged.pair_count * int(max_paths_per_pair), *tail),
@@ -656,9 +634,7 @@ class PathResult:
             metadata=result_metadata,
         )
 
-    def cir(
-        self, *, normalize_delays: bool = True
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    def cir(self, *, normalize_delays: bool = True) -> tuple[torch.Tensor, torch.Tensor]:
         tau = self.tau
         if normalize_delays:
             tau = tau - _masked_min(tau, self.valid)
@@ -667,9 +643,7 @@ class PathResult:
             self.valid.unsqueeze(-1), self.a, torch.zeros_like(self.a)
         ), tau
 
-    def cfr(
-        self, frequencies: torch.Tensor, *, normalize_delays: bool = True
-    ) -> torch.Tensor:
+    def cfr(self, frequencies: torch.Tensor, *, normalize_delays: bool = True) -> torch.Tensor:
         if frequencies.ndim != 1:
             raise ValueError("frequencies must have shape (frequency,)")
         tau = self.tau
@@ -682,7 +656,7 @@ class PathResult:
         return (coeff.unsqueeze(-1) * phase.unsqueeze(-2)).sum(dim=-3)
 
     def taps(
-        self, bandwidth: float, num_taps: int, *, normalize_delays: bool = True
+        self, bandwidth: float, num_taps: int, *, normalize_delays: bool = True,
     ) -> torch.Tensor:
         if bandwidth <= 0.0:
             raise ValueError("bandwidth must be > 0")
@@ -725,10 +699,7 @@ class PathResult:
         return output
 
     def beamform(
-        self,
-        *,
-        tx_weights: torch.Tensor | None = None,
-        rx_weights: torch.Tensor | None = None,
+        self, *, tx_weights: torch.Tensor | None = None, rx_weights: torch.Tensor | None = None,
     ) -> "BeamformedPathResult":
         """Return a signal view using complex per-endpoint antenna weights.
 
@@ -824,9 +795,7 @@ class BeamformedPathResult:
     tx_weights: torch.Tensor
     rx_weights: torch.Tensor
 
-    def cir(
-        self, *, normalize_delays: bool = True
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    def cir(self, *, normalize_delays: bool = True) -> tuple[torch.Tensor, torch.Tensor]:
         source = self.source
         factor = (
             self.rx_weights.conj().reshape(source.num_rx, source.num_rx_ant, 1, 1, 1, 1)
@@ -852,9 +821,7 @@ class BeamformedPathResult:
         tau = torch.where(valid, tau, torch.full_like(tau, -1.0))
         return coefficient, tau
 
-    def cfr(
-        self, frequencies: torch.Tensor, *, normalize_delays: bool = True
-    ) -> torch.Tensor:
+    def cfr(self, frequencies: torch.Tensor, *, normalize_delays: bool = True) -> torch.Tensor:
         if frequencies.ndim != 1:
             raise ValueError("frequencies must have shape (frequency,)")
         coefficient, tau = self.cir(normalize_delays=normalize_delays)
@@ -865,7 +832,7 @@ class BeamformedPathResult:
         return (coefficient.unsqueeze(-1) * phase.unsqueeze(-2)).sum(dim=-3)
 
     def taps(
-        self, bandwidth: float, num_taps: int, *, normalize_delays: bool = True
+        self, bandwidth: float, num_taps: int, *, normalize_delays: bool = True,
     ) -> torch.Tensor:
         if bandwidth <= 0.0:
             raise ValueError("bandwidth must be > 0")
@@ -918,13 +885,8 @@ def endpoint_angles(direction: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor
 
 
 def from_evaluated_paths(
-    paths: "EvaluatedPaths",
-    *,
-    num_rx: int,
-    num_tx: int,
-    tx_positions: torch.Tensor,
-    rx_positions: torch.Tensor,
-    metadata: dict[str, Any] | None = None,
+    paths: "EvaluatedPaths", *, num_rx: int, num_tx: int, tx_positions: torch.Tensor,
+    rx_positions: torch.Tensor, metadata: dict[str, Any] | None = None,
 ) -> PathResult:
     """Pack evaluated propagation rows without losing event sequences."""
 
@@ -1014,19 +976,10 @@ def from_evaluated_paths(
 
 
 def _metadata(
-    *,
-    config: Config,
-    path_count: int,
-    reflection_available: bool,
-    diffraction_available: bool,
-    path_native_available: bool,
-    transmission_path_count: int = 0,
-    scattering_path_count: int = 0,
-    ad_companion_launches: int = 0,
-    ad_tape_bytes: int = 0,
-    forward_time_ms: float = 0.0,
-    peak_memory_bytes: int = 0,
-    scattering_info: dict[str, Any] | None = None,
+    *, config: Config, path_count: int, reflection_available: bool, diffraction_available: bool,
+    path_native_available: bool, transmission_path_count: int = 0, scattering_path_count: int = 0,
+    ad_companion_launches: int = 0, ad_tape_bytes: int = 0, forward_time_ms: float = 0.0,
+    peak_memory_bytes: int = 0, scattering_info: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     # diffraction AD: the real registered-companion accounting. vjp retains
     # tape and schedules its companions on the user's later backward; jvp
@@ -1171,12 +1124,8 @@ class _AntennaEndpoint(Protocol):
 
 
 def _synthetic_endpoint_factor(
-    endpoints: Sequence[_AntennaEndpoint],
-    directions: torch.Tensor,
-    *,
-    num_ant: int,
-    frequency_hz: float,
-    conjugate_pattern: bool,
+    endpoints: Sequence[_AntennaEndpoint], directions: torch.Tensor, *, num_ant: int,
+    frequency_hz: float, conjugate_pattern: bool,
 ) -> torch.Tensor:
     """Batch steering/pattern weights over endpoints sharing the same object.
 
@@ -1230,7 +1179,7 @@ def _synthetic_endpoint_factor(
 
 
 def _stack_endpoint_weights(
-    endpoints: Sequence[object], *, attribute: str, device: torch.device
+    endpoints: Sequence[object], *, attribute: str, device: torch.device,
 ) -> torch.Tensor | None:
     values = [getattr(endpoint, attribute) for endpoint in endpoints]
     if not values or all(value is None for value in values):
@@ -1240,9 +1189,7 @@ def _stack_endpoint_weights(
     return torch.stack(values).to(device=device, dtype=torch.complex64)
 
 
-def _validate_endpoint_weight_coverage(
-    endpoints: Sequence[object], *, attribute: str
-) -> None:
+def _validate_endpoint_weight_coverage(endpoints: Sequence[object], *, attribute: str) -> None:
     values = [getattr(endpoint, attribute) for endpoint in endpoints]
     if any(value is None for value in values) and any(
         value is not None for value in values
@@ -1266,10 +1213,7 @@ def validate_synthetic_array_scene(scene: SolverScene) -> None:
 
 
 def pack_synthetic_arrays(
-    result: PathResult,
-    *,
-    frequency_hz: float,
-    transmitters: Sequence[Transmitter],
+    result: PathResult, *, frequency_hz: float, transmitters: Sequence[Transmitter],
     receivers: Sequence[Receiver],
 ) -> PathResult:
     """Expand centre-reference paths using far-field array phase weighting.
@@ -1446,11 +1390,7 @@ def explicit_array_scene(scene: SolverScene) -> tuple[SolverScene, int, int]:
 
 
 def pack_explicit_arrays(
-    result: PathResult,
-    *,
-    scene: SolverScene,
-    num_rx_ant: int,
-    num_tx_ant: int,
+    result: PathResult, *, scene: SolverScene, num_rx_ant: int, num_tx_ant: int,
 ) -> PathResult:
     """Pack independently traced element endpoints into antenna dimensions."""
 
@@ -1545,7 +1485,7 @@ class _DeferredPathResult:
 
 
 def _stable_endpoint_id_lookups(
-    scene: Scene, *, device: torch.device
+    scene: Scene, *, device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     source_ids = tuple(int(view.source.antenna_id) for view in scene.transmitters)
     sink_ids: list[int] = []
@@ -1709,9 +1649,7 @@ def _pipeline_solve_base(
 
 
 def _pipeline_solve(
-    scene: Scene,
-    config: Config,
-    *,
+    scene: Scene, config: Config, *,
     solve_base: Callable[[Scene, Config], _DeferredPathResult] = _pipeline_solve_base,
 ) -> PathResult:
     """Solve canonical paths and pack synthetic or explicit antenna arrays."""

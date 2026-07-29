@@ -40,13 +40,8 @@ __all__ = [
 # contracts
 # ---------------------------------------------------------------------------
 def _validate_layer_csr(
-    layer_offset: torch.Tensor,
-    layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    device: int,
+    layer_offset: torch.Tensor, layer_count: torch.Tensor, layer_thickness_m: torch.Tensor,
+    layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, device: int,
 ) -> None:
     validate_cuda_tensor("layer_offset", layer_offset, dtype=torch.int32, ndim=1)
     validate_cuda_tensor("layer_count", layer_count, dtype=torch.int32, ndim=1)
@@ -80,9 +75,7 @@ validate_layer_csr = _validate_layer_csr
 # functional
 # ---------------------------------------------------------------------------
 def bdpt_face_material_tensors(
-    material_eps_r: torch.Tensor,
-    material_sigma_e: torch.Tensor,
-    material_mu_r: torch.Tensor,
+    material_eps_r: torch.Tensor, material_sigma_e: torch.Tensor, material_mu_r: torch.Tensor,
     face_material_id: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("material_eps_r", material_eps_r, dtype=torch.float32, ndim=1)
@@ -110,10 +103,8 @@ def bdpt_face_material_tensors(
 
 
 def bdpt_face_material_tensors_from_host(
-    material_eps_r: tuple[float, ...],
-    material_sigma_e: tuple[float, ...],
-    material_mu_r: tuple[float, ...],
-    face_material_id: tuple[int, ...],
+    material_eps_r: tuple[float, ...], material_sigma_e: tuple[float, ...],
+    material_mu_r: tuple[float, ...], face_material_id: tuple[int, ...],
 ) -> dict[str, torch.Tensor]:
     if not material_eps_r:
         raise ValueError("material_eps_r must not be empty")
@@ -158,16 +149,9 @@ _EM_LAYER_STACK_FIELDS = (
 
 
 def em_layer_stack_eval(
-    cos_theta: torch.Tensor,
-    material_id: torch.Tensor,
-    layer_offset: torch.Tensor,
-    layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    *,
-    frequency_hz: float,
+    cos_theta: torch.Tensor, material_id: torch.Tensor, layer_offset: torch.Tensor,
+    layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, *, frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("cos_theta", cos_theta, dtype=torch.float32, ndim=1)
     validate_cuda_tensor("material_id", material_id, dtype=torch.int32, ndim=1)
@@ -210,20 +194,11 @@ def em_layer_stack_eval(
 
 
 def em_layer_stack_backward(
-    cos_theta: torch.Tensor,
-    material_id: torch.Tensor,
-    layer_offset: torch.Tensor,
-    layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    grad_outputs: tuple[torch.Tensor | None, ...],
-    *,
-    frequency_hz: float,
-    need_cos_theta: bool,
-    need_layers: bool,
-    need_frequency: bool,
+    cos_theta: torch.Tensor, material_id: torch.Tensor, layer_offset: torch.Tensor,
+    layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor,
+    grad_outputs: tuple[torch.Tensor | None, ...], *, frequency_hz: float, need_cos_theta: bool,
+    need_layers: bool, need_frequency: bool,
 ) -> dict[str, torch.Tensor]:
     if len(grad_outputs) != len(_EM_LAYER_STACK_FIELDS):
         raise ValueError(
@@ -256,20 +231,11 @@ def em_layer_stack_backward(
 
 
 def em_layer_stack_jvp(
-    cos_theta: torch.Tensor,
-    material_id: torch.Tensor,
-    layer_offset: torch.Tensor,
-    layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    *,
-    frequency_hz: float,
-    tangent_cos_theta: torch.Tensor | None,
-    tangent_layer_thickness: torch.Tensor | None,
-    tangent_layer_eps_r: torch.Tensor | None,
-    tangent_layer_sigma_e: torch.Tensor | None,
+    cos_theta: torch.Tensor, material_id: torch.Tensor, layer_offset: torch.Tensor,
+    layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, *, frequency_hz: float,
+    tangent_cos_theta: torch.Tensor | None, tangent_layer_thickness: torch.Tensor | None,
+    tangent_layer_eps_r: torch.Tensor | None, tangent_layer_sigma_e: torch.Tensor | None,
     tangent_frequency: float,
 ) -> dict[str, torch.Tensor]:
     out = _required_native_op("em_layer_stack_jvp")(
@@ -294,9 +260,7 @@ def em_layer_stack_jvp(
 
 
 def mc_face_material_tensors(
-    material_eps_r: torch.Tensor,
-    material_sigma_e: torch.Tensor,
-    material_mu_r: torch.Tensor,
+    material_eps_r: torch.Tensor, material_sigma_e: torch.Tensor, material_mu_r: torch.Tensor,
     face_material_id: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("material_eps_r", material_eps_r, dtype=torch.float32, ndim=1)
@@ -338,16 +302,8 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        cos_theta,
-        material_id,
-        layer_offset,
-        layer_count,
-        layer_thickness_m,
-        layer_eps_r,
-        layer_sigma_e,
-        layer_mu_r,
-        frequency,
-        frequency_value,
+        cos_theta, material_id, layer_offset, layer_count, layer_thickness_m, layer_eps_r,
+        layer_sigma_e, layer_mu_r, frequency, frequency_value,
     ):
         out = em_layer_stack_eval(
             cos_theta,
@@ -424,17 +380,8 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx,
-        t_cos_theta,
-        _t_material_id,
-        _t_layer_offset,
-        _t_layer_count,
-        t_layer_thickness,
-        t_layer_eps_r,
-        t_layer_sigma_e,
-        t_layer_mu_r,
-        t_frequency,
-        _t_frequency_value,
+        ctx, t_cos_theta, _t_material_id, _t_layer_offset, _t_layer_count, t_layer_thickness,
+        t_layer_eps_r, t_layer_sigma_e, t_layer_mu_r, t_frequency, _t_frequency_value,
     ):
         _ad_reject_fixed_tangents(
             "em_layer_stack_ad", ((t_layer_mu_r, "layer_mu_r"),)
@@ -484,16 +431,9 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
 
 
 def em_layer_stack_ad(
-    cos_theta: torch.Tensor,
-    material_id: torch.Tensor,
-    layer_offset: torch.Tensor,
-    layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    *,
-    frequency: torch.Tensor | float,
+    cos_theta: torch.Tensor, material_id: torch.Tensor, layer_offset: torch.Tensor,
+    layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, *, frequency: torch.Tensor | float,
     frequency_value: float | None = None,
 ) -> dict[str, torch.Tensor]:
     """Differentiable:func:`em_layer_stack_eval` (solver derivatives).

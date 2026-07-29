@@ -16,9 +16,7 @@ from benchmarks.phase13_phase12.profilers import (
 
 
 def _database(
-    path: Path,
-    *,
-    ranges: tuple[tuple[str, int, int], ...],
+    path: Path, *, ranges: tuple[tuple[str, int, int], ...],
     runtime: tuple[tuple[int, int, int | None, int], ...],
     kernels: tuple[tuple[int, int, int | None, int, int], ...],
     copies: tuple[tuple[int, int, int | None, int, int, int, int], ...] = (),
@@ -67,7 +65,7 @@ def _database(
     ((-1, 0), (0, -1)),
 )
 def test_nsys_rejects_negative_gpu_placement_ids(
-    tmp_path: Path, stream_id: int, device_id: int
+    tmp_path: Path, stream_id: int, device_id: int,
 ) -> None:
     database = _database(
         tmp_path / f"negative-{stream_id}-{device_id}.sqlite",
@@ -80,9 +78,7 @@ def test_nsys_rejects_negative_gpu_placement_ids(
         parse_nsys_sqlite(database)
 
 
-def test_nsys_rejects_correlation_reuse_across_activity_families(
-    tmp_path: Path,
-) -> None:
+def test_nsys_rejects_correlation_reuse_across_activity_families(tmp_path: Path) -> None:
     database = _database(
         tmp_path / "cross-family.sqlite",
         ranges=(("witwin.channel:stage", 100, 200),),
@@ -97,7 +93,7 @@ def test_nsys_rejects_correlation_reuse_across_activity_families(
 
 @pytest.mark.parametrize("second", ((120, 180), (150, 250)))
 def test_nsys_rejects_overlapping_instances_of_one_required_range(
-    tmp_path: Path, second: tuple[int, int]
+    tmp_path: Path, second: tuple[int, int],
 ) -> None:
     database = _database(
         tmp_path / f"overlap-{second[0]}-{second[1]}.sqlite",
@@ -114,9 +110,7 @@ def test_nsys_rejects_overlapping_instances_of_one_required_range(
 
 
 @pytest.mark.parametrize(("field", "replacement"), (("device_id", 1), ("stream_id", 8)))
-def test_target_samples_must_share_one_device_and_stream(
-    field: str, replacement: int
-) -> None:
+def test_target_samples_must_share_one_device_and_stream(field: str, replacement: int) -> None:
     rows = [{"device_id": 0, "stream_id": 7} for _ in range(7)]
     rows[-1][field] = replacement
 

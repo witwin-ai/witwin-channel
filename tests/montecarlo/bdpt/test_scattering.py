@@ -58,9 +58,7 @@ def _roughness(sigma_h: float = _SIGMA_H) -> SurfaceRoughness:
     )
 
 
-def _material(
-    roughness: SurfaceRoughness | None,
-) -> PhysicalMaterial:
+def _material(roughness: SurfaceRoughness | None) -> PhysicalMaterial:
     return PhysicalMaterial(
         layers=(MaterialLayer(thickness_m=_THICKNESS, eps_r=_EPS_R, sigma_e=_SIGMA_E),),
         roughness_front=roughness,

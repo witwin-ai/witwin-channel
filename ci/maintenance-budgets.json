@@ -30,12 +30,6 @@
       "owner": "montecarlo/bdpt maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
-    "witwin/channel/kernels/montecarlo.py::bdpt_reflected_light_subpath_state": {
-      "ceiling": 16,
-      "expires_on": "2027-01-31",
-      "owner": "montecarlo/bdpt maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
-    },
     "witwin/channel/montecarlo/bdpt.py::_collect_connection_samples": {
       "ceiling": 36,
       "expires_on": "2027-01-31",
@@ -115,13 +109,7 @@
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
     "witwin/channel/kernels/topology.py::deterministic_reflection_order1_compact": {
-      "ceiling": 24,
-      "expires_on": "2027-01-31",
-      "owner": "propagation maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
-    },
-    "witwin/channel/kernels/topology.py::deterministic_reflection_sequence_compact": {
-      "ceiling": 21,
+      "ceiling": 17,
       "expires_on": "2027-01-31",
       "owner": "propagation maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."

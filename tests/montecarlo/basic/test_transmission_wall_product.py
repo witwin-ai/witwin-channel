@@ -102,7 +102,7 @@ def _assert_tensors_are_zero(values: tuple[torch.Tensor, ...]) -> None:
 
 
 def _call_zero_jvp(
-    inputs: tuple[torch.Tensor, ...], state: object
+    inputs: tuple[torch.Tensor, ...], state: object,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     return mc_transmission_wall_product_jvp(
         *inputs,
@@ -269,9 +269,7 @@ def test_transmission_wall_product_contract_error_makes_entire_result_inert(
 
 
 @pytest.mark.parametrize("corruption", ["canonical", "primitive", "csr"])
-def test_transmission_wall_product_contract_error_makes_ad_results_inert(
-    corruption: str,
-) -> None:
+def test_transmission_wall_product_contract_error_makes_ad_results_inert(corruption: str) -> None:
     inputs, state = _case()
     if corruption == "canonical":
         inputs[1][0] = 2
@@ -592,9 +590,7 @@ def test_transmission_wall_product_pins_left_to_right_three_wall_product() -> No
 @pytest.mark.parametrize(
     "frequency_hz", [0.0, float("nan"), float("inf"), -float("inf")]
 )
-def test_transmission_wall_product_rejects_nonfinite_or_zero_frequency(
-    frequency_hz: float,
-) -> None:
+def test_transmission_wall_product_rejects_nonfinite_or_zero_frequency(frequency_hz: float) -> None:
     inputs, state = _case()
     with pytest.raises(ValueError, match="frequency_hz must be finite and positive"):
         mc_transmission_wall_product(*inputs, state, frequency_hz=frequency_hz)

@@ -53,7 +53,7 @@ _RT_FIELDS = (
     ],
 )
 def test_production_layer_stack_is_bitwise_equal_to_reference(
-    layers: list[tuple], frequency_hz: float
+    layers: list[tuple], frequency_hz: float,
 ) -> None:
     cos_theta = np.array([0.015625, 0.125, 0.5, 0.984375], dtype=np.float64)
     production = production_layer_stack_rt(layers, cos_theta, frequency_hz)

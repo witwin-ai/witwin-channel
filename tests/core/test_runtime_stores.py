@@ -24,11 +24,7 @@ from witwin.channel.scene.compiler import (
 
 
 _REQUIRE_TENSOR_SOURCE = '''def require_tensor(
-    name: str,
-    tensor: torch.Tensor,
-    *,
-    dtype: torch.dtype,
-    ndim: int,
+    name: str, tensor: torch.Tensor, *, dtype: torch.dtype, ndim: int,
     trailing_shape: tuple[int, ...] = (),
 ) -> None:
     if not isinstance(tensor, torch.Tensor):
@@ -372,9 +368,7 @@ def test_assignment_store_default_factory_is_independent_per_instance():
         ),
     ),
 )
-def test_assignment_store_validation_order_and_errors_are_exact(
-    changes, error, message
-):
+def test_assignment_store_validation_order_and_errors_are_exact(changes, error, message):
     values = _assignment_store_kwargs()
     values.update(changes)
 

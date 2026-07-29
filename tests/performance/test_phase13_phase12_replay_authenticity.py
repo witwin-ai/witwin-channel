@@ -41,7 +41,7 @@ def test_runner_hash_binding_requires_the_complete_exact_frozen_map() -> None:
 
 
 def test_git_environment_drops_repository_redirecting_ambient_state(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     redirected_names = (
         "GIT_DIR",
@@ -122,9 +122,7 @@ def _validate_capture(capture: object, identity_capture: object) -> dict[str, ob
     )
 
 
-def test_retained_timed_worker_capture_binds_canonical_argv_cwd_and_success(
-    tmp_path: Path,
-) -> None:
+def test_retained_timed_worker_capture_binds_canonical_argv_cwd_and_success(tmp_path: Path) -> None:
     capture, identity_capture = _canonical_captures(tmp_path)
     assert _validate_capture(capture, identity_capture) == capture
 

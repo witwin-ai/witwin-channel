@@ -13,10 +13,7 @@ from benchmarks import bench_path_solver_threeway as benchmark
 
 
 def _record(
-    delay_s: float,
-    coefficient: complex,
-    *,
-    angle_offset: float = 0.0,
+    delay_s: float, coefficient: complex, *, angle_offset: float = 0.0,
     position_offset: float = 0.0,
 ) -> dict[str, object]:
     return {

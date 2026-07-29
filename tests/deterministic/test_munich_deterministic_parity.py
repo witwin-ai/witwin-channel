@@ -135,7 +135,7 @@ def test_munich_benchmark_defaults_to_stage8_depth_two():
     ("max_depth", "expected_launch_count"), ((1, 20), (2, 23), (3, 25))
 )
 def test_reduced_munich_native_depth_one_through_three_exports_reflection_paths(
-    max_depth, expected_launch_count
+    max_depth, expected_launch_count,
 ):
     if not torch.cuda.is_available():
         pytest.skip(

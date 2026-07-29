@@ -66,11 +66,7 @@ def _parse_msvc_environment_stdout(payload: bytes) -> dict[str, str]:
 
 
 def _capture_compiler_versions(
-    config: RunnerConfig,
-    *,
-    root: Path,
-    store: ArtifactStore,
-    environment: Mapping[str, str],
+    config: RunnerConfig, *, root: Path, store: ArtifactStore, environment: Mapping[str, str],
     timeout_seconds: int,
 ) -> dict[str, object]:
     commands = {
@@ -210,11 +206,7 @@ def _same_path(actual: str, expected: Path) -> bool:
 
 
 def _validate_cache(
-    path: Path,
-    *,
-    config: RunnerConfig,
-    source: Path,
-    install: Path,
+    path: Path, *, config: RunnerConfig, source: Path, install: Path,
 ) -> dict[str, str]:
     values = _cache(path)
     exact = {
@@ -267,7 +259,7 @@ def _tree_manifest(source: Path, installed: Path) -> tuple[list[dict[str, object
 
 
 def _retain_toolchain(
-    store: ArtifactStore, *, role: str, build: Path
+    store: ArtifactStore, *, role: str, build: Path,
 ) -> dict[str, dict[str, object]]:
     required = {
         "cmake_cache": [build / "CMakeCache.txt"],
@@ -287,14 +279,8 @@ def _retain_toolchain(
 
 
 def _prepare_rayd_source(
-    config: RunnerConfig,
-    *,
-    commit: str,
-    repository_url: str,
-    expected_header_sha256: str,
-    root: Path,
-    store: ArtifactStore,
-    timeout_seconds: int,
+    config: RunnerConfig, *, commit: str, repository_url: str, expected_header_sha256: str,
+    root: Path, store: ArtifactStore, timeout_seconds: int,
 ) -> tuple[Path, dict[str, object]]:
     if commit != _RAYD_COMMIT:
         raise EvidenceError(
@@ -415,15 +401,8 @@ def _prepare_rayd_source(
 
 
 def _fresh_build(
-    config: RunnerConfig,
-    *,
-    role: str,
-    input_variant: VariantConfig,
-    commit: str,
-    root: Path,
-    store: ArtifactStore,
-    timeout_seconds: int,
-    build_environment: Mapping[str, str],
+    config: RunnerConfig, *, role: str, input_variant: VariantConfig, commit: str, root: Path,
+    store: ArtifactStore, timeout_seconds: int, build_environment: Mapping[str, str],
 ) -> tuple[VariantConfig, dict[str, object]]:
     role_root = root / f"{role}-{commit}"
     if role_root.exists():
@@ -606,10 +585,7 @@ def _fresh_build(
 
 
 def prepare_fresh_channel_builds(
-    config: RunnerConfig,
-    implementation: dict[str, object],
-    *,
-    store: ArtifactStore,
+    config: RunnerConfig, implementation: dict[str, object], *, store: ArtifactStore,
     timeout_seconds: int,
 ) -> tuple[RunnerConfig, dict[str, object]]:
     root = config.build_parent / store.root.name
@@ -691,10 +667,7 @@ def prepare_fresh_channel_builds(
 
 
 def validate_channel_build_records(
-    value: object,
-    *,
-    implementation: dict[str, object],
-    store: ArtifactStore,
+    value: object, *, implementation: dict[str, object], store: ArtifactStore,
 ) -> dict[str, object]:
     if not isinstance(value, dict) or set(value) != {
         "root", "unique_commit_count", "rayd_source", "msvc_environment", "bindings", "records",
@@ -1022,7 +995,7 @@ def validate_channel_build_records(
 
 
 def compiler_resource_checks(
-    channel_builds: object, gate: Mapping[str, object]
+    channel_builds: object, gate: Mapping[str, object],
 ) -> dict[str, dict[str, object]]:
     if not isinstance(channel_builds, dict):
         raise EvidenceError("fresh Channel build evidence is malformed")

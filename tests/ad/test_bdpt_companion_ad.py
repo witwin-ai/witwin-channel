@@ -54,17 +54,9 @@ def _f32(x: torch.Tensor) -> torch.Tensor:
 
 
 def _subpath_state(
-    origin: torch.Tensor,
-    direction: torch.Tensor,
-    field: torch.Tensor,
-    throughput: torch.Tensor,
-    *,
-    component_mask: int = 3,
-    depth: int = 1,
-    tx_id: int = 0,
-    rx_id: int = -1,
-    source_power: torch.Tensor | None = None,
-    path_length: torch.Tensor | None = None,
+    origin: torch.Tensor, direction: torch.Tensor, field: torch.Tensor, throughput: torch.Tensor, *,
+    component_mask: int = 3, depth: int = 1, tx_id: int = 0, rx_id: int = -1,
+    source_power: torch.Tensor | None = None, path_length: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
     n = origin.shape[0]
     dev = origin.device
@@ -101,9 +93,7 @@ def _subpath_state(
     }
 
 
-def _intersection(
-    t: torch.Tensor, p: torch.Tensor, n: torch.Tensor
-) -> dict[str, torch.Tensor]:
+def _intersection(t: torch.Tensor, p: torch.Tensor, n: torch.Tensor) -> dict[str, torch.Tensor]:
     rows = t.shape[0]
     dev = t.device
     return {

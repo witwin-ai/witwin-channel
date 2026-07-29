@@ -96,8 +96,10 @@ def _grids(iso: bool):
     }
 
 
-def _oracle(iso: bool, sigma_h, lx, ly, thickness, eps, sigma, frequency, grids,
-            sinkhorn_iters: int = _SINKHORN_ITERS):
+def _oracle(
+    iso: bool, sigma_h, lx, ly, thickness, eps, sigma, frequency, grids,
+    sinkhorn_iters: int = _SINKHORN_ITERS,
+):
     layers = torch.stack(
         (
             thickness.reshape(()),
@@ -130,8 +132,10 @@ def _to_native(t: torch.Tensor) -> torch.Tensor:
     return t.detach().to(device="cuda", dtype=torch.float32).contiguous()
 
 
-def _native_backward(out, grids, sigma_h, lx, ly, thickness, eps, sigma, frequency,
-                     grad_f_te, grad_f_tm, *, rough, layers, freq):
+def _native_backward(
+    out, grids, sigma_h, lx, ly, thickness, eps, sigma, frequency, grad_f_te, grad_f_tm, *, rough,
+    layers, freq,
+):
     from witwin.channel.kernels.scattering import (
         kirchhoff_table_build_backward,
     )
@@ -167,8 +171,10 @@ def _rel(a: float, b: float) -> float:
     return abs(a - b) / max(abs(a), abs(b), _ABS_TOL)
 
 
-def _oracle_grads(iso, sigma_h, lx, ly, thickness, eps, sigma, frequency, grids,
-                  grad_f_te, grad_f_tm, sinkhorn_iters):
+def _oracle_grads(
+    iso, sigma_h, lx, ly, thickness, eps, sigma, frequency, grids, grad_f_te, grad_f_tm,
+    sinkhorn_iters,
+):
     out = _oracle(
         iso, sigma_h, lx, ly, thickness, eps, sigma, frequency, grids,
         sinkhorn_iters=sinkhorn_iters,

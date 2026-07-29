@@ -75,9 +75,7 @@ import witwin.channel._channel
     }
 
 
-def test_propagation_runtime_oracle_and_kernel_boundaries_are_detected(
-    tmp_path: Path,
-):
+def test_propagation_runtime_oracle_and_kernel_boundaries_are_detected(tmp_path: Path):
     package_root = _synthetic_package(
         tmp_path,
         {

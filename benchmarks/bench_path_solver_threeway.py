@@ -91,7 +91,7 @@ def _scene_xml(args: argparse.Namespace) -> Path:
 
 
 def _time_repeated(
-    operation, sync, *, warmup: int, repeats: int
+    operation, sync, *, warmup: int, repeats: int,
 ) -> tuple[Any, float, list[float], dict[str, int]]:
     tracemalloc.start()
     tracemalloc.reset_peak()
@@ -161,7 +161,7 @@ def _complex_from_pair(value: list[float] | tuple[float, float]) -> complex:
 
 
 def _component_signal_views(
-    component_stats: dict[str, Any], frequency_offsets_hz: tuple[float, ...]
+    component_stats: dict[str, Any], frequency_offsets_hz: tuple[float, ...],
 ) -> None:
     for bucket in component_stats.values():
         bucket["cir_by_pair"] = {}
@@ -186,12 +186,7 @@ def _component_signal_views(
 
 
 def _stats_from_labeled_paths(
-    *,
-    tau,
-    valid,
-    labels,
-    num_rx: int,
-    num_tx: int,
+    *, tau, valid, labels, num_rx: int, num_tx: int,
     records_by_index: dict[tuple[int, int, int], dict[str, Any]] | None = None,
     frequency_offsets_hz: tuple[float, ...] = (0.0,),
 ) -> dict[str, Any]:
@@ -241,11 +236,7 @@ def _stats_from_labeled_paths(
 
 
 def _native_case_stats(
-    result,
-    *,
-    num_rx: int,
-    num_tx: int,
-    frequency_offsets_hz: tuple[float, ...],
+    result, *, num_rx: int, num_tx: int, frequency_offsets_hz: tuple[float, ...],
 ) -> dict[str, Any]:
     import numpy as np
 
@@ -442,13 +433,7 @@ def _sionna_labels(paths, *, force_los: bool = False):
 
 
 def _dense_path_records(
-    *,
-    tau,
-    valid,
-    coefficient,
-    angles: dict[str, Any],
-    interaction_types,
-    interaction_positions,
+    *, tau, valid, coefficient, angles: dict[str, Any], interaction_types, interaction_positions,
 ) -> dict[tuple[int, int, int], dict[str, Any]]:
     import numpy as np
 
@@ -819,9 +804,7 @@ def _wrap_delta(value: float) -> float:
 
 
 def _match_records(
-    reference: list[dict[str, Any]],
-    candidate: list[dict[str, Any]],
-    tau_tol_s: float,
+    reference: list[dict[str, Any]], candidate: list[dict[str, Any]], tau_tol_s: float,
 ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
     available = set(range(len(candidate)))
     matches = []
@@ -838,9 +821,7 @@ def _match_records(
     return matches
 
 
-def _matched_path_metrics(
-    matches: list[tuple[dict[str, Any], dict[str, Any]]]
-) -> dict[str, Any]:
+def _matched_path_metrics(matches: list[tuple[dict[str, Any], dict[str, Any]]]) -> dict[str, Any]:
     magnitude_errors_db = []
     phase_errors_rad = []
     angle_errors_rad = []
@@ -915,17 +896,9 @@ def _cfr_metrics(native_stats: dict[str, Any], reference_stats: dict[str, Any]) 
 
 
 def _component_delay_comparison(
-    native: dict[str, Any],
-    other: dict[str, Any],
-    *,
-    component: str,
-    case: str,
-    tau_tol_s: float,
-    exact_counts: bool,
-    magnitude_tol_db: float = 0.25,
-    phase_tol_rad: float = 1.0e-3,
-    angle_tol_rad: float = 1.0e-3,
-    geometry_tol_m: float = 1.0e-3,
+    native: dict[str, Any], other: dict[str, Any], *, component: str, case: str, tau_tol_s: float,
+    exact_counts: bool, magnitude_tol_db: float = 0.25, phase_tol_rad: float = 1.0e-3,
+    angle_tol_rad: float = 1.0e-3, geometry_tol_m: float = 1.0e-3,
 ) -> dict[str, Any]:
     native_stats = native["cases"][case]["component_stats"][component]
     other_stats = other["cases"][case]["component_stats"][component]
@@ -1057,7 +1030,7 @@ def _speed_summary(providers: dict[str, dict[str, Any]]) -> dict[str, Any]:
 
 
 def _run_provider_subprocess(
-    args: argparse.Namespace, provider: str, *, seed: int | None = None
+    args: argparse.Namespace, provider: str, *, seed: int | None = None,
 ) -> dict[str, Any]:
     cmd = [
         sys.executable,
@@ -1141,8 +1114,7 @@ def _confidence_interval(values: list[float]) -> dict[str, Any]:
 
 
 def _diffraction_seed_summary(
-    seed_payloads: list[tuple[int, list[dict[str, Any]]]],
-    args: argparse.Namespace,
+    seed_payloads: list[tuple[int, list[dict[str, Any]]]], args: argparse.Namespace,
 ) -> dict[str, Any]:
     by_provider: dict[str, list[dict[str, Any]]] = {}
     for seed, payloads in seed_payloads:

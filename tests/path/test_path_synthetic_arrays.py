@@ -30,11 +30,7 @@ def _ula(num_antennas: int, spacing_m: float, *, axis: str = "x") -> torch.Tenso
 
 
 def _ura(
-    rows: int,
-    columns: int,
-    spacing_m: tuple[float, float],
-    *,
-    axes: tuple[str, str] = ("x", "y"),
+    rows: int, columns: int, spacing_m: tuple[float, float], *, axes: tuple[str, str] = ("x", "y"),
 ) -> torch.Tensor:
     positions = torch.zeros((rows * columns, 3), dtype=torch.float32)
     row = torch.arange(rows, dtype=torch.float32) - 0.5 * (rows - 1)
@@ -305,9 +301,7 @@ def test_unsupported_synthetic_layout_fails_before_native_solve(monkeypatch):
 
 
 @pytest.mark.parametrize("synthetic_array", [True, False])
-def test_partial_endpoint_weights_fail_before_native_solve(
-    monkeypatch, synthetic_array
-):
+def test_partial_endpoint_weights_fail_before_native_solve(monkeypatch, synthetic_array):
     scene = Scene(
         structures=[],
         endpoints=[

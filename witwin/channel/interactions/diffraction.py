@@ -62,10 +62,7 @@ class DiffractionRxChunkRequest:
 
 
 def prepare_diffraction_order1_plan(
-    *,
-    metadata: Mapping[str, object],
-    tx_count: int,
-    rx_count: int,
+    *, metadata: Mapping[str, object], tx_count: int, rx_count: int,
 ) -> DiffractionOrder1Plan:
     mitsuba_metadata = metadata.get("mitsuba", {})
     # Channel's merge_shapes import keeps the selected boundary-edge table
@@ -82,18 +79,14 @@ def prepare_diffraction_order1_plan(
 
 
 def iter_diffraction_tx_requests(
-    plan: DiffractionOrder1Plan,
-    *,
-    tx_positions: torch.Tensor,
+    plan: DiffractionOrder1Plan, *, tx_positions: torch.Tensor,
 ) -> Iterator[DiffractionTxRequest]:
     for tx_index in range(plan.tx_count):
         yield DiffractionTxRequest(tx_index=tx_index, tx=tx_positions[tx_index])
 
 
 def iter_diffraction_rx_chunk_requests(
-    plan: DiffractionOrder1Plan,
-    *,
-    state_count: int,
+    plan: DiffractionOrder1Plan, *, state_count: int,
 ) -> Iterator[DiffractionRxChunkRequest]:
     rx_chunk_size = max(1, _MULTIBOUNCE_PAIR_CHUNK_SIZE // state_count)
     for rx_start in range(0, plan.rx_count, rx_chunk_size):
@@ -121,9 +114,7 @@ class DiffractionEdgeGeometry:
 
 
 def query_diffraction_edges(
-    rayd: object,
-    *,
-    preserve_imported_edges: bool,
+    rayd: object, *, preserve_imported_edges: bool,
 ) -> DiffractionEdgeGeometry:
     raw = (
         _diffraction_edge_geometry(rayd.edge_records())
@@ -161,9 +152,7 @@ class DiffractionStateGeometry:
     source_power: torch.Tensor
 
 
-def name_diffraction_states(
-    states: tuple[torch.Tensor, ...],
-) -> DiffractionStateGeometry:
+def name_diffraction_states(states: tuple[torch.Tensor, ...]) -> DiffractionStateGeometry:
     if len(states) != 12:
         raise ValueError("diffraction state tuple must contain exactly 12 tensors")
     return DiffractionStateGeometry(
@@ -200,9 +189,7 @@ class DiffractionVisibleStatePlan:
 
 
 def plan_tx_visible_diffraction_states(
-    rayd: object,
-    states: tuple[torch.Tensor, ...],
-    tx: torch.Tensor,
+    rayd: object, states: tuple[torch.Tensor, ...], tx: torch.Tensor,
 ) -> DiffractionVisibleStatePlan:
     named = name_diffraction_states(states)
     active = geometry_kernels.diffraction_tx_visible_state_plan(
@@ -282,9 +269,7 @@ class DiffractionOrder1Geometry:
     interaction_position: torch.Tensor
 
 
-def query_diffraction_order1(
-    query: DiffractionOrder1Query,
-) -> DiffractionOrder1Geometry:
+def query_diffraction_order1(query: DiffractionOrder1Query) -> DiffractionOrder1Geometry:
     states = query.states
     cuda_profile_mark(CudaProfileMark.OPTIX_TRAVERSAL)
     cuda_profile_mark(CudaProfileMark.DIFFRACTION_EXPORTER_REQUEST)
@@ -333,11 +318,7 @@ def query_diffraction_order1(
 
 
 def _deterministic_diffraction_states(
-    rayd: object,
-    tx: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_index: int,
-    *,
+    rayd: object, tx: torch.Tensor, tx_power: torch.Tensor, tx_index: int, *,
     preserve_imported_edges: bool = False,
 ) -> tuple[torch.Tensor, ...]:
     edges = query_diffraction_edges(
@@ -363,14 +344,8 @@ def _deterministic_diffraction_states(
 
 @profiled_cuda_range(CudaProfileRange.DIFFRACTION_TOTAL_STAGE)
 def _diffraction_topology_order1(
-    scene: Scene,
-    compiled: object,
-    tx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    rx_positions: torch.Tensor,
-    *,
-    frequency_hz: float,
-    isb_boundary_taper_width: float = 0.0,
+    scene: Scene, compiled: object, tx_positions: torch.Tensor, tx_power: torch.Tensor,
+    rx_positions: torch.Tensor, *, frequency_hz: float, isb_boundary_taper_width: float = 0.0,
 ) -> tuple[dict[str, torch.Tensor], int, torch.Tensor]:
     from witwin.channel.kernels import fields as field_kernels
 

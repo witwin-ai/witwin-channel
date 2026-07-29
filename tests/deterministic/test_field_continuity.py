@@ -114,9 +114,7 @@ def _build_scene(x_values: np.ndarray, y_values: np.ndarray) -> Scene:
 
 
 def _solve_maps(
-    x_values: np.ndarray,
-    y_values: np.ndarray,
-    components: frozenset[str] | set[str],
+    x_values: np.ndarray, y_values: np.ndarray, components: frozenset[str] | set[str],
     max_depth: int,
 ) -> tuple[np.ndarray, dict[str, np.ndarray]]:
     """Return the (ny, nx) total field map and per-component z-projected maps.

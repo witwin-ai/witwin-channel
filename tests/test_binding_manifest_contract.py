@@ -22,7 +22,7 @@ PHASE13_MIGRATION_DELTA_PATH = (
 
 
 def _semantic_projection(
-    manifest: dict[str, Any], *, removed_parameters: dict[str, set[str]] | None = None
+    manifest: dict[str, Any], *, removed_parameters: dict[str, set[str]] | None = None,
 ) -> list[dict[str, Any]]:
     """Discard source locations while retaining the complete pybind contract."""
 

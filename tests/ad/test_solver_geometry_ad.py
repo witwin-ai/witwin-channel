@@ -58,8 +58,7 @@ def _vec(values: tuple[float, float, float]) -> torch.Tensor:
 
 
 def _reflection_scene(
-    tx: torch.Tensor | None = None,
-    rx: torch.Tensor | None = None,
+    tx: torch.Tensor | None = None, rx: torch.Tensor | None = None,
     vertices: torch.Tensor | None = None,
 ) -> Scene:
     wall_vertices = (
@@ -97,8 +96,7 @@ _TRANSMISSION_WALL_VERTICES = (
 
 
 def _transmission_scene(
-    tx: torch.Tensor | None = None,
-    rx: torch.Tensor | None = None,
+    tx: torch.Tensor | None = None, rx: torch.Tensor | None = None,
     vertices: torch.Tensor | None = None,
 ) -> Scene:
     material = PhysicalMaterial(
@@ -138,9 +136,7 @@ def _transmission_scene(
     )
 
 
-def _los_scene(
-    tx: torch.Tensor | None = None, rx: torch.Tensor | None = None
-) -> Scene:
+def _los_scene(tx: torch.Tensor | None = None, rx: torch.Tensor | None = None) -> Scene:
     return Scene(
         structures=[],
         endpoints=[
@@ -182,7 +178,7 @@ def _loss(result, solver: str) -> torch.Tensor:
 
 
 def _fd_endpoint_gradient(
-    builder, solver: str, components: frozenset[str], *, endpoint: str, base
+    builder, solver: str, components: frozenset[str], *, endpoint: str, base,
 ) -> torch.Tensor:
     def evaluate(values: torch.Tensor) -> torch.Tensor:
         scene = builder(**{endpoint: values.clone()})

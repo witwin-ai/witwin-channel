@@ -124,9 +124,7 @@ def test_primal_route_is_one_pair_major_batch_with_shared_state(monkeypatch) -> 
 
 
 @pytest.mark.parametrize("ad_mode", ["jvp", "vjp"])
-def test_ad_route_uses_native_tape_companions_and_live_geometry(
-    monkeypatch, ad_mode
-) -> None:
+def test_ad_route_uses_native_tape_companions_and_live_geometry(monkeypatch, ad_mode) -> None:
     scene, compiled, tx, rx = _fixture()
     failure_state = _unchecked_failure_state()
     vertices = torch.arange(9, dtype=torch.float32).reshape(3, 3)
@@ -187,9 +185,7 @@ def test_ad_route_uses_native_tape_companions_and_live_geometry(
     assert kwargs["policy"] is SegmentPenetrationPolicy.EnumeratedFullDistance
 
 
-def test_invalid_poison_capacity_tail_is_compacted_before_engine_fields(
-    monkeypatch,
-) -> None:
+def test_invalid_poison_capacity_tail_is_compacted_before_engine_fields(monkeypatch) -> None:
     scene, compiled, tx, rx = _fixture()
     failure_state = _unchecked_failure_state()
     valid = torch.tensor([True, False, True, False])
@@ -231,9 +227,7 @@ def test_invalid_poison_capacity_tail_is_compacted_before_engine_fields(
     assert block["path_gain"].tolist() == [1.0, 2.0]
 
 
-def test_structural_no_work_never_requires_or_observes_failure_state(
-    monkeypatch,
-) -> None:
+def test_structural_no_work_never_requires_or_observes_failure_state(monkeypatch) -> None:
     _scene, compiled, tx, rx = _fixture()
     scene = SimpleNamespace(structures=[])
     monkeypatch.setattr(transmission, "_ensure_topology_fields", lambda block: block)
@@ -253,9 +247,7 @@ def test_structural_no_work_never_requires_or_observes_failure_state(
     assert block["valid"].numel() == 0
 
 
-def test_engine_observes_shared_failure_once_after_field_sanitization(
-    monkeypatch,
-) -> None:
+def test_engine_observes_shared_failure_once_after_field_sanitization(monkeypatch) -> None:
     events: list[str] = []
     failure_state = object()
     capacity_execution = SimpleNamespace(candidate_capacity=1)

@@ -11,9 +11,7 @@ from witwin.core import AntennaState, ReceiverGrid, Scene
 _LIGHT_SPEED_M_PER_S = 299_792_458.0
 
 
-def _receiver_blocks(
-    scene: Scene, *, device: torch.device
-) -> tuple[torch.Tensor, torch.Tensor]:
+def _receiver_blocks(scene: Scene, *, device: torch.device) -> tuple[torch.Tensor, torch.Tensor]:
     positions = []
     polarizations = []
     receivers = tuple(endpoint for endpoint in scene.endpoints if endpoint.role == "rx")
@@ -35,10 +33,7 @@ def _receiver_blocks(
 
 
 def los_path_gain_reference(
-    scene: Scene,
-    *,
-    device: torch.device,
-    reference_frequency_hz: float,
+    scene: Scene, *, device: torch.device, reference_frequency_hz: float,
 ) -> torch.Tensor:
     transmitters = tuple(
         endpoint for endpoint in scene.endpoints if endpoint.role == "tx"

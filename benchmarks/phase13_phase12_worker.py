@@ -231,9 +231,7 @@ def _result_tensors(result: object) -> list[tuple[str, torch.Tensor]]:
 
 
 def _time_workload(
-    solve: Callable[[], object],
-    *,
-    semantic_hash: Callable[[object], str] | None = None,
+    solve: Callable[[], object], *, semantic_hash: Callable[[object], str] | None = None,
 ) -> tuple[list[float], list[float], object, list[str]]:
     with torch.inference_mode():
         warmup_result = solve()

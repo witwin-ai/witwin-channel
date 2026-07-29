@@ -145,9 +145,7 @@ def test_resolver_accepts_unique_lock_valid_package(tmp_path: Path):
         ("escape", "safe POSIX relative path"),
     ],
 )
-def test_resolver_fails_loudly_on_package_mutation(
-    tmp_path: Path, mutation: str, message: str
-):
+def test_resolver_fails_loudly_on_package_mutation(tmp_path: Path, mutation: str, message: str):
     resolver = _load_resolver()
     distribution, resource = _package(tmp_path)
     metadata_path = resource / "rayd-source.json"

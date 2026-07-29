@@ -119,7 +119,7 @@ def test_pack_preserves_pair_capacity_normal_bits_and_device_counts() -> None:
     ("tx_count", "rx_count", "hit_capacity"), [(0, 3, 0), (2, 1, 0)]
 )
 def test_zero_pair_or_hit_capacity_is_inert(
-    tx_count: int, rx_count: int, hit_capacity: int
+    tx_count: int, rx_count: int, hit_capacity: int,
 ) -> None:
     rows = tx_count * rx_count
     penetration = _empty_penetration(rows, hit_capacity)

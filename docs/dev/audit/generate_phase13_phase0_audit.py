@@ -112,7 +112,7 @@ SYMBOLS = {item["name"]: item for item in MANIFEST["symbols"]}
 
 
 def identifier_index(
-    tokens: set[str], files: list[Path], root: Path = REPO, *, require_call: bool = False
+    tokens: set[str], files: list[Path], root: Path = REPO, *, require_call: bool = False,
 ) -> dict[str, list[dict[str, Any]]]:
     by_token: dict[str, dict[str, list[int]]] = {token: {} for token in tokens}
     for path in files:
@@ -613,7 +613,9 @@ write_json(
 )
 
 
-def selected_contract(symbol: str, target_owner: str, compile_contract: str, fusion: str, tape: str) -> dict[str, Any]:
+def selected_contract(
+    symbol: str, target_owner: str, compile_contract: str, fusion: str, tape: str,
+) -> dict[str, Any]:
     row = next(item for item in CURRENT_RECORDS if item["symbol"] == symbol)
     return {
         "symbol": symbol,

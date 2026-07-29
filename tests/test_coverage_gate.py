@@ -89,9 +89,7 @@ def test_every_section_floor_names_a_former_narrow_module() -> None:
 
 
 @pytest.mark.parametrize("path", sorted(SECTIONS))
-def test_section_floor_is_not_masked_by_the_rest_of_the_merged_module(
-    path: str,
-) -> None:
+def test_section_floor_is_not_masked_by_the_rest_of_the_merged_module(path: str) -> None:
     """A poorly covered section must fail even when its containing module clears the file threshold."""
 
     report = copy.deepcopy(_accepted_report())

@@ -162,9 +162,7 @@ def _canonical_members(archive: zipfile.ZipFile) -> list[str]:
     return members
 
 
-def _metadata_identity(
-    archive: zipfile.ZipFile, members: list[str]
-) -> tuple[str, str, str]:
+def _metadata_identity(archive: zipfile.ZipFile, members: list[str]) -> tuple[str, str, str]:
     metadata_files = [
         member
         for member in members
@@ -406,9 +404,7 @@ def _record_hash(payload: bytes) -> str:
     return f"sha256={encoded}"
 
 
-def _audit_record(
-    archive: zipfile.ZipFile, members: list[str], *, dist_info: str
-) -> None:
+def _audit_record(archive: zipfile.ZipFile, members: list[str], *, dist_info: str) -> None:
     record_member = f"{dist_info}/RECORD"
     try:
         record_text = archive.read(record_member).decode("utf-8")
@@ -559,7 +555,7 @@ def _audit_wheel_contents(path: Path) -> str:
 
 
 def _audit_wheel_pe(
-    path: Path, native_member: str, *, dumpbin: str = "dumpbin"
+    path: Path, native_member: str, *, dumpbin: str = "dumpbin",
 ) -> dict[str, object]:
     with zipfile.ZipFile(path) as archive:
         payload = archive.read(native_member)
@@ -585,9 +581,7 @@ def _reject_json_constant(value: str) -> object:
     raise ValueError(f"isolated wheel smoke JSON contains non-finite value {value}")
 
 
-def _exact_keys(
-    value: object, expected: frozenset[str], *, label: str
-) -> dict[str, object]:
+def _exact_keys(value: object, expected: frozenset[str], *, label: str) -> dict[str, object]:
     if not isinstance(value, dict) or set(value) != expected:
         actual = sorted(value) if isinstance(value, dict) else type(value).__name__
         raise ValueError(f"isolated wheel smoke {label} schema mismatch: {actual}")
@@ -682,14 +676,8 @@ def _validate_build_info(value: object) -> dict[str, object]:
 
 
 def _parse_smoke_evidence(
-    stdout: str,
-    *,
-    expected_wheel_sha256: str,
-    expected_name: str,
-    expected_version: str,
-    target: Path,
-    native_member: str,
-    expected_build_identity: dict[str, object],
+    stdout: str, *, expected_wheel_sha256: str, expected_name: str, expected_version: str,
+    target: Path, native_member: str, expected_build_identity: dict[str, object],
 ) -> dict[str, object]:
     try:
         evidence = json.loads(
@@ -755,12 +743,7 @@ def _parse_smoke_evidence(
 
 
 def _smoke_code(
-    *,
-    target: Path,
-    wheel: Path,
-    wheel_sha256: str,
-    expected_name: str,
-    expected_version: str,
+    *, target: Path, wheel: Path, wheel_sha256: str, expected_name: str, expected_version: str,
 ) -> str:
     # Derived here, not passed in, so the expected contract version has exactly
     # one home and no caller can supply a second opinion about it.

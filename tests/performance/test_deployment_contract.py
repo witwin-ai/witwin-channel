@@ -119,9 +119,7 @@ def test_runtime_diagnostics_rejects_negative_active_cuda_device(monkeypatch):
 
 
 @pytest.mark.parametrize("device", [None, "cuda:0"])
-def test_require_supported_runtime_rejects_missing_or_non_dict_device(
-    monkeypatch, device
-):
+def test_require_supported_runtime_rejects_missing_or_non_dict_device(monkeypatch, device):
     diagnostics = {
         "errors": [],
         "cuda_available": True,
@@ -164,7 +162,7 @@ def test_require_supported_runtime_keeps_declared_unverified_status(monkeypatch)
 
 @pytest.mark.parametrize("native_build", [{}, {"cuda_architectures": "89-real"}])
 def test_require_supported_runtime_rejects_missing_or_malformed_architectures(
-    monkeypatch, native_build
+    monkeypatch, native_build,
 ):
     monkeypatch.setattr(deployment, "_import_torch", lambda: _cuda_torch(89))
     monkeypatch.setattr(

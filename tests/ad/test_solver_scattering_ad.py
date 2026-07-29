@@ -102,10 +102,7 @@ def _heights(seed: int = 5, size: int = 16) -> torch.Tensor:
 
 
 def _solve(
-    scene: Scene,
-    solver: str,
-    ad_mode: str,
-    *,
+    scene: Scene, solver: str, ad_mode: str, *,
     reference_frequency_hz: float | torch.Tensor = _FREQUENCY_HZ,
 ):
     components = frozenset({"scattering"})
@@ -324,9 +321,7 @@ def _material_leaf(scene: Scene, name: str) -> torch.Tensor:
     )
 
 
-def _fd_material_gradient(
-    scene: Scene, leaf: torch.Tensor, step: float
-) -> torch.Tensor:
+def _fd_material_gradient(scene: Scene, leaf: torch.Tensor, step: float) -> torch.Tensor:
     base = leaf.detach().clone()
 
     def evaluate(values: torch.Tensor) -> torch.Tensor:

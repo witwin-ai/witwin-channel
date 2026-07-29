@@ -190,13 +190,8 @@ def require_supported_runtime() -> dict[str, Any]:
 
 
 def pipeline_cache_key(
-    *,
-    geometry_version: int,
-    material_version: int,
-    assignment_version: int,
-    frequency_hz: float,
-    solver: str,
-    build: dict[str, Any] | None = None,
+    *, geometry_version: int, material_version: int, assignment_version: int, frequency_hz: float,
+    solver: str, build: dict[str, Any] | None = None,
 ) -> str:
     """Return a cache-key ABI digest; no pipeline cache is implemented yet."""
 

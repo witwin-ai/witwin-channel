@@ -136,10 +136,7 @@ def require_frequency_offsets(value: object) -> tuple[float, ...] | None:
 
 
 def require_wideband_payload(
-    name: str,
-    payload: object,
-    offsets: object,
-    reference: torch.Tensor,
+    name: str, payload: object, offsets: object, reference: torch.Tensor,
 ) -> None:
     """Enforce the wideband evaluation paired-presence and shape law on one transport.
 
@@ -278,9 +275,7 @@ def carries_ad(value: torch.Tensor | None) -> bool:
     )
 
 
-def _primal_only_values(
-    compiled: CompiledScene, request: object
-) -> dict[str, torch.Tensor | None]:
+def _primal_only_values(compiled: CompiledScene, request: object) -> dict[str, torch.Tensor | None]:
     """The tensors named by ``capabilities.primal_only_ad_inputs``.
 
  Two of them live on the compiled scene rather than on the request: the
@@ -301,9 +296,7 @@ def _primal_only_values(
     }
 
 
-def require_primal_only_ad_inputs(
-    compiled: CompiledScene, request: object
-) -> None:
+def require_primal_only_ad_inputs(compiled: CompiledScene, request: object) -> None:
     """Reject before native work any AD input that the field companions declare primal-only."""
 
     if request.ad_mode == "none":
@@ -319,7 +312,7 @@ def require_primal_only_ad_inputs(
 
 
 def _ad_leaf_tensors(
-    compiled: CompiledScene, request: object
+    compiled: CompiledScene, request: object,
 ) -> tuple[tuple[str, torch.Tensor], ...]:
     """Every tensor a caller can seed on this call, named for a refusal.
 
@@ -349,9 +342,7 @@ def _ad_leaf_tensors(
     )
 
 
-def require_first_order_request(
-    compiled: CompiledScene, request: object
-) -> None:
+def require_first_order_request(compiled: CompiledScene, request: object) -> None:
     """Refuse a forward-over-reverse composition before any numerical work.
 
  A reverse pass cannot carry a forward tangent through the native
@@ -506,9 +497,7 @@ class WorldProvenance:
             time_s=getattr(compiled, "time_s", None),
         )
 
-    def moved_domain(
-        self, current: WorldProvenance, *, allow_geometry: bool = False
-    ) -> str | None:
+    def moved_domain(self, current: WorldProvenance, *, allow_geometry: bool = False) -> str | None:
         """Name the first version domain that differs, or ``None``.
 
  Four host integer comparisons. No device work, no allocation, no
@@ -1526,9 +1515,7 @@ def _malformed_rows(topology: PropagationTopology, width: int) -> torch.Tensor:
     )
 
 
-def prepare_fixed_topology(
-    topology: PropagationTopology,
-) -> PreparedFixedTopology:
+def prepare_fixed_topology(topology: PropagationTopology) -> PreparedFixedTopology:
     """Partition a frozen topology by component and interaction depth.
 
  This is the one place the consumer looks at a frozen topology on the host.
@@ -1584,11 +1571,7 @@ def prepare_fixed_topology(
 
 
 def replicate_over_slots(
-    prepared: PreparedFixedTopology,
-    slot_count: int,
-    *,
-    source_count: int,
-    sink_count: int,
+    prepared: PreparedFixedTopology, slot_count: int, *, source_count: int, sink_count: int,
 ) -> PreparedFixedTopology:
     """Tile a frozen topology over ``slot_count`` block-diagonal slots.
 
@@ -1829,9 +1812,7 @@ def _candidate_tensors(paths: EvaluatedPaths) -> tuple[torch.Tensor, ...]:
 
 
 def _validate_inputs(
-    paths: EvaluatedPaths,
-    source_stable_ids: torch.Tensor,
-    sink_stable_ids: torch.Tensor,
+    paths: EvaluatedPaths, source_stable_ids: torch.Tensor, sink_stable_ids: torch.Tensor,
 ) -> tuple[torch.Tensor, ...]:
     from witwin.channel.propagation.rows import EvaluatedPaths
 
@@ -1867,7 +1848,7 @@ def _validate_inputs(
 
 
 def evaluated_paths_compact_finalize(
-    *inputs: torch.Tensor, rows_are_compact: bool
+    *inputs: torch.Tensor, rows_are_compact: bool,
 ) -> dict[str, object]:
     return _required_native_op("evaluated_paths_compact_finalize")(
         *inputs, rows_are_compact
@@ -1967,10 +1948,7 @@ class _CompactEvaluatedPathsFunction(torch.autograd.Function):
 
 
 def compact_evaluated_paths(
-    paths: EvaluatedPaths,
-    *,
-    source_stable_ids: torch.Tensor,
-    sink_stable_ids: torch.Tensor,
+    paths: EvaluatedPaths, *, source_stable_ids: torch.Tensor, sink_stable_ids: torch.Tensor,
     rows_are_compact: bool = False,
 ) -> CompactEvaluatedPaths:
     """Publish exact valid rows and pair segmentation from the sole native owner."""
@@ -2057,13 +2035,8 @@ def compact_evaluated_paths(
 
 
 def consumer_los_jones(
-    *,
-    pair_index: torch.Tensor,
-    source_positions: torch.Tensor,
-    sink_positions: torch.Tensor,
-    source_reference_basis: torch.Tensor,
-    sink_reference_basis: torch.Tensor,
-    frequency_hz: float,
+    *, pair_index: torch.Tensor, source_positions: torch.Tensor, sink_positions: torch.Tensor,
+    source_reference_basis: torch.Tensor, sink_reference_basis: torch.Tensor, frequency_hz: float,
 ) -> LoSJonesRows:
     """Evaluate primal-only LoS transport between row-specific transverse bases."""
 
@@ -2212,9 +2185,7 @@ class _FixedLoSGatherFunction(torch.autograd.Function):
 
 
 def fixed_los_gather(
-    topology: PropagationTopology,
-    sources: EndpointBatch,
-    sinks: EndpointBatch,
+    topology: PropagationTopology, sources: EndpointBatch, sinks: EndpointBatch,
 ) -> FixedLoSRows:
     """Validate and gather frozen LoS rows without Python/Torch indexing."""
 
@@ -2327,9 +2298,7 @@ def _bit(flag: torch.Tensor, bit: int) -> torch.Tensor:
     return flag.to(dtype=torch.int32) * bit
 
 
-def _order_violation(
-    pair_index: torch.Tensor, in_bounds: torch.Tensor
-) -> torch.Tensor:
+def _order_violation(pair_index: torch.Tensor, in_bounds: torch.Tensor) -> torch.Tensor:
     """True when an in-bounds row breaks non-decreasing pair-major order."""
 
     if pair_index.shape[0] < 2:
@@ -2339,12 +2308,8 @@ def _order_violation(
 
 
 def _contract_error(
-    topology: PropagationTopology,
-    sources: EndpointBatch,
-    sinks: EndpointBatch,
-    source_row_index: torch.Tensor,
-    sink_row_index: torch.Tensor,
-    pair_index: torch.Tensor,
+    topology: PropagationTopology, sources: EndpointBatch, sinks: EndpointBatch,
+    source_row_index: torch.Tensor, sink_row_index: torch.Tensor, pair_index: torch.Tensor,
     slot_broken: torch.Tensor | None,
 ) -> torch.Tensor:
     """One device-resident int32 bitmask covering every frozen row."""
@@ -2372,9 +2337,7 @@ def _contract_error(
 
 
 def _slot_pairing(
-    source_row_index: torch.Tensor,
-    sink_row_index: torch.Tensor,
-    slot_sources: int,
+    source_row_index: torch.Tensor, sink_row_index: torch.Tensor, slot_sources: int,
     slot_sinks: int,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Block-diagonal pair index, plus the rows that break the block law.
@@ -2397,9 +2360,7 @@ def _slot_pairing(
     return pair_index, broken
 
 
-def _pair_segmentation(
-    pair_index: torch.Tensor, pair_count: int
-) -> torch.Tensor:
+def _pair_segmentation(pair_index: torch.Tensor, pair_count: int) -> torch.Tensor:
     counts = torch.zeros(
         (pair_count + 1,), dtype=torch.int64, device=pair_index.device
     )
@@ -2412,10 +2373,7 @@ def _pair_segmentation(
 
 
 def prepared_row_gather(
-    topology: PropagationTopology,
-    sources: EndpointBatch,
-    sinks: EndpointBatch,
-    *,
+    topology: PropagationTopology, sources: EndpointBatch, sinks: EndpointBatch, *,
     slot_count: int = 1,
 ) -> PreparedRows:
     """Validate frozen rows and bind them to the current endpoint batches.
@@ -2501,7 +2459,7 @@ def select_rows(values: torch.Tensor, rows: torch.Tensor) -> torch.Tensor:
 
 
 def excited_field(
-    field_vector: torch.Tensor, tx_power: torch.Tensor, *, ad_mode: str
+    field_vector: torch.Tensor, tx_power: torch.Tensor, *, ad_mode: str,
 ) -> torch.Tensor:
     """Return the source-excited complex3 field for a unit-excitation one.
 
@@ -2534,10 +2492,7 @@ def _primal(value: torch.Tensor) -> torch.Tensor:
 
 
 def transverse_basis(
-    reference_basis: torch.Tensor,
-    leg_origin: torch.Tensor,
-    leg_target: torch.Tensor,
-    *,
+    reference_basis: torch.Tensor, leg_origin: torch.Tensor, leg_target: torch.Tensor, *,
     frequency_hz: float,
 ) -> torch.Tensor:
     """Row-aligned orthonormal basis transverse to ``leg_target - leg_origin``.
@@ -2566,9 +2521,7 @@ def transverse_basis(
 
 
 def _project(
-    field_vector: torch.Tensor,
-    direction: torch.Tensor,
-    sink_vector: torch.Tensor,
+    field_vector: torch.Tensor, direction: torch.Tensor, sink_vector: torch.Tensor,
 ) -> torch.Tensor:
     from witwin.channel.kernels import fields as field_kernels
 
@@ -2578,13 +2531,8 @@ def _project(
 
 
 def compose_jones(
-    excite: _FieldOp,
-    *,
-    source_basis: torch.Tensor,
-    sink_reference_basis: torch.Tensor,
-    arrival_origin: torch.Tensor,
-    arrival_target: torch.Tensor,
-    frequency_hz: float,
+    excite: _FieldOp, *, source_basis: torch.Tensor, sink_reference_basis: torch.Tensor,
+    arrival_origin: torch.Tensor, arrival_target: torch.Tensor, frequency_hz: float,
 ) -> tuple[torch.Tensor, torch.Tensor, dict[str, torch.Tensor]]:
     """Build the ``(N, 2, 2)`` operator from two excitations of ``excite``.
 
@@ -2670,11 +2618,7 @@ class GeometryLiveness:
 
     @classmethod
     def of(
-        cls,
-        source: torch.Tensor,
-        target: torch.Tensor,
-        vertices: object,
-        *,
+        cls, source: torch.Tensor, target: torch.Tensor, vertices: object, *,
         direction_components: bool = True,
     ) -> GeometryLiveness:
         endpoints = _ad_geometry_live(source, target)
@@ -2788,11 +2732,8 @@ def _scene_tables(compiled: CompiledScene) -> dict[str, object]:
 
 
 def _reflection_inputs(
-    compiled: CompiledScene,
-    bucket: FixedTopologyBucket,
-    tables: dict[str, object],
-    prepared: PreparedFixedTopology,
-    rows: PreparedRows,
+    compiled: CompiledScene, bucket: FixedTopologyBucket, tables: dict[str, object],
+    prepared: PreparedFixedTopology, rows: PreparedRows,
 ) -> BucketInputs:
     from witwin.channel.propagation.geometry import (
         reflection_epc_paths,
@@ -2827,7 +2768,7 @@ def _reflection_inputs(
 
 
 def _los_inputs(
-    compiled: CompiledScene, bucket: FixedTopologyBucket, rows: PreparedRows
+    compiled: CompiledScene, bucket: FixedTopologyBucket, rows: PreparedRows,
 ) -> BucketInputs:
     source = select_rows(rows.source, bucket.rows)
     target = select_rows(rows.target, bucket.rows)
@@ -2870,9 +2811,7 @@ def _los_inputs(
     )
 
 
-def _inert_where_invalid(
-    values: torch.Tensor, valid: torch.Tensor
-) -> torch.Tensor:
+def _inert_where_invalid(values: torch.Tensor, valid: torch.Tensor) -> torch.Tensor:
     """Select a row's value or the inert constant; never a numerical blend."""
 
     shape = (-1, *((1,) * (values.ndim - 1)))
@@ -2880,20 +2819,15 @@ def _inert_where_invalid(
 
 
 def _field_op(
-    inputs: BucketInputs,
-    *,
-    ad_mode: str,
-    frequency: float | torch.Tensor,
-    frequency_value: float,
-    geometry_live: GeometryLiveness | None,
-    ledger: object | None = None,
+    inputs: BucketInputs, *, ad_mode: str, frequency: float | torch.Tensor, frequency_value: float,
+    geometry_live: GeometryLiveness | None, ledger: object | None = None,
 ) -> Callable[[torch.Tensor, torch.Tensor], dict[str, torch.Tensor]]:
     from witwin.channel.kernels import fields as field_kernels
 
     differentiable = ad_mode != "none"
 
     def run(
-        tx_polarization: torch.Tensor, rx_polarization: torch.Tensor
+        tx_polarization: torch.Tensor, rx_polarization: torch.Tensor,
     ) -> dict[str, torch.Tensor]:
         if inputs.depth == 0:
             leading = (inputs.source, inputs.target)
@@ -2962,12 +2896,8 @@ def _leg_endpoints(inputs: BucketInputs) -> tuple[torch.Tensor, torch.Tensor]:
 
 
 def _jones_values(
-    inputs: BucketInputs,
-    run: Callable[[torch.Tensor, torch.Tensor], dict[str, torch.Tensor]],
-    *,
-    source_reference: torch.Tensor,
-    sink_reference: torch.Tensor,
-    frequency_value: float,
+    inputs: BucketInputs, run: Callable[[torch.Tensor, torch.Tensor], dict[str, torch.Tensor]], *,
+    source_reference: torch.Tensor, sink_reference: torch.Tensor, frequency_value: float,
 ) -> dict[str, torch.Tensor]:
     launch_target, arrival_origin = _leg_endpoints(inputs)
     source_basis = _inert_where_invalid(
@@ -2996,15 +2926,9 @@ def _jones_values(
 
 
 def _bucket_values(
-    inputs: BucketInputs,
-    run: Callable[[torch.Tensor, torch.Tensor], dict[str, torch.Tensor]],
-    *,
-    response: str,
-    ad_mode: str,
-    source_reference: torch.Tensor | None,
-    sink_reference: torch.Tensor | None,
-    frequency_value: float,
-    ledger: object | None = None,
+    inputs: BucketInputs, run: Callable[[torch.Tensor, torch.Tensor], dict[str, torch.Tensor]], *,
+    response: str, ad_mode: str, source_reference: torch.Tensor | None,
+    sink_reference: torch.Tensor | None, frequency_value: float, ledger: object | None = None,
 ) -> dict[str, torch.Tensor]:
     if response != "polarimetric_transport":
         values = run(inputs.tx_polarization, inputs.rx_polarization)
@@ -3038,11 +2962,8 @@ def _pad_interactions(values: torch.Tensor, width: int) -> torch.Tensor:
 
 
 def _publish_bucket(
-    outputs: dict[str, torch.Tensor],
-    values: dict[str, torch.Tensor],
-    inputs: BucketInputs,
-    bucket: FixedTopologyBucket,
-    width: int,
+    outputs: dict[str, torch.Tensor], values: dict[str, torch.Tensor], inputs: BucketInputs,
+    bucket: FixedTopologyBucket, width: int,
 ) -> None:
     rows = bucket.rows
     valid = inputs.valid
@@ -3072,9 +2993,7 @@ def _publish_bucket(
             outputs[name].index_copy_(0, rows, values[name])
 
 
-def _allocate(
-    rows: PreparedRows, width: int, response: str
-) -> dict[str, torch.Tensor | None]:
+def _allocate(rows: PreparedRows, width: int, response: str) -> dict[str, torch.Tensor | None]:
     count = rows.row_count
     device = rows.source.device
     polarimetric = response == "polarimetric_transport"
@@ -3108,18 +3027,10 @@ def _allocate(
 
 
 def evaluate_prepared(
-    compiled: CompiledScene,
-    prepared: PreparedFixedTopology,
-    rows: PreparedRows,
-    *,
-    response: str,
-    ad_mode: str,
-    frequency: float | torch.Tensor,
-    frequency_value: float,
-    source_reference_basis: torch.Tensor | None,
-    sink_reference_basis: torch.Tensor | None,
-    publish_row_validity: bool,
-    geometry_live: GeometryLiveness | None = None,
+    compiled: CompiledScene, prepared: PreparedFixedTopology, rows: PreparedRows, *, response: str,
+    ad_mode: str, frequency: float | torch.Tensor, frequency_value: float,
+    source_reference_basis: torch.Tensor | None, sink_reference_basis: torch.Tensor | None,
+    publish_row_validity: bool, geometry_live: GeometryLiveness | None = None,
     ledger: object | None = None,
 ) -> FixedRowOutputs:
     """Replay every host-known bucket of a prepared frozen topology.
@@ -3236,7 +3147,7 @@ class _ConsumerRows:
 
 
 def _preflight_evaluate(
-    compiled: object, request: object
+    compiled: object, request: object,
 ) -> tuple[CompiledScene, PropagationRequest]:
     from witwin.channel.scene.compiler import CompiledScene
 
@@ -3334,7 +3245,7 @@ def _require_polarimetric_inputs(request: PropagationRequest) -> None:
 
 
 def _solver_scene(
-    compiled: CompiledScene, sources: EndpointBatch, sinks: EndpointBatch
+    compiled: CompiledScene, sources: EndpointBatch, sinks: EndpointBatch,
 ) -> tuple[SolverScene, EnumeratedEndpointTensors]:
     """Bind explicit request batches without consulting compiled endpoints."""
 
@@ -3363,10 +3274,7 @@ def _solver_scene(
     ), endpoint_tensors
 
 
-def _compact(
-    evaluated: object,
-    metadata: ExactPairMetadata | None,
-) -> _ConsumerRows:
+def _compact(evaluated: object, metadata: ExactPairMetadata | None) -> _ConsumerRows:
     from witwin.channel.propagation.rows import EvaluatedPaths
 
     if not isinstance(evaluated, EvaluatedPaths):
@@ -3391,10 +3299,7 @@ def _compact(
 
 
 def _fused_los_jones(
-    compact: _ConsumerRows,
-    *,
-    sources: EndpointBatch,
-    sinks: EndpointBatch,
+    compact: _ConsumerRows, *, sources: EndpointBatch, sinks: EndpointBatch,
     reference_frequency_hz: float | torch.Tensor,
 ) -> JonesTransport:
     """Primal-only fused operator: one native launch for the whole batch."""
@@ -3417,12 +3322,8 @@ def _fused_los_jones(
 
 
 def _composed_los_jones(
-    compact: _ConsumerRows,
-    *,
-    sources: EndpointBatch,
-    sinks: EndpointBatch,
-    frequency: float | torch.Tensor,
-    frequency_value: float,
+    compact: _ConsumerRows, *, sources: EndpointBatch, sinks: EndpointBatch,
+    frequency: float | torch.Tensor, frequency_value: float,
 ) -> JonesTransport:
     """Differentiable operator composed from the native free-space owner.
 
@@ -3471,14 +3372,8 @@ def _composed_los_jones(
 
 
 def _transport(
-    response: str,
-    compact: _ConsumerRows,
-    *,
-    sources: EndpointBatch,
-    sinks: EndpointBatch,
-    reference_frequency_hz: float | torch.Tensor,
-    ad_mode: str,
-    frequency_value: float,
+    response: str, compact: _ConsumerRows, *, sources: EndpointBatch, sinks: EndpointBatch,
+    reference_frequency_hz: float | torch.Tensor, ad_mode: str, frequency_value: float,
 ) -> ScalarTransport | Complex3Transport | JonesTransport:
     fields = compact.evaluated.fields
     geometry = compact.evaluated.geometry
@@ -3513,16 +3408,9 @@ def _transport(
 
 
 def _path_batch(
-    compact: _ConsumerRows,
-    *,
-    pair_count: int,
-    response: str,
-    sources: EndpointBatch,
-    sinks: EndpointBatch,
-    reference_frequency_hz: float | torch.Tensor,
-    ad_mode: str,
-    frequency_value: float,
-    provenance: WorldProvenance,
+    compact: _ConsumerRows, *, pair_count: int, response: str, sources: EndpointBatch,
+    sinks: EndpointBatch, reference_frequency_hz: float | torch.Tensor, ad_mode: str,
+    frequency_value: float, provenance: WorldProvenance,
 ) -> PropagationPathBatch:
     evaluated = compact.evaluated
     source = evaluated.topology
@@ -3570,11 +3458,7 @@ def _path_batch(
     )
 
 
-def _diagnostics(
-    sidecars: object,
-    compact: _ConsumerRows,
-    ad_mode: str,
-) -> PropagationDiagnostics:
+def _diagnostics(sidecars: object, compact: _ConsumerRows, ad_mode: str) -> PropagationDiagnostics:
     execution = sidecars.execution
     return PropagationDiagnostics(
         discovery_launch_count=int(execution.launch_count),
@@ -3591,9 +3475,7 @@ def _diagnostics(
     )
 
 
-def evaluate(
-    compiled_scene: CompiledScene, request: PropagationRequest
-) -> PropagationEvaluation:
+def evaluate(compiled_scene: CompiledScene, request: PropagationRequest) -> PropagationEvaluation:
     """Discover and evaluate one all-or-nothing compact propagation batch."""
 
     from witwin.channel.propagation.enumerated import (
@@ -3638,9 +3520,7 @@ def evaluate(
     )
 
 
-def _require_current_world(
-    compiled: CompiledScene, request: FixedTopologyRequest
-) -> None:
+def _require_current_world(compiled: CompiledScene, request: FixedTopologyRequest) -> None:
     """Refuse a frozen replay against a world that moved (world-version validation).
 
  Four host integer comparisons against the version domains the compiled
@@ -3672,9 +3552,7 @@ def _require_current_world(
 
 
 def rediscovery_required(
-    compiled_scene: CompiledScene,
-    topology: PropagationTopology | PreparedFixedTopology,
-    *,
+    compiled_scene: CompiledScene, topology: PropagationTopology | PreparedFixedTopology, *,
     revalidate_source: bool = False,
 ) -> str | None:
     """Name the version domain that moved under a frozen topology, or ``None``.
@@ -3749,9 +3627,7 @@ def _require_wideband_dispersive_materials(compiled: CompiledScene) -> None:
     )
 
 
-def _require_resolvable_offsets(
-    offsets: tuple[float, ...], reference_frequency_hz: float
-) -> None:
+def _require_resolvable_offsets(offsets: tuple[float, ...], reference_frequency_hz: float) -> None:
     """W2: refuse an offset grid the native launch grid cannot resolve.
 
  Every native field bridge casts the frequency to float32 at the launch, so
@@ -3823,9 +3699,7 @@ def _require_wideband_smooth_scene(compiled: CompiledScene) -> None:
         )
 
 
-def _preflight_wideband(
-    compiled: CompiledScene, request: FixedTopologyRequest
-) -> None:
+def _preflight_wideband(compiled: CompiledScene, request: FixedTopologyRequest) -> None:
     """Scene-dependent wideband refusals, each independent (wideband evaluation).
 
  Every check is reachable on its own: a dispersive smooth scene with a
@@ -3844,7 +3718,7 @@ def _preflight_wideband(
 
 
 def _preflight_reevaluate(
-    compiled: object, request: object
+    compiled: object, request: object,
 ) -> tuple[CompiledScene, FixedTopologyRequest]:
     from witwin.channel.scene.compiler import CompiledScene
 
@@ -3890,9 +3764,7 @@ def _preflight_reevaluate(
     return compiled, request
 
 
-def _offset_frequency(
-    frequency: float | torch.Tensor, offset: float
-) -> float | torch.Tensor:
+def _offset_frequency(frequency: float | torch.Tensor, offset: float) -> float | torch.Tensor:
     """The AD-facing frequency of one wideband column.
 
  A tensor reference frequency stays a tensor, so the seed a caller placed on
@@ -3904,9 +3776,7 @@ def _offset_frequency(
     return frequency if offset == 0.0 else frequency + offset
 
 
-def _wideband_columns(
-    offsets: tuple[float, ...], column: object
-) -> torch.Tensor:
+def _wideband_columns(offsets: tuple[float, ...], column: object) -> torch.Tensor:
     """Stack per-frequency native outputs into one payload axis.
 
  Structural packing and nothing else: every value in the stack came out of
@@ -3933,10 +3803,7 @@ def _column_payload(response: str, outputs: object) -> torch.Tensor:
 
 
 def _fixed_transport(
-    response: str,
-    outputs: object,
-    *,
-    offsets: tuple[float, ...] | None = None,
+    response: str, outputs: object, *, offsets: tuple[float, ...] | None = None,
     payload: torch.Tensor | None = None,
 ) -> ScalarTransport | Complex3Transport | JonesTransport:
     if response == "scalar_transport":
@@ -3977,7 +3844,7 @@ def _slot_pair_count(request: FixedTopologyRequest) -> int:
 
 
 def _reevaluate_prepared(
-    compiled: CompiledScene, request: FixedTopologyRequest
+    compiled: CompiledScene, request: FixedTopologyRequest,
 ) -> FixedTopologyEvaluation:
     """Replay a prepared frozen topology bucket by bucket."""
 
@@ -4096,7 +3963,7 @@ def _reevaluate_prepared(
 
 
 def reevaluate(
-    compiled_scene: CompiledScene, request: FixedTopologyRequest
+    compiled_scene: CompiledScene, request: FixedTopologyRequest,
 ) -> FixedTopologyEvaluation:
     """Reevaluate frozen rows without topology discovery or compaction."""
 
@@ -4304,7 +4171,7 @@ class TimeVaryingTransport:
 
     @classmethod
     def from_transport(
-        cls, transport: PropagationTransport, slot_count: int
+        cls, transport: PropagationTransport, slot_count: int,
     ) -> TimeVaryingTransport:
         if isinstance(transport, ScalarTransport):
             return cls(
@@ -4360,10 +4227,7 @@ class TimeVaryingEvaluation:
 
     @classmethod
     def from_evaluation(
-        cls,
-        evaluation: FixedTopologyEvaluation,
-        times_s: torch.Tensor,
-        slot_count: int,
+        cls, evaluation: FixedTopologyEvaluation, times_s: torch.Tensor, slot_count: int,
     ) -> TimeVaryingEvaluation:
         paths = evaluation.paths
         pair_count = paths.pair_count // slot_count
@@ -4393,7 +4257,7 @@ class TimeVaryingEvaluation:
 
 
 def evaluate_time_varying(
-    compiled_scene: CompiledScene, request: TimeVaryingRequest
+    compiled_scene: CompiledScene, request: TimeVaryingRequest,
 ) -> TimeVaryingEvaluation:
     """Replay one frozen topology across a whole block of world instants.
 

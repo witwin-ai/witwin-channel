@@ -16,12 +16,9 @@ pytestmark = pytest.mark.skipif(
 
 
 def _topology(
-    source_index: torch.Tensor,
-    sink_index: torch.Tensor,
-    *,
+    source_index: torch.Tensor, sink_index: torch.Tensor, *,
     source_ids: tuple[int, ...] = (101, 101, 303, 303),
-    sink_ids: tuple[int, ...] = (707, 707, 707, 909),
-    depth: torch.Tensor | None = None,
+    sink_ids: tuple[int, ...] = (707, 707, 707, 909), depth: torch.Tensor | None = None,
     component_id: torch.Tensor | None = None,
 ) -> PropagationTopology:
     device = source_index.device
@@ -52,10 +49,8 @@ def _topology(
 
 
 def _endpoints(
-    source_positions: torch.Tensor | None = None,
-    sink_positions: torch.Tensor | None = None,
-    source_powers: torch.Tensor | None = None,
-    source_polarizations: torch.Tensor | None = None,
+    source_positions: torch.Tensor | None = None, sink_positions: torch.Tensor | None = None,
+    source_powers: torch.Tensor | None = None, source_polarizations: torch.Tensor | None = None,
     sink_polarizations: torch.Tensor | None = None,
 ) -> tuple[EndpointBatch, EndpointBatch]:
     device = torch.device("cuda")
@@ -283,12 +278,7 @@ def test_fixed_los_gather_jvp_uses_native_endpoint_gather() -> None:
     ],
 )
 def test_fixed_los_gather_rejects_invalid_frozen_topology_before_result(
-    source_index,
-    sink_index,
-    source_ids,
-    sink_ids,
-    depth,
-    component,
+    source_index, sink_index, source_ids, sink_ids, depth, component,
 ) -> None:
     topology = _topology(
         torch.tensor(source_index, device="cuda", dtype=torch.int32),

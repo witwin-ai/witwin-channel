@@ -61,9 +61,7 @@ def _imported_modules(node: ast.Import | ast.ImportFrom) -> list[str]:
 
 
 def scan_source(
-    source: str,
-    path: Path = Path("<memory>"),
-    *,
+    source: str, path: Path = Path("<memory>"), *,
     forbidden_modules: tuple[str, ...] = FORBIDDEN_MODULES,
 ) -> list[Violation]:
     tree = ast.parse(source.lstrip("\ufeff"), filename=str(path))
@@ -78,7 +76,7 @@ def scan_source(
 
 
 def scan_file(
-    path: Path, *, forbidden_modules: tuple[str, ...] = FORBIDDEN_MODULES
+    path: Path, *, forbidden_modules: tuple[str, ...] = FORBIDDEN_MODULES,
 ) -> list[Violation]:
     return scan_source(
         path.read_text(encoding="utf-8-sig"),
@@ -98,7 +96,7 @@ def production_python_files(root: Path) -> list[Path]:
 
 
 def scan_roots(
-    roots: list[Path], *, forbidden_modules: tuple[str, ...] = FORBIDDEN_MODULES
+    roots: list[Path], *, forbidden_modules: tuple[str, ...] = FORBIDDEN_MODULES,
 ) -> list[Violation]:
     return [
         violation

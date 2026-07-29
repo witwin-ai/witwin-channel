@@ -17,7 +17,7 @@ DEFAULT_TORCH_CUDA_ARCH_LIST = "7.5 8.0 8.6 8.9 12.0+PTX"
 
 
 def _run(
-    *args: str, cwd: Path | None = None, env: dict[str, str] | None = None
+    *args: str, cwd: Path | None = None, env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         args,
@@ -78,13 +78,9 @@ def _clone_locked_rayd(destination: Path) -> dict[str, object]:
 
 
 def _configure(
-    rayd: Path,
-    build: Path,
-    *,
-    release: bool | None = None,
+    rayd: Path, build: Path, *, release: bool | None = None,
     torch_cuda_arch_list: str = DEFAULT_TORCH_CUDA_ARCH_LIST,
-    cmake_cuda_architectures: str | None = None,
-    skbuild_state: str | None = None,
+    cmake_cuda_architectures: str | None = None, skbuild_state: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["TORCH_CUDA_ARCH_LIST"] = torch_cuda_arch_list
@@ -224,9 +220,7 @@ def test_cmake_rejects_disabled_torch_cuda_architectures(tmp_path: Path):
         ("dirty-release", "forbids a dirty RayD checkout"),
     ],
 )
-def test_cmake_rejects_unlocked_rayd(
-    tmp_path: Path, mutation: str, expected_error: str
-):
+def test_cmake_rejects_unlocked_rayd(tmp_path: Path, mutation: str, expected_error: str):
     rayd = tmp_path / "rayd"
     lock = _clone_locked_rayd(rayd)
     git = shutil.which("git")

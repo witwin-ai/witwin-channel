@@ -130,9 +130,7 @@ def python_code_tokens(source: str) -> list[tuple[str, int]]:
 
 
 def _consume_leading_string_run(
-    tokens: Sequence[tokenize.TokenInfo],
-    index: int,
-    result: list[tuple[str, int]],
+    tokens: Sequence[tokenize.TokenInfo], index: int, result: list[tuple[str, int]],
 ) -> int:
     """Handle a string that opens a logical line; return the next index.
 
@@ -381,7 +379,7 @@ class _UnionFind:
 
 
 def _coalesce_blocks(
-    flat: _Flat, covered: bytearray, min_tokens: int
+    flat: _Flat, covered: bytearray, min_tokens: int,
 ) -> tuple[list[tuple[int, int]], list[int]]:
     """Merge covered token runs into contiguous same-file blocks.
 
@@ -424,7 +422,7 @@ def _region_id(corpus: str, block_content_hashes: Sequence[str]) -> str:
 
 
 def analyze_corpus(
-    corpus: str, sources: Sequence[SourceFile], min_tokens: int = MIN_TOKENS
+    corpus: str, sources: Sequence[SourceFile], min_tokens: int = MIN_TOKENS,
 ) -> CorpusResult:
     flat = _flatten(sources)
     seeds = _seed_groups(flat, min_tokens)
@@ -544,9 +542,7 @@ def build_report(repo: Path, min_tokens: int = MIN_TOKENS) -> dict[str, object]:
 
 
 def report_from_results(
-    python_result: CorpusResult,
-    native_result: CorpusResult,
-    min_tokens: int = MIN_TOKENS,
+    python_result: CorpusResult, native_result: CorpusResult, min_tokens: int = MIN_TOKENS,
 ) -> dict[str, object]:
     results = (python_result, native_result)
     combined_duplicate = sum(result.duplicate_lines for result in results)

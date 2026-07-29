@@ -66,11 +66,7 @@ def _validate_open_file(stream: object, *, label: str) -> os.stat_result:
 
 
 def _stream_open_file(
-    stream: object,
-    *,
-    label: str,
-    sink: object | None = None,
-    collect_limit: int | None = None,
+    stream: object, *, label: str, sink: object | None = None, collect_limit: int | None = None,
 ) -> tuple[bytes | None, str, int]:
     before = _validate_open_file(stream, label=label)
     digest = hashlib.sha256()
@@ -108,8 +104,7 @@ def _stream_open_file(
 
 
 def read_external_stable(
-    path: Path, *, label: str, allow_empty: bool = False,
-    max_bytes: int = 16 * 1024 * 1024,
+    path: Path, *, label: str, allow_empty: bool = False, max_bytes: int = 16 * 1024 * 1024,
 ) -> tuple[bytes, str, int]:
     reject_reparse_chain(path)
     try:
@@ -125,9 +120,7 @@ def read_external_stable(
     return payload, digest, size
 
 
-def hash_external_stable(
-    path: Path, *, label: str, allow_empty: bool = False
-) -> tuple[str, int]:
+def hash_external_stable(path: Path, *, label: str, allow_empty: bool = False) -> tuple[str, int]:
     reject_reparse_chain(path)
     try:
         with path.open("rb") as stream:
@@ -176,7 +169,7 @@ class ArtifactStore:
         return path
 
     def write_bytes(
-        self, relative_value: object, payload: bytes, *, allow_empty: bool = True
+        self, relative_value: object, payload: bytes, *, allow_empty: bool = True,
     ) -> dict[str, object]:
         if not payload and not allow_empty:
             raise EvidenceError(f"artifact must not be empty: {relative_value}")
@@ -199,12 +192,7 @@ class ArtifactStore:
         return {"path": safe_relative_path(relative_value).as_posix(), "sha256": digest, "bytes": size}
 
     def retain_external(
-        self,
-        source: Path,
-        relative_value: object,
-        *,
-        label: str,
-        allow_empty: bool = False,
+        self, source: Path, relative_value: object, *, label: str, allow_empty: bool = False,
         minimum_mtime_ns: int | None = None,
     ) -> dict[str, object]:
         """Copy one external file while reading/hash-checking one source handle."""
@@ -239,11 +227,7 @@ class ArtifactStore:
         }
 
     def inspect(
-        self,
-        relative_value: object,
-        *,
-        label: str,
-        allow_empty: bool = False,
+        self, relative_value: object, *, label: str, allow_empty: bool = False,
         minimum_mtime_ns: int | None = None,
     ) -> dict[str, object]:
         relative = safe_relative_path(relative_value)

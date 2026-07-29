@@ -34,9 +34,7 @@ _MULTIBOUNCE_PAIR_CHUNK_SIZE = 4_194_304
 _MULTIBOUNCE_DISCOVERY_RAYS = 262_144
 
 
-def _face_sequence_count(
-    face_count: int, depth: int, *, adjacent_distinct: bool
-) -> int:
+def _face_sequence_count(face_count: int, depth: int, *, adjacent_distinct: bool) -> int:
     if adjacent_distinct and depth > 1:
         if face_count <= 1:
             return 0
@@ -45,13 +43,8 @@ def _face_sequence_count(
 
 
 def _face_sequence_chunks(
-    face_count: int,
-    depth: int,
-    *,
-    chunk_size: int,
-    reference: torch.Tensor,
-    face_ids: torch.Tensor | None = None,
-    adjacent_distinct: bool = False,
+    face_count: int, depth: int, *, chunk_size: int, reference: torch.Tensor,
+    face_ids: torch.Tensor | None = None, adjacent_distinct: bool = False,
 ) -> object:
     total = _face_sequence_count(face_count, depth, adjacent_distinct=adjacent_distinct)
     for start in range(0, total, chunk_size):
@@ -79,11 +72,7 @@ def _face_sequence_chunks(
 
 class TraceReflectionGroupChains(Protocol):
     def __call__(
-        self,
-        tx: torch.Tensor,
-        *,
-        face_group_id: torch.Tensor,
-        max_depth: int,
+        self, tx: torch.Tensor, *, face_group_id: torch.Tensor, max_depth: int,
     ) -> torch.Tensor: ...
 
 
@@ -126,10 +115,7 @@ class ReflectionMultibounceEpcRequest:
 
 
 def prepare_reflection_order1_plan(
-    *,
-    group_count: int,
-    representative_faces: torch.Tensor,
-    face_group_id: torch.Tensor,
+    *, group_count: int, representative_faces: torch.Tensor, face_group_id: torch.Tensor,
 ) -> ReflectionOrder1Plan:
     exhaustive = group_count <= _ORDER1_EXHAUSTIVE_GROUP_LIMIT
     base_sequences = (
@@ -155,13 +141,8 @@ def prepare_reflection_order1_plan(
 
 
 def iter_reflection_order1_epc_requests(
-    plan: ReflectionOrder1Plan,
-    *,
-    tx_positions: torch.Tensor,
-    rx_positions: torch.Tensor,
-    tri_a: torch.Tensor,
-    normals: torch.Tensor,
-    trace_group_chains: TraceReflectionGroupChains,
+    plan: ReflectionOrder1Plan, *, tx_positions: torch.Tensor, rx_positions: torch.Tensor,
+    tri_a: torch.Tensor, normals: torch.Tensor, trace_group_chains: TraceReflectionGroupChains,
 ) -> Iterator[ReflectionOrder1EpcRequest]:
     rx_count = int(rx_positions.shape[0])
     if plan.group_count <= 0 or rx_count <= 0:
@@ -203,12 +184,8 @@ def iter_reflection_order1_epc_requests(
 
 
 def prepare_reflection_multibounce_plan(
-    *,
-    group_count: int,
-    representative_faces: torch.Tensor,
-    face_group_id: torch.Tensor,
-    min_depth: int,
-    max_depth: int,
+    *, group_count: int, representative_faces: torch.Tensor, face_group_id: torch.Tensor,
+    min_depth: int, max_depth: int,
 ) -> ReflectionMultibouncePlan:
     exhaustive = all(
         _face_sequence_count(group_count, depth, adjacent_distinct=True)
@@ -229,13 +206,8 @@ def prepare_reflection_multibounce_plan(
 
 
 def iter_reflection_multibounce_epc_requests(
-    plan: ReflectionMultibouncePlan,
-    *,
-    tx_positions: torch.Tensor,
-    rx_positions: torch.Tensor,
-    sequence_reference: torch.Tensor,
-    tri_a: torch.Tensor,
-    normals: torch.Tensor,
+    plan: ReflectionMultibouncePlan, *, tx_positions: torch.Tensor, rx_positions: torch.Tensor,
+    sequence_reference: torch.Tensor, tri_a: torch.Tensor, normals: torch.Tensor,
     trace_group_chains: TraceReflectionGroupChains,
     record_candidate_count: RecordReflectionCandidateCount,
 ) -> Iterator[ReflectionMultibounceEpcRequest]:
@@ -373,13 +345,8 @@ def query_reflection_epc(query: ReflectionEpcQuery) -> ReflectionEpcGeometry:
 
 
 def _reflection_topology_order1(
-    scene: Scene,
-    compiled: object,
-    tx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    rx_positions: torch.Tensor,
-    *,
-    frequency_hz: float,
+    scene: Scene, compiled: object, tx_positions: torch.Tensor, tx_power: torch.Tensor,
+    rx_positions: torch.Tensor, *, frequency_hz: float,
 ) -> tuple[dict[str, torch.Tensor], int]:
     from witwin.channel.kernels import fields as field_kernels
 
@@ -468,7 +435,7 @@ def _reflection_topology_order1(
         ), launch_count
 
     def trace_group_chains(
-        tx: torch.Tensor, *, face_group_id: torch.Tensor, max_depth: int
+        tx: torch.Tensor, *, face_group_id: torch.Tensor, max_depth: int,
     ) -> torch.Tensor:
         nonlocal launch_count
         chains = _discovered_group_chains(
@@ -572,11 +539,7 @@ def _reflection_topology_order1(
 
 
 def _discovered_group_chains(
-    rayd: object,
-    tx: torch.Tensor,
-    *,
-    face_group_id: torch.Tensor,
-    max_depth: int,
+    rayd: object, tx: torch.Tensor, *, face_group_id: torch.Tensor, max_depth: int,
     ray_count: int = _MULTIBOUNCE_DISCOVERY_RAYS,
 ) -> torch.Tensor:
     """Trace specular chains from the transmitter and map them to plane groups.
@@ -607,15 +570,8 @@ def _discovered_group_chains(
 
 
 def _reflection_topology_multibounce(
-    scene: Scene,
-    compiled: object,
-    tx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    rx_positions: torch.Tensor,
-    *,
-    frequency_hz: float,
-    min_depth: int,
-    max_depth: int,
+    scene: Scene, compiled: object, tx_positions: torch.Tensor, tx_power: torch.Tensor,
+    rx_positions: torch.Tensor, *, frequency_hz: float, min_depth: int, max_depth: int,
     max_paths: int | None,
 ) -> tuple[dict[str, torch.Tensor], int, int]:
     from witwin.channel.kernels import fields as field_kernels
@@ -713,7 +669,7 @@ def _reflection_topology_multibounce(
     theoretical_candidate_count = 0
 
     def trace_group_chains(
-        tx: torch.Tensor, *, face_group_id: torch.Tensor, max_depth: int
+        tx: torch.Tensor, *, face_group_id: torch.Tensor, max_depth: int,
     ) -> torch.Tensor:
         nonlocal launch_count
         chains = _discovered_group_chains(

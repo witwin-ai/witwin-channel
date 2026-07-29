@@ -78,12 +78,7 @@ def _wall_mesh() -> Mesh:
     )
 
 
-def _wall_structure(
-    mesh: Mesh,
-    material: PhysicalMaterial,
-    *,
-    assignment_id: int = 1,
-) -> Structure:
+def _wall_structure(mesh: Mesh, material: PhysicalMaterial, *, assignment_id: int = 1) -> Structure:
     return Structure(
         geometry=mesh,
         material=material,
@@ -95,9 +90,7 @@ def _wall_structure(
 
 
 def _wall_world(
-    *,
-    eps_r: float = CONCRETE["eps_r"],
-    assignment_id: int = 1,
+    *, eps_r: float = CONCRETE["eps_r"], assignment_id: int = 1,
 ) -> tuple[Scene, Mesh, PhysicalMaterial]:
     mesh = _wall_mesh()
     material = PhysicalMaterial(

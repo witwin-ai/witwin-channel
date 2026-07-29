@@ -32,9 +32,7 @@ PEC_EFFECTIVE_SIGMA_E = 1.0e9
 
 
 def face_material_tensors(
-    scene_or_compiled: "Scene | CompiledScene",
-    *,
-    device: torch.device,
+    scene_or_compiled: "Scene | CompiledScene", *, device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     # Imported here because ``scene`` reaches materials through the scattering
     # tables; a module-level edge back into the compiled scene would close that
@@ -73,9 +71,7 @@ def face_material_tensors(
 
 
 def face_material_thickness(
-    scene_or_compiled: "Scene | CompiledScene",
-    *,
-    device: torch.device,
+    scene_or_compiled: "Scene | CompiledScene", *, device: torch.device,
 ) -> torch.Tensor:
     """Expand ITU slab thickness to the global face layout."""
 
@@ -93,7 +89,7 @@ def face_material_thickness(
 
 
 def face_material_field_bundle(
-    scene_or_compiled: "Scene | CompiledScene", *, device: torch.device
+    scene_or_compiled: "Scene | CompiledScene", *, device: torch.device,
 ) -> dict[str, torch.Tensor]:
     """Return the complete per-face finite-slab field operator inputs."""
 
@@ -242,10 +238,7 @@ def _stack_rt_one_pol(y_out, y_layers, deltas, y_back):
 
 
 def layer_stack_rt(
-    layers: Sequence[tuple],
-    cos_theta_i,
-    frequency_hz,
-    outside: _ProductionMedium | None = None,
+    layers: Sequence[tuple], cos_theta_i, frequency_hz, outside: _ProductionMedium | None = None,
     backing: _ProductionMedium | None = None,
 ) -> _ProductionRTCoefficients:
     """Production NumPy precompute for a planar material layer stack."""
@@ -295,7 +288,7 @@ def layer_stack_rt(
 
 
 def _require_frequency_ad_constant_materials(
-    scene: Scene, compiled: object, *, ad_mode: str
+    scene: Scene, compiled: object, *, ad_mode: str,
 ) -> None:
     """Explicit-failure contract for frequency AD over dispersive materials.
 

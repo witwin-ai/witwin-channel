@@ -61,14 +61,8 @@ def _ez_like(reference: torch.Tensor) -> torch.Tensor:
 
 
 def _reflect_complex3(
-    field: torch.Tensor,
-    incident_dir: torch.Tensor,
-    normal: torch.Tensor,
-    eps_r: torch.Tensor,
-    sigma_e: torch.Tensor,
-    mu_r: torch.Tensor,
-    gain: torch.Tensor,
-    thickness: torch.Tensor,
+    field: torch.Tensor, incident_dir: torch.Tensor, normal: torch.Tensor, eps_r: torch.Tensor,
+    sigma_e: torch.Tensor, mu_r: torch.Tensor, gain: torch.Tensor, thickness: torch.Tensor,
     frequency: torch.Tensor,
 ) -> torch.Tensor:
     """One specular reflection Jones update (``transport::reflect_complex3``).
@@ -108,12 +102,8 @@ def _reflect_complex3(
 
 
 def effective_power_reflectance(
-    incident_dir: torch.Tensor,
-    normal: torch.Tensor,
-    eps_r: torch.Tensor,
-    sigma_e: torch.Tensor,
-    mu_r: torch.Tensor,
-    frequency: torch.Tensor,
+    incident_dir: torch.Tensor, normal: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor,
+    mu_r: torch.Tensor, frequency: torch.Tensor,
 ) -> torch.Tensor:
     """``effective_power_reflectance`` (bdpt_subpaths.cu): interface-only reflectance.
 
@@ -162,16 +152,9 @@ def effective_power_reflectance(
 
 
 def reflected_subpath_advance_reference(
-    field_in: torch.Tensor,
-    throughput_in: torch.Tensor,
-    incident_dir: torch.Tensor,
-    normal: torch.Tensor,
-    eps_r: torch.Tensor,
-    sigma_e: torch.Tensor,
-    mu_r: torch.Tensor,
-    gain: torch.Tensor,
-    thickness: torch.Tensor,
-    frequency: torch.Tensor,
+    field_in: torch.Tensor, throughput_in: torch.Tensor, incident_dir: torch.Tensor,
+    normal: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor,
+    gain: torch.Tensor, thickness: torch.Tensor, frequency: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Reflected-subpath derivatives reflected-subpath advance (field + throughput proxy).
 
@@ -198,7 +181,7 @@ def reflected_subpath_advance_reference(
 
 
 def _sp_proxy_weights(
-    incident: torch.Tensor, normal_in: torch.Tensor
+    incident: torch.Tensor, normal_in: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """``sp_proxy_weights`` (bdpt_subpaths.cu): x-hat power weights onto the s/p basis."""
 
@@ -219,10 +202,7 @@ def _sp_proxy_weights(
 
 
 def _layer_phase_index(
-    eps_r: torch.Tensor,
-    sigma_e: torch.Tensor,
-    mu_r: torch.Tensor,
-    omega: torch.Tensor,
+    eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor, omega: torch.Tensor,
     k0: torch.Tensor,
 ) -> torch.Tensor:
     """Re(k_layer)/k0 from the passive medium (``em::make_medium`` phase index)."""
@@ -237,15 +217,9 @@ def _layer_phase_index(
 
 
 def transmitted_subpath_advance_reference(
-    field_in: torch.Tensor,
-    throughput_in: torch.Tensor,
-    incident_dir: torch.Tensor,
-    normal: torch.Tensor,
-    layer_thickness_m: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    frequency: torch.Tensor,
+    field_in: torch.Tensor, throughput_in: torch.Tensor, incident_dir: torch.Tensor,
+    normal: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, frequency: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Transmitted-subpath derivatives transmitted-subpath advance (single wall, per-row layers).
 
@@ -352,14 +326,9 @@ def transmitted_subpath_advance_reference(
 
 
 def endpoint_connection_contribution_reference(
-    light_field: torch.Tensor,
-    source_power: torch.Tensor,
-    light_origin: torch.Tensor,
-    sensor_origin: torch.Tensor,
-    receiver_polarization: torch.Tensor,
-    light_path_length: torch.Tensor,
-    frequency: torch.Tensor,
-    samples_per_tx: int,
+    light_field: torch.Tensor, source_power: torch.Tensor, light_origin: torch.Tensor,
+    sensor_origin: torch.Tensor, receiver_polarization: torch.Tensor,
+    light_path_length: torch.Tensor, frequency: torch.Tensor, samples_per_tx: int,
 ) -> torch.Tensor:
     """Endpoint-connection derivatives per-row endpoint contribution.
 
@@ -394,12 +363,8 @@ def endpoint_connection_contribution_reference(
 
 
 def _bin_index(
-    tx_id: torch.Tensor,
-    rx_id: torch.Tensor,
-    component_id: torch.Tensor,
-    valid: torch.Tensor,
-    tx_count: int,
-    rx_count: int,
+    tx_id: torch.Tensor, rx_id: torch.Tensor, component_id: torch.Tensor, valid: torch.Tensor,
+    tx_count: int, rx_count: int,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Return the flat (tx*rx) bin index and the accumulable-row mask (frozen)."""
 
@@ -419,14 +384,8 @@ def _bin_index(
 
 
 def accumulate_power_reference(
-    contribution: torch.Tensor,
-    mis_weight: torch.Tensor,
-    tx_id: torch.Tensor,
-    rx_id: torch.Tensor,
-    component_id: torch.Tensor,
-    valid: torch.Tensor,
-    tx_count: int,
-    rx_count: int,
+    contribution: torch.Tensor, mis_weight: torch.Tensor, tx_id: torch.Tensor, rx_id: torch.Tensor,
+    component_id: torch.Tensor, valid: torch.Tensor, tx_count: int, rx_count: int,
 ) -> dict[str, torch.Tensor]:
     """Connection-accumulation derivatives power-domain accumulate. Live leaf: ``contribution``.
 
@@ -456,14 +415,8 @@ def accumulate_power_reference(
 
 
 def accumulate_coherent_reference(
-    coeff_real: torch.Tensor,
-    coeff_imag: torch.Tensor,
-    tx_id: torch.Tensor,
-    rx_id: torch.Tensor,
-    component_id: torch.Tensor,
-    valid: torch.Tensor,
-    tx_count: int,
-    rx_count: int,
+    coeff_real: torch.Tensor, coeff_imag: torch.Tensor, tx_id: torch.Tensor, rx_id: torch.Tensor,
+    component_id: torch.Tensor, valid: torch.Tensor, tx_count: int, rx_count: int,
 ) -> dict[str, torch.Tensor]:
     """Connection-accumulation derivatives coherent-domain accumulate. Live leaves: coeff_real/imag.
 
@@ -499,11 +452,8 @@ def accumulate_coherent_reference(
 
 
 def finalize_components_reference(
-    los: torch.Tensor,
-    reflection: torch.Tensor,
-    diffraction: torch.Tensor,
-    transmission: torch.Tensor,
-    scattering: torch.Tensor,
+    los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor,
+    transmission: torch.Tensor, scattering: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Result-finalization derivatives finalize (shape-agnostic linear map).
 

@@ -93,7 +93,7 @@ _CASES = (
 
 @pytest.mark.parametrize(("name", "scene_factory", "components", "max_depth"), _CASES)
 def test_path_and_deterministic_share_complex_field_geometry_and_delay(
-    name, scene_factory, components, max_depth
+    name, scene_factory, components, max_depth,
 ):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for Phase B analytic acceptance")
@@ -228,7 +228,7 @@ def test_monte_carlo_los_common_power_is_finite_and_converged(solver, config_typ
     ),
 )
 def test_monte_carlo_supported_scenarios_are_finite_and_reference_bounded(
-    name, scene_factory, components, max_depth, solver, config_type, use_grid, samples
+    name, scene_factory, components, max_depth, solver, config_type, use_grid, samples,
 ):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for Phase B Monte Carlo acceptance")

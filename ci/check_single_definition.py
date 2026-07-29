@@ -262,18 +262,14 @@ class Violation:
     detail: str
 
 
-def definition_sites(
-    concept: Concept, facts: list[FunctionFacts]
-) -> list[FunctionFacts]:
+def definition_sites(concept: Concept, facts: list[FunctionFacts]) -> list[FunctionFacts]:
     return sorted(
         (fact for fact in facts if concept.signature.matches(fact)),
         key=lambda fact: (fact.module, fact.qualname),
     )
 
 
-def concept_violations(
-    concept: Concept, facts: list[FunctionFacts]
-) -> list[Violation]:
+def concept_violations(concept: Concept, facts: list[FunctionFacts]) -> list[Violation]:
     sites = definition_sites(concept, facts)
     # A recorded duplicate is a copy wherever it lives, including inside the
     # owner module, so it never counts towards the owner's definition budget.
@@ -328,7 +324,7 @@ def concept_violations(
 
 
 def find_violations(
-    package_root: Path, concepts: tuple[Concept, ...] = CONCEPTS
+    package_root: Path, concepts: tuple[Concept, ...] = CONCEPTS,
 ) -> list[Violation]:
     facts = package_facts(package_root)
     return [

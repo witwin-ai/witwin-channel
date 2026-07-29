@@ -50,9 +50,7 @@ def diffraction_edge_geometry(records: object) -> tuple[torch.Tensor, ...]:
 
 
 def cached_diffraction_edge_geometry(
-    rayd: RayDSceneResource,
-    *,
-    preserve_imported_edges: bool = False,
+    rayd: RayDSceneResource, *, preserve_imported_edges: bool = False,
 ) -> tuple[torch.Tensor, ...]:
     cache = rayd.runtime_cache
     cache_key = (
@@ -91,14 +89,12 @@ class ReceiverLayout:
         raise ValueError(f"receiver layout kind is not accepted: {self.kind}")
 
 
-def transmitter_tensors(
-    scene: Scene, *, device: torch.device
-) -> tuple[torch.Tensor, torch.Tensor]:
+def transmitter_tensors(scene: Scene, *, device: torch.device) -> tuple[torch.Tensor, torch.Tensor]:
     return _native_transmitter_positions(scene, device=device)
 
 
 def receiver_positions_and_layout(
-    scene: Scene, *, device: torch.device
+    scene: Scene, *, device: torch.device,
 ) -> tuple[torch.Tensor, ReceiverLayout]:
     if not scene.receivers:
         return torch.empty((0, 3), device=device, dtype=torch.float32), ReceiverLayout(
@@ -122,7 +118,7 @@ _PLANE_GROUP_QUANTIZATION = 1.0e-4
 
 
 def _reflect_points(
-    points: torch.Tensor, plane_points: torch.Tensor, normals: torch.Tensor
+    points: torch.Tensor, plane_points: torch.Tensor, normals: torch.Tensor,
 ) -> torch.Tensor:
     return geometry_kernels.deterministic_reflect_points(
         points.contiguous(), plane_points.contiguous(), normals.contiguous()
@@ -130,10 +126,7 @@ def _reflect_points(
 
 
 def _coplanar_face_groups(
-    tri_a: torch.Tensor,
-    normals: torch.Tensor,
-    surface_ids: torch.Tensor,
-    *,
+    tri_a: torch.Tensor, normals: torch.Tensor, surface_ids: torch.Tensor, *,
     quantization: float = _PLANE_GROUP_QUANTIZATION,
 ) -> dict[str, torch.Tensor | int]:
     if tri_a.ndim != 2 or tri_a.shape[-1] != 3:
@@ -152,10 +145,7 @@ def _coplanar_face_groups(
 
 
 def _cached_coplanar_face_groups(
-    rayd: object,
-    tri_a: torch.Tensor,
-    normals: torch.Tensor,
-    surface_ids: torch.Tensor,
+    rayd: object, tri_a: torch.Tensor, normals: torch.Tensor, surface_ids: torch.Tensor,
 ) -> dict[str, torch.Tensor | int]:
     """Coplanar face groups are geometry-only; cache them per RayD scene so
  the union-find does not rerun for every component of every solve."""
@@ -208,7 +198,7 @@ def _vertices_participate_in_ad(scene: Scene) -> bool:
 
 
 def _opposite_vertex_ids(
-    faces: torch.Tensor, v0_ids: torch.Tensor, v1_ids: torch.Tensor
+    faces: torch.Tensor, v0_ids: torch.Tensor, v1_ids: torch.Tensor,
 ) -> torch.Tensor:
     """Per-row id of the triangle vertex opposite the (v0, v1) edge.
 
@@ -222,12 +212,8 @@ def _opposite_vertex_ids(
 
 
 def reflection_epc_paths(
-    compiled: object,
-    vertices: torch.Tensor,
-    source: torch.Tensor,
-    target: torch.Tensor,
-    face_id: torch.Tensor,
-    depth: int,
+    compiled: object, vertices: torch.Tensor, source: torch.Tensor, target: torch.Tensor,
+    face_id: torch.Tensor, depth: int,
 ) -> dict[str, torch.Tensor]:
     """Frozen-winner reflection EPC re-solve, published with its validity.
 
@@ -279,12 +265,8 @@ def reflection_epc_paths(
 
 
 def _reflection_geometry_ad(
-    compiled: object,
-    vertices: torch.Tensor,
-    source: torch.Tensor,
-    target: torch.Tensor,
-    face_id: torch.Tensor,
-    depth: int,
+    compiled: object, vertices: torch.Tensor, source: torch.Tensor, target: torch.Tensor,
+    face_id: torch.Tensor, depth: int,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """All-or-nothing fixed-winner reflection hit geometry.
 
@@ -355,13 +337,8 @@ def occluder_boxes(compiled: object) -> tuple[torch.Tensor, torch.Tensor] | None
 
 
 def los_clearance_factor(
-    source: torch.Tensor,
-    target: torch.Tensor,
-    box_min: torch.Tensor,
-    box_max: torch.Tensor,
-    *,
-    frequency_hz: float,
-    width: float,
+    source: torch.Tensor, target: torch.Tensor, box_min: torch.Tensor, box_max: torch.Tensor, *,
+    frequency_hz: float, width: float,
 ) -> torch.Tensor:
     """Native per-pair ISB membership factor tau in [0, 1] (the boundary taper).
 
@@ -403,11 +380,8 @@ def los_clearance_factor(
 
 
 def apply_los_taper(
-    field_vector: torch.Tensor,
-    coefficient: torch.Tensor,
-    path_field: torch.Tensor,
-    path_gain: torch.Tensor,
-    tau: torch.Tensor,
+    field_vector: torch.Tensor, coefficient: torch.Tensor, path_field: torch.Tensor,
+    path_gain: torch.Tensor, tau: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Native scale of a LoS field bundle by the per-row factor tau (the boundary taper).
 
@@ -456,9 +430,7 @@ def run_visibility_query(query: VisibilityQuery) -> VisibilityResult:
     )
 
 
-def _rayd_visibility_mask(
-    rayd: object, start: torch.Tensor, end: torch.Tensor
-) -> torch.Tensor:
+def _rayd_visibility_mask(rayd: object, start: torch.Tensor, end: torch.Tensor) -> torch.Tensor:
     if start.shape[0] == 0:
         return torch.empty((0,), device=start.device, dtype=torch.bool)
     return geometry_kernels.rayd_visibility_forward(
@@ -467,11 +439,7 @@ def _rayd_visibility_mask(
 
 
 def _los_visibility_mask(
-    rayd: object,
-    tx_for_path: torch.Tensor,
-    rx_for_path: torch.Tensor,
-    *,
-    has_structures: bool,
+    rayd: object, tx_for_path: torch.Tensor, rx_for_path: torch.Tensor, *, has_structures: bool,
 ) -> torch.Tensor | None:
     if not has_structures or tx_for_path.shape[0] == 0:
         return None

@@ -56,10 +56,8 @@ def _vec(values: tuple[float, float, float]) -> torch.Tensor:
 
 
 def _scene(
-    tx: torch.Tensor | None = None,
-    rx: torch.Tensor | None = None,
-    vertices_a: torch.Tensor | None = None,
-    vertices_b: torch.Tensor | None = None,
+    tx: torch.Tensor | None = None, rx: torch.Tensor | None = None,
+    vertices_a: torch.Tensor | None = None, vertices_b: torch.Tensor | None = None,
 ) -> Scene:
     common_device = (
         vertices_a.device
@@ -118,10 +116,7 @@ def _scene(
 
 
 def _solve(
-    scene: Scene,
-    solver: str,
-    ad_mode: str,
-    *,
+    scene: Scene, solver: str, ad_mode: str, *,
     reference_frequency_hz: float | torch.Tensor = _FREQUENCY_HZ,
 ):
     if solver == "path":

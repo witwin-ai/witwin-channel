@@ -75,9 +75,7 @@ def test_basic_metadata_reports_requested_and_effective_config():
 @pytest.mark.parametrize(
     "component", ["reflection", "diffraction", "transmission", "scattering"]
 )
-def test_montecarlo_configs_reject_zero_depth_scattering_before_solve(
-    config_type, component
-):
+def test_montecarlo_configs_reject_zero_depth_scattering_before_solve(config_type, component):
     with pytest.raises(RuntimeError, match="max_depth >= 1"):
         config_type(max_depth=0, components={component})
 

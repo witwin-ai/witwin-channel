@@ -20,7 +20,7 @@ def _sqrt_passive(z: torch.Tensor) -> torch.Tensor:
 
 
 def _stack_power_reflectance(
-    layers: torch.Tensor, cos_theta: torch.Tensor, frequency: torch.Tensor
+    layers: torch.Tensor, cos_theta: torch.Tensor, frequency: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """``(|r_te|^2, |r_tm|^2)`` for the vacuum|layers|vacuum stack (float64).
 
@@ -117,8 +117,7 @@ def _lobe_series(qx, qy, qn, sigma_h, lx, ly, n_terms: int) -> torch.Tensor:
 
 
 def _raw_lobe_grid(
-    layers, frequency, k0, sigma_h, lx, ly, n_terms,
-    inc_cos, inc_phi, out_cos, out_phi,
+    layers, frequency, k0, sigma_h, lx, ly, n_terms, inc_cos, inc_phi, out_cos, out_phi,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     sin_inc = torch.sqrt((1.0 - inc_cos**2).clamp_min(0.0))
     sin_out = torch.sqrt((1.0 - out_cos**2).clamp_min(0.0))
@@ -155,8 +154,7 @@ def _raw_lobe_grid(
 
 
 def _sinkhorn_balance(
-    s: torch.Tensor, r_diff: torch.Tensor, cos_o: torch.Tensor,
-    *, isotropic: bool, iterations: int,
+    s: torch.Tensor, r_diff: torch.Tensor, cos_o: torch.Tensor, *, isotropic: bool, iterations: int,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Unrolled symmetric Sinkhorn balance (differentiable, mirrors tables.py).
 
@@ -198,19 +196,9 @@ def _sinkhorn_balance(
 
 
 def torch_build_table(
-    sigma_h: torch.Tensor,
-    lx: torch.Tensor,
-    ly: torch.Tensor,
-    layers: torch.Tensor,
-    frequency: torch.Tensor,
-    cos_i: torch.Tensor,
-    phi_i: torch.Tensor,
-    cos_o: torch.Tensor,
-    phi_o: torch.Tensor,
-    *,
-    n_terms: int,
-    isotropic: bool,
-    sinkhorn_iters: int = 256,
+    sigma_h: torch.Tensor, lx: torch.Tensor, ly: torch.Tensor, layers: torch.Tensor,
+    frequency: torch.Tensor, cos_i: torch.Tensor, phi_i: torch.Tensor, cos_o: torch.Tensor,
+    phi_o: torch.Tensor, *, n_terms: int, isotropic: bool, sinkhorn_iters: int = 256,
 ) -> dict[str, torch.Tensor]:
     """Differentiable float64 Kirchhoff table build (oracle).
 

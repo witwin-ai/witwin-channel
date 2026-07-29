@@ -41,16 +41,8 @@ _FD_STEP = 5.0e-4
 
 
 def _ensemble_case(
-    *,
-    device: str = "cuda",
-    seed: int,
-    rows: int = 24,
-    samples: int = 10,
-    num_rx: int = 4,
-    nti: int = 8,
-    nto: int = 8,
-    npo: int = 8,
-    coef: float = 0.35,
+    *, device: str = "cuda", seed: int, rows: int = 24, samples: int = 10, num_rx: int = 4,
+    nti: int = 8, nto: int = 8, npo: int = 8, coef: float = 0.35,
 ):
     """Small single-isotropic-material ensemble case (all rows above horizon)."""
 
@@ -709,15 +701,8 @@ def test_ensemble_ad_mode_none_has_no_autograd_function():
 
 
 def _patch_case(
-    *,
-    device: str = "cuda",
-    seed: int,
-    rows: int = 6,
-    patches: int = 8,
-    grid: int = 16,
-    grazing: bool = False,
-    zero_height: bool = False,
-    frequency_hz: float = 3.0e9,
+    *, device: str = "cuda", seed: int, rows: int = 6, patches: int = 8, grid: int = 16,
+    grazing: bool = False, zero_height: bool = False, frequency_hz: float = 3.0e9,
 ):
     """Small phase-screen patch case on the z = 0 plane (normal +z)."""
 

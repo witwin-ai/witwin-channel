@@ -21,18 +21,9 @@ from witwin.channel.runtime import (
 # accumulation
 # ---------------------------------------------------------------------------
 def deterministic_accumulate_flat(
-    valid: torch.Tensor,
-    tx_id: torch.Tensor,
-    rx_id: torch.Tensor,
-    component_id: torch.Tensor,
-    path_gain: torch.Tensor,
-    field_real: torch.Tensor,
-    field_imag: torch.Tensor,
-    *,
-    num_tx: int,
-    num_rx: int,
-    coherent: bool,
-    scattering_combine_domain: int = 0,
+    valid: torch.Tensor, tx_id: torch.Tensor, rx_id: torch.Tensor, component_id: torch.Tensor,
+    path_gain: torch.Tensor, field_real: torch.Tensor, field_imag: torch.Tensor, *, num_tx: int,
+    num_rx: int, coherent: bool, scattering_combine_domain: int = 0,
 ) -> dict[str, torch.Tensor]:
     if int(scattering_combine_domain) not in (0, 1):
         raise ValueError("scattering_combine_domain must be 0 (power) or 1 (coherent)")
@@ -122,25 +113,14 @@ _DETERMINISTIC_ACCUM_FIELDS = (
 
 
 def deterministic_accumulate_flat_backward(
-    valid: torch.Tensor,
-    tx_id: torch.Tensor,
-    rx_id: torch.Tensor,
-    component_id: torch.Tensor,
-    component_field_real: torch.Tensor,
-    component_field_imag: torch.Tensor,
-    field_total_real: torch.Tensor,
-    field_total_imag: torch.Tensor,
-    power_total: torch.Tensor,
-    *,
-    grad_power_total: torch.Tensor | None = None,
-    grad_field_total_real: torch.Tensor | None = None,
+    valid: torch.Tensor, tx_id: torch.Tensor, rx_id: torch.Tensor, component_id: torch.Tensor,
+    component_field_real: torch.Tensor, component_field_imag: torch.Tensor,
+    field_total_real: torch.Tensor, field_total_imag: torch.Tensor, power_total: torch.Tensor, *,
+    grad_power_total: torch.Tensor | None = None, grad_field_total_real: torch.Tensor | None = None,
     grad_field_total_imag: torch.Tensor | None = None,
     grad_component_power: torch.Tensor | None = None,
     grad_component_field_real: torch.Tensor | None = None,
-    grad_component_field_imag: torch.Tensor | None = None,
-    num_tx: int,
-    num_rx: int,
-    coherent: bool,
+    grad_component_field_imag: torch.Tensor | None = None, num_tx: int, num_rx: int, coherent: bool,
     scattering_combine_domain: int = 0,
 ) -> dict[str, torch.Tensor]:
     out = _required_native_op("deterministic_accumulate_flat_backward")(
@@ -174,21 +154,11 @@ def deterministic_accumulate_flat_backward(
 
 
 def deterministic_accumulate_flat_jvp(
-    valid: torch.Tensor,
-    tx_id: torch.Tensor,
-    rx_id: torch.Tensor,
-    component_id: torch.Tensor,
-    component_field_real: torch.Tensor,
-    component_field_imag: torch.Tensor,
-    power_total: torch.Tensor,
-    *,
-    tangent_path_gain: torch.Tensor | None = None,
-    tangent_field_real: torch.Tensor | None = None,
-    tangent_field_imag: torch.Tensor | None = None,
-    num_tx: int,
-    num_rx: int,
-    coherent: bool,
-    scattering_combine_domain: int = 0,
+    valid: torch.Tensor, tx_id: torch.Tensor, rx_id: torch.Tensor, component_id: torch.Tensor,
+    component_field_real: torch.Tensor, component_field_imag: torch.Tensor,
+    power_total: torch.Tensor, *, tangent_path_gain: torch.Tensor | None = None,
+    tangent_field_real: torch.Tensor | None = None, tangent_field_imag: torch.Tensor | None = None,
+    num_tx: int, num_rx: int, coherent: bool, scattering_combine_domain: int = 0,
 ) -> dict[str, torch.Tensor]:
     out = _required_native_op("deterministic_accumulate_flat_jvp")(
         valid,
@@ -236,17 +206,8 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        valid,
-        tx_id,
-        rx_id,
-        component_id,
-        path_gain,
-        field_real,
-        field_imag,
-        num_tx,
-        num_rx,
-        coherent,
-        scattering_combine_domain,
+        valid, tx_id, rx_id, component_id, path_gain, field_real, field_imag, num_tx, num_rx,
+        coherent, scattering_combine_domain,
     ):
         op_name = (
             "deterministic_accumulate_flat_fwd64"
@@ -303,13 +264,8 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
     @staticmethod
     @_ad_first_order_only
     def backward(
-        ctx,
-        grad_power_total,
-        grad_field_total_real,
-        grad_field_total_imag,
-        grad_component_power,
-        grad_component_field_real,
-        grad_component_field_imag,
+        ctx, grad_power_total, grad_field_total_real, grad_field_total_imag, grad_component_power,
+        grad_component_field_real, grad_component_field_imag,
     ):
         none_grads = (None,) * 11
         need_gain = bool(ctx.needs_input_grad[4])
@@ -372,18 +328,8 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx,
-        _t_valid,
-        _t_tx_id,
-        _t_rx_id,
-        _t_component_id,
-        t_path_gain,
-        t_field_real,
-        t_field_imag,
-        _t_num_tx,
-        _t_num_rx,
-        _t_coherent,
-        _t_scattering_combine_domain,
+        ctx, _t_valid, _t_tx_id, _t_rx_id, _t_component_id, t_path_gain, t_field_real, t_field_imag,
+        _t_num_tx, _t_num_rx, _t_coherent, _t_scattering_combine_domain,
     ):
         tangent_gain = _ad_native_tangent_or_none(t_path_gain)
         tangent_real = _ad_native_tangent_or_none(t_field_real)
@@ -422,18 +368,9 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
 
 
 def deterministic_accumulate_flat_ad(
-    valid: torch.Tensor,
-    tx_id: torch.Tensor,
-    rx_id: torch.Tensor,
-    component_id: torch.Tensor,
-    path_gain: torch.Tensor,
-    field_real: torch.Tensor,
-    field_imag: torch.Tensor,
-    *,
-    num_tx: int,
-    num_rx: int,
-    coherent: bool,
-    scattering_combine_domain: int = 0,
+    valid: torch.Tensor, tx_id: torch.Tensor, rx_id: torch.Tensor, component_id: torch.Tensor,
+    path_gain: torch.Tensor, field_real: torch.Tensor, field_imag: torch.Tensor, *, num_tx: int,
+    num_rx: int, coherent: bool, scattering_combine_domain: int = 0,
 ) -> dict[str, torch.Tensor]:
     """Differentiable:func:`deterministic_accumulate_flat` (the AD contract)."""
 

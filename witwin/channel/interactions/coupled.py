@@ -92,12 +92,8 @@ class CoupledDdCandidateRequest:
 
 
 def prepare_coupled_candidate_plan(
-    *,
-    tx_count: int,
-    rx_count: int,
-    representative_faces: torch.Tensor,
-    selected_edges: torch.Tensor,
-    candidate_limit: int,
+    *, tx_count: int, rx_count: int, representative_faces: torch.Tensor,
+    selected_edges: torch.Tensor, candidate_limit: int,
     chunk_size: int = _COUPLED_CANDIDATE_CHUNK_SIZE,
     dd_chunk_size: int = _COUPLED_DD_CANDIDATE_CHUNK_SIZE,
 ) -> CoupledCandidatePlan:
@@ -140,9 +136,7 @@ def prepare_coupled_candidate_plan(
 
 
 def iter_coupled_candidate_requests(
-    plan: CoupledCandidatePlan,
-    *,
-    device: torch.device,
+    plan: CoupledCandidatePlan, *, device: torch.device,
 ) -> Iterator[CoupledCandidateRequest]:
     for start in range(0, plan.base_candidate_count, plan.chunk_size):
         end = min(start + plan.chunk_size, plan.base_candidate_count)
@@ -176,9 +170,7 @@ def iter_coupled_candidate_requests(
 
 
 def iter_coupled_dd_candidate_requests(
-    plan: CoupledCandidatePlan,
-    *,
-    device: torch.device,
+    plan: CoupledCandidatePlan, *, device: torch.device,
 ) -> Iterator[CoupledDdCandidateRequest]:
     """Stream cid-7 ordered edge-pair candidates (e1 != e2 by index).
 
@@ -399,10 +391,7 @@ class _CoupledTopologyContext:
 
 
 def _prepare_coupled_topology_context(
-    scene: Scene,
-    compiled: object,
-    tx_positions: torch.Tensor,
-    rx_positions: torch.Tensor,
+    scene: Scene, compiled: object, tx_positions: torch.Tensor, rx_positions: torch.Tensor,
 ) -> _CoupledTopologyContext | None:
     """Build the receiver-independent coupled context, or ``None`` when empty.
 
@@ -496,10 +485,7 @@ def _prepare_coupled_topology_context(
 
 
 def _coupled_topology_rx_block(
-    context: _CoupledTopologyContext,
-    tx_positions: torch.Tensor,
-    rx_positions: torch.Tensor,
-    *,
+    context: _CoupledTopologyContext, tx_positions: torch.Tensor, rx_positions: torch.Tensor, *,
     candidate_limit: int,
 ) -> tuple[dict[str, torch.Tensor], int, int]:
     """Discover coupled rows for one receiver slice against a prepared context.
@@ -714,11 +700,7 @@ def _coupled_topology_rx_block(
 
 
 def _coupled_reflection_diffraction_topology_order2(
-    scene: Scene,
-    compiled: object,
-    tx_positions: torch.Tensor,
-    rx_positions: torch.Tensor,
-    *,
+    scene: Scene, compiled: object, tx_positions: torch.Tensor, rx_positions: torch.Tensor, *,
     candidate_limit: int,
 ) -> tuple[dict[str, torch.Tensor], int, int]:
     """Construct bounded 1R+1D and reciprocal 1D+1R geometry.
@@ -745,13 +727,8 @@ def _coupled_reflection_diffraction_topology_order2(
 
 
 def coupled_reflection_diffraction_topology(
-    scene: Scene,
-    compiled: object,
-    tx_positions: torch.Tensor,
-    rx_positions: torch.Tensor,
-    *,
-    candidate_limit: int,
-    rx_streamed: bool,
+    scene: Scene, compiled: object, tx_positions: torch.Tensor, rx_positions: torch.Tensor, *,
+    candidate_limit: int, rx_streamed: bool,
 ) -> tuple[dict[str, torch.Tensor], int, int]:
     """Dispatch coupled discovery: receiver-streamed grid vs single-shot.
 
@@ -770,11 +747,7 @@ def coupled_reflection_diffraction_topology(
 
 
 def _coupled_reflection_diffraction_topology_rx_streamed(
-    scene: Scene,
-    compiled: object,
-    tx_positions: torch.Tensor,
-    rx_positions: torch.Tensor,
-    *,
+    scene: Scene, compiled: object, tx_positions: torch.Tensor, rx_positions: torch.Tensor, *,
     candidate_limit: int,
 ) -> tuple[dict[str, torch.Tensor], int, int]:
     """Stream coupled discovery over receiver blocks for the grid solver.

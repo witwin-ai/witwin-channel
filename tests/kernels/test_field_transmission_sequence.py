@@ -44,15 +44,9 @@ def _csr(materials: list[list[tuple[float, float, float, float]]]) -> dict[str, 
 
 
 def _transmission(
-    source: list[float],
-    target: list[float],
-    normal: list[float],
-    hit: list[float],
-    polarization: list[float],
-    materials: list[list[tuple[float, float, float, float]]],
-    frequency_hz: float,
-    material_index: int = 0,
-    path_valid: bool = True,
+    source: list[float], target: list[float], normal: list[float], hit: list[float],
+    polarization: list[float], materials: list[list[tuple[float, float, float, float]]],
+    frequency_hz: float, material_index: int = 0, path_valid: bool = True,
 ) -> dict[str, torch.Tensor]:
     return field_kernels.field_transmission_sequence(
         torch.tensor([path_valid], device="cuda", dtype=torch.bool),
@@ -88,10 +82,7 @@ def test_invalid_path_short_circuits_poisoned_payload():
 
 
 def _free_space(
-    source: list[float],
-    target: list[float],
-    polarization: list[float],
-    frequency_hz: float,
+    source: list[float], target: list[float], polarization: list[float], frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
     return field_kernels.field_free_space(
         torch.tensor([source], device="cuda", dtype=torch.float32),

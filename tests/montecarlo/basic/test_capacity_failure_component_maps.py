@@ -177,9 +177,7 @@ def test_component_map_sanitizer_zero_rows_preserve_family_shapes() -> None:
 
 
 @pytest.mark.parametrize("failed", [False, True])
-def test_component_map_sanitizer_noncontiguous_vjp_jvp_are_exact(
-    failed: bool,
-) -> None:
+def test_component_map_sanitizer_noncontiguous_vjp_jvp_are_exact(failed: bool) -> None:
     values = _maps(requires_grad=True)
     state = create_capacity_failure_state(values[0])
     if failed:
@@ -253,8 +251,7 @@ def test_component_map_sanitizer_forwards_exact_failure_storage_once(
     ),
 )
 def test_component_map_sanitizer_family_has_no_fallback(
-    missing_symbol: str,
-    monkeypatch: pytest.MonkeyPatch,
+    missing_symbol: str, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     original = capacity_kernels._required_native_op
 

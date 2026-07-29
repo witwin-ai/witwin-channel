@@ -14,7 +14,7 @@ from witwin.channel.scene.resources import eval_bsdf
 
 
 def _sp_basis(
-    n: torch.Tensor, d: torch.Tensor, backup_axis: torch.Tensor
+    n: torch.Tensor, d: torch.Tensor, backup_axis: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     s = torch.cross(n, d, dim=-1)
     degenerate = torch.linalg.vector_norm(s, dim=-1, keepdim=True) < 1.0e-6
@@ -24,25 +24,11 @@ def _sp_basis(
 
 
 def kirchhoff_ensemble_rows(
-    points: torch.Tensor,
-    n_o: torch.Tensor,
-    t1r: torch.Tensor,
-    t2r: torch.Tensor,
-    wi_local: torch.Tensor,
-    cos_i: torch.Tensor,
-    r1: torch.Tensor,
-    a_te2: torch.Tensor,
-    a_tm2: torch.Tensor,
-    weights: torch.Tensor,
-    material_id: torch.Tensor,
-    backup_axis: torch.Tensor,
-    rx_positions: torch.Tensor,
-    rx_pol: torch.Tensor,
-    rc: torch.Tensor,
-    sc: torch.Tensor,
-    tables: dict[int, object],
-    coef: float,
-    threshold: float,
+    points: torch.Tensor, n_o: torch.Tensor, t1r: torch.Tensor, t2r: torch.Tensor,
+    wi_local: torch.Tensor, cos_i: torch.Tensor, r1: torch.Tensor, a_te2: torch.Tensor,
+    a_tm2: torch.Tensor, weights: torch.Tensor, material_id: torch.Tensor,
+    backup_axis: torch.Tensor, rx_positions: torch.Tensor, rx_pol: torch.Tensor, rc: torch.Tensor,
+    sc: torch.Tensor, tables: dict[int, object], coef: float, threshold: float,
 ) -> dict[str, torch.Tensor]:
     """Per visibility-surviving row physics matching the removed Torch source."""
 
@@ -124,7 +110,7 @@ def _wrap_2pi(angle: torch.Tensor) -> torch.Tensor:
 
 
 def _axis_clamp_weights(
-    coord: torch.Tensor, n: int
+    coord: torch.Tensor, n: int,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Cell-centered non-periodic axis (centers ``(k+0.5)/n``) with edge clamp.
 
@@ -147,7 +133,7 @@ def _axis_clamp_weights(
 
 
 def _axis_periodic_weights(
-    phi: torch.Tensor, n: int
+    phi: torch.Tensor, n: int,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Cell-centered periodic axis over ``[0, 2*pi)`` (centers ``(k+0.5)*2*pi/n``).
 
@@ -163,10 +149,7 @@ def _axis_periodic_weights(
 
 
 def bsdf_table_interp(
-    wi_local: torch.Tensor,
-    wo_local: torch.Tensor,
-    f_te: torch.Tensor,
-    f_tm: torch.Tensor,
+    wi_local: torch.Tensor, wo_local: torch.Tensor, f_te: torch.Tensor, f_tm: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Differentiable multilinear Kirchhoff-table lookup (float64-capable).
 
@@ -213,25 +196,11 @@ def bsdf_table_interp(
 
 
 def kirchhoff_ensemble_gain_reference(
-    wo_rows: torch.Tensor,
-    r2_rows: torch.Tensor,
-    cos_o_rows: torch.Tensor,
-    n_o: torch.Tensor,
-    t1r: torch.Tensor,
-    t2r: torch.Tensor,
-    wi_local: torch.Tensor,
-    cos_i: torch.Tensor,
-    r1: torch.Tensor,
-    a_te2: torch.Tensor,
-    a_tm2: torch.Tensor,
-    weights: torch.Tensor,
-    backup_axis: torch.Tensor,
-    rx_pol: torch.Tensor,
-    rc_idx: torch.Tensor,
-    sc_idx: torch.Tensor,
-    f_te: torch.Tensor,
-    f_tm: torch.Tensor,
-    coef: torch.Tensor,
+    wo_rows: torch.Tensor, r2_rows: torch.Tensor, cos_o_rows: torch.Tensor, n_o: torch.Tensor,
+    t1r: torch.Tensor, t2r: torch.Tensor, wi_local: torch.Tensor, cos_i: torch.Tensor,
+    r1: torch.Tensor, a_te2: torch.Tensor, a_tm2: torch.Tensor, weights: torch.Tensor,
+    backup_axis: torch.Tensor, rx_pol: torch.Tensor, rc_idx: torch.Tensor, sc_idx: torch.Tensor,
+    f_te: torch.Tensor, f_tm: torch.Tensor, coef: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Differentiable re-derivation of scattering AD from *gathered* inputs.
 

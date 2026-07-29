@@ -65,11 +65,7 @@ def test_prepare_coupled_candidate_plan_freezes_counts_and_tensor_identity():
     ),
 )
 def test_candidate_guard_runs_during_planning_before_iteration(
-    monkeypatch,
-    tx_count,
-    rx_count,
-    candidate_limit,
-    expected_limit,
+    monkeypatch, tx_count, rx_count, candidate_limit, expected_limit,
 ):
     monkeypatch.setattr(
         coupled.torch,
@@ -171,9 +167,7 @@ def test_candidate_requests_are_lazy_chunked_and_rd_first(monkeypatch):
     ),
 )
 def test_zero_candidate_plan_yields_without_prefetch(
-    monkeypatch,
-    representative_faces,
-    selected_edges,
+    monkeypatch, representative_faces, selected_edges,
 ):
     monkeypatch.setattr(
         coupled.torch,

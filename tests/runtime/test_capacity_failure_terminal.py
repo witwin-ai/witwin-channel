@@ -40,9 +40,7 @@ def test_capacity_failure_terminal_zero_state_is_current_stream_noop() -> None:
     assert state.bits.tolist() == [0]
 
 
-def test_capacity_failure_terminal_requires_typed_state_before_dispatch(
-    monkeypatch,
-) -> None:
+def test_capacity_failure_terminal_requires_typed_state_before_dispatch(monkeypatch) -> None:
     monkeypatch.setattr(
         runtime,
         "required_symbol",
@@ -65,9 +63,7 @@ def test_capacity_failure_terminal_native_bridge_rejects_bad_metadata() -> None:
         native(torch.zeros(2, device="cuda", dtype=torch.int32))
 
 
-def test_capacity_failure_terminal_missing_symbol_has_no_fallback(
-    monkeypatch,
-) -> None:
+def test_capacity_failure_terminal_missing_symbol_has_no_fallback(monkeypatch) -> None:
     state = CapacityFailureState(
         torch.zeros(1, device="cuda", dtype=torch.int32)
     )

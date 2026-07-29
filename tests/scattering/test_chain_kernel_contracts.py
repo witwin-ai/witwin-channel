@@ -59,18 +59,8 @@ def _leg(generator, rows, depth, device, *, dmax=_DMAX):
 
 
 def _chain_ensemble_case(
-    *,
-    device: str = "cuda",
-    seed: int,
-    rows: int = 12,
-    d1: int = 1,
-    d2: int = 1,
-    nti: int = 6,
-    npi: int = 1,
-    nto: int = 6,
-    npo: int = 8,
-    coef: float = 3.0e-4,
-    frequency_hz: float = 3.0e9,
+    *, device: str = "cuda", seed: int, rows: int = 12, d1: int = 1, d2: int = 1, nti: int = 6,
+    npi: int = 1, nto: int = 6, npo: int = 8, coef: float = 3.0e-4, frequency_hz: float = 3.0e9,
 ):
     generator = torch.Generator(device=device).manual_seed(seed)
 
@@ -178,15 +168,8 @@ def _ensemble_forward(case, threshold=-1.0):
 
 
 def _chain_realization_case(
-    *,
-    device: str = "cuda",
-    seed: int,
-    rows: int = 6,
-    patches: int = 8,
-    grid: int = 16,
-    d1: int = 1,
-    d2: int = 1,
-    frequency_hz: float = 3.0e9,
+    *, device: str = "cuda", seed: int, rows: int = 6, patches: int = 8, grid: int = 16,
+    d1: int = 1, d2: int = 1, frequency_hz: float = 3.0e9,
 ):
     generator = torch.Generator(device=device).manual_seed(seed)
 

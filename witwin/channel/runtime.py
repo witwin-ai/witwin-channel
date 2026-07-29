@@ -84,13 +84,8 @@ def uses_cxx11_abi() -> bool:
 
 
 def validate_cuda_tensor(
-    name: str,
-    tensor: torch.Tensor,
-    *,
-    dtype: torch.dtype,
-    ndim: int,
-    trailing_shape: tuple[int, ...] = (),
-    require_contiguous: bool = True,
+    name: str, tensor: torch.Tensor, *, dtype: torch.dtype, ndim: int,
+    trailing_shape: tuple[int, ...] = (), require_contiguous: bool = True,
 ) -> torch.Tensor:
     if not isinstance(tensor, torch.Tensor):
         raise TypeError(f"{name} must be a torch.Tensor")
@@ -108,16 +103,9 @@ def validate_cuda_tensor(
 
 
 def require_tensor(
-    name: str,
-    value: object,
-    *,
-    dtype: torch.dtype,
-    shape: tuple[int, ...] | None = None,
-    ndim: int | None = None,
-    device: torch.device | None = None,
-    cuda: bool = False,
-    contiguous: bool = False,
-    dtype_error: type[Exception] = ValueError,
+    name: str, value: object, *, dtype: torch.dtype, shape: tuple[int, ...] | None = None,
+    ndim: int | None = None, device: torch.device | None = None, cuda: bool = False,
+    contiguous: bool = False, dtype_error: type[Exception] = ValueError,
 ) -> torch.Tensor:
     """Validate one declared tensor field of a typed row or capacity contract.
 
@@ -270,7 +258,7 @@ def _packaged_expected_fingerprint() -> str:
 
 
 def _require_value_type(
-    info: Mapping[str, object], name: str, expected_type: type[object]
+    info: Mapping[str, object], name: str, expected_type: type[object],
 ) -> object:
     if name not in info:
         raise ExtensionABIError(f"_channel.build_info() is missing {name!r}")
@@ -303,9 +291,7 @@ def _expected_fingerprint(info: Mapping[str, object]) -> str:
     return hashlib.sha256(canonical).hexdigest()
 
 
-def _locked_rayd_source_manifest(
-    info: Mapping[str, object], lock: Mapping[str, object]
-) -> object:
+def _locked_rayd_source_manifest(info: Mapping[str, object], lock: Mapping[str, object]) -> object:
     source_manifest = str(info["rayd_source_manifest_sha256"])
     if _SHA256_PATTERN.fullmatch(source_manifest) is None:
         raise ExtensionABIError("RayD source manifest must be a SHA-256 digest")
@@ -430,7 +416,7 @@ def _validate_build_info(raw_info: object) -> dict[str, object]:
 
 
 def _validate_extension(
-    module: object, *, packaged: bool, expected_fingerprint: str | None = None
+    module: object, *, packaged: bool, expected_fingerprint: str | None = None,
 ) -> object:
     if packaged:
         _assert_packaged_origin(module)
@@ -644,8 +630,7 @@ def bdpt_zero_matrix(reference: torch.Tensor, *, rows: int, cols: int) -> torch.
 
 
 def mc_transmitter_tensors(
-    flat_positions: tuple[float, ...],
-    powers: tuple[float, ...],
+    flat_positions: tuple[float, ...], powers: tuple[float, ...],
 ) -> dict[str, torch.Tensor]:
     if len(flat_positions) % 3 != 0:
         raise ValueError("flat_positions must contain xyz triples")
@@ -683,12 +668,8 @@ def mc_pack_vec3(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Ten
 
 
 def mc_receiver_grid_points(
-    reference: torch.Tensor,
-    *,
-    origin: tuple[float, float, float],
-    x_axis: tuple[float, float, float],
-    y_axis: tuple[float, float, float],
-    shape: tuple[int, int],
+    reference: torch.Tensor, *, origin: tuple[float, float, float],
+    x_axis: tuple[float, float, float], y_axis: tuple[float, float, float], shape: tuple[int, int],
     spacing: tuple[float, float],
 ) -> torch.Tensor:
     validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=2)
@@ -780,9 +761,7 @@ def _ad_native_tangent_or_none(value: torch.Tensor | None) -> torch.Tensor | Non
 
 
 def _ad_checked_tangent(
-    name: str,
-    tangent: torch.Tensor | None,
-    primal_shape: tuple[int, ...],
+    name: str, tangent: torch.Tensor | None, primal_shape: tuple[int, ...],
 ) -> torch.Tensor | None:
     """Validate an unwrapped jvp tangent against its primal contract.
 
@@ -818,9 +797,7 @@ def _ad_check_active(active: torch.Tensor | None, rows: int) -> None:
 
 
 def _ad_check_optional_grad(
-    name: str,
-    grad: torch.Tensor | None,
-    allowed_shapes: tuple[tuple[int, ...], ...],
+    name: str, grad: torch.Tensor | None, allowed_shapes: tuple[tuple[int, ...], ...],
 ) -> None:
     # Cotangents from autograd may be strided views; the native kernels
     # consume explicit strides, so contiguity is deliberately not required.
@@ -838,11 +815,7 @@ def _ad_check_optional_grad(
         )
 
 
-def _ad_check_tangent_vec3(
-    name: str,
-    tangent: torch.Tensor | None,
-    rows: int | None,
-) -> None:
+def _ad_check_tangent_vec3(name: str, tangent: torch.Tensor | None, rows: int | None) -> None:
     """Validate a facade-level jvp tangent.
 
  ``rows=None`` checks only the ``(V, 3)`` layout; the native entry point
@@ -898,16 +871,14 @@ def _ad_frequency_tangent(tangent: torch.Tensor | None) -> float:
 
 
 def _ad_frequency_grad(
-    grad_frequency: torch.Tensor, meta: tuple[torch.dtype, torch.device]
+    grad_frequency: torch.Tensor, meta: tuple[torch.dtype, torch.device],
 ) -> torch.Tensor:
     dtype, device = meta
     return grad_frequency.to(dtype=dtype, device=device)[0]
 
 
 def _ad_reject_fixed_inputs(
-    op_name: str,
-    needs_input_grad: tuple[bool, ...],
-    fixed: tuple[tuple[int, str], ...],
+    op_name: str, needs_input_grad: tuple[bool, ...], fixed: tuple[tuple[int, str], ...],
 ) -> None:
     for index, name in fixed:
         if needs_input_grad[index]:
@@ -918,10 +889,7 @@ def _ad_reject_fixed_inputs(
             )
 
 
-def _ad_reject_fixed_tangents(
-    op_name: str,
-    tangents: tuple[tuple[object, str], ...],
-) -> None:
+def _ad_reject_fixed_tangents(op_name: str, tangents: tuple[tuple[object, str], ...]) -> None:
     for tangent, name in tangents:
         if isinstance(tangent, torch.Tensor) and (
             _ad_native_tangent_or_none(tangent) is not None
@@ -959,9 +927,7 @@ def _frequency_participates_in_ad(frequency: float | torch.Tensor) -> bool:
     return _participates_in_ad(frequency)
 
 
-def _ad_geometry_tangent(
-    name: str, tangent: object, primal: torch.Tensor
-) -> torch.Tensor | None:
+def _ad_geometry_tangent(name: str, tangent: object, primal: torch.Tensor) -> torch.Tensor | None:
     """Unwrap and validate a geometry tangent against its primal tensor."""
 
     value = _ad_native_tangent_or_none(
@@ -1075,24 +1041,12 @@ REQUIRED_METADATA_FIELDS = (
 
 
 def make_metadata(
-    *,
-    primitive: str,
-    forward_launch_count: int = 0,
-    backward_launch_count: int = 0,
-    jvp_launch_count: int = 0,
-    intermediate_bytes: int = 0,
-    tape_bytes: int = 0,
-    fused_stages: int = 0,
-    accumulation_strategy: str = "none",
-    scheduling_strategy: str = "none",
-    registers_per_thread: int = 0,
-    shared_memory_bytes: int = 0,
-    occupancy_estimate: float = 0.0,
-    spill_bytes: int = 0,
-    rayd_native: bool = False,
-    ad_status: str = "none",
-    forward_time_ms: float = 0.0,
-    peak_memory_bytes: int = 0,
+    *, primitive: str, forward_launch_count: int = 0, backward_launch_count: int = 0,
+    jvp_launch_count: int = 0, intermediate_bytes: int = 0, tape_bytes: int = 0,
+    fused_stages: int = 0, accumulation_strategy: str = "none", scheduling_strategy: str = "none",
+    registers_per_thread: int = 0, shared_memory_bytes: int = 0, occupancy_estimate: float = 0.0,
+    spill_bytes: int = 0, rayd_native: bool = False, ad_status: str = "none",
+    forward_time_ms: float = 0.0, peak_memory_bytes: int = 0,
 ) -> dict[str, bool | float | int | str]:
     metadata: dict[str, bool | float | int | str] = {
         "primitive": primitive,
@@ -1123,9 +1077,7 @@ def make_metadata(
     return metadata
 
 
-def noop_metadata(
-    *, accumulation_strategy: str = "none"
-) -> dict[str, bool | float | int | str]:
+def noop_metadata(*, accumulation_strategy: str = "none") -> dict[str, bool | float | int | str]:
     return make_metadata(
         primitive="noop_metadata",
         accumulation_strategy=accumulation_strategy,
@@ -1260,15 +1212,8 @@ def checked_product(*values: int, label: str = "workload") -> int:
 
 
 def estimate_monte_carlo_memory(
-    *,
-    samples: int,
-    transmitters: int,
-    receivers: int,
-    depth: int,
-    bytes_per_path_state: int = 192,
-    output_bytes_per_pair: int = 16,
-    persistent_bytes: int = 0,
-    tape_bytes: int = 0,
+    *, samples: int, transmitters: int, receivers: int, depth: int, bytes_per_path_state: int = 192,
+    output_bytes_per_pair: int = 16, persistent_bytes: int = 0, tape_bytes: int = 0,
 ) -> MemoryEstimate:
     """Conservative, allocation-free estimate for MC/BDPT scale sweeps.
 
@@ -1312,11 +1257,7 @@ def estimate_monte_carlo_memory(
 
 
 def enforce_memory_budget(
-    estimate: MemoryEstimate,
-    *,
-    budget_bytes: int,
-    workload: str,
-    headroom_bytes: int = 0,
+    estimate: MemoryEstimate, *, budget_bytes: int, workload: str, headroom_bytes: int = 0,
 ) -> None:
     """Fail with an actionable error before any workload allocation occurs."""
 
@@ -1467,9 +1408,7 @@ def create_capacity_failure_state(reference: torch.Tensor) -> CapacityFailureSta
     return CapacityFailureState(bits=bits)
 
 
-def create_solve_capacity_transaction(
-    reference: torch.Tensor,
-) -> SolveCapacityTransaction:
+def create_solve_capacity_transaction(reference: torch.Tensor) -> SolveCapacityTransaction:
     """Create the one capacity transaction owned by a participating solve."""
 
     return SolveCapacityTransaction(
@@ -1477,9 +1416,7 @@ def create_solve_capacity_transaction(
     )
 
 
-def require_capacity_failure_state(
-    state: object, *, device: torch.device
-) -> CapacityFailureState:
+def require_capacity_failure_state(state: object, *, device: torch.device) -> CapacityFailureState:
     """Validate a required typed state without reading its device value."""
 
     if not isinstance(state, CapacityFailureState):
@@ -1544,9 +1481,7 @@ _P = ParamSpec("_P")
 _R = TypeVar("_R")
 
 
-def profiled_cuda_range(
-    name: CudaProfileRange,
-) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
+def profiled_cuda_range(name: CudaProfileRange) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
     """Wrap an operation owner in one balanced semantic NVTX range."""
 
     def decorate(operation: Callable[_P, _R]) -> Callable[_P, _R]:

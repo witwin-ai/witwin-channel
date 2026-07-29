@@ -326,10 +326,7 @@ class Result:
 # --- Result accumulation and path-sample assembly ---------------------------
 
 def _component_maps_from_matrices(
-    component_matrices: dict[str, torch.Tensor],
-    *,
-    rows: int,
-    cols: int,
+    component_matrices: dict[str, torch.Tensor], *, rows: int, cols: int,
 ) -> dict[str, torch.Tensor]:
     return {
         name: bdpt_los_component_maps_from_matrix(component, rows=rows, cols=cols)
@@ -337,9 +334,7 @@ def _component_maps_from_matrices(
     }
 
 
-def _path_samples_from_connection_export(
-    exported: dict[str, torch.Tensor],
-) -> BDPTPathSamples:
+def _path_samples_from_connection_export(exported: dict[str, torch.Tensor]) -> BDPTPathSamples:
     return BDPTPathSamples(
         topology=exported["topology"],
         contribution=exported["contribution"],
@@ -387,11 +382,8 @@ _BDPT_SUBPATH_TANGENT_FIELDS = (
 
 
 def _validate_subpath_field_cotangents(
-    grad_field_real: torch.Tensor | None,
-    grad_field_imag: torch.Tensor | None,
-    grad_throughput_real: torch.Tensor | None,
-    grad_throughput_imag: torch.Tensor | None,
-    *,
+    grad_field_real: torch.Tensor | None, grad_field_imag: torch.Tensor | None,
+    grad_throughput_real: torch.Tensor | None, grad_throughput_imag: torch.Tensor | None, *,
     count: int,
 ) -> None:
     for name, tensor, trailing in (
@@ -416,23 +408,13 @@ def _validate_subpath_field_cotangents(
 
 
 def bdpt_reflected_light_subpath_state_backward(
-    light: dict[str, torch.Tensor],
-    intersection: dict[str, torch.Tensor],
-    material_gain: torch.Tensor,
-    material_valid: torch.Tensor,
-    material_eps_r: torch.Tensor,
-    material_sigma_e: torch.Tensor,
-    material_mu_r: torch.Tensor,
-    material_thickness: torch.Tensor,
-    *,
-    frequency_hz: float,
-    grad_field_real: torch.Tensor | None = None,
-    grad_field_imag: torch.Tensor | None = None,
-    grad_throughput_real: torch.Tensor | None = None,
-    grad_throughput_imag: torch.Tensor | None = None,
-    need_grad_material: bool = False,
-    need_grad_field_in: bool = False,
-    need_grad_frequency: bool = False,
+    light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor],
+    material_gain: torch.Tensor, material_valid: torch.Tensor, material_eps_r: torch.Tensor,
+    material_sigma_e: torch.Tensor, material_mu_r: torch.Tensor, material_thickness: torch.Tensor,
+    *, frequency_hz: float, grad_field_real: torch.Tensor | None = None,
+    grad_field_imag: torch.Tensor | None = None, grad_throughput_real: torch.Tensor | None = None,
+    grad_throughput_imag: torch.Tensor | None = None, need_grad_material: bool = False,
+    need_grad_field_in: bool = False, need_grad_frequency: bool = False,
 ) -> dict[str, torch.Tensor | None]:
     """VJP of:func:`bdpt_reflected_light_subpath_state` (reflected-subpath derivatives).
 
@@ -488,21 +470,12 @@ def bdpt_reflected_light_subpath_state_backward(
 
 
 def bdpt_reflected_light_subpath_state_jvp(
-    light: dict[str, torch.Tensor],
-    intersection: dict[str, torch.Tensor],
-    material_gain: torch.Tensor,
-    material_valid: torch.Tensor,
-    material_eps_r: torch.Tensor,
-    material_sigma_e: torch.Tensor,
-    material_mu_r: torch.Tensor,
-    material_thickness: torch.Tensor,
-    *,
-    frequency_hz: float,
-    tangent_eps_r: torch.Tensor | None = None,
-    tangent_sigma_e: torch.Tensor | None = None,
-    tangent_gain: torch.Tensor | None = None,
-    tangent_thickness: torch.Tensor | None = None,
-    tangent_frequency: float = 0.0,
+    light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor],
+    material_gain: torch.Tensor, material_valid: torch.Tensor, material_eps_r: torch.Tensor,
+    material_sigma_e: torch.Tensor, material_mu_r: torch.Tensor, material_thickness: torch.Tensor,
+    *, frequency_hz: float, tangent_eps_r: torch.Tensor | None = None,
+    tangent_sigma_e: torch.Tensor | None = None, tangent_gain: torch.Tensor | None = None,
+    tangent_thickness: torch.Tensor | None = None, tangent_frequency: float = 0.0,
     tangent_light_field_real: torch.Tensor | None = None,
     tangent_light_field_imag: torch.Tensor | None = None,
     tangent_light_throughput_real: torch.Tensor | None = None,
@@ -546,24 +519,13 @@ def bdpt_reflected_light_subpath_state_jvp(
 
 
 def bdpt_transmitted_light_subpath_state_backward(
-    light: dict[str, torch.Tensor],
-    intersection: dict[str, torch.Tensor],
-    face_material_id: torch.Tensor,
-    layer_offset: torch.Tensor,
-    layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    *,
-    frequency_hz: float,
-    grad_field_real: torch.Tensor | None = None,
-    grad_field_imag: torch.Tensor | None = None,
-    grad_throughput_real: torch.Tensor | None = None,
-    grad_throughput_imag: torch.Tensor | None = None,
-    need_grad_layers: bool = False,
-    need_grad_field_in: bool = False,
-    need_grad_frequency: bool = False,
+    light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor],
+    face_material_id: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor,
+    layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor,
+    layer_mu_r: torch.Tensor, *, frequency_hz: float, grad_field_real: torch.Tensor | None = None,
+    grad_field_imag: torch.Tensor | None = None, grad_throughput_real: torch.Tensor | None = None,
+    grad_throughput_imag: torch.Tensor | None = None, need_grad_layers: bool = False,
+    need_grad_field_in: bool = False, need_grad_frequency: bool = False,
 ) -> dict[str, torch.Tensor | None]:
     """VJP of:func:`bdpt_transmitted_light_subpath_state` (transmitted-subpath derivatives).
 
@@ -618,21 +580,13 @@ def bdpt_transmitted_light_subpath_state_backward(
 
 
 def bdpt_transmitted_light_subpath_state_jvp(
-    light: dict[str, torch.Tensor],
-    intersection: dict[str, torch.Tensor],
-    face_material_id: torch.Tensor,
-    layer_offset: torch.Tensor,
-    layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    *,
-    frequency_hz: float,
+    light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor],
+    face_material_id: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor,
+    layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor,
+    layer_mu_r: torch.Tensor, *, frequency_hz: float,
     tangent_layer_thickness: torch.Tensor | None = None,
     tangent_layer_eps_r: torch.Tensor | None = None,
-    tangent_layer_sigma_e: torch.Tensor | None = None,
-    tangent_frequency: float = 0.0,
+    tangent_layer_sigma_e: torch.Tensor | None = None, tangent_frequency: float = 0.0,
     tangent_light_field_real: torch.Tensor | None = None,
     tangent_light_field_imag: torch.Tensor | None = None,
     tangent_light_throughput_real: torch.Tensor | None = None,
@@ -672,19 +626,10 @@ def bdpt_transmitted_light_subpath_state_jvp(
 
 
 def bdpt_endpoint_connection_samples_backward(
-    light: dict[str, torch.Tensor],
-    sensor: dict[str, torch.Tensor],
-    *,
-    frequency_hz: float,
-    samples_per_tx: int,
-    mis: str,
-    beta: float,
-    strategy_count: int,
-    max_paths: int | None,
-    grad_contribution: torch.Tensor | None = None,
-    need_grad_field: bool = False,
-    need_grad_frequency: bool = False,
-    need_grad_tx_power: bool = False,
+    light: dict[str, torch.Tensor], sensor: dict[str, torch.Tensor], *, frequency_hz: float,
+    samples_per_tx: int, mis: str, beta: float, strategy_count: int, max_paths: int | None,
+    grad_contribution: torch.Tensor | None = None, need_grad_field: bool = False,
+    need_grad_frequency: bool = False, need_grad_tx_power: bool = False,
 ) -> dict[str, torch.Tensor | None]:
     """VJP of:func:`bdpt_endpoint_connection_samples` (endpoint-connection derivatives).
 
@@ -736,20 +681,12 @@ def bdpt_endpoint_connection_samples_backward(
 
 
 def bdpt_endpoint_connection_samples_jvp(
-    light: dict[str, torch.Tensor],
-    sensor: dict[str, torch.Tensor],
-    *,
-    frequency_hz: float,
-    samples_per_tx: int,
-    mis: str,
-    beta: float,
-    strategy_count: int,
-    max_paths: int | None,
+    light: dict[str, torch.Tensor], sensor: dict[str, torch.Tensor], *, frequency_hz: float,
+    samples_per_tx: int, mis: str, beta: float, strategy_count: int, max_paths: int | None,
     tangent_light_field_real: torch.Tensor | None = None,
     tangent_light_field_imag: torch.Tensor | None = None,
     tangent_sensor_field_real: torch.Tensor | None = None,
-    tangent_sensor_field_imag: torch.Tensor | None = None,
-    tangent_frequency: float = 0.0,
+    tangent_sensor_field_imag: torch.Tensor | None = None, tangent_frequency: float = 0.0,
     tangent_tx_power: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
     """JVP of:func:`bdpt_endpoint_connection_samples` (endpoint-connection derivatives)."""
@@ -782,14 +719,8 @@ def bdpt_endpoint_connection_samples_jvp(
 
 
 def bdpt_accumulate_connection_samples_forward_ad(
-    samples: dict[str, torch.Tensor],
-    *,
-    tx_count: int,
-    rx_count: int,
-    accumulation_strategy: str,
-    combine_domain: str,
-    coeff_real: torch.Tensor,
-    coeff_imag: torch.Tensor,
+    samples: dict[str, torch.Tensor], *, tx_count: int, rx_count: int, accumulation_strategy: str,
+    combine_domain: str, coeff_real: torch.Tensor, coeff_imag: torch.Tensor,
 ) -> tuple[dict[str, torch.Tensor], tuple[torch.Tensor, ...]]:
     """Accumulate forward that also returns the coherent bin-sum buffers.
 
@@ -828,19 +759,11 @@ def bdpt_accumulate_connection_samples_forward_ad(
 
 
 def bdpt_accumulate_connection_samples_backward(
-    samples: dict[str, torch.Tensor],
-    *,
-    tx_count: int,
-    rx_count: int,
-    combine_domain: str,
-    bin_sums: tuple[torch.Tensor, ...] = (),
-    grad_path_gain: torch.Tensor | None = None,
-    grad_los: torch.Tensor | None = None,
-    grad_reflection: torch.Tensor | None = None,
-    grad_diffraction: torch.Tensor | None = None,
-    grad_transmission: torch.Tensor | None = None,
-    grad_scattering: torch.Tensor | None = None,
-    need_grad_contribution: bool = False,
+    samples: dict[str, torch.Tensor], *, tx_count: int, rx_count: int, combine_domain: str,
+    bin_sums: tuple[torch.Tensor, ...] = (), grad_path_gain: torch.Tensor | None = None,
+    grad_los: torch.Tensor | None = None, grad_reflection: torch.Tensor | None = None,
+    grad_diffraction: torch.Tensor | None = None, grad_transmission: torch.Tensor | None = None,
+    grad_scattering: torch.Tensor | None = None, need_grad_contribution: bool = False,
     need_grad_coeff: bool = False,
 ) -> dict[str, torch.Tensor | None]:
     """VJP of:func:`bdpt_accumulate_connection_samples`, both domains (connection accumulation).
@@ -886,15 +809,9 @@ def bdpt_accumulate_connection_samples_backward(
 
 
 def bdpt_accumulate_connection_samples_jvp(
-    samples: dict[str, torch.Tensor],
-    *,
-    tx_count: int,
-    rx_count: int,
-    combine_domain: str,
-    bin_sums: tuple[torch.Tensor, ...] = (),
-    tangent_contribution: torch.Tensor | None = None,
-    tangent_coeff_real: torch.Tensor | None = None,
-    tangent_coeff_imag: torch.Tensor | None = None,
+    samples: dict[str, torch.Tensor], *, tx_count: int, rx_count: int, combine_domain: str,
+    bin_sums: tuple[torch.Tensor, ...] = (), tangent_contribution: torch.Tensor | None = None,
+    tangent_coeff_real: torch.Tensor | None = None, tangent_coeff_imag: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
     """JVP of:func:`bdpt_accumulate_connection_samples`, both domains (connection accumulation).
 
@@ -949,11 +866,8 @@ _SUBPATH_DIFF_INDEX = {
 
 
 def _subpath_with_fields(
-    base: dict[str, torch.Tensor],
-    field_real: torch.Tensor,
-    field_imag: torch.Tensor,
-    throughput_real: torch.Tensor,
-    throughput_imag: torch.Tensor,
+    base: dict[str, torch.Tensor], field_real: torch.Tensor, field_imag: torch.Tensor,
+    throughput_real: torch.Tensor, throughput_imag: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Rebuild a subpath dict overriding only the four differentiable slots."""
 
@@ -1243,17 +1157,10 @@ def _subpath_tangent_outputs(out: dict[str, torch.Tensor]) -> tuple:
 
 
 def bdpt_reflected_light_subpath_state_ad(
-    light: dict[str, torch.Tensor],
-    intersection: dict[str, torch.Tensor],
-    *,
-    material_gain: torch.Tensor,
-    material_valid: torch.Tensor,
-    material_eps_r: torch.Tensor,
-    material_sigma_e: torch.Tensor,
-    material_mu_r: torch.Tensor,
-    material_thickness: torch.Tensor,
-    frequency: torch.Tensor | float,
-    frequency_value: float | None = None,
+    light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor], *,
+    material_gain: torch.Tensor, material_valid: torch.Tensor, material_eps_r: torch.Tensor,
+    material_sigma_e: torch.Tensor, material_mu_r: torch.Tensor, material_thickness: torch.Tensor,
+    frequency: torch.Tensor | float, frequency_value: float | None = None,
 ) -> dict[str, torch.Tensor]:
     """Differentiable:func:`bdpt_reflected_light_subpath_state` (reflected-subpath derivatives)."""
 
@@ -1525,18 +1432,10 @@ class _BdptTransmittedSubpathAdFunction(torch.autograd.Function):
 
 
 def bdpt_transmitted_light_subpath_state_ad(
-    light: dict[str, torch.Tensor],
-    intersection: dict[str, torch.Tensor],
-    *,
-    face_material_id: torch.Tensor,
-    layer_offset: torch.Tensor,
-    layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    frequency: torch.Tensor | float,
-    frequency_value: float | None = None,
+    light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor], *,
+    face_material_id: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor,
+    layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor,
+    layer_mu_r: torch.Tensor, frequency: torch.Tensor | float, frequency_value: float | None = None,
 ) -> dict[str, torch.Tensor]:
     """Differentiable:func:`bdpt_transmitted_light_subpath_state` (transmitted-subpath derivatives)."""
 
@@ -1795,16 +1694,9 @@ class _BdptEndpointConnectionAdFunction(torch.autograd.Function):
 
 
 def bdpt_endpoint_connection_samples_ad(
-    light: dict[str, torch.Tensor],
-    sensor: dict[str, torch.Tensor],
-    tx_power: torch.Tensor,
-    *,
-    frequency: torch.Tensor | float,
-    frequency_value: float | None = None,
-    samples_per_tx: int,
-    max_paths: int | None = None,
-    mis: str = "power_heuristic",
-    beta: float = 2.0,
+    light: dict[str, torch.Tensor], sensor: dict[str, torch.Tensor], tx_power: torch.Tensor, *,
+    frequency: torch.Tensor | float, frequency_value: float | None = None, samples_per_tx: int,
+    max_paths: int | None = None, mis: str = "power_heuristic", beta: float = 2.0,
     strategy_count: int = 1,
 ) -> dict[str, torch.Tensor]:
     """Differentiable:func:`bdpt_endpoint_connection_samples` (endpoint-connection derivatives).
@@ -1954,11 +1846,8 @@ _FINALIZE_TANGENT_FIELDS = (
 
 
 def bdpt_finalize_point_components_ad(
-    los: torch.Tensor,
-    reflection: torch.Tensor,
-    diffraction: torch.Tensor,
-    transmission: torch.Tensor,
-    scattering: torch.Tensor,
+    los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor,
+    transmission: torch.Tensor, scattering: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Differentiable:func:`bdpt_finalize_point_components` (point-result finalization)."""
 
@@ -1969,11 +1858,8 @@ def bdpt_finalize_point_components_ad(
 
 
 def bdpt_finalize_component_maps_ad(
-    los: torch.Tensor,
-    reflection: torch.Tensor,
-    diffraction: torch.Tensor,
-    transmission: torch.Tensor,
-    scattering: torch.Tensor,
+    los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor,
+    transmission: torch.Tensor, scattering: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Differentiable:func:`bdpt_finalize_component_maps` (map finalization)."""
 
@@ -2165,14 +2051,9 @@ class _BdptAccumulateAdFunction(torch.autograd.Function):
 
 
 def bdpt_accumulate_connection_samples_ad(
-    samples: dict[str, torch.Tensor],
-    *,
-    tx_count: int,
-    rx_count: int,
-    accumulation_strategy: str = "atomic",
-    combine_domain: str = "power",
-    coeff_real: torch.Tensor | None = None,
-    coeff_imag: torch.Tensor | None = None,
+    samples: dict[str, torch.Tensor], *, tx_count: int, rx_count: int,
+    accumulation_strategy: str = "atomic", combine_domain: str = "power",
+    coeff_real: torch.Tensor | None = None, coeff_imag: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
     """Differentiable:func:`bdpt_accumulate_connection_samples` (connection accumulation)."""
 
@@ -2206,19 +2087,10 @@ _MASK_TRANSMISSION = 8
 
 
 def _native_los_connection_samples(
-    rayd: Any,
-    light: dict[str, torch.Tensor],
-    sensor: dict[str, torch.Tensor],
-    *,
-    scene_has_structures: bool,
-    frequency_hz: float | torch.Tensor,
-    mis: str,
-    beta: float,
-    strategy_count: int,
-    ad: bool = False,
-    tx_power: torch.Tensor | None = None,
-    frequency_value: float | None = None,
-    ledger: object | None = None,
+    rayd: Any, light: dict[str, torch.Tensor], sensor: dict[str, torch.Tensor], *,
+    scene_has_structures: bool, frequency_hz: float | torch.Tensor, mis: str, beta: float,
+    strategy_count: int, ad: bool = False, tx_power: torch.Tensor | None = None,
+    frequency_value: float | None = None, ledger: object | None = None,
 ) -> dict[str, torch.Tensor]:
     if ad:
         # BDPT AD: the LoS direct connection carries both a frequency gradient
@@ -2274,8 +2146,7 @@ def _native_los_connection_samples(
 
 
 def _merge_event_states(
-    reflected: dict[str, torch.Tensor],
-    transmitted: dict[str, torch.Tensor],
+    reflected: dict[str, torch.Tensor], transmitted: dict[str, torch.Tensor],
     choose_transmit: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Row-wise merge of the two event kernels' outputs.
@@ -2295,8 +2166,7 @@ def _merge_event_states(
 
 
 def _merge_scattered_state(
-    merged: dict[str, torch.Tensor],
-    scattered: dict[str, torch.Tensor],
+    merged: dict[str, torch.Tensor], scattered: dict[str, torch.Tensor],
     choose_scatter: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Row-wise overlay of the scattered branch onto the reflect/transmit
@@ -2311,19 +2181,10 @@ def _merge_scattered_state(
 
 
 def _select_surface_events(
-    *,
-    cos_theta: torch.Tensor,
-    material_id: torch.Tensor,
-    hit_ok: torch.Tensor,
-    material_bundle: dict[str, torch.Tensor],
-    layer_csr: dict[str, torch.Tensor],
-    runtimes: dict[int, Any],
-    frequency_value: float,
-    samples: int,
-    seed: int,
-    tx_index: int,
-    bounce: int,
-    device: torch.device,
+    *, cos_theta: torch.Tensor, material_id: torch.Tensor, hit_ok: torch.Tensor,
+    material_bundle: dict[str, torch.Tensor], layer_csr: dict[str, torch.Tensor],
+    runtimes: dict[int, Any], frequency_value: float, samples: int, seed: int, tx_index: int,
+    bounce: int, device: torch.device,
 ) -> dict[str, torch.Tensor]:
     """Three-way (scatter / transmit / reflect) event selection at a surface hit.
 
@@ -2391,29 +2252,12 @@ def _select_surface_events(
 
 
 def _emit_scatter_nee(
-    *,
-    rayd: Any,
-    sensor: dict[str, torch.Tensor],
-    state: dict[str, torch.Tensor],
-    hit: dict[str, torch.Tensor],
-    merged: dict[str, torch.Tensor],
-    choose_scatter: torch.Tensor,
-    p_scatter: torch.Tensor,
-    material_id: torch.Tensor,
-    material_axis_rad: torch.Tensor,
-    runtimes: dict[int, Any],
-    max_scattering_order: int,
-    samples: int,
-    seed: int,
-    tx_index: int,
-    bounce: int,
-    device: torch.device,
-    scene_diagonal: float,
-    frequency_hz: float | torch.Tensor,
-    frequency_value: float,
-    tx_power: torch.Tensor,
-    ad: bool,
-    ledger: object | None,
+    *, rayd: Any, sensor: dict[str, torch.Tensor], state: dict[str, torch.Tensor],
+    hit: dict[str, torch.Tensor], merged: dict[str, torch.Tensor], choose_scatter: torch.Tensor,
+    p_scatter: torch.Tensor, material_id: torch.Tensor, material_axis_rad: torch.Tensor,
+    runtimes: dict[int, Any], max_scattering_order: int, samples: int, seed: int, tx_index: int,
+    bounce: int, device: torch.device, scene_diagonal: float, frequency_hz: float | torch.Tensor,
+    frequency_value: float, tx_power: torch.Tensor, ad: bool, ledger: object | None,
     sample_blocks: list[dict[str, torch.Tensor]],
 ) -> tuple[dict[str, torch.Tensor], torch.Tensor, int]:
     """Scatter branch: local frames, the scattered subpath overlay, and NEE rows.
@@ -2542,22 +2386,10 @@ def _emit_scatter_nee(
 
 
 def _emit_mixed_transmission(
-    *,
-    rayd: Any,
-    sensor: dict[str, torch.Tensor],
-    merged: dict[str, torch.Tensor],
-    choose_scatter: torch.Tensor,
-    emit_mixed_transmission: bool,
-    sensor_count: int,
-    samples: int,
-    tx_power: torch.Tensor,
-    frequency_hz: float | torch.Tensor,
-    frequency_value: float,
-    mis: str,
-    beta: float,
-    ad: bool,
-    ledger: object | None,
-    sample_blocks: list[dict[str, torch.Tensor]],
+    *, rayd: Any, sensor: dict[str, torch.Tensor], merged: dict[str, torch.Tensor],
+    choose_scatter: torch.Tensor, emit_mixed_transmission: bool, sensor_count: int, samples: int,
+    tx_power: torch.Tensor, frequency_hz: float | torch.Tensor, frequency_value: float, mis: str,
+    beta: float, ad: bool, ledger: object | None, sample_blocks: list[dict[str, torch.Tensor]],
 ) -> None:
     """Emit the MIXED reflection+transmission endpoint connection (component 5).
 
@@ -2628,12 +2460,8 @@ def _emit_mixed_transmission(
 
 
 def _apply_scatter_continuation(
-    *,
-    merged: dict[str, torch.Tensor],
-    scatter_count: torch.Tensor | None,
-    choose_scatter: torch.Tensor,
-    scattered_valid: torch.Tensor,
-    max_scattering_order: int,
+    *, merged: dict[str, torch.Tensor], scatter_count: torch.Tensor | None,
+    choose_scatter: torch.Tensor, scattered_valid: torch.Tensor, max_scattering_order: int,
 ) -> torch.Tensor | None:
     """Terminate (order 1) or continue (order > 1) scattered subpaths.
 
@@ -2664,27 +2492,12 @@ def _apply_scatter_continuation(
 
 
 def _transmission_sampled_connection_samples(
-    rayd: Any,
-    tx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_positions: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    sensor: dict[str, torch.Tensor],
-    material_bundle: dict[str, torch.Tensor],
-    *,
-    frequency_hz: float,
-    samples: int,
-    max_depth: int,
-    seed: int,
-    mis: str,
-    beta: float,
-    scattering_runtimes: dict[int, Any] | None = None,
-    emit_mixed_transmission: bool = True,
-    scene_diagonal: float = 0.0,
-    max_scattering_order: int = 1,
-    ad: bool = False,
-    ledger: object | None = None,
+    rayd: Any, tx_positions: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
+    rx_positions: torch.Tensor, rx_polarization: torch.Tensor, sensor: dict[str, torch.Tensor],
+    material_bundle: dict[str, torch.Tensor], *, frequency_hz: float, samples: int, max_depth: int,
+    seed: int, mis: str, beta: float, scattering_runtimes: dict[int, Any] | None = None,
+    emit_mixed_transmission: bool = True, scene_diagonal: float = 0.0,
+    max_scattering_order: int = 1, ad: bool = False, ledger: object | None = None,
 ) -> tuple[list[dict[str, torch.Tensor]], dict[str, int]]:
     """Shooting-context light subpaths with three-way event selection.
 
@@ -3009,10 +2822,7 @@ def transmitter_tensors(scene: SolverScene) -> tuple[torch.Tensor, torch.Tensor]
 
 
 def receiver_positions(
-    scene: SolverScene,
-    *,
-    reference: torch.Tensor,
-    grid: ReceiverGrid | None = None,
+    scene: SolverScene, *, reference: torch.Tensor, grid: ReceiverGrid | None = None,
 ) -> torch.Tensor:
     if grid is not None:
         return bdpt_receiver_grid_points(
@@ -3037,7 +2847,9 @@ def receiver_positions(
     return bdpt_host_vec3_tensor(tuple(flat_positions))
 # --- Launch state -----------------------------------------------------------
 
-def make_launch_state(reference: torch.Tensor, *, tx_count: int, config: Config) -> dict[str, torch.Tensor]:
+def make_launch_state(
+    reference: torch.Tensor, *, tx_count: int, config: Config,
+) -> dict[str, torch.Tensor]:
     return bdpt_launch_state(  # type: ignore[no-any-return]
         reference,
         tx_count=tx_count,
@@ -3092,7 +2904,7 @@ _COMPONENT_MASK_BITS = {
 
 
 def select_accumulation_strategy(
-    config: Config, *, grid_cells: int, estimated_valid_ratio: float
+    config: Config, *, grid_cells: int, estimated_valid_ratio: float,
 ) -> str:
     if config.accumulation_strategy != "auto":
         return config.accumulation_strategy
@@ -3106,9 +2918,7 @@ def select_accumulation_strategy(
     return "atomic"
 
 
-def _ad_launch_accounting(
-    config: Config, ad_ledger: AdLaunchLedger | None
-) -> tuple[int, int, int]:
+def _ad_launch_accounting(config: Config, ad_ledger: AdLaunchLedger | None) -> tuple[int, int, int]:
     """BDPT AD companion accounting: backward/jvp launch counts and tape bytes.
 
  ad_mode='none' wires no companions and retains no tape (bitwise default).
@@ -3123,20 +2933,10 @@ def _ad_launch_accounting(
 
 
 def make_solver_metadata(
-    *,
-    config: Config,
-    selected_accumulation_strategy: str,
-    path_counts_by_strategy: dict[str, int],
-    valid_contribution_count: int,
-    reflection_available: bool,
-    diffraction_available: bool,
-    cuda_available: bool,
-    optix_available: bool,
-    workspace_bytes: int,
-    variance_enabled: bool,
-    launch_count: int,
-    effective_max_depth: int,
-    ad_ledger: AdLaunchLedger | None = None,
+    *, config: Config, selected_accumulation_strategy: str, path_counts_by_strategy: dict[str, int],
+    valid_contribution_count: int, reflection_available: bool, diffraction_available: bool,
+    cuda_available: bool, optix_available: bool, workspace_bytes: int, variance_enabled: bool,
+    launch_count: int, effective_max_depth: int, ad_ledger: AdLaunchLedger | None = None,
 ) -> dict[str, Any]:
     rayd_component_enabled = (
         "reflection" in config.components and reflection_available
@@ -3302,15 +3102,9 @@ class _EndpointWorkspace:
 
 
 def _accumulate_connection_samples(
-    config: Config,
-    samples: dict[str, torch.Tensor],
-    *,
-    tx_count: int,
-    rx_count: int,
-    accumulation_strategy: str,
-    combine_domain: str = "power",
-    coeff_real: torch.Tensor | None = None,
-    coeff_imag: torch.Tensor | None = None,
+    config: Config, samples: dict[str, torch.Tensor], *, tx_count: int, rx_count: int,
+    accumulation_strategy: str, combine_domain: str = "power",
+    coeff_real: torch.Tensor | None = None, coeff_imag: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
     """Accumulate dispatcher: the differentiable twin under ad_mode != 'none',
  else the bitwise primal. Both domains (power/coherent) route through the
@@ -3338,11 +3132,8 @@ def _accumulate_connection_samples(
 
 
 def _reduced_light_endpoint_state(
-    tx_reference: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_positions: torch.Tensor,
-    rx_polarization: torch.Tensor,
+    tx_reference: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
+    rx_positions: torch.Tensor, rx_polarization: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """One light endpoint per transmitter for the deterministic LoS term.
 
@@ -3396,13 +3187,9 @@ def _live_tx_power(scene: SolverScene, *, reference: torch.Tensor) -> torch.Tens
 
 
 def _build_endpoint_subpaths(
-    scene: SolverScene,
-    config: Config,
-    *,
-    grid: ReceiverGrid | None,
+    scene: SolverScene, config: Config, *, grid: ReceiverGrid | None,
     transmitter_tensors_fn: Callable[[SolverScene], tuple[torch.Tensor, torch.Tensor]],
-    selected_accumulation: str,
-    ledger: AdLaunchLedger | None = None,
+    selected_accumulation: str, ledger: AdLaunchLedger | None = None,
 ) -> _EndpointWorkspace:
     tx_reference, tx_power = transmitter_tensors_fn(scene)
     if config.ad_mode != "none":
@@ -3552,7 +3339,7 @@ class _BDPTTopologyOptions:
 
 
 def _estimate_workspace_bytes(
-    config: Config, *, tx_count: int, grid_cells: int, rx_count: int
+    config: Config, *, tx_count: int, grid_cells: int, rx_count: int,
 ) -> int:
     launch_entries = (
         max(0, int(tx_count)) * int(config.samples) * int(config.sample_streams)
@@ -3630,10 +3417,7 @@ def _effective_native_depth(config: Config) -> int:
 
 
 def _evaluated_connection_samples(
-    paths: EvaluatedPaths,
-    selected: torch.Tensor,
-    *,
-    component_out: int,
+    paths: EvaluatedPaths, selected: torch.Tensor, *, component_out: int,
     tx_power: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor] | None:
     if int(selected.numel()) == 0:
@@ -3689,11 +3473,7 @@ def _evaluated_connection_samples(
 
 
 def _single_class_discrete_connection_samples(
-    scene: SolverScene,
-    config: Config,
-    *,
-    component: str,
-    component_id: int,
+    scene: SolverScene, config: Config, *, component: str, component_id: int,
     tx_power: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor] | None:
     """Enumerate one delta-like path class as unit-mass discrete connections.
@@ -3727,7 +3507,7 @@ def _single_class_discrete_connection_samples(
 
 
 def _reflection_discrete_connection_samples(
-    scene: SolverScene, config: Config, *, tx_power: torch.Tensor | None = None
+    scene: SolverScene, config: Config, *, tx_power: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor] | None:
     """Enumerate delta-specular paths with unit forward/reverse discrete mass."""
 
@@ -3737,7 +3517,7 @@ def _reflection_discrete_connection_samples(
 
 
 def _diffraction_discrete_connection_samples(
-    scene: SolverScene, config: Config, *, tx_power: torch.Tensor | None = None
+    scene: SolverScene, config: Config, *, tx_power: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor] | None:
     """Enumerate first-order UTD diffraction paths with unit discrete mass.
 
@@ -3757,7 +3537,7 @@ def _diffraction_discrete_connection_samples(
 
 
 def _transmission_discrete_connection_samples(
-    scene: SolverScene, config: Config, *, tx_power: torch.Tensor | None = None
+    scene: SolverScene, config: Config, *, tx_power: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor] | None:
     """Enumerate pure straight-segment transmission paths with unit discrete mass.
 
@@ -3775,7 +3555,7 @@ def _transmission_discrete_connection_samples(
 
 
 def _coupled_discrete_connection_samples(
-    scene: SolverScene, config: Config, *, tx_power: torch.Tensor | None = None
+    scene: SolverScene, config: Config, *, tx_power: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor] | None:
     """Enumerate mixed delta/UTD paths with unit bidirectional discrete mass."""
 
@@ -3803,11 +3583,7 @@ _COHERENT_ENUMERATED_COMPONENTS = (
 
 
 def _enumerated_component_block_with_field(
-    scene: SolverScene,
-    config: Config,
-    *,
-    component: str,
-    component_id: int,
+    scene: SolverScene, config: Config, *, component: str, component_id: int,
 ) -> tuple[dict[str, torch.Tensor], torch.Tensor, torch.Tensor] | None:
     """Enumerate one delta/UTD class as a discrete block plus its complex field.
 
@@ -3838,7 +3614,7 @@ def _enumerated_component_block_with_field(
 
 
 def _coupled_component_block_with_field(
-    scene: SolverScene, config: Config
+    scene: SolverScene, config: Config,
 ) -> tuple[dict[str, torch.Tensor], torch.Tensor, torch.Tensor] | None:
     """Coupled reflection-diffraction discrete block plus its complex field."""
 
@@ -4022,10 +3798,7 @@ def _reject_live_geometry_through_sampler(scene: SolverScene, config: Config) ->
 
 
 def _prepare_workspace_and_capabilities(
-    scene: SolverScene,
-    config: Config,
-    *,
-    grid: ReceiverGrid | None,
+    scene: SolverScene, config: Config, *, grid: ReceiverGrid | None,
     build_info_fn: Callable[[], dict[str, object]],
 ) -> _SolvePrep:
     grid_cells = 0 if grid is None else int(grid.shape[0] * grid.shape[1])
@@ -4406,10 +4179,7 @@ def _accumulate_and_finalize(
 
 
 def _export_paths(
-    scene: SolverScene,
-    config: Config,
-    *,
-    workspace: _EndpointWorkspace,
+    scene: SolverScene, config: Config, *, workspace: _EndpointWorkspace,
     estimate_samples: dict[str, torch.Tensor] | None,
 ) -> ReceiverGrid | None:
     endpoint_only = workspace.endpoint_only
@@ -4447,20 +4217,11 @@ def _export_paths(
 
 
 def _build_metadata(
-    scene: SolverScene,
-    config: Config,
-    *,
-    prep: _SolvePrep,
-    workspace: _EndpointWorkspace,
-    estimate_samples: dict[str, torch.Tensor] | None,
-    path_gain: torch.Tensor,
-    variance: torch.Tensor | None,
-    launch_count: int,
-    transmission_chain_count: int,
-    event_counts: dict[str, int],
-    scattering_runtimes: dict[int, Any],
-    component_maps: dict[str, torch.Tensor] | None,
-    ledger: AdLaunchLedger | None = None,
+    scene: SolverScene, config: Config, *, prep: _SolvePrep, workspace: _EndpointWorkspace,
+    estimate_samples: dict[str, torch.Tensor] | None, path_gain: torch.Tensor,
+    variance: torch.Tensor | None, launch_count: int, transmission_chain_count: int,
+    event_counts: dict[str, int], scattering_runtimes: dict[int, Any],
+    component_maps: dict[str, torch.Tensor] | None, ledger: AdLaunchLedger | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
     launch_state = workspace.launch_state
     endpoint_subpaths = workspace.endpoint_subpaths

@@ -133,9 +133,7 @@ def test_legacy_three_cube_256_is_not_yee_phase_locked():
     [("single_cube", 1), ("three_cube", 3), ("three_cube_320", 3)],
 )
 @pytest.mark.parametrize("material", ["metal", "dielectric"])
-def test_channel_scene_matches_case_geometry_and_material(
-    scenario, cube_count, material
-):
+def test_channel_scene_matches_case_geometry_and_material(scenario, cube_count, material):
     spec = load_case(scenario, material)
     scene = build_channel_scene(spec)
 

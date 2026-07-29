@@ -176,13 +176,8 @@ def make_cuda_generator(seed: int) -> torch.Generator:
 # wall-product companion, and one final capacity-map sanitizer companion; the
 # finalize sum registers no native companion (its cotangent is a view).
 def make_solver_metadata(
-    *,
-    config: Config,
-    path_count: int,
-    contribution_capacity: int,
-    reflection_available: bool,
-    diffraction_available: bool,
-    ad_ledger: AdLaunchLedger | None = None,
+    *, config: Config, path_count: int, contribution_capacity: int, reflection_available: bool,
+    diffraction_available: bool, ad_ledger: AdLaunchLedger | None = None,
 ) -> dict[str, Any]:
     forward_launch_count = 1 if contribution_capacity else 0
     # solver derivatives: report the companion launches this solve actually
@@ -248,11 +243,7 @@ def make_solver_metadata(
 
 
 def los_path_gain(
-    scene: SolverScene,
-    *,
-    device: torch.device,
-    ad: bool = False,
-    ledger: object | None = None,
+    scene: SolverScene, *, device: torch.device, ad: bool = False, ledger: object | None = None,
 ) -> torch.Tensor:
     tx_pos, tx_power = transmitter_positions(scene, device=device)
     rx_pos = receiver_positions(scene, device=device, reference=tx_pos)
@@ -284,7 +275,9 @@ def los_path_gain(
     return exported["path_gain_matrix"]
 
 
-def apply_point_los_visibility(scene: SolverScene, rayd: object, los: torch.Tensor, *, device: torch.device) -> torch.Tensor:
+def apply_point_los_visibility(
+    scene: SolverScene, rayd: object, los: torch.Tensor, *, device: torch.device,
+) -> torch.Tensor:
     """Zero occluded (tx, rx) entries of a point-receiver LoS matrix."""
 
     if not scene.structures or los.numel() == 0:
@@ -349,13 +342,8 @@ MaterialTensors = tuple[
 
 
 def _grid_los_matrix(
-    scene: SolverScene,
-    grid: ReceiverGrid,
-    *,
-    device: torch.device,
-    los: torch.Tensor | None = None,
-    ad: bool = False,
-    ledger: object | None = None,
+    scene: SolverScene, grid: ReceiverGrid, *, device: torch.device,
+    los: torch.Tensor | None = None, ad: bool = False, ledger: object | None = None,
 ) -> torch.Tensor:
     if los is not None and len(scene.receivers) == 1 and scene.receivers[0] is grid:
         return los
@@ -364,11 +352,7 @@ def _grid_los_matrix(
 
 
 def _grid_visibility_masks(
-    scene: SolverScene,
-    rayd: RayDSceneResource,
-    grid: ReceiverGrid,
-    *,
-    device: torch.device,
+    scene: SolverScene, rayd: RayDSceneResource, grid: ReceiverGrid, *, device: torch.device,
 ) -> torch.Tensor:
     handle = rayd.require_resource()
     tx_pos, _ = transmitter_positions(scene, device=device)
@@ -387,14 +371,8 @@ def _grid_visibility_masks(
 
 
 def los_component_map(
-    scene: SolverScene,
-    rayd: RayDSceneResource,
-    grid: ReceiverGrid,
-    *,
-    device: torch.device,
-    los: torch.Tensor | None = None,
-    ad: bool = False,
-    ledger: object | None = None,
+    scene: SolverScene, rayd: RayDSceneResource, grid: ReceiverGrid, *, device: torch.device,
+    los: torch.Tensor | None = None, ad: bool = False, ledger: object | None = None,
 ) -> torch.Tensor:
     los = _grid_los_matrix(scene, grid, device=device, los=los, ad=ad, ledger=ledger)
     if ad:
@@ -436,16 +414,9 @@ def _sample_directions(count: int, *, reference: torch.Tensor) -> torch.Tensor:
 
 
 def transmission_component_map(
-    scene: SolverScene,
-    rayd: RayDSceneResource,
-    grid: ReceiverGrid,
-    *,
-    max_depth: int,
-    device: torch.device,
-    failure_state: CapacityFailureState,
-    los: torch.Tensor | None = None,
-    ad: bool = False,
-    ledger: object | None = None,
+    scene: SolverScene, rayd: RayDSceneResource, grid: ReceiverGrid, *, max_depth: int,
+    device: torch.device, failure_state: CapacityFailureState, los: torch.Tensor | None = None,
+    ad: bool = False, ledger: object | None = None,
 ) -> torch.Tensor:
     """Straight-penetration transmission radiomap (the transmission behavior,
  endpoint-connection context).
@@ -558,15 +529,8 @@ def transmission_component_map(
 
 
 def scattering_component_map(
-    scene: SolverScene,
-    rayd: RayDSceneResource,
-    grid: ReceiverGrid,
-    *,
-    samples: int,
-    seed: int,
-    device: torch.device,
-    ad: bool = False,
-    ledger: object | None = None,
+    scene: SolverScene, rayd: RayDSceneResource, grid: ReceiverGrid, *, samples: int, seed: int,
+    device: torch.device, ad: bool = False, ledger: object | None = None,
 ) -> tuple[torch.Tensor, dict[str, int]]:
     """Kirchhoff diffuse scattering radiomap from area-sampled rough faces.
 
@@ -627,17 +591,9 @@ def scattering_component_map(
 
 
 def reflection_component_maps_with_wedges(
-    scene: SolverScene,
-    rayd: RayDSceneResource,
-    grid: ReceiverGrid,
-    *,
-    samples: int,
-    max_depth: int,
-    device: torch.device,
-    material_tensors: MaterialTensors,
-    collect_wedges: bool = False,
-    ad: bool = False,
-    ledger: object | None = None,
+    scene: SolverScene, rayd: RayDSceneResource, grid: ReceiverGrid, *, samples: int,
+    max_depth: int, device: torch.device, material_tensors: MaterialTensors,
+    collect_wedges: bool = False, ad: bool = False, ledger: object | None = None,
 ) -> ReflectionComponentResult:
     if not scene.structures:
         tx_pos, _ = transmitter_positions(scene, device=device)
@@ -819,8 +775,7 @@ def _native_surface_group_edge_candidates(  # type: ignore[no-untyped-def]
 
 
 def _cached_primitive_edge_candidates(
-    rayd: RayDSceneResource,
-    selected: torch.Tensor,
+    rayd: RayDSceneResource, selected: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     key = (int(selected.data_ptr()), int(selected.numel()))
     cache = rayd.runtime_cache
@@ -835,8 +790,7 @@ def _cached_primitive_edge_candidates(
 
 
 def _discover_diffraction_edges_from_wedges(
-    rayd: RayDSceneResource,
-    wedges: WedgeEventBatch,
+    rayd: RayDSceneResource, wedges: WedgeEventBatch,
     edge_geometry: tuple[torch.Tensor, ...] | None = None,
     edge_candidates: tuple[torch.Tensor, torch.Tensor] | None = None,
 ) -> torch.Tensor:
@@ -899,12 +853,8 @@ def _discover_diffraction_edges_from_wedges(
 
 
 def _diffraction_states_from_edge_indices(
-    rayd: RayDSceneResource,
-    tx: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_power_index: int,
-    edge_indices: torch.Tensor,
-    edge_geometry: tuple[torch.Tensor, ...] | None = None,
+    rayd: RayDSceneResource, tx: torch.Tensor, tx_power: torch.Tensor, tx_power_index: int,
+    edge_indices: torch.Tensor, edge_geometry: tuple[torch.Tensor, ...] | None = None,
 ) -> tuple[torch.Tensor, ...]:
     (
         _selected,
@@ -941,12 +891,8 @@ def _diffraction_states_from_edge_indices(
 
 
 def _diffraction_states(
-    scene: SolverScene,
-    rayd: RayDSceneResource,
-    tx: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_power_index: int,
-    edge_geometry: tuple[torch.Tensor, ...] | None = None,
+    scene: SolverScene, rayd: RayDSceneResource, tx: torch.Tensor, tx_power: torch.Tensor,
+    tx_power_index: int, edge_geometry: tuple[torch.Tensor, ...] | None = None,
 ) -> tuple[torch.Tensor, ...]:
     del scene
     geometry = (
@@ -985,16 +931,9 @@ def _diffraction_states(
 
 
 def diffraction_component_map(
-    scene: SolverScene,
-    rayd: RayDSceneResource,
-    grid: ReceiverGrid,
-    *,
-    samples: int,
-    seed: int,
-    device: torch.device,
-    material_tensors: MaterialTensors,
-    wedge_events: tuple[WedgeEventBatch, ...] | None = None,
-    ad: bool = False,
+    scene: SolverScene, rayd: RayDSceneResource, grid: ReceiverGrid, *, samples: int, seed: int,
+    device: torch.device, material_tensors: MaterialTensors,
+    wedge_events: tuple[WedgeEventBatch, ...] | None = None, ad: bool = False,
     ledger: object | None = None,
 ) -> torch.Tensor:
     if not scene.structures:
@@ -1294,7 +1233,7 @@ def _enforce_workspace_budget(scene: SolverScene, config: Config) -> None:
 
 
 def _face_material_tensors(
-    scene: SolverScene, *, device: torch.device, ad: bool
+    scene: SolverScene, *, device: torch.device, ad: bool,
 ) -> tuple[torch.Tensor, ...]:
     """Per-face material tensors from the compiled material store.
 
@@ -1357,12 +1296,8 @@ def _mc_scattering_component(  # type: ignore[no-untyped-def]
 
 
 def _validate_native_component_capabilities(
-    config: Config,
-    *,
-    reflection_available: bool,
-    diffraction_available: bool,
-    transmission_available: bool,
-    scattering_available: bool,
+    config: Config, *, reflection_available: bool, diffraction_available: bool,
+    transmission_available: bool, scattering_available: bool,
 ) -> None:
     if "reflection" in config.components and not reflection_available:
         raise RuntimeError("reflection requires RayD native capability")
@@ -1375,14 +1310,8 @@ def _validate_native_component_capabilities(
 
 
 def _initial_los_state(
-    scene: SolverScene,
-    config: Config,
-    *,
-    device: torch.device,
-    rayd: object,
-    grid: ReceiverGrid | None,
-    ad: bool,
-    ledger: AdLaunchLedger,
+    scene: SolverScene, config: Config, *, device: torch.device, rayd: object,
+    grid: ReceiverGrid | None, ad: bool, ledger: AdLaunchLedger,
 ) -> tuple[torch.Tensor, int, int]:
     if "los" in config.components:
         los = los_path_gain(scene, device=device, ad=ad, ledger=ledger if ad else None)

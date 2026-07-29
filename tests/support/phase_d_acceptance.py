@@ -283,9 +283,7 @@ def _path_scattering(scene: Scene, seed: int, reference_frequency_hz: float) -> 
     return float(result.a[scattering].abs().square().sum())
 
 
-def _deterministic_scattering(
-    scene: Scene, seed: int, reference_frequency_hz: float
-) -> float:
+def _deterministic_scattering(scene: Scene, seed: int, reference_frequency_hz: float) -> float:
     del seed
     result = solve_deterministic(
         scene,

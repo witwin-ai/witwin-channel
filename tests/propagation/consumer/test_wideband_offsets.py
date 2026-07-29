@@ -85,14 +85,8 @@ def _empty_scene(frequency_hz: float) -> object:
 
 
 def _discover(
-    compiled,
-    sources,
-    sinks,
-    frequency_hz: float,
-    *,
-    components: frozenset[str],
-    max_depth: int = 1,
-    response: str = "scalar_transport",
+    compiled, sources, sinks, frequency_hz: float, *, components: frozenset[str],
+    max_depth: int = 1, response: str = "scalar_transport",
 ):
     return evaluate(
         compiled,
@@ -109,12 +103,7 @@ def _discover(
     )
 
 
-def _reflection_world(
-    frequency_hz: float,
-    material: dict,
-    *,
-    response: str = "scalar_transport",
-):
+def _reflection_world(frequency_hz: float, material: dict, *, response: str = "scalar_transport"):
     """One frozen reflection row off a single wall, ready for a sweep."""
 
     compiled = _wall_scene(frequency_hz, **material)
@@ -133,15 +122,8 @@ def _reflection_world(
 
 
 def _sweep(
-    compiled,
-    sources,
-    sinks,
-    prepared,
-    frequency_hz: float,
-    offsets: tuple[float, ...],
-    *,
-    response: str = "scalar_transport",
-    ad_mode: str = "none",
+    compiled, sources, sinks, prepared, frequency_hz: float, offsets: tuple[float, ...], *,
+    response: str = "scalar_transport", ad_mode: str = "none",
 ):
     return reevaluate(
         compiled,

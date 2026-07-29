@@ -126,9 +126,7 @@ __all__ = ["Config"]
     )
 
 
-def test_api_manifest_resolves_literal_module_override_through_reexport(
-    tmp_path: Path,
-):
+def test_api_manifest_resolves_literal_module_override_through_reexport(tmp_path: Path):
     _write(
         tmp_path / "witwin/channel/__init__.py",
         "from .api import Config\n__all__ = ['Config']\n",
@@ -208,9 +206,7 @@ channel_pair_cuda(
     assert entries[0]["token_count"] == 7
 
 
-def test_adr033_identity_normalization_preserves_frozen_native_hashes(
-    tmp_path: Path,
-):
+def test_adr033_identity_normalization_preserves_frozen_native_hashes(tmp_path: Path):
     former_function = "c" + "n_op"
     former_namespace = "channel" + "_native"
     former_macro = "CHANNEL" + "_NATIVE_WITH_RAYD"
@@ -316,7 +312,7 @@ def test_runtime_artifacts_reject_secret_bearing_payloads(tmp_path: Path):
 
 
 def test_environment_manifest_records_presence_but_not_environment_values(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setenv("RAYD_SOURCE_DIR", "do-not-record-this-path")
     monkeypatch.setattr(
@@ -377,7 +373,7 @@ def test_git_state_collapses_private_claude_paths(monkeypatch: pytest.MonkeyPatc
 
 
 def test_torch_runtime_query_is_isolated_from_channel(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ):
     recorded = {}
 
@@ -411,9 +407,7 @@ def test_torch_runtime_query_is_isolated_from_channel(
     assert "channel" not in recorded["command"][2]
 
 
-def test_build_manifest_records_compile_contract_and_redacts_cache_paths(
-    tmp_path: Path,
-):
+def test_build_manifest_records_compile_contract_and_redacts_cache_paths(tmp_path: Path):
     _write(
         tmp_path / "CMakeLists.txt",
         """
@@ -508,7 +502,7 @@ set(CMAKE_CUDA_SIMULATE_VERSION "19.44")
 
 
 def test_pytest_collection_uses_repository_local_basetemp(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ):
     recorded: dict[str, object] = {}
 
@@ -535,7 +529,7 @@ def test_pytest_collection_uses_repository_local_basetemp(
 
 
 def test_freeze_is_immutable_and_marks_partial_artifact_incomplete(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ):
     repo = tmp_path / "repo"
     output = tmp_path / "output"

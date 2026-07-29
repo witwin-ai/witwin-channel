@@ -108,10 +108,7 @@ def _add_scene_overlay(axis, spec) -> None:
     )
 
 
-def plot_three_cube_deterministic(
-    deterministic: FieldMap,
-    output: str | Path,
-) -> Path:
+def plot_three_cube_deterministic(deterministic: FieldMap, output: str | Path) -> Path:
     _validate_current_case(deterministic)
     spec = load_case("three_cube", "metal")
     valid = observation_valid_mask(spec, deterministic.x, deterministic.y)

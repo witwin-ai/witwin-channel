@@ -56,10 +56,7 @@ _COUPLED_RX = (0.55, 2.3, 4.8)
 _COUPLED_COMPONENTS = frozenset({"reflection", "diffraction"})
 
 
-def _wedge_scene(
-    tx: torch.Tensor | None = None,
-    rx: torch.Tensor | None = None,
-) -> Scene:
+def _wedge_scene(tx: torch.Tensor | None = None, rx: torch.Tensor | None = None) -> Scene:
     # Route through the module TX/RX (perturbed off the y = 0 mirror plane, see
     # _WEDGE_RX) rather than the shared scenes.py defaults, which are still on it.
     return wedge_diffraction_scene(
@@ -69,10 +66,7 @@ def _wedge_scene(
     )
 
 
-def _coupled_scene(
-    tx: torch.Tensor | None = None,
-    rx: torch.Tensor | None = None,
-) -> Scene:
+def _coupled_scene(tx: torch.Tensor | None = None, rx: torch.Tensor | None = None) -> Scene:
     return coupled_wall_wedge_scene(
         PhysicalMaterial(**_WEDGE_MATERIAL),
         tx=torch.tensor(_COUPLED_TX) if tx is None else tx,
@@ -81,10 +75,7 @@ def _coupled_scene(
 
 
 def _solve_wedge(
-    scene: Scene,
-    solver: str,
-    ad_mode: str,
-    *,
+    scene: Scene, solver: str, ad_mode: str, *,
     reference_frequency_hz: float | torch.Tensor = _FREQUENCY_HZ,
 ):
     components = frozenset({"diffraction"})
@@ -107,10 +98,7 @@ def _solve_wedge(
 
 
 def _solve_coupled(
-    scene: Scene,
-    ad_mode: str,
-    *,
-    reference_frequency_hz: float | torch.Tensor = _FREQUENCY_HZ,
+    scene: Scene, ad_mode: str, *, reference_frequency_hz: float | torch.Tensor = _FREQUENCY_HZ,
 ):
     return path_solve(
         scene,
@@ -136,11 +124,7 @@ def _loss(result, solver: str) -> torch.Tensor:
 
 
 def _fd_gradient_via_store(
-    scene: Scene,
-    solve,
-    solver: str,
-    leaf: torch.Tensor,
-    step: float,
+    scene: Scene, solve, solver: str, leaf: torch.Tensor, step: float,
 ) -> torch.Tensor:
     base = leaf.detach().clone()
 

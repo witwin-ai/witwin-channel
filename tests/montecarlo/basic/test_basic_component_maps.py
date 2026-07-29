@@ -27,9 +27,7 @@ def _transmitters(scene: Scene):
     return tuple(endpoint for endpoint in scene.endpoints if endpoint.role == "tx")
 
 
-def _replace_receivers(
-    scene: Scene, receiver: ReceiverGrid, *, structures=None
-) -> Scene:
+def _replace_receivers(scene: Scene, receiver: ReceiverGrid, *, structures=None) -> Scene:
     return Scene(
         structures=scene.structures if structures is None else structures,
         endpoints=(*_transmitters(scene), receiver),
@@ -56,15 +54,11 @@ def _non_square_grid_at_x(x: float) -> ReceiverGrid:
     )
 
 
-def _safe_normalize_vectors(
-    vectors: torch.Tensor, *, eps: float = 1.0e-6
-) -> torch.Tensor:
+def _safe_normalize_vectors(vectors: torch.Tensor, *, eps: float = 1.0e-6) -> torch.Tensor:
     return torch.nn.functional.normalize(vectors, dim=1, eps=eps)
 
 
-def _unsigned_angle(
-    a: torch.Tensor, b: torch.Tensor, axis: torch.Tensor
-) -> torch.Tensor:
+def _unsigned_angle(a: torch.Tensor, b: torch.Tensor, axis: torch.Tensor) -> torch.Tensor:
     cross = torch.cross(a, b, dim=1)
     signed_norm = torch.sign((cross * axis).sum(dim=1)) * torch.linalg.vector_norm(
         cross, dim=1
@@ -74,7 +68,7 @@ def _unsigned_angle(
 
 
 def _opposite_vertex(
-    face: torch.Tensor, shared0: torch.Tensor, shared1: torch.Tensor
+    face: torch.Tensor, shared0: torch.Tensor, shared1: torch.Tensor,
 ) -> torch.Tensor:
     face = face.to(dtype=torch.long)
     x_other = (face[:, 0] != shared0) & (face[:, 0] != shared1)
@@ -426,9 +420,7 @@ def test_diffraction_edge_geometry_native_matches_torch_reference():
         torch.testing.assert_close(native[idx], reference[idx], rtol=1e-6, atol=1e-6)
 
 
-def test_solver_diffraction_wedge_candidates_are_built_once_for_multiple_transmitters(
-    monkeypatch,
-):
+def test_solver_diffraction_wedge_candidates_are_built_once_for_multiple_transmitters(monkeypatch):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic diffraction")
     if not build_info()["uses_rayd_native"]:

@@ -55,9 +55,7 @@ _MC_COMPONENT_MAP_FIELDS = (
 )
 
 
-def _validate_capacity_component_maps(
-    maps: tuple[torch.Tensor, ...],
-) -> torch.Tensor:
+def _validate_capacity_component_maps(maps: tuple[torch.Tensor, ...]) -> torch.Tensor:
     if len(maps) != len(_MC_COMPONENT_MAP_FIELDS):
         raise ValueError("MC capacity sanitizer requires five component maps")
     reference = maps[0]
@@ -71,9 +69,7 @@ def _validate_capacity_component_maps(
 
 
 def _capacity_component_maps_result(
-    exported: object,
-    *,
-    reference: torch.Tensor,
+    exported: object, *, reference: torch.Tensor,
 ) -> tuple[torch.Tensor, ...]:
     if not isinstance(exported, dict) or set(exported) != set(_MC_COMPONENT_MAP_FIELDS):
         raise TypeError("native MC capacity map sanitizer returned bad fields")
@@ -86,8 +82,7 @@ def _capacity_component_maps_result(
 
 
 def _mc_capacity_failure_component_maps_sanitize_native(
-    failure_state_bits: torch.Tensor,
-    *maps: torch.Tensor,
+    failure_state_bits: torch.Tensor, *maps: torch.Tensor,
 ) -> tuple[torch.Tensor, ...]:
     reference = _validate_capacity_component_maps(maps)
     exported = _required_native_op("mc_capacity_failure_component_maps_sanitize")(
@@ -97,9 +92,7 @@ def _mc_capacity_failure_component_maps_sanitize_native(
 
 
 def _mc_capacity_failure_component_maps_sanitize_backward_native(
-    failure_state_bits: torch.Tensor,
-    reference: torch.Tensor,
-    *gradients: torch.Tensor | None,
+    failure_state_bits: torch.Tensor, reference: torch.Tensor, *gradients: torch.Tensor | None,
 ) -> tuple[torch.Tensor, ...]:
     exported = _required_native_op(
         "mc_capacity_failure_component_maps_sanitize_backward"
@@ -108,9 +101,7 @@ def _mc_capacity_failure_component_maps_sanitize_backward_native(
 
 
 def _mc_capacity_failure_component_maps_sanitize_jvp_native(
-    failure_state_bits: torch.Tensor,
-    reference: torch.Tensor,
-    *tangents: torch.Tensor | None,
+    failure_state_bits: torch.Tensor, reference: torch.Tensor, *tangents: torch.Tensor | None,
 ) -> tuple[torch.Tensor, ...]:
     exported = _required_native_op("mc_capacity_failure_component_maps_sanitize_jvp")(
         failure_state_bits, reference, *tangents
@@ -167,13 +158,8 @@ class _McCapacityFailureComponentMapsSanitizeFunction(torch.autograd.Function):
 
 
 def mc_capacity_failure_component_maps_sanitize(
-    los: torch.Tensor,
-    reflection: torch.Tensor,
-    diffraction: torch.Tensor,
-    transmission: torch.Tensor,
-    scattering: torch.Tensor,
-    *,
-    failure_state: CapacityFailureState,
+    los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor,
+    transmission: torch.Tensor, scattering: torch.Tensor, *, failure_state: CapacityFailureState,
 ) -> dict[str, torch.Tensor]:
     """Make every MC Basic component map inert after transaction failure."""
 
@@ -202,11 +188,8 @@ _MC_FINALIZE_FIELDS = (
 
 
 def mc_finalize_component_maps(
-    los: torch.Tensor,
-    reflection: torch.Tensor,
-    diffraction: torch.Tensor,
-    transmission: torch.Tensor,
-    scattering: torch.Tensor,
+    los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor,
+    transmission: torch.Tensor, scattering: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("los", los, dtype=torch.float32, ndim=3)
     validate_cuda_tensor("reflection", reflection, dtype=torch.float32, ndim=3)
@@ -299,11 +282,8 @@ class _McFinalizeComponentMapsAdFunction(torch.autograd.Function):
 
 
 def mc_finalize_component_maps_ad(
-    los: torch.Tensor,
-    reflection: torch.Tensor,
-    diffraction: torch.Tensor,
-    transmission: torch.Tensor,
-    scattering: torch.Tensor,
+    los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor,
+    transmission: torch.Tensor, scattering: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Differentiable:func:`mc_finalize_component_maps`."""
 
@@ -314,8 +294,7 @@ def mc_finalize_component_maps_ad(
 
 
 def mc_los_component_maps_adjoint(
-    grad_maps: torch.Tensor,
-    visible: torch.Tensor | None,
+    grad_maps: torch.Tensor, visible: torch.Tensor | None,
 ) -> torch.Tensor:
     """Adjoint of the (visibility-masked) LoS component-map layout."""
 
@@ -395,11 +374,7 @@ class _McLosGridMapsAdFunction(torch.autograd.Function):
 
 
 def mc_los_grid_maps_ad(
-    matrix: torch.Tensor,
-    visible: torch.Tensor | None,
-    *,
-    rows: int,
-    cols: int,
+    matrix: torch.Tensor, visible: torch.Tensor | None, *, rows: int, cols: int,
 ) -> torch.Tensor:
     """Differentiable grid component maps from a (tx, cells) matrix."""
 
@@ -420,7 +395,7 @@ def mc_zero_matrix(reference: torch.Tensor, *, rows: int, cols: int) -> torch.Te
 
 
 def mc_point_component_power(
-    path_gain: torch.Tensor, *, include_los: bool
+    path_gain: torch.Tensor, *, include_los: bool,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("path_gain", path_gain, dtype=torch.float32, ndim=2)
     exported = _required_native_op("mc_point_component_power")(
@@ -434,11 +409,7 @@ def mc_point_component_power(
 
 
 def mc_component_map_buffer(
-    reference: torch.Tensor,
-    *,
-    tx_count: int,
-    dim0: int,
-    dim1: int,
+    reference: torch.Tensor, *, tx_count: int, dim0: int, dim1: int,
 ) -> torch.Tensor:
     validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=2)
     if tx_count < 0 or dim0 < 0 or dim1 < 0:
@@ -457,10 +428,7 @@ def mc_component_map_buffer(
 
 
 def mc_store_component_map(
-    maps: torch.Tensor,
-    source: torch.Tensor,
-    *,
-    tx_index: int,
+    maps: torch.Tensor, source: torch.Tensor, *, tx_index: int,
 ) -> torch.Tensor:
     validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
     validate_cuda_tensor("source", source, dtype=torch.float32, ndim=2)
@@ -474,11 +442,7 @@ def mc_store_component_map(
 
 
 def mc_store_scaled_component_map(
-    maps: torch.Tensor,
-    source: torch.Tensor,
-    scale_values: torch.Tensor,
-    *,
-    tx_index: int,
+    maps: torch.Tensor, source: torch.Tensor, scale_values: torch.Tensor, *, tx_index: int,
     scale_index: int,
 ) -> torch.Tensor:
     validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
@@ -510,9 +474,7 @@ def mc_los_component_maps(los: torch.Tensor) -> torch.Tensor:
     return maps
 
 
-def mc_los_component_maps_from_matrix(
-    los: torch.Tensor, *, rows: int, cols: int
-) -> torch.Tensor:
+def mc_los_component_maps_from_matrix(los: torch.Tensor, *, rows: int, cols: int) -> torch.Tensor:
     validate_cuda_tensor("los", los, dtype=torch.float32, ndim=2)
     if rows < 0 or cols < 0:
         raise ValueError("rows and cols must be non-negative")
@@ -534,11 +496,7 @@ def mc_los_component_maps_from_matrix(
 
 
 def mc_apply_los_visibility(
-    maps: torch.Tensor,
-    los: torch.Tensor,
-    visible: torch.Tensor,
-    *,
-    tx_index: int,
+    maps: torch.Tensor, los: torch.Tensor, visible: torch.Tensor, *, tx_index: int,
 ) -> torch.Tensor:
     validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
     validate_cuda_tensor("los", los, dtype=torch.float32, ndim=2)
@@ -554,10 +512,7 @@ def mc_apply_los_visibility(
 
 
 def mc_los_visibility_inputs(
-    tx_positions: torch.Tensor,
-    *,
-    tx_index: int,
-    rx_count: int,
+    tx_positions: torch.Tensor, *, tx_index: int, rx_count: int,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor(
         "tx_positions", tx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -577,13 +532,8 @@ def mc_los_visibility_inputs(
 
 
 def mc_los_path_gain_backward(
-    tx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    rx_positions: torch.Tensor,
-    grad_output: torch.Tensor,
-    tx_polarizations: torch.Tensor,
-    *,
-    frequency_hz: float,
+    tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor,
+    grad_output: torch.Tensor, tx_polarizations: torch.Tensor, *, frequency_hz: float,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     validate_cuda_tensor(
         "tx_positions", tx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -654,19 +604,10 @@ def mc_los_path_gain_backward(
 
 
 def mc_los_path_gain_jvp(
-    tx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    rx_positions: torch.Tensor,
-    tx_tangent: torch.Tensor,
-    power_tangent: torch.Tensor,
-    rx_tangent: torch.Tensor,
-    has_tx_tangent: bool,
-    has_power_tangent: bool,
-    has_rx_tangent: bool,
-    tx_polarizations: torch.Tensor,
-    *,
-    frequency_hz: float,
-    frequency_tangent: float = 0.0,
+    tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor,
+    tx_tangent: torch.Tensor, power_tangent: torch.Tensor, rx_tangent: torch.Tensor,
+    has_tx_tangent: bool, has_power_tangent: bool, has_rx_tangent: bool,
+    tx_polarizations: torch.Tensor, *, frequency_hz: float, frequency_tangent: float = 0.0,
 ) -> torch.Tensor:
     validate_cuda_tensor(
         "tx_positions", tx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -739,9 +680,7 @@ class _McLosPathGainAdFunction(torch.autograd.Function):
  """
 
     @staticmethod
-    def forward(
-        tx_positions, tx_power, rx_positions, frequency, frequency_value, tx_pol
-    ):
+    def forward(tx_positions, tx_power, rx_positions, frequency, frequency_value, tx_pol):
         exported = path_los_export(
             tx_positions,
             tx_power,
@@ -839,12 +778,8 @@ class _McLosPathGainAdFunction(torch.autograd.Function):
 
 
 def mc_los_path_gain_ad(
-    tx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    rx_positions: torch.Tensor,
-    tx_polarizations: torch.Tensor,
-    *,
-    frequency: torch.Tensor | float,
+    tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor,
+    tx_polarizations: torch.Tensor, *, frequency: torch.Tensor | float,
     frequency_value: float | None = None,
 ) -> torch.Tensor:
     """Differentiable LoS path-gain matrix (endpoints and frequency).
@@ -869,31 +804,13 @@ def mc_los_path_gain_ad(
 
 
 def mc_slab_reflection_accumulate(
-    ray_o: torch.Tensor,
-    ray_d: torch.Tensor,
-    trace_valid: torch.Tensor,
-    trace_t: torch.Tensor,
-    trace_prim: torch.Tensor,
-    face_normals: torch.Tensor,
-    material_eta_r: torch.Tensor,
-    material_sigma: torch.Tensor,
-    material_gain: torch.Tensor,
-    material_valid: torch.Tensor,
-    material_thickness: torch.Tensor,
-    *,
-    tx_pol: torch.Tensor,
-    contribution_depth: int,
-    grid_axis: int,
-    grid_position: float,
-    grid_coord0_min: float,
-    grid_coord0_max: float,
-    grid_coord1_min: float,
-    grid_coord1_max: float,
-    grid_resolution0: int,
-    grid_resolution1: int,
-    wavelength: float,
-    solid_angle_per_ray: float,
-    grid_cell_area: float,
+    ray_o: torch.Tensor, ray_d: torch.Tensor, trace_valid: torch.Tensor, trace_t: torch.Tensor,
+    trace_prim: torch.Tensor, face_normals: torch.Tensor, material_eta_r: torch.Tensor,
+    material_sigma: torch.Tensor, material_gain: torch.Tensor, material_valid: torch.Tensor,
+    material_thickness: torch.Tensor, *, tx_pol: torch.Tensor, contribution_depth: int,
+    grid_axis: int, grid_position: float, grid_coord0_min: float, grid_coord0_max: float,
+    grid_coord1_min: float, grid_coord1_max: float, grid_resolution0: int, grid_resolution1: int,
+    wavelength: float, solid_angle_per_ray: float, grid_cell_area: float,
 ) -> torch.Tensor:
     """Accumulate finite-thickness slab specular reflections into a radiomap.
 
@@ -955,35 +872,14 @@ def mc_reflection_ad_max_depth() -> int:
 
 
 def mc_slab_reflection_accumulate_backward(
-    ray_o: torch.Tensor,
-    ray_d: torch.Tensor,
-    trace_valid: torch.Tensor,
-    trace_t: torch.Tensor,
-    trace_prim: torch.Tensor,
-    face_normals: torch.Tensor,
-    material_eta_r: torch.Tensor,
-    material_sigma: torch.Tensor,
-    material_gain: torch.Tensor,
-    material_valid: torch.Tensor,
-    material_thickness: torch.Tensor,
-    grad_output: torch.Tensor,
-    *,
-    tx_pol: torch.Tensor,
-    need_materials: bool,
-    need_frequency: bool,
-    contribution_depth: int,
-    grid_axis: int,
-    grid_position: float,
-    grid_coord0_min: float,
-    grid_coord0_max: float,
-    grid_coord1_min: float,
-    grid_coord1_max: float,
-    grid_resolution0: int,
-    grid_resolution1: int,
-    wavelength: float,
-    solid_angle_per_ray: float,
-    grid_cell_area: float,
-    wavelength_dfreq: float,
+    ray_o: torch.Tensor, ray_d: torch.Tensor, trace_valid: torch.Tensor, trace_t: torch.Tensor,
+    trace_prim: torch.Tensor, face_normals: torch.Tensor, material_eta_r: torch.Tensor,
+    material_sigma: torch.Tensor, material_gain: torch.Tensor, material_valid: torch.Tensor,
+    material_thickness: torch.Tensor, grad_output: torch.Tensor, *, tx_pol: torch.Tensor,
+    need_materials: bool, need_frequency: bool, contribution_depth: int, grid_axis: int,
+    grid_position: float, grid_coord0_min: float, grid_coord0_max: float, grid_coord1_min: float,
+    grid_coord1_max: float, grid_resolution0: int, grid_resolution1: int, wavelength: float,
+    solid_angle_per_ray: float, grid_cell_area: float, wavelength_dfreq: float,
 ) -> tuple[torch.Tensor, ...]:
     gradients = _required_native_op("mc_slab_reflection_accumulate_backward")(
         ray_o,
@@ -1024,36 +920,15 @@ def mc_slab_reflection_accumulate_backward(
 
 
 def mc_slab_reflection_accumulate_jvp(
-    ray_o: torch.Tensor,
-    ray_d: torch.Tensor,
-    trace_valid: torch.Tensor,
-    trace_t: torch.Tensor,
-    trace_prim: torch.Tensor,
-    face_normals: torch.Tensor,
-    material_eta_r: torch.Tensor,
-    material_sigma: torch.Tensor,
-    material_gain: torch.Tensor,
-    material_valid: torch.Tensor,
-    material_thickness: torch.Tensor,
-    tangent_eta_r: torch.Tensor | None,
-    tangent_sigma: torch.Tensor | None,
-    tangent_gain: torch.Tensor | None,
-    tangent_thickness: torch.Tensor | None,
-    *,
-    tx_pol: torch.Tensor,
-    contribution_depth: int,
-    grid_axis: int,
-    grid_position: float,
-    grid_coord0_min: float,
-    grid_coord0_max: float,
-    grid_coord1_min: float,
-    grid_coord1_max: float,
-    grid_resolution0: int,
-    grid_resolution1: int,
-    wavelength: float,
-    solid_angle_per_ray: float,
-    grid_cell_area: float,
-    wavelength_tangent: float,
+    ray_o: torch.Tensor, ray_d: torch.Tensor, trace_valid: torch.Tensor, trace_t: torch.Tensor,
+    trace_prim: torch.Tensor, face_normals: torch.Tensor, material_eta_r: torch.Tensor,
+    material_sigma: torch.Tensor, material_gain: torch.Tensor, material_valid: torch.Tensor,
+    material_thickness: torch.Tensor, tangent_eta_r: torch.Tensor | None,
+    tangent_sigma: torch.Tensor | None, tangent_gain: torch.Tensor | None,
+    tangent_thickness: torch.Tensor | None, *, tx_pol: torch.Tensor, contribution_depth: int,
+    grid_axis: int, grid_position: float, grid_coord0_min: float, grid_coord0_max: float,
+    grid_coord1_min: float, grid_coord1_max: float, grid_resolution0: int, grid_resolution1: int,
+    wavelength: float, solid_angle_per_ray: float, grid_cell_area: float, wavelength_tangent: float,
 ) -> torch.Tensor:
     output = _required_native_op("mc_slab_reflection_accumulate_jvp")(
         ray_o,
@@ -1110,20 +985,8 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        tx_anchor,
-        eta_r,
-        sigma_e,
-        gain,
-        thickness,
-        frequency,
-        ray_o,
-        ray_d,
-        trace_valid,
-        trace_t,
-        trace_prim,
-        face_normals,
-        material_valid,
-        params,
+        tx_anchor, eta_r, sigma_e, gain, thickness, frequency, ray_o, ray_d, trace_valid, trace_t,
+        trace_prim, face_normals, material_valid, params,
     ):
         return mc_slab_reflection_accumulate(
             ray_o,
@@ -1274,21 +1137,8 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx,
-        t_anchor,
-        t_eta,
-        t_sigma,
-        t_gain,
-        t_thickness,
-        t_frequency,
-        t_ray_o,
-        t_ray_d,
-        t_trace_valid,
-        t_trace_t,
-        t_trace_prim,
-        t_face_normals,
-        t_material_valid,
-        _t_params,
+        ctx, t_anchor, t_eta, t_sigma, t_gain, t_thickness, t_frequency, t_ray_o, t_ray_d,
+        t_trace_valid, t_trace_t, t_trace_prim, t_face_normals, t_material_valid, _t_params,
     ):
         _ad_reject_fixed_tangents(
             "mc_slab_reflection_accumulate_ad",
@@ -1395,32 +1245,13 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
 
 
 def mc_slab_reflection_accumulate_ad(
-    tx_anchor: torch.Tensor,
-    material_eta_r: torch.Tensor,
-    material_sigma: torch.Tensor,
-    material_gain: torch.Tensor,
-    material_thickness: torch.Tensor,
-    frequency: torch.Tensor | float,
-    ray_o: torch.Tensor,
-    ray_d: torch.Tensor,
-    trace_valid: torch.Tensor,
-    trace_t: torch.Tensor,
-    trace_prim: torch.Tensor,
-    face_normals: torch.Tensor,
-    material_valid: torch.Tensor,
-    *,
-    tx_pol: torch.Tensor,
-    contribution_depth: int,
-    grid_axis: int,
-    grid_position: float,
-    grid_coord0_min: float,
-    grid_coord0_max: float,
-    grid_coord1_min: float,
-    grid_coord1_max: float,
-    grid_resolution0: int,
-    grid_resolution1: int,
-    wavelength: float,
-    solid_angle_per_ray: float,
+    tx_anchor: torch.Tensor, material_eta_r: torch.Tensor, material_sigma: torch.Tensor,
+    material_gain: torch.Tensor, material_thickness: torch.Tensor, frequency: torch.Tensor | float,
+    ray_o: torch.Tensor, ray_d: torch.Tensor, trace_valid: torch.Tensor, trace_t: torch.Tensor,
+    trace_prim: torch.Tensor, face_normals: torch.Tensor, material_valid: torch.Tensor, *,
+    tx_pol: torch.Tensor, contribution_depth: int, grid_axis: int, grid_position: float,
+    grid_coord0_min: float, grid_coord0_max: float, grid_coord1_min: float, grid_coord1_max: float,
+    grid_resolution0: int, grid_resolution1: int, wavelength: float, solid_angle_per_ray: float,
     grid_cell_area: float,
 ) -> torch.Tensor:
     """Differentiable:func:`mc_slab_reflection_accumulate` (one tx)."""
@@ -1502,29 +1333,13 @@ def mc_utd_diffraction_tape_accumulate(*args: object) -> torch.Tensor:
 
 
 def mc_utd_diffraction_tape_accumulate_backward(
-    tape_tensors: tuple[torch.Tensor, ...],
-    state_tensors: tuple[torch.Tensor, ...],
-    material_eta_r: torch.Tensor,
-    material_sigma: torch.Tensor,
-    material_mu_r: torch.Tensor,
-    material_gain: torch.Tensor,
-    material_valid: torch.Tensor,
-    material_thickness: torch.Tensor,
-    grad_output: torch.Tensor,
-    *,
-    tx_pol: torch.Tensor,
-    need_materials: bool,
-    need_source: bool,
-    need_frequency: bool,
-    grid_axis: int,
-    grid_position: float,
-    grid_resolution0: int,
-    grid_resolution1: int,
-    wavelength: float,
-    grid_cell_area: float,
-    seed: int,
-    total_edge_length: float,
-    wavelength_dfreq: float,
+    tape_tensors: tuple[torch.Tensor, ...], state_tensors: tuple[torch.Tensor, ...],
+    material_eta_r: torch.Tensor, material_sigma: torch.Tensor, material_mu_r: torch.Tensor,
+    material_gain: torch.Tensor, material_valid: torch.Tensor, material_thickness: torch.Tensor,
+    grad_output: torch.Tensor, *, tx_pol: torch.Tensor, need_materials: bool, need_source: bool,
+    need_frequency: bool, grid_axis: int, grid_position: float, grid_resolution0: int,
+    grid_resolution1: int, wavelength: float, grid_cell_area: float, seed: int,
+    total_edge_length: float, wavelength_dfreq: float,
 ) -> tuple[torch.Tensor, ...]:
     gradients = _required_native_op("mc_utd_diffraction_tape_accumulate_backward")(
         *tape_tensors,
@@ -1559,30 +1374,14 @@ def mc_utd_diffraction_tape_accumulate_backward(
 
 
 def mc_utd_diffraction_tape_accumulate_jvp(
-    tape_tensors: tuple[torch.Tensor, ...],
-    state_tensors: tuple[torch.Tensor, ...],
-    material_eta_r: torch.Tensor,
-    material_sigma: torch.Tensor,
-    material_mu_r: torch.Tensor,
-    material_gain: torch.Tensor,
-    material_valid: torch.Tensor,
-    material_thickness: torch.Tensor,
-    tangent_eta_r: torch.Tensor | None,
-    tangent_sigma: torch.Tensor | None,
-    tangent_gain: torch.Tensor | None,
-    tangent_thickness: torch.Tensor | None,
-    tangent_source: torch.Tensor | None,
-    *,
-    tx_pol: torch.Tensor,
-    grid_axis: int,
-    grid_position: float,
-    grid_resolution0: int,
-    grid_resolution1: int,
-    wavelength: float,
-    grid_cell_area: float,
-    seed: int,
-    total_edge_length: float,
-    wavelength_tangent: float,
+    tape_tensors: tuple[torch.Tensor, ...], state_tensors: tuple[torch.Tensor, ...],
+    material_eta_r: torch.Tensor, material_sigma: torch.Tensor, material_mu_r: torch.Tensor,
+    material_gain: torch.Tensor, material_valid: torch.Tensor, material_thickness: torch.Tensor,
+    tangent_eta_r: torch.Tensor | None, tangent_sigma: torch.Tensor | None,
+    tangent_gain: torch.Tensor | None, tangent_thickness: torch.Tensor | None,
+    tangent_source: torch.Tensor | None, *, tx_pol: torch.Tensor, grid_axis: int,
+    grid_position: float, grid_resolution0: int, grid_resolution1: int, wavelength: float,
+    grid_cell_area: float, seed: int, total_edge_length: float, wavelength_tangent: float,
 ) -> torch.Tensor:
     output = _required_native_op("mc_utd_diffraction_tape_accumulate_jvp")(
         *tape_tensors,
@@ -1640,30 +1439,10 @@ class _McDiffractionMapAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        tx_anchor,
-        eta_r,
-        sigma_e,
-        gain,
-        thickness,
-        frequency,
-        tape_active,
-        tape_state,
-        tape_cell,
-        tape_u,
-        state_edge_pos,
-        state_edge_dir,
-        state_t_min,
-        state_t_max,
-        state_n0,
-        state_n1,
-        state_prim0,
-        state_prim1,
-        state_exterior_angle,
-        state_src,
-        state_src_power,
-        material_mu_r,
-        material_valid,
-        params,
+        tx_anchor, eta_r, sigma_e, gain, thickness, frequency, tape_active, tape_state, tape_cell,
+        tape_u, state_edge_pos, state_edge_dir, state_t_min, state_t_max, state_n0, state_n1,
+        state_prim0, state_prim1, state_exterior_angle, state_src, state_src_power, material_mu_r,
+        material_valid, params,
     ):
         return mc_utd_diffraction_tape_accumulate(
             tape_active,
@@ -1885,30 +1664,13 @@ class _McDiffractionMapAdFunction(torch.autograd.Function):
 
 
 def mc_utd_diffraction_tape_accumulate_ad(
-    tx_anchor: torch.Tensor,
-    material_eta_r: torch.Tensor,
-    material_sigma: torch.Tensor,
-    material_gain: torch.Tensor,
-    material_thickness: torch.Tensor,
-    frequency: torch.Tensor | float,
-    tape_tensors: tuple[torch.Tensor, ...],
-    state_tensors: tuple[torch.Tensor, ...],
-    material_mu_r: torch.Tensor,
-    material_valid: torch.Tensor,
-    *,
-    tx_pol: torch.Tensor,
-    grid_axis: int,
-    grid_position: float,
-    grid_coord0_min: float,
-    grid_coord0_max: float,
-    grid_coord1_min: float,
-    grid_coord1_max: float,
-    grid_resolution0: int,
-    grid_resolution1: int,
-    wavelength: float,
-    grid_cell_area: float,
-    seed: int,
-    total_edge_length: float,
+    tx_anchor: torch.Tensor, material_eta_r: torch.Tensor, material_sigma: torch.Tensor,
+    material_gain: torch.Tensor, material_thickness: torch.Tensor, frequency: torch.Tensor | float,
+    tape_tensors: tuple[torch.Tensor, ...], state_tensors: tuple[torch.Tensor, ...],
+    material_mu_r: torch.Tensor, material_valid: torch.Tensor, *, tx_pol: torch.Tensor,
+    grid_axis: int, grid_position: float, grid_coord0_min: float, grid_coord0_max: float,
+    grid_coord1_min: float, grid_coord1_max: float, grid_resolution0: int, grid_resolution1: int,
+    wavelength: float, grid_cell_area: float, seed: int, total_edge_length: float,
 ) -> torch.Tensor:
     """Differentiable:func:`mc_utd_diffraction_tape_accumulate` (one tx)."""
 
@@ -1950,10 +1712,7 @@ def mc_utd_diffraction_tape_accumulate_ad(
 # basic sampling
 # -------------------------------------------------------------------------
 def mc_reflection_launch_inputs(
-    tx_positions: torch.Tensor,
-    *,
-    tx_index: int,
-    sample_count: int,
+    tx_positions: torch.Tensor, *, tx_index: int, sample_count: int,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor(
         "tx_positions", tx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -1979,7 +1738,7 @@ def mc_reflection_launch_inputs(
 
 
 def _validate_mc_diffraction_discovery_args(
-    args: tuple[torch.Tensor, ...], *, counted: bool
+    args: tuple[torch.Tensor, ...], *, counted: bool,
 ) -> None:
     expected = 16 if counted else 15
     if len(args) != expected:
@@ -2043,9 +1802,7 @@ def mc_diffraction_discover_edges_counted(*args: torch.Tensor) -> torch.Tensor:
     return out
 
 
-def mc_diffraction_state_wi(
-    state_edge_pos: torch.Tensor, state_src: torch.Tensor
-) -> torch.Tensor:
+def mc_diffraction_state_wi(state_edge_pos: torch.Tensor, state_src: torch.Tensor) -> torch.Tensor:
     validate_cuda_tensor(
         "state_edge_pos",
         state_edge_pos,
@@ -2068,17 +1825,9 @@ def mc_diffraction_state_wi(
 
 
 def mc_diffraction_state_pack(
-    edge_indices: torch.Tensor,
-    edge_pos: torch.Tensor,
-    edge_dir: torch.Tensor,
-    line_min: torch.Tensor,
-    line_max: torch.Tensor,
-    n0: torch.Tensor,
-    n1: torch.Tensor,
-    face0: torch.Tensor,
-    face1: torch.Tensor,
-    exterior_angle: torch.Tensor,
-    tx: torch.Tensor,
+    edge_indices: torch.Tensor, edge_pos: torch.Tensor, edge_dir: torch.Tensor,
+    line_min: torch.Tensor, line_max: torch.Tensor, n0: torch.Tensor, n1: torch.Tensor,
+    face0: torch.Tensor, face1: torch.Tensor, exterior_angle: torch.Tensor, tx: torch.Tensor,
     tx_power: torch.Tensor,
 ) -> tuple[torch.Tensor, ...]:
     validate_cuda_tensor("edge_indices", edge_indices, dtype=torch.int32, ndim=1)
@@ -2159,25 +1908,12 @@ class McTransmissionWallProduct:
 
 
 def _validate_inputs(
-    valid: torch.Tensor,
-    num_hits: torch.Tensor,
-    reached_target: torch.Tensor,
-    direction: torch.Tensor,
-    normal: torch.Tensor,
-    global_primitive_id: torch.Tensor,
-    face_material_id: torch.Tensor,
-    geometry_mode_id: torch.Tensor,
-    layer_offset: torch.Tensor,
-    layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    pair_polarization: torch.Tensor,
-    base_power: torch.Tensor,
-    failure_state: CapacityFailureState,
-    *,
-    frequency_hz: float,
+    valid: torch.Tensor, num_hits: torch.Tensor, reached_target: torch.Tensor,
+    direction: torch.Tensor, normal: torch.Tensor, global_primitive_id: torch.Tensor,
+    face_material_id: torch.Tensor, geometry_mode_id: torch.Tensor, layer_offset: torch.Tensor,
+    layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, pair_polarization: torch.Tensor,
+    base_power: torch.Tensor, failure_state: CapacityFailureState, *, frequency_hz: float,
 ) -> tuple[int, int]:
     validate_cuda_tensor("valid", valid, dtype=torch.bool, ndim=2)
     rows, hit_capacity = valid.shape
@@ -2265,24 +2001,12 @@ def _validate_inputs(
 
 
 def _arguments(
-    valid: torch.Tensor,
-    num_hits: torch.Tensor,
-    reached_target: torch.Tensor,
-    direction: torch.Tensor,
-    normal: torch.Tensor,
-    global_primitive_id: torch.Tensor,
-    face_material_id: torch.Tensor,
-    geometry_mode_id: torch.Tensor,
-    layer_offset: torch.Tensor,
-    layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    pair_polarization: torch.Tensor,
-    base_power: torch.Tensor,
-    frequency_hz: float,
-    failure_state: CapacityFailureState,
+    valid: torch.Tensor, num_hits: torch.Tensor, reached_target: torch.Tensor,
+    direction: torch.Tensor, normal: torch.Tensor, global_primitive_id: torch.Tensor,
+    face_material_id: torch.Tensor, geometry_mode_id: torch.Tensor, layer_offset: torch.Tensor,
+    layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, pair_polarization: torch.Tensor,
+    base_power: torch.Tensor, frequency_hz: float, failure_state: CapacityFailureState,
 ) -> tuple[object, ...]:
     return (
         valid,
@@ -2332,25 +2056,12 @@ def _result(exported: object, *, rows: int) -> McTransmissionWallProduct:
 
 
 def mc_transmission_wall_product(
-    valid: torch.Tensor,
-    num_hits: torch.Tensor,
-    reached_target: torch.Tensor,
-    direction: torch.Tensor,
-    normal: torch.Tensor,
-    global_primitive_id: torch.Tensor,
-    face_material_id: torch.Tensor,
-    geometry_mode_id: torch.Tensor,
-    layer_offset: torch.Tensor,
-    layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    pair_polarization: torch.Tensor,
-    base_power: torch.Tensor,
-    failure_state: CapacityFailureState,
-    *,
-    frequency_hz: float,
+    valid: torch.Tensor, num_hits: torch.Tensor, reached_target: torch.Tensor,
+    direction: torch.Tensor, normal: torch.Tensor, global_primitive_id: torch.Tensor,
+    face_material_id: torch.Tensor, geometry_mode_id: torch.Tensor, layer_offset: torch.Tensor,
+    layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, pair_polarization: torch.Tensor,
+    base_power: torch.Tensor, failure_state: CapacityFailureState, *, frequency_hz: float,
 ) -> McTransmissionWallProduct:
     """Evaluate the live segment penetration fixed-capacity MC estimator."""
 
@@ -2400,11 +2111,8 @@ def mc_transmission_wall_product(
 
 
 def mc_transmission_wall_product_backward(
-    *inputs: torch.Tensor,
-    frequency_hz: float,
-    failure_state: CapacityFailureState,
-    grad_scaled_power: torch.Tensor | None,
-    grad_transmittance: torch.Tensor | None,
+    *inputs: torch.Tensor, frequency_hz: float, failure_state: CapacityFailureState,
+    grad_scaled_power: torch.Tensor | None, grad_transmittance: torch.Tensor | None,
 ) -> tuple[torch.Tensor, ...]:
     if len(inputs) != 16:
         raise ValueError("MC transmission wall-product backward requires 16 inputs")
@@ -2451,15 +2159,10 @@ def mc_transmission_wall_product_backward(
 
 
 def mc_transmission_wall_product_jvp(
-    *inputs: torch.Tensor,
-    frequency_hz: float,
-    failure_state: CapacityFailureState,
-    tangent_direction: torch.Tensor | None,
-    tangent_normal: torch.Tensor | None,
-    tangent_layer_thickness_m: torch.Tensor | None,
-    tangent_layer_eps_r: torch.Tensor | None,
-    tangent_layer_sigma_e: torch.Tensor | None,
-    tangent_base_power: torch.Tensor | None,
+    *inputs: torch.Tensor, frequency_hz: float, failure_state: CapacityFailureState,
+    tangent_direction: torch.Tensor | None, tangent_normal: torch.Tensor | None,
+    tangent_layer_thickness_m: torch.Tensor | None, tangent_layer_eps_r: torch.Tensor | None,
+    tangent_layer_sigma_e: torch.Tensor | None, tangent_base_power: torch.Tensor | None,
     tangent_frequency: float,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     if len(inputs) != 16:
@@ -2631,26 +2334,13 @@ class _McTransmissionWallProductAd(torch.autograd.Function):
 
 
 def mc_transmission_wall_product_ad(
-    valid: torch.Tensor,
-    num_hits: torch.Tensor,
-    reached_target: torch.Tensor,
-    direction: torch.Tensor,
-    normal: torch.Tensor,
-    global_primitive_id: torch.Tensor,
-    face_material_id: torch.Tensor,
-    geometry_mode_id: torch.Tensor,
-    layer_offset: torch.Tensor,
-    layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    pair_polarization: torch.Tensor,
-    base_power: torch.Tensor,
-    frequency: torch.Tensor | float,
-    failure_state: CapacityFailureState,
-    *,
-    frequency_value: float | None = None,
+    valid: torch.Tensor, num_hits: torch.Tensor, reached_target: torch.Tensor,
+    direction: torch.Tensor, normal: torch.Tensor, global_primitive_id: torch.Tensor,
+    face_material_id: torch.Tensor, geometry_mode_id: torch.Tensor, layer_offset: torch.Tensor,
+    layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, pair_polarization: torch.Tensor,
+    base_power: torch.Tensor, frequency: torch.Tensor | float, failure_state: CapacityFailureState,
+    *, frequency_value: float | None = None,
 ) -> McTransmissionWallProduct:
     """Differentiable fixed-topology wall product with native VJP/JVP."""
 
@@ -2698,10 +2388,7 @@ __all__ = [
 # bdpt maps
 # -------------------------------------------------------------------------
 def bdpt_store_point_component_column(
-    target: torch.Tensor,
-    source: torch.Tensor,
-    *,
-    rx_index: int,
+    target: torch.Tensor, source: torch.Tensor, *, rx_index: int,
 ) -> torch.Tensor:
     validate_cuda_tensor("target", target, dtype=torch.float32, ndim=2)
     validate_cuda_tensor("source", source, dtype=torch.float32, ndim=3)
@@ -2724,11 +2411,8 @@ def bdpt_store_point_component_column(
 
 
 def bdpt_finalize_point_components(
-    los: torch.Tensor,
-    reflection: torch.Tensor,
-    diffraction: torch.Tensor,
-    transmission: torch.Tensor,
-    scattering: torch.Tensor,
+    los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor,
+    transmission: torch.Tensor, scattering: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("los", los, dtype=torch.float32, ndim=2)
     validate_cuda_tensor("reflection", reflection, dtype=torch.float32, ndim=2)
@@ -2768,7 +2452,7 @@ def bdpt_finalize_point_components(
 
 
 def bdpt_point_component_power(
-    path_gain: torch.Tensor, *, include_los: bool
+    path_gain: torch.Tensor, *, include_los: bool,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("path_gain", path_gain, dtype=torch.float32, ndim=2)
     exported = _required_native_op("bdpt_point_component_power")(
@@ -2782,8 +2466,7 @@ def bdpt_point_component_power(
 
 
 def bdpt_transmitter_tensors(
-    flat_positions: tuple[float, ...],
-    powers: tuple[float, ...],
+    flat_positions: tuple[float, ...], powers: tuple[float, ...],
 ) -> dict[str, torch.Tensor]:
     if len(flat_positions) % 3 != 0:
         raise ValueError("flat_positions must contain xyz triples")
@@ -2811,12 +2494,8 @@ def bdpt_host_vec3_tensor(flat_positions: tuple[float, ...]) -> torch.Tensor:
 
 
 def bdpt_receiver_grid_points(
-    reference: torch.Tensor,
-    *,
-    origin: tuple[float, float, float],
-    x_axis: tuple[float, float, float],
-    y_axis: tuple[float, float, float],
-    shape: tuple[int, int],
+    reference: torch.Tensor, *, origin: tuple[float, float, float],
+    x_axis: tuple[float, float, float], y_axis: tuple[float, float, float], shape: tuple[int, int],
     spacing: tuple[float, float],
 ) -> torch.Tensor:
     validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=2)
@@ -2856,12 +2535,8 @@ def bdpt_receiver_grid_points(
 
 
 def bdpt_los_export(
-    tx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    rx_positions: torch.Tensor,
-    tx_polarizations: torch.Tensor,
-    *,
-    frequency_hz: float,
+    tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor,
+    tx_polarizations: torch.Tensor, *, frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor(
         "tx_positions", tx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -2911,9 +2586,7 @@ def bdpt_los_component_maps(los: torch.Tensor) -> torch.Tensor:
     return maps
 
 
-def bdpt_los_component_maps_from_matrix(
-    los: torch.Tensor, *, rows: int, cols: int
-) -> torch.Tensor:
+def bdpt_los_component_maps_from_matrix(los: torch.Tensor, *, rows: int, cols: int) -> torch.Tensor:
     validate_cuda_tensor("los", los, dtype=torch.float32, ndim=2)
     if rows < 0 or cols < 0:
         raise ValueError("rows and cols must be non-negative")
@@ -2935,10 +2608,7 @@ def bdpt_los_component_maps_from_matrix(
 
 
 def bdpt_los_visibility_inputs(
-    tx_positions: torch.Tensor,
-    *,
-    tx_index: int,
-    rx_count: int,
+    tx_positions: torch.Tensor, *, tx_index: int, rx_count: int,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor(
         "tx_positions", tx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -2958,11 +2628,7 @@ def bdpt_los_visibility_inputs(
 
 
 def bdpt_apply_los_visibility(
-    maps: torch.Tensor,
-    los: torch.Tensor,
-    visible: torch.Tensor,
-    *,
-    tx_index: int,
+    maps: torch.Tensor, los: torch.Tensor, visible: torch.Tensor, *, tx_index: int,
 ) -> torch.Tensor:
     validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
     validate_cuda_tensor("los", los, dtype=torch.float32, ndim=2)
@@ -2981,11 +2647,7 @@ def bdpt_apply_los_visibility(
 
 
 def bdpt_component_map_buffer(
-    reference: torch.Tensor,
-    *,
-    tx_count: int,
-    dim0: int,
-    dim1: int,
+    reference: torch.Tensor, *, tx_count: int, dim0: int, dim1: int,
 ) -> torch.Tensor:
     validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=2)
     if tx_count < 0 or dim0 < 0 or dim1 < 0:
@@ -3006,10 +2668,7 @@ def bdpt_component_map_buffer(
 
 
 def bdpt_store_component_map(
-    maps: torch.Tensor,
-    source: torch.Tensor,
-    *,
-    tx_index: int,
+    maps: torch.Tensor, source: torch.Tensor, *, tx_index: int,
 ) -> torch.Tensor:
     validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
     validate_cuda_tensor("source", source, dtype=torch.float32, ndim=2)
@@ -3021,11 +2680,7 @@ def bdpt_store_component_map(
 
 
 def bdpt_store_scaled_component_map(
-    maps: torch.Tensor,
-    source: torch.Tensor,
-    scale_values: torch.Tensor,
-    *,
-    tx_index: int,
+    maps: torch.Tensor, source: torch.Tensor, scale_values: torch.Tensor, *, tx_index: int,
     scale_index: int,
 ) -> torch.Tensor:
     validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
@@ -3047,11 +2702,8 @@ def bdpt_store_scaled_component_map(
 
 
 def bdpt_finalize_component_maps(
-    los: torch.Tensor,
-    reflection: torch.Tensor,
-    diffraction: torch.Tensor,
-    transmission: torch.Tensor,
-    scattering: torch.Tensor,
+    los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor,
+    transmission: torch.Tensor, scattering: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("los", los, dtype=torch.float32, ndim=3)
     validate_cuda_tensor("reflection", reflection, dtype=torch.float32, ndim=3)
@@ -3116,21 +2768,11 @@ _BDPT_FINALIZE_TANGENTS = (
 
 
 def _bdpt_finalize_backward(
-    op_name: str,
-    ndim: int,
-    los: torch.Tensor,
-    reflection: torch.Tensor,
-    diffraction: torch.Tensor,
-    transmission: torch.Tensor,
-    scattering: torch.Tensor,
-    *,
-    grad_path_gain: torch.Tensor | None,
-    grad_los_power: torch.Tensor | None,
-    grad_reflection_power: torch.Tensor | None,
-    grad_diffraction_power: torch.Tensor | None,
-    grad_transmission_power: torch.Tensor | None,
-    grad_scattering_power: torch.Tensor | None,
-    need_grad_components: bool,
+    op_name: str, ndim: int, los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor,
+    transmission: torch.Tensor, scattering: torch.Tensor, *, grad_path_gain: torch.Tensor | None,
+    grad_los_power: torch.Tensor | None, grad_reflection_power: torch.Tensor | None,
+    grad_diffraction_power: torch.Tensor | None, grad_transmission_power: torch.Tensor | None,
+    grad_scattering_power: torch.Tensor | None, need_grad_components: bool,
 ) -> dict[str, torch.Tensor | None]:
     for name, tensor in (
         ("los", los),
@@ -3181,19 +2823,10 @@ def _bdpt_finalize_backward(
 
 
 def _bdpt_finalize_jvp(
-    op_name: str,
-    ndim: int,
-    los: torch.Tensor,
-    reflection: torch.Tensor,
-    diffraction: torch.Tensor,
-    transmission: torch.Tensor,
-    scattering: torch.Tensor,
-    *,
-    tangent_los: torch.Tensor | None,
-    tangent_reflection: torch.Tensor | None,
-    tangent_diffraction: torch.Tensor | None,
-    tangent_transmission: torch.Tensor | None,
-    tangent_scattering: torch.Tensor | None,
+    op_name: str, ndim: int, los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor,
+    transmission: torch.Tensor, scattering: torch.Tensor, *, tangent_los: torch.Tensor | None,
+    tangent_reflection: torch.Tensor | None, tangent_diffraction: torch.Tensor | None,
+    tangent_transmission: torch.Tensor | None, tangent_scattering: torch.Tensor | None,
 ) -> dict[str, torch.Tensor]:
     for name, tensor in (
         ("los", los),
@@ -3223,19 +2856,13 @@ def _bdpt_finalize_jvp(
 
 
 def bdpt_finalize_point_components_backward(
-    los: torch.Tensor,
-    reflection: torch.Tensor,
-    diffraction: torch.Tensor,
-    transmission: torch.Tensor,
-    scattering: torch.Tensor,
-    *,
-    grad_path_gain: torch.Tensor | None = None,
-    grad_los_power: torch.Tensor | None = None,
+    los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor,
+    transmission: torch.Tensor, scattering: torch.Tensor, *,
+    grad_path_gain: torch.Tensor | None = None, grad_los_power: torch.Tensor | None = None,
     grad_reflection_power: torch.Tensor | None = None,
     grad_diffraction_power: torch.Tensor | None = None,
     grad_transmission_power: torch.Tensor | None = None,
-    grad_scattering_power: torch.Tensor | None = None,
-    need_grad_components: bool = False,
+    grad_scattering_power: torch.Tensor | None = None, need_grad_components: bool = False,
 ) -> dict[str, torch.Tensor | None]:
     """VJP of:func:`bdpt_finalize_point_components` (point-result finalization)."""
 
@@ -3258,14 +2885,9 @@ def bdpt_finalize_point_components_backward(
 
 
 def bdpt_finalize_point_components_jvp(
-    los: torch.Tensor,
-    reflection: torch.Tensor,
-    diffraction: torch.Tensor,
-    transmission: torch.Tensor,
-    scattering: torch.Tensor,
-    *,
-    tangent_los: torch.Tensor | None = None,
-    tangent_reflection: torch.Tensor | None = None,
+    los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor,
+    transmission: torch.Tensor, scattering: torch.Tensor, *,
+    tangent_los: torch.Tensor | None = None, tangent_reflection: torch.Tensor | None = None,
     tangent_diffraction: torch.Tensor | None = None,
     tangent_transmission: torch.Tensor | None = None,
     tangent_scattering: torch.Tensor | None = None,
@@ -3289,19 +2911,13 @@ def bdpt_finalize_point_components_jvp(
 
 
 def bdpt_finalize_component_maps_backward(
-    los: torch.Tensor,
-    reflection: torch.Tensor,
-    diffraction: torch.Tensor,
-    transmission: torch.Tensor,
-    scattering: torch.Tensor,
-    *,
-    grad_path_gain: torch.Tensor | None = None,
-    grad_los_power: torch.Tensor | None = None,
+    los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor,
+    transmission: torch.Tensor, scattering: torch.Tensor, *,
+    grad_path_gain: torch.Tensor | None = None, grad_los_power: torch.Tensor | None = None,
     grad_reflection_power: torch.Tensor | None = None,
     grad_diffraction_power: torch.Tensor | None = None,
     grad_transmission_power: torch.Tensor | None = None,
-    grad_scattering_power: torch.Tensor | None = None,
-    need_grad_components: bool = False,
+    grad_scattering_power: torch.Tensor | None = None, need_grad_components: bool = False,
 ) -> dict[str, torch.Tensor | None]:
     """VJP of:func:`bdpt_finalize_component_maps` (map finalization, 3-D maps)."""
 
@@ -3324,14 +2940,9 @@ def bdpt_finalize_component_maps_backward(
 
 
 def bdpt_finalize_component_maps_jvp(
-    los: torch.Tensor,
-    reflection: torch.Tensor,
-    diffraction: torch.Tensor,
-    transmission: torch.Tensor,
-    scattering: torch.Tensor,
-    *,
-    tangent_los: torch.Tensor | None = None,
-    tangent_reflection: torch.Tensor | None = None,
+    los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor,
+    transmission: torch.Tensor, scattering: torch.Tensor, *,
+    tangent_los: torch.Tensor | None = None, tangent_reflection: torch.Tensor | None = None,
     tangent_diffraction: torch.Tensor | None = None,
     tangent_transmission: torch.Tensor | None = None,
     tangent_scattering: torch.Tensor | None = None,
@@ -3358,12 +2969,7 @@ def bdpt_finalize_component_maps_jvp(
 # bdpt paths
 # -------------------------------------------------------------------------
 def bdpt_launch_state(
-    reference: torch.Tensor,
-    *,
-    tx_count: int,
-    samples: int,
-    sample_streams: int,
-    seed: int,
+    reference: torch.Tensor, *, tx_count: int, samples: int, sample_streams: int, seed: int,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=2)
     if tx_count < 0:
@@ -3424,7 +3030,7 @@ _BDPT_SUBPATH_SCHEMA: dict[str, tuple[torch.dtype, tuple[int | None, ...]]] = {
 
 
 def _validate_bdpt_subpath_state(
-    name: str, exported: dict[str, torch.Tensor], expected_count: int | None
+    name: str, exported: dict[str, torch.Tensor], expected_count: int | None,
 ) -> None:
     if not isinstance(exported, dict):
         raise TypeError(f"{name} must be a dict")
@@ -3460,9 +3066,7 @@ _BDPT_CONNECTION_SCHEMA: dict[str, tuple[torch.dtype, tuple[int | None, ...]]] =
 
 
 def _validate_bdpt_connection_samples(
-    name: str,
-    exported: dict[str, torch.Tensor],
-    expected_count: int | None,
+    name: str, exported: dict[str, torch.Tensor], expected_count: int | None,
 ) -> None:
     if not isinstance(exported, dict):
         raise TypeError(f"{name} must be a dict")
@@ -3515,7 +3119,7 @@ _BDPT_ACCUMULATE_BIN_SUM_ORDER = (
 
 
 def _bdpt_accumulate_bin_sum_args(
-    combine_domain: str, bin_sums: tuple[torch.Tensor, ...]
+    combine_domain: str, bin_sums: tuple[torch.Tensor, ...],
 ) -> tuple[torch.Tensor | None, ...]:
     """Expand the coherent forward's phasor bin sums into the ten positional
  ``los_re..scattering_im`` args the native accumulate VJP/JVP consume.
@@ -3558,12 +3162,8 @@ def bdpt_empty_subpath_state(reference: torch.Tensor) -> dict[str, torch.Tensor]
 
 
 def bdpt_endpoint_subpath_state(
-    tx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_positions: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    launch_tx_id: torch.Tensor,
+    tx_positions: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
+    rx_positions: torch.Tensor, rx_polarization: torch.Tensor, launch_tx_id: torch.Tensor,
     light_seed: torch.Tensor,
 ) -> dict[str, dict[str, torch.Tensor]]:
     validate_cuda_tensor(
@@ -3627,9 +3227,7 @@ def bdpt_endpoint_subpath_state(
     return {"light": light, "sensor": sensor}
 
 
-def bdpt_subpath_intersection_inputs(
-    subpath: dict[str, torch.Tensor],
-) -> dict[str, torch.Tensor]:
+def bdpt_subpath_intersection_inputs(subpath: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
     _validate_bdpt_subpath_state("subpath", subpath, None)
     exported = _required_native_op("bdpt_subpath_intersection_inputs")(subpath)
     if not isinstance(exported, dict):
@@ -3666,18 +3264,9 @@ def bdpt_subpath_intersection_inputs(
     return exported
 
 
-def bdpt_reflected_light_subpath_state(
-    light: dict[str, torch.Tensor],
-    intersection: dict[str, torch.Tensor],
-    *,
-    material_gain: torch.Tensor,
-    material_valid: torch.Tensor,
-    material_eps_r: torch.Tensor,
-    material_sigma_e: torch.Tensor,
-    material_mu_r: torch.Tensor,
-    material_thickness: torch.Tensor,
-    frequency_hz: float,
-) -> dict[str, torch.Tensor]:
+def _validate_bdpt_intersection(
+    light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor],
+) -> int:
     _validate_bdpt_subpath_state("light", light, None)
     if not isinstance(intersection, dict) or set(intersection) != set(
         _BDPT_INTERSECTION_FIELDS
@@ -3707,6 +3296,15 @@ def bdpt_reflected_light_subpath_state(
         dtype=torch.int32,
         ndim=1,
     )
+    return count
+
+def bdpt_reflected_light_subpath_state(
+    light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor], *,
+    material_gain: torch.Tensor, material_valid: torch.Tensor, material_eps_r: torch.Tensor,
+    material_sigma_e: torch.Tensor, material_mu_r: torch.Tensor, material_thickness: torch.Tensor,
+    frequency_hz: float,
+) -> dict[str, torch.Tensor]:
+    count = _validate_bdpt_intersection(light, intersection)
     validate_cuda_tensor("material_gain", material_gain, dtype=torch.float32, ndim=1)
     validate_cuda_tensor("material_valid", material_valid, dtype=torch.bool, ndim=1)
     validate_cuda_tensor("material_eps_r", material_eps_r, dtype=torch.float32, ndim=1)
@@ -3761,47 +3359,12 @@ def bdpt_reflected_light_subpath_state(
 
 
 def bdpt_transmitted_light_subpath_state(
-    light: dict[str, torch.Tensor],
-    intersection: dict[str, torch.Tensor],
-    *,
-    face_material_id: torch.Tensor,
-    layer_offset: torch.Tensor,
-    layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    frequency_hz: float,
+    light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor], *,
+    face_material_id: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor,
+    layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor,
+    layer_mu_r: torch.Tensor, frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
-    _validate_bdpt_subpath_state("light", light, None)
-    if not isinstance(intersection, dict) or set(intersection) != set(
-        _BDPT_INTERSECTION_FIELDS
-    ):
-        raise ValueError("intersection returned unexpected fields")
-    count = int(light["origin"].shape[0])
-    validate_cuda_tensor(
-        "intersection.t", intersection["t"], dtype=torch.float32, ndim=1
-    )
-    validate_cuda_tensor(
-        "intersection.p",
-        intersection["p"],
-        dtype=torch.float32,
-        ndim=2,
-        trailing_shape=(3,),
-    )
-    validate_cuda_tensor(
-        "intersection.n",
-        intersection["n"],
-        dtype=torch.float32,
-        ndim=2,
-        trailing_shape=(3,),
-    )
-    validate_cuda_tensor(
-        "intersection.global_prim_id",
-        intersection["global_prim_id"],
-        dtype=torch.int32,
-        ndim=1,
-    )
+    count = _validate_bdpt_intersection(light, intersection)
     validate_cuda_tensor(
         "face_material_id", face_material_id, dtype=torch.int32, ndim=1
     )
@@ -3843,15 +3406,9 @@ def bdpt_transmitted_light_subpath_state(
 
 
 def bdpt_endpoint_connection_samples(
-    light: dict[str, torch.Tensor],
-    sensor: dict[str, torch.Tensor],
-    *,
-    frequency_hz: float,
-    samples_per_tx: int,
-    max_paths: int | None = None,
-    mis: str = "power_heuristic",
-    beta: float = 2.0,
-    strategy_count: int = 1,
+    light: dict[str, torch.Tensor], sensor: dict[str, torch.Tensor], *, frequency_hz: float,
+    samples_per_tx: int, max_paths: int | None = None, mis: str = "power_heuristic",
+    beta: float = 2.0, strategy_count: int = 1,
 ) -> dict[str, torch.Tensor]:
     _validate_bdpt_subpath_state("light", light, None)
     _validate_bdpt_subpath_state("sensor", sensor, None)
@@ -3888,10 +3445,7 @@ def bdpt_endpoint_connection_samples(
 
 
 def bdpt_endpoint_connection_visibility_inputs(
-    light: dict[str, torch.Tensor],
-    sensor: dict[str, torch.Tensor],
-    *,
-    sample_count: int,
+    light: dict[str, torch.Tensor], sensor: dict[str, torch.Tensor], *, sample_count: int,
 ) -> dict[str, torch.Tensor]:
     _validate_bdpt_subpath_state("light", light, None)
     _validate_bdpt_subpath_state("sensor", sensor, None)
@@ -3934,9 +3488,7 @@ def bdpt_endpoint_connection_visibility_inputs(
 
 
 def _resolve_accumulate_coeffs(
-    samples: dict[str, torch.Tensor],
-    combine_domain: str,
-    coeff_real: torch.Tensor | None,
+    samples: dict[str, torch.Tensor], combine_domain: str, coeff_real: torch.Tensor | None,
     coeff_imag: torch.Tensor | None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Validate coherent phasor planes or create empty placeholders for power-domain accumulation."""
@@ -3964,14 +3516,9 @@ def _resolve_accumulate_coeffs(
 
 
 def bdpt_accumulate_connection_samples(
-    samples: dict[str, torch.Tensor],
-    *,
-    tx_count: int,
-    rx_count: int,
-    accumulation_strategy: str = "atomic",
-    combine_domain: str = "power",
-    coeff_real: torch.Tensor | None = None,
-    coeff_imag: torch.Tensor | None = None,
+    samples: dict[str, torch.Tensor], *, tx_count: int, rx_count: int,
+    accumulation_strategy: str = "atomic", combine_domain: str = "power",
+    coeff_real: torch.Tensor | None = None, coeff_imag: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
     """Accumulate connection samples into per-component matrices.
 
@@ -4033,8 +3580,7 @@ def bdpt_accumulate_connection_samples(
 
 
 def bdpt_filter_connection_samples(
-    samples: dict[str, torch.Tensor],
-    visible: torch.Tensor,
+    samples: dict[str, torch.Tensor], visible: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     _validate_bdpt_connection_samples("samples", samples, None)
     validate_cuda_tensor("visible", visible, dtype=torch.bool, ndim=1)
@@ -4064,9 +3610,7 @@ def bdpt_count_valid_connection_samples(samples: dict[str, torch.Tensor]) -> int
 
 
 def bdpt_compact_connection_samples(
-    samples: dict[str, torch.Tensor],
-    *,
-    max_paths: int | None = None,
+    samples: dict[str, torch.Tensor], *, max_paths: int | None = None,
 ) -> dict[str, torch.Tensor]:
     _validate_bdpt_connection_samples("samples", samples, None)
     max_paths_value = -1 if max_paths is None else int(max_paths)
@@ -4102,11 +3646,7 @@ def bdpt_concat_connection_samples(
 
 
 def bdpt_connection_variance(
-    samples: dict[str, torch.Tensor],
-    *,
-    tx_count: int,
-    rx_count: int,
-    samples_per_tx: int,
+    samples: dict[str, torch.Tensor], *, tx_count: int, rx_count: int, samples_per_tx: int,
 ) -> torch.Tensor:
     _validate_bdpt_connection_samples("samples", samples, None)
     if tx_count < 0 or rx_count < 0:
@@ -4128,11 +3668,7 @@ def bdpt_connection_variance(
 
 
 def bdpt_mis_weights(
-    pdf: torch.Tensor,
-    strategy_pdf_sum: torch.Tensor,
-    *,
-    mis: str,
-    beta: float = 2.0,
+    pdf: torch.Tensor, strategy_pdf_sum: torch.Tensor, *, mis: str, beta: float = 2.0,
 ) -> torch.Tensor:
     validate_cuda_tensor("pdf", pdf, dtype=torch.float32, ndim=1)
     validate_cuda_tensor(
@@ -4158,9 +3694,7 @@ def bdpt_mis_weights(
 # -------------------------------------------------------------------------
 # bdpt sampling
 # -------------------------------------------------------------------------
-def bdpt_sample_directions(
-    count: int, reference: torch.Tensor, *, seed: int
-) -> torch.Tensor:
+def bdpt_sample_directions(count: int, reference: torch.Tensor, *, seed: int) -> torch.Tensor:
     if count < 0:
         raise ValueError("count must be non-negative")
     if seed < 0:
@@ -4178,10 +3712,7 @@ def bdpt_sample_directions(
 
 
 def bdpt_reflection_launch_inputs(
-    tx_positions: torch.Tensor,
-    *,
-    tx_index: int,
-    sample_count: int,
+    tx_positions: torch.Tensor, *, tx_index: int, sample_count: int,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor(
         "tx_positions", tx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)

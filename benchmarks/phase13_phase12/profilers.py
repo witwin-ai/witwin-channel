@@ -113,9 +113,7 @@ def _enum_map(connection: sqlite3.Connection, table: str) -> dict[int, str]:
     }
 
 
-def _api_names(
-    connection: sqlite3.Connection, activity_table: str, enum_table: str
-) -> list[str]:
+def _api_names(connection: sqlite3.Connection, activity_table: str, enum_table: str) -> list[str]:
     columns = _columns(connection, activity_table)
     if "name" in columns:
         return [str(row[0]) for row in connection.execute(f'SELECT "name" FROM "{activity_table}"')]
@@ -131,9 +129,7 @@ def _api_names(
     return names
 
 
-def _column(
-    columns: Sequence[str], candidates: Sequence[str], *, label: str
-) -> str:
+def _column(columns: Sequence[str], candidates: Sequence[str], *, label: str) -> str:
     value = next((name for name in candidates if name in columns), None)
     if value is None:
         raise EvidenceError(f"Nsight {label} lacks one of {tuple(candidates)}")
@@ -141,7 +137,7 @@ def _column(
 
 
 def _activity_rows(
-    connection: sqlite3.Connection, activity_table: str, enum_table: str
+    connection: sqlite3.Connection, activity_table: str, enum_table: str,
 ) -> list[dict[str, object]]:
     """Resolve CUDA API rows without trusting exporter-specific column order."""
     columns = _columns(connection, activity_table)
@@ -190,7 +186,7 @@ def _activity_rows(
 
 
 def _gpu_activity_rows(
-    connection: sqlite3.Connection, table: str, *, include_copy_kind: bool
+    connection: sqlite3.Connection, table: str, *, include_copy_kind: bool,
 ) -> list[dict[str, object]]:
     columns = _columns(connection, table)
     start_column = _column(columns, ("start",), label=f"{table} start")
@@ -238,9 +234,7 @@ def _gpu_activity_rows(
     return rows
 
 
-def _strictly_nested(
-    first: tuple[int, int], second: tuple[int, int]
-) -> bool:
+def _strictly_nested(first: tuple[int, int], second: tuple[int, int]) -> bool:
     if first == second:
         return False
     return (
@@ -255,7 +249,7 @@ def _ranges_overlap(first: tuple[int, int], second: tuple[int, int]) -> bool:
 
 
 def _require_single_target_placement(
-    rows: Sequence[Mapping[str, object]], *, name: str
+    rows: Sequence[Mapping[str, object]], *, name: str,
 ) -> tuple[int, int]:
     if len(rows) != 7:
         raise EvidenceError(f"Nsight target range {name} does not have seven samples")
@@ -614,8 +608,8 @@ def parse_nsys_sqlite(path: Path) -> dict[str, object]:
 
 
 def _nsys_commands(
-    config: RunnerConfig, *, group: str, variant_name: str, scenario: str,
-    process_index: int, order: str, store: ArtifactStore,
+    config: RunnerConfig, *, group: str, variant_name: str, scenario: str, process_index: int,
+    order: str, store: ArtifactStore,
 ) -> tuple[list[str], list[str], Path, Path]:
     variant = config.variant(group, variant_name)
     stem = f"profiles/nsys-{group}-{process_index:02d}-{order}-{scenario}-{variant_name}"
@@ -640,11 +634,7 @@ def _nsys_commands(
 
 
 def _capture_reference(
-    store: ArtifactStore,
-    path: Path,
-    *,
-    label: str,
-    minimum_mtime_ns: int,
+    store: ArtifactStore, path: Path, *, label: str, minimum_mtime_ns: int,
 ) -> dict[str, object]:
     return store.inspect(
         store.relative_for_created_file(path),
@@ -654,8 +644,7 @@ def _capture_reference(
 
 
 def run_nsys_matrix(
-    config: RunnerConfig, gate: Mapping[str, object], *, group: str,
-    timeout_seconds: int,
+    config: RunnerConfig, gate: Mapping[str, object], *, group: str, timeout_seconds: int,
     store: ArtifactStore,
 ) -> dict[str, object]:
     tool = executable_identity(config.tools.nsys, label="Nsight Systems")
@@ -748,7 +737,7 @@ def run_nsys_matrix(
 
 
 def validate_nsys_timelines(
-    captures: Sequence[Mapping[str, object]], gate: Mapping[str, object], *, group: str
+    captures: Sequence[Mapping[str, object]], gate: Mapping[str, object], *, group: str,
 ) -> list[dict[str, object]]:
     if len(captures) != 10:
         raise EvidenceError("Nsight capture count is not the fixed five-pair matrix")
@@ -1084,11 +1073,8 @@ def validate_nsys_timelines(
 
 
 def attach_profile_timings(
-    pairs: Sequence[Mapping[str, object]],
-    captures: Sequence[Mapping[str, object]],
-    gate: Mapping[str, object],
-    *,
-    group: str,
+    pairs: Sequence[Mapping[str, object]], captures: Sequence[Mapping[str, object]],
+    gate: Mapping[str, object], *, group: str,
 ) -> list[dict[str, object]]:
     """Attach stage samples recomputed only from retained Nsight ranges."""
     normalized: list[dict[str, object]] = []

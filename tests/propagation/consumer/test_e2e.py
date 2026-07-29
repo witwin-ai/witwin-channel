@@ -27,9 +27,7 @@ pytestmark = pytest.mark.skipif(
 _FREQUENCY_HZ = 1.0e9
 
 
-def _endpoints(
-    source_positions: torch.Tensor | None = None,
-) -> tuple[EndpointBatch, EndpointBatch]:
+def _endpoints(source_positions: torch.Tensor | None = None) -> tuple[EndpointBatch, EndpointBatch]:
     basis = torch.tensor(
         [[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]],
         device="cuda",

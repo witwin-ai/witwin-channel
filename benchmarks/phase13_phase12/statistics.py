@@ -96,7 +96,7 @@ def _validate_identity(value: object, *, label: str) -> dict[str, object]:
 
 
 def _validate_hash_rows(
-    value: object, *, label: str, expected_names: set[str]
+    value: object, *, label: str, expected_names: set[str],
 ) -> list[dict[str, object]]:
     if not isinstance(value, list):
         raise EvidenceError(f"{label} must be an array")
@@ -119,8 +119,7 @@ def _validate_hash_rows(
 
 
 def validate_worker_record(
-    raw: object, *, expected_group: str, expected_variant: str,
-    process_index: int, order: str,
+    raw: object, *, expected_group: str, expected_variant: str, process_index: int, order: str,
     gate: Mapping[str, object],
 ) -> dict[str, object]:
     record = exact_keys(
@@ -244,8 +243,7 @@ def validate_worker_record(
 
 
 def validate_process_identity(
-    pairs: Sequence[Mapping[str, object]],
-    implementation: Mapping[str, object],
+    pairs: Sequence[Mapping[str, object]], implementation: Mapping[str, object],
     gate: Mapping[str, object],
 ) -> dict[str, object]:
     group = str(pairs[0]["group"])
@@ -343,8 +341,7 @@ def validate_process_identity(
 
 
 def paired_bootstrap(
-    values: Sequence[float], *, resamples: int, confidence: float = 0.95,
-    seed: int = 13029030,
+    values: Sequence[float], *, resamples: int, confidence: float = 0.95, seed: int = 13029030,
 ) -> dict[str, object]:
     if len(values) != 5 or resamples != 100000 or confidence != 0.95:
         raise EvidenceError("paired bootstrap requires five pairs, 100000 resamples, 95% confidence")
@@ -381,8 +378,7 @@ def _timing(record: Mapping[str, object], name: str) -> Mapping[str, object]:
 
 
 def compare_timings(
-    pairs: Sequence[Mapping[str, object]], gate: Mapping[str, object], *,
-    bootstrap_resamples: int,
+    pairs: Sequence[Mapping[str, object]], gate: Mapping[str, object], *, bootstrap_resamples: int,
 ) -> list[dict[str, object]]:
     validate_exact_schedule(pairs, gate)
     group = str(pairs[0]["group"])
@@ -468,7 +464,7 @@ def compare_timings(
 
 
 def validate_correctness(
-    pairs: Sequence[Mapping[str, object]], gate: Mapping[str, object]
+    pairs: Sequence[Mapping[str, object]], gate: Mapping[str, object],
 ) -> dict[str, object]:
     validate_exact_schedule(pairs, gate)
     target_hashes: set[str] = set()
@@ -519,7 +515,7 @@ def validate_correctness(
 
 
 def summarize_resources(
-    pairs: Sequence[Mapping[str, object]], gate: Mapping[str, object]
+    pairs: Sequence[Mapping[str, object]], gate: Mapping[str, object],
 ) -> dict[str, object]:
     validate_exact_schedule(pairs, gate)
     memories = [pair["candidate"]["memory"] for pair in pairs]  # type: ignore[index]

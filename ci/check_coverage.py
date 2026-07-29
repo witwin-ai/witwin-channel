@@ -70,9 +70,7 @@ def section_line_numbers(path: str, members: list[str]) -> set[int]:
     return lines
 
 
-def _evaluate_sections(
-    files: dict[str, dict[str, Any]], policy: dict[str, Any]
-) -> list[str]:
+def _evaluate_sections(files: dict[str, dict[str, Any]], policy: dict[str, Any]) -> list[str]:
     """Return violations of the per-section statement floors.
 
  A section floor guards one named group of members inside a consolidated
@@ -112,9 +110,7 @@ def _evaluate_sections(
     return errors
 
 
-def evaluate(
-    report: dict[str, Any], policy: dict[str, Any], baseline: dict[str, Any]
-) -> list[str]:
+def evaluate(report: dict[str, Any], policy: dict[str, Any], baseline: dict[str, Any]) -> list[str]:
     """Return deterministic policy violations; an empty list means acceptance."""
 
     errors: list[str] = []

@@ -28,7 +28,7 @@ _PATCH_QUAD_ORDER = 16
 
 
 def duffy_gl_nodes(
-    device, dtype: torch.dtype = torch.float64, order: int = _PATCH_QUAD_ORDER
+    device, dtype: torch.dtype = torch.float64, order: int = _PATCH_QUAD_ORDER,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Duffy-mapped GL nodes ``(a, b, w)``; mirrors ``functional._duffy_nodes``.
 
@@ -49,16 +49,9 @@ def duffy_gl_nodes(
 
 
 def _patch_integral(
-    heights: torch.Tensor,
-    patch_tris: torch.Tensor,
-    patch_uvs: torch.Tensor,
-    rows: torch.Tensor,
-    d_i: torch.Tensor,
-    d_o: torch.Tensor,
-    quad_a: torch.Tensor,
-    quad_b: torch.Tensor,
-    quad_w: torch.Tensor,
-    k0: torch.Tensor,
+    heights: torch.Tensor, patch_tris: torch.Tensor, patch_uvs: torch.Tensor, rows: torch.Tensor,
+    d_i: torch.Tensor, d_o: torch.Tensor, quad_a: torch.Tensor, quad_b: torch.Tensor,
+    quad_w: torch.Tensor, k0: torch.Tensor,
 ) -> torch.Tensor:
     """Per-row phase-screen aperture integral (rough-surface scattering quadrature).
 
@@ -102,30 +95,12 @@ def _patch_integral(
 
 
 def chain_realization_eval(
-    heights: torch.Tensor,
-    patch_tris: torch.Tensor,
-    patch_uvs: torch.Tensor,
-    rows: torch.Tensor,
-    source: torch.Tensor,
-    tx_pol: torch.Tensor,
-    c1: dict[str, torch.Tensor],
-    vertex: torch.Tensor,
-    n_rows: torch.Tensor,
-    r_te: torch.Tensor,
-    r_tm: torch.Tensor,
-    d_i: torch.Tensor,
-    d_o: torch.Tensor,
-    c2: dict[str, torch.Tensor],
-    target: torch.Tensor,
-    rx_pol: torch.Tensor,
-    l1: torch.Tensor,
-    l2: torch.Tensor,
-    centroids: torch.Tensor,
-    quad_a: torch.Tensor,
-    quad_b: torch.Tensor,
-    quad_w: torch.Tensor,
-    k0: torch.Tensor,
-    frequency_hz: torch.Tensor,
+    heights: torch.Tensor, patch_tris: torch.Tensor, patch_uvs: torch.Tensor, rows: torch.Tensor,
+    source: torch.Tensor, tx_pol: torch.Tensor, c1: dict[str, torch.Tensor], vertex: torch.Tensor,
+    n_rows: torch.Tensor, r_te: torch.Tensor, r_tm: torch.Tensor, d_i: torch.Tensor,
+    d_o: torch.Tensor, c2: dict[str, torch.Tensor], target: torch.Tensor, rx_pol: torch.Tensor,
+    l1: torch.Tensor, l2: torch.Tensor, centroids: torch.Tensor, quad_a: torch.Tensor,
+    quad_b: torch.Tensor, quad_w: torch.Tensor, k0: torch.Tensor, frequency_hz: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Differentiable float64 coherent scattering coherent per-row field and total.
 

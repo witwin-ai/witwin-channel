@@ -324,11 +324,7 @@ def test_mc_basic_maps_grid_ad_methods_resolve_canonical_siblings():
     ),
 )
 def test_mc_basic_maps_component_ad_methods_resolve_canonical_siblings(
-    class_name: str,
-    forward_name: str,
-    backward_name: str,
-    jvp_name: str,
-    entry_name: str,
+    class_name: str, forward_name: str, backward_name: str, jvp_name: str, entry_name: str,
 ):
     function = getattr(montecarlo, class_name)
 

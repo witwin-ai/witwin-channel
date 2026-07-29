@@ -52,7 +52,7 @@ _EXTENDED_ROW_FIELDS = (
 
 
 def _evaluated_paths(
-    *, rows: int = 2, width: int = 2
+    *, rows: int = 2, width: int = 2,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     scalar = torch.arange(1, rows + 1, dtype=torch.float32)
     vector = torch.stack((scalar, scalar + 10.0, scalar + 20.0), dim=-1)
@@ -259,9 +259,7 @@ def test_typed_scattering_noop_preserves_identity():
 
 @pytest.mark.parametrize(("existing_rows", "width"), ((2, 2), (1, 0), (0, 0)))
 def test_typed_scattering_append_preserves_prefix_and_sidecars(
-    monkeypatch: pytest.MonkeyPatch,
-    existing_rows: int,
-    width: int,
+    monkeypatch: pytest.MonkeyPatch, existing_rows: int, width: int,
 ):
     evaluated, sidecars = _evaluated_paths(rows=existing_rows, width=width)
     original_identity = evaluated.row_identity

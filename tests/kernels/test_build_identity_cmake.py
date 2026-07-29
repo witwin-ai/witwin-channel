@@ -49,14 +49,8 @@ def _repository(path: Path, *, remote: str | None = None) -> str:
 
 
 def _validate(
-    channel: Path,
-    rayd: Path,
-    *,
-    channel_sha: str,
-    rayd_sha: str,
-    channel_dirty: int = 0,
-    rayd_dirty: int = 0,
-    release: bool = False,
+    channel: Path, rayd: Path, *, channel_sha: str, rayd_sha: str, channel_dirty: int = 0,
+    rayd_dirty: int = 0, release: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     abi = rayd / "integration.h"
     lock = channel / "rayd.lock.json"

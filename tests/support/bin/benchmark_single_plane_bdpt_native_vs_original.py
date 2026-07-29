@@ -230,15 +230,8 @@ def _timing_summary(timings: list[float]) -> dict[str, float]:
 
 
 def _run_original(
-    *,
-    channel_root: pathlib.Path,
-    artifact_dir: pathlib.Path,
-    samples: int,
-    grid_size: int,
-    seed: int,
-    warmup_runs: int,
-    repeats: int,
-    timeout_seconds: float,
+    *, channel_root: pathlib.Path, artifact_dir: pathlib.Path, samples: int, grid_size: int,
+    seed: int, warmup_runs: int, repeats: int, timeout_seconds: float,
 ) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
     if not channel_root.exists():
         raise FileNotFoundError(f"original channel root not found: {channel_root}")
@@ -342,12 +335,7 @@ def _delta_metrics(native: np.ndarray, original: np.ndarray) -> dict[str, float 
 
 
 def _run_native(
-    *,
-    samples: int,
-    grid_size: int,
-    seed: int,
-    warmup_runs: int,
-    repeats: int,
+    *, samples: int, grid_size: int, seed: int, warmup_runs: int, repeats: int,
 ) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
     scene = _native_scene(grid_size)
     config = Config(
@@ -408,18 +396,11 @@ def _enforce_gates(gates: list[dict[str, object]]) -> None:
 
 
 def run_benchmark(
-    *,
-    channel_root: str | pathlib.Path = DEFAULT_CHANNEL_ROOT,
+    *, channel_root: str | pathlib.Path = DEFAULT_CHANNEL_ROOT,
     artifact_dir: str | pathlib.Path = _REPO_ROOT / "artifacts" / "bdpt_single_plane_native_vs_original",
-    samples: int = 256,
-    grid_size: int = 8,
-    seed: int = 7,
-    warmup_runs: int = 1,
-    repeats: int = 3,
-    original_timeout_seconds: float = 180.0,
-    min_speedup: float = 1.25,
-    max_relative_sum_error: float = 0.75,
-    strict_gates: bool = False,
+    samples: int = 256, grid_size: int = 8, seed: int = 7, warmup_runs: int = 1, repeats: int = 3,
+    original_timeout_seconds: float = 180.0, min_speedup: float = 1.25,
+    max_relative_sum_error: float = 0.75, strict_gates: bool = False,
 ) -> dict[str, Any]:
     if not torch.cuda.is_available():
         raise RuntimeError("single-plane BDPT native-vs-original benchmark requires CUDA")

@@ -41,13 +41,8 @@ def _require_rayd() -> None:
 
 
 def _scene(
-    rms_height_m: float,
-    corr_length_m: float = 0.15,
-    *,
-    half_size: float = _HALF_SIZE,
-    phase_screen: object | None = None,
-    swap_endpoints: bool = False,
-    receivers: list | None = None,
+    rms_height_m: float, corr_length_m: float = 0.15, *, half_size: float = _HALF_SIZE,
+    phase_screen: object | None = None, swap_endpoints: bool = False, receivers: list | None = None,
 ) -> Scene:
     wall = rough_wall_structure(
         2.5,

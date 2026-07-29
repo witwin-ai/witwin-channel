@@ -88,11 +88,7 @@ def _write_json(path: Path, value: object) -> None:
 
 
 def _run(
-    command: Sequence[str],
-    *,
-    cwd: Path,
-    timeout: int = 15,
-    env: dict[str, str] | None = None,
+    command: Sequence[str], *, cwd: Path, timeout: int = 15, env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         list(command),
@@ -256,9 +252,7 @@ print(json.dumps({
     }
 
 
-def environment_manifest(
-    repo: Path, rayd_root: Path | None = None
-) -> dict[str, object]:
+def environment_manifest(repo: Path, rayd_root: Path | None = None) -> dict[str, object]:
     """Collect version metadata without reading any environment variable value."""
 
     return {
@@ -437,9 +431,7 @@ def _cmake_toolchain_contract(cache_path: Path | None) -> dict[str, object] | No
 
 
 def build_manifest(
-    repo: Path,
-    native_binaries: Sequence[Path] = (),
-    cmake_cache: Path | None = None,
+    repo: Path, native_binaries: Sequence[Path] = (), cmake_cache: Path | None = None,
 ) -> dict[str, object]:
     native_root = repo / "native" / "channel"
     sources = [repo / "CMakeLists.txt", repo / "pyproject.toml"]
@@ -565,7 +557,7 @@ def _resolve_import_from(module: str, is_package: bool, node: ast.ImportFrom) ->
 
 
 def _module_index(
-    module: str, path: Path, tree: ast.Module
+    module: str, path: Path, tree: ast.Module,
 ) -> tuple[dict[str, ast.AST], dict[str, tuple[str, str | None]]]:
     definitions: dict[str, ast.AST] = {}
     imports: dict[str, tuple[str, str | None]] = {}
@@ -622,9 +614,7 @@ def _class_module_overrides(tree: ast.Module) -> dict[str, str]:
     return overrides
 
 
-def _decorator_names(
-    node: ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef,
-) -> list[str]:
+def _decorator_names(node: ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
     return [ast.unparse(decorator) for decorator in node.decorator_list]
 
 
@@ -720,9 +710,7 @@ def api_manifest(repo: Path, public_modules: Sequence[str]) -> dict[str, object]
         indices[module] = _module_index(module, path, tree)
         class_module_overrides[module] = _class_module_overrides(tree)
 
-    def describe(
-        module: str, name: str, seen: set[tuple[str, str]]
-    ) -> dict[str, object]:
+    def describe(module: str, name: str, seen: set[tuple[str, str]]) -> dict[str, object]:
         key = (module, name)
         if key in seen:
             raise BaselineError(f"cyclic API re-export: {module}.{name}")
@@ -811,7 +799,7 @@ def _import_edges(repo: Path) -> tuple[list[str], list[dict[str, object]]]:
 
 
 def _strongly_connected_components(
-    modules: Sequence[str], edges: Sequence[dict[str, object]]
+    modules: Sequence[str], edges: Sequence[dict[str, object]],
 ) -> list[list[str]]:
     adjacency = {module: [] for module in modules}
     for edge in edges:
@@ -943,9 +931,7 @@ def python_body_hashes(repo: Path) -> list[dict[str, object]]:
     return sorted(entries, key=lambda item: (str(item["path"]), int(item["line"])))
 
 
-def _matching_delimiter(
-    text: str, start: int, opening: str = "(", closing: str = ")"
-) -> int:
+def _matching_delimiter(text: str, start: int, opening: str = "(", closing: str = ")") -> int:
     if start >= len(text) or text[start] != opening:
         raise ValueError("start does not point at the opening delimiter")
     depth = 0
@@ -1130,7 +1116,7 @@ _CPP_MULTILINE_FUNCTION = re.compile(
 
 
 def cpp_body_hashes(
-    repo: Path, *, adr033_predecessor_identity: bool = False
+    repo: Path, *, adr033_predecessor_identity: bool = False,
 ) -> list[dict[str, object]]:
     entries = []
     root = repo / "native" / "channel"
@@ -1223,7 +1209,7 @@ def _cpp_string(value: str) -> str | None:
 
 
 def _find_cpp_declaration(
-    sources: Sequence[tuple[Path, str]], target: str
+    sources: Sequence[tuple[Path, str]], target: str,
 ) -> tuple[str | None, list[dict[str, object]]]:
     pattern = re.compile(
         rf"(?m)^[ \t]*(?P<return>[A-Za-z_][^\n;{{}}]*?)\s+{re.escape(target)}\s*\("
@@ -1421,9 +1407,7 @@ def pytest_marker_manifest(repo: Path) -> dict[str, object]:
     }
 
 
-def collect_pytest_manifest(
-    repo: Path, basetemp: Path | None = None
-) -> dict[str, object]:
+def collect_pytest_manifest(repo: Path, basetemp: Path | None = None) -> dict[str, object]:
     env = os.environ.copy()
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     basetemp = (
@@ -1528,16 +1512,10 @@ def runtime_artifact_manifest(specifications: Sequence[str]) -> dict[str, object
 
 
 def freeze_baseline(
-    repo: Path,
-    output_root: Path,
-    *,
-    public_modules: Sequence[str] = DEFAULT_PUBLIC_MODULES,
-    runtime_artifacts: Sequence[str] = (),
-    native_binaries: Sequence[Path] = (),
-    cmake_cache: Path | None = None,
-    rayd_root: Path | None = None,
-    pytest_basetemp: Path | None = None,
-    collect_tests: bool = True,
+    repo: Path, output_root: Path, *, public_modules: Sequence[str] = DEFAULT_PUBLIC_MODULES,
+    runtime_artifacts: Sequence[str] = (), native_binaries: Sequence[Path] = (),
+    cmake_cache: Path | None = None, rayd_root: Path | None = None,
+    pytest_basetemp: Path | None = None, collect_tests: bool = True,
 ) -> Path:
     repo = repo.resolve()
     if not (repo / "pyproject.toml").is_file() or not (repo / ".git").exists():

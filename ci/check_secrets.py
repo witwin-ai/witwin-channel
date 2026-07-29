@@ -282,9 +282,7 @@ def load_allowlist(path: Path) -> set[tuple[str, str, str]]:
     return entries
 
 
-def filter_findings(
-    findings: list[Finding], allowlist: set[tuple[str, str, str]]
-) -> list[Finding]:
+def filter_findings(findings: list[Finding], allowlist: set[tuple[str, str, str]]) -> list[Finding]:
     return [
         finding
         for finding in findings

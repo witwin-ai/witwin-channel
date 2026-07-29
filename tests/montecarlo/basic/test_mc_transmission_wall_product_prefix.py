@@ -49,9 +49,7 @@ def _inputs(face_material: list[int]) -> tuple[torch.Tensor, ...]:
     )
 
 
-def _backward(
-    inputs: tuple[torch.Tensor, ...], failure_state: object
-) -> tuple[torch.Tensor, ...]:
+def _backward(inputs: tuple[torch.Tensor, ...], failure_state: object) -> tuple[torch.Tensor, ...]:
     return mc_transmission_wall_product_backward(
         *inputs,
         frequency_hz=_FREQUENCY_HZ,
@@ -62,7 +60,7 @@ def _backward(
 
 
 def _jvp(
-    inputs: tuple[torch.Tensor, ...], failure_state: object
+    inputs: tuple[torch.Tensor, ...], failure_state: object,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     return mc_transmission_wall_product_jvp(
         *inputs,

@@ -70,9 +70,7 @@ def _validate_ledger_entries(ledger: dict[str, object]) -> list[str]:
     return problems
 
 
-def evaluate(
-    report: dict[str, object], ledger: dict[str, object]
-) -> list[str]:
+def evaluate(report: dict[str, object], ledger: dict[str, object]) -> list[str]:
     """Return deterministic gate violations; empty means the gate passes."""
 
     problems = _validate_ledger_entries(ledger)

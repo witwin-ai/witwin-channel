@@ -49,11 +49,7 @@ def _receiver(position: torch.Tensor) -> AntennaState:
 
 
 def _mesh_structure(
-    vertices: torch.Tensor,
-    faces: torch.Tensor,
-    material: PhysicalMaterial,
-    *,
-    name: str,
+    vertices: torch.Tensor, faces: torch.Tensor, material: PhysicalMaterial, *, name: str,
     surface_id: int,
 ) -> Structure:
     return Structure(
@@ -120,7 +116,7 @@ def _scenario_spec(name: str) -> dict[str, Any]:
 
 
 def _point_endpoints(
-    *, tx_count: int, receiver_count: int, tx_origin: tuple[float, float, float]
+    *, tx_count: int, receiver_count: int, tx_origin: tuple[float, float, float],
 ) -> tuple[list[AntennaState], list[AntennaState]]:
     if tx_count <= 0 or receiver_count <= 0:
         raise ValueError("tx_count and receiver_count must be positive")
@@ -242,10 +238,7 @@ def _terrain_mesh(size: int = 9) -> Structure:
 
 
 def _receiver_grid(
-    shape: tuple[int, int],
-    *,
-    bounds_x: tuple[float, float],
-    bounds_y: tuple[float, float],
+    shape: tuple[int, int], *, bounds_x: tuple[float, float], bounds_y: tuple[float, float],
     z: float,
 ) -> ReceiverGrid:
     rows, cols = shape
@@ -359,11 +352,7 @@ def _files_sha256(scene_xml: Path) -> str:
 
 
 def _city_scene(
-    name: str,
-    *,
-    asset_root: str | Path | None,
-    tx_count: int,
-    grid_shape: tuple[int, int],
+    name: str, *, asset_root: str | Path | None, tx_count: int, grid_shape: tuple[int, int],
 ) -> tuple[Scene, str, Path]:
     spec = _scenario_spec(name)
     root = _asset_root(asset_root)
@@ -423,12 +412,8 @@ def _receiver_scale(scene: Scene) -> tuple[int, int]:
 
 
 def build_scenario(
-    name: str,
-    *,
-    asset_root: str | Path | None = None,
-    tx_count: int | None = None,
-    receiver_count: int | None = None,
-    grid_shape: tuple[int, int] | None = None,
+    name: str, *, asset_root: str | Path | None = None, tx_count: int | None = None,
+    receiver_count: int | None = None, grid_shape: tuple[int, int] | None = None,
 ) -> ScenarioBundle:
     """Build one versioned performance acceptance scenario without hidden reduced fallbacks."""
 

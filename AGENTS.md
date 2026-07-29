@@ -457,6 +457,48 @@ requires them.
   override must be explicit and validate the complete build fingerprint. Never
   search for or silently load a global/stale extension.
 
+## Source organization and code style
+
+File boundaries follow canonical domain ownership, native ABI/fusion and
+compile-mode boundaries, and tape lifetime. There is no Python or native file
+line limit. Merge code when one owner was split for size alone; do not merge
+independent owners or add forwarding modules, aliases, or compatibility
+re-exports to hide a move. The import graph, orphan-module check, public API
+snapshot, binding manifests, and native translation-unit inventory enforce the
+current structure.
+
+Every tracked Python, C++, CUDA, and native header starts with `Copyright Xingyu
+Chen.` and one plain sentence saying what the file does. All later comments and
+docstrings also describe current behavior or a nearby reason in plain language;
+source prose does not narrate plans, decision numbers, migration history, phases,
+or audits. `ci/check_source_headers.py` enforces the complete file, not only the
+first two lines.
+
+Python signatures use the repository's 100-column compact parameter packing.
+Run `python tools/compact_signatures.py`; quick CI runs its `--check` mode. Ruff
+is the linter, not the formatter, because Ruff's exploded layout restores one
+parameter per line. Native code uses the root `.clang-format` with parameter
+and argument bin-packing; format touched ranges or files only. Introduce a named
+request object only for a real, single-owner domain contract, never as a generic
+argument bag or layout wrapper. Explicit ABI, pybind, and autograd companion
+argument order may stay flat.
+
+Ordinary native scalar, vector, and complex math has one owner:
+`native/channel/kernels/math.cuh`. Python uses math exported by `witwin.core`.
+Do not declare another `Vec3`, `Complex`, `Complex3`, normalization helper, or
+generic Channel tensor-math module. Algorithm-specific tape and derivative
+state remains with its algorithm owner. `ci/check_shared_math.py` is the
+regression gate.
+
+Run `tools/duplication_report.py` over the complete production tree before a
+cross-file cleanup. Same-owner validation, indexing, packing, and result
+assembly may be shared only when validation order, error precedence, ABI order,
+allocation, launches, synchronization, and result identity remain unchanged.
+Cross-owner lookalikes remain explicit. Primal/JVP/VJP/backward arithmetic
+classified as numerical lockstep duplication is not cleanup debt: deduplicate
+it only in a separate numerical change with exactness, compiler-output,
+resource, and performance evidence. `ci/check_duplication.py` must have no
+unclassified or stale region and its frozen coverage ceiling may only tighten.
 ## Change discipline
 
 Before editing, identify the canonical domain owner and read its README plus the
@@ -519,6 +561,7 @@ to make a change pass.
 These instructions summarize the accepted architecture. Detailed contracts and
 acceptance evidence live in:
 
+- `docs/dev/standards/source-code-style.md`
 - `docs/dev/plans/08-channel-modular-architecture-hardening-plan.md`
 - `docs/dev/standards/adr-001-python-native-dispatch.md`
 - `docs/dev/standards/adr-003-public-internal-api.md`

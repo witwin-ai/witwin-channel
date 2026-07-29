@@ -45,11 +45,7 @@ class _DebyeDispersion:
 
 
 def _triangle(
-    material,
-    *,
-    name: str,
-    z: float,
-    phase_screen: PhaseScreen | None = None,
+    material, *, name: str, z: float, phase_screen: PhaseScreen | None = None,
 ) -> Structure:
     vertices = torch.tensor(
         [[0.0, 0.0, z], [1.0, 0.0, z], [0.0, 1.0, z]],
@@ -71,8 +67,7 @@ def _triangle(
 
 
 def _compile(
-    *materials,
-    phase_screens: dict[int, PhaseScreen] | None = None,
+    *materials, phase_screens: dict[int, PhaseScreen] | None = None,
     reference_frequency_hz=_FREQUENCY_HZ,
 ):
     screens = phase_screens or {}

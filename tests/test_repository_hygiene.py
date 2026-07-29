@@ -47,9 +47,7 @@ def test_clean_repository_passes(git_repo: Path):
     assert hygiene.main([str(git_repo)]) == 0
 
 
-def test_forbidden_tracked_build_and_temporary_artifacts_are_reported(
-    git_repo: Path,
-):
+def test_forbidden_tracked_build_and_temporary_artifacts_are_reported(git_repo: Path):
     _track(git_repo, "build-local/output.txt")
     _track(git_repo, "src/pkg/__pycache__/module.pyc")
     _track(git_repo, "native/generated.dll")
@@ -74,9 +72,7 @@ def test_oversized_gate_reads_the_tracked_blob_from_the_index(git_repo: Path):
     ]
 
 
-def test_default_cli_rejects_dirty_tree_but_can_scan_during_local_work(
-    git_repo: Path,
-):
+def test_default_cli_rejects_dirty_tree_but_can_scan_during_local_work(git_repo: Path):
     (git_repo / "generated.txt").write_text("test output\n", encoding="utf-8")
 
     assert hygiene.main([str(git_repo)]) == 1

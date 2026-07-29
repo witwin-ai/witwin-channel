@@ -48,6 +48,7 @@ def test_tiers_cover_the_required_gate_families() -> None:
         "quick.mypy",
         "quick.import-graph",
         "quick.contract-coverage",
+        "quick.compact-signatures",
         "quick.public-api-binding-contract-manifests",
         "quick.production-dependencies",
         "quick.product-identity",

@@ -253,10 +253,7 @@ def capabilities() -> dict[str, Any]:
 
 
 def config_metadata(
-    *,
-    requested: dict[str, Any],
-    effective: dict[str, Any],
-    component_max_depth: dict[str, int],
+    *, requested: dict[str, Any], effective: dict[str, Any], component_max_depth: dict[str, int],
 ) -> dict[str, Any]:
     """Build the common requested/effective solver metadata contract."""
 

@@ -47,7 +47,7 @@ def _block_sequence_width(block: dict[str, torch.Tensor]) -> int:
 
 
 def concatenate_path_blocks(
-    blocks: list[dict[str, torch.Tensor]], *, device: torch.device
+    blocks: list[dict[str, torch.Tensor]], *, device: torch.device,
 ) -> dict[str, torch.Tensor]:
     nonempty = [block for block in blocks if int(block["valid"].numel()) > 0]
     if not nonempty:
@@ -67,9 +67,7 @@ def concatenate_path_blocks(
     )
 
 
-def _sort_order(
-    paths: dict[str, torch.Tensor], *, tx_count: int, max_depth: int
-) -> torch.Tensor:
+def _sort_order(paths: dict[str, torch.Tensor], *, tx_count: int, max_depth: int) -> torch.Tensor:
     del tx_count, max_depth
     sequence = paths.get("primitive_sequence")
     if sequence is None or sequence.dim() != 2:
@@ -89,7 +87,7 @@ def _sort_order(
 
 
 def _interaction_type_sequence(
-    *, component_id: torch.Tensor, depth: torch.Tensor, width: int
+    *, component_id: torch.Tensor, depth: torch.Tensor, width: int,
 ) -> torch.Tensor:
     count = int(component_id.numel())
     result = torch.zeros((count, width), device=component_id.device, dtype=torch.int32)
@@ -147,11 +145,7 @@ def canonical_sequence_key(paths: dict[str, torch.Tensor]) -> torch.Tensor:
 
 
 def _canonical_selection_order(
-    paths: dict[str, torch.Tensor],
-    *,
-    tx_count: int,
-    max_depth: int,
-    max_paths: int | None,
+    paths: dict[str, torch.Tensor], *, tx_count: int, max_depth: int, max_paths: int | None,
     max_paths_scope: str,
 ) -> torch.Tensor:
     order = _sort_order(paths, tx_count=tx_count, max_depth=max_depth)
@@ -196,7 +190,7 @@ def _canonical_selection_order(
 
 
 def _pad_topology_sequences(
-    block: dict[str, torch.Tensor], *, width: int
+    block: dict[str, torch.Tensor], *, width: int,
 ) -> dict[str, torch.Tensor]:
     if width < 0:
         raise ValueError("sequence width must be non-negative")
@@ -261,9 +255,7 @@ class EvaluatedPathSidecars:
     compact_metadata: topology_kernels.ExactPairMetadata | None = None
 
 
-def evaluated_paths_from_result(
-    paths: object,
-) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
+def evaluated_paths_from_result(paths: object) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     """Normalize one canonical result directly into split typed contracts."""
 
     path_count = int(paths.valid.numel())
@@ -414,20 +406,10 @@ def evaluated_paths_from_result(
 
 
 def evaluated_paths_from_block(
-    paths: dict[str, torch.Tensor],
-    *,
-    max_paths: int | None,
-    max_paths_scope: str,
-    tx_count: int,
-    rx_count: int,
-    max_depth: int,
-    launch_count: int,
-    visibility_rejection_count: int = 0,
-    selected_edge_count: int = 0,
-    candidate_count: int | None = None,
-    guardrail_count: int = 0,
-    source_stable_ids: torch.Tensor | None = None,
-    sink_stable_ids: torch.Tensor | None = None,
+    paths: dict[str, torch.Tensor], *, max_paths: int | None, max_paths_scope: str, tx_count: int,
+    rx_count: int, max_depth: int, launch_count: int, visibility_rejection_count: int = 0,
+    selected_edge_count: int = 0, candidate_count: int | None = None, guardrail_count: int = 0,
+    source_stable_ids: torch.Tensor | None = None, sink_stable_ids: torch.Tensor | None = None,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     """Select a canonical path block and construct split typed contracts."""
 
@@ -485,15 +467,10 @@ def evaluated_paths_from_block(
 
 
 def _ensure_topology_fields(
-    block: dict[str, torch.Tensor],
-    *,
-    interaction_position: torch.Tensor | None = None,
-    interaction_normal: torch.Tensor | None = None,
-    material_id: torch.Tensor | None = None,
-    path_field: torch.Tensor | None = None,
-    field_xyz: torch.Tensor | None = None,
-    coefficient: torch.Tensor | None = None,
-    primitive_sequence: torch.Tensor | None = None,
+    block: dict[str, torch.Tensor], *, interaction_position: torch.Tensor | None = None,
+    interaction_normal: torch.Tensor | None = None, material_id: torch.Tensor | None = None,
+    path_field: torch.Tensor | None = None, field_xyz: torch.Tensor | None = None,
+    coefficient: torch.Tensor | None = None, primitive_sequence: torch.Tensor | None = None,
     material_sequence: torch.Tensor | None = None,
     interaction_positions: torch.Tensor | None = None,
     interaction_normals: torch.Tensor | None = None,

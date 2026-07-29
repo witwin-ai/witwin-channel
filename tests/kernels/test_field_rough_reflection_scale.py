@@ -13,8 +13,7 @@ from tests.reference import rough_reflection as reference
 
 
 def _random_case(
-    rows, depth, *, device, seed, rough_fraction=0.7, replaced_fraction=0.0,
-    sigma_scale=0.005,
+    rows, depth, *, device, seed, rough_fraction=0.7, replaced_fraction=0.0, sigma_scale=0.005,
 ):
     generator = torch.Generator(device=device).manual_seed(seed)
 

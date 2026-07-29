@@ -31,11 +31,7 @@ REFERENCE_FREQUENCY_HZ = 2.4e9
 
 
 def _mesh_structure(
-    vertices: torch.Tensor,
-    faces: torch.Tensor,
-    material: PhysicalMaterial,
-    *,
-    name: str,
+    vertices: torch.Tensor, faces: torch.Tensor, material: PhysicalMaterial, *, name: str,
     surface_id: int,
 ) -> Structure:
     return Structure(
@@ -118,13 +114,8 @@ def _reduced_scene(grid_size: int) -> Scene:
 
 
 def run_benchmark(
-    *,
-    samples: int = 4096,
-    grid_size: int = 32,
-    warmup_runs: int = 1,
-    repeats: int = 3,
-    emit_artifacts: bool = True,
-    artifact_dir: str | Path = "artifacts/bdpt_munich",
+    *, samples: int = 4096, grid_size: int = 32, warmup_runs: int = 1, repeats: int = 3,
+    emit_artifacts: bool = True, artifact_dir: str | Path = "artifacts/bdpt_munich",
 ) -> dict[str, float | bool | int | str]:
     if not torch.cuda.is_available():
         raise RuntimeError("bench_bdpt_munich requires CUDA")

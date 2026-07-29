@@ -207,8 +207,7 @@ def test_evaluate_composed_jones_ad_route_reproduces_the_fused_primal() -> None:
     )
 
 
-def test_jones_bases_are_transverse_to_their_own_leg_and_direction_is_frozen(
-) -> None:
+def test_jones_bases_are_transverse_to_their_own_leg_and_direction_is_frozen() -> None:
     """The invariant the whole operator rests on, tied to its AD consequence.
 
  A reflection row launches on one direction and arrives on another. If a
@@ -324,8 +323,7 @@ def test_reflection_jones_supports_reverse_mode_endpoint_gradients() -> None:
     assert int(torch.count_nonzero(sink_positions.grad)) > 0
 
 
-def test_polarization_basis_gradients_are_rejected_before_any_native_work(
-) -> None:
+def test_polarization_basis_gradients_are_rejected_before_any_native_work() -> None:
     """The frozen-basis contract, enforced rather than documented.
 
  The composition hands both bases to native companions that reject
@@ -422,8 +420,7 @@ def test_reflection_jones_reverse_mode_matches_central_differences() -> None:
     assert hit.requires_grad
 
 
-def test_reflection_jones_supports_forward_mode_under_the_declared_convention(
-) -> None:
+def test_reflection_jones_supports_forward_mode_under_the_declared_convention() -> None:
     """``jvp`` is declared for polarimetric_transport and nothing else uses it."""
 
     import torch.autograd.forward_ad as forward_ad
@@ -483,8 +480,7 @@ def test_reflection_jones_supports_forward_mode_under_the_declared_convention(
     assert float((matrix_tangent - reference).abs().max()) < 1.0e-2 * scale
 
 
-def test_multi_pair_jones_reproduces_the_single_pair_operator_row_for_row(
-) -> None:
+def test_multi_pair_jones_reproduces_the_single_pair_operator_row_for_row() -> None:
     """Two sources and three sinks, so the diagonal pair-index trick is used.
 
  ``transverse_basis`` hands the native endpoint-basis owner per-row tables
@@ -518,9 +514,7 @@ def test_multi_pair_jones_reproduces_the_single_pair_operator_row_for_row(
 @pytest.mark.parametrize(
     "field", ["powers_w", "polarizations", "polarization_basis"]
 )
-def test_every_declared_frozen_polarimetric_input_is_enforced_on_evaluate(
-    field,
-) -> None:
+def test_every_declared_frozen_polarimetric_input_is_enforced_on_evaluate(field) -> None:
     """A declared frozen input that nobody checks is not a contract.
 
  ``polarimetric_frozen_ad_inputs`` names tx_power, the endpoint

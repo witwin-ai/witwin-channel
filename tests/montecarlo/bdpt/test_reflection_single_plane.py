@@ -143,7 +143,7 @@ def test_bdpt_grid_reflection_solver_does_not_use_image_source_path_export():
     ],
 )
 def test_bdpt_single_plane_reflection_converges_to_maintained_reference(
-    samples, relative_tolerance
+    samples, relative_tolerance,
 ):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT reflection convergence")

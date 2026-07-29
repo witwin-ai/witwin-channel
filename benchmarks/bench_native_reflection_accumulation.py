@@ -110,7 +110,9 @@ def _time_event(torch: Any, func: Any) -> tuple[float, Any]:
     return float(start.elapsed_time(end)), value
 
 
-def _run_once(imports: dict[str, Any], *, samples: int, max_depth: int, strategy: str) -> dict[str, Any]:
+def _run_once(
+    imports: dict[str, Any], *, samples: int, max_depth: int, strategy: str,
+) -> dict[str, Any]:
     torch = imports["torch"]
     mc_component_map_buffer = imports["mc_component_map_buffer"]
     mc_finalize_component_maps = imports["mc_finalize_component_maps"]
@@ -236,11 +238,7 @@ def _run_once(imports: dict[str, Any], *, samples: int, max_depth: int, strategy
 
 
 def run_native_reflection_benchmark(
-    *,
-    samples: list[int],
-    max_depths: list[int],
-    strategy: str,
-    repeats: int,
+    *, samples: list[int], max_depths: list[int], strategy: str, repeats: int,
 ) -> dict[str, Any]:
     imports = _native_imports()
     torch = imports["torch"]

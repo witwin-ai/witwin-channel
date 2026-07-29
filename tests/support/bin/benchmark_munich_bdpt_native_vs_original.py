@@ -385,7 +385,9 @@ if __name__ == "__main__":
 """
 
 
-def _run_original(args: argparse.Namespace, artifact_dir: pathlib.Path) -> tuple[dict[str, Any], dict[str, torch.Tensor]]:
+def _run_original(
+    args: argparse.Namespace, artifact_dir: pathlib.Path,
+) -> tuple[dict[str, Any], dict[str, torch.Tensor]]:
     channel_root = pathlib.Path(args.channel_root)
     if not channel_root.exists():
         raise FileNotFoundError(f"original channel root not found: {channel_root}")
@@ -471,7 +473,9 @@ def _run_original(args: argparse.Namespace, artifact_dir: pathlib.Path) -> tuple
     }, {"path_gain": original_total.contiguous(), **original_components}
 
 
-def _delta_metrics(native: torch.Tensor, original: torch.Tensor) -> tuple[torch.Tensor, dict[str, float | int]]:
+def _delta_metrics(
+    native: torch.Tensor, original: torch.Tensor,
+) -> tuple[torch.Tensor, dict[str, float | int]]:
     original = original.to(device=native.device)
     native_db = _db(native)
     original_db = _db(original)

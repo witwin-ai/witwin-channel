@@ -63,7 +63,7 @@ class Observation:
 
 
 def summarize_observations(
-    observations: Iterable[Observation], *, reference: float | None = None
+    observations: Iterable[Observation], *, reference: float | None = None,
 ) -> dict[str, Any]:
     rows = tuple(observations)
     values = [
@@ -123,9 +123,7 @@ def summarize_observations(
     }
 
 
-def evaluate_thresholds(
-    summary: dict[str, Any], thresholds: dict[str, Any]
-) -> dict[str, bool]:
+def evaluate_thresholds(summary: dict[str, Any], thresholds: dict[str, Any]) -> dict[str, bool]:
     checks = {
         "failure_rate": summary["failure_rate"]
         <= float(thresholds["failure_rate_max"]),

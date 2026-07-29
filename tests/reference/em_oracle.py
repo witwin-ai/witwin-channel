@@ -202,10 +202,7 @@ def _stack_rt_one_pol(y_out, y_layers, deltas, y_back):
 
 
 def layer_stack_rt(
-    layers: Sequence[tuple],
-    cos_theta_i,
-    frequency_hz,
-    outside: Medium | None = None,
+    layers: Sequence[tuple], cos_theta_i, frequency_hz, outside: Medium | None = None,
     backing: Medium | None = None,
 ) -> RTCoefficients:
     """Reflection/transmission of a planar layer stack, both polarizations.
@@ -287,9 +284,7 @@ def coherent_attenuation(sigma_h, k_z1):
     return np.exp(-2.0 * (np.asarray(k_z1) * sigma_h) ** 2)
 
 
-def kirchhoff_diffuse_lobe_series(
-    q_par_x, q_par_y, q_n, sigma_h, lx, ly, n_terms: int = 64
-):
+def kirchhoff_diffuse_lobe_series(q_par_x, q_par_y, q_n, sigma_h, lx, ly, n_terms: int = 64):
     """Beckmann series for the Gaussian-correlation Kirchhoff diffuse lobe.
 
  Evaluates (the scattering model)
@@ -323,14 +318,7 @@ def kirchhoff_diffuse_lobe_series(
 
 
 def kirchhoff_diffuse_lobe_quadrature(
-    q_par_x,
-    q_par_y,
-    q_n,
-    sigma_h,
-    lx,
-    ly,
-    n_points: int = 220,
-    half_width: float = 6.0,
+    q_par_x, q_par_y, q_n, sigma_h, lx, ly, n_points: int = 220, half_width: float = 6.0,
 ):
     """Kirchhoff diffuse lobe via direct 2D Fourier quadrature (cross-check).
 
@@ -362,12 +350,7 @@ def kirchhoff_diffuse_lobe_quadrature(
 
 
 def phase_screen_patch_integral(
-    height_fn: Callable,
-    patch_corners,
-    k_i_vec,
-    k_s_vec,
-    frequency_hz,
-    n_quad=64,
+    height_fn: Callable, patch_corners, k_i_vec, k_s_vec, frequency_hz, n_quad=64,
 ):
     """Direct complex Kirchhoff phase integral over a planar patch.
 

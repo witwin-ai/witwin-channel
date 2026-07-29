@@ -21,11 +21,8 @@ pytestmark = pytest.mark.skipif(
 
 
 def _paths(
-    path_length: torch.Tensor,
-    *,
-    valid_values: tuple[bool, ...] = (False, True, False, True),
-    tx_values: tuple[int, ...] = (0, 1, 0, 0),
-    rx_values: tuple[int, ...] = (0, 0, 1, 1),
+    path_length: torch.Tensor, *, valid_values: tuple[bool, ...] = (False, True, False, True),
+    tx_values: tuple[int, ...] = (0, 1, 0, 0), rx_values: tuple[int, ...] = (0, 0, 1, 1),
 ) -> EvaluatedPaths:
     device = path_length.device
     rows = int(path_length.shape[0])

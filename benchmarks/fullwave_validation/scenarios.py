@@ -73,7 +73,7 @@ def load_case(scenario: str, material: str) -> CaseSpec:
 
 
 def _cube_mesh(
-    center: tuple[float, float, float], size: float
+    center: tuple[float, float, float], size: float,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     cx, cy, cz = center
     half = size / 2.0
@@ -174,11 +174,7 @@ def build_channel_scene(spec: CaseSpec) -> Scene:
     )
 
 
-def observation_valid_mask(
-    spec: CaseSpec,
-    x: np.ndarray,
-    y: np.ndarray,
-) -> np.ndarray:
+def observation_valid_mask(spec: CaseSpec, x: np.ndarray, y: np.ndarray) -> np.ndarray:
     """Return valid observation samples, excluding PEC volume intersections."""
     x_values = np.asarray(x, dtype=np.float64)
     y_values = np.asarray(y, dtype=np.float64)

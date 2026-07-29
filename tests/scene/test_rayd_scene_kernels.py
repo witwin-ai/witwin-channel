@@ -62,10 +62,7 @@ def test_rayd_scene_lifecycle_has_one_canonical_owner():
 
 
 @pytest.mark.parametrize("name, expected", _RAYD_LIFECYCLE_AST_DIGESTS.items())
-def test_rayd_scene_lifecycle_move_preserves_frozen_definition_ast(
-    name: str,
-    expected: str,
-):
+def test_rayd_scene_lifecycle_move_preserves_frozen_definition_ast(name: str, expected: str):
     assert _definition_ast_digest(getattr(rayd_scene, name)) == expected
 
 
@@ -100,11 +97,7 @@ def test_rayd_edge_records_preserve_order_cache_identity_and_owner_lifetime(
         calls.append(resource)
         return values
 
-    def pack(
-        x: torch.Tensor,
-        y: torch.Tensor,
-        z: torch.Tensor,
-    ) -> torch.Tensor:
+    def pack(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
         pack_calls.append((x, y, z))
         return packed
 
@@ -216,9 +209,7 @@ def test_rayd_scene_builder_preserves_native_order_flags_uv_and_keepalive(
     assert left[0].shape == right[0].shape == (0, 4)
 
 
-def test_rayd_scene_builder_preserves_unavailable_reasons(
-    monkeypatch: pytest.MonkeyPatch,
-):
+def test_rayd_scene_builder_preserves_unavailable_reasons(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(rayd_scene.torch.cuda, "is_available", lambda: False)
 
     assert (
@@ -274,9 +265,7 @@ def test_scene_create_preserves_native_argument_order(monkeypatch: pytest.Monkey
     ]
 
 
-def test_scene_edge_records_preserves_typed_resource_and_tuple(
-    monkeypatch: pytest.MonkeyPatch,
-):
+def test_scene_edge_records_preserves_typed_resource_and_tuple(monkeypatch: pytest.MonkeyPatch):
     record = torch.empty(0)
     calls: list[tuple[object, ...]] = []
 

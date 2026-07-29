@@ -20,10 +20,7 @@ from witwin.channel.interactions import diffraction
         ({"mitsuba": object()}, False),
     ),
 )
-def test_prepare_diffraction_order1_plan_preserves_imported_edge_policy(
-    metadata,
-    expected,
-):
+def test_prepare_diffraction_order1_plan_preserves_imported_edge_policy(metadata, expected):
     plan = diffraction.prepare_diffraction_order1_plan(
         metadata=metadata,
         tx_count=2,

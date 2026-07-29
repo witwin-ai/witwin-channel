@@ -13,9 +13,7 @@ from benchmarks.phase13_phase12.profilers import parse_nsys_sqlite
 
 
 def _database(
-    path: Path,
-    *,
-    ranges: tuple[tuple[str, int, int], ...],
+    path: Path, *, ranges: tuple[tuple[str, int, int], ...],
     runtime: tuple[tuple[int, int, int | None, int], ...],
     kernels: tuple[tuple[int, int, int | None, int, int], ...],
     copies: tuple[tuple[int, int, int | None, int, int, int, int], ...] = (),
@@ -60,9 +58,7 @@ def _database(
     return path
 
 
-def test_nsys_uses_launch_correlation_and_gpu_timeline_for_stage_time(
-    tmp_path: Path,
-) -> None:
+def test_nsys_uses_launch_correlation_and_gpu_timeline_for_stage_time(tmp_path: Path) -> None:
     database = _database(
         tmp_path / "capture.sqlite",
         ranges=(
@@ -124,9 +120,7 @@ def test_nsys_rejects_memcpy_api_without_gpu_activity(tmp_path: Path) -> None:
         parse_nsys_sqlite(database)
 
 
-def test_nsys_allows_nested_ownership_but_rejects_sibling_contamination(
-    tmp_path: Path,
-) -> None:
+def test_nsys_allows_nested_ownership_but_rejects_sibling_contamination(tmp_path: Path) -> None:
     database = _database(
         tmp_path / "sibling.sqlite",
         ranges=(

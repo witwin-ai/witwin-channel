@@ -91,9 +91,7 @@ def test_rigid_transform_fixture_preserves_relative_geometry() -> None:
 
 
 @pytest.mark.parametrize("solver_name", ["path", "deterministic"])
-def test_field_solver_transmission_is_rigid_transform_invariant(
-    solver_name: str,
-) -> None:
+def test_field_solver_transmission_is_rigid_transform_invariant(solver_name: str) -> None:
     _require_native()
     adapter = _adapter(solver_name)
     assert _ratio(adapter, transformed=True) == pytest.approx(
@@ -102,9 +100,7 @@ def test_field_solver_transmission_is_rigid_transform_invariant(
 
 
 @pytest.mark.parametrize("solver_name", ["path", "deterministic"])
-def test_field_solver_scattering_power_is_rigid_transform_invariant(
-    solver_name: str,
-) -> None:
+def test_field_solver_scattering_power_is_rigid_transform_invariant(solver_name: str) -> None:
     _require_native()
     adapter = _adapter(solver_name)
     baseline = adapter.scattering(rough_scene(), 0, _FREQUENCY_HZ)
@@ -116,9 +112,7 @@ def test_field_solver_scattering_power_is_rigid_transform_invariant(
 
 
 @pytest.mark.parametrize("solver_name", ["mc_basic", "bdpt"])
-def test_power_solver_transmission_is_rigid_transform_invariant(
-    solver_name: str,
-) -> None:
+def test_power_solver_transmission_is_rigid_transform_invariant(solver_name: str) -> None:
     _require_native()
     adapter = _adapter(solver_name)
     baseline = float(_ratio(adapter, transformed=False))

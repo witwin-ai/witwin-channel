@@ -74,9 +74,7 @@ def _material(roughness: SurfaceRoughness | None) -> PhysicalMaterial:
     )
 
 
-def _wall(
-    material: PhysicalMaterial, *, x: float = 2.5, surface_id: int = 1
-) -> Structure:
+def _wall(material: PhysicalMaterial, *, x: float = 2.5, surface_id: int = 1) -> Structure:
     return make_mesh_structure(
         vertices=torch.tensor(
             [[x, -4.0, -4.0], [x, 4.0, -4.0], [x, -4.0, 4.0], [x, 4.0, 4.0]]

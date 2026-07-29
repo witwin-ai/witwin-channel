@@ -51,11 +51,7 @@ def boundary_mask(component: np.ndarray) -> np.ndarray:
 
 
 def strongest_boundary_profile(
-    candidate: FieldMap,
-    reference: FieldMap,
-    component: str,
-    *,
-    valid_mask: np.ndarray,
+    candidate: FieldMap, reference: FieldMap, component: str, *, valid_mask: np.ndarray,
     half_width: int = 7,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, str]:
     mask = boundary_mask(candidate.components[component])

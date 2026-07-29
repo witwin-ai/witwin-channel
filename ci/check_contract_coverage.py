@@ -380,7 +380,7 @@ def _python_definitions(repo: Path) -> dict[str, ast.AST]:
 
 
 def _python_call_sites(
-    repo: Path, targets: frozenset[str]
+    repo: Path, targets: frozenset[str],
 ) -> dict[str, list[tuple[str, str, int]]]:
     root = repo / PYTHON_PACKAGE_PATH
     call_sites: dict[str, list[tuple[str, str, int]]] = defaultdict(list)
@@ -414,7 +414,7 @@ def _native_reference_count(node: ast.AST, symbol: str) -> int:
 
 
 def _validate_registry(
-    repo: Path, value: object, *, label: str
+    repo: Path, value: object, *, label: str,
 ) -> tuple[dict[str, str], list[str]]:
     if not isinstance(value, dict) or not all(
         isinstance(key, str) and isinstance(nodeid, str)

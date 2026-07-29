@@ -59,11 +59,7 @@ from witwin.channel.scene.resources import (
 
 
 def require_tensor(
-    name: str,
-    tensor: torch.Tensor,
-    *,
-    dtype: torch.dtype,
-    ndim: int,
+    name: str, tensor: torch.Tensor, *, dtype: torch.dtype, ndim: int,
     trailing_shape: tuple[int, ...] = (),
 ) -> None:
     if not isinstance(tensor, torch.Tensor):
@@ -326,9 +322,7 @@ class AssignmentStore:
                 raise ValueError("structure_phase_screens values must be PhaseScreen")
 
 
-def _validated_time(
-    time_s: float | torch.Tensor | None,
-) -> float | torch.Tensor | None:
+def _validated_time(time_s: float | torch.Tensor | None) -> float | torch.Tensor | None:
     """Normalize a compiled snapshot instant without reading a tensor."""
 
     if isinstance(time_s, torch.Tensor):
@@ -408,9 +402,7 @@ class CompiledScene:
             if not math.isfinite(value) or value < 0.0:
                 raise ValueError(f"{name} must be finite and non-negative")
 
-    def require_reference_frequency(
-        self, reference_frequency_hz: float | torch.Tensor
-    ) -> None:
+    def require_reference_frequency(self, reference_frequency_hz: float | torch.Tensor) -> None:
         """Reject a request/compile frequency mismatch before native work."""
 
         compiled = self.reference_frequency_hz
@@ -727,8 +719,7 @@ def _frequency_value(reference_frequency_hz: float | torch.Tensor) -> float:
 
 
 def _frequency_identity(
-    reference_frequency_hz: float | torch.Tensor,
-    value: float,
+    reference_frequency_hz: float | torch.Tensor, value: float,
 ) -> tuple[object, ...]:
     if isinstance(reference_frequency_hz, torch.Tensor):
         return (
@@ -742,9 +733,7 @@ def _frequency_identity(
     return ("float", value.hex())
 
 
-def _versions(
-    scene_or_snapshot: Scene | SceneSnapshot,
-) -> tuple[int, int, int, int]:
+def _versions(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[int, int, int, int]:
     return (
         int(scene_or_snapshot.topology_version),
         int(scene_or_snapshot.geometry_version),
@@ -764,9 +753,7 @@ def _source_structures(
     )
 
 
-def _runtime_structures(
-    scene_or_snapshot: Scene | SceneSnapshot,
-) -> tuple[_RuntimeStructure, ...]:
+def _runtime_structures(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[_RuntimeStructure, ...]:
     runtime: list[_RuntimeStructure] = []
     for structure, rigid_motion, deformation in _source_structures(scene_or_snapshot):
         if not structure.enabled:
@@ -878,9 +865,7 @@ def _runtime_structures(
 
 
 def _compile_penetration_scene_diagonals(
-    structures: tuple[_RuntimeStructure, ...],
-    *,
-    rayd: RayDSceneResource,
+    structures: tuple[_RuntimeStructure, ...], *, rayd: RayDSceneResource,
 ) -> tuple[float, float]:
     if not structures:
         return 0.0, 0.0
@@ -903,10 +888,7 @@ def _compile_penetration_scene_diagonals(
 
 
 def _compile_geometry(
-    structures: tuple[_RuntimeStructure, ...],
-    version: int,
-    *,
-    rayd: RayDSceneResource,
+    structures: tuple[_RuntimeStructure, ...], version: int, *, rayd: RayDSceneResource,
 ) -> GeometryStore:
     if not structures:
         empty_vertices = torch.empty((0, 3), dtype=torch.float32)
@@ -982,10 +964,7 @@ def _sigma_from_eps(value, frequency_hz: float):
     )
 
 
-def _material_record(
-    material: PhysicalMaterial,
-    frequency_hz: float,
-) -> dict[str, object]:
+def _material_record(material: PhysicalMaterial, frequency_hz: float) -> dict[str, object]:
     if material.roughness_back is not None and (
         material.roughness_front is None
         or material.roughness_back is not material.roughness_front
@@ -1074,9 +1053,7 @@ def _unique_materials(
 
 
 def _material_cache_token(
-    material_version: int,
-    material_ids: tuple[int, ...],
-    frequency_hz: float,
+    material_version: int, material_ids: tuple[int, ...], frequency_hz: float,
 ) -> str:
     payload = repr(
         (MATERIAL_ABI_VERSION, material_version, material_ids, frequency_hz.hex())
@@ -1103,9 +1080,7 @@ def _stack(values: list[object], *, dtype: torch.dtype) -> torch.Tensor:
 
 
 def _compile_materials(
-    materials: tuple[tuple[int, PhysicalMaterial], ...],
-    frequency_hz: float,
-    version: int,
+    materials: tuple[tuple[int, PhysicalMaterial], ...], frequency_hz: float, version: int,
 ) -> MaterialStore:
     if not materials:
         materials = ((0, PhysicalMaterial(material_id=0, name="vacuum")),)
@@ -1175,11 +1150,8 @@ def _compile_materials(
 
 
 def _compile_assignments(
-    structures: tuple[_RuntimeStructure, ...],
-    *,
-    material_row_by_id: dict[int, int],
-    geometry: GeometryStore,
-    version: int,
+    structures: tuple[_RuntimeStructure, ...], *, material_row_by_id: dict[int, int],
+    geometry: GeometryStore, version: int,
 ) -> AssignmentStore:
     face_rows: list[int] = []
     phase_screens: dict[int, PhaseScreen] = {}
@@ -1240,8 +1212,7 @@ def _compile_assignments(
 
 
 def _cache_key(
-    scene_or_snapshot: Scene | SceneSnapshot,
-    versions: tuple[int, int, int, int],
+    scene_or_snapshot: Scene | SceneSnapshot, versions: tuple[int, int, int, int],
     frequency_identity: tuple[object, ...],
 ) -> tuple[object, ...]:
     runtime_device = (
@@ -1256,9 +1227,7 @@ def _cache_key(
     )
 
 
-def _rayd_input_identity(
-    scene_or_snapshot: Scene | SceneSnapshot,
-) -> tuple[object, ...]:
+def _rayd_input_identity(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[object, ...]:
     edge_policy = scene_or_snapshot.metadata.get("imported_edge_policy")
     states = tuple(
         item
@@ -1287,9 +1256,7 @@ def _rayd_input_identity(
     )
 
 
-def _geometry_mapping_identity(
-    scene_or_snapshot: Scene | SceneSnapshot,
-) -> tuple[object, ...]:
+def _geometry_mapping_identity(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[object, ...]:
     return (
         _rayd_input_identity(scene_or_snapshot),
         tuple(
@@ -1337,9 +1304,7 @@ def _assignment_input_identity(
 
 
 def compile(
-    scene_or_snapshot: Scene | SceneSnapshot,
-    *,
-    reference_frequency_hz: float | torch.Tensor,
+    scene_or_snapshot: Scene | SceneSnapshot, *, reference_frequency_hz: float | torch.Tensor,
 ) -> CompiledScene:
     """Build or reuse the sole Channel runtime for a Core world contract."""
 
@@ -1518,10 +1483,7 @@ def host_vec3_tensor(flat_positions: tuple[float, ...]) -> torch.Tensor:
 
 
 def receiver_positions(
-    scene: object,
-    *,
-    device: torch.device,
-    reference: torch.Tensor | None = None,
+    scene: object, *, device: torch.device, reference: torch.Tensor | None = None,
 ) -> torch.Tensor:
     if (
         len(scene.receivers) == 1
@@ -1552,7 +1514,7 @@ def receiver_positions(
 
 
 def transmitter_positions(
-    scene: object, *, device: torch.device
+    scene: object, *, device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     if not scene.transmitters:
         exported = mc_transmitter_tensors((), ())
@@ -1571,9 +1533,7 @@ def transmitter_positions(
     return positions, powers
 
 
-def transmitter_polarizations_as_stored(
-    scene: object, *, device: torch.device
-) -> torch.Tensor:
+def transmitter_polarizations_as_stored(scene: object, *, device: torch.device) -> torch.Tensor:
     """Return transmitter polarizations with the scene's stored dtype and layout."""
 
     if not scene.transmitters:

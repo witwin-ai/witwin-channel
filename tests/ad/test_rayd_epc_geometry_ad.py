@@ -77,9 +77,7 @@ def _build_rayd_scene(vertices: torch.Tensor, faces) -> object:
     return compile_scene(scene, reference_frequency_hz=3.5e9).rayd
 
 
-def _plane_inputs(
-    rayd: object, sequence: torch.Tensor
-) -> tuple[torch.Tensor, torch.Tensor]:
+def _plane_inputs(rayd: object, sequence: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     """Direct-plane arrays exactly as the solver seam builds them."""
 
     records = rayd.edge_records()

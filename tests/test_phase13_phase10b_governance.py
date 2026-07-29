@@ -83,9 +83,7 @@ def _lf_text_sha256(path: Path) -> str:
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
-def test_lf_text_sha256_normalizes_eol_without_hiding_content_changes(
-    tmp_path: Path,
-) -> None:
+def test_lf_text_sha256_normalizes_eol_without_hiding_content_changes(tmp_path: Path) -> None:
     lf = tmp_path / "lf.txt"
     crlf = tmp_path / "crlf.txt"
     changed = tmp_path / "changed.txt"

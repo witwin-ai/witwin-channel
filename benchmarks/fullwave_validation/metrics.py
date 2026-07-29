@@ -64,10 +64,7 @@ def resample_regular(source: FieldMap, x: np.ndarray, y: np.ndarray) -> FieldMap
 
 
 def _resample_array(
-    source_x: np.ndarray,
-    source_y: np.ndarray,
-    values: np.ndarray,
-    target_x: np.ndarray,
+    source_x: np.ndarray, source_y: np.ndarray, values: np.ndarray, target_x: np.ndarray,
     target_y: np.ndarray,
 ) -> np.ndarray:
     x_margin = 0.51 * float(np.min(np.diff(source_x)))
@@ -95,10 +92,7 @@ def _interp_complex(x: np.ndarray, xp: np.ndarray, values: np.ndarray) -> np.nda
 
 
 def compare_fields(
-    candidate: FieldMap,
-    reference: FieldMap,
-    *,
-    valid_mask: np.ndarray | None = None,
+    candidate: FieldMap, reference: FieldMap, *, valid_mask: np.ndarray | None = None,
 ) -> ErrorMetrics:
     aligned = resample_regular(reference, candidate.x, candidate.y)
     mask = _validated_mask(valid_mask, candidate.field.shape)
@@ -134,10 +128,7 @@ def compare_fields(
 
 
 def compare_magnitudes(
-    candidate: FieldMap,
-    reference: FieldMap,
-    *,
-    valid_mask: np.ndarray | None = None,
+    candidate: FieldMap, reference: FieldMap, *, valid_mask: np.ndarray | None = None,
     amplitude_scale: float | None = None,
 ) -> MagnitudeMetrics:
     """Compare field envelopes after matching RMS amplitude.
@@ -183,10 +174,7 @@ def compare_magnitudes(
 
 
 def analyze_boundaries(
-    deterministic: FieldMap,
-    fullwave: FieldMap,
-    *,
-    support_floor_db: float = -80.0,
+    deterministic: FieldMap, fullwave: FieldMap, *, support_floor_db: float = -80.0,
     valid_mask: np.ndarray | None = None,
 ) -> dict[str, BoundaryMetrics]:
     aligned = resample_regular(fullwave, deterministic.x, deterministic.y)
@@ -206,13 +194,8 @@ def analyze_boundaries(
 
 
 def _boundary_metrics(
-    kind: str,
-    component: str,
-    deterministic: FieldMap,
-    fullwave: FieldMap,
-    *,
-    support_floor_db: float,
-    valid_mask: np.ndarray,
+    kind: str, component: str, deterministic: FieldMap, fullwave: FieldMap, *,
+    support_floor_db: float, valid_mask: np.ndarray,
 ) -> BoundaryMetrics:
     if component not in deterministic.components:
         raise ValueError(f"deterministic reference is missing {component!r}")
@@ -249,9 +232,7 @@ def _boundary_metrics(
     )
 
 
-def _edge_jumps_db(
-    field: np.ndarray, x_edges: np.ndarray, y_edges: np.ndarray
-) -> np.ndarray:
+def _edge_jumps_db(field: np.ndarray, x_edges: np.ndarray, y_edges: np.ndarray) -> np.ndarray:
     magnitude = np.abs(field)
     floor = max(float(magnitude.max()) * 1.0e-10, 1.0e-30)
     db = 20.0 * np.log10(np.maximum(magnitude, floor))

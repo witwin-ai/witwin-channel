@@ -35,9 +35,7 @@ def test_path_public_api_is_single_versionless_contract():
     } & set(path_api.__all__)
 
 
-def _ragged(
-    *, count: int, rx_id=None, tx_id=None, field=None, depth: int = 2, max_paths=None
-):
+def _ragged(*, count: int, rx_id=None, tx_id=None, field=None, depth: int = 2, max_paths=None):
     rx_id = torch.tensor(rx_id if rx_id is not None else [0] * count, dtype=torch.int32)
     tx_id = torch.tensor(tx_id if tx_id is not None else [0] * count, dtype=torch.int32)
     field = (

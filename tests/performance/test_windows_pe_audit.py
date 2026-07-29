@@ -96,9 +96,7 @@ def test_export_parser_fails_loudly(output: str, match: str):
         audit_windows_pe.parse_exports(output)
 
 
-def test_audit_pe_invokes_both_dumpbin_modes_and_records_identity(
-    tmp_path: Path, monkeypatch
-):
+def test_audit_pe_invokes_both_dumpbin_modes_and_records_identity(tmp_path: Path, monkeypatch):
     pe = tmp_path / "_channel.pyd"
     pe.write_bytes(b"MZ-test")
     calls: list[str] = []

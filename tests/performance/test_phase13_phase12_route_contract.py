@@ -11,9 +11,7 @@ from benchmarks.phase13_phase12 import workers
 from benchmarks.phase13_phase12.contracts import EvidenceError
 
 
-def _install_route_replay(
-    monkeypatch: pytest.MonkeyPatch, *, keep_stable_candidate: bool
-) -> None:
+def _install_route_replay(monkeypatch: pytest.MonkeyPatch, *, keep_stable_candidate: bool) -> None:
     matches = {
         ("base", "incident_te_tm_fractions"): [
             "witwin/channel/montecarlo/events/transmission.py:129:def incident_te_tm_fractions("
@@ -69,9 +67,7 @@ def test_montecarlo_route_keeps_stable_owner_and_deletes_old_helper(
     assert audit["checks"]["candidate_stable:straight_transmission_chains"] is True
 
 
-def test_montecarlo_route_rejects_deleting_stable_owner(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_montecarlo_route_rejects_deleting_stable_owner(monkeypatch: pytest.MonkeyPatch) -> None:
     _install_route_replay(monkeypatch, keep_stable_candidate=False)
 
     with pytest.raises(EvidenceError, match="candidate_stable:straight_transmission_chains"):

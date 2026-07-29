@@ -68,14 +68,8 @@ def _without_payload(capture: dict[str, object]) -> dict[str, object]:
 
 
 def _capture(
-    config: RunnerConfig,
-    store: ArtifactStore,
-    *,
-    argv: list[str],
-    cwd: Path,
-    stem: str,
-    timeout_seconds: int,
-    environment: Mapping[str, str] | None = None,
+    config: RunnerConfig, store: ArtifactStore, *, argv: list[str], cwd: Path, stem: str,
+    timeout_seconds: int, environment: Mapping[str, str] | None = None,
 ) -> dict[str, object]:
     return _without_payload(
         run_captured(
@@ -109,11 +103,7 @@ def _quoted_cmake_definition(name: str, value: object) -> str:
 
 
 def _prepare_packaged_validation_checkout(
-    config: RunnerConfig,
-    store: ArtifactStore,
-    *,
-    commit: str,
-    timeout_seconds: int,
+    config: RunnerConfig, store: ArtifactStore, *, commit: str, timeout_seconds: int,
 ) -> dict[str, object]:
     candidate = config.variant(FINAL_GROUP, "candidate")
     if candidate.runner_extension is None or candidate.runner_site_packages is None:
@@ -264,7 +254,7 @@ def _prepare_packaged_validation_checkout(
 
 
 def _runner_channel_environment(
-    config: RunnerConfig, validation: Mapping[str, object]
+    config: RunnerConfig, validation: Mapping[str, object],
 ) -> tuple[dict[str, str], dict[str, object]]:
     candidate = config.variant(FINAL_GROUP, "candidate")
     try:
@@ -334,11 +324,7 @@ def _runner_channel_environment(
 
 
 def _run_channel_tier(
-    config: RunnerConfig,
-    tier: str,
-    *,
-    validation: Mapping[str, object],
-    timeout_seconds: int,
+    config: RunnerConfig, tier: str, *, validation: Mapping[str, object], timeout_seconds: int,
     store: ArtifactStore,
 ) -> dict[str, object]:
     candidate = config.variant(FINAL_GROUP, "candidate")
@@ -368,7 +354,7 @@ def _run_channel_tier(
 
 
 def _fresh_rayd_build(
-    config: RunnerConfig, *, timeout_seconds: int, store: ArtifactStore
+    config: RunnerConfig, *, timeout_seconds: int, store: ArtifactStore,
 ) -> tuple[Path, dict[str, dict[str, object]]]:
     build_dir = config.rayd_checkout / "backends" / "torch" / "build" / "local-120"
     if os.path.lexists(build_dir):
@@ -396,11 +382,7 @@ def _fresh_rayd_build(
 
 
 def _run_rayd_checks(
-    config: RunnerConfig,
-    build_dir: Path,
-    *,
-    timeout_seconds: int,
-    store: ArtifactStore,
+    config: RunnerConfig, build_dir: Path, *, timeout_seconds: int, store: ArtifactStore,
 ) -> dict[str, dict[str, object]]:
     direct = _capture(
         config,
@@ -440,7 +422,7 @@ def _fresh_release_files(checkout: Path) -> tuple[Path, Path]:
 
 
 def _load_retained_json(
-    store: ArtifactStore, reference: Mapping[str, object], *, label: str
+    store: ArtifactStore, reference: Mapping[str, object], *, label: str,
 ) -> dict[str, object]:
     try:
         payload = json.loads(
@@ -476,10 +458,7 @@ def _build_fingerprint(info: Mapping[str, object]) -> str:
 
 
 def _validate_wheel_smoke(
-    smoke: Mapping[str, object],
-    *,
-    implementation: Mapping[str, object],
-    wheel_sha256: str,
+    smoke: Mapping[str, object], *, implementation: Mapping[str, object], wheel_sha256: str,
 ) -> dict[str, object]:
     exact_keys(
         smoke,
@@ -521,10 +500,7 @@ def _validate_wheel_smoke(
 
 
 def _retain_rayd_build_facts(
-    config: RunnerConfig,
-    store: ArtifactStore,
-    build_dir: Path,
-    *,
+    config: RunnerConfig, store: ArtifactStore, build_dir: Path, *,
     implementation: Mapping[str, object],
 ) -> dict[str, object]:
     cache = store.retain_external(
@@ -595,10 +571,7 @@ def _cache_values(payload: bytes) -> dict[str, str]:
 
 
 def _validate_rayd_build_facts(
-    facts: Mapping[str, object],
-    *,
-    store: ArtifactStore,
-    rayd_checkout: Path | None,
+    facts: Mapping[str, object], *, store: ArtifactStore, rayd_checkout: Path | None,
     implementation: Mapping[str, object],
 ) -> None:
     exact_keys(
@@ -687,10 +660,7 @@ def _validate_rayd_build_facts(
 
 
 def _independent_wheel_audit(
-    config: RunnerConfig,
-    store: ArtifactStore,
-    wheel: Mapping[str, object],
-    *,
+    config: RunnerConfig, store: ArtifactStore, wheel: Mapping[str, object], *,
     timeout_seconds: int,
 ) -> dict[str, object]:
     candidate = config.variant(FINAL_GROUP, "candidate")
@@ -714,9 +684,7 @@ def _independent_wheel_audit(
     return {"capture": capture, "artifact": artifact, "payload": payload}
 
 
-def _retain_wheel_native(
-    store: ArtifactStore, wheel: Mapping[str, object]
-) -> dict[str, object]:
+def _retain_wheel_native(store: ArtifactStore, wheel: Mapping[str, object]) -> dict[str, object]:
     wheel_path = store.root / str(wheel["path"])
     store.verify_reference(wheel, label="release wheel")
     try:
@@ -749,11 +717,8 @@ def _retain_wheel_native(
 
 
 def _validate_extracted_pe_audit(
-    payload: Mapping[str, object],
-    *,
-    native: Mapping[str, object],
-    wheel_pe_audit: Mapping[str, object],
-    store: ArtifactStore,
+    payload: Mapping[str, object], *, native: Mapping[str, object],
+    wheel_pe_audit: Mapping[str, object], store: ArtifactStore,
 ) -> dict[str, object]:
     exact_keys(
         payload,
@@ -787,12 +752,8 @@ def _validate_extracted_pe_audit(
 
 
 def _independent_wheel_pe_audit(
-    config: RunnerConfig,
-    store: ArtifactStore,
-    native: Mapping[str, object],
-    *,
-    wheel_pe_audit: Mapping[str, object],
-    timeout_seconds: int,
+    config: RunnerConfig, store: ArtifactStore, native: Mapping[str, object], *,
+    wheel_pe_audit: Mapping[str, object], timeout_seconds: int,
 ) -> dict[str, object]:
     native_artifact = native.get("artifact")
     if not isinstance(native_artifact, dict):
@@ -837,11 +798,7 @@ def _independent_wheel_pe_audit(
 
 
 def _independent_cuda_arch_audit(
-    config: RunnerConfig,
-    store: ArtifactStore,
-    extension_path: Path,
-    *,
-    timeout_seconds: int,
+    config: RunnerConfig, store: ArtifactStore, extension_path: Path, *, timeout_seconds: int,
 ) -> dict[str, object]:
     capture = _capture(
         config,
@@ -897,12 +854,8 @@ def _naming_audit(checkout: Path) -> dict[str, object]:
 
 
 def run_release_evidence(
-    config: RunnerConfig,
-    gate: Mapping[str, object],
-    *,
-    implementation: Mapping[str, object],
-    timeout_seconds: int,
-    store: ArtifactStore,
+    config: RunnerConfig, gate: Mapping[str, object], *, implementation: Mapping[str, object],
+    timeout_seconds: int, store: ArtifactStore,
 ) -> dict[str, object]:
     candidate = config.variant(FINAL_GROUP, "candidate")
     if candidate.runner_extension is None or candidate.runner_site_packages is None:
@@ -1069,7 +1022,7 @@ def run_release_evidence(
 
 
 def _validate_runner_binding(
-    capture: Mapping[str, object], *, implementation: Mapping[str, object]
+    capture: Mapping[str, object], *, implementation: Mapping[str, object],
 ) -> dict[str, object]:
     binding = capture.get("runner_binding")
     if not isinstance(binding, dict):
@@ -1130,10 +1083,7 @@ def _validate_runner_binding(
 
 
 def _validate_packaged_validation_checkout(
-    value: object,
-    *,
-    implementation: Mapping[str, object],
-    store: ArtifactStore,
+    value: object, *, implementation: Mapping[str, object], store: ArtifactStore,
 ) -> dict[str, object]:
     if not isinstance(value, dict):
         raise EvidenceError("packaged validation checkout evidence is malformed")
@@ -1251,11 +1201,8 @@ def _validate_packaged_validation_checkout(
 
 
 def validate_release_report(
-    release: Mapping[str, object],
-    *,
-    implementation: Mapping[str, object],
-    gate: Mapping[str, object],
-    store: ArtifactStore,
+    release: Mapping[str, object], *, implementation: Mapping[str, object],
+    gate: Mapping[str, object], store: ArtifactStore,
 ) -> dict[str, object]:
     exact_keys(
         release,

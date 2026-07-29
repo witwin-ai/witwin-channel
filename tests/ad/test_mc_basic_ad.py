@@ -69,8 +69,7 @@ def _wall() -> Structure:
 
 
 def _reflection_scene(
-    frequency: float | torch.Tensor = _FREQUENCY_HZ,
-    tx: torch.Tensor | None = None,
+    frequency: float | torch.Tensor = _FREQUENCY_HZ, tx: torch.Tensor | None = None,
 ) -> Scene:
     position = torch.tensor(_TX) if tx is None else tx
     return Scene(
@@ -81,8 +80,7 @@ def _reflection_scene(
 
 
 def _transmission_scene(
-    frequency: float | torch.Tensor = _FREQUENCY_HZ,
-    tx: torch.Tensor | None = None,
+    frequency: float | torch.Tensor = _FREQUENCY_HZ, tx: torch.Tensor | None = None,
 ) -> Scene:
     material = PhysicalMaterial(
         layers=(
@@ -109,8 +107,7 @@ def _transmission_scene(
 
 
 def _los_scene(
-    frequency: float | torch.Tensor = _FREQUENCY_HZ,
-    tx: torch.Tensor | None = None,
+    frequency: float | torch.Tensor = _FREQUENCY_HZ, tx: torch.Tensor | None = None,
     rx: torch.Tensor | None = None,
 ) -> Scene:
     return Scene(
@@ -170,7 +167,7 @@ _MATERIAL_STEPS = {
 
 
 def _fd_material_gradient(
-    scene: Scene, components: frozenset[str], leaf: torch.Tensor, step: float
+    scene: Scene, components: frozenset[str], leaf: torch.Tensor, step: float,
 ) -> torch.Tensor:
     base = leaf.detach().clone()
 
@@ -442,8 +439,7 @@ _DIFFRACTION_SAMPLES = 4096
 
 
 def _diffraction_scene(
-    frequency: float | torch.Tensor = _FREQUENCY_HZ,
-    tx: torch.Tensor | None = None,
+    frequency: float | torch.Tensor = _FREQUENCY_HZ, tx: torch.Tensor | None = None,
 ) -> Scene:
     from tests.support.scenes import wedge_diffraction_scene
 

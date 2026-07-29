@@ -79,8 +79,7 @@ def cpu_contracts(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _install_native(
-    monkeypatch: pytest.MonkeyPatch,
-    implementations: dict[str, Callable[..., object]],
+    monkeypatch: pytest.MonkeyPatch, implementations: dict[str, Callable[..., object]],
 ) -> None:
     def required(name: str) -> Callable[..., object]:
         return implementations[name]
@@ -111,7 +110,7 @@ def test_policy_and_failure_bit_are_stable_and_generation_free() -> None:
 
 
 def test_forward_and_tape_keep_named_order_and_state_identity(
-    monkeypatch: pytest.MonkeyPatch, cpu_contracts: None
+    monkeypatch: pytest.MonkeyPatch, cpu_contracts: None,
 ) -> None:
     scene, origins, targets, active, state = _request()
     result_values = _result_values()
@@ -173,7 +172,7 @@ def test_forward_and_tape_keep_named_order_and_state_identity(
 
 
 def test_backward_and_jvp_flatten_complete_primal_tape_and_return_named_results(
-    monkeypatch: pytest.MonkeyPatch, cpu_contracts: None
+    monkeypatch: pytest.MonkeyPatch, cpu_contracts: None,
 ) -> None:
     scene, origins, targets, active, state = _request()
     result_values = _result_values()
@@ -260,7 +259,7 @@ def test_backward_and_jvp_flatten_complete_primal_tape_and_return_named_results(
 
 
 def test_companions_reject_a_different_failure_state_before_dispatch(
-    monkeypatch: pytest.MonkeyPatch, cpu_contracts: None
+    monkeypatch: pytest.MonkeyPatch, cpu_contracts: None,
 ) -> None:
     scene, origins, targets, active, state = _request()
     taped = SegmentPenetrationTapeResult(
@@ -287,7 +286,7 @@ def test_companions_reject_a_different_failure_state_before_dispatch(
 
 
 def test_missing_segment_penetration_family_has_no_fallback(
-    monkeypatch: pytest.MonkeyPatch, cpu_contracts: None
+    monkeypatch: pytest.MonkeyPatch, cpu_contracts: None,
 ) -> None:
     scene, origins, targets, active, state = _request()
     tape = SegmentPenetrationTapeResult(
@@ -332,9 +331,7 @@ def test_missing_segment_penetration_family_has_no_fallback(
             call()
 
 
-def test_request_requires_explicit_policy_and_structural_inactive_mask(
-    cpu_contracts: None,
-) -> None:
+def test_request_requires_explicit_policy_and_structural_inactive_mask(cpu_contracts: None) -> None:
     scene, origins, targets, _active, state = _request()
     with pytest.raises(TypeError, match="SegmentPenetrationPolicy"):
         geometry._segment_penetration_request_args(
@@ -374,7 +371,7 @@ def test_custom_function_routes_only_to_native_family_facades() -> None:
 
 
 def test_custom_function_executes_native_tape_vjp_and_jvp(
-    monkeypatch: pytest.MonkeyPatch, cpu_contracts: None
+    monkeypatch: pytest.MonkeyPatch, cpu_contracts: None,
 ) -> None:
     scene, origins, targets, active, state = _request()
     vertices = torch.zeros((4, 3), requires_grad=True)

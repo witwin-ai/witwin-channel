@@ -50,9 +50,7 @@ def _state_raw() -> tuple[torch.Tensor, ...]:
     )
 
 
-def test_edge_query_names_cached_and_imported_raw_geometry_without_copies(
-    monkeypatch,
-):
+def test_edge_query_names_cached_and_imported_raw_geometry_without_copies(monkeypatch):
     rayd = _Rayd()
     raw = _edge_raw()
     calls = []
@@ -222,9 +220,7 @@ def test_tx_visibility_plan_has_no_python_geometry_or_compaction() -> None:
         assert forbidden not in source
 
 
-def test_order1_query_consumes_visible_plan_and_preserves_state_identity(
-    monkeypatch,
-):
+def test_order1_query_consumes_visible_plan_and_preserves_state_identity(monkeypatch):
     named_states = diffraction.name_diffraction_states(_state_raw())
     active = torch.ones(1, dtype=torch.bool)
     states = diffraction.DiffractionVisibleStatePlan(

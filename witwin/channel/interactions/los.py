@@ -34,10 +34,7 @@ class LosCandidatePlan:
 
 
 def prepare_los_candidates(
-    *,
-    tx_id: torch.Tensor,
-    rx_id: torch.Tensor,
-    sequence_width: int,
+    *, tx_id: torch.Tensor, rx_id: torch.Tensor, sequence_width: int,
 ) -> LosCandidatePlan:
     return LosCandidatePlan(
         tx_id=tx_id,
@@ -48,17 +45,9 @@ def prepare_los_candidates(
 
 
 def _los_topology(
-    scene: Scene,
-    compiled: object,
-    tx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    rx_positions: torch.Tensor,
-    tx_polarizations: torch.Tensor,
-    *,
-    frequency_hz: float,
-    sequence_width: int,
-    isb_boundary_taper: bool = False,
-    isb_boundary_taper_width: float = 0.5,
+    scene: Scene, compiled: object, tx_positions: torch.Tensor, tx_power: torch.Tensor,
+    rx_positions: torch.Tensor, tx_polarizations: torch.Tensor, *, frequency_hz: float,
+    sequence_width: int, isb_boundary_taper: bool = False, isb_boundary_taper_width: float = 0.5,
 ) -> tuple[dict[str, torch.Tensor], int, int, int]:
     # the per-transmitter polarization (threaded from the caller) drives the
     # LoS dipole sin^2 pattern in path_los_export.

@@ -66,14 +66,7 @@ def _expanded_scene(tx_count: int, rx_count: int) -> Scene:
     )
 
 
-def _operation(
-    solver: str,
-    scene: Scene,
-    *,
-    depth: int,
-    samples: int,
-    workspace_limit_bytes: int,
-):
+def _operation(solver: str, scene: Scene, *, depth: int, samples: int, workspace_limit_bytes: int):
     components = {"los"} if depth == 0 else {"los", "reflection"}
     if solver == "path":
         from witwin.channel.path import Config, solve

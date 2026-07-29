@@ -173,12 +173,7 @@ def load_tidy3d_data(path: str | Path, spec: CaseSpec) -> FieldMap:
     return extract_tidy3d_field_map(td.SimulationData.from_file(str(path)), spec)
 
 
-def submit_tidy3d(
-    spec: CaseSpec,
-    *,
-    task_name: str,
-    data_path: str | Path,
-) -> FieldMap:
+def submit_tidy3d(spec: CaseSpec, *, task_name: str, data_path: str | Path) -> FieldMap:
     try:
         from tidy3d import web
     except ImportError as exc:

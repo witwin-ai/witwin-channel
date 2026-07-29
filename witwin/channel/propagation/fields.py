@@ -95,16 +95,9 @@ if TYPE_CHECKING:
 
 
 def _resolve_coupled_rd_stationary(
-    source: torch.Tensor,
-    target: torch.Tensor,
-    rows: torch.Tensor,
-    reverse_order: bool,
-    tri_a: torch.Tensor,
-    normals_table: torch.Tensor,
-    reflection_face: torch.Tensor,
-    edge_geometry: tuple[torch.Tensor, ...],
-    edge_id: torch.Tensor,
-    edge_position: torch.Tensor,
+    source: torch.Tensor, target: torch.Tensor, rows: torch.Tensor, reverse_order: bool,
+    tri_a: torch.Tensor, normals_table: torch.Tensor, reflection_face: torch.Tensor,
+    edge_geometry: tuple[torch.Tensor, ...], edge_id: torch.Tensor, edge_position: torch.Tensor,
     reflection_position: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Differentiable fixed-winner coupled stationary re-solve (cid 3/4, AD).
@@ -155,30 +148,14 @@ def _resolve_coupled_rd_stationary(
 
 
 def _evaluate_coupled_dd_rows(
-    topology: PathTopology,
-    geometry: PathGeometry,
-    source: torch.Tensor,
-    target: torch.Tensor,
-    source_power: torch.Tensor,
-    tx_pol: torch.Tensor,
-    rx_pol: torch.Tensor,
-    material: dict[str, torch.Tensor],
-    edge_geometry: tuple[torch.Tensor, ...],
-    edge_n0: torch.Tensor,
-    edge_n1: torch.Tensor,
-    edge_exterior: torch.Tensor,
-    edge_face0: torch.Tensor,
-    edge_face1: torch.Tensor,
-    ad_enabled: bool,
-    frequency: float | torch.Tensor,
-    frequency_value: float | None,
-    ledger: AdLaunchLedger | None,
-    field_xyz: torch.Tensor,
-    coefficient: torch.Tensor,
-    path_field: torch.Tensor,
-    path_gain: torch.Tensor,
-    direction: torch.Tensor,
-    launch_count: int,
+    topology: PathTopology, geometry: PathGeometry, source: torch.Tensor, target: torch.Tensor,
+    source_power: torch.Tensor, tx_pol: torch.Tensor, rx_pol: torch.Tensor,
+    material: dict[str, torch.Tensor], edge_geometry: tuple[torch.Tensor, ...],
+    edge_n0: torch.Tensor, edge_n1: torch.Tensor, edge_exterior: torch.Tensor,
+    edge_face0: torch.Tensor, edge_face1: torch.Tensor, ad_enabled: bool,
+    frequency: float | torch.Tensor, frequency_value: float | None, ledger: AdLaunchLedger | None,
+    field_xyz: torch.Tensor, coefficient: torch.Tensor, path_field: torch.Tensor,
+    path_gain: torch.Tensor, direction: torch.Tensor, launch_count: int,
 ) -> int:
     """Evaluate the coupled double-diffraction rows (cid 7, coupled double diffraction).
 
@@ -201,7 +178,7 @@ def _evaluate_coupled_dd_rows(
         q2 = geometry.interaction_positions[dd_rows, 1].contiguous()
 
         def _dd_line_bounds(
-            edge_id: torch.Tensor, keller_point: torch.Tensor
+            edge_id: torch.Tensor, keller_point: torch.Tensor,
         ) -> tuple[torch.Tensor, torch.Tensor]:
             # /coupled double diffraction: edge-segment bounds relative to the passed Keller
             # point along the normalized edge axis, so the native stationary
@@ -224,9 +201,7 @@ def _evaluate_coupled_dd_rows(
         edge1_line_min, edge1_line_max = _dd_line_bounds(edge1_id, q1)
         edge2_line_min, edge2_line_max = _dd_line_bounds(edge2_id, q2)
 
-        def _dd_wedge_faces(
-            edge_id: torch.Tensor,
-        ) -> tuple[torch.Tensor, torch.Tensor]:
+        def _dd_wedge_faces(edge_id: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
             face0 = edge_face0[edge_id]
             raw_face1 = edge_face1[edge_id]
             # Boundary edges have no second face; reuse face0 like cid 3/4.
@@ -236,9 +211,7 @@ def _evaluate_coupled_dd_rows(
         edge1_face0, edge1_face1 = _dd_wedge_faces(edge1_id)
         edge2_face0, edge2_face1 = _dd_wedge_faces(edge2_id)
 
-        def _dd_material_tuple(
-            face: torch.Tensor,
-        ) -> tuple[torch.Tensor, ...]:
+        def _dd_material_tuple(face: torch.Tensor) -> tuple[torch.Tensor, ...]:
             return tuple(
                 material[name][face].contiguous()
                 for name in ("eps_r", "sigma_e", "mu_r", "gain", "thickness")
@@ -310,7 +283,7 @@ def _evaluate_coupled_dd_rows(
 
 
 def _los_taper_frequency(
-    frequency_value: float | None, frequency: float | torch.Tensor
+    frequency_value: float | None, frequency: float | torch.Tensor,
 ) -> float | torch.Tensor:
     """Host frequency for the boundary taper LoS taper clearance kernel.
 
@@ -324,13 +297,8 @@ def _los_taper_frequency(
 
 
 def _rough_scale_inputs(
-    compiled: object,
-    topology: PathTopology,
-    rows: torch.Tensor,
-    depth_value: int,
-    material: dict[str, torch.Tensor],
-    *,
-    scattering_active: bool,
+    compiled: object, topology: PathTopology, rows: torch.Tensor, depth_value: int,
+    material: dict[str, torch.Tensor], *, scattering_active: bool,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | None:
     """Host-side per-bounce inputs for the native rough-reflection C_r op.
 
@@ -395,24 +363,12 @@ def _rough_scale_inputs(
 
 
 def _evaluate_los_fields(
-    topology: PathTopology,
-    source: torch.Tensor,
-    target: torch.Tensor,
-    source_power: torch.Tensor,
-    tx_pol: torch.Tensor,
-    rx_pol: torch.Tensor,
-    los_field_op: Callable[..., dict[str, torch.Tensor]],
-    ledger: AdLaunchLedger | None,
-    field_xyz: torch.Tensor,
-    coefficient: torch.Tensor,
-    path_field: torch.Tensor,
-    path_gain: torch.Tensor,
-    path_length: torch.Tensor,
-    delay: torch.Tensor,
-    direction: torch.Tensor,
-    launch_count: int,
-    compiled: object,
-    frequency_hz: float,
+    topology: PathTopology, source: torch.Tensor, target: torch.Tensor, source_power: torch.Tensor,
+    tx_pol: torch.Tensor, rx_pol: torch.Tensor,
+    los_field_op: Callable[..., dict[str, torch.Tensor]], ledger: AdLaunchLedger | None,
+    field_xyz: torch.Tensor, coefficient: torch.Tensor, path_field: torch.Tensor,
+    path_gain: torch.Tensor, path_length: torch.Tensor, delay: torch.Tensor,
+    direction: torch.Tensor, launch_count: int, compiled: object, frequency_hz: float,
     isb_boundary_taper_width: float,
 ) -> int:
     los_rows = torch.nonzero(topology.component_id == 0, as_tuple=False).reshape(-1)
@@ -465,32 +421,15 @@ def _evaluate_los_fields(
 
 
 def _evaluate_reflection_fields(
-    compiled: object,
-    topology: PathTopology,
-    geometry: PathGeometry,
-    source: torch.Tensor,
-    target: torch.Tensor,
-    source_power: torch.Tensor,
-    tx_pol: torch.Tensor,
-    rx_pol: torch.Tensor,
-    components: frozenset[str] | set[str],
-    device: torch.device,
-    frequency: float | torch.Tensor,
-    geometry_ad: bool,
-    vertices: torch.Tensor | None,
-    reflection_field_op: Callable[..., dict[str, torch.Tensor]],
-    ledger: AdLaunchLedger | None,
-    material: dict[str, torch.Tensor] | None,
-    ad_enabled: bool,
-    frequency_value: float | None,
-    field_xyz: torch.Tensor,
-    coefficient: torch.Tensor,
-    path_field: torch.Tensor,
-    path_gain: torch.Tensor,
-    path_length: torch.Tensor,
-    delay: torch.Tensor,
-    direction: torch.Tensor,
-    launch_count: int,
+    compiled: object, topology: PathTopology, geometry: PathGeometry, source: torch.Tensor,
+    target: torch.Tensor, source_power: torch.Tensor, tx_pol: torch.Tensor, rx_pol: torch.Tensor,
+    components: frozenset[str] | set[str], device: torch.device, frequency: float | torch.Tensor,
+    geometry_ad: bool, vertices: torch.Tensor | None,
+    reflection_field_op: Callable[..., dict[str, torch.Tensor]], ledger: AdLaunchLedger | None,
+    material: dict[str, torch.Tensor] | None, ad_enabled: bool, frequency_value: float | None,
+    field_xyz: torch.Tensor, coefficient: torch.Tensor, path_field: torch.Tensor,
+    path_gain: torch.Tensor, path_length: torch.Tensor, delay: torch.Tensor,
+    direction: torch.Tensor, launch_count: int,
 ) -> tuple[dict[str, torch.Tensor] | None, int]:
     for depth_value in range(1, 6):
         rows = torch.nonzero(
@@ -596,28 +535,13 @@ def _evaluate_reflection_fields(
 
 
 def _evaluate_transmission_fields(
-    compiled: object,
-    topology: PathTopology,
-    geometry: PathGeometry,
-    source: torch.Tensor,
-    target: torch.Tensor,
-    source_power: torch.Tensor,
-    tx_pol: torch.Tensor,
-    rx_pol: torch.Tensor,
-    device: torch.device,
-    geometry_ad: bool,
-    vertices: torch.Tensor | None,
-    transmission_field_op: Callable[..., dict[str, torch.Tensor]],
-    ledger: AdLaunchLedger | None,
-    material: dict[str, torch.Tensor] | None,
-    field_xyz: torch.Tensor,
-    coefficient: torch.Tensor,
-    path_field: torch.Tensor,
-    path_gain: torch.Tensor,
-    path_length: torch.Tensor,
-    delay: torch.Tensor,
-    direction: torch.Tensor,
-    launch_count: int,
+    compiled: object, topology: PathTopology, geometry: PathGeometry, source: torch.Tensor,
+    target: torch.Tensor, source_power: torch.Tensor, tx_pol: torch.Tensor, rx_pol: torch.Tensor,
+    device: torch.device, geometry_ad: bool, vertices: torch.Tensor | None,
+    transmission_field_op: Callable[..., dict[str, torch.Tensor]], ledger: AdLaunchLedger | None,
+    material: dict[str, torch.Tensor] | None, field_xyz: torch.Tensor, coefficient: torch.Tensor,
+    path_field: torch.Tensor, path_gain: torch.Tensor, path_length: torch.Tensor,
+    delay: torch.Tensor, direction: torch.Tensor, launch_count: int,
 ) -> tuple[dict[str, torch.Tensor] | None, int]:
     transmission_rows = torch.nonzero(
         topology.component_id == 5, as_tuple=False
@@ -687,29 +611,13 @@ def _evaluate_transmission_fields(
 
 
 def _evaluate_diffraction_fields(
-    scene: Scene,
-    compiled: object,
-    topology: PathTopology,
-    geometry: PathGeometry,
-    input_fields: PathFields,
-    source: torch.Tensor,
-    target: torch.Tensor,
-    source_power: torch.Tensor,
-    rx_pol: torch.Tensor,
-    device: torch.device,
-    frequency: float | torch.Tensor,
-    frequency_value: float | None,
-    ad_enabled: bool,
-    geometry_ad: bool,
-    vertices: torch.Tensor | None,
-    ledger: AdLaunchLedger | None,
-    material: dict[str, torch.Tensor] | None,
-    field_xyz: torch.Tensor,
-    coefficient: torch.Tensor,
-    path_field: torch.Tensor,
-    path_gain: torch.Tensor,
-    direction: torch.Tensor,
-    launch_count: int,
+    scene: Scene, compiled: object, topology: PathTopology, geometry: PathGeometry,
+    input_fields: PathFields, source: torch.Tensor, target: torch.Tensor,
+    source_power: torch.Tensor, rx_pol: torch.Tensor, device: torch.device,
+    frequency: float | torch.Tensor, frequency_value: float | None, ad_enabled: bool,
+    geometry_ad: bool, vertices: torch.Tensor | None, ledger: AdLaunchLedger | None,
+    material: dict[str, torch.Tensor] | None, field_xyz: torch.Tensor, coefficient: torch.Tensor,
+    path_field: torch.Tensor, path_gain: torch.Tensor, direction: torch.Tensor, launch_count: int,
 ) -> tuple[dict[str, torch.Tensor] | None, int]:
     diffraction_rows = torch.nonzero(
         topology.component_id == 2, as_tuple=False
@@ -838,28 +746,13 @@ def _evaluate_diffraction_fields(
 
 
 def _evaluate_coupled_fields(
-    scene: Scene,
-    compiled: object,
-    topology: PathTopology,
-    geometry: PathGeometry,
-    source: torch.Tensor,
-    target: torch.Tensor,
-    source_power: torch.Tensor,
-    tx_pol: torch.Tensor,
-    rx_pol: torch.Tensor,
-    device: torch.device,
-    frequency: float | torch.Tensor,
-    frequency_value: float | None,
-    ad_enabled: bool,
-    geometry_ad: bool,
-    ledger: AdLaunchLedger | None,
-    material: dict[str, torch.Tensor] | None,
-    field_xyz: torch.Tensor,
-    coefficient: torch.Tensor,
-    path_field: torch.Tensor,
-    path_gain: torch.Tensor,
-    direction: torch.Tensor,
-    launch_count: int,
+    scene: Scene, compiled: object, topology: PathTopology, geometry: PathGeometry,
+    source: torch.Tensor, target: torch.Tensor, source_power: torch.Tensor, tx_pol: torch.Tensor,
+    rx_pol: torch.Tensor, device: torch.device, frequency: float | torch.Tensor,
+    frequency_value: float | None, ad_enabled: bool, geometry_ad: bool,
+    ledger: AdLaunchLedger | None, material: dict[str, torch.Tensor] | None,
+    field_xyz: torch.Tensor, coefficient: torch.Tensor, path_field: torch.Tensor,
+    path_gain: torch.Tensor, direction: torch.Tensor, launch_count: int,
 ) -> tuple[dict[str, torch.Tensor] | None, int]:
     coupled_rows = torch.nonzero(
         (topology.component_id == 3)
@@ -1054,21 +947,12 @@ def _evaluate_coupled_fields(
 
 
 def evaluate_path_fields(
-    scene: Scene,
-    compiled: object,
-    paths: EvaluatedPaths,
-    execution: PathExecutionStats,
-    tx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    rx_positions: torch.Tensor,
-    *,
-    components: frozenset[str] | set[str] = frozenset(),
-    ad_mode: str = "none",
-    frequency_value: float | None = None,
-    isb_boundary_taper_width: float = 0.0,
+    scene: Scene, compiled: object, paths: EvaluatedPaths, execution: PathExecutionStats,
+    tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor, *,
+    components: frozenset[str] | set[str] = frozenset(), ad_mode: str = "none",
+    frequency_value: float | None = None, isb_boundary_taper_width: float = 0.0,
     endpoint_tx_polarizations: torch.Tensor | None = None,
-    endpoint_rx_polarizations: torch.Tensor | None = None,
-    explicit_endpoint_geometry: bool = False,
+    endpoint_rx_polarizations: torch.Tensor | None = None, explicit_endpoint_geometry: bool = False,
 ) -> tuple[EvaluatedPaths, PathExecutionStats]:
     """Evaluate selected canonical rows with the shared complex3 ABI.
 

@@ -42,7 +42,7 @@ def _csr(materials: list[list[tuple[float, float, float, float]]]) -> dict[str, 
 
 
 def _light_state(
-    direction: list[float], field: list[float], *, component_mask: int = 3
+    direction: list[float], field: list[float], *, component_mask: int = 3,
 ) -> dict[str, torch.Tensor]:
     return {
         "origin": torch.tensor([[0.0, 0.0, 1.0]], device="cuda", dtype=torch.float32),
@@ -248,7 +248,7 @@ def _sensor_state() -> dict[str, torch.Tensor]:
     ],
 )
 def test_connection_component_classification_uses_exclusive_priority(
-    component_mask, expected_component
+    component_mask, expected_component,
 ):
     """component classification: path_class priority is
  scattering > diffraction > transmission > reflection > los."""

@@ -28,7 +28,7 @@ from witwin.channel.scene.compiler import compile as compile_scene
     ],
 )
 def test_budget_failure_precedes_cuda_native_and_tensor_work(
-    monkeypatch: pytest.MonkeyPatch, module_name: str, config: object
+    monkeypatch: pytest.MonkeyPatch, module_name: str, config: object,
 ) -> None:
     solver = importlib.import_module(module_name)
     scene = empty_space_los_scene()

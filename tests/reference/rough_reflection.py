@@ -13,13 +13,8 @@ _C0 = 299792458.0
 
 
 def rough_reflection_factor(
-    positions: torch.Tensor,
-    normals: torch.Tensor,
-    source: torch.Tensor,
-    sigma_b: torch.Tensor,
-    rough_b: torch.Tensor,
-    replaced: torch.Tensor,
-    frequency_hz: float | torch.Tensor,
+    positions: torch.Tensor, normals: torch.Tensor, source: torch.Tensor, sigma_b: torch.Tensor,
+    rough_b: torch.Tensor, replaced: torch.Tensor, frequency_hz: float | torch.Tensor,
 ) -> torch.Tensor:
     """C_r = prod_b exp(-2*(k0*cos_b*sigma_b)^2) on rough bounces (1 else).
 
@@ -45,16 +40,9 @@ def rough_reflection_factor(
 
 
 def rough_reflection_scale(
-    field_vector: torch.Tensor,
-    coefficient: torch.Tensor,
-    path_field: torch.Tensor,
-    path_gain: torch.Tensor,
-    positions: torch.Tensor,
-    normals: torch.Tensor,
-    source: torch.Tensor,
-    sigma_b: torch.Tensor,
-    rough_b: torch.Tensor,
-    replaced: torch.Tensor,
+    field_vector: torch.Tensor, coefficient: torch.Tensor, path_field: torch.Tensor,
+    path_gain: torch.Tensor, positions: torch.Tensor, normals: torch.Tensor, source: torch.Tensor,
+    sigma_b: torch.Tensor, rough_b: torch.Tensor, replaced: torch.Tensor,
     frequency_hz: float | torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Apply the real C_r factor onto the four reflection field outputs."""

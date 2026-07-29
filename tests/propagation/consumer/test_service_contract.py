@@ -155,9 +155,7 @@ def _fixed_topology():
     )
 
 
-def test_evaluate_consumes_request_batch_and_aliases_finalized_rows(
-    monkeypatch,
-) -> None:
+def test_evaluate_consumes_request_batch_and_aliases_finalized_rows(monkeypatch) -> None:
     from witwin.channel.propagation.consumer import (
         PropagationRequest,
         ScalarTransport,
@@ -286,9 +284,7 @@ def test_scattering_fails_at_request_construction(monkeypatch) -> None:
         )
 
 
-def test_reevaluate_reuses_frozen_topology_without_discovery(
-    monkeypatch,
-) -> None:
+def test_reevaluate_reuses_frozen_topology_without_discovery(monkeypatch) -> None:
     from witwin.channel.propagation.consumer import (
         FixedTopologyRequest,
         ScalarTransport,
@@ -375,9 +371,7 @@ def test_reevaluate_reuses_frozen_topology_without_discovery(
     assert result.diagnostics.validation_sync_count == 1
 
 
-def test_unsupported_fixed_response_fails_at_request_construction(
-    monkeypatch,
-) -> None:
+def test_unsupported_fixed_response_fails_at_request_construction(monkeypatch) -> None:
     """Construction rejects any response that declares no fixed-topology provider."""
 
     from witwin.channel.propagation.consumer import (

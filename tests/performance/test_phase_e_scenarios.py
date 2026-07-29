@@ -56,7 +56,7 @@ def test_committed_manifest_has_five_truthful_scenario_identities():
     ],
 )
 def test_point_generators_record_hash_geometry_and_endpoint_scale(
-    name: str, triangles: int, receiver_count: int, grid_cells: int
+    name: str, triangles: int, receiver_count: int, grid_cells: int,
 ):
     first = build_scenario(name, tx_count=2, receiver_count=receiver_count)
     second = build_scenario(name, tx_count=2, receiver_count=receiver_count)

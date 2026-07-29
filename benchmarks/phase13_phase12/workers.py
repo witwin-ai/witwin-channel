@@ -69,9 +69,7 @@ def _clean_git_environment(git_executable: Path) -> dict[str, str]:
     )
 
 
-def _git_argv(
-    git_executable: Path, checkout: Path, *arguments: str
-) -> list[str]:
+def _git_argv(git_executable: Path, checkout: Path, *arguments: str) -> list[str]:
     return [
         str(git_executable),
         "-c",
@@ -98,7 +96,7 @@ def executable_identity(path: Path, *, label: str) -> dict[str, object]:
 
 
 def _git(
-    git_executable: Path, checkout: Path, *arguments: str, binary: bool = False
+    git_executable: Path, checkout: Path, *arguments: str, binary: bool = False,
 ) -> str | bytes:
     try:
         completed = subprocess.run(
@@ -119,9 +117,7 @@ def _git(
     return str(completed.stdout).strip()
 
 
-def _verify_repo_file_at_head(
-    git_executable: Path, checkout: Path, relative: Path
-) -> str:
+def _verify_repo_file_at_head(git_executable: Path, checkout: Path, relative: Path) -> str:
     working = checkout / relative
     if not working.is_file():
         raise EvidenceError(f"canonical repository file is missing: {working}")
@@ -136,7 +132,7 @@ def _verify_repo_file_at_head(
 
 
 def _checkout_state(
-    git_executable: Path, checkout: Path, *, label: str, require_clean: bool = True
+    git_executable: Path, checkout: Path, *, label: str, require_clean: bool = True,
 ) -> dict[str, object]:
     if not checkout.is_dir():
         raise EvidenceError(f"{label} checkout does not exist: {checkout}")
@@ -178,11 +174,8 @@ def _lock_identity(checkout: Path) -> dict[str, object]:
 
 
 def verify_checkouts(
-    config: RunnerConfig,
-    gate: Mapping[str, object] | None = None,
-    *,
-    store: ArtifactStore | None = None,
-    require_clean_rayd: bool = True,
+    config: RunnerConfig, gate: Mapping[str, object] | None = None, *,
+    store: ArtifactStore | None = None, require_clean_rayd: bool = True,
 ) -> dict[str, object]:
     states: dict[str, dict[str, object]] = {}
     locks: dict[str, dict[str, object]] = {}
@@ -505,7 +498,7 @@ def _tracked_matches(git_executable: Path, checkout: Path, pattern: str) -> list
 
 
 def _tracked_matches_revision(
-    git_executable: Path, repository: Path, revision: str, pattern: str
+    git_executable: Path, repository: Path, revision: str, pattern: str,
 ) -> list[str]:
     completed = subprocess.run(
         _git_argv(
@@ -533,12 +526,7 @@ def _tracked_matches_revision(
 
 
 def _route_transition_at_revisions(
-    group: str,
-    baseline: str,
-    candidate: str,
-    *,
-    repository: Path,
-    git_executable: Path,
+    group: str, baseline: str, candidate: str, *, repository: Path, git_executable: Path,
 ) -> dict[str, object]:
     policy = _ROUTE_POLICY[group]
     old_rows: dict[str, dict[str, object]] = {}
@@ -602,7 +590,7 @@ def _route_transition_at_revisions(
 
 
 def verify_route_transition(
-    group: str, baseline: Path, candidate: Path, *, git_executable: Path
+    group: str, baseline: Path, candidate: Path, *, git_executable: Path,
 ) -> dict[str, object]:
     policy = _ROUTE_POLICY[group]
     old_rows: dict[str, dict[str, object]] = {}
@@ -662,9 +650,7 @@ def verify_route_transition(
     }
 
 
-def _canonical_runner_hash_map(
-    raw: object, *, label: str
-) -> dict[str, str]:
+def _canonical_runner_hash_map(raw: object, *, label: str) -> dict[str, str]:
     expected_paths = {path.as_posix() for path in RUNNER_REPO_PATHS}
     if not isinstance(raw, dict) or set(raw) != expected_paths:
         raise EvidenceError(
@@ -683,9 +669,7 @@ def _canonical_runner_hash_map(
     return result
 
 
-def _bind_runner_hash_maps(
-    reported: object, frozen: object
-) -> dict[str, str]:
+def _bind_runner_hash_maps(reported: object, frozen: object) -> dict[str, str]:
     reported_hashes = _canonical_runner_hash_map(
         reported, label="reported runner blob identity"
     )
@@ -698,10 +682,7 @@ def _bind_runner_hash_maps(
 
 
 def verify_evidence_commit_binding(
-    repository: Path,
-    implementation: Mapping[str, object],
-    *,
-    git_executable: Path,
+    repository: Path, implementation: Mapping[str, object], *, git_executable: Path,
     frozen_runner_hashes: object,
 ) -> dict[str, object]:
     groups = implementation.get("groups")
@@ -960,12 +941,7 @@ def run_captured(
 
 
 def probe_variant_identity(
-    config: RunnerConfig,
-    *,
-    group: str,
-    name: str,
-    process_index: int,
-    store: ArtifactStore,
+    config: RunnerConfig, *, group: str, name: str, process_index: int, store: ArtifactStore,
     timeout_seconds: int,
 ) -> tuple[dict[str, object], dict[str, object]]:
     """Probe build/runtime identity separately from numerical measurement."""
@@ -1068,11 +1044,7 @@ def probe_variant_identity(
 
 
 def validate_retained_identity(
-    record: object,
-    *,
-    capture: object,
-    identity: object,
-    store: ArtifactStore,
+    record: object, *, capture: object, identity: object, store: ArtifactStore,
 ) -> dict[str, object]:
     """Recompute reported identity from probe stdout and retained extension."""
     if not isinstance(record, dict) or set(record) != {
@@ -1177,13 +1149,8 @@ def worker_argv(
 
 
 def validate_retained_worker_capture(
-    capture: object,
-    *,
-    identity_capture: object,
-    expected_group: str,
-    expected_variant: str,
-    process_index: int,
-    order: str,
+    capture: object, *, identity_capture: object, expected_group: str, expected_variant: str,
+    process_index: int, order: str,
 ) -> dict[str, object]:
     """Bind a retained timed-worker capture to its canonical invocation."""
     capture_keys = {
@@ -1248,8 +1215,8 @@ def validate_retained_worker_capture(
 
 
 def diagnostic_argv(
-    variant: VariantConfig, *, group: str, name: str, process_index: int,
-    output: Path, munich_scene_xml: Path, sionna_source_root: Path,
+    variant: VariantConfig, *, group: str, name: str, process_index: int, output: Path,
+    munich_scene_xml: Path, sionna_source_root: Path,
 ) -> list[str]:
     if variant.runner_site_packages is None or variant.runner_extension is None:
         raise EvidenceError("diagnostic worker requires a runner-built Channel installation")
@@ -1266,8 +1233,7 @@ def diagnostic_argv(
 
 
 def collect_process_pairs(
-    config: RunnerConfig, gate: Mapping[str, object], *, group: str,
-    timeout_seconds: int,
+    config: RunnerConfig, gate: Mapping[str, object], *, group: str, timeout_seconds: int,
     store: ArtifactStore,
 ) -> list[dict[str, object]]:
     pairs: list[dict[str, object]] = []

@@ -21,9 +21,7 @@ from benchmarks.phase13_phase12_evidence import (  # noqa: E402
 )
 
 
-def validate_evidence(
-    evidence_path: Path, raw_root: Path, *, repository: Path = ROOT
-) -> None:
+def validate_evidence(evidence_path: Path, raw_root: Path, *, repository: Path = ROOT) -> None:
     try:
         import jsonschema
     except ImportError as exc:

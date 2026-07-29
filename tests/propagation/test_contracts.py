@@ -75,7 +75,7 @@ def _field_inputs(rows: int = 3) -> dict[str, torch.Tensor]:
 
 
 def _contracts(
-    rows: int = 3, width: int = 2
+    rows: int = 3, width: int = 2,
 ) -> tuple[PathTopology, PathGeometry, PathFields, EvaluatedPaths]:
     topology = PathTopology(**_topology_inputs(rows, width))
     geometry = PathGeometry(

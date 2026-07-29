@@ -205,7 +205,9 @@ if __name__ == "__main__":
 """
 
 
-def _run_original(args: argparse.Namespace, artifact_dir: pathlib.Path) -> tuple[dict[str, Any], dict[str, torch.Tensor]]:
+def _run_original(
+    args: argparse.Namespace, artifact_dir: pathlib.Path,
+) -> tuple[dict[str, Any], dict[str, torch.Tensor]]:
     channel_root = pathlib.Path(args.channel_root)
     if not channel_root.exists():
         return {"available": False, "reason": f"channel root not found: {channel_root}"}, {}
@@ -290,7 +292,9 @@ def _run_original(args: argparse.Namespace, artifact_dir: pathlib.Path) -> tuple
     }, tensors
 
 
-def _delta_metrics(native_total: torch.Tensor, original_total: torch.Tensor) -> tuple[torch.Tensor, dict[str, float | int]]:
+def _delta_metrics(
+    native_total: torch.Tensor, original_total: torch.Tensor,
+) -> tuple[torch.Tensor, dict[str, float | int]]:
     original_total = original_total.to(device=native_total.device)
     native_db = _db(native_total)
     original_db = _db(original_total)
@@ -317,8 +321,7 @@ def _component_finite_counts(components: dict[str, torch.Tensor]) -> dict[str, i
 
 
 def _component_delta_metrics(
-    native_components: dict[str, torch.Tensor],
-    original_components: dict[str, torch.Tensor],
+    native_components: dict[str, torch.Tensor], original_components: dict[str, torch.Tensor],
 ) -> tuple[dict[str, torch.Tensor], dict[str, dict[str, float | int]]]:
     delta_maps: dict[str, torch.Tensor] = {}
     metrics: dict[str, dict[str, float | int]] = {}

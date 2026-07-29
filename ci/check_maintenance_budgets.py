@@ -96,9 +96,7 @@ class _FunctionCollector(ast.NodeVisitor):
         self.generic_visit(node)
         self.scope.pop()
 
-    def _visit_function(
-        self, node: ast.FunctionDef | ast.AsyncFunctionDef
-    ) -> None:
+    def _visit_function(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
         qualname = ".".join((*self.scope, node.name))
         self.metrics.append(
             FunctionMetric(
@@ -118,7 +116,7 @@ class _FunctionCollector(ast.NodeVisitor):
 
 
 def measure_repository(
-    root: Path, source_root: str
+    root: Path, source_root: str,
 ) -> tuple[list[FileMetric], list[FunctionMetric]]:
     root = root.resolve()
     source = root / source_root
@@ -148,7 +146,7 @@ def measure_repository(
 
 
 def measure_native_files(
-    root: Path, native_root: str, suffixes: tuple[str, ...] = NATIVE_SUFFIXES
+    root: Path, native_root: str, suffixes: tuple[str, ...] = NATIVE_SUFFIXES,
 ) -> list[FileMetric]:
     """Line-count native translation units under ``native_root``.
 
@@ -222,11 +220,7 @@ def _exemptions(config: dict[str, Any], section: str) -> dict[str, Exemption]:
 
 
 def _check_debt(
-    *,
-    values: dict[str, int],
-    recommended: int,
-    exemptions: dict[str, Exemption],
-    today: date,
+    *, values: dict[str, int], recommended: int, exemptions: dict[str, Exemption], today: date,
     label: str,
 ) -> list[Violation]:
     violations: list[Violation] = []
@@ -270,7 +264,7 @@ def _check_debt(
 
 
 def check_budgets(
-    root: Path, config: dict[str, Any], *, today: date | None = None
+    root: Path, config: dict[str, Any], *, today: date | None = None,
 ) -> list[Violation]:
     if config.get("schema_version") != 1:
         raise ValueError("schema_version must be 1")
@@ -312,7 +306,7 @@ def check_budgets(
 
 
 def _check_python_file_budgets(
-    files: list[FileMetric], config: dict[str, Any], *, today: date
+    files: list[FileMetric], config: dict[str, Any], *, today: date,
 ) -> list[Violation]:
     """Apply the optional ``limits.file_lines`` gate to measured Python files.
 
@@ -351,9 +345,7 @@ def _check_python_file_budgets(
     return violations
 
 
-def _check_native_budgets(
-    root: Path, config: dict[str, Any], *, today: date
-) -> list[Violation]:
+def _check_native_budgets(root: Path, config: dict[str, Any], *, today: date) -> list[Violation]:
     limits = config.get("limits")
     if not isinstance(limits, dict):
         raise ValueError("limits must be a JSON object")

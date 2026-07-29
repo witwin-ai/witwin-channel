@@ -159,8 +159,7 @@ def _evaluated_paths_capacity_pack_jvp_native(*args: object) -> object:
 
 
 def _enumerated_capacity_failure_vector_sanitize_native(
-    failure_state_bits: torch.Tensor,
-    values: torch.Tensor,
+    failure_state_bits: torch.Tensor, values: torch.Tensor,
 ) -> torch.Tensor:
     output = _required_native_op("enumerated_capacity_failure_vector_sanitize")(
         failure_state_bits, values
@@ -291,9 +290,7 @@ class _EnumeratedCapacityFailureSanitizeFunction(torch.autograd.Function):
 
 
 def enumerated_capacity_failure_sanitize(
-    paths: EvaluatedPaths,
-    *,
-    failure_state: CapacityFailureState,
+    paths: EvaluatedPaths, *, failure_state: CapacityFailureState,
 ) -> EvaluatedPaths:
     """Make every final enumerated row inert after any transaction failure."""
 
@@ -379,9 +376,7 @@ class _EnumeratedCapacityFailureVectorSanitizeFunction(torch.autograd.Function):
 
 
 def enumerated_capacity_failure_vector_sanitize(
-    values: torch.Tensor,
-    *,
-    failure_state: CapacityFailureState,
+    values: torch.Tensor, *, failure_state: CapacityFailureState,
 ) -> torch.Tensor:
     """Sanitize the deterministic diffraction vector sidecar on failure."""
 
@@ -398,8 +393,7 @@ def enumerated_capacity_failure_vector_sanitize(
 
 
 def sanitize_enumerated_capacity_transaction(
-    paths: EvaluatedPaths,
-    sidecars: EvaluatedPathSidecars,
+    paths: EvaluatedPaths, sidecars: EvaluatedPathSidecars,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     """Sanitize all enumerated payloads before outer solver result assembly."""
 
@@ -518,10 +512,7 @@ def _require_defer_capacity_terminal(value: bool) -> None:
 
 
 def _create_transmission_capacity_transaction(
-    scene: Scene,
-    config: EnumeratedPathConfig,
-    components: set[str],
-    tx_positions: torch.Tensor,
+    scene: Scene, config: EnumeratedPathConfig, components: set[str], tx_positions: torch.Tensor,
     rx_positions: torch.Tensor,
 ) -> SolveCapacityTransaction | None:
     has_work = (
@@ -545,11 +536,8 @@ def _capacity_execution_summary(
 
 
 def _finish_capacity_boundary(
-    evaluated: EvaluatedPaths,
-    sidecars: EvaluatedPathSidecars,
-    transaction: SolveCapacityTransaction | None,
-    *,
-    defer_terminal: bool,
+    evaluated: EvaluatedPaths, sidecars: EvaluatedPathSidecars,
+    transaction: SolveCapacityTransaction | None, *, defer_terminal: bool,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     if transaction is None or defer_terminal:
         return evaluated, sidecars
@@ -559,12 +547,8 @@ def _finish_capacity_boundary(
 
 
 def evaluate_enumerated_paths(
-    scene: Scene,
-    config: EnumeratedPathConfig,
-    *,
-    frequency_value: float | None = None,
-    coupled_rx_streaming: bool = False,
-    defer_capacity_terminal: bool = False,
+    scene: Scene, config: EnumeratedPathConfig, *, frequency_value: float | None = None,
+    coupled_rx_streaming: bool = False, defer_capacity_terminal: bool = False,
     endpoint_tensors: EnumeratedEndpointTensors | None = None,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     """Discover, select, and evaluate canonical enumerated propagation rows.

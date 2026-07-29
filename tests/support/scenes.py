@@ -22,17 +22,9 @@ from tests.support.core_world import (
 
 
 def rough_wall_structure(
-    x_m: float,
-    *,
-    rms_height_m: float,
-    corr_length_m: float,
-    half_size: float = 2.0,
-    eps_r: float = 4.0,
-    sigma_e: float = 0.01,
-    thickness_m: float = 0.1,
-    phase_screen: object | None = None,
-    with_uv: bool = False,
-    name: str = "rough-wall",
+    x_m: float, *, rms_height_m: float, corr_length_m: float, half_size: float = 2.0,
+    eps_r: float = 4.0, sigma_e: float = 0.01, thickness_m: float = 0.1,
+    phase_screen: object | None = None, with_uv: bool = False, name: str = "rough-wall",
     surface_id: int = 1,
 ) -> Structure:
     """Axis-aligned wall in the x = ``x_m`` plane with front-surface roughness.
@@ -156,11 +148,7 @@ def same_side_wall_reflection_scene() -> Scene:
 
 
 def transmission_wall_structure(
-    x_m: float,
-    material: object,
-    *,
-    name: str = "wall",
-    surface_id: int = 1,
+    x_m: float, material: object, *, name: str = "wall", surface_id: int = 1,
     half_size: float = 4.0,
 ) -> Structure:
     """Axis-aligned thin-sheet wall in the x = ``x_m`` plane (normal +x)."""
@@ -182,11 +170,8 @@ def transmission_wall_structure(
 
 
 def wedge_diffraction_scene(
-    material: object | None = None,
-    *,
-    tx: torch.Tensor | None = None,
-    rx: torch.Tensor | None = None,
-    frequency: float | torch.Tensor = 3.0e9,
+    material: object | None = None, *, tx: torch.Tensor | None = None,
+    rx: torch.Tensor | None = None, frequency: float | torch.Tensor = 3.0e9,
 ) -> Scene:
     wedge_material = (
         PhysicalMaterial.perfect_conductor() if material is None else material
@@ -231,11 +216,8 @@ def wedge_diffraction_scene(
 
 
 def coupled_wall_wedge_scene(
-    material: object | None = None,
-    *,
-    tx: torch.Tensor | None = None,
-    rx: torch.Tensor | None = None,
-    frequency: float | torch.Tensor = 3.0e9,
+    material: object | None = None, *, tx: torch.Tensor | None = None,
+    rx: torch.Tensor | None = None, frequency: float | torch.Tensor = 3.0e9,
 ) -> Scene:
     """Analytic z=0 reflector plus the convex edge through (2, y, 2)."""
 

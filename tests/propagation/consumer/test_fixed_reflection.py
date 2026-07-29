@@ -432,8 +432,7 @@ def test_reflection_transport_is_finite_on_the_inert_zero_geometry() -> None:
     assert torch.isfinite(target.grad).all()
 
 
-def test_the_specular_point_moves_with_the_sink_and_that_motion_is_differentiable(
-) -> None:
+def test_the_specular_point_moves_with_the_sink_and_that_motion_is_differentiable() -> None:
     """The term this whole capability exists to provide, pinned to a number.
 
  A frozen reflection row is a face sequence, so at a new sink the
@@ -531,8 +530,7 @@ def test_depth_two_rows_reproduce_discovery_and_die_inertly() -> None:
     ) == 0.0
 
 
-def test_an_occluded_reflection_row_is_invalid_and_the_occluder_is_the_cause(
-) -> None:
+def test_an_occluded_reflection_row_is_invalid_and_the_occluder_is_the_cause() -> None:
     """The other way a frozen row dies, and a control that isolates it.
 
  Both shipped dead-row tests kill their row by sliding the stationary point
@@ -658,8 +656,7 @@ def test_a_multi_pair_batch_reproduces_discovery_row_for_row() -> None:
     assert int(torch.unique(reflection, dim=0).shape[0]) == 6
 
 
-def test_forward_mode_publishes_geometry_tangents_under_the_declared_convention(
-) -> None:
+def test_forward_mode_publishes_geometry_tangents_under_the_declared_convention() -> None:
     """The derivative family a Doppler consumer reads, checked against FD.
 
  ``delay_rate`` comes from the forward-mode tangent of ``delay_s``, so this
@@ -794,8 +791,7 @@ def test_a_forward_only_dual_carries_full_geometry_tangents() -> None:
     )
 
 
-def test_reevaluate_rejects_a_realization_coherent_screen_before_native_work(
-) -> None:
+def test_reevaluate_rejects_a_realization_coherent_screen_before_native_work() -> None:
     """The second branch of the smooth-scene gate.
 
  A flat realization_coherent screen leaves ``scatter_model_id`` at 0, so it

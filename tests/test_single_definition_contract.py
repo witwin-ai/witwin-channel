@@ -149,7 +149,7 @@ def test_a_signature_is_not_satisfied_by_ordinary_code(real_facts):
     ],
 )
 def test_a_renamed_near_copy_is_rejected(
-    real_facts, name: str, source: str, module: str, qualname: str
+    real_facts, name: str, source: str, module: str, qualname: str,
 ):
     entry = concept(name)
     violations = single.concept_violations(

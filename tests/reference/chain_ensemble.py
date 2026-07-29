@@ -57,9 +57,7 @@ def _c3_scale(axis: torch.Tensor, scalar: torch.Tensor) -> torch.Tensor:
 # ---------------------------------------------------------------------------
 
 
-def _reflect_frame(
-    incident: torch.Tensor, normal: torch.Tensor
-) -> dict[str, torch.Tensor]:
+def _reflect_frame(incident: torch.Tensor, normal: torch.Tensor) -> dict[str, torch.Tensor]:
     """``reflect_frame`` (field_transport.cuh:282): s/p basis of one bounce.
 
  Returns ``s_axis`` / ``p_in`` / ``p_out`` / ``reflected`` / ``cos_theta``
@@ -104,13 +102,8 @@ def _fallback_perp(direction: torch.Tensor) -> torch.Tensor:
 
 
 def _slab_fresnel(
-    cos_theta: torch.Tensor,
-    eps_r: torch.Tensor,
-    sigma_e: torch.Tensor,
-    mu_r: torch.Tensor,
-    gain: torch.Tensor,
-    thickness: torch.Tensor,
-    frequency_hz: torch.Tensor,
+    cos_theta: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor,
+    gain: torch.Tensor, thickness: torch.Tensor, frequency_hz: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """``slab_fresnel`` (field_transport.cuh:209): thin-sheet (r_te, r_tm).
 
@@ -151,7 +144,7 @@ def _slab_fresnel(
 
 
 def _cr_factor(
-    cos_theta: torch.Tensor, sigma_b: torch.Tensor, rough: torch.Tensor, k0: torch.Tensor
+    cos_theta: torch.Tensor, sigma_b: torch.Tensor, rough: torch.Tensor, k0: torch.Tensor,
 ) -> torch.Tensor:
     """Per-bounce ``C_r = exp(-2*(k0*cos*sigma)^2)`` on rough bounces (1 else).
 
@@ -164,18 +157,9 @@ def _cr_factor(
 
 
 def transport_chain(
-    value: torch.Tensor,
-    start: torch.Tensor,
-    end: torch.Tensor,
-    positions: torch.Tensor,
-    normals: torch.Tensor,
-    eps_r: torch.Tensor,
-    sigma_e: torch.Tensor,
-    mu_r: torch.Tensor,
-    gain: torch.Tensor,
-    thickness: torch.Tensor,
-    sigma_b: torch.Tensor,
-    rough: torch.Tensor,
+    value: torch.Tensor, start: torch.Tensor, end: torch.Tensor, positions: torch.Tensor,
+    normals: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor,
+    gain: torch.Tensor, thickness: torch.Tensor, sigma_b: torch.Tensor, rough: torch.Tensor,
     frequency_hz: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Transport a Complex3 field from ``start`` to ``end`` through the chain.
@@ -242,25 +226,11 @@ def _empty_chain(n: int, device, real_dtype) -> dict[str, torch.Tensor]:
 
 
 def chain_ensemble_gain_reference(
-    source: torch.Tensor,
-    tx_pol: torch.Tensor,
-    c1: dict[str, torch.Tensor],
-    vertex: torch.Tensor,
-    n_o: torch.Tensor,
-    t1r: torch.Tensor,
-    t2r: torch.Tensor,
-    backup_axis: torch.Tensor,
-    f_te: torch.Tensor,
-    f_tm: torch.Tensor,
-    c2: dict[str, torch.Tensor],
-    target: torch.Tensor,
-    rx_pol: torch.Tensor,
-    l1: torch.Tensor,
-    l2: torch.Tensor,
-    weights: torch.Tensor,
-    coef: torch.Tensor,
-    frequency_hz: torch.Tensor,
-    threshold: float,
+    source: torch.Tensor, tx_pol: torch.Tensor, c1: dict[str, torch.Tensor], vertex: torch.Tensor,
+    n_o: torch.Tensor, t1r: torch.Tensor, t2r: torch.Tensor, backup_axis: torch.Tensor,
+    f_te: torch.Tensor, f_tm: torch.Tensor, c2: dict[str, torch.Tensor], target: torch.Tensor,
+    rx_pol: torch.Tensor, l1: torch.Tensor, l2: torch.Tensor, weights: torch.Tensor,
+    coef: torch.Tensor, frequency_hz: torch.Tensor, threshold: float,
 ) -> dict[str, torch.Tensor]:
     """Differentiable float64 coherent scattering per-row power gain.
 

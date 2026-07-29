@@ -83,12 +83,7 @@ __all__ = [
 
 
 def _validate_enumerated_field_result(
-    out: object,
-    count: int,
-    *,
-    type_error: str,
-    field_error: str,
-    shape_error_prefix: str,
+    out: object, count: int, *, type_error: str, field_error: str, shape_error_prefix: str,
 ) -> dict[str, torch.Tensor]:
     """Validate the shared enumerated-field result schema in field order."""
 
@@ -113,13 +108,8 @@ def _validate_enumerated_field_result(
 
 
 def field_free_space(
-    source: torch.Tensor,
-    target: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    *,
-    frequency_hz: float,
+    source: torch.Tensor, target: torch.Tensor, tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, *, frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
     for name, value in (
         ("source", source),
@@ -157,9 +147,7 @@ def field_free_space(
 
 
 def field_project_complex3(
-    field_vector: torch.Tensor,
-    direction: torch.Tensor,
-    rx_polarization: torch.Tensor,
+    field_vector: torch.Tensor, direction: torch.Tensor, rx_polarization: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("field_vector", field_vector, dtype=torch.complex64, ndim=2)
     validate_cuda_tensor(
@@ -190,20 +178,10 @@ def field_project_complex3(
 
 
 def field_reflection_sequence(
-    source: torch.Tensor,
-    target: torch.Tensor,
-    interaction_positions: torch.Tensor,
-    interaction_normals: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    eps_r: torch.Tensor,
-    sigma_e: torch.Tensor,
-    mu_r: torch.Tensor,
-    gain: torch.Tensor,
-    thickness: torch.Tensor,
-    *,
-    frequency_hz: float,
+    source: torch.Tensor, target: torch.Tensor, interaction_positions: torch.Tensor,
+    interaction_normals: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor,
+    gain: torch.Tensor, thickness: torch.Tensor, *, frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
     for name, value in (
         ("source", source),
@@ -265,24 +243,12 @@ def field_reflection_sequence(
 
 
 def field_transmission_sequence(
-    path_valid: torch.Tensor,
-    source: torch.Tensor,
-    target: torch.Tensor,
-    interaction_positions: torch.Tensor,
-    interaction_normals: torch.Tensor,
-    interaction_material_id: torch.Tensor,
-    interaction_valid: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    layer_offset: torch.Tensor,
-    layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    *,
-    frequency_hz: float,
+    path_valid: torch.Tensor, source: torch.Tensor, target: torch.Tensor,
+    interaction_positions: torch.Tensor, interaction_normals: torch.Tensor,
+    interaction_material_id: torch.Tensor, interaction_valid: torch.Tensor, tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, layer_offset: torch.Tensor,
+    layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, *, frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("path_valid", path_valid, dtype=torch.bool, ndim=1)
     for name, value in (
@@ -365,26 +331,13 @@ def field_transmission_sequence(
 
 
 def field_coupled_rd(
-    source: torch.Tensor,
-    target: torch.Tensor,
-    reflection_position: torch.Tensor,
-    reflection_normal: torch.Tensor,
-    edge_position: torch.Tensor,
-    edge_direction: torch.Tensor,
-    edge_n0: torch.Tensor,
-    edge_n1: torch.Tensor,
-    exterior_angle: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    reflection_material: tuple[torch.Tensor, ...],
-    wedge_material0: tuple[torch.Tensor, ...],
-    wedge_material1: tuple[torch.Tensor, ...],
-    edge_line_min: torch.Tensor,
-    edge_line_max: torch.Tensor,
-    *,
-    frequency_hz: float,
-    reverse: bool,
+    source: torch.Tensor, target: torch.Tensor, reflection_position: torch.Tensor,
+    reflection_normal: torch.Tensor, edge_position: torch.Tensor, edge_direction: torch.Tensor,
+    edge_n0: torch.Tensor, edge_n1: torch.Tensor, exterior_angle: torch.Tensor,
+    tx_power: torch.Tensor, tx_polarization: torch.Tensor, rx_polarization: torch.Tensor,
+    reflection_material: tuple[torch.Tensor, ...], wedge_material0: tuple[torch.Tensor, ...],
+    wedge_material1: tuple[torch.Tensor, ...], edge_line_min: torch.Tensor,
+    edge_line_max: torch.Tensor, *, frequency_hz: float, reverse: bool,
 ) -> dict[str, torch.Tensor]:
     vectors = (
         source,
@@ -455,31 +408,15 @@ def field_coupled_rd(
 
 
 def field_coupled_dd(
-    source: torch.Tensor,
-    target: torch.Tensor,
-    edge1_position: torch.Tensor,
-    edge1_direction: torch.Tensor,
-    edge1_n0: torch.Tensor,
-    edge1_n1: torch.Tensor,
-    edge1_exterior: torch.Tensor,
-    edge2_position: torch.Tensor,
-    edge2_direction: torch.Tensor,
-    edge2_n0: torch.Tensor,
-    edge2_n1: torch.Tensor,
-    edge2_exterior: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    wedge1_material0: tuple[torch.Tensor, ...],
-    wedge1_material1: tuple[torch.Tensor, ...],
-    wedge2_material0: tuple[torch.Tensor, ...],
-    wedge2_material1: tuple[torch.Tensor, ...],
-    edge1_line_min: torch.Tensor,
-    edge1_line_max: torch.Tensor,
-    edge2_line_min: torch.Tensor,
-    edge2_line_max: torch.Tensor,
-    *,
-    frequency_hz: float,
+    source: torch.Tensor, target: torch.Tensor, edge1_position: torch.Tensor,
+    edge1_direction: torch.Tensor, edge1_n0: torch.Tensor, edge1_n1: torch.Tensor,
+    edge1_exterior: torch.Tensor, edge2_position: torch.Tensor, edge2_direction: torch.Tensor,
+    edge2_n0: torch.Tensor, edge2_n1: torch.Tensor, edge2_exterior: torch.Tensor,
+    tx_power: torch.Tensor, tx_polarization: torch.Tensor, rx_polarization: torch.Tensor,
+    wedge1_material0: tuple[torch.Tensor, ...], wedge1_material1: tuple[torch.Tensor, ...],
+    wedge2_material0: tuple[torch.Tensor, ...], wedge2_material1: tuple[torch.Tensor, ...],
+    edge1_line_min: torch.Tensor, edge1_line_max: torch.Tensor, edge2_line_min: torch.Tensor,
+    edge2_line_max: torch.Tensor, *, frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
     """Coupled double-diffraction field (TX->e1->e2->RX), component id 7.
 
@@ -612,21 +549,12 @@ _FIELD_AD_DIRECTION_TANGENT_FIELDS = (*_FIELD_AD_TANGENT_FIELDS, "direction")
 
 
 def field_free_space_backward(
-    source: torch.Tensor,
-    target: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    *,
-    frequency_hz: float,
-    grad_field_vector: torch.Tensor | None = None,
-    grad_coefficient: torch.Tensor | None = None,
-    grad_path_field: torch.Tensor | None = None,
-    grad_path_gain: torch.Tensor | None = None,
-    grad_path_length: torch.Tensor | None = None,
-    grad_delay: torch.Tensor | None = None,
-    grad_direction: torch.Tensor | None = None,
-    need_grad_frequency: bool = True,
+    source: torch.Tensor, target: torch.Tensor, tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, *, frequency_hz: float,
+    grad_field_vector: torch.Tensor | None = None, grad_coefficient: torch.Tensor | None = None,
+    grad_path_field: torch.Tensor | None = None, grad_path_gain: torch.Tensor | None = None,
+    grad_path_length: torch.Tensor | None = None, grad_delay: torch.Tensor | None = None,
+    grad_direction: torch.Tensor | None = None, need_grad_frequency: bool = True,
     need_grad_geometry: bool = False,
 ) -> dict[str, torch.Tensor | None]:
     out = _required_native_op("field_free_space_backward")(
@@ -653,15 +581,9 @@ def field_free_space_backward(
 
 
 def field_free_space_jvp(
-    source: torch.Tensor,
-    target: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    *,
-    frequency_hz: float,
-    tangent_frequency: float,
-    tangent_source: torch.Tensor | None = None,
+    source: torch.Tensor, target: torch.Tensor, tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, *, frequency_hz: float,
+    tangent_frequency: float, tangent_source: torch.Tensor | None = None,
     tangent_target: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
     out = _required_native_op("field_free_space_jvp")(
@@ -683,33 +605,16 @@ def field_free_space_jvp(
 
 
 def field_reflection_sequence_backward(
-    source: torch.Tensor,
-    target: torch.Tensor,
-    interaction_positions: torch.Tensor,
-    interaction_normals: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    eps_r: torch.Tensor,
-    sigma_e: torch.Tensor,
-    mu_r: torch.Tensor,
-    gain: torch.Tensor,
-    thickness: torch.Tensor,
-    *,
-    frequency_hz: float,
-    grad_field_vector: torch.Tensor | None = None,
-    grad_coefficient: torch.Tensor | None = None,
-    grad_path_field: torch.Tensor | None = None,
-    grad_path_gain: torch.Tensor | None = None,
-    grad_path_length: torch.Tensor | None = None,
-    grad_delay: torch.Tensor | None = None,
-    grad_direction: torch.Tensor | None = None,
-    need_grad_eps_r: bool = True,
-    need_grad_sigma_e: bool = True,
-    need_grad_gain: bool = False,
-    need_grad_thickness: bool = True,
-    need_grad_frequency: bool = True,
-    need_grad_geometry: bool = False,
+    source: torch.Tensor, target: torch.Tensor, interaction_positions: torch.Tensor,
+    interaction_normals: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor,
+    gain: torch.Tensor, thickness: torch.Tensor, *, frequency_hz: float,
+    grad_field_vector: torch.Tensor | None = None, grad_coefficient: torch.Tensor | None = None,
+    grad_path_field: torch.Tensor | None = None, grad_path_gain: torch.Tensor | None = None,
+    grad_path_length: torch.Tensor | None = None, grad_delay: torch.Tensor | None = None,
+    grad_direction: torch.Tensor | None = None, need_grad_eps_r: bool = True,
+    need_grad_sigma_e: bool = True, need_grad_gain: bool = False, need_grad_thickness: bool = True,
+    need_grad_frequency: bool = True, need_grad_geometry: bool = False,
 ) -> dict[str, torch.Tensor | None]:
     out = _required_native_op("field_reflection_sequence_backward")(
         source,
@@ -758,26 +663,13 @@ def field_reflection_sequence_backward(
 
 
 def field_reflection_sequence_jvp(
-    source: torch.Tensor,
-    target: torch.Tensor,
-    interaction_positions: torch.Tensor,
-    interaction_normals: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    eps_r: torch.Tensor,
-    sigma_e: torch.Tensor,
-    mu_r: torch.Tensor,
-    gain: torch.Tensor,
-    thickness: torch.Tensor,
-    *,
-    frequency_hz: float,
-    tangent_eps_r: torch.Tensor | None = None,
-    tangent_sigma_e: torch.Tensor | None = None,
-    tangent_gain: torch.Tensor | None = None,
-    tangent_thickness: torch.Tensor | None = None,
-    tangent_frequency: float = 0.0,
-    tangent_source: torch.Tensor | None = None,
+    source: torch.Tensor, target: torch.Tensor, interaction_positions: torch.Tensor,
+    interaction_normals: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor,
+    gain: torch.Tensor, thickness: torch.Tensor, *, frequency_hz: float,
+    tangent_eps_r: torch.Tensor | None = None, tangent_sigma_e: torch.Tensor | None = None,
+    tangent_gain: torch.Tensor | None = None, tangent_thickness: torch.Tensor | None = None,
+    tangent_frequency: float = 0.0, tangent_source: torch.Tensor | None = None,
     tangent_target: torch.Tensor | None = None,
     tangent_interaction_positions: torch.Tensor | None = None,
     tangent_interaction_normals: torch.Tensor | None = None,
@@ -816,34 +708,17 @@ def field_reflection_sequence_jvp(
 
 
 def field_transmission_sequence_backward(
-    path_valid: torch.Tensor,
-    source: torch.Tensor,
-    target: torch.Tensor,
-    interaction_positions: torch.Tensor,
-    interaction_normals: torch.Tensor,
-    interaction_material_id: torch.Tensor,
-    interaction_valid: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    layer_offset: torch.Tensor,
-    layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    *,
-    frequency_hz: float,
-    grad_field_vector: torch.Tensor | None = None,
-    grad_coefficient: torch.Tensor | None = None,
-    grad_path_field: torch.Tensor | None = None,
-    grad_path_gain: torch.Tensor | None = None,
-    grad_path_length: torch.Tensor | None = None,
-    grad_delay: torch.Tensor | None = None,
-    need_grad_layer_thickness: bool = True,
-    need_grad_layer_eps_r: bool = True,
-    need_grad_layer_sigma_e: bool = True,
-    need_grad_frequency: bool = True,
+    path_valid: torch.Tensor, source: torch.Tensor, target: torch.Tensor,
+    interaction_positions: torch.Tensor, interaction_normals: torch.Tensor,
+    interaction_material_id: torch.Tensor, interaction_valid: torch.Tensor, tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, layer_offset: torch.Tensor,
+    layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, *, frequency_hz: float,
+    grad_field_vector: torch.Tensor | None = None, grad_coefficient: torch.Tensor | None = None,
+    grad_path_field: torch.Tensor | None = None, grad_path_gain: torch.Tensor | None = None,
+    grad_path_length: torch.Tensor | None = None, grad_delay: torch.Tensor | None = None,
+    need_grad_layer_thickness: bool = True, need_grad_layer_eps_r: bool = True,
+    need_grad_layer_sigma_e: bool = True, need_grad_frequency: bool = True,
     need_grad_geometry: bool = False,
 ) -> dict[str, torch.Tensor | None]:
     out = _required_native_op("field_transmission_sequence_backward")(
@@ -894,30 +769,16 @@ def field_transmission_sequence_backward(
 
 
 def field_transmission_sequence_jvp(
-    path_valid: torch.Tensor,
-    source: torch.Tensor,
-    target: torch.Tensor,
-    interaction_positions: torch.Tensor,
-    interaction_normals: torch.Tensor,
-    interaction_material_id: torch.Tensor,
-    interaction_valid: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    layer_offset: torch.Tensor,
-    layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    *,
-    frequency_hz: float,
+    path_valid: torch.Tensor, source: torch.Tensor, target: torch.Tensor,
+    interaction_positions: torch.Tensor, interaction_normals: torch.Tensor,
+    interaction_material_id: torch.Tensor, interaction_valid: torch.Tensor, tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, layer_offset: torch.Tensor,
+    layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, *, frequency_hz: float,
     tangent_layer_thickness_m: torch.Tensor | None = None,
     tangent_layer_eps_r: torch.Tensor | None = None,
-    tangent_layer_sigma_e: torch.Tensor | None = None,
-    tangent_frequency: float = 0.0,
-    tangent_source: torch.Tensor | None = None,
-    tangent_target: torch.Tensor | None = None,
+    tangent_layer_sigma_e: torch.Tensor | None = None, tangent_frequency: float = 0.0,
+    tangent_source: torch.Tensor | None = None, tangent_target: torch.Tensor | None = None,
     tangent_interaction_positions: torch.Tensor | None = None,
     tangent_interaction_normals: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
@@ -974,29 +835,13 @@ def _validate_wedge_valid(valid: torch.Tensor, source: torch.Tensor) -> None:
 
 
 def field_diffraction_wedge(
-    valid: torch.Tensor,
-    source: torch.Tensor,
-    target: torch.Tensor,
-    edge_position: torch.Tensor,
-    edge_direction: torch.Tensor,
-    edge_t_min: torch.Tensor,
-    edge_t_max: torch.Tensor,
-    edge_n0: torch.Tensor,
-    edge_n1: torch.Tensor,
-    exterior_angle: torch.Tensor,
-    face0_valid: torch.Tensor,
-    face0_eps_r: torch.Tensor,
-    face0_sigma_e: torch.Tensor,
-    face0_mu_r: torch.Tensor,
-    face0_gain: torch.Tensor,
-    face1_valid: torch.Tensor,
-    face1_eps_r: torch.Tensor,
-    face1_sigma_e: torch.Tensor,
-    face1_mu_r: torch.Tensor,
-    face1_gain: torch.Tensor,
-    tx_power: torch.Tensor,
-    *,
-    frequency_hz: float,
+    valid: torch.Tensor, source: torch.Tensor, target: torch.Tensor, edge_position: torch.Tensor,
+    edge_direction: torch.Tensor, edge_t_min: torch.Tensor, edge_t_max: torch.Tensor,
+    edge_n0: torch.Tensor, edge_n1: torch.Tensor, exterior_angle: torch.Tensor,
+    face0_valid: torch.Tensor, face0_eps_r: torch.Tensor, face0_sigma_e: torch.Tensor,
+    face0_mu_r: torch.Tensor, face0_gain: torch.Tensor, face1_valid: torch.Tensor,
+    face1_eps_r: torch.Tensor, face1_sigma_e: torch.Tensor, face1_mu_r: torch.Tensor,
+    face1_gain: torch.Tensor, tx_power: torch.Tensor, *, frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
     """Re-evaluate RayD's order-1 UTD wedge export from the frozen topology."""
 
@@ -1049,18 +894,9 @@ _ROUGH_SCALE_TANGENT_FIELDS = tuple(
 
 
 def field_rough_reflection_scale(
-    field_vector: torch.Tensor,
-    coefficient: torch.Tensor,
-    path_field: torch.Tensor,
-    path_gain: torch.Tensor,
-    positions: torch.Tensor,
-    normals: torch.Tensor,
-    source: torch.Tensor,
-    sigma_b: torch.Tensor,
-    rough_b: torch.Tensor,
-    replaced: torch.Tensor,
-    *,
-    frequency_hz: float,
+    field_vector: torch.Tensor, coefficient: torch.Tensor, path_field: torch.Tensor,
+    path_gain: torch.Tensor, positions: torch.Tensor, normals: torch.Tensor, source: torch.Tensor,
+    sigma_b: torch.Tensor, rough_b: torch.Tensor, replaced: torch.Tensor, *, frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
     """Native rough-surface C_r factor applied to the reflection outputs.
 
@@ -1102,25 +938,12 @@ def field_rough_reflection_scale(
 
 
 def field_rough_reflection_scale_backward(
-    field_vector: torch.Tensor,
-    coefficient: torch.Tensor,
-    path_field: torch.Tensor,
-    path_gain: torch.Tensor,
-    positions: torch.Tensor,
-    normals: torch.Tensor,
-    source: torch.Tensor,
-    sigma_b: torch.Tensor,
-    rough_b: torch.Tensor,
-    replaced: torch.Tensor,
-    *,
-    frequency_hz: float,
-    grad_field_vector: torch.Tensor | None = None,
-    grad_coefficient: torch.Tensor | None = None,
-    grad_path_field: torch.Tensor | None = None,
-    grad_path_gain: torch.Tensor | None = None,
-    need_field: bool = True,
-    need_geometry: bool = False,
-    need_frequency: bool = True,
+    field_vector: torch.Tensor, coefficient: torch.Tensor, path_field: torch.Tensor,
+    path_gain: torch.Tensor, positions: torch.Tensor, normals: torch.Tensor, source: torch.Tensor,
+    sigma_b: torch.Tensor, rough_b: torch.Tensor, replaced: torch.Tensor, *, frequency_hz: float,
+    grad_field_vector: torch.Tensor | None = None, grad_coefficient: torch.Tensor | None = None,
+    grad_path_field: torch.Tensor | None = None, grad_path_gain: torch.Tensor | None = None,
+    need_field: bool = True, need_geometry: bool = False, need_frequency: bool = True,
 ) -> dict[str, torch.Tensor | None]:
     """VJP of:func:`field_rough_reflection_scale` (frequency and geometry)."""
 
@@ -1163,25 +986,13 @@ def field_rough_reflection_scale_backward(
 
 
 def field_rough_reflection_scale_jvp(
-    field_vector: torch.Tensor,
-    coefficient: torch.Tensor,
-    path_field: torch.Tensor,
-    path_gain: torch.Tensor,
-    positions: torch.Tensor,
-    normals: torch.Tensor,
-    source: torch.Tensor,
-    sigma_b: torch.Tensor,
-    rough_b: torch.Tensor,
-    replaced: torch.Tensor,
-    *,
-    frequency_hz: float,
+    field_vector: torch.Tensor, coefficient: torch.Tensor, path_field: torch.Tensor,
+    path_gain: torch.Tensor, positions: torch.Tensor, normals: torch.Tensor, source: torch.Tensor,
+    sigma_b: torch.Tensor, rough_b: torch.Tensor, replaced: torch.Tensor, *, frequency_hz: float,
     tangent_field_vector: torch.Tensor | None = None,
-    tangent_coefficient: torch.Tensor | None = None,
-    tangent_path_field: torch.Tensor | None = None,
-    tangent_path_gain: torch.Tensor | None = None,
-    tangent_positions: torch.Tensor | None = None,
-    tangent_normals: torch.Tensor | None = None,
-    tangent_source: torch.Tensor | None = None,
+    tangent_coefficient: torch.Tensor | None = None, tangent_path_field: torch.Tensor | None = None,
+    tangent_path_gain: torch.Tensor | None = None, tangent_positions: torch.Tensor | None = None,
+    tangent_normals: torch.Tensor | None = None, tangent_source: torch.Tensor | None = None,
     tangent_frequency: float = 0.0,
 ) -> dict[str, torch.Tensor]:
     """JVP of:func:`field_rough_reflection_scale` (frequency and geometry)."""
@@ -1282,13 +1093,7 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        source,
-        target,
-        tx_power,
-        tx_polarization,
-        rx_polarization,
-        frequency,
-        frequency_value,
+        source, target, tx_power, tx_polarization, rx_polarization, frequency, frequency_value,
         liveness,
     ):
         op_name = (
@@ -1339,14 +1144,8 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
     @staticmethod
     @_ad_first_order_only
     def backward(
-        ctx,
-        grad_field_vector,
-        grad_coefficient,
-        grad_path_field,
-        grad_path_gain,
-        grad_path_length,
-        grad_delay,
-        grad_direction,
+        ctx, grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain, grad_path_length,
+        grad_delay, grad_direction,
     ):
         none_grads = (None,) * 8
         _ad_reject_fixed_inputs(
@@ -1412,14 +1211,7 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx,
-        t_source,
-        t_target,
-        t_tx_power,
-        t_tx_pol,
-        t_rx_pol,
-        t_frequency,
-        _t_frequency_value,
+        ctx, t_source, t_target, t_tx_power, t_tx_pol, t_rx_pol, t_frequency, _t_frequency_value,
         _t_liveness,
     ):
         _ad_reject_fixed_tangents(
@@ -1461,14 +1253,9 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
 
 
 def field_free_space_ad(
-    source: torch.Tensor,
-    target: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    *,
-    frequency: torch.Tensor | float,
-    frequency_value: float | None = None,
+    source: torch.Tensor, target: torch.Tensor, tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, *,
+    frequency: torch.Tensor | float, frequency_value: float | None = None,
     direction_live: bool = False,
 ) -> dict[str, torch.Tensor]:
     """Differentiable:func:`field_free_space` (frequency only in AD).
@@ -1502,20 +1289,8 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        source,
-        target,
-        interaction_positions,
-        interaction_normals,
-        tx_power,
-        tx_polarization,
-        rx_polarization,
-        eps_r,
-        sigma_e,
-        mu_r,
-        gain,
-        thickness,
-        frequency,
-        frequency_value,
+        source, target, interaction_positions, interaction_normals, tx_power, tx_polarization,
+        rx_polarization, eps_r, sigma_e, mu_r, gain, thickness, frequency, frequency_value,
         liveness,
     ):
         out = _required_native_op("field_reflection_sequence")(
@@ -1558,14 +1333,8 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
     @staticmethod
     @_ad_first_order_only
     def backward(
-        ctx,
-        grad_field_vector,
-        grad_coefficient,
-        grad_path_field,
-        grad_path_gain,
-        grad_path_length,
-        grad_delay,
-        grad_direction,
+        ctx, grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain, grad_path_length,
+        grad_delay, grad_direction,
     ):
         none_grads = (None,) * 15
         _ad_reject_fixed_inputs(
@@ -1670,22 +1439,8 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx,
-        t_source,
-        t_target,
-        t_positions,
-        t_normals,
-        t_tx_power,
-        t_tx_pol,
-        t_rx_pol,
-        t_eps_r,
-        t_sigma_e,
-        t_mu_r,
-        t_gain,
-        t_thickness,
-        t_frequency,
-        _t_frequency_value,
-        _t_liveness,
+        ctx, t_source, t_target, t_positions, t_normals, t_tx_power, t_tx_pol, t_rx_pol, t_eps_r,
+        t_sigma_e, t_mu_r, t_gain, t_thickness, t_frequency, _t_frequency_value, _t_liveness,
     ):
         _ad_reject_fixed_tangents(
             "field_reflection_sequence_ad",
@@ -1765,22 +1520,11 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
 
 
 def field_reflection_sequence_ad(
-    source: torch.Tensor,
-    target: torch.Tensor,
-    interaction_positions: torch.Tensor,
-    interaction_normals: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    eps_r: torch.Tensor,
-    sigma_e: torch.Tensor,
-    mu_r: torch.Tensor,
-    gain: torch.Tensor,
-    thickness: torch.Tensor,
-    *,
-    frequency: torch.Tensor | float,
-    frequency_value: float | None = None,
-    direction_live: bool = False,
+    source: torch.Tensor, target: torch.Tensor, interaction_positions: torch.Tensor,
+    interaction_normals: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
+    rx_polarization: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor,
+    gain: torch.Tensor, thickness: torch.Tensor, *, frequency: torch.Tensor | float,
+    frequency_value: float | None = None, direction_live: bool = False,
 ) -> dict[str, torch.Tensor]:
     """Differentiable:func:`field_reflection_sequence` (materials + frequency).
 
@@ -1828,24 +1572,10 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        path_valid,
-        source,
-        target,
-        interaction_positions,
-        interaction_normals,
-        interaction_material_id,
-        interaction_valid,
-        tx_power,
-        tx_polarization,
-        rx_polarization,
-        layer_offset,
-        layer_count,
-        layer_thickness_m,
-        layer_eps_r,
-        layer_sigma_e,
-        layer_mu_r,
-        frequency,
-        frequency_value,
+        path_valid, source, target, interaction_positions, interaction_normals,
+        interaction_material_id, interaction_valid, tx_power, tx_polarization, rx_polarization,
+        layer_offset, layer_count, layer_thickness_m, layer_eps_r, layer_sigma_e, layer_mu_r,
+        frequency, frequency_value,
     ):
         out = _required_native_op("field_transmission_sequence")(
             path_valid,
@@ -1893,14 +1623,8 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
     @staticmethod
     @_ad_first_order_only
     def backward(
-        ctx,
-        grad_field_vector,
-        grad_coefficient,
-        grad_path_field,
-        grad_path_gain,
-        grad_path_length,
-        grad_delay,
-        _grad_direction,
+        ctx, grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain, grad_path_length,
+        grad_delay, _grad_direction,
     ):
         none_grads = (None,) * 18
         _ad_reject_fixed_inputs(
@@ -1981,24 +1705,9 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx,
-        _t_path_valid,
-        t_source,
-        t_target,
-        t_positions,
-        t_normals,
-        _t_material_id,
-        _t_interaction_valid,
-        t_tx_power,
-        t_tx_pol,
-        t_rx_pol,
-        _t_layer_offset,
-        _t_layer_count,
-        t_layer_thickness,
-        t_layer_eps_r,
-        t_layer_sigma_e,
-        t_layer_mu_r,
-        t_frequency,
+        ctx, _t_path_valid, t_source, t_target, t_positions, t_normals, _t_material_id,
+        _t_interaction_valid, t_tx_power, t_tx_pol, t_rx_pol, _t_layer_offset, _t_layer_count,
+        t_layer_thickness, t_layer_eps_r, t_layer_sigma_e, t_layer_mu_r, t_frequency,
         _t_frequency_value,
     ):
         _ad_reject_fixed_tangents(
@@ -2075,24 +1784,12 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
 
 
 def field_transmission_sequence_ad(
-    path_valid: torch.Tensor,
-    source: torch.Tensor,
-    target: torch.Tensor,
-    interaction_positions: torch.Tensor,
-    interaction_normals: torch.Tensor,
-    interaction_material_id: torch.Tensor,
-    interaction_valid: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    layer_offset: torch.Tensor,
-    layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor,
-    layer_eps_r: torch.Tensor,
-    layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor,
-    *,
-    frequency: torch.Tensor | float,
+    path_valid: torch.Tensor, source: torch.Tensor, target: torch.Tensor,
+    interaction_positions: torch.Tensor, interaction_normals: torch.Tensor,
+    interaction_material_id: torch.Tensor, interaction_valid: torch.Tensor, tx_power: torch.Tensor,
+    tx_polarization: torch.Tensor, rx_polarization: torch.Tensor, layer_offset: torch.Tensor,
+    layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor,
+    layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, *, frequency: torch.Tensor | float,
     frequency_value: float | None = None,
 ) -> dict[str, torch.Tensor]:
     """Differentiable:func:`field_transmission_sequence` (layers + frequency).
@@ -2140,34 +1837,10 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        valid,
-        source,
-        target,
-        edge_position,
-        edge_direction,
-        edge_t_min,
-        edge_t_max,
-        edge_n0,
-        edge_n1,
-        exterior_angle,
-        face0_valid,
-        face0_eps_r,
-        face0_sigma_e,
-        face0_mu_r,
-        face0_gain,
-        face1_valid,
-        face1_eps_r,
-        face1_sigma_e,
-        face1_mu_r,
-        face1_gain,
-        tx_power,
-        frequency,
-        vertex_v0,
-        vertex_v1,
-        vertex_opp0,
-        vertex_opp1,
-        edge_boundary,
-        frequency_value,
+        valid, source, target, edge_position, edge_direction, edge_t_min, edge_t_max, edge_n0,
+        edge_n1, exterior_angle, face0_valid, face0_eps_r, face0_sigma_e, face0_mu_r, face0_gain,
+        face1_valid, face1_eps_r, face1_sigma_e, face1_mu_r, face1_gain, tx_power, frequency,
+        vertex_v0, vertex_v1, vertex_opp0, vertex_opp1, edge_boundary, frequency_value,
     ):
         out = _required_native_op("field_diffraction_wedge")(
             valid,
@@ -2410,31 +2083,14 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
 
 
 def field_diffraction_wedge_ad(
-    valid: torch.Tensor,
-    source: torch.Tensor,
-    target: torch.Tensor,
-    edge_position: torch.Tensor,
-    edge_direction: torch.Tensor,
-    edge_t_min: torch.Tensor,
-    edge_t_max: torch.Tensor,
-    edge_n0: torch.Tensor,
-    edge_n1: torch.Tensor,
-    exterior_angle: torch.Tensor,
-    face0_valid: torch.Tensor,
-    face0_eps_r: torch.Tensor,
-    face0_sigma_e: torch.Tensor,
-    face0_mu_r: torch.Tensor,
-    face0_gain: torch.Tensor,
-    face1_valid: torch.Tensor,
-    face1_eps_r: torch.Tensor,
-    face1_sigma_e: torch.Tensor,
-    face1_mu_r: torch.Tensor,
-    face1_gain: torch.Tensor,
-    tx_power: torch.Tensor,
-    *,
-    frequency: torch.Tensor | float,
-    frequency_value: float | None = None,
-    vertices: tuple[torch.Tensor, ...] | None = None,
+    valid: torch.Tensor, source: torch.Tensor, target: torch.Tensor, edge_position: torch.Tensor,
+    edge_direction: torch.Tensor, edge_t_min: torch.Tensor, edge_t_max: torch.Tensor,
+    edge_n0: torch.Tensor, edge_n1: torch.Tensor, exterior_angle: torch.Tensor,
+    face0_valid: torch.Tensor, face0_eps_r: torch.Tensor, face0_sigma_e: torch.Tensor,
+    face0_mu_r: torch.Tensor, face0_gain: torch.Tensor, face1_valid: torch.Tensor,
+    face1_eps_r: torch.Tensor, face1_sigma_e: torch.Tensor, face1_mu_r: torch.Tensor,
+    face1_gain: torch.Tensor, tx_power: torch.Tensor, *, frequency: torch.Tensor | float,
+    frequency_value: float | None = None, vertices: tuple[torch.Tensor, ...] | None = None,
 ) -> dict[str, torch.Tensor]:
     """Differentiable:func:`field_diffraction_wedge`.
 
@@ -2497,38 +2153,11 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        source,
-        target,
-        reflection_position,
-        reflection_normal,
-        edge_position,
-        edge_direction,
-        edge_n0,
-        edge_n1,
-        exterior_angle,
-        tx_power,
-        tx_polarization,
-        rx_polarization,
-        refl_eps_r,
-        refl_sigma_e,
-        refl_mu_r,
-        refl_gain,
-        refl_thickness,
-        w0_eps_r,
-        w0_sigma_e,
-        w0_mu_r,
-        w0_gain,
-        w0_thickness,
-        w1_eps_r,
-        w1_sigma_e,
-        w1_mu_r,
-        w1_gain,
-        w1_thickness,
-        frequency,
-        reverse,
-        frequency_value,
-        edge_line_min,
-        edge_line_max,
+        source, target, reflection_position, reflection_normal, edge_position, edge_direction,
+        edge_n0, edge_n1, exterior_angle, tx_power, tx_polarization, rx_polarization, refl_eps_r,
+        refl_sigma_e, refl_mu_r, refl_gain, refl_thickness, w0_eps_r, w0_sigma_e, w0_mu_r, w0_gain,
+        w0_thickness, w1_eps_r, w1_sigma_e, w1_mu_r, w1_gain, w1_thickness, frequency, reverse,
+        frequency_value, edge_line_min, edge_line_max,
     ):
         out = _required_native_op("field_coupled_rd")(
             source,
@@ -2595,12 +2224,7 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
     @staticmethod
     @_ad_first_order_only
     def backward(
-        ctx,
-        grad_field_vector,
-        grad_coefficient,
-        grad_path_field,
-        grad_path_gain,
-        _grad_direction,
+        ctx, grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain, _grad_direction,
     ):
         none_grads = (None,) * 32
         _ad_reject_fixed_inputs(
@@ -2801,27 +2425,14 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
 
 
 def field_coupled_rd_ad(
-    source: torch.Tensor,
-    target: torch.Tensor,
-    reflection_position: torch.Tensor,
-    reflection_normal: torch.Tensor,
-    edge_position: torch.Tensor,
-    edge_direction: torch.Tensor,
-    edge_n0: torch.Tensor,
-    edge_n1: torch.Tensor,
-    exterior_angle: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    reflection_material: tuple[torch.Tensor, ...],
-    wedge_material0: tuple[torch.Tensor, ...],
-    wedge_material1: tuple[torch.Tensor, ...],
-    edge_line_min: torch.Tensor,
-    edge_line_max: torch.Tensor,
-    *,
-    frequency: torch.Tensor | float,
-    frequency_value: float | None = None,
-    reverse: bool,
+    source: torch.Tensor, target: torch.Tensor, reflection_position: torch.Tensor,
+    reflection_normal: torch.Tensor, edge_position: torch.Tensor, edge_direction: torch.Tensor,
+    edge_n0: torch.Tensor, edge_n1: torch.Tensor, exterior_angle: torch.Tensor,
+    tx_power: torch.Tensor, tx_polarization: torch.Tensor, rx_polarization: torch.Tensor,
+    reflection_material: tuple[torch.Tensor, ...], wedge_material0: tuple[torch.Tensor, ...],
+    wedge_material1: tuple[torch.Tensor, ...], edge_line_min: torch.Tensor,
+    edge_line_max: torch.Tensor, *, frequency: torch.Tensor | float,
+    frequency_value: float | None = None, reverse: bool,
 ) -> dict[str, torch.Tensor]:
     """Differentiable:func:`field_coupled_rd` (12 material scalars + frequency + geometry).
 
@@ -2875,14 +2486,7 @@ class _CoupledRdPrepareAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        source,
-        receiver,
-        plane_point,
-        plane_normal,
-        edge_pos,
-        edge_dir,
-        edge_t_min,
-        edge_t_max,
+        source, receiver, plane_point, plane_normal, edge_pos, edge_dir, edge_t_min, edge_t_max,
     ):
         out = _required_native_op("coupled_rd_prepare")(
             source,
@@ -2984,14 +2588,9 @@ class _CoupledRdPrepareAdFunction(torch.autograd.Function):
 
 
 def coupled_rd_prepare_ad(
-    source: torch.Tensor,
-    receiver: torch.Tensor,
-    plane_point: torch.Tensor,
-    plane_normal: torch.Tensor,
-    edge_pos: torch.Tensor,
-    edge_dir: torch.Tensor,
-    edge_t_min: torch.Tensor,
-    edge_t_max: torch.Tensor,
+    source: torch.Tensor, receiver: torch.Tensor, plane_point: torch.Tensor,
+    plane_normal: torch.Tensor, edge_pos: torch.Tensor, edge_dir: torch.Tensor,
+    edge_t_min: torch.Tensor, edge_t_max: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Differentiable fixed-winner coupled stationary geometry re-solve."""
 
@@ -3056,47 +2655,12 @@ class _FieldCoupledDdAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        source,
-        target,
-        edge1_position,
-        edge1_direction,
-        edge1_n0,
-        edge1_n1,
-        edge1_exterior,
-        edge2_position,
-        edge2_direction,
-        edge2_n0,
-        edge2_n1,
-        edge2_exterior,
-        tx_power,
-        tx_polarization,
-        rx_polarization,
-        w1a_eps_r,
-        w1a_sigma_e,
-        w1a_mu_r,
-        w1a_gain,
-        w1a_thickness,
-        w1b_eps_r,
-        w1b_sigma_e,
-        w1b_mu_r,
-        w1b_gain,
-        w1b_thickness,
-        w2a_eps_r,
-        w2a_sigma_e,
-        w2a_mu_r,
-        w2a_gain,
-        w2a_thickness,
-        w2b_eps_r,
-        w2b_sigma_e,
-        w2b_mu_r,
-        w2b_gain,
-        w2b_thickness,
-        frequency,
-        frequency_value,
-        edge1_line_min,
-        edge1_line_max,
-        edge2_line_min,
-        edge2_line_max,
+        source, target, edge1_position, edge1_direction, edge1_n0, edge1_n1, edge1_exterior,
+        edge2_position, edge2_direction, edge2_n0, edge2_n1, edge2_exterior, tx_power,
+        tx_polarization, rx_polarization, w1a_eps_r, w1a_sigma_e, w1a_mu_r, w1a_gain, w1a_thickness,
+        w1b_eps_r, w1b_sigma_e, w1b_mu_r, w1b_gain, w1b_thickness, w2a_eps_r, w2a_sigma_e, w2a_mu_r,
+        w2a_gain, w2a_thickness, w2b_eps_r, w2b_sigma_e, w2b_mu_r, w2b_gain, w2b_thickness,
+        frequency, frequency_value, edge1_line_min, edge1_line_max, edge2_line_min, edge2_line_max,
     ):
         out = _required_native_op("field_coupled_dd")(
             source,
@@ -3171,12 +2735,7 @@ class _FieldCoupledDdAdFunction(torch.autograd.Function):
     @staticmethod
     @_ad_first_order_only
     def backward(
-        ctx,
-        grad_field_vector,
-        grad_coefficient,
-        grad_path_field,
-        grad_path_gain,
-        _grad_direction,
+        ctx, grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain, _grad_direction,
     ):
         none_grads = (None,) * 41
         _ad_reject_fixed_inputs(
@@ -3374,31 +2933,15 @@ class _FieldCoupledDdAdFunction(torch.autograd.Function):
 
 
 def field_coupled_dd_ad(
-    source: torch.Tensor,
-    target: torch.Tensor,
-    edge1_position: torch.Tensor,
-    edge1_direction: torch.Tensor,
-    edge1_n0: torch.Tensor,
-    edge1_n1: torch.Tensor,
-    edge1_exterior: torch.Tensor,
-    edge2_position: torch.Tensor,
-    edge2_direction: torch.Tensor,
-    edge2_n0: torch.Tensor,
-    edge2_n1: torch.Tensor,
-    edge2_exterior: torch.Tensor,
-    tx_power: torch.Tensor,
-    tx_polarization: torch.Tensor,
-    rx_polarization: torch.Tensor,
-    wedge1_material0: tuple[torch.Tensor, ...],
-    wedge1_material1: tuple[torch.Tensor, ...],
-    wedge2_material0: tuple[torch.Tensor, ...],
-    wedge2_material1: tuple[torch.Tensor, ...],
-    edge1_line_min: torch.Tensor,
-    edge1_line_max: torch.Tensor,
-    edge2_line_min: torch.Tensor,
-    edge2_line_max: torch.Tensor,
-    *,
-    frequency: torch.Tensor | float,
+    source: torch.Tensor, target: torch.Tensor, edge1_position: torch.Tensor,
+    edge1_direction: torch.Tensor, edge1_n0: torch.Tensor, edge1_n1: torch.Tensor,
+    edge1_exterior: torch.Tensor, edge2_position: torch.Tensor, edge2_direction: torch.Tensor,
+    edge2_n0: torch.Tensor, edge2_n1: torch.Tensor, edge2_exterior: torch.Tensor,
+    tx_power: torch.Tensor, tx_polarization: torch.Tensor, rx_polarization: torch.Tensor,
+    wedge1_material0: tuple[torch.Tensor, ...], wedge1_material1: tuple[torch.Tensor, ...],
+    wedge2_material0: tuple[torch.Tensor, ...], wedge2_material1: tuple[torch.Tensor, ...],
+    edge1_line_min: torch.Tensor, edge1_line_max: torch.Tensor, edge2_line_min: torch.Tensor,
+    edge2_line_max: torch.Tensor, *, frequency: torch.Tensor | float,
     frequency_value: float | None = None,
 ) -> dict[str, torch.Tensor]:
     """Differentiable:func:`field_coupled_dd` (16 material scalars + frequency + tx/rx).
@@ -3524,9 +3067,7 @@ class _FieldProjectComplex3AdFunction(torch.autograd.Function):
 
 
 def field_project_complex3_ad(
-    field_vector: torch.Tensor,
-    direction: torch.Tensor,
-    rx_polarization: torch.Tensor,
+    field_vector: torch.Tensor, direction: torch.Tensor, rx_polarization: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Differentiable:func:`field_project_complex3` (field vector + direction)."""
 
@@ -3553,19 +3094,8 @@ class _FieldRoughReflectionScaleAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        field_vector,
-        coefficient,
-        path_field,
-        path_gain,
-        positions,
-        normals,
-        source,
-        sigma_b,
-        rough_b,
-        replaced,
-        frequency,
-        frequency_value,
-        geometry_live,
+        field_vector, coefficient, path_field, path_gain, positions, normals, source, sigma_b,
+        rough_b, replaced, frequency, frequency_value, geometry_live,
     ):
         out = field_rough_reflection_scale(
             field_vector,
@@ -3603,13 +3133,7 @@ class _FieldRoughReflectionScaleAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(
-        ctx,
-        grad_field_vector,
-        grad_coefficient,
-        grad_path_field,
-        grad_path_gain,
-    ):
+    def backward(ctx, grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain):
         none_grads = (None,) * 13
         _ad_reject_fixed_inputs(
             "field_rough_reflection_scale_ad",
@@ -3664,19 +3188,8 @@ class _FieldRoughReflectionScaleAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx,
-        t_field_vector,
-        t_coefficient,
-        t_path_field,
-        t_path_gain,
-        t_positions,
-        t_normals,
-        t_source,
-        t_sigma_b,
-        _t_rough_b,
-        _t_replaced,
-        t_frequency,
-        _t_frequency_value,
+        ctx, t_field_vector, t_coefficient, t_path_field, t_path_gain, t_positions, t_normals,
+        t_source, t_sigma_b, _t_rough_b, _t_replaced, t_frequency, _t_frequency_value,
         _t_geometry_live,
     ):
         _ad_reject_fixed_tangents(
@@ -3728,19 +3241,10 @@ class _FieldRoughReflectionScaleAdFunction(torch.autograd.Function):
 
 
 def field_rough_reflection_scale_ad(
-    field_vector: torch.Tensor,
-    coefficient: torch.Tensor,
-    path_field: torch.Tensor,
-    path_gain: torch.Tensor,
-    positions: torch.Tensor,
-    normals: torch.Tensor,
-    source: torch.Tensor,
-    sigma_b: torch.Tensor,
-    rough_b: torch.Tensor,
-    replaced: torch.Tensor,
-    *,
-    frequency: torch.Tensor | float,
-    frequency_value: float | None = None,
+    field_vector: torch.Tensor, coefficient: torch.Tensor, path_field: torch.Tensor,
+    path_gain: torch.Tensor, positions: torch.Tensor, normals: torch.Tensor, source: torch.Tensor,
+    sigma_b: torch.Tensor, rough_b: torch.Tensor, replaced: torch.Tensor, *,
+    frequency: torch.Tensor | float, frequency_value: float | None = None,
 ) -> dict[str, torch.Tensor]:
     """Differentiable:func:`field_rough_reflection_scale` (frequency + geometry).
 
@@ -3770,7 +3274,7 @@ def field_rough_reflection_scale_ad(
 
 
 def _validate_source_amplitude_inputs(
-    field_vector: torch.Tensor, tx_power: torch.Tensor, *, field_name: str
+    field_vector: torch.Tensor, tx_power: torch.Tensor, *, field_name: str,
 ) -> int:
     # Cotangents and tangents arrive as strided views; the native owner
     # canonicalizes them, so layout is not part of this contract.
@@ -3796,7 +3300,7 @@ def _validate_source_amplitude_inputs(
 
 
 def _validate_source_amplitude_result(
-    out: object, name: str, count: int, *, operation: str
+    out: object, name: str, count: int, *, operation: str,
 ) -> dict[str, torch.Tensor]:
     if not isinstance(out, dict) or set(out) != {name}:
         raise TypeError(f"_channel.{operation} returned invalid fields")
@@ -3807,7 +3311,7 @@ def _validate_source_amplitude_result(
 
 
 def field_source_amplitude_scale(
-    field_vector: torch.Tensor, tx_power: torch.Tensor
+    field_vector: torch.Tensor, tx_power: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Apply ``sqrt(max(tx_power, 0))`` to a transported complex3 field.
 
@@ -3828,7 +3332,7 @@ def field_source_amplitude_scale(
 
 
 def field_source_amplitude_scale_backward(
-    tx_power: torch.Tensor, grad_path_field_vector: torch.Tensor
+    tx_power: torch.Tensor, grad_path_field_vector: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """VJP of:func:`field_source_amplitude_scale`; ``tx_power`` is frozen."""
 
@@ -3847,7 +3351,7 @@ def field_source_amplitude_scale_backward(
 
 
 def field_source_amplitude_scale_jvp(
-    tx_power: torch.Tensor, tangent_field_vector: torch.Tensor
+    tx_power: torch.Tensor, tangent_field_vector: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """JVP of:func:`field_source_amplitude_scale`; ``tx_power`` is frozen."""
 
@@ -3915,7 +3419,7 @@ class _FieldSourceAmplitudeScaleAdFunction(torch.autograd.Function):
 
 
 def field_source_amplitude_scale_ad(
-    field_vector: torch.Tensor, tx_power: torch.Tensor
+    field_vector: torch.Tensor, tx_power: torch.Tensor,
 ) -> torch.Tensor:
     """Differentiable:func:`field_source_amplitude_scale` (field vector only)."""
 
@@ -3923,10 +3427,7 @@ def field_source_amplitude_scale_ad(
 
 
 def deterministic_los_field(
-    path_gain: torch.Tensor,
-    path_length_m: torch.Tensor,
-    *,
-    frequency_hz: float,
+    path_gain: torch.Tensor, path_length_m: torch.Tensor, *, frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("path_gain", path_gain, dtype=torch.float32, ndim=1)
     validate_cuda_tensor("path_length_m", path_length_m, dtype=torch.float32, ndim=1)
@@ -3955,12 +3456,8 @@ def deterministic_los_field(
 
 
 def deterministic_diffraction_vector_field(
-    x_re: torch.Tensor,
-    x_im: torch.Tensor,
-    y_re: torch.Tensor,
-    y_im: torch.Tensor,
-    z_re: torch.Tensor,
-    z_im: torch.Tensor,
+    x_re: torch.Tensor, x_im: torch.Tensor, y_re: torch.Tensor, y_im: torch.Tensor,
+    z_re: torch.Tensor, z_im: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("x_re", x_re, dtype=torch.float32, ndim=1)
     for name, tensor in {
@@ -3998,17 +3495,9 @@ def deterministic_diffraction_vector_field(
 
 
 def deterministic_reflection_field(
-    tx_position: torch.Tensor,
-    rx_position: torch.Tensor,
-    hit_position: torch.Tensor,
-    normal: torch.Tensor,
-    tx_power: torch.Tensor,
-    eps_r: torch.Tensor,
-    sigma_e: torch.Tensor,
-    mu_r: torch.Tensor,
-    gain: torch.Tensor,
-    *,
-    frequency_hz: float,
+    tx_position: torch.Tensor, rx_position: torch.Tensor, hit_position: torch.Tensor,
+    normal: torch.Tensor, tx_power: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor,
+    mu_r: torch.Tensor, gain: torch.Tensor, *, frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor(
         "tx_position", tx_position, dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -4085,17 +3574,9 @@ def deterministic_reflection_field(
 
 
 def deterministic_reflection_sequence_field(
-    tx_position: torch.Tensor,
-    rx_position: torch.Tensor,
-    hit_positions: torch.Tensor,
-    normals: torch.Tensor,
-    tx_power: torch.Tensor,
-    eps_r: torch.Tensor,
-    sigma_e: torch.Tensor,
-    mu_r: torch.Tensor,
-    gain: torch.Tensor,
-    *,
-    frequency_hz: float,
+    tx_position: torch.Tensor, rx_position: torch.Tensor, hit_positions: torch.Tensor,
+    normals: torch.Tensor, tx_power: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor,
+    mu_r: torch.Tensor, gain: torch.Tensor, *, frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor(
         "tx_position", tx_position, dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -4180,9 +3661,7 @@ def deterministic_delay_to_path_length(delay_s: torch.Tensor) -> torch.Tensor:
     return path_length
 
 
-def deterministic_pack_complex(
-    field_real: torch.Tensor, field_imag: torch.Tensor
-) -> torch.Tensor:
+def deterministic_pack_complex(field_real: torch.Tensor, field_imag: torch.Tensor) -> torch.Tensor:
     validate_cuda_tensor("field_real", field_real, dtype=torch.float32, ndim=1)
     validate_cuda_tensor("field_imag", field_imag, dtype=torch.float32, ndim=1)
     if field_imag.shape != field_real.shape:
@@ -4197,7 +3676,7 @@ def deterministic_pack_complex(
 
 
 def deterministic_phase_from_field(
-    field_real: torch.Tensor, field_imag: torch.Tensor
+    field_real: torch.Tensor, field_imag: torch.Tensor,
 ) -> torch.Tensor:
     validate_cuda_tensor("field_real", field_real, dtype=torch.float32, ndim=1)
     validate_cuda_tensor("field_imag", field_imag, dtype=torch.float32, ndim=1)
@@ -4236,7 +3715,7 @@ def deterministic_zero_field_phase(reference: torch.Tensor) -> dict[str, torch.T
 
 
 def deterministic_phase_from_length(
-    path_length_m: torch.Tensor, *, frequency_hz: float
+    path_length_m: torch.Tensor, *, frequency_hz: float,
 ) -> torch.Tensor:
     validate_cuda_tensor("path_length_m", path_length_m, dtype=torch.float32, ndim=1)
     if frequency_hz <= 0.0:
@@ -4251,7 +3730,7 @@ def deterministic_phase_from_length(
 
 
 def deterministic_field_from_power_phase(
-    path_gain: torch.Tensor, phase_rad: torch.Tensor
+    path_gain: torch.Tensor, phase_rad: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("path_gain", path_gain, dtype=torch.float32, ndim=1)
     validate_cuda_tensor("phase_rad", phase_rad, dtype=torch.float32, ndim=1)

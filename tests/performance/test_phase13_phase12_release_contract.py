@@ -90,9 +90,7 @@ def _multiarch_build_info() -> dict[str, object]:
     return info
 
 
-def test_release_tiers_bind_packaged_checkout_without_developer_override(
-    tmp_path: Path,
-) -> None:
+def test_release_tiers_bind_packaged_checkout_without_developer_override(tmp_path: Path) -> None:
     config, validation = _config(tmp_path)
 
     environment, binding = _runner_channel_environment(config, validation)  # type: ignore[arg-type]

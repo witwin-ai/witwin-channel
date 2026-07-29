@@ -11,11 +11,8 @@ from witwin.channel import runtime
 
 
 def _endpoint_subpath_state(
-    tx_positions: torch.Tensor,
-    tx_power: torch.Tensor,
-    rx_positions: torch.Tensor,
-    launch_tx_id: torch.Tensor,
-    light_seed: torch.Tensor,
+    tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor,
+    launch_tx_id: torch.Tensor, light_seed: torch.Tensor,
 ) -> dict[str, dict[str, torch.Tensor]]:
     tx_polarization = torch.zeros_like(tx_positions)
     tx_polarization[:, 2] = 1.0
@@ -32,9 +29,7 @@ def _endpoint_subpath_state(
     )
 
 
-def _complete_subpath_field_state(
-    state: dict[str, torch.Tensor],
-) -> dict[str, torch.Tensor]:
+def _complete_subpath_field_state(state: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
     count = int(state["origin"].shape[0])
     field_real = torch.zeros((count, 3), device="cuda", dtype=torch.float32)
     field_real[:, 2] = 1.0
@@ -784,14 +779,8 @@ def test_bdpt_accumulate_connection_samples_passes_strategy_id_to_native(monkeyp
 
     class FakeNative:
         def bdpt_accumulate_connection_samples(
-            self,
-            samples,
-            tx_count,
-            rx_count,
-            accumulation_strategy,
-            combine_domain=0,
-            coeff_real=None,
-            coeff_imag=None,
+            self, samples, tx_count, rx_count, accumulation_strategy, combine_domain=0,
+            coeff_real=None, coeff_imag=None,
         ):
             calls.append(accumulation_strategy)
             combine_calls.append(

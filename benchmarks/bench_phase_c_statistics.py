@@ -40,9 +40,7 @@ from witwin.channel.montecarlo.bdpt import solve as solve_bdpt
 _DEFAULT_GATE = _ROOT / "benchmarks" / "gates" / "phase_c_statistics.v1.json"
 
 
-def _observe(
-    seed: int, operation: Callable[[], tuple[torch.Tensor, float]]
-) -> Observation:
+def _observe(seed: int, operation: Callable[[], tuple[torch.Tensor, float]]) -> Observation:
     try:
         tensor, value = operation()
         finite = torch.isfinite(tensor)
@@ -54,7 +52,7 @@ def _observe(
 
 
 def _run_case(
-    name: str, seeds: tuple[int, ...], samples: int
+    name: str, seeds: tuple[int, ...], samples: int,
 ) -> tuple[list[Observation], float | None]:
     if name == "bdpt_wedge_diffraction":
         scene = wedge_diffraction_scene()

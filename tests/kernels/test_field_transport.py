@@ -11,13 +11,7 @@ from witwin.channel.kernels import fields as field_kernels
 
 
 def _slab_coefficient(
-    *,
-    eps_r: float,
-    sigma_e: float,
-    mu_r: float,
-    gain: float,
-    thickness: float,
-    frequency: float,
+    *, eps_r: float, sigma_e: float, mu_r: float, gain: float, thickness: float, frequency: float,
 ) -> complex:
     epsilon0 = 8.8541878128e-12
     omega = 2.0 * math.pi * frequency

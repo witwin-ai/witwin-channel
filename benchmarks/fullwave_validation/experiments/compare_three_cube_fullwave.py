@@ -85,12 +85,7 @@ def gap_map(candidate: FieldMap, reference: FieldMap, mask: np.ndarray, scale: f
     return np.where(mask, gap_db, np.nan)
 
 
-def column(
-    deterministic: FieldMap,
-    fullwave: FieldMap,
-    mask: np.ndarray,
-    scale: float,
-) -> dict:
+def column(deterministic: FieldMap, fullwave: FieldMap, mask: np.ndarray, scale: float) -> dict:
     magnitude = compare_magnitudes(
         deterministic, fullwave, valid_mask=mask, amplitude_scale=scale
     )
@@ -112,9 +107,7 @@ def column(
     return result
 
 
-def flagship_line_scan(
-    maps: dict[str, FieldMap], reference: FieldMap, scale: float
-) -> dict:
+def flagship_line_scan(maps: dict[str, FieldMap], reference: FieldMap, scale: float) -> dict:
     """|field| dB along x at the flagship occlusion row (y ~ 0.457)."""
     any_map = next(iter(maps.values()))
     row = int(np.argmin(np.abs(any_map.y - FLAGSHIP_Y)))

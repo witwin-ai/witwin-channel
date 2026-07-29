@@ -36,7 +36,7 @@ def _scene(feature: str) -> Scene:
 
 @pytest.mark.parametrize("feature", ["array", "pattern", "precoding", "combining"])
 def test_unsupported_endpoint_features_fail_before_cuda(
-    monkeypatch: pytest.MonkeyPatch, feature: str
+    monkeypatch: pytest.MonkeyPatch, feature: str,
 ) -> None:
     cuda_calls = 0
 
