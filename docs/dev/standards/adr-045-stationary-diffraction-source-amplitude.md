@@ -1,6 +1,6 @@
 # ADR-045: Correct stationary-diffraction source amplitude before boundary work
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-07-27
 - **Kind:** One RayD-owned numerical correction with no Channel ABI or public
   API change.  It changes direct-incident stationary diffraction fields and
@@ -101,6 +101,22 @@ The proposal becomes Accepted only when all of the following are frozen:
    state, CUDA/driver/GPU, compiler, ABI header hash, and command line.  A dirty
    explicit RayD checkout is developer evidence only.
 
+## Acceptance record (2026-07-29)
+
+Accepted against clean RayD commit
+`9ab3bf6326efe6ff22f079638d65be76f4b08fc8` and canonical source manifest
+`61af830bfa98d7806aaf2eaa171890623f86ad99c36ca7927d26c359d718acfb`.
+The RayD diffraction-wedge analytic/Dual/native suite, CUDA multipath parity,
+and full API6 unittest discovery passed in `witwin3`. Channel direct-D/coupled-D
+primal and first-order AD contracts, the CUDA/full/AD solver suites, the fresh
+single-cube and three-cube full-wave reruns, and wheel identity/smoke gates
+passed in `witwin2`. The four archived full-wave hashes remained unchanged.
+Every rerun invoked deterministic propagation with `isb_boundary_taper=False`;
+the three-cube NPZ schema does not serialize that invocation field, so the
+acceptance relies on the versioned command/config and renderer regression rather
+than claiming an absent sidecar value. The measured result is deliberately
+mixed: RSB excess and the worst deterministic jump improve with coupled terms,
+while ISB remains open. No threshold was relaxed and no smoothing was added.
 ## Deployment boundary
 
 The production `dependencies/rayd.lock.json` does not move while this ADR is

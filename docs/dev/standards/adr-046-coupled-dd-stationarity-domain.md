@@ -1,6 +1,6 @@
 # ADR-046: Certify coupled D-D stationarity and the ordinary UTD leg domain
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-07-27
 - **Kind:** One Channel-owned numerical correction to coupled sequential
   double-diffraction discovery. It changes which cid-7 candidates are
@@ -239,6 +239,24 @@ performance result.
    the benchmark deltas and prepare-kernel/end-to-end timing; acceptance does
    not follow from a visually smoother plot.
 
+## Acceptance record (2026-07-29)
+
+Accepted with the implementation in current owner
+`native/channel/kernels/coupled.cu`, the RayD local-coordinate line-Fermat
+primitive at `9ab3bf6326efe6ff22f079638d65be76f4b08fc8`, and the production lock
+manifest `61af830bfa98d7806aaf2eaa171890623f86ad99c36ca7927d26c359d718acfb`.
+Direct CUDA witnesses cover ordinary slow convergence, singular/shared-vertex
+rejection, the single-cube false-assertion case, reciprocity/axis reversal, and
+primal/JVP/VJP contracts. Channel CUDA, full solver, no-fallback, full AD,
+statistics, generated Phase-E, peak-memory, cold-start, solver-scaling, compile-
+scaling, and wheel-smoke checks passed. Fresh full-wave reruns preserve all four
+reference hashes and use no taper. Runtime work remains inside the existing
+prepare kernel: launch count, visibility-query count, public result shape, and
+host synchronization boundaries are unchanged. The full external Munich/SF
+Phase-E profile remains unavailable on this refactored main because its own
+loader explicitly requires a not-yet-restored Core-owned XML importer; that
+pre-existing release-infrastructure gap is not used as numerical acceptance
+evidence.
 ## Consequences
 
 - Ordinary coupled D-D fields cannot be published without RayD's analytic

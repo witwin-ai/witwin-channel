@@ -53,15 +53,31 @@ RayD:
 - Correctly isolated API6 full unittest discovery: 160 run, 19 explicit external
   parity skips, zero failures/errors.
 
-Channel targeted evidence before the clean final CI run:
+Channel regression evidence from the clean implementation lineage:
 
 - coupled D-D topology + diffraction/coupled AD + validation: 60/60 pass;
 - full validation module after renderer tests: 27/27 pass;
+- native CUDA unit-contract suite: 2,190 passed, 2 skipped;
+- four-solver E2E: 14 passed; no-fallback: 26 passed; AD core: 121 passed;
+- nightly full coverage: 2,686 passed, 8 skipped, 1 expected failure, with the
+  coverage policy passing;
+- Munich parity: 10 passed, 6 explicit skips; full AD: 329 passed, 2 skipped,
+  1 expected failure; the statistics acceptance gate passed;
 - Python compileall, Ruff, mypy, import graph, binding coverage, orphan-module,
-  single-definition, shared-math, source-prose, and compact-signature checks pass.
+  single-definition, shared-math, source-prose, and compact-signature checks pass;
+- nightly multi-architecture wheel build, independent `witwin.core` wheel,
+  installed-wheel native identity/PE smoke, and duplication gate pass;
+- generated-scene Phase-E performance, peak-memory preflight, four-solver
+  cold-start, full solver-scaling axes, and 256/1024-structure compile scaling
+  pass.
 
-The project release tier is run from the clean implementation commit and its
-result is appended before final handoff.
+The monolithic release wrapper cannot complete its full external-city Phase-E
+case on this refactored `main`: `benchmarks/phase_e_scenarios.py` explicitly
+fails before numerical work because the Core-owned Munich/SF XML importer has
+not yet been restored, and the full assets require an external root. The
+reduced generated profile passes. This pre-existing release-infrastructure gap
+is recorded rather than bypassed with a synthetic fallback; it is not evidence
+for or against this boundary-physics change.
 
 ## Immutable full-wave references
 
@@ -85,7 +101,7 @@ numeric array and metadata field exactly. No archive file was rewritten.
 - magnitude correlation: `0.8761177011`;
 - ISB deterministic jump p95: `2.1035169725 dB`;
 - RSB deterministic jump p95: `3.3675912373 dB`;
-- every deterministic solve records zero boundary taper.
+- the single-cube result metadata records zero boundary taper.
 
 ### Three cubes (`three_cube_320`)
 
@@ -102,9 +118,17 @@ numeric array and metadata field exactly. No archive file was rewritten.
 
 The coupled term materially reduces the RSB excess and worst deterministic-only
 jump. It does not close ISB or vertex/shadow physics: the ISB p95 gets worse in
-this case while the global magnitude fit changes only slightly. This is the
-expected honest outcome of removing numerical defects without introducing a
-heuristic taper.
+this case while the global magnitude fit changes only slightly. Compared with
+the 2026-07-27 coupled-ON artifact, the new worst jump improves while its ISB
+and RSB p95 excess values are both somewhat worse; therefore this audit does
+not claim every localized metric regressed monotonically in the good direction.
+This is the expected honest outcome of removing numerical defects without
+introducing a heuristic taper.
+
+The three-cube benchmark command and renderer set `isb_boundary_taper=False`
+explicitly, but the current coupled ON/OFF NPZ schema does not serialize that
+field. The audit records the executable configuration instead of asserting a
+nonexistent artifact key.
 
 ## Rendering artifacts
 
