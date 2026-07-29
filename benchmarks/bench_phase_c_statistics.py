@@ -30,7 +30,7 @@ from benchmarks.statistical_gate import (
 from tests.montecarlo.basic import test_basic_scattering as basic_scattering
 from tests.montecarlo.bdpt import test_transmission as bdpt_transmission
 from tests.support.scenes import wedge_diffraction_scene
-from witwin.channel.core.materials import PerfectConductor
+from witwin.core import PhysicalMaterial
 from witwin.channel.montecarlo.basic import Config as BasicConfig
 from witwin.channel.montecarlo.basic import solve as solve_basic
 from witwin.channel.montecarlo.bdpt import Config as BDPTConfig
@@ -38,6 +38,8 @@ from witwin.channel.montecarlo.bdpt import solve as solve_bdpt
 
 
 _DEFAULT_GATE = _ROOT / "benchmarks" / "gates" / "phase_c_statistics.v1.json"
+_BDPT_FREQUENCY_HZ = 3.0e9
+_SCATTERING_FREQUENCY_HZ = 60.0e9
 
 
 def _observe(seed: int, operation: Callable[[], tuple[torch.Tensor, float]]) -> Observation:
@@ -69,6 +71,7 @@ def _run_case(
                                 components={"diffraction"},
                                 receiver_strategy="point_sphere",
                             ),
+                            reference_frequency_hz=_BDPT_FREQUENCY_HZ,
                         )
                     ).path_gain,
                     float(result.component_power["diffraction"]),
@@ -95,6 +98,7 @@ def _run_case(
                             BasicConfig(
                                 samples=samples, seed=seed, components={"scattering"}
                             ),
+                            reference_frequency_hz=_SCATTERING_FREQUENCY_HZ,
                         )
                     ).path_gain,
                     float(result.component_maps["scattering"][0, 0, 0]),
@@ -108,7 +112,9 @@ def _run_case(
                 bdpt_transmission._wall(
                     bdpt_transmission._lossy(), x=2.5, surface_id=1
                 ),
-                bdpt_transmission._wall(PerfectConductor(), x=6.0, surface_id=2),
+                bdpt_transmission._wall(
+                    PhysicalMaterial.perfect_conductor(), x=6.0, surface_id=2
+                ),
             ]
         )
         return [
@@ -124,6 +130,7 @@ def _run_case(
                                 max_depth=3,
                                 components={"reflection", "transmission"},
                             ),
+                            reference_frequency_hz=_BDPT_FREQUENCY_HZ,
                         )
                     ).path_gain,
                     float(result.component_power["transmission"]),
