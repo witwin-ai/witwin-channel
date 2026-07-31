@@ -245,6 +245,7 @@ jobs:
           if ($lock.repository_url -cne $env:RAYD_REPOSITORY_URL) { throw "Channel lock repository mismatch: $($lock.repository_url)" }
           if ($actualRemote -cne $env:RAYD_REPOSITORY_URL) { throw "RayD checkout repository mismatch: $actualRemote" }
           if ($dirty) { throw "RayD checkout is dirty: $dirty" }
+          if (-not (Test-Path -LiteralPath rayd/drjit/scripts/verify_cuda_binary_arches.py -PathType Leaf)) { throw "RayD CUDA architecture verifier is missing" }
 
       - name: Configure CUDA build profile
         shell: pwsh
@@ -311,7 +312,7 @@ jobs:
         shell: pwsh
         run: |
           $wheel = (Get-ChildItem channel/dist/*.whl -File -ErrorAction Stop).FullName
-          python rayd/backends/drjit/scripts/verify_cuda_binary_arches.py `
+          python rayd/drjit/scripts/verify_cuda_binary_arches.py `
             --stem _channel `
             --expected-sass $env:EXPECTED_SASS `
             --expected-ptx $env:EXPECTED_PTX `
@@ -422,6 +423,7 @@ jobs:
           assert lock["repository_url"] == os.environ["RAYD_REPOSITORY_URL"]
           assert actual_remote == os.environ["RAYD_REPOSITORY_URL"], actual_remote
           assert not dirty, dirty
+          assert Path("rayd/drjit/scripts/verify_cuda_binary_arches.py").is_file()
           PY
 
       - name: Expose sccache to manylinux
@@ -511,7 +513,7 @@ jobs:
             --exclude libtorch_python.so
             --exclude libtorch_global_deps.so
             -w {dest_dir} {wheel} &&
-            python /host${{ github.workspace }}/rayd/backends/drjit/scripts/verify_cuda_binary_arches.py
+            python /host${{ github.workspace }}/rayd/drjit/scripts/verify_cuda_binary_arches.py
             --stem _channel
             --expected-sass 70,75,80,86,87,89,90,100,101,120
             --expected-ptx 120

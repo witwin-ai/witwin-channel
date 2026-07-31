@@ -255,6 +255,8 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert full_arches in workflow
     assert "--expected-sass 70,75,80,86,87,89,90,100,101,120" in workflow
     assert "--expected-ptx 120" in workflow
+    assert workflow.count("rayd/drjit/scripts/verify_cuda_binary_arches.py") == 4
+    assert "rayd/backends/drjit/scripts" not in workflow
     assert "CHANNEL_CUDA_GENCODE_FLAGS=" in workflow
     assert "RAYD_TORCH_CUDA_GENCODE_FLAGS=" in workflow
     assert 'CMAKE_CUDA_COMPILER_LAUNCHER: ""' in workflow
