@@ -43,8 +43,8 @@ def _valid_build_info() -> dict[str, object]:
         "rayd_dirty": False,
         "rayd_commit": "2" * 40,
         "rayd_integration_abi_sha256": "3" * 64,
-        "rayd_integration_abi_kind": "source-header-sha256",
-        "rayd_integration_abi_path": "backends/torch/include/rayd/torch/integration.h",
+        "rayd_integration_abi_kind": "source-header-set-sha256",
+        "rayd_integration_abi_path": "include/rayd/integration.h",
         "rayd_repository_url": "https://example.invalid/RayD.git",
         "rayd_source_kind": "git-checkout",
         "rayd_source_manifest_sha256": "4" * 64,
@@ -63,16 +63,14 @@ def _configure_identity_checks(monkeypatch: pytest.MonkeyPatch) -> None:
             "repository_url": "https://example.invalid/RayD.git",
             "commit": "2" * 40,
             "integration_abi": {
-                "kind": "source-header-sha256",
-                "path": "backends/torch/include/rayd/torch/integration.h",
+                "kind": "source-header-set-sha256",
+                "entrypoint": "include/rayd/integration.h",
                 "sha256": "3" * 64,
             },
             "source_bundle": {"manifest_sha256": "4" * 64},
         },
     )
-    monkeypatch.setattr(
-        runtime, "_runtime_identity", lambda: ("2.10.0", "12.8", "msvc")
-    )
+    monkeypatch.setattr(runtime, "_runtime_identity", lambda: ("2.10.0", "12.8", "msvc"))
 
 
 def test_no_compatibility_extension_facade_exists():
@@ -176,9 +174,7 @@ def test_developer_override_loads_only_the_exact_absolute_path(
         return loaded
 
     monkeypatch.setattr(runtime.util, "find_spec", lambda _name: None)
-    monkeypatch.setattr(
-        runtime, "_load_developer_extension", load_developer_extension
-    )
+    monkeypatch.setattr(runtime, "_load_developer_extension", load_developer_extension)
     monkeypatch.setenv("WITWIN_CHANNEL_DEVELOPER_OVERRIDE", "1")
     monkeypatch.setenv("WITWIN_CHANNEL_EXTENSION_PATH", str(path))
     monkeypatch.setenv("WITWIN_CHANNEL_EXPECTED_FINGERPRINT", "a" * 64)
@@ -192,9 +188,7 @@ def test_packaged_module_origin_cannot_resolve_to_global_extension(
 ):
     global_extension = tmp_path / "_channel.pyd"
     global_extension.touch()
-    module = SimpleNamespace(
-        __file__=str(global_extension), build_info=lambda: _valid_build_info()
-    )
+    module = SimpleNamespace(__file__=str(global_extension), build_info=lambda: _valid_build_info())
     monkeypatch.setattr(runtime.util, "find_spec", lambda _name: object())
     monkeypatch.setattr(runtime.importlib, "import_module", lambda *_a, **_k: module)
     monkeypatch.setattr(runtime, "_packaged_expected_fingerprint", lambda: "0" * 64)
@@ -261,9 +255,7 @@ def test_developer_expected_fingerprint_mismatch_is_rejected(monkeypatch: pytest
     module = SimpleNamespace(build_info=lambda: _valid_build_info())
 
     with pytest.raises(runtime.ExtensionABIError, match="expected build fingerprint"):
-        runtime._validate_extension(
-            module, packaged=False, expected_fingerprint="f" * 64
-        )
+        runtime._validate_extension(module, packaged=False, expected_fingerprint="f" * 64)
 
 
 def test_valid_complete_identity_is_accepted(monkeypatch: pytest.MonkeyPatch):
@@ -303,7 +295,8 @@ def test_real_rayd_lock_uses_the_canonical_schema():
         "api_version",
         "identity",
         "kind",
-        "path",
+        "entrypoint",
+        "headers",
         "sha256",
     }
     assert set(lock["source_bundle"]) == {

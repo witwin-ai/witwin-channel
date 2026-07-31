@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <rayd/torch/integration.h>
+#include <rayd/integration.h>
 #include <torch/extension.h>
 
 #include <memory>
@@ -12,7 +12,7 @@
 #include <utility>
 
 static_assert(
-    rayd::torch::kIntegrationApiVersion == 6u,
+    rayd::torch::kIntegrationApiVersion == 8u,
     "Channel requires RayD Torch integration API 6.");
 static_assert(
     rayd::torch::kIntegrationHeaderIdentity ==

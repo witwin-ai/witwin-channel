@@ -124,16 +124,9 @@ def _resolve_wheel(path: Path) -> Path:
 
 
 def _canonical_member(name: str) -> str:
-    if (
-        not name
-        or "\\" in name
-        or name.startswith("/")
-        or re.match(r"^[A-Za-z]:", name)
-    ):
+    if not name or "\\" in name or name.startswith("/") or re.match(r"^[A-Za-z]:", name):
         raise ValueError(f"wheel member is not a canonical relative path: {name!r}")
-    if unicodedata.normalize("NFC", name) != name or any(
-        ord(char) < 32 for char in name
-    ):
+    if unicodedata.normalize("NFC", name) != name or any(ord(char) < 32 for char in name):
         raise ValueError(f"wheel member is not canonical Unicode/text: {name!r}")
     parts = name.split("/")
     if any(part in {"", ".", ".."} for part in parts):
@@ -146,15 +139,11 @@ def _canonical_members(archive: zipfile.ZipFile) -> list[str]:
     identities: set[str] = set()
     for info in archive.infolist():
         if info.is_dir():
-            raise ValueError(
-                f"wheel must not contain directory entries: {info.filename!r}"
-            )
+            raise ValueError(f"wheel must not contain directory entries: {info.filename!r}")
         member = _canonical_member(info.filename)
         identity = unicodedata.normalize("NFC", member).casefold()
         if identity in identities:
-            raise ValueError(
-                f"wheel contains duplicate normalized/casefold member: {member!r}"
-            )
+            raise ValueError(f"wheel contains duplicate normalized/casefold member: {member!r}")
         identities.add(identity)
         members.append(member)
     if not members:
@@ -175,9 +164,7 @@ def _metadata_identity(archive: zipfile.ZipFile, members: list[str]) -> tuple[st
             "wheel must contain exactly one canonical .dist-info/METADATA file; "
             f"found {metadata_files}"
         )
-    metadata = BytesParser(policy=policy.default).parsebytes(
-        archive.read(metadata_files[0])
-    )
+    metadata = BytesParser(policy=policy.default).parsebytes(archive.read(metadata_files[0]))
     names = metadata.get_all("Name", [])
     versions = metadata.get_all("Version", [])
     if len(names) != 1 or len(versions) != 1:
@@ -241,18 +228,18 @@ def _source_member_payload(member: str) -> bytes:
 def repository_consumer_contract_version() -> int:
     """Read ``CONTRACT_VERSION`` from the checked-in consumer contract module.
 
- Parsed rather than imported: the smoke must not need an importable, natively
- loadable ``witwin.channel`` in the parent process, and parsing keeps the
- expected value tied to the source revision the wheel is built from.
+    Parsed rather than imported: the smoke must not need an importable, natively
+    loadable ``witwin.channel`` in the parent process, and parsing keeps the
+    expected value tied to the source revision the wheel is built from.
 
- Public because it has a second caller by design. Any other gate that needs
- the expected contract version CALLS THIS rather than restating the integer -
- the Linux wheel-metadata smoke in ``publish-witwin-channel.yml`` now does.
- That is the whole point: the literal 5 this replaced went stale silently and
- failed every release wheel smoke, while the workflow carried an
- independently stale 2 for the same constant. Two copies of one integer is
- how both of them went wrong without anyone noticing.
- """
+    Public because it has a second caller by design. Any other gate that needs
+    the expected contract version CALLS THIS rather than restating the integer -
+    the Linux wheel-metadata smoke in ``publish-witwin-channel.yml`` now does.
+    That is the whole point: the literal 5 this replaced went stale silently and
+    failed every release wheel smoke, while the workflow carried an
+    independently stale 2 for the same constant. Two copies of one integer is
+    how both of them went wrong without anyone noticing.
+    """
     payload = _source_member_payload(_CONSUMER_CONTRACT_MEMBER)
     try:
         module = ast.parse(payload.decode("utf-8"), filename=_CONSUMER_CONTRACT_MEMBER)
@@ -315,7 +302,7 @@ def _rayd_lock_identity(payload: bytes, *, label: str) -> dict[str, str]:
     )
     integration = _exact_keys(
         lock["integration_abi"],
-        frozenset({"api_version", "identity", "kind", "path", "sha256"}),
+        frozenset({"api_version", "entrypoint", "headers", "identity", "kind", "sha256"}),
         label=f"{label} integration ABI",
     )
     source_bundle = _exact_keys(
@@ -336,7 +323,7 @@ def _rayd_lock_identity(payload: bytes, *, label: str) -> dict[str, str]:
         "rayd_commit": lock["commit"],
         "rayd_repository_url": lock["repository_url"],
         "rayd_integration_abi_kind": integration["kind"],
-        "rayd_integration_abi_path": integration["path"],
+        "rayd_integration_abi_path": integration["entrypoint"],
         "rayd_integration_abi_sha256": integration["sha256"],
         "rayd_source_manifest_sha256": source_bundle["manifest_sha256"],
     }
@@ -352,9 +339,7 @@ def _rayd_lock_identity(payload: bytes, *, label: str) -> dict[str, str]:
 
 
 def _runtime_identity_from_archive(archive: zipfile.ZipFile) -> dict[str, object]:
-    fingerprint_member = (
-        "witwin/channel/_channel.build-fingerprint"
-    )
+    fingerprint_member = "witwin/channel/_channel.build-fingerprint"
     fingerprint = archive.read(fingerprint_member)
     match = re.fullmatch(rb"([0-9a-f]{64})(?:\r?\n)?", fingerprint)
     if match is None:
@@ -364,24 +349,16 @@ def _runtime_identity_from_archive(archive: zipfile.ZipFile) -> dict[str, object
     wheel_lock_payload = archive.read(lock_member)
     repository_root = Path(__file__).resolve().parents[1]
     try:
-        authoritative_payload = (
-            repository_root / "dependencies" / "rayd.lock.json"
-        ).read_bytes()
+        authoritative_payload = (repository_root / "dependencies" / "rayd.lock.json").read_bytes()
     except OSError as exc:
-        raise ValueError(
-            "authoritative dependencies/rayd.lock.json is unreadable"
-        ) from exc
+        raise ValueError("authoritative dependencies/rayd.lock.json is unreadable") from exc
     wheel_identity = _rayd_lock_identity(wheel_lock_payload, label="wheel RayD lock")
     authoritative_identity = _rayd_lock_identity(
         authoritative_payload, label="authoritative RayD lock"
     )
-    if (
-        wheel_identity != authoritative_identity
-        or wheel_lock_payload != authoritative_payload
-    ):
+    if wheel_identity != authoritative_identity or wheel_lock_payload != authoritative_payload:
         raise ValueError(
-            "wheel RayD lock does not exactly match authoritative "
-            "dependencies/rayd.lock.json"
+            "wheel RayD lock does not exactly match authoritative dependencies/rayd.lock.json"
         )
     return {
         "build_fingerprint": match.group(1).decode("ascii"),
@@ -428,18 +405,12 @@ def _audit_record(archive: zipfile.ZipFile, members: list[str], *, dist_info: st
     if set(recorded) != set(expected_identities):
         missing = sorted(set(expected_identities) - set(recorded))
         extra = sorted(set(recorded) - set(expected_identities))
-        raise ValueError(
-            f"wheel RECORD member coverage mismatch: missing={missing}, extra={extra}"
-        )
+        raise ValueError(f"wheel RECORD member coverage mismatch: missing={missing}, extra={extra}")
     mismatched_case = sorted(
-        member
-        for member in expected_identities.values()
-        if member not in {row[0] for row in rows}
+        member for member in expected_identities.values() if member not in {row[0] for row in rows}
     )
     if mismatched_case:
-        raise ValueError(
-            f"wheel RECORD member spelling/case mismatch: {mismatched_case}"
-        )
+        raise ValueError(f"wheel RECORD member spelling/case mismatch: {mismatched_case}")
 
     for identity, member in expected_identities.items():
         digest, size = recorded[identity]
@@ -470,9 +441,7 @@ def _audit_wheel_contents(path: Path) -> str:
             )
         native_extension = _NATIVE_MEMBER
         shared_libraries = [
-            name
-            for name in names
-            if Path(name).suffix.lower() in {".dll", ".dylib", ".pyd", ".so"}
+            name for name in names if Path(name).suffix.lower() in {".dll", ".dylib", ".pyd", ".so"}
         ]
         if shared_libraries != [native_extension]:
             raise ValueError(
@@ -499,9 +468,7 @@ def _audit_wheel_contents(path: Path) -> str:
             if archive.read(member) != _source_member_payload(member)
         )
         if mismatched_sources:
-            raise ValueError(
-                f"wheel checked-in source bytes differ: {mismatched_sources}"
-            )
+            raise ValueError(f"wheel checked-in source bytes differ: {mismatched_sources}")
 
         allowed_dist_info = {f"{dist_info}/{name}" for name in _DIST_INFO_FILES}
         unexpected_members = sorted(
@@ -522,15 +489,12 @@ def _audit_wheel_contents(path: Path) -> str:
         dist_info_members = {name for name in names if name.startswith(f"{dist_info}/")}
         if dist_info_members != allowed_dist_info:
             raise ValueError(
-                "wheel dist-info must contain exactly METADATA, WHEEL, RECORD, "
-                "and licenses/LICENSE"
+                "wheel dist-info must contain exactly METADATA, WHEEL, RECORD, and licenses/LICENSE"
             )
         license_member = f"{dist_info}/{_DIST_INFO_LICENSE}"
         repository_license = Path(__file__).resolve().parents[1] / "LICENSE"
         if archive.read(license_member) != repository_license.read_bytes():
-            raise ValueError(
-                "wheel dist-info license bytes differ from the repository LICENSE"
-            )
+            raise ValueError("wheel dist-info license bytes differ from the repository LICENSE")
         _audit_record(archive, names, dist_info=dist_info)
         _runtime_identity_from_archive(archive)
 
@@ -594,9 +558,7 @@ def _isolated_path(value: object, *, label: str, target: Path) -> Path:
     try:
         resolved = Path(value).resolve(strict=True)
     except OSError as exc:
-        raise ValueError(
-            f"isolated wheel smoke {label} is not an existing path"
-        ) from exc
+        raise ValueError(f"isolated wheel smoke {label} is not an existing path") from exc
     if not resolved.is_relative_to(target):
         raise ValueError(f"isolated wheel smoke {label} resolved outside target")
     return resolved
@@ -620,9 +582,7 @@ def _validate_build_info(value: object) -> dict[str, object]:
     if any(type(info[name]) is not int for name in integers):
         raise ValueError("isolated wheel smoke build_info integer field has wrong type")
     if any(type(info[name]) is not str or not info[name] for name in strings):
-        raise ValueError(
-            "isolated wheel smoke build_info string field is empty or invalid"
-        )
+        raise ValueError("isolated wheel smoke build_info string field is empty or invalid")
     architectures = info["cuda_architectures"]
     if (
         not isinstance(architectures, list)
@@ -632,34 +592,28 @@ def _validate_build_info(value: object) -> dict[str, object]:
             for item in architectures
         )
     ):
-        raise ValueError(
-            "isolated wheel smoke build_info CUDA architectures are invalid"
-        )
+        raise ValueError("isolated wheel smoke build_info CUDA architectures are invalid")
     expected_values = {
         "backend": "channel",
         "build_type": "Release",
         "channel_abi_version": 1,
         "material_abi_version": 3,
         "rayd_integration": "source-linked",
-        "rayd_integration_abi_kind": "source-header-sha256",
-        "rayd_integration_abi_path": "backends/torch/include/rayd/torch/integration.h",
-        "rayd_repository_url": "https://github.com/Asixa/RayD.git",
+        "rayd_integration_abi_kind": "source-header-set-sha256",
+        "rayd_integration_abi_path": "include/rayd/integration.h",
+        "rayd_repository_url": "https://github.com/Asixa/RayD",
         "uses_dr_jit": False,
         "uses_path_native": True,
         "uses_rayd_native": True,
     }
-    mismatched = [
-        name for name, expected in expected_values.items() if info[name] != expected
-    ]
+    mismatched = [name for name, expected in expected_values.items() if info[name] != expected]
     if mismatched:
         raise ValueError(
             "isolated wheel smoke build_info has unexpected release identity: "
             + ", ".join(mismatched)
         )
     if info["channel_git_dirty"] is not False or info["rayd_dirty"] is not False:
-        raise ValueError(
-            "isolated wheel smoke build_info must report clean repositories"
-        )
+        raise ValueError("isolated wheel smoke build_info must report clean repositories")
     if _SHA_PATTERN.fullmatch(str(info["channel_git_sha"])) is None:
         raise ValueError("isolated wheel smoke Channel Git identity is invalid")
     if _SHA_PATTERN.fullmatch(str(info["rayd_commit"])) is None:
@@ -700,13 +654,8 @@ def _parse_smoke_evidence(
         frozenset({"name", "root", "version"}),
         label="distribution",
     )
-    if (
-        distribution["name"] != expected_name
-        or distribution["version"] != expected_version
-    ):
-        raise ValueError(
-            "isolated wheel smoke distribution identity disagrees with parent"
-        )
+    if distribution["name"] != expected_name or distribution["version"] != expected_version:
+        raise ValueError("isolated wheel smoke distribution identity disagrees with parent")
 
     target = target.resolve(strict=True)
     distribution_root = _isolated_path(
@@ -717,9 +666,7 @@ def _parse_smoke_evidence(
     package_origin = _isolated_path(
         evidence["package_origin"], label="package origin", target=target
     )
-    native_origin = _isolated_path(
-        evidence["native_origin"], label="native origin", target=target
-    )
+    native_origin = _isolated_path(evidence["native_origin"], label="native origin", target=target)
     expected_package_origin = (target / "witwin/channel/__init__.py").resolve()
     if package_origin != expected_package_origin or not package_origin.is_file():
         raise ValueError("isolated wheel smoke package origin is invalid")

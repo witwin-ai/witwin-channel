@@ -86,9 +86,7 @@ def test_tiers_cover_the_required_gate_families() -> None:
         "release.fresh-checkout-wheel-smoke",
         "release.rayd-lock-build-identity",
     } <= set(_ids("release"))
-    performance = next(
-        gate for gate in tiers.RELEASE_GATES if gate.id == "release.performance"
-    )
+    performance = next(gate for gate in tiers.RELEASE_GATES if gate.id == "release.performance")
     assert performance.args[performance.args.index("--profile") + 1] == "full"
     scaling = next(gate for gate in tiers.RELEASE_GATES if gate.id == "release.scaling")
     assert scaling.args[scaling.args.index("--gpu-budget-gib") + 1] == "16"
@@ -103,8 +101,7 @@ def test_tiers_cover_the_required_gate_families() -> None:
     wheel_builds = [
         gate
         for gate in tiers.TIER_GATES["release"]
-        if gate.id.endswith("wheel-build")
-        or "wheel-build-py311-cu128-win-x64" in gate.id
+        if gate.id.endswith("wheel-build") or "wheel-build-py311-cu128-win-x64" in gate.id
     ]
     # Four, not two: each tier that smokes a Channel wheel also has to produce
     # the Core wheel that goes into the same isolated target. `wheel_smoke.py`
@@ -113,9 +110,7 @@ def test_tiers_cover_the_required_gate_families() -> None:
     assert len(wheel_builds) == 4
     assert all("--no-isolation" in gate.args for gate in wheel_builds)
     wheel_smokes = {
-        gate.id: gate.args
-        for gate in tiers.TIER_GATES["release"]
-        if "wheel-smoke" in gate.id
+        gate.id: gate.args for gate in tiers.TIER_GATES["release"] if "wheel-smoke" in gate.id
     }
     assert wheel_smokes == {
         "nightly.wheel-smoke-py311-cu128-win-x64": (
@@ -218,12 +213,8 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
         101,
     ]
 
-    assert {path.name for path in WORKFLOWS.glob("*.yml")} == {
-        "publish-witwin-channel.yml"
-    }
-    workflow = (WORKFLOWS / "publish-witwin-channel.yml").read_text(
-        encoding="utf-8"
-    )
+    assert {path.name for path in WORKFLOWS.glob("*.yml")} == {"publish-witwin-channel.yml"}
+    workflow = (WORKFLOWS / "publish-witwin-channel.yml").read_text(encoding="utf-8")
     assert "\n  push:" not in workflow
     assert "\n  pull_request:" not in workflow
     assert "\n  schedule:" not in workflow
@@ -244,13 +235,11 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "channel-linux-8core" not in workflow
     assert "manylinux_2_28" in workflow
 
-    locked_rayd = "9ab3bf6326efe6ff22f079638d65be76f4b08fc8"
-    locked_core = "7791ce21a23d471bf4306b21d6919000ef97bccc"
-    lock = json.loads(
-        (ROOT / "dependencies" / "rayd.lock.json").read_text(encoding="utf-8")
-    )
+    locked_rayd = "c7a99979d0fdcc67b2ec8a12246a7df597603409"
+    locked_core = "46c826d969654912461d2e18b6cb87df9cc3df8f"
+    lock = json.loads((ROOT / "dependencies" / "rayd.lock.json").read_text(encoding="utf-8"))
     assert lock["commit"] == locked_rayd
-    assert lock["source_bundle"]["distribution_version"] == "0.7.0"
+    assert lock["source_bundle"]["distribution_version"] == "0.8.0"
     assert f"RAYD_COMMIT: {locked_rayd}" in workflow
     assert f"CORE_COMMIT: {locked_core}" in workflow
     assert "repository: witwin-ai/witwin-core" in workflow
@@ -268,12 +257,12 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "--expected-ptx 120" in workflow
     assert "CHANNEL_CUDA_GENCODE_FLAGS=" in workflow
     assert "RAYD_TORCH_CUDA_GENCODE_FLAGS=" in workflow
-    assert "CMAKE_CUDA_COMPILER_LAUNCHER: \"\"" in workflow
-    assert "CMAKE_BUILD_PARALLEL_LEVEL: \"3\"" in workflow
+    assert 'CMAKE_CUDA_COMPILER_LAUNCHER: ""' in workflow
+    assert 'CMAKE_BUILD_PARALLEL_LEVEL: "3"' in workflow
     assert "CMAKE_BUILD_PARALLEL_LEVEL=2" in workflow
     assert "Windows Channel wheel build: {0:N2} minutes" in workflow
     assert "exceeded the previous 100-minute target; continuing" in workflow
-    assert "throw \"Windows Channel wheel build exceeded" not in workflow
+    assert 'throw "Windows Channel wheel build exceeded' not in workflow
     assert ".Path.Replace('\\', '/')" in workflow
     assert "actions/cache@v5" in workflow
     assert "sub-packages:" in workflow
@@ -287,16 +276,13 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert '"consumer_los_jones"' in workflow
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
     assert "CHANNEL_CUDA_GENCODE_FLAGS" in cmake
-    second_torch_find = cmake.index("find_package(Torch REQUIRED)", cmake.index("add_subdirectory("))
-    channel_gencode_cleanup = cmake.index(
-        "Channel CUDA flags after removing Torch gencode flags"
+    second_torch_find = cmake.index(
+        "find_package(Torch REQUIRED)", cmake.index("add_subdirectory(")
     )
+    channel_gencode_cleanup = cmake.index("Channel CUDA flags after removing Torch gencode flags")
     channel_target = cmake.index("Python_add_library(")
     assert second_torch_find < channel_gencode_cleanup < channel_target
-    assert (
-        '"(^|[ \\t])-gencode[ \\t]+arch=[^ \\t]+,code=[^ \\t]+"'
-        in cmake
-    )
+    assert '"(^|[ \\t])-gencode[ \\t]+arch=[^ \\t]+,code=[^ \\t]+"' in cmake
     assert "set_target_properties(_channel PROPERTIES CUDA_ARCHITECTURES OFF)" in cmake
     assert "target_compile_options(" in cmake
 
@@ -329,10 +315,7 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
         not re.search(r"(?<!rayd::)torch::", path.read_text(encoding="utf-8"))
         for path in cuda_sources
     )
-    assert all(
-        "at::kFloat32" not in path.read_text(encoding="utf-8")
-        for path in cuda_sources
-    )
+    assert all("at::kFloat32" not in path.read_text(encoding="utf-8") for path in cuda_sources)
     raw_typed_range = re.compile(
         r"for\s*\([^)]*:\s*\{(?P<items>.*?)\}\)\s*\{",
         re.DOTALL,
@@ -342,20 +325,16 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
         text = path.read_text(encoding="utf-8")
         for match in raw_typed_range.finditer(text):
             items = match.group("items")
-            if (
-                ("std::pair" in items or "std::tuple" in items)
-                and re.search(r'^\s*\{"', items, re.MULTILINE)
+            if ("std::pair" in items or "std::tuple" in items) and re.search(
+                r'^\s*\{"', items, re.MULTILINE
             ):
                 ambiguous_ranges.append(path)
     assert ambiguous_ranges == []
 
-    publish_guard = (
-        "github.event_name == 'release' && github.event.action == 'published'"
-    )
+    publish_guard = "github.event_name == 'release' && github.event.action == 'published'"
     assert publish_guard in workflow
     recovery_guard = (
-        "github.event_name == 'workflow_dispatch' && "
-        "inputs.scope == 'windows-release-recovery'"
+        "github.event_name == 'workflow_dispatch' && inputs.scope == 'windows-release-recovery'"
     )
     assert recovery_guard in workflow
     assert "actions/runs/${LINUX_ARTIFACT_RUN_ID}/artifacts" in workflow

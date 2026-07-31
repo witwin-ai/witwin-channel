@@ -45,16 +45,16 @@
 #include <cusolverDn.h>
 #include "torch_cuda.h"
 
-#include <rayd/shared/rf/layer_stack.cuh>
-#include <rayd/torch/rf/field_transport_ad.cuh>
+#include <src/transmission_device.cuh>
+#include <src/field_transport_ad.cuh>
 #include "../tensor_checks.h"
 
 namespace {
 
 constexpr int kBlockSize = 256;
-namespace em = rayd::shared::rf::em;
-namespace ad = rayd::torch::rf::field_transport_ad;
-namespace utd = rayd::shared::utd;
+namespace em = rayd::shared::transmission;
+namespace ad = rayd::torch::field_transport_ad;
+namespace utd = rayd::shared::diffraction;
 
 constexpr float kTwoPi = 6.283185307179586f;
 constexpr float kDkDf = kTwoPi / em::kSpeedOfLight;  // dk0/df

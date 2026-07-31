@@ -1946,7 +1946,7 @@ pybind11::dict channel_consumer_fixed_los_gather_jvp(
 #include "torch_cuda.h"
 
 #include "math.cuh"
-#include <rayd/shared/rf/field_transport.cuh>
+#include <rayd/field_transport.cuh>
 
 #include "../tensor_checks.h"
 
@@ -1956,8 +1956,8 @@ pybind11::dict channel_consumer_fixed_los_gather_jvp(
 namespace {
 
 constexpr int kJonesBlockSize = 256;
-namespace field = rayd::shared::utd;
-namespace transport = rayd::shared::rf::field_transport;
+namespace field = rayd::shared::diffraction;
+namespace transport = rayd::shared::field_transport;
 
 
 

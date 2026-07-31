@@ -7,22 +7,17 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 AUDIT = ROOT / "docs/dev/audit"
-RAYD_ROOT = Path(os.environ.get("RAYD_SOURCE_DIR", ROOT.parent.parent / "RayD"))
+RAYD_ROOT = Path(os.environ.get("RAYD_SOURCE_DIR", ROOT.parent / "RayD"))
 PHASE10B_RAYD_COMMIT = "768b96e42a95f70c32d55f98a72000085317e288"
-INTEGRATION_SHA256 = (
-    "0608bfbaf022379bc03442f9baa777ec05cfe3f6ab9b964e2385ec12a7b6c654"
-)
-TYPED_SHA256 = (
-    "ac95c418860d109aeaa96623131592e4df8887992e5fc25ecab71b4ddbf1f55b"
-)
-SHARED_SHA256 = (
-    "38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38"
-)
+INTEGRATION_SHA256 = "0608bfbaf022379bc03442f9baa777ec05cfe3f6ab9b964e2385ec12a7b6c654"
+TYPED_SHA256 = "ac95c418860d109aeaa96623131592e4df8887992e5fc25ecab71b4ddbf1f55b"
+SHARED_SHA256 = "38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38"
 PHASE10B_BINDING_MANIFEST_SHA256 = (
     "264bddd77eed701b951bab1bb03185ba8ef53c0e6953c1f1ed3a0a1c12405b71"
 )
@@ -49,9 +44,7 @@ PHASE10B_RAYD_SOURCE_SHA256 = {
         "970c579cc9d0c384d28e7aaa8f32200800a1de159de9a0338b2f0bad75f7fa93"
     ),
 }
-PHASE10B_DIRECT_TEST_SHA256 = (
-    "5661129d9662d4f2879aaba284b245dd7f32a61b95c13a77e270d624ff315423"
-)
+PHASE10B_DIRECT_TEST_SHA256 = "5661129d9662d4f2879aaba284b245dd7f32a61b95c13a77e270d624ff315423"
 IDENTITY = (
     "rayd.torch.integration.v2.20260719.rf-transmission-sequence."
     "pure-wedge-diffraction.scattering-table-single-bounce.scattering-chains"
@@ -81,6 +74,17 @@ def _lf_text_sha256(path: Path) -> str:
     text = path.read_bytes().decode("utf-8")
     normalized = text.replace("\r\n", "\n")
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def _rayd_snapshot_text(path: str) -> str:
+    return subprocess.run(
+        ["git", "show", f"{PHASE10B_RAYD_COMMIT}:{path}"],
+        cwd=RAYD_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    ).stdout
 
 
 def test_lf_text_sha256_normalizes_eol_without_hiding_content_changes(tmp_path: Path) -> None:
@@ -133,10 +137,7 @@ def test_phase10b_pin_owner_counts_and_manifests_are_atomic() -> None:
     owners = {row["symbol"]: row["numerical_owner"] for row in inventory["symbols"]}
     assert all(owners[symbol] == "RayD" for symbol in CHAIN_SYMBOLS)
 
-    assert (
-        evidence["activation"]["binding_manifest_sha256"]
-        == PHASE10B_BINDING_MANIFEST_SHA256
-    )
+    assert evidence["activation"]["binding_manifest_sha256"] == PHASE10B_BINDING_MANIFEST_SHA256
     assert (
         evidence["activation"]["contract_coverage_manifest_sha256"]
         == PHASE10B_COVERAGE_MANIFEST_SHA256
@@ -160,12 +161,8 @@ def test_phase10b_rayd_identity_sources_and_direct_contract_are_recorded() -> No
 
 
 def test_phase10b_channel_is_typed_facade_without_duplicate_or_fallback() -> None:
-    materials = (ROOT / "native/channel/binding/materials.cpp").read_text(
-        encoding="utf-8-sig"
-    )
-    event_source = (ROOT / "native/channel/kernels/montecarlo.cu").read_text(
-        encoding="utf-8-sig"
-    )
+    materials = (ROOT / "native/channel/binding/materials.cpp").read_text(encoding="utf-8-sig")
+    event_source = (ROOT / "native/channel/kernels/montecarlo.cu").read_text(encoding="utf-8-sig")
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8-sig")
 
     assert all(not (ROOT / path).exists() for path in DELETED)
@@ -185,14 +182,10 @@ def test_phase10b_channel_is_typed_facade_without_duplicate_or_fallback() -> Non
 def test_phase10b_compile_launch_codegen_and_dependency_contracts_are_frozen() -> None:
     evidence = _json(AUDIT / "phase13-scattering-phase10b-evidence.json")
     graph = _json(AUDIT / "phase13-shared-rf-dependency-graph.json")
-    rayd_cmake = (RAYD_ROOT / "backends/torch/CMakeLists.txt").read_text(
-        encoding="utf-8-sig"
-    )
+    rayd_cmake = _rayd_snapshot_text("backends/torch/CMakeLists.txt")
     fmad_blocks = [
         block
-        for block in re.findall(
-            r"set_source_files_properties\((.*?)\)", rayd_cmake, re.DOTALL
-        )
+        for block in re.findall(r"set_source_files_properties\((.*?)\)", rayd_cmake, re.DOTALL)
         if "--fmad=false" in block
     ]
 
@@ -217,10 +210,7 @@ def test_phase10b_compile_launch_codegen_and_dependency_contracts_are_frozen() -
     assert evidence["sm120_codegen"]["exact_match_to_channel_baseline"] is True
     assert all(len(item["sha256"]) == 64 for item in evidence["sm120_codegen"]["families"].values())
     assert all(
-        not (
-            edge["from"].startswith("RayD:")
-            and edge["to"].startswith("native/channel_native/")
-        )
+        not (edge["from"].startswith("RayD:") and edge["to"].startswith("native/channel_native/"))
         for edge in graph["edges"]
     )
 

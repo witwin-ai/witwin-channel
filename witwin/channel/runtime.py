@@ -379,7 +379,7 @@ def _validate_build_info(raw_info: object) -> dict[str, object]:
         "rayd_repository_url": lock.get("repository_url"),
         "rayd_commit": lock.get("commit"),
         "rayd_integration_abi_kind": integration_abi.get("kind"),
-        "rayd_integration_abi_path": integration_abi.get("path"),
+        "rayd_integration_abi_path": integration_abi.get("entrypoint"),
         "rayd_integration_abi_sha256": integration_abi.get("sha256"),
         "rayd_source_manifest_sha256": _locked_rayd_source_manifest(info, lock),
     }

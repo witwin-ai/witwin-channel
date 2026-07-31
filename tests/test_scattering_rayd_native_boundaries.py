@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 KERNELS = ROOT / "native/channel/kernels"
 BINDING = ROOT / "native/channel/binding/materials.cpp"
-RAYD_ROOT = Path(os.environ.get("RAYD_SOURCE_DIR", ROOT.parent.parent / "RayD"))
+RAYD_ROOT = Path(os.environ.get("RAYD_SOURCE_DIR", ROOT.parent / "RayD"))
 
 MOVED_TUS = {
     "scattering_chain_ensemble.cu",
@@ -59,26 +59,28 @@ def _native_section(path: Path, section_name: str) -> str:
 
 
 def test_current_build_uses_the_locked_rayd_scattering_surface() -> None:
-    integration = RAYD_ROOT / "backends/torch/include/rayd/torch/integration.h"
+    integration = RAYD_ROOT / "include/rayd/integration.h"
     assert _sha256(integration) == (
-        "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14"
+        "57a48596403ecb81a6064f908bd945637a00d353f292acb904c851af389e3a67"
     )
     integration_text = integration.read_text(encoding="utf-8-sig")
-    assert 'kIntegrationApiVersion = 6;' in integration_text
+    assert "kIntegrationApiVersion = 8;" in integration_text
     assert '"rayd.torch.integration";' in integration_text
     assert "integration_v2" not in integration_text
     assert "rayd.torch.integration.v2" not in integration_text
-    assert _sha256(
-        RAYD_ROOT / "backends/torch/include/rayd/torch/rf/scattering.h"
-    ) == "7a29ff216f11a08256ee271ef5dcad817e4b8379d88bc07772685fa3da439aa9"
-    assert _sha256(
-        RAYD_ROOT / "shared/include/rayd/shared/rf/scattering_table.cuh"
-    ) == "38ea9be424640301a88a97bccca9ab4bc599191ecfb0b259881ef6a300c96e38"
+    assert (
+        _sha256(RAYD_ROOT / "include/rayd/scattering.h")
+        == "67bfa850df5f4ef95f24f4456124c9b5d4bdc9d97b4292f419b078ee8e63e20b"
+    )
+    assert (
+        _sha256(RAYD_ROOT / "include/rayd/scattering_table.cuh")
+        == "c430b7d96ff964d4b71a384526fc6b0173e191e21fc21a503bd6ad77aa438fce"
+    )
 
 
 def test_phase10b_binding_has_one_typed_adapter_per_entry() -> None:
     source = BINDING.read_text(encoding="utf-8-sig")
-    assert source.count("#include <rayd/torch/integration.h>") == 1
+    assert source.count("#include <rayd/integration.h>") == 1
     assert "<<<" not in source
     for entry in TYPED_ENTRIES:
         assert source.count(f"rayd::torch::{entry}(") == 1

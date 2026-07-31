@@ -1,7 +1,7 @@
 // Copyright Xingyu Chen.
 // Exercises legacy slab lockstep native behavior.
 
-#include <rayd/torch/rf/field_transport_ad.cuh>
+#include <src/field_transport_ad.cuh>
 
 #include <cuda_runtime.h>
 
@@ -11,9 +11,9 @@
 
 namespace {
 
-namespace ad = rayd::torch::rf::field_transport_ad;
-namespace transport = rayd::shared::rf::field_transport;
-namespace utd = rayd::shared::utd;
+namespace ad = rayd::torch::field_transport_ad;
+namespace transport = rayd::shared::field_transport;
+namespace utd = rayd::shared::diffraction;
 
 struct SlabCase {
     const char* name;

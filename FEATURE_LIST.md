@@ -110,26 +110,24 @@ priority `scattering > diffraction > transmission > reflection > los`.
 ## Native runtime boundary
 
 - `_channel` is the single production extension. It source-links RayD
-  `d0e44b41da529eb75da50c9a2b80546ec6514c13` (`rayd-torch 0.7.0`) and calls the typed
+  `c7a99979d0fdcc67b2ec8a12246a7df597603409` (`rayd-torch 0.8.0`) and calls the typed
   `rayd::torch` C++ API directly; no RayD Python module, second dispatcher,
-  copied C ABI, getter table, or dynamic symbol lookup participates. RayD's
-  legacy `extern "C"` Torch integration entry points are retired.
+  copied C ABI, getter table, or dynamic symbol lookup participates.
 - Builds use an explicit validated `RAYD_SOURCE_DIR` first. Without one, they
-  may use a unique passive `rayd-torch` source bundle only after clean-state,
-  lock, RECORD, and full-manifest verification. The published 0.7.0 bundle
-  reports a dirty source and is therefore rejected; Channel 0.4.0 release
-  builds use the locked clean Git checkout. No conda-prefix, site-packages, or
-  global CMake scan is performed. `build_info` reports only the source kind
-  and manifest SHA, never a machine-specific source path.
+  may use the unique passive `rayd-torch` 0.8.0 source bundle only after lock,
+  RECORD, full-manifest, complete header-set, and clean-state verification. No
+  conda-prefix, site-packages, or global CMake scan is performed. `build_info`
+  reports only the source kind and manifest SHA, never a machine-specific
+  source path.
 - Scene ownership crosses Python/C++ as `RayDSceneResource`; integer scene
   handles and the former bridge/common indirection are removed. RayD-owned ABI
   names use `rayd_*`; Channel-composed R-D/D-D geometry uses `coupled_*`.
-- The locked integration header is
-  `backends/torch/include/rayd/torch/integration.h` with SHA-256
-  `57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14`
-  and identity
-  `rayd.torch.integration`. The numeric API version is 6 and is validated
-  independently from this stable, capability-neutral source name.
+- The locked integration boundary is the eight-header set rooted at
+  `include/rayd/integration.h`, with normalized aggregate SHA-256
+  `db48cdb91b31c00a14259f912f8b504eb2485a031b036c6f79688cb5452670c4`
+  and identity `rayd.torch.integration`. The numeric API version is 8. Each
+  header SHA, the aggregate digest, and the API version are validated
+  independently from the stable, capability-neutral identity.
 - Under ADR-035, RayD owns native trace selection behind that typed boundary.
   `TraceBackend::Auto` prefers OptiX and may select RayD's full-result
   pure-CUDA path when OptiX is unavailable. This is not a Torch, CPU, Dr.Jit,
@@ -516,6 +514,6 @@ priority `scattering > diffraction > transmission > reflection > los`.
 ## Distribution
 
 - GitHub Actions prebuilds Windows and manylinux_2_28 wheels from the locked,
-  clean RayD 0.7.0 source checkout. Release fatbins include native SM87 SASS
+  clean RayD 0.8.0 source checkout. Release fatbins include native SM87 SASS
   alongside the maintained CUDA 12.8 architecture set. Ordinary commits,
   pull requests, and schedules do not start paid native builds.

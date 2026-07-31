@@ -2,7 +2,7 @@
 // Implements materials native integration.
 
 #include <torch/extension.h>
-#include <rayd/torch/integration.h>
+#include <rayd/integration.h>
 
 #include "registry.h"
 

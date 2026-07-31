@@ -6,12 +6,12 @@
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
-#include <rayd/shared/utd/utd_math.h>
+#include <rayd/utd.h>
 
 #include "../tensor_checks.h"
 #include "math.cuh"
-#include <rayd/shared/rf/field_transport.cuh>
-#include <rayd/torch/rf/field_transport_ad.cuh>
+#include <rayd/field_transport.cuh>
+#include <src/field_transport_ad.cuh>
 #include <algorithm>
 #include <cstdint>
 #include <vector>
@@ -108,9 +108,9 @@
 namespace {
 
 constexpr int kDiffractionBlockSize = 256;
-namespace utd = rayd::shared::utd;
-namespace transport = rayd::shared::rf::field_transport;
-namespace fad = rayd::torch::rf::field_transport_ad;
+namespace utd = rayd::shared::diffraction;
+namespace transport = rayd::shared::field_transport;
+namespace fad = rayd::torch::field_transport_ad;
 
 __device__ __forceinline__ unsigned int dfr_hash(unsigned int x) {
     x^=x>>16; x*=0x7feb352du; x^=x>>15; x*=0x846ca68bu; x^=x>>16; return x;

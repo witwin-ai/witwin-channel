@@ -4,7 +4,7 @@
 #pragma once
 
 #include <cuda_runtime.h>
-#include <rayd/shared/utd/utd_types.h>
+#include <rayd/utd.h>
 
 #include <cmath>
 #include <cstdint>
@@ -33,11 +33,11 @@ __device__ __forceinline__ Vec3 load_vec3(const float* values, int64_t index) {
     return vec3(values[base], values[base + 1], values[base + 2]);
 }
 
-__device__ __forceinline__ rayd::shared::utd::float3a load_field_vec3(
+__device__ __forceinline__ rayd::shared::diffraction::float3a load_field_vec3(
     const float* values,
     int64_t index) {
     const int64_t base = index * 3;
-    return rayd::shared::utd::make_f3(
+    return rayd::shared::diffraction::make_f3(
         values[base], values[base + 1], values[base + 2]);
 }
 

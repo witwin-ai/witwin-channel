@@ -41,9 +41,9 @@ permissions:
   contents: read
 
 env:
-  CORE_COMMIT: 7791ce21a23d471bf4306b21d6919000ef97bccc
-  RAYD_COMMIT: 9ab3bf6326efe6ff22f079638d65be76f4b08fc8
-  RAYD_REPOSITORY_URL: https://github.com/Asixa/RayD.git
+  CORE_COMMIT: 46c826d969654912461d2e18b6cb87df9cc3df8f
+  RAYD_COMMIT: c7a99979d0fdcc67b2ec8a12246a7df597603409
+  RAYD_REPOSITORY_URL: https://github.com/Asixa/RayD
   FULL_CUDA_ARCHITECTURES: 70-real;75-real;80-real;86-real;87-real;89-real;90-real;100-real;101-real;120-real;120-virtual
   FULL_EXPECTED_SASS: 70,75,80,86,87,89,90,100,101,120
   FULL_EXPECTED_PTX: "120"
@@ -119,7 +119,7 @@ jobs:
           RECOVERY_SCOPE: ${{ inputs.scope }}
         run: |
           [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$RELEASE_TAG" == "witwin-channel-v0.4.0" ]]
+          [[ "$RELEASE_TAG" == "witwin-channel-v0.5.0" ]]
           [[ "$LINUX_ARTIFACT_RUN_ID" =~ ^[0-9]+$ ]]
           tag_sha="$(
             gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" \
@@ -182,7 +182,7 @@ jobs:
           path: core
           persist-credentials: false
 
-      - name: Check out locked RayD 0.7.0 source
+      - name: Check out locked RayD 0.8.0 source
         uses: actions/checkout@v5
         with:
           repository: Asixa/RayD
@@ -356,7 +356,7 @@ jobs:
           path: core
           persist-credentials: false
 
-      - name: Check out locked RayD 0.7.0 source
+      - name: Check out locked RayD 0.8.0 source
         uses: actions/checkout@v5
         with:
           repository: Asixa/RayD

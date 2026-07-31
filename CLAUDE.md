@@ -355,10 +355,16 @@ requires them.
   import `rayd.torch`, scan `CONDA_PREFIX`/site-packages/CMake registries, trust
   self-reported package identity without the full manifest, or record an
   absolute source path in the build fingerprint.
-- The stable public typed boundary is `rayd/torch/integration.h` with identity
-  `rayd.torch.integration`. Validate its numeric API version independently; do
-  not encode version or capability growth in a WIP filename, target, identity,
-  forwarding header, or compatibility alias.
+- The stable public typed boundary is the eight-header RayD 0.8 integration set
+  rooted at `rayd/integration.h`, with identity `rayd.torch.integration`.
+  Validate its normalized per-header SHA-256 values, aggregate header-set
+  digest, and numeric API version independently; do not encode version or
+  capability growth in a WIP filename, target, identity, forwarding header, or
+  compatibility alias. Channel-owned fused CUDA kernels may directly include
+  the lock-validated bundled `src/field_transport_ad.cuh` and
+  `src/transmission_device.cuh` numerical sources declared private by RayD
+  ADR-0041; those exact source-bundle dependencies are not a second typed
+  boundary or permission to reach other RayD private headers.
 - RayD scene ownership crosses the boundary as an RAII `SceneResource` held by
   a typed `RayDSceneResource` holder. Never encode a native pointer as an
   integer handle or add dummy/stale-handle plumbing. Typed operations use

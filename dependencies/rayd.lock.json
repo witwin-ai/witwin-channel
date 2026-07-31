@@ -1,18 +1,28 @@
 {
   "schema_version": 2,
-  "repository_url": "https://github.com/Asixa/RayD.git",
-  "commit": "9ab3bf6326efe6ff22f079638d65be76f4b08fc8",
+  "repository_url": "https://github.com/Asixa/RayD",
+  "commit": "c7a99979d0fdcc67b2ec8a12246a7df597603409",
   "integration_abi": {
-    "kind": "source-header-sha256",
-    "path": "backends/torch/include/rayd/torch/integration.h",
-    "sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
-    "api_version": 6,
+    "kind": "source-header-set-sha256",
+    "entrypoint": "include/rayd/integration.h",
+    "headers": [
+      {"path": "include/rayd/diffraction.h", "sha256": "40a3800a1f8019108c0f5182d11c90698419da1df18d5b948dba83f2fc2867a9"},
+      {"path": "include/rayd/integration.h", "sha256": "57a48596403ecb81a6064f908bd945637a00d353f292acb904c851af389e3a67"},
+      {"path": "include/rayd/penetration.h", "sha256": "363554e2c9d33b7a039ea252b5bfdbfcc5a70eceb4a1e5e9d0a23ef0aba13a57"},
+      {"path": "include/rayd/reflection.h", "sha256": "e7decb547d45cbf03fe810785aabc059f6ed43eda1a48165aa18297bf0746d73"},
+      {"path": "include/rayd/scattering.h", "sha256": "67bfa850df5f4ef95f24f4456124c9b5d4bdc9d97b4292f419b078ee8e63e20b"},
+      {"path": "include/rayd/scene.h", "sha256": "0ad8a15be68f98a9ae9646d85cd8e77b4b255b158ddfc10820503dd900d36480"},
+      {"path": "include/rayd/transmission.h", "sha256": "2ee0a6b5170f371a74e2ed69cde429b43ec8cee5f31f5f0366fa8337168372e1"},
+      {"path": "include/rayd/visibility.h", "sha256": "95796526b7a94c580b28cca652d1859b63f9792c9eaf0115bd1d44ca75e85125"}
+    ],
+    "sha256": "db48cdb91b31c00a14259f912f8b504eb2485a031b036c6f79688cb5452670c4",
+    "api_version": 8,
     "identity": "rayd.torch.integration"
   },
   "source_bundle": {
     "distribution": "rayd-torch",
-    "distribution_version": "0.7.0",
+    "distribution_version": "0.8.0",
     "metadata_path": "rayd/torch/_source/rayd-source.json",
-    "manifest_sha256": "61af830bfa98d7806aaf2eaa171890623f86ad99c36ca7927d26c359d718acfb"
+    "manifest_sha256": "c4fb39b27eeea2588615d1493c6fe3f4fc0202017341fa320dafdcacb595b1c1"
   }
 }

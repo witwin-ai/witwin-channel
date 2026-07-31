@@ -3,7 +3,7 @@
 
 #include "field_ad.cuh"
 
-#include <rayd/shared/rf/layer_stack.cuh>
+#include <src/transmission_device.cuh>
 
 #include <algorithm>
 #include <cmath>

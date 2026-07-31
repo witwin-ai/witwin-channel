@@ -7,7 +7,7 @@
 #include <cuda_runtime_api.h>
 #include "torch_cuda.h"
 
-#include <rayd/shared/rf/field_transport.cuh>
+#include <rayd/field_transport.cuh>
 
 #include <algorithm>
 #include <cmath>
@@ -17,8 +17,8 @@
 
 namespace {
 
-namespace utd = rayd::shared::utd;
-namespace transport = rayd::shared::rf::field_transport;
+namespace utd = rayd::shared::diffraction;
+namespace transport = rayd::shared::field_transport;
 
 constexpr float kLightSpeedMPerS = 299792458.0f;
 constexpr float kPi = 3.14159265358979323846f;
@@ -2478,7 +2478,7 @@ pybind11::dict channel_bdpt_accumulate_connection_samples_jvp_cuda(
 // ==== Section: BDPT connection AD ====
 
 
-#include <rayd/torch/rf/field_transport_ad.cuh>
+#include <src/field_transport_ad.cuh>
 
 #include <algorithm>
 
@@ -2499,7 +2499,7 @@ pybind11::dict channel_bdpt_accumulate_connection_samples_jvp_cuda(
 
 namespace {
 
-namespace ad = rayd::torch::rf::field_transport_ad;
+namespace ad = rayd::torch::field_transport_ad;
 
 // Recompute the frozen carrier for one connection row exactly as
 // bdpt_endpoint_connection_samples_kernel; returns whether the row contributes.

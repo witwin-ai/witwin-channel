@@ -14,18 +14,10 @@ from tools.refactor_baseline import cpp_body_hashes
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 KERNEL_ROOT = REPOSITORY_ROOT / "native/channel/kernels"
-INVENTORY_PATH = (
-    REPOSITORY_ROOT / "docs/dev/audit/phase9-native-owner-inventory.json"
-)
-MIGRATION_DELTA_PATH = (
-    REPOSITORY_ROOT / "docs/dev/audit/phase13-migration-delta.json"
-)
-RAYD_ROOT = Path(
-    os.environ.get("RAYD_SOURCE_DIR", REPOSITORY_ROOT.parent.parent / "RayD")
-)
-RAYD_WEDGE_SOURCE = (
-    RAYD_ROOT / "backends/torch/src/torch_ext/rf/diffraction_wedge.cu"
-)
+INVENTORY_PATH = REPOSITORY_ROOT / "docs/dev/audit/phase9-native-owner-inventory.json"
+MIGRATION_DELTA_PATH = REPOSITORY_ROOT / "docs/dev/audit/phase13-migration-delta.json"
+RAYD_ROOT = Path(os.environ.get("RAYD_SOURCE_DIR", REPOSITORY_ROOT.parent / "RayD"))
+RAYD_WEDGE_SOURCE = RAYD_ROOT / "src/diffraction/wedge.cu"
 FIELDS_BINDING = REPOSITORY_ROOT / "native/channel/binding/fields.cpp"
 
 TRANSLATION_UNITS = {
@@ -120,15 +112,12 @@ def test_rayd_pure_wedge_preserves_launch_and_fast_math_boundary() -> None:
     assert sum(actual.values()) == 3
     assert source.count("cudaStreamSynchronize(") == 0
 
-    cmake = (RAYD_ROOT / "backends/torch/CMakeLists.txt").read_text(
-        encoding="utf-8-sig"
-    )
-    relative = RAYD_WEDGE_SOURCE.relative_to(
-        RAYD_ROOT / "backends/torch"
-    ).as_posix()
-    assert cmake.count(relative) == 2
+    cmake = (RAYD_ROOT / "torch/CMakeLists.txt").read_text(encoding="utf-8-sig")
+    relative = RAYD_WEDGE_SOURCE.relative_to(RAYD_ROOT).as_posix()
+    registered = f"${{RAYD_ROOT_DIR}}/{relative}"
+    assert cmake.count(registered) == 2
     source_property = re.compile(
-        rf"set_source_files_properties\(\s*{re.escape(relative)}\s+"
+        rf"set_source_files_properties\(\s*{re.escape(registered)}\s+"
         r"PROPERTIES\s+COMPILE_OPTIONS\s+"
         r'"\$<\$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>"\)',
         re.DOTALL,
@@ -138,7 +127,7 @@ def test_rayd_pure_wedge_preserves_launch_and_fast_math_boundary() -> None:
 
 def test_pure_wedge_typed_adapter_preserves_channel_schemas() -> None:
     source = FIELDS_BINDING.read_text(encoding="utf-8-sig")
-    assert source.count("#include <rayd/torch/integration.h>") == 1
+    assert source.count("#include <rayd/integration.h>") == 1
     for entry in (
         "field_diffraction_wedge",
         "field_diffraction_wedge_backward",
@@ -151,9 +140,7 @@ def test_pure_wedge_typed_adapter_preserves_channel_schemas() -> None:
         "field_vector",
         "direction",
     }
-    assert _dict_keys(
-        _function_body(source, "channel_field_diffraction_wedge_backward")
-    ) == {
+    assert _dict_keys(_function_body(source, "channel_field_diffraction_wedge_backward")) == {
         "grad_source",
         "grad_target",
         "grad_face0_eps_r",
@@ -168,9 +155,10 @@ def test_pure_wedge_typed_adapter_preserves_channel_schemas() -> None:
         "grad_vertex_opp0",
         "grad_vertex_opp1",
     }
-    assert _dict_keys(
-        _function_body(source, "diffraction_wedge_jvp_result_dict")
-    ) == {"tangent_field_vector", "tangent_direction"}
+    assert _dict_keys(_function_body(source, "diffraction_wedge_jvp_result_dict")) == {
+        "tangent_field_vector",
+        "tangent_direction",
+    }
 
     backward = _function_body(source, "channel_field_diffraction_wedge_backward")
     for flag in (
@@ -214,14 +202,10 @@ def test_pure_wedge_typed_adapter_preserves_channel_schemas() -> None:
     ):
         assert f"request.{optional} = optional_tensor({optional});" in request
     assert "request.frequency_hz = frequency_hz;" in request
-    assert (
-        "request.isb_boundary_taper_width = isb_boundary_taper_width;" in request
-    )
+    assert "request.isb_boundary_taper_width = isb_boundary_taper_width;" in request
 
     for cotangent in ("grad_field_vector", "grad_direction"):
-        assert (
-            f"request.{cotangent} = optional_tensor({cotangent});" in backward
-        )
+        assert f"request.{cotangent} = optional_tensor({cotangent});" in backward
 
     jvp = _function_body(source, "channel_field_diffraction_wedge_jvp")
     for tangent in (

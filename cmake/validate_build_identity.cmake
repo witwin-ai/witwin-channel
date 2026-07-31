@@ -71,6 +71,10 @@ validate_git_checkout(
     "${CHANNEL_SOURCE_DIR}"
     "${CHANNEL_EXPECTED_GIT_SHA}"
     "${CHANNEL_EXPECTED_GIT_DIRTY}")
+file(SHA256 "${CHANNEL_RAYD_LOCK_FILE}" actual_rayd_lock_sha256)
+if(NOT actual_rayd_lock_sha256 STREQUAL CHANNEL_EXPECTED_RAYD_LOCK_SHA256)
+    message(FATAL_ERROR "RayD lock changed after configure; rerun CMake configure.")
+endif()
 if(CHANNEL_RAYD_SOURCE_KIND STREQUAL "git-checkout")
     validate_git_checkout(
         "RayD"
@@ -86,6 +90,18 @@ if(CHANNEL_RAYD_SOURCE_KIND STREQUAL "git-checkout")
             "RayD origin changed after configure: expected "
             "'${CHANNEL_EXPECTED_RAYD_REMOTE}', found '${actual_rayd_remote}'; "
             "rerun CMake configure.")
+    endif()
+    execute_process(
+        COMMAND
+            "${CHANNEL_PYTHON_EXECUTABLE}"
+            "${CHANNEL_RAYD_RESOLVER}"
+            --lock "${CHANNEL_RAYD_LOCK_FILE}"
+            --validate-source "${CHANNEL_RAYD_SOURCE_DIR}"
+        RESULT_VARIABLE source_validation_result
+        ERROR_VARIABLE source_validation_error)
+    if(NOT source_validation_result EQUAL 0)
+        message(FATAL_ERROR
+            "RayD integration ABI changed after configure: ${source_validation_error}")
     endif()
 elseif(CHANNEL_RAYD_SOURCE_KIND STREQUAL "python-package")
     execute_process(
@@ -103,15 +119,4 @@ elseif(CHANNEL_RAYD_SOURCE_KIND STREQUAL "python-package")
 else()
     message(FATAL_ERROR
         "Unknown RayD source kind '${CHANNEL_RAYD_SOURCE_KIND}'.")
-endif()
-
-file(SHA256 "${CHANNEL_RAYD_ABI_FILE}" actual_rayd_abi_sha256)
-if(NOT actual_rayd_abi_sha256 STREQUAL CHANNEL_EXPECTED_RAYD_ABI_SHA256)
-    message(FATAL_ERROR
-        "RayD integration ABI changed after configure; rerun CMake configure.")
-endif()
-
-file(SHA256 "${CHANNEL_RAYD_LOCK_FILE}" actual_rayd_lock_sha256)
-if(NOT actual_rayd_lock_sha256 STREQUAL CHANNEL_EXPECTED_RAYD_LOCK_SHA256)
-    message(FATAL_ERROR "RayD lock changed after configure; rerun CMake configure.")
 endif()

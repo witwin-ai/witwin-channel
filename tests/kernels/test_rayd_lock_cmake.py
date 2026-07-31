@@ -43,9 +43,7 @@ def _clone_locked_rayd(destination: Path) -> dict[str, object]:
     lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
     git = shutil.which("git")
     assert git is not None
-    clone = _run(
-        git, "clone", "--shared", "--no-checkout", str(_rayd_source()), str(destination)
-    )
+    clone = _run(git, "clone", "--shared", "--no-checkout", str(_rayd_source()), str(destination))
     assert clone.returncode == 0, clone.stderr
     assert (
         _run(
@@ -58,17 +56,16 @@ def _clone_locked_rayd(destination: Path) -> dict[str, object]:
         ).returncode
         == 0
     )
-    assert (
-        _run(git, "sparse-checkout", "init", "--no-cone", cwd=destination).returncode
-        == 0
-    )
-    abi_path = str(lock["integration_abi"]["path"])
+    assert _run(git, "sparse-checkout", "init", "--no-cone", cwd=destination).returncode == 0
+    abi_paths = [header["path"] for header in lock["integration_abi"]["headers"]]
     sparse = _run(
         git,
         "sparse-checkout",
         "set",
-        "backends/torch/CMakeLists.txt",
-        abi_path,
+        "torch/CMakeLists.txt",
+        "src/field_transport_ad.cuh",
+        "src/transmission_device.cuh",
+        *abi_paths,
         cwd=destination,
     )
     assert sparse.returncode == 0, sparse.stderr
@@ -107,23 +104,55 @@ def _configure(
 def test_rayd_lock_is_machine_readable_and_complete():
     lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
 
-    assert lock == {
-        "schema_version": 2,
-        "repository_url": "https://github.com/Asixa/RayD.git",
-        "commit": "9ab3bf6326efe6ff22f079638d65be76f4b08fc8",
-        "integration_abi": {
-            "kind": "source-header-sha256",
-            "path": "backends/torch/include/rayd/torch/integration.h",
-            "sha256": "57f83ea460e376166fd5ee22a8243a7c1576a290e1de99c0cbe8e86e93392e14",
-            "api_version": 6,
-            "identity": "rayd.torch.integration",
-        },
-        "source_bundle": {
-            "distribution": "rayd-torch",
-            "distribution_version": "0.7.0",
-            "metadata_path": "rayd/torch/_source/rayd-source.json",
-            "manifest_sha256": "61af830bfa98d7806aaf2eaa171890623f86ad99c36ca7927d26c359d718acfb",
-        },
+    assert lock["schema_version"] == 2
+    assert lock["repository_url"] == "https://github.com/Asixa/RayD"
+    assert lock["commit"] == "c7a99979d0fdcc67b2ec8a12246a7df597603409"
+    assert lock["integration_abi"] == {
+        "kind": "source-header-set-sha256",
+        "entrypoint": "include/rayd/integration.h",
+        "headers": [
+            {
+                "path": "include/rayd/diffraction.h",
+                "sha256": "40a3800a1f8019108c0f5182d11c90698419da1df18d5b948dba83f2fc2867a9",
+            },
+            {
+                "path": "include/rayd/integration.h",
+                "sha256": "57a48596403ecb81a6064f908bd945637a00d353f292acb904c851af389e3a67",
+            },
+            {
+                "path": "include/rayd/penetration.h",
+                "sha256": "363554e2c9d33b7a039ea252b5bfdbfcc5a70eceb4a1e5e9d0a23ef0aba13a57",
+            },
+            {
+                "path": "include/rayd/reflection.h",
+                "sha256": "e7decb547d45cbf03fe810785aabc059f6ed43eda1a48165aa18297bf0746d73",
+            },
+            {
+                "path": "include/rayd/scattering.h",
+                "sha256": "67bfa850df5f4ef95f24f4456124c9b5d4bdc9d97b4292f419b078ee8e63e20b",
+            },
+            {
+                "path": "include/rayd/scene.h",
+                "sha256": "0ad8a15be68f98a9ae9646d85cd8e77b4b255b158ddfc10820503dd900d36480",
+            },
+            {
+                "path": "include/rayd/transmission.h",
+                "sha256": "2ee0a6b5170f371a74e2ed69cde429b43ec8cee5f31f5f0366fa8337168372e1",
+            },
+            {
+                "path": "include/rayd/visibility.h",
+                "sha256": "95796526b7a94c580b28cca652d1859b63f9792c9eaf0115bd1d44ca75e85125",
+            },
+        ],
+        "sha256": "db48cdb91b31c00a14259f912f8b504eb2485a031b036c6f79688cb5452670c4",
+        "api_version": 8,
+        "identity": "rayd.torch.integration",
+    }
+    assert lock["source_bundle"] == {
+        "distribution": "rayd-torch",
+        "distribution_version": "0.8.0",
+        "metadata_path": "rayd/torch/_source/rayd-source.json",
+        "manifest_sha256": "c4fb39b27eeea2588615d1493c6fe3f4fc0202017341fa320dafdcacb595b1c1",
     }
 
 
@@ -142,13 +171,9 @@ def test_cmake_accepts_the_locked_rayd_checkout(tmp_path: Path):
     configured = _configure(rayd, tmp_path / "build")
 
     assert configured.returncode == 0, configured.stdout + configured.stderr
+    assert f"Validated locked RayD git-checkout source {lock['commit']}" in configured.stdout
     assert (
-        f"Validated locked RayD git-checkout source {lock['commit']}"
-        in configured.stdout
-    )
-    assert (
-        "Channel CUDA architectures: "
-        "75-real;80-real;86-real;89-real;120-real;120-virtual"
+        "Channel CUDA architectures: 75-real;80-real;86-real;89-real;120-real;120-virtual"
     ) in configured.stdout
 
 
@@ -156,15 +181,10 @@ def test_cmake_normalizes_explicit_torch_cuda_arch_override(tmp_path: Path):
     rayd = tmp_path / "rayd"
     _clone_locked_rayd(rayd)
 
-    configured = _configure(
-        rayd, tmp_path / "build", torch_cuda_arch_list="8.6 12.0+PTX"
-    )
+    configured = _configure(rayd, tmp_path / "build", torch_cuda_arch_list="8.6 12.0+PTX")
 
     assert configured.returncode == 0, configured.stdout + configured.stderr
-    assert (
-        "Channel CUDA architectures: 86-real;120-real;120-virtual"
-        in configured.stdout
-    )
+    assert "Channel CUDA architectures: 86-real;120-real;120-virtual" in configured.stdout
     cache = (tmp_path / "build" / "CMakeCache.txt").read_text(encoding="utf-8")
     assert "CMAKE_CUDA_ARCHITECTURES:STRING=86-real;120-real;120-virtual" in cache
 
@@ -216,7 +236,7 @@ def test_cmake_rejects_disabled_torch_cuda_architectures(tmp_path: Path):
     [
         ("commit", "RayD revision mismatch"),
         ("remote", "RayD repository mismatch"),
-        ("abi", "RayD integration ABI mismatch"),
+        ("abi", "RayD integration header changed"),
         ("dirty-release", "forbids a dirty RayD checkout"),
     ],
 )
@@ -227,21 +247,10 @@ def test_cmake_rejects_unlocked_rayd(tmp_path: Path, mutation: str, expected_err
     assert git is not None
     release = mutation == "dirty-release"
     if mutation == "commit":
+        assert _run(git, "config", "user.name", "Channel Test", cwd=rayd).returncode == 0
+        assert _run(git, "config", "user.email", "test@example.invalid", cwd=rayd).returncode == 0
         assert (
-            _run(git, "config", "user.name", "Channel Test", cwd=rayd).returncode
-            == 0
-        )
-        assert (
-            _run(
-                git, "config", "user.email", "test@example.invalid", cwd=rayd
-            ).returncode
-            == 0
-        )
-        assert (
-            _run(
-                git, "commit", "--allow-empty", "-m", "wrong revision", cwd=rayd
-            ).returncode
-            == 0
+            _run(git, "commit", "--allow-empty", "-m", "wrong revision", cwd=rayd).returncode == 0
         )
     elif mutation == "remote":
         assert (
@@ -256,15 +265,11 @@ def test_cmake_rejects_unlocked_rayd(tmp_path: Path, mutation: str, expected_err
             == 0
         )
     elif mutation == "abi":
-        abi_path = rayd / str(lock["integration_abi"]["path"])
-        abi_path.write_text(
-            abi_path.read_text(encoding="utf-8") + "\n", encoding="utf-8"
-        )
+        abi_path = rayd / str(lock["integration_abi"]["entrypoint"])
+        abi_path.write_text(abi_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
     else:
-        cmake_file = rayd / "backends" / "torch" / "CMakeLists.txt"
-        cmake_file.write_text(
-            cmake_file.read_text(encoding="utf-8") + "\n", encoding="utf-8"
-        )
+        cmake_file = rayd / "torch" / "CMakeLists.txt"
+        cmake_file.write_text(cmake_file.read_text(encoding="utf-8") + "\n", encoding="utf-8")
 
     configured = _configure(rayd, tmp_path / "build", release=release)
 
@@ -276,10 +281,8 @@ def test_cmake_rejects_unlocked_rayd(tmp_path: Path, mutation: str, expected_err
 def test_wheel_configuration_enables_clean_release_guard_by_default(tmp_path: Path):
     rayd = tmp_path / "rayd"
     _clone_locked_rayd(rayd)
-    cmake_file = rayd / "backends" / "torch" / "CMakeLists.txt"
-    cmake_file.write_text(
-        cmake_file.read_text(encoding="utf-8") + "\n", encoding="utf-8"
-    )
+    cmake_file = rayd / "torch" / "CMakeLists.txt"
+    cmake_file.write_text(cmake_file.read_text(encoding="utf-8") + "\n", encoding="utf-8")
 
     configured = _configure(
         rayd,

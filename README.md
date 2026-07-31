@@ -81,6 +81,10 @@ Each solver owns its own `Config`, `Result`, and `solve(scene, config)` public
 contract. The exact stable exports are recorded in
 [`ci/public-api-snapshot.json`](ci/public-api-snapshot.json).
 
+Complete signatures, parameter tables, tensor layouts, methods, exceptions,
+and usage patterns are collected in the
+[`docs/api-reference`](docs/api-reference/index.md) API Reference.
+
 ## Requirements
 
 - CPython 3.11.
@@ -89,6 +93,7 @@ contract. The exact stable exports are recorded in
   runtime-verified row. Release wheels must contain the repository-wide native
   SASS set, including SM87, and compute_120 PTX; SM87 runtime validation remains
   separate evidence.
+- witwin==0.4.0 for the logical world contracts.
 - An ABI-compatible `witwin-channel` wheel, or a source build against the
   repository-locked RayD integration.
 
@@ -107,7 +112,7 @@ Install an approved wheel into an environment that already contains the
 matching CUDA-enabled PyTorch build:
 
 ```powershell
-python -m pip install .\witwin_channel-0.4.0-cp311-cp311-win_amd64.whl --no-deps
+python -m pip install .\witwin_channel-0.5.0-cp311-cp311-win_amd64.whl --no-deps
 ```
 
 For a source build, select the intended RayD checkout explicitly and keep the
@@ -115,17 +120,14 @@ build in the same Python environment as PyTorch:
 
 ```powershell
 conda activate witwin2
-$env:CMAKE_ARGS = "-DRAYD_SOURCE_DIR=E:/Code/RayD"
+$env:CMAKE_ARGS = "-DRAYD_SOURCE_DIR=E:/Code/witwin-platform/RayD"
 python -m pip install . --no-build-isolation --no-deps
 ```
 
-When `RAYD_SOURCE_DIR` is omitted, the build may use a unique locked
-`rayd-torch` source bundle only when its package metadata reports a clean,
-matching source tree. The published `rayd-torch` 0.7.0 bundle does not satisfy
-that release guard, so Channel 0.4.0 source builds must set `RAYD_SOURCE_DIR`
-to the locked clean checkout. Discovery never scans a Conda prefix or loads an
-arbitrary global build.
-
+When `RAYD_SOURCE_DIR` is omitted, the build may use the unique locked
+`rayd-torch` 0.8.0 source bundle after validating its clean metadata, complete
+source manifest, RECORD ownership, and eight-header integration identity.
+Discovery never scans a Conda prefix or loads an arbitrary global build.
 Do not mix files from the 0.3 and 0.4 implementations in one environment.
 
 ## Quick start

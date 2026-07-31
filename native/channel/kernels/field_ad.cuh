@@ -9,7 +9,7 @@
 #include <c10/util/complex.h>
 #include "torch_cuda.h"
 
-#include <rayd/torch/rf/field_transport_ad.cuh>
+#include <src/field_transport_ad.cuh>
 #include "../tensor_checks.h"
 
 // Backward / JVP companion kernels for the field transport forwards
@@ -26,10 +26,11 @@ namespace {
 
 constexpr int kBlockSize = 256;
 constexpr int kMaxAdDepth = 8;
-namespace field = rayd::shared::utd;
-namespace em = rayd::shared::rf::em;
-namespace transport = rayd::shared::rf::field_transport;
-namespace ad = rayd::torch::rf::field_transport_ad;
+namespace field = rayd::shared::diffraction;
+namespace em = rayd::shared::transmission;
+namespace transport = rayd::shared::field_transport;
+namespace ad = rayd::torch::field_transport_ad;
+namespace vmath = rayd::shared::math;
 
 using ad::DualC;
 using ad::adj_dot;

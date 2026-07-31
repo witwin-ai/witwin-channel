@@ -9,17 +9,17 @@
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
 
-#include <rayd/shared/rf/field_transport.cuh>
-#include <rayd/shared/rf/layer_stack.cuh>
+#include <rayd/field_transport.cuh>
+#include <src/transmission_device.cuh>
 
 #include <vector>
 
 namespace {
 
 constexpr double kPi = 3.141592653589793238462643383279502884;
-namespace em = rayd::shared::rf::em;
-namespace utd = rayd::shared::utd;
-namespace transport = rayd::shared::rf::field_transport;
+namespace em = rayd::shared::transmission;
+namespace utd = rayd::shared::diffraction;
+namespace transport = rayd::shared::field_transport;
 
 // Subpath event codes (event_type). Endpoint and specular events are delta
 // events: they never multiply the stored non-delta proposal densities.
@@ -1158,7 +1158,7 @@ std::vector<at::Tensor> channel_bdpt_reflected_light_subpath_state_cuda(
 // ==== Section: BDPT subpath AD ====
 #include "field_ad.cuh"
 
-#include <rayd/shared/rf/layer_stack.cuh>
+#include <src/transmission_device.cuh>
 
 // BDPT AD: backward + jvp companions for the BDPT light-subpath
 // advance ops.
@@ -1181,7 +1181,7 @@ std::vector<at::Tensor> channel_bdpt_reflected_light_subpath_state_cuda(
 
 namespace {
 
-namespace ad = rayd::torch::rf::field_transport_ad;
+namespace ad = rayd::torch::field_transport_ad;
 
 constexpr float kSubpathEps = 1.0e-9f;
 constexpr float kSubpathEpsilon0 = 8.8541878128e-12f;

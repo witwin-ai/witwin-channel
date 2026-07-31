@@ -4,7 +4,19 @@ All notable changes to `witwin-channel` are documented in this file.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-30
+
 ### Changed
+
+- **Breaking (ADR-047).** Channel now source-links the released RayD 0.8.0
+  commit and validates its API-8 eight-header integration set, published source
+  manifest, canonical `torch/` build tree, and bundled
+  `src/field_transport_ad.cuh` and `src/transmission_device.cuh` source
+  seams. The retired RayD 0.7 include and source-tree spellings have no
+  compatibility alias.
+- Require the released `witwin==0.4.0` logical-world package and pin its release
+  commit in the native wheel workflow. The Channel distribution version is
+  0.5.0.
 
 - **Breaking (ADR-039).** The propagation consumer publishes the declared
   source amplitude. `ScalarTransport.coefficient` and `Complex3Transport.field`
@@ -122,4 +134,6 @@ All notable changes to `witwin-channel` are documented in this file.
 - Obsolete self-hosted quick, CUDA, nightly, and evidence-only release
   workflows.
 
+[Unreleased]: https://github.com/witwin-ai/witwin-channel/compare/witwin-channel-v0.5.0...HEAD
+[0.5.0]: https://github.com/witwin-ai/witwin-channel/releases/tag/witwin-channel-v0.5.0
 [0.4.0]: https://github.com/witwin-ai/witwin-channel/releases/tag/witwin-channel-v0.4.0

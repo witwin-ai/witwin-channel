@@ -1554,5 +1554,67 @@
         }
       }
     ]
+  },
+  "rayd_080_current": {
+    "status": "accepted RayD 0.8 source-boundary activation",
+    "adr": "docs/dev/standards/adr-047-rayd-0.8-source-boundary.md",
+    "numerical_owner_changed": false,
+    "launch_or_reduction_order_changed": false,
+    "approved_phase9_body_hash_transformations": [
+      {
+        "owner_id": "field_transport.free_space",
+        "owner_before": "Channel Native",
+        "owner_after": "Channel Native",
+        "transformation_kind": "RayD 0.8 removed private vector helper spellings; Channel now calls the lock-validated public rayd::shared::math owner with identical expression order",
+        "before": {
+          "name": "free_space_fwd_kernel",
+          "token_count": 299,
+          "signature_sha256": "19c5101a2fb073924f8ad242da7dc39a512c528a4cd2d69b80c02f978d54bcbd",
+          "body_sha256": "39a2b22b25d45e7d2dbf2f0a4e2efb912dfe57737a91a7d7f218ab95fff390b8"
+        },
+        "after": {
+          "name": "free_space_fwd_kernel",
+          "token_count": 291,
+          "signature_sha256": "19c5101a2fb073924f8ad242da7dc39a512c528a4cd2d69b80c02f978d54bcbd",
+          "body_sha256": "f918091e0331c41e67878424f01302c5b4236efee11498f7bf5abdb05181651b"
+        }
+      },
+      {
+        "owner_id": "field_transport.free_space",
+        "owner_before": "Channel Native",
+        "owner_after": "Channel Native",
+        "transformation_kind": "RayD 0.8 removed private vector helper spellings; Channel now calls the lock-validated public rayd::shared::math owner with identical expression order",
+        "before": {
+          "name": "free_space_backward_kernel",
+          "token_count": 947,
+          "signature_sha256": "2d45227056e11f269f168620a731a28ab05190fe30a2291971e7c0fd22f0b355",
+          "body_sha256": "f2609607052b877d89e8ae8f1b8f03b5d99b01267bc82d8b40825b8e0272d62c"
+        },
+        "after": {
+          "name": "free_space_backward_kernel",
+          "token_count": 929,
+          "signature_sha256": "2d45227056e11f269f168620a731a28ab05190fe30a2291971e7c0fd22f0b355",
+          "body_sha256": "9dec98992938ccbc4d35f3c1d65d80c3fb958fce135cecd27412fa5cbd5a5e35"
+        }
+      },
+      {
+        "owner_id": "field_transport.free_space",
+        "owner_before": "Channel Native",
+        "owner_after": "Channel Native",
+        "transformation_kind": "RayD 0.8 removed private vector helper spellings; Channel now calls the lock-validated public rayd::shared::math owner with identical expression order",
+        "before": {
+          "name": "free_space_jvp_kernel",
+          "token_count": 633,
+          "signature_sha256": "4b902cf3f2f9c226e4afe3e9d8503ba4db54ad9be23e1c0083a0d918c643f734",
+          "body_sha256": "ef6d0a3cb09df53ce9be86bdd4a9ba2a25e748d47672e287165d8ce0ec2ed367"
+        },
+        "after": {
+          "name": "free_space_jvp_kernel",
+          "token_count": 613,
+          "signature_sha256": "4b902cf3f2f9c226e4afe3e9d8503ba4db54ad9be23e1c0083a0d918c643f734",
+          "body_sha256": "efa88d8c258b1c9db0e4d859fbb85d2f41b193981e75f2f5afcc3a5b21b1c770"
+        }
+      }
+    ]
   }
 }

@@ -32,12 +32,9 @@ def _write_wheel(path: Path, *, name: str, version: str) -> bytes:
         {
             f"{dist_info}/METADATA": metadata.as_bytes(),
             f"{dist_info}/WHEEL": b"Wheel-Version: 1.0\nGenerator: tests\nRoot-Is-Purelib: false\nTag: cp311-cp311-win_amd64\n",
-            f"{dist_info}/licenses/LICENSE": (
-                repository_root / "LICENSE"
-            ).read_bytes(),
+            f"{dist_info}/licenses/LICENSE": (repository_root / "LICENSE").read_bytes(),
             "witwin/channel/_channel.cp311-win_amd64.pyd": b"native",
-            "witwin/channel/_channel.build-fingerprint": b"f" * 64
-            + b"\n",
+            "witwin/channel/_channel.build-fingerprint": b"f" * 64 + b"\n",
             "witwin/channel/rayd.lock.json": (
                 repository_root / "dependencies" / "rayd.lock.json"
             ).read_bytes(),
@@ -97,9 +94,7 @@ def test_wheel_identity_and_sha256_are_read_from_wheel(tmp_path: Path):
         "witwin-channel",
         "0.1.0",
     )
-    assert (
-        wheel_smoke._sha256(wheel) == __import__("hashlib").sha256(payload).hexdigest()
-    )
+    assert wheel_smoke._sha256(wheel) == __import__("hashlib").sha256(payload).hexdigest()
 
 
 def test_wheel_identity_rejects_unexpected_distribution(tmp_path: Path):
@@ -115,9 +110,7 @@ def test_wheel_identity_rejects_dist_info_version_mismatch(tmp_path: Path):
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
     metadata_member = "witwin_channel-0.1.0.dist-info/METADATA"
     with zipfile.ZipFile(wheel) as archive:
-        metadata = archive.read(metadata_member).replace(
-            b"Version: 0.1.0", b"Version: 0.2.0"
-        )
+        metadata = archive.read(metadata_member).replace(b"Version: 0.1.0", b"Version: 0.2.0")
     _replace_member(wheel, metadata_member, metadata)
 
     with pytest.raises(ValueError, match="does not exactly match"):
@@ -214,9 +207,7 @@ def test_wheel_content_audit_rejects_casefold_duplicate(tmp_path: Path):
     wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
     with zipfile.ZipFile(wheel, "a") as archive:
-        archive.writestr(
-            "WITWIN/channel/rayd.lock.json", b"casefold duplicate"
-        )
+        archive.writestr("WITWIN/channel/rayd.lock.json", b"casefold duplicate")
 
     with pytest.raises(ValueError, match="duplicate normalized/casefold"):
         wheel_smoke._audit_wheel_contents(wheel)
@@ -353,9 +344,7 @@ def test_wheel_pe_audit_extracts_only_owned_extension(tmp_path: Path, monkeypatc
 def _build_info() -> dict[str, object]:
     repository_root = Path(wheel_smoke.__file__).resolve().parents[1]
     lock = json.loads(
-        (repository_root / "dependencies" / "rayd.lock.json").read_text(
-            encoding="utf-8"
-        )
+        (repository_root / "dependencies" / "rayd.lock.json").read_text(encoding="utf-8")
     )
     integration = lock["integration_abi"]
     return {
@@ -377,7 +366,7 @@ def _build_info() -> dict[str, object]:
         "rayd_dirty": False,
         "rayd_integration": "source-linked",
         "rayd_integration_abi_kind": integration["kind"],
-        "rayd_integration_abi_path": integration["path"],
+        "rayd_integration_abi_path": integration["entrypoint"],
         "rayd_integration_abi_sha256": integration["sha256"],
         "rayd_repository_url": lock["repository_url"],
         "rayd_source_kind": "git-checkout",
@@ -422,9 +411,7 @@ def _expected_build_identity(build_info: dict[str, object]) -> dict[str, object]
         "rayd_integration_abi_path": build_info["rayd_integration_abi_path"],
         "rayd_integration_abi_sha256": build_info["rayd_integration_abi_sha256"],
         "rayd_repository_url": build_info["rayd_repository_url"],
-        "rayd_source_manifest_sha256": build_info[
-            "rayd_source_manifest_sha256"
-        ],
+        "rayd_source_manifest_sha256": build_info["rayd_source_manifest_sha256"],
     }
 
 
@@ -559,9 +546,7 @@ def test_wheel_rejects_alternate_valid_rayd_identity_with_synced_record_and_buil
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
     repository_root = Path(wheel_smoke.__file__).resolve().parents[1]
     alternate = json.loads(
-        (repository_root / "dependencies" / "rayd.lock.json").read_text(
-            encoding="utf-8"
-        )
+        (repository_root / "dependencies" / "rayd.lock.json").read_text(encoding="utf-8")
     )
     alternate["commit"] = "e" * 40
     alternate["integration_abi"]["sha256"] = "b" * 64
@@ -574,9 +559,7 @@ def test_wheel_rejects_alternate_valid_rayd_identity_with_synced_record_and_buil
 
     synced_build_info = _build_info()
     synced_build_info["rayd_commit"] = alternate["commit"]
-    synced_build_info["rayd_integration_abi_sha256"] = alternate["integration_abi"][
-        "sha256"
-    ]
+    synced_build_info["rayd_integration_abi_sha256"] = alternate["integration_abi"]["sha256"]
     assert synced_build_info["rayd_commit"] == "e" * 40
     assert synced_build_info["rayd_integration_abi_sha256"] == "b" * 64
     target = tmp_path / "target"

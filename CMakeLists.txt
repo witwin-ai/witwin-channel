@@ -11,7 +11,7 @@ string(JSON RAYD_LOCK_SCHEMA_VERSION GET "${CHANNEL_RAYD_LOCK_JSON}" schema_vers
 string(JSON RAYD_LOCK_REPOSITORY_URL GET "${CHANNEL_RAYD_LOCK_JSON}" repository_url)
 string(JSON RAYD_LOCK_COMMIT GET "${CHANNEL_RAYD_LOCK_JSON}" commit)
 string(JSON RAYD_LOCK_ABI_KIND GET "${CHANNEL_RAYD_LOCK_JSON}" integration_abi kind)
-string(JSON RAYD_LOCK_ABI_PATH GET "${CHANNEL_RAYD_LOCK_JSON}" integration_abi path)
+string(JSON RAYD_LOCK_ABI_PATH GET "${CHANNEL_RAYD_LOCK_JSON}" integration_abi entrypoint)
 string(JSON RAYD_LOCK_ABI_SHA256 GET "${CHANNEL_RAYD_LOCK_JSON}" integration_abi sha256)
 string(JSON RAYD_LOCK_ABI_API_VERSION GET "${CHANNEL_RAYD_LOCK_JSON}" integration_abi api_version)
 string(JSON RAYD_LOCK_ABI_IDENTITY GET "${CHANNEL_RAYD_LOCK_JSON}" integration_abi identity)
@@ -22,10 +22,10 @@ string(JSON RAYD_LOCK_SOURCE_MANIFEST_SHA256 GET "${CHANNEL_RAYD_LOCK_JSON}" sou
 if(NOT RAYD_LOCK_SCHEMA_VERSION EQUAL 2)
     message(FATAL_ERROR "Unsupported RayD lock schema_version=${RAYD_LOCK_SCHEMA_VERSION}; expected 2.")
 endif()
-if(NOT RAYD_LOCK_ABI_KIND STREQUAL "source-header-sha256")
+if(NOT RAYD_LOCK_ABI_KIND STREQUAL "source-header-set-sha256")
     message(FATAL_ERROR
         "Unsupported RayD integration ABI kind '${RAYD_LOCK_ABI_KIND}'; "
-        "expected source-header-sha256.")
+        "expected source-header-set-sha256.")
 endif()
 
 set(CHANNEL_DEFAULT_CUDA_ARCHITECTURES "75-real;80-real;86-real;89-real;120-real;120-virtual")
@@ -246,7 +246,7 @@ set(CHANNEL_RAYD_SOURCE_MANIFEST_SHA256 "${RAYD_LOCK_SOURCE_MANIFEST_SHA256}")
 if(NOT RAYD_SOURCE_DIR STREQUAL "")
     set(CHANNEL_RAYD_SOURCE_KIND "git-checkout")
     get_filename_component(RAYD_SOURCE_DIR "${RAYD_SOURCE_DIR}" ABSOLUTE)
-    if(NOT EXISTS "${RAYD_SOURCE_DIR}/backends/torch/CMakeLists.txt")
+    if(NOT EXISTS "${RAYD_SOURCE_DIR}/torch/CMakeLists.txt")
         message(FATAL_ERROR
             "Explicit RAYD_SOURCE_DIR='${RAYD_SOURCE_DIR}' is not a RayD source tree; "
             "package discovery is not a fallback for an invalid explicit path.")
@@ -283,18 +283,20 @@ if(NOT RAYD_GIT_REMOTE_URL STREQUAL RAYD_LOCK_REPOSITORY_URL)
         "RayD repository mismatch: origin is '${RAYD_GIT_REMOTE_URL}', "
         "lock requires '${RAYD_LOCK_REPOSITORY_URL}'.")
 endif()
-set(RAYD_INTEGRATION_ABI_FILE "${RAYD_SOURCE_DIR}/${RAYD_LOCK_ABI_PATH}")
-if(NOT EXISTS "${RAYD_INTEGRATION_ABI_FILE}")
-    message(FATAL_ERROR "RayD integration ABI header is missing: ${RAYD_LOCK_ABI_PATH}")
-endif()
-file(SHA256 "${RAYD_INTEGRATION_ABI_FILE}" RAYD_INTEGRATION_ABI_SHA256)
-string(TOLOWER "${RAYD_LOCK_ABI_SHA256}" RAYD_LOCK_ABI_SHA256)
-if(NOT RAYD_INTEGRATION_ABI_SHA256 STREQUAL RAYD_LOCK_ABI_SHA256)
+execute_process(
+    COMMAND
+        "${Python_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/resolve_rayd_source.py"
+        --lock "${CHANNEL_RAYD_LOCK_FILE}"
+        --validate-source "${RAYD_SOURCE_DIR}"
+    RESULT_VARIABLE CHANNEL_RAYD_HEADER_SET_EXIT
+    ERROR_VARIABLE CHANNEL_RAYD_HEADER_SET_ERROR)
+if(NOT CHANNEL_RAYD_HEADER_SET_EXIT EQUAL 0)
     message(FATAL_ERROR
-        "RayD integration ABI mismatch for ${RAYD_LOCK_ABI_PATH}: "
-        "checkout is ${RAYD_INTEGRATION_ABI_SHA256}, "
-        "lock requires ${RAYD_LOCK_ABI_SHA256}.")
+        "RayD integration header-set validation failed: "
+        "${CHANNEL_RAYD_HEADER_SET_ERROR}")
 endif()
+set(RAYD_INTEGRATION_ABI_FILE "${RAYD_SOURCE_DIR}/${RAYD_LOCK_ABI_PATH}")
 execute_process(
     COMMAND "${GIT_EXECUTABLE}" status --porcelain --untracked-files=normal
     WORKING_DIRECTORY "${RAYD_SOURCE_DIR}"
@@ -384,7 +386,7 @@ set(RAYD_TORCH_BUILD_NATIVE ON CACHE BOOL "Build RayD Torch native core." FORCE)
 set(RAYD_TORCH_BUILD_PYTHON_MODULE OFF CACHE BOOL "Do not build RayD's Python module inside Channel." FORCE)
 set(RAYD_TORCH_INSTALL_SOURCE_BUNDLE OFF CACHE BOOL "Channel consumes an already validated RayD source bundle." FORCE)
 add_subdirectory(
-    "${RAYD_SOURCE_DIR}/backends/torch"
+    "${RAYD_SOURCE_DIR}/torch"
     "${CMAKE_CURRENT_BINARY_DIR}/rayd-torch"
     EXCLUDE_FROM_ALL)
 if(NOT TARGET rayd_torch_native_core)
@@ -609,6 +611,7 @@ if(WIN32)
 endif()
 
 target_compile_features(_channel PRIVATE cxx_std_17)
+target_include_directories(_channel PRIVATE "${RAYD_SOURCE_DIR}")
 # These lockstep kernels preserve Torch per-operation float rounding. Implicit
 # fma contraction would change the rounding of their mul/add chains, so it is
 # disabled for these TUs (explicit fmaf calls, e.g. the shared table
@@ -674,8 +677,8 @@ if(BUILD_TESTING)
         channel_legacy_slab_lockstep
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/native/channel"
-            "${RAYD_SOURCE_DIR}/shared/include"
-            "${RAYD_SOURCE_DIR}/backends/torch/include"
+            "${RAYD_SOURCE_DIR}"
+            "${RAYD_SOURCE_DIR}/include"
             "${TORCH_INSTALL_PREFIX}/include"
             "${TORCH_INSTALL_PREFIX}/include/torch/csrc/api/include")
     target_link_libraries(channel_legacy_slab_lockstep PRIVATE CUDA::cudart)

@@ -49,8 +49,7 @@ def test_phase_p_binding_owner_and_symbol_ledgers_close_exactly() -> None:
     assert len(binding_names) == inventory["counts"]["bindings"] == 234
     assert (
         sum(
-            inventory["counts"][name]
-            for name in ("rayd_numerical", "layered", "channel_numerical")
+            inventory["counts"][name] for name in ("rayd_numerical", "layered", "channel_numerical")
         )
         == 234
     )
@@ -81,24 +80,17 @@ def test_phase_p_freezes_failure_launch_and_memory_contracts() -> None:
         "integration_api_version": 6,
         "pushed": True,
     }
-    assert audit["typed_contract"]["failure_bit"] == (
-        "SEGMENT_PENETRATION_FAILURE = 1 << 7"
-    )
+    assert audit["typed_contract"]["failure_bit"] == ("SEGMENT_PENETRATION_FAILURE = 1 << 7")
     assert audit["typed_contract"]["failure_scope"] == (
-        "overflow, request/device-mask contract contradiction, and non-finite "
-        "penetration state"
+        "overflow, request/device-mask contract contradiction, and non-finite penetration state"
     )
     assert audit["typed_contract"]["host_cardinality_read"] is False
     assert audit["typed_contract"]["partial_result"] is False
     assert audit["launch_budget"]["segment_forward_active"]["optix"] == 1
     assert audit["launch_budget"]["segment_forward_all_inactive"]["optix"] == 0
     assert audit["launch_budget"]["enumerated_transmission_topology_pack_N_gt_0"] == 4
-    assert audit["resident_byte_budget"]["segment_primal_plus_tape"] == (
-        "23*N + 63*N*D"
-    )
-    assert audit["resident_byte_budget"]["enumerated_tape_plus_topology"] == (
-        "N*(96 + 95*D) + 8"
-    )
+    assert audit["resident_byte_budget"]["segment_primal_plus_tape"] == ("23*N + 63*N*D")
+    assert audit["resident_byte_budget"]["enumerated_tape_plus_topology"] == ("N*(96 + 95*D) + 8")
     assert audit["public_api"]["changed"] is False
     assert audit["public_api"]["generation_suffixed_name_added"] is False
 
@@ -126,8 +118,7 @@ def test_phase_p_live_duplication_refresh_is_closed_without_budget_relaxation() 
         "stale_region_count": 0,
         "unclassified_region_count": 0,
         "status": (
-            "all current regions classified; frozen duplication coverage "
-            "acceptance remains met"
+            "all current regions classified; frozen duplication coverage acceptance remains met"
         ),
     }
     current = duplication["native_layout_refresh"]

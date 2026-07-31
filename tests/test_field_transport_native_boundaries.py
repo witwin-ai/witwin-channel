@@ -14,20 +14,10 @@ from tools.refactor_baseline import cpp_body_hashes
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 KERNEL_ROOT = REPOSITORY_ROOT / "native/channel/kernels"
-INVENTORY_PATH = (
-    REPOSITORY_ROOT / "docs/dev/audit/phase9-native-owner-inventory.json"
-)
-RAYD_ROOT = Path(
-    os.environ.get("RAYD_SOURCE_DIR", REPOSITORY_ROOT.parent.parent / "RayD")
-)
-RAYD_FIELD_TRANSPORT_AD = (
-    RAYD_ROOT
-    / "backends/torch/include/rayd/torch/rf/field_transport_ad.cuh"
-)
-RAYD_TRANSMISSION_SOURCES = (
-    RAYD_ROOT / "backends/torch/src/torch_ext/rf/transmission_sequence.cu",
-    RAYD_ROOT / "backends/torch/src/torch_ext/rf/transmission_sequence_ad.cu",
-)
+INVENTORY_PATH = REPOSITORY_ROOT / "docs/dev/audit/phase9-native-owner-inventory.json"
+RAYD_ROOT = Path(os.environ.get("RAYD_SOURCE_DIR", REPOSITORY_ROOT.parent / "RayD"))
+RAYD_FIELD_TRANSPORT_AD = RAYD_ROOT / "src/field_transport_ad.cuh"
+RAYD_TRANSMISSION_SOURCE = RAYD_ROOT / "src/transmission.cu"
 FIELDS_BINDING = REPOSITORY_ROOT / "native/channel/binding/fields.cpp"
 
 TRANSLATION_UNITS = {
@@ -49,6 +39,7 @@ TRANSMISSION_ABI = {
 }
 REMOVED_TRANSMISSION_TU = KERNEL_ROOT / "field_transport_transmission.cu"
 COMMON_HELPERS = {
+    "load3",
     "load3f",
     "load_sequence3f",
     "load_dual3f",
@@ -112,12 +103,14 @@ def test_rayd_transmission_preserves_migrated_launch_budget() -> None:
         for entry in inventory["source_evidence"]
         if entry["path"] == "native/channel_native/kernels/field_transport_ad.cu"
     )
-    ad_source = RAYD_TRANSMISSION_SOURCES[1].read_text(encoding="utf-8-sig")
+    ad_source = RAYD_TRANSMISSION_SOURCE.read_text(encoding="utf-8-sig")
     actual = Counter(
-        re.findall(
+        kernel
+        for kernel in re.findall(
             r"\b([A-Za-z_]\w*_kernel)(?:\s*<[^;{}]*?>)?\s*<<<",
             ad_source,
         )
+        if kernel.startswith("transmission_sequence_") and kernel != "transmission_sequence_kernel"
     )
     expected = Counter(
         site["kernel"]
@@ -128,14 +121,14 @@ def test_rayd_transmission_preserves_migrated_launch_budget() -> None:
     assert sum(actual.values()) == 2
     assert ad_source.count("cudaStreamSynchronize(") == 0
 
-    primal_source = RAYD_TRANSMISSION_SOURCES[0].read_text(encoding="utf-8-sig")
+    primal_source = RAYD_TRANSMISSION_SOURCE.read_text(encoding="utf-8-sig")
     assert len(re.findall(r"\btransmission_sequence_kernel\s*<<<", primal_source)) == 1
     assert primal_source.count("cudaStreamSynchronize(") == 0
 
 
 def test_transmission_sequence_typed_adapter_preserves_channel_schemas() -> None:
     source = FIELDS_BINDING.read_text(encoding="utf-8-sig")
-    assert source.count("#include <rayd/torch/integration.h>") == 1
+    assert source.count("#include <rayd/integration.h>") == 1
     for entry in (
         "field_transmission_sequence",
         "field_transmission_sequence_backward",
@@ -159,9 +152,7 @@ def test_transmission_sequence_typed_adapter_preserves_channel_schemas() -> None
         "delay_s",
         "direction",
     }
-    assert _dict_keys(
-        _function_body(source, "channel_field_transmission_sequence_backward")
-    ) == {
+    assert _dict_keys(_function_body(source, "channel_field_transmission_sequence_backward")) == {
         "grad_layer_thickness_m",
         "grad_layer_eps_r",
         "grad_layer_sigma_e",
@@ -171,9 +162,7 @@ def test_transmission_sequence_typed_adapter_preserves_channel_schemas() -> None
         "grad_interaction_positions",
         "grad_interaction_normals",
     }
-    assert _dict_keys(
-        _function_body(source, "transmission_sequence_jvp_result_dict")
-    ) == {
+    assert _dict_keys(_function_body(source, "transmission_sequence_jvp_result_dict")) == {
         "field_vector",
         "coefficient",
         "path_field",
@@ -191,21 +180,15 @@ def test_field_transport_common_helpers_have_one_source() -> None:
     merged = KERNEL_ROOT / "fields.cu"
 
     assert COMMON_HELPERS == names[common]
-    assert merged.read_text(encoding="utf-8-sig").count(
-        '#include "field_ad.cuh"'
-    ) == 2
+    assert merged.read_text(encoding="utf-8-sig").count('#include "field_ad.cuh"') == 2
 
 
 def test_output_chain_ad_helpers_are_defined_only_in_locked_rayd_header() -> None:
-    common_source = (
-        KERNEL_ROOT / "field_ad.cuh"
-    ).read_text(encoding="utf-8-sig")
+    common_source = (KERNEL_ROOT / "field_ad.cuh").read_text(encoding="utf-8-sig")
     rayd_source = RAYD_FIELD_TRANSPORT_AD.read_text(encoding="utf-8-sig")
 
     for helper in RAYD_NUMERICAL_HELPERS:
-        definition = re.compile(
-            rf"__device__\s+__forceinline__[^;{{}}]*\b{helper}\s*\("
-        )
+        definition = re.compile(rf"__device__\s+__forceinline__[^;{{}}]*\b{helper}\s*\(")
         assert len(definition.findall(rayd_source)) == 1
         assert not definition.search(common_source)
         assert common_source.count(f"using ad::{helper};") == 1
@@ -223,9 +206,6 @@ def test_field_transport_consolidation_is_registered_once() -> None:
     assert not REMOVED_TRANSMISSION_TU.exists()
     assert common not in cmake
 
-    rayd_cmake = (
-        RAYD_ROOT / "backends/torch/CMakeLists.txt"
-    ).read_text(encoding="utf-8-sig")
-    for source in RAYD_TRANSMISSION_SOURCES:
-        relative = source.relative_to(RAYD_ROOT / "backends/torch").as_posix()
-        assert rayd_cmake.count(relative) == 1
+    rayd_cmake = (RAYD_ROOT / "torch/CMakeLists.txt").read_text(encoding="utf-8-sig")
+    relative = RAYD_TRANSMISSION_SOURCE.relative_to(RAYD_ROOT).as_posix()
+    assert rayd_cmake.count(f"${{RAYD_ROOT_DIR}}/{relative}") == 1

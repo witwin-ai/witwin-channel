@@ -8,8 +8,8 @@
 #include <c10/util/complex.h>
 #include "torch_cuda.h"
 
-#include <rayd/shared/rf/field_transport.cuh>
-#include <rayd/torch/rf/field_transport_ad.cuh>
+#include <rayd/field_transport.cuh>
+#include <src/field_transport_ad.cuh>
 #include "../tensor_checks.h"
 
 #include <array>
@@ -18,9 +18,9 @@
 namespace {
 
 constexpr int kBlockSize = 128;
-namespace field = rayd::shared::utd;
-namespace transport = rayd::shared::rf::field_transport;
-namespace ad = rayd::torch::rf::field_transport_ad;
+namespace field = rayd::shared::diffraction;
+namespace transport = rayd::shared::field_transport;
+namespace ad = rayd::torch::field_transport_ad;
 
 using Dual = field::Dual;
 using DualV3 = field::Vec3T<Dual>;
@@ -88,7 +88,7 @@ T* opt_mut_ptr(at::Tensor* tensor) {
 // reflection-diffraction.
 //
 // The wedge field is RayD's own templated forward
-// (rayd/shared/utd/utd_math.h): instantiated with float it IS the production
+// (rayd/utd.h): instantiated with float it IS the production
 // forward, instantiated with utd::Dual the same pass carries an exact
 // directional derivative (host-FD validated in both channel conventions).
 // Reverse mode runs one seeded dual pass per requested input scalar and
@@ -2251,7 +2251,7 @@ pybind11::dict channel_field_project_complex3_jvp(
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
 #include "math.cuh"
-#include <rayd/shared/utd/utd_math.h>
+#include <rayd/utd.h>
 #include "torch_cuda.h"
 
 #include "../tensor_checks.h"
@@ -2268,7 +2268,7 @@ namespace {
 constexpr int kBlockSize = 256;
 constexpr float kGeometryEpsilon = 1.0e-6f;
 constexpr float kSpeedOfLight = 299792458.0f;
-namespace utd = rayd::shared::utd;
+namespace utd = rayd::shared::diffraction;
 
 
 

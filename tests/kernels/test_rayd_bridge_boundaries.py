@@ -101,8 +101,7 @@ def test_rayd_wrapper_definitions_are_unique_and_owned_by_responsibility():
 def test_cmake_builds_every_rayd_source_without_legacy_exception_boundary():
     cmake = (_repo_root() / "CMakeLists.txt").read_text()
     source_paths = tuple(
-        f"native/channel/rayd/{source_name}"
-        for source_name in RAYD_BRIDGE_SOURCES
+        f"native/channel/rayd/{source_name}" for source_name in RAYD_BRIDGE_SOURCES
     )
 
     extension_sources = re.search(
@@ -124,9 +123,7 @@ def test_cmake_builds_every_rayd_source_without_legacy_exception_boundary():
 
 
 def test_diffraction_visibility_plan_calls_the_typed_rayd_axial_operation() -> None:
-    source = (_repo_root() / "native/channel/rayd/diffraction.cpp").read_text(
-        encoding="utf-8-sig"
-    )
+    source = (_repo_root() / "native/channel/rayd/diffraction.cpp").read_text(encoding="utf-8-sig")
 
     assert source.count("channel_diffraction_tx_visible_state_plan(") == 1
     assert source.count("rayd::torch::AxialEdgeVisibilityRequest request{") == 1
@@ -140,19 +137,13 @@ def test_diffraction_visibility_plan_calls_the_typed_rayd_axial_operation() -> N
     assert ".cpu()" not in body
 
 
-def test_segment_penetration_bridge_preserves_the_typed_api6_contract() -> None:
+def test_segment_penetration_bridge_preserves_the_typed_api8_contract() -> None:
     root = _repo_root()
-    resource = (root / "native/channel/rayd/resource.h").read_text(
-        encoding="utf-8-sig"
-    )
-    geometry = (root / "native/channel/rayd/geometry.cpp").read_text(
-        encoding="utf-8-sig"
-    )
-    binding = (root / "native/channel/binding/rayd.cpp").read_text(
-        encoding="utf-8-sig"
-    )
+    resource = (root / "native/channel/rayd/resource.h").read_text(encoding="utf-8-sig")
+    geometry = (root / "native/channel/rayd/geometry.cpp").read_text(encoding="utf-8-sig")
+    binding = (root / "native/channel/binding/rayd.cpp").read_text(encoding="utf-8-sig")
 
-    assert "rayd::torch::kIntegrationApiVersion == 6u" in resource
+    assert "rayd::torch::kIntegrationApiVersion == 8u" in resource
     assert 'std::string_view{"rayd.torch.integration"}' in resource
     assert "switch (policy)" in geometry
     assert geometry.count("case 0:") == 1
@@ -189,9 +180,9 @@ def test_segment_penetration_bridge_preserves_the_typed_api6_contract() -> None:
         result_pack.index(field) for field in result_fields
     )
 
-    tape_pack = geometry.split("pack_segment_penetration_tape(", 1)[1].split(
-        "}  // namespace", 1
-    )[0]
+    tape_pack = geometry.split("pack_segment_penetration_tape(", 1)[1].split("}  // namespace", 1)[
+        0
+    ]
     tape_fields = tuple(f"out.result.{field[4:]}" for field in result_fields) + (
         "out.tape_primitive_id",
         "out.tape_barycentric",

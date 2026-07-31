@@ -27,12 +27,7 @@ from benchmarks.phase13_phase12.release import (
 
 def _config(tmp_path: Path) -> tuple[SimpleNamespace, dict[str, object]]:
     checkout = tmp_path / "validation"
-    extension = (
-        checkout
-        / "witwin"
-        / "channel"
-        / "_channel.cp311-win_amd64.pyd"
-    )
+    extension = checkout / "witwin" / "channel" / "_channel.cp311-win_amd64.pyd"
     extension.parent.mkdir(parents=True)
     extension.write_bytes(b"runner extension")
     site_packages = tmp_path / "runner-install" / "site-packages"
@@ -78,9 +73,7 @@ def _multiarch_build_info() -> dict[str, object]:
         "rayd_commit": "2" * 40,
         "rayd_integration_abi_sha256": "3" * 64,
         "rayd_integration_abi_kind": "source-header-sha256",
-        "rayd_integration_abi_path": (
-            "backends/torch/include/rayd/torch/integration.h"
-        ),
+        "rayd_integration_abi_path": ("backends/torch/include/rayd/torch/integration.h"),
         "rayd_repository_url": "https://github.com/Asixa/RayD.git",
         "rayd_source_kind": "git-checkout",
         "rayd_source_manifest_sha256": "4" * 64,
@@ -98,12 +91,8 @@ def test_release_tiers_bind_packaged_checkout_without_developer_override(tmp_pat
     assert binding["mode"] == "runner-owned-packaged-validation-checkout"
     assert environment["PYTHONPATH"] == str(tmp_path / "validation")
     assert environment["TORCH_CUDA_ARCH_LIST"] == TORCH_WHEEL_ARCHITECTURES
-    assert f'-DRAYD_SOURCE_DIR="{(tmp_path / "rayd").as_posix()}"' in environment[
-        "CMAKE_ARGS"
-    ]
-    assert "75-real;80-real;86-real;89-real;120-real;120-virtual" in environment[
-        "CMAKE_ARGS"
-    ]
+    assert f'-DRAYD_SOURCE_DIR="{(tmp_path / "rayd").as_posix()}"' in environment["CMAKE_ARGS"]
+    assert "75-real;80-real;86-real;89-real;120-real;120-virtual" in environment["CMAKE_ARGS"]
     assert not any(name.startswith("WITWIN_CHANNEL_") for name in environment)
 
 
@@ -126,9 +115,7 @@ def test_wheel_fingerprint_is_multiarch_identity_not_sm120_timing_identity() -> 
         "pe_audit": {"sha256": "5" * 64},
     }
 
-    validated = _validate_wheel_smoke(
-        smoke, implementation=implementation, wheel_sha256="4" * 64
-    )
+    validated = _validate_wheel_smoke(smoke, implementation=implementation, wheel_sha256="4" * 64)
 
     assert validated["build_info"]["build_fingerprint"] == _build_fingerprint(info)  # type: ignore[index]
     assert info["build_fingerprint"] != implementation["final_build_fingerprint"]
@@ -185,14 +172,12 @@ def test_direct_pe_audit_must_target_retained_wheel_native(tmp_path: Path) -> No
         "exports_sha256": "6" * 64,
         "python_init_export": "PyInit__channel",
     }
-    wheel_pe = {
-        key: value for key, value in payload.items() if key != "path"
-    } | {"wheel_member": WHEEL_NATIVE_MEMBER}
+    wheel_pe = {key: value for key, value in payload.items() if key != "path"} | {
+        "wheel_member": WHEEL_NATIVE_MEMBER
+    }
 
     assert (
-        _validate_extracted_pe_audit(
-            payload, native=native, wheel_pe_audit=wheel_pe, store=store
-        )
+        _validate_extracted_pe_audit(payload, native=native, wheel_pe_audit=wheel_pe, store=store)
         == wheel_pe
     )
 

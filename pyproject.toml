@@ -8,7 +8,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "witwin-channel"
-version = "0.4.0"
+version = "0.5.0"
 description = "GPU-accelerated differentiable wireless propagation simulation for RF digital twins."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"

@@ -41,9 +41,7 @@ class _FakeDistribution:
         self.version = version
         self._path = root / f"rayd_torch-{version}.dist-info"
         self.files = [
-            path.relative_to(root).as_posix()
-            for path in root.rglob("*")
-            if path.is_file()
+            path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()
         ]
 
     def locate_file(self, path: str):
@@ -80,13 +78,7 @@ def _package(tmp_path: Path) -> tuple[_FakeDistribution, Path]:
     completed = subprocess.run(
         (
             sys.executable,
-            os.fspath(
-                workspace
-                / "backends"
-                / "torch"
-                / "scripts"
-                / "generate_source_bundle.py"
-            ),
+            os.fspath(workspace / "torch" / "scripts" / "generate_source_bundle.py"),
             "--workspace",
             os.fspath(workspace),
             "--output",
@@ -128,9 +120,10 @@ def test_resolver_accepts_unique_lock_valid_package(tmp_path: Path):
 
     assert result["source_kind"] == "python-package"
     assert Path(result["source_dir"]) == (resource / "source").resolve()
-    assert result["source_manifest_sha256"] == json.loads(
-        LOCK_PATH.read_text(encoding="utf-8")
-    )["source_bundle"]["manifest_sha256"]
+    assert (
+        result["source_manifest_sha256"]
+        == json.loads(LOCK_PATH.read_text(encoding="utf-8"))["source_bundle"]["manifest_sha256"]
+    )
 
 
 @pytest.mark.parametrize(
@@ -157,7 +150,7 @@ def test_resolver_fails_loudly_on_package_mutation(tmp_path: Path, mutation: str
     elif mutation == "dirty":
         metadata["dirty"] = True
     elif mutation == "source":
-        target = resource / "source" / "backends" / "torch" / "CMakeLists.txt"
+        target = resource / "source" / "torch" / "CMakeLists.txt"
         target.write_text(target.read_text(encoding="utf-8") + "\n", encoding="utf-8")
     elif mutation == "extra":
         (resource / "source" / "extra.cu").write_text("", encoding="utf-8")

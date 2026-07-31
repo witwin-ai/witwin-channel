@@ -12,16 +12,11 @@ from tools.refactor_baseline import cpp_body_hashes
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-INVENTORY_PATH = (
-    REPOSITORY_ROOT / "docs/dev/audit/phase9-native-owner-inventory.json"
-)
+INVENTORY_PATH = REPOSITORY_ROOT / "docs/dev/audit/phase9-native-owner-inventory.json"
 CURRENT_OWNER_INVENTORY_PATH = (
-    REPOSITORY_ROOT
-    / "docs/dev/audit/phase13-current-native-owner-inventory.json"
+    REPOSITORY_ROOT / "docs/dev/audit/phase13-current-native-owner-inventory.json"
 )
-MIGRATION_DELTA_PATH = (
-    REPOSITORY_ROOT / "docs/dev/audit/phase13-migration-delta.json"
-)
+MIGRATION_DELTA_PATH = REPOSITORY_ROOT / "docs/dev/audit/phase13-migration-delta.json"
 EXPECTED_OWNER_IDS = {
     "path.compaction",
     "path.topology",
@@ -101,9 +96,7 @@ def test_path_compaction_abi_owner_is_complete_and_frozen() -> None:
         "cn_path_finalize_blocks_cuda",
     }
     frozen_names = {
-        entry["name"]
-        for owner in owners.values()
-        for entry in owner["cpp_body_hash_multiset"]
+        entry["name"] for owner in owners.values() for entry in owner["cpp_body_hash_multiset"]
     }
 
     assert set(owners["path.compaction"]["abi_owner"]) == expected
@@ -113,10 +106,7 @@ def test_path_compaction_abi_owner_is_complete_and_frozen() -> None:
         "cn_deterministic_reflection_order1_compact",
         "cn_deterministic_reflection_sequence_compact",
         "cn_deterministic_diffraction_order1_compact",
-    } <= {
-        entry["name"]
-        for entry in owners["path.topology"]["cpp_body_hash_multiset"]
-    }
+    } <= {entry["name"] for entry in owners["path.topology"]["cpp_body_hash_multiset"]}
 
 
 def test_bdpt_abi_owners_are_complete_and_frozen() -> None:
@@ -143,27 +133,21 @@ def test_bdpt_abi_owners_are_complete_and_frozen() -> None:
 
     for owner_id, expected in expected_by_owner.items():
         owner = owners[owner_id]
-        frozen_names = {
-            entry["name"] for entry in owner["cpp_body_hash_multiset"]
-        }
+        frozen_names = {entry["name"] for entry in owner["cpp_body_hash_multiset"]}
         assert set(owner["abi_owner"]) == expected
         assert expected <= frozen_names
 
 
 def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() -> None:
     inventory = _load_inventory()
-    current_inventory = json.loads(
-        CURRENT_OWNER_INVENTORY_PATH.read_text(encoding="utf-8")
-    )
+    current_inventory = json.loads(CURRENT_OWNER_INVENTORY_PATH.read_text(encoding="utf-8"))
     migration = json.loads(MIGRATION_DELTA_PATH.read_text(encoding="utf-8"))
     expected = Counter(
         _hash_tuple(entry)
         for owner in inventory["owners"]
         for entry in owner["cpp_body_hash_multiset"]
     )
-    current_hashes = cpp_body_hashes(
-        REPOSITORY_ROOT, adr033_predecessor_identity=True
-    )
+    current_hashes = cpp_body_hashes(REPOSITORY_ROOT, adr033_predecessor_identity=True)
     actual = Counter(_hash_tuple(entry) for entry in current_hashes)
     compact_count_helper_transformations = {
         "cn_path_filter_los_cuda",
@@ -181,16 +165,12 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
         if entry["name"] in compact_count_helper_transformations
     )
     compact_count_helper_after_entries = [
-        entry
-        for entry in current_hashes
-        if entry["name"] in compact_count_helper_transformations
+        entry for entry in current_hashes if entry["name"] in compact_count_helper_transformations
     ]
     compact_count_helper_after = Counter(
         _hash_tuple(entry) for entry in compact_count_helper_after_entries
     )
-    transfers = migration["phase3_current"][
-        "approved_phase9_body_hash_transfer_multiset"
-    ]
+    transfers = migration["phase3_current"]["approved_phase9_body_hash_transfer_multiset"]
     phase4 = migration["phase4_current"]
     phase6a = migration["phase6a_current"]
     phase6b = migration["phase6b_current"]
@@ -199,64 +179,60 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
     phase10b = migration["phase10b_current"]
     phase11b = migration["phase11b_current"]
     shared_math = migration["shared_math_current"]
+    rayd_080 = migration["rayd_080_current"]
     deleted_bindings = set(phase4["deleted_bindings"])
     approved_deletions = Counter(
         _hash_tuple(entry)
         for entry in (
             phase4["approved_phase9_body_hash_deletions"]
             + phase6a["approved_phase9_body_hash_deletions"]
-                + phase6b["approved_phase9_body_hash_deletions"]
-                + phase8a["approved_phase9_body_hash_deletions"]
-                + phase10a["approved_phase9_body_hash_deletions"]
-                + phase10b["approved_phase9_body_hash_deletions"]
-                + shared_math["approved_phase9_body_hash_deletions"]
+            + phase6b["approved_phase9_body_hash_deletions"]
+            + phase8a["approved_phase9_body_hash_deletions"]
+            + phase10a["approved_phase9_body_hash_deletions"]
+            + phase10b["approved_phase9_body_hash_deletions"]
+            + shared_math["approved_phase9_body_hash_deletions"]
         )
     )
     live_transfers = [
-        transfer
-        for transfer in transfers
-        if transfer["binding_symbol"] not in deleted_bindings
+        transfer for transfer in transfers if transfer["binding_symbol"] not in deleted_bindings
     ]
-    approved_before = Counter(
-        _hash_tuple(transfer["before"]) for transfer in live_transfers
-    )
-    approved_after = Counter(
-        _hash_tuple(transfer["after"]) for transfer in live_transfers
-    )
-    phase11b_transformations = phase11b[
-        "approved_phase9_body_hash_transformations"
-    ]
+    approved_before = Counter(_hash_tuple(transfer["before"]) for transfer in live_transfers)
+    approved_after = Counter(_hash_tuple(transfer["after"]) for transfer in live_transfers)
+    phase11b_transformations = phase11b["approved_phase9_body_hash_transformations"]
     phase11b_before = Counter(
-        _hash_tuple(transformation["before"])
-        for transformation in phase11b_transformations
+        _hash_tuple(transformation["before"]) for transformation in phase11b_transformations
     )
     phase11b_after = Counter(
-        _hash_tuple(transformation["after"])
-        for transformation in phase11b_transformations
+        _hash_tuple(transformation["after"]) for transformation in phase11b_transformations
     )
     phase11b_names = {
-        transformation["before"]["name"]
-        for transformation in phase11b_transformations
+        transformation["before"]["name"] for transformation in phase11b_transformations
     }
-    shared_math_transformations = shared_math[
-        "approved_phase9_body_hash_transformations"
-    ]
+    shared_math_transformations = shared_math["approved_phase9_body_hash_transformations"]
     shared_math_before = Counter(
-        _hash_tuple(transformation["before"])
-        for transformation in shared_math_transformations
+        _hash_tuple(transformation["before"]) for transformation in shared_math_transformations
     )
     shared_math_after = Counter(
-        _hash_tuple(transformation["after"])
-        for transformation in shared_math_transformations
+        _hash_tuple(transformation["after"]) for transformation in shared_math_transformations
     )
     shared_math_names = {
-        transformation["before"]["name"]
-        for transformation in shared_math_transformations
+        transformation["before"]["name"] for transformation in shared_math_transformations
     }
     actual_shared_math = Counter(
-        _hash_tuple(entry)
-        for entry in current_hashes
-        if entry["name"] in shared_math_names
+        _hash_tuple(entry) for entry in current_hashes if entry["name"] in shared_math_names
+    )
+    rayd_080_transformations = rayd_080["approved_phase9_body_hash_transformations"]
+    rayd_080_before = Counter(
+        _hash_tuple(transformation["before"]) for transformation in rayd_080_transformations
+    )
+    rayd_080_after = Counter(
+        _hash_tuple(transformation["after"]) for transformation in rayd_080_transformations
+    )
+    rayd_080_names = {
+        transformation["before"]["name"] for transformation in rayd_080_transformations
+    }
+    actual_rayd_080 = Counter(
+        _hash_tuple(entry) for entry in current_hashes if entry["name"] in rayd_080_names
     )
     # first-order differentiation the two Channel-owned field transports an optional
     # arrival-direction cotangent input and a direction tangent output. Eight
@@ -265,45 +241,39 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
     adr043_transformations = migration["adr043_current"][
         "approved_phase9_body_hash_transformations"
     ]
-    adr043_names = {
-        transformation["before"]["name"]
-        for transformation in adr043_transformations
-    }
+    adr043_names = {transformation["before"]["name"] for transformation in adr043_transformations}
     adr043_before = Counter(
-        _hash_tuple(transformation["before"])
-        for transformation in adr043_transformations
+        _hash_tuple(transformation["before"]) for transformation in adr043_transformations
     )
     adr043_after = Counter(
-        _hash_tuple(transformation["after"])
-        for transformation in adr043_transformations
+        _hash_tuple(transformation["after"]) for transformation in adr043_transformations
+    )
+    rayd_080_adr043 = [
+        transformation
+        for transformation in rayd_080_transformations
+        if transformation["before"]["name"] in adr043_names
+    ]
+    composed_adr043_after = (
+        adr043_after
+        - Counter(_hash_tuple(transformation["before"]) for transformation in rayd_080_adr043)
+        + Counter(_hash_tuple(transformation["after"]) for transformation in rayd_080_adr043)
     )
     actual_adr043 = Counter(
-        _hash_tuple(entry)
-        for entry in current_hashes
-        if entry["name"] in adr043_names
+        _hash_tuple(entry) for entry in current_hashes if entry["name"] in adr043_names
     )
     actual_phase11b = Counter(
-        _hash_tuple(entry)
-        for entry in current_hashes
-        if entry["name"] in phase11b_names
+        _hash_tuple(entry) for entry in current_hashes if entry["name"] in phase11b_names
     )
-    transferred_names = {
-        transfer["before"]["name"] for transfer in live_transfers
-    }
+    transferred_names = {transfer["before"]["name"] for transfer in live_transfers}
     actual_transferred = Counter(
-        _hash_tuple(entry)
-        for entry in current_hashes
-        if entry["name"] in transferred_names
+        _hash_tuple(entry) for entry in current_hashes if entry["name"] in transferred_names
     )
     phase9_owners = {
-        owner["id"]: Counter(
-            _hash_tuple(entry) for entry in owner["cpp_body_hash_multiset"]
-        )
+        owner["id"]: Counter(_hash_tuple(entry) for entry in owner["cpp_body_hash_multiset"])
         for owner in inventory["owners"]
     }
     current_owners = {
-        entry["symbol"]: entry["numerical_owner"]
-        for entry in current_inventory["symbols"]
+        entry["symbol"]: entry["numerical_owner"] for entry in current_inventory["symbols"]
     }
 
     # Validate recorded body transformations against the immutable ownership snapshot.
@@ -322,8 +292,33 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
         + compact_count_helper_before
         + adr043_before
         + shared_math_before
+        + (rayd_080_before & expected)
     )
     assert actual_shared_math == shared_math_after
+    assert actual_rayd_080 == rayd_080_after
+    assert rayd_080["adr"] == "docs/dev/standards/adr-047-rayd-0.8-source-boundary.md"
+    assert rayd_080["numerical_owner_changed"] is False
+    assert rayd_080["launch_or_reduction_order_changed"] is False
+    assert len(rayd_080_transformations) == len(rayd_080_names) == 3
+    for transformation in rayd_080_transformations:
+        assert set(transformation) == {
+            "owner_id",
+            "owner_before",
+            "owner_after",
+            "transformation_kind",
+            "before",
+            "after",
+        }
+        assert set(transformation["before"]) == set(HASH_FIELDS)
+        assert set(transformation["after"]) == set(HASH_FIELDS)
+        assert transformation["before"]["name"] == transformation["after"]["name"]
+        assert (
+            transformation["before"]["signature_sha256"]
+            == transformation["after"]["signature_sha256"]
+        )
+        assert transformation["owner_before"] == transformation["owner_after"] == ("Channel Native")
+        before = _hash_tuple(transformation["before"])
+        assert (phase9_owners[transformation["owner_id"]][before] + adr043_after[before]) == 1
     assert shared_math["owner"] == "native/channel/kernels/math.cuh"
     assert len(shared_math_transformations) == len(shared_math_names) == 1
     for transformation in shared_math_transformations:
@@ -341,10 +336,8 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
             transformation["before"]["signature_sha256"]
             == transformation["after"]["signature_sha256"]
         )
-        assert transformation["owner_before"] == transformation["owner_after"] == (
-            "Channel Native"
-        )
-    assert actual_adr043 == adr043_after
+        assert transformation["owner_before"] == transformation["owner_after"] == ("Channel Native")
+    assert actual_adr043 == composed_adr043_after
     assert len(adr043_transformations) == len(adr043_names) == 8
     for transformation in adr043_transformations:
         assert transformation["owner_before"] == "Channel Native"
@@ -354,30 +347,19 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
         assert transformation["before"]["name"] == transformation["after"]["name"]
         # Every one of them really did change body, and only the four that
         # gained a parameter changed signature.
-        assert (
-            transformation["before"]["body_sha256"]
-            != transformation["after"]["body_sha256"]
-        )
+        assert transformation["before"]["body_sha256"] != transformation["after"]["body_sha256"]
         assert transformation["signature_changed"] == (
             transformation["before"]["signature_sha256"]
             != transformation["after"]["signature_sha256"]
         )
-        assert phase9_owners[transformation["owner_id"]][
-            _hash_tuple(transformation["before"])
-        ] == 1
+        assert phase9_owners[transformation["owner_id"]][_hash_tuple(transformation["before"])] == 1
     assert (
-        sum(
-            transformation["signature_changed"]
-            for transformation in adr043_transformations
-        )
-        == 6
+        sum(transformation["signature_changed"] for transformation in adr043_transformations) == 6
     )
     assert {
         entry["name"] for entry in compact_count_helper_after_entries
     } == compact_count_helper_transformations
-    assert len(compact_count_helper_after) == len(
-        compact_count_helper_transformations
-    )
+    assert len(compact_count_helper_after) == len(compact_count_helper_transformations)
     frozen_compact_signatures = {
         entry["name"]: entry["signature_sha256"]
         for owner in inventory["owners"]
@@ -385,8 +367,7 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
         if entry["name"] in compact_count_helper_transformations
     }
     assert {
-        entry["name"]: entry["signature_sha256"]
-        for entry in compact_count_helper_after_entries
+        entry["name"]: entry["signature_sha256"] for entry in compact_count_helper_after_entries
     } == frozen_compact_signatures
     assert actual_transferred == approved_after
     assert actual_phase11b == phase11b_after
@@ -409,9 +390,7 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
             == transformation["after"]["signature_sha256"]
         )
         assert transformation["owner_before"] == transformation["owner_after"] == "Channel Native"
-        assert phase9_owners[transformation["owner_id"]][
-            _hash_tuple(transformation["before"])
-        ] == 1
+        assert phase9_owners[transformation["owner_id"]][_hash_tuple(transformation["before"])] == 1
         assert current_owners[transformation["binding_symbol"]] == "Channel Native"
     for transfer in transfers:
         assert set(transfer) == {
@@ -431,13 +410,9 @@ def test_frozen_native_body_hash_multisets_still_exist_after_function_moves() ->
             assert _hash_tuple(transfer["before"]) in approved_deletions
         else:
             assert current_owners[transfer["binding_symbol"]] == transfer["owner_after"]
-        assert phase9_owners[transfer["owner_id"]][
-            _hash_tuple(transfer["before"])
-        ] == 1
+        assert phase9_owners[transfer["owner_id"]][_hash_tuple(transfer["before"])] == 1
     for entry in (
-        entry
-        for owner in inventory["owners"]
-        for entry in owner["cpp_body_hash_multiset"]
+        entry for owner in inventory["owners"] for entry in owner["cpp_body_hash_multiset"]
     ):
         assert set(entry) == set(HASH_FIELDS)
         assert isinstance(entry["token_count"], int)
@@ -471,12 +446,8 @@ def test_source_launch_and_sync_snapshot_is_complete_and_specific() -> None:
 
 def test_legacy_slab_primal_and_dual_lockstep_sets_are_explicit() -> None:
     owners = {owner["id"]: owner for owner in _load_inventory()["owners"]}
-    primal = {
-        entry["name"] for entry in owners["legacy_slab.primal"]["cpp_body_hash_multiset"]
-    }
-    dual = {
-        entry["name"] for entry in owners["legacy_slab.dual"]["cpp_body_hash_multiset"]
-    }
+    primal = {entry["name"] for entry in owners["legacy_slab.primal"]["cpp_body_hash_multiset"]}
+    dual = {entry["name"] for entry in owners["legacy_slab.dual"]["cpp_body_hash_multiset"]}
 
     assert primal == {
         "legacy_add",

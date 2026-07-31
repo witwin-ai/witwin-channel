@@ -10,18 +10,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 AUDIT = ROOT / "docs/dev/audit"
-RAYD_ROOT = Path(os.environ.get("RAYD_SOURCE_DIR", ROOT.parent.parent / "RayD"))
+RAYD_ROOT = Path(os.environ.get("RAYD_SOURCE_DIR", ROOT.parent / "RayD"))
 RAYD_COMMIT = "11e72526cdddf669678975c8921a9d44c6504e20"
-INTEGRATION_SHA256 = (
-    "7a2b68f459e7e981a23735271eff2844fe0483d119cf514d59d2032d11be5aef"
-)
+INTEGRATION_SHA256 = "7a2b68f459e7e981a23735271eff2844fe0483d119cf514d59d2032d11be5aef"
 INTEGRATION_IDENTITY = (
-    "rayd.torch.integration.v2.20260719.rf-transmission-sequence."
-    "pure-wedge-diffraction"
+    "rayd.torch.integration.v2.20260719.rf-transmission-sequence.pure-wedge-diffraction"
 )
-NUMERICAL_REGION_SHA256 = (
-    "09b4788ce1c39bb51a1c76f1a6f95269ae65cb8b04a501d174f355bd7bf53f3c"
-)
+NUMERICAL_REGION_SHA256 = "09b4788ce1c39bb51a1c76f1a6f95269ae65cb8b04a501d174f355bd7bf53f3c"
 PURE_WEDGE = {
     "field_diffraction_wedge",
     "field_diffraction_wedge_backward",
@@ -31,6 +26,17 @@ PURE_WEDGE = {
 
 def _json(path: Path) -> dict[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _rayd_snapshot_text(path: str) -> str:
+    return subprocess.run(
+        ["git", "show", f"{RAYD_COMMIT}:{path}"],
+        cwd=RAYD_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    ).stdout
 
 
 def test_phase8a_pin_manifest_and_owner_counts_are_atomic() -> None:
@@ -76,9 +82,7 @@ def test_phase8a_rayd_identity_sources_and_direct_test_are_locked() -> None:
 
 
 def test_phase8a_channel_is_a_typed_facade_without_numerical_fallback() -> None:
-    fields = (ROOT / "native/channel/binding/fields.cpp").read_text(
-        encoding="utf-8-sig"
-    )
+    fields = (ROOT / "native/channel/binding/fields.cpp").read_text(encoding="utf-8-sig")
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8-sig")
     removed = ROOT / "native/channel/kernels/field_wedge_ad_diffraction.cu"
 
@@ -101,12 +105,8 @@ def test_phase8a_launch_compile_and_dependency_boundaries_are_frozen() -> None:
     graph = _json(AUDIT / "phase13-shared-rf-dependency-graph.json")
     consolidation = _json(AUDIT / "adr-044-native-tu-consolidation.json")
 
-    rayd_source = (
-        RAYD_ROOT / "backends/torch/src/torch_ext/rf/diffraction_wedge.cu"
-    ).read_text(encoding="utf-8-sig")
-    rayd_cmake = (RAYD_ROOT / "backends/torch/CMakeLists.txt").read_text(
-        encoding="utf-8-sig"
-    )
+    rayd_source = _rayd_snapshot_text("backends/torch/src/torch_ext/rf/diffraction_wedge.cu")
+    rayd_cmake = _rayd_snapshot_text("backends/torch/CMakeLists.txt")
 
     assert rayd_source.count("<<<") == 3
     assert "cudaDeviceSynchronize" not in rayd_source
@@ -166,10 +166,7 @@ def test_phase8a_launch_compile_and_dependency_boundaries_are_frozen() -> None:
     assert packaging["rayd_python_extension_built_or_imported"] is False  # type: ignore[index]
 
     assert all(
-        not (
-            edge["from"].startswith("RayD:")
-            and edge["to"].startswith("native/channel/")
-        )
+        not (edge["from"].startswith("RayD:") and edge["to"].startswith("native/channel/"))
         for edge in graph["edges"]  # type: ignore[index]
     )
 
@@ -205,7 +202,8 @@ def test_phase8a_ledgers_and_guardrails_are_closed() -> None:
     )
     assert pure["phase7_current_owner"] == "Channel Native"
     actions = {
-        row["symbol"]: row["status"] for row in ledger["actions"]  # type: ignore[index]
+        row["symbol"]: row["status"]
+        for row in ledger["actions"]  # type: ignore[index]
     }
     assert all(actions[symbol] == "applied in Phase 8A" for symbol in PURE_WEDGE)
     assert (ROOT / "AGENTS.md").read_bytes() == (ROOT / "CLAUDE.md").read_bytes()

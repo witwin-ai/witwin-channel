@@ -10,7 +10,7 @@
 
 #include "../tensor_checks.h"
 #include "math.cuh"
-#include <rayd/shared/rf/field_transport.cuh>
+#include <rayd/field_transport.cuh>
 
 #include <cmath>
 
@@ -23,8 +23,8 @@ constexpr float kPi = 3.14159265358979323846f;
 constexpr float kEps = 1.0e-6f;
 
 using channel::check_tensor;
-namespace transport = rayd::shared::rf::field_transport;
-namespace utd = rayd::shared::utd;
+namespace transport = rayd::shared::field_transport;
+namespace utd = rayd::shared::diffraction;
 
 using channel::math::Complex;
 using channel::math::Complex3;

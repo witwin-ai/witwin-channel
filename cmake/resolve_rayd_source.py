@@ -31,6 +31,11 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _normalized_text_sha256(path: Path) -> str:
+    content = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return hashlib.sha256(content).hexdigest()
+
+
 def _mapping(value: object, *, label: str, keys: set[str]) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != keys:
         actual = sorted(value) if isinstance(value, dict) else type(value).__name__
@@ -57,6 +62,49 @@ def _safe_relative(value: object, *, label: str) -> PurePosixPath:
     ):
         raise RayDDiscoveryError(f"{label} is not a safe POSIX relative path: {text!r}")
     return path
+
+
+def _integration_abi(value: object, *, label: str) -> dict[str, Any]:
+    integration = _mapping(
+        value,
+        label=label,
+        keys={"kind", "entrypoint", "headers", "sha256", "api_version", "identity"},
+    )
+    if integration["kind"] != "source-header-set-sha256":
+        raise RayDDiscoveryError(f"{label} kind must be source-header-set-sha256")
+    entrypoint = _safe_relative(integration["entrypoint"], label=f"{label} entrypoint")
+    headers = integration["headers"]
+    if not isinstance(headers, list) or not headers:
+        raise RayDDiscoveryError(f"{label} headers must be a non-empty list")
+    described: list[tuple[str, str]] = []
+    for index, raw_header in enumerate(headers):
+        header = _mapping(
+            raw_header,
+            label=f"{label} header {index}",
+            keys={"path", "sha256"},
+        )
+        path = _safe_relative(header["path"], label=f"{label} header path {index}")
+        digest = _string(header["sha256"], label=f"{label} header SHA {index}")
+        if SHA256_PATTERN.fullmatch(digest) is None:
+            raise RayDDiscoveryError(f"{label} header SHA {index} must be a lowercase SHA-256")
+        described.append((path.as_posix(), digest))
+    if described != sorted(described) or len({path for path, _ in described}) != len(described):
+        raise RayDDiscoveryError(f"{label} headers must have unique paths in sorted order")
+    if entrypoint.as_posix() not in {path for path, _ in described}:
+        raise RayDDiscoveryError(f"{label} entrypoint is not present in headers")
+    aggregate = hashlib.sha256()
+    for path, digest in described:
+        aggregate.update(path.encode("utf-8"))
+        aggregate.update(b"\0")
+        aggregate.update(digest.encode("ascii"))
+        aggregate.update(b"\n")
+    expected_aggregate = _string(integration["sha256"], label=f"{label} SHA")
+    if aggregate.hexdigest() != expected_aggregate:
+        raise RayDDiscoveryError(f"{label} aggregate SHA does not match its headers")
+    if not isinstance(integration["api_version"], int) or integration["api_version"] < 1:
+        raise RayDDiscoveryError(f"{label} api_version must be a positive integer")
+    _string(integration["identity"], label=f"{label} identity")
+    return integration
 
 
 def _inside(path: Path, root: Path, *, label: str) -> Path:
@@ -92,11 +140,7 @@ def _validate_lock(path: Path) -> dict[str, Any]:
     commit = _string(lock["commit"], label="RayD lock commit")
     if SHA_PATTERN.fullmatch(commit) is None:
         raise RayDDiscoveryError("RayD lock commit must be a lowercase 40-digit SHA")
-    integration = _mapping(
-        lock["integration_abi"],
-        label="RayD lock integration_abi",
-        keys={"kind", "path", "sha256", "api_version", "identity"},
-    )
+    integration = _integration_abi(lock["integration_abi"], label="RayD lock integration_abi")
     bundle = _mapping(
         lock["source_bundle"],
         label="RayD lock source_bundle",
@@ -108,17 +152,37 @@ def _validate_lock(path: Path) -> dict[str, Any]:
     ):
         if SHA256_PATTERN.fullmatch(_string(value, label=label)) is None:
             raise RayDDiscoveryError(f"{label} must be a lowercase SHA-256")
-    _safe_relative(integration["path"], label="RayD lock integration ABI path")
+    _safe_relative(integration["entrypoint"], label="RayD lock integration ABI entrypoint")
     _safe_relative(bundle["metadata_path"], label="RayD lock metadata path")
     return lock
+
+
+def _validate_source_tree(source_root: Path, integration: dict[str, Any]) -> None:
+    source_root = source_root.resolve(strict=True)
+    for index, header in enumerate(integration["headers"]):
+        relative = _safe_relative(header["path"], label=f"RayD integration header path {index}")
+        path = _inside(
+            source_root / Path(*relative.parts),
+            source_root,
+            label=f"RayD integration header {index}",
+        )
+        if _normalized_text_sha256(path) != header["sha256"]:
+            raise RayDDiscoveryError(f"RayD integration header changed: {relative.as_posix()!r}")
+    if not (source_root / "torch" / "CMakeLists.txt").is_file():
+        raise RayDDiscoveryError("RayD source lacks torch/CMakeLists.txt")
+    if not (source_root / "include" / "rayd" / "integration.h").is_file():
+        raise RayDDiscoveryError("RayD source lacks include/rayd/integration.h")
+    if not (source_root / "src" / "field_transport_ad.cuh").is_file():
+        raise RayDDiscoveryError("RayD source lacks src/field_transport_ad.cuh")
+    if not (source_root / "src" / "transmission_device.cuh").is_file():
+        raise RayDDiscoveryError("RayD source lacks src/transmission_device.cuh")
 
 
 def _active_distribution(name: str) -> importlib.metadata.Distribution:
     distributions = list(importlib.metadata.distributions(name=name))
     if len(distributions) != 1:
         locations = sorted(
-            str(getattr(distribution, "_path", "unknown"))
-            for distribution in distributions
+            str(getattr(distribution, "_path", "unknown")) for distribution in distributions
         )
         raise RayDDiscoveryError(
             f"expected exactly one active {name!r} distribution, found "
@@ -138,9 +202,7 @@ def resolve(lock_path: Path) -> dict[str, object]:
     lock_path = lock_path.resolve(strict=True)
     lock = _validate_lock(lock_path)
     bundle_lock = lock["source_bundle"]
-    distribution_name = _string(
-        bundle_lock["distribution"], label="RayD source distribution"
-    )
+    distribution_name = _string(bundle_lock["distribution"], label="RayD source distribution")
     distribution = _active_distribution(distribution_name)
     expected_version = _string(
         bundle_lock["distribution_version"], label="RayD source distribution version"
@@ -158,9 +220,7 @@ def resolve(lock_path: Path) -> dict[str, object]:
     metadata_record_path = metadata_relative.as_posix()
     record_paths = _record_paths(distribution)
     if metadata_record_path not in record_paths:
-        raise RayDDiscoveryError(
-            f"rayd-torch RECORD does not own {metadata_record_path!r}"
-        )
+        raise RayDDiscoveryError(f"rayd-torch RECORD does not own {metadata_record_path!r}")
     metadata_path = _inside(
         distribution.locate_file(metadata_record_path),
         distribution_root,
@@ -180,8 +240,8 @@ def resolve(lock_path: Path) -> dict[str, object]:
             "integration_abi",
         },
     )
-    if metadata["schema_version"] != 1:
-        raise RayDDiscoveryError("RayD package metadata schema_version must be 1")
+    if metadata["schema_version"] != 2:
+        raise RayDDiscoveryError("RayD package metadata schema_version must be 2")
     package_distribution = _mapping(
         metadata["distribution"],
         label="RayD package distribution",
@@ -199,10 +259,8 @@ def resolve(lock_path: Path) -> dict[str, object]:
     if metadata["dirty"] is not False:
         raise RayDDiscoveryError("RayD package source metadata must report dirty=false")
 
-    integration = _mapping(
-        metadata["integration_abi"],
-        label="RayD package integration_abi",
-        keys={"kind", "path", "sha256", "api_version", "identity"},
+    integration = _integration_abi(
+        metadata["integration_abi"], label="RayD package integration_abi"
     )
     if integration != lock["integration_abi"]:
         raise RayDDiscoveryError("RayD package integration ABI does not match the lock")
@@ -213,9 +271,7 @@ def resolve(lock_path: Path) -> dict[str, object]:
     )
     if manifest_metadata["sha256"] != bundle_lock["manifest_sha256"]:
         raise RayDDiscoveryError("RayD package source manifest SHA does not match the lock")
-    source_relative = _safe_relative(
-        metadata["source_root"], label="RayD package source_root"
-    )
+    source_relative = _safe_relative(metadata["source_root"], label="RayD package source_root")
     manifest_relative = _safe_relative(
         manifest_metadata["path"], label="RayD package manifest path"
     )
@@ -251,9 +307,7 @@ def resolve(lock_path: Path) -> dict[str, object]:
             label=f"RayD package source manifest entry {index}",
             keys={"path", "sha256"},
         )
-        relative = _safe_relative(
-            entry["path"], label=f"RayD package source manifest path {index}"
-        )
+        relative = _safe_relative(entry["path"], label=f"RayD package source manifest path {index}")
         relative_text = relative.as_posix()
         digest = _string(entry["sha256"], label=f"RayD source SHA {relative_text}")
         if SHA256_PATTERN.fullmatch(digest) is None:
@@ -283,17 +337,7 @@ def resolve(lock_path: Path) -> dict[str, object]:
         missing = sorted(set(described) - actual)
         raise RayDDiscoveryError(f"RayD package source files are missing: {missing}")
 
-    integration_path = _inside(
-        source_root / Path(*_safe_relative(integration["path"], label="ABI path").parts),
-        source_root,
-        label="RayD integration ABI",
-    )
-    if _sha256(integration_path) != integration["sha256"]:
-        raise RayDDiscoveryError("RayD integration ABI header bytes changed")
-    if not (source_root / "backends" / "torch" / "CMakeLists.txt").is_file():
-        raise RayDDiscoveryError("RayD package source lacks backends/torch/CMakeLists.txt")
-    if not (source_root / "shared" / "include").is_dir():
-        raise RayDDiscoveryError("RayD package source lacks shared/include")
+    _validate_source_tree(source_root, integration)
 
     return {
         "source_kind": "python-package",
@@ -306,27 +350,41 @@ def resolve(lock_path: Path) -> dict[str, object]:
     }
 
 
+def validate_source(lock_path: Path, source_root: Path) -> None:
+    lock = _validate_lock(lock_path.resolve(strict=True))
+    integration = _integration_abi(lock["integration_abi"], label="RayD lock integration_abi")
+    _validate_source_tree(source_root, integration)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--lock", required=True, type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--expected-source", type=Path)
+    parser.add_argument("--validate-source", type=Path)
     arguments = parser.parse_args()
     try:
-        result = resolve(arguments.lock)
-        if arguments.expected_source is not None:
-            expected = arguments.expected_source.resolve(strict=True)
-            actual = Path(str(result["source_dir"])).resolve(strict=True)
-            if actual != expected:
+        if arguments.validate_source is not None:
+            if arguments.output is not None or arguments.expected_source is not None:
                 raise RayDDiscoveryError(
-                    f"RayD package source changed after configure: {actual} != {expected}"
+                    "--validate-source cannot be combined with --output or --expected-source"
                 )
-        if arguments.output is not None:
-            arguments.output.write_text(
-                json.dumps(result, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-                newline="\n",
-            )
+            validate_source(arguments.lock, arguments.validate_source)
+        else:
+            result = resolve(arguments.lock)
+            if arguments.expected_source is not None:
+                expected = arguments.expected_source.resolve(strict=True)
+                actual = Path(str(result["source_dir"])).resolve(strict=True)
+                if actual != expected:
+                    raise RayDDiscoveryError(
+                        f"RayD package source changed after configure: {actual} != {expected}"
+                    )
+            if arguments.output is not None:
+                arguments.output.write_text(
+                    json.dumps(result, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                    newline="\n",
+                )
     except RayDDiscoveryError as exc:
         parser.exit(2, f"RayD package discovery failed: {exc}\n")
 
