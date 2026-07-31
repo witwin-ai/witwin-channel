@@ -280,6 +280,11 @@ def test_wheel_content_audit_rejects_any_extra_dso(tmp_path: Path, member: str):
     [
         ("rayd/torch/_stable_ops.dll", b"leaked dependency", "no DSO except"),
         (
+            "witwin/channel/_channel.cpython-311-x86_64-linux-gnu.so.so",
+            b"double suffix",
+            "no DSO except",
+        ),
+        (
             "witwin/channel/CMakeFiles/kernel.obj",
             b"build output",
             "source closure",

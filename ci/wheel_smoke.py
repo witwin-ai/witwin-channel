@@ -506,7 +506,7 @@ def _audit_wheel_contents(path: Path) -> str:
                 (parts and parts[0] == "rayd")
                 or any(part in {"cmakefiles", "_skbuild", "build"} for part in parts)
                 or suffix in _FORBIDDEN_BUILD_SUFFIXES
-                or name.endswith(".pyd.pyd")
+                or name.endswith((".pyd.pyd", ".so.so"))
             ):
                 forbidden.append(name)
                 continue

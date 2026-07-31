@@ -196,20 +196,20 @@ message(STATUS "Channel Torch CUDA architectures: ${CHANNEL_TORCH_CUDA_ARCH_LIST
 
 find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
 find_package(Git REQUIRED)
+execute_process(
+    COMMAND "${Python_EXECUTABLE}" -c
+        "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX') or '')"
+    RESULT_VARIABLE CHANNEL_PYTHON_SUFFIX_RESULT
+    OUTPUT_VARIABLE CHANNEL_PYTHON_EXTENSION_SUFFIX
+    ERROR_VARIABLE CHANNEL_PYTHON_SUFFIX_ERROR
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+if(NOT CHANNEL_PYTHON_SUFFIX_RESULT EQUAL 0
+   OR NOT CHANNEL_PYTHON_EXTENSION_SUFFIX MATCHES "^\\..*\\.(pyd|so)$")
+    message(FATAL_ERROR
+        "Could not determine the configured Python extension suffix: "
+        "'${CHANNEL_PYTHON_EXTENSION_SUFFIX}' ${CHANNEL_PYTHON_SUFFIX_ERROR}")
+endif()
 if(WIN32)
-    execute_process(
-        COMMAND "${Python_EXECUTABLE}" -c
-            "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX') or '')"
-        RESULT_VARIABLE CHANNEL_PYTHON_SUFFIX_RESULT
-        OUTPUT_VARIABLE CHANNEL_PYTHON_EXTENSION_SUFFIX
-        ERROR_VARIABLE CHANNEL_PYTHON_SUFFIX_ERROR
-        OUTPUT_STRIP_TRAILING_WHITESPACE)
-    if(NOT CHANNEL_PYTHON_SUFFIX_RESULT EQUAL 0
-       OR NOT CHANNEL_PYTHON_EXTENSION_SUFFIX MATCHES "^\\..*\\.pyd$")
-        message(FATAL_ERROR
-            "Could not determine the configured Python extension suffix: "
-            "'${CHANNEL_PYTHON_EXTENSION_SUFFIX}' ${CHANNEL_PYTHON_SUFFIX_ERROR}")
-    endif()
     get_filename_component(CHANNEL_PYTHON_ENV_ROOT "${Python_EXECUTABLE}" DIRECTORY)
     execute_process(
         COMMAND "${Python_EXECUTABLE}" -c
@@ -602,13 +602,11 @@ else()
     message(STATUS "Channel grouped CUDA gencode flags: ${CHANNEL_CUDA_GENCODE_FLAGS}")
 endif()
 add_dependencies(_channel channel_validate_build_identity)
-if(WIN32)
-    # CMake 4.3 may append CMAKE_SHARED_MODULE_SUFFIX after the SOABI suffix,
-    # producing a non-importable `.pyd.pyd`; sysconfig is authoritative here.
-    set_target_properties(
-        _channel
-        PROPERTIES SUFFIX "${CHANNEL_PYTHON_EXTENSION_SUFFIX}")
-endif()
+# CMake 4.3 may append CMAKE_SHARED_MODULE_SUFFIX after the SOABI suffix,
+# producing a non-importable `.so.so` or `.pyd.pyd`; sysconfig is authoritative.
+set_target_properties(
+    _channel
+    PROPERTIES SUFFIX "${CHANNEL_PYTHON_EXTENSION_SUFFIX}")
 
 target_compile_features(_channel PRIVATE cxx_std_17)
 target_include_directories(_channel PRIVATE "${RAYD_SOURCE_DIR}")

@@ -286,6 +286,12 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert second_torch_find < channel_gencode_cleanup < channel_target
     assert '"(^|[ \\t])-gencode[ \\t]+arch=[^ \\t]+,code=[^ \\t]+"' in cmake
     assert "set_target_properties(_channel PROPERTIES CUDA_ARCHITECTURES OFF)" in cmake
+    suffix_probe = cmake.index("OUTPUT_VARIABLE CHANNEL_PYTHON_EXTENSION_SUFFIX")
+    windows_block = cmake.index("if(WIN32)", suffix_probe)
+    suffix_target = cmake.index(
+        'PROPERTIES SUFFIX "${CHANNEL_PYTHON_EXTENSION_SUFFIX}"',
+    )
+    assert suffix_probe < windows_block < suffix_target
     assert "target_compile_options(" in cmake
 
     kernels = ROOT / "native" / "channel" / "kernels"
