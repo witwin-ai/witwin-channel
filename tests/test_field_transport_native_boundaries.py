@@ -39,7 +39,6 @@ TRANSMISSION_ABI = {
 }
 REMOVED_TRANSMISSION_TU = KERNEL_ROOT / "field_transport_transmission.cu"
 COMMON_HELPERS = {
-    "load3",
     "load3f",
     "load_sequence3f",
     "load_dual3f",

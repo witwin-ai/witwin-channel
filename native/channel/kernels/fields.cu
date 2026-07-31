@@ -1209,10 +1209,10 @@ __global__ void free_space_fwd_kernel(
          index < count;
          index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
         const ad::FreeSpaceEval<T> eval = ad::free_space_eval<T>(
-            load3(source, index),
-            load3(target, index),
-            load3(tx_polarization, index),
-            load3(rx_polarization, index),
+            channel::math::load_rayd_vec3(source, index),
+            channel::math::load_rayd_vec3(target, index),
+            channel::math::load_rayd_vec3(tx_polarization, index),
+            channel::math::load_rayd_vec3(rx_polarization, index),
             tx_power[index],
             frequency_hz);
         const int64_t base = index * 3;
@@ -1256,10 +1256,10 @@ __global__ void free_space_backward_kernel(
          index < count;
          index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
         const ad::FreeSpaceEval<T> eval = ad::free_space_eval<T>(
-            load3(source, index),
-            load3(target, index),
-            load3(tx_polarization, index),
-            load3(rx_polarization, index),
+            channel::math::load_rayd_vec3(source, index),
+            channel::math::load_rayd_vec3(target, index),
+            channel::math::load_rayd_vec3(tx_polarization, index),
+            channel::math::load_rayd_vec3(rx_polarization, index),
             tx_power[index],
             frequency_hz);
         const int64_t base = index * 3;
@@ -1314,19 +1314,24 @@ __global__ void free_space_backward_kernel(
         if (grad_delay != nullptr)
             g_distance += grad_delay[index] / T(ad::kSpeedOfLight);
         const ad::Vec3<T> offset =
-            vmath::subtract(load3(target, index), load3(source, index));
+            vmath::subtract(
+                channel::math::load_rayd_vec3(target, index),
+                channel::math::load_rayd_vec3(source, index));
         // The published arrival direction is exactly eval.direction, so an
         // external cotangent on it seeds the same accumulator the two
         // transverse projections below feed. Seeding here rather than after
         // them keeps one adjoint chain: direction -> offset -> endpoints.
         ad::Vec3<T> g_direction = grad_direction != nullptr
-                                      ? load3(grad_direction, index)
+                                      ? channel::math::load_rayd_vec3(
+                                            grad_direction, index)
                                       : ad::Vec3<T>{T(0), T(0), T(0)};
         ad::adj_v3_transverse_project(
-            eval.direction, load3(tx_polarization, index), g_tx_axis,
+            eval.direction,
+            channel::math::load_rayd_vec3(tx_polarization, index), g_tx_axis,
             g_direction);
         ad::adj_v3_transverse_project(
-            eval.direction, load3(rx_polarization, index), g_rx_axis,
+            eval.direction,
+            channel::math::load_rayd_vec3(rx_polarization, index), g_rx_axis,
             g_direction);
         ad::Vec3<T> g_offset = {T(0), T(0), T(0)};
         ad::Vec3<T> g_alternate = {T(0), T(0), T(0)};
@@ -1370,28 +1375,36 @@ __global__ void free_space_jvp_kernel(
          index < count;
          index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
         const ad::FreeSpaceEval<T> eval = ad::free_space_eval<T>(
-            load3(source, index),
-            load3(target, index),
-            load3(tx_polarization, index),
-            load3(rx_polarization, index),
+            channel::math::load_rayd_vec3(source, index),
+            channel::math::load_rayd_vec3(target, index),
+            channel::math::load_rayd_vec3(tx_polarization, index),
+            channel::math::load_rayd_vec3(rx_polarization, index),
             tx_power[index],
             frequency_hz);
         const ad::Vec3<T> zero3 = {T(0), T(0), T(0)};
         const ad::Vec3<T> d_source =
-            tangent_source != nullptr ? load3(tangent_source, index) : zero3;
+            tangent_source != nullptr
+                ? channel::math::load_rayd_vec3(tangent_source, index)
+                : zero3;
         const ad::Vec3<T> d_target =
-            tangent_target != nullptr ? load3(tangent_target, index) : zero3;
+            tangent_target != nullptr
+                ? channel::math::load_rayd_vec3(tangent_target, index)
+                : zero3;
         const ad::DualV3<T> offset = {
-            vmath::subtract(load3(target, index), load3(source, index)),
+            vmath::subtract(
+                channel::math::load_rayd_vec3(target, index),
+                channel::math::load_rayd_vec3(source, index)),
             vmath::subtract(d_target, d_source)};
         T d_distance = T(0);
         (void)ad::dual_v3_length(offset, d_distance);
         const ad::DualV3<T> direction = ad::dual_v3_safe_normalize(
             offset, ad::dv3_const(ad::Vec3<T>{T(0), T(0), T(1)}));
         const ad::DualV3<T> tx_axis = ad::dual_v3_transverse_project(
-            direction, load3(tx_polarization, index));
+            direction,
+            channel::math::load_rayd_vec3(tx_polarization, index));
         const ad::DualV3<T> rx_axis = ad::dual_v3_transverse_project(
-            direction, load3(rx_polarization, index));
+            direction,
+            channel::math::load_rayd_vec3(rx_polarization, index));
         const c10::complex<T> d_carrier =
             eval.carrier_dfreq * tangent_frequency +
             eval.carrier_ddist * d_distance;

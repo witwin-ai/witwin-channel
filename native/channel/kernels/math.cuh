@@ -41,6 +41,14 @@ __device__ __forceinline__ rayd::shared::diffraction::float3a load_field_vec3(
         values[base], values[base + 1], values[base + 2]);
 }
 
+template <typename T>
+__device__ __forceinline__ rayd::shared::math::Vec3<T> load_rayd_vec3(
+    const T* values,
+    int64_t index) {
+    const int64_t base = index * 3;
+    return {values[base], values[base + 1], values[base + 2]};
+}
+
 __device__ __forceinline__ Vec3 load_sequence_vec3(
     const float* values,
     int64_t index,
