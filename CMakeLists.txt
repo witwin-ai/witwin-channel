@@ -430,7 +430,7 @@ if(NOT CHANNEL_CUDA_GENCODE_FLAGS STREQUAL "")
 endif()
 execute_process(
     COMMAND "${Python_EXECUTABLE}" -c
-        "import torch; print(torch.__version__.split('+', 1)[0]); print(torch.version.cuda or '')"
+        "import torch; print(torch.__version__.split('+', 1)[0]); print(torch.version.cuda or ''); print(int(bool(torch._C._GLIBCXX_USE_CXX11_ABI)))"
     RESULT_VARIABLE CHANNEL_TORCH_IDENTITY_RESULT
     OUTPUT_VARIABLE CHANNEL_TORCH_IDENTITY
     ERROR_VARIABLE CHANNEL_TORCH_IDENTITY_ERROR
@@ -443,8 +443,14 @@ string(REPLACE "\r\n" ";" CHANNEL_TORCH_IDENTITY "${CHANNEL_TORCH_IDENTITY}")
 string(REPLACE "\n" ";" CHANNEL_TORCH_IDENTITY "${CHANNEL_TORCH_IDENTITY}")
 list(GET CHANNEL_TORCH_IDENTITY 0 CHANNEL_TORCH_VERSION)
 list(GET CHANNEL_TORCH_IDENTITY 1 CHANNEL_TORCH_CUDA_VERSION)
+list(GET CHANNEL_TORCH_IDENTITY 2 CHANNEL_TORCH_CXX11_ABI)
 if(CHANNEL_TORCH_CUDA_VERSION STREQUAL "")
     message(FATAL_ERROR "Channel requires a CUDA-enabled PyTorch build.")
+endif()
+if(NOT CHANNEL_TORCH_CXX11_ABI MATCHES "^[01]$")
+    message(FATAL_ERROR
+        "Configured PyTorch reported an invalid C++ ABI identity: "
+        "'${CHANNEL_TORCH_CXX11_ABI}'.")
 endif()
 
 execute_process(
@@ -486,12 +492,10 @@ else()
 endif()
 if(MSVC)
     set(CHANNEL_CXX_ABI "msvc")
-elseif(TORCH_CXX_FLAGS MATCHES "_GLIBCXX_USE_CXX11_ABI=1")
+elseif(CHANNEL_TORCH_CXX11_ABI STREQUAL "1")
     set(CHANNEL_CXX_ABI "cxx11")
-elseif(TORCH_CXX_FLAGS MATCHES "_GLIBCXX_USE_CXX11_ABI=0")
-    set(CHANNEL_CXX_ABI "pre-cxx11")
 else()
-    set(CHANNEL_CXX_ABI "unknown")
+    set(CHANNEL_CXX_ABI "pre-cxx11")
 endif()
 set(CHANNEL_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
 set(CHANNEL_COMPILER "${CMAKE_CXX_COMPILER_ID}-${CMAKE_CXX_COMPILER_VERSION}")

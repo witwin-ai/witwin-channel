@@ -288,6 +288,8 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert second_torch_find < channel_gencode_cleanup < channel_target
     assert '"(^|[ \\t])-gencode[ \\t]+arch=[^ \\t]+,code=[^ \\t]+"' in cmake
     assert "set_target_properties(_channel PROPERTIES CUDA_ARCHITECTURES OFF)" in cmake
+    assert "torch._C._GLIBCXX_USE_CXX11_ABI" in cmake
+    assert 'TORCH_CXX_FLAGS MATCHES "_GLIBCXX_USE_CXX11_ABI' not in cmake
     suffix_probe = cmake.index("OUTPUT_VARIABLE CHANNEL_PYTHON_EXTENSION_SUFFIX")
     windows_block = cmake.index("if(WIN32)", suffix_probe)
     suffix_target = cmake.index(
