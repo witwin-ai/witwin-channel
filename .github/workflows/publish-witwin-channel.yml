@@ -691,7 +691,7 @@ jobs:
           if len(wheels) == 2:
               assert any("manylinux_2_28_x86_64.whl" in name for name in names)
           for wheel in wheels:
-              assert re.match(r"witwin_channel-0\.4\.0-", wheel.name), wheel
+              assert re.match(r"witwin_channel-0\.5\.0-", wheel.name), wheel
               members = zipfile.ZipFile(wheel).namelist()
               extensions = [
                   name

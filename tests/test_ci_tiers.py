@@ -271,6 +271,8 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "safe.directory /project/channel" in workflow
     assert "safe.directory /host${{ github.workspace }}/rayd" in workflow
     assert "python channel/ci/wheel_smoke.py" in workflow
+    assert r"witwin_channel-0\.5\.0-" in workflow
+    assert r"witwin_channel-0\.4\.0-" not in workflow
     assert "import witwin.channel as channel" in workflow
     assert "from witwin.channel.propagation import consumer" in workflow
     assert '"enumerated_canonical_compact"' in workflow
