@@ -177,6 +177,26 @@ def test_cmake_accepts_the_locked_rayd_checkout(tmp_path: Path):
     ) in configured.stdout
 
 
+def test_cmake_accepts_optional_dot_git_remote_suffix(tmp_path: Path):
+    rayd = tmp_path / "rayd"
+    lock = _clone_locked_rayd(rayd)
+    git = shutil.which("git")
+    assert git is not None
+    changed = _run(
+        git,
+        "remote",
+        "set-url",
+        "origin",
+        f"{lock['repository_url']}.git",
+        cwd=rayd,
+    )
+    assert changed.returncode == 0, changed.stderr
+
+    configured = _configure(rayd, tmp_path / "build")
+
+    assert configured.returncode == 0, configured.stdout + configured.stderr
+
+
 def test_cmake_normalizes_explicit_torch_cuda_arch_override(tmp_path: Path):
     rayd = tmp_path / "rayd"
     _clone_locked_rayd(rayd)

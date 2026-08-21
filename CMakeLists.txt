@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.26)
 
+function(channel_normalize_git_remote_url input_url output_variable)
+    set(normalized_url "${input_url}")
+    string(REGEX REPLACE "[/\\\\]+$" "" normalized_url "${normalized_url}")
+    string(REGEX REPLACE "\\.git$" "" normalized_url "${normalized_url}")
+    set(${output_variable} "${normalized_url}" PARENT_SCOPE)
+endfunction()
+
 set(CHANNEL_ABI_VERSION 1)
 set(CHANNEL_RAYD_LOCK_FILE "${CMAKE_CURRENT_SOURCE_DIR}/dependencies/rayd.lock.json")
 if(NOT EXISTS "${CHANNEL_RAYD_LOCK_FILE}")
@@ -278,7 +285,9 @@ if(NOT RAYD_GIT_REMOTE_RESULT EQUAL 0)
     message(FATAL_ERROR
         "Could not read the RayD origin URL in '${RAYD_SOURCE_DIR}': ${RAYD_GIT_REMOTE_ERROR}")
 endif()
-if(NOT RAYD_GIT_REMOTE_URL STREQUAL RAYD_LOCK_REPOSITORY_URL)
+channel_normalize_git_remote_url("${RAYD_GIT_REMOTE_URL}" RAYD_GIT_REMOTE_NORMALIZED)
+channel_normalize_git_remote_url("${RAYD_LOCK_REPOSITORY_URL}" RAYD_LOCK_REPOSITORY_NORMALIZED)
+if(NOT RAYD_GIT_REMOTE_NORMALIZED STREQUAL RAYD_LOCK_REPOSITORY_NORMALIZED)
     message(FATAL_ERROR
         "RayD repository mismatch: origin is '${RAYD_GIT_REMOTE_URL}', "
         "lock requires '${RAYD_LOCK_REPOSITORY_URL}'.")

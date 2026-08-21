@@ -111,6 +111,30 @@ def test_native_extension_prefers_packaged_module(monkeypatch: pytest.MonkeyPatc
     assert calls == [("._channel", "witwin.channel")]
 
 
+def test_packaged_fingerprint_falls_back_to_installed_distribution(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+):
+    installed = tmp_path / "witwin" / "channel" / "_channel.build-fingerprint"
+    installed.parent.mkdir(parents=True)
+    installed.write_text("a" * 64, encoding="ascii")
+
+    class MissingResource:
+        def joinpath(self, name):
+            return self
+
+        def is_file(self):
+            return False
+
+    class Distribution:
+        def locate_file(self, relative):
+            return tmp_path / relative
+
+    monkeypatch.setattr(runtime.resources, "files", lambda package: MissingResource())
+    monkeypatch.setattr(runtime.metadata, "distribution", lambda name: Distribution())
+
+    assert runtime._packaged_expected_fingerprint() == "a" * 64
+
+
 def test_native_extension_never_imports_a_global_module(monkeypatch: pytest.MonkeyPatch):
     calls: list[tuple[str, str | None]] = []
 
@@ -195,6 +219,23 @@ def test_packaged_module_origin_cannot_resolve_to_global_extension(
 
     with pytest.raises(runtime.ExtensionLoadError, match="outside"):
         runtime.native_extension()
+
+
+def test_packaged_origin_accepts_exact_editable_distribution_directory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+):
+    package_dir = tmp_path / "witwin" / "channel"
+    package_dir.mkdir(parents=True)
+    extension = package_dir / "_channel.pyd"
+    extension.touch()
+
+    class Distribution:
+        def locate_file(self, relative):
+            return tmp_path / relative
+
+    monkeypatch.setattr(runtime.metadata, "distribution", lambda name: Distribution())
+
+    runtime._assert_packaged_origin(SimpleNamespace(__file__=str(extension)))
 
 
 def test_extension_origin_accepts_spec_origin_when_file_is_missing(tmp_path: Path):

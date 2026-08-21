@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.26)
 
+function(normalize_git_remote_url input_url output_variable)
+    set(normalized_url "${input_url}")
+    string(REGEX REPLACE "[/\\\\]+$" "" normalized_url "${normalized_url}")
+    string(REGEX REPLACE "\\.git$" "" normalized_url "${normalized_url}")
+    set(${output_variable} "${normalized_url}" PARENT_SCOPE)
+endfunction()
+
 foreach(required_variable IN ITEMS
         GIT_EXECUTABLE
         CHANNEL_SOURCE_DIR
@@ -85,7 +92,9 @@ if(CHANNEL_RAYD_SOURCE_KIND STREQUAL "git-checkout")
         "${CHANNEL_RAYD_SOURCE_DIR}"
         actual_rayd_remote
         remote get-url origin)
-    if(NOT actual_rayd_remote STREQUAL CHANNEL_EXPECTED_RAYD_REMOTE)
+    normalize_git_remote_url("${actual_rayd_remote}" actual_rayd_remote_normalized)
+    normalize_git_remote_url("${CHANNEL_EXPECTED_RAYD_REMOTE}" expected_rayd_remote_normalized)
+    if(NOT actual_rayd_remote_normalized STREQUAL expected_rayd_remote_normalized)
         message(FATAL_ERROR
             "RayD origin changed after configure: expected "
             "'${CHANNEL_EXPECTED_RAYD_REMOTE}', found '${actual_rayd_remote}'; "

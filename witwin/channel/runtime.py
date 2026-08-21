@@ -14,7 +14,7 @@ from functools import lru_cache, wraps
 import functools
 import hashlib
 import importlib
-from importlib import machinery, resources, util
+from importlib import machinery, metadata, resources, util
 import json
 import os
 from pathlib import Path
@@ -206,10 +206,24 @@ def _extension_origin(module: object) -> Path:
         ) from exc
 
 
+def _installed_distribution_package_dir() -> Path | None:
+    try:
+        distribution = metadata.distribution("witwin-channel")
+    except metadata.PackageNotFoundError:
+        return None
+    package_dir = Path(distribution.locate_file("witwin/channel"))
+    try:
+        return package_dir.resolve(strict=True)
+    except OSError:
+        return None
+
+
 def _assert_packaged_origin(module: object) -> None:
     origin = _extension_origin(module)
     package_dir = Path(__file__).resolve().parent
-    if not origin.is_relative_to(package_dir):
+    installed_dir = _installed_distribution_package_dir()
+    allowed_dirs = (package_dir,) if installed_dir is None else (package_dir, installed_dir)
+    if not any(origin.is_relative_to(directory) for directory in allowed_dirs):
         raise ExtensionLoadError(
             f"refusing _channel resolved outside witwin.channel: {origin}"
         )
@@ -249,7 +263,13 @@ def _read_expected_fingerprint(raw: str, *, source: str) -> str:
 def _packaged_expected_fingerprint() -> str:
     sidecar = resources.files(__package__).joinpath("_channel.build-fingerprint")
     if not sidecar.is_file():
-        raise ExtensionABIError("the packaged build fingerprint is missing")
+        installed_dir = _installed_distribution_package_dir()
+        if installed_dir is not None:
+            installed = installed_dir / "_channel.build-fingerprint"
+            if installed.is_file():
+                sidecar = installed
+        if not sidecar.is_file():
+            raise ExtensionABIError("the packaged build fingerprint is missing")
     try:
         raw = sidecar.read_text(encoding="ascii")
     except OSError as exc:
