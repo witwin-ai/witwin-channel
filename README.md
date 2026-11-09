@@ -209,6 +209,21 @@ conda run -n witwin2 python ci/run_ci_tier.py quick
 conda run -n witwin2 python ci/run_ci_tier.py cuda
 ```
 
+The quick tier needs no native extension and runs on every push and pull
+request (`.github/workflows/quick-tier.yml`). The cuda tier and the full test
+suite need one. The test suite never picks a build directory on its own: when
+no packaged extension is installed, name the build to test explicitly.
+
+```powershell
+$env:WITWIN_CHANNEL_DEVELOPER_OVERRIDE = "1"
+$env:WITWIN_CHANNEL_EXTENSION_PATH = "<absolute path to the _channel extension>"
+$env:WITWIN_CHANNEL_EXPECTED_FINGERPRINT = "<contents of _channel.build-fingerprint beside it>"
+```
+
+Without these variables, pytest stops and lists the local builds under
+`artifacts/` with their build times, so you can see whether a build is older
+than the source you are testing.
+
 Architecture and domain-owner documentation lives next to the implementation
 under [`witwin/channel`](witwin/channel). Contributor rules and the
 full native validation matrix are defined in [`AGENTS.md`](AGENTS.md).

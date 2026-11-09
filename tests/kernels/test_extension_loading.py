@@ -238,6 +238,27 @@ def test_packaged_origin_accepts_exact_editable_distribution_directory(
     runtime._assert_packaged_origin(SimpleNamespace(__file__=str(extension)))
 
 
+def test_zip_backed_distribution_grants_no_origin_and_fails_with_load_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+):
+    extension = tmp_path / "elsewhere" / "_channel.pyd"
+    extension.parent.mkdir()
+    extension.touch()
+
+    class ZipEntry:
+        """Stands in for zipfile.Path, which has no __fspath__."""
+
+    class Distribution:
+        def locate_file(self, relative):
+            return ZipEntry()
+
+    monkeypatch.setattr(runtime.metadata, "distribution", lambda name: Distribution())
+
+    assert runtime._installed_distribution_package_dir() is None
+    with pytest.raises(runtime.ExtensionLoadError, match="outside"):
+        runtime._assert_packaged_origin(SimpleNamespace(__file__=str(extension)))
+
+
 def test_extension_origin_accepts_spec_origin_when_file_is_missing(tmp_path: Path):
     extension_file = tmp_path / "_channel.pyd"
     extension_file.touch()

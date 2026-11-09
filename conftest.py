@@ -14,7 +14,7 @@ _REPO_ROOT = Path(__file__).resolve().parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from tests.support.native_ext import BUILD_GUIDANCE, inject_native_paths  # noqa: E402
+from tests.support.native_ext import build_guidance, inject_native_paths  # noqa: E402
 
 if not inject_native_paths():
-    pytest.exit(BUILD_GUIDANCE, returncode=4)
+    pytest.exit(build_guidance(), returncode=4)

@@ -213,7 +213,10 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
         101,
     ]
 
-    assert {path.name for path in WORKFLOWS.glob("*.yml")} == {"publish-witwin-channel.yml"}
+    assert {path.name for path in WORKFLOWS.glob("*.yml")} == {
+        "publish-witwin-channel.yml",
+        "quick-tier.yml",
+    }
     workflow = (WORKFLOWS / "publish-witwin-channel.yml").read_text(encoding="utf-8")
     assert "\n  push:" not in workflow
     assert "\n  pull_request:" not in workflow
@@ -359,3 +362,19 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "needs.validate-wheels.result == 'success'" in workflow
     assert "pypa/gh-action-pypi-publish@release/v1" in workflow
     assert "id-token: write" in workflow
+
+
+def test_quick_tier_workflow_runs_on_every_push_and_pull_request() -> None:
+    workflow = (WORKFLOWS / "quick-tier.yml").read_text(encoding="utf-8")
+    publish = (WORKFLOWS / "publish-witwin-channel.yml").read_text(encoding="utf-8")
+
+    assert "\n  push:\n    branches:\n      - main" in workflow
+    assert "\n  pull_request:" in workflow
+    assert "run: python ci/run_ci_tier.py quick" in workflow
+    assert "self-hosted" not in workflow
+    # The quick tier never loads the extension, so it must not pay for CUDA wheels.
+    assert "download.pytorch.org/whl/cpu" in workflow
+    assert "cu128" not in workflow
+    core_pin = re.search(r"CORE_COMMIT: ([0-9a-f]{40})", workflow)
+    assert core_pin is not None
+    assert f"CORE_COMMIT: {core_pin.group(1)}" in publish

@@ -21,6 +21,8 @@ class Gate:
         return (python, *self.args)
 
 
+# The quick tier runs on hosts without a built extension, so its pytest gates pass
+# --confcutdir=tests to skip the root conftest that requires one.
 QUICK_GATES = (
     Gate(
         "quick.ruff",
@@ -50,6 +52,7 @@ QUICK_GATES = (
             "-m",
             "pytest",
             "-q",
+            "--confcutdir=tests",
             "tests/test_public_api_snapshot.py",
             "tests/test_binding_manifest_contract.py",
             "tests/test_phase10_legacy_dead_binding_audit.py",
@@ -76,6 +79,7 @@ QUICK_GATES = (
             "-m",
             "pytest",
             "-q",
+            "--confcutdir=tests",
             "tests/test_import_contract.py",
             "tests/test_supported_runtime_matrix.py",
             "tests/test_capabilities.py",

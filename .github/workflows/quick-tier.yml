@@ -1,0 +1,56 @@
+name: Quick tier
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quick-tier-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CORE_COMMIT: 46c826d969654912461d2e18b6cb87df9cc3df8f
+
+jobs:
+  quick:
+    name: Static and CPU gates
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out Channel
+        uses: actions/checkout@v5
+        with:
+          path: channel
+
+      - name: Check out locked Stage-I Core
+        uses: actions/checkout@v5
+        with:
+          repository: witwin-ai/witwin-core
+          ref: ${{ env.CORE_COMMIT }}
+          path: core
+          persist-credentials: false
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      # The quick tier never loads the native extension, so a CPU Torch build is enough.
+      - name: Install CPU Torch, Core, and gate tools
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install "numpy==2.2.6" "ruff==0.15.10" "mypy==1.18.2" "pytest==8.4.2"
+          python -m pip install --no-deps ./core
+
+      - name: Run the quick tier
+        working-directory: channel
+        shell: bash
+        run: python ci/run_ci_tier.py quick

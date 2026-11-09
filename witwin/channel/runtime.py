@@ -211,7 +211,12 @@ def _installed_distribution_package_dir() -> Path | None:
         distribution = metadata.distribution("witwin-channel")
     except metadata.PackageNotFoundError:
         return None
-    package_dir = Path(distribution.locate_file("witwin/channel"))
+    located = distribution.locate_file("witwin/channel")
+    # A zip-backed distribution returns a zipfile.Path, which is not a filesystem
+    # path and cannot hold the loaded extension, so it grants no extra origin.
+    if not isinstance(located, os.PathLike):
+        return None
+    package_dir = Path(located)
     try:
         return package_dir.resolve(strict=True)
     except OSError:
