@@ -40,16 +40,18 @@ def test_single_wedge_diffraction_matches_path_reference():
     )
     # The shared wedge emits one row for each surviving edge. Finite-edge
     # truncation and boundary blending push horizontal edge 4 below the 1e-30
-    # floor, leaving edge IDs 0, 1, 2, and 5 in both solvers.
+    # floor. The receiver lies behind both faces of the shared edge 0 (their
+    # normals point -x and -y), and RayD reports its edge-to-receiver segment
+    # as occluded, so edge 0 emits no row. That leaves edge IDs 1, 2, and 5 in
+    # both solvers.
     torch.testing.assert_close(
         result.paths.edge_id,
         torch.tensor(
-            [0, 1, 2, 5], device=result.paths.edge_id.device, dtype=torch.int32
+            [1, 2, 5], device=result.paths.edge_id.device, dtype=torch.int32
         ),
     )
     expected_length = torch.tensor(
         [
-            3.650281668,
             4.744879723,
             3.768759727,
             4.046976566,
@@ -60,10 +62,9 @@ def test_single_wedge_diffraction_matches_path_reference():
     # / /: the diffracted field carries the z-hat short-dipole sin
     # pattern (projected onto the rx polarization) and the monotone finite-edge
     # truncation with the boundary-distance odd blend, which reshape the
-    # per-edge gains; edges 0/1 sit at near-null while edges 2/5 stay dominant.
+    # per-edge gains; edge 1 sits at near-null while edges 2/5 stay dominant.
     expected_gain = torch.tensor(
         [
-            2.980571e-18,
             2.680186e-11,
             1.471983e-08,
             6.686395e-09,
@@ -121,9 +122,9 @@ def test_vertical_only_edge_policy_filters_horizontal_edges():
 
     assert result.paths is not None
     # The horizontal outline edges (|dz|/length = 0) must not produce paths;
-    # the vertical shared wedge edge and the slanted outline edges
-    # (|dz|/length ~ 0.83 > 0.7) survive.
-    assert int(result.paths.valid.numel()) == 3
+    # the slanted outline edges (|dz|/length ~ 0.83 > 0.7) survive. The vertical
+    # shared wedge edge passes the policy but is occluded from the receiver.
+    assert result.paths.edge_id.tolist() == [2, 5]
     baseline = solve(
         wedge_diffraction_scene(),
         Config(
@@ -134,10 +135,10 @@ def test_vertical_only_edge_policy_filters_horizontal_edges():
         ),
         reference_frequency_hz=3.0e9,
     )
-    # the finite-edge truncation pushes
-    # the weak horizontal edge that had admitted back below the existence
-    # floor, so the unfiltered baseline emits 4 paths; vertical_only keeps 3.
-    assert int(baseline.paths.valid.numel()) == 4
+    # The finite-edge truncation pushes the weak horizontal edge 4 below the
+    # existence floor, so the unfiltered baseline emits edges 1, 2 and 5;
+    # vertical_only drops horizontal edge 1.
+    assert baseline.paths.edge_id.tolist() == [1, 2, 5]
 
 
 def test_diffraction_path_field_export_uses_native_complex_fields():
@@ -174,3 +175,26 @@ def test_diffraction_path_field_export_uses_native_complex_fields():
     torch.testing.assert_close(
         result.path_gain, result.field.abs().square(), rtol=2.0e-4, atol=1.0e-10
     )
+
+def test_shared_wedge_edge_diffracts_to_a_receiver_in_front_of_the_faces():
+    """Edge 0 is dropped above only because that receiver is behind both faces."""
+
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic diffraction")
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
+
+    scene = wedge_diffraction_scene(rx=torch.tensor([1.0, 1.0, 0.5]))
+    result = solve(
+        scene,
+        Config(
+            components={"diffraction"},
+            coherent=False,
+            export_paths=True,
+            return_field=False,
+        ),
+        reference_frequency_hz=3.0e9,
+    )
+
+    assert result.paths is not None
+    assert 0 in result.paths.edge_id.tolist()
