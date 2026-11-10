@@ -494,10 +494,10 @@ def _path_components(config: EnumeratedPathConfig) -> set[str]:
 def _resolve_isb_taper(config: EnumeratedPathConfig) -> tuple[bool, float, float]:
     """Resolve the ISB boundary taper flag and per-stage widths.
 
- DEFAULT-OFF: when the taper is disabled the field/diffraction stages receive
- width 0.0 (every existing call path untouched) and the LoS membership stage
- receives the default 0.5, preserving the pre-the boundary taper calls byte-for-byte.
- """
+    DEFAULT-OFF: when the taper is disabled the field/diffraction stages receive
+    width 0.0 (every existing call path untouched) and the LoS membership stage
+    receives the default 0.5, preserving the pre-taper calls byte-for-byte.
+    """
 
     enabled = bool(getattr(config, "isb_boundary_taper", False))
     configured_width = float(getattr(config, "isb_boundary_taper_width", 0.5))
@@ -553,16 +553,16 @@ def evaluate_enumerated_paths(
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     """Discover, select, and evaluate canonical enumerated propagation rows.
 
- ``coupled_rx_streaming`` streams coupled reflection-diffraction discovery
- over receiver blocks so a full grid solve stays under the per-block
- candidate budget (coupled reflection and diffraction). The deterministic grid solver sets it; the path
- and Monte Carlo callers keep the single-shot total-cap discovery, so their
- coupled behavior is unchanged.
+    ``coupled_rx_streaming`` streams coupled reflection-diffraction discovery
+    over receiver blocks so a full grid solve stays under the per-block
+    candidate budget (coupled reflection and diffraction). The deterministic grid solver sets it; the path
+    and Monte Carlo callers keep the single-shot total-cap discovery, so their
+    coupled behavior is unchanged.
 
- ``defer_capacity_terminal`` is reserved for Path and Deterministic outer
- solvers, which must sanitize scattering-appended rows and enqueue the one
- terminal observer only after their public result/array packing. the enumerated-path oracle callers keep the default and complete the transaction here.
- """
+    ``defer_capacity_terminal`` is reserved for Path and Deterministic outer
+    solvers, which must sanitize scattering-appended rows and enqueue the one
+    terminal observer only after their public result/array packing. the enumerated-path oracle callers keep the default and complete the transaction here.
+    """
 
     _require_defer_capacity_terminal(defer_capacity_terminal)
     device = torch.device("cuda")
@@ -585,7 +585,7 @@ def evaluate_enumerated_paths(
     compiled = require_compiled(scene)
     # One host read of a tensor frequency for the whole export: discovery and
     # the field seam below share this detached scalar. Callers
-    # that already read it (the solver seams) pass it in.
+    # that already read it pass it in.
     frequency_hz = (
         _frequency_scalar(scene) if frequency_value is None else float(frequency_value)
     )
@@ -593,7 +593,7 @@ def evaluate_enumerated_paths(
     if ad_mode != "none":
         _require_frequency_ad_constant_materials(scene, compiled, ad_mode=ad_mode)
     components = _path_components(config)
-    # ISB boundary taper (the boundary taper): DEFAULT-OFF. When off, width 0.0 flows to the
+    # ISB boundary taper: DEFAULT-OFF. When off, width 0.0 flows to the
     # field/diffraction stages and every existing call path is untouched.
     isb_boundary_taper, isb_boundary_taper_width, isb_los_width = _resolve_isb_taper(
         config

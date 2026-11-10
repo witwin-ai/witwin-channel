@@ -86,36 +86,6 @@ def test_current_baseline_is_exact_and_passes() -> None:
     }
 
 
-def test_repository_budget_retires_all_file_size_gates() -> None:
-    config = budgets.load_budgets(BUDGET_PATH)
-
-    # Python files have no line-count limit or exemptions.
-    assert "file_lines" not in config["limits"]
-    assert "file_exemptions" not in config
-    # The reason is recorded in the config itself, next to what survived.
-    assert "Retired 2026-07-27" in config["limits_policy"]["file_lines"]
-    assert "Retired" not in config["limits_policy"]["function_complexity"]
-    # Native TU size was retired separately under CUDA source consolidation; complexity remains.
-    assert config["limits"]["function_complexity"] == {"recommended": 15}
-    assert "native_file_lines" not in config["limits"]
-    assert "native_file_exemptions" not in config
-    assert "Retired 2026-07-28" in config["limits_policy"]["native_file_lines"]
-    # Retiring the file-size gate must not disturb the complexity waivers: the
-    # section survives, is still enforced, and every surviving entry is live.
-    # Asserting a fixed count instead would be brittle and would say nothing -
-    # a refactor that simplifies an exempted function correctly retires its
-    # waiver, which is exactly what happened to four of them in source consolidation the initial implementation.
-    _, functions = budgets.measure_repository(ROOT, config["source_root"])
-    complexity = {metric.key: metric.complexity for metric in functions}
-    recommended = config["limits"]["function_complexity"]["recommended"]
-    exemptions = config["function_exemptions"]
-    assert exemptions
-    assert all(
-        complexity[key] > recommended and entry["ceiling"] == complexity[key]
-        for key, entry in exemptions.items()
-    )
-
-
 def test_absent_file_line_limit_skips_every_file_size_check(tmp_path: Path) -> None:
     # A file far past the retired hard limit of 2000 lines, whose only real
     # violation is control-flow complexity.

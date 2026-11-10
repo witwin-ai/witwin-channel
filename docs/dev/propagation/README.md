@@ -244,7 +244,7 @@ return a zero result, or silently switch algorithms.
 ## Maintenance
 
 New internal exports or owner moves require a migration note and contract
-tests. The completed kernel migration ledger is archived at
-`docs/dev/audit/phase12-ops-migration-ledger.json`; dependency changes must pass
+tests. The completed kernel migration ledger is archived in Git history
+(`docs/dev/archive.md`); dependency changes must pass
 the import graph. A new root or solver public export also updates
 `ci/public-api-snapshot.json`.

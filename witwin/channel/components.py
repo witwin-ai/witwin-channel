@@ -43,15 +43,15 @@ def component_availability_status(
 ) -> dict[str, str]:
     """Report the status of every component against what this solve can run.
 
- Every solver states its own error strings because the same missing native
- capability means something different per solver. ``depth_available`` is the
- solver's own bounce-budget check: the path solver is the only caller that
- refuses to call reflection or diffraction enabled without a depth budget,
- and it uses one condition with two messages. Reflection is decided
- completely before diffraction, and availability is checked before depth
- within each component, so a caller that fails two requirements at once
- always sees the first one in that fixed order.
- """
+    Every solver states its own error strings because the same missing native
+    capability means something different per solver. ``depth_available`` is the
+    solver's own bounce-budget check: the path solver is the only caller that
+    refuses to call reflection or diffraction enabled without a depth budget,
+    and it uses one condition with two messages. Reflection is decided
+    completely before diffraction, and availability is checked before depth
+    within each component, so a caller that fails two requirements at once
+    always sees the first one in that fixed order.
+    """
 
     requested = frozenset(components)
     status = {
@@ -84,11 +84,11 @@ def apply_exported_path_counts(
 ) -> dict[str, str]:
     """Refine transmission/scattering status with what the solve exported.
 
- Both components export real paths, so a requested component that produced
- no path (every wall too thick to penetrate, every surface smooth) keeps the
- truthful ``enabled_no_paths`` status rather than claiming paths exist.
- Mutates ``status`` in place and returns it.
- """
+    Both components export real paths, so a requested component that produced
+    no path (every wall too thick to penetrate, every surface smooth) keeps the
+    truthful ``enabled_no_paths`` status rather than claiming paths exist.
+    Mutates ``status`` in place and returns it.
+    """
 
     requested = frozenset(components)
     counts = {
@@ -108,15 +108,15 @@ def component_max_depth(
 ) -> dict[str, int]:
     """Per-component interaction depth, ``-1`` for a component not requested.
 
- LoS is depth 0 by definition. Reflection and transmission are chains and
- carry the solver's depth budget. Diffraction and scattering are
- single-bounce contracts, so their cap is a separate argument rather than
- the same one: BDPT passes ``min(1, effective_max_depth)`` because its
- budget can be smaller than a single bounce, while the enumerated solvers
- pass a literal 1. A solver whose component reaches further than this rule
- (path's coupled 1R1D/1D1R family) states that override at its own call
- site, where the reason for it lives.
- """
+    LoS is depth 0 by definition. Reflection and transmission are chains and
+    carry the solver's depth budget. Diffraction and scattering are
+    single-bounce contracts, so their cap is a separate argument rather than
+    the same one: BDPT passes ``min(1, effective_max_depth)`` because its
+    budget can be smaller than a single bounce, while the enumerated solvers
+    pass a literal 1. A solver whose component reaches further than this rule
+    (path's coupled 1R1D/1D1R family) states that override at its own call
+    site, where the reason for it lives.
+    """
 
     requested = frozenset(components)
     return {
@@ -175,9 +175,9 @@ def validate_bounce_depth(
 ) -> None:
     """Refuse a bounce-requiring component with no bounce budget.
 
- Each Monte Carlo solver names itself in the message, so the message is the
- caller's and the rule is shared.
- """
+    Each Monte Carlo solver names itself in the message, so the message is the
+    caller's and the rule is shared.
+    """
 
     if max_depth < 1 and components & BOUNCE_COMPONENTS:
         raise RuntimeError(error_message)
@@ -218,9 +218,9 @@ def validate_coupled_gate(
 ) -> None:
     """Validate the coupled reflection-diffraction opt-in gate (coupled reflection and diffraction).
 
- Split from the candidate-limit rule below because the path solver checks
- the two at different points in its ``__post_init__``.
- """
+    Split from the candidate-limit rule below because the path solver checks
+    the two at different points in its ``__post_init__``.
+    """
 
     if coupled_paths:
         if max_depth < 2:

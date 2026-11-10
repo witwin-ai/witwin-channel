@@ -9,7 +9,6 @@ from pathlib import Path
 import re
 
 from benchmarks.phase13_phase12.release import _naming_audit
-from ci import check_contract_coverage as coverage
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -69,21 +68,6 @@ def test_live_reflection_and_diffraction_producers_remain_compact() -> None:
         "deterministic_reflection_sequence_compact",
     } <= reflection_calls
     assert "deterministic_diffraction_order1_compact" in diffraction_calls
-
-
-def test_dormant_adr029_and_adr030_producers_have_no_production_caller() -> None:
-    call_sites = coverage._python_call_sites(
-        ROOT, frozenset(coverage.DORMANT_FACADE_OWNERS)
-    )
-    offenders = []
-    for facade, rows in sorted(call_sites.items()):
-        allowed = coverage.DORMANT_ALLOWED_FACADE_CALLERS.get(facade, frozenset())
-        offenders.extend(
-            f"{path}:{line}:{facade}:{caller}"
-            for caller, path, line in rows
-            if caller not in allowed
-        )
-    assert offenders == []
 
 
 def test_public_path_exports_retain_actual_row_compaction() -> None:

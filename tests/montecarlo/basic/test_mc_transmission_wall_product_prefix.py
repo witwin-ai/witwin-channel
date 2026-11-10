@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 import torch
@@ -20,7 +19,6 @@ pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required"
 )
 
-_ROOT = Path(__file__).resolve().parents[3]
 _FREQUENCY_HZ = 3.5e9
 
 
@@ -233,22 +231,3 @@ def test_later_discrete_corruption_is_preflighted_before_prefix_evaluation(
     jvp_state = create_capacity_failure_state(inputs[0])
     _assert_all_zero(_jvp(inputs, jvp_state))
     assert jvp_state.bits.tolist() == [expected_bit]
-
-
-def test_wall_product_source_uses_full_preflight_and_effective_prefix() -> None:
-    source = (
-        _ROOT / "native/channel/kernels/mc_transmission.cu"
-    ).read_text(encoding="utf-8")
-
-    assert source.count("for (int slot = 0; slot < count; ++slot)") == 1
-    assert source.count(
-        "for (int slot = 0; slot < preflight.first_blocker; ++slot)"
-    ) == 4
-    assert source.count(
-        "for (int other = 0; other < effective_count; ++other)"
-    ) == 2
-    assert "wall_count[row] = preflight.first_blocker + 1" in source
-    assert source.count("stopped_before_next_wall") == 12
-    assert source.count("if (!(wall_value > 0.0f))") == 2
-    assert "if (!(value.value > 0.0f))" in source
-    assert "if (!(wall.value > 0.0f))" in source

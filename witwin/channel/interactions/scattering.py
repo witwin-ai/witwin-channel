@@ -126,10 +126,10 @@ __all__ = [
 def frequency_tensor(scene: Scene, device: torch.device) -> torch.Tensor:
     """Scene carrier frequency as a 0-d float32 CUDA tensor for AD scalars.
 
- A ``requires_grad`` scene frequency keeps its autograd graph so frequency
- gradients flow through the radiometric ``coef`` / ``k0`` scalars; a plain
- Python-float frequency becomes a constant scalar tensor.
- """
+    A ``requires_grad`` scene frequency keeps its autograd graph so frequency
+    gradients flow through the radiometric ``coef`` / ``k0`` scalars; a plain
+    Python-float frequency becomes a constant scalar tensor.
+    """
 
     frequency = scene.frequency
     if isinstance(frequency, torch.Tensor):
@@ -142,11 +142,11 @@ def ensemble_coef_scale(
 ) -> torch.Tensor | None:
     """AD radiometric ``coef`` scale for ensemble rows, or ``None`` when AD is off.
 
- scattering AD: the radiometric scale becomes a Torch scalar so frequency gradients
- flow through the ensemble rows (their only frequency dependence). Ensemble
- rows are zero-the penetration implementationower rows, so nothing else is differentiable w.r.t.
- frequency.
- """
+    scattering AD: the radiometric scale becomes a Torch scalar so frequency gradients
+    flow through the ensemble rows (their only frequency dependence). Ensemble
+    rows are zero-phase power rows, so nothing else is differentiable w.r.t.
+    frequency.
+    """
 
     if not ad_enabled:
         return None
@@ -158,11 +158,11 @@ def realization_scalars(
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """AD ``(frequency_t, k0_t, amplitude_scale_t)`` for realization rows.
 
- scattering AD: ``k0`` and the outer amplitude scale become Torch scalars so
- frequency gradients flow through the coherent phase, the Kirchhoff prefactor
- and the radiometric normalization; ``frequency_t`` also threads into the
- differentiable EM layer stack.
- """
+    scattering AD: ``k0`` and the outer amplitude scale become Torch scalars so
+    frequency gradients flow through the coherent phase, the Kirchhoff prefactor
+    and the radiometric normalization; ``frequency_t`` also threads into the
+    differentiable EM layer stack.
+    """
 
     frequency_t = frequency_tensor(scene, device)
     k0_t = 2.0 * math.pi * frequency_t / C0
@@ -174,7 +174,7 @@ def realization_scalars(
 # Single-bounce scattering
 # -------------------------------------------------------------------------
 #
-# Deterministic rough-surface scattering (the rough-scattering model, the scattering model).
+# Deterministic rough-surface scattering.
 #
 # Appends single-bounce ``component_id=6`` scattering rows to canonical typed
 # ``EvaluatedPaths`` contracts. Two mutually exclusive per-surface modes:
@@ -247,7 +247,7 @@ def _sp_basis(
     n: torch.Tensor, d: torch.Tensor, backup_axis: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Local ``s = normalize(n x d)``, ``p = s x d`` with a deterministic
- backup axis at normal incidence (the field convention)."""
+    backup axis at normal incidence."""
 
     s = torch.cross(n, d, dim=-1)
     degenerate = torch.linalg.vector_norm(s, dim=-1, keepdim=True) < 1.0e-6
@@ -257,7 +257,7 @@ def _sp_basis(
 
 
 def _offset_eps(points: torch.Tensor, scene_diagonal: torch.Tensor) -> torch.Tensor:
-    """Scale-aware hit offset (the transmission behavior)."""
+    """Scale-aware hit offset."""
 
     return torch.maximum(
         torch.linalg.vector_norm(points, dim=-1) * 1.0e-6, scene_diagonal * 1.0e-6
@@ -289,10 +289,10 @@ def _r2_barycentric(
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Deterministic per-face R2 sample coordinates.
 
- Returns ``(face_of_sample, a, b)`` where ``(a, b)`` are uniform triangle
- barycentric coordinates (unit-square R2 points folded across the
- diagonal, an area-preserving map).
- """
+    Returns ``(face_of_sample, a, b)`` where ``(a, b)`` are uniform triangle
+    barycentric coordinates (unit-square R2 points folded across the
+    diagonal, an area-preserving map).
+    """
 
     total = int(counts.sum())
     face_of_sample = torch.repeat_interleave(
@@ -410,7 +410,7 @@ def _ensemble_rows(
     power_scale = wavelength**2 / (4.0 * math.pi) ** 2
     # AD mode (scattering AD): the radiometric scale ``coef`` becomes a Torch scalar
     # so frequency gradients flow through the ensemble rows (their only
-    # frequency dependence). Ensemble rows are zero-the penetration implementationower rows, so nothing
+    # frequency dependence). Ensemble rows are zero-phase power rows, so nothing
     # else here is differentiable w.r.t. frequency.
     coef_scale_t = ensemble_coef_scale(scene, device, ad_enabled=ad_enabled)
 
@@ -1236,13 +1236,13 @@ KMAX_AD_DEPTH = 8
 class ScatterChainDiscovery:
     """C1/C2 join output consumed read-only by the native chain facades.
 
- ``R`` = joined chain rows (budgeted keep-strongest-per-pair +
- ``scattering_chain_max_rows`` per (tx, rx)). Rows are frozen in tx-major
- order, so a consumer may pass a narrow view of its existing per-tx device
- selection mask as the explicit RayD row-valid contract without allocating
- a replacement mask. Every tensor shares one CUDA device and is
- C-contiguous; ``Dmax = KMAX_AD_DEPTH = 8``. See the field contract below.
- """
+    ``R`` = joined chain rows (budgeted keep-strongest-per-pair +
+    ``scattering_chain_max_rows`` per (tx, rx)). Rows are frozen in tx-major
+    order, so a consumer may pass a narrow view of its existing per-tx device
+    selection mask as the explicit RayD row-valid contract without allocating
+    a replacement mask. Every tensor shares one CUDA device and is
+    C-contiguous; ``Dmax = KMAX_AD_DEPTH = 8``. See the field contract below.
+    """
 
     # Row identity.
     tx_id: torch.Tensor  # [R] int32
@@ -1391,11 +1391,11 @@ def _equi_join_indices(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Vectorized equi-join: return ``(ai, bi)`` with ``a_key[ai] == b_key[bi]``.
 
- Produces every match combination (Cartesian per shared key), fully on device
- (no host sync per element). Row order is grouped by ascending dense key then
- by the input order within each side (stable), so downstream stable sorts make
- the final order fully deterministic.
- """
+    Produces every match combination (Cartesian per shared key), fully on device
+    (no host sync per element). Row order is grouped by ascending dense key then
+    by the input order within each side (stable), so downstream stable sorts make
+    the final order fully deterministic.
+    """
 
     device = a_key.device
     if a_key.numel() == 0 or b_key.numel() == 0:
@@ -1438,9 +1438,9 @@ def _stable_chain_order(
 ) -> torch.Tensor:
     """Deterministic row order: stable sort on (tx, rx, sample, d1, d2).
 
- Implemented as a lexicographic sort via a single composite key so the order
- is reproducible run-to-run.
- """
+    Implemented as a lexicographic sort via a single composite key so the order
+    is reproducible run-to-run.
+    """
 
     n = int(tx_id.shape[0])
     if n == 0:
@@ -1476,12 +1476,12 @@ def _budget_chain_rows(
 ) -> torch.Tensor:
     """Row indices of the strongest ``<= cap`` chain rows per (tx, rx) pair.
 
- Mirrors the single-bounce ``_keep_strongest_per_pair`` policy above,
- extended with the per-(tx, rx)
- ``scattering_chain_max_rows`` cap. ``strength`` is the geometric proxy
- ``1 / (L1^2 L2^2)`` (the dominant Op A gain factor); the final physical keep
- gate still runs in the native op.
- """
+    Mirrors the single-bounce ``_keep_strongest_per_pair`` policy above,
+    extended with the per-(tx, rx)
+    ``scattering_chain_max_rows`` cap. ``strength`` is the geometric proxy
+    ``1 / (L1^2 L2^2)`` (the dominant Op A gain factor); the final physical keep
+    gate still runs in the native op.
+    """
 
     pair = tx_id.to(torch.int64) * int(num_rx) + rx_id.to(torch.int64)
     order = torch.argsort(-strength.to(torch.float64), stable=True)
@@ -1505,11 +1505,11 @@ def build_chain_samples(
 ) -> ChainSamples | None:
     """Draw the chain-sample vertex set on the ensemble scatter faces.
 
- Uses the same R2 low-discrepancy barycentric scheme as the single-bounce
- ensemble sampler at the documented lower ``scattering_chain_samples_per_m2``
- density. Returns ``None`` when no ensemble
- scatter face carries a sample.
- """
+    Uses the same R2 low-discrepancy barycentric scheme as the single-bounce
+    ensemble sampler at the documented lower ``scattering_chain_samples_per_m2``
+    density. Returns ``None`` when no ensemble
+    scatter face carries a sample.
+    """
 
     if int(ensemble_faces.numel()) == 0:
         return None
@@ -1606,9 +1606,9 @@ def _polyline_length(
 ) -> torch.Tensor:
     """Unfolded chain length source -> hits[0..depth-1] -> endpoint (structural).
 
- Sum of the RayD-owned segment lengths; equals the image-source length for a
- specular chain to f32. ``hits`` is ``[M, depth, 3]`` (may be depth 0).
- """
+    Sum of the RayD-owned segment lengths; equals the image-source length for a
+    specular chain to f32. ``hits`` is ``[M, depth, 3]`` (may be depth 0).
+    """
 
     if depth == 0:
         return torch.linalg.vector_norm(endpoint - source, dim=-1)
@@ -1656,13 +1656,13 @@ def _leg_batch(
 ) -> dict[str, torch.Tensor]:
     """Pack one same-depth EPC batch into a padded leg record.
 
- ``hits``/``normals`` are ``[M, depth, 3]`` ordered source-first;
- ``primitive``/``material`` are ``[M, depth]``. For C2 (``reverse=True``) the
- bounce axis is flipped so the leg is indexed from the vertex outward toward
- RX, and ``endpoint_dir`` is the outgoing direction leaving the vertex; for C1
- (``reverse=False``) ``endpoint_dir`` is the incident direction arriving at
- the vertex. ``endpoint`` is the vertex position.
- """
+    ``hits``/``normals`` are ``[M, depth, 3]`` ordered source-first;
+    ``primitive``/``material`` are ``[M, depth]``. For C2 (``reverse=True``) the
+    bounce axis is flipped so the leg is indexed from the vertex outward toward
+    RX, and ``endpoint_dir`` is the outgoing direction leaving the vertex; for C1
+    (``reverse=False``) ``endpoint_dir`` is the incident direction arriving at
+    the vertex. ``endpoint`` is the vertex position.
+    """
 
     device = sample_index.device
     dmax = KMAX_AD_DEPTH
@@ -1718,11 +1718,11 @@ def _gather_leg(
     scene_diagonal: torch.Tensor, max_leg_depth: int, reverse: bool,
 ) -> dict[str, torch.Tensor]:
     """Enumerate specular reflection chains ``source -> {samples}`` at every leg
- depth ``0..max_leg_depth`` and pack them into a concatenated padded leg table.
+    depth ``0..max_leg_depth`` and pack them into a concatenated padded leg table.
 
- All hit geometry is produced by the native RayD EPC; this only selects,
- reverses (for C2), pads, and derives lengths/directions structurally.
- """
+    All hit geometry is produced by the native RayD EPC; this only selects,
+    reverses (for C2), pads, and derives lengths/directions structurally.
+    """
 
     device = samples.position.device
     rayd = compiled.rayd
@@ -1959,9 +1959,9 @@ def _trace_group_chains(
 ) -> torch.Tensor:
     """Trace specular chains from a source and map hits to plane-group ids.
 
- Mirrors ``interactions/reflection._discovered_group_chains`` (used only by
- the non-exhaustive discovery branch of the shared iterators).
- """
+    Mirrors ``interactions/reflection._discovered_group_chains`` (used only by
+    the non-exhaustive discovery branch of the shared iterators).
+    """
 
     from witwin.channel.kernels.topology import (
         mc_sample_directions,
@@ -1992,14 +1992,14 @@ def discover_scatter_chains(
 ) -> ScatterChainDiscovery | None:
     """Enumerate and join C1/C2 specular chains around each chain vertex.
 
- Runs the RayD reflection EPC for ``tx -> {samples}`` (C1) and
- ``rx -> {samples}`` (C2), joins the legs on the sample index (excluding the
- ``d1 = d2 = 0`` single-bounce collapse), enforces ``d1 + d2 <=
- scattering_chain_max_depth`` with each leg ``<= KMAX_AD_DEPTH``, budgets by
- keep-strongest per (tx, rx) up to ``scattering_chain_max_rows``, and returns
- the frozen:class:`ScatterChainDiscovery` in deterministic row order. Returns
- ``None`` when no chain row survives.
- """
+    Runs the RayD reflection EPC for ``tx -> {samples}`` (C1) and
+    ``rx -> {samples}`` (C2), joins the legs on the sample index (excluding the
+    ``d1 = d2 = 0`` single-bounce collapse), enforces ``d1 + d2 <=
+    scattering_chain_max_depth`` with each leg ``<= KMAX_AD_DEPTH``, budgets by
+    keep-strongest per (tx, rx) up to ``scattering_chain_max_rows``, and returns
+    the frozen :class:`ScatterChainDiscovery` in deterministic row order. Returns
+    ``None`` when no chain row survives.
+    """
 
     device = samples.position.device
     max_chain_depth = int(getattr(config, "scattering_chain_max_depth", 0))
@@ -2076,9 +2076,9 @@ def _join_leg_tables(
 ) -> list[dict[str, torch.Tensor]]:
     """Join C1/C2 legs per (tx, rx) on the sample index into chain-row blocks.
 
- Excludes the ``d1 = d2 = 0`` single-bounce collapse and enforces the total
- ``d1 + d2 <= scattering_chain_max_depth`` gate before packing each survivor.
- """
+    Excludes the ``d1 = d2 = 0`` single-bounce collapse and enforces the total
+    ``d1 + d2 <= scattering_chain_max_depth`` gate before packing each survivor.
+    """
 
     rows: list[dict[str, torch.Tensor]] = []
     for i in range(num_tx):
@@ -2265,9 +2265,9 @@ def _chain_bounce_material(
 ) -> torch.Tensor:
     """Gather a per-face Fresnel parameter onto a padded ``[R, Dmax]`` leg block.
 
- Padded slots (``primitive < 0``) take the identity ``pad`` value so the
- native chain transport treats them as no-ops (coherent-scattering padding).
- """
+    Padded slots (``primitive < 0``) take the identity ``pad`` value so the
+    native chain transport treats them as no-ops (coherent-scattering padding).
+    """
 
     valid = primitive >= 0
     idx = primitive.clamp_min(0).to(torch.int64)
@@ -2280,11 +2280,11 @@ def _chain_vertex_frame(
 ) -> dict[str, torch.Tensor]:
     """Vertex roughness frame + incident local coords (single-bounce parity).
 
- Mirrors ``_ensemble_rows``: the mean-plane normal is flipped toward the
- incident side, the principal roughness axes ``t1r``/``t2r`` are rotated by the
- material azimuth, and the incident direction is expressed in the local table
- frame (``wi_local``).
- """
+    Mirrors ``_ensemble_rows``: the mean-plane normal is flipped toward the
+    incident side, the principal roughness axes ``t1r``/``t2r`` are rotated by the
+    material azimuth, and the incident direction is expressed in the local table
+    frame (``wi_local``).
+    """
 
     d_i = discovery.d_i
     v_material = discovery.v_material.to(torch.int64)
@@ -2319,15 +2319,15 @@ def _chain_ensemble_evaluate(
 ) -> dict[str, torch.Tensor]:
     """Dispatch the native coherent scattering chain-ensemble kernel per transmitter.
 
- Builds the AS-BUILT native Op A argument set from the discovery contract plus
- the resident Kirchhoff tables and per-face material tensors, then dispatches
- the native ``scattering_chain_ensemble_eval`` (or its ``_ad`` companion) once
- per transmitter so the AD-live radiometric ``coef`` (which carries the per-tx
- power) crosses the ABI as a scalar exactly as the single-bounce op-1 path.
- The endpoint positions ``source``/``vertex``/``target`` feed the C1/C2
- transport and ``weights`` (per-vertex ``A_patch``) follows the op-1
- convention (with the ``1/(L1^2 L2^2)`` spreading applied in-kernel).
- """
+    Builds the AS-BUILT native Op A argument set from the discovery contract plus
+    the resident Kirchhoff tables and per-face material tensors, then dispatches
+    the native ``scattering_chain_ensemble_eval`` (or its ``_ad`` companion) once
+    per transmitter so the AD-live radiometric ``coef`` (which carries the per-tx
+    power) crosses the ABI as a scalar exactly as the single-bounce op-1 path.
+    The endpoint positions ``source``/``vertex``/``target`` feed the C1/C2
+    transport and ``weights`` (per-vertex ``A_patch``) follows the op-1
+    convention (with the ``1/(L1^2 L2^2)`` spreading applied in-kernel).
+    """
 
     op_a = getattr(scattering_kernels, "scattering_chain_ensemble_eval", None)
     op_a_ad = (
@@ -2474,11 +2474,11 @@ def _chain_topology_slots(
 ) -> dict[str, torch.Tensor]:
     """Build the multi-slot interaction sequence of every chain row.
 
- Slot layout per row (coherent scattering): ``[REFLECTION]*d1 + [SCATTERING] +
- [REFLECTION]*d2``; C1 fills the leading ``d1`` slots, the diffuse vertex sits
- at slot ``d1``, and C2 fills slots ``d1 + 1 .. d1 + d2``. Padded slots carry
- ``primitive/material = -1`` and ``interaction_type = 0`` (inactive).
- """
+    Slot layout per row (coherent scattering): ``[REFLECTION]*d1 + [SCATTERING] +
+    [REFLECTION]*d2``; C1 fills the leading ``d1`` slots, the diffuse vertex sits
+    at slot ``d1``, and C2 fills slots ``d1 + 1 .. d1 + d2``. Padded slots carry
+    ``primitive/material = -1`` and ``interaction_type = 0`` (inactive).
+    """
 
     device = discovery.device
     rows = discovery.row_count
@@ -2691,9 +2691,9 @@ def append_chain_scattering_paths(
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     """coherent scattering: discover and append enumerated scatter-chain rows.
 
- Default-OFF: ``scattering_chain_max_depth < 1`` returns the inputs unchanged
- (this branch is never entered, so the pipeline is byte-identical).
- """
+    Default-OFF: ``scattering_chain_max_depth < 1`` returns the inputs unchanged
+    (this branch is never entered, so the pipeline is byte-identical).
+    """
 
     device = evaluated.device
     compiled = require_compiled(scene)
@@ -2763,7 +2763,7 @@ def append_chain_scattering_paths(
 #
 # Shared Kirchhoff rough-surface scattering helpers for the MC solvers.
 #
-# Extends the wave-2 two-way {reflect, transmit} event machinery
+# Extends the two-way {reflect, transmit} event machinery
 # (:mod:`witwin.channel.interactions.transmission`) to the three-way
 # {reflect, scatter, transmit} selection of surface-event selection at hits on rough
 # faces (``scatter_model_id == 1``), and hosts the pure-torch pieces both MC
@@ -2775,10 +2775,10 @@ def append_chain_scattering_paths(
 #
 # - Event probabilities are proportional to the native energy
 # budgets ``(R_coh, R_diff, T_bar)`` at the hit incidence with the same
-# minimum-probability floor pattern as the wave-2 two-way split; the
+# minimum-probability floor pattern as the two-way split; the
 # selected branch's POWER is divided by its probability (fields by
 # ``sqrt(p)``), keeping the estimator unbiased. Smooth faces
-# (``scatter_model_id != 1``) keep the wave-2 two-way logic bit-identically:
+# (``scatter_model_id != 1``) keep the two-way logic bit-identically:
 # their scatter probability is exactly zero and their transmit probability
 # still comes from the native stack budgets, so the single selection
 # uniform partitions identically.
@@ -2788,8 +2788,7 @@ def append_chain_scattering_paths(
 # - Specular reflection and delta transmission stay discrete events;
 # Kirchhoff scattering is a continuous solid-angle density. The scattered
 # subpath stores ``pdf_forward *= pdf(wo|wi)`` and ``pdf_reverse *=
-# pdf(wi|wo)`` from the SAME reciprocal table with swapped arguments
-# (the sampling behavior).
+# pdf(wi|wo)`` from the SAME reciprocal table with swapped arguments.
 # - Depth rule (BDPT ``max_scattering_order``, coherent scattering):
 # * order 1 (default): scattering is single-bounce. A scattered subpath
 # connects to the receivers (NEE) and terminates; reflection/transmission
@@ -2826,7 +2825,7 @@ def append_chain_scattering_paths(
 # where ``P_te/P_tm`` are the incident Jones powers in the local s/p basis
 # (the same basis the table's co-pol kernels use) and the division by
 # ``p_scatter`` accounts for NEE being evaluated only on scatter-selected
-# rows. Cross-polarization is not tracked in v1 (the scattering model): the
+# rows. Cross-polarization is not tracked in v1: the
 # receiver is treated as polarization-matched to the scattered power, which
 # keeps BDPT consistent with the unpolarized MC basic map.
 #
@@ -2849,7 +2848,7 @@ SCATTERING_COMPONENT_ID = 6
 SCATTERING_EVENT_TYPE = 3
 
 # Distinct seed stream for the two direction-sampling uniforms so the event
-# SELECTION uniforms stay bit-identical to the wave-2 stream.
+# SELECTION uniforms stay bit-identical to the two-way event stream.
 _DIRECTION_SEED_SALT = 0x5CA77E12D5B7A31F
 _MASK63 = (1 << 63) - 1
 _DEGENERATE_SIN_SQ = 1.0e-12
@@ -2858,10 +2857,10 @@ _DEGENERATE_SIN_SQ = 1.0e-12
 def rough_material_runtimes(compiled: Any) -> dict[int, RoughMaterialRuntime]:
     """Kirchhoff runtimes per material index (``scatter_model_id == 1``).
 
- Reads the CSR layers and roughness fields from the compiled
- MaterialStore; the tables come from the compiled-scene lazy cache and
- raise ``kirchhoff_domain_exceeded`` for out-of-domain roughness.
- """
+    Reads the CSR layers and roughness fields from the compiled
+    MaterialStore; the tables come from the compiled-scene lazy cache and
+    raise ``kirchhoff_domain_exceeded`` for out-of-domain roughness.
+    """
 
     return compiled.rough_material_runtimes
 
@@ -2871,10 +2870,10 @@ def scatter_direction_uniforms(
 ) -> torch.Tensor:
     """Reproducible ``[count, 2]`` uniforms for Kirchhoff direction sampling.
 
- Derived like the wave-2 event-selection seeds but salted into a distinct
- stream, so the selection uniforms of:func:`witwin.channel.interactions.transmission.event_uniforms`
- are untouched (bit-identical smooth-face behavior).
- """
+    Derived like the two-way event-selection seeds but salted into a distinct
+    stream, so the selection uniforms of :func:`witwin.channel.interactions.transmission.event_uniforms`
+    are untouched (bit-identical smooth-face behavior).
+    """
 
     generator = torch.Generator(device=device)
     salted = _splitmix64(
@@ -2890,18 +2889,18 @@ def three_way_rough_probabilities(
 ) -> dict[str, torch.Tensor]:
     """Rough-face three-way event probabilities (surface-event selection).
 
- Returns row tensors ``p_scatter``, ``p_transmit``, ``r_coh_amplitude``
- (the coherent attenuation ``C_r`` for the reflect branch field) and the
- bool ``rough`` mask. Non-rough rows get zeros / False; the caller keeps
- the wave-2 two-way probabilities for them so smooth faces stay
- bit-identical.
+    Returns row tensors ``p_scatter``, ``p_transmit``, ``r_coh_amplitude``
+    (the coherent attenuation ``C_r`` for the reflect branch field) and the
+    bool ``rough`` mask. Non-rough rows get zeros / False; the caller keeps
+    the two-way probabilities for them so smooth faces stay
+    bit-identical.
 
- Probability construction per rough row: raw shares proportional to
- ``(R_coh, R_diff, T_bar)``; every event with a strictly positive budget
- is floored at ``floor`` and the triple renormalized. Events with a zero
- budget keep probability zero (never selected, so no division by their
- probability ever happens).
- """
+    Probability construction per rough row: raw shares proportional to
+    ``(R_coh, R_diff, T_bar)``; every event with a strictly positive budget
+    is floored at ``floor`` and the triple renormalized. Events with a zero
+    budget keep probability zero (never selected, so no division by their
+    probability ever happens).
+    """
 
     return scattering_event_probabilities(
         cos_theta.contiguous(),
@@ -2920,14 +2919,14 @@ def three_way_rough_probabilities(
 def local_frames(normal: torch.Tensor, axis_rad: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     """Deterministic tangent frame ``(t1, t2)`` of unit normals ``[N, 3]``.
 
- ``t1`` is the table's local x axis (roughness principal axis): the
- stable perpendicular reference (z axis unless the normal is nearly
- vertical, then x) rotated by ``axis_rad`` about the normal. Isotropic
- tables are rotation-invariant so the reference choice only matters for
- anisotropic roughness; anchoring the principal axis to this
- deterministic reference is the documented v1 convention (the same
- degenerate-axis pattern as the polarization basis helpers).
- """
+    ``t1`` is the table's local x axis (roughness principal axis): the
+    stable perpendicular reference (z axis unless the normal is nearly
+    vertical, then x) rotated by ``axis_rad`` about the normal. Isotropic
+    tables are rotation-invariant so the reference choice only matters for
+    anisotropic roughness; anchoring the principal axis to this
+    deterministic reference is the documented v1 convention (the same
+    degenerate-axis pattern as the polarization basis helpers).
+    """
 
     reference = torch.where(
         (normal[:, 2].abs() < 0.9)[:, None],
@@ -2975,14 +2974,14 @@ def te_tm_incident_power(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Incident Jones powers ``(P_te, P_tm)`` in the local s/p basis.
 
- ``direction`` is the propagation direction into the surface, ``normal``
- the mean-plane normal flipped toward the incident side. ``s =
- normalize(direction x normal)`` (the field convention) with a
- deterministic substitute basis at normal incidence,
- ``p = s x direction``. Any
- longitudinal residual of the field is dropped by the projection (the
- Jones carriers are transverse by construction).
- """
+    ``direction`` is the propagation direction into the surface, ``normal``
+    the mean-plane normal flipped toward the incident side. ``s =
+    normalize(direction x normal)`` with a
+    deterministic substitute basis at normal incidence,
+    ``p = s x direction``. Any
+    longitudinal residual of the field is dropped by the projection (the
+    Jones carriers are transverse by construction).
+    """
 
     s = torch.linalg.cross(direction, normal)
     s_norm_sq = (s * s).sum(dim=-1, keepdim=True)
@@ -3005,14 +3004,14 @@ def scatter_carried_incident_power(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Unpolarized incident ``(P_te, P_tm)`` of an already-scattered subpath.
 
- A scatter event clears the Complex3 Jones carrier (scattering is power-only
- in v1) and moves the transported power into the scalar throughput, so a
- FURTHER scatter vertex on the same multi-order subpath (coherent scattering) reads
- its incident power from the throughput rather than the zeroed field. The
- carried power is unpolarized, so it is split evenly across the local TE/TM
- channels; both halves feed the same ``P_te*f_te + P_tm*f_tm`` NEE kernel and
- the continuation's polarization-weighted BSDF as the single-bounce field
- decomposition (:func:`te_tm_incident_power`) does at the first scatter."""
+    A scatter event clears the Complex3 Jones carrier (scattering is power-only
+    in v1) and moves the transported power into the scalar throughput, so a
+    FURTHER scatter vertex on the same multi-order subpath (coherent scattering) reads
+    its incident power from the throughput rather than the zeroed field. The
+    carried power is unpolarized, so it is split evenly across the local TE/TM
+    channels; both halves feed the same ``P_te*f_te + P_tm*f_tm`` NEE kernel and
+    the continuation's polarization-weighted BSDF as the single-bounce field
+    decomposition (:func:`te_tm_incident_power`) does at the first scatter."""
 
     power = throughput_real**2 + throughput_imag**2
     half = 0.5 * power
@@ -3039,10 +3038,10 @@ def sample_scatter_directions(
 ) -> dict[str, torch.Tensor]:
     """Per-material Kirchhoff CDF sampling of local outgoing directions.
 
- Returns ``wo_local`` plus the continuous forward density
- ``pdf(wo|wi)`` and the swapped-argument reverse density ``pdf(wi|wo)``
- (the sampling behavior). Rows without a rough material keep zeros.
- """
+    Returns ``wo_local`` plus the continuous forward density
+    ``pdf(wo|wi)`` and the swapped-argument reverse density ``pdf(wi|wo)``.
+    Rows without a rough material keep zeros.
+    """
 
     count = int(material_id.shape[0])
     device = wi_local.device
@@ -3076,9 +3075,9 @@ def eval_bsdf_rows(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Batched ``(f_te, f_tm)`` lookups grouped by rough material.
 
- Under ``ad`` the native forward is dispatched behind:func:`scattering_table_eval_ad` so the resident table values keep their
- gradient (scattering AD); the plain (``ad`` off) path is bitwise unchanged.
- """
+    Under ``ad`` the native forward is dispatched behind :func:`scattering_table_eval_ad` so the resident table values keep their
+    gradient (scattering AD); the plain (``ad`` off) path is bitwise unchanged.
+    """
 
     count = int(material_id.shape[0])
     device = wi_local.device
@@ -3118,22 +3117,22 @@ def scattering_nee_connection_samples(
 ) -> dict[str, torch.Tensor] | None:
     """NEE connection rows from scatter-selected vertices (component 6).
 
- Assembled in torch instead of the native endpoint-connection kernel
- because scattering needs a PER-SENSOR BSDF re-evaluation f_K(wi, w_rx)
- and the 1/(r1^2*r2^2) double-spreading geometry, neither of which the
- delta-event connection kernel (single per-vertex field, unfolded
- 1/(r1+r2)^2 spreading, sampled-direction hemisphere gate) can express.
+    Assembled in torch instead of the native endpoint-connection kernel
+    because scattering needs a PER-SENSOR BSDF re-evaluation f_K(wi, w_rx)
+    and the 1/(r1^2*r2^2) double-spreading geometry, neither of which the
+    delta-event connection kernel (single per-vertex field, unfolded
+    1/(r1+r2)^2 spreading, sampled-direction hemisphere gate) can express.
 
- Row value (derivation in the module docstring):
- source_power * (P_te*f_te + P_tm*f_tm) * cos_o
- * (lambda/(4*pi))^2 * 4*pi / (r2^2 * p_scatter * N)
- The unfolded prefix distance r1 and cos_theta_i cancel against the
- solid-angle-to-area Jacobian of the uniform-sphere launch density.
- mis_weight is 1: the connection is the only strategy with nonzero
- density for a scattered vertex in v1 (single-bounce termination, point
- sensors); the directional density converted to the connection measure
- is recorded in ``pdf`` for diagnostics.
- """
+    Row value (derivation in the module docstring):
+    source_power * (P_te*f_te + P_tm*f_tm) * cos_o
+    * (lambda/(4*pi))^2 * 4*pi / (r2^2 * p_scatter * N)
+    The unfolded prefix distance r1 and cos_theta_i cancel against the
+    solid-angle-to-area Jacobian of the uniform-sphere launch density.
+    mis_weight is 1: the connection is the only strategy with nonzero
+    density for a scattered vertex in v1 (single-bounce termination, point
+    sensors); the directional density converted to the connection measure
+    is recorded in ``pdf`` for diagnostics.
+    """
 
     vertex_count = int(position.shape[0])
     sensor_count = int(sensor["origin"].shape[0])
@@ -3286,25 +3285,25 @@ def scattered_subpath_state(
 ) -> dict[str, torch.Tensor]:
     """Continued light subpath after a Kirchhoff scattering event.
 
- Assembled directly in torch with the native subpath tensor layout (no
- native kernel: the update is gather+FMA on the sampled table values).
- Scattering contributions are POWER-ONLY ensemble estimates. No coherent
- phase or cross-polarized Jones amplitude is available from the current
- Kirchhoff table, so the Complex3 carrier is explicitly cleared instead of
- manufacturing a zero-phase field.
+    Assembled directly in torch with the native subpath tensor layout (no
+    native kernel: the update is gather+FMA on the sampled table values).
+    Scattering contributions are POWER-ONLY ensemble estimates. No coherent
+    phase or cross-polarized Jones amplitude is available from the current
+    Kirchhoff table, so the Complex3 carrier is explicitly cleared instead of
+    manufacturing a zero-phase field.
 
- Post-scatter carrier semantics (coherent scattering): the scattered subpath's
- ``throughput_real`` is seeded from the FIELD-BASED incident power at this
- vertex (``sqrt(p_te + p_tm)``, which excludes ``source_power`` - the
- connection convention multiplies ``source_power`` separately), times the
- unbiased continuation amplitude ``sqrt(f_weighted * cos_o / (pdf * p))``.
- From this vertex on, ``|throughput|^2`` IS the authoritative unpolarized
- power weight of the subpath: subsequent specular events scale it by
- ``sqrt(gain * R_eff)`` at the actual incidence angle, which is the exact
- unpolarized power transport. The PRE-scatter throughput remains the
- sampling proxy of the sampling behavior and is deliberately not consumed
- here.
- """
+    Post-scatter carrier semantics (coherent scattering): the scattered subpath's
+    ``throughput_real`` is seeded from the FIELD-BASED incident power at this
+    vertex (``sqrt(p_te + p_tm)``, which excludes ``source_power`` - the
+    connection convention multiplies ``source_power`` separately), times the
+    unbiased continuation amplitude ``sqrt(f_weighted * cos_o / (pdf * p))``.
+    From this vertex on, ``|throughput|^2`` IS the authoritative unpolarized
+    power weight of the subpath: subsequent specular events scale it by
+    ``sqrt(gain * R_eff)`` at the actual incidence angle, which is the exact
+    unpolarized power transport. The PRE-scatter throughput remains the
+    sampling proxy of the sampling behavior and is deliberately not consumed
+    here.
+    """
 
     scatter_valid = choose_scatter & state["valid"]
     sampled = sample_scatter_directions(
@@ -3370,26 +3369,26 @@ def scattering_map_matrix(
 ) -> tuple[torch.Tensor, dict[str, int]]:
     """(tx, rx) matrix of the MC basic Kirchhoff scattering path gain.
 
- Estimator (derivation shared with the BDPT NEE builder in the module
- docstring): the scattering path gain at a receiver point x_r is the
- wall-area integral
+    Estimator (derivation shared with the BDPT NEE builder in the module
+    docstring): the scattering path gain at a receiver point x_r is the
+    wall-area integral
 
- g(x_r) = Int_A f_unpol(wi, wo) cos_i cos_o
- * (lambda/(4*pi))^2 / (r1^2 * r2^2) dA
+    g(x_r) = Int_A f_unpol(wi, wo) cos_i cos_o
+    * (lambda/(4*pi))^2 / (r1^2 * r2^2) dA
 
- estimated with ``samples`` area-weighted points on the rough faces
- (uniform-per-area density, weight A_total / samples). The matrix holds
- the PATH GAIN at each receiver point times the transmitter power,
- mirroring the LoS / transmission matrix conventions exactly.
+    estimated with ``samples`` area-weighted points on the rough faces
+    (uniform-per-area density, weight A_total / samples). The matrix holds
+    the PATH GAIN at each receiver point times the transmitter power,
+    mirroring the LoS / transmission matrix conventions exactly.
 
- v1 simplifications (documented, deliberately truthful rather than
- approximate): the incident segment tx->point must be UNOBSTRUCTED (a
- binary visibility test; no through-wall incident power), the outgoing
- segment point->receiver likewise; MC basic is unpolarized
- (supports_polarization is False), so the unpolarized mean kernel
- 0.5*(f_te + f_tm) is used - the average over incident polarizations.
- Scattering is single-bounce: tx -> rough point -> receiver only.
- """
+    v1 simplifications (documented, deliberately truthful rather than
+    approximate): the incident segment tx->point must be UNOBSTRUCTED (a
+    binary visibility test; no through-wall incident power), the outgoing
+    segment point->receiver likewise; MC basic is unpolarized
+    (supports_polarization is False), so the unpolarized mean kernel
+    0.5*(f_te + f_tm) is used - the average over incident polarizations.
+    Scattering is single-bounce: tx -> rough point -> receiver only.
+    """
 
     matrix = torch.zeros((int(tx_pos.shape[0]), int(rx_pos.shape[0])), device=device)
     stats = {

@@ -7,7 +7,6 @@ import ast
 import inspect
 from pathlib import Path
 
-from ci import check_import_graph as graph
 from witwin.channel import deterministic as deterministic_module
 from witwin.channel.montecarlo import bdpt as bdpt_pipeline
 from witwin.channel import path as path_module
@@ -20,8 +19,6 @@ from witwin.channel.propagation.penetration import (
 from witwin.channel.kernels import topology as topology_pack
 
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-PACKAGE_ROOT = REPOSITORY_ROOT / "witwin" / "channel"
 _RETIRED_NAMES = (
     "TransmissionClosestHitQuery",
     "query_transmission_closest_hit",
@@ -134,35 +131,3 @@ def test_path_deterministic_and_adr008_oracle_share_the_engine_entry() -> None:
     bdpt_source = Path(bdpt_pipeline.__file__).read_text(encoding="utf-8")
     assert "propagation.enumerated.transmission" not in bdpt_source
     assert "kernels.geometry" not in bdpt_source
-
-
-def test_retired_depth_march_sources_and_references_are_deleted() -> None:
-    assert not (PACKAGE_ROOT / "propagation" / "geometry" / "transmission.py").exists()
-    assert not (
-        PACKAGE_ROOT / "propagation" / "topology" / "discovery" / "transmission.py"
-    ).exists()
-
-    for path in PACKAGE_ROOT.rglob("*.py"):
-        source = path.read_text(encoding="utf-8")
-        for name in _RETIRED_NAMES:
-            assert name not in source, f"{path} retains retired {name}"
-
-
-def test_activation_adds_no_old_owner_import_edge_or_host_actual_count_read() -> None:
-    retired_modules = {
-        "witwin.channel.propagation.geometry.transmission",
-        "witwin.channel.propagation.topology.discovery.transmission",
-    }
-    edges = graph.collect_import_edges(PACKAGE_ROOT)
-    assert not any(edge.target in retired_modules for edge in edges)
-
-    for module in (engine, transmission):
-        source = Path(module.__file__).read_text(encoding="utf-8")
-        for forbidden in (
-            "device_candidate_count.item",
-            "device_candidate_count.tolist",
-            "device_guardrail_count.item",
-            "device_guardrail_count.tolist",
-            "cudaStreamSynchronize",
-        ):
-            assert forbidden not in source

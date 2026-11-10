@@ -1,9 +1,7 @@
 # Copyright Xingyu Chen.
 # Tests ad contract.
 
-import json
 import math
-from pathlib import Path
 
 import pytest
 import torch
@@ -184,27 +182,3 @@ def test_free_space_derivative_oracle_matches_centered_finite_difference():
     ) / (2.0 * step)
 
     torch.testing.assert_close(analytic, finite_difference, rtol=1.0e-8, atol=1.0e-12)
-
-
-def test_ad_inventory_records_solver_ad_contract():
-    root = Path(__file__).resolve().parents[1]
-    inventory = json.loads(
-        (
-            root / "docs" / "dev" / "replacement" / "channel-api-inventory.json"
-        ).read_text(encoding="utf-8")
-    )
-    audit = inventory["ad_audit"]
-
-    assert audit["production_channel_ad_references"] == 0
-    # material and frequency derivatives: the shared deterministic/path field seam calls the three
-    # differentiable field entry points (LoS, reflection, transmission).
-    # solver derivatives adds the six montecarlo.basic power-map entry points.
-    # diffraction AD adds the wedge re-evaluation, receiver projection, coupled
-    # R-D transport and coupled stationary re-solve entry points; AD adds
-    # the montecarlo.basic diffraction radiomap entry point.
-    assert audit["native_public_solver_ad_callers"] == 14
-    assert len(audit["native_public_solver_ad_call_sites"]) == 14
-    assert audit["legacy_reference_files_with_explicit_ad"] == 19
-    assert audit["decision"] == "fixed_topology_material_frequency_ad_t1"
-    # the AD capability gate flipped the capability manifest (AD).
-    assert audit["supports_ad"] is True

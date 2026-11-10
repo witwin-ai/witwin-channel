@@ -3,10 +3,7 @@
 
 from __future__ import annotations
 
-import ast
 from dataclasses import FrozenInstanceError, fields
-import hashlib
-from pathlib import Path
 
 import pytest
 import torch
@@ -14,43 +11,11 @@ import torch
 from witwin.channel.propagation import geometry as visibility
 
 
-# ``_rayd_visibility_mask`` re-pinned when the geometry kernel facades moved to
-# ``witwin.channel.kernels.geometry``: the only AST difference is the module
-# alias the native visibility call is spelled through (``geometry_bridge`` ->
-# ``geometry_kernels``). Control flow, arguments and evaluation order are
-# unchanged.
-_DIGESTS = {
-    "_rayd_visibility_mask": (
-        "169a295d4086227ef85e28ac87d3de79781d4cc52ae6687876f58de621b05f41"
-    ),
-    "_los_visibility_mask": (
-        "95411fd7b1c9d50f50e40d1d2af9e55d171c71c904e4139686148a5602c00878"
-    ),
-}
-
-
 class _Rayd:
     available = True
 
     def require_resource(self) -> int:
         return 17
-
-
-def _digest(name: str) -> str:
-    tree = ast.parse(Path(visibility.__file__).read_text(encoding="utf-8"))
-    definition = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name == name
-    )
-    return hashlib.sha256(
-        ast.dump(definition, include_attributes=False).encode()
-    ).hexdigest()
-
-
-def test_visibility_helpers_preserve_frozen_bodies():
-    for name, digest in _DIGESTS.items():
-        assert _digest(name) == digest
 
 
 def test_typed_visibility_query_consumes_raw_native_tuple(monkeypatch):

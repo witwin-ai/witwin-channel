@@ -78,9 +78,8 @@ implementations remain under `tests/` and are never production dependencies.
 ## Duplication
 
 Exact-token duplication of at least 100 tokens is inventoried by
-`tools/duplication_report.py`, classified in
-`docs/dev/audit/duplication-classification.json`, and checked by
-`ci/check_duplication.py`. Share validation, indexing, packing, and result
+`tools/duplication_report.py` and checked by `ci/check_duplication.py`, which
+holds total duplicate coverage under a ceiling that may only be lowered. Share validation, indexing, packing, and result
 assembly only inside the same domain owner and only when extraction preserves
 validation order, error precedence, allocation, launch, synchronization, and
 ABI order. Cross-owner lookalikes stay explicit.

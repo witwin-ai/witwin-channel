@@ -136,9 +136,9 @@ metadata.
 
 - Any change to the eight stable exports requires an intentional
   `ci/public-api-snapshot.json` update and a migration note.
-- The completed wrapper migration ledger is immutable historical evidence at
-  `docs/dev/audit/phase12-ops-migration-ledger.json`. Native ABI changes require
-  the relevant binding/audit manifest update.
+- The completed wrapper migration ledger is immutable archived in Git history
+  (`docs/dev/archive.md`). Native ABI changes
+  regenerate `ci/native-binding-manifest.json` with `python ci/check_native_bindings.py --write`.
 - Dependency changes must pass `ci/check_import_graph.py`; do not create or
   relocate allowlisted architecture debt.
 - Update result/schema contract tests and this README when shapes, dtypes,

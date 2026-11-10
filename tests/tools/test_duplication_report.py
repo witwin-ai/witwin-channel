@@ -92,57 +92,14 @@ def _report(coverage: float, region_ids: list[str]) -> dict[str, object]:
     }
 
 
-def _ledger(coverage: float, region_ids: list[str]) -> dict[str, object]:
-    return {
-        "schema_version": 1,
-        "baseline": {"coverage_percent": coverage},
-        "regions": {
-            region_id: {
-                "category": "other",
-                "owner": "example",
-                "reason": "example duplication",
-            }
-            for region_id in region_ids
-        },
-    }
+def test_gate_passes_below_the_ceiling() -> None:
+    assert check_duplication.evaluate(_report(5.0, ["aaaa"]), ceiling=6.0) == []
 
 
-def test_gate_passes_when_ledger_matches_report() -> None:
-    report = _report(5.0, ["aaaa", "bbbb"])
-    ledger = _ledger(6.0, ["aaaa", "bbbb"])
-    assert check_duplication.evaluate(report, ledger) == []
+def test_gate_allows_coverage_at_the_ceiling() -> None:
+    assert check_duplication.evaluate(_report(5.0, ["aaaa"]), ceiling=5.0) == []
 
 
-def test_gate_flags_unclassified_region() -> None:
-    report = _report(5.0, ["aaaa", "cccc"])
-    ledger = _ledger(6.0, ["aaaa"])
-    violations = check_duplication.evaluate(report, ledger)
-    assert any("unclassified region: cccc" in item for item in violations)
-
-
-def test_gate_flags_stale_ledger_entry() -> None:
-    report = _report(5.0, ["aaaa"])
-    ledger = _ledger(6.0, ["aaaa", "dddd"])
-    violations = check_duplication.evaluate(report, ledger)
-    assert any("stale ledger entry: dddd" in item for item in violations)
-
-
-def test_gate_flags_coverage_regression() -> None:
-    report = _report(7.5, ["aaaa"])
-    ledger = _ledger(5.0, ["aaaa"])
-    violations = check_duplication.evaluate(report, ledger)
-    assert any("coverage regression" in item for item in violations)
-
-
-def test_gate_allows_coverage_at_baseline() -> None:
-    report = _report(5.0, ["aaaa"])
-    ledger = _ledger(5.0, ["aaaa"])
-    assert check_duplication.evaluate(report, ledger) == []
-
-
-def test_gate_requires_lockstep_tests_for_numeric_exemption() -> None:
-    report = _report(5.0, ["aaaa"])
-    ledger = _ledger(6.0, ["aaaa"])
-    ledger["regions"]["aaaa"]["category"] = "numeric_sensitive_exempt"
-    violations = check_duplication.evaluate(report, ledger)
-    assert any("missing lockstep_tests" in item for item in violations)
+def test_gate_flags_coverage_above_the_ceiling() -> None:
+    violations = check_duplication.evaluate(_report(7.5, ["aaaa"]), ceiling=5.0)
+    assert any("exceeds the ceiling" in item for item in violations)

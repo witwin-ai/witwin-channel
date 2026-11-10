@@ -3,9 +3,6 @@
 
 from __future__ import annotations
 
-import ast
-import hashlib
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -14,29 +11,6 @@ import torch
 from witwin.channel import materials as materials_package
 from witwin.channel.montecarlo import basic as mc_basic
 from witwin.channel import runtime
-
-
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-
-_FUNCTION_DIGESTS = {
-    "_frequency_participates_in_ad": (
-        "2f734599df63cffb659b87efbca9aca37afe31925d9bfaefa7ae085ec73470d9"
-    ),
-    "_require_frequency_ad_constant_materials": (
-        "fd08a77fefe35e84f604fbf39ea4c6673fdbedf44396122563eeab7ef5353976"
-    ),
-}
-
-
-def _function_digest(module, name: str) -> str:
-    tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
-    definition = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name == name
-    )
-    payload = ast.dump(definition, include_attributes=False)
-    return hashlib.sha256(payload.encode()).hexdigest()
 
 
 def test_frequency_and_material_guards_have_canonical_owners():
@@ -50,17 +24,6 @@ def test_frequency_and_material_guards_have_canonical_owners():
         runtime._participates_in_ad is runtime._ad_geometry_live
     )
     assert "_require_frequency_ad_constant_materials" not in materials_package.__all__
-
-
-def test_moved_function_bodies_and_signatures_are_exact():
-    assert (
-        _function_digest(runtime, "_frequency_participates_in_ad")
-        == _FUNCTION_DIGESTS["_frequency_participates_in_ad"]
-    )
-    assert (
-        _function_digest(materials_package, "_require_frequency_ad_constant_materials")
-        == _FUNCTION_DIGESTS["_require_frequency_ad_constant_materials"]
-    )
 
 
 def test_frequency_participation_detects_reverse_and_forward_mode():

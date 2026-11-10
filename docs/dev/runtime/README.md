@@ -99,6 +99,6 @@ be explicit and validate the complete declared build identity.
 ## Maintenance
 
 Root exports update `ci/public-api-snapshot.json` and a migration note. The
-completed helper migration ledger is archived at
-`docs/dev/audit/phase12-ops-migration-ledger.json`. Runtime stays below scene
+completed helper migration ledger is archived in Git history
+(`docs/dev/archive.md`). Runtime stays below scene
 and solver domains in the import graph; undocumented debt is not permitted.

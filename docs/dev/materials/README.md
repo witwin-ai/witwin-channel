@@ -48,7 +48,7 @@ materials, or zero coefficients.
 ## Maintenance
 
 Export changes require `ci/public-api-snapshot.json` and a migration note.
-The completed kernel migration ledger is archived at
-`docs/dev/audit/phase12-ops-migration-ledger.json`. ABI changes require a
+The completed kernel migration ledger is archived in Git history
+(`docs/dev/archive.md`). ABI changes require a
 versioned migration and fixtures; dependency changes must satisfy the
 import-graph manifest.

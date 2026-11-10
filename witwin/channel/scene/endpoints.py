@@ -42,9 +42,9 @@ def _vector3(name: str, value: torch.Tensor) -> torch.Tensor:
 def orientation_matrix(orientation: torch.Tensor) -> torch.Tensor:
     """Return the local-to-world yaw/pitch/roll rotation matrix.
 
- The orientation vector is ``(yaw, pitch, roll)`` in radians and uses the
- intrinsic Z-Y-X convention.
- """
+    The orientation vector is ``(yaw, pitch, roll)`` in radians and uses the
+    intrinsic Z-Y-X convention.
+    """
 
     if orientation.shape == (4,):
         from witwin.core.math import quat_to_rotation_matrix
@@ -146,10 +146,10 @@ def apply_endpoint_weights(
 ) -> torch.Tensor:
     """Combine ``(rx, rx_ant, tx, tx_ant, ...)`` endpoint channels.
 
- The leading endpoint and antenna dimensions match:class:`PathResult`.
- Any trailing signal dimensions (path, time, frequency, or tap) are
- preserved. Receiver weights follow the usual conjugating convention.
- """
+    The leading endpoint and antenna dimensions match :class:`PathResult`.
+    Any trailing signal dimensions (path, time, frequency, or tap) are
+    preserved. Receiver weights follow the usual conjugating convention.
+    """
 
     if coefficients.ndim < 4:
         raise ValueError(
@@ -559,11 +559,11 @@ def axis_aligned_grid_spec(grid: ReceiverGrid) -> AxisAlignedGridSpec:
 def scene_vertex_table(scene: object, compiled: object) -> torch.Tensor:
     """Live global vertex table matching ``compiled.geometry.vertices``.
 
- RayD concatenates structure meshes in scene order, so the live table is
- the concatenation of the structure vertex tensors. Returning the live
- tensors (rather than the native export) is what lets mesh-vertex
- gradients exist at all.
- """
+    RayD concatenates structure meshes in scene order, so the live table is
+    the concatenation of the structure vertex tensors. Returning the live
+    tensors (rather than the native export) is what lets mesh-vertex
+    gradients exist at all.
+    """
 
     native = compiled.geometry.vertices
     if not scene.structures:
@@ -604,10 +604,10 @@ def receiver_positions_ad(
 ) -> torch.Tensor:
     """Live receiver positions for point receivers.
 
- Grid receivers are generated natively from origin/axes/spacing and stay
- detached: a grid exposes no per-receiver position tensor for a user to
- mark requires_grad, so nothing is silently zeroed here.
- """
+    Grid receivers are generated natively from origin/axes/spacing and stay
+    detached: a grid exposes no per-receiver position tensor for a user to
+    mark requires_grad, so nothing is silently zeroed here.
+    """
 
     if not scene.receivers or not all(
         isinstance(receiver, ReceiverPoint) for receiver in scene.receivers
@@ -625,16 +625,16 @@ def receiver_positions_ad(
 def transmitter_polarizations_f32(scene: object, *, device: torch.device) -> torch.Tensor:
     """Transmitter polarizations as a contiguous float32 ``(N, 3)`` tensor.
 
- Row order matches the transmitter order of the logical scene. The vectors
- are already unit and oriented by the Core transmitter model, so this only
- stacks them, casts to float32, and makes the result contiguous.
+    Row order matches the transmitter order of the logical scene. The vectors
+    are already unit and oriented by the Core transmitter model, so this only
+    stacks them, casts to float32, and makes the result contiguous.
 
- This is NOT:func:`witwin.channel.scene.compiler.transmitter_polarizations_as_stored`,
- which is a straight device upload: it keeps whatever dtype and layout the
- scene stored, and its empty case comes from the native transmitter builder
- rather than ``device``. Both are live and each has its own callers; the two
- names record the difference instead of hiding it behind one spelling.
- """
+    This is NOT :func:`witwin.channel.scene.compiler.transmitter_polarizations_as_stored`,
+    which is a straight device upload: it keeps whatever dtype and layout the
+    scene stored, and its empty case comes from the native transmitter builder
+    rather than ``device``. Both are live and each has its own callers; the two
+    names record the difference instead of hiding it behind one spelling.
+    """
 
     values = [tx.polarization for tx in scene.transmitters]
     if not values:
@@ -647,10 +647,10 @@ def receiver_polarizations_f32(
 ) -> torch.Tensor:
     """Receiver polarizations as a contiguous float32 ``(N, 3)`` tensor.
 
- With ``grid``, one grid polarization is broadcast over that grid's points.
- Without it, the scene's receivers are expanded in order: a grid contributes
- one row per point, a point receiver one row.
- """
+    With ``grid``, one grid polarization is broadcast over that grid's points.
+    Without it, the scene's receivers are expanded in order: a grid contributes
+    one row per point, a point receiver one row.
+    """
 
     if grid is not None:
         return (

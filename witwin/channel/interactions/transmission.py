@@ -61,11 +61,11 @@ def _transmission_topology(
 ) -> tuple[dict[str, torch.Tensor], int, CapacityExecutionCounts | None]:
     """Trace and pack one pair-major RayD penetration batch.
 
- Device-selected cardinality remains in the returned execution sidecar.
- Structural no-op scenes do not allocate a failure state or launch native
- work; every non-empty request shares the engine-owned failure state between
- RayD penetration and the component-5 topology pack.
- """
+    Device-selected cardinality remains in the returned execution sidecar.
+    Structural no-op scenes do not allocate a failure state or launch native
+    work; every non-empty request shares the engine-owned failure state between
+    RayD penetration and the component-5 topology pack.
+    """
 
     device = tx_positions.device
     tx_count = int(tx_positions.shape[0])
@@ -207,7 +207,7 @@ def scene_diagonal_m(scene: Any) -> float:
 
 
 def scale_aware_epsilon(position: torch.Tensor, *, scene_diagonal: float) -> torch.Tensor:
-    """Per-row restart offset ``max(|p|*1e-6, diag*1e-6, 1e-6 m)`` (the transmission behavior)."""
+    """Per-row restart offset ``max(|p|*1e-6, diag*1e-6, 1e-6 m)``."""
 
     floor = max(_MIN_EPSILON_M, float(scene_diagonal) * _RELATIVE_EPSILON)
     return (position.abs().amax(dim=-1) * _RELATIVE_EPSILON).clamp_min(floor)
@@ -222,7 +222,7 @@ def _splitmix64(value: int) -> int:
 
 def event_selection_seed(seed: int, tx_index: int, depth: int) -> int:
     """Deterministic per-(seed, tx, depth) generator seed via the native
- splitmix64 mixing pattern (matches bdpt_paths.cu)."""
+    splitmix64 mixing pattern (matches bdpt_paths.cu)."""
 
     mixed = _splitmix64(int(seed))
     mixed = _splitmix64(mixed ^ (((int(tx_index) + 1) * 0xD1B54A32D192ED03) & _MASK64))
@@ -242,8 +242,8 @@ def event_uniforms(
 
 def unpolarized_power_budgets(stack: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
     """(R_eff, T_eff) as the unpolarized TE/TM mean of the smooth-stack power
- budgets. The mean is acceptable for EVENT PROBABILITIES only; the selected
- branch's kernel applies the exact polarized Jones coefficients."""
+    budgets. The mean is acceptable for EVENT PROBABILITIES only; the selected
+    branch's kernel applies the exact polarized Jones coefficients."""
 
     r_eff = 0.5 * (stack["cap_R_te"] + stack["cap_R_tm"])
     t_eff = 0.5 * (stack["cap_T_te"] + stack["cap_T_tm"])
@@ -254,8 +254,8 @@ def transmission_event_probability(
     r_eff: torch.Tensor, t_eff: torch.Tensor, *, floor: float = _EVENT_PROBABILITY_FLOOR,
 ) -> torch.Tensor:
     """Event probability p_t = T/(R+T) with a minimum-probability floor when
- both budgets are nonzero (surface-event selection). Absorption 1-R-T terminates
- implicitly through the field magnitudes; there is no absorption event."""
+    both budgets are nonzero (surface-event selection). Absorption 1-R-T terminates
+    implicitly through the field magnitudes; there is no absorption event."""
 
     total = (r_eff + t_eff).clamp_min(1.0e-12)
     p_t = (t_eff / total).clamp(floor, 1.0 - floor)

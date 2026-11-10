@@ -195,6 +195,10 @@ def scan_repository(
                     f"{tracked_file.size} bytes exceeds {max_tracked_bytes} bytes",
                 )
             )
+    # The two agent guides are one document under two names.
+    agents, claude = root / "AGENTS.md", root / "CLAUDE.md"
+    if agents.is_file() and claude.is_file() and agents.read_bytes() != claude.read_bytes():
+        violations.append(Violation("agent-guide-mismatch", "AGENTS.md", "must be identical to CLAUDE.md"))
     return violations
 
 

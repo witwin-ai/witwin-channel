@@ -285,7 +285,7 @@ def mc_finalize_component_maps_ad(
     los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor,
     transmission: torch.Tensor, scattering: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable:func:`mc_finalize_component_maps`."""
+    """Differentiable :func:`mc_finalize_component_maps`."""
 
     values = _McFinalizeComponentMapsAdFunction.apply(
         los, reflection, diffraction, transmission, scattering
@@ -673,11 +673,11 @@ def mc_los_path_gain_jvp(
 class _McLosPathGainAdFunction(torch.autograd.Function):
     """Differentiable LoS power-gain matrix (solver derivatives).
 
- Differentiable inputs: tx_positions, rx_positions and the carrier
- frequency. tx_power stays fixed under the AD contract; requesting
- its gradient fails loudly. The forward is the primal path_los_export
- kernel; only the path_gain_matrix output is exposed.
- """
+    Differentiable inputs: tx_positions, rx_positions and the carrier
+    frequency. tx_power stays fixed under the AD contract; requesting
+    its gradient fails loudly. The forward is the primal path_los_export
+    kernel; only the path_gain_matrix output is exposed.
+    """
 
     @staticmethod
     def forward(tx_positions, tx_power, rx_positions, frequency, frequency_value, tx_pol):
@@ -784,12 +784,12 @@ def mc_los_path_gain_ad(
 ) -> torch.Tensor:
     """Differentiable LoS path-gain matrix (endpoints and frequency).
 
- ``frequency_value`` optionally carries the precomputed host scalar of
- ``frequency`` (one read per solve at the seam); when not
- supplied it is read here, exactly once per apply. ``tx_polarizations`` is
- the fixed per-transmitter polarization (frozen winner) driving the dipole
- sin^2 pattern; its endpoint dependence is differentiated natively.
- """
+    ``frequency_value`` optionally carries the precomputed host scalar of
+    ``frequency`` (one read per solve at the seam); when not
+    supplied it is read here, exactly once per apply. ``tx_polarizations`` is
+    the fixed per-transmitter polarization (frozen winner) driving the dipole
+    sin^2 pattern; its endpoint dependence is differentiated natively.
+    """
 
     if frequency_value is None:
         frequency_value = _ad_frequency_value(frequency)
@@ -814,23 +814,23 @@ def mc_slab_reflection_accumulate(
 ) -> torch.Tensor:
     """Accumulate finite-thickness slab specular reflections into a radiomap.
 
- Convention. This family reproduces one law only, and that law is a
- material law rather than a sampling rule: the ITU finite-thickness
- single-slab Fresnel TE/TM coefficient pair over ``eta_r`` / ``sigma_e`` /
- ``gain`` / ``thickness`` / ``wavelength``, applied per bounce in the
- ``(s_hat, p_in) -> (s_hat, p_out)`` frame and deposited incoherently as
- ``|E|^2 * solid_angle * (lambda / 4pi)^2 / (cell_area * |cos|)`` at the
- first plane crossing that the next trace hit does not occlude. It
- deliberately does NOT reproduce the hardcoded-vertical radiomap source
- convention, under which every launched ray leaves the transmitter with
- unit magnitude and a fixed z-hat polarization regardless of launch
- direction. Here the launched field is the unnormalized transverse
- projection of the true transmitter polarization instead, so every deposit
- carries the short-dipole ``sin^2(theta)`` pattern ( polarization
- consistency with the LoS and diffraction maps). Level parity with a
- unit-magnitude-source radiomap is therefore knowingly abandoned; a
- near-axis level offset is the intended behaviour, not a defect.
- """
+    Convention. This family reproduces one law only, and that law is a
+    material law rather than a sampling rule: the ITU finite-thickness
+    single-slab Fresnel TE/TM coefficient pair over ``eta_r`` / ``sigma_e`` /
+    ``gain`` / ``thickness`` / ``wavelength``, applied per bounce in the
+    ``(s_hat, p_in) -> (s_hat, p_out)`` frame and deposited incoherently as
+    ``|E|^2 * solid_angle * (lambda / 4pi)^2 / (cell_area * |cos|)`` at the
+    first plane crossing that the next trace hit does not occlude. It
+    deliberately does NOT reproduce the hardcoded-vertical radiomap source
+    convention, under which every launched ray leaves the transmitter with
+    unit magnitude and a fixed z-hat polarization regardless of launch
+    direction. Here the launched field is the unnormalized transverse
+    projection of the true transmitter polarization instead, so every deposit
+    carries the short-dipole ``sin^2(theta)`` pattern ( polarization
+    consistency with the LoS and diffraction maps). Level parity with a
+    unit-magnitude-source radiomap is therefore knowingly abandoned; a
+    near-axis level offset is the intended behaviour, not a defect.
+    """
 
     return _required_native_op("mc_slab_reflection_accumulate")(
         ray_o,
@@ -863,10 +863,10 @@ def mc_slab_reflection_accumulate(
 def mc_reflection_ad_max_depth() -> int:
     """Depth cap of the native reflection radiomap AD companions.
 
- The backward/jvp kernels stage per-bounce state in fixed-size register
- arrays, so ``contribution_depth`` must not exceed this cap. Exposed so the
- solver can reject an over-deep AD configuration before any launch.
- """
+    The backward/jvp kernels stage per-bounce state in fixed-size register
+    arrays, so ``contribution_depth`` must not exceed this cap. Exposed so the
+    solver can reject an over-deep AD configuration before any launch.
+    """
 
     return int(_required_native_op("mc_reflection_ad_max_depth")())
 
@@ -975,13 +975,13 @@ def mc_slab_reflection_accumulate_jvp(
 class _McReflectionMapAdFunction(torch.autograd.Function):
     """Differentiable slab reflection radiomap for one transmitter.
 
- Differentiable inputs: per-face eta_r / sigma_e / gain / thickness, the
- carrier frequency and the transmitter anchor. The trace tape, sampled
- directions, face normals and validity masks are frozen winners and fail
- loudly when a gradient is requested. The deposit weight is independent of
- the ray origin, so the transmitter anchor receives an exact zero gradient
- without a kernel launch (its binning influence is discrete and frozen).
- """
+    Differentiable inputs: per-face eta_r / sigma_e / gain / thickness, the
+    carrier frequency and the transmitter anchor. The trace tape, sampled
+    directions, face normals and validity masks are frozen winners and fail
+    loudly when a gradient is requested. The deposit weight is independent of
+    the ray origin, so the transmitter anchor receives an exact zero gradient
+    without a kernel launch (its binning influence is discrete and frozen).
+    """
 
     @staticmethod
     def forward(
@@ -1254,7 +1254,7 @@ def mc_slab_reflection_accumulate_ad(
     grid_resolution0: int, grid_resolution1: int, wavelength: float, solid_angle_per_ray: float,
     grid_cell_area: float,
 ) -> torch.Tensor:
-    """Differentiable:func:`mc_slab_reflection_accumulate` (one tx)."""
+    """Differentiable :func:`mc_slab_reflection_accumulate` (one tx)."""
 
     params = {
         "tx_pol": tx_pol,
@@ -1292,21 +1292,21 @@ def mc_slab_reflection_accumulate_ad(
 def mc_utd_diffraction_tape_accumulate(*args: object) -> torch.Tensor:
     """Accumulate UTD diffraction power over the sampled Keller-cone tape.
 
- Convention. The convention this family adopts is a Monte Carlo per-sample
- acceptance interval, not a material law: RayD proposes the complete Keller
- cone, a lane whose edge azimuth exceeds the wedge exterior angle is
- rejected, and an accepted lane keeps the full-cone ``1 / (2pi)`` proposal
- density, so its weight stays ``2pi`` rather than the accepted interval
- width. Everything else is this package's own UTD: the full
- Kouyoumjian-Pathak pair over the stored finite-thickness slab face
- operators (fixed-point plus stored-ops convention, ``selectStationaryPoint
- = 0`` and ``mat.omega = 0`` at the pair call), pseudo-infinite ``+-1e5``
- edge bounds, and the true per-transmitter polarization rather than a
- hardcoded vertical source. It deliberately does NOT reproduce the
- diffracted field level or the cell-by-cell lit set of a radiomap built on
- that hardcoded unit-magnitude vertical source; the short-dipole source
- pattern alone separates the two, so a level delta is expected.
- """
+    Convention. The convention this family adopts is a Monte Carlo per-sample
+    acceptance interval, not a material law: RayD proposes the complete Keller
+    cone, a lane whose edge azimuth exceeds the wedge exterior angle is
+    rejected, and an accepted lane keeps the full-cone ``1 / (2pi)`` proposal
+    density, so its weight stays ``2pi`` rather than the accepted interval
+    width. Everything else is this package's own UTD: the full
+    Kouyoumjian-Pathak pair over the stored finite-thickness slab face
+    operators (fixed-point plus stored-ops convention, ``selectStationaryPoint
+    = 0`` and ``mat.omega = 0`` at the pair call), pseudo-infinite ``+-1e5``
+    edge bounds, and the true per-transmitter polarization rather than a
+    hardcoded vertical source. It deliberately does NOT reproduce the
+    diffracted field level or the cell-by-cell lit set of a radiomap built on
+    that hardcoded unit-magnitude vertical source; the short-dipole source
+    pattern alone separates the two, so a level delta is expected.
+    """
 
     output = _required_native_op("mc_utd_diffraction_tape_accumulate")(*args)
     if not isinstance(output, torch.Tensor):
@@ -1426,16 +1426,16 @@ def mc_utd_diffraction_tape_accumulate_jvp(
 class _McDiffractionMapAdFunction(torch.autograd.Function):
     """Differentiable UTD diffraction radiomap for one transmitter.
 
- Differentiable inputs: per-face eta_r / sigma_e / gain / thickness, the
- carrier frequency and the transmitter anchor (the state sources are the
- anchor broadcast per winner edge state, so the anchor gradient is the
- per-state source gradient summed natively). The RayD sampling tape
- (active / state / cell / u), the per-lane Keller-cone azimuth, the edge
- state tables and the deposit binning are frozen winners and fail loudly
- when a gradient is requested; the continuous source dependence (incident
- spherical wave, incidence angles, cone orientation and the recomputed
- plane-crossing Jacobian) flows through the templated dual row.
- """
+    Differentiable inputs: per-face eta_r / sigma_e / gain / thickness, the
+    carrier frequency and the transmitter anchor (the state sources are the
+    anchor broadcast per winner edge state, so the anchor gradient is the
+    per-state source gradient summed natively). The RayD sampling tape
+    (active / state / cell / u), the per-lane Keller-cone azimuth, the edge
+    state tables and the deposit binning are frozen winners and fail loudly
+    when a gradient is requested; the continuous source dependence (incident
+    spherical wave, incidence angles, cone orientation and the recomputed
+    plane-crossing Jacobian) flows through the templated dual row.
+    """
 
     @staticmethod
     def forward(
@@ -1672,7 +1672,7 @@ def mc_utd_diffraction_tape_accumulate_ad(
     grid_coord1_min: float, grid_coord1_max: float, grid_resolution0: int, grid_resolution1: int,
     wavelength: float, grid_cell_area: float, seed: int, total_edge_length: float,
 ) -> torch.Tensor:
-    """Differentiable:func:`mc_utd_diffraction_tape_accumulate` (one tx)."""
+    """Differentiable :func:`mc_utd_diffraction_tape_accumulate` (one tx)."""
 
     if len(tape_tensors) != 4:
         raise ValueError("tape_tensors must hold (active, state, cell, u)")
@@ -2864,7 +2864,7 @@ def bdpt_finalize_point_components_backward(
     grad_transmission_power: torch.Tensor | None = None,
     grad_scattering_power: torch.Tensor | None = None, need_grad_components: bool = False,
 ) -> dict[str, torch.Tensor | None]:
-    """VJP of:func:`bdpt_finalize_point_components` (point-result finalization)."""
+    """VJP of :func:`bdpt_finalize_point_components` (point-result finalization)."""
 
     return _bdpt_finalize_backward(
         "bdpt_finalize_point_components_backward",
@@ -2892,7 +2892,7 @@ def bdpt_finalize_point_components_jvp(
     tangent_transmission: torch.Tensor | None = None,
     tangent_scattering: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
-    """JVP of:func:`bdpt_finalize_point_components` (point-result finalization)."""
+    """JVP of :func:`bdpt_finalize_point_components` (point-result finalization)."""
 
     return _bdpt_finalize_jvp(
         "bdpt_finalize_point_components_jvp",
@@ -2919,7 +2919,7 @@ def bdpt_finalize_component_maps_backward(
     grad_transmission_power: torch.Tensor | None = None,
     grad_scattering_power: torch.Tensor | None = None, need_grad_components: bool = False,
 ) -> dict[str, torch.Tensor | None]:
-    """VJP of:func:`bdpt_finalize_component_maps` (map finalization, 3-D maps)."""
+    """VJP of :func:`bdpt_finalize_component_maps` (map finalization, 3-D maps)."""
 
     return _bdpt_finalize_backward(
         "bdpt_finalize_component_maps_backward",
@@ -2947,7 +2947,7 @@ def bdpt_finalize_component_maps_jvp(
     tangent_transmission: torch.Tensor | None = None,
     tangent_scattering: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
-    """JVP of:func:`bdpt_finalize_component_maps` (map finalization, 3-D maps)."""
+    """JVP of :func:`bdpt_finalize_component_maps` (map finalization, 3-D maps)."""
 
     return _bdpt_finalize_jvp(
         "bdpt_finalize_component_maps_jvp",
@@ -3122,12 +3122,12 @@ def _bdpt_accumulate_bin_sum_args(
     combine_domain: str, bin_sums: tuple[torch.Tensor, ...],
 ) -> tuple[torch.Tensor | None, ...]:
     """Expand the coherent forward's phasor bin sums into the ten positional
- ``los_re..scattering_im`` args the native accumulate VJP/JVP consume.
+    ``los_re..scattering_im`` args the native accumulate VJP/JVP consume.
 
- BDPT AD (retained forward bin sums): the coherent backward/jvp read the
- per-component bin sums ``S_b`` retained by the forward, so no in-backward
- re-reduction and no sample coefficients are needed. The power domain takes
- no bin sums; every slot is ``None``."""
+    BDPT AD (retained forward bin sums): the coherent backward/jvp read the
+    per-component bin sums ``S_b`` retained by the forward, so no in-backward
+    re-reduction and no sample coefficients are needed. The power domain takes
+    no bin sums; every slot is ``None``."""
 
     bins = tuple(bin_sums)
     if combine_domain == "coherent":
@@ -3522,15 +3522,15 @@ def bdpt_accumulate_connection_samples(
 ) -> dict[str, torch.Tensor]:
     """Accumulate connection samples into per-component matrices.
 
- ``combine_domain='power'`` (default) is the incoherent per-path power
- accumulation, bit-identical to the pre-coherent combination behaviour; the coefficient
- tensors are ignored. ``combine_domain='coherent'`` (coherent combination, opt-in) sums
- the complex projected field coefficient (``coeff_real``/``coeff_imag``,
- row-aligned to ``samples``) into per-(tx, rx, component) phasor bins and
- finalizes ``|sum|^2``; the ``accumulation_strategy`` perf axis stays
- orthogonal (the coherent phasor sum always uses the atomic-double
- reduction).
- """
+    ``combine_domain='power'`` (default) is the incoherent per-path power
+    accumulation, bit-identical to the pre-coherent combination behaviour; the coefficient
+    tensors are ignored. ``combine_domain='coherent'`` (coherent combination, opt-in) sums
+    the complex projected field coefficient (``coeff_real``/``coeff_imag``,
+    row-aligned to ``samples``) into per-(tx, rx, component) phasor bins and
+    finalizes ``|sum|^2``; the ``accumulation_strategy`` perf axis stays
+    orthogonal (the coherent phasor sum always uses the atomic-double
+    reduction).
+    """
 
     _validate_bdpt_connection_samples("samples", samples, None)
     if tx_count < 0 or rx_count < 0:

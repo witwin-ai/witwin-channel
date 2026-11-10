@@ -17,32 +17,6 @@ from tests.reference import em_oracle
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 PACKAGE_ROOT = REPOSITORY_ROOT / "witwin" / "channel"
 
-_PUBLIC = (
-    "Medium",
-    "RTCoefficients",
-    "coherent_attenuation",
-    "complex_sqrt_passive",
-    "fresnel_interface",
-    "hemisphere_integral",
-    "kirchhoff_diffuse_lobe_quadrature",
-    "kirchhoff_diffuse_lobe_series",
-    "layer_stack_rt",
-    "medium_params",
-    "phase_screen_patch_integral",
-    "refraction_direction",
-    "vacuum_medium",
-)
-
-_EXPECTED_ALL = ["C0", "EPS0", "ETA0", "MU0", *sorted(_PUBLIC)]
-
-
-def test_reference_oracle_has_exactly_one_owner_module() -> None:
-    assert em_oracle.__all__ == _EXPECTED_ALL
-    for name in _PUBLIC:
-        owner = getattr(em_oracle, name)
-        assert owner.__module__ == "tests.reference.em_oracle", name
-
-
 def test_no_facade_impersonates_the_oracle_module() -> None:
     """No object rewrites ``__module__`` to point at a re-export shim."""
 

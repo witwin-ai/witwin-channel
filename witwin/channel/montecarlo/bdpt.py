@@ -160,19 +160,19 @@ def _validate_coherent_combine(coherent: bool, components: frozenset[str]) -> No
 def _validate_ad_readiness(ad_mode: str, components: frozenset[str]) -> None:
     """BDPT AD readiness gate.
 
- ``ad_mode='none'`` is the bitwise default and never builds a tape. Under
- ``jvp``/``vjp`` every BDPT estimator block is differentiable: the frozen
- material/EM/table/frequency/tx_power parameters ride the differentiable fields and
- scattering derivative companions plus the BDPT AD subpath / endpoint /
- accumulate / finalize companions. ``max_scattering_order > 1`` is allowed:
- its extra diffuse factors ride ``scattering_table_eval_ad`` and the subpath
- ``_ad`` wrappers exactly as order 1 does. Any combination whose native
- companions are not registered fails loudly where they are dispatched (a
- missing-symbol error from ``runtime.required_symbol``); it is never silently
- detached. No component combination is refused here in v1 because every
- differentiable-parameter path has a registered companion; geometry
- gradients through the stochastic sampler are refused at the autograd
- boundary (``ad_geometry='enumerated_blocks_only'``), not here."""
+    ``ad_mode='none'`` is the bitwise default and never builds a tape. Under
+    ``jvp``/``vjp`` every BDPT estimator block is differentiable: the frozen
+    material/EM/table/frequency/tx_power parameters ride the differentiable fields and
+    scattering derivative companions plus the BDPT AD subpath / endpoint /
+    accumulate / finalize companions. ``max_scattering_order > 1`` is allowed:
+    its extra diffuse factors ride ``scattering_table_eval_ad`` and the subpath
+    ``_ad`` wrappers exactly as order 1 does. Any combination whose native
+    companions are not registered fails loudly where they are dispatched (a
+    missing-symbol error from ``runtime.required_symbol``); it is never silently
+    detached. No component combination is refused here in v1 because every
+    differentiable-parameter path has a registered companion; geometry
+    gradients through the stochastic sampler are refused at the autograd
+    boundary (``ad_geometry='enumerated_blocks_only'``), not here."""
 
     if ad_mode == "none":
         return
@@ -184,9 +184,9 @@ def _validate_ad_readiness(ad_mode: str, components: frozenset[str]) -> None:
 def _validate_scattering_order(max_scattering_order: int) -> None:
     """coherent scattering: the diffuse multi-order cap must be a positive bounce count.
 
- Extracted to a module-level validator mirroring ``_validate_coherent_combine``
- so ``__post_init__`` stays within its maintenance-complexity budget.
- """
+    Extracted to a module-level validator mirroring ``_validate_coherent_combine``
+    so ``__post_init__`` stays within its maintenance-complexity budget.
+    """
     if max_scattering_order < 1:
         raise ValueError("max_scattering_order must be >= 1")
 
@@ -416,12 +416,12 @@ def bdpt_reflected_light_subpath_state_backward(
     grad_throughput_imag: torch.Tensor | None = None, need_grad_material: bool = False,
     need_grad_field_in: bool = False, need_grad_frequency: bool = False,
 ) -> dict[str, torch.Tensor | None]:
-    """VJP of:func:`bdpt_reflected_light_subpath_state` (reflected-subpath derivatives).
+    """VJP of :func:`bdpt_reflected_light_subpath_state` (reflected-subpath derivatives).
 
- ``grad_field_in = O^H grad_field_out`` (``O`` = ReflectFrame rotation x
- Fresnel diag); material partials via ``field_transport_ad.cuh::stack_rt_dual``
- accumulate into the shared CSR/material grads by ``atomicAdd``; the frequency
- grad by ``atomicAdd``. Off-flag groups are ``None``."""
+    ``grad_field_in = O^H grad_field_out`` (``O`` = ReflectFrame rotation x
+    Fresnel diag); material partials via ``field_transport_ad.cuh::stack_rt_dual``
+    accumulate into the shared CSR/material grads by ``atomicAdd``; the frequency
+    grad by ``atomicAdd``. Off-flag groups are ``None``."""
 
     _validate_bdpt_subpath_state("light", light, None)
     count = int(light["origin"].shape[0])
@@ -481,11 +481,11 @@ def bdpt_reflected_light_subpath_state_jvp(
     tangent_light_throughput_real: torch.Tensor | None = None,
     tangent_light_throughput_imag: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
-    """JVP of:func:`bdpt_reflected_light_subpath_state` (reflected-subpath derivatives).
+    """JVP of :func:`bdpt_reflected_light_subpath_state` (reflected-subpath derivatives).
 
- The differentiable reflected material set is ``{eps_r, sigma_e, gain,
- thickness}`` (``mu_r`` is frozen); ``tangent_gain`` maps to the native
- kernel's gain tangent slot."""
+    The differentiable reflected material set is ``{eps_r, sigma_e, gain,
+    thickness}`` (``mu_r`` is frozen); ``tangent_gain`` maps to the native
+    kernel's gain tangent slot."""
 
     _validate_bdpt_subpath_state("light", light, None)
     exported = _required_native_op("bdpt_reflected_light_subpath_state_jvp")(  # type: ignore[operator]
@@ -527,11 +527,11 @@ def bdpt_transmitted_light_subpath_state_backward(
     grad_throughput_imag: torch.Tensor | None = None, need_grad_layers: bool = False,
     need_grad_field_in: bool = False, need_grad_frequency: bool = False,
 ) -> dict[str, torch.Tensor | None]:
-    """VJP of:func:`bdpt_transmitted_light_subpath_state` (transmitted-subpath derivatives).
+    """VJP of :func:`bdpt_transmitted_light_subpath_state` (transmitted-subpath derivatives).
 
- Layer grads via ``stack_rt_dual`` folded onto the CSR by ``atomicAdd``
- (identical to ``em_layer_stack_backward`` / the transmission-sequence
- backward). Off-flag groups are ``None``."""
+    Layer grads via ``stack_rt_dual`` folded onto the CSR by ``atomicAdd``
+    (identical to ``em_layer_stack_backward`` / the transmission-sequence
+    backward). Off-flag groups are ``None``."""
 
     _validate_bdpt_subpath_state("light", light, None)
     count = int(light["origin"].shape[0])
@@ -592,7 +592,7 @@ def bdpt_transmitted_light_subpath_state_jvp(
     tangent_light_throughput_real: torch.Tensor | None = None,
     tangent_light_throughput_imag: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
-    """JVP of:func:`bdpt_transmitted_light_subpath_state` (transmitted-subpath derivatives)."""
+    """JVP of :func:`bdpt_transmitted_light_subpath_state` (transmitted-subpath derivatives)."""
 
     _validate_bdpt_subpath_state("light", light, None)
     exported = _required_native_op("bdpt_transmitted_light_subpath_state_jvp")(  # type: ignore[operator]
@@ -631,13 +631,13 @@ def bdpt_endpoint_connection_samples_backward(
     grad_contribution: torch.Tensor | None = None, need_grad_field: bool = False,
     need_grad_frequency: bool = False, need_grad_tx_power: bool = False,
 ) -> dict[str, torch.Tensor | None]:
-    """VJP of:func:`bdpt_endpoint_connection_samples` (endpoint-connection derivatives).
+    """VJP of :func:`bdpt_endpoint_connection_samples` (endpoint-connection derivatives).
 
- ``contribution = P_src |F|^2 (lambda/(4 pi L))^2 / N``: ``d/dF = 2 conj(F)
- rest`` folds onto the light/sensor field cotangents (direct stores),
- ``d/d lambda`` chains into ``grad_frequency`` (``atomicAdd``), ``d/d P_src``
- onto ``grad_tx_power`` (``atomicAdd``). ``L``, ``N``, visibility and MIS are
- frozen."""
+    ``contribution = P_src |F|^2 (lambda/(4 pi L))^2 / N``: ``d/dF = 2 conj(F)
+    rest`` folds onto the light/sensor field cotangents (direct stores),
+    ``d/d lambda`` chains into ``grad_frequency`` (``atomicAdd``), ``d/d P_src``
+    onto ``grad_tx_power`` (``atomicAdd``). ``L``, ``N``, visibility and MIS are
+    frozen."""
 
     _validate_bdpt_subpath_state("light", light, None)
     _validate_bdpt_subpath_state("sensor", sensor, None)
@@ -689,7 +689,7 @@ def bdpt_endpoint_connection_samples_jvp(
     tangent_sensor_field_imag: torch.Tensor | None = None, tangent_frequency: float = 0.0,
     tangent_tx_power: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
-    """JVP of:func:`bdpt_endpoint_connection_samples` (endpoint-connection derivatives)."""
+    """JVP of :func:`bdpt_endpoint_connection_samples` (endpoint-connection derivatives)."""
 
     _validate_bdpt_subpath_state("light", light, None)
     _validate_bdpt_subpath_state("sensor", sensor, None)
@@ -724,13 +724,13 @@ def bdpt_accumulate_connection_samples_forward_ad(
 ) -> tuple[dict[str, torch.Tensor], tuple[torch.Tensor, ...]]:
     """Accumulate forward that also returns the coherent bin-sum buffers.
 
- Coherent BDPT accumulation: the coherent forward returns the
- per-component phasor bin sums (``S_b``) as non-differentiable outputs so the
- coherent backward can read them without a second atomic-double reduction.
- Returns ``(component_matrices, bin_sums)`` where ``bin_sums`` is an ordered
- tuple (native return order, empty for the power domain) forwarded
- positionally to the backward companion. Numerically the component matrices
- are bitwise the primal:func:`bdpt_accumulate_connection_samples` result."""
+    Coherent BDPT accumulation: the coherent forward returns the
+    per-component phasor bin sums (``S_b``) as non-differentiable outputs so the
+    coherent backward can read them without a second atomic-double reduction.
+    Returns ``(component_matrices, bin_sums)`` where ``bin_sums`` is an ordered
+    tuple (native return order, empty for the power domain) forwarded
+    positionally to the backward companion. Numerically the component matrices
+    are bitwise the primal :func:`bdpt_accumulate_connection_samples` result."""
 
     strategy_ids = {"atomic": 0, "staged": 1, "compact": 2}
     combine_ids = {"power": 0, "coherent": 1}
@@ -766,15 +766,15 @@ def bdpt_accumulate_connection_samples_backward(
     grad_scattering: torch.Tensor | None = None, need_grad_contribution: bool = False,
     need_grad_coeff: bool = False,
 ) -> dict[str, torch.Tensor | None]:
-    """VJP of:func:`bdpt_accumulate_connection_samples`, both domains (connection accumulation).
+    """VJP of :func:`bdpt_accumulate_connection_samples`, both domains (connection accumulation).
 
- Power: ``grad_contribution_r = mis_r grad_M[bin(r)]`` (gather, no atomics);
- this is also the concat-backward split view. Coherent:
- ``grad_c_r = 2 grad_P[b] S_b`` read from the forward-retained ``bin_sums``
- (no backward re-reduction). Both gathers are
- deterministic. ``mis``, the accumulation strategy, and the index structure
- are frozen: the VJP does not read the sample coefficients, only the six
- output-matrix cotangents plus (coherent) the ten forward phasor bin sums."""
+    Power: ``grad_contribution_r = mis_r grad_M[bin(r)]`` (gather, no atomics);
+    this is also the concat-backward split view. Coherent:
+    ``grad_c_r = 2 grad_P[b] S_b`` read from the forward-retained ``bin_sums``
+    (no backward re-reduction). Both gathers are
+    deterministic. ``mis``, the accumulation strategy, and the index structure
+    are frozen: the VJP does not read the sample coefficients, only the six
+    output-matrix cotangents plus (coherent) the ten forward phasor bin sums."""
 
     _validate_bdpt_connection_samples("samples", samples, None)
     combine_ids = {"power": 0, "coherent": 1}
@@ -813,13 +813,13 @@ def bdpt_accumulate_connection_samples_jvp(
     bin_sums: tuple[torch.Tensor, ...] = (), tangent_contribution: torch.Tensor | None = None,
     tangent_coeff_real: torch.Tensor | None = None, tangent_coeff_imag: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
-    """JVP of:func:`bdpt_accumulate_connection_samples`, both domains (connection accumulation).
+    """JVP of :func:`bdpt_accumulate_connection_samples`, both domains (connection accumulation).
 
- Power: ``t_M[b] = SUM_r mis_r tangent_contribution_r``. Coherent:
- ``t_P = 2 Re(conj(S_b) t_S_b)``, ``t_S_b = SUM_r t_c_r``, with ``S_b`` read
- from the forward-retained ``bin_sums`` (no re-reduction).
- Both are fixed-order per-bin sums (deterministic, no float atomics on the
- JVP); the accumulation strategy and sample coefficients are frozen out."""
+    Power: ``t_M[b] = SUM_r mis_r tangent_contribution_r``. Coherent:
+    ``t_P = 2 Re(conj(S_b) t_S_b)``, ``t_S_b = SUM_r t_c_r``, with ``S_b`` read
+    from the forward-retained ``bin_sums`` (no re-reduction).
+    Both are fixed-order per-bin sums (deterministic, no float atomics on the
+    JVP); the accumulation strategy and sample coefficients are frozen out."""
 
     _validate_bdpt_connection_samples("samples", samples, None)
     combine_ids = {"power": 0, "coherent": 1}
@@ -885,7 +885,7 @@ def _subpath_output_tuple(out: dict[str, torch.Tensor]) -> tuple[torch.Tensor, .
 
 def _mark_subpath_structural(ctx, output) -> None:  # type: ignore[no-untyped-def]
     """Mark every subpath output field non-differentiable except the four
- field/throughput slots that carry the advance's cotangents."""
+    field/throughput slots that carry the advance's cotangents."""
 
     structural = [
         output[index]
@@ -899,11 +899,11 @@ def _subpath_backward_needs(  # type: ignore[no-untyped-def]
     needs_input_grad, material_indices: tuple[int, ...]
 ) -> tuple[bool, bool, bool]:
     """Derive the (field-in, material/layers, frequency) need flags for a subpath
- advance backward from ``ctx.needs_input_grad``.
+    advance backward from ``ctx.needs_input_grad``.
 
- ``material_indices`` selects the differentiable material/layer slots (they
- differ between the reflected and transmitted advances); slots 0-3 are the
- upstream field/throughput inputs and slot 8 is the carrier frequency."""
+    ``material_indices`` selects the differentiable material/layer slots (they
+    differ between the reflected and transmitted advances); slots 0-3 are the
+    upstream field/throughput inputs and slot 8 is the carrier frequency."""
 
     need_field_in = any(bool(needs_input_grad[i]) for i in range(4))
     need_material = any(bool(needs_input_grad[i]) for i in material_indices)
@@ -919,12 +919,12 @@ def _subpath_backward_needs(  # type: ignore[no-untyped-def]
 class _BdptReflectedSubpathAdFunction(torch.autograd.Function):
     """Differentiable specular-reflection subpath advance (reflected-subpath derivatives).
 
- Differentiable inputs: the upstream light field/throughput (4 tensors) and
- the per-face material eps_r / sigma_e / thickness plus the carrier
- frequency. Frozen (reject loudly): hit-point geometry (the ``intersection``
- dict), material_valid, material_gain, mu_r, and every structural subpath
- field. Hit geometry stays frozen in v1 (stochastic-sampler stance,
- ``ad_geometry='enumerated_blocks_only'``)."""
+    Differentiable inputs: the upstream light field/throughput (4 tensors) and
+    the per-face material eps_r / sigma_e / thickness plus the carrier
+    frequency. Frozen (reject loudly): hit-point geometry (the ``intersection``
+    dict), material_valid, material_gain, mu_r, and every structural subpath
+    field. Hit geometry stays frozen in v1 (stochastic-sampler stance,
+    ``ad_geometry='enumerated_blocks_only'``)."""
 
     @staticmethod
     def forward(  # type: ignore[no-untyped-def]
@@ -1162,7 +1162,7 @@ def bdpt_reflected_light_subpath_state_ad(
     material_sigma_e: torch.Tensor, material_mu_r: torch.Tensor, material_thickness: torch.Tensor,
     frequency: torch.Tensor | float, frequency_value: float | None = None,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable:func:`bdpt_reflected_light_subpath_state` (reflected-subpath derivatives)."""
+    """Differentiable :func:`bdpt_reflected_light_subpath_state` (reflected-subpath derivatives)."""
 
     if frequency_value is None:
         frequency_value = _ad_frequency_value(frequency)
@@ -1198,11 +1198,11 @@ def bdpt_reflected_light_subpath_state_ad(
 class _BdptTransmittedSubpathAdFunction(torch.autograd.Function):
     """Differentiable slab-transmission subpath advance (transmitted-subpath derivatives).
 
- Differentiable inputs: the upstream light field/throughput (4 tensors) and
- the CSR layer thickness / eps_r / sigma_e plus the carrier frequency. Frozen
- (reject loudly): hit-point geometry, face_material_id, the CSR index arrays
- (layer_offset / layer_count), layer_mu_r, and every structural subpath
- field."""
+    Differentiable inputs: the upstream light field/throughput (4 tensors) and
+    the CSR layer thickness / eps_r / sigma_e plus the carrier frequency. Frozen
+    (reject loudly): hit-point geometry, face_material_id, the CSR index arrays
+    (layer_offset / layer_count), layer_mu_r, and every structural subpath
+    field."""
 
     @staticmethod
     def forward(  # type: ignore[no-untyped-def]
@@ -1437,7 +1437,7 @@ def bdpt_transmitted_light_subpath_state_ad(
     layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor,
     layer_mu_r: torch.Tensor, frequency: torch.Tensor | float, frequency_value: float | None = None,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable:func:`bdpt_transmitted_light_subpath_state` (transmitted-subpath derivatives)."""
+    """Differentiable :func:`bdpt_transmitted_light_subpath_state` (transmitted-subpath derivatives)."""
 
     if frequency_value is None:
         frequency_value = _ad_frequency_value(frequency)
@@ -1491,11 +1491,11 @@ _CONNECTION_CONTRIBUTION_INDEX = _CONNECTION_FIELDS.index("contribution")
 class _BdptEndpointConnectionAdFunction(torch.autograd.Function):
     """Differentiable endpoint (LoS/NEE) connection contribution (endpoint-connection derivatives).
 
- Differentiable inputs: the light and sensor subpath fields (8 tensors), the
- carrier frequency and ``tx_power`` (P_src). Frozen (reject loudly): the
- connection length L, samples_per_tx N, visibility, MIS mode, component_id,
- and every structural connection field. Only ``contribution`` is a
- differentiable output; the other 11 schema fields are frozen structure."""
+    Differentiable inputs: the light and sensor subpath fields (8 tensors), the
+    carrier frequency and ``tx_power`` (P_src). Frozen (reject loudly): the
+    connection length L, samples_per_tx N, visibility, MIS mode, component_id,
+    and every structural connection field. Only ``contribution`` is a
+    differentiable output; the other 11 schema fields are frozen structure."""
 
     @staticmethod
     def forward(  # type: ignore[no-untyped-def]
@@ -1699,12 +1699,12 @@ def bdpt_endpoint_connection_samples_ad(
     max_paths: int | None = None, mis: str = "power_heuristic", beta: float = 2.0,
     strategy_count: int = 1,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable:func:`bdpt_endpoint_connection_samples` (endpoint-connection derivatives).
+    """Differentiable :func:`bdpt_endpoint_connection_samples` (endpoint-connection derivatives).
 
- ``tx_power`` (P_src) is carried so its gradient (``grad_tx_power``) is
- accumulated by the native backward; it is not consumed by the primal
- forward (source power rides the light subpath) so the primal is bitwise
- unchanged."""
+    ``tx_power`` (P_src) is carried so its gradient (``grad_tx_power``) is
+    accumulated by the native backward; it is not consumed by the primal
+    forward (source power rides the light subpath) so the primal is bitwise
+    unchanged."""
 
     if frequency_value is None:
         frequency_value = _ad_frequency_value(frequency)
@@ -1758,10 +1758,10 @@ _FINALIZE_FIELDS = (
 class _BdptFinalizeAdFunction(torch.autograd.Function):
     """Differentiable BDPT finalize (linear map; point-result finalization/6.6).
 
- The five component matrices/maps are all differentiable; the forward sums
- them into ``path_gain`` and reduces each into a 0-dim power. Backward is the
- native transpose companion, jvp the native forward map on the tangents;
- both deterministic, no atomics."""
+    The five component matrices/maps are all differentiable; the forward sums
+    them into ``path_gain`` and reduces each into a 0-dim power. Backward is the
+    native transpose companion, jvp the native forward map on the tangents;
+    both deterministic, no atomics."""
 
     @staticmethod
     def forward(los, reflection, diffraction, transmission, scattering, kind):  # type: ignore[no-untyped-def]
@@ -1849,7 +1849,7 @@ def bdpt_finalize_point_components_ad(
     los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor,
     transmission: torch.Tensor, scattering: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable:func:`bdpt_finalize_point_components` (point-result finalization)."""
+    """Differentiable :func:`bdpt_finalize_point_components` (point-result finalization)."""
 
     values = _BdptFinalizeAdFunction.apply(
         los, reflection, diffraction, transmission, scattering, "point"
@@ -1861,7 +1861,7 @@ def bdpt_finalize_component_maps_ad(
     los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor,
     transmission: torch.Tensor, scattering: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable:func:`bdpt_finalize_component_maps` (map finalization)."""
+    """Differentiable :func:`bdpt_finalize_component_maps` (map finalization)."""
 
     values = _BdptFinalizeAdFunction.apply(
         los, reflection, diffraction, transmission, scattering, "maps"
@@ -1887,11 +1887,11 @@ _ACCUMULATE_MATRIX_FIELDS = (
 class _BdptAccumulateAdFunction(torch.autograd.Function):
     """Differentiable connection-sample accumulate, both domains (connection accumulation).
 
- Differentiable inputs: the row ``contribution`` (power domain) OR the
- complex ``coeff_real``/``coeff_imag`` (coherent domain). Frozen (reject
- loudly): mis_weight, tx_id/rx_id/component_id/valid, the whole index
- structure. The coherent forward retains its per-component phasor bin sums
- ``S_b`` so the coherent backward needs no re-reduction (retained forward bin sums)."""
+    Differentiable inputs: the row ``contribution`` (power domain) OR the
+    complex ``coeff_real``/``coeff_imag`` (coherent domain). Frozen (reject
+    loudly): mis_weight, tx_id/rx_id/component_id/valid, the whole index
+    structure. The coherent forward retains its per-component phasor bin sums
+    ``S_b`` so the coherent backward needs no re-reduction (retained forward bin sums)."""
 
     @staticmethod
     def forward(  # type: ignore[no-untyped-def]
@@ -2055,7 +2055,7 @@ def bdpt_accumulate_connection_samples_ad(
     accumulation_strategy: str = "atomic", combine_domain: str = "power",
     coeff_real: torch.Tensor | None = None, coeff_imag: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable:func:`bdpt_accumulate_connection_samples` (connection accumulation)."""
+    """Differentiable :func:`bdpt_accumulate_connection_samples` (connection accumulation)."""
 
     device = samples["contribution"].device
     if combine_domain == "coherent":
@@ -2151,11 +2151,11 @@ def _merge_event_states(
 ) -> dict[str, torch.Tensor]:
     """Row-wise merge of the two event kernels' outputs.
 
- Both kernels are evaluated on the full batch and the per-row winner is
- selected, which preserves the tensor layout exactly (equivalent to
- partitioning the hit indices, running each kernel on its partition, and
- scattering back by original index).
- """
+    Both kernels are evaluated on the full batch and the per-row winner is
+    selected, which preserves the tensor layout exactly (equivalent to
+    partitioning the hit indices, running each kernel on its partition, and
+    scattering back by original index).
+    """
 
     wide = choose_transmit[:, None]
     merged: dict[str, torch.Tensor] = {}
@@ -2170,7 +2170,7 @@ def _merge_scattered_state(
     choose_scatter: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Row-wise overlay of the scattered branch onto the reflect/transmit
- merge (same evaluate-everywhere-select-per-row pattern as:func:`_merge_event_states`)."""
+    merge (same evaluate-everywhere-select-per-row pattern as :func:`_merge_event_states`)."""
 
     wide = choose_scatter[:, None]
     out: dict[str, torch.Tensor] = {}
@@ -2188,11 +2188,11 @@ def _select_surface_events(
 ) -> dict[str, torch.Tensor]:
     """Three-way (scatter / transmit / reflect) event selection at a surface hit.
 
- Pure lift of surface-event selection's frozen event-probability stack: the smooth
- two-way split, the rough three-way budget overlay on rough rows, and the
- single seeded uniform that partitions scatter/transmit/reflect. Returns the
- per-row selection masks plus the probabilities the unbiased weighting reads.
- """
+    Pure lift of surface-event selection's frozen event-probability stack: the smooth
+    two-way split, the rough three-way budget overlay on rough rows, and the
+    single seeded uniform that partitions scatter/transmit/reflect. Returns the
+    per-row selection masks plus the probabilities the unbiased weighting reads.
+    """
 
     stack = em_layer_stack_eval(
         cos_theta,
@@ -2222,7 +2222,7 @@ def _select_surface_events(
         p_scatter = torch.where(
             rough, rough_probs["p_scatter"], torch.zeros_like(p_transmit)
         )
-        # Smooth rows keep the exact wave-2 two-way probability;
+        # Smooth rows keep the exact two-way probability;
         # rough rows switch to the three-way budget split.
         p_transmit = torch.where(rough, rough_probs["p_transmit"], p_transmit)
         coherent_amplitude = torch.where(
@@ -2262,9 +2262,9 @@ def _emit_scatter_nee(
 ) -> tuple[dict[str, torch.Tensor], torch.Tensor, int]:
     """Scatter branch: local frames, the scattered subpath overlay, and NEE rows.
 
- Pure lift of the scatter-selected emission block (surface-event selection, coherent scattering). Appends the NEE connection block (when any) to ``sample_blocks`` and
- returns the (possibly overlaid) merged state, the scattered-valid mask, and
- the count of emitted NEE rows."""
+    Pure lift of the scatter-selected emission block (surface-event selection, coherent scattering). Appends the NEE connection block (when any) to ``sample_blocks`` and
+    returns the (possibly overlaid) merged state, the scattered-valid mask, and
+    the count of emitted NEE rows."""
 
     scattered_valid = torch.zeros_like(choose_scatter)
     nee_rows = 0
@@ -2393,9 +2393,9 @@ def _emit_mixed_transmission(
 ) -> None:
     """Emit the MIXED reflection+transmission endpoint connection (component 5).
 
- Pure lift of the mixed-transmission emission block (transmission): connects only the
- reflect-and-transmit subpaths through the native endpoint kernel, filters by
- visibility, and appends the resulting block to ``sample_blocks``."""
+    Pure lift of the mixed-transmission emission block (transmission): connects only the
+    reflect-and-transmit subpaths through the native endpoint kernel, filters by
+    visibility, and appends the resulting block to ``sample_blocks``."""
 
     mask = merged["component_mask"]
     mixed = (
@@ -2465,8 +2465,8 @@ def _apply_scatter_continuation(
 ) -> torch.Tensor | None:
     """Terminate (order 1) or continue (order > 1) scattered subpaths.
 
- Pure lift of the continuation/kill logic (coherent scattering). Mutates
- ``merged['valid']`` in place and returns the updated scatter-event tally."""
+    Pure lift of the continuation/kill logic (coherent scattering). Mutates
+    ``merged['valid']`` in place and returns the updated scatter-event tally."""
 
     if scatter_count is None:
         # order 1 (default): scattered subpaths connected above and
@@ -2501,39 +2501,39 @@ def _transmission_sampled_connection_samples(
 ) -> tuple[list[dict[str, torch.Tensor]], dict[str, int]]:
     """Shooting-context light subpaths with three-way event selection.
 
- Implements surface-event selection. At every surface hit a seeded, reproducible
- uniform selects among the delta specular reflection, the continuous
- Kirchhoff scattering (rough faces only, when ``scattering_runtimes`` is
- provided) and the delta transmission events; the selected branch's field
- is divided by sqrt(p_event) so the power estimator stays unbiased (see
- the inline algebra note).
+    Implements surface-event selection. At every surface hit a seeded, reproducible
+    uniform selects among the delta specular reflection, the continuous
+    Kirchhoff scattering (rough faces only, when ``scattering_runtimes`` is
+    provided) and the delta transmission events; the selected branch's field
+    is divided by sqrt(p_event) so the power estimator stays unbiased (see
+    the inline algebra note).
 
- Event probabilities: smooth faces keep the wave-2 two-way split
- p_t = T/(R+T) from the native stack budgets BIT-IDENTICALLY (their
- scatter probability is exactly zero, so the same uniform partitions the
- same way); rough faces use the native (R_coh, R_diff, T_bar) budgets
- with the same floor pattern. The rough reflect branch
- additionally multiplies the field by the coherent attenuation C_r so its
- amplitude represents sqrt(R_coh), matching the budget that selected it.
+    Event probabilities: smooth faces keep the two-way split
+    p_t = T/(R+T) from the native stack budgets BIT-IDENTICALLY (their
+    scatter probability is exactly zero, so the same uniform partitions the
+    same way); rough faces use the native (R_coh, R_diff, T_bar) budgets
+    with the same floor pattern. The rough reflect branch
+    additionally multiplies the field by the coherent attenuation C_r so its
+    amplitude represents sqrt(R_coh), matching the budget that selected it.
 
- Contribution routing (never double counts):
- - MIXED reflection+transmission chains connect through the native
- endpoint kernel (component 5), as in transmission; emitted only when
- ``emit_mixed_transmission`` (the transmission component is requested).
- - Scatter-selected vertices emit torch-side NEE rows (component 6).
- Depth rule (coherent scattering, ``max_scattering_order``):
- * order 1 (default, BIT-IDENTICAL): the scattered subpath emits its
- NEE row and TERMINATES; reflection/transmission never follow.
- * order > 1: the scattered subpath CONTINUES in its lobe-sampled
- direction (power divided by ``p_scatter * pdf(wo)`` in:func:`scattered_subpath_state`) and may reflect/transmit/scatter
- again, emitting an NEE row at every scatter vertex, until it has
- undergone ``max_scattering_order`` scatter events. A post-scatter
- subpath carries power in the scalar throughput (its Complex3 Jones
- field is cleared at a scatter vertex), so its incident power at a
- further scatter vertex is the unpolarized throughput power.
- - Pure reflection stays with the discrete enumeration and pure
- transmission with the straight endpoint chains.
- """
+    Contribution routing (never double counts):
+    - MIXED reflection+transmission chains connect through the native
+    endpoint kernel (component 5), as in transmission; emitted only when
+    ``emit_mixed_transmission`` (the transmission component is requested).
+    - Scatter-selected vertices emit torch-side NEE rows (component 6).
+    Depth rule (coherent scattering, ``max_scattering_order``):
+    * order 1 (default, BIT-IDENTICAL): the scattered subpath emits its
+    NEE row and TERMINATES; reflection/transmission never follow.
+    * order > 1: the scattered subpath CONTINUES in its lobe-sampled
+    direction (power divided by ``p_scatter * pdf(wo)`` in :func:`scattered_subpath_state`) and may reflect/transmit/scatter
+    again, emitting an NEE row at every scatter vertex, until it has
+    undergone ``max_scattering_order`` scatter events. A post-scatter
+    subpath carries power in the scalar throughput (its Complex3 Jones
+    field is cleared at a scatter vertex), so its incident power at a
+    further scatter vertex is the unpolarized throughput power.
+    - Pure reflection stays with the discrete enumeration and pure
+    transmission with the straight endpoint chains.
+    """
 
     device = tx_positions.device
     # scattering AD: under AD the carrier crosses as a live 0-dim tensor
@@ -2921,9 +2921,9 @@ def select_accumulation_strategy(
 def _ad_launch_accounting(config: Config, ad_ledger: AdLaunchLedger | None) -> tuple[int, int, int]:
     """BDPT AD companion accounting: backward/jvp launch counts and tape bytes.
 
- ad_mode='none' wires no companions and retains no tape (bitwise default).
- Under jvp/vjp report the companion launches this solve registered in the
- AdLaunchLedger, exactly as montecarlo.basic does."""
+    ad_mode='none' wires no companions and retains no tape (bitwise default).
+    Under jvp/vjp report the companion launches this solve registered in the
+    AdLaunchLedger, exactly as montecarlo.basic does."""
 
     ledger = ad_ledger if ad_ledger is not None else AdLaunchLedger()
     backward_launch_count = ledger.launches if config.ad_mode == "vjp" else 0
@@ -3107,8 +3107,8 @@ def _accumulate_connection_samples(
     coeff_real: torch.Tensor | None = None, coeff_imag: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
     """Accumulate dispatcher: the differentiable twin under ad_mode != 'none',
- else the bitwise primal. Both domains (power/coherent) route through the
- BDPT AD accumulate companions when AD is active (connection accumulation)."""
+    else the bitwise primal. Both domains (power/coherent) route through the
+    BDPT AD accumulate companions when AD is active (connection accumulation)."""
 
     if config.ad_mode != "none":
         return bdpt_accumulate_connection_samples_ad(
@@ -3137,11 +3137,11 @@ def _reduced_light_endpoint_state(
 ) -> dict[str, torch.Tensor]:
     """One light endpoint per transmitter for the deterministic LoS term.
 
- All depth-0 light samples share the transmitter position, so N samples
- per tx are N identical rows weighted 1/N. Connecting the T unique
- endpoints with samples_per_tx=1 yields the identical estimate while the
- connection table shrinks from T*N*R rows to T*R.
- """
+    All depth-0 light samples share the transmitter position, so N samples
+    per tx are N identical rows weighted 1/N. Connecting the T unique
+    endpoints with samples_per_tx=1 yields the identical estimate while the
+    connection table shrinks from T*N*R rows to T*R.
+    """
 
     device = tx_reference.device
     tx_count = int(tx_reference.shape[0])
@@ -3161,15 +3161,15 @@ def _reduced_light_endpoint_state(
 def _live_tx_power(scene: SolverScene, *, reference: torch.Tensor) -> torch.Tensor:
     """Reattach the live per-tx power leaves' gradient onto the native power pack.
 
- BDPT transmitter-power gradients: ``endpoints.transmitter_tensors`` reads
- ``float(power_w)`` and detaches the leaf. Under ad we pack the same values
- from the ``Transmitter.power_w`` tensors and add them (minus their detached
- selves) to the native ``reference`` so the returned tensor is bitwise-equal
- to the detached pack while carrying the leaves' gradient. A float ``power_w``
- packs a plain constant, so a materials-only ad graph is unchanged. The
- native endpoint kernels read the data pointer and detach on output, so the
- live gradient reaches the differentiable inputs (endpoint-connection
- companion, scattering-NEE source power) rather than the frozen subpaths."""
+    BDPT transmitter-power gradients: ``endpoints.transmitter_tensors`` reads
+    ``float(power_w)`` and detaches the leaf. Under ad we pack the same values
+    from the ``Transmitter.power_w`` tensors and add them (minus their detached
+    selves) to the native ``reference`` so the returned tensor is bitwise-equal
+    to the detached pack while carrying the leaves' gradient. A float ``power_w``
+    packs a plain constant, so a materials-only ad graph is unchanged. The
+    native endpoint kernels read the data pointer and detach on output, so the
+    live gradient reaches the differentiable inputs (endpoint-connection
+    companion, scattering-NEE source power) rather than the frozen subpaths."""
 
     powers = []
     for transmitter in scene.transmitters:
@@ -3478,14 +3478,14 @@ def _single_class_discrete_connection_samples(
 ) -> dict[str, torch.Tensor] | None:
     """Enumerate one delta-like path class as unit-mass discrete connections.
 
- Shared by the reflection and standalone-diffraction BDPT connection builders:
- both consume the public ``evaluate_enumerated_paths`` for a single delta/UTD
- component (the enumerated-path oracle), select the matching enumerated rows, and pack them with
- unit forward/reverse discrete mass. The selected ``component_id`` also names
- the accumulation bucket (reflection -> 1, diffraction -> 2). The coupled
- builder differs (mixed-order discovery plus a >=3 class selection) and keeps
- its own body.
- """
+    Shared by the reflection and standalone-diffraction BDPT connection builders:
+    both consume the public ``evaluate_enumerated_paths`` for a single delta/UTD
+    component from the enumerated-path oracle, select the matching enumerated rows, and pack them with
+    unit forward/reverse discrete mass. The selected ``component_id`` also names
+    the accumulation bucket (reflection -> 1, diffraction -> 2). The coupled
+    builder differs (mixed-order discovery plus a >=3 class selection) and keeps
+    its own body.
+    """
 
     paths, _ = evaluate_enumerated_paths(
         scene,
@@ -3521,15 +3521,15 @@ def _diffraction_discrete_connection_samples(
 ) -> dict[str, torch.Tensor] | None:
     """Enumerate first-order UTD diffraction paths with unit discrete mass.
 
- Standalone diffraction is a delta-like discrete path: first-order UTD emits
- one deterministic edge-diffraction connection per (tx, edge, rx) triple with
- the same field the deterministic solver evaluates. BDPT consumes it as an
- opaque discrete-path oracle (the enumerated-path oracle/BDPT diffraction) exactly as it does reflection,
- so the standalone diffraction component reproduces the deterministic
- reference instead of the retired crude power heuristic. The enumerated engine
- only implements order-1 diffraction, so max_diffraction_order stays at its
- default of 1.
- """
+    Standalone diffraction is a delta-like discrete path: first-order UTD emits
+    one deterministic edge-diffraction connection per (tx, edge, rx) triple with
+    the same field the deterministic solver evaluates. BDPT consumes it as an
+    opaque discrete-path oracle (the enumerated-path oracle/BDPT diffraction) exactly as it does reflection,
+    so the standalone diffraction component reproduces the deterministic
+    reference instead of the retired crude power heuristic. The enumerated engine
+    only implements order-1 diffraction, so max_diffraction_order stays at its
+    default of 1.
+    """
 
     return _single_class_discrete_connection_samples(
         scene, config, component="diffraction", component_id=2, tx_power=tx_power
@@ -3541,13 +3541,13 @@ def _transmission_discrete_connection_samples(
 ) -> dict[str, torch.Tensor] | None:
     """Enumerate pure straight-segment transmission paths with unit discrete mass.
 
- transmission polarization. Pure specular transmission is delta-like exactly as reflection is,
- so BDPT consumes it as an opaque enumerated discrete-path oracle (the enumerated-path oracle),
- reproducing the deterministic full-Jones layer-stack field
- (``field_transmission_sequence``) instead of the retired straight-chain TE/TM
- mean. Mixed reflection+transmission chains are not enumerable and stay with
- the event-selected shooting sampler (native full-Jones field).
- """
+    transmission polarization. Pure specular transmission is delta-like exactly as reflection is,
+    so BDPT consumes it as an opaque enumerated discrete-path oracle,
+    reproducing the deterministic full-Jones layer-stack field
+    (``field_transmission_sequence``) instead of the retired straight-chain TE/TM
+    mean. Mixed reflection+transmission chains are not enumerable and stay with
+    the event-selected shooting sampler (native full-Jones field).
+    """
 
     return _single_class_discrete_connection_samples(
         scene, config, component="transmission", component_id=5, tx_power=tx_power
@@ -3587,13 +3587,13 @@ def _enumerated_component_block_with_field(
 ) -> tuple[dict[str, torch.Tensor], torch.Tensor, torch.Tensor] | None:
     """Enumerate one delta/UTD class as a discrete block plus its complex field.
 
- coherent combination path. Returns the same unit-mass discrete connection block
- the power-domain path uses, together with the per-row complex projected
- field coefficient (``path_field``) selected in row order so it aligns with
- the block. ``path_field`` is the natively evaluated complex field the
- deterministic coherent accumulator sums, so BDPT coherent reproduces the
- deterministic per-component coherent power.
- """
+    coherent combination path. Returns the same unit-mass discrete connection block
+    the power-domain path uses, together with the per-row complex projected
+    field coefficient (``path_field``) selected in row order so it aligns with
+    the block. ``path_field`` is the natively evaluated complex field the
+    deterministic coherent accumulator sums, so BDPT coherent reproduces the
+    deterministic per-component coherent power.
+    """
 
     paths, _ = evaluate_enumerated_paths(
         scene,
@@ -3653,16 +3653,16 @@ def _collect_coherent_connection_samples(
 ]:
     """coherent combination collection over the enumerable delta/UTD family.
 
- Every coherent-eligible component (los / reflection / diffraction, plus the
- coupled compensator folded into diffraction) routes through the shared
- enumerated engine as a unit-mass discrete block carrying its complex field.
- The blocks concatenate through the native connection-sample concat (12-field
- schema, unchanged) while the per-row field coefficients concatenate in the
- same block order, then the coherent accumulate op sums the phasor per
- (tx, rx, component) and finalizes ``|sum|^2``. Config validation already
- guarantees ``components`` is a subset of {los, reflection, diffraction}, so
- transmission/scattering never reach here.
- """
+    Every coherent-eligible component (los / reflection / diffraction, plus the
+    coupled compensator folded into diffraction) routes through the shared
+    enumerated engine as a unit-mass discrete block carrying its complex field.
+    The blocks concatenate through the native connection-sample concat (12-field
+    schema, unchanged) while the per-row field coefficients concatenate in the
+    same block order, then the coherent accumulate op sums the phasor per
+    (tx, rx, component) and finalizes ``|sum|^2``. Config validation already
+    guarantees ``components`` is a subset of {los, reflection, diffraction}, so
+    transmission/scattering never reach here.
+    """
 
     topology_scene = workspace.topology_scene
     tx_count = workspace.tx_count
@@ -3769,15 +3769,15 @@ def _validate(scene: SolverScene, config: Config) -> ReceiverGrid | None:
 
 def _reject_live_geometry_through_sampler(scene: SolverScene, config: Config) -> None:
     """BDPT AD: mesh-vertex geometry is frozen for the stochastic sampler
- (``ad_geometry='enumerated_blocks_only'``).
+    (``ad_geometry='enumerated_blocks_only'``).
 
- Reflection/diffraction/transmission (pure) and LoS route through the shared
- enumerated engine, which owns geometry adjoints; but the mixed-transmission
- shooting walk and the scattering NEE draw hit points from the stochastic
- sampler, whose geometry is not differentiable in v1. If a mesh-vertex leaf
- participates in AD and one of those stochastic blocks will run, refuse
- loudly instead of silently detaching. Purely-enumerated component sets keep
- their geometry gradients untouched."""
+    Reflection/diffraction/transmission (pure) and LoS route through the shared
+    enumerated engine, which owns geometry adjoints; but the mixed-transmission
+    shooting walk and the scattering NEE draw hit points from the stochastic
+    sampler, whose geometry is not differentiable in v1. If a mesh-vertex leaf
+    participates in AD and one of those stochastic blocks will run, refuse
+    loudly instead of silently detaching. Purely-enumerated component sets keep
+    their geometry gradients untouched."""
 
     if config.ad_mode == "none":
         return

@@ -169,9 +169,9 @@ def _mesh_flags(*, use_face_normals: bool, edges_enabled: bool, dynamic: bool) -
 def build_scene_from_structures(structures: tuple[object, ...]) -> RayDSceneResource:
     """Build a typed RayD native scene from Channel structures.
 
- This function uses the RayD native core source-linked into
- `_channel`. It does not import a RayD Python package or dispatcher.
- """
+    This function uses the RayD native core source-linked into
+    `_channel`. It does not import a RayD Python package or dispatcher.
+    """
 
     if not structures:
         return RayDSceneResource(reason="scene has no structures")
@@ -324,9 +324,9 @@ def _duplicate_boundary_pairs(
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Group boundary edges by quantized endpoints.
 
- Returns (first_of_pair, second_of_pair, extra_duplicates); the extras are
- third-or-later records of a group and are simply deselected.
- """
+    Returns (first_of_pair, second_of_pair, extra_duplicates); the extras are
+    third-or-later records of a group and are simply deselected.
+    """
 
     device = candidate.device
     empty = torch.empty((0,), device=device, dtype=torch.long)
@@ -440,12 +440,12 @@ class RoughMaterialRuntime:
 class KirchhoffTableStack:
     """Stacked per-material Kirchhoff tables for the native ensemble kernel.
 
- ``material_slot`` maps a face material id to its slot (``-1`` when the
- material carries no Kirchhoff table). ``f_te_flat`` / ``f_tm_flat`` are the
- concatenated table values; ``table_offset`` and ``table_dims``
- (``[nti, npi, nto, npo]``) locate each slot's block so heterogeneous
- isotropic (``npi == 1``) and anisotropic (``npi == 64``) tables coexist.
- """
+    ``material_slot`` maps a face material id to its slot (``-1`` when the
+    material carries no Kirchhoff table). ``f_te_flat`` / ``f_tm_flat`` are the
+    concatenated table values; ``table_offset`` and ``table_dims``
+    (``[nti, npi, nto, npo]``) locate each slot's block so heterogeneous
+    isotropic (``npi == 1``) and anisotropic (``npi == 64``) tables coexist.
+    """
 
     material_slot: torch.Tensor
     f_te_flat: torch.Tensor
@@ -478,9 +478,9 @@ def _require_phase_screen_tensor(
 class PhaseScreenStructureResource:
     """Immutable scene-owned inputs for one realization phase screen.
 
- Endpoint-, frequency-, and solver-config-dependent patch subdivision and
- visibility are intentionally absent. They remain solve-plan state.
- """
+    Endpoint-, frequency-, and solver-config-dependent patch subdivision and
+    visibility are intentionally absent. They remain solve-plan state.
+    """
 
     structure_index: int
     material_index: int
@@ -619,12 +619,12 @@ def _maybe_differentiate_table(
 ) -> KirchhoffTable:
     """Attach the native build adjoint when store leaves participate in AD.
 
- ``store.frequency_hz`` is a host float, so a store-driven build carries no
- differentiable frequency leaf here (the AD wrapper still handles frequency
- when a caller supplies a live frequency tensor); the store trigger is the
- roughness/layer slices. When nothing requires grad the numpy table is
- returned unchanged (bitwise primal path).
- """
+    ``store.frequency_hz`` is a host float, so a store-driven build carries no
+    differentiable frequency leaf here (the AD wrapper still handles frequency
+    when a caller supplies a live frequency tensor); the store trigger is the
+    roughness/layer slices. When nothing requires grad the numpy table is
+    returned unchanged (bitwise primal path).
+    """
 
     from witwin.channel.runtime import _ad_geometry_live
 
@@ -711,10 +711,10 @@ def build_phase_screen_resources(
 ) -> PhaseScreenRuntimeResources:
     """Build immutable phase-screen resources without publishing partial state.
 
- This is called lazily by the first phase-screen consumer. The build owns
- only scene-static data; patch subdivision and visibility remain solve-plan
- work because they depend on endpoints, frequency, or solver configuration.
- """
+    This is called lazily by the first phase-screen consumer. The build owns
+    only scene-static data; patch subdivision and visibility remain solve-plan
+    work because they depend on endpoints, frequency, or solver configuration.
+    """
 
     _require_phase_screen_rayd_identity(rayd, key)
     if not assignments.structure_phase_screens:
@@ -980,7 +980,7 @@ def _phase_screen_rms_slope(
 # torch tensors on the requested device. Runtime eval/sample/pdf are pure
 # batched torch (GPU-first).
 #
-# Realization-coherent phase screens (the scattering model, the phase-screen model)
+# Realization-coherent phase screens
 # -----------------------------------------------------------------
 #
 # Heights NEVER displace geometry: RayD intersects the mean plane and the
@@ -1009,7 +1009,7 @@ N_PHI_I_ANISO = 64
 N_COS_THETA_O = 32
 N_PHI_O = 64
 
-# Applicability guards (the scattering model): tangent-plane approximation
+# Applicability guards: tangent-plane approximation
 # needs k0*l >= ~6 and moderate RMS slope sqrt(2)*sigma_h/l <= 0.5.
 MIN_K0_CORR_LENGTH = 6.0
 MAX_RMS_SLOPE = 0.5
@@ -1040,11 +1040,11 @@ def _kirchhoff_diffuse_lobe_series(q_par_x, q_par_y, q_n, sigma_h, lx, ly, n_ter
 class KirchhoffTable:
     """Precomputed Kirchhoff ensemble BSDF for one rough material.
 
- All tensors are float32 on one device. Axis tensors hold CELL CENTERS:
- ``cos_theta_i``/``cos_theta_o`` are uniform in cos over (0, 1],
- ``phi_i``/``phi_o`` uniform over [0, 2*pi). ``phi_i`` has one entry for
- isotropic roughness (``lx == ly``).
- """
+    All tensors are float32 on one device. Axis tensors hold CELL CENTERS:
+    ``cos_theta_i``/``cos_theta_o`` are uniform in cos over (0, 1],
+    ``phi_i``/``phi_o`` uniform over [0, 2*pi). ``phi_i`` has one entry for
+    isotropic roughness (``lx == ly``).
+    """
 
     # Axes (cell centers).
     cos_theta_i: torch.Tensor  # [Nti]
@@ -1128,13 +1128,13 @@ def _raw_lobe_grid(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Raw (un-normalized) TE/TM lobe on an (incidence x outgoing) grid.
 
- Returns arrays ``[len(inc_cos), len(inc_phi), len(out_cos),
- len(out_phi)]``. Used twice per build: once on the table axes and once
- with incidence/outgoing axes swapped (the exact grid-resample of
- ``f(wo, wi)`` - the analytic kernel is reciprocal, so re-evaluating at
- the swapped nodes is the lossless way to symmetrize; interpolating the
- coarse ``phi_i`` axis would smear the specular peak instead).
- """
+    Returns arrays ``[len(inc_cos), len(inc_phi), len(out_cos),
+    len(out_phi)]``. Used twice per build: once on the table axes and once
+    with incidence/outgoing axes swapped (the exact grid-resample of
+    ``f(wo, wi)`` - the analytic kernel is reciprocal, so re-evaluating at
+    the swapped nodes is the lossless way to symmetrize; interpolating the
+    coarse ``phi_i`` axis would smear the specular peak instead).
+    """
 
     sin_inc = np.sqrt(np.maximum(0.0, 1.0 - inc_cos**2))
     sin_out = np.sqrt(np.maximum(0.0, 1.0 - out_cos**2))
@@ -1180,12 +1180,12 @@ def _symmetric_energy_balance(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Balance a reciprocal nonnegative kernel without breaking symmetry.
 
- Finds positive diagonal factors ``a`` such that ``F_ij=a_i*S_ij*a_j``
- and every cosine-weighted row integral of ``F`` equals ``target_i``.
- This is the symmetric Sinkhorn fixed point with a half-step damping;
- unlike one-sided row normalization, reciprocity is invariant at every
- iteration.
- """
+    Finds positive diagonal factors ``a`` such that ``F_ij=a_i*S_ij*a_j``
+    and every cosine-weighted row integral of ``F`` equals ``target_i``.
+    This is the symmetric Sinkhorn fixed point with a half-step damping;
+    unlike one-sided row normalization, reciprocity is invariant at every
+    iteration.
+    """
 
     n_ti, n_pi, n_to, n_po = symmetric_lobe.shape
     if n_ti != n_to:
@@ -1250,13 +1250,13 @@ def build_kirchhoff_table(
 ) -> KirchhoffTable:
     """Precompute the Kirchhoff ensemble BSDF table for one material.
 
- ``roughness`` is a:class:`witwin.core.SurfaceRoughness`
- (or any object with the same fields); ``layers`` is the oracle layer
- list ``[(thickness_m, eps_r, sigma_e, mu_r), ...]`` in incidence order.
- Raises when the surface is outside the Kirchhoff applicability domain
- (``kirchhoff_domain_exceeded``) or reciprocal energy balancing fails to
- converge.
- """
+    ``roughness`` is a :class:`witwin.core.SurfaceRoughness`
+    (or any object with the same fields); ``layers`` is the oracle layer
+    list ``[(thickness_m, eps_r, sigma_e, mu_r), ...]`` in incidence order.
+    Raises when the surface is outside the Kirchhoff applicability domain
+    (``kirchhoff_domain_exceeded``) or reciprocal energy balancing fails to
+    converge.
+    """
 
     frequency_hz = float(frequency_hz)
     sigma_h = float(roughness.rms_height_m)
@@ -1428,9 +1428,9 @@ def eval_bsdf(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Bilinear (multilinear) lookup of ``(f_te, f_tm)`` for batched pairs.
 
- ``wi``/``wo`` are [N, 3] local-frame unit vectors pointing away from the
- surface. Directions below the horizon return 0.
- """
+    ``wi``/``wo`` are [N, 3] local-frame unit vectors pointing away from the
+    surface. Directions below the horizon return 0.
+    """
 
     from witwin.channel.kernels.scattering import (
         scattering_table_eval,
@@ -1447,12 +1447,12 @@ def sample_directions(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Sample outgoing directions by CDF inversion; returns ``(wo, pdf)``.
 
- Uses the nearest incidence bin (the same convention:func:`pdf` uses, so
- the sampler and its density are exactly consistent). ``u1`` inverts the
- marginal CDF over ``cos_theta_o``; ``u2`` the conditional CDF over
- ``phi_o``; both are linearly remapped inside the selected bin, i.e. the
- sampled density is piecewise constant per outgoing bin.
- """
+    Uses the nearest incidence bin (the same convention :func:`pdf` uses, so
+    the sampler and its density are exactly consistent). ``u1`` inverts the
+    marginal CDF over ``cos_theta_o``; ``u2`` the conditional CDF over
+    ``phi_o``; both are linearly remapped inside the selected bin, i.e. the
+    sampled density is piecewise constant per outgoing bin.
+    """
 
     from witwin.channel.kernels.scattering import (
         scattering_table_sample,
@@ -1473,12 +1473,12 @@ def sample_directions(
 def pdf(
     table: KirchhoffTable, valid: torch.Tensor, wi: torch.Tensor, wo: torch.Tensor,
 ) -> torch.Tensor:
-    """Solid-angle sampling density of:func:`sample_directions`.
+    """Solid-angle sampling density of :func:`sample_directions`.
 
- Piecewise constant per outgoing bin and exactly consistent with the
- sampler (same nearest incidence bin, same mass table); integrates to 1
- over the hemisphere by construction. Zero below the horizon.
- """
+    Piecewise constant per outgoing bin and exactly consistent with the
+    sampler (same nearest incidence bin, same mass table); integrates to 1
+    over the hemisphere by construction. Zero below the horizon.
+    """
 
     from witwin.channel.kernels.scattering import scattering_table_pdf
 
@@ -1496,10 +1496,10 @@ def pdf_reverse(
 ) -> torch.Tensor:
     """Reverse-direction PDF: the SAME table evaluated with swapped args.
 
- BDPT evaluates the reverse strategy density by treating the outgoing
- direction as the incidence direction (the sampling behavior); no separate
- reverse table exists.
- """
+    BDPT evaluates the reverse strategy density by treating the outgoing
+    direction as the incidence direction; no separate
+    reverse table exists.
+    """
 
     from witwin.channel.kernels.scattering import scattering_table_pdf
 
@@ -1530,9 +1530,9 @@ class PhaseScreenRuntime:
     def sample_height(self, uv: torch.Tensor) -> torch.Tensor:
         """Bilinear metric height [m] at ``uv`` ([..., 2], u right, v down).
 
- Manual gather with edge clamp (see module docstring for the texel
- convention).
- """
+        Manual gather with edge clamp (see module docstring for the texel
+        convention).
+        """
 
         if uv.shape[-1] != 2:
             raise ValueError("uv must have trailing dimension 2")
@@ -1573,10 +1573,10 @@ class PhaseScreenRuntime:
 def realization_seed(scene_seed: int, surface_id: int, realization_id: int) -> int:
     """Deterministic 64-bit seed for ``(scene_seed, surface_id, realization_id)``.
 
- SplitMix64-style avalanche over the packed inputs so nearby ids give
- decorrelated seeds while the mapping stays reproducible across runs and
- platforms (pure integer arithmetic, no RNG state involved).
- """
+    SplitMix64-style avalanche over the packed inputs so nearby ids give
+    decorrelated seeds while the mapping stays reproducible across runs and
+    platforms (pure integer arithmetic, no RNG state involved).
+    """
 
     mask = (1 << 64) - 1
     z = (int(scene_seed) & mask)
@@ -1594,23 +1594,23 @@ def generate_gaussian_realization(
 ) -> torch.Tensor:
     """Periodic Gaussian random height field with Gaussian correlation.
 
- FFT spectral synthesis of the Gaussian correlation
- ``C(x, y) = sigma_h^2 * exp(-(x/lx)^2 - (y/ly)^2)`` whose PSD (the Fourier convention, ``(1/(2*pi)^2) Int W d^2q = sigma_h^2``)
- is ``W(qx, qy) = pi*sigma_h^2*lx*ly*exp(-(qx^2*lx^2 + qy^2*ly^2)/4)``.
+    FFT spectral synthesis of the Gaussian correlation
+    ``C(x, y) = sigma_h^2 * exp(-(x/lx)^2 - (y/ly)^2)`` whose PSD (the Fourier convention, ``(1/(2*pi)^2) Int W d^2q = sigma_h^2``)
+    is ``W(qx, qy) = pi*sigma_h^2*lx*ly*exp(-(qx^2*lx^2 + qy^2*ly^2)/4)``.
 
- Normalization: on a periodic domain ``Lx x Ly`` each Fourier mode gets
- variance ``E[|h_k|^2] = W(q_k)/(Lx*Ly)`` (the Riemann sum of the PSD
- integral over the discrete mode lattice ``dq = 2*pi/L``). Modes are
- drawn as independent circular complex Gaussians and the real part is
- taken, which halves per-mode variance, so amplitudes carry a
- compensating ``sqrt(2)``. Total variance then approximates ``sigma_h^2``
- up to spectral truncation at Nyquist: for ``dx << l`` and ``L >> l`` the
- sampled RMS height matches ``sigma_h`` within a few percent.
+    Normalization: on a periodic domain ``Lx x Ly`` each Fourier mode gets
+    variance ``E[|h_k|^2] = W(q_k)/(Lx*Ly)`` (the Riemann sum of the PSD
+    integral over the discrete mode lattice ``dq = 2*pi/L``). Modes are
+    drawn as independent circular complex Gaussians and the real part is
+    taken, which halves per-mode variance, so amplitudes carry a
+    compensating ``sqrt(2)``. Total variance then approximates ``sigma_h^2``
+    up to spectral truncation at Nyquist: for ``dx << l`` and ``L >> l`` the
+    sampled RMS height matches ``sigma_h`` within a few percent.
 
- ``extent_m``/``resolution`` are ``(x, y)`` pairs (scalars broadcast).
- Returns float32 heights [m] of shape ``(ny, nx)`` on ``device``
- (row = v/y axis, matching:class:`PhaseScreenRuntime`).
- """
+    ``extent_m``/``resolution`` are ``(x, y)`` pairs (scalars broadcast).
+    Returns float32 heights [m] of shape ``(ny, nx)`` on ``device``
+    (row = v/y axis, matching :class:`PhaseScreenRuntime`).
+    """
 
     sigma_h = float(roughness.rms_height_m)
     lx = float(roughness.correlation_length_x_m)
@@ -1651,18 +1651,18 @@ def patch_phase_integral(
 ) -> torch.Tensor:
     """Triangle-domain quadrature of the Kirchhoff phase integral (GPU).
 
- Evaluates ``sum_T Int_T exp(-j*(k_s - k_i).x) * exp(-j*q_n*h(u, v)) dA``
- over triangles ``patch_vertices`` [T, 3, 3] with matching UVs
- ``uv_vertices`` [T, 3, 2] (a single triangle may omit the leading dim).
- Positions stay on the mean plane; heights enter only the phase, matching
- ``oracle.phase_screen_patch_integral`` for the same height field.
+    Evaluates ``sum_T Int_T exp(-j*(k_s - k_i).x) * exp(-j*q_n*h(u, v)) dA``
+    over triangles ``patch_vertices`` [T, 3, 3] with matching UVs
+    ``uv_vertices`` [T, 3, 2] (a single triangle may omit the leading dim).
+    Positions stay on the mean plane; heights enter only the phase, matching
+    ``oracle.phase_screen_patch_integral`` for the same height field.
 
- Quadrature: Duffy-mapped tensor-product Gauss-Legendre with ``n_quad``
- points per axis - the unit square ``(xi, eta)`` maps to barycentric
- ``(a, b) = (xi, eta*(1 - xi))`` with Jacobian ``(1 - xi)``, so
- refinement in ``n_quad`` converges to the exact triangle integral.
- Returns a 0-dim complex64 tensor on the runtime device.
- """
+    Quadrature: Duffy-mapped tensor-product Gauss-Legendre with ``n_quad``
+    points per axis - the unit square ``(xi, eta)`` maps to barycentric
+    ``(a, b) = (xi, eta*(1 - xi))`` with Jacobian ``(1 - xi)``, so
+    refinement in ``n_quad`` converges to the exact triangle integral.
+    Returns a 0-dim complex64 tensor on the runtime device.
+    """
 
     device = runtime.device
     tri = patch_vertices.to(device=device, dtype=torch.float32)
