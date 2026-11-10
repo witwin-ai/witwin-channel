@@ -221,8 +221,17 @@ $env:WITWIN_CHANNEL_EXPECTED_FINGERPRINT = "<contents of _channel.build-fingerpr
 ```
 
 Without these variables, pytest stops and lists the local builds under
-`artifacts/` with their build times, so you can see whether a build is older
-than the source you are testing.
+`build/` and `artifacts/` with their build times, so you can see whether a
+build is older than the source you are testing.
+
+On Linux, two scripts do this for a checkout. `scripts/dev_build.sh --rayd
+<RayD checkout at the locked commit>` configures and builds the extension with
+CMake and Ninja into `build/dev-<arch>` (`CHANNEL_DEV_CUDA_ARCH`, default 86),
+and `source scripts/dev_env.sh` exports the three variables for that build.
+The `dev` optional-dependency extra lists the test and lint tools at their CI
+versions.
+After a RayD change, `python tools/relock_rayd.py --rayd <RayD checkout>`
+re-locks `dependencies/rayd.lock.json` to that checkout's HEAD.
 
 Architecture and domain-owner documentation lives next to the implementation
 under [`witwin/channel`](witwin/channel). Contributor rules and the

@@ -61,3 +61,12 @@ def test_build_requirements_are_bounded_and_have_exact_ci_constraints():
     ]
     for package in ("cmake", "ninja", "scikit-build-core"):
         assert package in constraints
+
+def test_dev_extra_pins_every_tool_to_its_ci_constraint():
+    project = _load_toml("pyproject.toml")
+    constraints = _constraints()
+
+    dev = project["project"]["optional-dependencies"]["dev"]
+    pinned = dict(requirement.split("==", maxsplit=1) for requirement in dev)
+    assert set(pinned) == {"coverage", "mypy", "pytest", "ruff", "scipy"}
+    assert all(constraints[name] == version for name, version in pinned.items())

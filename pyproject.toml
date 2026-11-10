@@ -14,6 +14,10 @@ readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = ["torch==2.10.0", "witwin==0.4.0"]
 
+[project.optional-dependencies]
+# Developer tools and test-only libraries, pinned to constraints/ci-py311-cu128.txt.
+dev = ["coverage==7.13.1", "mypy==1.18.2", "pytest==8.4.2", "ruff==0.15.10", "scipy==1.17.1"]
+
 [tool.scikit-build]
 wheel.packages = ["witwin"]
 
