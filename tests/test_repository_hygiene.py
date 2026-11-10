@@ -77,3 +77,12 @@ def test_default_cli_rejects_dirty_tree_but_can_scan_during_local_work(git_repo:
 
     assert hygiene.main([str(git_repo)]) == 1
     assert hygiene.main([str(git_repo), "--allow-dirty"]) == 0
+
+def test_agent_guides_must_stay_identical(git_repo: Path):
+    _track(git_repo, "AGENTS.md", b"rules\n")
+    _track(git_repo, "CLAUDE.md", b"rules\n")
+    assert hygiene.scan_repository(git_repo) == []
+
+    (git_repo / "CLAUDE.md").write_bytes(b"rules, edited\n")
+    violations = hygiene.scan_repository(git_repo)
+    assert [(item.kind, item.path) for item in violations] == [("agent-guide-mismatch", "AGENTS.md")]
