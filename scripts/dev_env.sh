@@ -12,6 +12,10 @@
 # already set. Run Python and pytest from the worktree root so this worktree's
 # witwin/channel is the package that is imported. Re-source it after each rebuild:
 # the fingerprint changes with every configure that sees a new Git HEAD or dirty state.
+#
+# The CI tiers run `python -m ruff` and `python -m mypy`. When the conda env lacks
+# them and CHANNEL_DEV_TOOLS_BIN names a directory holding `ruff` and `mypy`
+# executables, a forwarding shim under build/dev-tools is put on PYTHONPATH.
 
 _channel_dev_env() {
     local root arch build extension
@@ -37,6 +41,21 @@ _channel_dev_env() {
     WITWIN_CHANNEL_EXPECTED_FINGERPRINT=$(tr -d '[:space:]' <"$build/_channel.build-fingerprint")
     export WITWIN_CHANNEL_EXPECTED_FINGERPRINT
     export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-1}
+    if [[ -n ${CHANNEL_DEV_TOOLS_BIN:-} ]] && ! python -c 'import ruff, mypy' 2>/dev/null; then
+        local shim=$root/build/dev-tools tool
+        for tool in ruff mypy; do
+            mkdir -p "$shim/$tool"
+            : >"$shim/$tool/__init__.py"
+            # The tool must not see this PYTHONPATH, or mypy would import the shim again.
+            printf '%s\n' 'import os, sys' 'env = dict(os.environ)' 'env.pop("PYTHONPATH", None)' \
+                "os.execve('$CHANNEL_DEV_TOOLS_BIN/$tool', ['$tool', *sys.argv[1:]], env)" \
+                >"$shim/$tool/__main__.py"
+        done
+        case ":${PYTHONPATH:-}:" in
+            *":$shim:"*) ;;
+            *) export PYTHONPATH=$shim${PYTHONPATH:+:$PYTHONPATH} ;;
+        esac
+    fi
     echo "dev_env.sh: $extension (fingerprint ${WITWIN_CHANNEL_EXPECTED_FINGERPRINT:0:12}...," \
         "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES)"
 }
