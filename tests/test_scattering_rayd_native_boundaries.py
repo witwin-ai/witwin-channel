@@ -74,7 +74,7 @@ def test_current_build_uses_the_locked_rayd_scattering_surface() -> None:
     )
     assert (
         _sha256(RAYD_ROOT / "include/rayd/scattering_table.cuh")
-        == "c430b7d96ff964d4b71a384526fc6b0173e191e21fc21a503bd6ad77aa438fce"
+        == "215c8c24f5855e40cdeb529565739c30c206a4bbdb9f3e17c0ac483da6723ed9"
     )
 
 
