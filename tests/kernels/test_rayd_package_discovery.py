@@ -66,6 +66,12 @@ def _package(tmp_path: Path) -> tuple[_FakeDistribution, Path]:
         text=True,
     )
     assert cloned.returncode == 0, cloned.stderr
+    # The locked manifest digest is that of a CRLF (core.autocrlf=true) checkout, the
+    # line endings the published rayd-torch wheel was built from; see tools/relock_rayd.py.
+    configured = subprocess.run(
+        ("git", "config", "core.autocrlf", "true"), cwd=workspace, check=False
+    )
+    assert configured.returncode == 0
     checked_out = subprocess.run(
         ("git", "checkout", "--detach", str(lock["commit"])),
         cwd=workspace,

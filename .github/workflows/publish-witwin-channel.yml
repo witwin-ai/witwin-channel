@@ -42,7 +42,7 @@ permissions:
 
 env:
   CORE_COMMIT: 46c826d969654912461d2e18b6cb87df9cc3df8f
-  RAYD_COMMIT: c7a99979d0fdcc67b2ec8a12246a7df597603409
+  RAYD_COMMIT: 14073822b95c8565abfaf504ee6b293f83aba427
   RAYD_REPOSITORY_URL: https://github.com/Asixa/RayD
   FULL_CUDA_ARCHITECTURES: 70-real;75-real;80-real;86-real;87-real;89-real;90-real;100-real;101-real;120-real;120-virtual
   FULL_EXPECTED_SASS: 70,75,80,86,87,89,90,100,101,120
