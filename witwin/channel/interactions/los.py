@@ -66,7 +66,7 @@ def _los_topology(
     )
     visible = None
     if bool(scene.structures) and plan.candidate_count > 0:
-        # ISB boundary taper (the boundary taper), LoS member. When on, the hard RayD
+        # ISB boundary taper, LoS member. When on, the hard RayD
         # occlusion gate is replaced by the C1 membership predicate tau > 0: LoS
         # rows within one taper margin of the shadow boundary survive and carry
         # the clearance factor (re-derived and applied in the field stage). The

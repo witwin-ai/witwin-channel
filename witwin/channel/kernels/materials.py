@@ -293,12 +293,12 @@ def mc_face_material_tensors(
 class _EmLayerStackAdFunction(torch.autograd.Function):
     """Differentiable layer-stack r/t coefficients and power budgets.
 
- Differentiable inputs: cos_theta (per row), the CSR layer thickness /
- eps_r / sigma_e and the carrier frequency. layer_mu_r and the CSR
- topology stay fixed under the AD contract; requesting the mu_r
- gradient fails loudly. Layer gradients accumulate atomically because the
- CSR store is shared by every row.
- """
+    Differentiable inputs: cos_theta (per row), the CSR layer thickness /
+    eps_r / sigma_e and the carrier frequency. layer_mu_r and the CSR
+    topology stay fixed under the AD contract; requesting the mu_r
+    gradient fails loudly. Layer gradients accumulate atomically because the
+    CSR store is shared by every row.
+    """
 
     @staticmethod
     def forward(
@@ -436,13 +436,13 @@ def em_layer_stack_ad(
     layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, *, frequency: torch.Tensor | float,
     frequency_value: float | None = None,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable:func:`em_layer_stack_eval` (solver derivatives).
+    """Differentiable :func:`em_layer_stack_eval` (solver derivatives).
 
- ``frequency_value`` is the precomputed host scalar of ``frequency``; a
- seam that applies several Functions per solve reads the 0-d tensor once
- and threads the float here so no Function re-reads it. When
- not supplied it is read here, exactly once per apply.
- """
+    ``frequency_value`` is the precomputed host scalar of ``frequency``; a
+    seam that applies several Functions per solve reads the 0-d tensor once
+    and threads the float here so no Function re-reads it. When
+    not supplied it is read here, exactly once per apply.
+    """
 
     if frequency_value is None:
         frequency_value = _ad_frequency_value(frequency)

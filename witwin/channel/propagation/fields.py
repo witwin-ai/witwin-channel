@@ -102,16 +102,16 @@ def _resolve_coupled_rd_stationary(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Differentiable fixed-winner coupled stationary re-solve (cid 3/4, AD).
 
- Pure lift of the cid-3/4 ``coupled_geometry_ad`` branch out of
- ``_evaluate_coupled_fields``, with identical math and error behavior.
- diffraction AD: the coupled interaction points move with the endpoints
- (Fresnel angles are not stationary), so re-solve the frozen winner's
- stationary geometry differentiably (the same image-source math as the
- discovery prepare kernel) and feed the live points into the field kernel.
- D->R is the reciprocal problem with the endpoints exchanged. Returns the
- live (edge_point, reflection_point); the passed positions are the frozen
- discovery references used only to guard that the winner did not move.
- """
+    Pure lift of the cid-3/4 ``coupled_geometry_ad`` branch out of
+    ``_evaluate_coupled_fields``, with identical math and error behavior.
+    diffraction AD: the coupled interaction points move with the endpoints
+    (Fresnel angles are not stationary), so re-solve the frozen winner's
+    stationary geometry differentiably (the same image-source math as the
+    discovery prepare kernel) and feed the live points into the field kernel.
+    D->R is the reciprocal problem with the endpoints exchanged. Returns the
+    live (edge_point, reflection_point); the passed positions are the frozen
+    discovery references used only to guard that the winner did not move.
+    """
 
     epc_source = target[rows] if reverse_order else source[rows]
     epc_receiver = source[rows] if reverse_order else target[rows]
@@ -159,14 +159,14 @@ def _evaluate_coupled_dd_rows(
 ) -> int:
     """Evaluate the coupled double-diffraction rows (cid 7, coupled double diffraction).
 
- Pure lift of the cid-7 branch out of ``_evaluate_coupled_fields``:
- identical gather math, tensor ordering, row identity, aliasing and error
- behavior. Both interactions are diffraction (type 2), so both
- primitive_sequence slots carry edge ids; interaction_positions carry the
- frozen Fermat seeds [Q1, Q2]. Results land in the same coherent coupled
- slot as cid 3/4 via in-place ``index_copy_`` on the shared output tensors,
- so their storage/aliasing is preserved. Returns the updated launch_count.
- """
+    Pure lift of the cid-7 branch out of ``_evaluate_coupled_fields``:
+    identical gather math, tensor ordering, row identity, aliasing and error
+    behavior. Both interactions are diffraction (type 2), so both
+    primitive_sequence slots carry edge ids; interaction_positions carry the
+    frozen Fermat seeds [Q1, Q2]. Results land in the same coherent coupled
+    slot as cid 3/4 via in-place ``index_copy_`` on the shared output tensors,
+    so their storage/aliasing is preserved. Returns the updated launch_count.
+    """
 
     dd_rows = torch.nonzero(
         topology.component_id == 7, as_tuple=False
@@ -287,11 +287,11 @@ def _los_taper_frequency(
 ) -> float | torch.Tensor:
     """Host frequency for the boundary taper LoS taper clearance kernel.
 
- The LoS taper only ever runs on the ad_mode="none" primal (taper + AD is
- rejected upstream until the C1 clearance companion lands, the boundary taper 3),
- so ``frequency_value`` is the host float scalar when set; fall back to the
- resolved frequency otherwise.
- """
+    The LoS taper only ever runs on the ad_mode="none" primal (taper + AD is
+    rejected upstream until the C1 clearance companion lands, the boundary taper 3),
+    so ``frequency_value`` is the host float scalar when set; fall back to the
+    resolved frequency otherwise.
+    """
 
     return float(frequency_value) if frequency_value is not None else frequency
 
@@ -302,20 +302,20 @@ def _rough_scale_inputs(
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | None:
     """Host-side per-bounce inputs for the native rough-reflection C_r op.
 
- Kirchhoff-rough faces (scatter_model_id == 1) attenuate their coherent
- specular Jones by C_r = exp(-2*(k0*cos_theta_i*sigma_h)^2) per bounce
- (the solver component layout, the scattering model). The native op
- ``field_rough_reflection_scale`` (rough-surface scattering) owns the factor math and
- its application; this helper only gates on the host materials and gathers
- the per-bounce ``sigma_b`` / ``rough_b`` and the realization ``replaced``
- mask. Returns ``None`` for smooth scenes so the reflection loop pays no
- extra GPU work.
+    Kirchhoff-rough faces (scatter_model_id == 1) attenuate their coherent
+    specular Jones by C_r = exp(-2*(k0*cos_theta_i*sigma_h)^2) per bounce
+    (the solver component layout, the scattering model). The native op
+    ``field_rough_reflection_scale`` (rough-surface scattering) owns the factor math and
+    its application; this helper only gates on the host materials and gathers
+    the per-bounce ``sigma_b`` / ``rough_b`` and the realization ``replaced``
+    mask. Returns ``None`` for smooth scenes so the reflection loop pays no
+    extra GPU work.
 
- When the scattering component is active, single-bounce specular rows on a
- surface carrying a realization_coherent phase screen are zeroed: the
- coherent patch integral REPLACES the delta specular for that surface
- (contract 6.7.3, never summed).
- """
+    When the scattering component is active, single-bounce specular rows on a
+    surface carrying a realization_coherent phase screen are zeroed: the
+    coherent patch integral REPLACES the delta specular for that surface
+    (contract 6.7.3, never summed).
+    """
 
     device = topology.valid.device
     # Early exits stay on CPU (the MaterialStore tensors live on the host):
@@ -383,7 +383,7 @@ def _evaluate_los_fields(
         if ledger is not None:
             ledger.add(*los_args)
         evaluated = los_field_op(*los_args)
-        # ISB boundary taper (the boundary taper), LoS member. When on (width > 0), scale the
+        # ISB boundary taper, LoS member. When on (width > 0), scale the
         # LoS field bundle by the C1 clearance factor tau re-derived on these rows
         # from the same native kernel that set the survival gate in discovery, so
         # the tapered rows carry a smoothly-decaying amplitude across the shadow
@@ -655,7 +655,7 @@ def _evaluate_diffraction_fields(
             valid1 = (face1 >= 0) & (face1 < face_count) & table_valid[face1_c]
             wedge_vertices = None
             if geometry_ad and _vertices_participate_in_ad(scene):
-                # Mesh-vertex x diffraction (the derivative capability matrix): hand the
+                # Mesh-vertex x diffraction: hand the
                 # winner edge vertices to the wedge kernel, which rebuilds
                 # the edge tables from them on the dual row. The integer
                 # winner extraction below runs on detached tables; only the
@@ -956,18 +956,18 @@ def evaluate_path_fields(
 ) -> tuple[EvaluatedPaths, PathExecutionStats]:
     """Evaluate selected canonical rows with the shared complex3 ABI.
 
- ``ad_mode == "none"`` keeps the exact primal behavior (plain facades,
- float frequency, no autograd graph). ``jvp``/``vjp`` route LoS,
- reflection and transmission through the differentiable field Functions:
- material gathers stay on the torch graph and the frequency is forwarded
- as a 0-d tensor when the scene stores one, alongside one precomputed
- host scalar (``frequency_value``) threaded into every field Function so
- a tensor-frequency solve pays a single device-to-host frequency read. Hit geometry stays detached under the fixed-topology
- contract unless a geometry leaf participates in AD, in which case it
- comes from RayD's fixed-winner geometry companions (see
- ``_reflection_geometry_ad``). The rough-surface C_r attenuation is pure
- torch and receives the same live frequency so dC_r/df is kept.
- """
+    ``ad_mode == "none"`` keeps the exact primal behavior (plain facades,
+    float frequency, no autograd graph). ``jvp``/``vjp`` route LoS,
+    reflection and transmission through the differentiable field Functions:
+    material gathers stay on the torch graph and the frequency is forwarded
+    as a 0-d tensor when the scene stores one, alongside one precomputed
+    host scalar (``frequency_value``) threaded into every field Function so
+    a tensor-frequency solve pays a single device-to-host frequency read. Hit geometry stays detached under the fixed-topology
+    contract unless a geometry leaf participates in AD, in which case it
+    comes from RayD's fixed-winner geometry companions (see
+    ``_reflection_geometry_ad``). The rough-surface C_r attenuation is pure
+    torch and receives the same live frequency so dC_r/df is kept.
+    """
 
     topology = paths.topology
     geometry = paths.geometry

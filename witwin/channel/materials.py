@@ -292,11 +292,11 @@ def _require_frequency_ad_constant_materials(
 ) -> None:
     """Explicit-failure contract for frequency AD over dispersive materials.
 
- Channel ``scene.compile`` freezes material records at the primal frequency, so
- a frequency gradient through a scene with frequency-dependent material
- laws would silently miss d(material)/d(frequency) (the AD contract:
- never return misleading gradients). Fail before any launch instead.
- """
+    Channel ``scene.compile`` freezes material records at the primal frequency, so
+    a frequency gradient through a scene with frequency-dependent material
+    laws would silently miss d(material)/d(frequency) (the AD contract:
+    never return misleading gradients). Fail before any launch instead.
+    """
 
     dependent = tuple(compiled.materials.frequency_dependent)
     if not dependent or not _frequency_participates_in_ad(scene.frequency):

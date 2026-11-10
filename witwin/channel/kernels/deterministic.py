@@ -186,23 +186,23 @@ def deterministic_accumulate_flat_jvp(
 class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
     """Differentiable deterministic flat-path accumulation (the AD contract).
 
- The forward is the primal native accumulator: each kept path's complex
- field and real power scatter into a frozen (component_slot, tx, rx)
- cell over the six slots los / reflection / diffraction / transmission /
- scattering / coupled, then coherent cells square the summed field
- (|sum E|^2 over the five coherent field slots) while incoherent cells sum
- per-path powers and expose a sqrt-power pseudo-field. Scattering is a
- power-domain slot in
- both modes: its gains add linearly to the totals and its cell field is
- a diagnostic that reaches no total. The scatter is linear in the
- per-path field/power, so the adjoint is one masked-gather kernel
- through the same frozen gates with the |.|^2 / sqrt cell nonlinearities
- linearized at the saved forward outputs, and the pushforward is the
- same scatter applied to the tangents. The slot/tx/rx ids are discrete
- winners and stay fixed. A float64 input batch routes through the
- float64 companion forward so torch.autograd.gradcheck can run in
- strict double precision.
- """
+    The forward is the primal native accumulator: each kept path's complex
+    field and real power scatter into a frozen (component_slot, tx, rx)
+    cell over the six slots los / reflection / diffraction / transmission /
+    scattering / coupled, then coherent cells square the summed field
+    (|sum E|^2 over the five coherent field slots) while incoherent cells sum
+    per-path powers and expose a sqrt-power pseudo-field. Scattering is a
+    power-domain slot in
+    both modes: its gains add linearly to the totals and its cell field is
+    a diagnostic that reaches no total. The scatter is linear in the
+    per-path field/power, so the adjoint is one masked-gather kernel
+    through the same frozen gates with the |.|^2 / sqrt cell nonlinearities
+    linearized at the saved forward outputs, and the pushforward is the
+    same scatter applied to the tangents. The slot/tx/rx ids are discrete
+    winners and stay fixed. A float64 input batch routes through the
+    float64 companion forward so torch.autograd.gradcheck can run in
+    strict double precision.
+    """
 
     @staticmethod
     def forward(
@@ -372,7 +372,7 @@ def deterministic_accumulate_flat_ad(
     path_gain: torch.Tensor, field_real: torch.Tensor, field_imag: torch.Tensor, *, num_tx: int,
     num_rx: int, coherent: bool, scattering_combine_domain: int = 0,
 ) -> dict[str, torch.Tensor]:
-    """Differentiable:func:`deterministic_accumulate_flat` (the AD contract)."""
+    """Differentiable :func:`deterministic_accumulate_flat` (the AD contract)."""
 
     values = _DeterministicAccumulateFlatAdFunction.apply(
         valid,

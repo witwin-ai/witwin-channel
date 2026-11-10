@@ -67,7 +67,7 @@ def prepare_diffraction_order1_plan(
     mitsuba_metadata = metadata.get("mitsuba", {})
     # Channel's merge_shapes import keeps the selected boundary-edge table
     # intact. The synthetic-scene path instead merges coincident structure
-    # boundaries into one physical wedge (the single-wedge test contract).
+    # boundaries into one physical wedge.
     preserve_imported_edges = isinstance(mitsuba_metadata, dict) and bool(
         mitsuba_metadata.get("merge_shapes", False)
     )
@@ -241,7 +241,7 @@ class DiffractionOrder1Query:
     state_count: int
     capacity: int
     wavelength: float
-    # ISB boundary taper (the boundary taper), D member. 0.0 (default) reproduces the hard
+    # ISB boundary taper, D member. 0.0 (default) reproduces the hard
     # RayD GO step; > 0 notches the incident-boundary odd part over the congruent
     # window inside the shared UTD header (pair.isbTaperWidthScale).
     isb_taper_width_scale: float = 0.0
@@ -448,7 +448,7 @@ def _diffraction_topology_order1(
                         state_count=state_count,
                         capacity=rx_request.capacity,
                         wavelength=float(wavelength),
-                        # ISB boundary taper (the boundary taper), D member. 0.0 when the
+                        # ISB boundary taper, D member. 0.0 when the
                         # switch is off keeps the RayD export bit-identical; the
                         # width notches the incident-boundary odd part in the header.
                         isb_taper_width_scale=float(isb_boundary_taper_width),

@@ -101,7 +101,7 @@ class Config:
     scattering_chain_max_depth: int = 0
     scattering_chain_samples_per_m2: float = 2.0
     scattering_chain_max_rows: int = 256
-    # ISB boundary taper (the boundary taper). DEFAULT-OFF visual-continuity heuristic: the
+    # ISB boundary taper. DEFAULT-OFF visual-continuity heuristic: the
     # hard LoS occlusion gate becomes a C1 membership taper tau(c / (width * w_F))
     # and the compensating order-1 diffraction odd step spreads over the same
     # congruent window. OFF (the default) is bit-identical to the hard gate and
@@ -703,10 +703,10 @@ class PathResult:
     ) -> "BeamformedPathResult":
         """Return a signal view using complex per-endpoint antenna weights.
 
- The raw antenna channel in this result is unchanged. When weights are
- omitted, the precoding/combining weights captured from the solved
- scene are used.
- """
+        The raw antenna channel in this result is unchanged. When weights are
+        omitted, the precoding/combining weights captured from the solved
+        scene are used.
+        """
 
         tx = self.tx_weights if tx_weights is None else tx_weights
         rx = self.rx_weights if rx_weights is None else rx_weights
@@ -789,7 +789,7 @@ class PathResult:
 
 @dataclass(frozen=True, slots=True)
 class BeamformedPathResult:
-    """Beamformed signal views backed by an immutable raw:class:`PathResult`."""
+    """Beamformed signal views backed by an immutable raw :class:`PathResult`."""
 
     source: PathResult
     tx_weights: torch.Tensor
@@ -1059,13 +1059,13 @@ def _metadata(
         },
     }
     if "transmission" in config.components:
-        # Endpoint-connection thin_sheet contract (the solver component layout).
+        # Endpoint-connection thin_sheet contract.
         metadata["transmission"] = {
             "thin_sheet_straight_path_approximation": True,
             "group_delay": "geometric",
         }
     if scattering_info is not None:
-        # Incoherent Kirchhoff patch quadrature (the rough-scattering model); the flag
+        # Incoherent Kirchhoff patch quadrature; the flag
         # documents that per-path phases are NOT physical for ensemble rows.
         metadata["scattering"] = dict(scattering_info)
     return metadata
@@ -1108,10 +1108,10 @@ def _flatten_receivers(receivers: Sequence[Receiver]) -> list[Receiver]:
 class _AntennaEndpoint(Protocol):
     """Structural view of the endpoint attributes synthetic packing reads.
 
- Both ``_TransmitterView`` and the receiver views expose ``array``,
- ``orientation`` and ``pattern``; this states that shared shape without
- importing a concrete endpoint class or widening the parameter to ``Any``.
- """
+    Both ``_TransmitterView`` and the receiver views expose ``array``,
+    ``orientation`` and ``pattern``; this states that shared shape without
+    importing a concrete endpoint class or widening the parameter to ``Any``.
+    """
 
     @property
     def array(self) -> Any: ...
@@ -1129,17 +1129,17 @@ def _synthetic_endpoint_factor(
 ) -> torch.Tensor:
     """Batch steering/pattern weights over endpoints sharing the same object.
 
- ``directions`` has shape ``(endpoint, *batch, 3)`` where ``directions[i]``
- is the far-field direction for ``endpoints[i]``. ``steering_vector`` and
- ``AntennaPattern.field_response`` are per-direction operations (the only
- reductions are the fixed length-3 vec3 contractions inside each element),
- so evaluating a group of endpoints in one batched launch is numerically
- identical to evaluating them one at a time. Endpoints that reference the
- same object (for example every element of one ``ReceiverGrid``) share
- array/orientation/pattern and are batched together, collapsing a per-
- endpoint Python loop into one native launch per distinct endpoint object.
- Returns ``(endpoint, *batch, num_ant)``.
- """
+    ``directions`` has shape ``(endpoint, *batch, 3)`` where ``directions[i]``
+    is the far-field direction for ``endpoints[i]``. ``steering_vector`` and
+    ``AntennaPattern.field_response`` are per-direction operations (the only
+    reductions are the fixed length-3 vec3 contractions inside each element),
+    so evaluating a group of endpoints in one batched launch is numerically
+    identical to evaluating them one at a time. Endpoints that reference the
+    same object (for example every element of one ``ReceiverGrid``) share
+    array/orientation/pattern and are batched together, collapsing a per-
+    endpoint Python loop into one native launch per distinct endpoint object.
+    Returns ``(endpoint, *batch, num_ant)``.
+    """
 
     groups: dict[int, list[int]] = {}
     for index, endpoint in enumerate(endpoints):
@@ -1218,10 +1218,10 @@ def pack_synthetic_arrays(
 ) -> PathResult:
     """Expand centre-reference paths using far-field array phase weighting.
 
- Synthetic arrays share one geometric path set across their elements. An
- explicit array must instead trace the element positions and is rejected
- here so that a far-field approximation is never reported as explicit.
- """
+    Synthetic arrays share one geometric path set across their elements. An
+    explicit array must instead trace the element positions and is rejected
+    here so that a far-field approximation is never reported as explicit.
+    """
 
     if frequency_hz <= 0.0:
         raise ValueError("frequency_hz must be positive")
@@ -1522,7 +1522,7 @@ def _validate_runtime(config: Config) -> tuple[bool, bool, bool]:
     if not torch.cuda.is_available():
         raise RuntimeError("witwin.channel.path solver requires CUDA")
     if config.isb_boundary_taper and config.ad_mode != "none":
-        # ISB boundary taper (the boundary taper) gate 3: the C1 clearance-factor AD
+        # ISB boundary taper gate 3: the C1 clearance-factor AD
         # companion is a documented follow-up; reject taper + AD loudly rather
         # than returning a silently incomplete gradient.
         raise RuntimeError(

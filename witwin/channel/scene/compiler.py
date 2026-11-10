@@ -429,13 +429,13 @@ class CompiledScene:
     def _fixed_reevaluation_table_sources(self) -> tuple[torch.Tensor, ...]:
         """Every tensor the fixed-replay tables are built from.
 
- The vertex table concatenates the live structure vertex tensors (or the
- native table when the scene has no structures); the material bundle is
- an index_select over the material and assignment stores. Enumerating the
- stores by dataclass field keeps this a superset of whatever the bundle
- builder reads, so a new store field cannot silently escape the liveness
- signature below.
- """
+        The vertex table concatenates the live structure vertex tensors (or the
+        native table when the scene has no structures); the material bundle is
+        an index_select over the material and assignment stores. Enumerating the
+        stores by dataclass field keeps this a superset of whatever the bundle
+        builder reads, so a new store field cannot silently escape the liveness
+        signature below.
+        """
 
         sources: list[torch.Tensor] = [self.geometry.vertices]
         for structure in self.structures:
@@ -452,11 +452,11 @@ class CompiledScene:
     def _fixed_reevaluation_table_state(self) -> tuple[tuple[bool, bool, bool, int], ...]:
         """Host-only autograd/mutation signature of the replay-table sources.
 
- Reads tensor attributes only - ``requires_grad``, the presence of a
- ``grad_fn`` or a forward-AD tangent, and the mutation ``_version``. It
- touches no device memory, launches nothing, and never synchronizes, so
- it is cheap enough to re-derive on every replay.
- """
+        Reads tensor attributes only - ``requires_grad``, the presence of a
+        ``grad_fn`` or a forward-AD tangent, and the mutation ``_version``. It
+        touches no device memory, launches nothing, and never synchronizes, so
+        it is cheap enough to re-derive on every replay.
+        """
 
         state: list[tuple[bool, bool, bool, int]] = []
         for source in self._fixed_reevaluation_table_sources():
@@ -473,23 +473,23 @@ class CompiledScene:
     def fixed_reevaluation_tables(self) -> dict[str, object]:
         """Scene-static vertex and material tables for fixed-topology replay.
 
- Built lazily per instance following the scene-static cache pattern:
- both tables depend only on this CompiledScene's immutable stores and
- structure tensors, and any world change produces a new instance through
- the version-token compile cache. The cache is bypassed whenever a table
- tensor participates in autograd - a cached graph node would be freed by
- the first backward and fail the second - so differentiable-material or
- differentiable-mesh loops pay the staging exactly as before, while the
- primal per-frame replay (the Radar Doppler shape) stages once.
+        Built lazily per instance following the scene-static cache pattern:
+        both tables depend only on this CompiledScene's immutable stores and
+        structure tensors, and any world change produces a new instance through
+        the version-token compile cache. The cache is bypassed whenever a table
+        tensor participates in autograd - a cached graph node would be freed by
+        the first backward and fail the second - so differentiable-material or
+        differentiable-mesh loops pay the staging exactly as before, while the
+        primal per-frame replay (the Radar Doppler shape) stages once.
 
- The bypass is decided per call, not once at population time: the cache
- is keyed on the host-only liveness/mutation signature of the source
- tensors, so marking ``materials.eps_r`` or a structure's vertices after
- a primal replay has already warmed the cache rebuilds the tables and
- keeps that leaf on the graph. Serving a stale cached table there would
- drop the leaf's gradient silently, which the AD capability record
- forbids.
- """
+        The bypass is decided per call, not once at population time: the cache
+        is keyed on the host-only liveness/mutation signature of the source
+        tensors, so marking ``materials.eps_r`` or a structure's vertices after
+        a primal replay has already warmed the cache rebuilds the tables and
+        keeps that leaf on the graph. Serving a stale cached table there would
+        drop the leaf's gradient silently, which the AD capability record
+        forbids.
+        """
 
         signature = self._fixed_reevaluation_table_state()
         cached = self._fixed_reevaluation_tables_cache
@@ -527,10 +527,10 @@ class CompiledScene:
     def kirchhoff_resources(self) -> KirchhoffRuntimeResources:
         """Kirchhoff BSDF tables per material index (scatter_model_id == 1).
 
- Built lazily from the MaterialStore CSR layers and roughness fields
- at the store frequency; raises ``kirchhoff_domain_exceeded`` for
- out-of-domain roughness (never silently degrades).
- """
+        Built lazily from the MaterialStore CSR layers and roughness fields
+        at the store frequency; raises ``kirchhoff_domain_exceeded`` for
+        out-of-domain roughness (never silently degrades).
+        """
 
         key = self._scattering_resource_key()
         if (
@@ -1453,12 +1453,12 @@ LIGHT_SPEED_M_PER_S = 299_792_458.0
 def _frequency_scalar(scene: SolverScene) -> float:
     """Detached scalar carrier for non-differentiable consumers.
 
- Topology discovery and metadata never differentiate with respect to
- frequency (fixed-topology contract), so detach before float to keep AD
- solves with a requires_grad tensor frequency warning-free. The field
- evaluation seam must NOT use this helper: it forwards the live tensor so
- the frequency stays on the autograd graph.
- """
+    Topology discovery and metadata never differentiate with respect to
+    frequency (fixed-topology contract), so detach before float to keep AD
+    solves with a requires_grad tensor frequency warning-free. The field
+    evaluation seam must NOT use this helper: it forwards the live tensor so
+    the frequency stays on the autograd graph.
+    """
 
     frequency = scene.frequency
     if isinstance(frequency, torch.Tensor):

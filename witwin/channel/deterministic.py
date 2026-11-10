@@ -137,9 +137,9 @@ class Config:
     # Coherent scattering combine (coherent scattering). DEFAULT-OFF opt-in. OFF keeps
     # the scattering slot an incoherent POWER sum bit-identical to today; ON
     # sums the complex path_field of scattering rows per (tx, rx) and finalizes
-    # |sum|^2 (the coherent combination per-component phasor precedent). It is physical only
+    # |sum|^2. It is physical only
     # for realization-coherent phase-screen rows, which carry a true complex
-    # field; ensemble rows are zero-the penetration implementationower rows, so the pipeline refuses an
+    # field; ensemble rows are zero-phase power rows, so the pipeline refuses an
     # ensemble-only solve loudly. Requires the 'scattering' component.
     scattering_coherent: bool = False
     # Enumerated scatter-chain path class (coherent scattering). DEFAULT-OFF opt-in:
@@ -155,7 +155,7 @@ class Config:
     scattering_chain_max_depth: int = 0
     scattering_chain_samples_per_m2: float = 2.0
     scattering_chain_max_rows: int = 256
-    # ISB boundary taper (the boundary taper). DEFAULT-OFF visual-continuity heuristic: the
+    # ISB boundary taper. DEFAULT-OFF visual-continuity heuristic: the
     # hard LoS occlusion gate becomes a C1 membership taper tau(c / (width * w_F))
     # and the compensating order-1 diffraction odd step spreads over the same
     # congruent window. OFF (the default) is bit-identical to the hard gate and
@@ -315,7 +315,7 @@ def accumulate_flat_components(
     # argument to the native accumulator, so the call stays byte-identical to
     # today; ON requests the native scattering_combine_domain=1 path where the
     # scattering slot's summed complex field squares into its power instead of
-    # summing per-row powers (the coherent combination per-component phasor precedent).
+    # summing per-row powers.
     combine_kwargs = {"scattering_combine_domain": 1} if scattering_coherent else {}
     if differentiable:
         # AD modes (the AD contract): the same native accumulator kernels run inside
@@ -519,7 +519,7 @@ def build_path_table(
 
 def _validate_requested_components(config: Config) -> None:
     if config.isb_boundary_taper and config.ad_mode != "none":
-        # ISB boundary taper (the boundary taper) gate 3: the C1 clearance-factor AD
+        # ISB boundary taper gate 3: the C1 clearance-factor AD
         # companion (d(tau)/d(endpoint)) is a documented follow-up. Until it
         # lands, taper + AD is rejected loudly rather than returning a silently
         # incomplete gradient. OFF-path AD stays bit-identical.
@@ -541,12 +541,12 @@ def _validate_requested_components(config: Config) -> None:
 def _validate_scattering_coherent_mode(scattering_info: dict[str, Any] | None) -> None:
     """coherent scattering solve-time gate for the coherent scattering combine.
 
- The combine sums the complex ``path_field`` of scattering rows and
- finalizes ``|sum|^2``. Only realization-coherent phase-screen rows carry a
- physical complex field; ensemble rows are zero-the penetration implementationower rows, so an
- ensemble-only (or empty-realization) solve would interfere meaningless
- phases. Both cases are refused loudly rather than returning a wrong number.
- """
+    The combine sums the complex ``path_field`` of scattering rows and
+    finalizes ``|sum|^2``. Only realization-coherent phase-screen rows carry a
+    physical complex field; ensemble rows are zero-phase power rows, so an
+    ensemble-only (or empty-realization) solve would interfere meaningless
+    phases. Both cases are refused loudly rather than returning a wrong number.
+    """
 
     info = scattering_info or {}
     ensemble = int(info.get("ensemble_sample_count", 0))
@@ -572,13 +572,13 @@ def _validate_scattering_coherent_mode(scattering_info: dict[str, Any] | None) -
 def _scattering_metadata(
     scattering_info: dict[str, Any] | None, config: Config,
 ) -> dict[str, Any] | None:
-    """Scattering metadata sub-dict for the deterministic result (the rough-scattering model).
+    """Scattering metadata sub-dict for the deterministic result.
 
- Returns ``None`` when no scattering rows were requested. Extracted as a
- sub-dict builder so ``_metadata`` stays within its complexity budget.
- Incoherent Kirchhoff patch quadrature means per-path phases are NOT physical
- for ensemble rows; coherent scattering how scattering rows combine together.
- """
+    Returns ``None`` when no scattering rows were requested. Extracted as a
+    sub-dict builder so ``_metadata`` stays within its complexity budget.
+    Incoherent Kirchhoff patch quadrature means per-path phases are NOT physical
+    for ensemble rows; coherent scattering how scattering rows combine together.
+    """
 
     if scattering_info is None:
         return None
@@ -594,11 +594,11 @@ def _coupled_paths_metadata(
 ) -> dict[str, Any]:
     """Coupled higher-order compensator metadata block (coupled reflection and diffraction + coupled double diffraction).
 
- Mirrors the path solver's coupled_paths block. ``coupled_paths=True`` now
- enables the uniform order-2 compensator family {R->D, D->R, D->D}; the DD
- (component id 7) member is reported as its own row count for audits while it
- aggregates into the single coherent coupled slot.
- """
+    Mirrors the path solver's coupled_paths block. ``coupled_paths=True`` now
+    enables the uniform order-2 compensator family {R->D, D->R, D->D}; the DD
+    (component id 7) member is reported as its own row count for audits while it
+    aggregates into the single coherent coupled slot.
+    """
 
     if not config.coupled_paths:
         return {
@@ -625,11 +625,11 @@ def _register_coupled_component(
 ) -> tuple[str, ...]:
     """Record the coupled component count and export name (coupled reflection and diffraction + coupled double diffraction).
 
- Coupled rows carry component ids 3 (R->D), 4 (D->R) and 7 (D->D, coupled double diffraction);
- all three accumulate into the single coupled slot. "coupled" is not a public
- component name, so it is enabled by the coupled_paths gate rather than the
- components set. The DD row count is recorded separately for audits.
- """
+    Coupled rows carry component ids 3 (R->D), 4 (D->R) and 7 (D->D, coupled double diffraction);
+    all three accumulate into the single coupled slot. "coupled" is not a public
+    component name, so it is enabled by the coupled_paths gate rather than the
+    components set. The DD row count is recorded separately for audits.
+    """
 
     if not config.coupled_paths:
         return extra_components
@@ -648,11 +648,11 @@ def _append_scattering(
 ) -> tuple[Any, Any, dict[str, Any] | None]:
     """Append Kirchhoff scattering rows and gate the coherent combine.
 
- Single-purpose solve stage (the rough-scattering model + coherent scattering). When scattering is
- not requested it returns the inputs unchanged with ``scattering_info=None``.
- When ``scattering_coherent`` is set, the coherent-scattering gate refuses an
- ensemble-only or empty-realization solve before any accumulation runs.
- """
+    Single-purpose solve stage (rough-surface and coherent scattering). When scattering is
+    not requested it returns the inputs unchanged with ``scattering_info=None``.
+    When ``scattering_coherent`` is set, the coherent-scattering gate refuses an
+    ensemble-only or empty-realization solve before any accumulation runs.
+    """
 
     if "scattering" not in config.components:
         return evaluated, sidecars, None
@@ -701,7 +701,7 @@ def _metadata(
             raise RuntimeError(
                 "deterministic transmission requires RayD native capability"
             )
-        # Endpoint-connection thin_sheet contract (the solver component layout).
+        # Endpoint-connection thin_sheet contract.
         metadata_transmission = {
             "thin_sheet_straight_path_approximation": True,
             "group_delay": "geometric",

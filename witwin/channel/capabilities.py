@@ -1,7 +1,7 @@
 # Copyright Xingyu Chen.
-# Solver-level capability manifest for:mod:`witwin.channel`.
+# Solver-level capability manifest for :mod:`witwin.channel`.
 
-"""Solver-level capability manifest for:mod:`witwin.channel`."""
+"""Solver-level capability manifest for :mod:`witwin.channel`."""
 
 from __future__ import annotations
 
@@ -171,7 +171,7 @@ _CAPABILITIES: dict[str, Any] = {
             "max_diffraction_order": 1,
             "supports_reflection_diffraction_coupling": True,
             # coupled double diffraction: BDPT reads the shared enumerated coupled union
-            # (the enumerated-path oracle), which now includes cid 7 D->D rows.
+            # from the enumerated-path oracle, which now includes cid 7 D->D rows.
             "coupled_double_diffraction": True,
             "supports_complex_path_coefficients": True,
             "supports_polarization": True,
@@ -207,11 +207,11 @@ _CAPABILITIES: dict[str, Any] = {
 def _propagation_consumer_capabilities() -> dict[str, Any]:
     """Project the consumer contract record into this manifest's shape.
 
- The values are read from the consumer contract rather than restated, so the
- solver manifest and the cross-package contract cannot drift apart. The
- import is deferred to keep this module free of a package-level dependency
- on ``propagation``.
- """
+    The values are read from the consumer contract rather than restated, so the
+    solver manifest and the cross-package contract cannot drift apart. The
+    import is deferred to keep this module free of a package-level dependency
+    on ``propagation``.
+    """
 
     from witwin.channel.propagation.consumer import capabilities as consumer
 
@@ -242,10 +242,10 @@ def _propagation_consumer_capabilities() -> dict[str, Any]:
 def capabilities() -> dict[str, Any]:
     """Return the versioned semantic solver capability manifest.
 
- ``components`` here is the solver-level set and includes ``scattering``.
- The narrower cross-package field-transport contract is reported under
- ``propagation_consumer`` and is owned by:func:`witwin.channel.propagation.consumer.capabilities`.
- """
+    ``components`` here is the solver-level set and includes ``scattering``.
+    The narrower cross-package field-transport contract is reported under
+    ``propagation_consumer`` and is owned by :func:`witwin.channel.propagation.consumer.capabilities`.
+    """
 
     manifest = deepcopy(_CAPABILITIES)
     manifest["propagation_consumer"] = _propagation_consumer_capabilities()
