@@ -45,6 +45,10 @@ def test_single_plane_bdpt_native_is_faster_than_original_channel_when_bridge_av
         if "original Channel single-plane BDPT subprocess failed" not in str(exc):
             raise
         pytest.skip(f"original Channel comparison baseline is unavailable: {exc}")
+    except FileNotFoundError as exc:
+        if "original channel root not found" not in str(exc):
+            raise
+        pytest.skip(f"original Channel comparison baseline is unavailable: {exc}")
 
     assert result["performance"]["native_faster_than_original"] is True
     assert result["performance"]["native_speedup_vs_original"] >= 1.25
