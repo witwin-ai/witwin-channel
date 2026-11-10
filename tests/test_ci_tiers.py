@@ -214,6 +214,7 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     ]
 
     assert {path.name for path in WORKFLOWS.glob("*.yml")} == {
+        "gpu-tier.yml",
         "publish-witwin-channel.yml",
         "quick-tier.yml",
     }
@@ -378,3 +379,16 @@ def test_quick_tier_workflow_runs_on_every_push_and_pull_request() -> None:
     core_pin = re.search(r"CORE_COMMIT: ([0-9a-f]{40})", workflow)
     assert core_pin is not None
     assert f"CORE_COMMIT: {core_pin.group(1)}" in publish
+
+
+def test_gpu_tier_workflow_builds_with_the_dev_scripts_on_a_gpu_runner() -> None:
+    workflow = (WORKFLOWS / "gpu-tier.yml").read_text(encoding="utf-8")
+
+    assert "\n  push:\n    branches:\n      - main" in workflow
+    assert "\n  pull_request:" in workflow
+    assert "runs-on: [self-hosted, linux, cuda]" in workflow
+    assert "ref: ${{ steps.lock.outputs.commit }}" in workflow
+    assert 'scripts/dev_build.sh --rayd "$GITHUB_WORKSPACE/rayd"' in workflow
+    assert "source scripts/dev_env.sh" in workflow
+    assert "python ci/run_ci_tier.py cuda" in workflow
+    assert "pip install" not in workflow

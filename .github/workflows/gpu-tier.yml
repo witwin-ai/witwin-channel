@@ -1,0 +1,75 @@
+# Builds the _channel extension with scripts/dev_build.sh and runs the cuda tier on a GPU.
+#
+# Runner requirements (self-hosted, labels self-hosted, linux, cuda):
+#   - an NVIDIA GPU of the architecture in CHANNEL_DEV_CUDA_ARCH (repository variable
+#     CHANNEL_GPU_ARCH, default 86) and a driver for CUDA 12.8;
+#   - a conda installation at CONDA_BASE (repository variable CHANNEL_GPU_CONDA_BASE,
+#     default $HOME/miniconda3) with an env named by CHANNEL_GPU_CONDA_ENV (default
+#     channel-ci) that holds Python 3.11, torch 2.10.0+cu128, witwin 0.4.0, nvcc 12.8,
+#     cmake and ninja from constraints/ci-py311-cu128.txt, and the `dev` extra; the env
+#     sets OPTIX_PATH to the OptiX 8.1 SDK headers. The workflow never installs into it.
+name: GPU tier
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gpu-tier-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CHANNEL_DEV_CUDA_ARCH: ${{ vars.CHANNEL_GPU_ARCH || '86' }}
+  CHANNEL_DEV_CONDA_ENV: ${{ vars.CHANNEL_GPU_CONDA_ENV || 'channel-ci' }}
+  CUDA_VISIBLE_DEVICES: ${{ vars.CHANNEL_GPU_DEVICE || '0' }}
+  # Empty means $HOME/miniconda3 (see scripts/dev_build.sh).
+  CONDA_BASE: ${{ vars.CHANNEL_GPU_CONDA_BASE }}
+
+jobs:
+  cuda:
+    name: Build and run the cuda tier
+    runs-on: [self-hosted, linux, cuda]
+    timeout-minutes: 120
+    steps:
+      - name: Check out Channel
+        uses: actions/checkout@v5
+        with:
+          path: channel
+
+      - name: Read the locked RayD commit
+        id: lock
+        shell: bash
+        run: |
+          commit=$(python3 -c 'import json; print(json.load(open("channel/dependencies/rayd.lock.json"))["commit"])')
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+
+      # Full history: the re-lock tool test derives a lock from the parent commit.
+      - name: Check out locked RayD source
+        uses: actions/checkout@v5
+        with:
+          repository: Asixa/RayD
+          ref: ${{ steps.lock.outputs.commit }}
+          path: rayd
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Build the extension
+        working-directory: channel
+        shell: bash
+        run: |
+          scripts/dev_build.sh --rayd "$GITHUB_WORKSPACE/rayd"
+
+      - name: Run the cuda tier
+        working-directory: channel
+        shell: bash
+        env:
+          RAYD_SOURCE_DIR: ${{ github.workspace }}/rayd
+        run: |
+          source scripts/dev_env.sh
+          python ci/run_ci_tier.py cuda
