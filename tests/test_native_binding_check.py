@@ -166,7 +166,9 @@ def test_moving_a_binding_between_files_leaves_the_manifest_unchanged(tmp_path: 
     assert check.render_manifest(check.generate_manifest(repo)) == before
 
 
-def test_the_cli_reports_a_stale_manifest(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_the_cli_reports_a_stale_manifest(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str],
+) -> None:
     repo = _repo(tmp_path, _KERNELS, _SOLVER_USES_BOTH)
 
     assert check.main(["--repo", str(repo), "--write"]) == 0

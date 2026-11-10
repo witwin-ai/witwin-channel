@@ -87,7 +87,9 @@ def test_layout_rejects_an_unregistered_or_twice_registered_source(tmp_path: Pat
         ("native/channel/kernels/bad.cuh", "#include <torch/extension.h>\n", "reaches <torch/extension.h>"),
     ],
 )
-def test_layout_rejects_each_forbidden_pattern(tmp_path: Path, relative: str, text: str, message: str) -> None:
+def test_layout_rejects_each_forbidden_pattern(
+    tmp_path: Path, relative: str, text: str, message: str,
+) -> None:
     repo = _repo(tmp_path)
     (repo / relative).write_text(text, encoding="utf-8")
     if relative.endswith(".cpp"):
