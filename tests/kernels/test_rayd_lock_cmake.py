@@ -106,7 +106,7 @@ def test_rayd_lock_is_machine_readable_and_complete():
 
     assert lock["schema_version"] == 2
     assert lock["repository_url"] == "https://github.com/Asixa/RayD"
-    assert lock["commit"] == "14073822b95c8565abfaf504ee6b293f83aba427"
+    assert lock["commit"] == "e4a63d2a7630fcc5f69b2375b11b1ef9f7e2caec"
     assert lock["integration_abi"] == {
         "kind": "source-header-set-sha256",
         "entrypoint": "include/rayd/integration.h",
@@ -133,7 +133,7 @@ def test_rayd_lock_is_machine_readable_and_complete():
             },
             {
                 "path": "include/rayd/scene.h",
-                "sha256": "0ad8a15be68f98a9ae9646d85cd8e77b4b255b158ddfc10820503dd900d36480",
+                "sha256": "892b20c3c8da21cef888c466cb26f787b0830f8e65b81babed815ec63363a4ed",
             },
             {
                 "path": "include/rayd/transmission.h",
@@ -144,7 +144,7 @@ def test_rayd_lock_is_machine_readable_and_complete():
                 "sha256": "95796526b7a94c580b28cca652d1859b63f9792c9eaf0115bd1d44ca75e85125",
             },
         ],
-        "sha256": "db48cdb91b31c00a14259f912f8b504eb2485a031b036c6f79688cb5452670c4",
+        "sha256": "802c3e40b3e5a90ac65500ebf3d7a8b774ef6ea1148adefd3d05a33c274a7b25",
         "api_version": 8,
         "identity": "rayd.torch.integration",
     }
@@ -152,7 +152,7 @@ def test_rayd_lock_is_machine_readable_and_complete():
         "distribution": "rayd-torch",
         "distribution_version": "0.8.0",
         "metadata_path": "rayd/torch/_source/rayd-source.json",
-        "manifest_sha256": "4b69a3f65d669467debf9752a6d0a85502b3fc73003d0cdd8e61921706dbff60",
+        "manifest_sha256": "3d978a7cd7eebe04ab6566f4d258cdba42eac125316e0cd47e02b1a903d2e4d4",
     }
 
 
