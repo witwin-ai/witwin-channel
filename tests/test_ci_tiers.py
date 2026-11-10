@@ -47,9 +47,11 @@ def test_tiers_cover_the_required_gate_families() -> None:
         "quick.ruff",
         "quick.mypy",
         "quick.import-graph",
-        "quick.contract-coverage",
+        "quick.native-bindings",
+        "quick.native-inventory",
+        "quick.duplication",
         "quick.compact-signatures",
-        "quick.public-api-binding-contract-manifests",
+        "quick.public-api-and-generated-checks",
         "quick.production-dependencies",
         "quick.product-identity",
         "quick.repository-hygiene",
@@ -74,7 +76,6 @@ def test_tiers_cover_the_required_gate_families() -> None:
         "nightly.wheel-build-py311-cu128-win-x64",
         "nightly.core-wheel-build",
         "nightly.wheel-smoke-py311-cu128-win-x64",
-        "nightly.duplication",
     } <= set(_ids("nightly"))
     assert {
         "release.performance",

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import functools
 import hashlib
 import importlib.metadata
 import json
@@ -975,6 +976,7 @@ def _matching_delimiter(text: str, start: int, opening: str = "(", closing: str 
     raise BaselineError(f"unmatched {opening!r} delimiter")
 
 
+@functools.lru_cache(maxsize=256)
 def _mask_cpp_comments(source: str) -> str:
     output = list(source)
     index = 0

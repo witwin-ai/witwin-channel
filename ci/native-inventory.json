@@ -1,0 +1,813 @@
+{
+  "schema_version": 1,
+  "generated_by": "python ci/check_native_inventory.py --write",
+  "files": {
+    "native/channel/bdpt.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/bdpt_ad_dispatch.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/bdpt_dict_helpers.h": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/binding/bdpt.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/binding/build.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/binding/fields.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/binding/materials.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/binding/module.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/binding/montecarlo.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/binding/montecarlo_transmission.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/binding/path.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/binding/rayd.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/binding/registry.h": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/binding/runtime.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/build_info.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/bdpt_connect.cu": {
+      "kernels": [
+        "bdpt_accumulate_coherent_backward_kernel",
+        "bdpt_accumulate_coherent_jvp_kernel",
+        "bdpt_accumulate_connection_samples_coherent_kernel",
+        "bdpt_accumulate_connection_samples_compacted_kernel",
+        "bdpt_accumulate_connection_samples_double_kernel",
+        "bdpt_accumulate_connection_samples_staged_kernel",
+        "bdpt_accumulate_power_backward_kernel",
+        "bdpt_accumulate_power_jvp_kernel",
+        "bdpt_cast_connection_accumulation_kernel",
+        "bdpt_compact_connection_samples_kernel",
+        "bdpt_compact_valid_connection_indices_kernel",
+        "bdpt_connection_variance_accum_double_kernel",
+        "bdpt_connection_variance_finalize_double_kernel",
+        "bdpt_copy_connection_samples_kernel",
+        "bdpt_count_valid_connection_samples_kernel",
+        "bdpt_endpoint_connection_backward_kernel",
+        "bdpt_endpoint_connection_jvp_kernel",
+        "bdpt_endpoint_connection_samples_kernel",
+        "bdpt_endpoint_connection_visibility_inputs_kernel",
+        "bdpt_filter_connection_samples_kernel",
+        "bdpt_finalize_coherent_accumulation_kernel",
+        "bdpt_mis_weights_kernel"
+      ],
+      "launches": [
+        "bdpt_accumulate_coherent_backward_kernel",
+        "bdpt_accumulate_coherent_jvp_kernel",
+        "bdpt_accumulate_connection_samples_coherent_kernel",
+        "bdpt_accumulate_connection_samples_compacted_kernel",
+        "bdpt_accumulate_connection_samples_double_kernel",
+        "bdpt_accumulate_connection_samples_staged_kernel",
+        "bdpt_accumulate_power_backward_kernel",
+        "bdpt_accumulate_power_jvp_kernel",
+        "bdpt_cast_connection_accumulation_kernel",
+        "bdpt_compact_connection_samples_kernel",
+        "bdpt_compact_valid_connection_indices_kernel",
+        "bdpt_connection_variance_accum_double_kernel",
+        "bdpt_connection_variance_finalize_double_kernel",
+        "bdpt_copy_connection_samples_kernel",
+        "bdpt_count_valid_connection_samples_kernel",
+        "bdpt_endpoint_connection_backward_kernel",
+        "bdpt_endpoint_connection_jvp_kernel",
+        "bdpt_endpoint_connection_samples_kernel",
+        "bdpt_endpoint_connection_visibility_inputs_kernel",
+        "bdpt_filter_connection_samples_kernel",
+        "bdpt_finalize_coherent_accumulation_kernel",
+        "bdpt_mis_weights_kernel"
+      ],
+      "host_synchronization": [
+        "cudaMemcpyAsync",
+        "cudaStreamSynchronize"
+      ],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/bdpt_paths.cu": {
+      "kernels": [
+        "bdpt_light_endpoint_subpaths_kernel",
+        "bdpt_reflected_light_subpaths_kernel",
+        "bdpt_sensor_endpoint_subpaths_kernel",
+        "bdpt_transmitted_light_subpaths_kernel",
+        "reflected_subpath_backward_kernel",
+        "reflected_subpath_jvp_kernel",
+        "transmitted_subpath_backward_kernel",
+        "transmitted_subpath_jvp_kernel"
+      ],
+      "launches": [
+        "bdpt_light_endpoint_subpaths_kernel",
+        "bdpt_reflected_light_subpaths_kernel",
+        "bdpt_sensor_endpoint_subpaths_kernel",
+        "bdpt_transmitted_light_subpaths_kernel",
+        "reflected_subpath_backward_kernel",
+        "reflected_subpath_jvp_kernel",
+        "transmitted_subpath_backward_kernel",
+        "transmitted_subpath_jvp_kernel"
+      ],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/bdpt_support.cu": {
+      "kernels": [
+        "bdpt_launch_state_kernel",
+        "bdpt_sample_directions_kernel",
+        "finalize_maps_backward_kernel",
+        "finalize_maps_jvp_kernel"
+      ],
+      "launches": [
+        "bdpt_launch_state_kernel",
+        "bdpt_sample_directions_kernel",
+        "finalize_maps_backward_kernel",
+        "finalize_maps_jvp_kernel"
+      ],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/capacity.cu": {
+      "kernels": [
+        "capacity_failure_component_maps_sanitize_kernel",
+        "capacity_failure_terminal_check_kernel",
+        "enumerated_capacity_failure_sanitize_kernel",
+        "enumerated_capacity_failure_vector_sanitize_kernel"
+      ],
+      "launches": [
+        "capacity_failure_component_maps_sanitize_kernel",
+        "capacity_failure_terminal_check_kernel",
+        "enumerated_capacity_failure_sanitize_kernel",
+        "enumerated_capacity_failure_vector_sanitize_kernel"
+      ],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/capacity.h": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/coupled.cu": {
+      "kernels": [
+        "coupled_active_mask_kernel",
+        "coupled_dd_backward_kernel",
+        "coupled_dd_finalize_kernel",
+        "coupled_dd_jvp_kernel",
+        "coupled_dd_prepare_kernel",
+        "coupled_prepare_backward_kernel",
+        "coupled_prepare_jvp_kernel",
+        "coupled_rd_backward_kernel",
+        "coupled_rd_finalize_kernel",
+        "coupled_rd_jvp_kernel",
+        "coupled_rd_prepare_kernel",
+        "project_complex3_backward_kernel",
+        "project_complex3_jvp_kernel"
+      ],
+      "launches": [
+        "coupled_active_mask_kernel",
+        "coupled_dd_backward_kernel",
+        "coupled_dd_finalize_kernel",
+        "coupled_dd_jvp_kernel",
+        "coupled_dd_prepare_kernel",
+        "coupled_prepare_backward_kernel",
+        "coupled_prepare_jvp_kernel",
+        "coupled_rd_backward_kernel",
+        "coupled_rd_finalize_kernel",
+        "coupled_rd_jvp_kernel",
+        "coupled_rd_prepare_kernel",
+        "project_complex3_backward_kernel",
+        "project_complex3_jvp_kernel"
+      ],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/deterministic.cu": {
+      "kernels": [
+        "deterministic_accumulate_backward_kernel",
+        "deterministic_accumulate_jvp_finalize_kernel",
+        "deterministic_accumulate_paths_kernel",
+        "deterministic_accumulate_tangent_scatter_kernel",
+        "deterministic_compact_edges_kernel",
+        "deterministic_component_counts_kernel",
+        "deterministic_delay_to_path_length_kernel",
+        "deterministic_diffraction_vector_field_kernel",
+        "deterministic_edge_flags_kernel",
+        "deterministic_field_from_power_phase_kernel",
+        "deterministic_finalize_accumulation_kernel",
+        "deterministic_los_field_kernel",
+        "deterministic_pack_complex_kernel",
+        "deterministic_phase_from_field_kernel",
+        "deterministic_phase_from_length_kernel",
+        "deterministic_reflection_field_kernel",
+        "deterministic_reflection_sequence_field_kernel"
+      ],
+      "launches": [
+        "deterministic_accumulate_backward_kernel",
+        "deterministic_accumulate_jvp_finalize_kernel",
+        "deterministic_accumulate_paths_kernel",
+        "deterministic_accumulate_tangent_scatter_kernel",
+        "deterministic_compact_edges_kernel",
+        "deterministic_component_counts_kernel",
+        "deterministic_delay_to_path_length_kernel",
+        "deterministic_diffraction_vector_field_kernel",
+        "deterministic_edge_flags_kernel",
+        "deterministic_field_from_power_phase_kernel",
+        "deterministic_finalize_accumulation_kernel",
+        "deterministic_los_field_kernel",
+        "deterministic_pack_complex_kernel",
+        "deterministic_phase_from_field_kernel",
+        "deterministic_phase_from_length_kernel",
+        "deterministic_reflection_field_kernel",
+        "deterministic_reflection_sequence_field_kernel"
+      ],
+      "host_synchronization": [
+        "cudaMemcpyAsync",
+        "cudaStreamSynchronize"
+      ],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/diffraction.cu": {
+      "kernels": [
+        "count_selected_edge_indices_kernel",
+        "count_surface_group_edges_kernel",
+        "diffraction_edge_geometry_kernel",
+        "diffraction_state_pack_kernel",
+        "diffraction_state_pack_selected_kernel",
+        "diffraction_state_wi_kernel",
+        "discover_kernel",
+        "emit_surface_group_face_rows_kernel",
+        "fill_int_kernel",
+        "fill_selected_edge_indices_kernel",
+        "fill_surface_group_root_edges_kernel",
+        "init_parent_kernel",
+        "utd_diffraction_tape_accumulate_backward_kernel",
+        "utd_diffraction_tape_accumulate_jvp_kernel",
+        "utd_diffraction_tape_accumulate_kernel"
+      ],
+      "launches": [
+        "count_selected_edge_indices_kernel",
+        "count_surface_group_edges_kernel",
+        "diffraction_edge_geometry_kernel",
+        "diffraction_state_pack_kernel",
+        "diffraction_state_pack_selected_kernel",
+        "diffraction_state_wi_kernel",
+        "discover_kernel",
+        "emit_surface_group_face_rows_kernel",
+        "fill_int_kernel",
+        "fill_selected_edge_indices_kernel",
+        "fill_surface_group_root_edges_kernel",
+        "init_parent_kernel",
+        "utd_diffraction_tape_accumulate_backward_kernel",
+        "utd_diffraction_tape_accumulate_jvp_kernel",
+        "utd_diffraction_tape_accumulate_kernel"
+      ],
+      "host_synchronization": [
+        "cudaMemcpyAsync",
+        "cudaStreamSynchronize"
+      ],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/evaluated_paths.cu": {
+      "kernels": [
+        "compact_contract_flags_kernel",
+        "compact_control_record_kernel",
+        "compact_pair_histogram_kernel",
+        "compact_payload_gather_kernel",
+        "compact_selection_kernel",
+        "dedup_pair_state_kernel",
+        "evaluated_paths_capacity_backward_scatter_kernel",
+        "evaluated_paths_capacity_continuous_init_kernel",
+        "evaluated_paths_capacity_jvp_gather_kernel",
+        "exact_pair_metadata_kernel",
+        "exact_row_metadata_kernel",
+        "final_pair_count_kernel",
+        "group_start_kernel",
+        "init_order_kernel",
+        "max_paths_flags_kernel",
+        "pair_state_init_kernel",
+        "publish_kernel",
+        "shortest_winner_kernel",
+        "sort_key_1d_kernel",
+        "sort_key_sequence_kernel",
+        "sort_key_valid_kernel",
+        "transmission_topology_init_kernel",
+        "transmission_topology_pack_backward_kernel",
+        "transmission_topology_pack_jvp_kernel",
+        "transmission_topology_pack_kernel",
+        "transmission_topology_preflight_kernel",
+        "transmission_topology_sanitize_kernel",
+        "validate_rows_kernel"
+      ],
+      "launches": [
+        "compact_contract_flags_kernel",
+        "compact_control_record_kernel",
+        "compact_pair_histogram_kernel",
+        "compact_payload_gather_kernel",
+        "compact_selection_kernel",
+        "dedup_pair_state_kernel",
+        "evaluated_paths_capacity_backward_scatter_kernel",
+        "evaluated_paths_capacity_continuous_init_kernel",
+        "evaluated_paths_capacity_jvp_gather_kernel",
+        "exact_pair_metadata_kernel",
+        "exact_row_metadata_kernel",
+        "final_pair_count_kernel",
+        "group_start_kernel",
+        "init_order_kernel",
+        "max_paths_flags_kernel",
+        "pair_state_init_kernel",
+        "publish_kernel",
+        "shortest_winner_kernel",
+        "sort_key_1d_kernel",
+        "sort_key_sequence_kernel",
+        "sort_key_valid_kernel",
+        "transmission_topology_init_kernel",
+        "transmission_topology_pack_backward_kernel",
+        "transmission_topology_pack_jvp_kernel",
+        "transmission_topology_pack_kernel",
+        "transmission_topology_preflight_kernel",
+        "transmission_topology_sanitize_kernel",
+        "validate_rows_kernel"
+      ],
+      "host_synchronization": [
+        "cudaMemcpyAsync",
+        "cudaStreamSynchronize"
+      ],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/field_ad.cuh": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/fields.cu": {
+      "kernels": [
+        "coupled_dd_field_kernel",
+        "coupled_rd_field_kernel",
+        "free_space_backward_kernel",
+        "free_space_fwd_kernel",
+        "free_space_jvp_kernel",
+        "free_space_kernel",
+        "project_complex3_kernel",
+        "reflection_sequence_backward_kernel",
+        "reflection_sequence_jvp_kernel",
+        "reflection_sequence_kernel",
+        "rough_scale_backward_kernel",
+        "rough_scale_forward_kernel",
+        "rough_scale_jvp_kernel",
+        "source_amplitude_scale_kernel"
+      ],
+      "launches": [
+        "coupled_dd_field_kernel",
+        "coupled_rd_field_kernel",
+        "free_space_backward_kernel",
+        "free_space_fwd_kernel",
+        "free_space_jvp_kernel",
+        "free_space_kernel",
+        "project_complex3_kernel",
+        "reflection_sequence_backward_kernel",
+        "reflection_sequence_jvp_kernel",
+        "reflection_sequence_kernel",
+        "rough_scale_backward_kernel",
+        "rough_scale_forward_kernel",
+        "rough_scale_jvp_kernel",
+        "source_amplitude_scale_kernel"
+      ],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/kirchhoff.cu": {
+      "kernels": [
+        "abar_kernel",
+        "assemble_matrix_kernel",
+        "budget_adjoint_kernel",
+        "budget_chain_backward_kernel",
+        "budget_chain_jvp_kernel",
+        "diag_kernel",
+        "jvp_forcing_kernel",
+        "pinv_project_kernel",
+        "pinv_reconstruct_kernel",
+        "raw_lobe_backward_kernel",
+        "raw_lobe_jvp_kernel",
+        "sbar_direct_kernel",
+        "sbar_implicit_kernel",
+        "smat_kernel",
+        "state_weight_kernel",
+        "tangent_f_kernel"
+      ],
+      "launches": [
+        "abar_kernel",
+        "assemble_matrix_kernel",
+        "budget_adjoint_kernel",
+        "budget_chain_backward_kernel",
+        "budget_chain_jvp_kernel",
+        "diag_kernel",
+        "jvp_forcing_kernel",
+        "pinv_project_kernel",
+        "pinv_reconstruct_kernel",
+        "raw_lobe_backward_kernel",
+        "raw_lobe_jvp_kernel",
+        "sbar_direct_kernel",
+        "sbar_implicit_kernel",
+        "smat_kernel",
+        "state_weight_kernel",
+        "tangent_f_kernel"
+      ],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": [
+        "--fmad=false"
+      ]
+    },
+    "native/channel/kernels/los.cu": {
+      "kernels": [
+        "apply_los_visibility_kernel",
+        "apply_los_visibility_public_layout_kernel",
+        "consumer_los_jones_kernel",
+        "fixed_los_backward_kernel",
+        "fixed_los_jvp_kernel",
+        "gather_fixed_los_kernel",
+        "los_component_maps_adjoint_kernel",
+        "los_component_maps_kernel",
+        "los_component_maps_public_layout_kernel",
+        "los_path_gain_backward_kernel",
+        "los_path_gain_jvp_kernel",
+        "los_silhouette_clearance_kernel",
+        "los_taper_apply_kernel",
+        "los_visibility_inputs_kernel",
+        "pack_vec3_kernel",
+        "path_los_export_kernel",
+        "receiver_grid_points_kernel",
+        "validate_fixed_los_kernel"
+      ],
+      "launches": [
+        "apply_los_visibility_kernel",
+        "apply_los_visibility_public_layout_kernel",
+        "consumer_los_jones_kernel",
+        "fixed_los_backward_kernel",
+        "fixed_los_jvp_kernel",
+        "gather_fixed_los_kernel",
+        "los_component_maps_adjoint_kernel",
+        "los_component_maps_kernel",
+        "los_path_gain_backward_kernel",
+        "los_path_gain_jvp_kernel",
+        "los_silhouette_clearance_kernel",
+        "los_taper_apply_kernel",
+        "los_visibility_inputs_kernel",
+        "pack_vec3_kernel",
+        "path_los_export_kernel",
+        "receiver_grid_points_kernel",
+        "validate_fixed_los_kernel"
+      ],
+      "host_synchronization": [
+        "cudaMemcpy",
+        "cudaMemcpyAsync",
+        "cudaStreamSynchronize"
+      ],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/math.cuh": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/mc_transmission.cu": {
+      "kernels": [
+        "sanitize_backward_kernel",
+        "sanitize_jvp_kernel",
+        "sanitize_primal_kernel",
+        "wall_product_backward_kernel",
+        "wall_product_jvp_kernel",
+        "wall_product_kernel",
+        "wall_product_shared_backward_kernel"
+      ],
+      "launches": [
+        "sanitize_backward_kernel",
+        "sanitize_jvp_kernel",
+        "sanitize_primal_kernel",
+        "wall_product_backward_kernel",
+        "wall_product_jvp_kernel",
+        "wall_product_kernel",
+        "wall_product_shared_backward_kernel"
+      ],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": [
+        "--fmad=false"
+      ]
+    },
+    "native/channel/kernels/montecarlo.cu": {
+      "kernels": [
+        "bdpt_finalize_point_components_kernel",
+        "bdpt_store_point_component_column_kernel",
+        "bdpt_sum_kernel",
+        "diffraction_edge_count_kernel",
+        "face_material_tensors_kernel",
+        "finalize_component_maps_kernel",
+        "pack_int2_kernel",
+        "sample_directions_kernel",
+        "scattering_event_kernel",
+        "store_component_map_kernel"
+      ],
+      "launches": [
+        "bdpt_finalize_point_components_kernel",
+        "bdpt_store_point_component_column_kernel",
+        "bdpt_sum_kernel",
+        "diffraction_edge_count_kernel",
+        "face_material_tensors_kernel",
+        "finalize_component_maps_kernel",
+        "pack_int2_kernel",
+        "sample_directions_kernel",
+        "scattering_event_kernel",
+        "store_component_map_kernel"
+      ],
+      "host_synchronization": [
+        "cudaMemcpyAsync",
+        "cudaStreamSynchronize"
+      ],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/path_compaction.cuh": {
+      "kernels": [
+        "compact_count_control_metadata_kernel"
+      ],
+      "launches": [
+        "compact_count_control_metadata_kernel"
+      ],
+      "host_synchronization": [
+        "cudaMemcpyAsync",
+        "cudaStreamSynchronize"
+      ],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/path_payload.cuh": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/paths.cu": {
+      "kernels": [
+        "deterministic_diffraction_order1_compact_kernel",
+        "deterministic_face_anchor_points_kernel",
+        "deterministic_face_group_assign_kernel",
+        "deterministic_face_group_flags_kernel",
+        "deterministic_face_group_keys_kernel",
+        "deterministic_face_group_members_kernel",
+        "deterministic_face_group_sort_key_kernel",
+        "deterministic_face_sequence_chunk_kernel",
+        "deterministic_gather_rows_kernel",
+        "deterministic_los_topology_all_kernel",
+        "deterministic_los_topology_compact_kernel",
+        "deterministic_normalize_vec3_kernel",
+        "deterministic_order_init_kernel",
+        "deterministic_pad_topology_sequences_kernel",
+        "deterministic_reflect_points_kernel",
+        "deterministic_reflection_epc_input_batch_kernel",
+        "deterministic_reflection_order1_compact_kernel",
+        "deterministic_reflection_sequence_compact_kernel",
+        "deterministic_repeat_range_kernel",
+        "deterministic_sort_key_1d_kernel",
+        "deterministic_sort_key_sequence_kernel",
+        "deterministic_surface_group_keys_kernel",
+        "deterministic_topology_base_fields_kernel",
+        "deterministic_topology_default_fields_kernel",
+        "path_block_compact_kernel",
+        "path_block_flags_kernel",
+        "path_concat_vec3_kernel",
+        "path_copy_block_kernel",
+        "path_diffraction_compact_kernel",
+        "path_gather_kernel",
+        "path_los_compact_kernel",
+        "path_los_visibility_inputs_kernel",
+        "path_reflection_candidates_kernel",
+        "path_sort_key_kernel",
+        "path_visibility_flags_kernel"
+      ],
+      "launches": [
+        "deterministic_diffraction_order1_compact_kernel",
+        "deterministic_face_anchor_points_kernel",
+        "deterministic_face_group_assign_kernel",
+        "deterministic_face_group_flags_kernel",
+        "deterministic_face_group_keys_kernel",
+        "deterministic_face_group_members_kernel",
+        "deterministic_face_group_sort_key_kernel",
+        "deterministic_face_sequence_chunk_kernel",
+        "deterministic_gather_rows_kernel",
+        "deterministic_los_topology_all_kernel",
+        "deterministic_los_topology_compact_kernel",
+        "deterministic_normalize_vec3_kernel",
+        "deterministic_order_init_kernel",
+        "deterministic_pad_topology_sequences_kernel",
+        "deterministic_reflect_points_kernel",
+        "deterministic_reflection_epc_input_batch_kernel",
+        "deterministic_reflection_order1_compact_kernel",
+        "deterministic_reflection_sequence_compact_kernel",
+        "deterministic_repeat_range_kernel",
+        "deterministic_sort_key_1d_kernel",
+        "deterministic_sort_key_sequence_kernel",
+        "deterministic_surface_group_keys_kernel",
+        "deterministic_topology_base_fields_kernel",
+        "deterministic_topology_default_fields_kernel",
+        "path_block_compact_kernel",
+        "path_block_flags_kernel",
+        "path_concat_vec3_kernel",
+        "path_copy_block_kernel",
+        "path_diffraction_compact_kernel",
+        "path_gather_kernel",
+        "path_los_compact_kernel",
+        "path_los_visibility_inputs_kernel",
+        "path_reflection_candidates_kernel",
+        "path_sort_key_kernel",
+        "path_visibility_flags_kernel"
+      ],
+      "host_synchronization": [
+        "cudaMemcpyAsync",
+        "cudaStreamSynchronize"
+      ],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/reflection.cu": {
+      "kernels": [
+        "reflection_launch_inputs_kernel",
+        "slab_reflection_accumulate_backward_kernel",
+        "slab_reflection_accumulate_jvp_kernel",
+        "slab_reflection_accumulate_kernel"
+      ],
+      "launches": [
+        "reflection_launch_inputs_kernel",
+        "slab_reflection_accumulate_backward_kernel",
+        "slab_reflection_accumulate_jvp_kernel",
+        "slab_reflection_accumulate_kernel"
+      ],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/torch_cuda.h": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/montecarlo_basic.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/path_block.h": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/path_solver.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/rayd/diffraction.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/rayd/geometry.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/rayd/reflection.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/rayd/resource.h": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/rayd/scene.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/tensor_checks.h": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    }
+  }
+}
