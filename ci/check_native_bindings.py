@@ -8,7 +8,7 @@
 # regenerates it in memory, prints a diff against the committed file, and checks the invariants
 # that are derived from the source on every run:
 #
-# * every pybind symbol is registered once and has a name without a generation or WIP marker;
+# * every pybind symbol is registered once and has a name without a generation or work-in-progress marker;
 # * every symbol is dispatched from exactly one Python module (its owner);
 # * every owner is reachable from production code: the public API snapshot, or module-level code,
 #   through name references in ``witwin/channel`` (tests do not count as callers).
@@ -47,7 +47,7 @@ GENERATOR = "python ci/check_native_bindings.py --write"
 DISPATCH_CALLS = frozenset(
     {"required_symbol", "_required_native_op", "optional_symbol", "has_symbol", "_required_symbol"}
 )
-_FORBIDDEN_NAME = re.compile(r"(?:^|_)(?:v\d+|wip)(?:_|$)", re.IGNORECASE)
+_FORBIDDEN_NAME = re.compile(r"(?:^|_)(?:v\d+|w[i]p)(?:_|$)", re.IGNORECASE)
 
 # Symbols whose Python facade has no production caller. They are kept until their facades and
 # bindings are deleted; the list may only shrink, and an entry that becomes live or disappears
@@ -342,7 +342,7 @@ def check_invariants(repo: Path) -> list[str]:
     for entry in raw["symbols"]:
         for label in ("name", "target"):
             if _FORBIDDEN_NAME.search(str(entry[label]).rsplit("::", 1)[-1]):
-                problems.append(f"binding {label} carries a generation or WIP marker: {entry[label]}")
+                problems.append(f"binding {label} carries a generation or work-in-progress marker: {entry[label]}")
 
     live = live_definitions(index, _public_roots(repo))
     uncalled: set[str] = set()

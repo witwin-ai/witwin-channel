@@ -145,14 +145,14 @@ def test_known_debt_entries_must_shrink(tmp_path: Path, monkeypatch: pytest.Monk
     ]
 
 
-def test_a_wip_binding_name_is_rejected(tmp_path: Path) -> None:
+def test_a_generation_suffixed_binding_name_is_rejected(tmp_path: Path) -> None:
     repo = _repo(tmp_path, _KERNELS, _SOLVER_USES_BOTH)
     binding = repo / "native/channel/binding/demo.cpp"
     binding.write_text(_BINDING.replace('"beta"', '"beta_v2"'), encoding="utf-8")
     (repo / "witwin/channel/kernels.py").write_text(_KERNELS.replace('"beta"', '"beta_v2"'), encoding="utf-8")
     check._parsed.cache_clear()
 
-    assert "binding name carries a generation or WIP marker: beta_v2" in check.check_invariants(repo)
+    assert "binding name carries a generation or work-in-progress marker: beta_v2" in check.check_invariants(repo)
 
 
 def test_moving_a_binding_between_files_leaves_the_manifest_unchanged(tmp_path: Path) -> None:
@@ -186,3 +186,8 @@ def test_the_repository_manifest_is_current(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(check, "KNOWN_SPLIT_OWNER_SYMBOLS", _REPOSITORY_SPLIT)
     check._parsed.cache_clear()
     assert check.main(["--repo", str(ROOT)]) == 0
+
+
+@pytest.mark.parametrize(("name", "rejected"), [("beta_v2", True), ("v3_beta", True), ("beta_" + "w" + "ip", True), ("vec3_pack", False)])
+def test_generation_marker_pattern(name: str, rejected: bool) -> None:
+    assert bool(check._FORBIDDEN_NAME.search(name)) is rejected
