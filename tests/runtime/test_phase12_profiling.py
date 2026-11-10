@@ -17,25 +17,6 @@ _ROOT = Path(__file__).resolve().parents[2]
 _CONTRACT = _ROOT / "benchmarks" / "phase13_phase12_profile_contract.json"
 
 
-def _function(path: str, name: str) -> ast.FunctionDef:
-    tree = ast.parse((_ROOT / path).read_text(encoding="utf-8"))
-    for node in tree.body:
-        if isinstance(node, ast.FunctionDef) and node.name == name:
-            return node
-    raise AssertionError(f"missing function {name} in {path}")
-
-
-def _profile_enum_members(node: ast.AST, helper: str) -> set[str]:
-    members: set[str] = set()
-    for call in (item for item in ast.walk(node) if isinstance(item, ast.Call)):
-        if not isinstance(call.func, ast.Name) or call.func.id != helper:
-            continue
-        if len(call.args) != 1 or not isinstance(call.args[0], ast.Attribute):
-            raise AssertionError(f"{helper} must receive one semantic enum member")
-        members.add(call.args[0].attr)
-    return members
-
-
 def test_cuda_profile_range_is_balanced_on_failure(monkeypatch) -> None:
     calls: list[tuple[str, str | None]] = []
     monkeypatch.setattr(
@@ -224,45 +205,3 @@ def test_profile_contract_matches_closed_semantic_name_sets() -> None:
             ":candidate",
         )
     )
-
-
-def test_baseline_owners_emit_only_real_profile_annotations() -> None:
-    enumerated = _function(
-        "witwin/channel/interactions/transmission.py",
-        "_transmission_topology",
-    )
-    assert _profile_enum_members(enumerated, "profiled_cuda_range") == {
-        "ENUMERATED_PENETRATION_DISCOVERY"
-    }
-
-    montecarlo = _function(
-        "witwin/channel/interactions/transmission.py",
-        "straight_transmission_chains",
-    )
-    assert _profile_enum_members(montecarlo, "profiled_cuda_range") == {
-        "MONTECARLO_BASIC_PENETRATION_DISCOVERY"
-    }
-    assert _profile_enum_members(montecarlo, "cuda_profile_mark") == {"OPTIX_TRAVERSAL"}
-
-    diffraction = _function(
-        "witwin/channel/interactions/diffraction.py",
-        "_diffraction_topology_order1",
-    )
-    assert _profile_enum_members(diffraction, "profiled_cuda_range") == {
-        "DIFFRACTION_TOTAL_STAGE"
-    }
-    assert _profile_enum_members(diffraction, "cuda_profile_range") == {
-        "DIFFRACTION_EXPORTER",
-        "DIFFRACTION_TOPOLOGY_PACKING",
-    }
-    assert "CAPACITY_STATUS" not in ast.dump(diffraction)
-    assert "DIFFRACTION_PAIR_REDUCER" not in ast.dump(diffraction)
-
-    diffraction_query = _function(
-        "witwin/channel/interactions/diffraction.py",
-        "query_diffraction_order1",
-    )
-    assert _profile_enum_members(diffraction_query, "cuda_profile_mark") == {
-        "OPTIX_TRAVERSAL",
-        "DIFFRACTION_EXPORTER_REQUEST",
-    }

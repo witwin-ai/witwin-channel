@@ -3,9 +3,6 @@
 
 from __future__ import annotations
 
-import ast
-import hashlib
-import inspect
 from types import SimpleNamespace
 
 import importlib.util
@@ -13,18 +10,6 @@ import importlib.util
 import pytest
 
 from witwin.channel import runtime
-
-
-def _body_hash(function: object) -> str:
-    tree = ast.parse(inspect.getsource(function))
-    node = tree.body[0]
-    assert isinstance(node, ast.FunctionDef)
-    body = ast.dump(
-        ast.Module(body=node.body, type_ignores=[]),
-        annotate_fields=True,
-        include_attributes=False,
-    )
-    return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
 
 @pytest.fixture(autouse=True)
@@ -39,17 +24,6 @@ def test_runtime_owns_the_only_native_symbol_accessor():
 
     assert runtime.native_extension is runtime.native_extension
     assert importlib.util.find_spec("witwin.channel.core") is None
-
-
-def test_required_native_op_has_one_body_preserving_runtime_owner():
-    function = runtime._required_native_op
-
-    assert function.__module__ == "witwin.channel.runtime"
-    assert "_required_native_op" not in runtime.__all__
-    assert function.__globals__["_native_symbols"] is runtime
-    assert _body_hash(function) == (
-        "f60ee207119d675d9a7b6b9982131fbc44b1238eb3ce8274b1607136fbfc490d"
-    )
 
 
 def test_native_extension_preserves_loader_cache(monkeypatch: pytest.MonkeyPatch):

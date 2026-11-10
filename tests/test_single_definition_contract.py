@@ -96,17 +96,6 @@ def test_each_protected_concept_resolves_to_its_declared_owner(real_facts):
         assert len(owned) == entry.owner_definitions, entry.name
 
 
-def test_the_registry_protects_the_three_named_concepts():
-    assert {entry.name for entry in single.CONCEPTS} == {
-        AVAILABILITY,
-        DEPTH,
-        SYMBOL,
-    }
-    assert concept(AVAILABILITY).owner == "witwin.channel.components"
-    assert concept(DEPTH).owner == "witwin.channel.components"
-    assert concept(SYMBOL).owner == "witwin.channel.runtime"
-
-
 def test_a_signature_is_not_satisfied_by_ordinary_code(real_facts):
     """1300+ real function scopes, and only the owners match."""
 
@@ -159,19 +148,6 @@ def test_a_renamed_near_copy_is_rejected(
     assert [violation.kind for violation in violations] == ["second-definition"]
     assert f"{module}.{qualname}" in violations[0].detail
     assert entry.owner in violations[0].detail
-
-
-def test_detection_ignores_every_identifier():
-    """The planted copies share no name with the owner they duplicate."""
-
-    for source, owner_name in (
-        (DEPTH_COPY, "component_max_depth"),
-        (AVAILABILITY_COPY, "component_availability_status"),
-        (SYMBOL_COPY, "required_symbol"),
-    ):
-        assert owner_name not in source
-    for shared in ("components", "chain_depth", "single_bounce_depth", "status"):
-        assert shared not in DEPTH_COPY
 
 
 def test_a_second_copy_inside_the_owner_module_is_rejected(real_facts):

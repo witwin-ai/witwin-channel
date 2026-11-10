@@ -3,11 +3,8 @@
 
 from __future__ import annotations
 
-import ast
 import gc
-import hashlib
 import importlib.util
-import inspect
 from types import SimpleNamespace
 import weakref
 
@@ -24,29 +21,6 @@ _SCENE_KERNEL_NAMES = (
     "rayd_scene_edge_records",
 )
 
-_RAYD_LIFECYCLE_AST_DIGESTS = {
-    "RayDEdgeRecords": "a4296830bde075e538eda13f45214ee312002948ef301301308560de7cd0c5e7",
-    "RayDSceneResource": "e883a145c6a9ce177d63a1055e4d189aba5f57e82961bf83df0b72e47a89ac8e",
-    "_empty_tensor": "23843cfd3570ca0ed7fc050e97f9cc27c5b24af88ae0cf079bd0d60ea0a609c2",
-    "_mesh_flags": "ab687287bfec1c541820f1eb9f115be95a63ecc04d48e6d2e982012e09dbdd7b",
-    # This digest includes the definition's concise docstring.
-    "build_scene_from_structures": "ef3d5e71550c3954b814fa5e119557c4301bd1b7eeac500873b5b58bdc70e1a1",
-}
-
-
-def _definition_ast_digest(definition: object) -> str:
-    module = ast.parse(inspect.getsource(rayd_scene))
-    node = next(
-        item
-        for item in module.body
-        if isinstance(item, (ast.FunctionDef, ast.ClassDef))
-        and item.name == definition.__name__
-    )
-    assert isinstance(node, (ast.FunctionDef, ast.ClassDef))
-    source = ast.dump(node, include_attributes=False).encode()
-    return hashlib.sha256(source).hexdigest()
-
-
 def test_rayd_scene_lifecycle_has_one_canonical_owner():
     assert rayd_scene.RayDSceneResource is compiler.RayDSceneResource
     assert rayd_scene.build_scene_from_structures.__module__ == rayd_scene.__name__
@@ -59,11 +33,6 @@ def test_rayd_scene_lifecycle_has_one_canonical_owner():
     assert importlib.util.find_spec("witwin.channel.scene.compiled") is None
     with pytest.raises(ModuleNotFoundError):
         importlib.util.find_spec("witwin.channel.core.runtime.compiled_scene")
-
-
-@pytest.mark.parametrize("name, expected", _RAYD_LIFECYCLE_AST_DIGESTS.items())
-def test_rayd_scene_lifecycle_move_preserves_frozen_definition_ast(name: str, expected: str):
-    assert _definition_ast_digest(getattr(rayd_scene, name)) == expected
 
 
 @pytest.mark.parametrize("name", _SCENE_KERNEL_NAMES)

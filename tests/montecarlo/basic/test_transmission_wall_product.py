@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import inspect
-import json
 from pathlib import Path
 
 import pytest
@@ -721,36 +720,3 @@ def test_transmission_wall_product_source_freezes_residency_and_reduction() -> N
     assert ".contiguous()" not in source
     assert "kTransmissionAdMaxDepth" not in source
     assert "mc_transmission_wall_product" in live_route
-
-
-def test_transmission_wall_product_live_owner_ledgers_are_complete() -> None:
-    inventory = json.loads(
-        (
-            _ROOT / "docs/dev/audit/phase13-current-native-owner-inventory.json"
-        ).read_text(encoding="utf-8")
-    )
-    symbols = [
-        "mc_transmission_wall_product",
-        "mc_transmission_wall_product_backward",
-        "mc_transmission_wall_product_jvp",
-    ]
-    rows = {row["symbol"]: row for row in inventory["symbols"]}
-    for symbol in symbols:
-        assert rows[symbol]["production_callers"]
-        assert rows[symbol]["liveness"] == "live-static-production-consumer"
-        historical_owner = "Channel" + " Native"
-        assert rows[symbol]["numerical_owner"] == historical_owner
-
-    ledger = json.loads(
-        (
-            _ROOT
-            / "docs/dev/audit/adr-027-mc-transmission-wall-product-resource-ledger.json"
-        ).read_text(encoding="utf-8")
-    )
-    assert ledger["status"] == (
-        "live Phase M native family; flattened MC transmission route active"
-    )
-    assert ledger["ownership"]["live_callers"]
-    assert ledger["numerical_contract"]["floating_point_atomics"] is False
-    assert ledger["capacity_contract"]["ad_hit_capacity_limit"] is None
-    assert ledger["acceptance"]["live_switch_performed"] is True

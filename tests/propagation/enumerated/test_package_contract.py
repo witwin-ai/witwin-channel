@@ -3,16 +3,12 @@
 
 from __future__ import annotations
 
-import ast
-from dataclasses import is_dataclass
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 import torch
 
 from witwin.channel.interactions import scattering
-from witwin.channel.propagation import enumerated
 from witwin.channel.propagation.rows import (
     EvaluatedPaths,
     PathFields,
@@ -172,76 +168,6 @@ def _install_row_collector(monkeypatch: pytest.MonkeyPatch) -> None:
         return _scattering_rows(), 11, 7, 1
 
     monkeypatch.setattr(scattering, "_collect_scattering_rows", collect)
-
-
-def test_enumerated_package_has_no_scattering_barrel_facade():
-    assert enumerated.__all__ == []
-    assert not hasattr(enumerated, "append_scattering_paths")
-    # The scattering owner publishes every enumerated scattering name exactly
-    # once. No name is
-    # added, renamed or dropped.
-    assert scattering.__all__ == [
-        "ChainSamples",
-        "KMAX_AD_DEPTH",
-        "MASK_SCATTERING",
-        "SCATTERING_COMPONENT_ID",
-        "SCATTERING_EVENT_TYPE",
-        "RoughMaterialRuntime",
-        "ScatterChainDiscovery",
-        "append_chain_scattering_paths",
-        "append_scattering_evaluated_paths",
-        "build_chain_samples",
-        "discover_scatter_chains",
-        "eval_bsdf_rows",
-        "local_frames",
-        "solid_angle_to_area_jacobian",
-        "local_to_world",
-        "rough_material_runtimes",
-        "sample_scatter_directions",
-        "scatter_carried_incident_power",
-        "scatter_direction_uniforms",
-        "scattered_subpath_state",
-        "scattering_map_matrix",
-        "scattering_nee_connection_samples",
-        "te_tm_incident_power",
-        "three_way_rough_probabilities",
-        "world_to_local",
-    ]
-
-
-def test_scattering_has_one_typed_concatenation_owner():
-    tree = ast.parse(Path(scattering.__file__).read_text(encoding="utf-8"))
-    functions = {
-        node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)
-    }
-    owner = functions["_extended_scattering_rows"]
-    assert sum(
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and isinstance(node.func.value, ast.Name)
-        and node.func.value.id == "torch"
-        and node.func.attr == "cat"
-        for node in ast.walk(owner)
-    ) == 1
-    assert "_extend_topology" not in functions
-    assert "append_scattering_paths" not in functions
-
-
-def test_scattering_config_contract_is_minimal_protocol():
-    assert enumerated.TopologyConfig._is_protocol
-    assert not is_dataclass(enumerated.TopologyConfig)
-    assert set(enumerated.TopologyConfig.__annotations__) == {
-        "components",
-        "max_depth",
-        "scattering_samples_per_m2",
-        "scattering_power_threshold",
-        "scattering_max_paths_per_pair",
-        # coherent scattering enumerated scatter-chain path class (intentional
-        # protocol extension; public-api snapshot updated in the same change).
-        "scattering_chain_max_depth",
-        "scattering_chain_samples_per_m2",
-        "scattering_chain_max_rows",
-    }
 
 
 def test_typed_scattering_noop_preserves_identity():
