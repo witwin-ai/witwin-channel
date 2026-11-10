@@ -113,6 +113,6 @@ stale native resources fail before solver execution.
 
 Changing root scene exports or targets requires `ci/public-api-snapshot.json`,
 contract tests, and a migration note. The completed scene-kernel migration
-ledger is archived at `docs/dev/audit/phase12-ops-migration-ledger.json`.
+ledger is archived in Git history (`docs/dev/archive.md`).
 Store/material ABI changes require a versioned migration; dependencies must
 satisfy the import graph.

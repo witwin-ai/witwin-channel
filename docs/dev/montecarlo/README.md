@@ -146,9 +146,9 @@ backend.
 
 - Adding, removing, renaming, or moving a stable basic/BDPT export requires an
   intentional update to `ci/public-api-snapshot.json` and a migration note.
-- The completed wrapper migration ledger is immutable historical evidence at
-  `docs/dev/audit/phase12-ops-migration-ledger.json`. Native binding changes
-  must update the relevant binding/audit manifest.
+- The completed wrapper migration ledger is immutable archived in Git history
+  (`docs/dev/archive.md`). Native binding changes
+  regenerate `ci/native-binding-manifest.json` with `python ci/check_native_bindings.py --write`.
 - New dependencies must pass the import-graph checker; architecture debt is not
   extended by editing the allowlist.
 - Keep solver capability metadata, contract tests, and this README synchronized

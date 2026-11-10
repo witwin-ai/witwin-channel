@@ -262,9 +262,9 @@ priority `scattering > diffraction > transmission > reflection > los`.
   ADR-030 and ADR-031 are REMOVED: the Phase-11 cutover deleted their 19
   native registrations, 13 CUDA translation units and 11 Python modules, so
   the extension exports 234 symbols rather than 253 and the dormant-symbol
-  allowlist is empty. `ci/check_contract_coverage.py` now asserts that no
-  caller-free native binding exists, keeping its dormant branch armed so a
-  future one needs a named decision rather than an allowlist entry.
+  allowlist is empty. `ci/check_native_bindings.py` derives each binding's
+  Python owner and production callers from the AST and rejects a new
+  caller-free binding.
   `ci/check_orphan_modules.py` keeps the Python half of that deletion from
   regrowing: every production module must be reachable from the package root or
   one of the four solver entry points, so a resurrected dead module fails the
