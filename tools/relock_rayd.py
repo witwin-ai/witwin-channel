@@ -25,10 +25,10 @@
 #
 # It then rewrites ``dependencies/rayd.lock.json`` and replaces every old pinned
 # value (commit, header digests, aggregate digest, manifest digest) by its new
-# value in each tracked file outside the historical records listed in
-# ``HISTORICAL_PREFIXES`` (governance tests, the publish workflow, the feature
-# list). The packaged ``witwin/channel/rayd.lock.json`` is not a tracked file; the
-# build installs a copy of ``dependencies/rayd.lock.json``.
+# value in each tracked file (governance tests, the publish workflow, the feature
+# list) outside the dated records listed in ``DATED_RECORD_PREFIXES``. The
+# packaged ``witwin/channel/rayd.lock.json`` is not a tracked file; the build
+# installs a copy of ``dependencies/rayd.lock.json``.
 #
 # A change of the distribution version or the API version cannot be replaced
 # textually; the tool updates the lock and lists the files that still quote the
@@ -55,7 +55,7 @@ ROOT = Path(__file__).resolve().parents[1]
 LOCK_RELATIVE = "dependencies/rayd.lock.json"
 # Dated design records, audits, plans and baselines describe the lock as it was
 # when they were written and are never rewritten.
-HISTORICAL_PREFIXES = (
+DATED_RECORD_PREFIXES = (
     "CHANGELOG.md",
     "docs/dev/audit/",
     "docs/dev/baselines/",
@@ -225,7 +225,7 @@ def _lockstep_files(root: Path) -> list[str]:
         for path in tracked
         if path
         and path != LOCK_RELATIVE
-        and not path.startswith(HISTORICAL_PREFIXES)
+        and not path.startswith(DATED_RECORD_PREFIXES)
         and (root / path).is_file()
     )
 
