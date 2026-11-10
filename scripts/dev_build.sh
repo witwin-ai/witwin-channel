@@ -4,9 +4,11 @@
 #
 # Usage: scripts/dev_build.sh [--rayd DIR] [--clean]
 #
-#   --rayd DIR   RayD checkout to source-link. Its HEAD must equal the commit in
-#                dependencies/rayd.lock.json (a dirty RayD tree is allowed). Default:
-#                $RAYD_SOURCE_DIR, else the sibling directory ../rayd-integ.
+#   --rayd DIR   RayD checkout to source-link. When its HEAD equals the commit in
+#                dependencies/rayd.lock.json it is used as is (a dirty tree is allowed).
+#                Otherwise the locked commit is checked out from DIR's history into
+#                build/rayd-<commit> (a shared clone, reused by later builds) and that
+#                clean tree is used. Default: $RAYD_SOURCE_DIR, else ../rayd-integ.
 #   --clean      delete the build directory first.
 #
 # Environment:
@@ -32,11 +34,17 @@ while [[ $# -gt 0 ]]; do
         --rayd) RAYD_DIR=$2; shift 2 ;;
         --rayd=*) RAYD_DIR=${1#--rayd=}; shift ;;
         --clean) CLEAN=1; shift ;;
-        -h|--help) sed -n '3,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '3,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//'; exit 0 ;;
         *) echo "dev_build.sh: unknown argument: $1" >&2; exit 2 ;;
     esac
 done
 RAYD_DIR=$(cd "$RAYD_DIR" && pwd)
+LOCK_COMMIT=$(sed -n 's/^ *"commit": "\([0-9a-f]\{40\}\)".*/\1/p' "$ROOT/dependencies/rayd.lock.json")
+LOCK_URL=$(sed -n 's/^ *"repository_url": "\(.*\)".*/\1/p' "$ROOT/dependencies/rayd.lock.json")
+if [[ ${#LOCK_COMMIT} != 40 || -z $LOCK_URL ]]; then
+    echo "dev_build.sh: could not read commit and repository_url from dependencies/rayd.lock.json" >&2
+    exit 2
+fi
 
 ARCH=${CHANNEL_DEV_CUDA_ARCH:-86}
 if [[ ! $ARCH =~ ^[0-9]{2,3}$ ]]; then
@@ -73,6 +81,22 @@ if ! flock -n 9; then
 fi
 if [[ $CLEAN == 1 ]]; then
     find "$BUILD_DIR" -mindepth 1 -delete
+fi
+
+if [[ $(git -C "$RAYD_DIR" rev-parse HEAD) != "$LOCK_COMMIT" ]]; then
+    if ! git -C "$RAYD_DIR" cat-file -e "$LOCK_COMMIT^{commit}" 2>/dev/null; then
+        echo "dev_build.sh: $RAYD_DIR is not at the locked RayD commit $LOCK_COMMIT and does not" \
+            "contain it; pass --rayd with a checkout that does" >&2
+        exit 2
+    fi
+    LOCKED_RAYD=$ROOT/build/rayd-$LOCK_COMMIT
+    if [[ ! -d $LOCKED_RAYD/.git ]]; then
+        git clone --quiet --shared --no-checkout "$RAYD_DIR" "$LOCKED_RAYD"
+        git -C "$LOCKED_RAYD" remote set-url origin "$LOCK_URL"
+        git -C "$LOCKED_RAYD" checkout --quiet --detach "$LOCK_COMMIT"
+    fi
+    echo "dev_build.sh: $RAYD_DIR is not at the locked commit; using $LOCKED_RAYD" >&2
+    RAYD_DIR=$LOCKED_RAYD
 fi
 
 start=$(date +%s)
