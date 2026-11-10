@@ -58,3 +58,27 @@ def test_incomplete_override_reports_the_missing_variable(
 
     assert native_ext.inject_native_paths() is False
     assert "WITWIN_CHANNEL_EXPECTED_FINGERPRINT is not set" in native_ext.build_guidance()
+
+
+def test_shadowed_installed_extension_is_named_instead_of_reported_missing(
+    monkeypatch: pytest.MonkeyPatch, local_build: Path, tmp_path: Path,
+) -> None:
+    installed = tmp_path / "site-packages" / "witwin" / "channel" / local_build.name
+    installed.parent.mkdir(parents=True)
+    installed.touch()
+    monkeypatch.setattr(native_ext, "_installed_extension", lambda: installed)
+
+    guidance = native_ext.build_guidance()
+
+    assert "No packaged extension is installed" not in guidance
+    assert f"installed with an extension at {installed}" in guidance
+    assert "shadows" in guidance
+
+
+def test_dev_build_directories_are_listed(local_build: Path, tmp_path: Path) -> None:
+    dev_dir = tmp_path / "build" / "dev-86"
+    dev_dir.mkdir(parents=True)
+    extension = dev_dir / local_build.name
+    extension.touch()
+
+    assert str(extension.resolve()) in native_ext.build_guidance()
