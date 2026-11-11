@@ -1565,8 +1565,31 @@ def _face_material_tensors(
 
     if ad:
         return build()
+    # The primal tensors are a pure function of the compiled store and face assignment, so they
+    # are kept on the RayD scene resource and reused while every source tensor is unchanged
+    # (same storage, same in-place version): a warm solve uploads no material table.
+    compiled = require_compiled(scene)
+    sources = [
+        value
+        for value in (
+            *(getattr(compiled.materials, name) for name in compiled.materials.__dataclass_fields__),
+            compiled.assignments.face_material_id,
+        )
+        if isinstance(value, torch.Tensor)
+    ]
+    key = (
+        id(compiled.materials),
+        str(device),
+        tuple((int(t.data_ptr()), int(t._version), tuple(t.shape)) for t in sources),
+    )
+    cache = compiled.rayd.runtime_cache
+    cached = cache.get("mc_face_material_tensors")
+    if cached is not None and cached[0] == key:  # type: ignore[index]
+        return cached[1]  # type: ignore[index, no-any-return]
     with torch.no_grad():
-        return build()
+        tensors = build()
+    cache["mc_face_material_tensors"] = (key, tensors)
+    return tensors
 
 
 def _mc_scattering_component(  # type: ignore[no-untyped-def]

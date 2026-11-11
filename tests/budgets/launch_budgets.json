@@ -65,26 +65,26 @@
    "d2h_bytes": 119
   },
   "mc.lr.d1.g128.s64k.c32": {
-   "kernels": 25,
-   "syncs": 32,
-   "h2d_count": 36,
-   "h2d_bytes": 91402,
+   "kernels": 11,
+   "syncs": 1,
+   "h2d_count": 6,
+   "h2d_bytes": 1544,
    "d2h_count": 0,
    "d2h_bytes": 0
   },
   "mc.lr.d1.g64.s64k.c4": {
-   "kernels": 25,
-   "syncs": 32,
-   "h2d_count": 36,
-   "h2d_bytes": 2698,
+   "kernels": 11,
+   "syncs": 1,
+   "h2d_count": 6,
+   "h2d_bytes": 1544,
    "d2h_count": 0,
    "d2h_bytes": 0
   },
   "mc.lr.d1.g64.s64k.c8": {
-   "kernels": 25,
-   "syncs": 32,
-   "h2d_count": 36,
-   "h2d_bytes": 6922,
+   "kernels": 11,
+   "syncs": 1,
+   "h2d_count": 6,
+   "h2d_bytes": 1544,
    "d2h_count": 0,
    "d2h_bytes": 0
   },
