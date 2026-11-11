@@ -12,10 +12,11 @@ _FREQUENCY_HZ = 3.5e9
 _WIDTH = 3
 _COLUMNS = ("field_xyz", "coefficient", "path_field", "path_gain", "path_length", "delay", "direction")
 # (component, depth) of every row: LoS, reflection depth 1..3, order-1 diffraction, and rows the
-# launch must leave untouched (transmission, coupled R-D, D-R, D-D, scattering, reflection depth 0).
+# launch must leave untouched (transmission, interaction chains with the diffraction last, first or
+# interior, double diffraction, scattering, reflection depth 0).
 _ROWS = (
     (0, 0), (1, 1), (2, 1), (1, 2), (5, 2), (1, 3), (0, 0), (3, 2), (1, 1), (2, 1), (4, 2),
-    (7, 2), (6, 1), (1, 0), (1, 2), (0, 0), (1, 3), (2, 1),
+    (7, 2), (6, 1), (1, 0), (1, 2), (0, 0), (1, 3), (2, 1), (9, 3),
 )
 
 

@@ -36,8 +36,9 @@ solver has read it since the layout-independent diffraction change.
      realization-replaced faces, the rough-surface coherent factor;
    - order-1 diffraction rows run the receiver projection of the exported UTD field
      (arrival direction, projection, unit-source columns);
-   - every other row (transmission, coupled R-D/D-R/D-D, scattering, reflection depth
-     0, LoS when the boundary taper owns it) keeps its input values.
+   - every other row (transmission, interaction chains — component ids 3, 4 and `8 + s` —
+     double diffraction, scattering, reflection depth 0, LoS when the boundary taper owns
+     it) keeps its input values.
    Endpoints come from the per-transmitter and per-receiver tables through `tx_id` /
    `rx_id`, slab parameters from the per-face tables through `primitive_sequence`, and
    interaction geometry from the `[N, W, 3]` tables at the row's own stride. The launch
@@ -63,9 +64,10 @@ solver has read it since the layout-independent diffraction change.
    complex-by-real division with the same `c10::complex` operator.
 3. **What stays outside.** Transmission (`rayd::torch::field_transmission_sequence`)
    and the diffraction wedge used by AD are RayD operations whose device code is not
-   exported by the locked RayD; the coupled field kernels are owned by the coupled
-   chain work in `coupled.cu`. They keep their per-group launch after the fused launch
-   and write their rows in place into the fused output (no clone). Their per-row
+   exported by the locked RayD; the interaction-chain and double-diffraction field
+   kernels live in `coupled.cu` and are called through `_evaluate_coupled_fields`
+   unchanged. They keep their per-group launch after the fused launch and write their
+   rows in place into the fused output (no clone). Their per-row
    endpoint gathers are only formed when such rows exist. The LoS boundary taper keeps
    its per-group route when it is on.
 4. **AD route unchanged.** `ad_mode="jvp"`/`"vjp"` keeps one differentiable Function
