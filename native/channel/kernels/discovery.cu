@@ -1,5 +1,5 @@
 // Copyright Xingyu Chen.
-// Generates specular reflection candidates: plane-group tables, image-tree expansion and receiver pruning.
+// Generates reflection candidates: plane-group tables, image-tree expansion, receiver tests.
 
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
