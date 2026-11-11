@@ -6,7 +6,8 @@ waveform, target, RCS, IQ, ADC, detection, or processing policy.
 
 ## Version and compatibility
 
-- `CONTRACT_VERSION == 6`.
+- `CONTRACT_VERSION == 7`. Version 7 added `PropagationRequest.discovery`,
+  `PropagationEvaluation.complete` and `PropagationCapabilities.discovery_modes`.
 - The module's `__all__` is the complete stable public surface. Consumer names
   are not duplicated at `witwin.channel`.
 - A breaking schema or semantic change increments the version and atomically

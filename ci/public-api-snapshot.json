@@ -194,6 +194,12 @@
           "contract_sha256": "a2978c77b751c552f731c3709b6aed3f97b1af0ee50a3c3fd733c2a3a993ce31"
         },
         {
+          "name": "DISCOVERY_MODES",
+          "kind": "unresolved",
+          "target": "witwin.channel.propagation.consumer.DISCOVERY_MODES",
+          "contract_sha256": "3e6ae23db898ed36db842422a3be60932199d533e3de36f48daea343534d814a"
+        },
+        {
           "name": "EndpointBatch",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.EndpointBatch",
@@ -245,7 +251,7 @@
           "name": "PropagationCapabilities",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.PropagationCapabilities",
-          "contract_sha256": "99d7b4f3314334215941ea7d253dc639aac68317942ab8989b5b88c3e113ba34"
+          "contract_sha256": "d0f0a427d0da4d7b80b23729c80fe45c0761addafd1186da6be15261ff329a3d"
         },
         {
           "name": "PropagationComponent",
@@ -266,10 +272,16 @@
           "contract_sha256": "926559f7d289792ccf8fdf2d99f8b07b17be3ac6e170c3a77bbe5c774c68e9a0"
         },
         {
+          "name": "PropagationDiscovery",
+          "kind": "unresolved",
+          "target": "witwin.channel.propagation.consumer.PropagationDiscovery",
+          "contract_sha256": "689748a32b33cb5f24a74a2022758f7a7461f3995d307378fbee70784e363b66"
+        },
+        {
           "name": "PropagationEvaluation",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.PropagationEvaluation",
-          "contract_sha256": "66e4aacc5c059d9131cb9e869fb676ad75de5a8975b1f9d330c34ecb6700fbf5"
+          "contract_sha256": "5ed02b310ec25a0f22458d2ce2641ec738dad3458e11c54b049cf380589a0386"
         },
         {
           "name": "PropagationGeometry",
@@ -287,7 +299,7 @@
           "name": "PropagationRequest",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.PropagationRequest",
-          "contract_sha256": "0f377227abe54e09c428fd1dd304feb8f8ba9fc8078778edbaf1c969c234a17c"
+          "contract_sha256": "6963eb2850bb0a57f0416daea23c375dae7cc576304081bfd81ec66c5d184677"
         },
         {
           "name": "PropagationResponse",

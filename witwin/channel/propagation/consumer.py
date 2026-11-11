@@ -413,7 +413,7 @@ def tape_bytes(ledger_bytes: int, ad_mode: str) -> int:
 # rejected call.
 
 
-CONTRACT_VERSION = 6
+CONTRACT_VERSION = 7
 
 
 PropagationComponent: TypeAlias = Literal[
@@ -425,12 +425,16 @@ PropagationResponse: TypeAlias = Literal[
 PropagationTopologyMode: TypeAlias = Literal["discover"]
 PropagationAdMode: TypeAlias = Literal["none", "jvp", "vjp"]
 PropagationWorldMotion: TypeAlias = Literal["frozen_world", "fixed_winner_replay"]
+# Reflection candidate source: "auto" (complete image tree, ray discovery only past its cost
+# budget), "exhaustive" (every plane-group sequence) or "rays" (ray discovery only).
+PropagationDiscovery: TypeAlias = Literal["auto", "exhaustive", "rays"]
 
 COMPONENTS: frozenset[str] = frozenset(get_args(PropagationComponent))
 RESPONSES: frozenset[str] = frozenset(get_args(PropagationResponse))
 TOPOLOGY_MODES: frozenset[str] = frozenset(get_args(PropagationTopologyMode))
 AD_MODES: frozenset[str] = frozenset(get_args(PropagationAdMode))
 WORLD_MOTIONS: frozenset[str] = frozenset(get_args(PropagationWorldMotion))
+DISCOVERY_MODES: frozenset[str] = frozenset(get_args(PropagationDiscovery))
 
 MAX_DEPTH = 5
 
@@ -638,6 +642,9 @@ class PropagationRequest:
     topology_mode: PropagationTopologyMode
     ad_mode: PropagationAdMode
     max_paths: int | None = None
+    # How reflection candidates are found. PropagationEvaluation.complete reports whether the
+    # published rows are provably every path the request admits.
+    discovery: PropagationDiscovery = "auto"
 
     def __post_init__(self) -> None:
         _require_endpoints(self.sources, self.sinks)
@@ -645,6 +652,7 @@ class PropagationRequest:
         _require_vocabulary("response", self.response, RESPONSES)
         _require_vocabulary("topology_mode", self.topology_mode, TOPOLOGY_MODES)
         _require_vocabulary("ad_mode", self.ad_mode, AD_MODES)
+        _require_vocabulary("discovery", self.discovery, DISCOVERY_MODES)
         if type(self.max_depth) is not int or not 0 <= self.max_depth <= MAX_DEPTH:
             raise ValueError(f"max_depth must be an int in [0, {MAX_DEPTH}]")
         if self.max_paths is not None and (
@@ -1095,6 +1103,9 @@ class PropagationCapabilities:
     # Whether PropagationDiagnostics carries ad_companion_launches and
     # ad_tape_bytes.
     ad_accounting: bool
+    # The accepted PropagationRequest.discovery values. Every evaluate result
+    # carries PropagationEvaluation.complete for the mode it ran.
+    discovery_modes: frozenset[str]
 
     def components_for(self, response: str) -> frozenset[str]:
         return dict(self.response_components)[response]
@@ -1175,6 +1186,7 @@ _CAPABILITIES = PropagationCapabilities(
     primal_only_ad_inputs=_PRIMAL_ONLY_AD_INPUTS,
     supports_higher_order_ad=False,
     ad_accounting=True,
+    discovery_modes=DISCOVERY_MODES,
 )
 
 
@@ -1225,6 +1237,9 @@ class PropagationEvaluation:
     convention: PropagationConvention
     capabilities: PropagationCapabilities
     diagnostics: PropagationDiagnostics
+    # True when the rows are provably every path the request admits; False when
+    # reflection candidates came from ray discovery, which can miss paths.
+    complete: bool
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -3596,6 +3611,7 @@ def _diagnostics(
 def evaluate(compiled_scene: CompiledScene, request: PropagationRequest) -> PropagationEvaluation:
     """Discover and evaluate one all-or-nothing compact propagation batch."""
 
+    from witwin.channel.components import discovery_metadata
     from witwin.channel.propagation.enumerated import (
         EnumeratedOptions,
         evaluate_enumerated_paths,
@@ -3613,6 +3629,7 @@ def evaluate(compiled_scene: CompiledScene, request: PropagationRequest) -> Prop
         # exact count the compaction already copies, with no further host read.
         max_paths=None if request.max_paths is None else request.max_paths + 1,
         ad_mode=request.ad_mode,
+        discovery=request.discovery,
     )
     evaluated, sidecars = evaluate_enumerated_paths(
         scene,
@@ -3645,6 +3662,11 @@ def evaluate(compiled_scene: CompiledScene, request: PropagationRequest) -> Prop
         convention=_CONVENTION,
         capabilities=_CAPABILITIES,
         diagnostics=_diagnostics(sidecars, compact, request.ad_mode, dropped_rows),
+        complete=bool(
+            discovery_metadata(
+                request.discovery, sidecars.execution.reflection_discovery
+            )["complete"]
+        ),
     )
 
 
@@ -4453,6 +4475,7 @@ __all__ = [
     "COMPONENTS",
     "CONTRACT_VERSION",
     "Complex3Transport",
+    "DISCOVERY_MODES",
     "EndpointBatch",
     "FixedTopologyBucket",
     "FixedTopologyEvaluation",
@@ -4465,6 +4488,7 @@ __all__ = [
     "PropagationComponent",
     "PropagationConvention",
     "PropagationDiagnostics",
+    "PropagationDiscovery",
     "PropagationEvaluation",
     "PropagationGeometry",
     "PropagationPathBatch",
