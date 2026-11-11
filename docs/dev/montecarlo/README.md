@@ -140,16 +140,19 @@ used by focused contract tests, but are not compatibility promises. The parent
 
 - Reflection, diffraction, straight transmission and the coupled classes come
   from one enumerated-oracle call; each row's component id is its bucket.
-- Mixed reflection+transmission chains are sampled by the fused wavefront
-  (`bdpt_wavefront_transmission`): all transmitters in one wavefront, chunks of
-  `2^18` samples, per bounce one RayD intersection and one native bounce step
-  (event selection, only the selected branch, in-place update, device tallies),
-  and per receiver tile of at most `2^20` pairs a visibility query and a fused
-  connect-and-accumulate kernel that never stores a connection row. AD, rough
-  (Kirchhoff) faces, `export_paths` and `diagnostics` use the event-composed
-  sampler instead; both draw the same native counter-based random numbers
-  (a pure function of seed, stream, global sample index and depth), so they
-  give the same estimate. `metadata["sampler"]` names the one used.
+- The sampled chains run on the fused wavefront (`bdpt_wavefront_transmission`):
+  all transmitters in one wavefront, chunks of `2^18` samples, per bounce one
+  RayD intersection and one native bounce step (scatter / transmit / reflect
+  selection, only the selected branch, in-place update, device tallies; on rough
+  faces Kirchhoff lobe sampling and the post-scatter carrier), and per receiver
+  tile of at most `2^20` pairs a visibility query and a fused connect-and-
+  accumulate kernel for mixed reflection+transmission vertices and scatter
+  next-event rows; no connection row is stored. `export_paths` and
+  `diagnostics` rerun it once to write the counted rows. Only `jvp` / `vjp`
+  use the event-composed sampler (AD companions); both draw the same native
+  counter-based random numbers (a pure function of seed, stream, global sample
+  index and depth) and return the same primal. `metadata["sampler"]` names the
+  one used.
 - Metadata counts stay on the device and are read in one copy per solve.
 - Limitation: a mixed reflection+transmission chain is estimated by connecting
   the vertex after a specular event straight to the receiver (a
