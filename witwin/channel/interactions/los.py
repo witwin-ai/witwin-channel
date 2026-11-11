@@ -22,6 +22,7 @@ from witwin.channel.propagation.topology import _ensure_topology_fields
 from witwin.channel.kernels import topology as topology_kernels
 
 if TYPE_CHECKING:
+    from witwin.channel.scene.compiler import CompiledScene
     from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
@@ -45,7 +46,7 @@ def prepare_los_candidates(
 
 
 def _los_topology(
-    scene: Scene, compiled: object, tx_positions: torch.Tensor, tx_power: torch.Tensor,
+    scene: Scene, compiled: CompiledScene, tx_positions: torch.Tensor, tx_power: torch.Tensor,
     rx_positions: torch.Tensor, tx_polarizations: torch.Tensor, *, frequency_hz: float,
     sequence_width: int, isb_boundary_taper: bool = False, isb_boundary_taper_width: float = 0.5,
 ) -> tuple[dict[str, torch.Tensor], int, int, int]:

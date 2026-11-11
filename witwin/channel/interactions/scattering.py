@@ -13,8 +13,10 @@ from dataclasses import (
 )
 from typing import (
     Any,
+    Protocol,
     TYPE_CHECKING,
     TypedDict,
+    cast,
 )
 
 import torch
@@ -72,7 +74,18 @@ from witwin.channel.scene.resources import (
 )
 
 if TYPE_CHECKING:
+    from witwin.channel.scene.compiler import CompiledScene
     from witwin.channel.scene.endpoints import SolverScene as Scene
+    from witwin.channel.scene.resources import RayDSceneResource
+
+    class _EndpointTensors(Protocol):
+        """The explicit endpoint batch a propagation consumer passes in."""
+
+        tx_positions: torch.Tensor
+        tx_power: torch.Tensor
+        tx_polarizations: torch.Tensor
+        rx_positions: torch.Tensor
+        rx_polarizations: torch.Tensor
 
 __all__ = [
     "ChainSamples",
@@ -244,7 +257,9 @@ def _offset_eps(points: torch.Tensor, scene_diagonal: torch.Tensor) -> torch.Ten
     ).clamp_min(1.0e-6)
 
 
-def _visible(rayd: object, start: torch.Tensor, end: torch.Tensor) -> tuple[torch.Tensor, int]:
+def _visible(
+    rayd: RayDSceneResource, start: torch.Tensor, end: torch.Tensor,
+) -> tuple[torch.Tensor, int]:
     """Chunked segment visibility; returns (mask, launch_count)."""
 
     count = int(start.shape[0])
@@ -341,7 +356,7 @@ class _RowCollector:
 
 
 def _ensemble_rows(
-    scene: Scene, compiled: object, config: TopologyConfig, collector: _RowCollector, *,
+    scene: Scene, compiled: CompiledScene, config: TopologyConfig, collector: _RowCollector, *,
     tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor,
     tx_pol: torch.Tensor, rx_pol: torch.Tensor, ensemble_faces: torch.Tensor,
     scene_diagonal: torch.Tensor, info: dict[str, Any], ad_mode: str = "none",
@@ -499,7 +514,7 @@ def _ensemble_rows(
             if ad_enabled:
                 evaluated = scattering_kernels.scattering_ensemble_eval_ad(
                     *ensemble_args,
-                    coef=float(tx_power[tx_index]) * coef_scale_t,
+                    coef=float(tx_power[tx_index]) * cast(torch.Tensor, coef_scale_t),
                     threshold=max(threshold, 0.0),
                 )
             else:
@@ -576,7 +591,7 @@ def _subdivide_face(
 
 
 def _realization_rows(
-    scene: Scene, compiled: object, config: TopologyConfig, collector: _RowCollector, *,
+    scene: Scene, compiled: CompiledScene, config: TopologyConfig, collector: _RowCollector, *,
     tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor,
     tx_pol: torch.Tensor, rx_pol: torch.Tensor, screens: dict[int, PhaseScreen],
     scene_diagonal: torch.Tensor, info: dict[str, Any], ad_mode: str = "none",
@@ -1027,7 +1042,7 @@ def _scattering_info() -> dict[str, Any]:
 
 def _collect_scattering_rows(
     scene: Scene, config: TopologyConfig, *, device: torch.device, info: dict[str, Any],
-    ad_mode: str = "none", endpoint_tensors: object | None = None,
+    ad_mode: str = "none", endpoint_tensors: _EndpointTensors | None = None,
 ) -> tuple[dict[str, torch.Tensor] | None, int, int, int]:
     compiled = require_compiled(scene)
     screens = realization_phase_screens(compiled.materials, compiled.assignments)
@@ -1144,7 +1159,7 @@ def _collect_scattering_rows(
 
 def append_scattering_evaluated_paths(
     scene: Scene, config: TopologyConfig, evaluated: EvaluatedPaths,
-    sidecars: EvaluatedPathSidecars, *, endpoint_tensors: object | None = None,
+    sidecars: EvaluatedPathSidecars, *, endpoint_tensors: _EndpointTensors | None = None,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars, dict[str, Any]]:
     """Append scattering rows to canonical typed path contracts."""
 
@@ -1480,7 +1495,7 @@ def _budget_chain_rows(
 
 
 def build_chain_samples(
-    compiled: object, config: "TopologyConfig", ensemble_faces: torch.Tensor, *,
+    compiled: CompiledScene, config: "TopologyConfig", ensemble_faces: torch.Tensor, *,
     device: torch.device,
 ) -> ChainSamples | None:
     """Draw the chain-sample vertex set on the ensemble scatter faces.
@@ -1546,7 +1561,7 @@ class _ReflectionGeometry:
     face_group_id: torch.Tensor
 
 
-def _reflection_geometry(compiled: object, device: torch.device) -> _ReflectionGeometry:
+def _reflection_geometry(compiled: CompiledScene, device: torch.device) -> _ReflectionGeometry:
     records = compiled.rayd.edge_records()
     vertices = records.vertices
     faces = records.faces.contiguous()
@@ -1599,7 +1614,7 @@ def _polyline_length(
     return seg
 
 
-def _visibility(rayd: object, start: torch.Tensor, end: torch.Tensor) -> torch.Tensor:
+def _visibility(rayd: RayDSceneResource, start: torch.Tensor, end: torch.Tensor) -> torch.Tensor:
     count = int(start.shape[0])
     if count == 0:
         return torch.empty((0,), device=start.device, dtype=torch.bool)
@@ -1694,8 +1709,8 @@ def _leg_batch(
 
 
 def _gather_leg(
-    *, compiled: object, geom: _ReflectionGeometry, source: torch.Tensor, samples: ChainSamples,
-    scene_diagonal: torch.Tensor, max_leg_depth: int, reverse: bool,
+    *, compiled: CompiledScene, geom: _ReflectionGeometry, source: torch.Tensor,
+    samples: ChainSamples, scene_diagonal: torch.Tensor, max_leg_depth: int, reverse: bool,
 ) -> dict[str, torch.Tensor]:
     """Enumerate specular reflection chains ``source -> {samples}`` at every leg
     depth ``0..max_leg_depth`` and pack them into a concatenated padded leg table.
@@ -1773,8 +1788,9 @@ def _gather_leg(
 
 
 def _gather_leg_order1(
-    *, compiled: object, geom: _ReflectionGeometry, source: torch.Tensor, samples: ChainSamples,
-    tx_power_ref: torch.Tensor, reverse: bool, batches: list[dict[str, torch.Tensor]],
+    *, compiled: CompiledScene, geom: _ReflectionGeometry, source: torch.Tensor,
+    samples: ChainSamples, tx_power_ref: torch.Tensor, reverse: bool,
+    batches: list[dict[str, torch.Tensor]],
 ) -> None:
     groups = geom.groups
     group_count = int(groups["group_count"])
@@ -1851,8 +1867,8 @@ def _gather_leg_order1(
 
 
 def _gather_leg_multibounce(
-    *, compiled: object, geom: _ReflectionGeometry, source: torch.Tensor, samples: ChainSamples,
-    tx_power_ref: torch.Tensor, max_leg_depth: int, reverse: bool,
+    *, compiled: CompiledScene, geom: _ReflectionGeometry, source: torch.Tensor,
+    samples: ChainSamples, tx_power_ref: torch.Tensor, max_leg_depth: int, reverse: bool,
     batches: list[dict[str, torch.Tensor]],
 ) -> None:
     groups = geom.groups
@@ -1932,7 +1948,7 @@ def _gather_leg_multibounce(
 
 
 def _trace_group_chains(
-    rayd: object, tx: torch.Tensor, *, face_group_id: torch.Tensor, max_depth: int,
+    rayd: RayDSceneResource, tx: torch.Tensor, *, face_group_id: torch.Tensor, max_depth: int,
     ray_count: int = 262_144,
 ) -> torch.Tensor:
     """Trace specular chains from a source and map hits to plane-group ids.
@@ -1965,7 +1981,7 @@ def _trace_group_chains(
 
 
 def discover_scatter_chains(
-    compiled: object, config: "TopologyConfig", *, tx_positions: torch.Tensor,
+    compiled: CompiledScene, config: "TopologyConfig", *, tx_positions: torch.Tensor,
     rx_positions: torch.Tensor, samples: ChainSamples, scene_diagonal: torch.Tensor,
 ) -> ScatterChainDiscovery | None:
     """Enumerate and join C1/C2 specular chains around each chain vertex.
@@ -2015,7 +2031,7 @@ def discover_scatter_chains(
 
 
 def _enumerate_leg_tables(
-    *, compiled: object, geom: "_ReflectionGeometry", tx_positions: torch.Tensor,
+    *, compiled: CompiledScene, geom: "_ReflectionGeometry", tx_positions: torch.Tensor,
     rx_positions: torch.Tensor, samples: ChainSamples, scene_diagonal: torch.Tensor,
     max_leg_depth: int,
 ) -> tuple[list[dict[str, torch.Tensor]], list[dict[str, torch.Tensor]]]:
@@ -2209,7 +2225,7 @@ def _assemble_discovery(merged: dict[str, torch.Tensor]) -> ScatterChainDiscover
 
 
 def _ensemble_scatter_faces(
-    compiled: object, screens: dict[int, PhaseScreen], *, device: torch.device,
+    compiled: CompiledScene, screens: dict[int, PhaseScreen], *, device: torch.device,
 ) -> torch.Tensor:
     """Ensemble (non-realization) rough scatter faces (single-bounce parity)."""
 
@@ -2282,8 +2298,8 @@ def _chain_vertex_frame(
 
 
 def _chain_ensemble_evaluate(
-    scene: Scene, compiled: object, config: TopologyConfig, discovery: ScatterChainDiscovery, *,
-    tx_pol: torch.Tensor, rx_pol: torch.Tensor, tx_positions: torch.Tensor,
+    scene: Scene, compiled: CompiledScene, config: TopologyConfig, discovery: ScatterChainDiscovery,
+    *, tx_pol: torch.Tensor, rx_pol: torch.Tensor, tx_positions: torch.Tensor,
     rx_positions: torch.Tensor, tx_power: torch.Tensor, device: torch.device, ad_mode: str,
 ) -> dict[str, torch.Tensor]:
     """Dispatch the native coherent scattering chain-ensemble kernel per transmitter.
@@ -2717,7 +2733,7 @@ def append_chain_scattering_paths(
 LIGHT_SPEED_M_PER_S = 299_792_458.0
 
 
-def rough_material_runtimes(compiled: Any) -> dict[int, RoughMaterialRuntime]:
+def rough_material_runtimes(compiled: CompiledScene) -> dict[int, RoughMaterialRuntime]:
     """Kirchhoff runtimes per material index (``scatter_model_id == 1``).
 
     Reads the CSR layers and roughness fields from the compiled
@@ -2908,7 +2924,7 @@ def scattering_map_matrix(
         active = candidates & visible_tx
         tx_visible.append(active.sum())
         incident = torch.where(active, cos_i / (r1 * r1), torch.zeros_like(cos_i))
-        samples = (
+        pair_samples = (
             points.contiguous(),
             normal_flipped.contiguous(),
             frame_t1.contiguous(),
@@ -2923,13 +2939,13 @@ def scattering_map_matrix(
         sums: list[torch.Tensor] = []
         for start in range(0, rx_count, rx_chunk):
             cells = receivers[start : start + rx_chunk]
-            leg_start, leg_end, pair_active = mc_scattering_pair_legs(samples, tables, cells)
+            leg_start, leg_end, pair_active = mc_scattering_pair_legs(pair_samples, tables, cells)
             visible_rx = geometry_kernels.rayd_visibility_forward(
                 handle, leg_start, leg_end, pair_active
             )[0]
             sums.append(
                 mc_scattering_pair_sum(
-                    samples,
+                    pair_samples,
                     tables,
                     cells,
                     (pair_active & visible_rx).contiguous(),

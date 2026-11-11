@@ -83,6 +83,7 @@ from witwin.channel.propagation.topology import (
 )
 
 if TYPE_CHECKING:
+    from witwin.channel.scene.compiler import CompiledScene
     from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
@@ -142,7 +143,7 @@ def _chain_rows(groups: PathRowGroups) -> torch.Tensor | None:
     present = [group for group in (_CHAIN_LAST_GROUP, _CHAIN_FIRST_GROUP) if groups.count(group) > 0]
     if len(present) == 1:
         return groups.rows(present[0])
-    return torch.cat([groups.rows(group) for group in present])  # type: ignore[misc]
+    return torch.cat([groups.rows(group) for group in present])
 
 
 def _chain_diffraction_slot(component_id: torch.Tensor, depth: torch.Tensor) -> torch.Tensor:
@@ -156,7 +157,7 @@ def _chain_diffraction_slot(component_id: torch.Tensor, depth: torch.Tensor) -> 
 
 
 def _evaluate_chain_rows(
-    compiled: object, topology: PathTopology, geometry: PathGeometry, source: torch.Tensor,
+    compiled: CompiledScene, topology: PathTopology, geometry: PathGeometry, source: torch.Tensor,
     target: torch.Tensor, source_power: torch.Tensor, tx_pol: torch.Tensor, rx_pol: torch.Tensor,
     material: dict[str, torch.Tensor], edge_geometry: tuple[torch.Tensor, ...],
     edge_n0: torch.Tensor, edge_n1: torch.Tensor, edge_exterior: torch.Tensor,
@@ -389,8 +390,8 @@ def _los_taper_frequency(
 
 
 def _rough_scale_inputs(
-    compiled: object, face_id: torch.Tensor, depth_value: int, material: dict[str, torch.Tensor], *,
-    scattering_active: bool,
+    compiled: CompiledScene, face_id: torch.Tensor, depth_value: int,
+    material: dict[str, torch.Tensor], *, scattering_active: bool,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | None:
     """Host-side per-bounce inputs for the native rough-reflection C_r op.
 
@@ -455,7 +456,7 @@ def _evaluate_los_fields(
     groups: PathRowGroups, source: torch.Tensor, target: torch.Tensor, source_power: torch.Tensor,
     tx_pol: torch.Tensor, rx_pol: torch.Tensor,
     los_field_op: Callable[..., dict[str, torch.Tensor]], ledger: AdLaunchLedger | None,
-    outputs: _FieldOutputs, launch_count: int, compiled: object, frequency_hz: float,
+    outputs: _FieldOutputs, launch_count: int, compiled: CompiledScene, frequency_hz: float,
     isb_boundary_taper_width: float,
 ) -> int:
     if groups.count(_LOS_GROUP) > 0:
@@ -502,7 +503,7 @@ def _evaluate_los_fields(
 
 
 def _evaluate_reflection_fields(
-    compiled: object, topology: PathTopology, geometry: PathGeometry, groups: PathRowGroups,
+    compiled: CompiledScene, topology: PathTopology, geometry: PathGeometry, groups: PathRowGroups,
     source: torch.Tensor, target: torch.Tensor, source_power: torch.Tensor, tx_pol: torch.Tensor,
     rx_pol: torch.Tensor, components: frozenset[str] | set[str], device: torch.device,
     frequency: float | torch.Tensor, geometry_ad: bool, vertices: torch.Tensor | None,
@@ -607,7 +608,7 @@ def _evaluate_reflection_fields(
 
 
 def _evaluate_transmission_fields(
-    compiled: object, topology: PathTopology, geometry: PathGeometry, source: torch.Tensor,
+    compiled: CompiledScene, topology: PathTopology, geometry: PathGeometry, source: torch.Tensor,
     target: torch.Tensor, source_power: torch.Tensor, tx_pol: torch.Tensor, rx_pol: torch.Tensor,
     device: torch.device, geometry_ad: bool, vertices: torch.Tensor | None,
     transmission_field_op: Callable[..., dict[str, torch.Tensor]], ledger: AdLaunchLedger | None,
@@ -673,7 +674,7 @@ def _evaluate_transmission_fields(
 
 
 def _evaluate_diffraction_fields(
-    scene: Scene, compiled: object, topology: PathTopology, geometry: PathGeometry,
+    scene: Scene, compiled: CompiledScene, topology: PathTopology, geometry: PathGeometry,
     input_fields: PathFields, source: torch.Tensor, target: torch.Tensor,
     source_power: torch.Tensor, rx_pol: torch.Tensor, device: torch.device,
     frequency: float | torch.Tensor, frequency_value: float | None, ad_enabled: bool,
@@ -734,10 +735,11 @@ def _evaluate_diffraction_fields(
                 # A half-plane edge carries its one sheet face on both sides.
                 edge_boundary = ((face1 < 0) | (face1 == face0)).contiguous()
                 wedge_vertices = (
-                    vertices[edge_v0_ids].contiguous(),
-                    vertices[edge_v1_ids].contiguous(),
-                    vertices[opp0_ids].contiguous(),
-                    vertices[opp1_ids].contiguous(),
+                    # The caller passes the vertex table whenever geometry AD is on.
+                    vertices[edge_v0_ids].contiguous(),  # type: ignore[index]
+                    vertices[edge_v1_ids].contiguous(),  # type: ignore[index]
+                    vertices[opp0_ids].contiguous(),  # type: ignore[index]
+                    vertices[opp1_ids].contiguous(),  # type: ignore[index]
                     edge_boundary,
                 )
             wedge_args = (
@@ -808,7 +810,7 @@ def _evaluate_diffraction_fields(
 
 
 def _evaluate_coupled_fields(
-    scene: Scene, compiled: object, topology: PathTopology, geometry: PathGeometry,
+    scene: Scene, compiled: CompiledScene, topology: PathTopology, geometry: PathGeometry,
     source: torch.Tensor, target: torch.Tensor, source_power: torch.Tensor, tx_pol: torch.Tensor,
     rx_pol: torch.Tensor, device: torch.device, frequency: float | torch.Tensor,
     frequency_value: float | None, ad_enabled: bool, geometry_ad: bool,
@@ -896,7 +898,7 @@ def _evaluate_coupled_fields(
 
 
 def evaluate_path_fields(
-    scene: Scene, compiled: object, paths: EvaluatedPaths, execution: PathExecutionStats,
+    scene: Scene, compiled: CompiledScene, paths: EvaluatedPaths, execution: PathExecutionStats,
     tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor, *,
     row_groups: PathRowGroups, components: frozenset[str] | set[str] = frozenset(),
     ad_mode: str = "none", frequency_value: float | None = None,

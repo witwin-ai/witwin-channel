@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from functools import partial
 import math
 import struct
-from typing import TYPE_CHECKING, Literal, Protocol, TypeAlias, get_args
+from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeAlias, TypedDict, cast, get_args
 
 import torch
 
@@ -31,11 +31,14 @@ from witwin.channel.runtime import (
 )
 
 if TYPE_CHECKING:
+    from witwin.channel.kernels.fields import ReflectionLayers
     from witwin.channel.kernels.topology import ExactPairMetadata
     from witwin.channel.propagation.enumerated import (
         EnumeratedEndpointTensors,
     )
     from witwin.channel.propagation.rows import EvaluatedPaths
+    from witwin.channel.propagation.topology import EvaluatedPathSidecars
+    from witwin.channel.runtime import AdLaunchLedger
     from witwin.channel.scene.compiler import CompiledScene
     from witwin.channel.scene.endpoints import SolverScene
 
@@ -275,7 +278,9 @@ def carries_ad(value: torch.Tensor | None) -> bool:
     )
 
 
-def _primal_only_values(compiled: CompiledScene, request: object) -> dict[str, torch.Tensor | None]:
+def _primal_only_values(
+    compiled: CompiledScene, request: PropagationRequest | FixedTopologyRequest,
+) -> dict[str, torch.Tensor | None]:
     """The tensors named by ``capabilities.primal_only_ad_inputs``.
 
     Two of them live on the compiled scene rather than on the request: the
@@ -296,7 +301,9 @@ def _primal_only_values(compiled: CompiledScene, request: object) -> dict[str, t
     }
 
 
-def require_primal_only_ad_inputs(compiled: CompiledScene, request: object) -> None:
+def require_primal_only_ad_inputs(
+    compiled: CompiledScene, request: PropagationRequest | FixedTopologyRequest,
+) -> None:
     """Reject before native work any AD input that the field companions declare primal-only."""
 
     if request.ad_mode == "none":
@@ -312,7 +319,7 @@ def require_primal_only_ad_inputs(compiled: CompiledScene, request: object) -> N
 
 
 def _ad_leaf_tensors(
-    compiled: CompiledScene, request: object,
+    compiled: CompiledScene, request: PropagationRequest | FixedTopologyRequest,
 ) -> tuple[tuple[str, torch.Tensor], ...]:
     """Every tensor a caller can seed on this call, named for a refusal.
 
@@ -342,7 +349,9 @@ def _ad_leaf_tensors(
     )
 
 
-def require_first_order_request(compiled: CompiledScene, request: object) -> None:
+def require_first_order_request(
+    compiled: CompiledScene, request: PropagationRequest | FixedTopologyRequest,
+) -> None:
     """Refuse a forward-over-reverse composition before any numerical work.
 
     A reverse pass cannot carry a forward tangent through the native
@@ -371,7 +380,7 @@ def require_first_order_request(compiled: CompiledScene, request: object) -> Non
             )
 
 
-def ad_ledger(ad_mode: str) -> object | None:
+def ad_ledger(ad_mode: str) -> AdLaunchLedger | None:
     """One AD ledger per reevaluation, or ``None`` for a primal call.
 
     The discovery route already builds one inside its field loop and hands it
@@ -1867,15 +1876,15 @@ def _validate_inputs(
 
 def evaluated_paths_compact_finalize(
     *inputs: torch.Tensor, rows_are_compact: bool,
-) -> dict[str, object]:
-    return _required_native_op("evaluated_paths_compact_finalize")(
+) -> dict[str, Any]:
+    return cast(dict[str, Any], _required_native_op("evaluated_paths_compact_finalize")(
         *inputs, rows_are_compact
-    )
+    ))
 
 
 class _CompactEvaluatedPathsFunction(torch.autograd.Function):
     @staticmethod
-    def forward(*inputs):
+    def forward(*inputs: Any) -> Any:
         raw = evaluated_paths_compact_finalize(
             *inputs, rows_are_compact=False
         )
@@ -1890,7 +1899,7 @@ class _CompactEvaluatedPathsFunction(torch.autograd.Function):
         return outputs
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> None:
         ctx.set_materialize_grads(False)
         ctx.candidate_count = int(inputs[0].shape[0])
         ctx.sequence_width = int(inputs[8].shape[1])
@@ -1904,7 +1913,7 @@ class _CompactEvaluatedPathsFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, *grad_outputs):
+    def backward(ctx: Any, *grad_outputs: Any) -> Any:
         none_grads = (None,) * 24
         continuous_grads = grad_outputs[_DISCRETE_OUTPUT_COUNT:]
         if all(value is None for value in continuous_grads):
@@ -1936,7 +1945,7 @@ class _CompactEvaluatedPathsFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def jvp(ctx, *tangents):
+    def jvp(ctx: Any, *tangents: Any) -> Any:
         continuous_tangents = tuple(
             _ad_native_tangent_or_none(value) for value in tangents[11:22]
         )
@@ -2132,7 +2141,7 @@ class FixedLoSRows:
 
 class _FixedLoSGatherFunction(torch.autograd.Function):
     @staticmethod
-    def forward(*inputs):
+    def forward(*inputs: Any) -> Any:
         raw = _required_native_op("consumer_fixed_los_gather")(*inputs)
         if not isinstance(raw, dict) or set(raw) != set(
             _LOS_GATHER_OUTPUT_FIELDS
@@ -2141,7 +2150,7 @@ class _FixedLoSGatherFunction(torch.autograd.Function):
         return tuple(raw[name] for name in _LOS_GATHER_OUTPUT_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> None:
         ctx.set_materialize_grads(False)
         source_index, sink_index = (
             torch.autograd.forward_ad.unpack_dual(value).primal
@@ -2155,7 +2164,7 @@ class _FixedLoSGatherFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, *grad_outputs):
+    def backward(ctx: Any, *grad_outputs: Any) -> Any:
         endpoint_grads = grad_outputs[:5]
         if all(value is None for value in endpoint_grads):
             return (None,) * 13
@@ -2180,7 +2189,7 @@ class _FixedLoSGatherFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def jvp(ctx, *tangents):
+    def jvp(ctx: Any, *tangents: Any) -> Any:
         endpoint_tangents = tuple(
             _ad_native_tangent_or_none(value) for value in tangents[6:11]
         )
@@ -2700,7 +2709,7 @@ class BucketInputs:
     interaction_normals: torch.Tensor
     material: tuple[torch.Tensor, ...]
     valid: torch.Tensor
-    layers: object = None
+    layers: ReflectionLayers | None = None
 
     @property
     def row_count(self) -> int:
@@ -2756,15 +2765,22 @@ def require_smooth_reflection_scene(compiled: CompiledScene) -> None:
         )
 
 
-def _scene_tables(compiled: CompiledScene) -> dict[str, object]:
+class _SceneTables(TypedDict):
+    """The scene-static vertex table and per-face material bundle of a fixed replay."""
+
+    vertices: torch.Tensor
+    material: dict[str, torch.Tensor]
+
+
+def _scene_tables(compiled: CompiledScene) -> _SceneTables:
     # CompiledScene owns the lazy scene-static cache ; the
     # replay just consumes it. The primal per-frame case stages host-to-device
     # once per compiled scene instead of once per call.
-    return compiled.fixed_reevaluation_tables()
+    return cast(_SceneTables, compiled.fixed_reevaluation_tables())
 
 
 def _reflection_inputs(
-    compiled: CompiledScene, bucket: FixedTopologyBucket, tables: dict[str, object],
+    compiled: CompiledScene, bucket: FixedTopologyBucket, tables: _SceneTables,
     prepared: PreparedFixedTopology, rows: PreparedRows,
 ) -> BucketInputs:
     from witwin.channel.kernels import fields as field_kernels
@@ -2859,7 +2875,7 @@ def _inert_where_invalid(values: torch.Tensor, valid: torch.Tensor) -> torch.Ten
 
 def _field_op(
     inputs: BucketInputs, *, ad_mode: str, frequency: float | torch.Tensor, frequency_value: float,
-    geometry_live: GeometryLiveness | None, ledger: object | None = None,
+    geometry_live: GeometryLiveness | None, ledger: AdLaunchLedger | None = None,
 ) -> Callable[[torch.Tensor, torch.Tensor], dict[str, torch.Tensor]]:
     from witwin.channel.kernels import fields as field_kernels
 
@@ -2869,7 +2885,7 @@ def _field_op(
         tx_polarization: torch.Tensor, rx_polarization: torch.Tensor,
     ) -> dict[str, torch.Tensor]:
         if inputs.depth == 0:
-            leading = (inputs.source, inputs.target)
+            leading: tuple[torch.Tensor, ...] = (inputs.source, inputs.target)
             trailing: tuple[torch.Tensor, ...] = ()
         else:
             leading = (
@@ -2890,6 +2906,7 @@ def _field_op(
             rx_polarization,
             *trailing,
         )
+        operator: Callable[..., dict[str, torch.Tensor]]
         if differentiable:
             operator = (
                 field_kernels.field_free_space_ad
@@ -2898,7 +2915,9 @@ def _field_op(
             )
             if ledger is not None:
                 ledger.add(*arguments)
-            layer_kwargs = {} if inputs.depth == 0 else {"layers": inputs.layers}
+            layer_kwargs: dict[str, ReflectionLayers | None] = (
+                {} if inputs.depth == 0 else {"layers": inputs.layers}
+            )
             return operator(
                 *arguments,
                 **layer_kwargs,
@@ -2909,10 +2928,11 @@ def _field_op(
                     and geometry_live.direction_at_depth(inputs.depth)
                 ),
             )
-        operator = (
+        operator = cast(
+            "Callable[..., dict[str, torch.Tensor]]",
             field_kernels.field_free_space
             if inputs.depth == 0
-            else field_kernels.field_reflection_sequence
+            else field_kernels.field_reflection_sequence,
         )
         if inputs.depth == 0:
             return operator(*arguments, frequency_hz=frequency_value)
@@ -2971,7 +2991,8 @@ def _jones_values(
 def _bucket_values(
     inputs: BucketInputs, run: Callable[[torch.Tensor, torch.Tensor], dict[str, torch.Tensor]], *,
     response: str, ad_mode: str, source_reference: torch.Tensor | None,
-    sink_reference: torch.Tensor | None, frequency_value: float, ledger: object | None = None,
+    sink_reference: torch.Tensor | None, frequency_value: float,
+    ledger: AdLaunchLedger | None = None,
 ) -> dict[str, torch.Tensor]:
     if response != "polarimetric_transport":
         values = run(inputs.tx_polarization, inputs.rx_polarization)
@@ -3074,7 +3095,7 @@ def evaluate_prepared(
     ad_mode: str, frequency: float | torch.Tensor, frequency_value: float,
     source_reference_basis: torch.Tensor | None, sink_reference_basis: torch.Tensor | None,
     publish_row_validity: bool, geometry_live: GeometryLiveness | None = None,
-    ledger: object | None = None, bucket_inputs: tuple[BucketInputs, ...] | None = None,
+    ledger: AdLaunchLedger | None = None, bucket_inputs: tuple[BucketInputs, ...] | None = None,
 ) -> FixedRowOutputs:
     """Replay every host-known bucket of a prepared frozen topology.
 
@@ -3139,10 +3160,11 @@ def prepared_bucket_inputs(
     A wideband caller computes these once and shares them across its frequency columns.
     """
 
+    # Only reflection buckets read the tables; an all-LoS replay never stages them.
     tables = (
         _scene_tables(compiled)
         if any(bucket.depth > 0 for bucket in prepared.buckets)
-        else {}
+        else cast(_SceneTables, {})
     )
     return tuple(
         _los_inputs(compiled, bucket, rows)
@@ -3589,7 +3611,8 @@ def _path_batch(
 
 
 def _diagnostics(
-    sidecars: object, compact: _ConsumerRows, ad_mode: str, transmission_dropped_rows: int,
+    sidecars: EvaluatedPathSidecars, compact: _ConsumerRows, ad_mode: str,
+    transmission_dropped_rows: int,
 ) -> PropagationDiagnostics:
     execution = sidecars.execution
     return PropagationDiagnostics(
@@ -3933,7 +3956,9 @@ def _offset_frequency(frequency: float | torch.Tensor, offset: float) -> float |
     return frequency if offset == 0.0 else frequency + offset
 
 
-def _wideband_columns(offsets: tuple[float, ...], column: object) -> torch.Tensor:
+def _wideband_columns(
+    offsets: tuple[float, ...], column: Callable[[float], torch.Tensor],
+) -> torch.Tensor:
     """Stack per-frequency native outputs into one payload axis.
 
     Structural packing and nothing else: every value in the stack came out of
@@ -3944,7 +3969,7 @@ def _wideband_columns(offsets: tuple[float, ...], column: object) -> torch.Tenso
     return torch.stack([column(offset) for offset in offsets], dim=1)
 
 
-def _column_payload(response: str, outputs: object) -> torch.Tensor:
+def _column_payload(response: str, outputs: FixedRowOutputs) -> torch.Tensor:
     """The one tensor a wideband column contributes to the payload axis.
 
     A column recomputes the geometry natively and discards it: the published
@@ -3960,7 +3985,7 @@ def _column_payload(response: str, outputs: object) -> torch.Tensor:
 
 
 def _fixed_transport(
-    response: str, outputs: object, *, offsets: tuple[float, ...] | None = None,
+    response: str, outputs: FixedRowOutputs, *, offsets: tuple[float, ...] | None = None,
     payload: torch.Tensor | None = None,
 ) -> ScalarTransport | Complex3Transport | JonesTransport:
     if response == "scalar_transport":
@@ -4053,7 +4078,7 @@ def _reevaluate_prepared(
     # they run once and every frequency column reuses them.
     bucket_inputs = prepared_bucket_inputs(compiled, prepared, rows)
 
-    def column(offset: float):
+    def column(offset: float) -> FixedRowOutputs:
         return evaluate_prepared(
             compiled,
             prepared,

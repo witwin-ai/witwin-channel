@@ -38,7 +38,9 @@ from witwin.channel.runtime import (
 )
 
 if TYPE_CHECKING:
+    from witwin.channel.scene.compiler import CompiledScene
     from witwin.channel.scene.endpoints import SolverScene as Scene
+    from witwin.channel.scene.resources import RayDSceneResource
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,7 +103,7 @@ class DiffractionEdgeGeometry:
 
 
 def query_diffraction_edges(
-    rayd: object, *, preserve_imported_edges: bool,
+    rayd: RayDSceneResource, *, preserve_imported_edges: bool,
 ) -> DiffractionEdgeGeometry:
     raw = (
         _diffraction_edge_geometry(rayd.edge_records())
@@ -124,7 +126,7 @@ def query_diffraction_edges(
 
 
 def selected_diffraction_edges(
-    rayd: object, *, preserve_imported_edges: bool,
+    rayd: RayDSceneResource, *, preserve_imported_edges: bool,
 ) -> tuple[DiffractionEdgeGeometry, torch.Tensor]:
     """The edge table and its selected edge indices, queried once for every transmitter."""
 
@@ -185,7 +187,7 @@ class DiffractionVisibleStatePlan:
 
 
 def plan_tx_visible_diffraction_states(
-    rayd: object, states: tuple[torch.Tensor, ...], tx: torch.Tensor, *,
+    rayd: RayDSceneResource, states: tuple[torch.Tensor, ...], tx: torch.Tensor, *,
     per_state_source: bool = False,
 ) -> DiffractionVisibleStatePlan:
     """Transmitter-visible states; ``per_state_source`` checks each state against its own source."""
@@ -324,7 +326,7 @@ def query_diffraction_order1(query: DiffractionOrder1Query) -> DiffractionOrder1
 
 
 def _deterministic_diffraction_states(
-    rayd: object, tx: torch.Tensor, tx_power: torch.Tensor, tx_index: int, *,
+    rayd: RayDSceneResource, tx: torch.Tensor, tx_power: torch.Tensor, tx_index: int, *,
     preserve_imported_edges: bool = False,
     edges: tuple[DiffractionEdgeGeometry, torch.Tensor] | None = None,
 ) -> tuple[torch.Tensor, ...]:
@@ -332,18 +334,18 @@ def _deterministic_diffraction_states(
 
     if edges is None:
         edges = selected_diffraction_edges(rayd, preserve_imported_edges=preserve_imported_edges)
-    edges, selected_indices = edges
+    edge_table, selected_indices = edges
     return topology_kernels.deterministic_diffraction_state_pack(
         selected_indices,
-        edges.edge_position,
-        edges.edge_direction,
-        edges.line_min,
-        edges.line_max,
-        edges.n0,
-        edges.n1,
-        edges.face0,
-        edges.face1,
-        edges.exterior_angle,
+        edge_table.edge_position,
+        edge_table.edge_direction,
+        edge_table.line_min,
+        edge_table.line_max,
+        edge_table.n0,
+        edge_table.n1,
+        edge_table.face0,
+        edge_table.face1,
+        edge_table.exterior_angle,
         tx,
         tx_power,
         int(tx_index),
@@ -415,7 +417,7 @@ def _batched_diffraction_states(
 
 @profiled_cuda_range(CudaProfileRange.DIFFRACTION_TOTAL_STAGE)
 def _diffraction_topology_order1(
-    scene: Scene, compiled: object, tx_positions: torch.Tensor, tx_power: torch.Tensor,
+    scene: Scene, compiled: CompiledScene, tx_positions: torch.Tensor, tx_power: torch.Tensor,
     rx_positions: torch.Tensor, *, frequency_hz: float, isb_boundary_taper_width: float = 0.0,
     tx_polarizations: torch.Tensor | None = None,
 ) -> tuple[dict[str, torch.Tensor], int, torch.Tensor]:
