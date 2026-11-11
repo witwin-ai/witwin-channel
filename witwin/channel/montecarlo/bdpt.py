@@ -16,8 +16,7 @@ from witwin.core import Scene, SceneSnapshot
 from witwin.channel import build_info
 from witwin.channel.capabilities import (
     _BDPT_AD_DIFFERENTIABLE_PARAMETERS, capabilities,
-    config_metadata,
-    estimator_metadata,
+    config_metadata, estimator_metadata,
     serialize_config,
 )
 from witwin.channel.components import (
