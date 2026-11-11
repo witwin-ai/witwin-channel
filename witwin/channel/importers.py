@@ -495,11 +495,17 @@ def read_obj(path: StrPath) -> tuple[MeshData, ...]:
         raise ValueError(f"{obj_path}: OBJ file has no vertices or faces")
     points = np.asarray(vertices, dtype=np.float64)
     return tuple(
-        MeshData(
-            obj_path.stem if key is None else f"{obj_path.stem}:{key}", points, _fan(group), key
-        )
+        _referenced(obj_path.stem if key is None else f"{obj_path.stem}:{key}", points,
+                    _fan(group), key)
         for key, group in polygons.items()
     )
+
+
+def _referenced(name: str, points: np.ndarray, faces: np.ndarray, key: str | None) -> MeshData:
+    """Keep only the vertices ``faces`` references, so a split file shares no vertex rows."""
+
+    used, compact = np.unique(faces.reshape(-1), return_inverse=True)
+    return MeshData(name, points[used], compact.reshape(-1, 3), key)
 
 
 # --------------------------------------------------------------------------- glTF

@@ -122,6 +122,21 @@ def test_obj_splits_by_usemtl_and_triangulates_quads(tmp_path: Path) -> None:
     assert [mesh.faces.shape[0] for mesh in meshes] == [8, 4]
 
 
+def test_obj_groups_keep_only_their_own_vertices(tmp_path: Path) -> None:
+    path = tmp_path / "two.obj"
+    path.write_text(
+        "v 0 0 0\nv 1 0 0\nv 0 1 0\nv 5 0 0\nv 6 0 0\nv 5 1 0\n"
+        "usemtl a\nf 1 2 3\nusemtl b\nf 4 5 6\n"
+    )
+
+    meshes = read_obj(path)
+    imported = load_mesh(path, PhysicalMaterial())
+
+    assert [mesh.vertices.shape[0] for mesh in meshes] == [3, 3]
+    np.testing.assert_allclose(meshes[1].vertices[0], [5, 0, 0])
+    assert imported.welded_vertex_count == 0
+
+
 def test_load_mesh_maps_obj_materials_and_builds_core_structures(tmp_path: Path) -> None:
     walls = PhysicalMaterial(eps_r=5.0, name="walls")
     roof = PhysicalMaterial(eps_r=3.0, name="roof")
