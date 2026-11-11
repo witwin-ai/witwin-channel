@@ -179,11 +179,21 @@ control-record copy, the row count of every field-stage group: one group per
 component id, reflection split by depth `0..W`, and one trailing group. It also
 returns a device order that lists each group's compact rows in ascending row
 order. `propagation.fields.evaluate_path_fields` takes these as
-`rows.PathRowGroups`, slices each group's rows from the order, and evaluates
-only the groups and reflection depths that have rows; it performs no
-`torch.nonzero` or other Torch-hidden synchronization. The exact LoS fast path
-passes a single identity group. An output column is cloned only when a group
-writes part of it; a group that covers every row is evaluated without gathers.
+`rows.PathRowGroups` and performs no `torch.nonzero` or other Torch-hidden
+synchronization. The exact LoS fast path passes a single identity group.
+
+The primal field stage (`ad_mode="none"`) is one native launch,
+`field_canonical_rows`: one thread per canonical row (visited in the group order,
+so a warp sees one row kind) switches on `(component_id, depth)` and evaluates
+LoS, reflection of every depth (slab or layer stack, with the rough-surface
+factor) and the order-1 diffraction receiver projection, reading endpoints,
+per-face materials and interaction geometry straight from the canonical tables.
+It writes the seven field-stage columns into fresh tensors and copies every other
+row through. Transmission (a RayD operation), the coupled chains (`coupled.cu`)
+and the LoS boundary taper then run on their own groups and write those rows in
+place. The AD route keeps one differentiable Function per group, slicing each
+group's rows from the order; an output column is cloned only when a group writes
+part of it. See `standards/adr-0xx-m3-7-fused-field-kernel.md`.
 
 Reflection discovery (`interactions.reflection`) emits topology rows with EPC
 geometry and path length but no fields; the field stage owns every reflection

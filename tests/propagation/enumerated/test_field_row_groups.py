@@ -90,6 +90,38 @@ def test_field_stage_component_passes_issue_no_torch_synchronization(monkeypatch
         "_evaluate_coupled_fields",
     ):
         monkeypatch.setattr(field_stage, name, strict(getattr(field_stage, name)))
+    launches: list[object] = []
+    canonical = field_stage.field_kernels.field_canonical_rows
+
+    def counted(**kwargs):
+        launches.append(kwargs["order"])
+        return strict(canonical)(**kwargs)
+
+    monkeypatch.setattr(field_stage.field_kernels, "field_canonical_rows", counted)
     evaluated, _ = _solve(scene, config)
+    assert len(launches) == 1
     assert torch.equal(evaluated.fields.path_field, reference.fields.path_field)
     assert torch.equal(evaluated.geometry.path_length_m, reference.geometry.path_length_m)
+
+
+def test_primal_field_stage_runs_no_per_component_field_operator(monkeypatch):
+    _require_native()
+    from witwin.channel.kernels import fields as field_kernels
+
+    for name in (
+        "field_free_space",
+        "field_reflection_sequence",
+        "field_project_complex3",
+        "field_rough_reflection_scale",
+    ):
+        monkeypatch.setattr(
+            field_kernels,
+            name,
+            lambda *args, _name=name, **kwargs: pytest.fail(f"{_name} ran per row group"),
+        )
+    evaluated, _ = _solve(
+        two_wall_multibounce_scene(),
+        Config(components={"los", "reflection", "diffraction"}, max_depth=3),
+    )
+    assert evaluated.row_count > 0
+    assert bool(torch.isfinite(evaluated.fields.path_gain).all())

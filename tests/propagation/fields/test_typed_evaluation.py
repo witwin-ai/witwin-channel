@@ -220,11 +220,107 @@ def test_unwritten_outputs_alias_the_inputs_and_full_writes_take_the_result(monk
         torch.arange(36, dtype=torch.float32).reshape(12, 3),
         row_groups=_groups(paths),
         components={"los"},
+        ad_mode="vjp",
         frequency_value=3.0e9,
     )
     assert typed_result.fields.path_gain is full["path_gain"]
     assert typed_result.fields.path_field is paths.fields.path_field
     assert typed_result.geometry.delay_s is paths.geometry.delay_s
+
+
+def _patch_canonical_launch(monkeypatch, calls: list[dict[str, object]]) -> None:
+    def fake_canonical_rows(**kwargs):
+        calls.append(kwargs)
+        return {name: value + 1 for name, value in kwargs["fields"].items()}
+
+    monkeypatch.setattr(evaluation.field_kernels, "field_canonical_rows", fake_canonical_rows)
+    monkeypatch.setattr(
+        evaluation,
+        "_canonical_face_tables",
+        lambda _compiled, _groups, _components, _device: "faces",
+    )
+
+
+def test_primal_field_stage_is_one_canonical_launch_over_unsliced_tables(monkeypatch):
+    paths, sidecars = _evaluated_paths_fixture()
+    events: list[str] = []
+    _patch_field_stages(monkeypatch, events)
+    calls: list[dict[str, object]] = []
+    _patch_canonical_launch(monkeypatch, calls)
+    tx_positions = torch.arange(36, dtype=torch.float32).reshape(12, 3)
+    rx_positions = tx_positions + 1.0
+    typed_result, execution = evaluation.evaluate_path_fields(
+        SimpleNamespace(frequency=3.0e9),
+        object(),
+        paths,
+        sidecars.execution,
+        tx_positions,
+        torch.arange(1, 13, dtype=torch.float32),
+        rx_positions,
+        row_groups=_groups(paths),
+        components={"los", "reflection", "diffraction"},
+        frequency_value=3.0e9,
+    )
+    # Line of sight, reflection and diffraction are one launch; no per-group operator runs.
+    assert events == []
+    (call,) = calls
+    assert execution.launch_count == sidecars.execution.launch_count + 1
+    assert call["order"] is None and call["evaluate_los"] is True
+    assert call["faces"] == "faces" and call["frequency_hz"] == 3.0e9
+    assert torch.equal(call["tx_positions"], tx_positions)
+    assert torch.equal(call["rx_positions"], rx_positions)
+    assert call["primitive_sequence"] is paths.topology.primitive_sequence
+    assert call["fields"]["path_gain"] is paths.fields.path_gain
+    assert call["fields"]["delay"] is paths.geometry.delay_s
+    assert torch.equal(typed_result.fields.path_gain, paths.fields.path_gain + 1)
+    assert torch.equal(typed_result.geometry.field_direction, paths.geometry.field_direction + 1)
+    for name in ("interaction_positions", "interaction_normals"):
+        _assert_exact_tensor(getattr(typed_result.geometry, name), getattr(paths.geometry, name))
+
+
+def test_primal_transmission_and_coupled_rows_write_into_the_canonical_columns(monkeypatch):
+    paths, sidecars = _evaluated_paths_fixture()
+    events: list[str] = []
+    _patch_field_stages(monkeypatch, events)
+    calls: list[dict[str, object]] = []
+    _patch_canonical_launch(monkeypatch, calls)
+    written: dict[str, torch.Tensor] = {}
+
+    def fake_transmission(*args):
+        events.append("transmission")
+        outputs = _outputs(args)
+        written["before"] = outputs.values["path_gain"]
+        outputs.write("path_gain", torch.tensor([0], dtype=torch.int64), torch.tensor([-5.0]))
+        return None, args[-1] + 1
+
+    def fake_coupled(*args):
+        events.append("coupled")
+        return None, args[-1] + 1
+
+    monkeypatch.setattr(evaluation, "_evaluate_transmission_fields", fake_transmission)
+    monkeypatch.setattr(evaluation, "_evaluate_coupled_fields", fake_coupled)
+    width = int(paths.topology.primitive_sequence.shape[1])
+    counts = [0] * (8 + width + 2)
+    counts[5] = paths.row_count
+    typed_result, execution = evaluation.evaluate_path_fields(
+        SimpleNamespace(frequency=3.0e9),
+        object(),
+        paths,
+        sidecars.execution,
+        torch.arange(36, dtype=torch.float32).reshape(12, 3),
+        torch.arange(1, 13, dtype=torch.float32),
+        torch.arange(36, dtype=torch.float32).reshape(12, 3),
+        row_groups=PathRowGroups(order=None, counts=tuple(counts)),
+        components={"transmission"},
+        frequency_value=3.0e9,
+    )
+    assert events == ["transmission", "coupled"]
+    assert len(calls) == 1
+    assert execution.launch_count == sidecars.execution.launch_count + 3
+    # The canonical result is owned by the stage, so the row write lands in place.
+    assert typed_result.fields.path_gain is written["before"]
+    assert float(typed_result.fields.path_gain[0]) == -5.0
+    assert torch.equal(typed_result.fields.path_gain[1:], paths.fields.path_gain[1:] + 1)
 
 
 def test_empty_typed_field_seam_preserves_input_identity():

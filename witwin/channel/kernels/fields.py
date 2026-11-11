@@ -56,6 +56,8 @@ __all__ = [
     "field_coupled_rd_ad",
     "field_diffraction_wedge",
     "field_diffraction_wedge_ad",
+    "CanonicalFaceTables",
+    "field_canonical_rows",
     "field_free_space",
     "field_free_space_ad",
     "field_free_space_backward",
@@ -339,6 +341,109 @@ def field_transport_columns(
         columns,
     ):
         raise ValueError(f"_channel.{name} returned bad shapes")
+    return out
+
+
+_CANONICAL_ROW_COLUMNS = (
+    "field_xyz", "coefficient", "path_field", "path_gain", "path_length", "delay", "direction",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class CanonicalFaceTables:
+    """Per-face slab tables, the layer store and the rough-surface tables of a canonical launch.
+
+    ``rough_sigma``/``rough`` are None on a smooth scene and ``replaced`` is None unless a
+    realization phase screen replaces the specular reflection of its faces.
+    """
+
+    eps_r: torch.Tensor
+    sigma_e: torch.Tensor
+    mu_r: torch.Tensor
+    gain: torch.Tensor
+    thickness: torch.Tensor
+    material: torch.Tensor
+    layers: tuple[torch.Tensor, ...]
+    multilayer: bool
+    rough_sigma: torch.Tensor | None = None
+    rough: torch.Tensor | None = None
+    replaced: torch.Tensor | None = None
+
+    @classmethod
+    def empty(cls, device: torch.device) -> CanonicalFaceTables:
+        """Tables of a launch without reflection rows; nothing reads them."""
+
+        empty_f = torch.empty((0,), device=device, dtype=torch.float32)
+        empty_i = torch.empty((0,), device=device, dtype=torch.int32)
+        return cls(
+            eps_r=empty_f, sigma_e=empty_f, mu_r=empty_f, gain=empty_f, thickness=empty_f,
+            material=empty_i, layers=(empty_i, empty_i, empty_f, empty_f, empty_f, empty_f),
+            multilayer=False,
+        )
+
+
+def field_canonical_rows(
+    *, order: torch.Tensor | None, component_id: torch.Tensor, depth: torch.Tensor,
+    tx_id: torch.Tensor, rx_id: torch.Tensor, primitive_sequence: torch.Tensor,
+    tx_positions: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
+    rx_positions: torch.Tensor, rx_polarization: torch.Tensor, interaction_positions: torch.Tensor,
+    interaction_normals: torch.Tensor, fields: dict[str, torch.Tensor], faces: CanonicalFaceTables,
+    evaluate_los: bool, frequency_hz: float,
+) -> dict[str, torch.Tensor]:
+    """Field-stage columns of every canonical row in one native launch.
+
+    Line-of-sight rows (when ``evaluate_los``), reflection rows of depth ``1..W`` and order-1
+    diffraction rows are evaluated with the arithmetic of :func:`field_free_space`,
+    :func:`field_reflection_sequence` (plus the rough-surface factor) and the diffraction
+    receiver projection; every other row keeps its value from ``fields``. Endpoints are read
+    from the per-transmitter and per-receiver tables by ``tx_id``/``rx_id``. Returns new
+    tensors keyed like ``fields`` (``field_xyz``, ``coefficient``, ``path_field``,
+    ``path_gain``, ``path_length``, ``delay``, ``direction``).
+    """
+
+    if set(fields) != set(_CANONICAL_ROW_COLUMNS):
+        raise ValueError("fields must hold exactly the canonical field-stage columns")
+    if not frequency_hz > 0.0:
+        raise ValueError("frequency_hz must be positive")
+    device = component_id.device
+    empty_f = torch.empty((0,), device=device, dtype=torch.float32)
+    empty_b = torch.empty((0,), device=device, dtype=torch.bool)
+    out = _required_native_op("field_canonical_rows")(
+        torch.empty((0,), device=device, dtype=torch.int64) if order is None else order,
+        component_id,
+        depth,
+        tx_id,
+        rx_id,
+        primitive_sequence,
+        tx_positions,
+        tx_power,
+        tx_polarization,
+        rx_positions,
+        rx_polarization,
+        interaction_positions,
+        interaction_normals,
+        *(fields[name] for name in _CANONICAL_ROW_COLUMNS),
+        faces.eps_r,
+        faces.sigma_e,
+        faces.mu_r,
+        faces.gain,
+        faces.thickness,
+        faces.material,
+        *faces.layers,
+        bool(faces.multilayer),
+        empty_f if faces.rough_sigma is None else faces.rough_sigma,
+        empty_b if faces.rough is None else faces.rough,
+        empty_b if faces.replaced is None else faces.replaced,
+        faces.rough is not None,
+        faces.replaced is not None,
+        bool(evaluate_los),
+        float(frequency_hz),
+    )
+    if not isinstance(out, dict) or set(out) != set(_CANONICAL_ROW_COLUMNS):
+        raise TypeError("_channel.field_canonical_rows returned invalid fields")
+    for name in _CANONICAL_ROW_COLUMNS:
+        if out[name].shape != fields[name].shape or out[name].dtype != fields[name].dtype:
+            raise ValueError(f"_channel.field_canonical_rows returned bad {name}")
     return out
 
 

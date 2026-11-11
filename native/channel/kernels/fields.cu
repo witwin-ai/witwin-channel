@@ -58,6 +58,67 @@ __device__ __forceinline__ field::Complex from_complex(c10::complex<float> value
     return field::cplx(value.real(), value.imag());
 }
 
+// One transport lane (row, frequency) before it is stored: the polarized field, the receiver
+// projection, the source-excited projection, the path length and the arrival direction.
+struct TransportLane {
+    field::Complex3 value;
+    field::Complex scalar;
+    field::Complex received;
+    float length;
+    field::float3a direction;
+};
+
+// Output columns of a transport launch. Every pointer after path_field is null when the caller
+// only asks for the field vector and the source-excited projection.
+struct TransportOutputs {
+    c10::complex<float>* field_vector;
+    c10::complex<float>* coefficient;
+    c10::complex<float>* path_field;
+    float* path_gain;
+    float* path_length;
+    float* delay;
+    float* direction;
+};
+
+__device__ __forceinline__ void store_transport_lane(
+    const TransportOutputs& out, int64_t index, const TransportLane& lane) {
+    const int64_t base = index * 3;
+    out.field_vector[base] = to_complex(lane.value.x);
+    out.field_vector[base + 1] = to_complex(lane.value.y);
+    out.field_vector[base + 2] = to_complex(lane.value.z);
+    out.path_field[index] = to_complex(lane.received);
+    if (out.coefficient == nullptr) {
+        return;
+    }
+    out.coefficient[index] = to_complex(lane.scalar);
+    out.path_gain[index] = field::cplx_abs_sqr(lane.received);
+    out.path_length[index] = lane.length;
+    out.delay[index] = lane.length / transport::kSpeedOfLight;
+    out.direction[base] = lane.direction.x;
+    out.direction[base + 1] = lane.direction.y;
+    out.direction[base + 2] = lane.direction.z;
+}
+
+__device__ __forceinline__ TransportLane free_space_lane(
+    field::float3a source_value, field::float3a target_value, float tx_power,
+    field::float3a tx_pol, field::float3a rx_pol, float frequency_hz) {
+    const field::float3a offset = field::f3_sub(target_value, source_value);
+    const float distance = field::safe_length(offset);
+    const field::float3a direction = field::safe_normalize(
+        offset, field::make_f3(0.0f, 0.0f, 1.0f));
+    const float wave_number =
+        2.0f * field::UTD_PI * frequency_hz / transport::kSpeedOfLight;
+    const float source_amplitude = sqrtf(fmaxf(tx_power, 0.0f));
+    TransportLane lane;
+    lane.value = transport::free_space_complex3(
+        source_value, target_value, wave_number, tx_pol);
+    lane.scalar = transport::project_receiver(lane.value, direction, rx_pol);
+    lane.received = field::cplx_mul_real(lane.scalar, source_amplitude);
+    lane.length = distance;
+    lane.direction = direction;
+    return lane;
+}
+
 __global__ void free_space_kernel(
     int64_t count,
     const float* source,
@@ -66,50 +127,19 @@ __global__ void free_space_kernel(
     const float* tx_polarization,
     const float* rx_polarization,
     FrequencyColumns columns,
-    c10::complex<float>* field_vector,
-    c10::complex<float>* coefficient,
-    c10::complex<float>* path_field,
-    float* path_gain,
-    float* path_length,
-    float* delay,
-    float* direction_out) {
+    TransportOutputs out) {
     for (int64_t lane = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          lane < count * columns.count;
          lane += static_cast<int64_t>(blockDim.x) * gridDim.x) {
         const int64_t index = lane / columns.count;
         const int64_t column = lane - index * columns.count;
-        const float frequency_hz = columns.values[column];
-        const int64_t out = index * columns.out_stride + columns.column_offset + column;
-        const field::float3a source_value = channel::math::load_field_vec3(source, index);
-        const field::float3a target_value = channel::math::load_field_vec3(target, index);
-        const field::float3a offset = field::f3_sub(target_value, source_value);
-        const float distance = field::safe_length(offset);
-        const field::float3a direction = field::safe_normalize(
-            offset, field::make_f3(0.0f, 0.0f, 1.0f));
-        const field::float3a tx_pol = channel::math::load_field_vec3(tx_polarization, index);
-        const float wave_number =
-            2.0f * field::UTD_PI * frequency_hz / transport::kSpeedOfLight;
-        const float source_amplitude = sqrtf(fmaxf(tx_power[index], 0.0f));
-        const field::Complex3 value = transport::free_space_complex3(
-            source_value, target_value, wave_number, tx_pol);
-        const int64_t base = out * 3;
-        field_vector[base] = to_complex(value.x);
-        field_vector[base + 1] = to_complex(value.y);
-        field_vector[base + 2] = to_complex(value.z);
-        const field::Complex scalar = transport::project_receiver(
-            value, direction, channel::math::load_field_vec3(rx_polarization, index));
-        const field::Complex received = field::cplx_mul_real(scalar, source_amplitude);
-        path_field[out] = to_complex(received);
-        if (coefficient == nullptr) {
-            continue;
-        }
-        coefficient[out] = to_complex(scalar);
-        path_gain[out] = field::cplx_abs_sqr(received);
-        path_length[out] = distance;
-        delay[out] = distance / transport::kSpeedOfLight;
-        direction_out[base] = direction.x;
-        direction_out[base + 1] = direction.y;
-        direction_out[base + 2] = direction.z;
+        store_transport_lane(
+            out, index * columns.out_stride + columns.column_offset + column,
+            free_space_lane(
+                channel::math::load_field_vec3(source, index),
+                channel::math::load_field_vec3(target, index), tx_power[index],
+                channel::math::load_field_vec3(tx_polarization, index),
+                channel::math::load_field_vec3(rx_polarization, index), columns.values[column]));
     }
 }
 
@@ -142,6 +172,86 @@ __device__ __forceinline__ field::float3a load_sequence3(
     return field::make_f3(values[base], values[base + 1], values[base + 2]);
 }
 
+// Every output of one reflection lane, computed before any is stored.
+struct ReflectionRow {
+    field::Complex3 value;
+    field::Complex scalar;
+    field::Complex received;
+    float path_gain;
+    float length;
+    float delay;
+    field::float3a direction;
+};
+
+// One reflection lane. It is not inlined, so its floating-point code (and therefore its rounding)
+// is the same in every kernel that evaluates reflection rows. ``positions``/``normals`` point at
+// the row's first bounce. Slab parameters are read at ``slot_base + bounce`` of (N, D) gathered
+// tables, or, when ``face_ids`` is set, at the bounce's face of per-face tables; ``material`` is
+// null when no layer store is consulted.
+__device__ __noinline__ void reflection_row(
+    ReflectionRow& row, field::float3a source_value, field::float3a target_value, float tx_power,
+    field::float3a tx_pol, field::float3a rx_pol, const float* positions, const float* normals,
+    const float* eps_r, const float* sigma_e, const float* mu_r, const float* gain,
+    const float* thickness, const int* material, const int* face_ids, int64_t face_count,
+    int64_t slot_base, int64_t depth, const layered::LayerTables& layers, float frequency_hz) {
+    field::float3a previous = source_value;
+    field::float3a first_hit = load_sequence3(positions, 0, 0, 1);
+    field::float3a incident = field::safe_normalize(
+        field::f3_sub(first_hit, previous), field::make_f3(0.0f, 0.0f, 1.0f));
+    // unnormalized transverse projection of the transmit polarization
+    // (short-dipole sin(theta) weight); the Jones s/p bases stay orthonormal.
+    field::float3a tx_axis = field::project_to_wedge_plane(tx_pol, incident);
+    field::Complex3 value = field::cplx_scale_real(
+        tx_axis, field::cplx(1.0f, 0.0f));
+    float total_length = 0.0f;
+    field::float3a outgoing = incident;
+    for (int64_t bounce = 0; bounce < depth; ++bounce) {
+        const field::float3a hit = load_sequence3(positions, 0, bounce, 1);
+        incident = field::safe_normalize(
+            field::f3_sub(hit, previous), outgoing);
+        total_length += field::safe_length(field::f3_sub(hit, previous));
+        int64_t slot = slot_base + bounce;
+        if (face_ids != nullptr) {
+            slot = face_ids[bounce];
+            slot = slot < 0 ? slot + face_count : slot;
+        }
+        value = layered::reflect_layered(
+            value,
+            incident,
+            load_sequence3(normals, 0, bounce, 1),
+            eps_r[slot],
+            sigma_e[slot],
+            mu_r[slot],
+            gain[slot],
+            thickness[slot],
+            frequency_hz,
+            material == nullptr ? -1 : material[slot],
+            layers,
+            outgoing);
+        previous = hit;
+    }
+    const field::float3a final_offset = field::f3_sub(target_value, previous);
+    const field::float3a final_direction = field::safe_normalize(
+        final_offset, outgoing);
+    total_length += field::safe_length(final_offset);
+    const float wave_number =
+        2.0f * field::UTD_PI * frequency_hz / transport::kSpeedOfLight;
+    const float amplitude = 1.0f /
+                            (2.0f * wave_number *
+                             fmaxf(total_length, field::UTD_EPS));
+    const field::Complex propagation = field::cplx_mul_real(
+        field::cplx_exp_phase(
+            transport::precise_neg_kd(wave_number, total_length)),
+        amplitude);
+    row.value = field::c3_scale(value, propagation);
+    row.scalar = transport::project_receiver(row.value, final_direction, rx_pol);
+    row.received = field::cplx_mul_real(row.scalar, sqrtf(fmaxf(tx_power, 0.0f)));
+    row.path_gain = field::cplx_abs_sqr(row.received);
+    row.length = total_length;
+    row.delay = total_length / transport::kSpeedOfLight;
+    row.direction = final_direction;
+}
+
 __global__ void reflection_sequence_kernel(
     int64_t count,
     int64_t depth,
@@ -160,89 +270,37 @@ __global__ void reflection_sequence_kernel(
     const int* bounce_material,
     layered::LayerTables layers,
     FrequencyColumns columns,
-    c10::complex<float>* field_vector,
-    c10::complex<float>* coefficient,
-    c10::complex<float>* path_field,
-    float* path_gain,
-    float* path_length,
-    float* delay,
-    float* direction_out) {
+    TransportOutputs out) {
     for (int64_t lane = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          lane < count * columns.count;
          lane += static_cast<int64_t>(blockDim.x) * gridDim.x) {
         const int64_t index = lane / columns.count;
         const int64_t column = lane - index * columns.count;
-        const float frequency_hz = columns.values[column];
-        const int64_t out = index * columns.out_stride + columns.column_offset + column;
-        field::float3a previous = channel::math::load_field_vec3(source, index);
-        field::float3a first_hit = load_sequence3(
-            interaction_positions, index, 0, depth);
-        field::float3a incident = field::safe_normalize(
-            field::f3_sub(first_hit, previous), field::make_f3(0.0f, 0.0f, 1.0f));
-        // unnormalized transverse projection of the transmit polarization
-        // (short-dipole sin(theta) weight); the Jones s/p bases stay orthonormal.
-        field::float3a tx_axis = field::project_to_wedge_plane(
-            channel::math::load_field_vec3(tx_polarization, index), incident);
-        field::Complex3 value = field::cplx_scale_real(
-            tx_axis, field::cplx(1.0f, 0.0f));
-        float total_length = 0.0f;
-        field::float3a outgoing = incident;
-        for (int64_t bounce = 0; bounce < depth; ++bounce) {
-            const field::float3a hit = load_sequence3(
-                interaction_positions, index, bounce, depth);
-            incident = field::safe_normalize(
-                field::f3_sub(hit, previous), outgoing);
-            total_length += field::safe_length(field::f3_sub(hit, previous));
-            const int64_t scalar = index * depth + bounce;
-            value = layered::reflect_layered(
-                value,
-                incident,
-                load_sequence3(interaction_normals, index, bounce, depth),
-                eps_r[scalar],
-                sigma_e[scalar],
-                mu_r[scalar],
-                gain[scalar],
-                thickness[scalar],
-                frequency_hz,
-                bounce_material[scalar],
-                layers,
-                outgoing);
-            previous = hit;
-        }
-        const field::float3a target_value = channel::math::load_field_vec3(target, index);
-        const field::float3a final_offset = field::f3_sub(target_value, previous);
-        const field::float3a final_direction = field::safe_normalize(
-            final_offset, outgoing);
-        total_length += field::safe_length(final_offset);
-        const float wave_number =
-            2.0f * field::UTD_PI * frequency_hz / transport::kSpeedOfLight;
-        const float amplitude = 1.0f /
-                                (2.0f * wave_number *
-                                 fmaxf(total_length, field::UTD_EPS));
-        const field::Complex propagation = field::cplx_mul_real(
-            field::cplx_exp_phase(
-                transport::precise_neg_kd(wave_number, total_length)),
-            amplitude);
-        value = field::c3_scale(value, propagation);
-        const int64_t base = out * 3;
-        field_vector[base] = to_complex(value.x);
-        field_vector[base + 1] = to_complex(value.y);
-        field_vector[base + 2] = to_complex(value.z);
-        const field::Complex scalar = transport::project_receiver(
-            value, final_direction, channel::math::load_field_vec3(rx_polarization, index));
-        const field::Complex received = field::cplx_mul_real(
-            scalar, sqrtf(fmaxf(tx_power[index], 0.0f)));
-        path_field[out] = to_complex(received);
-        if (coefficient == nullptr) {
+        const int64_t target_index = index * columns.out_stride + columns.column_offset + column;
+        ReflectionRow row;
+        reflection_row(
+            row, channel::math::load_field_vec3(source, index),
+            channel::math::load_field_vec3(target, index), tx_power[index],
+            channel::math::load_field_vec3(tx_polarization, index),
+            channel::math::load_field_vec3(rx_polarization, index),
+            interaction_positions + index * depth * 3, interaction_normals + index * depth * 3,
+            eps_r, sigma_e, mu_r, gain, thickness, bounce_material, nullptr, 0, index * depth,
+            depth, layers, columns.values[column]);
+        const int64_t base = target_index * 3;
+        out.field_vector[base] = to_complex(row.value.x);
+        out.field_vector[base + 1] = to_complex(row.value.y);
+        out.field_vector[base + 2] = to_complex(row.value.z);
+        out.path_field[target_index] = to_complex(row.received);
+        if (out.coefficient == nullptr) {
             continue;
         }
-        coefficient[out] = to_complex(scalar);
-        path_gain[out] = field::cplx_abs_sqr(received);
-        path_length[out] = total_length;
-        delay[out] = total_length / transport::kSpeedOfLight;
-        direction_out[base] = final_direction.x;
-        direction_out[base + 1] = final_direction.y;
-        direction_out[base + 2] = final_direction.z;
+        out.coefficient[target_index] = to_complex(row.scalar);
+        out.path_gain[target_index] = row.path_gain;
+        out.path_length[target_index] = row.length;
+        out.delay[target_index] = row.delay;
+        out.direction[base] = row.direction.x;
+        out.direction[base + 1] = row.direction.y;
+        out.direction[base + 2] = row.direction.z;
     }
 }
 
@@ -751,13 +809,8 @@ void launch_free_space(
         tx_polarization.data_ptr<float>(),
         rx_polarization.data_ptr<float>(),
         columns,
-        field_vector,
-        coefficient,
-        path_field,
-        path_gain,
-        path_length,
-        delay,
-        direction);
+        TransportOutputs{
+            field_vector, coefficient, path_field, path_gain, path_length, delay, direction});
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 
@@ -962,13 +1015,8 @@ void launch_reflection_sequence(
         bounce_material.data_ptr<int>(),
         layers,
         columns,
-        field_vector,
-        coefficient,
-        path_field,
-        path_gain,
-        path_length,
-        delay,
-        direction);
+        TransportOutputs{
+            field_vector, coefficient, path_field, path_gain, path_length, delay, direction});
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 
@@ -3078,8 +3126,83 @@ __device__ __forceinline__ cfloat cscale(cfloat value, float s) {
     return cfloat(value.real() * s, value.imag() * s);
 }
 
+// Rough-scale inputs of a request whose per-bounce inputs were gathered into (N, D) tables.
+struct GatheredRoughBounces {
+    const float* positions;
+    const float* normals;
+    const float* source;
+    const float* sigma_b;
+    const bool* rough_b;
+    int64_t row;
+    int depth;
+
+    __device__ __forceinline__ const float* position(int b) const {
+        return positions + (row * depth + b) * 3;
+    }
+    __device__ __forceinline__ const float* normal(int b) const {
+        return normals + (row * depth + b) * 3;
+    }
+    __device__ __forceinline__ const float* origin() const { return source + row * 3; }
+    __device__ __forceinline__ float sigma(int b) const { return sigma_b[row * depth + b]; }
+    __device__ __forceinline__ bool rough(int b) const { return rough_b[row * depth + b]; }
+};
+
 // Per-bounce recomputation shared by forward, backward and jvp. Fills the
 // bounce arrays and returns the product factor (before the replaced mask).
+template <typename Bounces>
+__device__ __forceinline__ float rough_bounce_factor(
+    int depth, float k0, const Bounces& bounces,
+    float seg_dir[kMaxDepth][3],
+    float normal[kMaxDepth][3],
+    float sign[kMaxDepth],
+    float cos_b[kMaxDepth],
+    float inv_len[kMaxDepth],
+    bool rough[kMaxDepth],
+    float sigma[kMaxDepth]) {
+    float factor = 1.0f;
+    for (int b = 0; b < depth; ++b) {
+        const float* hit = bounces.position(b);
+        const float* previous = b == 0 ? bounces.origin() : bounces.position(b - 1);
+        const float sx = hit[0] - previous[0];
+        const float sy = hit[1] - previous[1];
+        const float sz = hit[2] - previous[2];
+        const float len = sqrtf(sx * sx + sy * sy + sz * sz);
+        // Match Torch's ``seg / norm.clamp_min(1e-9)`` (division, not a
+        // reciprocal multiply) so the coherent factor is float-faithful.
+        const float denom = fmaxf(len, 1.0e-9f);
+        const float dx = sx / denom, dy = sy / denom, dz = sz / denom;
+        const float inv = 1.0f / denom;
+        const float* face_normal = bounces.normal(b);
+        const float nx = face_normal[0];
+        const float ny = face_normal[1];
+        const float nz = face_normal[2];
+        // Torch evaluates (seg_dir*normal).sum(-1) as three rounded products
+        // then a left-associated sum; keep the products in registers so the
+        // compiler cannot fuse them into an fma with different rounding.
+        const float p0 = __fmul_rn(dx, nx);
+        const float p1 = __fmul_rn(dy, ny);
+        const float p2 = __fmul_rn(dz, nz);
+        const float dot = __fadd_rn(__fadd_rn(p0, p1), p2);
+        const float cb = fabsf(dot);
+        seg_dir[b][0] = dx; seg_dir[b][1] = dy; seg_dir[b][2] = dz;
+        normal[b][0] = nx; normal[b][1] = ny; normal[b][2] = nz;
+        sign[b] = dot > 0.0f ? 1.0f : (dot < 0.0f ? -1.0f : 0.0f);
+        cos_b[b] = cb;
+        inv_len[b] = inv;
+        const bool r = bounces.rough(b);
+        rough[b] = r;
+        const float s = bounces.sigma(b);
+        sigma[b] = s;
+        if (r) {
+            // Match the Torch association exp(-2 * (k0*cos*sigma).square):
+            // square first, then scale by -2.
+            const float u = k0 * cb * s;
+            factor *= expf(-2.0f * (u * u));
+        }
+    }
+    return factor;
+}
+
 __device__ __forceinline__ float rough_bounces(
     int64_t row, int depth, float k0,
     const float* __restrict__ positions,
@@ -3094,54 +3217,9 @@ __device__ __forceinline__ float rough_bounces(
     float inv_len[kMaxDepth],
     bool rough[kMaxDepth],
     float sigma[kMaxDepth]) {
-    float factor = 1.0f;
-    for (int b = 0; b < depth; ++b) {
-        const int64_t pb = (row * depth + b) * 3;
-        float sx, sy, sz;
-        if (b == 0) {
-            sx = positions[pb + 0] - source[row * 3 + 0];
-            sy = positions[pb + 1] - source[row * 3 + 1];
-            sz = positions[pb + 2] - source[row * 3 + 2];
-        } else {
-            const int64_t prev = (row * depth + b - 1) * 3;
-            sx = positions[pb + 0] - positions[prev + 0];
-            sy = positions[pb + 1] - positions[prev + 1];
-            sz = positions[pb + 2] - positions[prev + 2];
-        }
-        const float len = sqrtf(sx * sx + sy * sy + sz * sz);
-        // Match Torch's ``seg / norm.clamp_min(1e-9)`` (division, not a
-        // reciprocal multiply) so the coherent factor is float-faithful.
-        const float denom = fmaxf(len, 1.0e-9f);
-        const float dx = sx / denom, dy = sy / denom, dz = sz / denom;
-        const float inv = 1.0f / denom;
-        const float nx = normals[pb + 0];
-        const float ny = normals[pb + 1];
-        const float nz = normals[pb + 2];
-        // Torch evaluates (seg_dir*normal).sum(-1) as three rounded products
-        // then a left-associated sum; keep the products in registers so the
-        // compiler cannot fuse them into an fma with different rounding.
-        const float p0 = __fmul_rn(dx, nx);
-        const float p1 = __fmul_rn(dy, ny);
-        const float p2 = __fmul_rn(dz, nz);
-        const float dot = __fadd_rn(__fadd_rn(p0, p1), p2);
-        const float cb = fabsf(dot);
-        seg_dir[b][0] = dx; seg_dir[b][1] = dy; seg_dir[b][2] = dz;
-        normal[b][0] = nx; normal[b][1] = ny; normal[b][2] = nz;
-        sign[b] = dot > 0.0f ? 1.0f : (dot < 0.0f ? -1.0f : 0.0f);
-        cos_b[b] = cb;
-        inv_len[b] = inv;
-        const bool r = rough_b[row * depth + b];
-        rough[b] = r;
-        const float s = sigma_b[row * depth + b];
-        sigma[b] = s;
-        if (r) {
-            // Match the Torch association exp(-2 * (k0*cos*sigma).square):
-            // square first, then scale by -2.
-            const float u = k0 * cb * s;
-            factor *= expf(-2.0f * (u * u));
-        }
-    }
-    return factor;
+    const GatheredRoughBounces bounces = {positions, normals, source, sigma_b, rough_b, row, depth};
+    return rough_bounce_factor(
+        depth, k0, bounces, seg_dir, normal, sign, cos_b, inv_len, rough, sigma);
 }
 
 __global__ void rough_scale_forward_kernel(
@@ -3847,6 +3925,451 @@ pybind11::dict channel_field_source_amplitude_scale_jvp(
     pybind11::dict out;
     out["tangent_path_field_vector"] = scaled(tangent_field_vector, tx_power);
     return out;
+}
+
+#undef launch_blocks
+#undef kBlockSize
+
+// ==== Section: Canonical-row field stage ====
+// One launch evaluates every field-stage row whose operator lives in this translation unit:
+// line of sight, specular reflection of every depth (finite slab or layer stack, with the
+// rough-surface coherent factor) and the receiver projection of order-1 diffraction. Each
+// thread reads its row's endpoints, interaction tables and per-face materials directly from
+// the canonical tables, runs the same per-row arithmetic as the per-operator kernels above,
+// and writes the seven field-stage columns in place. Rows of any other kind keep their input
+// values for the operators that run after this launch.
+
+#define launch_blocks canonical_field_launch_blocks
+#define kBlockSize kCanonicalFieldBlockSize
+
+namespace {
+
+constexpr int kBlockSize = 256;
+
+int launch_blocks(int64_t count) {
+    return static_cast<int>((count + kBlockSize - 1) / kBlockSize);
+}
+
+constexpr int kLineOfSightComponent = 0;
+constexpr int kReflectionComponent = 1;
+constexpr int kDiffractionComponent = 2;
+
+struct CanonicalRows {
+    int64_t count;
+    int64_t width;
+    const int64_t* order;
+    const int* component_id;
+    const int* depth;
+    const int* tx_id;
+    const int* rx_id;
+    const int* primitive_sequence;
+    const float* tx_positions;
+    const float* tx_power;
+    const float* tx_polarization;
+    int64_t tx_count;
+    const float* rx_positions;
+    const float* rx_polarization;
+    int64_t rx_count;
+    const float* interaction_positions;
+    const float* interaction_normals;
+    const cfloat* field_xyz;
+    const cfloat* coefficient;
+    const cfloat* path_field;
+    const float* path_gain;
+    const float* path_length;
+    const float* delay;
+    const float* direction;
+    bool evaluate_los;
+    float frequency_hz;
+};
+
+struct FaceTables {
+    const float* eps_r;
+    const float* sigma_e;
+    const float* mu_r;
+    const float* gain;
+    const float* thickness;
+    const int* material;
+    int64_t count;
+    layered::LayerTables layers;
+    bool multilayer;
+    const float* rough_sigma;
+    const bool* rough;
+    const bool* replaced;
+    float rough_k0;
+};
+
+// Index semantics of a Torch gather: a negative index counts from the end. Returns -1 when the
+// index is outside the table.
+__device__ __forceinline__ int64_t table_index(int64_t index, int64_t count) {
+    const int64_t wrapped = index < 0 ? index + count : index;
+    return wrapped >= 0 && wrapped < count ? wrapped : -1;
+}
+
+__device__ __forceinline__ int64_t bounce_face(
+    const CanonicalRows& rows, const FaceTables& faces, int64_t row, int64_t bounce) {
+    return table_index(rows.primitive_sequence[row * rows.width + bounce], faces.count);
+}
+
+struct FaceRoughBounces {
+    const CanonicalRows& rows;
+    const FaceTables& faces;
+    int64_t row;
+    const float* source;
+
+    __device__ __forceinline__ const float* position(int b) const {
+        return rows.interaction_positions + (row * rows.width + b) * 3;
+    }
+    __device__ __forceinline__ const float* normal(int b) const {
+        return rows.interaction_normals + (row * rows.width + b) * 3;
+    }
+    __device__ __forceinline__ const float* origin() const { return source; }
+    __device__ __forceinline__ float sigma(int b) const {
+        return faces.rough == nullptr ? 0.0f : faces.rough_sigma[bounce_face(rows, faces, row, b)];
+    }
+    __device__ __forceinline__ bool rough(int b) const {
+        return faces.rough != nullptr && faces.rough[bounce_face(rows, faces, row, b)];
+    }
+};
+
+// Reflection row through the shared reflection lane, with slab parameters read from the per-face
+// tables. ``factor`` is the rough-surface coherent factor applied as the rough-scale kernel applies
+// it; a smooth row passes 1, which scales exactly.
+__device__ __forceinline__ void store_reflection_row(
+    const CanonicalRows& rows, const FaceTables& faces, const TransportOutputs& out, int64_t index,
+    int64_t tx, int64_t rx, int64_t depth, float factor) {
+    ReflectionRow row;
+    reflection_row(
+        row, channel::math::load_field_vec3(rows.tx_positions, tx),
+        channel::math::load_field_vec3(rows.rx_positions, rx), rows.tx_power[tx],
+        channel::math::load_field_vec3(rows.tx_polarization, tx),
+        channel::math::load_field_vec3(rows.rx_polarization, rx),
+        rows.interaction_positions + index * rows.width * 3,
+        rows.interaction_normals + index * rows.width * 3, faces.eps_r, faces.sigma_e, faces.mu_r,
+        faces.gain, faces.thickness, faces.multilayer ? faces.material : nullptr,
+        rows.primitive_sequence + index * rows.width, faces.count, 0, depth, faces.layers,
+        rows.frequency_hz);
+    const int64_t base = index * 3;
+    out.field_vector[base] = cscale(to_complex(row.value.x), factor);
+    out.field_vector[base + 1] = cscale(to_complex(row.value.y), factor);
+    out.field_vector[base + 2] = cscale(to_complex(row.value.z), factor);
+    out.path_field[index] = cscale(to_complex(row.received), factor);
+    out.coefficient[index] = cscale(to_complex(row.scalar), factor);
+    out.path_gain[index] = row.path_gain * factor * factor;
+    out.path_length[index] = row.length;
+    out.delay[index] = row.delay;
+    out.direction[base] = row.direction.x;
+    out.direction[base + 1] = row.direction.y;
+    out.direction[base + 2] = row.direction.z;
+}
+
+__device__ __forceinline__ void store_input_row(
+    const CanonicalRows& rows, const TransportOutputs& out, int64_t row) {
+    for (int c = 0; c < 3; ++c) {
+        out.field_vector[row * 3 + c] = rows.field_xyz[row * 3 + c];
+        out.direction[row * 3 + c] = rows.direction[row * 3 + c];
+    }
+    out.coefficient[row] = rows.coefficient[row];
+    out.path_field[row] = rows.path_field[row];
+    out.path_gain[row] = rows.path_gain[row];
+    out.path_length[row] = rows.path_length[row];
+    out.delay[row] = rows.delay[row];
+}
+
+// A row whose endpoint or face index is outside its table publishes inert zeros.
+__device__ __forceinline__ void store_inert_row(const TransportOutputs& out, int64_t row) {
+    for (int c = 0; c < 3; ++c) {
+        out.field_vector[row * 3 + c] = cfloat(0.0f, 0.0f);
+        out.direction[row * 3 + c] = 0.0f;
+    }
+    out.coefficient[row] = cfloat(0.0f, 0.0f);
+    out.path_field[row] = cfloat(0.0f, 0.0f);
+    out.path_gain[row] = 0.0f;
+    out.path_length[row] = 0.0f;
+    out.delay[row] = 0.0f;
+}
+
+// Receiver projection of a diffraction row whose source-excited UTD field was exported by
+// discovery: arrival direction from the edge point, projection, and the unit-source columns.
+__device__ __forceinline__ void store_diffraction_row(
+    const CanonicalRows& rows, const TransportOutputs& out, int64_t row, int64_t tx, int64_t rx) {
+    const float* target = rows.rx_positions + rx * 3;
+    const float* edge_point = rows.interaction_positions + row * rows.width * 3;
+    const float x = target[0] - edge_point[0];
+    const float y = target[1] - edge_point[1];
+    const float z = target[2] - edge_point[2];
+    const float length = fmaxf(sqrtf(x * x + y * y + z * z), 1.0e-6f);
+    const field::float3a arrival = field::make_f3(x / length, y / length, z / length);
+    const field::Complex3 value = {
+        from_complex(rows.field_xyz[row * 3]),
+        from_complex(rows.field_xyz[row * 3 + 1]),
+        from_complex(rows.field_xyz[row * 3 + 2]),
+    };
+    const field::Complex scalar = transport::project_receiver(
+        value, arrival, channel::math::load_field_vec3(rows.rx_polarization, rx));
+    // Torch semantics of ``power.clamp_min(1e-30).sqrt()`` and a complex-by-real division.
+    const float power = rows.tx_power[tx];
+    const cfloat amplitude(sqrtf(isnan(power) ? power : fmaxf(power, 1.0e-30f)), 0.0f);
+    for (int c = 0; c < 3; ++c) {
+        out.field_vector[row * 3 + c] = rows.field_xyz[row * 3 + c] / amplitude;
+    }
+    out.direction[row * 3] = arrival.x;
+    out.direction[row * 3 + 1] = arrival.y;
+    out.direction[row * 3 + 2] = arrival.z;
+    out.path_field[row] = to_complex(scalar);
+    out.coefficient[row] = to_complex(scalar) / amplitude;
+    out.path_gain[row] = field::cplx_abs_sqr(scalar);
+    out.path_length[row] = rows.path_length[row];
+    out.delay[row] = rows.delay[row];
+}
+
+__global__ void canonical_field_kernel(CanonicalRows rows, FaceTables faces, TransportOutputs out) {
+    for (int64_t lane = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         lane < rows.count;
+         lane += static_cast<int64_t>(blockDim.x) * gridDim.x) {
+        const int64_t row = rows.order == nullptr ? lane : rows.order[lane];
+        const int component = rows.component_id[row];
+        const int64_t depth = rows.depth[row];
+        const bool los = component == kLineOfSightComponent && rows.evaluate_los;
+        const bool reflection =
+            component == kReflectionComponent && depth >= 1 && depth <= rows.width;
+        const bool diffraction = component == kDiffractionComponent && rows.width >= 1;
+        if (!los && !reflection && !diffraction) {
+            store_input_row(rows, out, row);
+            continue;
+        }
+        const int64_t tx = table_index(rows.tx_id[row], rows.tx_count);
+        const int64_t rx = table_index(rows.rx_id[row], rows.rx_count);
+        bool inert = tx < 0 || rx < 0;
+        for (int64_t bounce = 0; reflection && !inert && bounce < depth; ++bounce) {
+            inert = bounce_face(rows, faces, row, bounce) < 0;
+        }
+        if (inert) {
+            store_inert_row(out, row);
+            continue;
+        }
+        if (diffraction) {
+            store_diffraction_row(rows, out, row, tx, rx);
+            continue;
+        }
+        const field::float3a source = channel::math::load_field_vec3(rows.tx_positions, tx);
+        const field::float3a target = channel::math::load_field_vec3(rows.rx_positions, rx);
+        const field::float3a tx_pol = channel::math::load_field_vec3(rows.tx_polarization, tx);
+        const field::float3a rx_pol = channel::math::load_field_vec3(rows.rx_polarization, rx);
+        if (los) {
+            store_transport_lane(
+                out, row,
+                free_space_lane(source, target, rows.tx_power[tx], tx_pol, rx_pol, rows.frequency_hz));
+            continue;
+        }
+        float factor = 1.0f;
+        if (faces.rough != nullptr || faces.replaced != nullptr) {
+            float seg_dir[kMaxDepth][3], normal[kMaxDepth][3];
+            float sign[kMaxDepth], cos_b[kMaxDepth], inv_len[kMaxDepth], sigma[kMaxDepth];
+            bool rough[kMaxDepth];
+            const FaceRoughBounces rough_bounces_of_row = {
+                rows, faces, row, rows.tx_positions + tx * 3};
+            factor = rough_bounce_factor(
+                static_cast<int>(depth), faces.rough_k0, rough_bounces_of_row, seg_dir, normal,
+                sign, cos_b, inv_len, rough, sigma);
+            if (depth == 1 && faces.replaced != nullptr &&
+                faces.replaced[bounce_face(rows, faces, row, 0)]) {
+                factor = 0.0f;
+            }
+        }
+        store_reflection_row(rows, faces, out, row, tx, rx, depth, factor);
+    }
+}
+
+}  // namespace
+
+pybind11::dict channel_field_canonical_rows(
+    at::Tensor order,
+    at::Tensor component_id,
+    at::Tensor depth,
+    at::Tensor tx_id,
+    at::Tensor rx_id,
+    at::Tensor primitive_sequence,
+    at::Tensor tx_positions,
+    at::Tensor tx_power,
+    at::Tensor tx_polarization,
+    at::Tensor rx_positions,
+    at::Tensor rx_polarization,
+    at::Tensor interaction_positions,
+    at::Tensor interaction_normals,
+    at::Tensor field_xyz,
+    at::Tensor coefficient,
+    at::Tensor path_field,
+    at::Tensor path_gain,
+    at::Tensor path_length,
+    at::Tensor delay,
+    at::Tensor direction,
+    at::Tensor face_eps_r,
+    at::Tensor face_sigma_e,
+    at::Tensor face_mu_r,
+    at::Tensor face_gain,
+    at::Tensor face_thickness,
+    at::Tensor face_material,
+    at::Tensor layer_offset,
+    at::Tensor layer_count,
+    at::Tensor layer_thickness_m,
+    at::Tensor layer_eps_r,
+    at::Tensor layer_sigma_e,
+    at::Tensor layer_mu_r,
+    bool multilayer,
+    at::Tensor face_rough_sigma,
+    at::Tensor face_rough,
+    at::Tensor face_replaced,
+    bool rough,
+    bool replace_specular,
+    bool evaluate_los,
+    double frequency_hz) {
+    using channel::check_flat_tensor;
+    using channel::check_tensor;
+    using channel::check_vec3_table;
+    const int64_t count = component_id.size(0);
+    check_flat_tensor(order, "order", at::kLong);
+    TORCH_CHECK(order.size(0) == 0 || order.size(0) == count,
+                "order must be empty or list every row");
+    for (const auto& named : std::vector<std::pair<at::Tensor, const char*>>{
+             {component_id, "component_id"}, {depth, "depth"}, {tx_id, "tx_id"}, {rx_id, "rx_id"}}) {
+        check_flat_tensor(named.first, named.second, at::kInt);
+        TORCH_CHECK(named.first.size(0) == count, named.second, " must list every row");
+    }
+    check_tensor(primitive_sequence, "primitive_sequence", at::kInt, 2);
+    const int64_t width = primitive_sequence.size(1);
+    TORCH_CHECK(primitive_sequence.size(0) == count, "primitive_sequence must list every row");
+    for (const auto& named : std::vector<std::pair<at::Tensor, const char*>>{
+             {interaction_positions, "interaction_positions"},
+             {interaction_normals, "interaction_normals"}}) {
+        check_tensor(named.first, named.second, at::kFloat, 3);
+        TORCH_CHECK(named.first.size(0) == count && named.first.size(1) == width &&
+                        named.first.size(2) == 3,
+                    named.second, " must have shape (N, W, 3)");
+    }
+    check_vec3_table(tx_positions, "tx_positions");
+    check_vec3_table(tx_polarization, "tx_polarization");
+    check_flat_tensor(tx_power, "tx_power", at::kFloat);
+    TORCH_CHECK(tx_power.size(0) == tx_positions.size(0) &&
+                    tx_polarization.size(0) == tx_positions.size(0),
+                "transmitter tables must share one length");
+    check_vec3_table(rx_positions, "rx_positions");
+    check_vec3_table(rx_polarization, "rx_polarization");
+    TORCH_CHECK(rx_polarization.size(0) == rx_positions.size(0),
+                "receiver tables must share one length");
+    check_tensor(field_xyz, "field_xyz", at::kComplexFloat, 2);
+    TORCH_CHECK(field_xyz.size(0) == count && field_xyz.size(1) == 3,
+                "field_xyz must have shape (N, 3)");
+    check_vec3_table(direction, "direction");
+    TORCH_CHECK(direction.size(0) == count, "direction must list every row");
+    for (const auto& named : std::vector<std::pair<at::Tensor, const char*>>{
+             {coefficient, "coefficient"}, {path_field, "path_field"}}) {
+        check_flat_tensor(named.first, named.second, at::kComplexFloat);
+        TORCH_CHECK(named.first.size(0) == count, named.second, " must list every row");
+    }
+    for (const auto& named : std::vector<std::pair<at::Tensor, const char*>>{
+             {path_gain, "path_gain"}, {path_length, "path_length"}, {delay, "delay"}}) {
+        check_flat_tensor(named.first, named.second, at::kFloat);
+        TORCH_CHECK(named.first.size(0) == count, named.second, " must list every row");
+    }
+    const int64_t face_count = face_eps_r.size(0);
+    for (const auto& named : std::vector<std::pair<at::Tensor, const char*>>{
+             {face_eps_r, "face_eps_r"}, {face_sigma_e, "face_sigma_e"}, {face_mu_r, "face_mu_r"},
+             {face_gain, "face_gain"}, {face_thickness, "face_thickness"}}) {
+        check_flat_tensor(named.first, named.second, at::kFloat);
+        TORCH_CHECK(named.first.size(0) == face_count, named.second, " must list every face");
+    }
+    check_flat_tensor(face_material, "face_material", at::kInt);
+    TORCH_CHECK(face_material.size(0) == face_count, "face_material must list every face");
+    TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
+
+    FaceTables faces = {};
+    faces.eps_r = face_eps_r.data_ptr<float>();
+    faces.sigma_e = face_sigma_e.data_ptr<float>();
+    faces.mu_r = face_mu_r.data_ptr<float>();
+    faces.gain = face_gain.data_ptr<float>();
+    faces.thickness = face_thickness.data_ptr<float>();
+    faces.material = face_material.data_ptr<int>();
+    faces.count = face_count;
+    faces.multilayer = multilayer;
+    if (multilayer) {
+        faces.layers = reflection_layer_tables(
+            face_material.reshape({face_count, 1}), layer_offset, layer_count, layer_thickness_m,
+            layer_eps_r, layer_sigma_e, layer_mu_r, face_count, 1);
+    }
+    if (rough || replace_specular) {
+        TORCH_CHECK(width <= kMaxDepth, "rough reflection supports at most ", kMaxDepth, " bounces");
+        faces.rough_k0 = static_cast<float>(2.0 * kPi * frequency_hz / kC0);
+    }
+    if (rough) {
+        check_flat_tensor(face_rough_sigma, "face_rough_sigma", at::kFloat);
+        check_flat_tensor(face_rough, "face_rough", at::kBool);
+        TORCH_CHECK(face_rough_sigma.size(0) == face_count && face_rough.size(0) == face_count,
+                    "rough face tables must list every face");
+        faces.rough_sigma = face_rough_sigma.data_ptr<float>();
+        faces.rough = face_rough.data_ptr<bool>();
+    }
+    if (replace_specular) {
+        check_flat_tensor(face_replaced, "face_replaced", at::kBool);
+        TORCH_CHECK(face_replaced.size(0) == face_count, "face_replaced must list every face");
+        faces.replaced = face_replaced.data_ptr<bool>();
+    }
+
+    CanonicalRows rows = {};
+    rows.count = count;
+    rows.width = width;
+    rows.order = order.size(0) == 0 ? nullptr : order.data_ptr<int64_t>();
+    rows.component_id = component_id.data_ptr<int>();
+    rows.depth = depth.data_ptr<int>();
+    rows.tx_id = tx_id.data_ptr<int>();
+    rows.rx_id = rx_id.data_ptr<int>();
+    rows.primitive_sequence = primitive_sequence.data_ptr<int>();
+    rows.tx_positions = tx_positions.data_ptr<float>();
+    rows.tx_power = tx_power.data_ptr<float>();
+    rows.tx_polarization = tx_polarization.data_ptr<float>();
+    rows.tx_count = tx_positions.size(0);
+    rows.rx_positions = rx_positions.data_ptr<float>();
+    rows.rx_polarization = rx_polarization.data_ptr<float>();
+    rows.rx_count = rx_positions.size(0);
+    rows.interaction_positions = interaction_positions.data_ptr<float>();
+    rows.interaction_normals = interaction_normals.data_ptr<float>();
+    rows.field_xyz = field_xyz.data_ptr<cfloat>();
+    rows.coefficient = coefficient.data_ptr<cfloat>();
+    rows.path_field = path_field.data_ptr<cfloat>();
+    rows.path_gain = path_gain.data_ptr<float>();
+    rows.path_length = path_length.data_ptr<float>();
+    rows.delay = delay.data_ptr<float>();
+    rows.direction = direction.data_ptr<float>();
+    rows.evaluate_los = evaluate_los;
+    rows.frequency_hz = static_cast<float>(frequency_hz);
+
+    auto out_field_xyz = at::empty_like(field_xyz);
+    auto out_coefficient = at::empty_like(coefficient);
+    auto out_path_field = at::empty_like(path_field);
+    auto out_path_gain = at::empty_like(path_gain);
+    auto out_path_length = at::empty_like(path_length);
+    auto out_delay = at::empty_like(delay);
+    auto out_direction = at::empty_like(direction);
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(field_xyz.get_device()).stream();
+        canonical_field_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+            rows, faces,
+            TransportOutputs{
+                out_field_xyz.data_ptr<cfloat>(), out_coefficient.data_ptr<cfloat>(),
+                out_path_field.data_ptr<cfloat>(), out_path_gain.data_ptr<float>(),
+                out_path_length.data_ptr<float>(), out_delay.data_ptr<float>(),
+                out_direction.data_ptr<float>()});
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    pybind11::dict result;
+    result["field_xyz"] = out_field_xyz;
+    result["coefficient"] = out_coefficient;
+    result["path_field"] = out_path_field;
+    result["path_gain"] = out_path_gain;
+    result["path_length"] = out_path_length;
+    result["delay"] = out_delay;
+    result["direction"] = out_direction;
+    return result;
 }
 
 #undef launch_blocks

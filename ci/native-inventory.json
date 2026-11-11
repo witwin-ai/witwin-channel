@@ -489,6 +489,7 @@
     },
     "native/channel/kernels/fields.cu": {
       "kernels": [
+        "canonical_field_kernel",
         "coupled_dd_field_kernel",
         "coupled_rd_field_kernel",
         "free_space_backward_kernel",
@@ -505,6 +506,7 @@
         "source_amplitude_scale_kernel"
       ],
       "launches": [
+        "canonical_field_kernel",
         "coupled_dd_field_kernel",
         "coupled_rd_field_kernel",
         "free_space_backward_kernel",
