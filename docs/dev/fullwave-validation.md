@@ -384,3 +384,65 @@ and other invalid observation cells.
 The workflow diagnoses discontinuities; it does not yet define pass/fail
 thresholds. Thresholds should be frozen only after references for all four
 cases have been generated at a reviewed grid-convergence level.
+
+## Tidy3D reference set and accuracy gate (`fullwave_reference.v1.json`)
+
+The cases above compare against local witwin-maxwell runs whose arrays are not
+in the repository. The committed reference set is a separate, small group of
+synthetic scenes solved once with Tidy3D 2.11.2 and stored as calibrated field
+maps under `tests/data/fullwave/<case>.npz`, so the comparison needs no
+full-wave solver to reproduce.
+
+| Case | Geometry | Polarization | Planes `z` (m) | Role |
+| --- | --- | --- | --- | --- |
+| `beam_z`, `beam_y` | PEC beam 0.18 x 0.5 x 0.18 m: four 90-degree wedges with 8.3-wavelength edges | z, y | -0.1, 0.12 | fit |
+| `halfplane_z`, `halfplane_y` | zero-thickness PEC plate 0.5 x 0.5 m in `x = 0` | z, y | -0.05, -0.2 | fit |
+| `cube_z` | manifest `single_cube` layout, PEC | z | 0.1, 0.3 | fit |
+| `cube_x` | same, x-polarized | x | 0.1, 0.3 | holdout |
+| `three_cube_z` | manifest `three_cube_320` layout, PEC | z | 0.1 | holdout |
+| `cube_dielectric_z` | `single_cube`, eps_r 4, sigma 0.01 S/m | z | 0.1, 0.3 | holdout |
+| `empty_z`, `empty_x` | free space | z, x | -0.1 | calibration |
+
+All runs use 5 GHz, a uniform 2 mm grid (2.5 mm for `three_cube_z`, about
+lambda/24 to lambda/30), 12 PML layers outside the domain, a Gaussian-pulse
+`PointDipole` and colocated monitors. Stored maps keep every fourth colocated
+grid node (8 mm or 10 mm pitch), so no interpolation is involved. The ten
+tasks cost 1.35 FlexCredits.
+
+**Calibration.** The two free-space runs fit one complex constant `C` per
+dipole axis between the conjugated Tidy3D phasor and the exact field of a unit
+dipole (`exp(-jkr)/r` times the transverse projection, with its `1/(kr)` and
+`1/(kr)^2` terms). The ratio is constant to +-0.4 % in magnitude; its phase
+drifts by about -8 degrees per metre (z) and -1 degree per metre (x), the FDTD
+dispersion at this grid. Stored fields are `conj(E_tidy3d) / C`, so they are in
+the same units as the deterministic field divided by its own LoS calibration
+(the LoS term alone equals the unit-dipole far field to 5e-5). Nothing is
+fitted per case.
+
+**Regions.** `classify_regions` labels each sample: invalid (inside or within
+one pitch of a block, two pitches of a plate), corner (the Keller stationary
+point of a silhouette edge seen by both antennas lies within
+`0.15 sqrt(lambda L)` of an edge end), transition (within half a projected
+Fresnel width `sqrt(lambda s (s + s') / s')` of a change of LoS or specular
+reflection visibility), otherwise lit or shadow by LoS visibility.
+
+**Metrics.** `region_errors` reports per region the RMS and mean of the dB
+magnitude error (both maps clamped 40 dB below the plane's 99th percentile) and
+the complex NMSE with no fitted scale or phase.
+
+**Gate.** `tests/accuracy/test_fullwave.py` (cuda tier, about 10 s) solves
+every fit and holdout case with the deterministic solver (`max_depth` 2, 3 for
+`three_cube_z`, coupled paths on, no ISB taper) and checks each region's RMS dB
+error and complex NMSE, and each plane's ISB/RSB jump p95 excess, against
+ceilings set from the measured errors plus headroom (ADR-050 amendment). The
+jump check matters: a wider corner sigmoid lowered the region RMS but put
+several-dB steps on shadow boundaries, which RMS alone did not flag.
+
+Regenerating the set (needs the Tidy3D API key; never uploads repository
+content, only the synthetic simulations):
+
+```bash
+python benchmarks/fullwave_validation/experiments/build_reference_set.py estimate --tasks tasks.json --data-dir out
+python benchmarks/fullwave_validation/experiments/build_reference_set.py submit --tasks tasks.json --data-dir out --max-credits 20
+python benchmarks/fullwave_validation/experiments/build_reference_set.py extract --tasks tasks.json --data-dir out
+```
