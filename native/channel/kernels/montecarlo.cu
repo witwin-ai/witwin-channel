@@ -968,3 +968,281 @@ pybind11::dict channel_scattering_event_probabilities(at::Tensor cos_theta,at::T
     for(const auto&t:{material_id,cap_r_te,cap_r_tm,cap_t_te,cap_t_tm,rough_sigma,scatter_model})TORCH_CHECK(t.get_device()==cos_theta.get_device(),"scattering tensors must share device");
     auto ps=at::empty_like(cos_theta),pt=at::empty_like(cos_theta),cr=at::empty_like(cos_theta);auto rb=at::empty({count},cos_theta.options().dtype(at::kBool));if(count>0){auto s=at::cuda::getCurrentCUDAStream(cos_theta.get_device()).stream();scattering_event_kernel<<<blocks(count),kBlockSize,0,s>>>(count,cos_theta.data_ptr<float>(),material_id.data_ptr<int>(),cap_r_te.data_ptr<float>(),cap_r_tm.data_ptr<float>(),cap_t_te.data_ptr<float>(),cap_t_tm.data_ptr<float>(),rough_sigma.data_ptr<float>(),scatter_model.data_ptr<int>(),rough_sigma.size(0),static_cast<float>(frequency),static_cast<float>(probability_floor),ps.data_ptr<float>(),pt.data_ptr<float>(),cr.data_ptr<float>(),rb.data_ptr<bool>());C10_CUDA_KERNEL_LAUNCH_CHECK();}pybind11::dict out;out["p_scatter"]=ps;out["p_transmit"]=pt;out["r_coh_amplitude"]=cr;out["rough"]=rb;return out;
 }
+
+// ==== Section: Monte Carlo scattering receiver pairs ====
+#include <ATen/ATen.h>
+#include <ATen/cuda/CUDAContext.h>
+#include <c10/cuda/CUDAException.h>
+#include <rayd/scattering_table.cuh>
+
+#include "../tensor_checks.h"
+
+#include <algorithm>
+#include <tuple>
+
+namespace {
+
+constexpr int kPairBlockSize = 256;
+namespace table = rayd::shared::scattering;
+
+// Per-sample inputs of the area-sampled Kirchhoff estimator: rough-surface point, mean-plane
+// normal flipped towards the transmitter, local frame, incident direction in that frame,
+// incident weight cos_i / r1^2 (0 when the sample is not lit), spawn epsilon and face material.
+struct ScatterSamples {
+    const float* points;
+    const float* normals;
+    const float* frame_t1;
+    const float* frame_t2;
+    const float* wi_local;
+    const float* incident;
+    const float* epsilon;
+    const int* material;
+    int64_t count;
+};
+
+struct ScatterTables {
+    const int* material_slot;
+    int64_t material_count;
+    const int64_t* table_offset;
+    const int* table_dims;
+    const float* f_te;
+    const float* f_tm;
+};
+
+struct PairGeometry {
+    bool active;
+    float wo_world[3];
+    float wo_local[3];
+    float weight;
+    int slot;
+};
+
+__device__ __forceinline__ float3 load_vec3(const float* values, int64_t index) {
+    return make_float3(values[3 * index], values[3 * index + 1], values[3 * index + 2]);
+}
+
+__device__ __forceinline__ float dot3(float3 a, float3 b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+// Outgoing geometry of sample n towards receiver rx: active when the sample is lit, carries a
+// table, and the receiver lies on the lit side; weight = cos_o * incident / r2^2.
+__device__ __forceinline__ PairGeometry pair_geometry(
+    const ScatterSamples& samples, const ScatterTables& tables, int64_t n, float3 rx) {
+    PairGeometry pair{};
+    pair.active = false;
+    const int material = samples.material[n];
+    pair.slot = material >= 0 && material < tables.material_count ? tables.material_slot[material] : -1;
+    const float incident = samples.incident[n];
+    if (pair.slot < 0 || !(incident > 0.0f)) return pair;
+    const float3 p = load_vec3(samples.points, n);
+    const float3 delta = make_float3(rx.x - p.x, rx.y - p.y, rx.z - p.z);
+    const float r2 = fmaxf(sqrtf(dot3(delta, delta)), 1.0e-6f);
+    const float3 wo = make_float3(delta.x / r2, delta.y / r2, delta.z / r2);
+    const float3 normal = load_vec3(samples.normals, n);
+    const float cos_o = dot3(wo, normal);
+    if (!(cos_o > 0.0f)) return pair;
+    pair.active = true;
+    pair.wo_world[0] = wo.x;
+    pair.wo_world[1] = wo.y;
+    pair.wo_world[2] = wo.z;
+    pair.wo_local[0] = dot3(wo, load_vec3(samples.frame_t1, n));
+    pair.wo_local[1] = dot3(wo, load_vec3(samples.frame_t2, n));
+    pair.wo_local[2] = cos_o;
+    pair.weight = incident * cos_o / (r2 * r2);
+    return pair;
+}
+
+__device__ __forceinline__ void slot_table(
+    const ScatterTables& tables, int slot, const float* f_te, const float* f_tm,
+    const float*& te, const float*& tm, int dims[4]) {
+    const int64_t offset = tables.table_offset[slot];
+    te = f_te + offset;
+    tm = f_tm + offset;
+    for (int k = 0; k < 4; ++k) dims[k] = tables.table_dims[4 * slot + k];
+}
+
+// Visibility legs of every (receiver j of the chunk, sample n) pair, entry j * N + n: from the
+// sample point moved epsilon along the outgoing ray to the receiver.
+__global__ void scattering_pair_legs_kernel(
+    ScatterSamples samples, ScatterTables tables, const float* receivers, int64_t receiver_count,
+    float* start, float* end, bool* active) {
+    const int64_t total = receiver_count * samples.count;
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t entry = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x; entry < total;
+         entry += stride) {
+        const int64_t j = entry / samples.count;
+        const int64_t n = entry - j * samples.count;
+        const float3 rx = load_vec3(receivers, j);
+        const PairGeometry pair = pair_geometry(samples, tables, n, rx);
+        const float3 p = load_vec3(samples.points, n);
+        const float eps = samples.epsilon[n];
+        start[3 * entry] = p.x + pair.wo_world[0] * eps;
+        start[3 * entry + 1] = p.y + pair.wo_world[1] * eps;
+        start[3 * entry + 2] = p.z + pair.wo_world[2] * eps;
+        end[3 * entry] = rx.x;
+        end[3 * entry + 1] = rx.y;
+        end[3 * entry + 2] = rx.z;
+        active[entry] = pair.active;
+    }
+}
+
+// One block per receiver of the chunk: the lanes add their samples' deposits
+// 0.5 * (f_te + f_tm) * weight in ascending sample order, then a fixed tree combines the lanes,
+// so the sum is reproducible. f_te / f_tm are the (possibly tangent) table values.
+__global__ void scattering_pair_sum_kernel(
+    ScatterSamples samples, ScatterTables tables, const float* receivers, const bool* visible,
+    const float* f_te, const float* f_tm, float* out, unsigned long long* deposited) {
+    __shared__ float partial[kPairBlockSize];
+    __shared__ unsigned int counts[kPairBlockSize];
+    const int64_t j = blockIdx.x;
+    const float3 rx = load_vec3(receivers, j);
+    float sum = 0.0f;
+    unsigned int count = 0;
+    for (int64_t n = threadIdx.x; n < samples.count; n += blockDim.x) {
+        if (!visible[j * samples.count + n]) continue;
+        const PairGeometry pair = pair_geometry(samples, tables, n, rx);
+        if (!pair.active) continue;
+        const float* te;
+        const float* tm;
+        int dims[4];
+        slot_table(tables, pair.slot, f_te, f_tm, te, tm, dims);
+        float out_te, out_tm;
+        table::eval_te_tm(te, tm, dims[0], dims[1], dims[2], dims[3], samples.wi_local + 3 * n,
+                          pair.wo_local, out_te, out_tm);
+        const float deposit = 0.5f * (out_te + out_tm) * pair.weight;
+        sum += deposit;
+        count += deposit > 0.0f ? 1u : 0u;
+    }
+    partial[threadIdx.x] = sum;
+    counts[threadIdx.x] = count;
+    __syncthreads();
+    for (int width = blockDim.x / 2; width > 0; width /= 2) {
+        if (static_cast<int>(threadIdx.x) < width) {
+            partial[threadIdx.x] += partial[threadIdx.x + width];
+            counts[threadIdx.x] += counts[threadIdx.x + width];
+        }
+        __syncthreads();
+    }
+    if (threadIdx.x == 0) {
+        out[j] = partial[0];
+        if (deposited != nullptr) atomicAdd(deposited, static_cast<unsigned long long>(counts[0]));
+    }
+}
+
+// VJP of the pair sum with respect to the flat table values: every visible pair spreads
+// grad[j] * 0.5 * weight over its 16 interpolation corners in both channels.
+__global__ void scattering_pair_sum_backward_kernel(
+    ScatterSamples samples, ScatterTables tables, const float* receivers, int64_t receiver_count,
+    const bool* visible, const float* grad, float* grad_te, float* grad_tm) {
+    const int64_t total = receiver_count * samples.count;
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t entry = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x; entry < total;
+         entry += stride) {
+        if (!visible[entry]) continue;
+        const int64_t j = entry / samples.count;
+        const int64_t n = entry - j * samples.count;
+        const float g = grad[j];
+        if (g == 0.0f) continue;
+        const PairGeometry pair = pair_geometry(samples, tables, n, load_vec3(receivers, j));
+        if (!pair.active) continue;
+        const float* te;
+        const float* tm;
+        int dims[4];
+        slot_table(tables, pair.slot, tables.f_te, tables.f_tm, te, tm, dims);
+        table::TableEvalGrad eval;
+        table::eval_te_tm_grad(te, tm, dims[0], dims[1], dims[2], dims[3], samples.wi_local + 3 * n,
+                               pair.wo_local, eval);
+        if (!eval.active) continue;
+        const int64_t offset = tables.table_offset[pair.slot];
+        const float scale = g * 0.5f * pair.weight;
+        for (int k = 0; k < 16; ++k) {
+            if (eval.cw[k] == 0.0f) continue;
+            atomicAdd(grad_te + offset + eval.idx[k], scale * eval.cw[k]);
+            atomicAdd(grad_tm + offset + eval.idx[k], scale * eval.cw[k]);
+        }
+    }
+}
+
+ScatterSamples scatter_samples(
+    const at::Tensor& points, const at::Tensor& normals, const at::Tensor& frame_t1,
+    const at::Tensor& frame_t2, const at::Tensor& wi_local, const at::Tensor& incident,
+    const at::Tensor& epsilon, const at::Tensor& material) {
+    return {points.data_ptr<float>(), normals.data_ptr<float>(), frame_t1.data_ptr<float>(),
+            frame_t2.data_ptr<float>(), wi_local.data_ptr<float>(), incident.data_ptr<float>(),
+            epsilon.data_ptr<float>(), material.data_ptr<int>(), points.size(0)};
+}
+
+ScatterTables scatter_tables(
+    const at::Tensor& material_slot, const at::Tensor& table_offset, const at::Tensor& table_dims,
+    const at::Tensor& f_te, const at::Tensor& f_tm) {
+    return {material_slot.data_ptr<int>(), material_slot.numel(), table_offset.data_ptr<int64_t>(),
+            table_dims.data_ptr<int>(), f_te.data_ptr<float>(), f_tm.data_ptr<float>()};
+}
+
+int pair_blocks(int64_t count) {
+    return static_cast<int>(std::min<int64_t>((count + kPairBlockSize - 1) / kPairBlockSize, 65535));
+}
+
+}  // namespace
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> channel_mc_scattering_pair_legs_cuda(
+    at::Tensor points, at::Tensor normals, at::Tensor frame_t1, at::Tensor frame_t2,
+    at::Tensor wi_local, at::Tensor incident, at::Tensor epsilon, at::Tensor material,
+    at::Tensor material_slot, at::Tensor table_offset, at::Tensor table_dims, at::Tensor f_te,
+    at::Tensor f_tm, at::Tensor receivers) {
+    const int64_t total = receivers.size(0) * points.size(0);
+    auto start = at::empty({total, 3}, points.options());
+    auto end = at::empty({total, 3}, points.options());
+    auto active = at::empty({total}, points.options().dtype(at::kBool));
+    if (total > 0) {
+        auto stream = at::cuda::getCurrentCUDAStream(points.get_device()).stream();
+        scattering_pair_legs_kernel<<<pair_blocks(total), kPairBlockSize, 0, stream>>>(
+            scatter_samples(points, normals, frame_t1, frame_t2, wi_local, incident, epsilon, material),
+            scatter_tables(material_slot, table_offset, table_dims, f_te, f_tm),
+            receivers.data_ptr<float>(), receivers.size(0), start.data_ptr<float>(),
+            end.data_ptr<float>(), active.data_ptr<bool>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return {start, end, active};
+}
+
+at::Tensor channel_mc_scattering_pair_sum_cuda(
+    at::Tensor points, at::Tensor normals, at::Tensor frame_t1, at::Tensor frame_t2,
+    at::Tensor wi_local, at::Tensor incident, at::Tensor epsilon, at::Tensor material,
+    at::Tensor material_slot, at::Tensor table_offset, at::Tensor table_dims, at::Tensor f_te,
+    at::Tensor f_tm, at::Tensor receivers, at::Tensor visible, at::Tensor value_te,
+    at::Tensor value_tm, at::Tensor deposited) {
+    auto out = at::empty({receivers.size(0)}, points.options());
+    if (receivers.size(0) == 0) return out;
+    auto stream = at::cuda::getCurrentCUDAStream(points.get_device()).stream();
+    scattering_pair_sum_kernel<<<static_cast<unsigned int>(receivers.size(0)), kPairBlockSize, 0, stream>>>(
+        scatter_samples(points, normals, frame_t1, frame_t2, wi_local, incident, epsilon, material),
+        scatter_tables(material_slot, table_offset, table_dims, f_te, f_tm),
+        receivers.data_ptr<float>(), visible.data_ptr<bool>(), value_te.data_ptr<float>(),
+        value_tm.data_ptr<float>(), out.data_ptr<float>(),
+        deposited.numel() > 0 ? reinterpret_cast<unsigned long long*>(deposited.data_ptr<int64_t>())
+                              : nullptr);
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    return out;
+}
+
+std::tuple<at::Tensor, at::Tensor> channel_mc_scattering_pair_sum_backward_cuda(
+    at::Tensor points, at::Tensor normals, at::Tensor frame_t1, at::Tensor frame_t2,
+    at::Tensor wi_local, at::Tensor incident, at::Tensor epsilon, at::Tensor material,
+    at::Tensor material_slot, at::Tensor table_offset, at::Tensor table_dims, at::Tensor f_te,
+    at::Tensor f_tm, at::Tensor receivers, at::Tensor visible, at::Tensor grad) {
+    auto grad_te = at::zeros_like(f_te);
+    auto grad_tm = at::zeros_like(f_tm);
+    const int64_t total = receivers.size(0) * points.size(0);
+    if (total > 0) {
+        auto stream = at::cuda::getCurrentCUDAStream(points.get_device()).stream();
+        scattering_pair_sum_backward_kernel<<<pair_blocks(total), kPairBlockSize, 0, stream>>>(
+            scatter_samples(points, normals, frame_t1, frame_t2, wi_local, incident, epsilon, material),
+            scatter_tables(material_slot, table_offset, table_dims, f_te, f_tm),
+            receivers.data_ptr<float>(), receivers.size(0), visible.data_ptr<bool>(),
+            grad.data_ptr<float>(), grad_te.data_ptr<float>(), grad_tm.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return {grad_te, grad_tm};
+}

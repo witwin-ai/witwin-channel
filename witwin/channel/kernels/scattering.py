@@ -25,7 +25,10 @@ from witwin.channel.runtime import (
     validate_cuda_tensor,
 )
 
+
 __all__ = [
+    "mc_scattering_pair_legs",
+    "mc_scattering_pair_sum",
     "_KirchhoffTableBuildAdFunction",
     "_ScatteringChainEnsembleEvalAdFunction",
     "_ScatteringChainRealizationEvalAdFunction",
@@ -3159,3 +3162,112 @@ def kirchhoff_table_build_ad(
         float(frequency_value),
     )
     return f_te, f_tm
+
+
+def mc_scattering_pair_legs(
+    samples: tuple[torch.Tensor, ...], tables: tuple[torch.Tensor, ...], receivers: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Visibility legs ``(start, end, active)`` of every (receiver, sample) pair, receiver-major.
+
+    ``samples`` = (points, normals, frame_t1, frame_t2, wi_local, incident, epsilon, material);
+    ``tables`` = (material_slot, table_offset, table_dims, f_te_flat, f_tm_flat).
+    """
+
+    out = _required_native_op("mc_scattering_pair_legs")(*samples, *tables, receivers)
+    if not isinstance(out, tuple) or len(out) != 3:
+        raise TypeError("_channel.mc_scattering_pair_legs must return 3 tensors")
+    return out[0], out[1], out[2]
+
+
+def _mc_scattering_pair_sum(
+    samples: tuple[torch.Tensor, ...], tables: tuple[torch.Tensor, ...], receivers: torch.Tensor,
+    visible: torch.Tensor, value_te: torch.Tensor, value_tm: torch.Tensor, deposited: torch.Tensor,
+) -> torch.Tensor:
+    out = _required_native_op("mc_scattering_pair_sum")(
+        *samples, *tables, receivers, visible, value_te, value_tm, deposited
+    )
+    if not isinstance(out, torch.Tensor):
+        raise TypeError("_channel.mc_scattering_pair_sum must return a tensor")
+    return out
+
+
+class _McScatteringPairSumFunction(torch.autograd.Function):
+    """Per-receiver Kirchhoff deposit sum, differentiable in the flat table values.
+
+    The samples, frames, receivers and visibility are frozen winners; the sum is linear in the
+    table values, so the VJP spreads the cotangent over the interpolation corners and the JVP is
+    the same sum over the tangent tables.
+    """
+
+    @staticmethod
+    def forward(f_te, f_tm, samples, tables, receivers, visible, deposited):
+        native_tables = (*tables[:3], f_te, f_tm)
+        return _mc_scattering_pair_sum(
+            samples, native_tables, receivers, visible, f_te, f_tm, deposited
+        )
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        f_te, f_tm, samples, tables, receivers, visible, _deposited = inputs
+        ctx.samples = samples
+        ctx.tables = (*tables[:3],)
+        ctx.receivers = receivers
+        ctx.visible = visible
+        ctx.save_for_backward(f_te, f_tm)
+        ctx.save_for_forward(f_te, f_tm)
+
+    @staticmethod
+    @_ad_first_order_only
+    def backward(ctx, grad_out):
+        if grad_out is None:
+            return (None,) * 7
+        f_te, f_tm = ctx.saved_tensors
+        out = _required_native_op("mc_scattering_pair_sum_backward")(
+            *ctx.samples,
+            *ctx.tables,
+            _ad_native_tensor(f_te).detach(),
+            _ad_native_tensor(f_tm).detach(),
+            ctx.receivers,
+            ctx.visible,
+            _ad_native_tensor(grad_out).contiguous(),
+        )
+        return out[0], out[1], None, None, None, None, None
+
+    @staticmethod
+    def jvp(ctx, t_te, t_tm, *_rest):
+        tangent_te = _ad_native_tangent_or_none(t_te)
+        tangent_tm = _ad_native_tangent_or_none(t_tm)
+        if tangent_te is None and tangent_tm is None:
+            return None
+        f_te, f_tm = ctx.saved_tensors
+        zero = torch.zeros_like(_ad_native_tensor(f_te))
+        with disable_functorch():
+            return _mc_scattering_pair_sum(
+                ctx.samples,
+                (*ctx.tables, _ad_native_tensor(f_te), _ad_native_tensor(f_tm)),
+                ctx.receivers,
+                ctx.visible,
+                tangent_te.contiguous() if tangent_te is not None else zero,
+                tangent_tm.contiguous() if tangent_tm is not None else zero,
+                zero.new_empty((0,), dtype=torch.int64),
+            )
+
+
+def mc_scattering_pair_sum(
+    samples: tuple[torch.Tensor, ...], tables: tuple[torch.Tensor, ...], receivers: torch.Tensor,
+    visible: torch.Tensor, *, deposited: torch.Tensor, ad: bool = False,
+) -> torch.Tensor:
+    """Per-receiver sum of ``0.5 (f_te + f_tm) cos_o cos_i / (r1^2 r2^2)`` over visible pairs.
+
+    Each receiver sums its samples in a fixed order (reproducible). ``deposited`` (int64, one
+    element) counts the positive deposits. Under ``ad`` the flat table values keep their graph.
+    """
+
+    if ad:
+        return _McScatteringPairSumFunction.apply(  # type: ignore[no-any-return]
+            tables[3], tables[4], samples, tables, receivers, visible, deposited
+        )
+    return _mc_scattering_pair_sum(
+        samples, tables, receivers, visible, tables[3].detach(), tables[4].detach(), deposited
+    )

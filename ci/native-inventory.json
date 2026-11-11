@@ -348,6 +348,7 @@
         "fill_selected_edge_indices_kernel",
         "fill_surface_group_root_edges_kernel",
         "init_parent_kernel",
+        "point_diffraction_tape_kernel",
         "utd_diffraction_tape_accumulate_backward_kernel",
         "utd_diffraction_tape_accumulate_jvp_kernel",
         "utd_diffraction_tape_accumulate_kernel"
@@ -365,6 +366,7 @@
         "fill_selected_edge_indices_kernel",
         "fill_surface_group_root_edges_kernel",
         "init_parent_kernel",
+        "point_diffraction_tape_kernel",
         "utd_diffraction_tape_accumulate_backward_kernel",
         "utd_diffraction_tape_accumulate_jvp_kernel",
         "utd_diffraction_tape_accumulate_kernel"
@@ -626,6 +628,9 @@
         "pack_int2_kernel",
         "sample_directions_kernel",
         "scattering_event_kernel",
+        "scattering_pair_legs_kernel",
+        "scattering_pair_sum_backward_kernel",
+        "scattering_pair_sum_kernel",
         "store_component_map_kernel"
       ],
       "launches": [
@@ -638,6 +643,9 @@
         "pack_int2_kernel",
         "sample_directions_kernel",
         "scattering_event_kernel",
+        "scattering_pair_legs_kernel",
+        "scattering_pair_sum_backward_kernel",
+        "scattering_pair_sum_kernel",
         "store_component_map_kernel"
       ],
       "host_synchronization": [

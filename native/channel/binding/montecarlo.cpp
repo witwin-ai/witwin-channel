@@ -169,6 +169,23 @@ torch::Tensor channel_mc_slab_reflection_accumulate_jvp(
     torch::Tensor solid_angle, double cell_area, double wavelength_tangent,
     torch::Tensor tx_pol, torch::Tensor points, double point_radius);
 torch::Tensor channel_mc_diffraction_state_wi(torch::Tensor state_edge_pos, torch::Tensor state_src);
+pybind11::tuple channel_mc_scattering_pair_legs(
+    torch::Tensor points, torch::Tensor normals, torch::Tensor frame_t1, torch::Tensor frame_t2,
+    torch::Tensor wi_local, torch::Tensor incident, torch::Tensor epsilon, torch::Tensor material,
+    torch::Tensor material_slot, torch::Tensor table_offset, torch::Tensor table_dims,
+    torch::Tensor f_te, torch::Tensor f_tm, torch::Tensor receivers);
+torch::Tensor channel_mc_scattering_pair_sum(
+    torch::Tensor points, torch::Tensor normals, torch::Tensor frame_t1, torch::Tensor frame_t2,
+    torch::Tensor wi_local, torch::Tensor incident, torch::Tensor epsilon, torch::Tensor material,
+    torch::Tensor material_slot, torch::Tensor table_offset, torch::Tensor table_dims,
+    torch::Tensor f_te, torch::Tensor f_tm, torch::Tensor receivers, torch::Tensor visible,
+    torch::Tensor value_te, torch::Tensor value_tm, torch::Tensor deposited);
+pybind11::tuple channel_mc_scattering_pair_sum_backward(
+    torch::Tensor points, torch::Tensor normals, torch::Tensor frame_t1, torch::Tensor frame_t2,
+    torch::Tensor wi_local, torch::Tensor incident, torch::Tensor epsilon, torch::Tensor material,
+    torch::Tensor material_slot, torch::Tensor table_offset, torch::Tensor table_dims,
+    torch::Tensor f_te, torch::Tensor f_tm, torch::Tensor receivers, torch::Tensor visible,
+    torch::Tensor grad);
 pybind11::tuple channel_mc_point_diffraction_tape(
     torch::Tensor sample_state, torch::Tensor edge_pos, torch::Tensor edge_dir,
     torch::Tensor t_min, torch::Tensor t_max, torch::Tensor n0, torch::Tensor nn,
@@ -355,6 +372,18 @@ void register_montecarlo(pybind11::module_ &module) {
         "mc_diffraction_state_wi",
         &channel_mc_diffraction_state_wi,
         "Compute MC diffraction incident directions with a CUDA kernel.");
+    module.def(
+        "mc_scattering_pair_legs",
+        &channel_mc_scattering_pair_legs,
+        "Write the receiver visibility legs of every MC scattering sample with a CUDA kernel.");
+    module.def(
+        "mc_scattering_pair_sum",
+        &channel_mc_scattering_pair_sum,
+        "Sum MC scattering deposits per receiver in a fixed order with a CUDA kernel.");
+    module.def(
+        "mc_scattering_pair_sum_backward",
+        &channel_mc_scattering_pair_sum_backward,
+        "VJP of the MC scattering pair sum with respect to the Kirchhoff table values.");
     module.def(
         "mc_point_diffraction_tape",
         &channel_mc_point_diffraction_tape,

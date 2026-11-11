@@ -184,6 +184,22 @@ at::Tensor channel_mc_receiver_grid_points_cuda(
     double y_axis_z,
     double spacing0,
     double spacing1);
+std::tuple<at::Tensor, at::Tensor, at::Tensor> channel_mc_scattering_pair_legs_cuda(
+    at::Tensor points, at::Tensor normals, at::Tensor frame_t1, at::Tensor frame_t2,
+    at::Tensor wi_local, at::Tensor incident, at::Tensor epsilon, at::Tensor material,
+    at::Tensor material_slot, at::Tensor table_offset, at::Tensor table_dims, at::Tensor f_te,
+    at::Tensor f_tm, at::Tensor receivers);
+at::Tensor channel_mc_scattering_pair_sum_cuda(
+    at::Tensor points, at::Tensor normals, at::Tensor frame_t1, at::Tensor frame_t2,
+    at::Tensor wi_local, at::Tensor incident, at::Tensor epsilon, at::Tensor material,
+    at::Tensor material_slot, at::Tensor table_offset, at::Tensor table_dims, at::Tensor f_te,
+    at::Tensor f_tm, at::Tensor receivers, at::Tensor visible, at::Tensor value_te,
+    at::Tensor value_tm, at::Tensor deposited);
+std::tuple<at::Tensor, at::Tensor> channel_mc_scattering_pair_sum_backward_cuda(
+    at::Tensor points, at::Tensor normals, at::Tensor frame_t1, at::Tensor frame_t2,
+    at::Tensor wi_local, at::Tensor incident, at::Tensor epsilon, at::Tensor material,
+    at::Tensor material_slot, at::Tensor table_offset, at::Tensor table_dims, at::Tensor f_te,
+    at::Tensor f_tm, at::Tensor receivers, at::Tensor visible, at::Tensor grad);
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_mc_reflection_rays_cuda(
     at::Tensor tx_positions, at::Tensor bounds, bool use_bounds, int64_t sample_count, int64_t seed);
 at::Tensor channel_mc_scene_bounds_cuda(at::Tensor vertices);
@@ -1028,4 +1044,102 @@ pybind11::dict channel_mc_finalize_component_maps(
     out["transmission_power"] = transmission_power;
     out["scattering_power"] = scattering_power;
     return out;
+}
+
+namespace {
+
+// Validates the shared sample, table and receiver tables of the MC scattering pair ops.
+void check_scattering_pairs(
+    const torch::Tensor& points, const torch::Tensor& normals, const torch::Tensor& frame_t1,
+    const torch::Tensor& frame_t2, const torch::Tensor& wi_local, const torch::Tensor& incident,
+    const torch::Tensor& epsilon, const torch::Tensor& material, const torch::Tensor& material_slot,
+    const torch::Tensor& table_offset, const torch::Tensor& table_dims, const torch::Tensor& f_te,
+    const torch::Tensor& f_tm, const torch::Tensor& receivers) {
+    const int64_t samples = points.size(0);
+    for (const auto* tensor : {&points, &normals, &frame_t1, &frame_t2, &wi_local, &receivers})
+        TORCH_CHECK(tensor->is_cuda() && tensor->scalar_type() == at::kFloat && tensor->dim() == 2 &&
+                        tensor->size(1) == 3 && tensor->is_contiguous() &&
+                        tensor->get_device() == points.get_device(),
+                    "scattering pair vectors must be contiguous float32 CUDA (N, 3) tensors");
+    for (const auto* tensor : {&normals, &frame_t1, &frame_t2, &wi_local})
+        TORCH_CHECK(tensor->size(0) == samples, "scattering sample tables must share N");
+    for (const auto* tensor : {&incident, &epsilon})
+        TORCH_CHECK(tensor->is_cuda() && tensor->scalar_type() == at::kFloat && tensor->is_contiguous() &&
+                        tensor->numel() == samples,
+                    "incident and epsilon must be contiguous float32 (N,) tensors");
+    TORCH_CHECK(material.is_cuda() && material.scalar_type() == at::kInt && material.is_contiguous() &&
+                    material.numel() == samples,
+                "material must be a contiguous int32 (N,) tensor");
+    TORCH_CHECK(material_slot.is_cuda() && material_slot.scalar_type() == at::kInt &&
+                    material_slot.is_contiguous(),
+                "material_slot must be a contiguous int32 CUDA tensor");
+    TORCH_CHECK(table_offset.is_cuda() && table_offset.scalar_type() == at::kLong &&
+                    table_offset.is_contiguous() && table_dims.is_cuda() &&
+                    table_dims.scalar_type() == at::kInt && table_dims.is_contiguous() &&
+                    table_dims.dim() == 2 && table_dims.size(1) == 4 &&
+                    table_dims.size(0) == table_offset.numel(),
+                "table_offset (S,) int64 and table_dims (S, 4) int32 must describe the same slots");
+    TORCH_CHECK(f_te.is_cuda() && f_te.scalar_type() == at::kFloat && f_te.is_contiguous() &&
+                    f_tm.sizes() == f_te.sizes() && f_tm.scalar_type() == at::kFloat &&
+                    f_tm.is_contiguous(),
+                "f_te and f_tm must be contiguous float32 tables of one shape");
+}
+
+void check_pair_mask(const torch::Tensor& visible, const torch::Tensor& points,
+                     const torch::Tensor& receivers) {
+    TORCH_CHECK(visible.is_cuda() && visible.scalar_type() == at::kBool && visible.is_contiguous() &&
+                    visible.numel() == points.size(0) * receivers.size(0),
+                "visible must be a contiguous bool tensor with one entry per (receiver, sample)");
+}
+
+}  // namespace
+
+pybind11::tuple channel_mc_scattering_pair_legs(
+    torch::Tensor points, torch::Tensor normals, torch::Tensor frame_t1, torch::Tensor frame_t2,
+    torch::Tensor wi_local, torch::Tensor incident, torch::Tensor epsilon, torch::Tensor material,
+    torch::Tensor material_slot, torch::Tensor table_offset, torch::Tensor table_dims,
+    torch::Tensor f_te, torch::Tensor f_tm, torch::Tensor receivers) {
+    check_scattering_pairs(points, normals, frame_t1, frame_t2, wi_local, incident, epsilon, material,
+                           material_slot, table_offset, table_dims, f_te, f_tm, receivers);
+    auto out = channel_mc_scattering_pair_legs_cuda(
+        points, normals, frame_t1, frame_t2, wi_local, incident, epsilon, material, material_slot,
+        table_offset, table_dims, f_te, f_tm, receivers);
+    return pybind11::make_tuple(std::get<0>(out), std::get<1>(out), std::get<2>(out));
+}
+
+torch::Tensor channel_mc_scattering_pair_sum(
+    torch::Tensor points, torch::Tensor normals, torch::Tensor frame_t1, torch::Tensor frame_t2,
+    torch::Tensor wi_local, torch::Tensor incident, torch::Tensor epsilon, torch::Tensor material,
+    torch::Tensor material_slot, torch::Tensor table_offset, torch::Tensor table_dims,
+    torch::Tensor f_te, torch::Tensor f_tm, torch::Tensor receivers, torch::Tensor visible,
+    torch::Tensor value_te, torch::Tensor value_tm, torch::Tensor deposited) {
+    check_scattering_pairs(points, normals, frame_t1, frame_t2, wi_local, incident, epsilon, material,
+                           material_slot, table_offset, table_dims, f_te, f_tm, receivers);
+    check_pair_mask(visible, points, receivers);
+    TORCH_CHECK(value_te.sizes() == f_te.sizes() && value_tm.sizes() == f_te.sizes() &&
+                    value_te.scalar_type() == at::kFloat && value_tm.scalar_type() == at::kFloat &&
+                    value_te.is_contiguous() && value_tm.is_contiguous(),
+                "value tables must match f_te");
+    TORCH_CHECK(deposited.is_cuda() && deposited.scalar_type() == at::kLong && deposited.numel() <= 1,
+                "deposited must be an empty or one-element int64 CUDA tensor");
+    return channel_mc_scattering_pair_sum_cuda(
+        points, normals, frame_t1, frame_t2, wi_local, incident, epsilon, material, material_slot,
+        table_offset, table_dims, f_te, f_tm, receivers, visible, value_te, value_tm, deposited);
+}
+
+pybind11::tuple channel_mc_scattering_pair_sum_backward(
+    torch::Tensor points, torch::Tensor normals, torch::Tensor frame_t1, torch::Tensor frame_t2,
+    torch::Tensor wi_local, torch::Tensor incident, torch::Tensor epsilon, torch::Tensor material,
+    torch::Tensor material_slot, torch::Tensor table_offset, torch::Tensor table_dims,
+    torch::Tensor f_te, torch::Tensor f_tm, torch::Tensor receivers, torch::Tensor visible,
+    torch::Tensor grad) {
+    check_scattering_pairs(points, normals, frame_t1, frame_t2, wi_local, incident, epsilon, material,
+                           material_slot, table_offset, table_dims, f_te, f_tm, receivers);
+    check_pair_mask(visible, points, receivers);
+    TORCH_CHECK(grad.is_cuda() && grad.scalar_type() == at::kFloat && grad.numel() == receivers.size(0),
+                "grad must be a float32 CUDA tensor with one entry per receiver");
+    auto out = channel_mc_scattering_pair_sum_backward_cuda(
+        points, normals, frame_t1, frame_t2, wi_local, incident, epsilon, material, material_slot,
+        table_offset, table_dims, f_te, f_tm, receivers, visible, grad.contiguous());
+    return pybind11::make_tuple(std::get<0>(out), std::get<1>(out));
 }

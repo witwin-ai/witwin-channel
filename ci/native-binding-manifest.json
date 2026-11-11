@@ -3495,6 +3495,29 @@
       "python_owners": ["witwin.channel.runtime.mc_pack_vec3"]
     },
     {
+      "name": "mc_point_diffraction_tape",
+      "target": "channel_mc_point_diffraction_tape",
+      "return_type": "pybind11::tuple",
+      "doc": "Build the capture-sphere diffraction tape of point receivers with a CUDA kernel.",
+      "parameters": [
+        ["sample_state", "torch::Tensor", null],
+        ["edge_pos", "torch::Tensor", null],
+        ["edge_dir", "torch::Tensor", null],
+        ["t_min", "torch::Tensor", null],
+        ["t_max", "torch::Tensor", null],
+        ["n0", "torch::Tensor", null],
+        ["nn", "torch::Tensor", null],
+        ["source", "torch::Tensor", null],
+        ["points", "torch::Tensor", null],
+        ["point_begin", "int64_t", null],
+        ["point_count", "int64_t", null],
+        ["seed", "int64_t", null],
+        ["point_radius", "double", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.montecarlo.mc_point_diffraction_tape"]
+    },
+    {
       "name": "mc_receiver_grid_points",
       "target": "channel_mc_receiver_grid_points",
       "return_type": "torch::Tensor",
@@ -3604,6 +3627,84 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.topology.mc_sample_directions"]
+    },
+    {
+      "name": "mc_scattering_pair_legs",
+      "target": "channel_mc_scattering_pair_legs",
+      "return_type": "pybind11::tuple",
+      "doc": "Write the receiver visibility legs of every MC scattering sample with a CUDA kernel.",
+      "parameters": [
+        ["points", "torch::Tensor", null],
+        ["normals", "torch::Tensor", null],
+        ["frame_t1", "torch::Tensor", null],
+        ["frame_t2", "torch::Tensor", null],
+        ["wi_local", "torch::Tensor", null],
+        ["incident", "torch::Tensor", null],
+        ["epsilon", "torch::Tensor", null],
+        ["material", "torch::Tensor", null],
+        ["material_slot", "torch::Tensor", null],
+        ["table_offset", "torch::Tensor", null],
+        ["table_dims", "torch::Tensor", null],
+        ["f_te", "torch::Tensor", null],
+        ["f_tm", "torch::Tensor", null],
+        ["receivers", "torch::Tensor", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.scattering.mc_scattering_pair_legs"]
+    },
+    {
+      "name": "mc_scattering_pair_sum",
+      "target": "channel_mc_scattering_pair_sum",
+      "return_type": "torch::Tensor",
+      "doc": "Sum MC scattering deposits per receiver in a fixed order with a CUDA kernel.",
+      "parameters": [
+        ["points", "torch::Tensor", null],
+        ["normals", "torch::Tensor", null],
+        ["frame_t1", "torch::Tensor", null],
+        ["frame_t2", "torch::Tensor", null],
+        ["wi_local", "torch::Tensor", null],
+        ["incident", "torch::Tensor", null],
+        ["epsilon", "torch::Tensor", null],
+        ["material", "torch::Tensor", null],
+        ["material_slot", "torch::Tensor", null],
+        ["table_offset", "torch::Tensor", null],
+        ["table_dims", "torch::Tensor", null],
+        ["f_te", "torch::Tensor", null],
+        ["f_tm", "torch::Tensor", null],
+        ["receivers", "torch::Tensor", null],
+        ["visible", "torch::Tensor", null],
+        ["value_te", "torch::Tensor", null],
+        ["value_tm", "torch::Tensor", null],
+        ["deposited", "torch::Tensor", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.scattering._mc_scattering_pair_sum"]
+    },
+    {
+      "name": "mc_scattering_pair_sum_backward",
+      "target": "channel_mc_scattering_pair_sum_backward",
+      "return_type": "pybind11::tuple",
+      "doc": "VJP of the MC scattering pair sum with respect to the Kirchhoff table values.",
+      "parameters": [
+        ["points", "torch::Tensor", null],
+        ["normals", "torch::Tensor", null],
+        ["frame_t1", "torch::Tensor", null],
+        ["frame_t2", "torch::Tensor", null],
+        ["wi_local", "torch::Tensor", null],
+        ["incident", "torch::Tensor", null],
+        ["epsilon", "torch::Tensor", null],
+        ["material", "torch::Tensor", null],
+        ["material_slot", "torch::Tensor", null],
+        ["table_offset", "torch::Tensor", null],
+        ["table_dims", "torch::Tensor", null],
+        ["f_te", "torch::Tensor", null],
+        ["f_tm", "torch::Tensor", null],
+        ["receivers", "torch::Tensor", null],
+        ["visible", "torch::Tensor", null],
+        ["grad", "torch::Tensor", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.scattering._McScatteringPairSumFunction"]
     },
     {
       "name": "mc_scene_bounds",
@@ -3930,7 +4031,11 @@
         ["double", "", null],
         ["int64_t", "", null],
         ["double", "", null],
-        ["Tensor", "torch::", null]
+        ["Tensor", "torch::", null],
+        ["tape_lane", "torch::Tensor", null],
+        ["points", "torch::Tensor", null],
+        ["point_radius", "double", null],
+        ["edge_samples", "int64_t", null]
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.montecarlo.mc_utd_diffraction_tape_accumulate"]
@@ -3975,7 +4080,11 @@
         ["seed", "int64_t", null],
         ["total_edge_length", "double", null],
         ["wavelength_dfreq", "double", null],
-        ["tx_pol", "torch::Tensor", null]
+        ["tx_pol", "torch::Tensor", null],
+        ["tape_lane", "torch::Tensor", null],
+        ["points", "torch::Tensor", null],
+        ["point_radius", "double", null],
+        ["edge_samples", "int64_t", null]
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.montecarlo.mc_utd_diffraction_tape_accumulate_backward"]
@@ -4026,7 +4135,11 @@
         ["seed", "int64_t", null],
         ["total_edge_length", "double", null],
         ["wavelength_tangent", "double", null],
-        ["tx_pol", "torch::Tensor", null]
+        ["tx_pol", "torch::Tensor", null],
+        ["tape_lane", "torch::Tensor", null],
+        ["points", "torch::Tensor", null],
+        ["point_radius", "double", null],
+        ["edge_samples", "int64_t", null]
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.montecarlo.mc_utd_diffraction_tape_accumulate_jvp"]
