@@ -918,7 +918,10 @@ at::Tensor channel_bdpt_count_valid_connection_samples_cuda(at::Tensor valid) {
     const int64_t count = valid.size(0);
     // The count stays on the device; the caller reads it with the solve's other
     // metadata counts in one copy.
-    auto valid_count = at::zeros({}, valid.options().dtype(at::kLong));
+    auto valid_count = at::empty({}, valid.options().dtype(at::kLong));
+    C10_CUDA_CHECK(cudaMemsetAsync(
+        valid_count.data_ptr(), 0, sizeof(int64_t),
+        at::cuda::getCurrentCUDAStream(valid.get_device()).stream()));
     if (count > 0) {
         constexpr int threads = 256;
         int blocks = static_cast<int>((count + threads - 1) / threads);
@@ -1676,7 +1679,8 @@ SortedBins sorted_bins(
 // bins[key] = fixed-order sum of first[row] * second[row] over the key's rows.
 at::Tensor sorted_bin_sums(const SortedBins& sorted, const float* first, const float* second,
                            const at::Tensor& reference) {
-    auto bins = at::zeros({static_cast<int64_t>(sorted.bins_count)}, reference.options().dtype(at::kDouble));
+    auto bins = at::empty({static_cast<int64_t>(sorted.bins_count)}, reference.options().dtype(at::kDouble));
+    zero_double_tensor(bins);
     if (sorted.count == 0) {
         return bins;
     }
@@ -3329,6 +3333,17 @@ void channel_bdpt_wavefront_connect_accumulate_cuda(
         transmission.data_ptr<double>(),
         reinterpret_cast<unsigned long long*>(valid_rows.data_ptr<int64_t>()));
     C10_CUDA_KERNEL_LAUNCH_CHECK();
+}
+
+// Zero-filled CUDA storage for the wavefront accumulators and counters.
+at::Tensor channel_bdpt_wavefront_zeros_cuda(at::IntArrayRef sizes, const at::TensorOptions& options) {
+    auto tensor = at::empty(sizes, options);
+    if (tensor.numel() > 0) {
+        C10_CUDA_CHECK(cudaMemsetAsync(
+            tensor.data_ptr(), 0, static_cast<size_t>(tensor.numel()) * tensor.element_size(),
+            at::cuda::getCurrentCUDAStream(tensor.get_device()).stream()));
+    }
+    return tensor;
 }
 
 at::Tensor channel_bdpt_wavefront_finalize_cuda(const at::Tensor& accumulated, const at::Tensor& base) {

@@ -99,6 +99,7 @@ void channel_bdpt_wavefront_connect_accumulate_cuda(
     at::Tensor& transmission,
     at::Tensor& valid_rows);
 at::Tensor channel_bdpt_wavefront_finalize_cuda(const at::Tensor& accumulated, const at::Tensor& base);
+at::Tensor channel_bdpt_wavefront_zeros_cuda(at::IntArrayRef sizes, const at::TensorOptions& options);
 
 namespace {
 
@@ -215,10 +216,10 @@ pybind11::dict channel_bdpt_wavefront_transmission(
 
     const auto float_options = tx_positions.options().dtype(at::kFloat);
     const auto long_options = tx_positions.options().dtype(at::kLong);
-    auto accumulated = at::zeros({tx_count, rx_count}, tx_positions.options().dtype(at::kDouble));
+    auto accumulated = channel_bdpt_wavefront_zeros_cuda({tx_count, rx_count}, tx_positions.options().dtype(at::kDouble));
     // [transmit events, reflect events, accumulated rows]
-    auto counters = at::zeros({3}, long_options);
-    auto alive = at::zeros({max_depth}, long_options);
+    auto counters = channel_bdpt_wavefront_zeros_cuda({3}, long_options);
+    auto alive = channel_bdpt_wavefront_zeros_cuda({max_depth}, long_options);
     auto event_counters = counters.narrow(0, 0, 2);
     auto valid_rows = counters.narrow(0, 2, 1);
 

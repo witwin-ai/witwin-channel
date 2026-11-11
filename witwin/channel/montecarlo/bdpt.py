@@ -3546,8 +3546,8 @@ def _enumerated_discrete_connection_samples(
     return _EnumeratedBlock(
         samples=samples,
         dropped_rows=dropped_rows,
-        coeff_real=field.real.contiguous(),
-        coeff_imag=field.imag.contiguous(),
+        coeff_real=field.real,
+        coeff_imag=field.imag,
     )
 
 
