@@ -3963,7 +3963,7 @@ def bdpt_scatter_table_stack(
 
     Structural packing only: ``material_slot[m]`` is the slot of material ``m``
     (``-1`` without a table) and every table block is located by its offsets and
-    ``[nti, npi, nto, npo]`` dims. Table values are read detached.
+    ``[nti, npi, nto, npo]`` dims. ``f_te`` / ``f_tm`` keep their autograd graph.
     """
 
     device = material_bundle["scatter_model_id"].device
@@ -3981,9 +3981,12 @@ def bdpt_scatter_table_stack(
         table = runtimes[material].table  # type: ignore[attr-defined]
         slot[material] = index
         for name in ("f_te", "f_tm", "conditional_cdf", "sample_density", "marginal_cdf"):
-            parts[name].append(
-                getattr(table, name).detach().to(device=device, dtype=torch.float32).reshape(-1)
-            )
+            value = getattr(table, name)
+            # Table values keep their graph (their derivative is a wavefront
+            # leaf); the sampling CDFs are frozen.
+            if name not in ("f_te", "f_tm"):
+                value = value.detach()
+            parts[name].append(value.to(device=device, dtype=torch.float32).reshape(-1))
         offsets.append(running)
         marginal_offsets.append(marginal_running)
         dims.append([int(size) for size in table.f_te.shape])
@@ -3997,6 +4000,58 @@ def bdpt_scatter_table_stack(
     for name in ("scatter_model_id", "rough_sigma_h_m", "rough_axis_rad"):
         stack[name] = material_bundle[name].contiguous()
     return stack
+
+
+def _bdpt_wavefront_arguments(
+    rayd: object, tx_positions: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
+    rx_positions: torch.Tensor, rx_polarization: torch.Tensor,
+    material_bundle: dict[str, torch.Tensor], first: torch.Tensor, second: torch.Tensor, *,
+    scatter: dict[str, torch.Tensor] | None, frequency_hz: float, samples: int, max_depth: int,
+    seed: int, mis_mode: int, beta: float, emit_mixed: bool, max_scattering_order: int,
+    scene_diagonal: float, chunk_samples: int, pair_tile: int,
+) -> list[object]:
+    """Validated positional arguments shared by the three wavefront passes."""
+
+    for name, tensor in (
+        ("tx_positions", tx_positions),
+        ("tx_polarization", tx_polarization),
+        ("rx_positions", rx_positions),
+        ("rx_polarization", rx_polarization),
+    ):
+        validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    validate_cuda_tensor("tx_power", tx_power, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("transmission matrix", first, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("scattering matrix", second, dtype=torch.float32, ndim=2)
+    if samples <= 0 or max_depth < 1 or seed < 0 or chunk_samples <= 0 or pair_tile <= 0:
+        raise ValueError("samples, max_depth, chunk_samples and pair_tile must be positive")
+    materials = {
+        name: material_bundle[name].detach() for name in _BDPT_WAVEFRONT_MATERIAL_FIELDS
+    }
+    if scatter is not None:
+        scatter = {name: value.detach() for name, value in scatter.items()}
+    return [
+        _rayd_scene_resource(rayd),
+        tx_positions,
+        tx_power.detach().contiguous(),
+        tx_polarization.contiguous(),
+        rx_positions.contiguous(),
+        rx_polarization.contiguous(),
+        materials,
+        scatter,
+        first.detach().contiguous(),
+        second.detach().contiguous(),
+        float(frequency_hz),
+        int(samples),
+        int(max_depth),
+        int(seed),
+        int(mis_mode),
+        float(beta),
+        bool(emit_mixed),
+        int(max_scattering_order),
+        float(scene_diagonal),
+        int(chunk_samples),
+        int(pair_tile),
+    ]
 
 
 def bdpt_wavefront_transmission(
@@ -4018,42 +4073,16 @@ def bdpt_wavefront_transmission(
     connection-sample schema, sorted by (sample, bounce, receiver).
     """
 
-    for name, tensor in (
-        ("tx_positions", tx_positions),
-        ("tx_polarization", tx_polarization),
-        ("rx_positions", rx_positions),
-        ("rx_polarization", rx_polarization),
-    ):
-        validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=2, trailing_shape=(3,))
-    validate_cuda_tensor("tx_power", tx_power, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("base_transmission", base_transmission, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("base_scattering", base_scattering, dtype=torch.float32, ndim=2)
-    if samples <= 0 or max_depth < 1 or seed < 0 or chunk_samples <= 0 or pair_tile <= 0:
-        raise ValueError("samples, max_depth, chunk_samples and pair_tile must be positive")
-    materials = {name: material_bundle[name] for name in _BDPT_WAVEFRONT_MATERIAL_FIELDS}
+    arguments = _bdpt_wavefront_arguments(
+        rayd, tx_positions, tx_power, tx_polarization, rx_positions, rx_polarization,
+        material_bundle, base_transmission, base_scattering, scatter=scatter,
+        frequency_hz=frequency_hz, samples=samples, max_depth=max_depth, seed=seed,
+        mis_mode=mis_mode, beta=beta, emit_mixed=emit_mixed,
+        max_scattering_order=max_scattering_order, scene_diagonal=scene_diagonal,
+        chunk_samples=chunk_samples, pair_tile=pair_tile,
+    )
     out = _required_native_op("bdpt_wavefront_transmission")(
-        _rayd_scene_resource(rayd),
-        tx_positions,
-        tx_power.detach().contiguous(),
-        tx_polarization.contiguous(),
-        rx_positions.contiguous(),
-        rx_polarization.contiguous(),
-        materials,
-        scatter,
-        base_transmission.contiguous(),
-        base_scattering.contiguous(),
-        float(frequency_hz),
-        int(samples),
-        int(max_depth),
-        int(seed),
-        int(mis_mode),
-        float(beta),
-        bool(emit_mixed),
-        int(max_scattering_order),
-        float(scene_diagonal),
-        int(chunk_samples),
-        int(pair_tile),
-        -1 if rows_capacity is None else int(rows_capacity),
+        *arguments, -1 if rows_capacity is None else int(rows_capacity)
     )
     expected = {"transmission", "scattering", "counts"} | (
         set() if rows_capacity is None else {"rows"}
@@ -4067,4 +4096,87 @@ def bdpt_wavefront_transmission(
     validate_cuda_tensor("transmission", out["transmission"], dtype=torch.float32, ndim=2)
     validate_cuda_tensor("scattering", out["scattering"], dtype=torch.float32, ndim=2)
     validate_cuda_tensor("counts", out["counts"], dtype=torch.int64, ndim=1)
+    return out
+
+
+BDPT_WAVEFRONT_GRADIENTS = (
+    "face_eps_r",
+    "face_sigma_e",
+    "face_gain",
+    "face_thickness",
+    "layer_thickness_m",
+    "layer_eps_r",
+    "layer_sigma_e",
+    "f_te",
+    "f_tm",
+    "tx_power",
+    "frequency",
+)
+
+
+def bdpt_wavefront_jvp(
+    rayd: object, tx_positions: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
+    rx_positions: torch.Tensor, rx_polarization: torch.Tensor,
+    material_bundle: dict[str, torch.Tensor], base_transmission: torch.Tensor,
+    base_scattering: torch.Tensor, *, tangents: dict[str, object],
+    scatter: dict[str, torch.Tensor] | None, frequency_hz: float, samples: int, max_depth: int,
+    seed: int, mis_mode: int, beta: float, emit_mixed: bool, max_scattering_order: int,
+    scene_diagonal: float, chunk_samples: int = 1 << 18, pair_tile: int = 1 << 20,
+) -> dict[str, torch.Tensor]:
+    """Run the wavefront primal and its forward-mode tangent in one native pass.
+
+    ``tangents`` holds float tangents of the leaves in ``BDPT_WAVEFRONT_GRADIENTS``
+    (missing or ``None`` is zero; ``frequency`` is a float) and the
+    ``base_transmission`` / ``base_scattering`` matrix tangents.
+    """
+
+    arguments = _bdpt_wavefront_arguments(
+        rayd, tx_positions, tx_power, tx_polarization, rx_positions, rx_polarization,
+        material_bundle, base_transmission, base_scattering, scatter=scatter,
+        frequency_hz=frequency_hz, samples=samples, max_depth=max_depth, seed=seed,
+        mis_mode=mis_mode, beta=beta, emit_mixed=emit_mixed,
+        max_scattering_order=max_scattering_order, scene_diagonal=scene_diagonal,
+        chunk_samples=chunk_samples, pair_tile=pair_tile,
+    )
+    native_tangents: dict[str, object] = {"frequency": float(tangents.get("frequency", 0.0))}  # type: ignore[arg-type]
+    for name, value in tangents.items():
+        if name == "frequency" or value is None:
+            continue
+        if name not in BDPT_WAVEFRONT_GRADIENTS and name not in ("base_transmission", "base_scattering"):
+            raise ValueError(f"unknown BDPT wavefront tangent {name!r}")
+        tensor = value  # type: ignore[assignment]
+        validate_cuda_tensor(f"tangent {name}", tensor, dtype=torch.float32, ndim=tensor.dim())  # type: ignore[arg-type,union-attr]
+        native_tangents[name] = tensor.detach().contiguous()  # type: ignore[union-attr]
+    out = _required_native_op("bdpt_wavefront_jvp")(*arguments, native_tangents)
+    expected = {"transmission", "scattering", "tangent_transmission", "tangent_scattering", "counts"}
+    if not isinstance(out, dict) or set(out) != expected:
+        raise TypeError("_channel.bdpt_wavefront_jvp returned unexpected fields")
+    return out
+
+
+def bdpt_wavefront_backward(
+    rayd: object, tx_positions: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
+    rx_positions: torch.Tensor, rx_polarization: torch.Tensor,
+    material_bundle: dict[str, torch.Tensor], grad_transmission: torch.Tensor,
+    grad_scattering: torch.Tensor, *, needs: tuple[str, ...],
+    scatter: dict[str, torch.Tensor] | None, frequency_hz: float, samples: int, max_depth: int,
+    seed: int, mis_mode: int, beta: float, emit_mixed: bool, max_scattering_order: int,
+    scene_diagonal: float, chunk_samples: int = 1 << 16, pair_tile: int = 1 << 20,
+) -> dict[str, torch.Tensor]:
+    """Replay the wavefront and return the float gradients of the leaves in ``needs``."""
+
+    unknown = set(needs) - set(BDPT_WAVEFRONT_GRADIENTS)
+    if unknown:
+        raise ValueError(f"unknown BDPT wavefront gradients {sorted(unknown)}")
+    arguments = _bdpt_wavefront_arguments(
+        rayd, tx_positions, tx_power, tx_polarization, rx_positions, rx_polarization,
+        material_bundle, grad_transmission, grad_scattering, scatter=scatter,
+        frequency_hz=frequency_hz, samples=samples, max_depth=max_depth, seed=seed,
+        mis_mode=mis_mode, beta=beta, emit_mixed=emit_mixed,
+        max_scattering_order=max_scattering_order, scene_diagonal=scene_diagonal,
+        chunk_samples=chunk_samples, pair_tile=pair_tile,
+    )
+    out = _required_native_op("bdpt_wavefront_backward")(*arguments, list(needs))
+    if not isinstance(out, dict) or set(out) != set(needs):
+        raise TypeError("_channel.bdpt_wavefront_backward returned unexpected fields")
     return out

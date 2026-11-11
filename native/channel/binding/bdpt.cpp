@@ -2,6 +2,7 @@
 // Implements bdpt native integration.
 
 #include <torch/extension.h>
+#include <pybind11/stl.h>
 
 #include "../rayd/resource.h"
 #include "registry.h"
@@ -109,6 +110,52 @@ pybind11::dict channel_bdpt_wavefront_transmission(
     int64_t chunk_samples,
     int64_t pair_tile,
     int64_t rows_capacity);
+pybind11::dict channel_bdpt_wavefront_jvp(
+    RayDSceneResource& scene,
+    torch::Tensor tx_positions,
+    torch::Tensor tx_power,
+    torch::Tensor tx_polarization,
+    torch::Tensor rx_positions,
+    torch::Tensor rx_polarization,
+    pybind11::dict materials,
+    pybind11::object scatter,
+    torch::Tensor base_transmission,
+    torch::Tensor base_scattering,
+    double frequency_hz,
+    int64_t samples,
+    int64_t max_depth,
+    int64_t seed,
+    int64_t mode_id,
+    double beta,
+    bool emit_mixed,
+    int64_t max_scattering_order,
+    double scene_diagonal,
+    int64_t chunk_samples,
+    int64_t pair_tile,
+    pybind11::dict tangents);
+pybind11::dict channel_bdpt_wavefront_backward(
+    RayDSceneResource& scene,
+    torch::Tensor tx_positions,
+    torch::Tensor tx_power,
+    torch::Tensor tx_polarization,
+    torch::Tensor rx_positions,
+    torch::Tensor rx_polarization,
+    pybind11::dict materials,
+    pybind11::object scatter,
+    torch::Tensor grad_transmission,
+    torch::Tensor grad_scattering,
+    double frequency_hz,
+    int64_t samples,
+    int64_t max_depth,
+    int64_t seed,
+    int64_t mode_id,
+    double beta,
+    bool emit_mixed,
+    int64_t max_scattering_order,
+    double scene_diagonal,
+    int64_t chunk_samples,
+    int64_t pair_tile,
+    std::vector<std::string> needs);
 torch::Tensor channel_bdpt_mis_weights(
     torch::Tensor pdf,
     torch::Tensor strategy_pdf_sum,
@@ -562,6 +609,14 @@ void register_bdpt_components(pybind11::module_ &module) {
         "bdpt_wavefront_transmission",
         &channel_bdpt_wavefront_transmission,
         "Run the fused all-transmitter BDPT wavefront: mixed chains and rough-face scatter connections.");
+    module.def(
+        "bdpt_wavefront_jvp",
+        &channel_bdpt_wavefront_jvp,
+        "Run the BDPT wavefront with its forward-mode tangents in one pass.");
+    module.def(
+        "bdpt_wavefront_backward",
+        &channel_bdpt_wavefront_backward,
+        "Replay the BDPT wavefront and return the reverse-mode leaf gradients.");
     module.def(
         "bdpt_transmitter_tensors",
         &channel_bdpt_transmitter_tensors,
