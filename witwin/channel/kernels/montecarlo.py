@@ -843,6 +843,26 @@ def _point_rows(points: torch.Tensor | None, reference: torch.Tensor) -> torch.T
     return points
 
 
+def _mc_reflection_layers(
+    layers: tuple[torch.Tensor, ...] | None, material_eta_r: torch.Tensor,
+) -> list[torch.Tensor]:
+    """Native layer bundle: per-face material ids plus the six CSR layer tables.
+
+    Without a bundle every face uses its scalar single-slab view.
+    """
+
+    if layers is not None:
+        return list(layers)
+    device = material_eta_r.device
+    empty_i = torch.empty((0,), device=device, dtype=torch.int32)
+    empty_f = torch.empty((0,), device=device, dtype=torch.float32)
+    return [
+        # Never read: an empty layer store marks every face single-layer.
+        torch.empty(material_eta_r.shape, device=device, dtype=torch.int32),
+        empty_i, empty_i, empty_f, empty_f, empty_f, empty_f,
+    ]
+
+
 def mc_slab_reflection_accumulate(
     ray_o: torch.Tensor, ray_d: torch.Tensor, trace_valid: torch.Tensor, trace_t: torch.Tensor,
     trace_prim: torch.Tensor, face_normals: torch.Tensor, material_eta_r: torch.Tensor,
@@ -852,6 +872,7 @@ def mc_slab_reflection_accumulate(
     grid_coord1_min: float, grid_coord1_max: float, grid_resolution0: int, grid_resolution1: int,
     wavelength: float, solid_angle_per_ray: torch.Tensor, grid_cell_area: float,
     points: torch.Tensor | None = None, point_radius: float = -0.01,
+    layers: tuple[torch.Tensor, ...] | None = None,
 ) -> torch.Tensor:
     """Accumulate finite-thickness slab specular reflections into a radiomap.
 
@@ -877,6 +898,9 @@ def mc_slab_reflection_accumulate(
     deposits ``|E|^2 * solid_angle * (lambda / 4pi)^2 / (pi * radius^2)``. The radius is
     ``point_radius`` when positive, else ``-point_radius`` times the straight transmitter
     distance (at least 1 mm). ``solid_angle_per_ray`` is a one-element device tensor.
+
+    ``layers`` (per-face material ids and the CSR layer store) lets a multilayer material reflect
+    as its whole stack; single-layer materials keep the slab law above.
     """
 
     return _required_native_op("mc_slab_reflection_accumulate")(
@@ -891,6 +915,7 @@ def mc_slab_reflection_accumulate(
         material_gain,
         material_valid,
         material_thickness,
+        _mc_reflection_layers(layers, material_eta_r),
         int(contribution_depth),
         int(grid_axis),
         float(grid_position),
@@ -930,6 +955,7 @@ def mc_slab_reflection_accumulate_backward(
     grid_coord1_max: float, grid_resolution0: int, grid_resolution1: int, wavelength: float,
     solid_angle_per_ray: torch.Tensor, grid_cell_area: float, wavelength_dfreq: float,
     points: torch.Tensor | None = None, point_radius: float = -0.01,
+    layers: tuple[torch.Tensor, ...] | None = None,
 ) -> tuple[torch.Tensor, ...]:
     gradients = _required_native_op("mc_slab_reflection_accumulate_backward")(
         ray_o,
@@ -943,6 +969,7 @@ def mc_slab_reflection_accumulate_backward(
         material_gain,
         material_valid,
         material_thickness,
+        _mc_reflection_layers(layers, material_eta_r),
         grad_output,
         bool(need_materials),
         bool(need_frequency),
@@ -982,6 +1009,7 @@ def mc_slab_reflection_accumulate_jvp(
     grid_coord1_min: float, grid_coord1_max: float, grid_resolution0: int, grid_resolution1: int,
     wavelength: float, solid_angle_per_ray: torch.Tensor, grid_cell_area: float,
     wavelength_tangent: float, points: torch.Tensor | None = None, point_radius: float = -0.01,
+    layers: tuple[torch.Tensor, ...] | None = None,
 ) -> torch.Tensor:
     output = _required_native_op("mc_slab_reflection_accumulate_jvp")(
         ray_o,
@@ -995,6 +1023,7 @@ def mc_slab_reflection_accumulate_jvp(
         material_gain,
         material_valid,
         material_thickness,
+        _mc_reflection_layers(layers, material_eta_r),
         tangent_eta_r if tangent_eta_r is not None else material_eta_r,
         tangent_sigma if tangent_sigma is not None else material_sigma,
         tangent_gain if tangent_gain is not None else material_gain,
@@ -1070,6 +1099,7 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
             grid_cell_area=params["grid_cell_area"],
             points=params["points"],
             point_radius=params["point_radius"],
+            layers=params.get("layers"),
         )
 
     @staticmethod
@@ -1128,6 +1158,11 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
         need_gain = bool(ctx.needs_input_grad[3])
         need_thickness = bool(ctx.needs_input_grad[4])
         need_materials = need_eta or need_sigma or need_gain or need_thickness
+        if ctx.params.get("multilayer", False) and (need_eta or need_sigma or need_thickness):
+            raise NotImplementedError(
+                "material derivatives (eta_r, sigma_e, thickness) of reflection off a multilayer "
+                "material are not supported; gain and frequency derivatives are"
+            )
         need_frequency = bool(ctx.needs_input_grad[5])
         grad_anchor = None
         if need_anchor:
@@ -1170,6 +1205,7 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
             grid_cell_area=params["grid_cell_area"],
             points=params["points"],
             point_radius=params["point_radius"],
+            layers=params.get("layers"),
             wavelength_dfreq=-wavelength * wavelength / _LIGHT_SPEED_M_PER_S_AD,
         )
         grad_frequency = (
@@ -1231,6 +1267,13 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
         )
         tangent_frequency = _ad_frequency_tangent(t_frequency)
         params = ctx.params
+        if ctx.params.get("multilayer", False) and any(
+            value is not None for value in (tangent_eta, tangent_sigma, tangent_thickness)
+        ):
+            raise NotImplementedError(
+                "material derivatives (eta_r, sigma_e, thickness) of reflection off a multilayer "
+                "material are not supported; gain and frequency derivatives are"
+            )
         if (
             tangent_eta is None
             and tangent_sigma is None
@@ -1300,6 +1343,7 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
                 grid_cell_area=params["grid_cell_area"],
                 points=params["points"],
                 point_radius=params["point_radius"],
+                layers=params.get("layers"),
                 wavelength_tangent=(-wavelength * wavelength / _LIGHT_SPEED_M_PER_S_AD)
                 * tangent_frequency,
             )
@@ -1314,7 +1358,8 @@ def mc_slab_reflection_accumulate_ad(
     grid_coord0_min: float, grid_coord0_max: float, grid_coord1_min: float, grid_coord1_max: float,
     grid_resolution0: int, grid_resolution1: int, wavelength: float,
     solid_angle_per_ray: torch.Tensor, grid_cell_area: float, points: torch.Tensor | None = None,
-    point_radius: float = -0.01,
+    point_radius: float = -0.01, layers: tuple[torch.Tensor, ...] | None = None,
+    multilayer: bool = False,
 ) -> torch.Tensor:
     """Differentiable :func:`mc_slab_reflection_accumulate` (one tx)."""
 
@@ -1334,6 +1379,8 @@ def mc_slab_reflection_accumulate_ad(
         "grid_cell_area": float(grid_cell_area),
         "points": points,
         "point_radius": float(point_radius),
+        "layers": layers,
+        "multilayer": bool(multilayer),
     }
     return _McReflectionMapAdFunction.apply(
         tx_anchor,

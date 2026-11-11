@@ -89,3 +89,13 @@ def test_concave_edge_is_not_a_wedge():
     corners = {(round(float(x), 3), round(float(y), 3)) for x, y in xy}
     assert (1.0, 1.0) not in corners
     assert corners == {(0.0, 0.0), (2.0, 0.0), (2.0, 1.0), (1.0, 2.0), (0.0, 2.0)}
+
+
+def test_sheet_edge_resting_on_a_surface_is_not_a_half_plane():
+    """A wall sheet standing on a ground plate keeps its free top edge and loses its foot."""
+    wall = [[0.0, 0.0, 0.0], [4.0, 0.0, 0.0], [4.0, 0.0, 3.0], [0.0, 0.0, 3.0]]
+    ground = [[-5.0, -5.0, 0.0], [9.0, -5.0, 0.0], [9.0, 5.0, 0.0], [-5.0, 5.0, 0.0]]
+    rows = _edges([_structure(wall, [[0, 1, 2], [0, 2, 3]]), _structure(ground, [[0, 1, 2], [0, 2, 3]])])
+    along_x = (rows["edge_dir"][:, 0].abs() > 0.99) & (rows["edge_pos"][:, 1].abs() < 1e-3)
+    heights = sorted(round(float(z), 3) for z in rows["edge_pos"][along_x][:, 2])
+    assert heights == [3.0]

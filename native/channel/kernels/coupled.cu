@@ -338,8 +338,10 @@ __device__ CoupledRowTangents coupled_rd_row_dual(
     pair.incidentDerivativeJones = field::jones_zero<Dual>();
     pair.face0Material.present = 1.0f;
     pair.face1Material.present = 1.0f;
+    Dual pair_face0_cos, pair_face1_cos;
+    field::pair_face_cosines(pair, diffraction_target, pair_face0_cos, pair_face1_cos);
     pair.face0Operator = slab_face_operator_dual(
-        field::fabsf(field::f3_dot(pair.n0, incident_direction)),
+        pair_face0_cos,
         {in.w0_eps, seeds.w0_eps},
         {in.w0_sigma, seeds.w0_sigma},
         in.w0_mu,
@@ -352,7 +354,7 @@ __device__ CoupledRowTangents coupled_rd_row_dual(
         input_edge_basis,
         output_edge_basis);
     pair.face1Operator = slab_face_operator_dual(
-        field::fabsf(field::f3_dot(pair.nn, incident_direction)),
+        pair_face1_cos,
         {in.w1_eps, seeds.w1_eps},
         {in.w1_sigma, seeds.w1_sigma},
         in.w1_mu,
@@ -787,8 +789,10 @@ __device__ CoupledRowTangents coupled_dd_row_dual(
     pair1.incidentDerivativeJones = field::jones_zero<Dual>();
     pair1.face0Material.present = 1.0f;
     pair1.face1Material.present = 1.0f;
+    Dual pair1_face0_cos, pair1_face1_cos;
+    field::pair_face_cosines(pair1, q2, pair1_face0_cos, pair1_face1_cos);
     pair1.face0Operator = slab_face_operator_dual(
-        field::fabsf(field::f3_dot(pair1.n0, incident_direction1)),
+        pair1_face0_cos,
         {in.w1a_eps, seeds.w1a_eps},
         {in.w1a_sigma, seeds.w1a_sigma},
         in.w1a_mu,
@@ -801,7 +805,7 @@ __device__ CoupledRowTangents coupled_dd_row_dual(
         input_edge_basis1,
         output_edge_basis1);
     pair1.face1Operator = slab_face_operator_dual(
-        field::fabsf(field::f3_dot(pair1.nn, incident_direction1)),
+        pair1_face1_cos,
         {in.w1b_eps, seeds.w1b_eps},
         {in.w1b_sigma, seeds.w1b_sigma},
         in.w1b_mu,
@@ -851,8 +855,10 @@ __device__ CoupledRowTangents coupled_dd_row_dual(
     pair2.incidentDerivativeJones = field::jones_zero<Dual>();
     pair2.face0Material.present = 1.0f;
     pair2.face1Material.present = 1.0f;
+    Dual pair2_face0_cos, pair2_face1_cos;
+    field::pair_face_cosines(pair2, dst, pair2_face0_cos, pair2_face1_cos);
     pair2.face0Operator = slab_face_operator_dual(
-        field::fabsf(field::f3_dot(pair2.n0, incident_direction2)),
+        pair2_face0_cos,
         {in.w2a_eps, seeds.w2a_eps},
         {in.w2a_sigma, seeds.w2a_sigma},
         in.w2a_mu,
@@ -865,7 +871,7 @@ __device__ CoupledRowTangents coupled_dd_row_dual(
         input_edge_basis2,
         output_edge_basis2);
     pair2.face1Operator = slab_face_operator_dual(
-        field::fabsf(field::f3_dot(pair2.nn, incident_direction2)),
+        pair2_face1_cos,
         {in.w2b_eps, seeds.w2b_eps},
         {in.w2b_sigma, seeds.w2b_sigma},
         in.w2b_mu,

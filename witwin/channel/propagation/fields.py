@@ -498,7 +498,12 @@ def _evaluate_reflection_fields(
                 # The fixed-winner EPC re-solve registers its own companion.
                 ledger.add(vertices, row_source, row_target, face_id)
             ledger.add(*reflection_args)
-        evaluated = reflection_field_op(*reflection_args)
+        layers = (
+            field_kernels.reflection_layers(material, face_id, multilayer=True)
+            if has_multilayer_material(compiled)
+            else None
+        )
+        evaluated = reflection_field_op(*reflection_args, layers=layers)
         # Rough-surface coherent attenuation / realization delta replacement
         # (rough-surface scattering). The native field_rough_reflection_scale kernel owns
         # the C_r factor and its application onto the four field outputs; C_r
@@ -893,6 +898,18 @@ def _evaluate_coupled_fields(
                     *wedge_materials1,
                     edge_line_min,
                     edge_line_max,
+                )
+            if has_multilayer_material(compiled):
+                if ad_enabled:
+                    raise NotImplementedError(
+                        "coupled reflection-diffraction derivatives with a multilayer reflecting "
+                        "material are not supported; disable coupled_paths or use ad_mode='none'"
+                    )
+                coupled_field_op = partial(
+                    coupled_field_op,
+                    layers=field_kernels.reflection_layers(
+                        material, reflection_face.unsqueeze(1), multilayer=True
+                    ),
                 )
             evaluated = coupled_field_op(
                 *coupled_args,

@@ -516,6 +516,7 @@ def refine_edge_geometry(
         boundary[pair_first] = False
     if int(extras.numel()) > 0:
         selected[extras] = False
+    _drop_contact_edges(rayd, selected, boundary, edge_pos, edge_dir, n0)
 
     if policy.boundary_edge_policy != "half_plane":
         selected &= ~boundary
@@ -530,6 +531,39 @@ def refine_edge_geometry(
         records, selected, edge_pos, edge_dir, line_max, n0, n1, shape1)
     rayd.runtime_cache[DIFFRACTION_EDGE_VERTEX_IDS] = (first_vertex, last_vertex)
     return (selected, edge_pos, edge_dir, lengths, line_min, line_max, n0, n1, face0, face1, exterior_angle)
+
+
+_CONTACT_PROBE_M = 1.0e-3
+
+
+def _drop_contact_edges(
+    rayd: object, selected: torch.Tensor, boundary: torch.Tensor, edge_pos: torch.Tensor,
+    edge_dir: torch.Tensor, n0: torch.Tensor,
+) -> None:
+    """Deselect half-plane edges that rest on another surface, in place.
+
+    A sheet whose free edge lies on another surface (an open box wall standing on the ground) forms
+    a closed junction there, not a diffracting free edge. Just past the edge, on either side of the
+    sheet, a short probe crossing the edge line then hits that surface: the probe starts
+    ``_CONTACT_PROBE_M`` off the sheet and inside its face and ends as far beyond the edge.
+    """
+
+    from witwin.channel.kernels import geometry as geometry_kernels
+
+    index = (selected & boundary).nonzero(as_tuple=False).squeeze(1)
+    if int(index.numel()) == 0:
+        return
+    point = edge_pos[index]
+    into = torch.cross(n0[index], edge_dir[index], dim=1)
+    into = into / into.norm(dim=1, keepdim=True).clamp_min(1.0e-12)
+    off = n0[index] * _CONTACT_PROBE_M
+    step = into * _CONTACT_PROBE_M
+    start = torch.cat([point + off + step, point - off + step]).contiguous()
+    end = torch.cat([point + off - step, point - off - step]).contiguous()
+    visible = geometry_kernels.rayd_visibility_forward(rayd.require_resource(), start, end, None)[0]
+    count = int(index.numel())
+    contact = ~(visible[:count] & visible[count:])
+    selected[index[contact]] = False
 
 
 def diffraction_edge_vertex_ids(

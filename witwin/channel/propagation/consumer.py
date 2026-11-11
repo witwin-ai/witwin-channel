@@ -2685,6 +2685,7 @@ class BucketInputs:
     interaction_normals: torch.Tensor
     material: tuple[torch.Tensor, ...]
     valid: torch.Tensor
+    layers: object = None
 
     @property
     def row_count(self) -> int:
@@ -2751,6 +2752,8 @@ def _reflection_inputs(
     compiled: CompiledScene, bucket: FixedTopologyBucket, tables: dict[str, object],
     prepared: PreparedFixedTopology, rows: PreparedRows,
 ) -> BucketInputs:
+    from witwin.channel.kernels import fields as field_kernels
+    from witwin.channel.materials import has_multilayer_material
     from witwin.channel.propagation.geometry import (
         reflection_epc_paths,
     )
@@ -2780,6 +2783,11 @@ def _reflection_inputs(
         interaction_normals=epc["normals"],
         material=tuple(material[name][face_id].contiguous() for name in _MATERIAL_FIELDS),
         valid=valid,
+        layers=(
+            field_kernels.reflection_layers(material, face_id, multilayer=True)
+            if has_multilayer_material(compiled)
+            else None
+        ),
     )
 
 
@@ -2875,8 +2883,10 @@ def _field_op(
             )
             if ledger is not None:
                 ledger.add(*arguments)
+            layer_kwargs = {} if inputs.depth == 0 else {"layers": inputs.layers}
             return operator(
                 *arguments,
+                **layer_kwargs,
                 frequency=frequency,
                 frequency_value=frequency_value,
                 direction_live=(
@@ -2889,7 +2899,9 @@ def _field_op(
             if inputs.depth == 0
             else field_kernels.field_reflection_sequence
         )
-        return operator(*arguments, frequency_hz=frequency_value)
+        if inputs.depth == 0:
+            return operator(*arguments, frequency_hz=frequency_value)
+        return operator(*arguments, layers=inputs.layers, frequency_hz=frequency_value)
 
     return run
 

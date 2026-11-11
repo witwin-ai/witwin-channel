@@ -88,5 +88,8 @@ sync and copy budgets do not see it.
   the sampling density is unchanged, but the sampled edge set and its states change.
 - The mitsuba `merge_shapes` import path keeps its imported edge table unrefined (unchanged), so it
   gets the orientation and concavity rules of the kernel but no merge.
-- Not done: boundary edges that lie on another shape's surface (the open bottom of a box standing on a
-  ground plane) are still half-planes; recognising them needs a surface-contact test.
+- Boundary edges that rest on another surface (the open bottom of a box standing on a ground plane, a
+  sheet ending on a wall) are not half-planes: at compile time two short visibility probes cross
+  the edge line just past the edge, one on each side of the sheet, 1 mm off the sheet and 1 mm into
+  and beyond it; if either is blocked the edge is deselected (`_drop_contact_edges`). Free sheet
+  edges see nothing there and stay half-planes. `test_sheet_edge_resting_on_a_surface_is_not_a_half_plane`.

@@ -59,6 +59,28 @@ def test_reciprocity_swap_tx_rx(accuracy, components):
     accuracy.check(f"{sorted(components)}", error, coefficient_tolerance(4 * sc.PITCH_M * 3))
 
 
+def test_coupled_reflection_diffraction_is_reciprocal(accuracy):
+    """The coupled R-D / D-R rows alone (coupled minus uncoupled solve) are reciprocal under a swap."""
+    from witwin.channel.path import Config, solve
+
+    city = sc.city(2)
+    points = [p.position.tolist() for p in sc.receiver_points(city.extent_m, 4, seed=5)]
+    a_side, b_side = points[:2], points[2:]
+
+    def pair_field(tx_points, rx_points, coupled):
+        scene = Scene(structures=city.structures,
+                      endpoints=[*(antenna("tx", p) for p in tx_points), *(antenna("rx", p) for p in rx_points)])
+        config = Config(components={"los", "reflection", "diffraction"}, max_depth=2, coupled_paths=coupled)
+        return _pair_matrix(solve(scene, config, reference_frequency_hz=FREQ))
+
+    forward = pair_field(a_side, b_side, True) - pair_field(a_side, b_side, False)
+    backward = pair_field(b_side, a_side, True) - pair_field(b_side, a_side, False)
+    scale = forward[1].real.abs().clamp_min(1e-30)
+    assert float(scale.max()) > 0.0
+    error = ((forward[0] - backward[0].transpose(0, 1)).abs() / scale).max().item()
+    accuracy.check("coupled rows", error, coefficient_tolerance(2 * sc.PITCH_M * 3))
+
+
 def _radiomap(subdiv: int, welded: bool, components: set[str], depth: int = 1) -> torch.Tensor:
     from witwin.channel.deterministic import Config, solve
 
@@ -231,6 +253,61 @@ def test_four_solvers_single_pec_wall_reflection(accuracy, solver):
     value = (_solve_points(_wall(), TX_REFLECTION, {"reflection"}) if solver == "path"
              else _solve_grid(solver, _wall(), TX_REFLECTION, {"reflection"})).numpy()
     accuracy.check(solver, float(np.max(np.abs(value / reference - 1.0))), tolerance)
+
+
+_MULTILAYER_WALL = ((0.02, 3.0, 0.001), (0.15, 6.5, 0.05), (0.02, 3.0, 0.001))
+
+
+def _multilayer_wall() -> list:
+    from witwin.core import MaterialLayer
+
+    material = PhysicalMaterial(layers=tuple(MaterialLayer(thickness_m=t, eps_r=e, sigma_e=s)
+                                             for t, e, s in _MULTILAYER_WALL))
+    v = [[WALL_X, -40.0, -20.0], [WALL_X, 40.0, -20.0], [WALL_X, -40.0, 40.0], [WALL_X, 40.0, 40.0]]
+    return [surface(v, [[0, 2, 1], [1, 2, 3]], material)]
+
+
+def _multilayer_image_power(tx, point) -> float:
+    from tests.reference import em_oracle as EM
+
+    z = (0.0, 0.0, 1.0)
+    image = np.array([2 * WALL_X - tx[0], tx[1], tx[2]])
+    cos_i = abs(WALL_X - tx[0]) / float(np.linalg.norm(np.asarray(point) - image))
+    stack = EM.layer_stack_rt([(t, e, s, 1.0) for t, e, s in _MULTILAYER_WALL], cos_i, FREQ)
+    value, _, _ = O.specular_reflection(tx, point, np.array([WALL_X, 0.0, 0.0]), (-1.0, 0.0, 0.0), FREQ, z, z,
+                                        r_te=complex(stack.r_te), r_tm=-complex(stack.r_tm))
+    return abs(value) ** 2
+
+
+@pytest.mark.parametrize("solver", ("deterministic", "path", "mc"))
+def test_multilayer_wall_reflection_across_solvers(accuracy, solver):
+    """A three-layer wall reflects as its whole stack in every solver that supports it (A-1).
+
+    Enumerated solvers are compared at the cell centres to float32 accuracy; Monte Carlo Basic with
+    the cell-averaged power and the counting tolerance of the PEC wall test.
+    """
+
+    centres = _cell_centres()
+    if solver == "mc":
+        reference = np.array([_cell_average(lambda p: _multilayer_image_power(TX_REFLECTION, p), c)
+                              for c in centres])
+        tolerance = float(np.max([5.0 / math.sqrt(_mc_hits(TX_REFLECTION, c)) for c in centres]))
+    else:
+        reference = np.array([_multilayer_image_power(TX_REFLECTION, c) for c in centres])
+        tolerance = 2.0 * coefficient_tolerance(40.0)
+    value = (_solve_points(_multilayer_wall(), TX_REFLECTION, {"reflection"}) if solver == "path"
+             else _solve_grid(solver, _multilayer_wall(), TX_REFLECTION, {"reflection"})).numpy()
+    accuracy.check(solver, float(np.max(np.abs(value / reference - 1.0))), tolerance)
+
+
+def test_bdpt_refuses_multilayer_reflection():
+    from witwin.channel.montecarlo import bdpt
+
+    scene = Scene(structures=_multilayer_wall(),
+                  endpoints=[antenna("tx", TX_REFLECTION), grid(GRID_ORIGIN, GRID_SHAPE, GRID_SPACING)])
+    with pytest.raises(NotImplementedError, match="multilayer"):
+        bdpt.solve(scene, bdpt.Config(components={"reflection"}, max_depth=1, samples=64),
+                   reference_frequency_hz=FREQ)
 
 
 def test_pec_screen_winding_invariance(accuracy):
