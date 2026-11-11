@@ -432,6 +432,9 @@ priority `scattering > diffraction > transmission > reflection > los`.
   = 2.0`, `scattering_chain_max_rows: int = 256`. The `d1 = d2 = 0` degenerate
   row collapses symbol-for-symbol to op 1 / op 2 (lockstep-pinned, not
   production-dispatched).
+  In 0.6.0 Op B and both ops' derivative companions, which no solve ever
+  dispatched, were removed: chain rows are ensemble-only (Op A) and a chain
+  solve with `ad_mode != "none"` is refused before native work.
 - Coherent scattering combine (ADR-021 D3, default OFF): new Deterministic/Path
   config `scattering_coherent: bool = False`. OFF is bit-identical to today (the
   scattering slot stays the incoherent `SUM |field|^2` power term). ON (requires
