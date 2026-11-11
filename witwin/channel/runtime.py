@@ -21,7 +21,7 @@ import re
 import sys
 from types import ModuleType
 import weakref
-from typing import Any, ParamSpec, Protocol, TypeVar, cast
+from typing import Any, ParamSpec, Protocol, TypedDict, TypeVar, cast, overload
 
 import torch
 
@@ -813,32 +813,36 @@ def native_extension() -> object:
     return _load_native_extension()
 
 
-def _required_symbol(extension: object, name: str) -> object:
+NativeOp = Callable[..., Any]
+"""A pybind-exported native operation; its argument and result contract lives in its facade."""
+
+
+def _required_symbol(extension: object, name: str) -> NativeOp:
     if extension is None or not hasattr(extension, name):
         raise NativeSymbolError(f"_channel.{name} CUDA kernel is required")
-    return getattr(extension, name)
+    return cast(NativeOp, getattr(extension, name))
 
 
 _native_symbols = sys.modules[__name__]
 
 
-def _required_native_op(name: str) -> object:
-    return _native_symbols._required_symbol(native_extension(), name)
+def _required_native_op(name: str) -> NativeOp:
+    return cast(NativeOp, _native_symbols._required_symbol(native_extension(), name))
 
 
-def required_symbol(name: str) -> object:
+def required_symbol(name: str) -> NativeOp:
     """Return a required symbol or raise :class:`NativeSymbolError`."""
 
     return _required_symbol(native_extension(), name)
 
 
-def optional_symbol(name: str) -> object | None:
+def optional_symbol(name: str) -> NativeOp | None:
     """Return an optional symbol, or ``None`` when that symbol is absent."""
 
     extension = native_extension()
     if extension is None:
         return None
-    return getattr(extension, name, None)
+    return cast("NativeOp | None", getattr(extension, name, None))
 
 
 def has_symbol(name: str) -> bool:
@@ -956,6 +960,14 @@ def _ad_raise_composed_transforms() -> None:
         " forward-mode jvp) are not supported by the native geometry kernels"
         " (first-order only)"
     )
+
+
+@overload
+def _ad_native_tensor(value: None) -> None: ...
+
+
+@overload
+def _ad_native_tensor(value: torch.Tensor) -> torch.Tensor: ...
 
 
 def _ad_native_tensor(value: torch.Tensor | None) -> torch.Tensor | None:
@@ -1273,6 +1285,29 @@ REQUIRED_METADATA_FIELDS = (
 )
 
 
+class KernelMetadata(TypedDict):
+    """The ``kernel`` execution record of a solver result: launches, tape, memory and timing."""
+
+    primitive: str
+    launch_count: int
+    forward_launch_count: int
+    backward_launch_count: int
+    jvp_launch_count: int
+    intermediate_bytes: int
+    tape_bytes: int
+    fused_stages: int
+    accumulation_strategy: str
+    scheduling_strategy: str
+    registers_per_thread: int
+    shared_memory_bytes: int
+    occupancy_estimate: float
+    spill_bytes: int
+    rayd_native: bool
+    ad_status: str
+    forward_time_ms: float
+    peak_memory_bytes: int
+
+
 def make_metadata(
     *, primitive: str, forward_launch_count: int = 0, backward_launch_count: int = 0,
     jvp_launch_count: int = 0, intermediate_bytes: int = 0, tape_bytes: int = 0,
@@ -1280,8 +1315,8 @@ def make_metadata(
     registers_per_thread: int = 0, shared_memory_bytes: int = 0, occupancy_estimate: float = 0.0,
     spill_bytes: int = 0, rayd_native: bool = False, ad_status: str = "none",
     forward_time_ms: float = 0.0, peak_memory_bytes: int = 0,
-) -> dict[str, bool | float | int | str]:
-    metadata: dict[str, bool | float | int | str] = {
+) -> KernelMetadata:
+    metadata: KernelMetadata = {
         "primitive": primitive,
         "launch_count": forward_launch_count + backward_launch_count + jvp_launch_count,
         "forward_launch_count": forward_launch_count,
@@ -1310,7 +1345,7 @@ def make_metadata(
     return metadata
 
 
-def noop_metadata(*, accumulation_strategy: str = "none") -> dict[str, bool | float | int | str]:
+def noop_metadata(*, accumulation_strategy: str = "none") -> KernelMetadata:
     return make_metadata(
         primitive="noop_metadata",
         accumulation_strategy=accumulation_strategy,
@@ -1825,6 +1860,7 @@ __all__ = [
     "ExtensionABIError",
     "ExtensionLoadError",
     "ExtensionSymbolError",
+    "KernelMetadata",
     "MemoryBudgetError",
     "MemoryEstimate",
     "NativeSymbolError",

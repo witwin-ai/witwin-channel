@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import math
+from typing import Any, TypedDict, cast
 
 import torch
 
@@ -479,7 +480,25 @@ def coupled_chain_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
             raise ValueError(f"{name} must have shape (N, depth, 3)")
     return out
 
-def coupled_dd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
+class CoupledDdGeometryOutputs(TypedDict):
+    """Two-edge diffraction geometry rows; no field or path gain."""
+
+    valid: torch.Tensor
+    interaction_type_sequence: torch.Tensor
+    primitive_sequence: torch.Tensor
+    edge_sequence: torch.Tensor
+    edge1_id: torch.Tensor
+    edge2_id: torch.Tensor
+    interaction_positions: torch.Tensor
+    interaction_normals: torch.Tensor
+    edge1_position: torch.Tensor
+    edge2_position: torch.Tensor
+    path_length_m: torch.Tensor
+    delay_s: torch.Tensor
+    certificate_rejection_count: torch.Tensor
+
+
+def coupled_dd_geometry_forward(*args: object) -> CoupledDdGeometryOutputs:
     """Construct two-edge (double) diffraction geometry without a coefficient.
 
     The native operation runs a convex bracketed Fermat solve for the two-edge
@@ -543,7 +562,7 @@ def coupled_dd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
         raise ValueError("interaction_normals must have shape (N, 2, 3)")
     if out["certificate_rejection_count"].shape != (1,):
         raise ValueError("certificate_rejection_count must have shape (1,)")
-    return out
+    return cast(CoupledDdGeometryOutputs, out)
 
 
 def rayd_diffraction_paths_order1_forward(*args: object) -> tuple[torch.Tensor, ...]:
@@ -1024,10 +1043,10 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        scene_resource, vertices, source, receiver, sequence, plane_points, plane_normals,
-        surface_group_id, surface_group_size, surface_group_members, max_bounces,
-        visibility_ignore_mode,
-    ):
+        scene_resource: Any, vertices: Any, source: Any, receiver: Any, sequence: Any,
+        plane_points: Any, plane_normals: Any, surface_group_id: Any, surface_group_size: Any,
+        surface_group_members: Any, max_bounces: Any, visibility_ignore_mode: Any,
+    ) -> Any:
         out = _required_native_op("rayd_reflection_epc_paths_forward")(
             scene_resource,
             source,
@@ -1046,7 +1065,7 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
         return tuple(out)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         (
             scene_resource,
@@ -1099,7 +1118,7 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, *grad_outputs):
+    def backward(ctx: Any, *grad_outputs: Any) -> Any:
         none_grads = (None,) * 12
         grad_path_length = grad_outputs[1]
         grad_hits = grad_outputs[4]
@@ -1136,7 +1155,9 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
             need_grad_source=need_grad_source,
             need_grad_receiver=need_grad_receiver,
         )
-        if need_grad_vertices and tuple(grad_vertices.shape) != ctx.vertices_shape:
+        if need_grad_vertices and (
+            tuple(cast(torch.Tensor, grad_vertices).shape) != ctx.vertices_shape
+        ):
             raise RuntimeError(
                 "rayd_reflection_epc_paths_ad vertices must be the scene"
                 " global vertex table"
@@ -1157,7 +1178,10 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def jvp(ctx, _grad_handle, grad_vertices, grad_source, grad_receiver, *_frozen_tangents):
+    def jvp(
+        ctx: Any, _grad_handle: Any, grad_vertices: Any, grad_source: Any, grad_receiver: Any,
+        *_frozen_tangents: Any,
+    ) -> Any:
         (
             source,
             receiver,
@@ -1317,11 +1341,11 @@ class _RaydFaceNormalsAdFunction(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(scene_resource, vertices, raw_face_normals):
+    def forward(scene_resource: Any, vertices: Any, raw_face_normals: Any) -> Any:
         return deterministic_normalize_vec3(raw_face_normals, eps=1.0e-6)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         scene_resource, vertices, _raw_face_normals = inputs
         vertices = torch.autograd.forward_ad.unpack_dual(vertices).primal
@@ -1330,7 +1354,7 @@ class _RaydFaceNormalsAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, grad_face_normals):
+    def backward(ctx: Any, grad_face_normals: Any) -> Any:
         if ctx.needs_input_grad[2]:
             raise RuntimeError(
                 "rayd_face_normals_ad differentiates the vertex table only;"
@@ -1346,7 +1370,7 @@ class _RaydFaceNormalsAdFunction(torch.autograd.Function):
         return (None, grad_vertices, None)
 
     @staticmethod
-    def jvp(ctx, _grad_handle, grad_vertices, _grad_raw_face_normals):
+    def jvp(ctx: Any, _grad_handle: Any, grad_vertices: Any, _grad_raw_face_normals: Any) -> Any:
         tangent_vertices = _ad_native_tangent_or_none(grad_vertices)
         if tangent_vertices is None:
             return None
@@ -1388,7 +1412,7 @@ def rayd_face_normals_ad(
 # penetration_autograd
 # ---------------------------------------------------------------------------
 def _segment_penetration_tape_from_values(
-    values: tuple[torch.Tensor, ...], *, hit_capacity: int, failure_state: object,
+    values: tuple[torch.Tensor, ...], *, hit_capacity: int, failure_state: CapacityFailureState,
 ) -> SegmentPenetrationTapeResult:
     result = SegmentPenetrationResult(
         hit_capacity=hit_capacity,
@@ -1446,9 +1470,10 @@ class _RaydSegmentPenetrationAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        scene_resource, vertices, origins, targets, input_active, input_active_any, hit_capacity,
-        policy, scene_diagonal, failure_state,
-    ):
+        scene_resource: Any, vertices: Any, origins: Any, targets: Any, input_active: Any,
+        input_active_any: Any, hit_capacity: Any, policy: Any, scene_diagonal: Any,
+        failure_state: Any,
+    ) -> Any:
         tape = rayd_segment_penetration_forward_tape(
             scene_resource,
             origins,
@@ -1463,7 +1488,7 @@ class _RaydSegmentPenetrationAdFunction(torch.autograd.Function):
         return _segment_penetration_tape_values(tape)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         (
             scene_resource,
@@ -1502,7 +1527,9 @@ class _RaydSegmentPenetrationAdFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def _saved_request(ctx):
+    def _saved_request(
+        ctx: Any,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None, SegmentPenetrationTapeResult]:
         origins, targets, active_ctx, *values = ctx.saved_tensors
         input_active = None if ctx.input_active_absent else active_ctx
         tape = _segment_penetration_tape_from_values(
@@ -1514,7 +1541,7 @@ class _RaydSegmentPenetrationAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, *grad_outputs):
+    def backward(ctx: Any, *grad_outputs: Any) -> Any:
         none_grads = (None,) * 10
         continuous_grads = grad_outputs[4:10]
         if not any(value is not None for value in continuous_grads):
@@ -1571,7 +1598,10 @@ class _RaydSegmentPenetrationAdFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def jvp(ctx, _grad_handle, grad_vertices, grad_origins, grad_targets, *_frozen_tangents):
+    def jvp(
+        ctx: Any, _grad_handle: Any, grad_vertices: Any, grad_origins: Any, grad_targets: Any,
+        *_frozen_tangents: Any,
+    ) -> Any:
         origins, targets, input_active, tape = (
             _RaydSegmentPenetrationAdFunction._saved_request(ctx)
         )
@@ -1637,7 +1667,7 @@ class _RaydSegmentPenetrationAdFunction(torch.autograd.Function):
 def rayd_segment_penetration_ad(
     scene_resource: object, vertices: torch.Tensor, origins: torch.Tensor, targets: torch.Tensor,
     input_active: torch.Tensor | None, *, input_active_any: bool, hit_capacity: int,
-    policy: SegmentPenetrationPolicy, scene_diagonal: float, failure_state: object,
+    policy: SegmentPenetrationPolicy, scene_diagonal: float, failure_state: CapacityFailureState,
 ) -> SegmentPenetrationResult:
     """Differentiable live RayD segment-penetration entry."""
 

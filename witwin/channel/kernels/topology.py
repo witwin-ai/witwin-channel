@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 import torch
 
@@ -181,7 +182,7 @@ def _validate_topology_extra_fields(
             validate_cuda_tensor(
                 f"{name}.{key}", tensor, dtype=dtype, ndim=2, trailing_shape=(3,)
             )
-            expected = (path_count, 3)
+            expected: tuple[int, ...] = (path_count, 3)
         elif key in {"primitive_sequence", "material_sequence"}:
             validate_cuda_tensor(f"{name}.{key}", tensor, dtype=dtype, ndim=2)
             expected = (path_count, sequence_width)
@@ -1595,7 +1596,7 @@ _DISCRETE_OUTPUT_COUNT = len(_STRUCTURAL_OUTPUT_FIELDS) + len(
 
 class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
     @staticmethod
-    def forward(*inputs):
+    def forward(*inputs: Any) -> Any:
         block = {
             name: value
             for name, value in zip(
@@ -1649,7 +1650,7 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
         return tuple(raw[name] for name in _FUNCTION_OUTPUT_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         ctx.candidate_count = int(inputs[0].shape[0])
         ctx.sequence_width = int(inputs[27])
@@ -1663,7 +1664,7 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, *grad_outputs):
+    def backward(ctx: Any, *grad_outputs: Any) -> Any:
         input_grads: list[torch.Tensor | None] = [None] * 30
         continuous_grads = grad_outputs[_DISCRETE_OUTPUT_COUNT:]
         if all(value is None for value in continuous_grads):
@@ -1705,7 +1706,7 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
         return tuple(input_grads)
 
     @staticmethod
-    def jvp(ctx, *tangents):
+    def jvp(ctx: Any, *tangents: Any) -> Any:
         continuous_tangents = tuple(
             _ad_native_tangent_or_none(value) for value in tangents[10:20]
         )
@@ -1817,7 +1818,7 @@ def _validate_stable_ids(
 
 
 def _metadata_from_raw(
-    raw: dict[str, object], *, pair_count: int, stable_ids_requested: bool,
+    raw: dict[str, Any], *, pair_count: int, stable_ids_requested: bool,
 ) -> ExactPairMetadata:
     expected = {
         "pair_index",
@@ -2093,14 +2094,14 @@ class _EnumeratedTransmissionTopologyPackFunction(torch.autograd.Function):
     """Native fixed-valid topology copy with native VJP/JVP companions."""
 
     @staticmethod
-    def forward(*inputs):
+    def forward(*inputs: Any) -> Any:
         raw = _required_native_op("enumerated_transmission_topology_pack")(*inputs)
         if not isinstance(raw, dict) or set(raw) != set(_OUTPUT_FIELDS):
             raise TypeError("native transmission topology pack returned bad fields")
         return tuple(raw[name] for name in _OUTPUT_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         saved = tuple(
             torch.autograd.forward_ad.unpack_dual(value).primal
@@ -2119,7 +2120,7 @@ class _EnumeratedTransmissionTopologyPackFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, *grad_outputs):
+    def backward(ctx: Any, *grad_outputs: Any) -> Any:
         none_grads = (None,) * 13
         continuous_grads = tuple(
             grad_outputs[_OUTPUT_FIELDS.index(name)]
@@ -2159,7 +2160,7 @@ class _EnumeratedTransmissionTopologyPackFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def jvp(ctx, *tangents):
+    def jvp(ctx: Any, *tangents: Any) -> Any:
         native_tangents = tuple(
             _ad_native_tangent_or_none(tangents[index]) for index in (5, 6, 7)
         )

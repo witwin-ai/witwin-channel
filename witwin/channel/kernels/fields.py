@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import torch
 
@@ -1160,7 +1161,7 @@ def ad_liveness(direction_live: bool, *geometry: object) -> tuple[bool, bool]:
     return (geometry_live, geometry_live and bool(direction_live))
 
 
-def mark_dead_outputs(ctx, output) -> None:
+def mark_dead_outputs(ctx: Any, output: Any) -> None:
     """Declare the outputs of one apply that carry no derivative.
 
     A dead output is marked exactly as it was before the direction seam
@@ -1168,7 +1169,7 @@ def mark_dead_outputs(ctx, output) -> None:
     object graph it saw at contract version 5.
     """
 
-    dead = []
+    dead: list[torch.Tensor] = []
     if not ctx.geometry_live:
         dead.extend((output[4], output[5]))
     if not ctx.direction_live:
@@ -1177,7 +1178,7 @@ def mark_dead_outputs(ctx, output) -> None:
         ctx.mark_non_differentiable(*dead)
 
 
-def direction_cotangent(ctx, grad_direction):
+def direction_cotangent(ctx: Any, grad_direction: torch.Tensor | None) -> torch.Tensor | None:
     """The incoming direction cotangent, or ``None`` if it was declared dead.
 
     Torch does not deliver a cotangent for an output marked non-differentiable,
@@ -1188,7 +1189,7 @@ def direction_cotangent(ctx, grad_direction):
     return grad_direction if ctx.direction_live else None
 
 
-def direction_tangents(ctx, out: dict[str, torch.Tensor]) -> tuple:
+def direction_tangents(ctx: Any, out: dict[str, torch.Tensor]) -> tuple:
     """Publish one apply's output tangents under the two liveness decisions.
 
     The native companion always computes the direction tangent - it is the dual
@@ -1215,9 +1216,9 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        source, target, tx_power, tx_polarization, rx_polarization, frequency, frequency_value,
-        liveness,
-    ):
+        source: Any, target: Any, tx_power: Any, tx_polarization: Any, rx_polarization: Any,
+        frequency: Any, frequency_value: Any, liveness: Any,
+    ) -> Any:
         op_name = (
             "field_free_space_fwd64"
             if source.dtype == torch.float64
@@ -1234,7 +1235,7 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
         return tuple(out[name] for name in _FIELD_AD_OUTPUT_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         (
             source,
@@ -1266,9 +1267,9 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
     @staticmethod
     @_ad_first_order_only
     def backward(
-        ctx, grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain, grad_path_length,
-        grad_delay, grad_direction,
-    ):
+        ctx: Any, grad_field_vector: Any, grad_coefficient: Any, grad_path_field: Any,
+        grad_path_gain: Any, grad_path_length: Any, grad_delay: Any, grad_direction: Any,
+    ) -> Any:
         none_grads = (None,) * 8
         _ad_reject_fixed_inputs(
             "field_free_space_ad",
@@ -1333,9 +1334,9 @@ class _FieldFreeSpaceAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx, t_source, t_target, t_tx_power, t_tx_pol, t_rx_pol, t_frequency, _t_frequency_value,
-        _t_liveness,
-    ):
+        ctx: Any, t_source: Any, t_target: Any, t_tx_power: Any, t_tx_pol: Any, t_rx_pol: Any,
+        t_frequency: Any, _t_frequency_value: Any, _t_liveness: Any,
+    ) -> Any:
         _ad_reject_fixed_tangents(
             "field_free_space_ad",
             (
@@ -1411,10 +1412,11 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        source, target, interaction_positions, interaction_normals, tx_power, tx_polarization,
-        rx_polarization, eps_r, sigma_e, mu_r, gain, thickness, frequency, frequency_value,
-        liveness, layers,
-    ):
+        source: Any, target: Any, interaction_positions: Any, interaction_normals: Any,
+        tx_power: Any, tx_polarization: Any, rx_polarization: Any, eps_r: Any, sigma_e: Any,
+        mu_r: Any, gain: Any, thickness: Any, frequency: Any, frequency_value: Any, liveness: Any,
+        layers: Any,
+    ) -> Any:
         out = _required_native_op("field_reflection_sequence")(
             source,
             target,
@@ -1434,7 +1436,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
         return tuple(out[name] for name in _FIELD_AD_OUTPUT_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         frequency = inputs[12]
         primals = tuple(
@@ -1457,9 +1459,9 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
     @staticmethod
     @_ad_first_order_only
     def backward(
-        ctx, grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain, grad_path_length,
-        grad_delay, grad_direction,
-    ):
+        ctx: Any, grad_field_vector: Any, grad_coefficient: Any, grad_path_field: Any,
+        grad_path_gain: Any, grad_path_length: Any, grad_delay: Any, grad_direction: Any,
+    ) -> Any:
         none_grads = (None,) * 16
         _ad_reject_fixed_inputs(
             "field_reflection_sequence_ad",
@@ -1565,10 +1567,11 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx, t_source, t_target, t_positions, t_normals, t_tx_power, t_tx_pol, t_rx_pol, t_eps_r,
-        t_sigma_e, t_mu_r, t_gain, t_thickness, t_frequency, _t_frequency_value, _t_liveness,
-        _t_layers,
-    ):
+        ctx: Any, t_source: Any, t_target: Any, t_positions: Any, t_normals: Any, t_tx_power: Any,
+        t_tx_pol: Any, t_rx_pol: Any, t_eps_r: Any, t_sigma_e: Any, t_mu_r: Any, t_gain: Any,
+        t_thickness: Any, t_frequency: Any, _t_frequency_value: Any, _t_liveness: Any,
+        _t_layers: Any,
+    ) -> Any:
         _ad_reject_fixed_tangents(
             "field_reflection_sequence_ad",
             (
@@ -1702,11 +1705,12 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        path_valid, source, target, interaction_positions, interaction_normals,
-        interaction_material_id, interaction_valid, tx_power, tx_polarization, rx_polarization,
-        layer_offset, layer_count, layer_thickness_m, layer_eps_r, layer_sigma_e, layer_mu_r,
-        frequency, frequency_value,
-    ):
+        path_valid: Any, source: Any, target: Any, interaction_positions: Any,
+        interaction_normals: Any, interaction_material_id: Any, interaction_valid: Any,
+        tx_power: Any, tx_polarization: Any, rx_polarization: Any, layer_offset: Any,
+        layer_count: Any, layer_thickness_m: Any, layer_eps_r: Any, layer_sigma_e: Any,
+        layer_mu_r: Any, frequency: Any, frequency_value: Any,
+    ) -> Any:
         out = _required_native_op("field_transmission_sequence")(
             path_valid,
             source,
@@ -1729,7 +1733,7 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
         return tuple(out[name] for name in _FIELD_AD_OUTPUT_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         frequency = inputs[16]
         primals = tuple(
@@ -1753,9 +1757,9 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
     @staticmethod
     @_ad_first_order_only
     def backward(
-        ctx, grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain, grad_path_length,
-        grad_delay, _grad_direction,
-    ):
+        ctx: Any, grad_field_vector: Any, grad_coefficient: Any, grad_path_field: Any,
+        grad_path_gain: Any, grad_path_length: Any, grad_delay: Any, _grad_direction: Any,
+    ) -> Any:
         none_grads = (None,) * 18
         _ad_reject_fixed_inputs(
             "field_transmission_sequence_ad",
@@ -1835,11 +1839,12 @@ class _FieldTransmissionSequenceAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx, _t_path_valid, t_source, t_target, t_positions, t_normals, _t_material_id,
-        _t_interaction_valid, t_tx_power, t_tx_pol, t_rx_pol, _t_layer_offset, _t_layer_count,
-        t_layer_thickness, t_layer_eps_r, t_layer_sigma_e, t_layer_mu_r, t_frequency,
-        _t_frequency_value,
-    ):
+        ctx: Any, _t_path_valid: Any, t_source: Any, t_target: Any, t_positions: Any,
+        t_normals: Any, _t_material_id: Any, _t_interaction_valid: Any, t_tx_power: Any,
+        t_tx_pol: Any, t_rx_pol: Any, _t_layer_offset: Any, _t_layer_count: Any,
+        t_layer_thickness: Any, t_layer_eps_r: Any, t_layer_sigma_e: Any, t_layer_mu_r: Any,
+        t_frequency: Any, _t_frequency_value: Any,
+    ) -> Any:
         _ad_reject_fixed_tangents(
             "field_transmission_sequence_ad",
             (
@@ -1967,11 +1972,13 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        valid, source, target, edge_position, edge_direction, edge_t_min, edge_t_max, edge_n0,
-        edge_n1, exterior_angle, face0_valid, face0_eps_r, face0_sigma_e, face0_mu_r, face0_gain,
-        face1_valid, face1_eps_r, face1_sigma_e, face1_mu_r, face1_gain, tx_power, frequency,
-        vertex_v0, vertex_v1, vertex_opp0, vertex_opp1, edge_boundary, frequency_value,
-    ):
+        valid: Any, source: Any, target: Any, edge_position: Any, edge_direction: Any,
+        edge_t_min: Any, edge_t_max: Any, edge_n0: Any, edge_n1: Any, exterior_angle: Any,
+        face0_valid: Any, face0_eps_r: Any, face0_sigma_e: Any, face0_mu_r: Any, face0_gain: Any,
+        face1_valid: Any, face1_eps_r: Any, face1_sigma_e: Any, face1_mu_r: Any, face1_gain: Any,
+        tx_power: Any, frequency: Any, vertex_v0: Any, vertex_v1: Any, vertex_opp0: Any,
+        vertex_opp1: Any, edge_boundary: Any, frequency_value: Any,
+    ) -> Any:
         out = _required_native_op("field_diffraction_wedge")(
             valid,
             source,
@@ -2009,7 +2016,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
         return tuple(out[name] for name in _WEDGE_OUTPUT_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         frequency = inputs[21]
         primals = tuple(
@@ -2037,7 +2044,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
         ctx.save_for_forward(*saved)
 
     @staticmethod
-    def _unpack_saved(ctx):
+    def _unpack_saved(ctx: Any) -> tuple[tuple[torch.Tensor, ...], tuple[torch.Tensor | None, ...]]:
         saved = ctx.saved_tensors
         primals = saved[:21]
         vertices = saved[21:26] if ctx.has_vertices else (None,) * 5
@@ -2045,7 +2052,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, grad_field_vector, grad_direction):
+    def backward(ctx: Any, grad_field_vector: Any, grad_direction: Any) -> Any:
         none_grads = (None,) * 28
         _ad_reject_fixed_inputs(
             "field_diffraction_wedge_ad",
@@ -2128,7 +2135,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def jvp(ctx, *tangents):
+    def jvp(ctx: Any, *tangents: Any) -> Any:
         _ad_reject_fixed_tangents(
             "field_diffraction_wedge_ad",
             (
@@ -2280,10 +2287,11 @@ class _FieldCoupledChainAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        source, target, positions, normals, component_id, depth, edge_direction, edge_n0, edge_n1,
-        exterior_angle, edge_line_min, edge_line_max, tx_power, tx_polarization, rx_polarization,
-        eps_r, sigma_e, mu_r, gain, thickness, frequency, frequency_value,
-    ):
+        source: Any, target: Any, positions: Any, normals: Any, component_id: Any, depth: Any,
+        edge_direction: Any, edge_n0: Any, edge_n1: Any, exterior_angle: Any, edge_line_min: Any,
+        edge_line_max: Any, tx_power: Any, tx_polarization: Any, rx_polarization: Any, eps_r: Any,
+        sigma_e: Any, mu_r: Any, gain: Any, thickness: Any, frequency: Any, frequency_value: Any,
+    ) -> Any:
         out = _required_native_op("field_coupled_chain")(
             source, target, positions, normals, component_id, depth, edge_direction, edge_n0,
             edge_n1, exterior_angle, edge_line_min, edge_line_max, tx_power, tx_polarization,
@@ -2293,7 +2301,7 @@ class _FieldCoupledChainAdFunction(torch.autograd.Function):
         return tuple(out[name] for name in _COUPLED_OUTPUT_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         frequency = inputs[20]
         primals = tuple(torch.autograd.forward_ad.unpack_dual(value).primal for value in inputs[:20])
@@ -2306,15 +2314,16 @@ class _FieldCoupledChainAdFunction(torch.autograd.Function):
         ctx.mark_non_differentiable(output[4])
 
     @staticmethod
-    def _native_primals(ctx) -> tuple[torch.Tensor, ...]:
+    def _native_primals(ctx: Any) -> tuple[torch.Tensor, ...]:
         saved = tuple(_ad_native_tensor(value) for value in ctx.saved_tensors)
         return (*saved, *_native_layers(None, saved[2][..., 0]), ctx.frequency_value)
 
     @staticmethod
     @_ad_first_order_only
     def backward(
-        ctx, grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain, _grad_direction,
-    ):
+        ctx: Any, grad_field_vector: Any, grad_coefficient: Any, grad_path_field: Any,
+        grad_path_gain: Any, _grad_direction: Any,
+    ) -> Any:
         none_grads = (None,) * 22
         _ad_reject_fixed_inputs(
             "field_coupled_chain_ad",
@@ -2351,7 +2360,7 @@ class _FieldCoupledChainAdFunction(torch.autograd.Function):
         return tuple(result)
 
     @staticmethod
-    def jvp(ctx, *tangents):
+    def jvp(ctx: Any, *tangents: Any) -> Any:
         _ad_reject_fixed_tangents(
             "field_coupled_chain_ad",
             tuple((tangents[index], name) for index, name in _CHAIN_FIXED_INPUTS),
@@ -2448,7 +2457,7 @@ _DD_GAIN_INDICES = (18, 23, 28, 33)
 _DD_THICKNESS_INDICES = (19, 24, 29, 34)
 
 
-def _dd_backward_needs(needs_input_grad) -> dict[str, bool]:
+def _dd_backward_needs(needs_input_grad: tuple[bool, ...]) -> dict[str, bool]:
     """Per-family gradient-request flags for the coupled-DD backward launch."""
     return {
         "geometry": any(bool(needs_input_grad[index]) for index in (0, 1)),
@@ -2483,13 +2492,16 @@ class _FieldCoupledDdAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        source, target, edge1_position, edge1_direction, edge1_n0, edge1_n1, edge1_exterior,
-        edge2_position, edge2_direction, edge2_n0, edge2_n1, edge2_exterior, tx_power,
-        tx_polarization, rx_polarization, w1a_eps_r, w1a_sigma_e, w1a_mu_r, w1a_gain, w1a_thickness,
-        w1b_eps_r, w1b_sigma_e, w1b_mu_r, w1b_gain, w1b_thickness, w2a_eps_r, w2a_sigma_e, w2a_mu_r,
-        w2a_gain, w2a_thickness, w2b_eps_r, w2b_sigma_e, w2b_mu_r, w2b_gain, w2b_thickness,
-        frequency, frequency_value, edge1_line_min, edge1_line_max, edge2_line_min, edge2_line_max,
-    ):
+        source: Any, target: Any, edge1_position: Any, edge1_direction: Any, edge1_n0: Any,
+        edge1_n1: Any, edge1_exterior: Any, edge2_position: Any, edge2_direction: Any,
+        edge2_n0: Any, edge2_n1: Any, edge2_exterior: Any, tx_power: Any, tx_polarization: Any,
+        rx_polarization: Any, w1a_eps_r: Any, w1a_sigma_e: Any, w1a_mu_r: Any, w1a_gain: Any,
+        w1a_thickness: Any, w1b_eps_r: Any, w1b_sigma_e: Any, w1b_mu_r: Any, w1b_gain: Any,
+        w1b_thickness: Any, w2a_eps_r: Any, w2a_sigma_e: Any, w2a_mu_r: Any, w2a_gain: Any,
+        w2a_thickness: Any, w2b_eps_r: Any, w2b_sigma_e: Any, w2b_mu_r: Any, w2b_gain: Any,
+        w2b_thickness: Any, frequency: Any, frequency_value: Any, edge1_line_min: Any,
+        edge1_line_max: Any, edge2_line_min: Any, edge2_line_max: Any,
+    ) -> Any:
         out = _required_native_op("field_coupled_dd")(
             source,
             target,
@@ -2535,7 +2547,7 @@ class _FieldCoupledDdAdFunction(torch.autograd.Function):
         return tuple(out[name] for name in _COUPLED_OUTPUT_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         frequency = inputs[35]
         # The native backward/jvp take the 35 primal field tensors (source ..
@@ -2563,8 +2575,9 @@ class _FieldCoupledDdAdFunction(torch.autograd.Function):
     @staticmethod
     @_ad_first_order_only
     def backward(
-        ctx, grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain, _grad_direction,
-    ):
+        ctx: Any, grad_field_vector: Any, grad_coefficient: Any, grad_path_field: Any,
+        grad_path_gain: Any, _grad_direction: Any,
+    ) -> Any:
         none_grads = (None,) * 41
         _ad_reject_fixed_inputs(
             "field_coupled_dd_ad",
@@ -2618,7 +2631,7 @@ class _FieldCoupledDdAdFunction(torch.autograd.Function):
             else None
         )
 
-        def material_column(name: str, column: int, index: int):
+        def material_column(name: str, column: int, index: int) -> torch.Tensor | None:
             if not ctx.needs_input_grad[index]:
                 return None
             return out[name][:, column]
@@ -2670,7 +2683,7 @@ class _FieldCoupledDdAdFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def jvp(ctx, *tangents):
+    def jvp(ctx: Any, *tangents: Any) -> Any:
         _ad_reject_fixed_tangents(
             "field_coupled_dd_ad",
             (
@@ -2706,7 +2719,7 @@ class _FieldCoupledDdAdFunction(torch.autograd.Function):
             "field_coupled_dd_ad tangent_target", tangents[1], saved[1]
         )
 
-        def material_pack(indices: tuple[int, int, int, int], name: str):
+        def material_pack(indices: tuple[int, int, int, int], name: str) -> torch.Tensor | None:
             columns = tuple(
                 _ad_checked_tangent(
                     f"field_coupled_dd_ad tangent_{name}",
@@ -2827,14 +2840,14 @@ class _FieldProjectComplex3AdFunction(torch.autograd.Function):
     """Differentiable receiver projection on a frozen polarization basis."""
 
     @staticmethod
-    def forward(field_vector, direction, rx_polarization):
+    def forward(field_vector: Any, direction: Any, rx_polarization: Any) -> Any:
         out = _required_native_op("field_project_complex3")(
             field_vector, direction, rx_polarization
         )
         return (out["coefficient"], out["path_gain"])
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         primals = tuple(
             torch.autograd.forward_ad.unpack_dual(value).primal for value in inputs
@@ -2844,7 +2857,7 @@ class _FieldProjectComplex3AdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, grad_coefficient, grad_path_gain):
+    def backward(ctx: Any, grad_coefficient: Any, grad_path_gain: Any) -> Any:
         _ad_reject_fixed_inputs(
             "field_project_complex3_ad",
             ctx.needs_input_grad,
@@ -2873,7 +2886,7 @@ class _FieldProjectComplex3AdFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def jvp(ctx, t_field_vector, t_direction, t_rx_polarization):
+    def jvp(ctx: Any, t_field_vector: Any, t_direction: Any, t_rx_polarization: Any) -> Any:
         _ad_reject_fixed_tangents(
             "field_project_complex3_ad",
             ((t_rx_polarization, "rx_polarization"),),
@@ -2922,9 +2935,10 @@ class _FieldRoughReflectionScaleAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        field_vector, coefficient, path_field, path_gain, positions, normals, source, sigma_b,
-        rough_b, replaced, frequency, frequency_value, geometry_live,
-    ):
+        field_vector: Any, coefficient: Any, path_field: Any, path_gain: Any, positions: Any,
+        normals: Any, source: Any, sigma_b: Any, rough_b: Any, replaced: Any, frequency: Any,
+        frequency_value: Any, geometry_live: Any,
+    ) -> Any:
         out = field_rough_reflection_scale(
             field_vector,
             coefficient,
@@ -2941,7 +2955,7 @@ class _FieldRoughReflectionScaleAdFunction(torch.autograd.Function):
         return tuple(out[name] for name in _ROUGH_SCALE_OUTPUT_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         frequency = inputs[10]
         primals = tuple(
@@ -2961,7 +2975,10 @@ class _FieldRoughReflectionScaleAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain):
+    def backward(
+        ctx: Any, grad_field_vector: Any, grad_coefficient: Any, grad_path_field: Any,
+        grad_path_gain: Any,
+    ) -> Any:
         none_grads = (None,) * 13
         _ad_reject_fixed_inputs(
             "field_rough_reflection_scale_ad",
@@ -3016,10 +3033,10 @@ class _FieldRoughReflectionScaleAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx, t_field_vector, t_coefficient, t_path_field, t_path_gain, t_positions, t_normals,
-        t_source, t_sigma_b, _t_rough_b, _t_replaced, t_frequency, _t_frequency_value,
-        _t_geometry_live,
-    ):
+        ctx: Any, t_field_vector: Any, t_coefficient: Any, t_path_field: Any, t_path_gain: Any,
+        t_positions: Any, t_normals: Any, t_source: Any, t_sigma_b: Any, _t_rough_b: Any,
+        _t_replaced: Any, t_frequency: Any, _t_frequency_value: Any, _t_geometry_live: Any,
+    ) -> Any:
         _ad_reject_fixed_tangents(
             "field_rough_reflection_scale_ad",
             ((t_sigma_b, "sigma_b"),),
@@ -3201,14 +3218,14 @@ class _FieldSourceAmplitudeScaleAdFunction(torch.autograd.Function):
     """Differentiable ``field_vector * sqrt(max(tx_power, 0))``."""
 
     @staticmethod
-    def forward(field_vector, tx_power):
+    def forward(field_vector: Any, tx_power: Any) -> Any:
         out = _required_native_op("field_source_amplitude_scale")(
             field_vector, tx_power
         )
         return out["path_field_vector"]
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         tx_power = torch.autograd.forward_ad.unpack_dual(inputs[1]).primal
         ctx.save_for_backward(tx_power)
@@ -3216,7 +3233,7 @@ class _FieldSourceAmplitudeScaleAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, grad_path_field_vector):
+    def backward(ctx: Any, grad_path_field_vector: Any) -> Any:
         _ad_reject_fixed_inputs(
             "field_source_amplitude_scale_ad",
             ctx.needs_input_grad,
@@ -3231,7 +3248,7 @@ class _FieldSourceAmplitudeScaleAdFunction(torch.autograd.Function):
         return (out["grad_field_vector"], None)
 
     @staticmethod
-    def jvp(ctx, t_field_vector, t_tx_power):
+    def jvp(ctx: Any, t_field_vector: Any, t_tx_power: Any) -> Any:
         _ad_reject_fixed_tangents(
             "field_source_amplitude_scale_ad", ((t_tx_power, "tx_power"),)
         )

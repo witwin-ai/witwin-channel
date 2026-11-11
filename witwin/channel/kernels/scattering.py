@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import Any, Protocol, TypedDict, cast
 
 import numpy as np
 import torch
@@ -189,12 +190,20 @@ def _validate_patch_inputs(scope: Mapping[str, torch.Tensor]) -> None:
         raise ValueError("valid must match patch rows")
 
 
+class PatchIntegralOutputs(TypedDict):
+    """Phase-screen patch integral: per-row ``integral``/``row_value`` and their ``total``."""
+
+    total: torch.Tensor
+    integral: torch.Tensor
+    row_value: torch.Tensor
+
+
 def scattering_patch_integral_eval(
     valid: torch.Tensor, patch_tris: torch.Tensor, patch_uvs: torch.Tensor, rows: torch.Tensor,
     d_i: torch.Tensor, d_o: torch.Tensor, n_rows: torch.Tensor, r_te: torch.Tensor,
     r_tm: torch.Tensor, pol_t: torch.Tensor, pol_r: torch.Tensor, r1_rows: torch.Tensor,
     r2_rows: torch.Tensor, centroids: torch.Tensor, heights: torch.Tensor, *, k0: float,
-) -> dict[str, torch.Tensor]:
+) -> PatchIntegralOutputs:
     """Native realization-coherent phase-screen patch integral (rough-surface scattering).
 
     One fused launch per (tx, rx, structure) plus a fixed-order deterministic
@@ -235,7 +244,7 @@ def scattering_patch_integral_eval(
         raise TypeError(
             "_channel.scattering_patch_integral_eval returned invalid fields"
         )
-    return out
+    return cast(PatchIntegralOutputs, out)
 
 
 _ENSEMBLE_OUTPUT_FIELDS = ("gain", "amplitude", "length", "keep")
@@ -617,7 +626,7 @@ def _validate_chain_leg(
     validate_cuda_tensor(
         f"{prefix}_normals", normals, dtype=torch.float32, ndim=3, trailing_shape=(3,)
     )
-    dmax = positions.shape[1]
+    dmax: int = positions.shape[1]
     if dmax > _K_MAX_AD_DEPTH:
         raise ValueError(
             f"{prefix} leg depth {dmax} exceeds kMaxAdDepth={_K_MAX_AD_DEPTH}"
@@ -814,10 +823,12 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        valid, wo_rows, r2_rows, cos_o_rows, n_o, t1r, t2r, wi_local, cos_i, r1, a_te2, a_tm2,
-        weights, material_id, backup_axis, rx_pol, rc_idx, sc_idx, f_te_flat, f_tm_flat,
-        table_offset, table_dims, material_slot, coef, threshold, coef_value,
-    ):
+        valid: Any, wo_rows: Any, r2_rows: Any, cos_o_rows: Any, n_o: Any, t1r: Any, t2r: Any,
+        wi_local: Any, cos_i: Any, r1: Any, a_te2: Any, a_tm2: Any, weights: Any, material_id: Any,
+        backup_axis: Any, rx_pol: Any, rc_idx: Any, sc_idx: Any, f_te_flat: Any, f_tm_flat: Any,
+        table_offset: Any, table_dims: Any, material_slot: Any, coef: Any, threshold: Any,
+        coef_value: Any,
+    ) -> Any:
         out = scattering_ensemble_eval(
             valid,
             wo_rows,
@@ -848,7 +859,7 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
         return tuple(out[name] for name in _ENSEMBLE_OUTPUT_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         coef = inputs[23]
         primals = tuple(
@@ -866,7 +877,9 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, grad_gain, grad_amplitude, grad_length, _grad_keep):
+    def backward(
+        ctx: Any, grad_gain: Any, grad_amplitude: Any, grad_length: Any, _grad_keep: Any,
+    ) -> Any:
         none_grads = (None,) * 26
         _ad_reject_fixed_inputs(
             "scattering_ensemble_eval_ad", ctx.needs_input_grad, _ENSEMBLE_FIXED
@@ -927,11 +940,12 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx, t_valid, t_wo_rows, t_r2_rows, t_cos_o_rows, t_n_o, t_t1r, t_t2r, t_wi_local, t_cos_i,
-        t_r1, t_a_te2, t_a_tm2, t_weights, t_material_id, t_backup_axis, t_rx_pol, t_rc_idx,
-        t_sc_idx, t_f_te_flat, t_f_tm_flat, t_table_offset, t_table_dims, t_material_slot, t_coef,
-        _t_threshold, _t_coef_value,
-    ):
+        ctx: Any, t_valid: Any, t_wo_rows: Any, t_r2_rows: Any, t_cos_o_rows: Any, t_n_o: Any,
+        t_t1r: Any, t_t2r: Any, t_wi_local: Any, t_cos_i: Any, t_r1: Any, t_a_te2: Any,
+        t_a_tm2: Any, t_weights: Any, t_material_id: Any, t_backup_axis: Any, t_rx_pol: Any,
+        t_rc_idx: Any, t_sc_idx: Any, t_f_te_flat: Any, t_f_tm_flat: Any, t_table_offset: Any,
+        t_table_dims: Any, t_material_slot: Any, t_coef: Any, _t_threshold: Any, _t_coef_value: Any,
+    ) -> Any:
         _ad_reject_fixed_tangents(
             "scattering_ensemble_eval_ad",
             (
@@ -1078,9 +1092,10 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        valid, patch_tris, patch_uvs, rows, d_i, d_o, n_rows, r_te, r_tm, pol_t, pol_r, r1_rows,
-        r2_rows, centroids, heights, quad_a, quad_b, quad_w, k0, k0_value,
-    ):
+        valid: Any, patch_tris: Any, patch_uvs: Any, rows: Any, d_i: Any, d_o: Any, n_rows: Any,
+        r_te: Any, r_tm: Any, pol_t: Any, pol_r: Any, r1_rows: Any, r2_rows: Any, centroids: Any,
+        heights: Any, quad_a: Any, quad_b: Any, quad_w: Any, k0: Any, k0_value: Any,
+    ) -> Any:
         out = _required_patch_forward(
             valid,
             patch_tris,
@@ -1105,7 +1120,7 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
         return tuple(out[name] for name in _PATCH_OUTPUT_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         k0 = inputs[18]
         primals = tuple(
@@ -1122,7 +1137,7 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, grad_total, _grad_integral, _grad_row_value):
+    def backward(ctx: Any, grad_total: Any, _grad_integral: Any, _grad_row_value: Any) -> Any:
         none_grads = (None,) * 20
         _ad_reject_fixed_inputs(
             "scattering_patch_integral_eval_ad", ctx.needs_input_grad, _PATCH_FIXED
@@ -1173,10 +1188,11 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx, t_valid, t_patch_tris, t_patch_uvs, t_rows, t_d_i, t_d_o, t_n_rows, t_r_te, t_r_tm,
-        t_pol_t, t_pol_r, t_r1_rows, t_r2_rows, t_centroids, t_heights, t_quad_a, t_quad_b,
-        t_quad_w, t_k0, _t_k0_value,
-    ):
+        ctx: Any, t_valid: Any, t_patch_tris: Any, t_patch_uvs: Any, t_rows: Any, t_d_i: Any,
+        t_d_o: Any, t_n_rows: Any, t_r_te: Any, t_r_tm: Any, t_pol_t: Any, t_pol_r: Any,
+        t_r1_rows: Any, t_r2_rows: Any, t_centroids: Any, t_heights: Any, t_quad_a: Any,
+        t_quad_b: Any, t_quad_w: Any, t_k0: Any, _t_k0_value: Any,
+    ) -> Any:
         _ad_reject_fixed_tangents(
             "scattering_patch_integral_eval_ad",
             (
@@ -1241,9 +1257,12 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
 
 
 def _required_patch_forward(
-    valid, patch_tris, patch_uvs, rows, d_i, d_o, n_rows, r_te, r_tm, pol_t, pol_r, r1_rows,
-    r2_rows, centroids, heights, quad_a, quad_b, quad_w, k0_value,
-):
+    valid: torch.Tensor, patch_tris: torch.Tensor, patch_uvs: torch.Tensor, rows: torch.Tensor,
+    d_i: torch.Tensor, d_o: torch.Tensor, n_rows: torch.Tensor, r_te: torch.Tensor,
+    r_tm: torch.Tensor, pol_t: torch.Tensor, pol_r: torch.Tensor, r1_rows: torch.Tensor,
+    r2_rows: torch.Tensor, centroids: torch.Tensor, heights: torch.Tensor, quad_a: torch.Tensor,
+    quad_b: torch.Tensor, quad_w: torch.Tensor, k0_value: float,
+) -> dict[str, torch.Tensor]:
     out = _required_native_op("scattering_patch_integral_eval")(
         valid,
         patch_tris,
@@ -1278,7 +1297,7 @@ def scattering_patch_integral_eval_ad(
     d_i: torch.Tensor, d_o: torch.Tensor, n_rows: torch.Tensor, r_te: torch.Tensor,
     r_tm: torch.Tensor, pol_t: torch.Tensor, pol_r: torch.Tensor, r1_rows: torch.Tensor,
     r2_rows: torch.Tensor, centroids: torch.Tensor, heights: torch.Tensor, *, k0: torch.Tensor,
-) -> dict[str, torch.Tensor]:
+) -> PatchIntegralOutputs:
     """Differentiable :func:`scattering_patch_integral_eval` (scattering AD).
 
     ``k0`` is the wavenumber as a 0-d scalar tensor so frequency gradients flow
@@ -1311,7 +1330,7 @@ def scattering_patch_integral_eval_ad(
         k0,
         float(k0_value),
     )
-    return dict(zip(_PATCH_OUTPUT_FIELDS, values, strict=True))
+    return cast(PatchIntegralOutputs, dict(zip(_PATCH_OUTPUT_FIELDS, values, strict=True)))
 
 
 # ---------------------------------------------------------------------------
@@ -1549,7 +1568,7 @@ _FIXED = (
 )
 
 
-def _backward_need_flags(needed) -> tuple[bool, bool, bool]:
+def _backward_need_flags(needed: tuple[bool, ...]) -> tuple[bool, bool, bool]:
     """Resolve which native grad groups the VJP must compute."""
 
     need_rough = bool(needed[0] or needed[1] or needed[2])
@@ -1569,7 +1588,9 @@ def _backward_is_noop(
     return no_grad_requested or no_upstream
 
 
-def _backward_grad_tuple(out, ctx, needed, *, need_frequency: bool) -> tuple:
+def _backward_grad_tuple(
+    out: dict[str, Any], ctx: Any, needed: tuple[bool, ...], *, need_frequency: bool,
+) -> tuple[torch.Tensor | None, ...]:
     """Pack the 21-slot input-gradient tuple from the native VJP output."""
 
     grad_sigma_h = (
@@ -1628,16 +1649,17 @@ class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        rough_sigma_h, rough_corr_x, rough_corr_y, layer_thickness_m, layer_eps_r, layer_sigma_e,
-        layer_mu_r, frequency, f_te_built, f_tm_built, s_te, s_tm, a_te, a_tm, r_diff_te, r_diff_tm,
-        cos_i, phi_i, cos_o, phi_o, frequency_value,
-    ):
+        rough_sigma_h: Any, rough_corr_x: Any, rough_corr_y: Any, layer_thickness_m: Any,
+        layer_eps_r: Any, layer_sigma_e: Any, layer_mu_r: Any, frequency: Any, f_te_built: Any,
+        f_tm_built: Any, s_te: Any, s_tm: Any, a_te: Any, a_tm: Any, r_diff_te: Any, r_diff_tm: Any,
+        cos_i: Any, phi_i: Any, cos_o: Any, phi_o: Any, frequency_value: Any,
+    ) -> Any:
         # The numpy build already produced f_te_built/f_tm_built; the forward is
         # a pure pass-through so the primal table stays bit-identical.
         return f_te_built, f_tm_built
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         frequency = inputs[7]
         ctx.sigma_h = _scalar_value(inputs[0])
@@ -1665,7 +1687,7 @@ class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, grad_f_te, grad_f_tm):
+    def backward(ctx: Any, grad_f_te: Any, grad_f_tm: Any) -> Any:
         none_grads = (None,) * 21
         _ad_reject_fixed_inputs(
             "kirchhoff_table_build_ad", ctx.needs_input_grad, _FIXED
@@ -1698,10 +1720,11 @@ class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx, t_sigma_h, t_corr_x, t_corr_y, t_thickness, t_eps, t_sigma, t_mu_r, t_frequency,
-        _t_f_te, _t_f_tm, _t_s_te, _t_s_tm, _t_a_te, _t_a_tm, _t_r_diff_te, _t_r_diff_tm, _t_cos_i,
-        _t_phi_i, _t_cos_o, _t_phi_o, _t_frequency_value,
-    ):
+        ctx: Any, t_sigma_h: Any, t_corr_x: Any, t_corr_y: Any, t_thickness: Any, t_eps: Any,
+        t_sigma: Any, t_mu_r: Any, t_frequency: Any, _t_f_te: Any, _t_f_tm: Any, _t_s_te: Any,
+        _t_s_tm: Any, _t_a_te: Any, _t_a_tm: Any, _t_r_diff_te: Any, _t_r_diff_tm: Any,
+        _t_cos_i: Any, _t_phi_i: Any, _t_cos_o: Any, _t_phi_o: Any, _t_frequency_value: Any,
+    ) -> Any:
         _ad_reject_fixed_tangents(
             "kirchhoff_table_build_ad",
             (
@@ -1748,10 +1771,37 @@ class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
         return out["tangent_f_te"], out["tangent_f_tm"]
 
 
+class _KirchhoffTableBuild(Protocol):
+    """The parts of a built Kirchhoff table that its AD replay reads."""
+
+    @property
+    def cos_theta_i(self) -> torch.Tensor: ...
+    @property
+    def phi_i(self) -> torch.Tensor: ...
+    @property
+    def cos_theta_o(self) -> torch.Tensor: ...
+    @property
+    def phi_o(self) -> torch.Tensor: ...
+    @property
+    def f_te(self) -> torch.Tensor: ...
+    @property
+    def f_tm(self) -> torch.Tensor: ...
+    @property
+    def r_diff_te(self) -> torch.Tensor: ...
+    @property
+    def r_diff_tm(self) -> torch.Tensor: ...
+    @property
+    def normalization_applied(self) -> torch.Tensor: ...
+    @property
+    def pre_balance_lobe_te(self) -> torch.Tensor | None: ...
+    @property
+    def pre_balance_lobe_tm(self) -> torch.Tensor | None: ...
+
+
 def kirchhoff_table_build_ad(
     rough_sigma_h: torch.Tensor, rough_corr_x: torch.Tensor, rough_corr_y: torch.Tensor,
     layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor, frequency: torch.Tensor, *, table,
+    layer_mu_r: torch.Tensor, frequency: torch.Tensor, *, table: _KirchhoffTableBuild,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Attach the native build adjoint to a numpy-built ``KirchhoffTable``.
 
@@ -1832,14 +1882,17 @@ class _McScatteringPairSumFunction(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(f_te, f_tm, samples, tables, receivers, visible, deposited):
+    def forward(
+        f_te: Any, f_tm: Any, samples: Any, tables: Any, receivers: Any, visible: Any,
+        deposited: Any,
+    ) -> Any:
         native_tables = (*tables[:3], f_te, f_tm)
         return _mc_scattering_pair_sum(
             samples, native_tables, receivers, visible, f_te, f_tm, deposited
         )
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         f_te, f_tm, samples, tables, receivers, visible, _deposited = inputs
         ctx.samples = samples
@@ -1851,7 +1904,7 @@ class _McScatteringPairSumFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, grad_out):
+    def backward(ctx: Any, grad_out: Any) -> Any:
         if grad_out is None:
             return (None,) * 7
         f_te, f_tm = ctx.saved_tensors
@@ -1867,7 +1920,7 @@ class _McScatteringPairSumFunction(torch.autograd.Function):
         return out[0], out[1], None, None, None, None, None
 
     @staticmethod
-    def jvp(ctx, t_te, t_tm, *_rest):
+    def jvp(ctx: Any, t_te: Any, t_tm: Any, *_rest: Any) -> Any:
         tangent_te = _ad_native_tangent_or_none(t_te)
         tangent_tm = _ad_native_tangent_or_none(t_tm)
         if tangent_te is None and tangent_tm is None:
@@ -1897,7 +1950,7 @@ def mc_scattering_pair_sum(
     """
 
     if ad:
-        return _McScatteringPairSumFunction.apply(  # type: ignore[no-any-return]
+        return _McScatteringPairSumFunction.apply(
             tables[3], tables[4], samples, tables, receivers, visible, deposited
         )
     return _mc_scattering_pair_sum(
