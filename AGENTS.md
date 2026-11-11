@@ -92,10 +92,14 @@ and that path is the contract; whether it is one module or a package is internal
   the public `evaluate_enumerated_paths` read-only as an opaque oracle (ADR-008).
 - Root modules: `constants`, `abi` (`Complex3State`, `JonesState`), `components`,
   `capabilities`, `deployment`.
+- `importers` and `presets`: file import (Mitsuba/Sionna XML, PLY, OBJ, glTF) and ITU-R P.2040
+  material / antenna-pattern factories (ADR-048). Import-time NumPy/stdlib code that builds
+  `witwin.core` values; they define no world types, never import a solver, and launch nothing.
 - Public API: the package root (`build_info`, `capabilities`, `pipeline_cache_key`,
-  `runtime_diagnostics`, `Complex3State`, `JonesState`), the four solver modules, and
-  `propagation.consumer`, exactly as frozen in `ci/public-api-snapshot.json`. Everything else is
-  internal: no compatibility shims, aliases or re-exports for moved internals.
+  `runtime_diagnostics`, `Complex3State`, `JonesState`), the four solver modules,
+  `propagation.consumer`, `importers` and `presets`, exactly as frozen in
+  `ci/public-api-snapshot.json`. Everything else is internal: no compatibility shims, aliases
+  or re-exports for moved internals.
 - Owner documents live at `docs/dev/<domain>/README.md`.
 
 ## 5. Native boundary
@@ -193,7 +197,7 @@ Plans are in `docs/dev/plans/` (the modular architecture is plan `08-*`); the st
 
 - Boundaries and API: 001 dispatch, 002 RayD lock, 003 public/internal API, 006 developer
   override, 033 product identity, 034 world/propagation boundary, 036 public surface, 047 RayD
-  0.8 source boundary.
+  0.8 source boundary, 048 scene import and presets.
 - Ownership: 007 propagation data, 008 enumerated oracle, 009 native fusion, 023 direct RayD
   integration, 024 shared RF/transmission, 025 diffraction family, 026 RayD scattering runtime,
   027 segment penetration, 044 native translation units.

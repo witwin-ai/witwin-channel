@@ -4,6 +4,23 @@ All notable changes to `witwin-channel` are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `witwin.channel.importers` (ADR-048): `load_mitsuba` imports Mitsuba 3 /
+  Sionna RT XML scenes (ply, obj, serialized, rectangle and cube shapes,
+  `to_world` transforms, ITU and explicit radio materials); `load_mesh`,
+  `read_ply`, `read_obj` and `read_gltf` import PLY, OBJ and glTF 2.0 files.
+  Duplicate vertices are welded by default and reported. Output is plain
+  `witwin.core` structures.
+- `witwin.channel.presets` (ADR-048): `itu_material` builds ITU-R P.2040
+  materials as dispersive `PhysicalMaterial` values with enforced frequency
+  ranges; `tr38901_pattern` and `dipole_pattern` build Core custom antenna
+  patterns.
+- `examples/` with runnable radiomap, path/CIR/CFR, material-calibration and
+  moving-transmitter scripts, and user guides under `docs/user/`.
+- The public API snapshot gains the two modules above; no existing export
+  changed.
+
 ## [0.5.0] - 2026-07-30
 
 ### Changed
