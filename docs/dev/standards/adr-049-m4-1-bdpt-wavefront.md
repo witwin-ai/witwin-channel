@@ -47,11 +47,21 @@ accumulate JVP looped every row for every output cell (`O(cells x rows)`).
    - The sampled estimate is added to the enumerated transmission matrix in
      one finalize kernel. Peak memory is one chunk of state, one hit record and
      one pair tile, independent of the sample count.
-2. **Where it runs.** The wavefront owns the sampler when `ad_mode='none'`,
-   no rough (Kirchhoff) material is present, and neither `export_paths` nor
-   `diagnostics` asks for rows. Otherwise the event-composed sampler runs
-   unchanged (AD companions, scatter branch, exported rows, variance); it
-   draws the same random numbers, so both produce the same estimate.
+2. **Where it runs.** The wavefront owns the sampler whenever
+   `ad_mode='none'`, including rough (Kirchhoff) faces and `export_paths` /
+   `diagnostics`:
+   - rough faces: the bounce step splits scatter / transmit / reflect with the
+     three-way budgets, samples the Kirchhoff lobe and evaluates the BSDF from
+     the stacked resident tables (RayD `scattering_table.cuh` device math),
+     seeds the unpolarized post-scatter carrier and applies the scatter-order
+     cap; each recorded scatter vertex makes its next-event row per receiver
+     tile (offset segment, RayD visibility, fused accumulation), so scattering
+     builds no N x R table;
+   - rows: a counting pass, the one sanctioned row-count copy, and a second
+     pass that writes exactly those rows (sorted by sample, bounce, receiver)
+     into the connection-sample schema for the compact export and the variance.
+   Under `jvp` / `vjp` the event-composed sampler still runs (AD companions);
+   it draws the same random numbers and returns bitwise the same primal.
    `Result.metadata["sampler"]` names the one used.
 3. **Random numbers.** Every sampler uniform is a pure function
    `u = h(seed, stream, g, depth)` of the global sample index
@@ -86,6 +96,20 @@ accumulate JVP looped every row for every output cell (`O(cells x rows)`).
   accumulate change order (now deterministic).
 - The mixed-chain sampler no longer scales its memory or launch count with
   `samples x receivers`; the workspace estimate counts one chunk and one tile.
+
+## Estimator limitation (mixed chains)
+
+The mixed reflection+transmission estimator connects the light vertex after a
+specular event (a point on a wall, carrying the sampled Jones field) straight
+to the receiver through one connection segment. A specular chain has measure
+zero in that connection; the estimator is a point-to-receiver radiometric
+connection, not an image-method path, so it is not the field the deterministic
+solver would assign to a reflect-then-transmit path and there is no
+deterministic reference for it (deterministic transmission is straight-segment
+only). Its equivalence evidence is therefore statistical: same-seed agreement
+between implementations and means over seeds against the previous sampler.
+Straight transmission, reflection and diffraction stay enumerated and agree
+with the deterministic solver by construction.
 
 ## Acceptance evidence
 

@@ -66,12 +66,12 @@ def _mixed_scene(transmitters=1) -> Scene:
     )
 
 
-def _solve(scene, config, monkeypatch=None, *, composed=False):
+def _solve(scene, config, monkeypatch=None, *, composed=False, frequency=_FREQUENCY):
     if composed:
         assert monkeypatch is not None
         monkeypatch.setattr(bdpt, "_wavefront_eligible", lambda config, runtimes: False)
     try:
-        return bdpt.solve(scene, config, reference_frequency_hz=_FREQUENCY)
+        return bdpt.solve(scene, config, reference_frequency_hz=frequency)
     finally:
         if composed:
             monkeypatch.undo()
@@ -208,3 +208,41 @@ def test_enumerated_oracle_is_called_once(monkeypatch):
             atol=0.0,
         )
 
+
+
+@cuda
+@pytest.mark.parametrize("order", [1, 3])
+@pytest.mark.parametrize("components", [{"scattering"}, {"scattering", "transmission"}])
+def test_wavefront_scatter_branch_matches_event_composed_sampler(monkeypatch, order, components):
+    _require_native()
+    from tests.montecarlo.bdpt.test_scattering import (
+        _FREQUENCY as frequency,
+        _material,
+        _point_scene,
+        _roughness,
+    )
+
+    scene = _point_scene(_material(_roughness()))
+    config = bdpt.Config(
+        samples=16_384, seed=5, max_depth=3, components=components, max_scattering_order=order
+    )
+    wavefront = _solve(scene, config, frequency=frequency)
+    composed = _solve(scene, config, monkeypatch, composed=True, frequency=frequency)
+
+    assert wavefront.metadata["sampler"] == "wavefront"
+    assert float(wavefront.component_power["scattering"]) > 0.0
+    for component in sorted(components):
+        torch.testing.assert_close(
+            wavefront.component_power[component],
+            composed.component_power[component],
+            rtol=1.0e-4,
+            atol=0.0,
+        )
+    assert (
+        wavefront.metadata["scattering"]["event_counts"]
+        == composed.metadata["scattering"]["event_counts"]
+    )
+    assert (
+        wavefront.metadata["scattering"]["nee_connection_rows"]
+        == composed.metadata["scattering"]["nee_connection_rows"]
+    )

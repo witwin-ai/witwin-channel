@@ -3956,18 +3956,66 @@ _BDPT_WAVEFRONT_MATERIAL_FIELDS = (
 )
 
 
+def bdpt_scatter_table_stack(
+    runtimes: dict[int, object], material_bundle: dict[str, torch.Tensor],
+) -> dict[str, torch.Tensor]:
+    """Stack the rough-material Kirchhoff tables and their sampling CDFs per slot.
+
+    Structural packing only: ``material_slot[m]`` is the slot of material ``m``
+    (``-1`` without a table) and every table block is located by its offsets and
+    ``[nti, npi, nto, npo]`` dims. Table values are read detached.
+    """
+
+    device = material_bundle["scatter_model_id"].device
+    material_count = int(material_bundle["scatter_model_id"].shape[0])
+    slot = torch.full((material_count,), -1, dtype=torch.int32, device=device)
+    parts: dict[str, list[torch.Tensor]] = {
+        "f_te": [], "f_tm": [], "conditional_cdf": [], "sample_density": [], "marginal_cdf": [],
+    }
+    offsets: list[int] = []
+    marginal_offsets: list[int] = []
+    dims: list[list[int]] = []
+    running = 0
+    marginal_running = 0
+    for index, material in enumerate(sorted(runtimes)):
+        table = runtimes[material].table  # type: ignore[attr-defined]
+        slot[material] = index
+        for name in ("f_te", "f_tm", "conditional_cdf", "sample_density", "marginal_cdf"):
+            parts[name].append(
+                getattr(table, name).detach().to(device=device, dtype=torch.float32).reshape(-1)
+            )
+        offsets.append(running)
+        marginal_offsets.append(marginal_running)
+        dims.append([int(size) for size in table.f_te.shape])
+        running += int(table.f_te.numel())
+        marginal_running += int(table.marginal_cdf.numel())
+    stack = {name: torch.cat(values).contiguous() for name, values in parts.items()}
+    stack["material_slot"] = slot
+    stack["table_offset"] = torch.tensor(offsets, dtype=torch.int64, device=device)
+    stack["marginal_offset"] = torch.tensor(marginal_offsets, dtype=torch.int64, device=device)
+    stack["table_dims"] = torch.tensor(dims, dtype=torch.int32, device=device).reshape(-1, 4)
+    for name in ("scatter_model_id", "rough_sigma_h_m", "rough_axis_rad"):
+        stack[name] = material_bundle[name].contiguous()
+    return stack
+
+
 def bdpt_wavefront_transmission(
     rayd: object, tx_positions: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
     rx_positions: torch.Tensor, rx_polarization: torch.Tensor,
-    material_bundle: dict[str, torch.Tensor], base_transmission: torch.Tensor, *,
-    frequency_hz: float, samples: int, max_depth: int, seed: int, mis_mode: int, beta: float,
-    chunk_samples: int = 1 << 18, pair_tile: int = 1 << 20,
-) -> dict[str, torch.Tensor]:
-    """Run the fused mixed reflection+transmission wavefront of every transmitter.
+    material_bundle: dict[str, torch.Tensor], base_transmission: torch.Tensor,
+    base_scattering: torch.Tensor, *, scatter: dict[str, torch.Tensor] | None, frequency_hz: float,
+    samples: int, max_depth: int, seed: int, mis_mode: int, beta: float, emit_mixed: bool,
+    max_scattering_order: int, scene_diagonal: float, chunk_samples: int = 1 << 18,
+    pair_tile: int = 1 << 20, rows_capacity: int | None = None,
+) -> dict[str, object]:
+    """Run the fused light-subpath wavefront of every transmitter.
 
-    Returns ``transmission`` (``base_transmission`` plus the sampled estimate,
-    float ``[T, R]``) and ``counts`` (int64 ``[3]``: transmit events, reflect
-    events, accumulated connection rows), both still on the device.
+    Returns ``transmission`` and ``scattering`` (the base matrices plus the sampled
+    mixed-chain and scatter next-event estimates, float ``[T, R]``) and ``counts``
+    (int64 ``[6]``: transmit, reflect and scatter events, mixed rows, scatter
+    rows, written rows), all still on the device. With ``rows_capacity`` it also
+    returns ``rows``: every accumulated connection row in the 12-field
+    connection-sample schema, sorted by (sample, bounce, receiver).
     """
 
     for name, tensor in (
@@ -3979,6 +4027,7 @@ def bdpt_wavefront_transmission(
         validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=2, trailing_shape=(3,))
     validate_cuda_tensor("tx_power", tx_power, dtype=torch.float32, ndim=1)
     validate_cuda_tensor("base_transmission", base_transmission, dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("base_scattering", base_scattering, dtype=torch.float32, ndim=2)
     if samples <= 0 or max_depth < 1 or seed < 0 or chunk_samples <= 0 or pair_tile <= 0:
         raise ValueError("samples, max_depth, chunk_samples and pair_tile must be positive")
     materials = {name: material_bundle[name] for name in _BDPT_WAVEFRONT_MATERIAL_FIELDS}
@@ -3990,18 +4039,32 @@ def bdpt_wavefront_transmission(
         rx_positions.contiguous(),
         rx_polarization.contiguous(),
         materials,
+        scatter,
         base_transmission.contiguous(),
+        base_scattering.contiguous(),
         float(frequency_hz),
         int(samples),
         int(max_depth),
         int(seed),
         int(mis_mode),
         float(beta),
+        bool(emit_mixed),
+        int(max_scattering_order),
+        float(scene_diagonal),
         int(chunk_samples),
         int(pair_tile),
+        -1 if rows_capacity is None else int(rows_capacity),
     )
-    if not isinstance(out, dict) or set(out) != {"transmission", "counts"}:
-        raise TypeError("_channel.bdpt_wavefront_transmission must return transmission and counts")
+    expected = {"transmission", "scattering", "counts"} | (
+        set() if rows_capacity is None else {"rows"}
+    )
+    if not isinstance(out, dict) or set(out) != expected:
+        raise TypeError("_channel.bdpt_wavefront_transmission returned unexpected fields")
+    if rows_capacity is not None:
+        _validate_bdpt_connection_samples(
+            "_channel.bdpt_wavefront_transmission rows", out["rows"], None
+        )
     validate_cuda_tensor("transmission", out["transmission"], dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("scattering", out["scattering"], dtype=torch.float32, ndim=2)
     validate_cuda_tensor("counts", out["counts"], dtype=torch.int64, ndim=1)
     return out
