@@ -146,10 +146,9 @@ def test_crlf_and_lf_checkouts_give_the_locked_manifest_digest(tmp_path: Path):
         digests[autocrlf] = resolver.source_manifest_sha256(
             resource / "source", [entry["path"] for entry in manifest["files"]]
         )
-    # The checkouts really differ: RayD's generator hashes raw bytes in the shipped manifest.
-    assert shipped["false"] != shipped["true"]
-    # The LF checkout's shipped manifest is the locked one, and both normalize to it.
-    assert shipped["false"] == locked
+    # RayD pins `* text=auto eol=lf`, so a core.autocrlf=true checkout ships the same manifest as an
+    # LF checkout; both shipped manifests and Channel's LF-normalized digest equal the lock.
+    assert shipped == {"false": locked, "true": locked}
     assert digests == {"false": locked, "true": locked}
 
 
