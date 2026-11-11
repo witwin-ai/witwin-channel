@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "repository_url": "https://github.com/Asixa/RayD",
-  "commit": "96d023b3c153015f32b1f8eb346eec0092f379f5",
+  "commit": "7bb4ec2f31c26c80bd763c16b3849250fa892cef",
   "integration_abi": {
     "kind": "source-header-set-sha256",
     "entrypoint": "include/rayd/integration.h",
