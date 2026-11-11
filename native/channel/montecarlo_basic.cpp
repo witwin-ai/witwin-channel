@@ -184,6 +184,22 @@ at::Tensor channel_mc_receiver_grid_points_cuda(
     double y_axis_z,
     double spacing0,
     double spacing1);
+std::tuple<at::Tensor, at::Tensor, at::Tensor> channel_mc_scattering_pair_legs_cuda(
+    at::Tensor points, at::Tensor normals, at::Tensor frame_t1, at::Tensor frame_t2,
+    at::Tensor wi_local, at::Tensor incident, at::Tensor epsilon, at::Tensor material,
+    at::Tensor material_slot, at::Tensor table_offset, at::Tensor table_dims, at::Tensor f_te,
+    at::Tensor f_tm, at::Tensor receivers);
+at::Tensor channel_mc_scattering_pair_sum_cuda(
+    at::Tensor points, at::Tensor normals, at::Tensor frame_t1, at::Tensor frame_t2,
+    at::Tensor wi_local, at::Tensor incident, at::Tensor epsilon, at::Tensor material,
+    at::Tensor material_slot, at::Tensor table_offset, at::Tensor table_dims, at::Tensor f_te,
+    at::Tensor f_tm, at::Tensor receivers, at::Tensor visible, at::Tensor value_te,
+    at::Tensor value_tm, at::Tensor deposited);
+std::tuple<at::Tensor, at::Tensor> channel_mc_scattering_pair_sum_backward_cuda(
+    at::Tensor points, at::Tensor normals, at::Tensor frame_t1, at::Tensor frame_t2,
+    at::Tensor wi_local, at::Tensor incident, at::Tensor epsilon, at::Tensor material,
+    at::Tensor material_slot, at::Tensor table_offset, at::Tensor table_dims, at::Tensor f_te,
+    at::Tensor f_tm, at::Tensor receivers, at::Tensor visible, at::Tensor grad);
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_mc_reflection_rays_cuda(
     at::Tensor tx_positions, at::Tensor bounds, bool use_bounds, int64_t sample_count, int64_t seed);
 at::Tensor channel_mc_scene_bounds_cuda(at::Tensor vertices);
@@ -231,7 +247,7 @@ at::Tensor channel_mc_utd_diffraction_tape_accumulate_cuda(
     at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,
     at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,
     at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,int64_t,double,double,double,double,double,
-    int64_t,int64_t,double,double,int64_t,double,at::Tensor);
+    int64_t,int64_t,double,double,int64_t,double,at::Tensor,const PointTapeTensors&);
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
 channel_mc_utd_diffraction_tape_accumulate_backward_cuda(
     at::Tensor tape_active, at::Tensor tape_state, at::Tensor tape_cell, at::Tensor tape_u,
@@ -244,7 +260,8 @@ channel_mc_utd_diffraction_tape_accumulate_backward_cuda(
     bool need_materials, bool need_source, bool need_frequency,
     int64_t axis, double plane,
     int64_t r0, int64_t r1, double wavelength, double cell_area, int64_t seed,
-    double total_edge_length, double wavelength_dfreq, at::Tensor tx_pol);
+    double total_edge_length, double wavelength_dfreq, at::Tensor tx_pol,
+    const PointTapeTensors& point_tape);
 at::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp_cuda(
     at::Tensor tape_active, at::Tensor tape_state, at::Tensor tape_cell, at::Tensor tape_u,
     at::Tensor edge_pos, at::Tensor edge_dir, at::Tensor t_min, at::Tensor t_max,
@@ -258,7 +275,13 @@ at::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp_cuda(
     bool has_tangent_thickness, bool has_tangent_source,
     int64_t axis, double plane,
     int64_t r0, int64_t r1, double wavelength, double cell_area, int64_t seed,
-    double total_edge_length, double wavelength_tangent, at::Tensor tx_pol);
+    double total_edge_length, double wavelength_tangent, at::Tensor tx_pol,
+    const PointTapeTensors& point_tape);
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+channel_mc_point_diffraction_tape_cuda(
+    at::Tensor sample_state, at::Tensor edge_pos, at::Tensor edge_dir, at::Tensor t_min,
+    at::Tensor t_max, at::Tensor n0, at::Tensor nn, at::Tensor source, at::Tensor points,
+    int64_t point_begin, int64_t point_count, int64_t seed, double point_radius);
 at::Tensor channel_mc_selected_edge_indices_cuda(at::Tensor selected);
 std::vector<at::Tensor> channel_mc_diffraction_state_pack_cuda(
     at::Tensor edge_indices,
@@ -756,6 +779,65 @@ torch::Tensor channel_mc_diffraction_state_wi(torch::Tensor state_edge_pos, torc
     return channel_mc_diffraction_state_wi_cuda(state_edge_pos, state_src);
 }
 
+namespace {
+
+// Point-receiver tape arguments of the diffraction tape ops; an empty `points` table is the
+// grid tape.
+PointTapeTensors point_tape_tensors(
+    const torch::Tensor& tape_lane, const torch::Tensor& points, double point_radius,
+    int64_t edge_samples, const torch::Tensor& tape_active) {
+    PointTapeTensors tensors;
+    TORCH_CHECK(points.is_cuda() && points.scalar_type() == at::kFloat && points.dim() == 2 &&
+                    points.size(1) == 3,
+                "points must be a float32 CUDA tensor of shape (P, 3)");
+    if (points.size(0) == 0) return tensors;
+    TORCH_CHECK(tape_lane.is_cuda() && tape_lane.scalar_type() == at::kInt &&
+                    tape_lane.numel() == tape_active.numel(),
+                "tape_lane must be an int32 CUDA tensor with one entry per tape row");
+    TORCH_CHECK(std::isfinite(point_radius) && point_radius != 0.0,
+                "point_radius must be finite and non-zero");
+    TORCH_CHECK(edge_samples > 0, "edge_samples must be positive for a point tape");
+    tensors.lane = tape_lane.contiguous();
+    tensors.points = points.contiguous();
+    tensors.point_radius = point_radius;
+    tensors.edge_samples = edge_samples;
+    return tensors;
+}
+
+}  // namespace
+
+pybind11::tuple channel_mc_point_diffraction_tape(
+    torch::Tensor sample_state, torch::Tensor edge_pos, torch::Tensor edge_dir,
+    torch::Tensor t_min, torch::Tensor t_max, torch::Tensor n0, torch::Tensor nn,
+    torch::Tensor source, torch::Tensor points, int64_t point_begin, int64_t point_count,
+    int64_t seed, double point_radius) {
+    TORCH_CHECK(sample_state.is_cuda() && sample_state.scalar_type() == at::kInt &&
+                    sample_state.dim() == 1,
+                "sample_state must be a rank-1 int32 CUDA tensor");
+    TORCH_CHECK(points.is_cuda() && points.scalar_type() == at::kFloat && points.dim() == 2 &&
+                    points.size(1) == 3,
+                "points must be a float32 CUDA tensor of shape (P, 3)");
+    TORCH_CHECK(point_begin >= 0 && point_count >= 0 && point_begin + point_count <= points.size(0),
+                "point range is out of bounds");
+    TORCH_CHECK(std::isfinite(point_radius) && point_radius != 0.0,
+                "point_radius must be finite and non-zero");
+    for (const auto* tensor : {&edge_pos, &edge_dir, &n0, &nn, &source})
+        TORCH_CHECK(tensor->is_cuda() && tensor->scalar_type() == at::kFloat && tensor->dim() == 2 &&
+                        tensor->size(1) == 3 && tensor->size(0) == edge_pos.size(0),
+                    "edge state vectors must be float32 CUDA tensors of shape (S, 3)");
+    for (const auto* tensor : {&t_min, &t_max})
+        TORCH_CHECK(tensor->is_cuda() && tensor->scalar_type() == at::kFloat &&
+                        tensor->numel() == edge_pos.size(0),
+                    "edge parameter bounds must have one entry per state");
+    auto out = channel_mc_point_diffraction_tape_cuda(
+        sample_state.contiguous(), edge_pos.contiguous(), edge_dir.contiguous(), t_min.contiguous(),
+        t_max.contiguous(), n0.contiguous(), nn.contiguous(), source.contiguous(),
+        points.contiguous(), point_begin, point_count, seed, point_radius);
+    return pybind11::make_tuple(std::get<0>(out), std::get<1>(out), std::get<2>(out),
+                                std::get<3>(out), std::get<4>(out), std::get<5>(out),
+                                std::get<6>(out), std::get<7>(out));
+}
+
 torch::Tensor channel_mc_utd_diffraction_tape_accumulate(
     torch::Tensor tape_active,torch::Tensor tape_state,torch::Tensor tape_cell,torch::Tensor tape_u,
     torch::Tensor edge_pos,torch::Tensor edge_dir,torch::Tensor t_min,torch::Tensor t_max,
@@ -764,13 +846,15 @@ torch::Tensor channel_mc_utd_diffraction_tape_accumulate(
     torch::Tensor eta_r,torch::Tensor sigma,torch::Tensor mu_r,torch::Tensor gain,
     torch::Tensor material_valid,torch::Tensor thickness,int64_t axis,double plane,double c0min,double c0max,
     double c1min,double c1max,int64_t r0,int64_t r1,double wavelength,double cell_area,int64_t seed,double total_edge_length,
-    torch::Tensor tx_pol) {
+    torch::Tensor tx_pol,
+    torch::Tensor tape_lane, torch::Tensor points, double point_radius, int64_t edge_samples) {
     TORCH_CHECK(tx_pol.is_cuda() && tx_pol.scalar_type() == at::kFloat && tx_pol.numel() == 3,
                 "tx_pol must be a float32 CUDA tensor with 3 elements");
     return channel_mc_utd_diffraction_tape_accumulate_cuda(
         tape_active,tape_state,tape_cell,tape_u,edge_pos,edge_dir,t_min,t_max,n0,nn,prim0,prim1,
         exterior_angle,source,source_power,eta_r,sigma,mu_r,gain,material_valid,thickness,axis,plane,
-        c0min,c0max,c1min,c1max,r0,r1,wavelength,cell_area,seed,total_edge_length,tx_pol.contiguous());
+        c0min,c0max,c1min,c1max,r0,r1,wavelength,cell_area,seed,total_edge_length,tx_pol.contiguous(),
+        point_tape_tensors(tape_lane, points, point_radius, edge_samples, tape_active));
 }
 
 pybind11::tuple channel_mc_utd_diffraction_tape_accumulate_backward(
@@ -785,7 +869,8 @@ pybind11::tuple channel_mc_utd_diffraction_tape_accumulate_backward(
     bool need_materials, bool need_source, bool need_frequency,
     int64_t axis, double plane, int64_t r0, int64_t r1, double wavelength,
     double cell_area, int64_t seed, double total_edge_length,
-    double wavelength_dfreq, torch::Tensor tx_pol) {
+    double wavelength_dfreq, torch::Tensor tx_pol,
+    torch::Tensor tape_lane, torch::Tensor points, double point_radius, int64_t edge_samples) {
     TORCH_CHECK(tx_pol.is_cuda() && tx_pol.scalar_type() == at::kFloat && tx_pol.numel() == 3,
                 "tx_pol must be a float32 CUDA tensor with 3 elements");
     auto gradients = channel_mc_utd_diffraction_tape_accumulate_backward_cuda(
@@ -794,7 +879,7 @@ pybind11::tuple channel_mc_utd_diffraction_tape_accumulate_backward(
         eta_r, sigma, mu_r, gain, material_valid, thickness, grad_output,
         need_materials, need_source, need_frequency, axis, plane, r0, r1,
         wavelength, cell_area, seed, total_edge_length, wavelength_dfreq,
-        tx_pol.contiguous());
+        tx_pol.contiguous(), point_tape_tensors(tape_lane, points, point_radius, edge_samples, tape_active));
     return pybind11::make_tuple(
         std::get<0>(gradients), std::get<1>(gradients), std::get<2>(gradients),
         std::get<3>(gradients), std::get<4>(gradients), std::get<5>(gradients));
@@ -815,7 +900,8 @@ torch::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp(
     bool has_tangent_thickness, bool has_tangent_source,
     int64_t axis, double plane, int64_t r0, int64_t r1, double wavelength,
     double cell_area, int64_t seed, double total_edge_length,
-    double wavelength_tangent, torch::Tensor tx_pol) {
+    double wavelength_tangent, torch::Tensor tx_pol,
+    torch::Tensor tape_lane, torch::Tensor points, double point_radius, int64_t edge_samples) {
     TORCH_CHECK(tx_pol.is_cuda() && tx_pol.scalar_type() == at::kFloat && tx_pol.numel() == 3,
                 "tx_pol must be a float32 CUDA tensor with 3 elements");
     return channel_mc_utd_diffraction_tape_accumulate_jvp_cuda(
@@ -826,7 +912,7 @@ torch::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp(
         has_tangent_eta_r, has_tangent_sigma, has_tangent_gain,
         has_tangent_thickness, has_tangent_source, axis, plane, r0, r1,
         wavelength, cell_area, seed, total_edge_length, wavelength_tangent,
-        tx_pol.contiguous());
+        tx_pol.contiguous(), point_tape_tensors(tape_lane, points, point_radius, edge_samples, tape_active));
 }
 
 torch::Tensor channel_mc_selected_edge_indices(torch::Tensor selected) {
@@ -958,4 +1044,102 @@ pybind11::dict channel_mc_finalize_component_maps(
     out["transmission_power"] = transmission_power;
     out["scattering_power"] = scattering_power;
     return out;
+}
+
+namespace {
+
+// Validates the shared sample, table and receiver tables of the MC scattering pair ops.
+void check_scattering_pairs(
+    const torch::Tensor& points, const torch::Tensor& normals, const torch::Tensor& frame_t1,
+    const torch::Tensor& frame_t2, const torch::Tensor& wi_local, const torch::Tensor& incident,
+    const torch::Tensor& epsilon, const torch::Tensor& material, const torch::Tensor& material_slot,
+    const torch::Tensor& table_offset, const torch::Tensor& table_dims, const torch::Tensor& f_te,
+    const torch::Tensor& f_tm, const torch::Tensor& receivers) {
+    const int64_t samples = points.size(0);
+    for (const auto* tensor : {&points, &normals, &frame_t1, &frame_t2, &wi_local, &receivers})
+        TORCH_CHECK(tensor->is_cuda() && tensor->scalar_type() == at::kFloat && tensor->dim() == 2 &&
+                        tensor->size(1) == 3 && tensor->is_contiguous() &&
+                        tensor->get_device() == points.get_device(),
+                    "scattering pair vectors must be contiguous float32 CUDA (N, 3) tensors");
+    for (const auto* tensor : {&normals, &frame_t1, &frame_t2, &wi_local})
+        TORCH_CHECK(tensor->size(0) == samples, "scattering sample tables must share N");
+    for (const auto* tensor : {&incident, &epsilon})
+        TORCH_CHECK(tensor->is_cuda() && tensor->scalar_type() == at::kFloat && tensor->is_contiguous() &&
+                        tensor->numel() == samples,
+                    "incident and epsilon must be contiguous float32 (N,) tensors");
+    TORCH_CHECK(material.is_cuda() && material.scalar_type() == at::kInt && material.is_contiguous() &&
+                    material.numel() == samples,
+                "material must be a contiguous int32 (N,) tensor");
+    TORCH_CHECK(material_slot.is_cuda() && material_slot.scalar_type() == at::kInt &&
+                    material_slot.is_contiguous(),
+                "material_slot must be a contiguous int32 CUDA tensor");
+    TORCH_CHECK(table_offset.is_cuda() && table_offset.scalar_type() == at::kLong &&
+                    table_offset.is_contiguous() && table_dims.is_cuda() &&
+                    table_dims.scalar_type() == at::kInt && table_dims.is_contiguous() &&
+                    table_dims.dim() == 2 && table_dims.size(1) == 4 &&
+                    table_dims.size(0) == table_offset.numel(),
+                "table_offset (S,) int64 and table_dims (S, 4) int32 must describe the same slots");
+    TORCH_CHECK(f_te.is_cuda() && f_te.scalar_type() == at::kFloat && f_te.is_contiguous() &&
+                    f_tm.sizes() == f_te.sizes() && f_tm.scalar_type() == at::kFloat &&
+                    f_tm.is_contiguous(),
+                "f_te and f_tm must be contiguous float32 tables of one shape");
+}
+
+void check_pair_mask(const torch::Tensor& visible, const torch::Tensor& points,
+                     const torch::Tensor& receivers) {
+    TORCH_CHECK(visible.is_cuda() && visible.scalar_type() == at::kBool && visible.is_contiguous() &&
+                    visible.numel() == points.size(0) * receivers.size(0),
+                "visible must be a contiguous bool tensor with one entry per (receiver, sample)");
+}
+
+}  // namespace
+
+pybind11::tuple channel_mc_scattering_pair_legs(
+    torch::Tensor points, torch::Tensor normals, torch::Tensor frame_t1, torch::Tensor frame_t2,
+    torch::Tensor wi_local, torch::Tensor incident, torch::Tensor epsilon, torch::Tensor material,
+    torch::Tensor material_slot, torch::Tensor table_offset, torch::Tensor table_dims,
+    torch::Tensor f_te, torch::Tensor f_tm, torch::Tensor receivers) {
+    check_scattering_pairs(points, normals, frame_t1, frame_t2, wi_local, incident, epsilon, material,
+                           material_slot, table_offset, table_dims, f_te, f_tm, receivers);
+    auto out = channel_mc_scattering_pair_legs_cuda(
+        points, normals, frame_t1, frame_t2, wi_local, incident, epsilon, material, material_slot,
+        table_offset, table_dims, f_te, f_tm, receivers);
+    return pybind11::make_tuple(std::get<0>(out), std::get<1>(out), std::get<2>(out));
+}
+
+torch::Tensor channel_mc_scattering_pair_sum(
+    torch::Tensor points, torch::Tensor normals, torch::Tensor frame_t1, torch::Tensor frame_t2,
+    torch::Tensor wi_local, torch::Tensor incident, torch::Tensor epsilon, torch::Tensor material,
+    torch::Tensor material_slot, torch::Tensor table_offset, torch::Tensor table_dims,
+    torch::Tensor f_te, torch::Tensor f_tm, torch::Tensor receivers, torch::Tensor visible,
+    torch::Tensor value_te, torch::Tensor value_tm, torch::Tensor deposited) {
+    check_scattering_pairs(points, normals, frame_t1, frame_t2, wi_local, incident, epsilon, material,
+                           material_slot, table_offset, table_dims, f_te, f_tm, receivers);
+    check_pair_mask(visible, points, receivers);
+    TORCH_CHECK(value_te.sizes() == f_te.sizes() && value_tm.sizes() == f_te.sizes() &&
+                    value_te.scalar_type() == at::kFloat && value_tm.scalar_type() == at::kFloat &&
+                    value_te.is_contiguous() && value_tm.is_contiguous(),
+                "value tables must match f_te");
+    TORCH_CHECK(deposited.is_cuda() && deposited.scalar_type() == at::kLong && deposited.numel() <= 1,
+                "deposited must be an empty or one-element int64 CUDA tensor");
+    return channel_mc_scattering_pair_sum_cuda(
+        points, normals, frame_t1, frame_t2, wi_local, incident, epsilon, material, material_slot,
+        table_offset, table_dims, f_te, f_tm, receivers, visible, value_te, value_tm, deposited);
+}
+
+pybind11::tuple channel_mc_scattering_pair_sum_backward(
+    torch::Tensor points, torch::Tensor normals, torch::Tensor frame_t1, torch::Tensor frame_t2,
+    torch::Tensor wi_local, torch::Tensor incident, torch::Tensor epsilon, torch::Tensor material,
+    torch::Tensor material_slot, torch::Tensor table_offset, torch::Tensor table_dims,
+    torch::Tensor f_te, torch::Tensor f_tm, torch::Tensor receivers, torch::Tensor visible,
+    torch::Tensor grad) {
+    check_scattering_pairs(points, normals, frame_t1, frame_t2, wi_local, incident, epsilon, material,
+                           material_slot, table_offset, table_dims, f_te, f_tm, receivers);
+    check_pair_mask(visible, points, receivers);
+    TORCH_CHECK(grad.is_cuda() && grad.scalar_type() == at::kFloat && grad.numel() == receivers.size(0),
+                "grad must be a float32 CUDA tensor with one entry per receiver");
+    auto out = channel_mc_scattering_pair_sum_backward_cuda(
+        points, normals, frame_t1, frame_t2, wi_local, incident, epsilon, material, material_slot,
+        table_offset, table_dims, f_te, f_tm, receivers, visible, grad.contiguous());
+    return pybind11::make_tuple(std::get<0>(out), std::get<1>(out));
 }

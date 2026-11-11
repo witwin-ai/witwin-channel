@@ -95,7 +95,6 @@ from witwin.channel.scene.compiler import (
 )
 from witwin.channel.scene.endpoints import (
     ReceiverGrid,
-    _ReceiverGridView,
     _endpoint_views,
     _validate_scalar_endpoint_boundary,
     axis_aligned_grid_spec as grid_spec,
@@ -1117,21 +1116,128 @@ def _diffraction_states(
     )
 
 
-def diffraction_component_map(
-    scene: SolverScene, rayd: RayDSceneResource, grid: ReceiverGrid, *, samples: int, seed: int,
-    device: torch.device, material_tensors: MaterialTensors,
-    wedge_events: tuple[WedgeEventBatch, ...] | None = None, ad: bool = False,
-    ledger: object | None = None,
+def _tx_diffraction_states(  # type: ignore[no-untyped-def]
+    scene: SolverScene, rayd: RayDSceneResource, tx: torch.Tensor, tx_power: torch.Tensor,
+    tx_index: int, *, wedge_events, get_edge_geometry, get_edge_candidates,
+) -> tuple[torch.Tensor, ...] | None:
+    """Packed edge states of one transmitter (from its wedge events when given), or None."""
+
+    if wedge_events is None:
+        return _diffraction_states(
+            scene, rayd, tx, tx_power, tx_index, edge_geometry=get_edge_geometry()
+        )
+    if int(wedge_events[tx_index].prim_id.numel()) == 0:
+        return None
+    geometry = get_edge_geometry()
+    edge_indices = _discover_diffraction_edges_from_wedges(
+        rayd,
+        wedge_events[tx_index],
+        edge_geometry=geometry,
+        edge_candidates=get_edge_candidates(geometry),
+    )
+    if int(edge_indices.numel()) == 0:
+        return None
+    return _diffraction_states_from_edge_indices(
+        rayd, tx, tx_power, tx_index, edge_indices, edge_geometry=geometry
+    )
+
+
+# Tape entries (lane, point receiver) per point diffraction launch.
+_POINT_DIFFRACTION_ENTRIES = 1 << 22
+
+
+def _point_diffraction_map(  # type: ignore[no-untyped-def]
+    handle, states: tuple[torch.Tensor, ...], sample_state_index: torch.Tensor,
+    points: torch.Tensor, *, material_tensors: MaterialTensors, tx_anchor: torch.Tensor,
+    tx_pol: torch.Tensor, frequency, wavelength: float, samples: int, seed: int,
+    total_edge_length: float, point_radius: float, ad: bool, ledger: object | None,
 ) -> torch.Tensor:
+    """Capture-sphere diffraction ``[1, P]`` of one transmitter at point receivers.
+
+    Every sampling lane draws its edge point and Keller-cone ray as the grid tape does; a ray
+    passing within a receiver's capture radius, with both visibility legs clear, deposits the
+    flux through the sphere's cross-section, evaluated by the same tape accumulate kernels.
+    """
+
+    eta_r, sigma, mu_r, gain, valid, thickness = material_tensors
+    state_tensors = tuple(states[1:12])
+    point_count = int(points.shape[0])
+    chunk = max(1, _POINT_DIFFRACTION_ENTRIES // max(samples, 1))
+    total: torch.Tensor | None = None
+    for begin in range(0, point_count, chunk):
+        count = min(chunk, point_count - begin)
+        tape = montecarlo_kernels.mc_point_diffraction_tape(
+            sample_state_index, state_tensors, points, point_begin=begin, point_count=count,
+            seed=seed, point_radius=point_radius,
+        )
+        source_clear = geometry_kernels.rayd_visibility_forward(
+            handle, tape.leg_source, tape.leg_edge, tape.active
+        )[0]
+        receiver_clear = geometry_kernels.rayd_visibility_forward(
+            handle, tape.leg_edge, tape.leg_receiver, tape.active
+        )[0]
+        active = tape.active & source_clear & receiver_clear
+        tape_tensors = (active, tape.state, tape.cell, tape.u)
+        point_tape = (tape.lane, points, float(point_radius), int(samples))
+        grid_args = {
+            "grid_axis": 2,
+            "grid_position": 0.0,
+            "grid_coord0_min": 0.0,
+            "grid_coord0_max": 0.0,
+            "grid_coord1_min": 0.0,
+            "grid_coord1_max": 0.0,
+            "grid_resolution0": point_count,
+            "grid_resolution1": 1,
+            "wavelength": float(wavelength),
+            "grid_cell_area": 1.0,
+            "seed": int(seed),
+            "total_edge_length": total_edge_length,
+        }
+        if ad:
+            if ledger is not None:
+                ledger.add(*tape_tensors, *state_tensors, eta_r, sigma, mu_r, gain, valid, thickness)  # type: ignore[attr-defined]
+            part = mc_utd_diffraction_tape_accumulate_ad(
+                tx_anchor, eta_r, sigma, gain, thickness, frequency, tape_tensors, state_tensors,
+                mu_r, valid, tx_pol=tx_pol, point_tape=point_tape, **grid_args,  # type: ignore[arg-type]
+            )
+        else:
+            part = mc_utd_diffraction_tape_accumulate(
+                *tape_tensors, *state_tensors, eta_r, sigma, mu_r, gain, valid, thickness,
+                *list(grid_args.values())[:8], grid_args["wavelength"],
+                grid_args["grid_cell_area"], grid_args["seed"], total_edge_length, tx_pol,
+                point_tape=point_tape,
+            )
+        total = part if total is None else total + part
+    assert total is not None
+    return total
+
+
+def diffraction_component_map(
+    scene: SolverScene, rayd: RayDSceneResource, grid: ReceiverGrid | None, *, samples: int,
+    seed: int, device: torch.device, material_tensors: MaterialTensors,
+    wedge_events: tuple[WedgeEventBatch, ...] | None = None, ad: bool = False,
+    ledger: object | None = None, points: torch.Tensor | None = None,
+    point_radius: float = -_RELATIVE_POINT_RADIUS,
+) -> torch.Tensor:
+    """Keller-cone diffraction deposits ``[T, cols, rows]`` on ``grid``, or ``[T, 1, P]`` at
+    point receivers ``points`` (capture spheres of ``point_radius``) when ``grid`` is None."""
+
+    def map_shape() -> tuple[int, int]:
+        if grid is not None:
+            dim0, dim1 = component_grid_shape(grid)
+            return int(dim0), int(dim1)
+        assert points is not None
+        return (1, int(points.shape[0]))
+
     if not scene.structures:
         tx_pos, _ = transmitter_positions(scene, device=device)
-        dim0, dim1 = component_grid_shape(grid)
+        dim0, dim1 = map_shape()
         return mc_component_map_buffer(
             tx_pos, tx_count=len(scene.transmitters), dim0=dim0, dim1=dim1
         )
     if not rayd.available:
         raise RuntimeError("diffraction requires RayD native scene capability")
-    spec = grid_spec(grid)
+    spec = grid_spec(grid) if grid is not None else None
     handle = rayd.require_resource()
     tx_pos, tx_power = transmitter_positions(scene, device=device)
     tx_live = transmitter_positions_ad(scene, tx_pos, device=device) if ad else tx_pos
@@ -1147,7 +1253,7 @@ def diffraction_component_map(
         material_thickness,
     ) = material_tensors
     wavelength = _LIGHT_SPEED_M_PER_S / _frequency_scalar(scene)
-    dim0, dim1 = component_grid_shape(grid)
+    dim0, dim1 = map_shape()
     ad_maps: list[torch.Tensor] = []
     maps = None
     if not ad:
@@ -1182,39 +1288,14 @@ def diffraction_component_map(
         return mc_component_map_buffer(tx_pos, tx_count=1, dim0=dim0, dim1=dim1)[0]
 
     for tx_index, tx in enumerate(tx_pos):
-        if wedge_events is not None:
-            if int(wedge_events[tx_index].prim_id.numel()) == 0:
-                if ad:
-                    ad_maps.append(zero_map())
-                continue
-            geometry = get_edge_geometry()
-            edge_indices = _discover_diffraction_edges_from_wedges(
-                rayd,
-                wedge_events[tx_index],
-                edge_geometry=geometry,
-                edge_candidates=get_edge_candidates(geometry),
-            )
-            if int(edge_indices.numel()) == 0:
-                if ad:
-                    ad_maps.append(zero_map())
-                continue
-            states = _diffraction_states_from_edge_indices(
-                rayd,
-                tx,
-                tx_power,
-                tx_index,
-                edge_indices,
-                edge_geometry=geometry,
-            )
-        else:
-            states = _diffraction_states(
-                scene,
-                rayd,
-                tx,
-                tx_power,
-                tx_index,
-                edge_geometry=get_edge_geometry(),
-            )
+        states = _tx_diffraction_states(
+            scene, rayd, tx, tx_power, tx_index, wedge_events=wedge_events,
+            get_edge_geometry=get_edge_geometry, get_edge_candidates=get_edge_candidates,
+        )
+        if states is None:
+            if ad:
+                ad_maps.append(zero_map())
+            continue
         state_count = int(states[0].shape[0])
         if state_count <= 0:
             if ad:
@@ -1246,6 +1327,20 @@ def diffraction_component_map(
             device=device,
             dtype=torch.float32,
         )
+        if spec is None:
+            assert points is not None
+            point_map = _point_diffraction_map(
+                handle, states, sample_state_index, points, material_tensors=material_tensors,
+                tx_anchor=tx_live[tx_index], tx_pol=tx_pol[tx_index], frequency=scene.frequency,
+                wavelength=wavelength, samples=int(samples), seed=int(seed),
+                total_edge_length=total_edge_length, point_radius=point_radius, ad=ad,
+                ledger=ledger,
+            )
+            if ad:
+                ad_maps.append(point_map)
+            else:
+                mc_store_component_map(maps, point_map, tx_index=tx_index)
+            continue
         state_wi = montecarlo_kernels.mc_diffraction_state_wi(states[1], states[10])
         sampled = geometry_kernels.rayd_diffraction_sample_tape_forward(
             handle,
@@ -1470,8 +1565,31 @@ def _face_material_tensors(
 
     if ad:
         return build()
+    # The primal tensors are a pure function of the compiled store and face assignment, so they
+    # are kept on the RayD scene resource and reused while every source tensor is unchanged
+    # (same storage, same in-place version): a warm solve uploads no material table.
+    compiled = require_compiled(scene)
+    sources = [
+        value
+        for value in (
+            *(getattr(compiled.materials, name) for name in compiled.materials.__dataclass_fields__),
+            compiled.assignments.face_material_id,
+        )
+        if isinstance(value, torch.Tensor)
+    ]
+    key = (
+        id(compiled.materials),
+        str(device),
+        tuple((int(t.data_ptr()), int(t._version), tuple(t.shape)) for t in sources),
+    )
+    cache = compiled.rayd.runtime_cache
+    cached = cache.get("mc_face_material_tensors")
+    if cached is not None and cached[0] == key:  # type: ignore[index]
+        return cached[1]  # type: ignore[index, no-any-return]
     with torch.no_grad():
-        return build()
+        tensors = build()
+    cache["mc_face_material_tensors"] = (key, tensors)
+    return tensors
 
 
 def _mc_scattering_component(  # type: ignore[no-untyped-def]
@@ -1596,9 +1714,12 @@ def _layout_specular_maps(  # type: ignore[no-untyped-def]
         )
     if wants_diffraction:
         columns = []
+        tx_pos, _ = transmitter_positions(scene, device=device)
         for block in blocks:
-            assert block.grid is not None
-            grid_map = diffraction_component_map(
+            params = _block_deposit_params(
+                scene, block, reference=tx_pos, receiver_radius_m=config.receiver_radius_m
+            )
+            block_map = diffraction_component_map(
                 scene,
                 rayd,
                 block.grid,
@@ -1609,8 +1730,10 @@ def _layout_specular_maps(  # type: ignore[no-untyped-def]
                 wedge_events=reflection.wedge_events,
                 ad=ad,
                 ledger=ledger if ad else None,
+                points=params["points"],  # type: ignore[arg-type]
+                point_radius=float(params["point_radius"]),  # type: ignore[arg-type]
             )
-            columns.append(_matrix_columns(grid_map, block, ad=ad))
+            columns.append(_matrix_columns(block_map, block, ad=ad))
         maps["diffraction"] = _layout_maps(columns)
     return maps
 
@@ -2017,27 +2140,6 @@ def solve_pipeline(  # type: ignore[no-untyped-def]
 # --- Public entry point ---------------------------------------------------
 
 
-def _refuse_point_diffraction(
-    views: tuple[object, ...], config: Config, *, has_geometry: bool,
-) -> None:
-    """Refuse diffraction at point receivers, which this solver samples only on grids."""
-
-    if not has_geometry or "diffraction" not in config.components:
-        return
-    points = len([
-        view
-        for view in views
-        if view.source.role != "tx" and not isinstance(view, _ReceiverGridView)  # type: ignore[attr-defined]
-    ])
-    if points:
-        raise ValueError(
-            "witwin.channel.montecarlo.basic samples diffraction only on a ReceiverGrid; the "
-            f"scene has {points} point receiver(s). Drop 'diffraction' from components, solve "
-            "the point receivers with witwin.channel.deterministic or witwin.channel.path, or "
-            "place them on a ReceiverGrid"
-        )
-
-
 def solve(  # type: ignore[no-untyped-def]
     scene: Scene | SceneSnapshot,
     config: Config,
@@ -2048,12 +2150,6 @@ def solve(  # type: ignore[no-untyped-def]
 
     require_config_type(config, Config, "witwin.channel.montecarlo.basic")
     endpoint_views = _endpoint_views(scene)
-    # Without an enabled structure every non-LoS component is exactly zero for any
-    # receiver, so only a scene with geometry needs the grid.
-    has_geometry = any(
-        getattr(item, "structure", item).enabled for item in scene.structures
-    )
-    _refuse_point_diffraction(endpoint_views, config, has_geometry=has_geometry)
     _validate_scalar_endpoint_boundary(endpoint_views)
     validate_scalar_endpoint_features(
         tuple(view for view in endpoint_views if view.source.role == "tx"),

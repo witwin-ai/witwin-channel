@@ -9,7 +9,7 @@ import pytest
 import torch
 
 from tests.support.core_world import make_receiver, make_receiver_grid
-from tests.support.scenes import same_side_wall_reflection_scene
+from tests.support.scenes import same_side_wall_reflection_scene, wedge_diffraction_scene
 from witwin.core import Scene
 from witwin.channel import deterministic
 from witwin.channel.montecarlo.basic import Config, solve
@@ -111,9 +111,40 @@ def test_mixed_grid_and_points_cover_every_receiver() -> None:
     torch.testing.assert_close(result.path_gain, total, rtol=1e-6, atol=0.0)
 
 
-def test_point_receivers_refuse_diffraction_before_native_work() -> None:
-    with pytest.raises(ValueError, match="samples diffraction only on a ReceiverGrid"):
-        _solve(same_side_wall_reflection_scene(), Config(samples=256, components={"diffraction"}))
+def _seed_mean_and_sem(values: list[float]) -> tuple[float, float]:
+    tensor = torch.tensor(values, dtype=torch.float64)
+    return float(tensor.mean()), float(tensor.std(unbiased=True)) / math.sqrt(len(values))
+
+
+def test_point_diffraction_agrees_with_the_grid_cell_estimator() -> None:
+    # The capture sphere and a small grid cell around the same point estimate the same
+    # Keller-cone flux density. (Both differ from witwin.channel.deterministic on this finite
+    # wedge by the pre-existing MC diffraction convention, so the grid cell is the oracle.)
+    scene = wedge_diffraction_scene()
+    tx = next(endpoint for endpoint in scene.endpoints if endpoint.role == "tx")
+    centre, h = torch.tensor([3.0, 1.0, 0.5]), 0.1
+    x_axis, y_axis = torch.tensor([1.0, 0.0, 0.0]), torch.tensor([0.0, 1.0, 0.0])
+    grid = make_receiver_grid(
+        origin=centre - (x_axis + y_axis) * h, x_axis=x_axis, y_axis=y_axis, shape=(3, 3),
+        spacing=(h, h),
+    )
+    grid_scene = Scene(structures=scene.structures, endpoints=[tx, grid])
+    point_values, cell_values = [], []
+    for seed in range(6):
+        point = _solve(
+            scene,
+            Config(samples=1 << 20, seed=seed, components={"diffraction"}, receiver_radius_m=0.05),
+        )
+        assert point.component_maps["diffraction"].shape == (1, 1)
+        point_values.append(float(point.path_gain[0, 0]))
+        cell = _solve(grid_scene, Config(samples=1 << 20, seed=seed, components={"diffraction"}))
+        cell_values.append(float(cell.component_maps["diffraction"][0, 1, 1]))
+    point_mean, point_sem = _seed_mean_and_sem(point_values)
+    cell_mean, cell_sem = _seed_mean_and_sem(cell_values)
+    assert point_mean > 0.0 and point_sem > 0.0
+    # Sphere (radius 0.05 m) and cell (0.1 m square) average a field that varies over ~1.4 m.
+    tolerance = 4.0 * math.hypot(point_sem, cell_sem) + 0.1 * cell_mean
+    assert abs(point_mean - cell_mean) <= tolerance, (point_mean, cell_mean, tolerance)
 
 
 def test_receiver_radius_must_be_positive() -> None:
@@ -124,3 +155,33 @@ def test_receiver_radius_must_be_positive() -> None:
 def test_scattering_samples_default_to_samples() -> None:
     assert Config(samples=512).scattering_sample_count == 512
     assert Config(samples=512, scattering_samples=64).scattering_sample_count == 64
+
+
+def test_primal_face_material_tensors_are_reused_until_the_store_changes() -> None:
+    from witwin.channel.montecarlo import basic as mc_basic
+    from witwin.channel.scene import compile as compile_scene
+    from witwin.channel.scene.endpoints import bind_solver_scene
+
+    compiled = compile_scene(same_side_wall_reflection_scene(), reference_frequency_hz=_FREQUENCY_HZ)
+    scene = bind_solver_scene(compiled)
+    device = torch.device("cuda")
+    first = mc_basic._face_material_tensors(scene, device=device, ad=False)
+    again = mc_basic._face_material_tensors(scene, device=device, ad=False)
+    assert all(a is b for a, b in zip(first, again))
+    with torch.no_grad():
+        compiled.materials.eps_r.add_(1.0)
+    changed = mc_basic._face_material_tensors(scene, device=device, ad=False)
+    assert changed[0] is not first[0]
+    torch.testing.assert_close(changed[0], first[0] + 1.0)
+
+
+def test_point_diffraction_ad_forward_is_the_primal_and_carries_a_source_gradient() -> None:
+    base = torch.tensor([0.0, -1.0, 0.5])
+    config = dict(samples=1 << 16, seed=2, components={"diffraction"}, receiver_radius_m=0.1)
+    primal = _solve(wedge_diffraction_scene(tx=base.clone()), Config(**config)).path_gain
+    leaf = base.clone().cuda().requires_grad_(True)
+    result = _solve(wedge_diffraction_scene(tx=leaf), Config(**config, ad_mode="vjp"))
+    torch.testing.assert_close(result.path_gain.detach(), primal, rtol=1e-6, atol=0.0)
+    result.path_gain.sum().backward()
+    assert leaf.grad is not None
+    assert bool(torch.isfinite(leaf.grad).all()) and float(leaf.grad.abs().max()) > 0.0

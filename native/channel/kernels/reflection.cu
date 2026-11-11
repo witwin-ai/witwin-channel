@@ -647,32 +647,28 @@ __global__ void slab_reflection_accumulate_backward_kernel(
             const Complex g_e_p = cmath::complex(
                 g_w_tm.r * r_tm.r + g_w_tm.i * r_tm.i,
                 -g_w_tm.r * r_tm.i + g_w_tm.i * r_tm.r);
-            if (need_materials) {
-                float face_grad[4];
-                for (int parameter = 0; parameter < 4; ++parameter) {
-                    ad::DualC dual_te, dual_tm;
-                    ad::legacy_slab_fresnel_dual(
-                        frame.cos_theta, eta_r[prim], sigma[prim], gain[prim],
-                        thickness[prim], wavelength,
-                        parameter == 0 ? 1.0f : 0.0f, parameter == 1 ? 1.0f : 0.0f,
-                        parameter == 2 ? 1.0f : 0.0f, parameter == 3 ? 1.0f : 0.0f, 0.0f,
-                        dual_te, dual_tm);
-                    face_grad[parameter] =
-                        adj_dot_local(g_r_te, dual_te.d) + adj_dot_local(g_r_tm, dual_tm.d);
+            if (need_materials || need_frequency) {
+                // One dual evaluation carries the four material tangents and the wavelength.
+                constexpr float kSeedEps[5] = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+                constexpr float kSeedSigma[5] = {0.0f, 1.0f, 0.0f, 0.0f, 0.0f};
+                constexpr float kSeedGain[5] = {0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+                constexpr float kSeedThickness[5] = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
+                constexpr float kSeedWavelength[5] = {0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+                rayd::shared::diffraction::Complex dual_r_te, dual_r_tm;
+                rayd::shared::diffraction::Complex d_te[5], d_tm[5];
+                ad::legacy_slab_fresnel_dual_multi<5>(
+                    frame.cos_theta, eta_r[prim], sigma[prim], gain[prim], thickness[prim], wavelength,
+                    kSeedEps, kSeedSigma, kSeedGain, kSeedThickness, kSeedWavelength, dual_r_te,
+                    dual_r_tm, d_te, d_tm);
+                if (need_materials) {
+                    warp_aggregated_add(grad_eta_r, prim, adj_dot_local(g_r_te, d_te[0]) + adj_dot_local(g_r_tm, d_tm[0]));
+                    warp_aggregated_add(grad_sigma, prim, adj_dot_local(g_r_te, d_te[1]) + adj_dot_local(g_r_tm, d_tm[1]));
+                    warp_aggregated_add(grad_gain, prim, adj_dot_local(g_r_te, d_te[2]) + adj_dot_local(g_r_tm, d_tm[2]));
+                    warp_aggregated_add(grad_thickness, prim,
+                                        adj_dot_local(g_r_te, d_te[3]) + adj_dot_local(g_r_tm, d_tm[3]));
                 }
-                warp_aggregated_add(grad_eta_r, prim, face_grad[0]);
-                warp_aggregated_add(grad_sigma, prim, face_grad[1]);
-                warp_aggregated_add(grad_gain, prim, face_grad[2]);
-                warp_aggregated_add(grad_thickness, prim, face_grad[3]);
-            }
-            if (need_frequency) {
-                ad::DualC dual_te, dual_tm;
-                ad::legacy_slab_fresnel_dual(
-                    frame.cos_theta, eta_r[prim], sigma[prim], gain[prim],
-                    thickness[prim], wavelength,
-                    0.0f, 0.0f, 0.0f, 0.0f, 1.0f, dual_te, dual_tm);
-                g_lambda += adj_dot_local(g_r_te, dual_te.d) +
-                            adj_dot_local(g_r_tm, dual_tm.d);
+                if (need_frequency)
+                    g_lambda += adj_dot_local(g_r_te, d_te[4]) + adj_dot_local(g_r_tm, d_tm[4]);
             }
             g_field = cmath::complex3_add(cmath::complex3_axis(frame.s_hat, g_e_s), cmath::complex3_axis(frame.p_in, g_e_p));
         }

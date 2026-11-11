@@ -47,6 +47,8 @@ from witwin.channel.kernels import scattering as scattering_kernels
 from witwin.channel.kernels import topology as topology_kernels
 from witwin.channel.kernels.montecarlo import bdpt_counter_uniforms
 from witwin.channel.kernels.scattering import (
+    mc_scattering_pair_legs,
+    mc_scattering_pair_sum,
     scattering_event_probabilities,
     scattering_table_eval_ad,
     scattering_table_sample,
@@ -3357,6 +3359,10 @@ def scattered_subpath_state(
     return scattered
 
 
+# (receiver, sample) pairs per native scattering launch.
+_SCATTER_PAIR_ENTRIES = 1 << 22
+
+
 def scattering_map_matrix(
     scene: Any, rayd: Any, tx_pos: torch.Tensor, tx_power: torch.Tensor, rx_pos: torch.Tensor, *,
     samples: int, seed: int, device: torch.device, ad: bool = False, ledger: object | None = None,
@@ -3385,7 +3391,7 @@ def scattering_map_matrix(
     """
 
     matrix = torch.zeros((int(tx_pos.shape[0]), int(rx_pos.shape[0])), device=device)
-    stats = {
+    stats: dict[str, int] = {
         "sample_count": 0,
         "rough_face_count": 0,
         "tx_visible_samples": 0,
@@ -3452,8 +3458,24 @@ def scattering_map_matrix(
     wavelength = LIGHT_SPEED_M_PER_S / frequency
     amplitude_sq = (wavelength / (4.0 * math.pi)) ** 2
     area_weight = total_area / float(count)
-    cell_chunk = max(1, 4_194_304 // max(count, 1))
-
+    stack = require_compiled(scene).kirchhoff_resources.stack
+    # The live per-material tables (a caller may attach a gradient or tangent to them after
+    # compilation), concatenated in the stack's slot order.
+    ordered = [runtimes[index].table for index in sorted(runtimes)]
+    f_te_flat = torch.cat([table.f_te.reshape(-1) for table in ordered])
+    f_tm_flat = torch.cat([table.f_tm.reshape(-1) for table in ordered])
+    tables = (
+        stack.material_slot.contiguous(),
+        stack.table_offset.contiguous(),
+        stack.table_dims.contiguous(),
+        f_te_flat.contiguous(),
+        f_tm_flat.contiguous(),
+    )
+    receivers = rx_pos.contiguous()
+    rx_chunk = max(1, _SCATTER_PAIR_ENTRIES // max(count, 1))
+    deposited = torch.zeros((1,), dtype=torch.int64, device=device)
+    rows: list[torch.Tensor] = []
+    tx_visible: list[torch.Tensor] = []
     for tx_index in range(int(tx_pos.shape[0])):
         to_tx = tx_pos[tx_index][None, :] - points
         r1 = to_tx.norm(dim=-1).clamp_min(1.0e-6)
@@ -3475,66 +3497,39 @@ def scattering_map_matrix(
             candidates.contiguous(),
         )[0]
         active = candidates & visible_tx
-        stats["tx_visible_samples"] += int(active.sum())
-        if not bool(active.any()):
-            continue
+        tx_visible.append(active.sum())
         incident = torch.where(active, cos_i / (r1 * r1), torch.zeros_like(cos_i))
-        for start in range(0, rx_count, cell_chunk):
-            end = min(start + cell_chunk, rx_count)
-            cells = rx_pos[start:end]
-            block = int(cells.shape[0])
-            delta = cells[None, :, :] - points[:, None, :]
-            r2 = delta.norm(dim=-1).clamp_min(1.0e-6)
-            wo_world = delta / r2[..., None]
-            cos_o = (wo_world * normal_flipped[:, None, :]).sum(dim=-1)
-            pair_active = active[:, None] & (cos_o > 0.0)
-            if not bool(pair_active.any()):
-                continue
-            wo_flat = wo_world.reshape(count * block, 3)
-            wo_local = torch.stack(
-                (
-                    (wo_flat * frame_t1.repeat_interleave(block, dim=0)).sum(dim=-1),
-                    (wo_flat * frame_t2.repeat_interleave(block, dim=0)).sum(dim=-1),
-                    (wo_flat * normal_flipped.repeat_interleave(block, dim=0)).sum(
-                        dim=-1
-                    ),
-                ),
-                dim=-1,
-            )
-            f_te, f_tm = eval_bsdf_rows(
-                pair_active.reshape(count * block).contiguous(),
-                point_material.repeat_interleave(block),
-                wi_local.repeat_interleave(block, dim=0).contiguous(),
-                wo_local.contiguous(),
-                runtimes,
-                ad=ad,
-                ledger=ledger,
-            )
-            f_unpol = 0.5 * (f_te + f_tm)
+        samples = (
+            points.contiguous(),
+            normal_flipped.contiguous(),
+            frame_t1.contiguous(),
+            frame_t2.contiguous(),
+            wi_local.contiguous(),
+            incident.detach().contiguous(),
+            epsilon.contiguous(),
+            point_material.contiguous(),
+        )
+        # Native all-pairs: visibility legs, one RayD visibility launch, then a fixed-order
+        # per-receiver deposit sum (differentiable in the table values under ad).
+        sums: list[torch.Tensor] = []
+        for start in range(0, rx_count, rx_chunk):
+            cells = receivers[start : start + rx_chunk]
+            leg_start, leg_end, pair_active = mc_scattering_pair_legs(samples, tables, cells)
             visible_rx = geometry_kernels.rayd_visibility_forward(
-                handle,
-                (points[:, None, :] + wo_world * epsilon[:, None, None])
-                .reshape(count * block, 3)
-                .contiguous(),
-                cells[None, :, :]
-                .expand(count, block, 3)
-                .reshape(count * block, 3)
-                .contiguous(),
-                pair_active.reshape(count * block).contiguous(),
+                handle, leg_start, leg_end, pair_active
             )[0]
-            deposit = (
-                area_weight
-                * amplitude_sq
-                * incident[:, None].expand(count, block).reshape(-1)
-                * f_unpol
-                * cos_o.reshape(-1).clamp_min(0.0)
-                / (r2.reshape(-1) ** 2)
+            sums.append(
+                mc_scattering_pair_sum(
+                    samples,
+                    tables,
+                    cells,
+                    (pair_active & visible_rx).contiguous(),
+                    deposited=deposited,
+                    ad=ad,
+                )
             )
-            deposit = torch.where(
-                pair_active.reshape(-1) & visible_rx,
-                deposit,
-                torch.zeros_like(deposit),
-            )
-            stats["deposited_rows"] += int((deposit > 0.0).sum())
-            matrix[tx_index, start:end] += deposit.reshape(count, block).sum(dim=0)
+        rows.append(sums[0] if len(sums) == 1 else torch.cat(sums))
+    stats["tx_visible_samples"] = int(torch.stack(tx_visible).sum()) if tx_visible else 0
+    stats["deposited_rows"] = int(deposited)
+    matrix = area_weight * amplitude_sq * torch.stack(rows, dim=0)
     return matrix * tx_power[:, None], stats

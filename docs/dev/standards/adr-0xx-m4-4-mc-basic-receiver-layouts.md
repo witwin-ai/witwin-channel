@@ -39,10 +39,16 @@ total over all columns as before.
   `rho` is `Config.receiver_radius_m` when set, else 1% of the straight transmitter
   distance (at least 1 mm). The AD companions use the same deposit visitor, so
   `ad_mode` works for point receivers too.
-- Diffraction is sampled on grids only (the RayD Keller-cone sampler bins on a grid
-  plane). A scene with point receivers and the diffraction component is refused
-  before any native work with a message naming the alternatives; MC Basic stays at
-  zero enumerated-path dependency, so the deterministic oracle is not an option.
+- Diffraction at point receivers uses a capture-sphere Keller-cone sampler. Every sampling
+  lane draws its edge state, edge parameter and cone azimuth exactly as the grid tape row does
+  (`mc_point_diffraction_tape`, one entry per (lane, receiver)); an entry is active when the
+  cone ray passes within the receiver's capture radius beyond the edge, and two RayD segment
+  visibility launches test source -> point just off the wedge (face-normal bisector) ->
+  receiver. The surviving entries run through the same tape accumulate kernels and their AD
+  companions with a point mode: the deposit plane is the plane through the receiver normal to
+  the primal cone ray (frozen, like the grid binning), and the deposit divides by the sphere
+  cross-section pi rho^2 instead of the cell area. Point entries are chunked to 2^22 per launch.
+  MC Basic keeps zero enumerated-path dependency.
 
 ## Evidence
 
@@ -50,11 +56,14 @@ total over all columns as before.
 Deterministic within the seed spread; two grids equal the two single-grid solves
 column for column (same seed, same rays); a mixed grid-and-points layout has one
 column per receiver and `path_gain` is the sum of the component columns; the
-diffraction refusal; `receiver_radius_m` validation.
+capture-sphere diffraction agrees with a 0.1 m grid cell around the same point within
+4 standard errors plus 10% (both MC diffraction estimators sit ~1.6x above Deterministic on
+this finite wedge, a pre-existing MC diffraction convention difference); point diffraction AD
+forward equals the primal and carries a source gradient; `receiver_radius_m` validation.
 
 ## Consequences
 
-The S-9/S-10 refusals in `montecarlo.basic` are lifted (BDPT keeps its own).
+The S-9/S-10 refusals in `montecarlo.basic` are lifted, including diffraction at points.
 Point receivers are noisier than grids at the same sample count; the default radius
 keeps the bias below about 1e-4 relative, users trade bias for variance with
 `receiver_radius_m`.

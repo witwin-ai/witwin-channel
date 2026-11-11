@@ -682,7 +682,12 @@ def test_diffraction_transmitter_position_grad_matches_fixed_tape_fd(monkeypatch
     fd_total = torch.zeros(3)
     ad_total = torch.zeros(3)
     stable_lanes = 0
-    for lane in active_indices[::5]:
+    # Every accepted lane is used, not a subsample: the dual freezes the truncation factor's
+    # tangent while the per-lane FD carries its ripple (about 10-30% of a lane's derivative on
+    # this fixture, oscillating in sign), so the aggregate converges like 1 / sqrt(lanes). With
+    # the launch lattice of this solver, the 240 accepted lanes give ~128 FD-stable ones and an
+    # aggregate error of ~2% (48 lanes: ~9%). The oracle needs at least 96 stable lanes.
+    for lane in active_indices:
         if one_lane_sum(lane, src0) <= 0.0:
             continue
         # Two-step consistency filter: a lane riding a UTD transition-region
@@ -700,10 +705,10 @@ def test_diffraction_transmitter_position_grad_matches_fixed_tape_fd(monkeypatch
         fd_total += fd_fine
         ad_total += lane_dual(lane)
         stable_lanes += 1
-        if stable_lanes >= 48:
+        if stable_lanes >= 256:
             break
 
-    assert stable_lanes >= 16, "the fixture no longer yields accept-stable lanes"
+    assert stable_lanes >= 96, "the fixture no longer yields enough accept-stable lanes"
     assert relative_error(ad_total, fd_total, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
 
 
