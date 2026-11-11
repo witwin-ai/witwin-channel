@@ -20,8 +20,9 @@ def _with_grid(scene: Scene, grid: ReceiverGrid) -> Scene:
 
 
 def _reflection_grid() -> ReceiverGrid:
+    # Offset by half a spacing so no sample lies on the transmitter at the origin.
     return make_receiver_grid(
-        origin=torch.tensor([0.0, -1.0, 0.0]),
+        origin=torch.tensor([0.0, -1.0, 0.25]),
         x_axis=torch.tensor([0.0, 1.0, 0.0]),
         y_axis=torch.tensor([0.0, 0.0, 1.0]),
         shape=(2, 2),
@@ -78,7 +79,7 @@ def test_bdpt_grid_variance_uses_public_non_square_layout():
         _with_grid(
             single_wall_reflection_scene(),
             make_receiver_grid(
-                origin=torch.tensor([0.0, -1.0, 0.0]),
+                origin=torch.tensor([0.0, -1.0, 0.25]),
                 x_axis=torch.tensor([0.0, 1.0, 0.0]),
                 y_axis=torch.tensor([0.0, 0.0, 1.0]),
                 shape=(2, 3),

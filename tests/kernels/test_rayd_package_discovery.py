@@ -225,6 +225,55 @@ def test_resolver_fails_loudly_on_package_mutation(tmp_path: Path, mutation: str
             resolver.resolve(LOCK_PATH)
 
 
+class _InstallerRecordPath(str):
+    """A RECORD entry without a hash, as an installer writes for bytecode it compiles."""
+
+    hash = None
+
+
+def _add_bytecode(
+    distribution: _FakeDistribution, resource: Path, relative: str, *, installer: bool,
+):
+    target = resource / "source" / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(b"\x00bytecode")
+    record = target.relative_to(distribution.root).as_posix()
+    distribution.files.append(_InstallerRecordPath(record) if installer else record)
+
+
+def test_resolver_ignores_installer_bytecode_of_manifested_scripts(tmp_path: Path):
+    """pip byte-compiles the bundled build scripts on install; that bytecode is not source."""
+
+    resolver = _load_resolver()
+    distribution, resource = _package(tmp_path)
+    _add_bytecode(
+        distribution, resource, "torch/scripts/__pycache__/embed_ptx.cpython-311.pyc", installer=True
+    )
+    with patch.object(resolver.importlib.metadata, "distributions", return_value=[distribution]):
+        resolved = resolver.resolve(LOCK_PATH)
+    assert resolved["source_kind"] == "python-package"
+
+
+@pytest.mark.parametrize(
+    ("relative", "installer"),
+    [
+        ("torch/scripts/__pycache__/embed_ptx.cpython-311.pyc", False),
+        ("torch/scripts/__pycache__/not_in_the_bundle.cpython-311.pyc", True),
+        ("torch/scripts/embed_ptx.cpython-311.pyc", True),
+    ],
+    ids=["hashed-in-record", "no-manifested-source", "outside-pycache"],
+)
+def test_resolver_rejects_bytecode_the_installer_did_not_generate(
+    tmp_path: Path, relative: str, installer: bool,
+):
+    resolver = _load_resolver()
+    distribution, resource = _package(tmp_path)
+    _add_bytecode(distribution, resource, relative, installer=installer)
+    with patch.object(resolver.importlib.metadata, "distributions", return_value=[distribution]):
+        with pytest.raises(resolver.RayDDiscoveryError, match="unmanifested RayD source file"):
+            resolver.resolve(LOCK_PATH)
+
+
 def test_resolver_rejects_missing_or_ambiguous_distribution(tmp_path: Path):
     resolver = _load_resolver()
     distribution, _ = _package(tmp_path)

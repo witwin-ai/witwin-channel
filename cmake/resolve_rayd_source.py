@@ -217,6 +217,27 @@ def _record_paths(distribution: importlib.metadata.Distribution) -> set[str]:
     return {PurePosixPath(str(path).replace("\\", "/")).as_posix() for path in files}
 
 
+def _installer_bytecode_paths(distribution: importlib.metadata.Distribution) -> set[str]:
+    """RECORD paths of bytecode the installer wrote, which RECORD lists without a hash."""
+
+    files = distribution.files or []
+    return {
+        PurePosixPath(str(path).replace("\\", "/")).as_posix()
+        for path in files
+        if getattr(path, "hash", ()) is None
+        and PurePosixPath(str(path)).suffix == ".pyc"
+        and "__pycache__" in PurePosixPath(str(path).replace("\\", "/")).parts
+    }
+
+
+def _bytecode_source(relative_text: str) -> str:
+    """The ``.py`` path a ``__pycache__/<module>.<tag>.pyc`` file was compiled from."""
+
+    path = PurePosixPath(relative_text)
+    module = path.name.split(".", 1)[0]
+    return (path.parent.parent / f"{module}.py").as_posix()
+
+
 def resolve(lock_path: Path) -> dict[str, object]:
     lock_path = lock_path.resolve(strict=True)
     lock = _validate_lock(lock_path)
@@ -238,6 +259,7 @@ def resolve(lock_path: Path) -> dict[str, object]:
     )
     metadata_record_path = metadata_relative.as_posix()
     record_paths = _record_paths(distribution)
+    installer_bytecode = _installer_bytecode_paths(distribution)
     if metadata_record_path not in record_paths:
         raise RayDDiscoveryError(f"rayd-torch RECORD does not own {metadata_record_path!r}")
     metadata_path = _inside(
@@ -341,13 +363,21 @@ def resolve(lock_path: Path) -> dict[str, object]:
             continue
         resolved = _inside(candidate, source_root, label="RayD package source file")
         relative_text = resolved.relative_to(source_root).as_posix()
+        record_path = resolved.relative_to(distribution_root).as_posix()
+        if (
+            relative_text not in described
+            and record_path in installer_bytecode
+            and _bytecode_source(relative_text) in described
+        ):
+            # pip byte-compiles the bundled build scripts at install time; that bytecode is not
+            # source, is never read by the build, and is not part of the locked manifest.
+            continue
         actual.add(relative_text)
         expected_digest = described.get(relative_text)
         if expected_digest is None:
             raise RayDDiscoveryError(f"unmanifested RayD source file {relative_text!r}")
         if _sha256(resolved) != expected_digest:
             raise RayDDiscoveryError(f"RayD source file changed: {relative_text!r}")
-        record_path = resolved.relative_to(distribution_root).as_posix()
         if record_path not in record_paths:
             raise RayDDiscoveryError(f"rayd-torch RECORD does not own {record_path!r}")
     if actual != set(described):

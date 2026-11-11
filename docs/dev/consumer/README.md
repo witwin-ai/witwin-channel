@@ -416,6 +416,18 @@ interaction width, the smooth-scene requirement of the reflection route, and
 fixed-topology AD input restrictions. All of them raise before any native work
 runs; there is no partial result.
 
+Endpoint coordinates are device data and are never read on the host by
+`evaluate` or `reevaluate`. Keeping every source/sink pair farther apart than
+the coincidence tolerance (the larger of wavelength/(4*pi) and `2^-20` times the
+coordinate magnitude, the rule the solvers enforce on scene endpoints) is the
+caller's precondition: a coincident pair publishes a zero line-of-sight
+coefficient and a near-coincident pair an unbounded far-field value.
+`check_endpoint_separation(sources, sinks, reference_frequency_hz=...)` tests
+the precondition with a few device reductions and one one-byte read, and raises
+`ValueError` naming the first coincident pair. Call it when the endpoint
+batches change, not inside a replay loop
+(`docs/dev/standards/adr-0xx-coincident-endpoints.md`).
+
 ## Result shape
 
 `PropagationPathBatch` publishes actual compact `K` rows, never provisioned

@@ -3724,6 +3724,86 @@ def _require_current_world(compiled: CompiledScene, request: FixedTopologyReques
     )
 
 
+_SEPARATION_CHUNK_PAIRS = 1 << 22
+
+
+def check_endpoint_separation(
+    sources: EndpointBatch, sinks: EndpointBatch, *, reference_frequency_hz: float | torch.Tensor,
+) -> None:
+    """Refuse a source and sink closer than the coincidence tolerance, with one host read.
+
+    Free-space propagation is undefined for coincident endpoints, so every
+    source/sink pair must be farther apart than the larger of wavelength/(4*pi)
+    at ``reference_frequency_hz`` and the float32 resolution of the pair's
+    coordinates; this is the tolerance the solvers refuse a receiver at.
+    :func:`evaluate` and :func:`reevaluate` never read endpoint coordinates on
+    the host, so they do not detect coincident pairs: a pair at zero distance
+    publishes a zero line-of-sight coefficient, a pair just apart a far-field
+    value that grows without bound. Call this whenever the endpoint batches
+    change, outside a replay loop. It runs a few device reductions and one
+    one-byte device-to-host read that synchronizes the current stream, and
+    raises ``ValueError`` naming the first coincident pair.
+    """
+
+    from witwin.channel.scene.endpoints import COORDINATE_RESOLUTION, coincidence_tolerance_m
+
+    if not isinstance(sources, EndpointBatch) or not isinstance(sinks, EndpointBatch):
+        raise TypeError("sources and sinks must be EndpointBatch instances")
+    if sources.device != sinks.device:
+        raise ValueError("source and sink batches must share one CUDA device")
+    frequency = (
+        float(reference_frequency_hz.detach())
+        if isinstance(reference_frequency_hz, torch.Tensor)
+        else float(reference_frequency_hz)
+    )
+    if not math.isfinite(frequency) or frequency <= 0.0:
+        raise ValueError("reference_frequency_hz must be finite and positive")
+    if sources.count == 0 or sinks.count == 0:
+        return
+    floor = coincidence_tolerance_m(frequency, 0.0)
+    source = sources.positions_m.detach().to(torch.float64)
+    sink = sinks.positions_m.detach().to(torch.float64)
+    sink_magnitude = sink.abs().amax(dim=1)
+    rows = max(1, _SEPARATION_CHUNK_PAIRS // sinks.count)
+
+    def coincident(start: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        block = source[start : start + rows]
+        distance = torch.cdist(block, sink, compute_mode="donot_use_mm_for_euclid_dist")
+        magnitude = torch.maximum(block.abs().amax(dim=1)[:, None], sink_magnitude[None, :])
+        tolerance = torch.clamp_min(magnitude * COORDINATE_RESOLUTION, floor)
+        return distance <= tolerance, distance, tolerance
+
+    found = torch.zeros((), dtype=torch.bool, device=source.device)
+    for start in range(0, sources.count, rows):
+        found |= coincident(start)[0].any()
+    if not bool(found):
+        return
+    first: tuple[int, int, float, float] | None = None
+    total = 0
+    for start in range(0, sources.count, rows):
+        mask, distance, tolerance = coincident(start)
+        total += int(mask.sum())
+        hits = torch.nonzero(mask)
+        if first is None and hits.shape[0]:
+            row, column = (int(value) for value in hits[0])
+            gap, limit = float(distance[row, column]), float(tolerance[row, column])
+            first = (start + row, column, gap, limit)
+    assert first is not None
+    index, column, gap, limit = first
+    raise ValueError(
+        f"source {index} (stable id {int(sources.stable_ids[index])}) at "
+        f"{_host_point(sources.positions_m[index])} coincides with sink {column} (stable id "
+        f"{int(sinks.stable_ids[column])}) at {_host_point(sinks.positions_m[column])}: the "
+        f"distance {gap:.3g} m is below the coincidence tolerance {limit:.3g} m (the larger of "
+        f"wavelength/(4*pi) at {frequency:.6g} Hz and the float32 coordinate resolution), "
+        f"where free-space propagation is undefined; {total} source/sink pair(s) are this close"
+    )
+
+
+def _host_point(value: torch.Tensor) -> str:
+    return "(" + ", ".join(f"{float(item):.6g}" for item in value.tolist()) + ")"
+
+
 def rediscovery_required(
     compiled_scene: CompiledScene, topology: PropagationTopology | PreparedFixedTopology, *,
     revalidate_source: bool = False,
@@ -4529,6 +4609,7 @@ __all__ = [
     "TimeVaryingTransport",
     "WorldProvenance",
     "capabilities",
+    "check_endpoint_separation",
     "evaluate",
     "evaluate_time_varying",
     "native_frequency_resolution_hz",
