@@ -13,6 +13,7 @@
 #include <rayd/field_transport.cuh>
 #include "../tensor_checks.h"
 
+#include <algorithm>
 #include <vector>
 
 #define launch_blocks field_transport_launch_blocks
@@ -25,6 +26,27 @@ namespace field = rayd::shared::diffraction;
 namespace transport = rayd::shared::field_transport;
 
 
+
+// Up to this many carrier frequencies evaluated by one field-transport launch. Each (row,
+// frequency) lane runs the single-frequency arithmetic unchanged; outputs are written at
+// row * out_stride + column_offset + f, and outputs a caller does not request are null.
+constexpr int kFrequencyColumnLimit = 64;
+
+struct FrequencyColumns {
+    float values[kFrequencyColumnLimit];
+    int64_t count;
+    int64_t out_stride;
+    int64_t column_offset;
+};
+
+FrequencyColumns single_frequency(double frequency_hz) {
+    FrequencyColumns columns = {};
+    columns.values[0] = static_cast<float>(frequency_hz);
+    columns.count = 1;
+    columns.out_stride = 1;
+    columns.column_offset = 0;
+    return columns;
+}
 
 __device__ __forceinline__ c10::complex<float> to_complex(field::Complex value) {
     return c10::complex<float>(value.re, value.im);
@@ -41,7 +63,7 @@ __global__ void free_space_kernel(
     const float* tx_power,
     const float* tx_polarization,
     const float* rx_polarization,
-    float frequency_hz,
+    FrequencyColumns columns,
     c10::complex<float>* field_vector,
     c10::complex<float>* coefficient,
     c10::complex<float>* path_field,
@@ -49,9 +71,13 @@ __global__ void free_space_kernel(
     float* path_length,
     float* delay,
     float* direction_out) {
-    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         index < count;
-         index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
+    for (int64_t lane = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         lane < count * columns.count;
+         lane += static_cast<int64_t>(blockDim.x) * gridDim.x) {
+        const int64_t index = lane / columns.count;
+        const int64_t column = lane - index * columns.count;
+        const float frequency_hz = columns.values[column];
+        const int64_t out = index * columns.out_stride + columns.column_offset + column;
         const field::float3a source_value = channel::math::load_field_vec3(source, index);
         const field::float3a target_value = channel::math::load_field_vec3(target, index);
         const field::float3a offset = field::f3_sub(target_value, source_value);
@@ -64,18 +90,21 @@ __global__ void free_space_kernel(
         const float source_amplitude = sqrtf(fmaxf(tx_power[index], 0.0f));
         const field::Complex3 value = transport::free_space_complex3(
             source_value, target_value, wave_number, tx_pol);
-        const int64_t base = index * 3;
+        const int64_t base = out * 3;
         field_vector[base] = to_complex(value.x);
         field_vector[base + 1] = to_complex(value.y);
         field_vector[base + 2] = to_complex(value.z);
         const field::Complex scalar = transport::project_receiver(
             value, direction, channel::math::load_field_vec3(rx_polarization, index));
-        coefficient[index] = to_complex(scalar);
         const field::Complex received = field::cplx_mul_real(scalar, source_amplitude);
-        path_field[index] = to_complex(received);
-        path_gain[index] = field::cplx_abs_sqr(received);
-        path_length[index] = distance;
-        delay[index] = distance / transport::kSpeedOfLight;
+        path_field[out] = to_complex(received);
+        if (coefficient == nullptr) {
+            continue;
+        }
+        coefficient[out] = to_complex(scalar);
+        path_gain[out] = field::cplx_abs_sqr(received);
+        path_length[out] = distance;
+        delay[out] = distance / transport::kSpeedOfLight;
         direction_out[base] = direction.x;
         direction_out[base + 1] = direction.y;
         direction_out[base + 2] = direction.z;
@@ -126,7 +155,7 @@ __global__ void reflection_sequence_kernel(
     const float* mu_r,
     const float* gain,
     const float* thickness,
-    float frequency_hz,
+    FrequencyColumns columns,
     c10::complex<float>* field_vector,
     c10::complex<float>* coefficient,
     c10::complex<float>* path_field,
@@ -134,9 +163,13 @@ __global__ void reflection_sequence_kernel(
     float* path_length,
     float* delay,
     float* direction_out) {
-    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         index < count;
-         index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
+    for (int64_t lane = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         lane < count * columns.count;
+         lane += static_cast<int64_t>(blockDim.x) * gridDim.x) {
+        const int64_t index = lane / columns.count;
+        const int64_t column = lane - index * columns.count;
+        const float frequency_hz = columns.values[column];
+        const int64_t out = index * columns.out_stride + columns.column_offset + column;
         field::float3a previous = channel::math::load_field_vec3(source, index);
         field::float3a first_hit = load_sequence3(
             interaction_positions, index, 0, depth);
@@ -185,19 +218,22 @@ __global__ void reflection_sequence_kernel(
                 transport::precise_neg_kd(wave_number, total_length)),
             amplitude);
         value = field::c3_scale(value, propagation);
-        const int64_t base = index * 3;
+        const int64_t base = out * 3;
         field_vector[base] = to_complex(value.x);
         field_vector[base + 1] = to_complex(value.y);
         field_vector[base + 2] = to_complex(value.z);
         const field::Complex scalar = transport::project_receiver(
             value, final_direction, channel::math::load_field_vec3(rx_polarization, index));
-        coefficient[index] = to_complex(scalar);
         const field::Complex received = field::cplx_mul_real(
             scalar, sqrtf(fmaxf(tx_power[index], 0.0f)));
-        path_field[index] = to_complex(received);
-        path_gain[index] = field::cplx_abs_sqr(received);
-        path_length[index] = total_length;
-        delay[index] = total_length / transport::kSpeedOfLight;
+        path_field[out] = to_complex(received);
+        if (coefficient == nullptr) {
+            continue;
+        }
+        coefficient[out] = to_complex(scalar);
+        path_gain[out] = field::cplx_abs_sqr(received);
+        path_length[out] = total_length;
+        delay[out] = total_length / transport::kSpeedOfLight;
         direction_out[base] = final_direction.x;
         direction_out[base + 1] = final_direction.y;
         direction_out[base + 2] = final_direction.z;
@@ -640,13 +676,11 @@ int launch_blocks(int64_t count) {
 
 }  // namespace
 
-pybind11::dict channel_field_free_space(
-    at::Tensor source,
-    at::Tensor target,
-    at::Tensor tx_power,
-    at::Tensor tx_polarization,
-    at::Tensor rx_polarization,
-    double frequency_hz) {
+namespace {
+
+void check_free_space_inputs(
+    const at::Tensor& source, const at::Tensor& target, const at::Tensor& tx_power,
+    const at::Tensor& tx_polarization, const at::Tensor& rx_polarization) {
     using channel::check_flat_tensor;
     using channel::check_vec3_table;
     check_vec3_table(source, "source");
@@ -659,8 +693,68 @@ pybind11::dict channel_field_free_space(
     TORCH_CHECK(tx_power.size(0) == count, "tx_power must match source rows");
     TORCH_CHECK(tx_polarization.size(0) == count, "tx_polarization must match source rows");
     TORCH_CHECK(rx_polarization.size(0) == count, "rx_polarization must match source rows");
-    TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
+}
 
+std::vector<FrequencyColumns> frequency_column_chunks(const std::vector<double>& frequencies) {
+    TORCH_CHECK(!frequencies.empty(), "frequency columns must not be empty");
+    std::vector<FrequencyColumns> chunks;
+    const int64_t total = static_cast<int64_t>(frequencies.size());
+    for (int64_t start = 0; start < total; start += kFrequencyColumnLimit) {
+        FrequencyColumns columns = {};
+        columns.count = std::min<int64_t>(kFrequencyColumnLimit, total - start);
+        columns.out_stride = total;
+        columns.column_offset = start;
+        for (int64_t column = 0; column < columns.count; ++column) {
+            const double frequency = frequencies[static_cast<size_t>(start + column)];
+            TORCH_CHECK(frequency > 0.0, "frequency_hz must be positive");
+            columns.values[column] = static_cast<float>(frequency);
+        }
+        chunks.push_back(columns);
+    }
+    return chunks;
+}
+
+void launch_free_space(
+    const at::Tensor& source, const at::Tensor& target, const at::Tensor& tx_power,
+    const at::Tensor& tx_polarization, const at::Tensor& rx_polarization,
+    const FrequencyColumns& columns, c10::complex<float>* field_vector,
+    c10::complex<float>* coefficient, c10::complex<float>* path_field, float* path_gain,
+    float* path_length, float* delay, float* direction) {
+    const int64_t count = source.size(0);
+    if (count == 0) {
+        return;
+    }
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
+    free_space_kernel<<<launch_blocks(count * columns.count), kBlockSize, 0, stream>>>(
+        count,
+        source.data_ptr<float>(),
+        target.data_ptr<float>(),
+        tx_power.data_ptr<float>(),
+        tx_polarization.data_ptr<float>(),
+        rx_polarization.data_ptr<float>(),
+        columns,
+        field_vector,
+        coefficient,
+        path_field,
+        path_gain,
+        path_length,
+        delay,
+        direction);
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+}
+
+}  // namespace
+
+pybind11::dict channel_field_free_space(
+    at::Tensor source,
+    at::Tensor target,
+    at::Tensor tx_power,
+    at::Tensor tx_polarization,
+    at::Tensor rx_polarization,
+    double frequency_hz) {
+    check_free_space_inputs(source, target, tx_power, tx_polarization, rx_polarization);
+    TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
+    const int64_t count = source.size(0);
     auto complex_options = source.options().dtype(at::kComplexFloat);
     auto field_vector = at::empty({count, 3}, complex_options);
     auto coefficient = at::empty({count}, complex_options);
@@ -669,25 +763,11 @@ pybind11::dict channel_field_free_space(
     auto path_length = at::empty_like(path_gain);
     auto delay = at::empty_like(path_gain);
     auto direction = at::empty_like(source);
-    if (count > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
-        free_space_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
-            count,
-            source.data_ptr<float>(),
-            target.data_ptr<float>(),
-            tx_power.data_ptr<float>(),
-            tx_polarization.data_ptr<float>(),
-            rx_polarization.data_ptr<float>(),
-            static_cast<float>(frequency_hz),
-            field_vector.data_ptr<c10::complex<float>>(),
-            coefficient.data_ptr<c10::complex<float>>(),
-            path_field.data_ptr<c10::complex<float>>(),
-            path_gain.data_ptr<float>(),
-            path_length.data_ptr<float>(),
-            delay.data_ptr<float>(),
-            direction.data_ptr<float>());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
+    launch_free_space(
+        source, target, tx_power, tx_polarization, rx_polarization, single_frequency(frequency_hz),
+        field_vector.data_ptr<c10::complex<float>>(), coefficient.data_ptr<c10::complex<float>>(),
+        path_field.data_ptr<c10::complex<float>>(), path_gain.data_ptr<float>(),
+        path_length.data_ptr<float>(), delay.data_ptr<float>(), direction.data_ptr<float>());
     pybind11::dict out;
     out["field_vector"] = field_vector;
     out["coefficient"] = coefficient;
@@ -696,6 +776,32 @@ pybind11::dict channel_field_free_space(
     out["path_length_m"] = path_length;
     out["delay_s"] = delay;
     out["direction"] = direction;
+    return out;
+}
+
+pybind11::dict channel_field_free_space_columns(
+    at::Tensor source,
+    at::Tensor target,
+    at::Tensor tx_power,
+    at::Tensor tx_polarization,
+    at::Tensor rx_polarization,
+    std::vector<double> frequencies_hz) {
+    check_free_space_inputs(source, target, tx_power, tx_polarization, rx_polarization);
+    const auto chunks = frequency_column_chunks(frequencies_hz);
+    const int64_t count = source.size(0);
+    const int64_t columns = static_cast<int64_t>(frequencies_hz.size());
+    auto complex_options = source.options().dtype(at::kComplexFloat);
+    auto field_vector = at::empty({count, columns, 3}, complex_options);
+    auto path_field = at::empty({count, columns}, complex_options);
+    for (const auto& chunk : chunks) {
+        launch_free_space(
+            source, target, tx_power, tx_polarization, rx_polarization, chunk,
+            field_vector.data_ptr<c10::complex<float>>(), nullptr,
+            path_field.data_ptr<c10::complex<float>>(), nullptr, nullptr, nullptr, nullptr);
+    }
+    pybind11::dict out;
+    out["field_vector"] = field_vector;
+    out["path_field"] = path_field;
     return out;
 }
 
@@ -732,20 +838,14 @@ pybind11::dict channel_field_project_complex3(
     return out;
 }
 
-pybind11::dict channel_field_reflection_sequence(
-    at::Tensor source,
-    at::Tensor target,
-    at::Tensor interaction_positions,
-    at::Tensor interaction_normals,
-    at::Tensor tx_power,
-    at::Tensor tx_polarization,
-    at::Tensor rx_polarization,
-    at::Tensor eps_r,
-    at::Tensor sigma_e,
-    at::Tensor mu_r,
-    at::Tensor gain,
-    at::Tensor thickness,
-    double frequency_hz) {
+namespace {
+
+void check_reflection_sequence_inputs(
+    const at::Tensor& source, const at::Tensor& target, const at::Tensor& interaction_positions,
+    const at::Tensor& interaction_normals, const at::Tensor& tx_power,
+    const at::Tensor& tx_polarization, const at::Tensor& rx_polarization, const at::Tensor& eps_r,
+    const at::Tensor& sigma_e, const at::Tensor& mu_r, const at::Tensor& gain,
+    const at::Tensor& thickness) {
     using channel::check_flat_tensor;
     using channel::check_tensor;
     using channel::check_vec3_table;
@@ -775,8 +875,69 @@ pybind11::dict channel_field_reflection_sequence(
     TORCH_CHECK(target.size(0) == count && tx_power.size(0) == count &&
                     tx_polarization.size(0) == count && rx_polarization.size(0) == count,
                 "reflection endpoint tensors must match source rows");
-    TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
+}
 
+void launch_reflection_sequence(
+    const at::Tensor& source, const at::Tensor& target, const at::Tensor& interaction_positions,
+    const at::Tensor& interaction_normals, const at::Tensor& tx_power,
+    const at::Tensor& tx_polarization, const at::Tensor& rx_polarization, const at::Tensor& eps_r,
+    const at::Tensor& sigma_e, const at::Tensor& mu_r, const at::Tensor& gain,
+    const at::Tensor& thickness, const FrequencyColumns& columns,
+    c10::complex<float>* field_vector, c10::complex<float>* coefficient,
+    c10::complex<float>* path_field, float* path_gain, float* path_length, float* delay,
+    float* direction) {
+    const int64_t count = source.size(0);
+    if (count == 0) {
+        return;
+    }
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
+    reflection_sequence_kernel<<<launch_blocks(count * columns.count), kBlockSize, 0, stream>>>(
+        count,
+        interaction_positions.size(1),
+        source.data_ptr<float>(),
+        target.data_ptr<float>(),
+        interaction_positions.data_ptr<float>(),
+        interaction_normals.data_ptr<float>(),
+        tx_power.data_ptr<float>(),
+        tx_polarization.data_ptr<float>(),
+        rx_polarization.data_ptr<float>(),
+        eps_r.data_ptr<float>(),
+        sigma_e.data_ptr<float>(),
+        mu_r.data_ptr<float>(),
+        gain.data_ptr<float>(),
+        thickness.data_ptr<float>(),
+        columns,
+        field_vector,
+        coefficient,
+        path_field,
+        path_gain,
+        path_length,
+        delay,
+        direction);
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+}
+
+}  // namespace
+
+pybind11::dict channel_field_reflection_sequence(
+    at::Tensor source,
+    at::Tensor target,
+    at::Tensor interaction_positions,
+    at::Tensor interaction_normals,
+    at::Tensor tx_power,
+    at::Tensor tx_polarization,
+    at::Tensor rx_polarization,
+    at::Tensor eps_r,
+    at::Tensor sigma_e,
+    at::Tensor mu_r,
+    at::Tensor gain,
+    at::Tensor thickness,
+    double frequency_hz) {
+    check_reflection_sequence_inputs(
+        source, target, interaction_positions, interaction_normals, tx_power, tx_polarization,
+        rx_polarization, eps_r, sigma_e, mu_r, gain, thickness);
+    TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
+    const int64_t count = source.size(0);
     auto complex_options = source.options().dtype(at::kComplexFloat);
     auto field_vector = at::empty({count, 3}, complex_options);
     auto coefficient = at::empty({count}, complex_options);
@@ -785,33 +946,12 @@ pybind11::dict channel_field_reflection_sequence(
     auto path_length = at::empty_like(path_gain);
     auto delay = at::empty_like(path_gain);
     auto direction = at::empty_like(source);
-    if (count > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
-        reflection_sequence_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
-            count,
-            depth,
-            source.data_ptr<float>(),
-            target.data_ptr<float>(),
-            interaction_positions.data_ptr<float>(),
-            interaction_normals.data_ptr<float>(),
-            tx_power.data_ptr<float>(),
-            tx_polarization.data_ptr<float>(),
-            rx_polarization.data_ptr<float>(),
-            eps_r.data_ptr<float>(),
-            sigma_e.data_ptr<float>(),
-            mu_r.data_ptr<float>(),
-            gain.data_ptr<float>(),
-            thickness.data_ptr<float>(),
-            static_cast<float>(frequency_hz),
-            field_vector.data_ptr<c10::complex<float>>(),
-            coefficient.data_ptr<c10::complex<float>>(),
-            path_field.data_ptr<c10::complex<float>>(),
-            path_gain.data_ptr<float>(),
-            path_length.data_ptr<float>(),
-            delay.data_ptr<float>(),
-            direction.data_ptr<float>());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
+    launch_reflection_sequence(
+        source, target, interaction_positions, interaction_normals, tx_power, tx_polarization,
+        rx_polarization, eps_r, sigma_e, mu_r, gain, thickness, single_frequency(frequency_hz),
+        field_vector.data_ptr<c10::complex<float>>(), coefficient.data_ptr<c10::complex<float>>(),
+        path_field.data_ptr<c10::complex<float>>(), path_gain.data_ptr<float>(),
+        path_length.data_ptr<float>(), delay.data_ptr<float>(), direction.data_ptr<float>());
     pybind11::dict out;
     out["field_vector"] = field_vector;
     out["coefficient"] = coefficient;
@@ -820,6 +960,42 @@ pybind11::dict channel_field_reflection_sequence(
     out["path_length_m"] = path_length;
     out["delay_s"] = delay;
     out["direction"] = direction;
+    return out;
+}
+
+pybind11::dict channel_field_reflection_sequence_columns(
+    at::Tensor source,
+    at::Tensor target,
+    at::Tensor interaction_positions,
+    at::Tensor interaction_normals,
+    at::Tensor tx_power,
+    at::Tensor tx_polarization,
+    at::Tensor rx_polarization,
+    at::Tensor eps_r,
+    at::Tensor sigma_e,
+    at::Tensor mu_r,
+    at::Tensor gain,
+    at::Tensor thickness,
+    std::vector<double> frequencies_hz) {
+    check_reflection_sequence_inputs(
+        source, target, interaction_positions, interaction_normals, tx_power, tx_polarization,
+        rx_polarization, eps_r, sigma_e, mu_r, gain, thickness);
+    const auto chunks = frequency_column_chunks(frequencies_hz);
+    const int64_t count = source.size(0);
+    const int64_t columns = static_cast<int64_t>(frequencies_hz.size());
+    auto complex_options = source.options().dtype(at::kComplexFloat);
+    auto field_vector = at::empty({count, columns, 3}, complex_options);
+    auto path_field = at::empty({count, columns}, complex_options);
+    for (const auto& chunk : chunks) {
+        launch_reflection_sequence(
+            source, target, interaction_positions, interaction_normals, tx_power, tx_polarization,
+            rx_polarization, eps_r, sigma_e, mu_r, gain, thickness, chunk,
+            field_vector.data_ptr<c10::complex<float>>(), nullptr,
+            path_field.data_ptr<c10::complex<float>>(), nullptr, nullptr, nullptr, nullptr);
+    }
+    pybind11::dict out;
+    out["field_vector"] = field_vector;
+    out["path_field"] = path_field;
     return out;
 }
 

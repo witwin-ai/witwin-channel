@@ -19,8 +19,6 @@ from witwin.channel.kernels.fields import (
     _FieldReflectionSequenceAdFunction,
     _FieldTransmissionSequenceAdFunction,
     coupled_rd_prepare_ad,
-    deterministic_delay_to_path_length as deterministic_delay_to_path_length,
-    deterministic_diffraction_vector_field as deterministic_diffraction_vector_field,
     deterministic_field_from_power_phase as deterministic_field_from_power_phase,
     deterministic_los_field as deterministic_los_field,
     deterministic_pack_complex as deterministic_pack_complex,

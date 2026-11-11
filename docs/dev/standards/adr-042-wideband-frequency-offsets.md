@@ -215,6 +215,17 @@ decomposition that ceiling is waiting on.
 
 ### 4. The launch-count law, stated out loud
 
+> **Amendment (0.6.0, M4-7): one `[K, F]` launch per bucket for primal sweeps.**
+> The visibility, EPC geometry and material gathers of every bucket run once and
+> all columns reuse them. With `ad_mode="none"` the columns no longer replay the
+> bucket: `field_free_space_columns` / `field_reflection_sequence_columns` run the
+> single-frequency arithmetic in one lane per (row, frequency), up to 64
+> frequencies per launch, so the law for a primal sweep is
+> `field launches = buckets (reference) + buckets * ceil(F / 64)` and every column,
+> the `0 Hz` one included, is bitwise the single-frequency replay at that
+> frequency (`test_every_wideband_column_is_bitwise_the_single_frequency_replay`).
+> AD sweeps keep the per-column replay below, over the shared bucket inputs.
+
 ADR-041 could truthfully say "no change to the number of launches per bucket".
 **This one cannot, and does not pretend otherwise.**
 

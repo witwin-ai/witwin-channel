@@ -8,7 +8,6 @@ from tests.support.scenes import empty_space_los_scene
 from tests.support.scenes import wedge_diffraction_scene
 from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
-from witwin.channel.kernels import fields as field_kernels
 from witwin.channel.kernels import topology as topology_kernels
 import witwin.channel.path as path_package
 
@@ -59,21 +58,21 @@ def test_los_hot_path_uses_native_topology_facade(monkeypatch):
     assert len(calls) == 1
 
 
-def test_diffraction_hot_path_uses_native_vector_field_facade(monkeypatch):
+def test_diffraction_hot_path_uses_native_topology_compact_facade(monkeypatch):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic hot-path contract")
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native diffraction is not built")
 
     calls = []
-    original = field_kernels.deterministic_diffraction_vector_field
+    original = topology_kernels.deterministic_diffraction_topology_compact
 
     def wrapped(*args, **kwargs):
         calls.append((args, kwargs))
         return original(*args, **kwargs)
 
     monkeypatch.setattr(
-        field_kernels, "deterministic_diffraction_vector_field", wrapped
+        topology_kernels, "deterministic_diffraction_topology_compact", wrapped
     )
 
     solve(

@@ -38,8 +38,6 @@ __all__ = [
     "_FieldTransmissionSequenceAdFunction",
     "ad_liveness",
     "coupled_rd_prepare_ad",
-    "deterministic_delay_to_path_length",
-    "deterministic_diffraction_vector_field",
     "deterministic_field_from_power_phase",
     "deterministic_los_field",
     "deterministic_pack_complex",
@@ -73,6 +71,7 @@ __all__ = [
     "field_source_amplitude_scale_backward",
     "field_source_amplitude_scale_jvp",
     "field_transmission_sequence",
+    "field_transport_columns",
     "field_transmission_sequence_ad",
     "field_transmission_sequence_backward",
     "field_transmission_sequence_jvp",
@@ -238,6 +237,42 @@ def field_reflection_sequence(
         field_error="field_reflection_sequence returned unexpected fields",
         shape_error_prefix="field_reflection_sequence",
     )
+
+
+def field_transport_columns(
+    *arguments: torch.Tensor, depth: int, frequencies_hz: tuple[float, ...],
+) -> dict[str, torch.Tensor]:
+    """Free-space (``depth == 0``) or reflection field at several carrier frequencies.
+
+    ``arguments`` are the positional tensors of :func:`field_free_space` or
+    :func:`field_reflection_sequence`. Each (row, frequency) lane runs that op's
+    single-frequency arithmetic, so column ``f`` is bitwise the single op at
+    ``frequencies_hz[f]``. Returns ``field_vector`` ``[N, F, 3]`` and ``path_field`` ``[N, F]``.
+    """
+
+    frequencies = tuple(float(value) for value in frequencies_hz)
+    if not frequencies or any(not value > 0.0 for value in frequencies):
+        raise ValueError("frequencies_hz must be a non-empty tuple of positive values")
+    name, expected = (
+        ("field_free_space_columns", 5) if depth == 0 else ("field_reflection_sequence_columns", 12)
+    )
+    if len(arguments) != expected:
+        raise TypeError(f"{name} takes {expected} tensors")
+    for value in arguments:
+        validate_cuda_tensor("field input", value, dtype=torch.float32, ndim=value.ndim)
+    count = int(arguments[0].shape[0])
+    out = _required_native_op(name)(*arguments, list(frequencies))
+    if not isinstance(out, dict) or set(out) != {"field_vector", "path_field"}:
+        raise TypeError(f"_channel.{name} returned invalid fields")
+    columns = len(frequencies)
+    validate_cuda_tensor("field_vector", out["field_vector"], dtype=torch.complex64, ndim=3)
+    validate_cuda_tensor("path_field", out["path_field"], dtype=torch.complex64, ndim=2)
+    if out["field_vector"].shape != (count, columns, 3) or out["path_field"].shape != (
+        count,
+        columns,
+    ):
+        raise ValueError(f"_channel.{name} returned bad shapes")
+    return out
 
 
 def field_transmission_sequence(
@@ -3451,56 +3486,6 @@ def deterministic_los_field(
     if exported["path_gain"].shape != path_gain.shape:
         raise ValueError("_channel.deterministic_los_field returned bad shape")
     return exported
-
-
-def deterministic_diffraction_vector_field(
-    x_re: torch.Tensor, x_im: torch.Tensor, y_re: torch.Tensor, y_im: torch.Tensor,
-    z_re: torch.Tensor, z_im: torch.Tensor,
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor("x_re", x_re, dtype=torch.float32, ndim=1)
-    for name, tensor in {
-        "x_im": x_im,
-        "y_re": y_re,
-        "y_im": y_im,
-        "z_re": z_re,
-        "z_im": z_im,
-    }.items():
-        validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=1)
-        if tensor.shape != x_re.shape:
-            raise ValueError(f"{name} must match x_re")
-
-    exported = _required_native_op("deterministic_diffraction_vector_field")(
-        x_re, x_im, y_re, y_im, z_re, z_im
-    )
-    if not isinstance(exported, dict):
-        raise TypeError(
-            "_channel.deterministic_diffraction_vector_field must return a dict"
-        )
-    validate_cuda_tensor(
-        "path_gain", exported["path_gain"], dtype=torch.float32, ndim=1
-    )
-    validate_cuda_tensor(
-        "field_real", exported["field_real"], dtype=torch.float32, ndim=1
-    )
-    validate_cuda_tensor(
-        "field_imag", exported["field_imag"], dtype=torch.float32, ndim=1
-    )
-    if exported["path_gain"].shape != x_re.shape:
-        raise ValueError(
-            "_channel.deterministic_diffraction_vector_field returned bad shape"
-        )
-    return exported
-
-
-def deterministic_delay_to_path_length(delay_s: torch.Tensor) -> torch.Tensor:
-    validate_cuda_tensor("delay_s", delay_s, dtype=torch.float32, ndim=1)
-    path_length = _required_native_op("deterministic_delay_to_path_length")(delay_s)
-    validate_cuda_tensor("path_length_m", path_length, dtype=torch.float32, ndim=1)
-    if path_length.shape != delay_s.shape:
-        raise ValueError(
-            "_channel.deterministic_delay_to_path_length returned bad shape"
-        )
-    return path_length
 
 
 def deterministic_pack_complex(field_real: torch.Tensor, field_imag: torch.Tensor) -> torch.Tensor:

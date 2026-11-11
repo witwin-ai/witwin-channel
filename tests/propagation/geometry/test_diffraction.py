@@ -147,9 +147,10 @@ def test_tx_visibility_plan_preserves_state_aliases_and_uses_separate_tx(monkeyp
     active = torch.tensor([True], dtype=torch.bool)
     calls: list[tuple[object, ...]] = []
 
-    def fake_plan(*args):
+    def fake_plan(*args, per_state_source=False):
         calls.append(args)
         assert args[0] == 29
+        assert per_state_source is False
         return active
 
     monkeypatch.setattr(

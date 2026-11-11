@@ -6,7 +6,6 @@ from __future__ import annotations
 from dataclasses import FrozenInstanceError, fields
 
 import pytest
-import torch
 
 from witwin.channel.interactions import diffraction
 
@@ -37,32 +36,6 @@ def test_prepare_diffraction_order1_plan_preserves_imported_edge_policy(metadata
     assert plan.rx_count == 5
     with pytest.raises(FrozenInstanceError):
         plan.rx_count = 6
-
-
-def test_tx_requests_are_lazy_and_do_not_prefetch_tensor_rows():
-    tx_positions = torch.arange(6, dtype=torch.float32).reshape(2, 3)
-    plan = diffraction.prepare_diffraction_order1_plan(
-        metadata={},
-        tx_count=2,
-        rx_count=1,
-    )
-    requests = diffraction.iter_diffraction_tx_requests(
-        plan,
-        tx_positions=tx_positions,
-    )
-
-    first = next(requests)
-    tx_positions[1, 0] = 99.0
-    second = next(requests)
-
-    assert first.tx_index == 0
-    assert first.tx.data_ptr() == tx_positions[0].data_ptr()
-    assert first.tx.stride() == tx_positions[0].stride()
-    assert second.tx_index == 1
-    assert second.tx.data_ptr() == tx_positions[1].data_ptr()
-    assert float(second.tx[0]) == 99.0
-    with pytest.raises(StopIteration):
-        next(requests)
 
 
 def test_rx_chunk_requests_preserve_state_capacity_and_order(monkeypatch):

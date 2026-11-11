@@ -3047,7 +3047,7 @@ def evaluate_prepared(
     ad_mode: str, frequency: float | torch.Tensor, frequency_value: float,
     source_reference_basis: torch.Tensor | None, sink_reference_basis: torch.Tensor | None,
     publish_row_validity: bool, geometry_live: GeometryLiveness | None = None,
-    ledger: object | None = None,
+    ledger: object | None = None, bucket_inputs: tuple[BucketInputs, ...] | None = None,
 ) -> FixedRowOutputs:
     """Replay every host-known bucket of a prepared frozen topology.
 
@@ -3060,17 +3060,9 @@ def evaluate_prepared(
 
     width = int(prepared.topology.primitive_sequence.shape[1])
     outputs = _allocate(rows, width, response)
-    tables = (
-        _scene_tables(compiled)
-        if any(bucket.depth > 0 for bucket in prepared.buckets)
-        else {}
-    )
-    for bucket in prepared.buckets:
-        inputs = (
-            _los_inputs(compiled, bucket, rows)
-            if bucket.depth == 0
-            else _reflection_inputs(compiled, bucket, tables, prepared, rows)
-        )
+    if bucket_inputs is None:
+        bucket_inputs = prepared_bucket_inputs(compiled, prepared, rows)
+    for bucket, inputs in zip(prepared.buckets, bucket_inputs, strict=True):
         values = _bucket_values(
             inputs,
             _field_op(
@@ -3110,6 +3102,77 @@ def evaluate_prepared(
         sink_basis=outputs["sink_basis"],
         row_valid=outputs["row_valid"] if publish_row_validity else None,
     )
+
+
+def prepared_bucket_inputs(
+    compiled: CompiledScene, prepared: PreparedFixedTopology, rows: PreparedRows,
+) -> tuple[BucketInputs, ...]:
+    """Frequency-independent inputs of every bucket: visibility, EPC geometry and materials.
+
+    A wideband caller computes these once and shares them across its frequency columns.
+    """
+
+    tables = (
+        _scene_tables(compiled)
+        if any(bucket.depth > 0 for bucket in prepared.buckets)
+        else {}
+    )
+    return tuple(
+        _los_inputs(compiled, bucket, rows)
+        if bucket.depth == 0
+        else _reflection_inputs(compiled, bucket, tables, prepared, rows)
+        for bucket in prepared.buckets
+    )
+
+
+def wideband_payload(
+    prepared: PreparedFixedTopology, rows: PreparedRows, bucket_inputs: tuple[BucketInputs, ...], *,
+    response: str, frequencies_hz: tuple[float, ...],
+) -> torch.Tensor:
+    """Primal ``[K, F]`` (scalar) or ``[K, F, 3]`` (complex3) payload, one native launch per bucket.
+
+    Every column is the single-frequency field at that absolute frequency, so a column equals
+    the reference replay's payload at the same frequency bit for bit.
+    """
+
+    from witwin.channel.kernels import fields as field_kernels
+
+    columns = len(frequencies_hz)
+    device = rows.source.device
+    complex3 = response == "complex3_transport"
+    shape = (rows.row_count, columns, 3) if complex3 else (rows.row_count, columns)
+    payload = torch.zeros(shape, dtype=torch.complex64, device=device)
+    for bucket, inputs in zip(prepared.buckets, bucket_inputs, strict=True):
+        leading = (
+            (inputs.source, inputs.target)
+            if inputs.depth == 0
+            else (
+                inputs.source,
+                inputs.target,
+                inputs.interaction_positions,
+                inputs.interaction_normals,
+            )
+        )
+        trailing = () if inputs.depth == 0 else inputs.material
+        out = field_kernels.field_transport_columns(
+            *leading,
+            inputs.tx_power,
+            inputs.tx_polarization,
+            inputs.rx_polarization,
+            *trailing,
+            depth=inputs.depth,
+            frequencies_hz=frequencies_hz,
+        )
+        if complex3:
+            count = int(inputs.tx_power.shape[0])
+            values = field_kernels.field_source_amplitude_scale(
+                out["field_vector"].reshape(count * columns, 3),
+                inputs.tx_power.repeat_interleave(columns),
+            )["path_field_vector"].reshape(count, columns, 3)
+        else:
+            values = out["path_field"]
+        payload.index_copy_(0, bucket.rows, values)
+    return payload
 
 
 def scene_vertex_table(compiled: CompiledScene) -> object:
@@ -3969,6 +4032,9 @@ def _reevaluate_prepared(
         ),
     )
     ledger = ad_ledger(request.ad_mode)
+    # Visibility, EPC geometry and material gathers do not depend on the carrier frequency:
+    # they run once and every frequency column reuses them.
+    bucket_inputs = prepared_bucket_inputs(compiled, prepared, rows)
 
     def column(offset: float):
         return evaluate_prepared(
@@ -3986,17 +4052,25 @@ def _reevaluate_prepared(
             ),
             geometry_live=geometry_live,
             ledger=ledger,
+            bucket_inputs=bucket_inputs,
         )
 
     outputs = column(0.0)
     offsets = request.frequency_offsets_hz
-    payload = (
-        None
-        if offsets is None
-        else _wideband_columns(
+    if offsets is None:
+        payload = None
+    elif request.ad_mode == "none":
+        payload = wideband_payload(
+            prepared,
+            rows,
+            bucket_inputs,
+            response=request.response,
+            frequencies_hz=tuple(compiled.materials.frequency_hz + offset for offset in offsets),
+        )
+    else:
+        payload = _wideband_columns(
             offsets, lambda offset: _column_payload(request.response, column(offset))
         )
-    )
     paths = PropagationPathBatch(
         pair_count=_slot_pair_count(request),
         path_count=rows.row_count,

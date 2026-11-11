@@ -19,7 +19,6 @@ namespace {
 constexpr int kBlockSize = 256;
 constexpr float kLightSpeed = 299792458.0f;
 constexpr float kPi = 3.14159265358979323846f;
-constexpr float kEps = 1.0e-6f;
 
 using channel::check_tensor;
 namespace transport = rayd::shared::field_transport;
@@ -56,66 +55,6 @@ __global__ void deterministic_los_field_kernel(
         path_gain[index] = input_path_gain[index];
         field_real[index] = amplitude * cosf(phase);
         field_imag[index] = amplitude * sinf(phase);
-    }
-}
-
-__global__ void deterministic_diffraction_vector_field_kernel(
-    const float *__restrict__ x_re,
-    const float *__restrict__ x_im,
-    const float *__restrict__ y_re,
-    const float *__restrict__ y_im,
-    const float *__restrict__ z_re,
-    const float *__restrict__ z_im,
-    int64_t count,
-    float *__restrict__ path_gain,
-    float *__restrict__ field_real,
-    float *__restrict__ field_imag) {
-    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
-    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         index < count;
-         index += stride) {
-        const float px = x_re[index] * x_re[index] + x_im[index] * x_im[index];
-        const float py = y_re[index] * y_re[index] + y_im[index] * y_im[index];
-        const float pz = z_re[index] * z_re[index] + z_im[index] * z_im[index];
-        const float total = px + py + pz;
-        path_gain[index] = total;
-
-        float real = x_re[index];
-        float imag = x_im[index];
-        float dominant = px;
-        if (py > dominant) {
-            dominant = py;
-            real = y_re[index];
-            imag = y_im[index];
-        }
-        if (pz > dominant) {
-            dominant = pz;
-            real = z_re[index];
-            imag = z_im[index];
-        }
-
-        const float dominant_amplitude = sqrtf(fmaxf(dominant, 0.0f));
-        const float total_amplitude = sqrtf(fmaxf(total, 0.0f));
-        if (dominant_amplitude > kEps) {
-            const float scale = total_amplitude / dominant_amplitude;
-            field_real[index] = real * scale;
-            field_imag[index] = imag * scale;
-        } else {
-            field_real[index] = 0.0f;
-            field_imag[index] = 0.0f;
-        }
-    }
-}
-
-__global__ void deterministic_delay_to_path_length_kernel(
-    const float *__restrict__ delay_s,
-    int64_t count,
-    float *__restrict__ path_length_m) {
-    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
-    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         index < count;
-         index += stride) {
-        path_length_m[index] = delay_s[index] * kLightSpeed;
     }
 }
 
@@ -219,69 +158,6 @@ pybind11::dict channel_deterministic_los_field(
     out["field_real"] = field_real;
     out["field_imag"] = field_imag;
     return out;
-}
-
-pybind11::dict channel_deterministic_diffraction_vector_field(
-    at::Tensor x_re,
-    at::Tensor x_im,
-    at::Tensor y_re,
-    at::Tensor y_im,
-    at::Tensor z_re,
-    at::Tensor z_im) {
-    check_tensor(x_re, "x_re", at::kFloat, 1);
-    check_tensor(x_im, "x_im", at::kFloat, 1);
-    check_tensor(y_re, "y_re", at::kFloat, 1);
-    check_tensor(y_im, "y_im", at::kFloat, 1);
-    check_tensor(z_re, "z_re", at::kFloat, 1);
-    check_tensor(z_im, "z_im", at::kFloat, 1);
-    TORCH_CHECK(x_im.sizes() == x_re.sizes(), "x_im must match x_re");
-    TORCH_CHECK(y_re.sizes() == x_re.sizes(), "y_re must match x_re");
-    TORCH_CHECK(y_im.sizes() == x_re.sizes(), "y_im must match x_re");
-    TORCH_CHECK(z_re.sizes() == x_re.sizes(), "z_re must match x_re");
-    TORCH_CHECK(z_im.sizes() == x_re.sizes(), "z_im must match x_re");
-
-    const int64_t count = x_re.size(0);
-    auto path_gain = at::empty({count}, x_re.options());
-    auto field_real = at::empty({count}, x_re.options());
-    auto field_imag = at::empty({count}, x_re.options());
-    if (count > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(x_re.get_device()).stream();
-        const int block_count = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
-        deterministic_diffraction_vector_field_kernel<<<block_count, kBlockSize, 0, stream>>>(
-            x_re.data_ptr<float>(),
-            x_im.data_ptr<float>(),
-            y_re.data_ptr<float>(),
-            y_im.data_ptr<float>(),
-            z_re.data_ptr<float>(),
-            z_im.data_ptr<float>(),
-            count,
-            path_gain.data_ptr<float>(),
-            field_real.data_ptr<float>(),
-            field_imag.data_ptr<float>());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-
-    pybind11::dict out;
-    out["path_gain"] = path_gain;
-    out["field_real"] = field_real;
-    out["field_imag"] = field_imag;
-    return out;
-}
-
-at::Tensor channel_deterministic_delay_to_path_length(at::Tensor delay_s) {
-    check_tensor(delay_s, "delay_s", at::kFloat, 1);
-    auto path_length = at::empty_like(delay_s);
-    const int64_t count = delay_s.size(0);
-    if (count > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(delay_s.get_device()).stream();
-        const int block_count = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
-        deterministic_delay_to_path_length_kernel<<<block_count, kBlockSize, 0, stream>>>(
-            delay_s.data_ptr<float>(),
-            count,
-            path_length.data_ptr<float>());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-    return path_length;
 }
 
 at::Tensor channel_deterministic_pack_complex(at::Tensor field_real, at::Tensor field_imag) {

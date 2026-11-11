@@ -239,50 +239,6 @@ __global__ void deterministic_pad_topology_sequences_kernel(
     }
 }
 
-__global__ void deterministic_topology_base_fields_kernel(
-    int64_t count,
-    const int* __restrict__ rx_id,
-    const float* __restrict__ path_length,
-    const float* __restrict__ delay,
-    const float* __restrict__ path_gain,
-    int tx_index,
-    int component_id,
-    const int* __restrict__ depth_source,
-    int depth_source_count,
-    int depth_value,
-    const int* __restrict__ primitive_source,
-    int primitive_source_count,
-    int primitive_value,
-    const int* __restrict__ edge_source,
-    int edge_source_count,
-    int edge_value,
-    bool* __restrict__ out_valid,
-    int* __restrict__ out_tx_id,
-    int* __restrict__ out_rx_id,
-    int* __restrict__ out_depth,
-    int* __restrict__ out_component_id,
-    int* __restrict__ out_primitive_id,
-    int* __restrict__ out_edge_id,
-    float* __restrict__ out_path_length,
-    float* __restrict__ out_delay,
-    float* __restrict__ out_path_gain) {
-    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
-    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         index < count;
-         index += stride) {
-        out_valid[index] = true;
-        out_tx_id[index] = tx_index;
-        out_rx_id[index] = rx_id[index];
-        out_depth[index] = depth_source_count == count ? depth_source[index] : depth_value;
-        out_component_id[index] = component_id;
-        out_primitive_id[index] = primitive_source_count == count ? primitive_source[index] : primitive_value;
-        out_edge_id[index] = edge_source_count == count ? edge_source[index] : edge_value;
-        out_path_length[index] = path_length[index];
-        out_delay[index] = delay[index];
-        out_path_gain[index] = path_gain[index];
-    }
-}
-
 __global__ void deterministic_repeat_range_kernel(
     int64_t count,
     int start,
@@ -1009,100 +965,6 @@ pybind11::dict channel_deterministic_pad_topology_sequences(
     out["material_sequence"] = material_out;
     out["interaction_positions"] = position_out;
     out["interaction_normals"] = normal_out;
-    return out;
-}
-
-pybind11::dict channel_deterministic_topology_base_fields(
-    at::Tensor rx_id,
-    at::Tensor path_length,
-    at::Tensor delay,
-    at::Tensor path_gain,
-    int64_t tx_index,
-    int64_t component_id,
-    at::Tensor depth_source,
-    int64_t depth_value,
-    at::Tensor primitive_source,
-    int64_t primitive_value,
-    at::Tensor edge_source,
-    int64_t edge_value) {
-    check_cuda_tensor(rx_id, "rx_id", at::kInt, 1);
-    check_cuda_tensor(path_length, "path_length_m", at::kFloat, 1);
-    check_cuda_tensor(delay, "delay_s", at::kFloat, 1);
-    check_cuda_tensor(path_gain, "path_gain", at::kFloat, 1);
-    check_cuda_tensor(depth_source, "depth_source", at::kInt, 1);
-    check_cuda_tensor(primitive_source, "primitive_source", at::kInt, 1);
-    check_cuda_tensor(edge_source, "edge_source", at::kInt, 1);
-    const int64_t count = rx_id.size(0);
-    const int device = rx_id.get_device();
-    TORCH_CHECK(path_length.size(0) == count, "path_length_m must match rx_id");
-    TORCH_CHECK(delay.size(0) == count, "delay_s must match rx_id");
-    TORCH_CHECK(path_gain.size(0) == count, "path_gain must match rx_id");
-    TORCH_CHECK(depth_source.size(0) == 0 || depth_source.size(0) == count, "depth_source must be empty or match rx_id");
-    TORCH_CHECK(primitive_source.size(0) == 0 || primitive_source.size(0) == count, "primitive_source must be empty or match rx_id");
-    TORCH_CHECK(edge_source.size(0) == 0 || edge_source.size(0) == count, "edge_source must be empty or match rx_id");
-    TORCH_CHECK(path_length.get_device() == device, "path_length_m must share rx_id device");
-    TORCH_CHECK(delay.get_device() == device, "delay_s must share rx_id device");
-    TORCH_CHECK(path_gain.get_device() == device, "path_gain must share rx_id device");
-    TORCH_CHECK(depth_source.get_device() == device, "depth_source must share rx_id device");
-    TORCH_CHECK(primitive_source.get_device() == device, "primitive_source must share rx_id device");
-    TORCH_CHECK(edge_source.get_device() == device, "edge_source must share rx_id device");
-
-    auto bool_options = rx_id.options().dtype(at::kBool);
-    auto int_options = rx_id.options().dtype(at::kInt);
-    auto float_options = path_gain.options().dtype(at::kFloat);
-    auto out_valid = at::empty({count}, bool_options);
-    auto out_tx_id = at::empty({count}, int_options);
-    auto out_rx_id = at::empty({count}, int_options);
-    auto out_depth = at::empty({count}, int_options);
-    auto out_component_id = at::empty({count}, int_options);
-    auto out_primitive_id = at::empty({count}, int_options);
-    auto out_edge_id = at::empty({count}, int_options);
-    auto out_path_length = at::empty({count}, float_options);
-    auto out_delay = at::empty({count}, float_options);
-    auto out_path_gain = at::empty({count}, float_options);
-    if (count > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
-        deterministic_topology_base_fields_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
-            count,
-            rx_id.data_ptr<int>(),
-            path_length.data_ptr<float>(),
-            delay.data_ptr<float>(),
-            path_gain.data_ptr<float>(),
-            static_cast<int>(tx_index),
-            static_cast<int>(component_id),
-            depth_source.data_ptr<int>(),
-            static_cast<int>(depth_source.size(0)),
-            static_cast<int>(depth_value),
-            primitive_source.data_ptr<int>(),
-            static_cast<int>(primitive_source.size(0)),
-            static_cast<int>(primitive_value),
-            edge_source.data_ptr<int>(),
-            static_cast<int>(edge_source.size(0)),
-            static_cast<int>(edge_value),
-            out_valid.data_ptr<bool>(),
-            out_tx_id.data_ptr<int>(),
-            out_rx_id.data_ptr<int>(),
-            out_depth.data_ptr<int>(),
-            out_component_id.data_ptr<int>(),
-            out_primitive_id.data_ptr<int>(),
-            out_edge_id.data_ptr<int>(),
-            out_path_length.data_ptr<float>(),
-            out_delay.data_ptr<float>(),
-            out_path_gain.data_ptr<float>());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-
-    pybind11::dict out;
-    out["valid"] = out_valid;
-    out["tx_id"] = out_tx_id;
-    out["rx_id"] = out_rx_id;
-    out["depth"] = out_depth;
-    out["component_id"] = out_component_id;
-    out["primitive_id"] = out_primitive_id;
-    out["edge_id"] = out_edge_id;
-    out["path_length_m"] = out_path_length;
-    out["delay_s"] = out_delay;
-    out["path_gain"] = out_path_gain;
     return out;
 }
 
@@ -2048,10 +1910,14 @@ __global__ void deterministic_reflection_sequence_compact_kernel(
     }
 }
 
-__global__ void deterministic_diffraction_order1_compact_kernel(
+// Writes one valid order-1 diffraction export row as a topology row: the exporter's UTD vector
+// field becomes field_xyz, the scalar field columns stay zero for the field stage.
+__global__ void deterministic_diffraction_topology_compact_kernel(
     int64_t count,
+    int rx_offset,
     const int* __restrict__ flags,
     const int* __restrict__ offsets,
+    const int* __restrict__ tx_id,
     const int* __restrict__ rx_id,
     const int* __restrict__ depth,
     const int* __restrict__ edge_id,
@@ -2063,17 +1929,21 @@ __global__ void deterministic_diffraction_order1_compact_kernel(
     const float* __restrict__ z_re,
     const float* __restrict__ z_im,
     const float* __restrict__ interaction_position,
+    bool* __restrict__ out_valid,
+    int* __restrict__ out_tx_id,
     int* __restrict__ out_rx_id,
     int* __restrict__ out_depth,
+    int* __restrict__ out_component_id,
+    int* __restrict__ out_primitive_id,
     int* __restrict__ out_edge_id,
+    float* __restrict__ out_path_length,
     float* __restrict__ out_delay,
-    float* __restrict__ out_x_re,
-    float* __restrict__ out_x_im,
-    float* __restrict__ out_y_re,
-    float* __restrict__ out_y_im,
-    float* __restrict__ out_z_re,
-    float* __restrict__ out_z_im,
-    float* __restrict__ out_interaction_position) {
+    float* __restrict__ out_path_gain,
+    c10::complex<float>* __restrict__ out_path_field,
+    c10::complex<float>* __restrict__ out_field_xyz,
+    float* __restrict__ out_interaction_position,
+    float* __restrict__ out_interaction_normal,
+    int* __restrict__ out_material_id) {
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count;
@@ -2081,22 +1951,27 @@ __global__ void deterministic_diffraction_order1_compact_kernel(
         if (flags[index] == 0) {
             continue;
         }
-        const int dst = offsets[index];
-        out_rx_id[dst] = rx_id[index];
+        const int64_t dst = offsets[index];
+        const float row_delay = delay[index];
+        out_valid[dst] = true;
+        out_tx_id[dst] = tx_id[index];
+        out_rx_id[dst] = rx_id[index] + rx_offset;
         out_depth[dst] = depth[index];
+        out_component_id[dst] = 2;
+        out_primitive_id[dst] = -1;
         out_edge_id[dst] = edge_id[index];
-        out_delay[dst] = delay[index];
-        out_x_re[dst] = x_re[index];
-        out_x_im[dst] = x_im[index];
-        out_y_re[dst] = y_re[index];
-        out_y_im[dst] = y_im[index];
-        out_z_re[dst] = z_re[index];
-        out_z_im[dst] = z_im[index];
-        const int64_t src_base = index * 3;
-        const int64_t dst_base = static_cast<int64_t>(dst) * 3;
-        out_interaction_position[dst_base + 0] = interaction_position[src_base + 0];
-        out_interaction_position[dst_base + 1] = interaction_position[src_base + 1];
-        out_interaction_position[dst_base + 2] = interaction_position[src_base + 2];
+        out_path_length[dst] = row_delay * 299792458.0f;
+        out_delay[dst] = row_delay;
+        out_path_gain[dst] = 0.0f;
+        out_path_field[dst] = c10::complex<float>(0.0f, 0.0f);
+        out_field_xyz[dst * 3 + 0] = c10::complex<float>(x_re[index], x_im[index]);
+        out_field_xyz[dst * 3 + 1] = c10::complex<float>(y_re[index], y_im[index]);
+        out_field_xyz[dst * 3 + 2] = c10::complex<float>(z_re[index], z_im[index]);
+        out_material_id[dst] = -1;
+        for (int axis = 0; axis < 3; ++axis) {
+            out_interaction_position[dst * 3 + axis] = interaction_position[index * 3 + axis];
+            out_interaction_normal[dst * 3 + axis] = 0.0f;
+        }
     }
 }
 
@@ -2945,65 +2820,59 @@ pybind11::dict channel_deterministic_reflection_sequence_compact(
     return out;
 }
 
-pybind11::dict channel_deterministic_diffraction_order1_compact(
-    at::Tensor valid,
-    at::Tensor rx_id,
-    at::Tensor depth,
-    at::Tensor edge_id,
-    at::Tensor delay,
-    at::Tensor x_re,
-    at::Tensor x_im,
-    at::Tensor y_re,
-    at::Tensor y_im,
-    at::Tensor z_re,
-    at::Tensor z_im,
-    at::Tensor interaction_position) {
+pybind11::dict channel_deterministic_diffraction_topology_compact(
+    at::Tensor valid, at::Tensor tx_id, at::Tensor rx_id, int64_t rx_offset, at::Tensor depth,
+    at::Tensor edge_id, at::Tensor delay, at::Tensor x_re, at::Tensor x_im, at::Tensor y_re,
+    at::Tensor y_im, at::Tensor z_re, at::Tensor z_im, at::Tensor interaction_position) {
     check_cuda_tensor(valid, "valid", at::kBool, 1);
-    check_cuda_tensor(rx_id, "rx_id", at::kInt, 1);
-    check_cuda_tensor(depth, "depth", at::kInt, 1);
-    check_cuda_tensor(edge_id, "edge_id", at::kInt, 1);
-    check_cuda_tensor(delay, "delay_s", at::kFloat, 1);
-    check_cuda_tensor(x_re, "x_re", at::kFloat, 1);
-    check_cuda_tensor(x_im, "x_im", at::kFloat, 1);
-    check_cuda_tensor(y_re, "y_re", at::kFloat, 1);
-    check_cuda_tensor(y_im, "y_im", at::kFloat, 1);
-    check_cuda_tensor(z_re, "z_re", at::kFloat, 1);
-    check_cuda_tensor(z_im, "z_im", at::kFloat, 1);
-    check_vec3_table(interaction_position, "interaction_position");
     const int64_t count = valid.size(0);
-    const int device = valid.get_device();
-    for (const auto& tensor : {rx_id, depth, edge_id}) {
-        TORCH_CHECK(tensor.size(0) == count, "diffraction int tensors must match valid");
-        TORCH_CHECK(tensor.get_device() == device, "diffraction int tensors must share valid device");
+    const std::pair<const char*, const at::Tensor*> int_inputs[] = {
+        {"tx_id", &tx_id}, {"rx_id", &rx_id}, {"depth", &depth}, {"edge_id", &edge_id}};
+    for (const auto& item : int_inputs) {
+        check_cuda_tensor(*item.second, item.first, at::kInt, 1);
+        TORCH_CHECK(item.second->size(0) == count, item.first, " must match valid");
     }
-    for (const auto& tensor : {delay, x_re, x_im, y_re, y_im, z_re, z_im}) {
-        TORCH_CHECK(tensor.size(0) == count, "diffraction float tensors must match valid");
-        TORCH_CHECK(tensor.get_device() == device, "diffraction float tensors must share valid device");
+    const std::pair<const char*, const at::Tensor*> float_inputs[] = {
+        {"delay_s", &delay}, {"x_re", &x_re}, {"x_im", &x_im}, {"y_re", &y_re},
+        {"y_im", &y_im}, {"z_re", &z_re}, {"z_im", &z_im}};
+    for (const auto& item : float_inputs) {
+        check_cuda_tensor(*item.second, item.first, at::kFloat, 1);
+        TORCH_CHECK(item.second->size(0) == count, item.first, " must match valid");
     }
+    check_vec3_table(interaction_position, "interaction_position");
     TORCH_CHECK(interaction_position.size(0) == count, "interaction_position must match valid");
-    TORCH_CHECK(interaction_position.get_device() == device, "interaction_position must share valid device");
-
-    auto int_options = rx_id.options().dtype(at::kInt);
-    auto float_options = delay.options().dtype(at::kFloat);
-    auto empty_out = [&]() {
+    TORCH_CHECK(rx_offset >= 0 && rx_offset <= std::numeric_limits<int>::max(), "rx_offset is out of range");
+    const int device = valid.get_device();
+    for (const at::Tensor* tensor : {&tx_id, &rx_id, &depth, &edge_id, &delay, &x_re, &x_im, &y_re, &y_im,
+                                     &z_re, &z_im, &interaction_position}) {
+        TORCH_CHECK(tensor->get_device() == device, "diffraction compact inputs must share one device");
+    }
+    auto bool_options = valid.options().dtype(at::kBool);
+    auto int_options = valid.options().dtype(at::kInt);
+    auto float_options = valid.options().dtype(at::kFloat);
+    auto complex_options = valid.options().dtype(at::kComplexFloat);
+    auto allocate = [&](int64_t rows) {
         pybind11::dict out;
-        out["rx_id"] = at::empty({0}, int_options);
-        out["depth"] = at::empty({0}, int_options);
-        out["edge_id"] = at::empty({0}, int_options);
-        out["delay_s"] = at::empty({0}, float_options);
-        out["x_re"] = at::empty({0}, float_options);
-        out["x_im"] = at::empty({0}, float_options);
-        out["y_re"] = at::empty({0}, float_options);
-        out["y_im"] = at::empty({0}, float_options);
-        out["z_re"] = at::empty({0}, float_options);
-        out["z_im"] = at::empty({0}, float_options);
-        out["interaction_position"] = at::empty({0, 3}, float_options);
+        out["valid"] = at::empty({rows}, bool_options);
+        out["tx_id"] = at::empty({rows}, int_options);
+        out["rx_id"] = at::empty({rows}, int_options);
+        out["depth"] = at::empty({rows}, int_options);
+        out["component_id"] = at::empty({rows}, int_options);
+        out["primitive_id"] = at::empty({rows}, int_options);
+        out["edge_id"] = at::empty({rows}, int_options);
+        out["path_length_m"] = at::empty({rows}, float_options);
+        out["delay_s"] = at::empty({rows}, float_options);
+        out["path_gain"] = at::empty({rows}, float_options);
+        out["path_field"] = at::empty({rows}, complex_options);
+        out["field_xyz"] = at::empty({rows, 3}, complex_options);
+        out["interaction_position"] = at::empty({rows, 3}, float_options);
+        out["interaction_normal"] = at::empty({rows, 3}, float_options);
+        out["material_id"] = at::empty({rows}, int_options);
         return out;
     };
     if (count == 0) {
-        return empty_out();
+        return allocate(0);
     }
-
     auto flags = at::empty({count}, int_options);
     auto offsets = at::empty({count + 1}, int_options);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
@@ -3013,28 +2882,19 @@ pybind11::dict channel_deterministic_diffraction_order1_compact(
         flags.data_ptr<int>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     channel::scan::exclusive_flag_offsets(flags, offsets, count, stream);
-    const int64_t out_count =
-        observe_compact_count(offsets, count, stream).count;
+    const int64_t out_count = observe_compact_count(offsets, count, stream).count;
+    pybind11::dict out = allocate(out_count);
     if (out_count == 0) {
-        return empty_out();
+        return out;
     }
-
-    pybind11::dict out;
-    out["rx_id"] = at::empty({out_count}, int_options);
-    out["depth"] = at::empty({out_count}, int_options);
-    out["edge_id"] = at::empty({out_count}, int_options);
-    out["delay_s"] = at::empty({out_count}, float_options);
-    out["x_re"] = at::empty({out_count}, float_options);
-    out["x_im"] = at::empty({out_count}, float_options);
-    out["y_re"] = at::empty({out_count}, float_options);
-    out["y_im"] = at::empty({out_count}, float_options);
-    out["z_re"] = at::empty({out_count}, float_options);
-    out["z_im"] = at::empty({out_count}, float_options);
-    out["interaction_position"] = at::empty({out_count, 3}, float_options);
-    deterministic_diffraction_order1_compact_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
+    auto tensor = [&](const char* name) { return pybind11::cast<at::Tensor>(out[name]); };
+    deterministic_diffraction_topology_compact_kernel<<<
+        static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
         count,
+        static_cast<int>(rx_offset),
         flags.data_ptr<int>(),
         offsets.data_ptr<int>(),
+        tx_id.data_ptr<int>(),
         rx_id.data_ptr<int>(),
         depth.data_ptr<int>(),
         edge_id.data_ptr<int>(),
@@ -3046,17 +2906,21 @@ pybind11::dict channel_deterministic_diffraction_order1_compact(
         z_re.data_ptr<float>(),
         z_im.data_ptr<float>(),
         interaction_position.data_ptr<float>(),
-        pybind11::cast<at::Tensor>(out["rx_id"]).data_ptr<int>(),
-        pybind11::cast<at::Tensor>(out["depth"]).data_ptr<int>(),
-        pybind11::cast<at::Tensor>(out["edge_id"]).data_ptr<int>(),
-        pybind11::cast<at::Tensor>(out["delay_s"]).data_ptr<float>(),
-        pybind11::cast<at::Tensor>(out["x_re"]).data_ptr<float>(),
-        pybind11::cast<at::Tensor>(out["x_im"]).data_ptr<float>(),
-        pybind11::cast<at::Tensor>(out["y_re"]).data_ptr<float>(),
-        pybind11::cast<at::Tensor>(out["y_im"]).data_ptr<float>(),
-        pybind11::cast<at::Tensor>(out["z_re"]).data_ptr<float>(),
-        pybind11::cast<at::Tensor>(out["z_im"]).data_ptr<float>(),
-        pybind11::cast<at::Tensor>(out["interaction_position"]).data_ptr<float>());
+        tensor("valid").data_ptr<bool>(),
+        tensor("tx_id").data_ptr<int>(),
+        tensor("rx_id").data_ptr<int>(),
+        tensor("depth").data_ptr<int>(),
+        tensor("component_id").data_ptr<int>(),
+        tensor("primitive_id").data_ptr<int>(),
+        tensor("edge_id").data_ptr<int>(),
+        tensor("path_length_m").data_ptr<float>(),
+        tensor("delay_s").data_ptr<float>(),
+        tensor("path_gain").data_ptr<float>(),
+        tensor("path_field").data_ptr<c10::complex<float>>(),
+        tensor("field_xyz").data_ptr<c10::complex<float>>(),
+        tensor("interaction_position").data_ptr<float>(),
+        tensor("interaction_normal").data_ptr<float>(),
+        tensor("material_id").data_ptr<int>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     return out;
 }

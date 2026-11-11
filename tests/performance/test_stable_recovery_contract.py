@@ -64,7 +64,7 @@ def test_live_reflection_and_diffraction_producers_remain_compact() -> None:
     )
 
     assert "deterministic_reflection_topology_compact" in reflection_calls
-    assert "deterministic_diffraction_order1_compact" in diffraction_calls
+    assert "deterministic_diffraction_topology_compact" in diffraction_calls
 
 
 def test_public_path_exports_retain_actual_row_compaction() -> None:
