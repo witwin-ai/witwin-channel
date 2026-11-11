@@ -26,8 +26,8 @@ the package tree.
   `EnumeratedFullDistance` RayD batch. Path does not own a closest-hit march or
   depth loop. It carries the typed solve transaction through scattering,
   sanitizes evaluated rows and the diffraction sidecar before result packing,
-  and enqueues the runtime-owned terminal observer exactly once after synthetic
-  or explicit array packing.
+  and observes the transaction once (inside the compact count copy); a
+  failed transaction raises `CapacityError` before any result is packed.
 - Under ADR-032, Path keeps one explicit post-sanitizer valid-row structural
   compaction before the result converter. This prevents failed `-1` identifiers
   from reaching that converter and is part of the authoritative `O(K)` compact

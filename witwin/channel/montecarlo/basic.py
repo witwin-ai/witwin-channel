@@ -413,6 +413,21 @@ def _sample_directions(count: int, *, reference: torch.Tensor) -> torch.Tensor:
     return montecarlo_kernels.mc_sample_directions(count, reference)
 
 
+def _transmission_capacity_metadata(
+    config: Config, capacity_transaction: SolveCapacityTransaction | None,
+) -> dict[str, Any]:
+    """Observe the solve's failure record once and report the dropped transmission cells.
+
+    A failed solve raises ``CapacityError`` here and returns no result.
+    """
+
+    dropped = capacity_transaction.terminal_check() if capacity_transaction is not None else 0
+    if "transmission" not in config.components:
+        return {}
+    # Grid cells whose straight tx->cell segment crosses more walls than max_depth.
+    return {"transmission": {"dropped_rows_over_max_depth": int(dropped)}}
+
+
 def transmission_component_map(
     scene: SolverScene, rayd: RayDSceneResource, grid: ReceiverGrid, *, max_depth: int,
     device: torch.device, failure_state: CapacityFailureState, los: torch.Tensor | None = None,
@@ -429,8 +444,8 @@ def transmission_component_map(
     path class and stay zero here, so los + transmission never double counts.
     A single eps_r=1 vacuum wall has unit power transmittance, which makes
     this map reproduce the unobstructed LoS map exactly (acceptance test);
-    the mandatory ``max_depth + 1`` probe makes over-capacity chains poison the
-    shared solve transaction instead of returning a truncated map.
+    a segment crossing more than ``max_depth`` walls is dropped (zero in this
+    map) and counted in the solve's failure record, never truncated.
     """
 
     if not scene.structures:
@@ -1581,6 +1596,7 @@ def solve_pipeline(  # type: ignore[no-untyped-def]
             component_power["transmission"] = torch.zeros_like(component_power["los"])
         if "scattering" in config.components:
             component_power["scattering"] = torch.zeros_like(component_power["los"])
+    transmission_metadata = _transmission_capacity_metadata(config, capacity_transaction)
     metadata = make_solver_metadata(
         config=config,
         path_count=path_count,
@@ -1589,6 +1605,7 @@ def solve_pipeline(  # type: ignore[no-untyped-def]
         diffraction_available=diffraction_available,
         ad_ledger=ledger,
     )
+    metadata.update(transmission_metadata)
     if "scattering" in config.components:
         metadata["scattering"] = {
             "component_mask_bit": 16,
@@ -1620,8 +1637,6 @@ def solve_pipeline(  # type: ignore[no-untyped-def]
         diagnostics=diagnostics,
         component_maps=component_maps,
     )
-    if capacity_transaction is not None:
-        capacity_transaction.terminal_check()
     return result
 
 

@@ -40,6 +40,7 @@ from witwin.channel.runtime import SolveCapacityTransaction, make_metadata
 from witwin.channel import build_info
 from witwin.channel.propagation.enumerated import (
     sanitize_enumerated_capacity_transaction,
+    transmission_dropped_rows,
 )
 from witwin.channel.propagation.consumer import compact_evaluated_paths
 from witwin.channel.scene.compiler import (
@@ -980,6 +981,7 @@ def _metadata(
     path_native_available: bool, transmission_path_count: int = 0, scattering_path_count: int = 0,
     ad_companion_launches: int = 0, ad_tape_bytes: int = 0, forward_time_ms: float = 0.0,
     peak_memory_bytes: int = 0, scattering_info: dict[str, Any] | None = None,
+    transmission_dropped_rows: int = 0,
 ) -> dict[str, Any]:
     # diffraction AD: the real registered-companion accounting. vjp retains
     # tape and schedules its companions on the user's later backward; jvp
@@ -1063,6 +1065,8 @@ def _metadata(
         metadata["transmission"] = {
             "thin_sheet_straight_path_approximation": True,
             "group_delay": "geometric",
+            # Endpoint pairs whose straight segment crosses more walls than max_depth.
+            "dropped_rows_over_max_depth": int(transmission_dropped_rows),
         }
     if scattering_info is not None:
         # Incoherent Kirchhoff patch quadrature; the flag
@@ -1632,6 +1636,7 @@ def _pipeline_solve_base(
         forward_time_ms=forward_time_ms,
         peak_memory_bytes=peak_memory_bytes,
         scattering_info=scattering_info,
+        transmission_dropped_rows=transmission_dropped_rows(sidecars),
     )
     tx_positions, _tx_power = transmitter_tensors(scene)
     rx_positions = receiver_positions(scene, reference=tx_positions)

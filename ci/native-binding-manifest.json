@@ -816,7 +816,7 @@
       "name": "capacity_failure_state_create",
       "target": "channel_capacity_failure_state_create",
       "return_type": "torch::Tensor",
-      "doc": "Create a zeroed device-resident capacity failure state.",
+      "doc": "Create a zeroed device-resident capacity failure record.",
       "parameters": [
         ["reference", "torch::Tensor", null]
       ],
@@ -826,17 +826,17 @@
       "python_owners": ["witwin.channel.runtime.create_capacity_failure_state"]
     },
     {
-      "name": "capacity_failure_terminal_check",
-      "target": "channel_capacity_failure_terminal_check",
-      "return_type": "void",
-      "doc": "Enqueue the terminal device failure for a capacity transaction.",
+      "name": "capacity_failure_state_read",
+      "target": "channel_capacity_failure_state_read",
+      "return_type": "pybind11::tuple",
+      "doc": "Copy a capacity failure record to the host once and return (bits, dropped_rows).",
       "parameters": [
-        ["failure_state", "torch::Tensor", null]
+        ["record", "torch::Tensor", null]
       ],
       "pybind_arguments": [
-        ["failure_state", null]
+        ["record", null]
       ],
-      "python_owners": ["witwin.channel.runtime.capacity_failure_terminal_check"]
+      "python_owners": ["witwin.channel.runtime.capacity_failure_state_read"]
     },
     {
       "name": "consumer_fixed_los_gather",
@@ -1840,7 +1840,8 @@
         ["max_paths_scope", "int64_t", null],
         ["sequence_width", "int64_t", null],
         ["source_stable_ids", "std::optional<torch::Tensor>", null],
-        ["sink_stable_ids", "std::optional<torch::Tensor>", null]
+        ["sink_stable_ids", "std::optional<torch::Tensor>", null],
+        ["capacity_failure_record", "std::optional<torch::Tensor>", null]
       ],
       "pybind_arguments": [
         ["block", null],
@@ -1851,7 +1852,8 @@
         ["max_paths_scope", null],
         ["sequence_width", null],
         ["source_stable_ids", "std::nullopt"],
-        ["sink_stable_ids", "std::nullopt"]
+        ["sink_stable_ids", "std::nullopt"],
+        ["capacity_failure_record", "std::nullopt"]
       ],
       "python_owners": ["witwin.channel.kernels.topology._EnumeratedCanonicalCompactFunction"]
     },
@@ -4375,7 +4377,7 @@
         ["hit_capacity", "int64_t", null],
         ["policy", "int64_t", null],
         ["scene_diagonal", "double", null],
-        ["capacity_failure_state", "torch::Tensor", null],
+        ["capacity_failure_record", "torch::Tensor", null],
         ["failure_bit", "int64_t", null],
         ["valid", "torch::Tensor", null],
         ["num_hits", "torch::Tensor", null],
@@ -4421,7 +4423,7 @@
         ["hit_capacity", "int64_t", null],
         ["policy", "int64_t", null],
         ["scene_diagonal", "double", null],
-        ["capacity_failure_state", "torch::Tensor", null],
+        ["capacity_failure_record", "torch::Tensor", null],
         ["failure_bit", "int64_t", null]
       ],
       "pybind_arguments": [],
@@ -4441,7 +4443,7 @@
         ["hit_capacity", "int64_t", null],
         ["policy", "int64_t", null],
         ["scene_diagonal", "double", null],
-        ["capacity_failure_state", "torch::Tensor", null],
+        ["capacity_failure_record", "torch::Tensor", null],
         ["failure_bit", "int64_t", null]
       ],
       "pybind_arguments": [],
@@ -4461,7 +4463,7 @@
         ["hit_capacity", "int64_t", null],
         ["policy", "int64_t", null],
         ["scene_diagonal", "double", null],
-        ["capacity_failure_state", "torch::Tensor", null],
+        ["capacity_failure_record", "torch::Tensor", null],
         ["failure_bit", "int64_t", null],
         ["valid", "torch::Tensor", null],
         ["num_hits", "torch::Tensor", null],

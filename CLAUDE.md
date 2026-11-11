@@ -55,9 +55,13 @@ Work the GPU does not need, and host round trips the solve does not need, are bu
 - Any input that passes validation either completes or raises a Python exception, and the CUDA
   context stays usable afterwards: no device trap, device assert, illegal address or hang.
 - Validate on the host, before the first launch, everything a kernel assumes: index ranges,
-  finite coordinates, sizes, depths. Data-dependent overflow is recorded in the solve's shared
-  `CapacityFailureState`, makes outputs inert, and is reported to Python; it never traps.
-  The device-side trap in `capacity_failure_terminal_check` is a known violation being removed.
+  finite coordinates, sizes, depths. Data-dependent failure is recorded in the solve's shared
+  `CapacityFailureState`, makes outputs inert, and reaches the host once per solve (inside the
+  compact count copy, or one read at finalization), where it raises `CapacityError` naming the
+  failure bits; it never traps. A row that legitimately exceeds a requested bound (more wall
+  crossings than `max_depth`, an uncertified coupled D-D root) is dropped and counted, not failed.
+- No `trap`, `__trap`, `CUDA_KERNEL_ASSERT`, `assert` or `torch._assert_async` in a kernel path
+  that validated input can reach.
 - Test a new failure mode in a fresh subprocess, then check the CUDA context still works.
 
 ## 4. Ownership map

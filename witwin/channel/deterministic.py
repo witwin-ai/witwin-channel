@@ -57,6 +57,7 @@ from witwin.channel.kernels.topology import (
 from witwin.channel.propagation.topology import EvaluatedPathSidecars
 from witwin.channel.propagation.enumerated import (
     sanitize_enumerated_capacity_transaction,
+    transmission_dropped_rows,
 )
 from witwin.channel.components import (
     apply_exported_path_counts,
@@ -671,7 +672,7 @@ def _metadata(
     *, config: Config, native_info: dict[str, Any], path_count: int,
     component_counts: dict[str, int], launch_count: int, ad_companion_launches: int = 0,
     ad_tape_bytes: int = 0, forward_time_ms: float = 0.0, peak_memory_bytes: int = 0,
-    scattering_info: dict[str, Any] | None = None,
+    scattering_info: dict[str, Any] | None = None, transmission_dropped_rows: int = 0,
 ) -> dict[str, Any]:
     capability = {
         "rayd_native": bool(native_info["uses_rayd_native"]),
@@ -705,6 +706,8 @@ def _metadata(
         metadata_transmission = {
             "thin_sheet_straight_path_approximation": True,
             "group_delay": "geometric",
+            # Endpoint pairs whose straight segment crosses more walls than max_depth.
+            "dropped_rows_over_max_depth": int(transmission_dropped_rows),
         }
     else:
         metadata_transmission = None
@@ -898,6 +901,7 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
         forward_time_ms=forward_time_ms,
         peak_memory_bytes=peak_memory_bytes,
         scattering_info=scattering_info,
+        transmission_dropped_rows=transmission_dropped_rows(sidecars),
     )
     diagnostics = None
     if config.diagnostics:

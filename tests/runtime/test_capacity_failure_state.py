@@ -32,23 +32,25 @@ def test_capacity_failure_state_is_native_zeroed_on_current_stream() -> None:
         state = create_capacity_failure_state(reference)
     stream.synchronize()
 
-    assert state.bits.dtype == torch.int32
-    assert state.bits.shape == (1,)
-    assert state.bits.is_contiguous()
-    assert state.bits.device == reference.device
-    assert state.bits.tolist() == [0]
+    assert state.record.dtype == torch.int32
+    assert state.record.shape == (2,)
+    assert state.bits.shape == (1,) and state.bits.is_contiguous()
+    assert state.dropped_rows.shape == (1,) and state.dropped_rows.is_contiguous()
+    assert state.bits.data_ptr() == state.record.data_ptr()
+    assert state.record.device == reference.device
+    assert state.record.tolist() == [0, 0]
 
 
 def test_capacity_failure_state_rejects_bad_metadata() -> None:
     with pytest.raises(ValueError, match="CUDA tensor"):
-        CapacityFailureState(torch.zeros(1, dtype=torch.int32))
-    with pytest.raises(ValueError, match=r"shape \(1,\)"):
-        CapacityFailureState(torch.zeros(2, device="cuda", dtype=torch.int32))
+        CapacityFailureState(torch.zeros(2, dtype=torch.int32))
+    with pytest.raises(ValueError, match=r"shape \(2,\)"):
+        CapacityFailureState(torch.zeros(1, device="cuda", dtype=torch.int32))
     with pytest.raises(TypeError, match="torch.int32"):
-        CapacityFailureState(torch.zeros(1, device="cuda", dtype=torch.int64))
+        CapacityFailureState(torch.zeros(2, device="cuda", dtype=torch.int64))
 
 
-def test_capacity_intermediates_have_no_trap_or_host_synchronization() -> None:
+def test_capacity_intermediates_have_no_host_synchronization() -> None:
     root = Path(__file__).resolve().parents[2]
     sources = (
         ("capacity.cu", "Enumerated capacity sanitization"),

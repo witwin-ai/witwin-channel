@@ -4,6 +4,18 @@ All notable changes to `witwin-channel` are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- `transmission` no longer destroys the CUDA context when a straight segment
+  crosses more walls than `max_depth` (or has non-finite or huge endpoints).
+  Over-depth pairs are dropped and counted in
+  `metadata["transmission"]["dropped_rows_over_max_depth"]` (Path,
+  Deterministic, MC Basic, BDPT) and
+  `PropagationDiagnostics.transmission_dropped_rows` (consumer, new field).
+  Genuine device failures raise `CapacityError` naming the failure bits.
+- `coupled_paths=True` no longer device-asserts when the coupled D-D bisection
+  cannot certify a stationary point; that candidate is dropped and counted.
+
 ## [0.5.0] - 2026-07-30
 
 ### Changed

@@ -40,7 +40,7 @@ pybind11::tuple channel_rayd_segment_penetration_forward(
     int64_t hit_capacity,
     int64_t policy,
     double scene_diagonal,
-    torch::Tensor capacity_failure_state,
+    torch::Tensor capacity_failure_record,
     int64_t failure_bit);
 pybind11::tuple channel_rayd_segment_penetration_forward_tape(
     RayDSceneResource &scene,
@@ -51,7 +51,7 @@ pybind11::tuple channel_rayd_segment_penetration_forward_tape(
     int64_t hit_capacity,
     int64_t policy,
     double scene_diagonal,
-    torch::Tensor capacity_failure_state,
+    torch::Tensor capacity_failure_record,
     int64_t failure_bit);
 pybind11::tuple channel_rayd_segment_penetration_backward(
     RayDSceneResource &scene,
@@ -62,7 +62,7 @@ pybind11::tuple channel_rayd_segment_penetration_backward(
     int64_t hit_capacity,
     int64_t policy,
     double scene_diagonal,
-    torch::Tensor capacity_failure_state,
+    torch::Tensor capacity_failure_record,
     int64_t failure_bit,
     torch::Tensor valid,
     torch::Tensor num_hits,
@@ -99,7 +99,7 @@ pybind11::tuple channel_rayd_segment_penetration_jvp(
     int64_t hit_capacity,
     int64_t policy,
     double scene_diagonal,
-    torch::Tensor capacity_failure_state,
+    torch::Tensor capacity_failure_record,
     int64_t failure_bit,
     torch::Tensor valid,
     torch::Tensor num_hits,

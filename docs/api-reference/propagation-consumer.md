@@ -461,6 +461,7 @@ PropagationDiagnostics(
     frequency_column_count: int = 1,
     ad_companion_launches: int = 0,
     ad_tape_bytes: int = 0,
+    transmission_dropped_rows: int = 0,
 )
 ```
 
@@ -478,8 +479,13 @@ PropagationDiagnostics(
 | `frequency_column_count` | Published propagation-frequency columns. |
 | `ad_companion_launches` | Native AD companion launches. |
 | `ad_tape_bytes` | AD tape bytes retained by the request. |
+| `transmission_dropped_rows` | Source-sink pairs without a transmission path because their straight segment crosses more walls than `max_depth` (new in 0.6.0; such pairs previously failed the whole request). |
 
-These fields are auditable records, not performance guarantees.
+These fields are auditable records, not performance guarantees. When a request
+carries `transmission`, `compact_count_d2h_bytes` is 16 instead of 8: the one
+compact copy also carries the request's failure record. A failed request raises
+`witwin.channel.runtime.CapacityError` (a `RuntimeError`) naming the failure
+bits and returns no result.
 
 ## Evaluation types
 

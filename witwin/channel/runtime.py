@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import AbstractContextManager, contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dataclass_field
 import enum
 from enum import StrEnum
 from functools import lru_cache, wraps
@@ -1315,24 +1315,77 @@ class CapacityFailureBit(enum.IntFlag):
     SEGMENT_PENETRATION_FAILURE = 1 << 7
 
 
-@dataclass(frozen=True, slots=True, eq=False)
-class CapacityFailureState:
-    """One solve-owned CUDA ``int32[1]`` failure bitmask.
+_CAPACITY_FAILURE_DESCRIPTIONS = {
+    CapacityFailureBit.DIFFRACTION_STATE_OVERFLOW: "diffraction state capacity exceeded",
+    CapacityFailureBit.DIFFRACTION_PATH_OVERFLOW: "diffraction path capacity exceeded",
+    CapacityFailureBit.DIFFRACTION_PATH_CONTRACT_ERROR: "diffraction path rows violated their contract",
+    CapacityFailureBit.PAIR_CAPACITY_OVERFLOW: "endpoint-pair capacity exceeded",
+    CapacityFailureBit.PAIR_CONTRACT_ERROR: (
+        "path rows referenced an endpoint, material or layer outside the compiled scene"
+    ),
+    CapacityFailureBit.COUPLED_CANDIDATE_OVERFLOW: "coupled candidate capacity exceeded",
+    CapacityFailureBit.REFLECTION_CANDIDATE_OVERFLOW: "reflection candidate capacity exceeded",
+    CapacityFailureBit.SEGMENT_PENETRATION_FAILURE: (
+        "a transmission segment could not be traced (non-finite or out-of-range endpoint "
+        "coordinates, or inconsistent penetration rows)"
+    ),
+}
 
-    Construction is metadata-only. Intermediate native operations atomically
-    accumulate bits on the active CUDA stream and never read them on the host.
+
+def decode_capacity_failure_bits(bits: int) -> tuple[str, ...]:
+    """Return the names of the set failure bits, low bit first; unknown bits are named by value."""
+
+    if type(bits) is not int:
+        raise TypeError("bits must be an int")
+    names = [flag.name for flag in CapacityFailureBit if bits & int(flag) and flag.name]
+    unknown = bits & ~int(sum(int(flag) for flag in CapacityFailureBit))
+    if unknown:
+        names.append(f"UNKNOWN_0x{unknown & 0xFFFFFFFF:08x}")
+    return tuple(names)
+
+
+class CapacityError(RuntimeError):
+    """A solve's device work reported a failure; no partial result was returned.
+
+    ``bits`` is the raw failure bitmask and ``bit_names`` its decoded names.
     """
 
-    bits: torch.Tensor
+    def __init__(self, bits: int) -> None:
+        self.bits = int(bits)
+        self.bit_names = decode_capacity_failure_bits(self.bits)
+        details = "; ".join(
+            f"{name}: {_CAPACITY_FAILURE_DESCRIPTIONS[CapacityFailureBit[name]]}"
+            if name in CapacityFailureBit.__members__
+            else name
+            for name in self.bit_names
+        )
+        super().__init__(f"the solve failed and returned no result: {details}")
+
+
+@dataclass(frozen=True, slots=True, eq=False)
+class CapacityFailureState:
+    """One solve-owned CUDA ``int32[2]`` record: failure bitmask, then dropped-row count.
+
+    Construction is metadata-only. Native operations atomically update the
+    record on the active CUDA stream; the host reads it once per solve.
+    """
+
+    record: torch.Tensor
+    # The int32[1] failure bitmask view that native operations OR into.
+    bits: torch.Tensor = dataclass_field(init=False)
+    # The int32[1] count of rows dropped for exceeding their hit capacity.
+    dropped_rows: torch.Tensor = dataclass_field(init=False)
 
     def __post_init__(self) -> None:
-        validate_cuda_tensor("bits", self.bits, dtype=torch.int32, ndim=1)
-        if self.bits.shape != (1,):
-            raise ValueError("bits must have shape (1,)")
+        validate_cuda_tensor("record", self.record, dtype=torch.int32, ndim=1)
+        if self.record.shape != (2,):
+            raise ValueError("record must have shape (2,)")
+        object.__setattr__(self, "bits", self.record[0:1])
+        object.__setattr__(self, "dropped_rows", self.record[1:2])
 
     @property
     def device(self) -> torch.device:
-        return self.bits.device
+        return self.record.device
 
 
 def require_host_count(name: str, value: object) -> int:
@@ -1389,15 +1442,17 @@ class CapacityExecutionCounts:
 
 @dataclass(slots=True, eq=False)
 class SolveCapacityTransaction:
-    """Solve-scoped owner of one failure state and one terminal observation.
+    """Solve-scoped owner of one failure record and its single host observation.
 
-    The transaction is orchestration state only. It never reads the CUDA
-    bitmask. Solvers pass ``failure_state`` unchanged to every capacity
-    intermediate and call ``terminal_check`` once after result sanitization.
+    Solvers pass ``failure_state`` unchanged to every capacity intermediate.
+    The record reaches the host exactly once: either inside an existing compact
+    count copy (``observe``) or, where a solve has no compact boundary, through
+    one read at result finalization (``terminal_check``). A non-zero bitmask
+    raises :class:`CapacityError`, so no partial result is returned.
     """
 
     failure_state: CapacityFailureState
-    _terminal_enqueued: bool = False
+    _observed_dropped_rows: int | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.failure_state, CapacityFailureState):
@@ -1408,29 +1463,50 @@ class SolveCapacityTransaction:
         return self.failure_state.device
 
     @property
-    def terminal_enqueued(self) -> bool:
-        return self._terminal_enqueued
+    def observed(self) -> bool:
+        return self._observed_dropped_rows is not None
 
-    def terminal_check(self) -> None:
-        """Enqueue the runtime terminal observer exactly once."""
+    @property
+    def dropped_rows(self) -> int:
+        """Rows dropped for exceeding their hit capacity; available after observation."""
 
-        if self._terminal_enqueued:
-            raise RuntimeError("capacity transaction terminal check already enqueued")
-        capacity_failure_terminal_check(self.failure_state)
-        self._terminal_enqueued = True
+        if self._observed_dropped_rows is None:
+            raise RuntimeError("capacity transaction has not been observed")
+        return self._observed_dropped_rows
+
+    def observe(self, bits: int, dropped_rows: int) -> None:
+        """Record the host copy of the failure record and raise if any bit is set."""
+
+        if self._observed_dropped_rows is not None:
+            raise RuntimeError("capacity transaction already observed")
+        if type(bits) is not int or type(dropped_rows) is not int:
+            raise TypeError("observed capacity values must be ints")
+        if dropped_rows < 0:
+            raise ValueError("dropped_rows must be non-negative")
+        self._observed_dropped_rows = dropped_rows
+        if bits != 0:
+            raise CapacityError(bits)
+
+    def terminal_check(self) -> int:
+        """Observe the record once if no compact boundary did, and return the dropped rows."""
+
+        if self._observed_dropped_rows is None:
+            bits, dropped_rows = capacity_failure_state_read(self.failure_state)
+            self.observe(bits, dropped_rows)
+        return self.dropped_rows
 
 
 def create_capacity_failure_state(reference: torch.Tensor) -> CapacityFailureState:
-    """Create a native-zeroed failure state on ``reference``'s CUDA device."""
+    """Create a native-zeroed failure record on ``reference``'s CUDA device."""
 
     if not isinstance(reference, torch.Tensor):
         raise TypeError("reference must be a torch.Tensor")
     if not reference.is_cuda:
         raise ValueError("reference must be a CUDA tensor")
-    bits = cast(Any, required_symbol("capacity_failure_state_create"))(reference)
-    if not isinstance(bits, torch.Tensor):
+    record = cast(Any, required_symbol("capacity_failure_state_create"))(reference)
+    if not isinstance(record, torch.Tensor):
         raise TypeError("native capacity failure state must be a tensor")
-    return CapacityFailureState(bits=bits)
+    return CapacityFailureState(record=record)
 
 
 def create_solve_capacity_transaction(reference: torch.Tensor) -> SolveCapacityTransaction:
@@ -1451,14 +1527,15 @@ def require_capacity_failure_state(state: object, *, device: torch.device) -> Ca
     return state
 
 
-def capacity_failure_terminal_check(failure_state: CapacityFailureState) -> None:
-    """Enqueue the one terminal failure observation for a capacity solve."""
+def capacity_failure_state_read(failure_state: CapacityFailureState) -> tuple[int, int]:
+    """Copy the failure record to the host once (one copy, one stream sync)."""
 
     if not isinstance(failure_state, CapacityFailureState):
         raise TypeError("failure_state must be a CapacityFailureState")
-    cast(Any, required_symbol("capacity_failure_terminal_check"))(
-        failure_state.bits
+    bits, dropped_rows = cast(Any, required_symbol("capacity_failure_state_read"))(
+        failure_state.record
     )
+    return int(bits), int(dropped_rows)
 
 
 # --- Stable CUDA profiler annotations for architecture evidence ---------
@@ -1531,6 +1608,7 @@ __all__ = [
     "AD_STATUSES",
     "AdLaunchLedger",
     "CHANNEL_ABI_VERSION",
+    "CapacityError",
     "CapacityExecutionCounts",
     "CapacityFailureBit",
     "CapacityFailureState",
@@ -1546,12 +1624,13 @@ __all__ = [
     "SolveCapacityTransaction",
     "bdpt_zero_matrix",
     "build_info",
-    "capacity_failure_terminal_check",
+    "capacity_failure_state_read",
     "checked_product",
     "create_capacity_failure_state",
     "create_solve_capacity_transaction",
     "cuda_profile_mark",
     "cuda_profile_range",
+    "decode_capacity_failure_bits",
     "disable_functorch",
     "enforce_memory_budget",
     "estimate_monte_carlo_memory",

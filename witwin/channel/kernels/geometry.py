@@ -173,7 +173,7 @@ def _segment_penetration_request_args(
         hit_capacity,
         int(policy),
         scene_diagonal_value,
-        failure_state.bits,
+        failure_state.record,
         _SEGMENT_PENETRATION_FAILURE_BIT,
     )
 

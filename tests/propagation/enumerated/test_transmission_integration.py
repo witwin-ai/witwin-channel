@@ -23,7 +23,10 @@ from witwin.channel.scene.endpoints import SolverScene
 
 def _unchecked_failure_state() -> CapacityFailureState:
     state = object.__new__(CapacityFailureState)
-    object.__setattr__(state, "bits", torch.zeros(1, dtype=torch.int32))
+    record = torch.zeros(2, dtype=torch.int32)
+    object.__setattr__(state, "record", record)
+    object.__setattr__(state, "bits", record[0:1])
+    object.__setattr__(state, "dropped_rows", record[1:2])
     return state
 
 
@@ -380,7 +383,7 @@ def test_engine_observes_shared_failure_once_after_field_sanitization(monkeypatc
     assert evaluated is evaluated_after
     assert actual_sidecars.execution is execution_after
     assert actual_sidecars.capacity_execution is capacity_execution
-    assert actual_sidecars.capacity_transaction is None
+    assert actual_sidecars.capacity_transaction is transaction
     assert events == [
         "transaction",
         "penetration",

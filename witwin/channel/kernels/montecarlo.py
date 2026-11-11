@@ -2198,7 +2198,7 @@ class _McTransmissionWallProductAd(torch.autograd.Function):
     @staticmethod
     def forward(*inputs):
         frequency_value = inputs[17]
-        failure_state = CapacityFailureState(bits=inputs[18])
+        failure_state = CapacityFailureState(record=inputs[18])
         result = mc_transmission_wall_product(
             *inputs[:16], failure_state, frequency_hz=frequency_value
         )
@@ -2259,7 +2259,7 @@ class _McTransmissionWallProductAd(torch.autograd.Function):
         gradients = mc_transmission_wall_product_backward(
             *inputs,
             frequency_hz=ctx.frequency_value,
-            failure_state=CapacityFailureState(bits=saved[16]),
+            failure_state=CapacityFailureState(record=saved[16]),
             grad_scaled_power=grad_scaled,
             grad_transmittance=grad_transmittance,
         )
@@ -2321,7 +2321,7 @@ class _McTransmissionWallProductAd(torch.autograd.Function):
             scaled, transmittance = mc_transmission_wall_product_jvp(
                 *inputs,
                 frequency_hz=ctx.frequency_value,
-                failure_state=CapacityFailureState(bits=_ad_native_tensor(saved[16])),
+                failure_state=CapacityFailureState(record=_ad_native_tensor(saved[16])),
                 tangent_direction=tangent_direction,
                 tangent_normal=tangent_normal,
                 tangent_layer_thickness_m=continuous_tangents[0],
@@ -2365,7 +2365,7 @@ def mc_transmission_wall_product_ad(
         base_power,
         frequency,
         float(frequency_value),
-        failure_state.bits,
+        failure_state.record,
     )
     return McTransmissionWallProduct(*values)
 

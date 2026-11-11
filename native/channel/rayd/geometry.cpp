@@ -88,8 +88,17 @@ rayd::torch::SegmentPenetrationRequest segment_penetration_request(
     int64_t hit_capacity,
     int64_t policy,
     double scene_diagonal,
-    torch::Tensor capacity_failure_state,
+    torch::Tensor capacity_failure_record,
     int64_t failure_bit) {
+    TORCH_CHECK(
+        capacity_failure_record.is_cuda() &&
+            capacity_failure_record.scalar_type() == torch::kInt &&
+            capacity_failure_record.dim() == 1 &&
+            capacity_failure_record.size(0) == 2 &&
+            capacity_failure_record.is_contiguous(),
+        "capacity_failure_record must be a contiguous CUDA int32 tensor of shape (2,)");
+    // A segment with more crossings than hit_capacity is beyond the requested
+    // depth: RayD drops that row and counts it in record[1]; the batch stays valid.
     return {
         scene.resource(),
         std::move(origins),
@@ -99,8 +108,10 @@ rayd::torch::SegmentPenetrationRequest segment_penetration_request(
         hit_capacity,
         segment_penetration_policy(policy),
         scene_diagonal,
-        std::move(capacity_failure_state),
+        capacity_failure_record.narrow(0, 0, 1),
         segment_penetration_failure_bit(failure_bit),
+        rayd::torch::SegmentPenetrationOverflowPolicy::DropRow,
+        capacity_failure_record.narrow(0, 1, 1),
     };
 }
 
@@ -194,7 +205,7 @@ pybind11::tuple channel_rayd_segment_penetration_forward(
     int64_t hit_capacity,
     int64_t policy,
     double scene_diagonal,
-    torch::Tensor capacity_failure_state,
+    torch::Tensor capacity_failure_record,
     int64_t failure_bit) {
     const auto request = segment_penetration_request(
         scene,
@@ -205,7 +216,7 @@ pybind11::tuple channel_rayd_segment_penetration_forward(
         hit_capacity,
         policy,
         scene_diagonal,
-        std::move(capacity_failure_state),
+        std::move(capacity_failure_record),
         failure_bit);
     return pack_segment_penetration_result(
         rayd::torch::segment_penetration_forward(request));
@@ -220,7 +231,7 @@ pybind11::tuple channel_rayd_segment_penetration_forward_tape(
     int64_t hit_capacity,
     int64_t policy,
     double scene_diagonal,
-    torch::Tensor capacity_failure_state,
+    torch::Tensor capacity_failure_record,
     int64_t failure_bit) {
     const auto request = segment_penetration_request(
         scene,
@@ -231,7 +242,7 @@ pybind11::tuple channel_rayd_segment_penetration_forward_tape(
         hit_capacity,
         policy,
         scene_diagonal,
-        std::move(capacity_failure_state),
+        std::move(capacity_failure_record),
         failure_bit);
     return pack_segment_penetration_tape(
         rayd::torch::segment_penetration_forward_tape(request));
@@ -246,7 +257,7 @@ pybind11::tuple channel_rayd_segment_penetration_backward(
     int64_t hit_capacity,
     int64_t policy,
     double scene_diagonal,
-    torch::Tensor capacity_failure_state,
+    torch::Tensor capacity_failure_record,
     int64_t failure_bit,
     torch::Tensor valid,
     torch::Tensor num_hits,
@@ -283,7 +294,7 @@ pybind11::tuple channel_rayd_segment_penetration_backward(
         hit_capacity,
         policy,
         scene_diagonal,
-        std::move(capacity_failure_state),
+        std::move(capacity_failure_record),
         failure_bit);
     const auto tape = segment_penetration_tape(
         std::move(valid),
@@ -332,7 +343,7 @@ pybind11::tuple channel_rayd_segment_penetration_jvp(
     int64_t hit_capacity,
     int64_t policy,
     double scene_diagonal,
-    torch::Tensor capacity_failure_state,
+    torch::Tensor capacity_failure_record,
     int64_t failure_bit,
     torch::Tensor valid,
     torch::Tensor num_hits,
@@ -363,7 +374,7 @@ pybind11::tuple channel_rayd_segment_penetration_jvp(
         hit_capacity,
         policy,
         scene_diagonal,
-        std::move(capacity_failure_state),
+        std::move(capacity_failure_record),
         failure_bit);
     const auto tape = segment_penetration_tape(
         std::move(valid),

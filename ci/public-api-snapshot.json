@@ -263,7 +263,7 @@
           "name": "PropagationDiagnostics",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.PropagationDiagnostics",
-          "contract_sha256": "444c08cbf0100b3f2443af842b09f83ac9ca693f6b1a857b8dedd1357622d7ec"
+          "contract_sha256": "926559f7d289792ccf8fdf2d99f8b07b17be3ac6e170c3a77bbe5c774c68e9a0"
         },
         {
           "name": "PropagationEvaluation",

@@ -454,6 +454,28 @@ __global__ void compact_control_record_kernel(
     }
 }
 
+// With a solve capacity record the control record also carries the solve's
+// failure bitmask (low 32 bits of element 1) and dropped-row count (high 32
+// bits), so the one count copy is also the solve's one failure observation.
+__global__ void compact_capacity_control_record_kernel(
+    const int* __restrict__ failure_state,
+    const int* __restrict__ selected_count,
+    const int* __restrict__ capacity_record,
+    int64_t candidate_count,
+    int64_t* __restrict__ control_record) {
+    if (blockIdx.x == 0 && threadIdx.x == 0) {
+        const int count = selected_count[0];
+        control_record[0] =
+            failure_state[0] == 0 && count >= 0 &&
+                    static_cast<int64_t>(count) <= candidate_count
+                ? static_cast<int64_t>(count)
+                : -1;
+        control_record[1] =
+            static_cast<int64_t>(static_cast<uint32_t>(capacity_record[0])) |
+            (static_cast<int64_t>(static_cast<uint32_t>(capacity_record[1])) << 32);
+    }
+}
+
 __global__ void exact_pair_metadata_kernel(
     const int64_t* __restrict__ selected_row_index,
     const int* __restrict__ tx_id,
@@ -896,7 +918,8 @@ pybind11::dict channel_enumerated_canonical_compact(
     int64_t max_paths_scope,
     int64_t sequence_width,
     std::optional<at::Tensor> source_stable_ids,
-    std::optional<at::Tensor> sink_stable_ids) {
+    std::optional<at::Tensor> sink_stable_ids,
+    std::optional<at::Tensor> capacity_failure_record) {
     auto valid = require_block_tensor(block, "valid");
     auto tx_id = require_block_tensor(block, "tx_id");
     auto rx_id = require_block_tensor(block, "rx_id");
@@ -933,23 +956,55 @@ pybind11::dict channel_enumerated_canonical_compact(
         pybind11::cast<at::Tensor>(capacity["selected_row_index"]);
     auto selected_count = pybind11::cast<at::Tensor>(capacity["num_selected"]);
     const int64_t candidate_count = valid.size(0);
+    const bool has_capacity_record = capacity_failure_record.has_value();
+    if (has_capacity_record) {
+        check_tensor(*capacity_failure_record, "capacity_failure_record", at::kInt, 1);
+        TORCH_CHECK(
+            capacity_failure_record->size(0) == 2,
+            "capacity_failure_record must have shape (2,)");
+        TORCH_CHECK(
+            capacity_failure_record->get_device() == device,
+            "capacity_failure_record must share the path device");
+    }
     int64_t path_count = 0;
-    if (candidate_count > 0) {
+    int64_t capacity_failure_bits = 0;
+    int64_t capacity_dropped_rows = 0;
+    const bool observe = candidate_count > 0 || has_capacity_record;
+    if (observe) {
         auto control_record = at::empty(
-            {1}, valid.options().dtype(at::kLong));
-        compact_control_record_kernel<<<1, 1, 0, stream>>>(
-            failure_state.data_ptr<int>(),
-            selected_count.data_ptr<int>(),
-            candidate_count,
-            control_record.data_ptr<int64_t>());
+            {has_capacity_record ? 2 : 1}, valid.options().dtype(at::kLong));
+        int64_t host_record[2] = {0, 0};
+        if (has_capacity_record) {
+            compact_capacity_control_record_kernel<<<1, 1, 0, stream>>>(
+                failure_state.data_ptr<int>(),
+                selected_count.data_ptr<int>(),
+                capacity_failure_record->data_ptr<int>(),
+                candidate_count,
+                control_record.data_ptr<int64_t>());
+        } else {
+            compact_control_record_kernel<<<1, 1, 0, stream>>>(
+                failure_state.data_ptr<int>(),
+                selected_count.data_ptr<int>(),
+                candidate_count,
+                control_record.data_ptr<int64_t>());
+        }
         C10_CUDA_KERNEL_LAUNCH_CHECK();
         C10_CUDA_CHECK(cudaMemcpyAsync(
-            &path_count,
+            host_record,
             control_record.data_ptr<int64_t>(),
-            sizeof(int64_t),
+            static_cast<size_t>(control_record.numel()) * sizeof(int64_t),
             cudaMemcpyDeviceToHost,
             stream));
         C10_CUDA_CHECK(cudaStreamSynchronize(stream));
+        path_count = host_record[0];
+        capacity_failure_bits =
+            static_cast<int64_t>(static_cast<uint32_t>(host_record[1] & 0xffffffff));
+        capacity_dropped_rows = static_cast<int64_t>(
+            static_cast<uint32_t>((static_cast<uint64_t>(host_record[1]) >> 32) & 0xffffffffu));
+        // A failed solve returns no rows; the caller raises from the observed bits.
+        if (capacity_failure_bits != 0) {
+            path_count = 0;
+        }
         TORCH_CHECK(
             path_count >= 0,
             "canonical compact selection failed its native contract");
@@ -985,11 +1040,14 @@ pybind11::dict channel_enumerated_canonical_compact(
     gathered["sink_id"] = metadata["sink_id"];
     gathered["path_count"] = path_count;
     gathered["count_d2h_copies"] =
-        candidate_count > 0 ? static_cast<int64_t>(1) : static_cast<int64_t>(0);
-    gathered["count_d2h_bytes"] =
-        candidate_count > 0 ? static_cast<int64_t>(8) : static_cast<int64_t>(0);
+        observe ? static_cast<int64_t>(1) : static_cast<int64_t>(0);
+    gathered["count_d2h_bytes"] = !observe
+        ? static_cast<int64_t>(0)
+        : (has_capacity_record ? static_cast<int64_t>(16) : static_cast<int64_t>(8));
     gathered["count_synchronizations"] =
-        candidate_count > 0 ? static_cast<int64_t>(1) : static_cast<int64_t>(0);
+        observe ? static_cast<int64_t>(1) : static_cast<int64_t>(0);
+    gathered["capacity_failure_bits"] = capacity_failure_bits;
+    gathered["capacity_dropped_rows"] = capacity_dropped_rows;
     return gathered;
 }
 
@@ -1155,16 +1213,13 @@ __global__ void transmission_topology_preflight_kernel(
     for (int64_t row = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          row < pair_count;
          row += stride) {
-        if (overflow[row]) {
-            atomicOr(
-                failure_state,
-                channel::capacity::kSegmentPenetrationFailure);
-            continue;
-        }
+        // A row with more crossings than the requested depth was dropped and
+        // counted by RayD: it must be inert and carries no transmission path.
         const int hits = num_hits[row];
         bool contract_ok =
             hits >= 0 && static_cast<int64_t>(hits) <= hit_capacity &&
-            (reached_target[row] || hits == 0);
+            (reached_target[row] || hits == 0) &&
+            !(overflow[row] && (hits != 0 || reached_target[row]));
         for (int64_t slot = 0; slot < hit_capacity; ++slot) {
             const bool expected_valid = slot < hits;
             const int64_t index = row * hit_capacity + slot;

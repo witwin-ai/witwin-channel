@@ -19,21 +19,56 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_solve_capacity_transaction_owns_state_and_one_terminal(monkeypatch) -> None:
+def test_solve_capacity_transaction_reads_the_record_once(monkeypatch) -> None:
     reference = torch.empty(1, device="cuda")
     transaction = create_solve_capacity_transaction(reference)
     observed: list[object] = []
+
+    def read(state):
+        observed.append(state)
+        return 0, 3
+
+    monkeypatch.setattr(runtime, "capacity_failure_state_read", read)
+
+    assert transaction.observed is False
+    assert transaction.terminal_check() == 3
+    assert transaction.terminal_check() == 3
+    assert observed == [transaction.failure_state]
+    assert transaction.observed is True
+    assert transaction.dropped_rows == 3
+
+
+def test_solve_capacity_transaction_compact_observation_skips_the_read(monkeypatch) -> None:
+    transaction = create_solve_capacity_transaction(torch.empty(1, device="cuda"))
     monkeypatch.setattr(
         runtime,
-        "capacity_failure_terminal_check",
-        lambda state: observed.append(state),
+        "capacity_failure_state_read",
+        lambda _state: pytest.fail("an observed transaction read the record again"),
     )
 
-    transaction.terminal_check()
-    assert observed == [transaction.failure_state]
-    assert transaction.terminal_enqueued is True
-    with pytest.raises(RuntimeError, match="already enqueued"):
-        transaction.terminal_check()
+    transaction.observe(0, 5)
+    assert transaction.terminal_check() == 5
+    with pytest.raises(RuntimeError, match="already observed"):
+        transaction.observe(0, 5)
+
+
+def test_solve_capacity_transaction_raises_named_capacity_error() -> None:
+    transaction = create_solve_capacity_transaction(torch.empty(1, device="cuda"))
+    bits = int(
+        runtime.CapacityFailureBit.SEGMENT_PENETRATION_FAILURE
+        | runtime.CapacityFailureBit.PAIR_CONTRACT_ERROR
+    )
+    with pytest.raises(runtime.CapacityError) as caught:
+        transaction.observe(bits, 0)
+    assert caught.value.bits == bits
+    assert caught.value.bit_names == ("PAIR_CONTRACT_ERROR", "SEGMENT_PENETRATION_FAILURE")
+    assert "SEGMENT_PENETRATION_FAILURE" in str(caught.value)
+    assert "returned no result" in str(caught.value)
+
+
+def test_unknown_failure_bits_are_named_by_value() -> None:
+    assert runtime.decode_capacity_failure_bits(1 << 12) == ("UNKNOWN_0x00001000",)
+    assert runtime.decode_capacity_failure_bits(0) == ()
 
 
 def test_capacity_execution_counts_keep_actual_counts_on_device() -> None:

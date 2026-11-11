@@ -124,8 +124,8 @@ used by focused contract tests, but are not compatibility promises. The parent
   the Channel wall-product primal/VJP/JVP family. Penetration and the
   estimator share one `CapacityFailureState`; failed work is sanitized before
   the Basic-owned native five-component-map primal/VJP/JVP sanitizer family
-  runs before finalization, and the solve enqueues the unique terminal observer
-  once after final result assembly.
+  runs before finalization, and the solve reads the failure record once
+  before metadata assembly (raising `CapacityError` on a set bit).
 - The former Python depth march, host Boolean breaks, active-row compaction,
   Torch restart/normalization, incident TE/TM, and wall-product expressions are
   not production backends or compatibility routes. Scattering retains only its
