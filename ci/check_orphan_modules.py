@@ -27,6 +27,7 @@ ENTRY_POINTS: dict[str, str] = {
     f"{PACKAGE}.deterministic": "the Deterministic solver entry point",
     f"{PACKAGE}.montecarlo.basic": "the Monte Carlo Basic solver entry point",
     f"{PACKAGE}.montecarlo.bdpt": "the Monte Carlo BDPT solver entry point",
+    f"{PACKAGE}.__main__": "the `python -m witwin.channel doctor` command",
 }
 
 
