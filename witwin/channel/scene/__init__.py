@@ -10,10 +10,14 @@ from typing import TYPE_CHECKING
 from witwin.core import Scene, SceneSnapshot
 
 if TYPE_CHECKING:
+    import torch
+
     from .compiler import CompiledScene
 
 
-def compile(scene_or_snapshot: Scene | SceneSnapshot, *, reference_frequency_hz) -> "CompiledScene":
+def compile(
+    scene_or_snapshot: Scene | SceneSnapshot, *, reference_frequency_hz: float | torch.Tensor,
+) -> "CompiledScene":
     from .compiler import compile as compile_scene
 
     return compile_scene(
@@ -28,7 +32,7 @@ def clear_compile_cache() -> None:
     clear()
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> type[CompiledScene]:
     if name == "CompiledScene":
         from .compiler import CompiledScene
 

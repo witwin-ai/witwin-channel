@@ -12,7 +12,7 @@ import math
 import os
 from pathlib import Path
 import re
-from typing import TYPE_CHECKING, Callable, Sequence
+from typing import TYPE_CHECKING, Callable, Sequence, cast
 
 import numpy as np
 import torch
@@ -30,7 +30,7 @@ from witwin.channel.runtime import (
 )
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.compiler import AssignmentStore, MaterialStore
+    from witwin.channel.scene.compiler import AssignmentStore, MaterialStore, _RuntimeStructure
 
 __all__ = [
     "DEFAULT_EDGE_POLICY",
@@ -162,7 +162,7 @@ class RayDSceneResource:
     def edge_records(self) -> RayDEdgeRecords:
         cached = self.runtime_cache.get("edge_records")
         if cached is not None:
-            return cached  # type: ignore[return-value]
+            return cast(RayDEdgeRecords, cached)
         try:
             values = rayd_scene_edge_records(self.require_resource())
         except RuntimeError as error:
@@ -255,7 +255,7 @@ def _allocated_device_bytes() -> int:
 
 
 def build_scene_from_structures(
-    structures: tuple[object, ...], *, dynamic: Sequence[bool] = (),
+    structures: tuple[_RuntimeStructure, ...], *, dynamic: Sequence[bool] = (),
 ) -> RayDSceneResource:
     """Build a typed RayD native scene from Channel structures.
 
@@ -437,7 +437,7 @@ def _lexicographic_min_first(
 
 
 def _duplicate_boundary_pairs(
-    records: object, candidate: torch.Tensor,
+    records: RayDEdgeRecords, candidate: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Group boundary edges by quantized endpoints.
 
@@ -471,7 +471,8 @@ def _duplicate_boundary_pairs(
 
 
 def refine_edge_geometry(
-    rayd: object, geometry: tuple[torch.Tensor, ...], *, policy: EdgePolicy | None = None,
+    rayd: RayDSceneResource, geometry: tuple[torch.Tensor, ...], *,
+    policy: EdgePolicy | None = None,
 ) -> tuple[torch.Tensor, ...]:
     """Return the geometry tuple with policy filtering and shared-edge merges."""
 
@@ -480,7 +481,7 @@ def refine_edge_geometry(
         return geometry
     records = rayd.edge_records()
     if policy is None:
-        policy = rayd.runtime_cache.get("edge_policy")
+        policy = cast("EdgePolicy | None", rayd.runtime_cache.get("edge_policy"))
     if not isinstance(policy, EdgePolicy):
         policy = DEFAULT_EDGE_POLICY
 
@@ -535,7 +536,7 @@ _CONTACT_PROBE_M = 1.0e-3
 
 
 def _drop_contact_edges(
-    rayd: object, selected: torch.Tensor, boundary: torch.Tensor, edge_pos: torch.Tensor,
+    rayd: RayDSceneResource, selected: torch.Tensor, boundary: torch.Tensor, edge_pos: torch.Tensor,
     edge_dir: torch.Tensor, n0: torch.Tensor,
 ) -> None:
     """Deselect half-plane edges that rest on another surface, in place.
@@ -565,7 +566,7 @@ def _drop_contact_edges(
 
 
 def diffraction_edge_vertex_ids(
-    rayd: object, edge_dir: torch.Tensor,
+    rayd: RayDSceneResource, edge_dir: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Vertex ids of each diffraction edge's first and last end point along ``edge_dir``.
 
@@ -575,7 +576,7 @@ def diffraction_edge_vertex_ids(
 
     cached = rayd.runtime_cache.get(DIFFRACTION_EDGE_VERTEX_IDS)
     if cached is not None:
-        return cached  # type: ignore[return-value]
+        return cast("tuple[torch.Tensor, torch.Tensor]", cached)
     records = rayd.edge_records()
     along = ((records.vertices[records.edge_v1.long()] - records.vertices[records.edge_v0.long()])
              * edge_dir).sum(dim=1) >= 0.0
@@ -593,8 +594,9 @@ def _canonical_sign(direction: torch.Tensor) -> torch.Tensor:
 
 
 def _merge_collinear_wedges(
-    records: object, selected: torch.Tensor, edge_pos: torch.Tensor, edge_dir: torch.Tensor,
-    half_length: torch.Tensor, n0: torch.Tensor, n1: torch.Tensor, shape1: torch.Tensor,
+    records: RayDEdgeRecords, selected: torch.Tensor, edge_pos: torch.Tensor,
+    edge_dir: torch.Tensor, half_length: torch.Tensor, n0: torch.Tensor, n1: torch.Tensor,
+    shape1: torch.Tensor,
 ) -> tuple[torch.Tensor, ...]:
     """Merge selected edge segments that form one physical wedge, updating ``selected`` in place.
 
@@ -1299,7 +1301,10 @@ MAX_RMS_SLOPE = 0.5
 MAX_K0_RMS_HEIGHT = 32.0
 
 
-def _kirchhoff_diffuse_lobe_series(q_par_x, q_par_y, q_n, sigma_h, lx, ly, n_terms: int = 64):
+def _kirchhoff_diffuse_lobe_series(
+    q_par_x: np.ndarray | float, q_par_y: np.ndarray | float, q_n: np.ndarray | float,
+    sigma_h: float, lx: float, ly: float, n_terms: int = 64,
+) -> np.ndarray | float:
     """Production Beckmann series for the Gaussian-correlation lobe."""
 
     qx, qy, qn = np.broadcast_arrays(
@@ -1601,7 +1606,8 @@ def _cached_kirchhoff_arrays(
 
 
 def build_kirchhoff_table(
-    roughness, layers: Sequence[tuple], frequency_hz: float, device: torch.device | str = "cuda",
+    roughness: SurfaceRoughness, layers: Sequence[tuple], frequency_hz: float,
+    device: torch.device | str = "cuda",
 ) -> KirchhoffTable:
     """Precompute the Kirchhoff ensemble BSDF table for one material.
 
