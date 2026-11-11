@@ -746,6 +746,98 @@ class ReflectionBlocksResult:
     wedge_events: tuple[WedgeEventBatch, ...]
 
 
+def _block_map_shape(block: ReceiverBlock) -> tuple[int, int]:
+    return component_grid_shape(block.grid) if block.grid is not None else (1, block.count)
+
+
+def _bounded_reflection_trace(
+    handle: object, ray_o: torch.Tensor, ray_d: torch.Tensor, active: torch.Tensor, *,
+    params: tuple[dict[str, object], ...], face_normals: torch.Tensor, material_valid: torch.Tensor,
+    wavelength: float, max_depth: int,
+) -> tuple[tuple[torch.Tensor, ...], tuple[torch.Tensor, torch.Tensor, torch.Tensor]]:
+    """``max_depth`` closest hits plus the final segment traced up to its farthest deposit."""
+
+    trace = geometry_kernels.rayd_trace_reflections_forward(
+        handle, ray_o, ray_d, ray_o.new_empty((0,)), active, int(max_depth)
+    )
+    segments = None
+    for block_params in params:
+        segments = montecarlo_kernels.mc_reflection_final_segment(
+            ray_o,
+            ray_d,
+            trace,
+            face_normals,
+            material_valid,
+            receiver=block_params,
+            wavelength=float(wavelength),
+            segments=segments,
+        )
+    assert segments is not None
+    final = geometry_kernels.rayd_trace_reflections_forward(
+        handle, segments.origin, segments.direction, segments.tmax, segments.active, 1
+    )
+    return trace, montecarlo_kernels.mc_reflection_append_final(trace, final, segments)
+
+
+def _first_hit_wedges(
+    tx: torch.Tensor, ray_o: torch.Tensor, ray_d: torch.Tensor, trace: tuple[torch.Tensor, ...],
+    face_normals: torch.Tensor,
+) -> WedgeEventBatch:
+    """Winner-event extraction on detached trace outputs (frozen discovery bookkeeping)."""
+
+    valid_indices = torch.nonzero(trace[0][:, 0], as_tuple=False).flatten()
+    prim_id = trace[2][:, 0].index_select(0, valid_indices)
+    ray_dir = ray_d.index_select(0, valid_indices)
+    hit_p = (
+        ray_o.index_select(0, valid_indices)
+        + trace[1][:, 0].index_select(0, valid_indices)[:, None] * ray_dir
+    )
+    hit_n = face_normals.detach().index_select(0, prim_id.to(dtype=torch.int64))
+    return WedgeEventBatch(
+        tx_pos=tx,
+        event_count=None,
+        ray_dir=ray_dir,
+        prim_id=prim_id,
+        hit_p=hit_p,
+        hit_n=hit_n,
+        hit_geo_n=hit_n,
+        bounce_depth=torch.zeros_like(prim_id),
+    )
+
+
+def _accumulate_reflection_block(
+    scene: SolverScene, block_params: dict[str, object], *, ray_o: torch.Tensor,
+    ray_d: torch.Tensor, full_trace: tuple[torch.Tensor, ...], face_normals: torch.Tensor,
+    material_tensors: MaterialTensors, tx_live: torch.Tensor, tx_pol: torch.Tensor,
+    solid_angle: torch.Tensor, max_depth: int, wavelength: float, ad: bool, ledger: object | None,
+) -> torch.Tensor:
+    eta_r, sigma, _mu_r, gain, valid, thickness = material_tensors
+    deposit = {key: value for key, value in block_params.items() if key.startswith("grid_")}
+    common = {
+        "tx_pol": tx_pol,
+        "contribution_depth": int(max_depth),
+        "wavelength": float(wavelength),
+        "solid_angle_per_ray": solid_angle,
+        "points": block_params["points"],
+        "point_radius": float(block_params["point_radius"]),  # type: ignore[arg-type]
+        **deposit,
+    }
+    if not ad:
+        return mc_slab_reflection_accumulate(  # type: ignore[arg-type]
+            ray_o, ray_d, *full_trace, face_normals, eta_r, sigma, gain, valid, thickness,
+            **common,
+        )
+    # Same accumulate kernel behind the autograd Function; the caller scales by the tx power.
+    if ledger is not None:
+        ledger.add(  # type: ignore[attr-defined]
+            ray_o, ray_d, *full_trace, face_normals, eta_r, sigma, gain, valid, thickness
+        )
+    return mc_slab_reflection_accumulate_ad(  # type: ignore[arg-type]
+        tx_live, eta_r, sigma, gain, thickness, scene.frequency, ray_o, ray_d, *full_trace,
+        face_normals, valid, **common,
+    )
+
+
 def reflection_block_outputs(
     scene: SolverScene, rayd: RayDSceneResource, blocks: tuple[ReceiverBlock, ...], *, samples: int,
     max_depth: int, seed: int, receiver_radius_m: float | None, device: torch.device,
@@ -764,13 +856,8 @@ def reflection_block_outputs(
     tx_count = int(tx_pos.shape[0])
     if not scene.structures or tx_count == 0:
         empty = tuple(
-            mc_component_map_buffer(
-                tx_pos,
-                tx_count=tx_count,
-                dim0=component_grid_shape(block.grid)[0] if block.grid is not None else 1,
-                dim1=component_grid_shape(block.grid)[1] if block.grid is not None else block.count,
-            )
-            for block in blocks
+            mc_component_map_buffer(tx_pos, tx_count=tx_count, dim0=shape[0], dim1=shape[1])
+            for shape in map(_block_map_shape, blocks)
         )
         return ReflectionBlocksResult(outputs=empty, wedge_events=())
     if not rayd.available:
@@ -781,14 +868,6 @@ def reflection_block_outputs(
     # transverse projection (short-dipole sin(theta) pattern).
     tx_pol = transmitter_polarizations_as_stored(scene, device=device)
     wavelength = _LIGHT_SPEED_M_PER_S / _frequency_scalar(scene)
-    (
-        material_eta_r,
-        material_sigma,
-        _material_mu_r,
-        material_gain,
-        material_valid,
-        material_thickness,
-    ) = material_tensors
     face_normals = rayd.edge_records().face_normals
     params = tuple(
         _block_deposit_params(scene, block, reference=tx_pos, receiver_radius_m=receiver_radius_m)
@@ -799,135 +878,45 @@ def reflection_block_outputs(
         tx_pos, bounds=_scene_bounds(rayd), sample_count=samples, seed=int(seed)
     )
     per_block: list[list[torch.Tensor]] = [[] for _ in blocks]
-    unbounded = tx_pos.new_empty((0,))
     wedge_batches: list[WedgeEventBatch] = []
     for tx_index in range(tx_count):
         rows = slice(tx_index * samples, (tx_index + 1) * samples)
-        ray_o = rays["ray_o"][rows]
-        ray_d = rays["ray_d"][rows]
-        solid_angle = rays["solid_angle"][tx_index : tx_index + 1]
-        trace = geometry_kernels.rayd_trace_reflections_forward(
-            handle, ray_o, ray_d, unbounded, rays["active"][rows], int(max_depth)
+        ray_o, ray_d = rays["ray_o"][rows], rays["ray_d"][rows]
+        trace, full_trace = _bounded_reflection_trace(
+            handle, ray_o, ray_d, rays["active"][rows], params=params,
+            face_normals=face_normals, material_valid=material_tensors[4],
+            wavelength=wavelength, max_depth=max_depth,
         )
-        segments = None
-        for block_params in params:
-            segments = montecarlo_kernels.mc_reflection_final_segment(
-                ray_o,
-                ray_d,
-                trace,
-                face_normals,
-                material_valid,
-                receiver=block_params,
-                wavelength=float(wavelength),
-                segments=segments,
-            )
-        assert segments is not None
-        final = geometry_kernels.rayd_trace_reflections_forward(
-            handle, segments.origin, segments.direction, segments.tmax, segments.active, 1
-        )
-        full_trace = montecarlo_kernels.mc_reflection_append_final(trace, final, segments)
         for block_index, block_params in enumerate(params):
-            deposit = {
-                key: value for key, value in block_params.items() if key.startswith("grid_")
-            }
-            if ad:
-                # Same accumulate kernel behind the autograd Function; the tx_power scale
-                # and the per-tx stack below replicate the store arithmetic value for value.
-                if ledger is not None:
-                    ledger.add(  # type: ignore[attr-defined]
-                        ray_o,
-                        ray_d,
-                        *full_trace,
-                        face_normals,
-                        material_eta_r,
-                        material_sigma,
-                        material_gain,
-                        material_valid,
-                        material_thickness,
-                    )
-                output = mc_slab_reflection_accumulate_ad(
-                    tx_live,
-                    material_eta_r,
-                    material_sigma,
-                    material_gain,
-                    material_thickness,
-                    scene.frequency,
-                    ray_o,
-                    ray_d,
-                    full_trace[0],
-                    full_trace[1],
-                    full_trace[2],
-                    face_normals,
-                    material_valid,
-                    tx_pol=tx_pol[tx_index],
-                    contribution_depth=int(max_depth),
-                    wavelength=float(wavelength),
-                    solid_angle_per_ray=solid_angle,
-                    points=block_params["points"],  # type: ignore[arg-type]
-                    point_radius=float(block_params["point_radius"]),  # type: ignore[arg-type]
-                    **deposit,  # type: ignore[arg-type]
-                )
-                per_block[block_index].append(output * tx_power[tx_index])
-            else:
-                output = mc_slab_reflection_accumulate(
-                    ray_o,
-                    ray_d,
-                    full_trace[0],
-                    full_trace[1],
-                    full_trace[2],
-                    face_normals,
-                    material_eta_r,
-                    material_sigma,
-                    material_gain,
-                    material_valid,
-                    material_thickness,
-                    tx_pol=tx_pol[tx_index],
-                    contribution_depth=int(max_depth),
-                    wavelength=float(wavelength),
-                    solid_angle_per_ray=solid_angle,
-                    points=block_params["points"],  # type: ignore[arg-type]
-                    point_radius=float(block_params["point_radius"]),  # type: ignore[arg-type]
-                    **deposit,  # type: ignore[arg-type]
-                )
-                per_block[block_index].append(output)
+            output = _accumulate_reflection_block(
+                scene, block_params, ray_o=ray_o, ray_d=ray_d, full_trace=full_trace,
+                face_normals=face_normals, material_tensors=material_tensors, tx_live=tx_live,
+                tx_pol=tx_pol[tx_index], solid_angle=rays["solid_angle"][tx_index : tx_index + 1],
+                max_depth=max_depth, wavelength=wavelength, ad=ad, ledger=ledger,
+            )
+            per_block[block_index].append(output * tx_power[tx_index] if ad else output)
         if collect_wedges:
-            # Winner-event extraction on detached trace outputs (frozen
-            # discovery bookkeeping in both primal and AD modes).
-            valid_indices = torch.nonzero(trace[0][:, 0], as_tuple=False).flatten()
-            prim_id = trace[2][:, 0].index_select(0, valid_indices)
-            ray_dir = ray_d.index_select(0, valid_indices)
-            hit_p = (
-                ray_o.index_select(0, valid_indices)
-                + trace[1][:, 0].index_select(0, valid_indices)[:, None] * ray_dir
-            )
-            hit_n = face_normals.detach().index_select(0, prim_id.to(dtype=torch.int64))
             wedge_batches.append(
-                WedgeEventBatch(
-                    tx_pos=tx_pos[tx_index],
-                    event_count=None,
-                    ray_dir=ray_dir,
-                    prim_id=prim_id,
-                    hit_p=hit_p,
-                    hit_n=hit_n,
-                    hit_geo_n=hit_n,
-                    bounce_depth=torch.zeros_like(prim_id),
-                )
+                _first_hit_wedges(tx_pos[tx_index], ray_o, ray_d, trace, face_normals)
             )
-    outputs: list[torch.Tensor] = []
-    for block_index, block in enumerate(blocks):
-        if ad:
-            outputs.append(torch.stack(per_block[block_index], dim=0))
-            continue
-        dim0, dim1 = (
-            component_grid_shape(block.grid) if block.grid is not None else (1, block.count)
-        )
-        maps = mc_component_map_buffer(tx_pos, tx_count=tx_count, dim0=dim0, dim1=dim1)
-        for tx_index, output in enumerate(per_block[block_index]):
-            mc_store_scaled_component_map(
-                maps, output, tx_power, tx_index=tx_index, scale_index=tx_index
-            )
-        outputs.append(maps)
-    return ReflectionBlocksResult(outputs=tuple(outputs), wedge_events=tuple(wedge_batches))
+    outputs = tuple(
+        _stack_block_outputs(per_block[index], block, tx_pos, tx_power, ad=ad)
+        for index, block in enumerate(blocks)
+    )
+    return ReflectionBlocksResult(outputs=outputs, wedge_events=tuple(wedge_batches))
+
+
+def _stack_block_outputs(
+    outputs: list[torch.Tensor], block: ReceiverBlock, tx_pos: torch.Tensor, tx_power: torch.Tensor,
+    *, ad: bool,
+) -> torch.Tensor:
+    if ad:
+        return torch.stack(outputs, dim=0)
+    dim0, dim1 = _block_map_shape(block)
+    maps = mc_component_map_buffer(tx_pos, tx_count=int(tx_pos.shape[0]), dim0=dim0, dim1=dim1)
+    for tx_index, output in enumerate(outputs):
+        mc_store_scaled_component_map(maps, output, tx_power, tx_index=tx_index, scale_index=tx_index)
+    return maps
 
 
 def reflection_component_maps_with_wedges(
@@ -1568,6 +1557,81 @@ def _layout_maps(columns: list[torch.Tensor]) -> torch.Tensor:
     return matrix.reshape(matrix.shape[0], 1, matrix.shape[1])
 
 
+def _layout_specular_maps(  # type: ignore[no-untyped-def]
+    scene: SolverScene, config: Config, blocks: tuple[ReceiverBlock, ...], *, rayd,
+    device: torch.device, ad: bool, ledger: AdLaunchLedger, available: bool,
+) -> dict[str, torch.Tensor]:
+    """Reflection and diffraction ``[T, 1, R]`` maps; absent when nothing is traced."""
+
+    wants_diffraction = "diffraction" in config.components and available
+    if "reflection" not in config.components and not wants_diffraction:
+        return {}
+    material_tensors = _face_material_tensors(scene, device=device, ad=ad)
+    # A diffraction-only AD solve still traces for wedge discovery, but its
+    # discarded reflection deposits stay primal so no companions are registered.
+    reflection_ad = ad and "reflection" in config.components
+    reflection = reflection_block_outputs(
+        scene,
+        rayd,
+        blocks,
+        samples=config.samples,
+        max_depth=config.max_depth,
+        seed=config.seed,
+        receiver_radius_m=config.receiver_radius_m,
+        device=device,
+        material_tensors=material_tensors,
+        collect_wedges=wants_diffraction,
+        ad=reflection_ad,
+        ledger=ledger if reflection_ad else None,
+    )
+    maps: dict[str, torch.Tensor] = {}
+    if "reflection" in config.components:
+        maps["reflection"] = _layout_maps(
+            [_matrix_columns(out, block) for out, block in zip(reflection.outputs, blocks)]
+        )
+    if wants_diffraction:
+        columns = []
+        for block in blocks:
+            assert block.grid is not None
+            grid_map = diffraction_component_map(
+                scene,
+                rayd,
+                block.grid,
+                samples=config.samples,
+                seed=config.seed,
+                device=device,
+                material_tensors=material_tensors,
+                wedge_events=reflection.wedge_events,
+                ad=ad,
+                ledger=ledger if ad else None,
+            )
+            columns.append(_matrix_columns(grid_map, block))
+        maps["diffraction"] = _layout_maps(columns)
+    return maps
+
+
+def _layout_scattering_map(  # type: ignore[no-untyped-def]
+    scene: SolverScene, config: Config, *, rayd, device: torch.device, ad: bool,
+    ledger: AdLaunchLedger,
+) -> tuple[torch.Tensor, dict[str, int]]:
+    if not rayd.available:
+        raise RuntimeError("scattering requires RayD native scene capability")
+    tx_pos, tx_power = transmitter_positions(scene, device=device)
+    matrix, stats = scattering_map_matrix(
+        scene,
+        rayd,
+        tx_pos,
+        tx_power,
+        receiver_positions(scene, device=device, reference=tx_pos),
+        samples=config.scattering_sample_count,
+        seed=config.seed,
+        device=device,
+        ad=ad,
+        ledger=ledger if ad else None,
+    )
+    return matrix.reshape(matrix.shape[0], 1, matrix.shape[1]), stats
+
+
 def _receiver_layout_component_maps(  # type: ignore[no-untyped-def]
     scene: SolverScene, config: Config, *, rayd, los: torch.Tensor, device: torch.device,
     ad: bool, ledger: AdLaunchLedger, available: bool, path_count: int,
@@ -1581,74 +1645,23 @@ def _receiver_layout_component_maps(  # type: ignore[no-untyped-def]
     transmission and scattering are evaluated per receiver position for every block.
     """
 
-    blocks = receiver_blocks(scene)
     tx_count = len(scene.transmitters)
     rx_count = int(los.shape[1])
-
-    def zero() -> torch.Tensor:
-        return mc_component_map_buffer(los, tx_count=tx_count, dim0=1, dim1=rx_count)
-
-    maps: dict[str, torch.Tensor] = {
-        "los": los.reshape(tx_count, 1, rx_count) if "los" in config.components else zero()
-    }
     has_rows = bool(scene.structures) and tx_count > 0 and rx_count > 0
-    wants_diffraction = "diffraction" in config.components and available
-    material_tensors = (
-        _face_material_tensors(scene, device=device, ad=ad)
-        if has_rows and ("reflection" in config.components or wants_diffraction)
-        else None
-    )
-    reflection = None
-    if material_tensors is not None:
-        reflection_ad = ad and "reflection" in config.components
-        reflection = reflection_block_outputs(
-            scene,
-            rayd,
-            blocks,
-            samples=config.samples,
-            max_depth=config.max_depth,
-            seed=config.seed,
-            receiver_radius_m=config.receiver_radius_m,
-            device=device,
-            material_tensors=material_tensors,
-            collect_wedges=wants_diffraction,
-            ad=reflection_ad,
-            ledger=ledger if reflection_ad else None,
-        )
-    if "reflection" in config.components and reflection is not None:
-        maps["reflection"] = _layout_maps(
-            [_matrix_columns(out, block) for out, block in zip(reflection.outputs, blocks)]
-        )
-        path_count += config.samples
-        contribution_capacity += int(maps["reflection"].numel())
-    else:
-        maps["reflection"] = zero()
-    if wants_diffraction and material_tensors is not None:
-        columns = []
-        for block in blocks:
-            assert block.grid is not None
-            columns.append(
-                _matrix_columns(
-                    diffraction_component_map(
-                        scene,
-                        rayd,
-                        block.grid,
-                        samples=config.samples,
-                        seed=config.seed,
-                        device=device,
-                        material_tensors=material_tensors,
-                        wedge_events=reflection.wedge_events if reflection is not None else None,
-                        ad=ad,
-                        ledger=ledger if ad else None,
-                    ),
-                    block,
-                )
+    maps: dict[str, torch.Tensor] = {}
+    if "los" in config.components:
+        maps["los"] = los.reshape(tx_count, 1, rx_count)
+    if has_rows:
+        maps.update(
+            _layout_specular_maps(
+                scene, config, receiver_blocks(scene), rayd=rayd, device=device, ad=ad,
+                ledger=ledger, available=available,
             )
-        maps["diffraction"] = _layout_maps(columns)
-        path_count += config.samples
-        contribution_capacity += int(maps["diffraction"].numel())
-    else:
-        maps["diffraction"] = zero()
+        )
+    for name in ("reflection", "diffraction"):
+        if name in maps:
+            path_count += config.samples
+            contribution_capacity += int(maps[name].numel())
     capacity_transaction = None
     if "transmission" in config.components and has_rows:
         capacity_transaction = create_solve_capacity_transaction(los)
@@ -1666,30 +1679,16 @@ def _receiver_layout_component_maps(  # type: ignore[no-untyped-def]
         maps["transmission"] = matrix.reshape(tx_count, 1, rx_count)
         path_count += tx_count * rx_count
         contribution_capacity += int(matrix.numel())
-    else:
-        maps["transmission"] = zero()
     scattering_stats = None
     if "scattering" in config.components and has_rows:
-        if not rayd.available:
-            raise RuntimeError("scattering requires RayD native scene capability")
-        tx_pos, tx_power = transmitter_positions(scene, device=device)
-        matrix, scattering_stats = scattering_map_matrix(
-            scene,
-            rayd,
-            tx_pos,
-            tx_power,
-            receiver_positions(scene, device=device, reference=tx_pos),
-            samples=config.scattering_sample_count,
-            seed=config.seed,
-            device=device,
-            ad=ad,
-            ledger=ledger if ad else None,
+        maps["scattering"], scattering_stats = _layout_scattering_map(
+            scene, config, rayd=rayd, device=device, ad=ad, ledger=ledger
         )
-        maps["scattering"] = matrix.reshape(tx_count, 1, rx_count)
         path_count += scattering_stats["sample_count"]
-        contribution_capacity += int(matrix.numel())
-    else:
-        maps["scattering"] = zero()
+        contribution_capacity += int(maps["scattering"].numel())
+    for name in ("los", "reflection", "diffraction", "transmission", "scattering"):
+        if name not in maps:
+            maps[name] = mc_component_map_buffer(los, tx_count=tx_count, dim0=1, dim1=rx_count)
     return maps, scattering_stats, capacity_transaction, path_count, contribution_capacity
 
 
