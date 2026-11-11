@@ -10,10 +10,10 @@
  ],
  "headroom": 0.1,
  "measured_on": {
-  "git_head": "d1c24af8831c",
+  "git_head": "a6f921b3fcad",
   "gpu": "NVIDIA RTX A6000",
   "torch": "2.10.0+cu128",
-  "started": "2026-11-10T16:49:27"
+  "started": "2026-11-10T19:47:43"
  },
  "cases": {
   "bdpt.lr.d1.g128.s4k.c32": {
