@@ -304,9 +304,7 @@
         "deterministic_los_field_kernel",
         "deterministic_pack_complex_kernel",
         "deterministic_phase_from_field_kernel",
-        "deterministic_phase_from_length_kernel",
-        "deterministic_reflection_field_kernel",
-        "deterministic_reflection_sequence_field_kernel"
+        "deterministic_phase_from_length_kernel"
       ],
       "launches": [
         "deterministic_accumulate_backward_kernel",
@@ -323,9 +321,7 @@
         "deterministic_los_field_kernel",
         "deterministic_pack_complex_kernel",
         "deterministic_phase_from_field_kernel",
-        "deterministic_phase_from_length_kernel",
-        "deterministic_reflection_field_kernel",
-        "deterministic_reflection_sequence_field_kernel"
+        "deterministic_phase_from_length_kernel"
       ],
       "host_synchronization": [
         "cudaMemcpyAsync",
@@ -378,7 +374,6 @@
     },
     "native/channel/kernels/evaluated_paths.cu": {
       "kernels": [
-        "compact_capacity_control_record_kernel",
         "compact_contract_flags_kernel",
         "compact_control_record_kernel",
         "compact_pair_histogram_kernel",
@@ -396,10 +391,11 @@
         "max_paths_flags_kernel",
         "pair_state_init_kernel",
         "publish_kernel",
+        "row_group_histogram_kernel",
+        "row_group_key_kernel",
         "shortest_winner_kernel",
-        "sort_key_1d_kernel",
-        "sort_key_sequence_kernel",
-        "sort_key_valid_kernel",
+        "sort_key_outer_kernel",
+        "sort_key_pair_kernel",
         "transmission_topology_init_kernel",
         "transmission_topology_pack_backward_kernel",
         "transmission_topology_pack_jvp_kernel",
@@ -409,7 +405,6 @@
         "validate_rows_kernel"
       ],
       "launches": [
-        "compact_capacity_control_record_kernel",
         "compact_contract_flags_kernel",
         "compact_control_record_kernel",
         "compact_pair_histogram_kernel",
@@ -427,10 +422,11 @@
         "max_paths_flags_kernel",
         "pair_state_init_kernel",
         "publish_kernel",
+        "row_group_histogram_kernel",
+        "row_group_key_kernel",
         "shortest_winner_kernel",
-        "sort_key_1d_kernel",
-        "sort_key_sequence_kernel",
-        "sort_key_valid_kernel",
+        "sort_key_outer_kernel",
+        "sort_key_pair_kernel",
         "transmission_topology_init_kernel",
         "transmission_topology_pack_backward_kernel",
         "transmission_topology_pack_jvp_kernel",
@@ -701,6 +697,7 @@
         "deterministic_reflection_epc_input_batch_kernel",
         "deterministic_reflection_order1_compact_kernel",
         "deterministic_reflection_sequence_compact_kernel",
+        "deterministic_reflection_topology_compact_kernel",
         "deterministic_repeat_range_kernel",
         "deterministic_sort_key_1d_kernel",
         "deterministic_sort_key_sequence_kernel",
@@ -740,6 +737,7 @@
         "deterministic_reflection_epc_input_batch_kernel",
         "deterministic_reflection_order1_compact_kernel",
         "deterministic_reflection_sequence_compact_kernel",
+        "deterministic_reflection_topology_compact_kernel",
         "deterministic_repeat_range_kernel",
         "deterministic_sort_key_1d_kernel",
         "deterministic_sort_key_sequence_kernel",
@@ -793,6 +791,13 @@
       "compile_options": []
     },
     "native/channel/kernels/reflection_receivers.h": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/scan.cuh": {
       "kernels": [],
       "launches": [],
       "host_synchronization": [],

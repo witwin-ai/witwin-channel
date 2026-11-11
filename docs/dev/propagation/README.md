@@ -172,6 +172,25 @@ production owner under ADR-032 and no ADR-029 switch is pending. ADR-031's
 per-pair `Qr` remains a Proposed caller-free experiment and is not public solver
 policy.
 
+### Field-stage row groups
+
+The canonical compact owner (`enumerated_canonical_compact`) returns, in its one
+control-record copy, the row count of every field-stage group: one group per
+component id, reflection split by depth `0..W`, and one trailing group. It also
+returns a device order that lists each group's compact rows in ascending row
+order. `propagation.fields.evaluate_path_fields` takes these as
+`rows.PathRowGroups`, slices each group's rows from the order, and evaluates
+only the groups and reflection depths that have rows; it performs no
+`torch.nonzero` or other Torch-hidden synchronization. The exact LoS fast path
+passes a single identity group. An output column is cloned only when a group
+writes part of it; a group that covers every row is evaluated without gathers.
+
+Reflection discovery (`interactions.reflection`) emits topology rows with EPC
+geometry and path length but no fields; the field stage owns every reflection
+field. EPC candidates fold the transmitter into the candidate index, so one
+input kernel, one EPC launch and one compaction serve every transmitter per
+memory-sized candidate chunk.
+
 ## Public entry points
 
 `propagation.consumer` is the one public surface in this package: the stable,

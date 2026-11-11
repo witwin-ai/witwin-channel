@@ -274,6 +274,15 @@ def capabilities() -> dict[str, Any]:
     return manifest
 
 
+def solver_capabilities(solver: str) -> dict[str, Any]:
+    """Return a fresh copy of one solver's entry of the capability manifest.
+
+    Equal to ``capabilities()["solvers"][solver]`` without copying the whole manifest.
+    """
+
+    return deepcopy(_CAPABILITIES["solvers"][solver])
+
+
 def config_metadata(
     *, requested: dict[str, Any], effective: dict[str, Any], component_max_depth: dict[str, int],
 ) -> dict[str, Any]:
@@ -306,4 +315,4 @@ def serialize_config(config: object) -> dict[str, Any]:
     return serialized
 
 
-__all__ = ["capabilities", "config_metadata", "serialize_config"]
+__all__ = ["capabilities", "config_metadata", "serialize_config", "solver_capabilities"]

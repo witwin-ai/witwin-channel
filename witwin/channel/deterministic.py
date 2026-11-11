@@ -48,9 +48,9 @@ from time import perf_counter
 
 from witwin.channel.scene.endpoints import validate_scalar_endpoint_features
 from witwin.channel.capabilities import (
-    capabilities,
     config_metadata,
     serialize_config,
+    solver_capabilities,
 )
 from witwin.channel import build_info
 from witwin.channel.runtime import make_metadata
@@ -782,7 +782,7 @@ def _metadata(
             ),
         )
     )
-    metadata["semantic_capabilities"] = capabilities()["solvers"]["deterministic"]
+    metadata["semantic_capabilities"] = solver_capabilities("deterministic")
     return metadata
 
 
@@ -929,7 +929,7 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
             "visibility_rejection_count": (
                 sidecars.execution.visibility_rejection_count
             ),
-            "selected_edge_count": sidecars.execution.selected_edge_count,
+            "selected_edge_count": sidecars.execution.resolved_selected_edge_count(),
             "path_planning": {
                 "max_paths": config.max_paths,
                 "max_paths_scope": config.max_paths_scope,

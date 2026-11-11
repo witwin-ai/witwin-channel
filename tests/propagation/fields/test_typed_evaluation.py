@@ -13,8 +13,24 @@ from witwin.channel.propagation.rows import (
     EvaluatedPaths,
     PathFields,
     PathGeometry,
+    PathRowGroups,
     PathTopology,
 )
+
+
+_OUTPUT_NAMES = (
+    "field_xyz",
+    "coefficient",
+    "path_field",
+    "path_gain",
+    "path_length",
+    "delay",
+    "direction",
+)
+
+
+def _outputs(args):
+    return next(arg for arg in args if isinstance(arg, evaluation._FieldOutputs))
 
 
 def _patch_field_stages(monkeypatch, events: list[str]) -> None:
@@ -26,32 +42,31 @@ def _patch_field_stages(monkeypatch, events: list[str]) -> None:
 
     def fake_los(*args):
         events.append("los")
-        for value, tensor in enumerate(args[8:15], start=1):
-            tensor.add_(value)
-        # ``launch_count`` precedes the compiled/taper metadata arguments.
-        return args[15] + 1
+        outputs = _outputs(args)
+        rows = torch.tensor([0], dtype=torch.int64)
+        for value, name in enumerate(_OUTPUT_NAMES, start=1):
+            current = outputs.values[name]
+            outputs.write(name, rows, current[rows] + value)
+        launch_count = next(arg for arg in args if type(arg) is int)
+        return launch_count + 1
 
     def fake_reflection(*args):
         events.append("reflection")
-        assert args[15] is None
         material = object()
         material_tokens.append(material)
         return material, args[-1] + 1
 
-    def fake_transmission(*args):
-        events.append("transmission")
-        assert args[13] is material_tokens[-1]
-        return args[13], args[-1] + 1
+    def threaded(name):
+        def call(*args):
+            events.append(name)
+            assert any(arg is material_tokens[-1] for arg in args)
+            return material_tokens[-1], args[-1] + 1
 
-    def fake_diffraction(*args):
-        events.append("diffraction")
-        assert args[16] is material_tokens[-1]
-        return args[16], args[-1] + 1
+        return call
 
-    def fake_coupled(*args):
-        events.append("coupled")
-        assert args[15] is material_tokens[-1]
-        return args[15], args[-1] + 1
+    fake_transmission = threaded("transmission")
+    fake_diffraction = threaded("diffraction")
+    fake_coupled = threaded("coupled")
 
     monkeypatch.setattr(evaluation, "AdLaunchLedger", _Ledger)
     monkeypatch.setattr(evaluation, "_geometry_participates_in_ad", lambda _scene: False)
@@ -71,6 +86,12 @@ def _patch_field_stages(monkeypatch, events: list[str]) -> None:
     monkeypatch.setattr(evaluation, "_evaluate_transmission_fields", fake_transmission)
     monkeypatch.setattr(evaluation, "_evaluate_diffraction_fields", fake_diffraction)
     monkeypatch.setattr(evaluation, "_evaluate_coupled_fields", fake_coupled)
+
+
+def _groups(paths: EvaluatedPaths) -> PathRowGroups:
+    return PathRowGroups.single(
+        0, paths.row_count, sequence_width=int(paths.topology.primitive_sequence.shape[1])
+    )
 
 
 def _assert_exact_tensor(observed: torch.Tensor, expected: torch.Tensor) -> None:
@@ -133,6 +154,7 @@ def test_typed_field_seam_preserves_order_values_and_alias_contracts(monkeypatch
         tx_positions,
         tx_power,
         rx_positions,
+        row_groups=_groups(paths),
         components={"los", "reflection", "transmission", "diffraction"},
         ad_mode="vjp",
         frequency_value=3.0e9,
@@ -163,13 +185,46 @@ def test_typed_field_seam_preserves_order_values_and_alias_contracts(monkeypatch
         (typed_result.geometry.delay_s, paths.geometry.delay_s),
         (typed_result.geometry.field_direction, paths.geometry.field_direction),
     )
-    for observed, original in cloned:
+    # A partially written output is a clone carrying the written rows; the inputs are untouched.
+    for value, (observed, original) in enumerate(cloned, start=1):
         assert observed is not original
         assert observed.untyped_storage()._cdata != original.untyped_storage()._cdata
         assert observed.shape == original.shape
         assert observed.dtype == original.dtype
         assert observed.device == original.device
         assert observed.requires_grad == original.requires_grad
+        assert torch.equal(observed[0], original[0] + value)
+        assert torch.equal(observed[1:], original[1:])
+
+
+def test_unwritten_outputs_alias_the_inputs_and_full_writes_take_the_result(monkeypatch):
+    paths, sidecars = _evaluated_paths_fixture()
+    events: list[str] = []
+    _patch_field_stages(monkeypatch, events)
+    full = {}
+
+    def fake_los(*args):
+        outputs = _outputs(args)
+        full["path_gain"] = outputs.values["path_gain"] * 2
+        outputs.write("path_gain", None, full["path_gain"])
+        return next(arg for arg in args if type(arg) is int)
+
+    monkeypatch.setattr(evaluation, "_evaluate_los_fields", fake_los)
+    typed_result, _ = evaluation.evaluate_path_fields(
+        SimpleNamespace(frequency=3.0e9),
+        object(),
+        paths,
+        sidecars.execution,
+        torch.arange(36, dtype=torch.float32).reshape(12, 3),
+        torch.arange(1, 13, dtype=torch.float32),
+        torch.arange(36, dtype=torch.float32).reshape(12, 3),
+        row_groups=_groups(paths),
+        components={"los"},
+        frequency_value=3.0e9,
+    )
+    assert typed_result.fields.path_gain is full["path_gain"]
+    assert typed_result.fields.path_field is paths.fields.path_field
+    assert typed_result.geometry.delay_s is paths.geometry.delay_s
 
 
 def test_empty_typed_field_seam_preserves_input_identity():
@@ -184,6 +239,7 @@ def test_empty_typed_field_seam_preserves_input_identity():
         torch.empty((0, 3)),
         torch.empty((0,)),
         torch.empty((0, 3)),
+        row_groups=_groups(paths),
     )
 
     assert typed_result is paths

@@ -4,7 +4,6 @@
 import pytest
 import torch
 
-from witwin.channel import runtime
 from tests.support.scenes import same_side_wall_reflection_scene
 from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
@@ -100,19 +99,16 @@ def test_reflection_solver_uses_native_field_kernel_when_available(monkeypatch):
         pytest.skip("CUDA is required for deterministic reflection")
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native reflection is not built")
-    if not hasattr(runtime.native_extension(), "deterministic_reflection_field"):
-        pytest.skip("native deterministic reflection field kernel is not built")
-
     calls = 0
-    native_field = field_kernels.deterministic_reflection_field
+    native_field = field_kernels.field_reflection_sequence
 
-    def count_native_call(**kwargs):
+    def count_native_call(*args, **kwargs):
         nonlocal calls
         calls += 1
-        return native_field(**kwargs)
+        return native_field(*args, **kwargs)
 
     monkeypatch.setattr(
-        field_kernels, "deterministic_reflection_field", count_native_call
+        field_kernels, "field_reflection_sequence", count_native_call
     )
     result = solve(
         same_side_wall_reflection_scene(),
@@ -152,16 +148,16 @@ def test_reflection_solver_requires_native_field_kernel(monkeypatch):
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native reflection is not built")
 
-    def fail_native_kernel(**kwargs):
+    def fail_native_kernel(*args, **kwargs):
         raise RuntimeError(
-            "_channel.deterministic_reflection_field CUDA kernel is required"
+            "_channel.field_reflection_sequence CUDA kernel is required"
         )
 
     monkeypatch.setattr(
-        field_kernels, "deterministic_reflection_field", fail_native_kernel
+        field_kernels, "field_reflection_sequence", fail_native_kernel
     )
     with pytest.raises(
-        RuntimeError, match="deterministic_reflection_field CUDA kernel is required"
+        RuntimeError, match="field_reflection_sequence CUDA kernel is required"
     ):
         solve(
             same_side_wall_reflection_scene(),

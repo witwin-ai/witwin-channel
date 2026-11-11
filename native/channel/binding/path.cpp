@@ -129,28 +129,6 @@ pybind11::dict channel_deterministic_diffraction_vector_field(
     torch::Tensor y_im,
     torch::Tensor z_re,
     torch::Tensor z_im);
-pybind11::dict channel_deterministic_reflection_field(
-    torch::Tensor tx_position,
-    torch::Tensor rx_position,
-    torch::Tensor hit_position,
-    torch::Tensor normal,
-    torch::Tensor tx_power,
-    torch::Tensor eps_r,
-    torch::Tensor sigma_e,
-    torch::Tensor mu_r,
-    torch::Tensor gain,
-    double frequency_hz);
-pybind11::dict channel_deterministic_reflection_sequence_field(
-    torch::Tensor tx_position,
-    torch::Tensor rx_position,
-    torch::Tensor hit_positions,
-    torch::Tensor normals,
-    torch::Tensor tx_power,
-    torch::Tensor eps_r,
-    torch::Tensor sigma_e,
-    torch::Tensor mu_r,
-    torch::Tensor gain,
-    double frequency_hz);
 torch::Tensor channel_deterministic_delay_to_path_length(torch::Tensor delay_s);
 torch::Tensor channel_deterministic_pack_complex(torch::Tensor field_real, torch::Tensor field_imag);
 torch::Tensor channel_deterministic_phase_from_field(torch::Tensor field_real, torch::Tensor field_imag);
@@ -202,13 +180,14 @@ pybind11::dict channel_deterministic_topology_base_fields(
 torch::Tensor channel_deterministic_repeat_range(torch::Tensor reference, int64_t start, int64_t end, int64_t repeats);
 torch::Tensor channel_deterministic_face_anchor_points(torch::Tensor vertices, torch::Tensor faces);
 pybind11::dict channel_deterministic_reflection_epc_input_batch(
-    torch::Tensor tx,
+    torch::Tensor tx_positions,
     torch::Tensor rx_positions,
     torch::Tensor sequences,
+    torch::Tensor sequence_tx,
     torch::Tensor tri_a,
     torch::Tensor normals,
-    int64_t rx_start,
-    int64_t rx_end);
+    int64_t candidate_start,
+    int64_t candidate_end);
 torch::Tensor channel_deterministic_face_sequence_chunk(
     torch::Tensor reference,
     int64_t face_count,
@@ -222,6 +201,15 @@ torch::Tensor channel_deterministic_mapped_face_sequence_chunk(
     int64_t start,
     int64_t end,
     bool adjacent_distinct);
+pybind11::dict channel_deterministic_reflection_topology_compact(
+    torch::Tensor visible,
+    torch::Tensor epc_sequences,
+    torch::Tensor epc_hits,
+    torch::Tensor epc_normals,
+    torch::Tensor epc_path_length,
+    torch::Tensor tx_indices,
+    torch::Tensor rx_indices,
+    torch::Tensor face_material_id);
 pybind11::dict channel_deterministic_reflection_order1_compact(
     torch::Tensor visible,
     torch::Tensor epc_faces,
@@ -626,14 +614,6 @@ void register_path_deterministic(pybind11::module_ &module) {
         &channel_deterministic_diffraction_vector_field,
         "Convert RayD diffraction vector components into scalar deterministic fields with a CUDA kernel.");
     module.def(
-        "deterministic_reflection_field",
-        &channel_deterministic_reflection_field,
-        "Evaluate deterministic scalar reflection complex fields with a CUDA kernel.");
-    module.def(
-        "deterministic_reflection_sequence_field",
-        &channel_deterministic_reflection_sequence_field,
-        "Evaluate deterministic multi-bounce scalar reflection complex fields with a CUDA kernel.");
-    module.def(
         "deterministic_delay_to_path_length",
         &channel_deterministic_delay_to_path_length,
         "Convert deterministic path delays to path lengths with a CUDA kernel.");
@@ -697,6 +677,10 @@ void register_path_deterministic(pybind11::module_ &module) {
         "deterministic_mapped_face_sequence_chunk",
         &channel_deterministic_mapped_face_sequence_chunk,
         "Generate mapped deterministic face sequence chunks with native CUDA.");
+    module.def(
+        "deterministic_reflection_topology_compact",
+        &channel_deterministic_reflection_topology_compact,
+        "Compact batched reflection EPC outputs into topology rows with native CUDA.");
     module.def(
         "deterministic_reflection_order1_compact",
         &channel_deterministic_reflection_order1_compact,

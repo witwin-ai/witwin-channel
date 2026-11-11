@@ -6,6 +6,7 @@
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
 #include "torch_cuda.h"
+#include "scan.cuh"
 
 #include <tuple>
 
@@ -18,31 +19,32 @@ struct CompactCountObservation {
     int control_error;
 };
 
+// offsets holds row_count + 1 exclusive-scan values; offsets[row_count] is the
+// compact count.
 __global__ void compact_count_control_metadata_kernel(
-    const int *__restrict__ flags,
     const int *__restrict__ offsets,
     const int *__restrict__ control_error,
     int64_t row_count,
     int64_t *__restrict__ metadata) {
     if (blockIdx.x == 0 && threadIdx.x == 0) {
         metadata[0] = control_error[0] == 0
-            ? static_cast<int64_t>(flags[row_count - 1]) +
-                static_cast<int64_t>(offsets[row_count - 1])
+            ? static_cast<int64_t>(offsets[row_count])
             : -1;
     }
 }
 
+// Copies the compact count, or with a control error the count/error record,
+// to the host in one copy and synchronizes the caller's stream once.
 inline CompactCountObservation observe_compact_count(
-    const at::Tensor& flags,
     const at::Tensor& offsets,
     int64_t row_count,
     cudaStream_t stream,
     const at::Tensor* control_error = nullptr) {
     TORCH_CHECK(row_count > 0, "compact count observation requires rows");
+    TORCH_CHECK(offsets.numel() > row_count, "compact offsets must hold row_count + 1 values");
     if (control_error != nullptr) {
-        auto metadata = at::empty({1}, flags.options().dtype(at::kLong));
+        auto metadata = at::empty({1}, offsets.options().dtype(at::kLong));
         compact_count_control_metadata_kernel<<<1, 1, 0, stream>>>(
-            flags.data_ptr<int>(),
             offsets.data_ptr<int>(),
             control_error->data_ptr<int>(),
             row_count,
@@ -60,24 +62,15 @@ inline CompactCountObservation observe_compact_count(
             host_metadata < 0 ? 0 : host_metadata,
             host_metadata < 0 ? 1 : 0};
     }
-    int last_flag = 0;
-    int last_offset = 0;
+    int total = 0;
     C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_flag,
-        flags.data_ptr<int>() + row_count - 1,
-        sizeof(int),
-        cudaMemcpyDeviceToHost,
-        stream));
-    C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_offset,
-        offsets.data_ptr<int>() + row_count - 1,
+        &total,
+        offsets.data_ptr<int>() + row_count,
         sizeof(int),
         cudaMemcpyDeviceToHost,
         stream));
     C10_CUDA_CHECK(cudaStreamSynchronize(stream));
-    return {
-        static_cast<int64_t>(last_flag) + static_cast<int64_t>(last_offset),
-        0};
+    return {static_cast<int64_t>(total), 0};
 }
 
 void check_cuda_tensor(

@@ -18,7 +18,6 @@ namespace {
 
 constexpr int kBlockSize = 256;
 constexpr float kLightSpeed = 299792458.0f;
-constexpr float kEpsilon0 = 8.854187817e-12f;
 constexpr float kPi = 3.14159265358979323846f;
 constexpr float kEps = 1.0e-6f;
 
@@ -36,194 +35,6 @@ namespace cmath = channel::math;
 /// ranges (matches the reference cplx_exp_neg_kd convention).
 __device__ float neg_kd_phase(float k, float d) {
     return transport::precise_neg_kd(k, d);
-}
-
-__device__ Float3 orthogonal_transverse(Float3 direction) {
-    Float3 axis = fabsf(direction.z) < 0.9f
-        ? cmath::vec3(0.0f, 0.0f, 1.0f)
-        : cmath::vec3(0.0f, 1.0f, 0.0f);
-    return cmath::normalize_min_length(
-        cmath::sub(axis, cmath::scale(direction, cmath::dot(axis, direction))),
-        kEps);
-}
-
-__device__ void fresnel_coefficients(
-    float cos_theta_in,
-    float eps_r,
-    float sigma_e,
-    float mu_r,
-    float frequency_hz,
-    Complex &r_te,
-    Complex &r_tm) {
-    const float cos_theta = fminf(fmaxf(cos_theta_in, kEps), 1.0f);
-    const float omega = fmaxf(2.0f * kPi * frequency_hz, kEps);
-    const float eta_r = fmaxf(eps_r, kEps);
-    const float sigma = fmaxf(sigma_e, 0.0f);
-    const float mu_value = fmaxf(mu_r, kEps);
-    utd::Complex shared_te;
-    utd::Complex shared_tm;
-    transport::legacy_interface_fresnel(
-        cos_theta,
-        eta_r,
-        sigma,
-        mu_value,
-        omega,
-        kEpsilon0,
-        kEps,
-        shared_te,
-        shared_tm);
-    r_te = cmath::complex(shared_te.re, shared_te.im);
-    r_tm = cmath::complex(shared_tm.re, shared_tm.im);
-}
-
-/// Initial transverse polarization: the default transmit polarization
-/// projected perpendicular to the launch direction and renormalized.
-__device__ Float3 initial_transverse_polarization(Float3 incident) {
-    // Default isotropic-transmitter convention: the transmit polarization is
-    // world vertical, +z. An isotropic radiator has no preferred frame of its
-    // own, so the source vector must be a fixed world direction rather than a
-    // per-ray quantity, and every map that shares this transmitter (LoS,
-    // reflection, diffraction) must read the same vector to stay
-    // polarization-consistent. Vertical is that shared convention; changing it
-    // rotates the pattern of every component at once.
-    const Float3 tx_pol = cmath::vec3(0.0f, 0.0f, 1.0f);
-    Float3 transverse = cmath::sub(tx_pol, cmath::scale(incident, cmath::dot(tx_pol, incident)));
-    const float transverse_norm = cmath::length(transverse);
-    if (transverse_norm > kEps) {
-        return cmath::scale(transverse, 1.0f / transverse_norm);
-    }
-    return orthogonal_transverse(incident);
-}
-
-/// Reflect a complex field 3-vector at a planar interface: decompose into
-/// s/p components, apply the Fresnel coefficients, and recompose on the
-/// rotated outgoing basis (mirrors RayD's epc_field.cu reflect_field_vector).
-__device__ Complex3 reflect_field_vector(
-    Complex3 field,
-    Float3 incident_direction,
-    Float3 normal,
-    float eps_r,
-    float sigma_e,
-    float mu_r,
-    float gain,
-    float frequency_hz,
-    Float3 &reflected_direction) {
-    const Float3 incident = cmath::normalize_min_length(incident_direction, kEps);
-    Float3 n = cmath::normalize_min_length(normal, kEps);
-    if (cmath::dot(incident, n) > 0.0f) {
-        n = cmath::scale(n, -1.0f);
-    }
-    const float dot_dn = cmath::dot(incident, n);
-    reflected_direction = cmath::normalize_min_length(cmath::sub(incident, cmath::scale(n, 2.0f * dot_dn)), kEps);
-
-    Float3 s_hat = cmath::cross(n, incident);
-    const float s_norm = cmath::length(s_hat);
-    const Float3 transverse_basis = orthogonal_transverse(incident);
-    s_hat = s_norm > kEps ? cmath::scale(s_hat, 1.0f / s_norm) : transverse_basis;
-    const Float3 p_in = cmath::normalize_min_length(cmath::cross(s_hat, incident), kEps);
-    const Float3 p_out = cmath::normalize_min_length(cmath::cross(s_hat, reflected_direction), kEps);
-
-    Complex r_te;
-    Complex r_tm;
-    fresnel_coefficients(fabsf(dot_dn), eps_r, sigma_e, mu_r, frequency_hz, r_te, r_tm);
-    const Complex e_s = cmath::complex3_dot_real(field, s_hat);
-    const Complex e_p = cmath::complex3_dot_real(field, p_in);
-    Complex3 reflected = cmath::complex3_add(
-        cmath::complex3_axis(s_hat, cmath::complex_mul(r_te, e_s)),
-        cmath::complex3_axis(p_out, cmath::complex_mul(r_tm, e_p)));
-    reflected.x = cmath::complex_scale(reflected.x, gain);
-    reflected.y = cmath::complex_scale(reflected.y, gain);
-    reflected.z = cmath::complex_scale(reflected.z, gain);
-    return reflected;
-}
-
-/// Collapse a complex field 3-vector to the exported scalar: total power in
-/// path_gain, and a scalar field carrying the dominant component's phase at
-/// the total amplitude (same convention as the diffraction vector field).
-__device__ void collapse_field_vector(
-    Complex3 field,
-    float &out_real,
-    float &out_imag,
-    float &out_gain) {
-    const float px = cmath::complex_abs2(field.x);
-    const float py = cmath::complex_abs2(field.y);
-    const float pz = cmath::complex_abs2(field.z);
-    const float total = px + py + pz;
-    out_gain = total;
-
-    Complex dominant = field.x;
-    float dominant_power = px;
-    if (py > dominant_power) {
-        dominant_power = py;
-        dominant = field.y;
-    }
-    if (pz > dominant_power) {
-        dominant_power = pz;
-        dominant = field.z;
-    }
-    const float dominant_amplitude = sqrtf(fmaxf(dominant_power, 0.0f));
-    const float total_amplitude = sqrtf(fmaxf(total, 0.0f));
-    if (dominant_amplitude > kEps) {
-        const float scale = total_amplitude / dominant_amplitude;
-        out_real = dominant.r * scale;
-        out_imag = dominant.i * scale;
-    } else {
-        out_real = 0.0f;
-        out_imag = 0.0f;
-    }
-}
-
-__global__ void deterministic_reflection_field_kernel(
-    const float *__restrict__ tx_position,
-    const float *__restrict__ rx_position,
-    const float *__restrict__ hit_position,
-    const float *__restrict__ normal,
-    const float *__restrict__ tx_power,
-    const float *__restrict__ eps_r,
-    const float *__restrict__ sigma_e,
-    const float *__restrict__ mu_r,
-    const float *__restrict__ gain,
-    float frequency_hz,
-    int64_t count,
-    float *__restrict__ path_gain,
-    float *__restrict__ field_real,
-    float *__restrict__ field_imag,
-    float *__restrict__ path_length_m,
-    float *__restrict__ delay_s) {
-    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
-    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         index < count;
-         index += stride) {
-        const Float3 tx = cmath::load_vec3(tx_position, index);
-        const Float3 rx = cmath::load_vec3(rx_position, index);
-        const Float3 hit = cmath::load_vec3(hit_position, index);
-        const Float3 incident = cmath::normalize_min_length(cmath::sub(hit, tx), kEps);
-        Float3 reflected_direction;
-        Complex3 field_vector = reflect_field_vector(
-            cmath::complex3_from_real(initial_transverse_polarization(incident)),
-            incident,
-            cmath::load_vec3(normal, index),
-            eps_r[index],
-            sigma_e[index],
-            mu_r[index],
-            gain[index],
-            frequency_hz,
-            reflected_direction);
-
-        const float segment0 = cmath::length(cmath::sub(hit, tx));
-        const float segment1 = cmath::length(cmath::sub(rx, hit));
-        const float path_length = fmaxf(segment0 + segment1, kEps);
-        const float wavelength = kLightSpeed / frequency_hz;
-        const float amplitude = sqrtf(fmaxf(tx_power[index], 0.0f)) * (wavelength / (4.0f * kPi)) / path_length;
-        const float phase = neg_kd_phase(2.0f * kPi / wavelength, path_length);
-        const Complex scale = cmath::complex_scale(cmath::complex(cosf(phase), sinf(phase)), amplitude);
-        field_vector.x = cmath::complex_mul(field_vector.x, scale);
-        field_vector.y = cmath::complex_mul(field_vector.y, scale);
-        field_vector.z = cmath::complex_mul(field_vector.z, scale);
-        collapse_field_vector(field_vector, field_real[index], field_imag[index], path_gain[index]);
-        path_length_m[index] = path_length;
-        delay_s[index] = path_length / kLightSpeed;
-    }
 }
 
 __global__ void deterministic_los_field_kernel(
@@ -293,72 +104,6 @@ __global__ void deterministic_diffraction_vector_field_kernel(
             field_real[index] = 0.0f;
             field_imag[index] = 0.0f;
         }
-    }
-}
-
-__global__ void deterministic_reflection_sequence_field_kernel(
-    const float *__restrict__ tx_position,
-    const float *__restrict__ rx_position,
-    const float *__restrict__ hit_positions,
-    const float *__restrict__ normals,
-    const float *__restrict__ tx_power,
-    const float *__restrict__ eps_r,
-    const float *__restrict__ sigma_e,
-    const float *__restrict__ mu_r,
-    const float *__restrict__ gain,
-    float frequency_hz,
-    int64_t count,
-    int64_t depth,
-    float *__restrict__ path_gain,
-    float *__restrict__ field_real,
-    float *__restrict__ field_imag,
-    float *__restrict__ path_length_m,
-    float *__restrict__ delay_s) {
-    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
-    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         index < count;
-         index += stride) {
-        const Float3 tx = cmath::load_vec3(tx_position, index);
-        const Float3 rx = cmath::load_vec3(rx_position, index);
-        Float3 previous = tx;
-        Complex3 field_vector = cmath::complex3_zero();
-        bool field_initialized = false;
-        float path_length = 0.0f;
-        for (int64_t bounce = 0; bounce < depth; ++bounce) {
-            const Float3 hit = cmath::load_sequence_vec3(hit_positions, index, bounce, depth);
-            const Float3 segment = cmath::sub(hit, previous);
-            path_length += cmath::length(segment);
-            const Float3 incident = cmath::normalize_min_length(segment, kEps);
-            if (!field_initialized) {
-                field_vector = cmath::complex3_from_real(initial_transverse_polarization(incident));
-                field_initialized = true;
-            }
-            const int64_t scalar_index = index * depth + bounce;
-            Float3 reflected_direction;
-            field_vector = reflect_field_vector(
-                field_vector,
-                incident,
-                cmath::load_sequence_vec3(normals, index, bounce, depth),
-                eps_r[scalar_index],
-                sigma_e[scalar_index],
-                mu_r[scalar_index],
-                gain[scalar_index],
-                frequency_hz,
-                reflected_direction);
-            previous = hit;
-        }
-
-        path_length = fmaxf(path_length + cmath::length(cmath::sub(rx, previous)), kEps);
-        const float wavelength = kLightSpeed / frequency_hz;
-        const float amplitude = sqrtf(fmaxf(tx_power[index], 0.0f)) * (wavelength / (4.0f * kPi)) / path_length;
-        const float phase = neg_kd_phase(2.0f * kPi / wavelength, path_length);
-        const Complex scale = cmath::complex_scale(cmath::complex(cosf(phase), sinf(phase)), amplitude);
-        field_vector.x = cmath::complex_mul(field_vector.x, scale);
-        field_vector.y = cmath::complex_mul(field_vector.y, scale);
-        field_vector.z = cmath::complex_mul(field_vector.z, scale);
-        collapse_field_vector(field_vector, field_real[index], field_imag[index], path_gain[index]);
-        path_length_m[index] = path_length;
-        delay_s[index] = path_length / kLightSpeed;
     }
 }
 
@@ -523,148 +268,6 @@ pybind11::dict channel_deterministic_diffraction_vector_field(
     return out;
 }
 
-pybind11::dict channel_deterministic_reflection_field(
-    at::Tensor tx_position,
-    at::Tensor rx_position,
-    at::Tensor hit_position,
-    at::Tensor normal,
-    at::Tensor tx_power,
-    at::Tensor eps_r,
-    at::Tensor sigma_e,
-    at::Tensor mu_r,
-    at::Tensor gain,
-    double frequency_hz) {
-    check_tensor(tx_position, "tx_position", at::kFloat, 2);
-    check_tensor(rx_position, "rx_position", at::kFloat, 2);
-    check_tensor(hit_position, "hit_position", at::kFloat, 2);
-    check_tensor(normal, "normal", at::kFloat, 2);
-    check_tensor(tx_power, "tx_power", at::kFloat, 1);
-    check_tensor(eps_r, "eps_r", at::kFloat, 1);
-    check_tensor(sigma_e, "sigma_e", at::kFloat, 1);
-    check_tensor(mu_r, "mu_r", at::kFloat, 1);
-    check_tensor(gain, "gain", at::kFloat, 1);
-    TORCH_CHECK(tx_position.size(1) == 3, "tx_position must have shape (N, 3)");
-    TORCH_CHECK(rx_position.sizes() == tx_position.sizes(), "rx_position must match tx_position");
-    TORCH_CHECK(hit_position.sizes() == tx_position.sizes(), "hit_position must match tx_position");
-    TORCH_CHECK(normal.sizes() == tx_position.sizes(), "normal must match tx_position");
-    const int64_t count = tx_position.size(0);
-    TORCH_CHECK(tx_power.size(0) == count, "tx_power must match path count");
-    TORCH_CHECK(eps_r.size(0) == count, "eps_r must match path count");
-    TORCH_CHECK(sigma_e.size(0) == count, "sigma_e must match path count");
-    TORCH_CHECK(mu_r.size(0) == count, "mu_r must match path count");
-    TORCH_CHECK(gain.size(0) == count, "gain must match path count");
-    TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
-
-    auto path_gain = at::empty({count}, tx_position.options());
-    auto field_real = at::empty({count}, tx_position.options());
-    auto field_imag = at::empty({count}, tx_position.options());
-    auto path_length = at::empty({count}, tx_position.options());
-    auto delay = at::empty({count}, tx_position.options());
-    if (count > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(tx_position.get_device()).stream();
-        const int block_count = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
-        deterministic_reflection_field_kernel<<<block_count, kBlockSize, 0, stream>>>(
-            tx_position.data_ptr<float>(),
-            rx_position.data_ptr<float>(),
-            hit_position.data_ptr<float>(),
-            normal.data_ptr<float>(),
-            tx_power.data_ptr<float>(),
-            eps_r.data_ptr<float>(),
-            sigma_e.data_ptr<float>(),
-            mu_r.data_ptr<float>(),
-            gain.data_ptr<float>(),
-            static_cast<float>(frequency_hz),
-            count,
-            path_gain.data_ptr<float>(),
-            field_real.data_ptr<float>(),
-            field_imag.data_ptr<float>(),
-            path_length.data_ptr<float>(),
-            delay.data_ptr<float>());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-
-    pybind11::dict out;
-    out["path_gain"] = path_gain;
-    out["field_real"] = field_real;
-    out["field_imag"] = field_imag;
-    out["path_length_m"] = path_length;
-    out["delay_s"] = delay;
-    return out;
-}
-
-pybind11::dict channel_deterministic_reflection_sequence_field(
-    at::Tensor tx_position,
-    at::Tensor rx_position,
-    at::Tensor hit_positions,
-    at::Tensor normals,
-    at::Tensor tx_power,
-    at::Tensor eps_r,
-    at::Tensor sigma_e,
-    at::Tensor mu_r,
-    at::Tensor gain,
-    double frequency_hz) {
-    check_tensor(tx_position, "tx_position", at::kFloat, 2);
-    check_tensor(rx_position, "rx_position", at::kFloat, 2);
-    check_tensor(hit_positions, "hit_positions", at::kFloat, 3);
-    check_tensor(normals, "normals", at::kFloat, 3);
-    check_tensor(tx_power, "tx_power", at::kFloat, 1);
-    check_tensor(eps_r, "eps_r", at::kFloat, 2);
-    check_tensor(sigma_e, "sigma_e", at::kFloat, 2);
-    check_tensor(mu_r, "mu_r", at::kFloat, 2);
-    check_tensor(gain, "gain", at::kFloat, 2);
-    TORCH_CHECK(tx_position.size(1) == 3, "tx_position must have shape (N, 3)");
-    TORCH_CHECK(rx_position.sizes() == tx_position.sizes(), "rx_position must match tx_position");
-    TORCH_CHECK(hit_positions.size(0) == tx_position.size(0), "hit_positions must match path count");
-    TORCH_CHECK(hit_positions.size(2) == 3, "hit_positions must have shape (N, D, 3)");
-    TORCH_CHECK(normals.sizes() == hit_positions.sizes(), "normals must match hit_positions");
-    const int64_t count = tx_position.size(0);
-    const int64_t depth = hit_positions.size(1);
-    TORCH_CHECK(depth > 0, "hit_positions depth must be positive");
-    TORCH_CHECK(tx_power.size(0) == count, "tx_power must match path count");
-    TORCH_CHECK(eps_r.size(0) == count && eps_r.size(1) == depth, "eps_r must have shape (N, D)");
-    TORCH_CHECK(sigma_e.sizes() == eps_r.sizes(), "sigma_e must match eps_r");
-    TORCH_CHECK(mu_r.sizes() == eps_r.sizes(), "mu_r must match eps_r");
-    TORCH_CHECK(gain.sizes() == eps_r.sizes(), "gain must match eps_r");
-    TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
-
-    auto path_gain = at::empty({count}, tx_position.options());
-    auto field_real = at::empty({count}, tx_position.options());
-    auto field_imag = at::empty({count}, tx_position.options());
-    auto path_length = at::empty({count}, tx_position.options());
-    auto delay = at::empty({count}, tx_position.options());
-    if (count > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(tx_position.get_device()).stream();
-        const int block_count = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
-        deterministic_reflection_sequence_field_kernel<<<block_count, kBlockSize, 0, stream>>>(
-            tx_position.data_ptr<float>(),
-            rx_position.data_ptr<float>(),
-            hit_positions.data_ptr<float>(),
-            normals.data_ptr<float>(),
-            tx_power.data_ptr<float>(),
-            eps_r.data_ptr<float>(),
-            sigma_e.data_ptr<float>(),
-            mu_r.data_ptr<float>(),
-            gain.data_ptr<float>(),
-            static_cast<float>(frequency_hz),
-            count,
-            depth,
-            path_gain.data_ptr<float>(),
-            field_real.data_ptr<float>(),
-            field_imag.data_ptr<float>(),
-            path_length.data_ptr<float>(),
-            delay.data_ptr<float>());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-
-    pybind11::dict out;
-    out["path_gain"] = path_gain;
-    out["field_real"] = field_real;
-    out["field_imag"] = field_imag;
-    out["path_length_m"] = path_length;
-    out["delay_s"] = delay;
-    return out;
-}
-
 at::Tensor channel_deterministic_delay_to_path_length(at::Tensor delay_s) {
     check_tensor(delay_s, "delay_s", at::kFloat, 1);
     auto path_length = at::empty_like(delay_s);
@@ -794,7 +397,7 @@ pybind11::dict channel_deterministic_field_from_power_phase(at::Tensor path_gain
 #include "torch_cuda.h"
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
-#include <thrust/scan.h>
+#include "scan.cuh"
 #include <thrust/sort.h>
 #include <thrust/unique.h>
 
@@ -1863,7 +1466,7 @@ int64_t channel_deterministic_selected_edge_count(at::Tensor edge_id) {
     }
     auto int_options = edge_id.options().dtype(at::kInt);
     auto flags = at::empty({path_count}, int_options);
-    auto offsets = at::empty({path_count}, int_options);
+    auto offsets = at::empty({path_count + 1}, int_options);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(edge_id.get_device()).stream();
     const int block_count = static_cast<int>((path_count + kBlockSize - 1) / kBlockSize);
     deterministic_edge_flags_kernel<<<block_count, kBlockSize, 0, stream>>>(
@@ -1872,28 +1475,17 @@ int64_t channel_deterministic_selected_edge_count(at::Tensor edge_id) {
         flags.data_ptr<int>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 
-    thrust::exclusive_scan(
-        thrust::cuda::par.on(stream),
-        thrust::device_pointer_cast(flags.data_ptr<int>()),
-        thrust::device_pointer_cast(flags.data_ptr<int>() + path_count),
-        thrust::device_pointer_cast(offsets.data_ptr<int>()));
+    channel::scan::exclusive_flag_offsets(flags, offsets, path_count, stream);
 
-    int last_flag = 0;
-    int last_offset = 0;
+int total = 0;
     C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_flag,
-        flags.data_ptr<int>() + path_count - 1,
-        sizeof(int),
-        cudaMemcpyDeviceToHost,
-        stream));
-    C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_offset,
-        offsets.data_ptr<int>() + path_count - 1,
+        &total,
+        offsets.data_ptr<int>() + path_count,
         sizeof(int),
         cudaMemcpyDeviceToHost,
         stream));
     C10_CUDA_CHECK(cudaStreamSynchronize(stream));
-    const int64_t selected_count = static_cast<int64_t>(last_flag) + static_cast<int64_t>(last_offset);
+    const int64_t selected_count = static_cast<int64_t>(total);
     if (selected_count == 0) {
         return 0;
     }

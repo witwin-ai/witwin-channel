@@ -5,8 +5,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Sequence
+from collections.abc import Callable
+from dataclasses import dataclass, fields
+from typing import TYPE_CHECKING, Sequence, TypeVar
 
 import numpy as np
 import torch
@@ -30,6 +31,53 @@ DIELECTRIC_MODEL_ID = 1
 PEC_MODEL_ID = 2
 PEC_EFFECTIVE_SIGMA_E = 1.0e9
 
+_T = TypeVar("_T")
+
+
+def _participates_in_ad(value: torch.Tensor) -> bool:
+    if value.requires_grad or value.grad_fn is not None:
+        return True
+    return torch.autograd.forward_ad.unpack_dual(value).tangent is not None
+
+
+def _store_state(compiled: "CompiledScene") -> tuple[tuple[int, int], ...] | None:
+    """Host-only mutation signature of the material and assignment stores, or None under AD.
+
+    Reads tensor attributes only (identity, ``_version`` and autograd liveness): it launches
+    nothing and never synchronizes. A store tensor that takes part in autograd disables the
+    cache so the leaf stays on the graph.
+    """
+
+    state: list[tuple[int, int]] = []
+    for store in (compiled.materials, compiled.assignments):
+        for store_field in fields(store):
+            value = getattr(store, store_field.name)
+            if isinstance(value, torch.Tensor):
+                if _participates_in_ad(value):
+                    return None
+                state.append((id(value), int(value._version)))
+    return tuple(state)
+
+
+def _cached_material_table(
+    compiled: "CompiledScene", kind: str, device: torch.device, build: Callable[[], _T],
+) -> _T:
+    """Build a device material table once per compiled scene, store state and device."""
+
+    state = _store_state(compiled)
+    if state is None:
+        return build()
+    device = torch.device(device)
+    if device.type == "cuda" and device.index is None:
+        device = torch.device("cuda", torch.cuda.current_device())
+    key = (device, compiled.materials.version, compiled.assignments.version, state)
+    cached = compiled._material_table_cache.get(kind)
+    if cached is not None and cached[0] == key:
+        return cached[1]
+    value = build()
+    compiled._material_table_cache[kind] = (key, value)
+    return value
+
 
 def face_material_tensors(
     scene_or_compiled: "Scene | CompiledScene", *, device: torch.device,
@@ -40,6 +88,14 @@ def face_material_tensors(
     from witwin.channel.scene.endpoints import require_compiled
 
     compiled = require_compiled(scene_or_compiled)
+    return _cached_material_table(
+        compiled, "face", device, lambda: _build_face_material_tensors(compiled, device)
+    )
+
+
+def _build_face_material_tensors(
+    compiled: "CompiledScene", device: torch.device,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     materials = compiled.materials
     assignments = compiled.assignments
     material_eps_r = materials.eps_r.to(device=device, dtype=torch.float32).contiguous()
@@ -78,6 +134,12 @@ def face_material_thickness(
     from witwin.channel.scene.endpoints import require_compiled
 
     compiled = require_compiled(scene_or_compiled)
+    return _cached_material_table(
+        compiled, "thickness", device, lambda: _build_face_material_thickness(compiled, device)
+    )
+
+
+def _build_face_material_thickness(compiled: "CompiledScene", device: torch.device) -> torch.Tensor:
     material_thickness = compiled.materials.thickness_m.to(
         device=device,
         dtype=torch.float32,
@@ -96,6 +158,46 @@ def face_material_field_bundle(
     from witwin.channel.scene.endpoints import require_compiled
 
     compiled = require_compiled(scene_or_compiled)
+    bundle = _cached_material_table(
+        compiled, "field", device, lambda: _build_face_material_field_bundle(compiled, device)
+    )
+    return dict(bundle)
+
+
+def face_material_id_table(
+    scene_or_compiled: "Scene | CompiledScene", *, device: torch.device,
+) -> torch.Tensor:
+    """Per-face material row (int32) on ``device``."""
+
+    return face_material_field_bundle(scene_or_compiled, device=device)["material_id"]
+
+
+def face_geometry_id_table(
+    scene_or_compiled: "Scene | CompiledScene", name: str, *, device: torch.device,
+) -> torch.Tensor:
+    """Per-face geometry id column (``face_surface_id`` or ``face_structure_id``) on ``device``."""
+
+    from witwin.channel.scene.endpoints import require_compiled
+
+    compiled = require_compiled(scene_or_compiled)
+    if name not in ("face_surface_id", "face_structure_id"):
+        raise ValueError(f"unknown per-face geometry id table {name!r}")
+    source = getattr(compiled.geometry, name)
+    target = torch.device(device)
+    if target.type == "cuda" and target.index is None:
+        target = torch.device("cuda", torch.cuda.current_device())
+    key = (target, compiled.geometry.version, id(source), int(source._version))
+    cached = compiled._material_table_cache.get(name)
+    if cached is not None and cached[0] == key:
+        return cached[1]
+    value = source.to(device=target, dtype=torch.int64).contiguous()
+    compiled._material_table_cache[name] = (key, value)
+    return value
+
+
+def _build_face_material_field_bundle(
+    compiled: "CompiledScene", device: torch.device,
+) -> dict[str, torch.Tensor]:
     materials = compiled.materials
     material_id = compiled.assignments.face_material_id.to(
         device=device, dtype=torch.int64

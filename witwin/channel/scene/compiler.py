@@ -386,6 +386,11 @@ class CompiledScene:
     _endpoint_store_cache: tuple[tuple, object] | None = field(
         default=None, repr=False, compare=False
     )
+    # Device-resident per-face material tables (witwin.channel.materials), keyed
+    # by table kind; each entry records the store versions and device it serves.
+    _material_table_cache: dict[str, tuple[tuple, object]] = field(
+        default_factory=dict, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         if not isinstance(self.source, (Scene, SceneSnapshot)):
