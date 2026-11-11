@@ -97,9 +97,45 @@ solver has read it since the layout-independent diffraction change.
 - Unwritten primal output columns are no longer aliases of the discovery columns; every
   primal output is a fresh tensor.
 
-## Evidence
-
-See "Acceptance" below; numbers are from the M3-7 branch, contended GPU 1, counts by
-`torch.profiler` and the budget harness.
-
 ## Acceptance
+
+Measured on the branch merged with `release/0.6.0` `9822360` against a build of `9822360`
+itself, both against RayD `58f54f1`, GPU 1 under a slot lock (contended).
+
+**Bit identity.** A scratch 4x4 city (16 boxes and a ground plane, 162 faces) at 3.5 GHz,
+20 cases: LoS only; LoS + reflection at depth 1-3 with 1, 4 and 32 transmitters; LoS +
+reflection + diffraction with mixed transmit and receive polarizations; every second building
+a two-layer material (deterministic and Path solver, with transmission); every second
+building Kirchhoff-rough; transmission with multilayer walls; `coupled_paths` (interaction
+chains and double diffraction); `ad_mode="vjp"` frequency gradients and `ad_mode="jvp"`
+frequency tangents on plain, multilayer and rough scenes, for both solvers. Every per-path
+column (all 24 `PathTable` columns or all Path-solver arrays, including `a`, and every
+per-path tangent) is bitwise identical in every case. Aggregated maps (`path_gain`,
+`field`, `component_power`) and the scalar frequency gradient differ in 8 of 20 cases at
+<= 1.4e-6 relative; this is the run-to-run atomic-accumulation nondeterminism these maps
+already have. On `d1_pol`, five runs of the baseline and four of the branch produced eight
+distinct `component_power["diffraction"]` maps, and one branch run is byte-identical to one
+baseline run. The repeat spreads per key are the same for both builds (for example
+`coupled_d` `component_power.coupled`: baseline-baseline 1.0e-6, branch-branch 9.2e-7).
+
+The fused kernel is also bitwise the per-operator kernels on synthetic rows that mix every
+row kind, with and without the group order, with and without multilayer and rough faces
+(`tests/propagation/fields/test_canonical_rows.py`). The per-operator reflection kernel is
+bitwise the pre-change kernel on 4096 random rows at depth 1-3.
+
+**Counts.** `benchmarks/baseline.py run --tags budget-small budget-medium budget-large
+--counts-only`, one warm solve, kernels per solve (syncs, H2D and D2H unchanged):
+
+| case | before | after |
+|---|---:|---:|
+| det.lrd.d1.g64.c4 / c8 | 193 | 130 |
+| det.lrd.d1.g128.c32 | 537 | 314 |
+| path.lrd.d1.p16.c4 / c8 / c32 | 213 | 149 |
+| bdpt.lr.d1.g64.s4k.c4 | 150 | 138 |
+| bdpt.lr.d1.g64.s4k.c8 | 129 | 117 |
+| bdpt.lr.d1.g128.s4k.c32 | 153 | 141 |
+| mc.* | 11 | 11 |
+
+Synchronizations and copies do not drop: the field stage already had none after the
+compact owner started supplying the row groups. `tests/budgets/launch_budgets.json` was
+regenerated from this measurement with 10 % headroom; no bound was raised.

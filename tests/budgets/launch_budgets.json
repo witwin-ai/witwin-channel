@@ -10,22 +10,22 @@
   ],
   "headroom": 0.1,
   "measured_on": {
-    "git_head": "eef6510378e9",
+    "git_head": "3d67a97e329f",
     "gpu": "NVIDIA RTX A6000",
     "torch": "2.10.0+cu128",
-    "started": "2026-11-10T21:56:50"
+    "started": "2026-11-11T09:54:42"
   },
   "cases": {
     "bdpt.lr.d1.g128.s4k.c32": {
-      "kernels": 204,
-      "syncs": 17,
-      "h2d_count": 24,
-      "h2d_bytes": 3741,
-      "d2h_count": 8,
-      "d2h_bytes": 102
+      "kernels": 156,
+      "syncs": 16,
+      "h2d_count": 17,
+      "h2d_bytes": 2033,
+      "d2h_count": 7,
+      "d2h_bytes": 97
     },
     "bdpt.lr.d1.g64.s4k.c4": {
-      "kernels": 164,
+      "kernels": 152,
       "syncs": 13,
       "h2d_count": 15,
       "h2d_bytes": 1417,
@@ -33,7 +33,7 @@
       "d2h_bytes": 84
     },
     "bdpt.lr.d1.g64.s4k.c8": {
-      "kernels": 142,
+      "kernels": 129,
       "syncs": 13,
       "h2d_count": 15,
       "h2d_bytes": 1417,
@@ -41,15 +41,15 @@
       "d2h_bytes": 84
     },
     "det.lrd.d1.g128.c32": {
-      "kernels": 802,
-      "syncs": 65,
-      "h2d_count": 124,
-      "h2d_bytes": 49747,
-      "d2h_count": 64,
-      "d2h_bytes": 344
+      "kernels": 346,
+      "syncs": 47,
+      "h2d_count": 82,
+      "h2d_bytes": 33080,
+      "d2h_count": 46,
+      "d2h_bytes": 269
     },
     "det.lrd.d1.g64.c4": {
-      "kernels": 212,
+      "kernels": 143,
       "syncs": 8,
       "h2d_count": 9,
       "h2d_bytes": 2649,
@@ -57,7 +57,7 @@
       "d2h_bytes": 115
     },
     "det.lrd.d1.g64.c8": {
-      "kernels": 212,
+      "kernels": 143,
       "syncs": 8,
       "h2d_count": 9,
       "h2d_bytes": 2649,
@@ -89,7 +89,7 @@
       "d2h_bytes": 0
     },
     "path.lrd.d1.p16.c32": {
-      "kernels": 235,
+      "kernels": 164,
       "syncs": 8,
       "h2d_count": 9,
       "h2d_bytes": 2649,
@@ -97,7 +97,7 @@
       "d2h_bytes": 97
     },
     "path.lrd.d1.p16.c4": {
-      "kernels": 235,
+      "kernels": 164,
       "syncs": 8,
       "h2d_count": 9,
       "h2d_bytes": 2649,
@@ -105,7 +105,7 @@
       "d2h_bytes": 97
     },
     "path.lrd.d1.p16.c8": {
-      "kernels": 235,
+      "kernels": 164,
       "syncs": 8,
       "h2d_count": 9,
       "h2d_bytes": 2649,
@@ -114,6 +114,6 @@
     }
   },
   "notes": {
-    "det.*.kernels": "tightened: the single-grid diffraction override and the grid transpose copies are gone; measured 192 (g64) and 729 (g128.c32), bound = measured + 10 %."
+    "kernels": "tightened: the primal field stage is one canonical-row launch (fused LoS, reflection and diffraction projection); measured det 130 (g64) / 314 (g128.c32), path 149, bdpt 117-141; bound = measured + 10 %."
   }
 }
