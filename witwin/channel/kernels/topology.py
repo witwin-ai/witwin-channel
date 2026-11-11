@@ -39,6 +39,9 @@ __all__ = [
     "CanonicalCompactRows",
     "ExactPairMetadata",
     "TransmissionTopologyCapacity",
+    "chain_candidates",
+    "chain_double_candidates",
+    "chain_node_edges",
     "core_pack_int2",
     "deterministic_component_counts",
     "deterministic_concat_topology_blocks",
@@ -1198,6 +1201,76 @@ def reflection_receiver_candidates(
     if not isinstance(exported, dict) or set(exported) != {"candidate_sequence", "candidate_receiver"}:
         raise TypeError("_channel.reflection_receiver_candidates must return the candidate lists")
     return exported["candidate_sequence"], exported["candidate_receiver"]
+
+
+def chain_node_edges(
+    *, node_sequences: torch.Tensor, node_images: torch.Tensor, plane_point: torch.Tensor,
+    plane_normal: torch.Tensor, bounds: torch.Tensor, occupancy: torch.Tensor,
+    edge_position: torch.Tensor, edge_direction: torch.Tensor, edge_t_min: torch.Tensor,
+    edge_t_max: torch.Tensor, node_start: int, node_end: int, tolerance: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """``(node, edge)`` pairs whose edge may lie in the node's reflection beam, node-major."""
+
+    validate_cuda_tensor("node_sequences", node_sequences, dtype=torch.int32, ndim=2)
+    validate_cuda_tensor("node_images", node_images, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    exported = _required_native_op("chain_node_edges")(
+        node_sequences, node_images, plane_point, plane_normal, bounds, occupancy, edge_position,
+        edge_direction, edge_t_min, edge_t_max, int(node_start), int(node_end), float(tolerance),
+    )
+    if not isinstance(exported, dict) or set(exported) != {"node", "edge"}:
+        raise TypeError("_channel.chain_node_edges must return the node and edge lists")
+    return exported["node"], exported["edge"]
+
+
+_CHAIN_CANDIDATE_FIELDS = frozenset({"tx", "rx", "edge", "a_node", "b_node", "point"})
+
+
+def chain_candidates(
+    *, lane_offsets: torch.Tensor, lane_start: int, lane_end: int, plane_point: torch.Tensor,
+    plane_normal: torch.Tensor, bounds: torch.Tensor, occupancy: torch.Tensor,
+    edge_position: torch.Tensor, edge_direction: torch.Tensor, edge_t_min: torch.Tensor,
+    edge_t_max: torch.Tensor, a: tuple[torch.Tensor, ...], b: tuple[torch.Tensor, ...],
+    box_tolerance: float, segment_tolerance: float, min_segment_length: float, edge_epsilon: float,
+) -> dict[str, torch.Tensor]:
+    """Interaction-chain candidates of one lane range that the image method cannot rule out.
+
+    ``a`` and ``b`` are the transmitter and receiver halves as ``(edge_offsets, endpoint, node,
+    endpoints, node_sequences, node_images)``; a lane joins one entry of each on a shared edge.
+    """
+
+    validate_cuda_tensor("lane_offsets", lane_offsets, dtype=torch.int64, ndim=1)
+    if len(a) != 6 or len(b) != 6:
+        raise ValueError("chain halves must carry six tables")
+    exported = _required_native_op("chain_candidates")(
+        lane_offsets, int(lane_start), int(lane_end), plane_point, plane_normal, bounds, occupancy,
+        edge_position, edge_direction, edge_t_min, edge_t_max, *a, *b, float(box_tolerance),
+        float(segment_tolerance), float(min_segment_length), float(edge_epsilon),
+    )
+    if not isinstance(exported, dict) or set(exported) != _CHAIN_CANDIDATE_FIELDS:
+        raise TypeError("_channel.chain_candidates must return the chain candidate tables")
+    return exported
+
+
+def chain_double_candidates(
+    *, pair_offsets: torch.Tensor, lane_start: int, lane_end: int, rx_count: int,
+    tx_offsets: torch.Tensor, tx_edges: torch.Tensor, rx_offsets: torch.Tensor,
+    rx_edges: torch.Tensor,
+) -> dict[str, torch.Tensor]:
+    """Double-diffraction candidates of one lane range: transmitter-visible x receiver-visible edges."""
+
+    for name, value in (
+        ("pair_offsets", pair_offsets), ("tx_offsets", tx_offsets), ("rx_offsets", rx_offsets),
+    ):
+        validate_cuda_tensor(name, value, dtype=torch.int64, ndim=1)
+    for name, value in (("tx_edges", tx_edges), ("rx_edges", rx_edges)):
+        validate_cuda_tensor(name, value, dtype=torch.int32, ndim=1)
+    exported = _required_native_op("chain_double_candidates")(
+        pair_offsets, int(lane_start), int(lane_end), int(rx_count), tx_offsets, tx_edges, rx_offsets,
+        rx_edges,
+    )
+    if not isinstance(exported, dict) or set(exported) != {"tx", "rx", "edge1", "edge2"}:
+        raise TypeError("_channel.chain_double_candidates must return the candidate tables")
+    return exported
 
 
 def _epc_candidate_space(

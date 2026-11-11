@@ -13,14 +13,12 @@ from witwin.channel import runtime
 
 
 _OWNER_NAMES = (
-    "_CoupledRdPrepareAdFunction",
-    "_FieldCoupledRdAdFunction",
+    "_FieldCoupledChainAdFunction",
     "_FieldDiffractionWedgeAdFunction",
     "_FieldFreeSpaceAdFunction",
     "_FieldReflectionSequenceAdFunction",
     "_FieldTransmissionSequenceAdFunction",
-    "coupled_rd_prepare_ad",
-    "field_coupled_rd_ad",
+    "field_coupled_chain_ad",
     "field_diffraction_wedge_ad",
     "field_free_space_ad",
     "field_reflection_sequence_ad",

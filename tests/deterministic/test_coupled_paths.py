@@ -11,7 +11,6 @@ import torch
 from tests.support.scenes import coupled_wall_wedge_scene
 from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
-from witwin.channel.kernels import geometry as geometry_kernels
 
 
 def _require_native() -> None:
@@ -97,7 +96,7 @@ def test_coupled_on_exports_finite_nonzero_coupled_component():
     )
 
     assert (
-        result.metadata["coupled_paths"]["geometry"] == "native_1r1d_reciprocal_plus_dd"
+        result.metadata["coupled_paths"]["geometry"] == "native_interaction_chains_plus_dd"
     )
     assert result.metadata["coupled_paths"]["coefficient"] == "unified_complex3_jones"
     assert result.metadata["counts"]["components"].get("coupled", 0) > 0
@@ -150,65 +149,29 @@ def test_coupled_on_runs_under_ad_modes(ad_mode):
     assert torch.isfinite(result.field.imag).all()
 
 
-def test_coupled_candidate_budget_fails_loudly_before_launch(monkeypatch):
-    """The per-block candidate guard fires without a Torch/CPU fallback.
+def test_coupled_candidate_limit_chunks_the_validator_without_capping():
+    """coupled_candidate_limit sizes the validator launches; it never drops or rejects rows.
 
- A one-candidate budget cannot fit even a single receiver block, so the
- shared plan raises before any coupled geometry kernel launches; nothing
- silently falls back to a reduced result.
- """
-
-    _require_native()
-    monkeypatch.setattr(
-        geometry_kernels,
-        "coupled_rd_geometry_forward",
-        lambda *_args, **_kwargs: pytest.fail(
-            "coupled kernel launched before the candidate guard"
-        ),
-    )
-    config = Config(
-        components=_BASE_COMPONENTS,
-        max_depth=2,
-        coupled_paths=True,
-        coupled_candidate_limit=1,
-    )
-    with pytest.raises(RuntimeError, match="exceeding coupled_candidate_limit=1"):
-        solve(coupled_wall_wedge_scene(), config, reference_frequency_hz=3.0e9)
-
-
-def test_coupled_dd_candidate_budget_fails_loudly_before_launch(monkeypatch):
-    """The budget guard counts the D->D union and fires before any launch.
-
- coupled double diffraction folds the one-direction ordered edge-pair stream
- (edges*(edges-1)) into the per-receiver candidate budget alongside the two
- R->D / D->R directions. A one-candidate budget cannot fit that union, so the
- shared plan raises before either the coupled R-D or the coupled D-D geometry
- kernel launches; neither bridge may run as a reduced fallback.
- """
+    A one-candidate limit validates every candidate in its own launch and must reproduce the
+    default solve: the same coupled rows with the same coefficients.
+    """
 
     _require_native()
-    monkeypatch.setattr(
-        geometry_kernels,
-        "coupled_rd_geometry_forward",
-        lambda *_args, **_kwargs: pytest.fail(
-            "coupled R-D kernel launched before the candidate guard"
-        ),
-    )
-    monkeypatch.setattr(
-        geometry_kernels,
-        "coupled_dd_geometry_forward",
-        lambda *_args, **_kwargs: pytest.fail(
-            "coupled D-D kernel launched before the candidate guard"
-        ),
-    )
-    config = Config(
-        components=_BASE_COMPONENTS,
-        max_depth=2,
-        coupled_paths=True,
-        coupled_candidate_limit=1,
-    )
-    with pytest.raises(RuntimeError, match="exceeding coupled_candidate_limit=1"):
-        solve(coupled_wall_wedge_scene(), config, reference_frequency_hz=3.0e9)
+    scene = coupled_wall_wedge_scene()
+
+    def coupled_rows(limit: int) -> torch.Tensor:
+        config = Config(
+            components=_BASE_COMPONENTS, max_depth=2, coupled_paths=True,
+            coupled_candidate_limit=limit, export_paths=True,
+        )
+        paths = solve(scene, config, reference_frequency_hz=3.0e9).paths
+        assert paths is not None
+        coupled = (paths.component_id == 3) | (paths.component_id == 4) | (paths.component_id == 7)
+        return paths.coefficient[coupled]
+
+    chunked = coupled_rows(1)
+    assert int(chunked.numel()) > 0
+    torch.testing.assert_close(chunked, coupled_rows(1_000_000), rtol=0.0, atol=0.0)
 
 
 def test_coupled_on_double_diffraction_keeps_coupled_component_finite_nonzero():

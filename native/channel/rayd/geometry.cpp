@@ -4,33 +4,32 @@
 #include "resource.h"
 #include "../tensor_checks.h"
 
+#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <vector>
 
-std::vector<at::Tensor> channel_coupled_rd_prepare_cuda(
+pybind11::dict channel_coupled_chain_finalize_cuda(
+    at::Tensor prefix_valid,
+    at::Tensor suffix_valid,
+    at::Tensor prefix_length,
+    at::Tensor suffix_length,
+    at::Tensor prefix_prims,
+    at::Tensor suffix_prims,
+    at::Tensor prefix_hits,
+    at::Tensor suffix_hits,
+    at::Tensor prefix_normals,
+    at::Tensor suffix_normals,
     at::Tensor source,
     at::Tensor receiver,
-    at::Tensor plane_point,
-    at::Tensor plane_normal,
-    at::Tensor edge_pos,
-    at::Tensor edge_dir,
-    at::Tensor edge_t_min,
-    at::Tensor edge_t_max);
-pybind11::dict channel_coupled_rd_finalize_cuda(
-    at::Tensor prefix_active,
-    at::Tensor suffix_visible,
-    at::Tensor epc_path_length,
-    at::Tensor resolved_face,
-    at::Tensor edge_id,
-    at::Tensor reflection_point,
-    at::Tensor reflection_normal,
     at::Tensor edge_point,
-    at::Tensor edge_direction,
-    at::Tensor receiver,
-    bool reverse);
+    at::Tensor edge_id,
+    double min_segment_length);
 at::Tensor channel_coupled_active_mask_cuda(at::Tensor lhs, at::Tensor rhs);
+at::Tensor channel_coupled_active_either_mask_cuda(at::Tensor lhs, at::Tensor rhs, at::Tensor other);
 std::vector<at::Tensor> channel_coupled_dd_prepare_cuda(
+    at::Tensor edge1_id,
+    at::Tensor edge2_id,
     at::Tensor source,
     at::Tensor receiver,
     at::Tensor edge1_pos,
@@ -520,109 +519,123 @@ pybind11::tuple channel_rayd_intersect_jvp(
         tensor_or_none(out.tangent_barycentric));
 }
 
-pybind11::dict channel_coupled_rd_geometry_forward(
+namespace {
+
+// One half of an interaction chain: the endpoint to the diffraction point through `faces`
+// (EPC), or a plain segment when the half has no reflection. Only active rows are traced.
+struct ChainLeg {
+    at::Tensor valid;
+    at::Tensor path_length;
+    at::Tensor prims;
+    at::Tensor hits;
+    at::Tensor normals;
+};
+
+ChainLeg trace_chain_leg(RayDSceneResource &scene, const at::Tensor &endpoint, const at::Tensor &point,
+                         const at::Tensor &active, const at::Tensor &faces, const at::Tensor &plane_points,
+                         const at::Tensor &plane_normals, const at::Tensor &surface_group_id,
+                         const at::Tensor &surface_group_size, const at::Tensor &surface_group_members,
+                         double min_segment_length) {
+    const int64_t count = endpoint.size(0);
+    const int64_t depth = faces.size(1);
+    ChainLeg leg;
+    if (depth == 0) {
+        // The segment is traced from the diffraction point to the endpoint, so a chain and its
+        // reverse trace the same segment the same way.
+        rayd::torch::VisibilityResult visibility =
+            rayd::torch::visibility_forward(scene.resource(), rayd::torch::VisibilityRequest{point, endpoint, active});
+        leg.valid = visibility.visible;
+        leg.path_length = at::empty({0}, point.options());
+        leg.prims = at::empty({count, 0}, faces.options());
+        leg.hits = at::empty({count, 0, 3}, point.options());
+        leg.normals = at::empty({count, 0, 3}, point.options());
+        return leg;
+    }
+    rayd::torch::ReflectionEpcRequest request;
+    request.source = endpoint;
+    request.receiver = point;
+    request.active = active;
+    request.expected_prim_ids = faces;
+    request.direct_plane_points = plane_points;
+    request.direct_plane_normals = plane_normals;
+    request.surface_group_id = surface_group_id;
+    request.surface_group_size = surface_group_size;
+    request.surface_group_members = surface_group_members;
+    request.max_bounces = depth;
+    request.visibility_ignore_mode = 1;
+    request.plane_tolerance = 1.0e-3;
+    request.min_segment_length = min_segment_length;
+    rayd::torch::ReflectionEpcResult epc = rayd::torch::reflection_epc_paths_forward(scene.resource(), request);
+    leg.valid = epc.valid;
+    leg.path_length = epc.path_length.contiguous();
+    leg.prims = epc.resolved_prim_ids.contiguous();
+    leg.hits = epc.hit_positions.contiguous();
+    leg.normals = epc.normals.contiguous();
+    return leg;
+}
+
+void check_chain_half(const at::Tensor &faces, const at::Tensor &plane_points, const at::Tensor &plane_normals,
+                      int64_t count, const char *name) {
+    TORCH_CHECK(faces.is_cuda() && faces.scalar_type() == at::kInt && faces.dim() == 2 && faces.is_contiguous(),
+                name, " faces must be a contiguous CUDA int32 (N, D) tensor");
+    TORCH_CHECK(faces.size(0) == count, name, " faces must match source rows");
+    for (const at::Tensor *tensor : {&plane_points, &plane_normals}) {
+        TORCH_CHECK(tensor->is_cuda() && tensor->scalar_type() == at::kFloat && tensor->dim() == 3 &&
+                        tensor->is_contiguous() && tensor->size(0) == count && tensor->size(1) == faces.size(1) &&
+                        tensor->size(2) == 3,
+                    name, " planes must be contiguous CUDA float32 (N, D, 3) tensors matching faces");
+    }
+}
+
+}  // namespace
+
+pybind11::dict channel_coupled_chain_geometry_forward(
     RayDSceneResource &scene,
     torch::Tensor source,
     torch::Tensor receiver,
-    torch::Tensor face_id,
-    torch::Tensor plane_point,
-    torch::Tensor plane_normal,
+    torch::Tensor edge_point,
     torch::Tensor edge_id,
-    torch::Tensor edge_pos,
-    torch::Tensor edge_dir,
-    torch::Tensor edge_t_min,
-    torch::Tensor edge_t_max,
+    torch::Tensor prefix_faces,
+    torch::Tensor prefix_plane_points,
+    torch::Tensor prefix_plane_normals,
+    torch::Tensor suffix_faces,
+    torch::Tensor suffix_plane_points,
+    torch::Tensor suffix_plane_normals,
     torch::Tensor surface_group_id,
     torch::Tensor surface_group_size,
     torch::Tensor surface_group_members,
-    bool reverse) {
+    double min_segment_length) {
     check_vec3_table(source, "source");
     check_vec3_table(receiver, "receiver");
-    check_flat_tensor(face_id, "face_id", at::kInt);
-    check_vec3_table(plane_point, "plane_point");
-    check_vec3_table(plane_normal, "plane_normal");
+    check_vec3_table(edge_point, "edge_point");
     check_flat_tensor(edge_id, "edge_id", at::kInt);
-    check_vec3_table(edge_pos, "edge_pos");
-    check_vec3_table(edge_dir, "edge_dir");
-    check_flat_tensor(edge_t_min, "edge_t_min", at::kFloat);
-    check_flat_tensor(edge_t_max, "edge_t_max", at::kFloat);
     check_flat_tensor(surface_group_id, "surface_group_id", at::kInt);
     check_flat_tensor(surface_group_size, "surface_group_size", at::kInt);
     check_flat_tensor(surface_group_members, "surface_group_members", at::kInt);
     const int64_t count = source.size(0);
-    TORCH_CHECK(receiver.size(0) == count, "receiver must match source rows");
-    TORCH_CHECK(face_id.size(0) == count && edge_id.size(0) == count,
-                "face_id and edge_id must match source rows");
-    for (const auto &tensor : {plane_point, plane_normal, edge_pos, edge_dir})
-        TORCH_CHECK(tensor.size(0) == count, "coupled geometry vector tables must match source rows");
-    TORCH_CHECK(edge_t_min.size(0) == count && edge_t_max.size(0) == count,
-                "edge bounds must match source rows");
-    TORCH_CHECK(surface_group_size.numel() > 0,
-                "surface_group_size must contain at least one group");
+    TORCH_CHECK(receiver.size(0) == count && edge_point.size(0) == count && edge_id.size(0) == count,
+                "chain candidate tables must match source rows");
+    check_chain_half(prefix_faces, prefix_plane_points, prefix_plane_normals, count, "prefix");
+    check_chain_half(suffix_faces, suffix_plane_points, suffix_plane_normals, count, "suffix");
+    TORCH_CHECK(prefix_faces.size(1) + suffix_faces.size(1) >= 1, "a chain needs at least one reflection");
+    TORCH_CHECK(prefix_faces.size(1) + suffix_faces.size(1) + 1 <= 8, "chain depth exceeds 8");
+    TORCH_CHECK(surface_group_size.numel() > 0, "surface_group_size must contain at least one group");
     TORCH_CHECK(surface_group_members.numel() % surface_group_size.numel() == 0,
                 "surface_group_members must be padded by group count");
+    TORCH_CHECK(std::isfinite(min_segment_length) && min_segment_length >= 0.0,
+                "min_segment_length must be finite and non-negative");
 
-    // D->R is the reciprocal R->D problem with endpoints exchanged. The
-    // output interaction sequence is reversed again by the finalize kernel.
-    at::Tensor epc_source = reverse ? receiver : source;
-    at::Tensor epc_receiver = reverse ? source : receiver;
-    std::vector<at::Tensor> prepared = channel_coupled_rd_prepare_cuda(
-        epc_source,
-        epc_receiver,
-        plane_point,
-        plane_normal,
-        edge_pos,
-        edge_dir,
-        edge_t_min,
-        edge_t_max);
-    TORCH_CHECK(prepared.size() == 4, "coupled R-D prepare returned an unexpected tensor count");
-    at::Tensor candidate_active = prepared[0];
-    at::Tensor diffraction_point = prepared[1];
-    at::Tensor expected_faces = face_id.reshape({count, 1}).contiguous();
-    at::Tensor direct_plane_points = plane_point.reshape({count, 1, 3}).contiguous();
-    at::Tensor direct_plane_normals = plane_normal.reshape({count, 1, 3}).contiguous();
-
-    rayd::torch::ReflectionEpcRequest epc_request;
-    epc_request.source = epc_source;
-    epc_request.receiver = diffraction_point;
-    epc_request.active = candidate_active;
-    epc_request.expected_prim_ids = expected_faces;
-    epc_request.direct_plane_points = direct_plane_points;
-    epc_request.direct_plane_normals = direct_plane_normals;
-    epc_request.surface_group_id = surface_group_id;
-    epc_request.surface_group_size = surface_group_size;
-    epc_request.surface_group_members = surface_group_members;
-    epc_request.max_bounces = 1;
-    epc_request.visibility_ignore_mode = 1;
-    epc_request.plane_tolerance = 1.0e-3;
-    rayd::torch::ReflectionEpcResult epc =
-        rayd::torch::reflection_epc_paths_forward(scene.resource(), epc_request);
-
-    at::Tensor prefix_active = channel_coupled_active_mask_cuda(candidate_active, epc.valid);
-    rayd::torch::VisibilityResult suffix = rayd::torch::visibility_forward(
-        scene.resource(),
-        rayd::torch::VisibilityRequest{
-            diffraction_point, epc_receiver, prefix_active});
-    at::Tensor resolved_face = epc.resolved_prim_ids.select(1, 0).contiguous();
-    at::Tensor reflection_position = epc.hit_positions.select(1, 0).contiguous();
-    at::Tensor reflection_normal = epc.normals.select(1, 0).contiguous();
-    pybind11::dict out = channel_coupled_rd_finalize_cuda(
-        prefix_active,
-        suffix.visible,
-        epc.path_length.contiguous(),
-        resolved_face,
-        edge_id,
-        reflection_position,
-        reflection_normal,
-        diffraction_point,
-        edge_dir,
-        epc_receiver,
-        reverse);
-    out["candidate_active"] = candidate_active;
-    out["virtual_source"] = prepared[2];
-    out["predicted_reflection_position"] = prepared[3];
-    out["suffix_blocker_primitive"] = suffix.blocker_prim;
-    return out;
+    // Each leg is traced only for rows whose previous leg is valid.
+    const at::Tensor all_rows = at::ones({count}, source.options().dtype(at::kBool));
+    ChainLeg prefix = trace_chain_leg(scene, source, edge_point, all_rows, prefix_faces, prefix_plane_points,
+                                      prefix_plane_normals, surface_group_id, surface_group_size,
+                                      surface_group_members, min_segment_length);
+    ChainLeg suffix = trace_chain_leg(scene, receiver, edge_point, prefix.valid, suffix_faces, suffix_plane_points,
+                                      suffix_plane_normals, surface_group_id, surface_group_size,
+                                      surface_group_members, min_segment_length);
+    return channel_coupled_chain_finalize_cuda(
+        prefix.valid, suffix.valid, prefix.path_length, suffix.path_length, prefix.prims, suffix.prims, prefix.hits,
+        suffix.hits, prefix.normals, suffix.normals, source, receiver, edge_point, edge_id, min_segment_length);
 }
 
 pybind11::dict channel_coupled_dd_geometry_forward(
@@ -663,6 +676,8 @@ pybind11::dict channel_coupled_dd_geometry_forward(
 
     // Prepare the two-edge Fermat point pair (Q1 on e1, Q2 on e2).
     std::vector<at::Tensor> prepared = channel_coupled_dd_prepare_cuda(
+        edge1_id,
+        edge2_id,
         source,
         receiver,
         edge1_pos,
@@ -679,17 +694,20 @@ pybind11::dict channel_coupled_dd_geometry_forward(
     at::Tensor q1 = prepared[1];
     at::Tensor q2 = prepared[2];
 
-    // Three RayD segment visibility queries (tx->Q1, Q1->Q2, Q2->rx), each
-    // gated by the candidate mask and ANDed into the row validity.
+    // RayD segment visibility of the three legs, each traced only for candidates whose
+    // previous legs are visible. The outer legs are traced from the diffraction point to the
+    // endpoint and the middle leg in both directions (visible when either trace is), so a
+    // candidate and its reverse (endpoints and edges exchanged) trace the same segments.
     rayd::torch::VisibilityResult leg1 = rayd::torch::visibility_forward(
-        scene.resource(), {source, q1, candidate_active});
-    rayd::torch::VisibilityResult leg2 = rayd::torch::visibility_forward(
-        scene.resource(), {q1, q2, candidate_active});
-    rayd::torch::VisibilityResult leg3 = rayd::torch::visibility_forward(
-        scene.resource(), {q2, receiver, candidate_active});
-
+        scene.resource(), {q1, source, candidate_active});
     at::Tensor prefix_active = channel_coupled_active_mask_cuda(candidate_active, leg1.visible);
-    prefix_active = channel_coupled_active_mask_cuda(prefix_active, leg2.visible);
+    rayd::torch::VisibilityResult leg2 = rayd::torch::visibility_forward(
+        scene.resource(), {q1, q2, prefix_active});
+    rayd::torch::VisibilityResult leg2_reverse = rayd::torch::visibility_forward(
+        scene.resource(), {q2, q1, prefix_active});
+    prefix_active = channel_coupled_active_either_mask_cuda(prefix_active, leg2.visible, leg2_reverse.visible);
+    rayd::torch::VisibilityResult leg3 = rayd::torch::visibility_forward(
+        scene.resource(), {q2, receiver, prefix_active});
     prefix_active = channel_coupled_active_mask_cuda(prefix_active, leg3.visible);
 
     pybind11::dict out = channel_coupled_dd_finalize_cuda(

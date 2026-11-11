@@ -172,9 +172,8 @@ class Result:
 
 # Component slots materialized by the native accumulator
 # (kAccumSlotCount=6 in kernels/deterministic_accum.cu); the path component
-# ids map to them as 0/1/2 -> 0/1/2, 5 -> 3, 6 -> 4, and 3/4 -> 5 (coupled reflection and diffraction:
-# reflection->diffraction and diffraction->reflection are the coupled classes,
-# both summed coherently into the single coupled field slot). Under
+# ids map to them as 0/1/2 -> 0/1/2, 5 -> 3, 6 -> 4, and the interaction chains and double
+# diffraction (3, 4, 7, 9..15) -> 5, summed coherently into the single coupled field slot. Under
 # ad_mode != "none" the same native forward runs inside a dispatch-only
 # autograd.Function whose backward/jvp are native CUDA companions
 # (accumulation_kernels.deterministic_accumulate_flat_ad), so the accumulated
@@ -507,12 +506,12 @@ def _scattering_metadata(
 def _coupled_paths_metadata(
     config: Config, component_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
-    """Coupled higher-order compensator metadata block (coupled reflection and diffraction + coupled double diffraction).
+    """Coupled-paths metadata block: interaction chains plus double diffraction.
 
-    Mirrors the path solver's coupled_paths block. ``coupled_paths=True`` now
-    enables the uniform order-2 compensator family {R->D, D->R, D->D}; the DD
-    (component id 7) member is reported as its own row count for audits while it
-    aggregates into the single coherent coupled slot.
+    Mirrors the path solver's coupled_paths block. ``coupled_paths=True`` enables the
+    interaction chains (reflections with one diffraction anywhere, up to ``max_depth``
+    interactions) and double diffraction; the double-diffraction rows (component id 7) are
+    reported as their own row count while they aggregate into the single coherent coupled slot.
     """
 
     if not config.coupled_paths:
@@ -524,7 +523,7 @@ def _coupled_paths_metadata(
     counts = component_counts or {}
     return {
         "requested": True,
-        "geometry": "native_1r1d_reciprocal_plus_dd",
+        "geometry": "native_interaction_chains_plus_dd",
         "coefficient": "unified_complex3_jones",
         "double_diffraction": {
             "geometry": "native_dd_cascade",
@@ -538,19 +537,23 @@ def _register_coupled_component(
     config: Config, topology: Any, component_counts: dict[str, int],
     extra_components: tuple[str, ...],
 ) -> tuple[str, ...]:
-    """Record the coupled component count and export name (coupled reflection and diffraction + coupled double diffraction).
+    """Record the coupled component count and export name.
 
-    Coupled rows carry component ids 3 (R->D), 4 (D->R) and 7 (D->D, coupled double diffraction);
-    all three accumulate into the single coupled slot. "coupled" is not a public
-    component name, so it is enabled by the coupled_paths gate rather than the
-    components set. The DD row count is recorded separately for audits.
+    Coupled rows carry component ids 3 (diffraction last), 4 (diffraction first), 9..15
+    (diffraction at an interior slot) and 7 (double diffraction); all accumulate into the single
+    coupled slot. "coupled" is not a public component name, so it is enabled by the
+    coupled_paths gate rather than the components set. The double-diffraction row count is
+    recorded separately for audits.
     """
 
     if not config.coupled_paths:
         return extra_components
     component_id = topology.component_id
     component_counts["coupled"] = int(
-        ((component_id == 3) | (component_id == 4) | (component_id == 7)).sum().item()
+        (
+            (component_id == 3) | (component_id == 4) | (component_id == 7)
+            | ((component_id > 8) & (component_id < 16))
+        ).sum().item()
     )
     component_counts["coupled_double_diffraction"] = int(
         (component_id == 7).sum().item()
@@ -752,9 +755,6 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
         scene,
         config,
         frequency_value=frequency_hz,
-        # Stream coupled discovery over receiver blocks so a full grid solve
-        # stays under the per-block candidate budget (coupled reflection and diffraction).
-        coupled_rx_streaming=config.coupled_paths,
         defer_capacity_terminal=True,
     )
     evaluated, sidecars, scattering_info = _append_scattering(

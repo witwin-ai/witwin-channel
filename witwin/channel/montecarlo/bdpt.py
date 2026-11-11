@@ -3446,9 +3446,9 @@ def _effective_native_depth(config: Config) -> int:
 
 
 # Enumerated component id -> BDPT accumulation bucket. LoS 0, reflection 1 and
-# diffraction 2 keep their id; coupled reflection-diffraction (3, 4) and double
+# diffraction 2 keep their id; the interaction chains (3, 4, 9..15) and double
 # diffraction (7) fold into diffraction; transmission keeps 5.
-_ENUMERATED_BUCKET = (0, 1, 2, 2, 2, 5, 6, 2)
+_ENUMERATED_BUCKET = (0, 1, 2, 2, 2, 5, 6, 2, 2, 2, 2, 2, 2, 2, 2, 2)
 
 
 def _evaluated_connection_samples(
