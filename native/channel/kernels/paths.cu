@@ -29,7 +29,10 @@ namespace {
 
 constexpr double kLightSpeedMetersPerSecond = 299792458.0;
 constexpr float kPi = 3.14159265358979323846f;
-constexpr float kReflectionBaryEps = 1.0e-4f;
+// In-face slack of a reflection point, relative to the coordinate magnitude of the triangle and
+// the point (RayD's reflection containment rule): a distance outside each edge line, so the
+// reflection support ends at a face's boundary edge whatever the face size.
+constexpr float kReflectionContainmentRelative = 8.0f / 8388608.0f;
 constexpr float kReflectionVisEps = 1.0e-4f;
 
 __device__ float channel_neg_kd_phase(float k, float d) {
@@ -377,8 +380,18 @@ __device__ bool inside_triangle3(
     const float v = (d11 * d20 - d01 * d21) * inv;
     const float w = (d00 * d21 - d01 * d20) * inv;
     const float u = 1.0f - v - w;
-    return u >= -kReflectionBaryEps && v >= -kReflectionBaryEps && w >= -kReflectionBaryEps &&
-        u <= 1.0f + kReflectionBaryEps && v <= 1.0f + kReflectionBaryEps && w <= 1.0f + kReflectionBaryEps;
+    float magnitude = 0.0f;
+    for (int axis = 0; axis < 3; ++axis) {
+        magnitude = fmaxf(magnitude, fmaxf(fmaxf(fabsf(a[axis]), fabsf(b[axis])), fmaxf(fabsf(c[axis]), fabsf(p[axis]))));
+    }
+    // A barycentric is the distance to the opposite edge over that edge's altitude 2A / |edge|.
+    const float slack = kReflectionContainmentRelative * magnitude;
+    const float twice_area = sqrtf(denom);
+    const float bcx = c[0] - b[0];
+    const float bcy = c[1] - b[1];
+    const float bcz = c[2] - b[2];
+    return v * twice_area >= -slack * sqrtf(d11) && w * twice_area >= -slack * sqrtf(d00) &&
+        u * twice_area >= -slack * sqrtf(bcx * bcx + bcy * bcy + bcz * bcz);
 }
 
 __global__ void path_reflection_candidates_kernel(
