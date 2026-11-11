@@ -61,6 +61,9 @@ def test_tiers_cover_the_required_gate_families() -> None:
     } <= set(_ids("quick"))
     assert {
         "cuda.unit-contract-acceptance",
+        "cuda.survival",
+        "cuda.reference-accuracy",
+        "cuda.launch-budgets",
         "cuda.four-solver-smoke",
         "cuda.no-fallback",
         "cuda.ad-core",

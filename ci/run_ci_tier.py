@@ -107,8 +107,17 @@ CUDA_GATES = (
             "--ignore=tests/deterministic/test_munich_deterministic_parity.py",
             "--ignore=tests/montecarlo/bdpt/test_munich_bdpt_parity.py",
             "--ignore=tests/scene/test_munich_loader_parity.py",
+            "--ignore=tests/survival",
+            "--ignore=tests/accuracy",
+            "--ignore=tests/budgets",
         ),
     ),
+    # Every hostile input in a fresh process; the CUDA context must stay usable afterwards.
+    Gate("cuda.survival", ("-m", "pytest", "-q", "tests/survival")),
+    # Independent float64 references and self-consistency checks; prints each test's error.
+    Gate("cuda.reference-accuracy", ("-m", "pytest", "-q", "tests/accuracy")),
+    # Kernel launch, host sync and copy upper bounds per solver and scene size.
+    Gate("cuda.launch-budgets", ("-m", "pytest", "-q", "tests/budgets")),
     Gate(
         "cuda.four-solver-smoke",
         (
