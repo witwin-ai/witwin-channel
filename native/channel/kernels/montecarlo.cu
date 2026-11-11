@@ -7,6 +7,7 @@
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
 #include "math.cuh"
+#include "constants.cuh"
 
 #include <tuple>
 
@@ -444,7 +445,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
 namespace {
 
 constexpr int kSampleBlockSize = 256;
-constexpr double kPi = 3.141592653589793238462643383279502884;
+using channel::kPi;
 constexpr double kGoldenRatio = 1.618033988749894848204586834365638118;
 
 __global__ void sample_directions_kernel(float *__restrict__ directions, int64_t count) {

@@ -12,6 +12,11 @@
 
 namespace channel {
 
+// Blocks of ``block_size`` threads that cover ``count`` threads.
+inline int launch_blocks(int64_t count, int block_size) {
+    return static_cast<int>((count + block_size - 1) / block_size);
+}
+
 inline at::Tensor empty_zero_cuda(
     at::IntArrayRef sizes,
     const at::TensorOptions& options,

@@ -4,6 +4,7 @@
 // ==== Section: BDPT subpaths ====
 #include "torch_cuda.h"
 #include "math.cuh"
+#include "constants.cuh"
 
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
@@ -18,7 +19,7 @@
 
 namespace {
 
-constexpr double kPi = 3.141592653589793238462643383279502884;
+using channel::kPi;
 namespace em = rayd::shared::transmission;
 namespace utd = rayd::shared::diffraction;
 namespace transport = rayd::shared::field_transport;
@@ -113,7 +114,7 @@ std::vector<at::Tensor> allocate_subpath_state(const at::Tensor& reference, int6
 }
 
 constexpr float kSubpathEps = 1.0e-9f;
-constexpr float kSubpathEpsilon0 = 8.8541878128e-12f;
+using channel::kVacuumPermittivityF;
 
 using SubpathComplex = channel::math::Complex;
 namespace cmath = channel::math;
@@ -152,7 +153,7 @@ __device__ float effective_power_reflectance(
     const float cos_theta = fminf(fmaxf(-dot_in, kSubpathEps), 1.0f);
     const float sin2 = fmaxf(0.0f, 1.0f - cos_theta * cos_theta);
     const float omega = fmaxf(static_cast<float>(2.0 * kPi) * frequency_hz, kSubpathEps);
-    const SubpathComplex eta = cmath::complex(fmaxf(eps_r, kSubpathEps), -fmaxf(sigma_e, 0.0f) / (omega * kSubpathEpsilon0));
+    const SubpathComplex eta = cmath::complex(fmaxf(eps_r, kSubpathEps), -fmaxf(sigma_e, 0.0f) / (omega * kVacuumPermittivityF));
     const float mu_value = fmaxf(mu_r, kSubpathEps);
     const SubpathComplex root = cmath::complex_sqrt_passive(cmath::complex_sub(cmath::complex_scale(eta, mu_value), cmath::complex(sin2, 0.0f)));
     const SubpathComplex mu_cos = cmath::complex(mu_value * cos_theta, 0.0f);
@@ -676,14 +677,13 @@ std::vector<at::Tensor> channel_bdpt_sensor_endpoint_subpath_state_cuda(
 // carrier, with the lockstep duals slab_fresnel_dual and stack_rt_dual.
 
 #define kSubpathEps kSubpathAdEps
-#define kSubpathEpsilon0 kSubpathAdEpsilon0
 
 namespace {
 
 namespace ad = rayd::torch::field_transport_ad;
 
 constexpr float kSubpathEps = 1.0e-9f;
-constexpr float kSubpathEpsilon0 = 8.8541878128e-12f;
+using channel::kVacuumPermittivityF;
 
 // ---------------------------------------------------------------------------
 // Reflection amplitude proxy (effective_power_reflectance) and its dual. This
@@ -809,10 +809,10 @@ __device__ float effective_reflectance_dual(
     const float d_eps_clamped = eps_r > kSubpathEps ? d_eps : 0.0f;
     const float sigma_clamped = fmaxf(sigma_e, 0.0f);
     const float d_sigma_clamped = sigma_e >= 0.0f ? d_sigma : 0.0f;
-    const float eta_im = -sigma_clamped / (omega * kSubpathEpsilon0);
+    const float eta_im = -sigma_clamped / (omega * kVacuumPermittivityF);
     const float d_eta_im =
         (-d_sigma_clamped / omega + sigma_clamped * d_omega / (omega * omega)) /
-        kSubpathEpsilon0;
+        kVacuumPermittivityF;
     const DualSC eta = dsc_make(eps_clamped, eta_im, d_eps_clamped, d_eta_im);
     const float mu_value = fmaxf(mu_r, kSubpathEps);
     const DualSC root = dsc_sqrt(dsc_sub(dsc_scale(eta, mu_value), dsc_const({geo.sin2, 0.0f})));
@@ -1118,7 +1118,6 @@ __device__ __forceinline__ ReflectSeed reflect_tangent_seed(const channel::bdpt_
 // ===========================================================================
 
 #undef kSubpathEps
-#undef kSubpathEpsilon0
 
 // ==== Section: BDPT wavefront sampler ====
 
@@ -1219,7 +1218,7 @@ __global__ void bdpt_wavefront_step_kernel(
         if (rough) {
             // Three-way budgets (R_coh, R_diff, T_bar), each positive budget
             // floored at 0.05 and the triple renormalized.
-            const float k0 = 6.2831853071795864769f * frequency_hz / 299792458.0f;
+            const float k0 = channel::kTwoPiF * frequency_hz / channel::kSpeedOfLightF;
             const float roughness = k0 * cos_theta * tables.rough_sigma_h[material];
             coherent = expf(-2.0f * roughness * roughness);
             const float r_coh = r_eff * coherent * coherent;

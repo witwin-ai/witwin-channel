@@ -75,6 +75,33 @@ Channel does not add a second generic tensor-math module. Domain-specific
 offline material math remains with its owner, while independent reference
 implementations remain under `tests/` and are never production dependencies.
 
+Physical constants and path component ids have one native owner,
+`native/channel/kernels/constants.cuh`: the speed of light, pi, two pi and the
+vacuum permittivity in a double and a float spelling (the float spelling is the
+double value rounded to float, so every replaced literal keeps its value and
+precision), and the `ComponentId` enum that `witwin.channel.path` also publishes.
+Grid sizing has one helper, `channel::launch_blocks(count, block_size)` in
+`native/channel/kernels/torch_cuda.h`; a translation-unit section names its own
+block-size constant instead of renaming `kBlockSize` or `launch_blocks` with a
+macro. `ci/check_shared_math.py` rejects the literals, local definitions and
+rename macros anywhere else.
+
+## Native operation declarations
+
+Every native symbol a facade module dispatches is declared once with
+`witwin/channel/kernels/spec.py`: `_native.op("symbol", ...)` lists the ABI
+arguments in C++ order, with the CUDA tensor check, host conversion and
+autograd role of each. Declaration order is the dispatch order;
+`ci/check_native_bindings.py` checks that the declared names and their order
+equal the C++ parameters (an `abi=` override names a differently spelled C++
+parameter) and attributes the symbol to the definitions that call the
+declaration. A facade validates with the declaration's checks, in declaration
+order or in an explicit order where an older error precedence is kept. An
+autograd Function names its `apply` inputs once with `AdInputs`, which derives
+the fixed-input refusals (gradient and tangent), the `needs_input_grad` tests and
+the gradient tuple from the names; positional `inputs[i]`, `needs_input_grad[i]`
+and `(None,) * N` tuples are not used.
+
 ## Duplication
 
 Exact-token duplication of at least 100 tokens is inventoried by

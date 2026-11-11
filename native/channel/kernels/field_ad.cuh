@@ -79,10 +79,6 @@ __device__ __forceinline__ c10::complex<float> to_c10(field::Complex value) {
 // Host entries.
 // ---------------------------------------------------------------------------
 
-int launch_blocks(int64_t count) {
-    return static_cast<int>((count + kBlockSize - 1) / kBlockSize);
-}
-
 // Gradient accumulators must start at zero; allocate raw and memset on the
 // current stream (same pattern as los.cu) instead of ATen zero-fill.
 at::Tensor zero_filled(at::IntArrayRef sizes, const at::TensorOptions& options) {

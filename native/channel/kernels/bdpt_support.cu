@@ -6,10 +6,11 @@
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
 #include "torch_cuda.h"
+#include "constants.cuh"
 
 namespace {
 
-constexpr double kPi = 3.141592653589793238462643383279502884;
+using channel::kPi;
 
 void check_reference(const at::Tensor& tensor) {
     TORCH_CHECK(tensor.is_cuda(), "reference must be a CUDA tensor");
