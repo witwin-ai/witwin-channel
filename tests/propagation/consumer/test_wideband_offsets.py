@@ -30,6 +30,7 @@ from witwin.channel.scene import compile as compile_scene
 from witwin.core import MaterialLayer, PhysicalMaterial, Scene
 
 from tests.propagation.consumer._multi_endpoint_world import (
+    FREQUENCY_HZ,
     FROZEN_ROW_COUNT,
     SINK_POSITIONS,
     SOURCE_POSITIONS,
@@ -297,7 +298,7 @@ def test_the_budget_is_flat_in_the_frequency_column_count() -> None:
 
 
 def test_the_launch_count_follows_the_published_law() -> None:
-    """``launches = (1 + F) * buckets``, asserted rather than asserted-about."""
+    """A primal sweep runs each bucket once at the reference and once for all F columns."""
 
     from witwin.channel.kernels import fields as field_kernels
 
@@ -308,22 +309,24 @@ def test_the_launch_count_follows_the_published_law() -> None:
     sources = source_batch(cuda_positions(SOURCE_POSITIONS))
     sinks = sink_batch(cuda_positions(SINK_POSITIONS))
 
-    counted: list[int] = [0]
-    originals = {
-        name: getattr(field_kernels, name)
-        for name in ("field_free_space", "field_reflection_sequence")
+    counted = {"single": 0, "columns": 0}
+    names = {
+        "field_free_space": "single",
+        "field_reflection_sequence": "single",
+        "field_transport_columns": "columns",
     }
+    originals = {name: getattr(field_kernels, name) for name in names}
 
-    def counting(original):
+    def counting(name, original):
         def wrapper(*args, **kwargs):
-            counted[0] += 1
+            counted[names[name]] += 1
             return original(*args, **kwargs)
 
         return wrapper
 
     try:
         for name, original in originals.items():
-            setattr(field_kernels, name, counting(original))
+            setattr(field_kernels, name, counting(name, original))
         measured = {}
         for count in (None, 1, 8, 64):
             offsets = (
@@ -331,16 +334,58 @@ def test_the_launch_count_follows_the_published_law() -> None:
                 if count is None
                 else tuple(float(1.0e6 * (index + 1)) for index in range(count))
             )
-            counted[0] = 0
+            counted.update(single=0, columns=0)
             replay(compiled, prepared, sources, sinks, frequency_offsets_hz=offsets)
-            measured[count] = counted[0]
+            measured[count] = dict(counted)
     finally:
         for name, original in originals.items():
             setattr(field_kernels, name, original)
 
-    assert measured[None] == buckets
+    assert measured[None] == {"single": buckets, "columns": 0}
     for count in (1, 8, 64):
-        assert measured[count] == (1 + count) * buckets, (count, measured)
+        assert measured[count] == {"single": buckets, "columns": buckets}, (count, measured)
+
+
+@pytest.mark.parametrize("response", ["scalar_transport", "complex3_transport"])
+def test_every_wideband_column_is_bitwise_the_single_frequency_replay(response) -> None:
+    from witwin.channel.propagation import consumer as consumer_module
+
+    compiled = compiled_world()
+    prepared = frozen_topology(compiled)
+    sources = source_batch(cuda_positions(SOURCE_POSITIONS))
+    sinks = sink_batch(cuda_positions(SINK_POSITIONS))
+    offsets = (-3.0e7, 0.0, 1.25e8, 7.0e8)
+    result = replay(
+        compiled, prepared, sources, sinks, response=response, frequency_offsets_hz=offsets
+    )
+    rows = consumer_module.prepared_row_gather(
+        prepared.topology, sources, sinks, face_count=int(compiled.geometry.faces.shape[0])
+    )
+    inputs = consumer_module.prepared_bucket_inputs(compiled, prepared, rows)
+    transport = result.paths.transport
+    payload = (
+        transport.coefficient_offsets
+        if response == "scalar_transport"
+        else transport.field_offsets
+    )
+    for index, offset in enumerate(offsets):
+        column = consumer_module.evaluate_prepared(
+            compiled,
+            prepared,
+            rows,
+            response=response,
+            ad_mode="none",
+            frequency=FREQUENCY_HZ + offset,
+            frequency_value=compiled.materials.frequency_hz + offset,
+            source_reference_basis=None,
+            sink_reference_basis=None,
+            publish_row_validity=True,
+            bucket_inputs=inputs,
+        )
+        expected = (
+            column.path_field if response == "scalar_transport" else column.path_field_vector
+        )
+        assert torch.equal(payload[:, index], expected), offset
 
 
 def test_slot_batching_and_frequency_offsets_compose() -> None:

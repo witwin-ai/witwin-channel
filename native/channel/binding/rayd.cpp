@@ -298,7 +298,8 @@ pybind11::tuple channel_rayd_diffraction_paths_order1_forward(
     int64_t state_limit,
     int64_t capacity,
     double wavelength,
-    double isb_taper_width_scale);
+    double isb_taper_width_scale,
+    std::optional<torch::Tensor> state_source_index);
 pybind11::tuple channel_rayd_diffraction_sample_tape_forward(
     RayDSceneResource &scene,
     pybind11::object active,
@@ -358,7 +359,8 @@ at::Tensor channel_diffraction_tx_visible_state_plan(
     torch::Tensor edge_position,
     torch::Tensor edge_direction,
     torch::Tensor edge_t_min,
-    torch::Tensor edge_t_max);
+    torch::Tensor edge_t_max,
+    std::optional<torch::Tensor> state_source);
 
 void register_rayd_geometry(pybind11::module_ &module) {
     pybind11::class_<RayDSceneResource, std::shared_ptr<RayDSceneResource>>(

@@ -42,7 +42,6 @@ __all__ = [
     "core_pack_int2",
     "deterministic_component_counts",
     "deterministic_concat_topology_blocks",
-    "deterministic_diffraction_order1_compact",
     "deterministic_diffraction_state_pack",
     "deterministic_diffraction_state_pack_selected",
     "deterministic_face_anchor_points",
@@ -55,10 +54,10 @@ __all__ = [
     "deterministic_reflection_order1_compact",
     "deterministic_reflection_sequence_compact",
     "deterministic_reflection_topology_compact",
+    "deterministic_diffraction_topology_compact",
     "deterministic_repeat_range",
     "deterministic_selected_edge_count",
     "deterministic_sort_order",
-    "deterministic_topology_base_fields",
     "deterministic_topology_default_fields",
     "enumerated_canonical_compact",
     "enumerated_exact_pair_metadata",
@@ -826,112 +825,6 @@ def deterministic_reflection_sequence_compact(
     return exported
 
 
-def deterministic_diffraction_order1_compact(
-    *, valid: torch.Tensor, rx_id: torch.Tensor, depth: torch.Tensor, edge_id: torch.Tensor,
-    delay_s: torch.Tensor, x_re: torch.Tensor, x_im: torch.Tensor, y_re: torch.Tensor,
-    y_im: torch.Tensor, z_re: torch.Tensor, z_im: torch.Tensor, interaction_position: torch.Tensor,
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor("valid", valid, dtype=torch.bool, ndim=1)
-    validate_cuda_tensor("rx_id", rx_id, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("depth", depth, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("edge_id", edge_id, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("delay_s", delay_s, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("x_re", x_re, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("x_im", x_im, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("y_re", y_re, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("y_im", y_im, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("z_re", z_re, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("z_im", z_im, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor(
-        "interaction_position",
-        interaction_position,
-        dtype=torch.float32,
-        ndim=2,
-        trailing_shape=(3,),
-    )
-    count = int(valid.shape[0])
-    for name, tensor in {
-        "rx_id": rx_id,
-        "depth": depth,
-        "edge_id": edge_id,
-        "delay_s": delay_s,
-        "x_re": x_re,
-        "x_im": x_im,
-        "y_re": y_re,
-        "y_im": y_im,
-        "z_re": z_re,
-        "z_im": z_im,
-    }.items():
-        if tensor.shape != (count,):
-            raise ValueError(f"{name} must match valid")
-    if interaction_position.shape != (count, 3):
-        raise ValueError("interaction_position must match valid")
-
-    exported = _required_native_op("deterministic_diffraction_order1_compact")(
-        valid,
-        rx_id,
-        depth,
-        edge_id,
-        delay_s,
-        x_re,
-        x_im,
-        y_re,
-        y_im,
-        z_re,
-        z_im,
-        interaction_position,
-    )
-    if not isinstance(exported, dict):
-        raise TypeError(
-            "_channel.deterministic_diffraction_order1_compact must return a dict"
-        )
-    expected_fields = {
-        "rx_id",
-        "depth",
-        "edge_id",
-        "delay_s",
-        "x_re",
-        "x_im",
-        "y_re",
-        "y_im",
-        "z_re",
-        "z_im",
-        "interaction_position",
-    }
-    if set(exported) != expected_fields:
-        raise ValueError(
-            "_channel.deterministic_diffraction_order1_compact returned unexpected fields"
-        )
-    selected_count = int(exported["rx_id"].shape[0])
-    validate_cuda_tensor("rx_id", exported["rx_id"], dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("depth", exported["depth"], dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("edge_id", exported["edge_id"], dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("delay_s", exported["delay_s"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("x_re", exported["x_re"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("x_im", exported["x_im"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("y_re", exported["y_re"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("y_im", exported["y_im"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("z_re", exported["z_re"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("z_im", exported["z_im"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor(
-        "interaction_position",
-        exported["interaction_position"],
-        dtype=torch.float32,
-        ndim=2,
-        trailing_shape=(3,),
-    )
-    for key in expected_fields - {"interaction_position"}:
-        if exported[key].shape != (selected_count,):
-            raise ValueError(
-                f"_channel.deterministic_diffraction_order1_compact returned bad {key} shape"
-            )
-    if exported["interaction_position"].shape != (selected_count, 3):
-        raise ValueError(
-            "_channel.deterministic_diffraction_order1_compact returned bad interaction_position shape"
-        )
-    return exported
-
-
 def deterministic_sort_order(
     valid: torch.Tensor, tx_id: torch.Tensor, rx_id: torch.Tensor, depth: torch.Tensor,
     component_id: torch.Tensor, primitive_id: torch.Tensor, edge_id: torch.Tensor,
@@ -1186,58 +1079,6 @@ def deterministic_pad_topology_sequences(
     return exported
 
 
-def deterministic_topology_base_fields(
-    *, rx_id: torch.Tensor, path_length_m: torch.Tensor, delay_s: torch.Tensor,
-    path_gain: torch.Tensor, tx_index: int, component_id: int, depth_source: torch.Tensor,
-    depth_value: int, primitive_source: torch.Tensor, primitive_value: int,
-    edge_source: torch.Tensor, edge_value: int,
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor("rx_id", rx_id, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("path_length_m", path_length_m, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("delay_s", delay_s, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("path_gain", path_gain, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("depth_source", depth_source, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor(
-        "primitive_source", primitive_source, dtype=torch.int32, ndim=1
-    )
-    validate_cuda_tensor("edge_source", edge_source, dtype=torch.int32, ndim=1)
-    count = int(rx_id.shape[0])
-    for name, tensor in {
-        "path_length_m": path_length_m,
-        "delay_s": delay_s,
-        "path_gain": path_gain,
-    }.items():
-        if tensor.shape != (count,):
-            raise ValueError(f"{name} must match rx_id")
-    for name, tensor in {
-        "depth_source": depth_source,
-        "primitive_source": primitive_source,
-        "edge_source": edge_source,
-    }.items():
-        if tensor.shape not in {(0,), (count,)}:
-            raise ValueError(f"{name} must be empty or match rx_id")
-    block = _required_native_op("deterministic_topology_base_fields")(
-        rx_id,
-        path_length_m,
-        delay_s,
-        path_gain,
-        int(tx_index),
-        int(component_id),
-        depth_source,
-        int(depth_value),
-        primitive_source,
-        int(primitive_value),
-        edge_source,
-        int(edge_value),
-    )
-    if not isinstance(block, dict):
-        raise TypeError(
-            "_channel.deterministic_topology_base_fields must return a dict"
-        )
-    _validate_path_block("deterministic_topology_base_fields", block)
-    return block
-
-
 def deterministic_repeat_range(
     reference: torch.Tensor, *, start: int, end: int, repeats: int,
 ) -> torch.Tensor:
@@ -1366,6 +1207,64 @@ def deterministic_reflection_epc_input_batch(
                 f"_channel.deterministic_reflection_epc_input_batch returned bad {key} shape"
             )
     return exported
+
+
+def deterministic_diffraction_topology_compact(
+    *, valid: torch.Tensor, tx_id: torch.Tensor, rx_id: torch.Tensor, rx_offset: int,
+    depth: torch.Tensor, edge_id: torch.Tensor, delay_s: torch.Tensor, x_re: torch.Tensor,
+    x_im: torch.Tensor, y_re: torch.Tensor, y_im: torch.Tensor, z_re: torch.Tensor,
+    z_im: torch.Tensor, interaction_position: torch.Tensor,
+) -> dict[str, torch.Tensor]:
+    """Compact valid order-1 diffraction exports into one topology block (one count copy).
+
+    Receiver ids are shifted by ``rx_offset``; the exporter's vector field becomes ``field_xyz``.
+    """
+
+    validate_cuda_tensor("valid", valid, dtype=torch.bool, ndim=1)
+    count = int(valid.shape[0])
+    for name, value in (("tx_id", tx_id), ("rx_id", rx_id), ("depth", depth), ("edge_id", edge_id)):
+        validate_cuda_tensor(name, value, dtype=torch.int32, ndim=1)
+        if value.shape != (count,):
+            raise ValueError(f"{name} must match valid")
+    for name, value in (
+        ("delay_s", delay_s),
+        ("x_re", x_re),
+        ("x_im", x_im),
+        ("y_re", y_re),
+        ("y_im", y_im),
+        ("z_re", z_re),
+        ("z_im", z_im),
+    ):
+        validate_cuda_tensor(name, value, dtype=torch.float32, ndim=1)
+        if value.shape != (count,):
+            raise ValueError(f"{name} must match valid")
+    validate_cuda_tensor(
+        "interaction_position", interaction_position, dtype=torch.float32, ndim=2,
+        trailing_shape=(3,),
+    )
+    if int(rx_offset) < 0:
+        raise ValueError("rx_offset must be non-negative")
+    block = _required_native_op("deterministic_diffraction_topology_compact")(
+        valid, tx_id, rx_id, int(rx_offset), depth, edge_id, delay_s, x_re, x_im, y_re, y_im,
+        z_re, z_im, interaction_position,
+    )
+    if not isinstance(block, dict):
+        raise TypeError("_channel.deterministic_diffraction_topology_compact must return a dict")
+    _validate_path_block("deterministic_diffraction_topology_compact", block)
+    rows = int(block["valid"].shape[0])
+    for key, dtype, shape in (
+        ("path_field", torch.complex64, (rows,)),
+        ("field_xyz", torch.complex64, (rows, 3)),
+        ("interaction_position", torch.float32, (rows, 3)),
+        ("interaction_normal", torch.float32, (rows, 3)),
+        ("material_id", torch.int32, (rows,)),
+    ):
+        validate_cuda_tensor(key, block[key], dtype=dtype, ndim=len(shape))
+        if tuple(block[key].shape) != shape:
+            raise ValueError(
+                f"_channel.deterministic_diffraction_topology_compact returned bad {key} shape"
+            )
+    return block
 
 
 def deterministic_reflection_topology_compact(

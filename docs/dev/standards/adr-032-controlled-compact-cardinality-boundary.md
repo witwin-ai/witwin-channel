@@ -48,6 +48,10 @@
 > with the transmitter count. The copy-count budget below is unchanged; the byte
 > budget reads "one control record of `8 * (2 + ceil(G / 2))` bytes per compact
 > call".
+> In `tests/budgets/launch_budgets.json` this record growth is the only reason a
+> bound rose: `d2h_bytes` of `bdpt.lr.d1.g64.s4k.c4` and `...c8` went from 75 to
+> 84 (measured 76 plus the file's 10 % headroom); every other bound was tightened
+> to the new measurement or kept.
 
 ## Context
 

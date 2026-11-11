@@ -191,6 +191,13 @@ field. EPC candidates fold the transmitter into the candidate index, so one
 input kernel, one EPC launch and one compaction serve every transmitter per
 memory-sized candidate chunk.
 
+Diffraction discovery (`interactions.diffraction`) packs the edge states of every
+transmitter in one launch, checks their transmitter visibility in one RayD axial
+call with a per-state source, and exports all of them in one RayD order-1 call per
+receiver chunk with a per-state transmitter index (incident polarization and
+`tx_id`). One native compaction per chunk writes topology rows carrying the UTD
+vector field as `field_xyz`; the field stage owns the scalar fields.
+
 ## Public entry points
 
 `propagation.consumer` is the one public surface in this package: the stable,

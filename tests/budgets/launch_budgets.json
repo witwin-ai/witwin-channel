@@ -1,116 +1,116 @@
 {
- "schema": "channel-launch-budgets.v1",
- "metrics": [
-  "kernels",
-  "syncs",
-  "h2d_count",
-  "h2d_bytes",
-  "d2h_count",
-  "d2h_bytes"
- ],
- "headroom": 0.1,
- "measured_on": {
-  "git_head": "a6f921b3fcad",
-  "gpu": "NVIDIA RTX A6000",
-  "torch": "2.10.0+cu128",
-  "started": "2026-11-10T19:47:43"
- },
- "cases": {
-  "bdpt.lr.d1.g128.s4k.c32": {
-   "kernels": 332,
-   "syncs": 68,
-   "h2d_count": 56,
-   "h2d_bytes": 490288,
-   "d2h_count": 27,
-   "d2h_bytes": 111
+  "schema": "channel-launch-budgets.v1",
+  "metrics": [
+    "kernels",
+    "syncs",
+    "h2d_count",
+    "h2d_bytes",
+    "d2h_count",
+    "d2h_bytes"
+  ],
+  "headroom": 0.1,
+  "measured_on": {
+    "git_head": "eef6510378e9",
+    "gpu": "NVIDIA RTX A6000",
+    "torch": "2.10.0+cu128",
+    "started": "2026-11-10T21:56:50"
   },
-  "bdpt.lr.d1.g64.s4k.c4": {
-   "kernels": 332,
-   "syncs": 59,
-   "h2d_count": 47,
-   "h2d_bytes": 59651,
-   "d2h_count": 18,
-   "d2h_bytes": 75
-  },
-  "bdpt.lr.d1.g64.s4k.c8": {
-   "kernels": 252,
-   "syncs": 59,
-   "h2d_count": 47,
-   "h2d_bytes": 72323,
-   "d2h_count": 18,
-   "d2h_bytes": 75
-  },
-  "det.lrd.d1.g128.c32": {
-   "kernels": 1648,
-   "syncs": 189,
-   "h2d_count": 170,
-   "h2d_bytes": 581240,
-   "d2h_count": 138,
-   "d2h_bytes": 577
-  },
-  "det.lrd.d1.g64.c4": {
-   "kernels": 408,
-   "syncs": 74,
-   "h2d_count": 56,
-   "h2d_bytes": 61900,
-   "d2h_count": 24,
-   "d2h_bytes": 119
-  },
-  "det.lrd.d1.g64.c8": {
-   "kernels": 408,
-   "syncs": 74,
-   "h2d_count": 56,
-   "h2d_bytes": 76684,
-   "d2h_count": 24,
-   "d2h_bytes": 119
-  },
-  "mc.lr.d1.g128.s64k.c32": {
-   "kernels": 11,
-   "syncs": 1,
-   "h2d_count": 6,
-   "h2d_bytes": 1544,
-   "d2h_count": 0,
-   "d2h_bytes": 0
-  },
-  "mc.lr.d1.g64.s64k.c4": {
-   "kernels": 11,
-   "syncs": 1,
-   "h2d_count": 6,
-   "h2d_bytes": 1544,
-   "d2h_count": 0,
-   "d2h_bytes": 0
-  },
-  "mc.lr.d1.g64.s64k.c8": {
-   "kernels": 11,
-   "syncs": 1,
-   "h2d_count": 6,
-   "h2d_bytes": 1544,
-   "d2h_count": 0,
-   "d2h_bytes": 0
-  },
-  "path.lrd.d1.p16.c32": {
-   "kernels": 889,
-   "syncs": 205,
-   "h2d_count": 165,
-   "h2d_bytes": 320643,
-   "d2h_count": 43,
-   "d2h_bytes": 211
-  },
-  "path.lrd.d1.p16.c4": {
-   "kernels": 889,
-   "syncs": 205,
-   "h2d_count": 165,
-   "h2d_bytes": 10179,
-   "d2h_count": 43,
-   "d2h_bytes": 211
-  },
-  "path.lrd.d1.p16.c8": {
-   "kernels": 889,
-   "syncs": 205,
-   "h2d_count": 165,
-   "h2d_bytes": 24963,
-   "d2h_count": 43,
-   "d2h_bytes": 211
+  "cases": {
+    "bdpt.lr.d1.g128.s4k.c32": {
+      "kernels": 204,
+      "syncs": 17,
+      "h2d_count": 24,
+      "h2d_bytes": 3741,
+      "d2h_count": 8,
+      "d2h_bytes": 102
+    },
+    "bdpt.lr.d1.g64.s4k.c4": {
+      "kernels": 164,
+      "syncs": 13,
+      "h2d_count": 15,
+      "h2d_bytes": 1417,
+      "d2h_count": 4,
+      "d2h_bytes": 84
+    },
+    "bdpt.lr.d1.g64.s4k.c8": {
+      "kernels": 142,
+      "syncs": 13,
+      "h2d_count": 15,
+      "h2d_bytes": 1417,
+      "d2h_count": 4,
+      "d2h_bytes": 84
+    },
+    "det.lrd.d1.g128.c32": {
+      "kernels": 817,
+      "syncs": 65,
+      "h2d_count": 124,
+      "h2d_bytes": 49747,
+      "d2h_count": 64,
+      "d2h_bytes": 344
+    },
+    "det.lrd.d1.g64.c4": {
+      "kernels": 226,
+      "syncs": 8,
+      "h2d_count": 9,
+      "h2d_bytes": 2649,
+      "d2h_count": 7,
+      "d2h_bytes": 115
+    },
+    "det.lrd.d1.g64.c8": {
+      "kernels": 226,
+      "syncs": 8,
+      "h2d_count": 9,
+      "h2d_bytes": 2649,
+      "d2h_count": 7,
+      "d2h_bytes": 115
+    },
+    "mc.lr.d1.g128.s64k.c32": {
+      "kernels": 11,
+      "syncs": 1,
+      "h2d_count": 6,
+      "h2d_bytes": 1544,
+      "d2h_count": 0,
+      "d2h_bytes": 0
+    },
+    "mc.lr.d1.g64.s64k.c4": {
+      "kernels": 11,
+      "syncs": 1,
+      "h2d_count": 6,
+      "h2d_bytes": 1544,
+      "d2h_count": 0,
+      "d2h_bytes": 0
+    },
+    "mc.lr.d1.g64.s64k.c8": {
+      "kernels": 11,
+      "syncs": 1,
+      "h2d_count": 6,
+      "h2d_bytes": 1544,
+      "d2h_count": 0,
+      "d2h_bytes": 0
+    },
+    "path.lrd.d1.p16.c32": {
+      "kernels": 235,
+      "syncs": 8,
+      "h2d_count": 9,
+      "h2d_bytes": 2649,
+      "d2h_count": 7,
+      "d2h_bytes": 97
+    },
+    "path.lrd.d1.p16.c4": {
+      "kernels": 235,
+      "syncs": 8,
+      "h2d_count": 9,
+      "h2d_bytes": 2649,
+      "d2h_count": 7,
+      "d2h_bytes": 97
+    },
+    "path.lrd.d1.p16.c8": {
+      "kernels": 235,
+      "syncs": 8,
+      "h2d_count": 9,
+      "h2d_bytes": 2649,
+      "d2h_count": 7,
+      "d2h_bytes": 97
+    }
   }
- }
 }

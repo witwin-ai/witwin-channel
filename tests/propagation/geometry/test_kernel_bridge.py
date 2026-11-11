@@ -148,9 +148,17 @@ def test_diffraction_visibility_plan_dispatches_only_native_numerical_inputs(
             edge_direction,
             edge_t_min,
             edge_t_max,
+            None,
         )
     ]
     assert all(argument is not source for argument in native_calls[0])
+    # With per-state sources the state source table is the visibility origin of each state.
+    geometry.diffraction_tx_visible_state_plan(
+        object(), tx, edge_index, edge_position, edge_direction, edge_t_min, edge_t_max,
+        passthrough_float3, passthrough_float3, prim0, prim1, exterior_angle, source,
+        source_power, per_state_source=True,
+    )
+    assert torch.equal(native_calls[1][-1], source)
     validation_contract = dict(validations)
     for name in ("tx", "edge_position", "edge_direction", "edge_t_min", "edge_t_max"):
         assert validation_contract[name] is True

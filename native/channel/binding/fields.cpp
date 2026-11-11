@@ -618,6 +618,13 @@ pybind11::dict channel_field_free_space(
     torch::Tensor tx_polarization,
     torch::Tensor rx_polarization,
     double frequency_hz);
+pybind11::dict channel_field_free_space_columns(
+    torch::Tensor source,
+    torch::Tensor target,
+    torch::Tensor tx_power,
+    torch::Tensor tx_polarization,
+    torch::Tensor rx_polarization,
+    std::vector<double> frequencies_hz);
 pybind11::dict channel_field_project_complex3(
     torch::Tensor field_vector,
     torch::Tensor direction,
@@ -636,6 +643,20 @@ pybind11::dict channel_field_reflection_sequence(
     torch::Tensor gain,
     torch::Tensor thickness,
     double frequency_hz);
+pybind11::dict channel_field_reflection_sequence_columns(
+    torch::Tensor source,
+    torch::Tensor target,
+    torch::Tensor interaction_positions,
+    torch::Tensor interaction_normals,
+    torch::Tensor tx_power,
+    torch::Tensor tx_polarization,
+    torch::Tensor rx_polarization,
+    torch::Tensor eps_r,
+    torch::Tensor sigma_e,
+    torch::Tensor mu_r,
+    torch::Tensor gain,
+    torch::Tensor thickness,
+    std::vector<double> frequencies_hz);
 pybind11::dict channel_field_transmission_sequence(
     torch::Tensor path_valid,
     torch::Tensor source,
@@ -990,6 +1011,10 @@ void register_fields(pybind11::module_ &module) {
         &channel_field_free_space,
         "Evaluate the canonical complex3 free-space field and receiver projection.");
     module.def(
+        "field_free_space_columns",
+        &channel_field_free_space_columns,
+        "Evaluate the field at several carrier frequencies in one native launch per 64 frequencies.");
+    module.def(
         "field_project_complex3",
         &channel_field_project_complex3,
         "Project a world-Cartesian complex3 field onto a receiver polarization.");
@@ -997,6 +1022,10 @@ void register_fields(pybind11::module_ &module) {
         "field_reflection_sequence",
         &channel_field_reflection_sequence,
         "Transport a canonical complex3 field through a finite-slab reflection sequence.");
+    module.def(
+        "field_reflection_sequence_columns",
+        &channel_field_reflection_sequence_columns,
+        "Evaluate the field at several carrier frequencies in one native launch per 64 frequencies.");
     module.def(
         "field_transmission_sequence",
         &channel_field_transmission_sequence,

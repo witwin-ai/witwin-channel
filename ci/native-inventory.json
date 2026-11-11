@@ -307,8 +307,6 @@
         "deterministic_accumulate_tangent_scatter_kernel",
         "deterministic_compact_edges_kernel",
         "deterministic_component_counts_kernel",
-        "deterministic_delay_to_path_length_kernel",
-        "deterministic_diffraction_vector_field_kernel",
         "deterministic_edge_flags_kernel",
         "deterministic_field_from_power_phase_kernel",
         "deterministic_finalize_accumulation_kernel",
@@ -324,8 +322,6 @@
         "deterministic_accumulate_tangent_scatter_kernel",
         "deterministic_compact_edges_kernel",
         "deterministic_component_counts_kernel",
-        "deterministic_delay_to_path_length_kernel",
-        "deterministic_diffraction_vector_field_kernel",
         "deterministic_edge_flags_kernel",
         "deterministic_field_from_power_phase_kernel",
         "deterministic_finalize_accumulation_kernel",
@@ -698,7 +694,7 @@
     },
     "native/channel/kernels/paths.cu": {
       "kernels": [
-        "deterministic_diffraction_order1_compact_kernel",
+        "deterministic_diffraction_topology_compact_kernel",
         "deterministic_face_anchor_points_kernel",
         "deterministic_face_group_assign_kernel",
         "deterministic_face_group_flags_kernel",
@@ -721,7 +717,6 @@
         "deterministic_sort_key_1d_kernel",
         "deterministic_sort_key_sequence_kernel",
         "deterministic_surface_group_keys_kernel",
-        "deterministic_topology_base_fields_kernel",
         "deterministic_topology_default_fields_kernel",
         "path_block_compact_kernel",
         "path_block_flags_kernel",
@@ -738,7 +733,7 @@
         "path_visibility_flags_kernel"
       ],
       "launches": [
-        "deterministic_diffraction_order1_compact_kernel",
+        "deterministic_diffraction_topology_compact_kernel",
         "deterministic_face_anchor_points_kernel",
         "deterministic_face_group_assign_kernel",
         "deterministic_face_group_flags_kernel",
@@ -761,7 +756,6 @@
         "deterministic_sort_key_1d_kernel",
         "deterministic_sort_key_sequence_kernel",
         "deterministic_surface_group_keys_kernel",
-        "deterministic_topology_base_fields_kernel",
         "deterministic_topology_default_fields_kernel",
         "path_block_compact_kernel",
         "path_block_flags_kernel",

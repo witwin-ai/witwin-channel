@@ -38,7 +38,8 @@ at::Tensor channel_diffraction_tx_visible_state_plan(
     torch::Tensor edge_position,
     torch::Tensor edge_direction,
     torch::Tensor edge_t_min,
-    torch::Tensor edge_t_max) {
+    torch::Tensor edge_t_max,
+    std::optional<torch::Tensor> state_source) {
     TORCH_CHECK(
         edge_position.dim() >= 1,
         "edge_position must have at least one dimension");
@@ -52,7 +53,8 @@ at::Tensor channel_diffraction_tx_visible_state_plan(
         edge_t_min,
         edge_t_max,
         std::nullopt,
-        {}};
+        {},
+        state_source};
     return rayd::torch::axial_edge_visibility_forward(scene.resource(), request)
         .any_visible;
 }
@@ -83,7 +85,8 @@ pybind11::tuple channel_rayd_diffraction_paths_order1_forward(
     int64_t state_limit,
     int64_t capacity,
     double wavelength,
-    double isb_taper_width_scale) {
+    double isb_taper_width_scale,
+    std::optional<torch::Tensor> state_source_index) {
     // tx_pol is the scene transmitter polarization threaded from the caller
     // . The RayD UTD op consumes it as the incident field basis.
     TORCH_CHECK(
@@ -104,7 +107,8 @@ pybind11::tuple channel_rayd_diffraction_paths_order1_forward(
         capacity,
         wavelength,
         isb_taper_width_scale,
-        rayd::torch::DiffractionPathLayout::Compact};
+        rayd::torch::DiffractionPathLayout::Compact,
+        state_source_index};
     return diffraction_path_tuple(
         rayd::torch::diffraction_paths_order1_forward(scene.resource(), config));
 }
