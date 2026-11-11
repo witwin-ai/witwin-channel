@@ -196,7 +196,8 @@ __device__ __forceinline__ void visit_deposits(
                                                 rx.resolution1), 0), rx.resolution1 - 1);
         const float coeff = solid_angle * (aperture / fmaxf(rx.cell_area, kReflectionEpsilon)) /
                             fmaxf(fabsf(axis_direction), kReflectionEpsilon);
-        visit(static_cast<int64_t>(i1) * rx.resolution0 + i0, t_plane, coeff);
+        // Row-major receiver cell: i0 runs along the grid rows (coord0), i1 along its columns.
+        visit(static_cast<int64_t>(i0) * rx.resolution1 + i1, t_plane, coeff);
         return;
     }
     for (int64_t index = rx.point_begin; index < rx.point_end; ++index) {
@@ -605,10 +606,10 @@ __global__ void slab_reflection_accumulate_backward_kernel(
                            [&](int64_t target, float, float coeff) {
                                const float power = field_power * coeff;
                                if (!(power > 0.0f && isfinite(power))) return;
-                               const int64_t i1 = rx.kind == 0 ? target / rx.resolution0 : 0;
-                               const int64_t i0 = target - i1 * rx.resolution0;
+                               const int64_t i0 = rx.kind == 0 ? target / rx.resolution1 : 0;
+                               const int64_t i1 = target - i0 * rx.resolution1;
                                const float g_dep = rx.kind == 0
-                                   ? grad_output[i1 * grad_stride0 + i0 * grad_stride1]
+                                   ? grad_output[i0 * grad_stride0 + i1 * grad_stride1]
                                    : grad_output[target * grad_stride0];
                                weight += g_dep * coeff;
                            });
@@ -905,7 +906,7 @@ void for_each_target_chunk(const ReflectionReceiverArgs& args, int64_t ray_count
 
 std::vector<int64_t> receiver_output_shape(const ReflectionReceiverArgs& args) {
     if (point_mode(args)) return {1, args.points.size(0)};
-    return {args.resolution1, args.resolution0};
+    return {args.resolution0, args.resolution1};
 }
 
 }  // namespace

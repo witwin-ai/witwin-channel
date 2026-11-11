@@ -5,7 +5,7 @@
 - **Decision ID:** `grid-axis-order`.
 - **Scope:** result layout of `deterministic`, `montecarlo.basic` and
   `montecarlo.bdpt` for a scene with exactly one `ReceiverGrid`. Layout change, no
-  physics change; `tests/budgets` MC kernel bound 11 -> 12.
+  physics change; no launch added (MC Basic deposits natively in row-major order).
 
 ## Context
 
@@ -37,27 +37,37 @@ order").
 - **Deterministic:** the flat accumulation is already row-major, so the grid view
   is a reshape. The per-tensor transpose copies (`path_gain`, `field`, each
   component power and field) are gone.
-- **MC Basic:** the native deposit maps stay `[T, cols, rows]`. `path_gain` is
-  gathered once into row-major order with the existing native
-  `mc_grid_maps_to_matrix` (AD-capable; its backward makes the incoming gradient
-  contiguous) and viewed as `[T, rows, cols]`; `component_maps` are returned as
-  transposed views. This is the one extra launch.
-- **BDPT:** `path_gain`, `component_maps` and `variance` are returned as
-  transposed views of the native maps; no launch is added.
+- **MC Basic:** every grid producer writes receiver row-major maps natively: the
+  matrix-to-map layout kernel (LoS, transmission, scattering) is now the identity
+  layout, the reflection deposit indexes `i0 * cols + i1` (coord0 runs along the
+  grid rows), and the diffraction tape accumulation maps the RayD tape cell
+  `i1 * rows + i0` to the same row-major element; each AD companion (map adjoint,
+  reflection VJP, diffraction VJP/JVP) reads and writes the same order. `path_gain`
+  from the elementwise finalize is therefore already row-major and is a view;
+  multi-receiver grid blocks need no gather either.
+- **BDPT:** its grid maps come from the same matrix-to-map kernel, so they are row
+  major too; no change in BDPT itself.
 
-MC Basic `component_maps` and the BDPT grid tensors are therefore
-non-contiguous views; Deterministic and MC Basic `path_gain` are contiguous.
-Making MC deposit natively in row-major order, or dropping BDPT's matrix-to-map
-conversion (which would leave a native binding without a caller), would remove
-the gather and the views; both are native changes left out of this record.
+All grid outputs are contiguous. A first version of this record kept MC's native
+`[T, cols, rows]` maps and gathered `path_gain` (one extra launch, accepted by the
+owner) with transposed views elsewhere; the owner then asked for the native
+layout instead, which removes that launch.
 
 ## Budget
 
-`tests/budgets/launch_budgets.json`: the three MC Basic cases go from 11 to 12
-kernels (measured 12; syncs, copies and bytes unchanged). The deterministic grid
-cases tighten (measured 192 for g64 and 729 for g128.c32, after this change and
-the D4 diffraction change; bounds 212 and 802). BDPT counts are unchanged
-(measured 149/129/185).
+MC Basic kernels are unchanged from the release baseline (11 on the budget cases;
+the multi-receiver grid-block gathers are gone as well). Deterministic grid cases
+tighten (measured 192 for g64 and 729 for g128.c32, after this change and the D4
+diffraction change; bounds 212 and 802). BDPT counts are unchanged.
+
+## Numerical identity
+
+`golden_mc.py` (MC Basic and BDPT on five grid scenes: reflection, diffraction,
+transmission, scattering, a grid plus a point; 51 tensors, all in `[T, rows, cols]`)
+compared before and after the native change: LoS, transmission, scattering, BDPT
+and every component power are bit-identical; reflection and diffraction maps differ
+only in the last bits where two runs of the unchanged build also differ (float
+atomic order of the deposits, up to 7e-15 absolute on 1e-8 values).
 
 ## Evidence
 
@@ -69,6 +79,5 @@ the D4 diffraction change; bounds 212 and 802). BDPT counts are unchanged
   `test_basic_component_maps`, `test_basic_receiver_layouts` (now also checks a
   single grid's `path_gain` equals its columns in a two-grid solve), BDPT
   `test_component_layout`, `test_variance`, and `test_endpoints_compat`.
-- `tests/ad/test_mc_basic_ad.py` and `test_mc_basic_scattering_ad.py` pass through
-  the gathered `path_gain` (they failed until the gather's backward made its
-  incoming gradient contiguous).
+- `tests/ad/test_mc_basic_ad.py` and `test_mc_basic_scattering_ad.py` (finite
+  differences and forward/reverse agreement through the row-major deposits) pass.

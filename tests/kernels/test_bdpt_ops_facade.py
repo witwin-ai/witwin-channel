@@ -895,8 +895,9 @@ def test_bdpt_los_component_maps_from_matrix_uses_native_grid_layout():
 
     maps = ops.bdpt_los_component_maps_from_matrix(los, rows=2, cols=3)
 
-    assert maps.shape == (1, 3, 2)
-    expected = torch.tensor([[[0.0, 3.0], [1.0, 4.0], [2.0, 5.0]]], device="cuda")
+    # Receiver row-major grid maps: entry [t, row, col] is matrix column row * cols + col.
+    assert maps.shape == (1, 2, 3)
+    expected = torch.tensor([[[0.0, 1.0, 2.0], [3.0, 4.0, 5.0]]], device="cuda")
     torch.testing.assert_close(maps, expected)
 
 

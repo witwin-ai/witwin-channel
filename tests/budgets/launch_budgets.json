@@ -65,7 +65,7 @@
       "d2h_bytes": 115
     },
     "mc.lr.d1.g128.s64k.c32": {
-      "kernels": 12,
+      "kernels": 11,
       "syncs": 1,
       "h2d_count": 6,
       "h2d_bytes": 1544,
@@ -73,7 +73,7 @@
       "d2h_bytes": 0
     },
     "mc.lr.d1.g64.s64k.c4": {
-      "kernels": 12,
+      "kernels": 11,
       "syncs": 1,
       "h2d_count": 6,
       "h2d_bytes": 1544,
@@ -81,7 +81,7 @@
       "d2h_bytes": 0
     },
     "mc.lr.d1.g64.s64k.c8": {
-      "kernels": 12,
+      "kernels": 11,
       "syncs": 1,
       "h2d_count": 6,
       "h2d_bytes": 1544,
@@ -114,7 +114,6 @@
     }
   },
   "notes": {
-    "mc.*.kernels": "11 -> 12, accepted by the owner for 0.6.0: a single-ReceiverGrid MC Basic path_gain is gathered once from the native [T, cols, rows] map into Core's row-major [T, rows, cols] layout (mc_grid_maps_to_matrix), so path_gain[t].reshape(-1)[k] is receiver k in every solver. Measured 12 on all three cases; every other MC metric is unchanged.",
     "det.*.kernels": "tightened: the single-grid diffraction override and the grid transpose copies are gone; measured 192 (g64) and 729 (g128.c32), bound = measured + 10 %."
   }
 }

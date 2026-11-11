@@ -4410,16 +4410,6 @@ def _accumulate_and_finalize(
                 rows=grid.shape[0],
                 cols=grid.shape[1],
             )
-    if grid is not None:
-        # The native maps are [T, cols, rows]; the grid result is [T, rows, cols] with
-        # entry [t, row, col] at the grid sample (row, col), like every other solver.
-        path_gain = path_gain.transpose(1, 2)
-        if component_maps is not None:
-            component_maps = {
-                name: value.transpose(1, 2) for name, value in component_maps.items()
-            }
-        if variance is not None:
-            variance = variance.transpose(1, 2)
     return component_maps, path_gain, component_power, variance
 
 

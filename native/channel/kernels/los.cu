@@ -266,25 +266,6 @@ __global__ void los_path_gain_jvp_kernel(
     }
 }
 
-__global__ void los_component_maps_kernel(
-    const float *__restrict__ los,
-    float *__restrict__ maps,
-    int64_t tx_count,
-    int64_t rows,
-    int64_t cols) {
-    const int64_t element_count = tx_count * rows * cols;
-    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
-    for (int64_t idx = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         idx < element_count;
-         idx += stride) {
-        const int64_t cell = idx % (rows * cols);
-        const int64_t tx = idx / (rows * cols);
-        const int64_t row = cell / cols;
-        const int64_t col = cell - row * cols;
-        maps[(tx * cols + col) * rows + row] = los[idx];
-    }
-}
-
 __global__ void los_component_maps_public_layout_kernel(
     const float *__restrict__ los,
     float *__restrict__ maps,
@@ -294,25 +275,6 @@ __global__ void los_component_maps_public_layout_kernel(
          idx < element_count;
          idx += stride) {
         maps[idx] = los[idx];
-    }
-}
-
-__global__ void apply_los_visibility_kernel(
-    const float *__restrict__ los,
-    const bool *__restrict__ visible,
-    float *__restrict__ maps,
-    int64_t tx_index,
-    int64_t rows,
-    int64_t cols) {
-    const int64_t cell_count = rows * cols;
-    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
-    for (int64_t cell = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         cell < cell_count;
-         cell += stride) {
-        const int64_t row = cell / cols;
-        const int64_t col = cell - row * cols;
-        const float gain = visible[cell] ? los[(tx_index * rows + row) * cols + col] : 0.0f;
-        maps[(tx_index * cols + col) * rows + row] = gain;
     }
 }
 
@@ -336,10 +298,10 @@ __global__ void apply_los_visibility_public_layout_kernel(
 }
 
 // Adjoint of the (visibility-masked) LoS component-map layout: the forward is
-// maps[tx, col, row] = visible[tx, cell] * los[tx, cell] with
-// cell = row * cols + col (identity mask when visible == nullptr), a pure
-// permutation times a frozen 0/1 mask, so the adjoint gathers the map
-// cotangent back into matrix layout under the same mask.
+// maps[tx, row, col] = visible[tx, cell] * los[tx, cell] with
+// cell = row * cols + col (identity mask when visible == nullptr), a frozen 0/1
+// mask on the row-major matrix, so the adjoint gathers the (possibly strided)
+// map cotangent back into matrix layout under the same mask.
 __global__ void los_component_maps_adjoint_kernel(
     const float *__restrict__ grad_maps,
     const bool *__restrict__ visible,
@@ -362,7 +324,7 @@ __global__ void los_component_maps_adjoint_kernel(
         const bool pass =
             visible == nullptr || visible[tx * rows * cols + cell];
         grad_matrix[idx] =
-            pass ? grad_maps[tx * grad_stride0 + col * grad_stride1 + row * grad_stride2]
+            pass ? grad_maps[tx * grad_stride0 + row * grad_stride1 + col * grad_stride2]
                  : 0.0f;
     }
 }
@@ -498,17 +460,16 @@ at::Tensor launch_los_component_maps(
     int64_t rows,
     int64_t cols) {
     const int64_t tx_count = los.size(0);
-    auto maps = at::empty({tx_count, cols, rows}, los.options());
+    // Grid maps share the matrix's receiver row-major order: maps[tx, row, col].
+    auto maps = at::empty({tx_count, rows, cols}, los.options());
     const int64_t element_count = los.numel();
     if (element_count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(los.get_device()).stream();
         const int block_count = static_cast<int>((element_count + kLosBlockSize - 1) / kLosBlockSize);
-        los_component_maps_kernel<<<block_count, kLosBlockSize, 0, stream>>>(
+        los_component_maps_public_layout_kernel<<<block_count, kLosBlockSize, 0, stream>>>(
             los.data_ptr<float>(),
             maps.data_ptr<float>(),
-            tx_count,
-            rows,
-            cols);
+            element_count);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return maps;
@@ -803,8 +764,8 @@ at::Tensor channel_mc_los_component_maps_adjoint_cuda(
     at::Tensor visible) {
     check_cuda_tensor_rank(grad_maps, "grad_maps", at::kFloat, 3);
     const int64_t tx_count = grad_maps.size(0);
-    const int64_t cols = grad_maps.size(1);
-    const int64_t rows = grad_maps.size(2);
+    const int64_t rows = grad_maps.size(1);
+    const int64_t cols = grad_maps.size(2);
     const bool has_visible = visible.numel() > 0;
     if (has_visible) {
         check_cuda_tensor(visible, "visible", at::kBool, 2);
@@ -843,15 +804,15 @@ at::Tensor channel_mc_apply_los_visibility_cuda(
     at::Tensor visible,
     int64_t tx_index) {
     CHANNEL_LOS_CHECK_VISIBILITY_APPLICATION();
-    const int64_t rows = maps.size(2);
-    const int64_t cols = maps.size(1);
+    const int64_t rows = maps.size(1);
+    const int64_t cols = maps.size(2);
     const int64_t cell_count = rows * cols;
     TORCH_CHECK(visible.size(0) == cell_count, "visible length must match one receiver grid");
 
     if (cell_count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(los.get_device()).stream();
         const int block_count = static_cast<int>((cell_count + kLosBlockSize - 1) / kLosBlockSize);
-        apply_los_visibility_kernel<<<block_count, kLosBlockSize, 0, stream>>>(
+        apply_los_visibility_public_layout_kernel<<<block_count, kLosBlockSize, 0, stream>>>(
             CHANNEL_LOS_VISIBILITY_LAUNCH_ARGUMENTS());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }

@@ -898,8 +898,7 @@ What changes:
   Code that transposed the old maps for plotting should now plot
   `path_gain[t].T` with `origin="lower"`; code that indexed the MC Basic flat
   `path_gain` should use `path_gain[t, i, j]` or `path_gain[t].reshape(-1)[i *
-  cols + j]`. MC Basic `component_maps` and the BDPT grid outputs are transposed
-  views; call `.contiguous()` before `.view()`. Other receiver layouts are
+  cols + j]`. Every grid output is contiguous. Other receiver layouts are
   unchanged (`[T, R]`, receiver row-major).
 - Deterministic diffraction power no longer depends on the receiver layout. A
   single grid previously replaced `component_power["diffraction"]` (and, with

@@ -42,7 +42,6 @@ from witwin.channel.kernels.montecarlo import (
     mc_apply_los_visibility,
     mc_capacity_failure_component_maps_sanitize,
     mc_component_map_buffer,
-    mc_grid_maps_to_matrix,
     mc_finalize_component_maps,
     mc_finalize_component_maps_ad,
     mc_los_component_maps_from_matrix,
@@ -469,7 +468,7 @@ def transmission_component_map(
     device: torch.device, failure_state: CapacityFailureState, los: torch.Tensor | None = None,
     ad: bool = False, ledger: object | None = None,
 ) -> torch.Tensor:
-    """Straight-penetration transmission radiomap ``[T, cols, rows]`` of one receiver grid."""
+    """Straight-penetration transmission radiomap ``[T, rows, cols]`` of one receiver grid."""
 
     tx_pos, _ = transmitter_positions(scene, device=device)
     if not scene.structures:
@@ -883,7 +882,7 @@ def reflection_block_outputs(
     One launch generates the seeded, bounds-folded lattice rays of every transmitter; per
     transmitter RayD traces ``max_depth`` closest hits, then one bounded trace of the final
     reflected segment up to the farthest deposit any block needs. Grid blocks give
-    ``[T, cols, rows]`` maps, point blocks ``[T, 1, P]``.
+    ``[T, rows, cols]`` maps, point blocks ``[T, 1, P]``.
     """
 
     tx_pos, tx_power = transmitter_positions(scene, device=device)
@@ -958,7 +957,7 @@ def reflection_component_maps_with_wedges(
     max_depth: int, device: torch.device, material_tensors: MaterialTensors, seed: int = 0,
     collect_wedges: bool = False, ad: bool = False, ledger: object | None = None,
 ) -> ReflectionComponentResult:
-    """Reflection maps ``[T, cols, rows]`` of one receiver grid plus the diffraction wedge events."""
+    """Reflection maps ``[T, rows, cols]`` of one receiver grid plus the diffraction wedge events."""
 
     block = ReceiverBlock(grid, (grid,), 0, int(grid.shape[0]) * int(grid.shape[1]))
     result = reflection_block_outputs(
@@ -1253,7 +1252,7 @@ def diffraction_component_map(
     ledger: object | None = None, points: torch.Tensor | None = None,
     point_radius: float = -_RELATIVE_POINT_RADIUS,
 ) -> torch.Tensor:
-    """Keller-cone diffraction deposits ``[T, cols, rows]`` on ``grid``, or ``[T, 1, P]`` at
+    """Keller-cone diffraction deposits ``[T, rows, cols]`` on ``grid``, or ``[T, 1, P]`` at
     point receivers ``points`` (capture spheres of ``point_radius``) when ``grid`` is None."""
 
     def map_shape() -> tuple[int, int]:
@@ -1697,18 +1696,14 @@ def _initial_los_state(
     return los, 0, 0
 
 
-def _matrix_columns(output: torch.Tensor, block: ReceiverBlock, *, ad: bool) -> torch.Tensor:
-    """``[T, count]`` receiver-order columns of one block output (grid maps are transposed)."""
+def _matrix_columns(output: torch.Tensor, block: ReceiverBlock) -> torch.Tensor:
+    """``[T, count]`` receiver-order columns of one block output (grid maps are row-major)."""
 
-    if block.grid is None:
-        return output.view(output.shape[0], block.count)
-    rows, cols = block.grid.shape
-    return mc_grid_maps_to_matrix(output, rows=int(rows), cols=int(cols), ad=ad)
+    return output.view(output.shape[0], block.count)
 
 
 def _public_layout(
-    path_gain: torch.Tensor, component_maps: dict[str, torch.Tensor], grid: ReceiverGrid | None, *,
-    ad: bool,
+    path_gain: torch.Tensor, component_maps: dict[str, torch.Tensor], grid: ReceiverGrid | None,
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
     """Public result layout: ``[T, R]`` receiver columns, or ``[T, rows, cols]`` for one grid."""
 
@@ -1717,13 +1712,9 @@ def _public_layout(
             name: value.view(value.shape[0], value.shape[2])
             for name, value in component_maps.items()
         }
-    # The native maps are [T, cols, rows]; the grid result is [T, rows, cols] with
-    # entry [t, row, col] at the grid sample (row, col), like every other solver.
+    # The native maps are already receiver row-major [T, rows, cols], like every other solver.
     rows, cols = (int(size) for size in grid.shape)
-    path_gain = mc_grid_maps_to_matrix(
-        path_gain.view(path_gain.shape[0], cols, rows), rows=rows, cols=cols, ad=ad,
-    ).view(path_gain.shape[0], rows, cols)
-    return path_gain, {name: value.transpose(1, 2) for name, value in component_maps.items()}
+    return path_gain.view(path_gain.shape[0], rows, cols), component_maps
 
 
 def _layout_maps(columns: list[torch.Tensor]) -> torch.Tensor:
@@ -1762,7 +1753,7 @@ def _layout_specular_maps(  # type: ignore[no-untyped-def]
     if "reflection" in config.components:
         maps["reflection"] = _layout_maps(
             [
-                _matrix_columns(out, block, ad=reflection_ad)
+                _matrix_columns(out, block)
                 for out, block in zip(reflection.outputs, blocks)
             ]
         )
@@ -1787,7 +1778,7 @@ def _layout_specular_maps(  # type: ignore[no-untyped-def]
                 points=params["points"],  # type: ignore[arg-type]
                 point_radius=float(params["point_radius"]),  # type: ignore[arg-type]
             )
-            columns.append(_matrix_columns(block_map, block, ad=ad))
+            columns.append(_matrix_columns(block_map, block))
         maps["diffraction"] = _layout_maps(columns)
     return maps
 
@@ -2141,7 +2132,7 @@ def solve_pipeline(  # type: ignore[no-untyped-def]
         component_power["transmission"] = finalized["transmission_power"]
     if "scattering" in config.components:
         component_power["scattering"] = finalized["scattering_power"]
-    path_gain, component_maps = _public_layout(path_gain, component_maps, grid, ad=ad)
+    path_gain, component_maps = _public_layout(path_gain, component_maps, grid)
     transmission_metadata = _transmission_capacity_metadata(config, capacity_transaction)
     metadata = make_solver_metadata(
         config=config,

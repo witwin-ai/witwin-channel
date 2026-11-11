@@ -86,7 +86,8 @@ used by focused contract tests, but are not compatibility promises. The parent
   and the selected components are drawn from `los`, `reflection`,
   `diffraction`, `transmission`, and `scattering`.
 - Basic returns incoherent real power in `path_gain`, `component_power` and
-  `component_maps`. With exactly one `ReceiverGrid` each map is `[T, cols, rows]`;
+  `component_maps`. With exactly one `ReceiverGrid` each map is `[T, rows, cols]`
+  (receiver row-major, deposited natively in that order);
   any other layout (point receivers, several grids, grids and points mixed) gives
   `[T, R]` matrices whose columns follow `scene.receivers` (grids in row-major
   receiver order), aligned with `path_gain`. It does not claim complex path

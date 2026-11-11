@@ -1074,7 +1074,9 @@ def first_receiver_grid(scene: object) -> ReceiverGrid | None:
 
 
 def component_grid_shape(grid: ReceiverGrid) -> tuple[int, int]:
-    return (grid.shape[1], grid.shape[0])
+    """Shape ``(rows, cols)`` of one grid's component maps: receiver row-major, like Core."""
+
+    return (grid.shape[0], grid.shape[1])
 
 
 def _axis_index(values: tuple[float, float, float], *, name: str) -> tuple[int, float]:

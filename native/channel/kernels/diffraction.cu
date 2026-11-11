@@ -215,6 +215,19 @@ struct PointTapeArgs {
 
 constexpr float kMinPointCaptureRadius = 1.0e-3f;
 
+// Output element of tape cell ``cell = i1 * r0 + i0``. A grid map is receiver row-major
+// [r0 rows, r1 cols], so the element is ``i0 * r1 + i1``; point receivers (r1 == 1) keep
+// their index.
+__device__ __forceinline__ int64_t tape_output_index(int cell, int r0, int r1) {
+    return static_cast<int64_t>(cell % r0) * r1 + cell / r0;
+}
+
+// Shape of the tape accumulation output: [r0, r1] for a grid, [1, P] for P point receivers.
+std::vector<int64_t> tape_output_shape(const PointTapeArgs& points, int64_t r0, int64_t r1) {
+    if (points.points != nullptr) return {r1, r0};
+    return {r0, r1};
+}
+
 __device__ __forceinline__ float point_tape_radius(
     const PointTapeArgs &points, utd::float3a rx, utd::float3a src) {
     if (points.radius > 0.0f) return points.radius;
@@ -537,7 +550,7 @@ __global__ void utd_diffraction_tape_accumulate_kernel(
             wavelength, cell_area, seed, total_edge_length, tx_pol, points, cell);
         float value = 0.0f;
         if (tape_row_value<float>(row, tape_seeds_zero(), value)) {
-            atomicAdd(output + cell, value);
+            atomicAdd(output + tape_output_index(cell, r0, r1), value);
         }
     }
 }
@@ -562,9 +575,9 @@ __global__ void utd_diffraction_tape_accumulate_backward_kernel(
         if (!tape_active[lane]) continue;
         const int sidx=tape_state[lane], cell=tape_cell[lane];
         if (sidx<0 || sidx>=state_count || cell<0 || cell>=r0*r1) continue;
+        const int64_t element = tape_output_index(cell, r0, r1);
         const float cotangent = grad_output[
-            static_cast<int64_t>(cell / r0) * grad_stride0 +
-            static_cast<int64_t>(cell % r0) * grad_stride1];
+            (element / r1) * grad_stride0 + (element % r1) * grad_stride1];
         if (cotangent == 0.0f) continue;
         const TapeRowContext row = load_tape_row(
             lane, sidx, TAPE_ROW_TABLE_ARGS, sample_count, axis, plane,
@@ -666,7 +679,7 @@ __global__ void utd_diffraction_tape_accumulate_jvp_kernel(
         seeds.wavelength = wavelength_tangent;
         utd::Dual value;
         if (tape_row_value<utd::Dual>(row, seeds, value)) {
-            atomicAdd(output_tangent + cell, value.d);
+            atomicAdd(output_tangent + tape_output_index(cell, r0, r1), value.d);
         }
     }
 }
@@ -1764,7 +1777,7 @@ at::Tensor channel_mc_utd_diffraction_tape_accumulate_cuda(
     at::Tensor tx_pol,
     const PointTapeTensors& point_tensors) {
     const PointTapeArgs point_tape = point_tape_args(point_tensors);
-    auto output=at::empty({r1,r0},source.options());
+    auto output=at::empty(tape_output_shape(point_tape,r0,r1),source.options());
     const auto stream=at::cuda::getCurrentCUDAStream();
     C10_CUDA_CHECK(cudaMemsetAsync(
         output.data_ptr<float>(),0,static_cast<size_t>(output.numel())*sizeof(float),stream));
@@ -1826,8 +1839,8 @@ channel_mc_utd_diffraction_tape_accumulate_backward_cuda(
     TORCH_CHECK(grad_output.scalar_type() == at::kFloat, "grad_output must be float32");
     TORCH_CHECK(grad_output.dim() == 2, "grad_output must have 2 dimensions");
     TORCH_CHECK(
-        grad_output.size(0) == r1 && grad_output.size(1) == r0,
-        "grad_output must match the (resolution1, resolution0) map");
+        grad_output.sizes() == at::IntArrayRef(tape_output_shape(point_tape, r0, r1)),
+        "grad_output must match the tape accumulation output");
     const auto face_options = eta_r.options();
     auto grad_eta_r = diffraction_zero_filled({eta_r.size(0)}, face_options);
     auto grad_sigma = diffraction_zero_filled({eta_r.size(0)}, face_options);
@@ -1890,7 +1903,8 @@ at::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp_cuda(
     double total_edge_length, double wavelength_tangent, at::Tensor tx_pol,
     const PointTapeTensors& point_tensors) {
     const PointTapeArgs point_tape = point_tape_args(point_tensors);
-    auto output_tangent = diffraction_zero_filled({r1, r0}, source.options());
+    auto output_tangent =
+        diffraction_zero_filled(tape_output_shape(point_tape, r0, r1), source.options());
     const int64_t samples = tape_active.numel();
     if (samples == 0) return output_tangent;
     const auto stream = at::cuda::getCurrentCUDAStream();

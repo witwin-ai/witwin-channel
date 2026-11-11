@@ -578,14 +578,12 @@
     },
     "native/channel/kernels/los.cu": {
       "kernels": [
-        "apply_los_visibility_kernel",
         "apply_los_visibility_public_layout_kernel",
         "consumer_los_jones_kernel",
         "fixed_los_backward_kernel",
         "fixed_los_jvp_kernel",
         "gather_fixed_los_kernel",
         "los_component_maps_adjoint_kernel",
-        "los_component_maps_kernel",
         "los_component_maps_public_layout_kernel",
         "los_path_gain_backward_kernel",
         "los_path_gain_jvp_kernel",
@@ -598,14 +596,13 @@
         "validate_fixed_los_kernel"
       ],
       "launches": [
-        "apply_los_visibility_kernel",
         "apply_los_visibility_public_layout_kernel",
         "consumer_los_jones_kernel",
         "fixed_los_backward_kernel",
         "fixed_los_jvp_kernel",
         "gather_fixed_los_kernel",
         "los_component_maps_adjoint_kernel",
-        "los_component_maps_kernel",
+        "los_component_maps_public_layout_kernel",
         "los_path_gain_backward_kernel",
         "los_path_gain_jvp_kernel",
         "los_silhouette_clearance_kernel",

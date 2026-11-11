@@ -81,10 +81,9 @@ BDPT `variance`:
   samples in row-major order (`i * cols + j`).
 
 So for a single grid, `path_gain[t].reshape(-1)[k]` is the same receiver `k` in
-every solver and equals the point-receiver result at that sample. Deterministic
-and MC Basic `path_gain` are contiguous; MC Basic `component_maps` and the BDPT
-grid outputs are transposed views of the native `[T, cols, rows]` maps (call
-`.contiguous()` before `.view()`).
+every solver and equals the point-receiver result at that sample. All grid
+outputs are contiguous: every solver accumulates or deposits in receiver
+row-major order natively.
 
 Result metadata of every solver carries `estimator` (`enumerated` or
 `sampled`), `quantity` (a dict from each requested component to
