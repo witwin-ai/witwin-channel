@@ -23,7 +23,10 @@ from witwin.channel.runtime import CapacityFailureBit, CapacityFailureState
 
 def _failure_state() -> CapacityFailureState:
     state = object.__new__(CapacityFailureState)
-    object.__setattr__(state, "bits", torch.zeros(1, dtype=torch.int32))
+    record = torch.zeros(2, dtype=torch.int32)
+    object.__setattr__(state, "record", record)
+    object.__setattr__(state, "bits", record[0:1])
+    object.__setattr__(state, "dropped_rows", record[1:2])
     return state
 
 
@@ -165,7 +168,7 @@ def test_forward_and_tape_keep_named_order_and_state_identity(
         assert args[1] is origins
         assert args[2] is targets
         assert args[3] is active
-        assert args[8] is state.bits
+        assert args[8] is state.record
         assert args[9] == 1 << 7
     assert calls[0][1][6] == 0
     assert calls[1][1][6] == 1
@@ -247,11 +250,11 @@ def test_backward_and_jvp_flatten_complete_primal_tape_and_return_named_results(
     expected_tape = (*result_values, *tape_values)
     backward_args = calls["backward"]
     jvp_args = calls["jvp"]
-    assert backward_args[8] is state.bits
+    assert backward_args[8] is state.record
     assert backward_args[10:27] == expected_tape
     assert backward_args[27] is grad_distance
     assert backward_args[33:] == (True, True, False)
-    assert jvp_args[8] is state.bits
+    assert jvp_args[8] is state.record
     assert jvp_args[10:27] == expected_tape
     assert jvp_args[27] is None
     assert jvp_args[28] is tangent_origins

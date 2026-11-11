@@ -3474,7 +3474,7 @@ def _evaluated_connection_samples(
 
 def _single_class_discrete_connection_samples(
     scene: SolverScene, config: Config, *, component: str, component_id: int,
-    tx_power: torch.Tensor | None = None,
+    tx_power: torch.Tensor | None = None, dropped_rows: list[int] | None = None,
 ) -> dict[str, torch.Tensor] | None:
     """Enumerate one delta-like path class as unit-mass discrete connections.
 
@@ -3487,7 +3487,7 @@ def _single_class_discrete_connection_samples(
     its own body.
     """
 
-    paths, _ = evaluate_enumerated_paths(
+    paths, sidecars = evaluate_enumerated_paths(
         scene,
         _BDPTTopologyOptions(
             max_depth=int(config.max_depth),
@@ -3498,6 +3498,9 @@ def _single_class_discrete_connection_samples(
             ad_mode=config.ad_mode,
         ),
     )
+    transaction = sidecars.capacity_transaction
+    if dropped_rows is not None and transaction is not None:
+        dropped_rows.append(transaction.terminal_check())
     selected = torch.nonzero(
         paths.topology.component_id == component_id, as_tuple=False
     ).flatten()
@@ -3538,7 +3541,7 @@ def _diffraction_discrete_connection_samples(
 
 def _transmission_discrete_connection_samples(
     scene: SolverScene, config: Config, *, tx_power: torch.Tensor | None = None,
-) -> dict[str, torch.Tensor] | None:
+) -> tuple[dict[str, torch.Tensor] | None, int]:
     """Enumerate pure straight-segment transmission paths with unit discrete mass.
 
     transmission polarization. Pure specular transmission is delta-like exactly as reflection is,
@@ -3546,12 +3549,16 @@ def _transmission_discrete_connection_samples(
     reproducing the deterministic full-Jones layer-stack field
     (``field_transmission_sequence``) instead of the retired straight-chain TE/TM
     mean. Mixed reflection+transmission chains are not enumerable and stay with
-    the event-selected shooting sampler (native full-Jones field).
+    the event-selected shooting sampler (native full-Jones field). Also returns
+    the endpoint pairs dropped for crossing more walls than ``max_depth``.
     """
 
-    return _single_class_discrete_connection_samples(
-        scene, config, component="transmission", component_id=5, tx_power=tx_power
+    dropped_rows: list[int] = []
+    samples = _single_class_discrete_connection_samples(
+        scene, config, component="transmission", component_id=5, tx_power=tx_power,
+        dropped_rows=dropped_rows,
     )
+    return samples, sum(dropped_rows)
 
 
 def _coupled_discrete_connection_samples(
@@ -3647,6 +3654,7 @@ def _collect_coherent_connection_samples(
     dict[str, torch.Tensor],
     dict[str, torch.Tensor] | None,
     int,
+    int,
     dict[str, int],
     dict[int, Any],
     int,
@@ -3715,7 +3723,7 @@ def _collect_coherent_connection_samples(
                 "scattering",
             )
         }
-        return component_matrices, None, 0, empty_event_counts, {}, launch_count
+        return component_matrices, None, 0, 0, empty_event_counts, {}, launch_count
 
     estimate_samples = (
         sample_blocks[0]
@@ -3749,6 +3757,7 @@ def _collect_coherent_connection_samples(
     return (
         component_matrices,
         estimate_samples,
+        0,
         0,
         empty_event_counts,
         {},
@@ -3869,6 +3878,7 @@ def _collect_connection_samples(
     dict[str, torch.Tensor],
     dict[str, torch.Tensor] | None,
     int,
+    int,
     dict[str, int],
     dict[int, Any],
     int,
@@ -3906,6 +3916,7 @@ def _collect_connection_samples(
 
     estimate_samples: dict[str, torch.Tensor] | None = None
     transmission_chain_count = 0
+    transmission_dropped_rows = 0
     event_counts = {"transmit": 0, "reflect": 0, "scatter": 0, "scattering_nee_rows": 0}
     scattering_runtimes: dict[int, Any] = {}
     if endpoint_only:
@@ -4007,8 +4018,10 @@ def _collect_connection_samples(
             # polarization-agnostic straight-chain TE/TM mean with the full-Jones
             # layer-stack field. Mixed reflection+transmission chains are handled
             # separately by the event-selected shooting sampler below.
-            transmission_samples = _transmission_discrete_connection_samples(
-                topology_scene, config, tx_power=enumerated_tx_power
+            transmission_samples, transmission_dropped_rows = (
+                _transmission_discrete_connection_samples(
+                    topology_scene, config, tx_power=enumerated_tx_power
+                )
             )
             if transmission_samples is not None:
                 sample_blocks.append(transmission_samples)
@@ -4080,6 +4093,7 @@ def _collect_connection_samples(
         component_matrices,
         estimate_samples,
         transmission_chain_count,
+        transmission_dropped_rows,
         event_counts,
         scattering_runtimes,
         launch_count,
@@ -4220,8 +4234,9 @@ def _build_metadata(
     scene: SolverScene, config: Config, *, prep: _SolvePrep, workspace: _EndpointWorkspace,
     estimate_samples: dict[str, torch.Tensor] | None, path_gain: torch.Tensor,
     variance: torch.Tensor | None, launch_count: int, transmission_chain_count: int,
-    event_counts: dict[str, int], scattering_runtimes: dict[int, Any],
-    component_maps: dict[str, torch.Tensor] | None, ledger: AdLaunchLedger | None = None,
+    transmission_dropped_rows: int, event_counts: dict[str, int],
+    scattering_runtimes: dict[int, Any], component_maps: dict[str, torch.Tensor] | None,
+    ledger: AdLaunchLedger | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
     launch_state = workspace.launch_state
     endpoint_subpaths = workspace.endpoint_subpaths
@@ -4256,6 +4271,8 @@ def _build_metadata(
         # component_mask bit 8 marks transmitted subpaths (component classification).
         metadata["transmission"] = {
             "straight_chain_paths": int(transmission_chain_count),
+            # Endpoint pairs whose straight segment crosses more walls than max_depth.
+            "dropped_rows_over_max_depth": int(transmission_dropped_rows),
             "event_counts": {
                 "transmit": int(event_counts["transmit"]),
                 "reflect": int(event_counts["reflect"]),
@@ -4327,6 +4344,7 @@ def _solve_pipeline(
         component_matrices,
         estimate_samples,
         transmission_chain_count,
+        transmission_dropped_rows,
         event_counts,
         scattering_runtimes,
         launch_count,
@@ -4354,6 +4372,7 @@ def _solve_pipeline(
         variance=variance,
         launch_count=launch_count,
         transmission_chain_count=transmission_chain_count,
+        transmission_dropped_rows=transmission_dropped_rows,
         event_counts=event_counts,
         scattering_runtimes=scattering_runtimes,
         component_maps=component_maps,

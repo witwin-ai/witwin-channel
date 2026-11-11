@@ -184,6 +184,28 @@ def test_contract_failure_sanitizes_entire_topology_and_counts() -> None:
     assert torch.count_nonzero(packed.path_field).item() == 0
 
 
+def test_inert_overflow_row_is_dropped_without_failing_the_batch() -> None:
+    penetration = _penetration()
+    # RayD's DropRow output for a segment with more crossings than max_depth.
+    penetration.valid[1].fill_(False)
+    penetration.num_hits[1] = 0
+    penetration.reached_target[1] = False
+    penetration.overflow[1] = True
+
+    packed = enumerated_transmission_topology_pack(
+        penetration,
+        torch.tensor([0, 0], device="cuda", dtype=torch.int32),
+        torch.tensor([0], device="cuda", dtype=torch.int32),
+        tx_count=1,
+        rx_count=3,
+    )
+
+    assert penetration.failure_state.bits.tolist() == [0]
+    assert packed.valid.tolist() == [False, False, True]
+    assert packed.execution.device_candidate_count.tolist() == [1]
+    assert packed.primitive_sequence[2].tolist() == [0, 1]
+
+
 @pytest.mark.parametrize("corruption", ["count", "prefix", "reached", "overflow"])
 def test_discrete_corruption_fails_before_payload_gather(corruption: str) -> None:
     penetration = _penetration()

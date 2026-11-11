@@ -110,7 +110,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
 ## Native runtime boundary
 
 - `_channel` is the single production extension. It source-links RayD
-  `e4a63d2a7630fcc5f69b2375b11b1ef9f7e2caec` (`rayd-torch 0.8.0`) and calls the typed
+  `93affb2d4a5cf2a65f8f2fa0eeddbbf647f52f4a` (`rayd-torch 0.8.0`) and calls the typed
   `rayd::torch` C++ API directly; no RayD Python module, second dispatcher,
   copied C ABI, getter table, or dynamic symbol lookup participates.
 - Builds use an explicit validated `RAYD_SOURCE_DIR` first. Without one, they
@@ -124,7 +124,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
   names use `rayd_*`; Channel-composed R-D/D-D geometry uses `coupled_*`.
 - The locked integration boundary is the eight-header set rooted at
   `include/rayd/integration.h`, with normalized aggregate SHA-256
-  `802c3e40b3e5a90ac65500ebf3d7a8b774ef6ea1148adefd3d05a33c274a7b25`
+  `e543a63e618dd74de8c5e178108cc46f3197c03b8306e37ed1bae5518050a788`
   and identity `rayd.torch.integration`. The numeric API version is 8. Each
   header SHA, the aggregate digest, and the API version are validated
   independently from the stable, capability-neutral identity.

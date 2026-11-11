@@ -299,7 +299,7 @@ def test_forward_jvp_and_backward_obey_adjoint_identity() -> None:
     torch.testing.assert_close(lhs, rhs, rtol=2.0e-4, atol=2.0e-5)
 
 
-def test_overflow_sanitizes_penetration_and_downstream_topology() -> None:
+def test_overflow_drops_only_that_row_and_counts_it() -> None:
     rayd, _vertices = _scene()
     origins = torch.tensor([[0.0, 0.0, -1.0]], dtype=torch.float32, device="cuda")
     targets = torch.tensor([[0.0, 0.0, 3.0]], dtype=torch.float32, device="cuda")
@@ -308,7 +308,8 @@ def test_overflow_sanitizes_penetration_and_downstream_topology() -> None:
         rayd, origins, targets, None, **kwargs
     )
 
-    assert failure_state.bits.tolist() == [1 << 7]
+    assert failure_state.bits.tolist() == [0]
+    assert failure_state.dropped_rows.tolist() == [1]
     assert tape.result.overflow.tolist() == [True]
     _assert_result_inert(tape.result)
 
@@ -320,6 +321,7 @@ def test_overflow_sanitizes_penetration_and_downstream_topology() -> None:
         rx_count=1,
     )
     assert packed.failure_state is failure_state
+    assert failure_state.bits.tolist() == [0]
     assert not packed.valid.any().item()
     assert packed.execution.device_candidate_count.tolist() == [0]
     assert packed.execution.device_guardrail_count.tolist() == [0]
@@ -373,7 +375,7 @@ def test_monte_carlo_policy_batches_clear_one_exact_capacity_and_zero_length() -
     assert result.global_primitive_id[2].tolist() == [0, 1]
 
 
-def test_monte_carlo_d_plus_one_overflow_poison_is_batch_wide() -> None:
+def test_monte_carlo_d_plus_one_overflow_drops_only_that_row() -> None:
     rayd, _vertices = _scene()
     origins = torch.tensor(
         [[0.0, 0.0, -1.0], [7.0, 7.0, -1.0]],
@@ -395,6 +397,9 @@ def test_monte_carlo_d_plus_one_overflow_poison_is_batch_wide() -> None:
         rayd, origins, targets, None, **kwargs
     )
 
-    assert failure_state.bits.tolist() == [1 << 7]
+    assert failure_state.bits.tolist() == [0]
+    assert failure_state.dropped_rows.tolist() == [1]
     assert result.overflow.tolist() == [True, False]
-    _assert_result_inert(result)
+    assert result.num_hits.tolist() == [0, 0]
+    assert result.reached_target.tolist() == [False, True]
+    assert not result.valid.any().item()

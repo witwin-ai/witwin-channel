@@ -410,8 +410,13 @@ def evaluated_paths_from_block(
     rx_count: int, max_depth: int, launch_count: int, visibility_rejection_count: int = 0,
     selected_edge_count: int = 0, candidate_count: int | None = None, guardrail_count: int = 0,
     source_stable_ids: torch.Tensor | None = None, sink_stable_ids: torch.Tensor | None = None,
+    capacity_transaction: SolveCapacityTransaction | None = None,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
-    """Select a canonical path block and construct split typed contracts."""
+    """Select a canonical path block and construct split typed contracts.
+
+    A solve capacity transaction is observed by the compact owner's one count
+    copy; a failed transaction raises ``CapacityError`` here.
+    """
 
     if "primitive_sequence" not in paths and int(paths["valid"].shape[0]) == 0:
         device = paths["valid"].device
@@ -436,7 +441,16 @@ def evaluated_paths_from_block(
         sequence_width=max_depth,
         source_stable_ids=source_stable_ids,
         sink_stable_ids=sink_stable_ids,
+        capacity_failure_state=(
+            capacity_transaction.failure_state
+            if capacity_transaction is not None
+            else None
+        ),
     )
+    if capacity_transaction is not None:
+        capacity_transaction.observe(
+            compact.capacity_failure_bits, compact.capacity_dropped_rows
+        )
     evaluated, sidecars = evaluated_paths_from_result(
         SimpleNamespace(
             **compact.block,

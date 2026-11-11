@@ -356,7 +356,8 @@ pybind11::dict channel_enumerated_canonical_compact(
     int64_t max_paths_scope,
     int64_t sequence_width,
     std::optional<torch::Tensor> source_stable_ids,
-    std::optional<torch::Tensor> sink_stable_ids);
+    std::optional<torch::Tensor> sink_stable_ids,
+    std::optional<torch::Tensor> capacity_failure_record);
 pybind11::dict channel_enumerated_exact_pair_metadata(
     torch::Tensor tx_id,
     torch::Tensor rx_id,
@@ -813,7 +814,8 @@ void register_path_deterministic(pybind11::module_ &module) {
         pybind11::arg("max_paths_scope"),
         pybind11::arg("sequence_width"),
         pybind11::arg("source_stable_ids") = std::nullopt,
-        pybind11::arg("sink_stable_ids") = std::nullopt);
+        pybind11::arg("sink_stable_ids") = std::nullopt,
+        pybind11::arg("capacity_failure_record") = std::nullopt);
     module.def(
         "enumerated_exact_pair_metadata",
         &channel_enumerated_exact_pair_metadata,

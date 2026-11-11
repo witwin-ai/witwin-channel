@@ -1214,6 +1214,9 @@ class PropagationDiagnostics:
     # reports zero tape however many companions it launched.
     ad_companion_launches: int = 0
     ad_tape_bytes: int = 0
+    # Source-sink pairs left without a transmission path because their straight
+    # segment crosses more walls than max_depth.
+    transmission_dropped_rows: int = 0
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -3458,7 +3461,9 @@ def _path_batch(
     )
 
 
-def _diagnostics(sidecars: object, compact: _ConsumerRows, ad_mode: str) -> PropagationDiagnostics:
+def _diagnostics(
+    sidecars: object, compact: _ConsumerRows, ad_mode: str, transmission_dropped_rows: int,
+) -> PropagationDiagnostics:
     execution = sidecars.execution
     return PropagationDiagnostics(
         discovery_launch_count=int(execution.launch_count),
@@ -3472,6 +3477,7 @@ def _diagnostics(sidecars: object, compact: _ConsumerRows, ad_mode: str) -> Prop
         validation_sync_count=0,
         ad_companion_launches=int(execution.ad_companion_launches),
         ad_tape_bytes=tape_bytes(execution.ad_tape_bytes, ad_mode),
+        transmission_dropped_rows=transmission_dropped_rows,
     )
 
 
@@ -3481,6 +3487,7 @@ def evaluate(compiled_scene: CompiledScene, request: PropagationRequest) -> Prop
     from witwin.channel.propagation.enumerated import (
         evaluate_enumerated_paths,
         sanitize_enumerated_capacity_transaction,
+        transmission_dropped_rows,
     )
 
     compiled, request = _preflight_evaluate(compiled_scene, request)
@@ -3498,8 +3505,7 @@ def evaluate(compiled_scene: CompiledScene, request: PropagationRequest) -> Prop
         defer_capacity_terminal=True,
     )
     evaluated, sidecars = sanitize_enumerated_capacity_transaction(evaluated, sidecars)
-    if sidecars.capacity_transaction is not None:
-        sidecars.capacity_transaction.terminal_check()
+    dropped_rows = transmission_dropped_rows(sidecars)
     compact = _compact(evaluated, getattr(sidecars, "compact_metadata", None))
     paths = _path_batch(
         compact,
@@ -3516,7 +3522,7 @@ def evaluate(compiled_scene: CompiledScene, request: PropagationRequest) -> Prop
         paths=paths,
         convention=_CONVENTION,
         capabilities=_CAPABILITIES,
-        diagnostics=_diagnostics(sidecars, compact, request.ad_mode),
+        diagnostics=_diagnostics(sidecars, compact, request.ad_mode, dropped_rows),
     )
 
 

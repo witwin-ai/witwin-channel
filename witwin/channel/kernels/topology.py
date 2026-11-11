@@ -1830,6 +1830,8 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
             max_paths,
             scope,
             sequence_width,
+            capacity_failure_record,
+            observation,
         ) = inputs[20:]
         raw = _required_native_op("enumerated_canonical_compact")(
             block,
@@ -1841,6 +1843,7 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
             int(sequence_width),
             source_stable_ids,
             sink_stable_ids,
+            capacity_failure_record,
         )
         expected = {
             *_FORWARD_BLOCK_FIELDS,
@@ -1849,9 +1852,13 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
             "count_d2h_copies",
             "count_d2h_bytes",
             "count_synchronizations",
+            "capacity_failure_bits",
+            "capacity_dropped_rows",
         }
         if not isinstance(raw, dict) or set(raw) != expected:
             raise TypeError("native canonical compact owner returned bad fields")
+        observation.bits = int(raw["capacity_failure_bits"])
+        observation.dropped_rows = int(raw["capacity_dropped_rows"])
         return tuple(raw[name] for name in _FUNCTION_OUTPUT_FIELDS)
 
     @staticmethod
@@ -1870,7 +1877,7 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
     @staticmethod
     @_ad_first_order_only
     def backward(ctx, *grad_outputs):
-        input_grads: list[torch.Tensor | None] = [None] * 28
+        input_grads: list[torch.Tensor | None] = [None] * 30
         continuous_grads = grad_outputs[_DISCRETE_OUTPUT_COUNT:]
         if all(value is None for value in continuous_grads):
             return tuple(input_grads)
@@ -1955,6 +1962,16 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
         )
 
 
+class _CompactCapacityObservation:
+    """Host values the compact owner copied alongside its row count."""
+
+    __slots__ = ("bits", "dropped_rows")
+
+    def __init__(self) -> None:
+        self.bits = 0
+        self.dropped_rows = 0
+
+
 @dataclass(frozen=True, slots=True)
 class CanonicalCompactRows:
     block: dict[str, torch.Tensor]
@@ -1967,6 +1984,8 @@ class CanonicalCompactRows:
     count_d2h_copies: int
     count_d2h_bytes: int
     count_synchronizations: int
+    capacity_failure_bits: int = 0
+    capacity_dropped_rows: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -2059,12 +2078,34 @@ def _metadata_from_raw(
     )
 
 
+def _compact_capacity_record(
+    capacity_failure_state: CapacityFailureState | None, *, reference: torch.Tensor,
+) -> torch.Tensor | None:
+    if capacity_failure_state is None:
+        return None
+    require_capacity_failure_state(capacity_failure_state, device=reference.device)
+    return capacity_failure_state.record
+
+
+def _compact_copy_budget(row_count: int, *, has_capacity_record: bool) -> tuple[int, int]:
+    """Return the compact owner's (copies, bytes): one copy of 8, or 16 with a failure record."""
+
+    if row_count == 0 and not has_capacity_record:
+        return 0, 0
+    return 1, 16 if has_capacity_record else 8
+
+
 def enumerated_canonical_compact(
     block: dict[str, torch.Tensor], *, pair_count: int, num_tx: int, num_rx: int,
     max_paths: int | None, max_paths_scope: str, sequence_width: int,
     source_stable_ids: torch.Tensor | None = None, sink_stable_ids: torch.Tensor | None = None,
+    capacity_failure_state: CapacityFailureState | None = None,
 ) -> CanonicalCompactRows:
-    """Select, deduplicate, limit, and gather exact rows in one native owner."""
+    """Select, deduplicate, limit, and gather exact rows in one native owner.
+
+    With ``capacity_failure_state`` the one count copy also carries the solve's
+    failure bitmask and dropped-row count, returned as host ints.
+    """
 
     _validate_counts(pair_count=pair_count, num_tx=num_tx, num_rx=num_rx)
     normalized = dict(block)
@@ -2090,6 +2131,10 @@ def enumerated_canonical_compact(
     scope = {"global": 0, "per_pair": 1}.get(max_paths_scope)
     if scope is None:
         raise ValueError("max_paths_scope must be 'global' or 'per_pair'")
+    capacity_failure_record = _compact_capacity_record(
+        capacity_failure_state, reference=normalized["valid"]
+    )
+    observation = _CompactCapacityObservation()
     outputs = _EnumeratedCanonicalCompactFunction.apply(
         *(normalized[name] for name in _DISCRETE_INPUT_FIELDS),
         *(normalized[name] for name in _CONTINUOUS_INPUT_FIELDS),
@@ -2101,6 +2146,8 @@ def enumerated_canonical_compact(
         -1 if max_paths is None else int(max_paths),
         int(scope),
         int(sequence_width),
+        capacity_failure_record,
+        observation,
     )
     raw = dict(zip(_FUNCTION_OUTPUT_FIELDS, outputs, strict=True))
     gathered = {name: raw[name] for name in _FORWARD_BLOCK_FIELDS}
@@ -2108,7 +2155,9 @@ def enumerated_canonical_compact(
         "enumerated_canonical_compact", gathered, sequence_width
     )
     path_count = int(raw["pair_index"].shape[0])
-    has_candidates = row_count > 0
+    copies, record_bytes = _compact_copy_budget(
+        row_count, has_capacity_record=capacity_failure_record is not None
+    )
     metadata = _metadata_from_raw(
         {
             "pair_index": raw["pair_index"],
@@ -2116,9 +2165,9 @@ def enumerated_canonical_compact(
             "source_id": raw["source_id"],
             "sink_id": raw["sink_id"],
             "path_count": path_count,
-            "count_d2h_copies": 1 if has_candidates else 0,
-            "count_d2h_bytes": 8 if has_candidates else 0,
-            "count_synchronizations": 1 if has_candidates else 0,
+            "count_d2h_copies": copies,
+            "count_d2h_bytes": record_bytes,
+            "count_synchronizations": copies,
         },
         pair_count=pair_count,
         stable_ids_requested=source_stable_ids is not None,
@@ -2142,6 +2191,8 @@ def enumerated_canonical_compact(
         count_d2h_copies=metadata.count_d2h_copies,
         count_d2h_bytes=metadata.count_d2h_bytes,
         count_synchronizations=metadata.count_synchronizations,
+        capacity_failure_bits=observation.bits,
+        capacity_dropped_rows=observation.dropped_rows,
     )
 
 

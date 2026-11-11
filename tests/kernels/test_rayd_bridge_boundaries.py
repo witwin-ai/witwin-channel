@@ -198,5 +198,6 @@ def test_segment_penetration_bridge_preserves_the_typed_api8_contract() -> None:
 
     for gradient in ("vertices", "origins", "targets"):
         assert f"tensor_or_none(out.grad_{gradient})" in geometry
-    assert "capacity_failure_state" in geometry
+    assert "capacity_failure_record" in geometry
+    assert "SegmentPenetrationOverflowPolicy::DropRow" in geometry
     assert "input_active_any" in geometry

@@ -78,6 +78,7 @@ def test_transmission_path_result_events_and_delay():
     assert result.metadata["transmission"] == {
         "thin_sheet_straight_path_approximation": True,
         "group_delay": "geometric",
+        "dropped_rows_over_max_depth": 0,
     }
 
 

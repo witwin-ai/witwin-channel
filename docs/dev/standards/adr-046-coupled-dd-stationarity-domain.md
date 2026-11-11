@@ -14,6 +14,24 @@
   taper), ADR-025 (RayD ownership of the pure-wedge operator), and RayD
   ADR-0037 (the shared local-coordinate line-Fermat primitive)
 
+> **Amendment (0.6.0, M1-3): an uncertified root drops the candidate.** The
+> paragraph "No fixed iteration result is published ..." below said a failed
+> position invariant inside a strict physical bracket "device-asserts" and is
+> "never converted to an inactive candidate". That assert fired on ordinary
+> scenes (one building with four point receivers in Path; a 4x4 city with a
+> 16x16 grid in Deterministic, audit finding S-2) and destroyed the CUDA context.
+> It is replaced: such a candidate is made inactive (both points NaN, as for a
+> physical-domain rejection) and counted atomically in a device `int32[1]`
+> `certificate_rejection_count` returned by `coupled_dd_geometry_forward`
+> (one zeroing memset per call, no extra kernel launch, no host read). The
+> certificate itself is unchanged, so every published row is still certified
+> and no uncertified point is ever published; the only change is that a float32
+> resolution failure loses that one candidate instead of the process. The count
+> is a device diagnostic; it is not yet surfaced in solver metadata. Large
+> world-coordinate translations that destroy the certificate (paragraph
+> "The existing geometry contract ...") likewise drop candidates rather than
+> failing the native operation.
+
 ## Context
 
 The full-wave boundary audit isolated a numerical/topological defect before

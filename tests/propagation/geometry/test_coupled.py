@@ -143,6 +143,7 @@ def test_coupled_dd_query_names_raw_geometry_and_preserves_identity(monkeypatch)
         "edge2_position": torch.ones((2, 3)),
         "path_length_m": torch.ones(2),
         "delay_s": torch.ones(2),
+        "certificate_rejection_count": torch.zeros(1, dtype=torch.int32),
     }
     calls = []
 

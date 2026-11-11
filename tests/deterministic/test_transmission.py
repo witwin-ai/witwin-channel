@@ -4,15 +4,9 @@
 """Tests transmission."""
 
 import math
-import os
-from pathlib import Path
-import subprocess
-import sys
-import textwrap
 
 import pytest
 import torch
-import witwin.core as core_package
 
 from tests.support.scenes import transmission_wall_structure
 from tests.support.core_world import make_receiver, make_transmitter
@@ -22,7 +16,6 @@ from witwin.channel.deterministic import Config, solve
 from witwin.core import MaterialLayer, PhysicalMaterial, Scene
 
 _FREQUENCY_HZ = 3.0e9
-_REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA torch is required"
@@ -108,6 +101,7 @@ def test_vacuum_wall_transmission_equals_empty_scene_los(rx_position):
     assert wall.metadata["transmission"] == {
         "thin_sheet_straight_path_approximation": True,
         "group_delay": "geometric",
+        "dropped_rows_over_max_depth": 0,
     }
 
 
@@ -180,67 +174,27 @@ def test_two_walls_transmission_is_the_product_of_single_wall_stacks():
     assert both.metadata["counts"]["components"]["transmission"] == 1
 
 
-def test_max_depth_overflow_is_fail_loud_for_two_walls():
+def test_max_depth_overflow_drops_the_two_wall_row_and_counts_it():
     _require_rayd()
-    code = textwrap.dedent(
-        """
-        import sys
-        import torch
-
-        sys.meta_path[:] = [
-            finder
-            for finder in sys.meta_path
-            if type(finder).__module__ != "_witwin_channel_editable"
-        ]
-
-        from tests.deterministic.test_transmission import (
-            _FREQUENCY_HZ,
-            _TRANSMISSION,
-            _scene,
-            _vacuum_wall,
-        )
-        from tests.support.scenes import transmission_wall_structure
-        from witwin.channel.deterministic import solve
-
-        structures = [
-            transmission_wall_structure(
-                2.0, _vacuum_wall(), name="wall-a", surface_id=1
-            ),
-            transmission_wall_structure(
-                3.0, _vacuum_wall(), name="wall-b", surface_id=2
-            ),
-        ]
-        solve(
-            _scene(structures, [5.0, 0.0, 0.0]),
-            _TRANSMISSION,
-            reference_frequency_hz=_FREQUENCY_HZ,
-        )
-        print("TERMINAL_ENQUEUED", flush=True)
-        try:
-            torch.cuda.synchronize()
-        except RuntimeError:
-            print("TERMINAL_SYNC_ERROR", flush=True)
-        else:
-            raise AssertionError("D + 1 penetration overflow did not fail loudly")
-        """
+    structures = [
+        transmission_wall_structure(2.0, _vacuum_wall(), name="wall-a", surface_id=1),
+        transmission_wall_structure(3.0, _vacuum_wall(), name="wall-b", surface_id=2),
+    ]
+    scene = _scene(structures, [5.0, 0.0, 0.0])
+    # Two walls exceed max_depth=1: the pair has no transmission path, and the
+    # solve completes instead of failing the batch.
+    shallow = solve(scene, _TRANSMISSION, reference_frequency_hz=_FREQUENCY_HZ)
+    torch.cuda.synchronize()
+    assert shallow.metadata["transmission"]["dropped_rows_over_max_depth"] == 1
+    assert shallow.metadata["counts"]["components"]["transmission"] == 0
+    assert torch.count_nonzero(shallow.component_power["transmission"]).item() == 0
+    deep = solve(
+        scene,
+        Config(components={"transmission"}, max_depth=2),
+        reference_frequency_hz=_FREQUENCY_HZ,
     )
-    environment = os.environ.copy()
-    source_root = str(_REPOSITORY_ROOT)
-    core_source_root = str(Path(core_package.__file__).resolve().parents[2])
-    environment["PYTHONPATH"] = os.pathsep.join((source_root, core_source_root))
-    completed = subprocess.run(
-        [sys.executable, "-c", code],
-        cwd=_REPOSITORY_ROOT,
-        env=environment,
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=60,
-    )
-
-    assert completed.returncode == 0, completed.stderr
-    assert "TERMINAL_ENQUEUED" in completed.stdout
-    assert "TERMINAL_SYNC_ERROR" in completed.stdout
+    assert deep.metadata["transmission"]["dropped_rows_over_max_depth"] == 0
+    assert deep.metadata["counts"]["components"]["transmission"] == 1
 
 
 def test_los_transmission_exclusivity():

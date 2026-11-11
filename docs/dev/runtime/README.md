@@ -22,16 +22,18 @@ never import it, and `runtime`'s own `CapacityExecutionCounts` needs the check.
 `runtime.CapacityFailureState` owns the shared failure protocol used
 by accepted genuinely fixed-capacity operations and retained caller-free
 experiments. Native creation asynchronously zeros one contiguous CUDA
-`int32[1]` bitmask on the caller's current stream. Participants receive and
-retain the same typed object/storage, atomically OR owner-specific bits, and
-never read the state on the host. Intermediates do not trap; a participating
-solve/result boundary owns the single `capacity_failure_terminal_check`
-observation. That runtime-owned
-native operation launches on the caller's current stream, leaves the bitmask
-unchanged, does nothing when it is zero, and raises an asynchronous device
-failure when any bit is set. It performs no host read, synchronization, scalar
-extraction, result allocation, or payload sanitization; every producer must
-publish its canonical inert result before the terminal launch.
+`int32[2]` record on the caller's current stream: element 0 is the failure
+bitmask (exposed as the `int32[1]` view `bits`), element 1 counts rows dropped
+for exceeding their requested hit capacity (`dropped_rows`). Participants
+receive and retain the same typed object/storage, atomically OR owner-specific
+bits or add dropped rows, and never read the record themselves. Nothing traps.
+`SolveCapacityTransaction` observes the record on the host exactly once per
+solve: `observe(bits, dropped_rows)` when the enumerated compact boundary
+already copied it inside its one count copy (ADR-032 amendment), otherwise
+`terminal_check()` performs the one 8-byte `capacity_failure_state_read`
+(copy plus one stream synchronization) at result finalization. A non-zero
+bitmask raises `CapacityError` with the decoded bit names before any result is
+returned; `terminal_check()` returns the dropped-row count for metadata.
 
 ADR-032 restores the enumerated `O(K)` compact production result. Its sole new
 accepted count D2H/synchronization allocation boundary is owned by propagation,

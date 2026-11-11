@@ -2485,7 +2485,8 @@ __global__ void coupled_dd_prepare_kernel(
     const float *__restrict__ edge2_t_max,
     bool *__restrict__ active,
     float *__restrict__ edge1_point,
-    float *__restrict__ edge2_point) {
+    float *__restrict__ edge2_point,
+    int *__restrict__ certificate_rejections) {
     for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          index < count;
          index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
@@ -2634,14 +2635,15 @@ __global__ void coupled_dd_prepare_kernel(
             conservative_bracket && inside1 && inside2 && finite_points &&
             solution_state.regular && legs_in_utd_domain;
         if (physical_domain && !position_resolved) {
+            // The float32 bisection bracketed a root but could not resolve it
+            // to the position tolerance: the candidate has no certified
+            // stationary point, so it is dropped and counted.
             active[index] = false;
             channel::math::store_vec3(
                 edge1_point, index, make_float3(NAN, NAN, NAN));
             channel::math::store_vec3(
                 edge2_point, index, make_float3(NAN, NAN, NAN));
-            CUDA_KERNEL_ASSERT(
-                false &&
-                "coupled D-D bisection violated stationary-root certificate");
+            atomicAdd(certificate_rejections, 1);
             continue;
         }
         const bool valid = physical_domain && position_resolved;
@@ -2877,8 +2879,10 @@ std::vector<at::Tensor> channel_coupled_dd_prepare_cuda(
     auto active = at::empty({count}, source.options().dtype(at::kBool));
     auto edge1_point = at::empty_like(source);
     auto edge2_point = at::empty_like(source);
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
+    auto certificate_rejections = channel::empty_zero_cuda(
+        {1}, source.options().dtype(at::kInt), stream);
     if (count > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
         coupled_dd_prepare_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
             count,
             source.data_ptr<float>(),
@@ -2893,10 +2897,11 @@ std::vector<at::Tensor> channel_coupled_dd_prepare_cuda(
             edge2_t_max.data_ptr<float>(),
             active.data_ptr<bool>(),
             edge1_point.data_ptr<float>(),
-            edge2_point.data_ptr<float>());
+            edge2_point.data_ptr<float>(),
+            certificate_rejections.data_ptr<int>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
-    return {active, edge1_point, edge2_point};
+    return {active, edge1_point, edge2_point, certificate_rejections};
 }
 
 pybind11::dict channel_coupled_dd_finalize_cuda(
