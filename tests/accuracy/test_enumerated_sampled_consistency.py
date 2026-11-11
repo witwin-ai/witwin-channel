@@ -37,12 +37,6 @@ def _ground(material: object) -> list:
     return [surface(v, [[0, 1, 2], [1, 3, 2]], material)]
 
 
-def _wedge() -> list:
-    from tests.support.scenes import wedge_diffraction_scene
-
-    return list(wedge_diffraction_scene().structures)
-
-
 def _mc_mean_and_sem(structures, tx, component, origin, shape, spacing):
     from witwin.channel.montecarlo import basic
 
@@ -77,6 +71,9 @@ def _deterministic(structures, tx, component, origin, shape, spacing, *, average
     return values.reshape(first // n, n, second // n, n).mean(dim=(1, 3))
 
 
+# Diffraction is not part of this gate: MC Basic samples Keller cones and Deterministic
+# enumerates UTD rows, two different estimators that are not expected to agree. The
+# deterministic diffraction target is the full-wave reference.
 # name: (structures, tx, component, grid origin, grid spacing)
 CONSISTENT = {
     "pec_wall_reflection_shallow": (
@@ -98,10 +95,6 @@ GAPS = {
         "reflection", (20.0, -3.0, 1.5), SPACING,
         "Scalar MC reflection near the Brewster angle versus vector deterministic Fresnel "
         "reflection. Measured MC/deterministic 1.186-1.333, up to 184 standard errors."),
-    "wedge_diffraction": (
-        _wedge, (0.0, -1.0, 0.5), "diffraction", (2.5, 0.5, 0.5), 0.5,
-        "MC Basic Keller-cone diffraction versus deterministic UTD on a finite PEC wedge. "
-        "Measured MC/deterministic 0.43-0.97, up to 27 standard errors."),
 }
 
 
