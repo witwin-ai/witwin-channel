@@ -29,7 +29,7 @@ permissions:
 
 env:
   CORE_COMMIT: 46c826d969654912461d2e18b6cb87df9cc3df8f
-  RAYD_COMMIT: 5b6e10dc4b85ca82e2cd995508296a391b9170ed
+  RAYD_COMMIT: 22d30ca05ae940fb7f2f6b8443b49708b7110757
   RAYD_REPOSITORY_URL: https://github.com/Asixa/RayD
 
 jobs:

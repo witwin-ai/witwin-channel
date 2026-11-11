@@ -106,7 +106,7 @@ def test_rayd_lock_is_machine_readable_and_complete():
 
     assert lock["schema_version"] == 2
     assert lock["repository_url"] == "https://github.com/Asixa/RayD"
-    assert lock["commit"] == "5b6e10dc4b85ca82e2cd995508296a391b9170ed"
+    assert lock["commit"] == "22d30ca05ae940fb7f2f6b8443b49708b7110757"
     assert lock["integration_abi"] == {
         "kind": "source-header-set-sha256",
         "entrypoint": "include/rayd/integration.h",
