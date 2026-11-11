@@ -1297,9 +1297,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_los_taper_app
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
 #include "torch_cuda.h"
-#include <thrust/device_ptr.h>
-#include <thrust/execution_policy.h>
-#include <thrust/scan.h>
+#include "scan.cuh"
 
 #include "../tensor_checks.h"
 
@@ -1766,12 +1764,7 @@ pybind11::dict channel_consumer_fixed_los_gather(
             rx_polarization.data_ptr<float>(),
             pair_offsets.data_ptr<int64_t>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
-        thrust::inclusive_scan(
-            thrust::cuda::par.on(stream),
-            thrust::device_pointer_cast(pair_offsets.data_ptr<int64_t>()),
-            thrust::device_pointer_cast(
-                pair_offsets.data_ptr<int64_t>() + pair_count + 1),
-            thrust::device_pointer_cast(pair_offsets.data_ptr<int64_t>()));
+        channel::scan::inclusive_sum_in_place(pair_offsets, pair_count + 1, stream);
     }
 
     pybind11::dict result;

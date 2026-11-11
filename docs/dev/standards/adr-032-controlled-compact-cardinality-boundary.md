@@ -29,6 +29,26 @@
 > 8 bytes, or 16 bytes when the call carries the solve failure record; the
 > synchronization count is unchanged".
 
+> **Amendment (0.6.0, M2-4/M2-9): the same copy also carries the field-stage
+> row groups.** The control record is now always `2 + ceil(G / 2)` `int64`
+> words: element 0 is `K` or the negative contract code, element 1 is the solve
+> failure word (0 without a capacity transaction), and the remaining words pack
+> `G = 8 + W + 2` `int32` row counts for the field-stage groups (one per
+> component id, reflection split by depth `0..W`, one trailing group), where `W`
+> is the sequence width. It is still **one** device-to-host copy and **one**
+> synchronization of the caller's current stream per compact call; only its
+> size grows (`W = 3`: 72 bytes). The owner also returns a device stable order
+> of the `K` rows by group, so the field stage slices each group's rows instead
+> of running one `torch.nonzero` (a hidden synchronization and copy) per
+> component and reflection depth. That removes up to twelve synchronizations and
+> copies per solve. Per-candidate reflection compaction (one 4-byte copy per
+> EPC launch) reads the total from the exclusive scan's extra element instead of
+> two 4-byte copies, and reflection, multi-bounce and discovery EPC launches are
+> batched over every transmitter, so the number of such copies no longer grows
+> with the transmitter count. The copy-count budget below is unchanged; the byte
+> budget reads "one control record of `8 * (2 + ceil(G / 2))` bytes per compact
+> call".
+
 ## Context
 
 ADR-029 treated elimination of a device-selected count transfer as a primary

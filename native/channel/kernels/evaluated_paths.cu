@@ -19,6 +19,7 @@
 #include <limits>
 #include <optional>
 #include <utility>
+#include <vector>
 
 #define launch_blocks canonical_select_launch_blocks
 
@@ -27,7 +28,39 @@ namespace {
 constexpr int kBlockSize = 256;
 constexpr int kGlobalScope = 0;
 constexpr int kPerPairScope = 1;
+// Packed outer sort key: component (3 bits), depth (8 bits), tx, rx, invalid.
+constexpr int kComponentKeyBits = 3;
+constexpr int kDepthKeyBits = 8;
+constexpr int kComponentKeyLimit = 1 << kComponentKeyBits;
+constexpr int kDepthKeyLimit = 1 << kDepthKeyBits;
+// Field-stage row groups: one per component id, reflection split by depth,
+// and one trailing group for rows outside both.
+constexpr int kComponentRowGroups = 8;
 using channel::check_tensor;
+
+int index_bits(int64_t count) {
+    int bits = 0;
+    while (bits < 62 && (int64_t{1} << bits) < count) {
+        ++bits;
+    }
+    return bits;
+}
+
+int64_t row_group_count(int64_t width) {
+    return kComponentRowGroups + width + 2;
+}
+
+__device__ __forceinline__ int row_group(int component, int depth, int64_t width) {
+    const int overflow = static_cast<int>(kComponentRowGroups + width + 1);
+    if (component == 1) {
+        return depth >= 0 && depth <= width ? kComponentRowGroups + depth : overflow;
+    }
+    return component >= 0 && component < kComponentRowGroups ? component : overflow;
+}
+
+__device__ __forceinline__ uint64_t biased_key(int value) {
+    return static_cast<uint64_t>(static_cast<uint32_t>(value) ^ 0x80000000u);
+}
 
 int launch_blocks(int64_t count) {
     return static_cast<int>((count + kBlockSize - 1) / kBlockSize);
@@ -38,6 +71,8 @@ __global__ void validate_rows_kernel(
     const bool* __restrict__ valid,
     const int* __restrict__ tx_id,
     const int* __restrict__ rx_id,
+    const int* __restrict__ depth,
+    const int* __restrict__ component_id,
     int* __restrict__ valid_count,
     int64_t count,
     int64_t num_tx,
@@ -55,8 +90,12 @@ __global__ void validate_rows_kernel(
         atomicAdd(valid_count, 1);
         const int tx = tx_id[row];
         const int rx = rx_id[row];
+        const int component = component_id[row];
+        const int row_depth = depth[row];
         if (tx < 0 || static_cast<int64_t>(tx) >= num_tx ||
-            rx < 0 || static_cast<int64_t>(rx) >= num_rx) {
+            rx < 0 || static_cast<int64_t>(rx) >= num_rx ||
+            component < 0 || component >= kComponentKeyLimit ||
+            row_depth < 0 || row_depth >= kDepthKeyLimit) {
             atomicOr(
                 failure_state,
                 channel::capacity::kPairContractError);
@@ -73,55 +112,87 @@ __global__ void init_order_kernel(int64_t count, int64_t* __restrict__ order) {
     }
 }
 
-__global__ void sort_key_1d_kernel(
+// Two int32 sort fields packed into one order-preserving 64-bit radix key;
+// hi is the more significant field and may be absent.
+__global__ void sort_key_pair_kernel(
     const int* __restrict__ failure_state,
     const bool* __restrict__ valid,
-    const int* __restrict__ values,
+    const int* __restrict__ hi,
+    int64_t hi_stride,
+    int64_t hi_column,
+    const int* __restrict__ lo,
+    int64_t lo_stride,
+    int64_t lo_column,
     const int64_t* __restrict__ order,
-    int64_t* __restrict__ keys,
+    uint64_t* __restrict__ keys,
     int64_t count) {
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t position = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          position < count;
          position += stride) {
         const int64_t row = order[position];
-        keys[position] = failure_state[0] == 0 && valid[row]
-            ? static_cast<int64_t>(values[row])
-            : 0;
+        const bool live = failure_state[0] == 0 && valid[row];
+        uint64_t key = biased_key(live ? lo[row * lo_stride + lo_column] : 0);
+        if (hi != nullptr) {
+            key |= biased_key(live ? hi[row * hi_stride + hi_column] : 0) << 32;
+        }
+        keys[position] = key;
     }
 }
 
-__global__ void sort_key_sequence_kernel(
+// Most significant key word: component, depth, tx, rx, then the invalid flag.
+__global__ void sort_key_outer_kernel(
     const int* __restrict__ failure_state,
     const bool* __restrict__ valid,
-    const int* __restrict__ sequence,
+    const int* __restrict__ component_id,
+    const int* __restrict__ depth,
+    const int* __restrict__ tx_id,
+    const int* __restrict__ rx_id,
     const int64_t* __restrict__ order,
-    int64_t* __restrict__ keys,
+    uint64_t* __restrict__ keys,
     int64_t count,
-    int64_t width,
-    int64_t column) {
+    int tx_bits,
+    int rx_bits) {
+    const int tx_shift = kComponentKeyBits + kDepthKeyBits;
+    const int rx_shift = tx_shift + tx_bits;
+    const int invalid_shift = rx_shift + rx_bits;
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t position = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          position < count;
          position += stride) {
         const int64_t row = order[position];
-        keys[position] = failure_state[0] == 0 && valid[row]
-            ? static_cast<int64_t>(sequence[row * width + column])
-            : 0;
+        if (failure_state[0] != 0 || !valid[row]) {
+            keys[position] = uint64_t{1} << invalid_shift;
+            continue;
+        }
+        keys[position] = static_cast<uint64_t>(component_id[row]) |
+            (static_cast<uint64_t>(depth[row]) << kComponentKeyBits) |
+            (static_cast<uint64_t>(tx_id[row]) << tx_shift) |
+            (static_cast<uint64_t>(rx_id[row]) << rx_shift);
     }
 }
 
-__global__ void sort_key_valid_kernel(
+__global__ void row_group_histogram_kernel(
     const int* __restrict__ failure_state,
-    const bool* __restrict__ valid,
-    const int64_t* __restrict__ order,
-    int64_t* __restrict__ keys,
-    int64_t count) {
+    const int64_t* __restrict__ selected_index,
+    const int* __restrict__ selected_count,
+    const int* __restrict__ component_id,
+    const int* __restrict__ depth,
+    int* __restrict__ group_counts,
+    int64_t capacity,
+    int64_t width) {
+    if (failure_state[0] != 0) {
+        return;
+    }
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t position = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         position < count;
+         position < capacity;
          position += stride) {
-        keys[position] = failure_state[0] == 0 && valid[order[position]] ? 0 : 1;
+        if (position >= selected_count[0]) {
+            continue;
+        }
+        const int64_t row = selected_index[position];
+        atomicAdd(group_counts + row_group(component_id[row], depth[row], width), 1);
     }
 }
 
@@ -439,9 +510,16 @@ __global__ void publish_kernel(
     }
 }
 
+// The control record is the compact owner's one host copy: element 0 is K or
+// -1 on a contract failure; element 1 packs the solve failure bitmask (low 32
+// bits) and dropped-row count (high 32 bits) when a capacity record is given,
+// else 0; the remaining int64 words carry the int32 per-group row counts.
 __global__ void compact_control_record_kernel(
     const int* __restrict__ failure_state,
     const int* __restrict__ selected_count,
+    const int* __restrict__ capacity_record,
+    const int* __restrict__ group_counts,
+    int64_t group_count,
     int64_t candidate_count,
     int64_t* __restrict__ control_record) {
     if (blockIdx.x == 0 && threadIdx.x == 0) {
@@ -451,29 +529,74 @@ __global__ void compact_control_record_kernel(
                     static_cast<int64_t>(count) <= candidate_count
                 ? static_cast<int64_t>(count)
                 : -1;
+        control_record[1] = capacity_record == nullptr
+            ? 0
+            : static_cast<int64_t>(static_cast<uint32_t>(capacity_record[0])) |
+                (static_cast<int64_t>(static_cast<uint32_t>(capacity_record[1])) << 32);
+        int* counts = reinterpret_cast<int*>(control_record + 2);
+        for (int64_t group = 0; group < group_count; ++group) {
+            counts[group] = group_counts[group];
+        }
+        if (group_count % 2 != 0) {
+            counts[group_count] = 0;
+        }
     }
 }
 
-// With a solve capacity record the control record also carries the solve's
-// failure bitmask (low 32 bits of element 1) and dropped-row count (high 32
-// bits), so the one count copy is also the solve's one failure observation.
-__global__ void compact_capacity_control_record_kernel(
-    const int* __restrict__ failure_state,
-    const int* __restrict__ selected_count,
-    const int* __restrict__ capacity_record,
-    int64_t candidate_count,
-    int64_t* __restrict__ control_record) {
-    if (blockIdx.x == 0 && threadIdx.x == 0) {
-        const int count = selected_count[0];
-        control_record[0] =
-            failure_state[0] == 0 && count >= 0 &&
-                    static_cast<int64_t>(count) <= candidate_count
-                ? static_cast<int64_t>(count)
-                : -1;
-        control_record[1] =
-            static_cast<int64_t>(static_cast<uint32_t>(capacity_record[0])) |
-            (static_cast<int64_t>(static_cast<uint32_t>(capacity_record[1])) << 32);
+__global__ void row_group_key_kernel(
+    const int64_t* __restrict__ row_index,
+    const int* __restrict__ component_id,
+    const int* __restrict__ depth,
+    unsigned int* __restrict__ keys,
+    int64_t* __restrict__ positions,
+    int64_t row_count,
+    int64_t width) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < row_count;
+         index += stride) {
+        const int64_t row = row_index[index];
+        keys[index] = static_cast<unsigned int>(row_group(component_id[row], depth[row], width));
+        positions[index] = index;
     }
+}
+
+// Stable counting order of the compact rows by field-stage group: rows of one
+// group stay in ascending compact-row order.
+at::Tensor row_group_order(
+    const at::Tensor& exact_index,
+    const at::Tensor& component_id,
+    const at::Tensor& depth,
+    int64_t width,
+    cudaStream_t stream) {
+    const int64_t row_count = exact_index.size(0);
+    auto long_options = exact_index.options();
+    auto order = at::empty({row_count}, long_options);
+    if (row_count == 0) {
+        return order;
+    }
+    auto keys = at::empty({row_count}, long_options.dtype(at::kInt));
+    auto sorted_keys = at::empty({row_count}, long_options.dtype(at::kInt));
+    auto positions = at::empty({row_count}, long_options);
+    row_group_key_kernel<<<launch_blocks(row_count), kBlockSize, 0, stream>>>(
+        exact_index.data_ptr<int64_t>(), component_id.data_ptr<int>(), depth.data_ptr<int>(),
+        reinterpret_cast<unsigned int*>(keys.data_ptr<int>()), positions.data_ptr<int64_t>(),
+        row_count, width);
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    const int end_bit = index_bits(row_group_count(width));
+    size_t bytes = 0;
+    C10_CUDA_CHECK(cub::DeviceRadixSort::SortPairs(
+        nullptr, bytes, reinterpret_cast<unsigned int*>(keys.data_ptr<int>()),
+        reinterpret_cast<unsigned int*>(sorted_keys.data_ptr<int>()),
+        positions.data_ptr<int64_t>(), order.data_ptr<int64_t>(), static_cast<int>(row_count),
+        0, end_bit, stream));
+    auto scratch = at::empty({static_cast<int64_t>(bytes > 0 ? bytes : 1)}, long_options.dtype(at::kByte));
+    C10_CUDA_CHECK(cub::DeviceRadixSort::SortPairs(
+        scratch.data_ptr<uint8_t>(), bytes, reinterpret_cast<unsigned int*>(keys.data_ptr<int>()),
+        reinterpret_cast<unsigned int*>(sorted_keys.data_ptr<int>()),
+        positions.data_ptr<int64_t>(), order.data_ptr<int64_t>(), static_cast<int>(row_count),
+        0, end_bit, stream));
+    return order;
 }
 
 __global__ void exact_pair_metadata_kernel(
@@ -622,19 +745,20 @@ static pybind11::dict canonical_capacity_select_impl(
     auto pair_counts = at::empty({pair_count}, int_options);
     auto pair_starts = at::empty({pair_count}, int_options);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
+    auto group_counts = channel::empty_zero_cuda({row_group_count(width)}, int_options, stream);
     size_t radix_scratch_bytes = 0;
     size_t select_scratch_bytes = 0;
     if (count > 0) {
         C10_CUDA_CHECK(cub::DeviceRadixSort::SortPairs(
             nullptr,
             radix_scratch_bytes,
-            keys.data_ptr<int64_t>(),
-            sorted_keys.data_ptr<int64_t>(),
+            reinterpret_cast<uint64_t*>(keys.data_ptr<int64_t>()),
+            reinterpret_cast<uint64_t*>(sorted_keys.data_ptr<int64_t>()),
             order.data_ptr<int64_t>(),
             sorted_order.data_ptr<int64_t>(),
             static_cast<int>(count),
             0,
-            sizeof(int64_t) * 8,
+            sizeof(uint64_t) * 8,
             stream));
         C10_CUDA_CHECK(cub::DeviceSelect::Flagged(
             nullptr,
@@ -669,50 +793,52 @@ static pybind11::dict canonical_capacity_select_impl(
     if (count > 0) {
         validate_rows_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
             failure_state.data_ptr<int>(), valid.data_ptr<bool>(), tx_id.data_ptr<int>(),
-            rx_id.data_ptr<int>(), valid_count.data_ptr<int>(), count, num_tx, num_rx);
+            rx_id.data_ptr<int>(), depth.data_ptr<int>(), component_id.data_ptr<int>(),
+            valid_count.data_ptr<int>(), count, num_tx, num_rx);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
         init_order_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(count, order.data_ptr<int64_t>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
-        auto stable_sort = [&]() {
+        // Least-significant-first stable radix passes over packed keys give the
+        // lexicographic order (invalid, rx, tx, depth, component, sequence
+        // columns, primitive, edge); each pass sorts only its used bits.
+        auto stable_sort = [&](int end_bit) {
             C10_CUDA_CHECK(cub::DeviceRadixSort::SortPairs(
                 cub_scratch.data_ptr<uint8_t>(),
                 radix_scratch_bytes,
-                keys.data_ptr<int64_t>(),
-                sorted_keys.data_ptr<int64_t>(),
+                reinterpret_cast<uint64_t*>(keys.data_ptr<int64_t>()),
+                reinterpret_cast<uint64_t*>(sorted_keys.data_ptr<int64_t>()),
                 order.data_ptr<int64_t>(),
                 sorted_order.data_ptr<int64_t>(),
                 static_cast<int>(count),
                 0,
-                sizeof(int64_t) * 8,
+                end_bit,
                 stream));
             std::swap(keys, sorted_keys);
             std::swap(order, sorted_order);
         };
-        auto sort_1d = [&](const at::Tensor& values) {
-            sort_key_1d_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
-                failure_state.data_ptr<int>(), valid.data_ptr<bool>(), values.data_ptr<int>(),
-                order.data_ptr<int64_t>(), keys.data_ptr<int64_t>(), count);
+        auto sort_pair = [&](const int* hi, int64_t hi_stride, int64_t hi_column,
+                             const int* lo, int64_t lo_stride, int64_t lo_column) {
+            sort_key_pair_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+                failure_state.data_ptr<int>(), valid.data_ptr<bool>(), hi, hi_stride, hi_column,
+                lo, lo_stride, lo_column, order.data_ptr<int64_t>(),
+                reinterpret_cast<uint64_t*>(keys.data_ptr<int64_t>()), count);
             C10_CUDA_KERNEL_LAUNCH_CHECK();
-            stable_sort();
+            stable_sort(hi != nullptr ? 64 : 32);
         };
-        sort_1d(edge_id);
-        sort_1d(primitive_id);
-        for (int64_t column = width - 1; column >= 0; --column) {
-            sort_key_sequence_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
-                failure_state.data_ptr<int>(), valid.data_ptr<bool>(), primitive_sequence.data_ptr<int>(),
-                order.data_ptr<int64_t>(), keys.data_ptr<int64_t>(), count, width, column);
-            C10_CUDA_KERNEL_LAUNCH_CHECK();
-            stable_sort();
+        const int* sequence = primitive_sequence.data_ptr<int>();
+        sort_pair(primitive_id.data_ptr<int>(), 1, 0, edge_id.data_ptr<int>(), 1, 0);
+        for (int64_t column = width - 1; column >= 0; column -= 2) {
+            sort_pair(column >= 1 ? sequence : nullptr, width, column - 1, sequence, width, column);
         }
-        sort_1d(component_id);
-        sort_1d(depth);
-        sort_1d(tx_id);
-        sort_1d(rx_id);
-        sort_key_valid_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
-            failure_state.data_ptr<int>(), valid.data_ptr<bool>(), order.data_ptr<int64_t>(),
-            keys.data_ptr<int64_t>(), count);
+        const int tx_bits = index_bits(num_tx);
+        const int rx_bits = index_bits(num_rx);
+        sort_key_outer_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+            failure_state.data_ptr<int>(), valid.data_ptr<bool>(), component_id.data_ptr<int>(),
+            depth.data_ptr<int>(), tx_id.data_ptr<int>(), rx_id.data_ptr<int>(),
+            order.data_ptr<int64_t>(), reinterpret_cast<uint64_t*>(keys.data_ptr<int64_t>()),
+            count, tx_bits, rx_bits);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
-        stable_sort();
+        stable_sort(kComponentKeyBits + kDepthKeyBits + tx_bits + rx_bits + 1);
         group_start_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
             failure_state.data_ptr<int>(), valid.data_ptr<bool>(), order.data_ptr<int64_t>(),
             tx_id.data_ptr<int>(), rx_id.data_ptr<int>(), depth.data_ptr<int>(),
@@ -763,6 +889,11 @@ static pybind11::dict canonical_capacity_select_impl(
         C10_CUDA_CHECK(cudaMemsetAsync(pair_counts.data_ptr<int>(), 0, pair_count * sizeof(int), stream));
     }
     if (count > 0) {
+        row_group_histogram_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+            failure_state.data_ptr<int>(), private_selected_index.data_ptr<int64_t>(),
+            private_selected_count.data_ptr<int>(), component_id.data_ptr<int>(),
+            depth.data_ptr<int>(), group_counts.data_ptr<int>(), count, width);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
         final_pair_count_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
             failure_state.data_ptr<int>(), private_selected_index.data_ptr<int64_t>(),
             private_selected_count.data_ptr<int>(), tx_id.data_ptr<int>(), rx_id.data_ptr<int>(),
@@ -783,6 +914,7 @@ static pybind11::dict canonical_capacity_select_impl(
     result["valid"] = selected_valid;
     result["num_selected"] = num_selected;
     result["num_paths"] = num_paths;
+    result["group_counts"] = group_counts;
     return result;
 }
 
@@ -966,33 +1098,29 @@ pybind11::dict channel_enumerated_canonical_compact(
             capacity_failure_record->get_device() == device,
             "capacity_failure_record must share the path device");
     }
+    auto group_counts = pybind11::cast<at::Tensor>(capacity["group_counts"]);
+    const int64_t group_count = group_counts.size(0);
+    const int64_t record_words = 2 + (group_count + 1) / 2;
+    std::vector<int64_t> host_record(static_cast<size_t>(record_words), 0);
     int64_t path_count = 0;
     int64_t capacity_failure_bits = 0;
     int64_t capacity_dropped_rows = 0;
     const bool observe = candidate_count > 0 || has_capacity_record;
     if (observe) {
-        auto control_record = at::empty(
-            {has_capacity_record ? 2 : 1}, valid.options().dtype(at::kLong));
-        int64_t host_record[2] = {0, 0};
-        if (has_capacity_record) {
-            compact_capacity_control_record_kernel<<<1, 1, 0, stream>>>(
-                failure_state.data_ptr<int>(),
-                selected_count.data_ptr<int>(),
-                capacity_failure_record->data_ptr<int>(),
-                candidate_count,
-                control_record.data_ptr<int64_t>());
-        } else {
-            compact_control_record_kernel<<<1, 1, 0, stream>>>(
-                failure_state.data_ptr<int>(),
-                selected_count.data_ptr<int>(),
-                candidate_count,
-                control_record.data_ptr<int64_t>());
-        }
+        auto control_record = at::empty({record_words}, valid.options().dtype(at::kLong));
+        compact_control_record_kernel<<<1, 1, 0, stream>>>(
+            failure_state.data_ptr<int>(),
+            selected_count.data_ptr<int>(),
+            has_capacity_record ? capacity_failure_record->data_ptr<int>() : nullptr,
+            group_counts.data_ptr<int>(),
+            group_count,
+            candidate_count,
+            control_record.data_ptr<int64_t>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
         C10_CUDA_CHECK(cudaMemcpyAsync(
-            host_record,
+            host_record.data(),
             control_record.data_ptr<int64_t>(),
-            static_cast<size_t>(control_record.numel()) * sizeof(int64_t),
+            static_cast<size_t>(record_words) * sizeof(int64_t),
             cudaMemcpyDeviceToHost,
             stream));
         C10_CUDA_CHECK(cudaStreamSynchronize(stream));
@@ -1009,6 +1137,17 @@ pybind11::dict channel_enumerated_canonical_compact(
             path_count >= 0,
             "canonical compact selection failed its native contract");
     }
+    pybind11::list row_group_counts;
+    const int* host_group_counts = reinterpret_cast<const int*>(host_record.data() + 2);
+    int64_t grouped_rows = 0;
+    for (int64_t group = 0; group < group_count; ++group) {
+        const int64_t value = path_count > 0 ? host_group_counts[group] : 0;
+        grouped_rows += value;
+        row_group_counts.append(value);
+    }
+    TORCH_CHECK(
+        grouped_rows == path_count,
+        "canonical compact row groups do not cover the selected rows");
 
     auto exact_index = at::empty(
         {path_count}, valid.options().dtype(at::kLong));
@@ -1034,6 +1173,9 @@ pybind11::dict channel_enumerated_canonical_compact(
         sink_stable_ids,
         stream);
     gathered["selected_row_index"] = exact_index;
+    gathered["row_group_order"] =
+        row_group_order(exact_index, component_id, depth, primitive_sequence.size(1), stream);
+    gathered["row_group_counts"] = row_group_counts;
     gathered["pair_index"] = metadata["pair_index"];
     gathered["pair_offsets"] = metadata["pair_offsets"];
     gathered["source_id"] = metadata["source_id"];
@@ -1041,9 +1183,8 @@ pybind11::dict channel_enumerated_canonical_compact(
     gathered["path_count"] = path_count;
     gathered["count_d2h_copies"] =
         observe ? static_cast<int64_t>(1) : static_cast<int64_t>(0);
-    gathered["count_d2h_bytes"] = !observe
-        ? static_cast<int64_t>(0)
-        : (has_capacity_record ? static_cast<int64_t>(16) : static_cast<int64_t>(8));
+    gathered["count_d2h_bytes"] =
+        observe ? record_words * static_cast<int64_t>(sizeof(int64_t)) : static_cast<int64_t>(0);
     gathered["count_synchronizations"] =
         observe ? static_cast<int64_t>(1) : static_cast<int64_t>(0);
     gathered["capacity_failure_bits"] = capacity_failure_bits;
@@ -1813,9 +1954,6 @@ pybind11::dict channel_enumerated_transmission_topology_pack_jvp(
 #include <cub/device/device_radix_sort.cuh>
 #include <cuda_runtime_api.h>
 #include "torch_cuda.h"
-#include <thrust/device_ptr.h>
-#include <thrust/execution_policy.h>
-#include <thrust/scan.h>
 
 #include "../tensor_checks.h"
 #include "path_payload.cuh"
@@ -2153,7 +2291,7 @@ pybind11::dict channel_evaluated_paths_compact_finalize(
             candidate_count <= std::numeric_limits<int>::max(),
             "compact candidate count exceeds int32 scan range");
         auto flags = at::empty({candidate_count}, int_options);
-        auto offsets = at::empty({candidate_count}, int_options);
+        auto offsets = at::empty({candidate_count + 1}, int_options);
         auto contract_error = channel::empty_zero_cuda(
             {1}, int_options, stream);
         compact_contract_flags_kernel<<<
@@ -2170,13 +2308,9 @@ pybind11::dict channel_evaluated_paths_compact_finalize(
             num_tx,
             num_rx);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
-        thrust::exclusive_scan(
-            thrust::cuda::par.on(stream),
-            thrust::device_pointer_cast(flags.data_ptr<int>()),
-            thrust::device_pointer_cast(flags.data_ptr<int>() + candidate_count),
-            thrust::device_pointer_cast(offsets.data_ptr<int>()));
+        channel::scan::exclusive_flag_offsets(flags, offsets, candidate_count, stream);
         const auto observation = observe_compact_count(
-            flags, offsets, candidate_count, stream, &contract_error);
+            offsets, candidate_count, stream, &contract_error);
         TORCH_CHECK(
             observation.control_error == 0,
             "valid evaluated path contains an out-of-range source/sink id");
@@ -2221,12 +2355,7 @@ pybind11::dict channel_evaluated_paths_compact_finalize(
             compact_count);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
-    thrust::inclusive_scan(
-        thrust::cuda::par.on(stream),
-        thrust::device_pointer_cast(pair_offsets.data_ptr<int64_t>()),
-        thrust::device_pointer_cast(
-            pair_offsets.data_ptr<int64_t>() + pair_count + 1),
-        thrust::device_pointer_cast(pair_offsets.data_ptr<int64_t>()));
+    channel::scan::inclusive_sum_in_place(pair_offsets, pair_count + 1, stream);
 
     std::optional<channel::evaluated_paths::AllocatedPayload> out;
     if (!rows_are_compact) {

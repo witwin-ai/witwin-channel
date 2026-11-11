@@ -929,7 +929,7 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
             "visibility_rejection_count": (
                 sidecars.execution.visibility_rejection_count
             ),
-            "selected_edge_count": sidecars.execution.selected_edge_count,
+            "selected_edge_count": sidecars.execution.resolved_selected_edge_count(),
             "path_planning": {
                 "max_paths": config.max_paths,
                 "max_paths_scope": config.max_paths_scope,

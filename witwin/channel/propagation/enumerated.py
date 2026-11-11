@@ -38,6 +38,7 @@ from witwin.channel.propagation.rows import (
     EvaluatedPaths,
     PathFields,
     PathGeometry,
+    PathRowGroups,
     PathTopology,
 )
 from witwin.channel.propagation.topology import (
@@ -748,6 +749,11 @@ def evaluate_enumerated_paths(
             tx_positions,
             field_tx_power,
             rx_positions,
+            row_groups=PathRowGroups.single(
+                0,
+                evaluated.row_count,
+                sequence_width=int(evaluated.topology.primitive_sequence.shape[1]),
+            ),
             components=components,
             ad_mode=ad_mode,
             frequency_value=frequency_hz,
@@ -795,9 +801,6 @@ def evaluate_enumerated_paths(
         for block in blocks
     ]
     paths = concatenate_path_blocks(padded_blocks, device=device)
-    selected_edge_count = topology_kernels.deterministic_selected_edge_count(
-        paths["edge_id"]
-    )
     evaluated, sidecars = evaluated_paths_from_block(
         paths,
         max_paths=config.max_paths,
@@ -807,7 +810,6 @@ def evaluate_enumerated_paths(
         max_depth=sequence_width,
         launch_count=launch_count,
         visibility_rejection_count=visibility_rejection_count,
-        selected_edge_count=selected_edge_count,
         candidate_count=candidate_count,
         guardrail_count=guardrail_count,
         source_stable_ids=(
@@ -820,6 +822,7 @@ def evaluate_enumerated_paths(
     )
     sidecars = replace(
         sidecars,
+        execution=replace(sidecars.execution, selected_edge_ids=paths["edge_id"]),
         diffraction_vector_field=diffraction_vector_field,
         capacity_execution=capacity_execution,
         capacity_transaction=capacity_transaction,
@@ -832,6 +835,7 @@ def evaluate_enumerated_paths(
         tx_positions,
         field_tx_power,
         rx_positions,
+        row_groups=sidecars.row_groups,
         components=components,
         ad_mode=ad_mode,
         frequency_value=frequency_hz,

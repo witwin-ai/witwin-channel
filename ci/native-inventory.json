@@ -355,7 +355,6 @@
     },
     "native/channel/kernels/evaluated_paths.cu": {
       "kernels": [
-        "compact_capacity_control_record_kernel",
         "compact_contract_flags_kernel",
         "compact_control_record_kernel",
         "compact_pair_histogram_kernel",
@@ -373,10 +372,11 @@
         "max_paths_flags_kernel",
         "pair_state_init_kernel",
         "publish_kernel",
+        "row_group_histogram_kernel",
+        "row_group_key_kernel",
         "shortest_winner_kernel",
-        "sort_key_1d_kernel",
-        "sort_key_sequence_kernel",
-        "sort_key_valid_kernel",
+        "sort_key_outer_kernel",
+        "sort_key_pair_kernel",
         "transmission_topology_init_kernel",
         "transmission_topology_pack_backward_kernel",
         "transmission_topology_pack_jvp_kernel",
@@ -386,7 +386,6 @@
         "validate_rows_kernel"
       ],
       "launches": [
-        "compact_capacity_control_record_kernel",
         "compact_contract_flags_kernel",
         "compact_control_record_kernel",
         "compact_pair_histogram_kernel",
@@ -404,10 +403,11 @@
         "max_paths_flags_kernel",
         "pair_state_init_kernel",
         "publish_kernel",
+        "row_group_histogram_kernel",
+        "row_group_key_kernel",
         "shortest_winner_kernel",
-        "sort_key_1d_kernel",
-        "sort_key_sequence_kernel",
-        "sort_key_valid_kernel",
+        "sort_key_outer_kernel",
+        "sort_key_pair_kernel",
         "transmission_topology_init_kernel",
         "transmission_topology_pack_backward_kernel",
         "transmission_topology_pack_jvp_kernel",
@@ -738,6 +738,13 @@
         "slab_reflection_accumulate_jvp_kernel",
         "slab_reflection_accumulate_kernel"
       ],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/scan.cuh": {
+      "kernels": [],
+      "launches": [],
       "host_synchronization": [],
       "device_trap": false,
       "compile_options": []

@@ -51,9 +51,11 @@ from witwin.channel.kernels.fields import (
 from witwin.channel.runtime import AdLaunchLedger, _ad_frequency_value
 from witwin.channel.kernels import fields as field_kernels
 from witwin.channel.propagation.rows import (
+    COMPONENT_ROW_GROUPS,
     EvaluatedPaths,
     PathFields,
     PathGeometry,
+    PathRowGroups,
     PathTopology,
 )
 from witwin.channel.scene import endpoints as scene_endpoints
@@ -66,6 +68,7 @@ from witwin.channel.scene.endpoints import (
     transmitter_polarizations_f32,
 )
 from witwin.channel.materials import (
+    face_geometry_id_table,
     face_material_field_bundle,
     face_material_tensors,
 )
@@ -94,8 +97,55 @@ if TYPE_CHECKING:
     from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
+_LOS_GROUP = 0
+_DIFFRACTION_GROUP = 2
+_RD_GROUP = 3
+_DR_GROUP = 4
+_TRANSMISSION_GROUP = 5
+_DD_GROUP = 7
+
+
+def _take(values: torch.Tensor, rows: torch.Tensor | None) -> torch.Tensor:
+    """Gather one row group; ``rows is None`` means the group is every row in order."""
+
+    return values.contiguous() if rows is None else values[rows].contiguous()
+
+
+class _FieldOutputs:
+    """The seven per-row field outputs, cloned from the inputs only on a partial write."""
+
+    __slots__ = ("values", "_owned")
+
+    def __init__(self, values: dict[str, torch.Tensor]) -> None:
+        self.values = dict(values)
+        self._owned: set[str] = set()
+
+    def write(self, name: str, rows: torch.Tensor | None, value: torch.Tensor) -> None:
+        if rows is None:
+            self.values[name] = value
+            self._owned.add(name)
+            return
+        if name not in self._owned:
+            self.values[name] = self.values[name].clone()
+            self._owned.add(name)
+        self.values[name].index_copy_(0, rows, value)
+
+    def write_evaluated(
+        self, rows: torch.Tensor | None, evaluated: dict[str, torch.Tensor], *,
+        with_length: bool = True,
+    ) -> None:
+        self.write("field_xyz", rows, evaluated["field_vector"])
+        self.write("coefficient", rows, evaluated["coefficient"])
+        self.write("path_field", rows, evaluated["path_field"])
+        self.write("path_gain", rows, evaluated["path_gain"])
+        if with_length:
+            self.write("path_length", rows, evaluated["path_length_m"])
+            self.write("delay", rows, evaluated["delay_s"])
+        self.write("direction", rows, evaluated["direction"])
+
+
 def _resolve_coupled_rd_stationary(
-    source: torch.Tensor, target: torch.Tensor, rows: torch.Tensor, reverse_order: bool,
+    source: torch.Tensor, target: torch.Tensor, rows: torch.Tensor | None, reverse_order: bool,
     tri_a: torch.Tensor, normals_table: torch.Tensor, reflection_face: torch.Tensor,
     edge_geometry: tuple[torch.Tensor, ...], edge_id: torch.Tensor, edge_position: torch.Tensor,
     reflection_position: torch.Tensor,
@@ -113,8 +163,8 @@ def _resolve_coupled_rd_stationary(
     discovery references used only to guard that the winner did not move.
     """
 
-    epc_source = target[rows] if reverse_order else source[rows]
-    epc_receiver = source[rows] if reverse_order else target[rows]
+    epc_source = _take(target, rows) if reverse_order else _take(source, rows)
+    epc_receiver = _take(source, rows) if reverse_order else _take(target, rows)
     resolved = field_kernels.coupled_rd_prepare_ad(
         epc_source.contiguous(),
         epc_receiver.contiguous(),
@@ -154,8 +204,7 @@ def _evaluate_coupled_dd_rows(
     edge_n0: torch.Tensor, edge_n1: torch.Tensor, edge_exterior: torch.Tensor,
     edge_face0: torch.Tensor, edge_face1: torch.Tensor, ad_enabled: bool,
     frequency: float | torch.Tensor, frequency_value: float | None, ledger: AdLaunchLedger | None,
-    field_xyz: torch.Tensor, coefficient: torch.Tensor, path_field: torch.Tensor,
-    path_gain: torch.Tensor, direction: torch.Tensor, launch_count: int,
+    groups: PathRowGroups, outputs: _FieldOutputs, launch_count: int,
 ) -> int:
     """Evaluate the coupled double-diffraction rows (cid 7, coupled double diffraction).
 
@@ -168,14 +217,14 @@ def _evaluate_coupled_dd_rows(
     so their storage/aliasing is preserved. Returns the updated launch_count.
     """
 
-    dd_rows = torch.nonzero(
-        topology.component_id == 7, as_tuple=False
-    ).reshape(-1)
-    if int(dd_rows.shape[0]) > 0:
-        edge1_id = topology.primitive_sequence[dd_rows, 0].to(dtype=torch.int64)
-        edge2_id = topology.primitive_sequence[dd_rows, 1].to(dtype=torch.int64)
-        q1 = geometry.interaction_positions[dd_rows, 0].contiguous()
-        q2 = geometry.interaction_positions[dd_rows, 1].contiguous()
+    if groups.count(_DD_GROUP) > 0:
+        dd_rows = groups.rows(_DD_GROUP)
+        dd_sequence = _take(topology.primitive_sequence, dd_rows)
+        dd_positions = _take(geometry.interaction_positions, dd_rows)
+        edge1_id = dd_sequence[:, 0].to(dtype=torch.int64)
+        edge2_id = dd_sequence[:, 1].to(dtype=torch.int64)
+        q1 = dd_positions[:, 0].contiguous()
+        q2 = dd_positions[:, 1].contiguous()
 
         def _dd_line_bounds(
             edge_id: torch.Tensor, keller_point: torch.Tensor,
@@ -234,8 +283,8 @@ def _evaluate_coupled_dd_rows(
             )
         )
         dd_args = (
-            source[dd_rows].contiguous(),
-            target[dd_rows].contiguous(),
+            _take(source, dd_rows),
+            _take(target, dd_rows),
             q1,
             edge_geometry[2][edge1_id].contiguous(),
             edge_n0[edge1_id].contiguous(),
@@ -246,9 +295,9 @@ def _evaluate_coupled_dd_rows(
             edge_n0[edge2_id].contiguous(),
             edge_n1[edge2_id].contiguous(),
             edge_exterior[edge2_id].contiguous(),
-            source_power[dd_rows].contiguous(),
-            tx_pol[dd_rows].contiguous(),
-            rx_pol[dd_rows].contiguous(),
+            _take(source_power, dd_rows),
+            _take(tx_pol, dd_rows),
+            _take(rx_pol, dd_rows),
         )
         if ledger is not None:
             ledger.add(
@@ -273,11 +322,7 @@ def _evaluate_coupled_dd_rows(
             edge2_line_min,
             edge2_line_max,
         )
-        field_xyz.index_copy_(0, dd_rows, evaluated["field_vector"])
-        coefficient.index_copy_(0, dd_rows, evaluated["coefficient"])
-        path_field.index_copy_(0, dd_rows, evaluated["path_field"])
-        path_gain.index_copy_(0, dd_rows, evaluated["path_gain"])
-        direction.index_copy_(0, dd_rows, evaluated["direction"])
+        outputs.write_evaluated(dd_rows, evaluated, with_length=False)
         launch_count += 1
     return launch_count
 
@@ -297,8 +342,8 @@ def _los_taper_frequency(
 
 
 def _rough_scale_inputs(
-    compiled: object, topology: PathTopology, rows: torch.Tensor, depth_value: int,
-    material: dict[str, torch.Tensor], *, scattering_active: bool,
+    compiled: object, face_id: torch.Tensor, depth_value: int, material: dict[str, torch.Tensor],
+    *, scattering_active: bool,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | None:
     """Host-side per-bounce inputs for the native rough-reflection C_r op.
 
@@ -317,7 +362,7 @@ def _rough_scale_inputs(
     (contract 6.7.3, never summed).
     """
 
-    device = topology.valid.device
+    device = face_id.device
     # Early exits stay on CPU (the MaterialStore tensors live on the host):
     # smooth scenes must not pay any extra GPU sync in the reflection loop.
     rough_face_any = bool((compiled.materials.scatter_model_id == 1).any())
@@ -332,10 +377,9 @@ def _rough_scale_inputs(
     if not rough_face_any and not realization_ids:
         return None
 
-    row_count = int(rows.numel())
+    row_count = int(face_id.shape[0])
     face_material = material["material_id"].to(dtype=torch.int64)
     rough_face = material["scatter_model_id"] == 1
-    face_id = topology.primitive_sequence[rows, :depth_value].to(dtype=torch.int64)
     if rough_face_any:
         sigma_face = material["rough_sigma_h_m"][face_material]
         sigma_b = sigma_face[face_id].to(torch.float32).contiguous()
@@ -349,9 +393,7 @@ def _rough_scale_inputs(
         )
     replaced = torch.zeros((row_count,), device=device, dtype=torch.bool)
     if realization_ids and depth_value == 1:
-        face_structure = compiled.geometry.face_structure_id.to(
-            device=device, dtype=torch.int64
-        )
+        face_structure = face_geometry_id_table(compiled, "face_structure_id", device=device)
         realization_face = torch.zeros(
             (int(face_structure.numel()),), device=device, dtype=torch.bool
         )
@@ -363,22 +405,20 @@ def _rough_scale_inputs(
 
 
 def _evaluate_los_fields(
-    topology: PathTopology, source: torch.Tensor, target: torch.Tensor, source_power: torch.Tensor,
+    groups: PathRowGroups, source: torch.Tensor, target: torch.Tensor, source_power: torch.Tensor,
     tx_pol: torch.Tensor, rx_pol: torch.Tensor,
     los_field_op: Callable[..., dict[str, torch.Tensor]], ledger: AdLaunchLedger | None,
-    field_xyz: torch.Tensor, coefficient: torch.Tensor, path_field: torch.Tensor,
-    path_gain: torch.Tensor, path_length: torch.Tensor, delay: torch.Tensor,
-    direction: torch.Tensor, launch_count: int, compiled: object, frequency_hz: float,
+    outputs: _FieldOutputs, launch_count: int, compiled: object, frequency_hz: float,
     isb_boundary_taper_width: float,
 ) -> int:
-    los_rows = torch.nonzero(topology.component_id == 0, as_tuple=False).reshape(-1)
-    if int(los_rows.shape[0]) > 0:
+    if groups.count(_LOS_GROUP) > 0:
+        los_rows = groups.rows(_LOS_GROUP)
         los_args = (
-            source[los_rows].contiguous(),
-            target[los_rows].contiguous(),
-            source_power[los_rows].contiguous(),
-            tx_pol[los_rows].contiguous(),
-            rx_pol[los_rows].contiguous(),
+            _take(source, los_rows),
+            _take(target, los_rows),
+            _take(source_power, los_rows),
+            _take(tx_pol, los_rows),
+            _take(rx_pol, los_rows),
         )
         if ledger is not None:
             ledger.add(*los_args)
@@ -409,60 +449,47 @@ def _evaluate_los_fields(
                 )
                 evaluated = {**evaluated, **scaled}
                 launch_count += 2
-        field_xyz.index_copy_(0, los_rows, evaluated["field_vector"])
-        coefficient.index_copy_(0, los_rows, evaluated["coefficient"])
-        path_field.index_copy_(0, los_rows, evaluated["path_field"])
-        path_gain.index_copy_(0, los_rows, evaluated["path_gain"])
-        path_length.index_copy_(0, los_rows, evaluated["path_length_m"])
-        delay.index_copy_(0, los_rows, evaluated["delay_s"])
-        direction.index_copy_(0, los_rows, evaluated["direction"])
+        outputs.write_evaluated(los_rows, evaluated)
         launch_count += 1
     return launch_count
 
 
 def _evaluate_reflection_fields(
-    compiled: object, topology: PathTopology, geometry: PathGeometry, source: torch.Tensor,
-    target: torch.Tensor, source_power: torch.Tensor, tx_pol: torch.Tensor, rx_pol: torch.Tensor,
-    components: frozenset[str] | set[str], device: torch.device, frequency: float | torch.Tensor,
-    geometry_ad: bool, vertices: torch.Tensor | None,
+    compiled: object, topology: PathTopology, geometry: PathGeometry, groups: PathRowGroups,
+    source: torch.Tensor, target: torch.Tensor, source_power: torch.Tensor, tx_pol: torch.Tensor,
+    rx_pol: torch.Tensor, components: frozenset[str] | set[str], device: torch.device,
+    frequency: float | torch.Tensor, geometry_ad: bool, vertices: torch.Tensor | None,
     reflection_field_op: Callable[..., dict[str, torch.Tensor]], ledger: AdLaunchLedger | None,
     material: dict[str, torch.Tensor] | None, ad_enabled: bool, frequency_value: float | None,
-    field_xyz: torch.Tensor, coefficient: torch.Tensor, path_field: torch.Tensor,
-    path_gain: torch.Tensor, path_length: torch.Tensor, delay: torch.Tensor,
-    direction: torch.Tensor, launch_count: int,
+    outputs: _FieldOutputs, launch_count: int,
 ) -> tuple[dict[str, torch.Tensor] | None, int]:
-    for depth_value in range(1, 6):
-        rows = torch.nonzero(
-            (topology.component_id == 1) & (topology.depth == depth_value),
-            as_tuple=False,
-        ).reshape(-1)
-        if int(rows.shape[0]) == 0:
-            continue
+    for depth_value in groups.reflection_depths():
+        rows = groups.rows(COMPONENT_ROW_GROUPS + depth_value)
         if material is None:
             material = face_material_field_bundle(compiled, device=device)
-        face_id = topology.primitive_sequence[rows, :depth_value].to(dtype=torch.int64)
+        face_id = _take(topology.primitive_sequence, rows)[:, :depth_value].to(dtype=torch.int64)
+        row_source = _take(source, rows)
+        row_target = _take(target, rows)
         if geometry_ad:
             positions, normals = _reflection_geometry_ad(
                 compiled,
                 vertices,
-                source[rows].contiguous(),
-                target[rows].contiguous(),
+                row_source,
+                row_target,
                 face_id,
                 depth_value,
             )
         else:
-            positions = geometry.interaction_positions[
-                rows, :depth_value
-            ].contiguous()
-            normals = geometry.interaction_normals[rows, :depth_value].contiguous()
+            positions = _take(geometry.interaction_positions, rows)[:, :depth_value].contiguous()
+            normals = _take(geometry.interaction_normals, rows)[:, :depth_value].contiguous()
         reflection_args = (
-            source[rows].contiguous(),
-            target[rows].contiguous(),
+            row_source,
+            row_target,
             positions,
             normals,
-            source_power[rows].contiguous(),
-            tx_pol[rows].contiguous(),
-            rx_pol[rows].contiguous(),
+            _take(source_power, rows),
+            _take(tx_pol, rows),
+            _take(rx_pol, rows),
             material["eps_r"][face_id].contiguous(),
             material["sigma_e"][face_id].contiguous(),
             material["mu_r"][face_id].contiguous(),
@@ -472,7 +499,7 @@ def _evaluate_reflection_fields(
         if ledger is not None:
             if geometry_ad:
                 # The fixed-winner EPC re-solve registers its own companion.
-                ledger.add(vertices, source[rows], target[rows], face_id)
+                ledger.add(vertices, row_source, row_target, face_id)
             ledger.add(*reflection_args)
         evaluated = reflection_field_op(*reflection_args)
         # Rough-surface coherent attenuation / realization delta replacement
@@ -483,8 +510,7 @@ def _evaluate_reflection_fields(
         # scenes).
         rough_inputs = _rough_scale_inputs(
             compiled,
-            topology,
-            rows,
+            face_id,
             depth_value,
             material,
             scattering_active="scattering" in components,
@@ -498,7 +524,7 @@ def _evaluate_reflection_fields(
                 evaluated["path_gain"],
                 positions,
                 normals,
-                source[rows].contiguous(),
+                row_source,
                 sigma_b,
                 rough_b,
                 replaced,
@@ -523,13 +549,7 @@ def _evaluate_reflection_fields(
                 "path_gain": scaled["path_gain"],
             }
             launch_count += 1
-        field_xyz.index_copy_(0, rows, evaluated["field_vector"])
-        coefficient.index_copy_(0, rows, evaluated["coefficient"])
-        path_field.index_copy_(0, rows, evaluated["path_field"])
-        path_gain.index_copy_(0, rows, evaluated["path_gain"])
-        path_length.index_copy_(0, rows, evaluated["path_length_m"])
-        delay.index_copy_(0, rows, evaluated["delay_s"])
-        direction.index_copy_(0, rows, evaluated["direction"])
+        outputs.write_evaluated(rows, evaluated)
         launch_count += 1
     return material, launch_count
 
@@ -539,23 +559,19 @@ def _evaluate_transmission_fields(
     target: torch.Tensor, source_power: torch.Tensor, tx_pol: torch.Tensor, rx_pol: torch.Tensor,
     device: torch.device, geometry_ad: bool, vertices: torch.Tensor | None,
     transmission_field_op: Callable[..., dict[str, torch.Tensor]], ledger: AdLaunchLedger | None,
-    material: dict[str, torch.Tensor] | None, field_xyz: torch.Tensor, coefficient: torch.Tensor,
-    path_field: torch.Tensor, path_gain: torch.Tensor, path_length: torch.Tensor,
-    delay: torch.Tensor, direction: torch.Tensor, launch_count: int,
+    material: dict[str, torch.Tensor] | None, groups: PathRowGroups, outputs: _FieldOutputs,
+    launch_count: int,
 ) -> tuple[dict[str, torch.Tensor] | None, int]:
-    transmission_rows = torch.nonzero(
-        topology.component_id == 5, as_tuple=False
-    ).reshape(-1)
-    if int(transmission_rows.shape[0]) > 0:
+    if groups.count(_TRANSMISSION_GROUP) > 0:
         if material is None:
             material = face_material_field_bundle(compiled, device=device)
-        rows = transmission_rows
+        rows = groups.rows(_TRANSMISSION_GROUP)
         width = int(geometry.interaction_positions.shape[1])
         slots = torch.arange(width, device=device).reshape(1, -1)
         event_valid = (
-            slots < topology.depth[rows].to(dtype=torch.int64).reshape(-1, 1)
+            slots < _take(topology.depth, rows).to(dtype=torch.int64).reshape(-1, 1)
         ).contiguous()
-        positions = geometry.interaction_positions[rows].contiguous()
+        positions = _take(geometry.interaction_positions, rows)
         if geometry_ad:
             # The transmission kernel reads only the straight source-target
             # ray and the wall normals, so the crossing points carry exactly
@@ -571,21 +587,21 @@ def _evaluate_transmission_fields(
                 vertices,
                 records.face_normals.contiguous(),
             )
-            prim_sequence = topology.primitive_sequence[rows].to(dtype=torch.int64)
+            prim_sequence = _take(topology.primitive_sequence, rows).to(dtype=torch.int64)
             normals = face_normal_table[prim_sequence.clamp_min(0)]
         else:
-            normals = geometry.interaction_normals[rows].contiguous()
+            normals = _take(geometry.interaction_normals, rows)
         transmission_args = (
-            topology.valid[rows].contiguous(),
-            source[rows].contiguous(),
-            target[rows].contiguous(),
+            _take(topology.valid, rows),
+            _take(source, rows),
+            _take(target, rows),
             positions,
             normals,
-            topology.material_sequence[rows].contiguous(),
+            _take(topology.material_sequence, rows),
             event_valid,
-            source_power[rows].contiguous(),
-            tx_pol[rows].contiguous(),
-            rx_pol[rows].contiguous(),
+            _take(source_power, rows),
+            _take(tx_pol, rows),
+            _take(rx_pol, rows),
             material["layer_offset"],
             material["layer_count"],
             material["layer_thickness_m"],
@@ -599,13 +615,7 @@ def _evaluate_transmission_fields(
                 ledger.add(vertices)
             ledger.add(*transmission_args)
         evaluated = transmission_field_op(*transmission_args)
-        field_xyz.index_copy_(0, rows, evaluated["field_vector"])
-        coefficient.index_copy_(0, rows, evaluated["coefficient"])
-        path_field.index_copy_(0, rows, evaluated["path_field"])
-        path_gain.index_copy_(0, rows, evaluated["path_gain"])
-        path_length.index_copy_(0, rows, evaluated["path_length_m"])
-        delay.index_copy_(0, rows, evaluated["delay_s"])
-        direction.index_copy_(0, rows, evaluated["direction"])
+        outputs.write_evaluated(rows, evaluated)
         launch_count += 1
     return material, launch_count
 
@@ -616,13 +626,11 @@ def _evaluate_diffraction_fields(
     source_power: torch.Tensor, rx_pol: torch.Tensor, device: torch.device,
     frequency: float | torch.Tensor, frequency_value: float | None, ad_enabled: bool,
     geometry_ad: bool, vertices: torch.Tensor | None, ledger: AdLaunchLedger | None,
-    material: dict[str, torch.Tensor] | None, field_xyz: torch.Tensor, coefficient: torch.Tensor,
-    path_field: torch.Tensor, path_gain: torch.Tensor, direction: torch.Tensor, launch_count: int,
+    material: dict[str, torch.Tensor] | None, groups: PathRowGroups, outputs: _FieldOutputs,
+    launch_count: int,
 ) -> tuple[dict[str, torch.Tensor] | None, int]:
-    diffraction_rows = torch.nonzero(
-        topology.component_id == 2, as_tuple=False
-    ).reshape(-1)
-    if int(diffraction_rows.shape[0]) > 0:
+    if groups.count(_DIFFRACTION_GROUP) > 0:
+        diffraction_rows = groups.rows(_DIFFRACTION_GROUP)
         if ad_enabled:
             # diffraction AD: RayD's order-1 path export is detached, so the
             # wedge field is re-evaluated from the frozen topology (edge id,
@@ -641,7 +649,7 @@ def _evaluate_diffraction_fields(
                 if preserve_imported_edges
                 else _cached_diffraction_edge_geometry(compiled.rayd)
             )
-            edge_id = topology.edge_id[diffraction_rows].to(dtype=torch.int64)
+            edge_id = _take(topology.edge_id, diffraction_rows).to(dtype=torch.int64)
             face0 = edge_geometry[8].to(dtype=torch.int64)[edge_id]
             face1 = edge_geometry[9].to(dtype=torch.int64)[edge_id]
             face_count = int(material["eps_r"].shape[0])
@@ -677,9 +685,9 @@ def _evaluate_diffraction_fields(
                     edge_boundary,
                 )
             wedge_args = (
-                topology.valid[diffraction_rows].contiguous(),
-                source[diffraction_rows].contiguous(),
-                target[diffraction_rows].contiguous(),
+                _take(topology.valid, diffraction_rows),
+                _take(source, diffraction_rows),
+                _take(target, diffraction_rows),
                 edge_geometry[1][edge_id].contiguous(),
                 edge_geometry[2][edge_id].contiguous(),
                 edge_geometry[4][edge_id].contiguous(),
@@ -697,7 +705,7 @@ def _evaluate_diffraction_fields(
                 material["sigma_e"][face1_c].contiguous(),
                 material["mu_r"][face1_c].contiguous(),
                 material["gain"][face1_c].contiguous(),
-                source_power[diffraction_rows].contiguous(),
+                _take(source_power, diffraction_rows),
             )
             if ledger is not None:
                 ledger.add(
@@ -713,34 +721,32 @@ def _evaluate_diffraction_fields(
             powered_xyz = evaluated["field_vector"]
             arrival = evaluated["direction"]
             if ledger is not None:
-                ledger.add(powered_xyz, arrival, rx_pol[diffraction_rows])
+                ledger.add(powered_xyz, arrival, _take(rx_pol, diffraction_rows))
             projected = field_kernels.field_project_complex3_ad(
                 powered_xyz,
                 arrival,
-                rx_pol[diffraction_rows].contiguous(),
+                _take(rx_pol, diffraction_rows),
             )
         else:
             arrival = geometry_kernels.deterministic_normalize_vec3(
                 (
-                    target[diffraction_rows]
-                    - geometry.interaction_positions[diffraction_rows, 0]
+                    _take(target, diffraction_rows)
+                    - _take(geometry.interaction_positions, diffraction_rows)[:, 0]
                 ).contiguous(),
                 eps=1.0e-6,
             )
-            powered_xyz = input_fields.field_xyz[diffraction_rows].contiguous()
+            powered_xyz = _take(input_fields.field_xyz, diffraction_rows)
             projected = field_kernels.field_project_complex3(
                 powered_xyz,
                 arrival,
-                rx_pol[diffraction_rows].contiguous(),
+                _take(rx_pol, diffraction_rows),
             )
-        amplitude = source_power[diffraction_rows].clamp_min(1.0e-30).sqrt()
-        field_xyz.index_copy_(0, diffraction_rows, powered_xyz / amplitude[:, None])
-        path_field.index_copy_(0, diffraction_rows, projected["coefficient"])
-        coefficient.index_copy_(
-            0, diffraction_rows, projected["coefficient"] / amplitude
-        )
-        path_gain.index_copy_(0, diffraction_rows, projected["path_gain"])
-        direction.index_copy_(0, diffraction_rows, arrival)
+        amplitude = _take(source_power, diffraction_rows).clamp_min(1.0e-30).sqrt()
+        outputs.write("field_xyz", diffraction_rows, powered_xyz / amplitude[:, None])
+        outputs.write("path_field", diffraction_rows, projected["coefficient"])
+        outputs.write("coefficient", diffraction_rows, projected["coefficient"] / amplitude)
+        outputs.write("path_gain", diffraction_rows, projected["path_gain"])
+        outputs.write("direction", diffraction_rows, arrival)
         launch_count += 1
     return material, launch_count
 
@@ -751,16 +757,9 @@ def _evaluate_coupled_fields(
     rx_pol: torch.Tensor, device: torch.device, frequency: float | torch.Tensor,
     frequency_value: float | None, ad_enabled: bool, geometry_ad: bool,
     ledger: AdLaunchLedger | None, material: dict[str, torch.Tensor] | None,
-    field_xyz: torch.Tensor, coefficient: torch.Tensor, path_field: torch.Tensor,
-    path_gain: torch.Tensor, direction: torch.Tensor, launch_count: int,
+    groups: PathRowGroups, outputs: _FieldOutputs, launch_count: int,
 ) -> tuple[dict[str, torch.Tensor] | None, int]:
-    coupled_rows = torch.nonzero(
-        (topology.component_id == 3)
-        | (topology.component_id == 4)
-        | (topology.component_id == 7),
-        as_tuple=False,
-    ).reshape(-1)
-    if int(coupled_rows.shape[0]) > 0:
+    if any(groups.count(group) > 0 for group in (_RD_GROUP, _DR_GROUP, _DD_GROUP)):
         if material is None:
             material = face_material_field_bundle(compiled, device=device)
         rayd = compiled.rayd
@@ -802,25 +801,20 @@ def _evaluate_coupled_fields(
             normals_table = geometry_kernels.deterministic_normalize_vec3(
                 records.face_normals.contiguous(), eps=1.0e-6
             )
-        for component_id, reverse_order in ((3, False), (4, True)):
-            rows = torch.nonzero(
-                topology.component_id == component_id, as_tuple=False
-            ).reshape(-1)
-            if int(rows.shape[0]) == 0:
+        for component_id, reverse_order in ((_RD_GROUP, False), (_DR_GROUP, True)):
+            if groups.count(component_id) == 0:
                 continue
-            edge_id = topology.edge_id[rows].to(dtype=torch.int64)
-            reflection_face = topology.primitive_id[rows].to(dtype=torch.int64)
+            rows = groups.rows(component_id)
+            edge_id = _take(topology.edge_id, rows).to(dtype=torch.int64)
+            reflection_face = _take(topology.primitive_id, rows).to(dtype=torch.int64)
             face0 = edge_face0[edge_id]
             raw_face1 = edge_face1[edge_id]
             face1 = torch.where(raw_face1 >= 0, raw_face1, face0)
             reflection_slot = 1 if reverse_order else 0
             edge_slot = 0 if reverse_order else 1
-            reflection_position = geometry.interaction_positions[
-                rows, reflection_slot
-            ].contiguous()
-            edge_position = geometry.interaction_positions[
-                rows, edge_slot
-            ].contiguous()
+            row_positions = _take(geometry.interaction_positions, rows)
+            reflection_position = row_positions[:, reflection_slot].contiguous()
+            edge_position = row_positions[:, edge_slot].contiguous()
             if coupled_geometry_ad:
                 edge_position, reflection_position = (
                     _resolve_coupled_rd_stationary(
@@ -874,25 +868,23 @@ def _evaluate_coupled_fields(
             wedge_materials0 = material_tuple(face0)
             wedge_materials1 = material_tuple(face1)
             coupled_args = (
-                source[rows].contiguous(),
-                target[rows].contiguous(),
+                _take(source, rows),
+                _take(target, rows),
                 reflection_position,
-                geometry.interaction_normals[
-                    rows, reflection_slot
-                ].contiguous(),
+                _take(geometry.interaction_normals, rows)[:, reflection_slot].contiguous(),
                 edge_position,
                 edge_geometry[2][edge_id].contiguous(),
                 edge_n0[edge_id].contiguous(),
                 edge_n1[edge_id].contiguous(),
                 edge_exterior[edge_id].contiguous(),
-                source_power[rows].contiguous(),
-                tx_pol[rows].contiguous(),
-                rx_pol[rows].contiguous(),
+                _take(source_power, rows),
+                _take(tx_pol, rows),
+                _take(rx_pol, rows),
             )
             if ledger is not None:
                 if coupled_geometry_ad:
                     # Fixed-winner coupled stationary re-solve companion.
-                    ledger.add(source[rows], target[rows], reflection_position)
+                    ledger.add(_take(source, rows), _take(target, rows), reflection_position)
                 ledger.add(
                     *coupled_args,
                     *reflection_materials,
@@ -910,11 +902,7 @@ def _evaluate_coupled_fields(
                 edge_line_max,
                 reverse=reverse_order,
             )
-            field_xyz.index_copy_(0, rows, evaluated["field_vector"])
-            coefficient.index_copy_(0, rows, evaluated["coefficient"])
-            path_field.index_copy_(0, rows, evaluated["path_field"])
-            path_gain.index_copy_(0, rows, evaluated["path_gain"])
-            direction.index_copy_(0, rows, evaluated["direction"])
+            outputs.write_evaluated(rows, evaluated, with_length=False)
             launch_count += 1
 
         launch_count = _evaluate_coupled_dd_rows(
@@ -936,11 +924,8 @@ def _evaluate_coupled_fields(
             frequency,
             frequency_value,
             ledger,
-            field_xyz,
-            coefficient,
-            path_field,
-            path_gain,
-            direction,
+            groups,
+            outputs,
             launch_count,
         )
     return material, launch_count
@@ -949,7 +934,8 @@ def _evaluate_coupled_fields(
 def evaluate_path_fields(
     scene: Scene, compiled: object, paths: EvaluatedPaths, execution: PathExecutionStats,
     tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor, *,
-    components: frozenset[str] | set[str] = frozenset(), ad_mode: str = "none",
+    row_groups: PathRowGroups, components: frozenset[str] | set[str] = frozenset(),
+    ad_mode: str = "none",
     frequency_value: float | None = None, isb_boundary_taper_width: float = 0.0,
     endpoint_tx_polarizations: torch.Tensor | None = None,
     endpoint_rx_polarizations: torch.Tensor | None = None, explicit_endpoint_geometry: bool = False,
@@ -975,6 +961,8 @@ def evaluate_path_fields(
     count = paths.row_count
     if count == 0:
         return paths, execution
+    if row_groups.row_count != count:
+        raise ValueError("row groups must cover every evaluated path row")
     ad_enabled = ad_mode != "none"
     # diffraction AD metadata: one ledger entry per registered differentiable
     # Function, tape bytes mirroring each Function's save_for_backward set.
@@ -1060,17 +1048,21 @@ def evaluate_path_fields(
     tx_pol = tx_pol_batch[tx_id].contiguous()
     rx_pol = rx_pol_batch[rx_id].contiguous()
 
-    field_xyz = input_fields.field_xyz.clone()
-    coefficient = input_fields.coefficient.clone()
-    path_field = input_fields.path_field.clone()
-    path_gain = input_fields.path_gain.clone()
-    path_length = geometry.path_length_m.clone()
-    delay = geometry.delay_s.clone()
-    direction = geometry.field_direction.clone()
+    outputs = _FieldOutputs(
+        {
+            "field_xyz": input_fields.field_xyz,
+            "coefficient": input_fields.coefficient,
+            "path_field": input_fields.path_field,
+            "path_gain": input_fields.path_gain,
+            "path_length": geometry.path_length_m,
+            "delay": geometry.delay_s,
+            "direction": geometry.field_direction,
+        }
+    )
     launch_count = execution.launch_count
 
     launch_count = _evaluate_los_fields(
-        topology,
+        row_groups,
         source,
         target,
         source_power,
@@ -1078,13 +1070,7 @@ def evaluate_path_fields(
         rx_pol,
         los_field_op,
         ledger,
-        field_xyz,
-        coefficient,
-        path_field,
-        path_gain,
-        path_length,
-        delay,
-        direction,
+        outputs,
         launch_count,
         compiled,
         _los_taper_frequency(frequency_value, frequency),
@@ -1096,6 +1082,7 @@ def evaluate_path_fields(
         compiled,
         topology,
         geometry,
+        row_groups,
         source,
         target,
         source_power,
@@ -1111,13 +1098,7 @@ def evaluate_path_fields(
         material,
         ad_enabled,
         frequency_value if ad_enabled else None,
-        field_xyz,
-        coefficient,
-        path_field,
-        path_gain,
-        path_length,
-        delay,
-        direction,
+        outputs,
         launch_count,
     )
 
@@ -1136,13 +1117,8 @@ def evaluate_path_fields(
         transmission_field_op,
         ledger,
         material,
-        field_xyz,
-        coefficient,
-        path_field,
-        path_gain,
-        path_length,
-        delay,
-        direction,
+        row_groups,
+        outputs,
         launch_count,
     )
 
@@ -1164,11 +1140,8 @@ def evaluate_path_fields(
         vertices if geometry_ad else None,
         ledger,
         material,
-        field_xyz,
-        coefficient,
-        path_field,
-        path_gain,
-        direction,
+        row_groups,
+        outputs,
         launch_count,
     )
 
@@ -1189,13 +1162,17 @@ def evaluate_path_fields(
         geometry_ad,
         ledger,
         material,
-        field_xyz,
-        coefficient,
-        path_field,
-        path_gain,
-        direction,
+        row_groups,
+        outputs,
         launch_count,
     )
+    field_xyz = outputs.values["field_xyz"]
+    coefficient = outputs.values["coefficient"]
+    path_field = outputs.values["path_field"]
+    path_gain = outputs.values["path_gain"]
+    path_length = outputs.values["path_length"]
+    delay = outputs.values["delay"]
+    direction = outputs.values["direction"]
 
     updated_geometry = PathGeometry(
         row_identity=paths.row_identity,

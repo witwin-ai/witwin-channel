@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from types import SimpleNamespace
 
 import torch
@@ -19,6 +19,7 @@ from witwin.channel.propagation.rows import (
     EvaluatedPaths,
     PathFields,
     PathGeometry,
+    PathRowGroups,
     PathTopology,
 )
 from witwin.channel.runtime import CapacityExecutionCounts, SolveCapacityTransaction
@@ -242,6 +243,16 @@ class PathExecutionStats:
     guardrail_count: int
     ad_companion_launches: int
     ad_tape_bytes: int
+    # Candidate edge ids whose distinct count is diagnostics metadata; counted
+    # only when a caller asks, so a solve without diagnostics pays nothing.
+    selected_edge_ids: torch.Tensor | None = field(default=None, compare=False, repr=False)
+
+    def resolved_selected_edge_count(self) -> int:
+        """Distinct selected edges: the stored count, or the native count of the candidate ids."""
+
+        if self.selected_edge_ids is None:
+            return self.selected_edge_count
+        return topology_kernels.deterministic_selected_edge_count(self.selected_edge_ids)
 
 
 @dataclass(frozen=True, slots=True)
@@ -253,6 +264,7 @@ class EvaluatedPathSidecars:
     capacity_execution: CapacityExecutionCounts | None = None
     capacity_transaction: SolveCapacityTransaction | None = None
     compact_metadata: topology_kernels.ExactPairMetadata | None = None
+    row_groups: PathRowGroups | None = None
 
 
 def evaluated_paths_from_result(paths: object) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
@@ -477,6 +489,7 @@ def evaluated_paths_from_block(
             count_d2h_bytes=compact.count_d2h_bytes,
             count_synchronizations=compact.count_synchronizations,
         ),
+        row_groups=PathRowGroups(order=compact.row_group_order, counts=compact.row_group_counts),
     )
 
 

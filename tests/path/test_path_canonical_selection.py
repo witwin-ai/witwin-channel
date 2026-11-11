@@ -4,6 +4,8 @@
 import pytest
 import torch
 
+from witwin.channel.kernels.topology import compact_control_record_bytes
+
 from witwin.channel.propagation import topology as concatenate
 from witwin.channel.propagation.topology import evaluated_paths_from_block
 from witwin.channel.kernels.topology import (
@@ -148,7 +150,7 @@ def test_exact_owner_carries_empty_pair_offsets_and_one_sync_ledger():
         torch.tensor([0, 5, 7, 7], device="cuda", dtype=torch.int64),
     )
     assert metadata.count_d2h_copies == 1
-    assert metadata.count_d2h_bytes == 8
+    assert metadata.count_d2h_bytes == compact_control_record_bytes(2) == 64
     assert metadata.count_synchronizations == 1
     assert bool(evaluated.topology.valid.all())
 

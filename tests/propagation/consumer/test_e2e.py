@@ -6,6 +6,8 @@ from __future__ import annotations
 import pytest
 import torch
 
+from witwin.channel.kernels.topology import compact_control_record_bytes
+
 from witwin.channel.propagation.consumer import (
     Complex3Transport,
     EndpointBatch,
@@ -155,7 +157,8 @@ def test_consumer_general_owner_publishes_exact_pair_layout_once() -> None:
         torch.tensor([701, 701, 702, 702], device="cuda", dtype=torch.int64),
     )
     assert result.diagnostics.compact_count_d2h_copies == 1
-    assert result.diagnostics.compact_count_d2h_bytes == 8
+    # One control record: K, the failure word and the per-group row counts (width 2).
+    assert result.diagnostics.compact_count_d2h_bytes == compact_control_record_bytes(2) == 64
     assert result.diagnostics.compact_sync_count == 1
 
 

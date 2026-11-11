@@ -1854,11 +1854,15 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
             "count_synchronizations",
             "capacity_failure_bits",
             "capacity_dropped_rows",
+            "row_group_order",
+            "row_group_counts",
         }
         if not isinstance(raw, dict) or set(raw) != expected:
             raise TypeError("native canonical compact owner returned bad fields")
         observation.bits = int(raw["capacity_failure_bits"])
         observation.dropped_rows = int(raw["capacity_dropped_rows"])
+        observation.row_group_order = raw["row_group_order"]
+        observation.row_group_counts = tuple(int(value) for value in raw["row_group_counts"])
         return tuple(raw[name] for name in _FUNCTION_OUTPUT_FIELDS)
 
     @staticmethod
@@ -1965,11 +1969,13 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
 class _CompactCapacityObservation:
     """Host values the compact owner copied alongside its row count."""
 
-    __slots__ = ("bits", "dropped_rows")
+    __slots__ = ("bits", "dropped_rows", "row_group_order", "row_group_counts")
 
     def __init__(self) -> None:
         self.bits = 0
         self.dropped_rows = 0
+        self.row_group_order: torch.Tensor | None = None
+        self.row_group_counts: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -1986,6 +1992,8 @@ class CanonicalCompactRows:
     count_synchronizations: int
     capacity_failure_bits: int = 0
     capacity_dropped_rows: int = 0
+    row_group_order: torch.Tensor | None = None
+    row_group_counts: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -2087,12 +2095,33 @@ def _compact_capacity_record(
     return capacity_failure_state.record
 
 
-def _compact_copy_budget(row_count: int, *, has_capacity_record: bool) -> tuple[int, int]:
-    """Return the compact owner's (copies, bytes): one copy of 8, or 16 with a failure record."""
+COMPONENT_ROW_GROUPS = 8
+
+
+def row_group_count(sequence_width: int) -> int:
+    """Field-stage row groups: one per component id, reflection by depth, one overflow."""
+
+    return COMPONENT_ROW_GROUPS + int(sequence_width) + 2
+
+
+def compact_control_record_bytes(sequence_width: int) -> int:
+    """Bytes of the compact owner's one control-record copy for a sequence width."""
+
+    return 8 * (2 + (row_group_count(sequence_width) + 1) // 2)
+
+
+def _compact_copy_budget(
+    row_count: int, *, has_capacity_record: bool, sequence_width: int,
+) -> tuple[int, int]:
+    """Return the compact owner's (copies, bytes) for its one control-record copy.
+
+    The record is K, the failure word, and the int32 per-group row counts packed into int64
+    words.
+    """
 
     if row_count == 0 and not has_capacity_record:
         return 0, 0
-    return 1, 16 if has_capacity_record else 8
+    return 1, compact_control_record_bytes(sequence_width)
 
 
 def enumerated_canonical_compact(
@@ -2156,8 +2185,16 @@ def enumerated_canonical_compact(
     )
     path_count = int(raw["pair_index"].shape[0])
     copies, record_bytes = _compact_copy_budget(
-        row_count, has_capacity_record=capacity_failure_record is not None
+        row_count,
+        has_capacity_record=capacity_failure_record is not None,
+        sequence_width=int(normalized["primitive_sequence"].shape[1]),
     )
+    group_counts = observation.row_group_counts
+    group_order = observation.row_group_order
+    if group_order is None or len(group_counts) != row_group_count(
+        int(normalized["primitive_sequence"].shape[1])
+    ):
+        raise RuntimeError("native canonical compact owner returned bad row groups")
     metadata = _metadata_from_raw(
         {
             "pair_index": raw["pair_index"],
@@ -2193,6 +2230,8 @@ def enumerated_canonical_compact(
         count_synchronizations=metadata.count_synchronizations,
         capacity_failure_bits=observation.bits,
         capacity_dropped_rows=observation.dropped_rows,
+        row_group_order=group_order,
+        row_group_counts=group_counts,
     )
 
 

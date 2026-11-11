@@ -250,4 +250,67 @@ class EvaluatedPaths:
         return self.topology.device
 
 
-__all__ = ["EvaluatedPaths", "PathFields", "PathGeometry", "PathTopology"]
+COMPONENT_ROW_GROUPS = 8
+
+
+@dataclass(frozen=True, slots=True, eq=False)
+class PathRowGroups:
+    """Host row counts and a device order that list each field-stage group's rows.
+
+    Group ``c`` holds the rows of component ``c`` (reflection excepted), group
+    ``8 + d`` the reflection rows of depth ``d``, and the last group every other row. Rows of
+    one group appear in ascending row order inside ``order``. ``order`` is None when the rows
+    are already grouped, in which case every row belongs to the single non-empty group.
+    """
+
+    order: torch.Tensor | None
+    counts: tuple[int, ...]
+    offsets: tuple[int, ...] = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        offsets = [0]
+        for value in self.counts:
+            if type(value) is not int or value < 0:
+                raise ValueError("row group counts must be non-negative ints")
+            offsets.append(offsets[-1] + value)
+        object.__setattr__(self, "offsets", tuple(offsets))
+        if self.order is not None:
+            require_tensor("order", self.order, dtype=torch.int64, shape=(offsets[-1],))
+        elif sum(1 for value in self.counts if value) > 1:
+            raise ValueError("ungrouped rows must belong to a single group")
+
+    @classmethod
+    def single(cls, group: int, row_count: int, *, sequence_width: int) -> PathRowGroups:
+        counts = [0] * (COMPONENT_ROW_GROUPS + int(sequence_width) + 2)
+        counts[group] = int(row_count)
+        return cls(order=None, counts=tuple(counts))
+
+    @property
+    def row_count(self) -> int:
+        return self.offsets[-1]
+
+    def count(self, group: int) -> int:
+        return self.counts[group] if 0 <= group < len(self.counts) else 0
+
+    def rows(self, group: int) -> torch.Tensor | None:
+        """Row indices of one non-empty group, or None when the group holds every row."""
+
+        count = self.count(group)
+        if count == 0:
+            raise ValueError(f"row group {group} is empty")
+        if count == self.row_count:
+            return None
+        assert self.order is not None
+        start = self.offsets[group]
+        return self.order[start : start + count]
+
+    def reflection_depths(self) -> tuple[int, ...]:
+        """Reflection depths that have rows, ascending."""
+
+        width = len(self.counts) - COMPONENT_ROW_GROUPS - 1
+        return tuple(
+            depth for depth in range(1, width) if self.count(COMPONENT_ROW_GROUPS + depth)
+        )
+
+
+__all__ = ["EvaluatedPaths", "PathFields", "PathGeometry", "PathRowGroups", "PathTopology"]

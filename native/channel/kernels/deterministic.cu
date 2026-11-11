@@ -794,7 +794,7 @@ pybind11::dict channel_deterministic_field_from_power_phase(at::Tensor path_gain
 #include "torch_cuda.h"
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
-#include <thrust/scan.h>
+#include "scan.cuh"
 #include <thrust/sort.h>
 #include <thrust/unique.h>
 
@@ -1863,7 +1863,7 @@ int64_t channel_deterministic_selected_edge_count(at::Tensor edge_id) {
     }
     auto int_options = edge_id.options().dtype(at::kInt);
     auto flags = at::empty({path_count}, int_options);
-    auto offsets = at::empty({path_count}, int_options);
+    auto offsets = at::empty({path_count + 1}, int_options);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(edge_id.get_device()).stream();
     const int block_count = static_cast<int>((path_count + kBlockSize - 1) / kBlockSize);
     deterministic_edge_flags_kernel<<<block_count, kBlockSize, 0, stream>>>(
@@ -1872,28 +1872,17 @@ int64_t channel_deterministic_selected_edge_count(at::Tensor edge_id) {
         flags.data_ptr<int>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 
-    thrust::exclusive_scan(
-        thrust::cuda::par.on(stream),
-        thrust::device_pointer_cast(flags.data_ptr<int>()),
-        thrust::device_pointer_cast(flags.data_ptr<int>() + path_count),
-        thrust::device_pointer_cast(offsets.data_ptr<int>()));
+    channel::scan::exclusive_flag_offsets(flags, offsets, path_count, stream);
 
-    int last_flag = 0;
-    int last_offset = 0;
+int total = 0;
     C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_flag,
-        flags.data_ptr<int>() + path_count - 1,
-        sizeof(int),
-        cudaMemcpyDeviceToHost,
-        stream));
-    C10_CUDA_CHECK(cudaMemcpyAsync(
-        &last_offset,
-        offsets.data_ptr<int>() + path_count - 1,
+        &total,
+        offsets.data_ptr<int>() + path_count,
         sizeof(int),
         cudaMemcpyDeviceToHost,
         stream));
     C10_CUDA_CHECK(cudaStreamSynchronize(stream));
-    const int64_t selected_count = static_cast<int64_t>(last_flag) + static_cast<int64_t>(last_offset);
+    const int64_t selected_count = static_cast<int64_t>(total);
     if (selected_count == 0) {
         return 0;
     }

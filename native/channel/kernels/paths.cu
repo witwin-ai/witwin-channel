@@ -2149,7 +2149,7 @@ channel_path_filter_los_cuda(
 
     auto int_options = tx_id.options().dtype(at::kInt);
     auto flags = at::empty({count}, int_options);
-    auto offsets = at::empty({count}, int_options);
+    auto offsets = at::empty({count + 1}, int_options);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(tx_id.get_device()).stream();
     path_visibility_flags_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
         count,
@@ -2157,14 +2157,10 @@ channel_path_filter_los_cuda(
         flags.data_ptr<int>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 
-    thrust::exclusive_scan(
-        thrust::cuda::par.on(stream),
-        thrust::device_pointer_cast(flags.data_ptr<int>()),
-        thrust::device_pointer_cast(flags.data_ptr<int>() + count),
-        thrust::device_pointer_cast(offsets.data_ptr<int>()));
+    channel::scan::exclusive_flag_offsets(flags, offsets, count, stream);
 
     const int64_t out_count =
-        observe_compact_count(flags, offsets, count, stream).count;
+        observe_compact_count(offsets, count, stream).count;
     if (out_count == 0) {
         return empty_path_block_from(tx_id);
     }
@@ -2249,7 +2245,7 @@ pybind11::dict channel_deterministic_los_topology_block(
 
     auto int_options = tx_id.options().dtype(at::kInt);
     auto flags = at::empty({count}, int_options);
-    auto offsets = at::empty({count}, int_options);
+    auto offsets = at::empty({count + 1}, int_options);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
     path_visibility_flags_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
         count,
@@ -2257,14 +2253,10 @@ pybind11::dict channel_deterministic_los_topology_block(
         flags.data_ptr<int>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 
-    thrust::exclusive_scan(
-        thrust::cuda::par.on(stream),
-        thrust::device_pointer_cast(flags.data_ptr<int>()),
-        thrust::device_pointer_cast(flags.data_ptr<int>() + count),
-        thrust::device_pointer_cast(offsets.data_ptr<int>()));
+    channel::scan::exclusive_flag_offsets(flags, offsets, count, stream);
 
     const int64_t out_count =
-        observe_compact_count(flags, offsets, count, stream).count;
+        observe_compact_count(offsets, count, stream).count;
     if (out_count == 0) {
         return empty_deterministic_los_topology_block_from(tx_id, sequence_width);
     }
@@ -2448,20 +2440,16 @@ pybind11::dict channel_deterministic_reflection_order1_compact(
     }
 
     auto flags = at::empty({count}, int_options);
-    auto offsets = at::empty({count}, int_options);
+    auto offsets = at::empty({count + 1}, int_options);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
     path_visibility_flags_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
         count,
         visible.data_ptr<bool>(),
         flags.data_ptr<int>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
-    thrust::exclusive_scan(
-        thrust::cuda::par.on(stream),
-        thrust::device_pointer_cast(flags.data_ptr<int>()),
-        thrust::device_pointer_cast(flags.data_ptr<int>() + count),
-        thrust::device_pointer_cast(offsets.data_ptr<int>()));
+    channel::scan::exclusive_flag_offsets(flags, offsets, count, stream);
     const int64_t out_count =
-        observe_compact_count(flags, offsets, count, stream).count;
+        observe_compact_count(offsets, count, stream).count;
     if (out_count == 0) {
         return empty_out();
     }
@@ -2623,20 +2611,16 @@ pybind11::dict channel_deterministic_reflection_sequence_compact(
     }
 
     auto flags = at::empty({count}, int_options);
-    auto offsets = at::empty({count}, int_options);
+    auto offsets = at::empty({count + 1}, int_options);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
     path_visibility_flags_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
         count,
         visible.data_ptr<bool>(),
         flags.data_ptr<int>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
-    thrust::exclusive_scan(
-        thrust::cuda::par.on(stream),
-        thrust::device_pointer_cast(flags.data_ptr<int>()),
-        thrust::device_pointer_cast(flags.data_ptr<int>() + count),
-        thrust::device_pointer_cast(offsets.data_ptr<int>()));
+    channel::scan::exclusive_flag_offsets(flags, offsets, count, stream);
     const int64_t visible_count =
-        observe_compact_count(flags, offsets, count, stream).count;
+        observe_compact_count(offsets, count, stream).count;
     const int64_t out_count = max_count < 0 ? visible_count : std::min<int64_t>(visible_count, max_count);
     if (out_count == 0) {
         return empty_out();
@@ -2805,20 +2789,16 @@ pybind11::dict channel_deterministic_diffraction_order1_compact(
     }
 
     auto flags = at::empty({count}, int_options);
-    auto offsets = at::empty({count}, int_options);
+    auto offsets = at::empty({count + 1}, int_options);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
     path_visibility_flags_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
         count,
         valid.data_ptr<bool>(),
         flags.data_ptr<int>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
-    thrust::exclusive_scan(
-        thrust::cuda::par.on(stream),
-        thrust::device_pointer_cast(flags.data_ptr<int>()),
-        thrust::device_pointer_cast(flags.data_ptr<int>() + count),
-        thrust::device_pointer_cast(offsets.data_ptr<int>()));
+    channel::scan::exclusive_flag_offsets(flags, offsets, count, stream);
     const int64_t out_count =
-        observe_compact_count(flags, offsets, count, stream).count;
+        observe_compact_count(offsets, count, stream).count;
     if (out_count == 0) {
         return empty_out();
     }
@@ -2891,7 +2871,7 @@ channel_path_filter_block_cuda(
 
     auto int_options = tx_id.options().dtype(at::kInt);
     auto flags = at::empty({count}, int_options);
-    auto offsets = at::empty({count}, int_options);
+    auto offsets = at::empty({count + 1}, int_options);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(valid.get_device()).stream();
     path_block_flags_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
         count,
@@ -2900,14 +2880,10 @@ channel_path_filter_block_cuda(
         visible1.data_ptr<bool>(),
         flags.data_ptr<int>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
-    thrust::exclusive_scan(
-        thrust::cuda::par.on(stream),
-        thrust::device_pointer_cast(flags.data_ptr<int>()),
-        thrust::device_pointer_cast(flags.data_ptr<int>() + count),
-        thrust::device_pointer_cast(offsets.data_ptr<int>()));
+    channel::scan::exclusive_flag_offsets(flags, offsets, count, stream);
 
     const int64_t out_count =
-        observe_compact_count(flags, offsets, count, stream).count;
+        observe_compact_count(offsets, count, stream).count;
     if (out_count == 0) {
         return empty_path_block_from(valid);
     }
@@ -2999,21 +2975,17 @@ channel_path_diffraction_block_cuda(
 
     auto int_options = rx_id.options().dtype(at::kInt);
     auto flags = at::empty({count}, int_options);
-    auto offsets = at::empty({count}, int_options);
+    auto offsets = at::empty({count + 1}, int_options);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(valid.get_device()).stream();
     path_visibility_flags_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
         count,
         valid.data_ptr<bool>(),
         flags.data_ptr<int>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
-    thrust::exclusive_scan(
-        thrust::cuda::par.on(stream),
-        thrust::device_pointer_cast(flags.data_ptr<int>()),
-        thrust::device_pointer_cast(flags.data_ptr<int>() + count),
-        thrust::device_pointer_cast(offsets.data_ptr<int>()));
+    channel::scan::exclusive_flag_offsets(flags, offsets, count, stream);
 
     const int64_t out_count =
-        observe_compact_count(flags, offsets, count, stream).count;
+        observe_compact_count(offsets, count, stream).count;
     if (out_count == 0) {
         return empty_path_block_from(valid);
     }
@@ -3827,18 +3799,14 @@ pybind11::dict channel_deterministic_face_groups(
     }
 
     auto flags = at::empty({face_count}, int_options);
-    auto group_offsets = at::empty({face_count}, int_options);
+    auto group_offsets = at::empty({face_count + 1}, int_options);
     deterministic_face_group_flags_kernel<<<static_cast<int>(launch_blocks(face_count)), kPathBlockSize, 0, stream>>>(
         face_count,
         key_matrix.data_ptr<int64_t>(),
         order.data_ptr<int64_t>(),
         flags.data_ptr<int>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
-    thrust::exclusive_scan(
-        thrust::cuda::par.on(stream),
-        thrust::device_pointer_cast(flags.data_ptr<int>()),
-        thrust::device_pointer_cast(flags.data_ptr<int>() + face_count),
-        thrust::device_pointer_cast(group_offsets.data_ptr<int>()));
+    channel::scan::exclusive_flag_offsets(flags, group_offsets, face_count, stream);
 
     int last_flag = 0;
     int last_offset = 0;
@@ -3958,18 +3926,14 @@ pybind11::dict channel_deterministic_surface_face_groups(at::Tensor surface_ids)
     }
 
     auto flags = at::empty({face_count}, int_options);
-    auto group_offsets = at::empty({face_count}, int_options);
+    auto group_offsets = at::empty({face_count + 1}, int_options);
     deterministic_face_group_flags_kernel<<<static_cast<int>(launch_blocks(face_count)), kPathBlockSize, 0, stream>>>(
         face_count,
         key_matrix.data_ptr<int64_t>(),
         order.data_ptr<int64_t>(),
         flags.data_ptr<int>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
-    thrust::exclusive_scan(
-        thrust::cuda::par.on(stream),
-        thrust::device_pointer_cast(flags.data_ptr<int>()),
-        thrust::device_pointer_cast(flags.data_ptr<int>() + face_count),
-        thrust::device_pointer_cast(group_offsets.data_ptr<int>()));
+    channel::scan::exclusive_flag_offsets(flags, group_offsets, face_count, stream);
 
     int last_flag = 0;
     int last_offset = 0;
