@@ -115,7 +115,11 @@ from witwin.channel.runtime import (
     required_symbol as _required_native_op,
     validate_cuda_tensor,
 )
-from witwin.channel.scene.compiler import compile as compile_scene, record_dropped_faces
+from witwin.channel.scene.compiler import (
+    compile as compile_scene,
+    receiver_positions as scene_receiver_positions,
+    record_dropped_faces,
+)
 from witwin.channel.scene.endpoints import (
     ReceiverGrid,
     ReceiverPoint,
@@ -125,7 +129,6 @@ from witwin.channel.scene.endpoints import (
     bind_solver_scene,
     first_receiver_grid,
     require_compiled,
-    require_single_receiver_layout,
     validate_scalar_endpoint_features,
     vector3_tuple as _vector3_tuple,
 )
@@ -2839,13 +2842,15 @@ def receiver_positions(
         )
     if len(scene.receivers) == 1 and isinstance(scene.receivers[0], ReceiverGrid):
         return receiver_positions(scene, reference=reference, grid=scene.receivers[0])
+    if any(isinstance(receiver, ReceiverGrid) for receiver in scene.receivers):
+        # Several grids or grids mixed with points: one flat list in scene order,
+        # the same receiver ids the enumerated oracle assigns.
+        return scene_receiver_positions(scene, device=reference.device, reference=reference)
 
     flat_positions: list[float] = []
     for receiver in scene.receivers:
         if isinstance(receiver, ReceiverPoint):
             flat_positions.extend(_vector3_tuple(receiver.position))
-        elif isinstance(receiver, ReceiverGrid):
-            raise ValueError("BDPT supports either one ReceiverGrid or point receivers, not mixed receiver grids")
         else:
             raise TypeError(f"receiver type is not accepted: {type(receiver)!r}")
     return bdpt_host_vec3_tensor(tuple(flat_positions))
@@ -3603,9 +3608,29 @@ def _collect_coherent_connection_samples(
     )
 
 
+def _single_receiver_grid(scene: SolverScene) -> ReceiverGrid | None:
+    """The grid of a scene whose only receiver is one ``ReceiverGrid``, else None.
+
+    One grid keeps the grid result layout (component maps); several grids, or
+    grids mixed with point receivers, are solved as one flat receiver list in
+    scene order (each grid contributes its cells), like the deterministic solver.
+    """
+
+    if len(scene.receivers) == 1 and isinstance(scene.receivers[0], ReceiverGrid):
+        return scene.receivers[0]
+    return None
+
+
+def _receiver_count(scene: SolverScene) -> int:
+    return sum(
+        int(receiver.shape[0] * receiver.shape[1]) if isinstance(receiver, ReceiverGrid) else 1
+        for receiver in scene.receivers
+    )
+
+
 def _validate(scene: SolverScene, config: Config) -> ReceiverGrid | None:
-    grid = first_receiver_grid(scene)
-    if grid is not None and config.receiver_strategy != "grid_area":
+    grid = _single_receiver_grid(scene)
+    if first_receiver_grid(scene) is not None and config.receiver_strategy != "grid_area":
         raise RuntimeError("receiver_strategy='point_sphere' requires point receivers")
     validate_scalar_endpoint_features(
         scene.transmitters, scene.receivers, solver="BDPT"
@@ -3656,7 +3681,7 @@ def _prepare_workspace_and_capabilities(
         grid_cells=grid_cells,
         estimated_valid_ratio=1.0 if "los" in config.components else 0.05,
     )
-    rx_count_estimate = grid_cells if grid is not None else len(scene.receivers)
+    rx_count_estimate = _receiver_count(scene)
     workspace_bytes = _estimate_workspace_bytes(
         config,
         tx_count=len(scene.transmitters),
@@ -4219,7 +4244,6 @@ def solve(  # type: ignore[no-untyped-def]
 
     require_config_type(config, Config, "witwin.channel.montecarlo.bdpt")
     endpoint_views = _endpoint_views(scene)
-    require_single_receiver_layout(endpoint_views, solver="witwin.channel.montecarlo.bdpt")
     if (
         any(isinstance(view, ReceiverGrid) for view in endpoint_views)
         and config.receiver_strategy != "grid_area"

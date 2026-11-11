@@ -152,6 +152,10 @@ used by focused contract tests, but are not compatibility promises. The parent
   estimates), never `staged`. `staged` and the accumulate JVP are a stable key
   sort plus a fixed-order reduce-by-key per `(tx, rx, component)`: bitwise
   reproducible run to run.
+- Receivers: one `ReceiverGrid` keeps the grid layout (`component_maps`);
+  several grids, or grids mixed with point receivers, are solved as one flat
+  receiver list in scene order (`path_gain[tx, receiver]`), like the
+  deterministic solver.
 - Design record: ADR-049 (`docs/dev/standards/adr-049-m4-1-bdpt-wavefront.md`).
 
 ### BDPT wavefront evidence

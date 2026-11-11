@@ -78,7 +78,16 @@ def test_mc_basic_still_solves_los_on_point_receivers() -> None:
     assert float(result.path_gain.sum()) > 0.0
 
 
-@pytest.mark.parametrize("solver", ["basic", "bdpt"])
+@pytest.mark.parametrize("layout", ["two_grids", "grid_and_point"])
+def test_bdpt_solves_multiple_or_mixed_receivers_as_one_flat_list(layout: str) -> None:
+    receivers = [_grid(), _grid(shape=(2, 2))] if layout == "two_grids" else [_grid(), _rx()]
+    result = _solve("bdpt", Scene(structures=[_wall()], endpoints=[_tx(), *receivers]), components={"los"})
+    assert result.path_gain.shape == (1, 16 + (4 if layout == "two_grids" else 1))
+    assert result.component_maps is None
+    assert float(result.path_gain.sum()) > 0.0
+
+
+@pytest.mark.parametrize("solver", ["basic"])
 @pytest.mark.parametrize("layout", ["two_grids", "grid_and_point"])
 def test_monte_carlo_refuses_multiple_or_mixed_receivers(
     monkeypatch, solver: str, layout: str,
