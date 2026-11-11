@@ -5,10 +5,14 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass, field, replace
+import hashlib
 import math
+import os
+from pathlib import Path
 import re
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, Callable, Sequence
 
 import numpy as np
 import torch
@@ -49,6 +53,7 @@ __all__ = [
     "build_kirchhoff_table_stack",
     "build_phase_screen_resources",
     "build_scene_from_structures",
+    "clear_kirchhoff_cache",
     "eval_bsdf",
     "generate_gaussian_realization",
     "patch_phase_integral",
@@ -1300,6 +1305,77 @@ def _symmetric_energy_balance(
     return balanced.reshape(symmetric_lobe.shape), factor.reshape(n_ti, n_pi)
 
 
+# Kirchhoff tables depend only on (roughness, layer stack, frequency). The host
+# arrays are kept in a process-wide LRU so a moved endpoint, a recompiled scene
+# or a second scene with the same material reuses them; each build still uploads
+# fresh device tensors, so no two tables alias storage. Setting
+# WITWIN_CHANNEL_KIRCHHOFF_CACHE_DIR also persists them across processes as .npz
+# files named by a digest of the key and the table format.
+KIRCHHOFF_CACHE_DIR_ENV = "WITWIN_CHANNEL_KIRCHHOFF_CACHE_DIR"
+_KIRCHHOFF_CACHE_CAPACITY = 32
+_KIRCHHOFF_FORMAT = (
+    "kirchhoff-v1", N_COS_THETA_I, N_PHI_I_ANISO, N_COS_THETA_O, N_PHI_O,
+)
+_KIRCHHOFF_ARRAY_CACHE: OrderedDict[tuple[object, ...], dict[str, np.ndarray]] = OrderedDict()
+_KIRCHHOFF_ARRAY_NAMES = (
+    "cos_theta_i", "phi_i", "cos_theta_o", "phi_o", "f_te", "f_tm", "r_diff_te", "r_diff_tm",
+    "r_diff_unpol", "normalization_applied", "sample_density", "marginal_cdf",
+    "conditional_cdf", "pre_balance_lobe_te", "pre_balance_lobe_tm", "reciprocity_error",
+)
+
+
+def clear_kirchhoff_cache() -> None:
+    """Drop every in-process Kirchhoff table (the disk cache is left alone)."""
+
+    _KIRCHHOFF_ARRAY_CACHE.clear()
+
+
+def _kirchhoff_disk_path(key: tuple[object, ...]) -> Path | None:
+    root = os.environ.get(KIRCHHOFF_CACHE_DIR_ENV, "").strip()
+    if not root:
+        return None
+    digest = hashlib.sha256(repr((_KIRCHHOFF_FORMAT, key)).encode()).hexdigest()[:32]
+    return Path(root) / f"kirchhoff-{digest}.npz"
+
+
+def _load_kirchhoff_disk(path: Path) -> dict[str, np.ndarray] | None:
+    try:
+        with np.load(path, allow_pickle=False) as data:
+            arrays = {name: np.array(data[name]) for name in _KIRCHHOFF_ARRAY_NAMES}
+    except (OSError, KeyError, ValueError):
+        return None
+    return arrays
+
+
+def _store_kirchhoff_disk(path: Path, arrays: dict[str, np.ndarray]) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        partial = path.with_name(f"{path.stem}.{os.getpid()}.tmp.npz")
+        np.savez(partial, **arrays)
+        os.replace(partial, path)
+    except OSError:
+        return
+
+
+def _cached_kirchhoff_arrays(
+    key: tuple[object, ...], build: Callable[[], dict[str, np.ndarray]],
+) -> dict[str, np.ndarray]:
+    cached = _KIRCHHOFF_ARRAY_CACHE.get(key)
+    if cached is not None:
+        _KIRCHHOFF_ARRAY_CACHE.move_to_end(key)
+        return cached
+    path = _kirchhoff_disk_path(key)
+    arrays = _load_kirchhoff_disk(path) if path is not None and path.is_file() else None
+    if arrays is None:
+        arrays = build()
+        if path is not None:
+            _store_kirchhoff_disk(path, arrays)
+    _KIRCHHOFF_ARRAY_CACHE[key] = arrays
+    while len(_KIRCHHOFF_ARRAY_CACHE) > _KIRCHHOFF_CACHE_CAPACITY:
+        _KIRCHHOFF_ARRAY_CACHE.popitem(last=False)
+    return arrays
+
+
 def build_kirchhoff_table(
     roughness, layers: Sequence[tuple], frequency_hz: float, device: torch.device | str = "cuda",
 ) -> KirchhoffTable:
@@ -1345,6 +1421,52 @@ def build_kirchhoff_table(
         raise ValueError(
             "kirchhoff_domain_exceeded: ensemble Kirchhoff requires " + " and ".join(violated)
         )
+
+    arrays = _cached_kirchhoff_arrays(
+        (sigma_h, lx, ly, axis_rad, tuple(tuple(float(v) for v in layer) for layer in layers),
+         frequency_hz),
+        lambda: _kirchhoff_table_arrays(sigma_h, lx, ly, layers, frequency_hz, k0),
+    )
+    device = torch.device(device)
+
+    def as32(name: str) -> torch.Tensor:
+        return torch.from_numpy(np.array(arrays[name], dtype=np.float32, copy=True)).to(device)
+
+    return KirchhoffTable(
+        cos_theta_i=as32("cos_theta_i"),
+        phi_i=as32("phi_i"),
+        cos_theta_o=as32("cos_theta_o"),
+        phi_o=as32("phi_o"),
+        f_te=as32("f_te"),
+        f_tm=as32("f_tm"),
+        r_diff_te=as32("r_diff_te"),
+        r_diff_tm=as32("r_diff_tm"),
+        r_diff_unpol=as32("r_diff_unpol"),
+        normalization_applied=as32("normalization_applied"),
+        sample_density=as32("sample_density"),
+        marginal_cdf=as32("marginal_cdf"),
+        conditional_cdf=as32("conditional_cdf"),
+        frequency_hz=frequency_hz,
+        k0=k0,
+        sigma_h_m=sigma_h,
+        corr_x_m=lx,
+        corr_y_m=ly,
+        principal_axis_rad=axis_rad,
+        anisotropic=lx != ly,
+        k0_l_min=k0_l_min,
+        rms_slope_max=rms_slope_max,
+        tangent_plane_ok=tangent_plane_ok,
+        slope_ok=slope_ok,
+        reciprocity_error=float(arrays["reciprocity_error"]),
+        pre_balance_lobe_te=as32("pre_balance_lobe_te"),
+        pre_balance_lobe_tm=as32("pre_balance_lobe_tm"),
+    )
+
+
+def _kirchhoff_table_arrays(
+    sigma_h: float, lx: float, ly: float, layers: Sequence[tuple], frequency_hz: float, k0: float,
+) -> dict[str, np.ndarray]:
+    """Float64 host build of every Kirchhoff table array, downcast to float32 at the end."""
 
     anisotropic = lx != ly
     cos_i = _cos_centers(N_COS_THETA_I)
@@ -1455,40 +1577,26 @@ def build_kirchhoff_table(
     conditional_cdf = np.cumsum(cond, axis=3)
     conditional_cdf /= conditional_cdf[..., -1:]
 
-    device = torch.device(device)
-
-    def as32(a: np.ndarray) -> torch.Tensor:
-        return torch.from_numpy(np.ascontiguousarray(a, dtype=np.float32)).to(device)
-
-    return KirchhoffTable(
-        cos_theta_i=as32(cos_i),
-        phi_i=as32(phi_i),
-        cos_theta_o=as32(cos_o),
-        phi_o=as32(phi_o),
-        f_te=as32(f_sym_te),
-        f_tm=as32(f_sym_tm),
-        r_diff_te=as32(r_diff_te_grid),
-        r_diff_tm=as32(r_diff_tm_grid),
-        r_diff_unpol=as32(0.5 * (r_diff_te_grid + r_diff_tm_grid)),
-        normalization_applied=as32(scales),
-        sample_density=as32(density),
-        marginal_cdf=as32(marginal_cdf),
-        conditional_cdf=as32(conditional_cdf),
-        frequency_hz=frequency_hz,
-        k0=k0,
-        sigma_h_m=sigma_h,
-        corr_x_m=lx,
-        corr_y_m=ly,
-        principal_axis_rad=axis_rad,
-        anisotropic=anisotropic,
-        k0_l_min=k0_l_min,
-        rms_slope_max=rms_slope_max,
-        tangent_plane_ok=tangent_plane_ok,
-        slope_ok=slope_ok,
-        reciprocity_error=reciprocity_error,
-        pre_balance_lobe_te=as32(pre_balance_lobe_te),
-        pre_balance_lobe_tm=as32(pre_balance_lobe_tm),
-    )
+    f32 = {
+        "cos_theta_i": cos_i,
+        "phi_i": phi_i,
+        "cos_theta_o": cos_o,
+        "phi_o": phi_o,
+        "f_te": f_sym_te,
+        "f_tm": f_sym_tm,
+        "r_diff_te": r_diff_te_grid,
+        "r_diff_tm": r_diff_tm_grid,
+        "r_diff_unpol": 0.5 * (r_diff_te_grid + r_diff_tm_grid),
+        "normalization_applied": scales,
+        "sample_density": density,
+        "marginal_cdf": marginal_cdf,
+        "conditional_cdf": conditional_cdf,
+        "pre_balance_lobe_te": pre_balance_lobe_te,
+        "pre_balance_lobe_tm": pre_balance_lobe_tm,
+    }
+    arrays = {name: np.ascontiguousarray(value, dtype=np.float32) for name, value in f32.items()}
+    arrays["reciprocity_error"] = np.asarray(reciprocity_error, dtype=np.float64)
+    return arrays
 
 
 def eval_bsdf(
