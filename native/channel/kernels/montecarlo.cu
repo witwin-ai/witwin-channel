@@ -1228,11 +1228,15 @@ std::tuple<at::Tensor, at::Tensor> channel_mc_scattering_pair_sum_backward_cuda(
     at::Tensor wi_local, at::Tensor incident, at::Tensor epsilon, at::Tensor material,
     at::Tensor material_slot, at::Tensor table_offset, at::Tensor table_dims, at::Tensor f_te,
     at::Tensor f_tm, at::Tensor receivers, at::Tensor visible, at::Tensor grad) {
-    auto grad_te = at::zeros_like(f_te);
-    auto grad_tm = at::zeros_like(f_tm);
+    auto grad_te = at::empty_like(f_te);
+    auto grad_tm = at::empty_like(f_tm);
+    auto stream = at::cuda::getCurrentCUDAStream(points.get_device()).stream();
+    for (const auto* tensor : {&grad_te, &grad_tm})
+        if (tensor->numel() > 0)
+            C10_CUDA_CHECK(cudaMemsetAsync(tensor->data_ptr(), 0,
+                                           static_cast<size_t>(tensor->numel()) * sizeof(float), stream));
     const int64_t total = receivers.size(0) * points.size(0);
     if (total > 0) {
-        auto stream = at::cuda::getCurrentCUDAStream(points.get_device()).stream();
         scattering_pair_sum_backward_kernel<<<pair_blocks(total), kPairBlockSize, 0, stream>>>(
             scatter_samples(points, normals, frame_t1, frame_t2, wi_local, incident, epsilon, material),
             scatter_tables(material_slot, table_offset, table_dims, f_te, f_tm),
