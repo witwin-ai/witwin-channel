@@ -106,7 +106,7 @@ def test_rayd_lock_is_machine_readable_and_complete():
 
     assert lock["schema_version"] == 2
     assert lock["repository_url"] == "https://github.com/Asixa/RayD"
-    assert lock["commit"] == "5e8d9bc9db2cf434fa2e6385b6a2af5f62e01f18"
+    assert lock["commit"] == "c486d630a60088843b238c1377469d3b6041e8e8"
     assert lock["integration_abi"] == {
         "kind": "source-header-set-sha256",
         "entrypoint": "include/rayd/integration.h",
@@ -152,7 +152,7 @@ def test_rayd_lock_is_machine_readable_and_complete():
         "distribution": "rayd-torch",
         "distribution_version": "0.8.0",
         "metadata_path": "rayd/torch/_source/rayd-source.json",
-        "manifest_sha256": "3880de3f78dbff123b200408adabbad62f280da789eeda8aa3c495af8476e858",
+        "manifest_sha256": "49546824befd7aa28d78498b817650a982567c87686eaab025805abfe59c8ab5",
     }
 
 
