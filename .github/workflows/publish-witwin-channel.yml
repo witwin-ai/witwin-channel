@@ -29,7 +29,7 @@ permissions:
 
 env:
   CORE_COMMIT: 46c826d969654912461d2e18b6cb87df9cc3df8f
-  RAYD_COMMIT: 914c2044d62baf669fb4f7421c6486d70290837b
+  RAYD_COMMIT: 8f501ea9aa5d5f8e45cd867a5969589e129c462f
   RAYD_REPOSITORY_URL: https://github.com/Asixa/RayD
 
 jobs:
@@ -136,7 +136,7 @@ jobs:
           path: core
           persist-credentials: false
 
-      - name: Check out locked RayD 0.9.0 source
+      - name: Check out locked RayD 0.10.0 source
         uses: actions/checkout@v5
         with:
           repository: Asixa/RayD
@@ -300,7 +300,7 @@ jobs:
           path: core
           persist-credentials: false
 
-      - name: Check out locked RayD 0.9.0 source
+      - name: Check out locked RayD 0.10.0 source
         uses: actions/checkout@v5
         with:
           repository: Asixa/RayD

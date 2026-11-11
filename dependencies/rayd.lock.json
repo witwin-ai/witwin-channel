@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "repository_url": "https://github.com/Asixa/RayD",
-  "commit": "914c2044d62baf669fb4f7421c6486d70290837b",
+  "commit": "8f501ea9aa5d5f8e45cd867a5969589e129c462f",
   "integration_abi": {
     "kind": "source-header-set-sha256",
     "entrypoint": "include/rayd/integration.h",
@@ -21,8 +21,8 @@
   },
   "source_bundle": {
     "distribution": "rayd-torch",
-    "distribution_version": "0.9.0",
+    "distribution_version": "0.10.0",
     "metadata_path": "rayd/torch/_source/rayd-source.json",
-    "manifest_sha256": "30a555fb22ddd1d803c33fbe218324621a5eac032be1f1f87989de72e92b2c88"
+    "manifest_sha256": "f4e46a94047927e33835822f1352b6126d4ccc5f0020f41ddbcd0324b302f897"
   }
 }
