@@ -2,6 +2,7 @@
 // Implements diffraction CUDA operations.
 
 // ==== Section: Diffraction kernels ====
+#include "reflection_receivers.h"
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
@@ -200,6 +201,27 @@ __device__ __forceinline__ void freeze_complex_tangent<utd::Dual>(
 // host layer).
 // ---------------------------------------------------------------------------
 
+// Point-receiver tape (nullptr points: grid tape). lane holds the sampling lane of every tape
+// entry (its edge parameter and cone azimuth), edge_samples the lane count the edge weight
+// divides by, and the capture radius is radius when positive, else relative_radius times the
+// straight source distance (at least kMinPointCaptureRadius).
+struct PointTapeArgs {
+    const int *lane = nullptr;
+    const float *points = nullptr;
+    float radius = 0.0f;
+    float relative_radius = 0.0f;
+    int64_t edge_samples = 0;
+};
+
+constexpr float kMinPointCaptureRadius = 1.0e-3f;
+
+__device__ __forceinline__ float point_tape_radius(
+    const PointTapeArgs &points, utd::float3a rx, utd::float3a src) {
+    if (points.radius > 0.0f) return points.radius;
+    return fmaxf(kMinPointCaptureRadius,
+                 points.relative_radius * utd::safe_length(utd::f3_sub(rx, src)));
+}
+
 struct TapeRowContext {
     utd::float3a edge_pos;
     utd::float3a edge_dir_raw;
@@ -225,6 +247,10 @@ struct TapeRowContext {
     float plane;
     float cell_area;
     float edge_weight;
+    // Point receivers: the deposit is the flux through the cross-section rx_area of a capture
+    // sphere around rx, measured on the plane through rx normal to the primal cone ray.
+    bool point_mode;
+    utd::float3a rx;
 };
 
 struct TapeRowSeeds {
@@ -253,7 +279,7 @@ __device__ __forceinline__ TapeRowContext load_tape_row(
     const float *gain, const float *thickness, const bool *material_valid,
     int64_t sample_count, int axis, float plane, float wavelength,
     float cell_area, int seed, float total_edge_length,
-    const float *tx_pol) {
+    const float *tx_pol, const PointTapeArgs &points = PointTapeArgs{}, int cell = 0) {
     TapeRowContext c;
     c.edge_pos = load_utd3(edge_pos, sidx);
     c.edge_dir_raw = load_utd3(edge_dir, sidx);
@@ -283,18 +309,27 @@ __device__ __forceinline__ TapeRowContext load_tape_row(
     c.tx_pol = utd::make_f3(tx_pol[0], tx_pol[1], tx_pol[2]);
     c.src_power = source_power[sidx];
     c.u = tape_u[lane];
+    const int64_t azimuth_lane = points.lane != nullptr ? points.lane[lane] : lane;
     sincosf(
         2.0f * utd::UTD_PI *
             dfr_uniform(
-                static_cast<unsigned int>(lane), 1u,
+                static_cast<unsigned int>(azimuth_lane), 1u,
                 static_cast<unsigned int>(seed)),
         &c.azimuth_sa, &c.azimuth_ca);
     c.wavelength = wavelength;
     c.axis = axis;
     c.plane = plane;
     c.cell_area = cell_area;
+    const int64_t weight_samples = points.edge_samples > 0 ? points.edge_samples : sample_count;
     c.edge_weight =
-        total_edge_length / fmaxf(static_cast<float>(sample_count), 1.0f);
+        total_edge_length / fmaxf(static_cast<float>(weight_samples), 1.0f);
+    c.point_mode = points.points != nullptr;
+    c.rx = utd::make_f3(0.f, 0.f, 0.f);
+    if (c.point_mode) {
+        c.rx = load_utd3(points.points, cell);
+        const float radius = point_tape_radius(points, c.rx, c.src);
+        c.cell_area = utd::UTD_PI * radius * radius;
+    }
     return c;
 }
 
@@ -327,9 +362,20 @@ __device__ bool tape_row_value(
                     utd::f3_mul(basis1, c.azimuth_sa)),
                 radial)),
         basis0);
-    const T denom = component_t(ko_exact, c.axis);
+    // Grid: the deposit plane is the grid plane. Point: the plane through rx normal to the
+    // primal cone ray (frozen, like the binning).
+    const utd::float3a plane_normal = utd::make_f3(
+        utd::scalar_value(ko_exact.x), utd::scalar_value(ko_exact.y), utd::scalar_value(ko_exact.z));
+    auto plane_component = [&](const utd::Vec3T<T>& v) -> T {
+        if (!c.point_mode) return component_t(v, c.axis);
+        return v.x * plane_normal.x + v.y * plane_normal.y + v.z * plane_normal.z;
+    };
+    const T plane_value = c.point_mode
+        ? T(c.rx.x * plane_normal.x + c.rx.y * plane_normal.y + c.rx.z * plane_normal.z)
+        : T(c.plane);
+    const T denom = plane_component(ko_exact);
     if (fabsf(utd::scalar_value(denom)) < 1.0e-8f) return false;
-    const T distance = (c.plane - component_t(edge_point, c.axis)) / denom;
+    const T distance = (plane_value - plane_component(edge_point)) / denom;
     if (!(utd::scalar_value(distance) > 0.0f)) return false;
     const utd::Vec3T<T> target =
         utd::f3_add(edge_point, utd::f3_mul(ko_exact, distance));
@@ -447,9 +493,9 @@ __device__ bool tape_row_value(
             utd::f3_mul(basis1, c.azimuth_ca)),
         radial);
     const utd::Vec3T<T> je = utd::f3_sub(
-        eh, utd::f3_mul(ko, component_t(eh, c.axis) / denom));
+        eh, utd::f3_mul(ko, plane_component(eh) / denom));
     const utd::Vec3T<T> jp = utd::f3_mul(
-        utd::f3_sub(dko, utd::f3_mul(ko, component_t(dko, c.axis) / denom)),
+        utd::f3_sub(dko, utd::f3_mul(ko, plane_component(dko) / denom)),
         distance);
     const T jacobian = utd::safe_length(utd::f3_cross(jp, je));
     const T value = field_power * c.src_power * jacobian *
@@ -476,7 +522,7 @@ __global__ void utd_diffraction_tape_accumulate_kernel(
     const bool *material_valid, float *output, int64_t sample_count, int state_count,
     int axis, float plane, float c0min, float c0max, float c1min, float c1max,
     int r0, int r1, float wavelength, float cell_area, int seed, float total_edge_length,
-    const float *tx_pol) {
+    const float *tx_pol, PointTapeArgs points) {
     (void)c0min; (void)c0max; (void)c1min; (void)c1max;
     const int64_t stride = static_cast<int64_t>(blockDim.x)*gridDim.x;
     for (int64_t lane=static_cast<int64_t>(blockIdx.x)*blockDim.x+threadIdx.x;
@@ -486,7 +532,7 @@ __global__ void utd_diffraction_tape_accumulate_kernel(
         if (sidx<0 || sidx>=state_count || cell<0 || cell>=r0*r1) continue;
         const TapeRowContext row = load_tape_row(
             lane, sidx, TAPE_ROW_TABLE_ARGS, sample_count, axis, plane,
-            wavelength, cell_area, seed, total_edge_length, tx_pol);
+            wavelength, cell_area, seed, total_edge_length, tx_pol, points, cell);
         float value = 0.0f;
         if (tape_row_value<float>(row, tape_seeds_zero(), value)) {
             atomicAdd(output + cell, value);
@@ -507,7 +553,7 @@ __global__ void utd_diffraction_tape_accumulate_backward_kernel(
     int axis, float plane, int r0, int r1, float wavelength, float cell_area,
     int seed, float total_edge_length, float wavelength_dfreq,
     int64_t grad_stride0, int64_t grad_stride1,
-    const float *tx_pol) {
+    const float *tx_pol, PointTapeArgs points) {
     const int64_t stride = static_cast<int64_t>(blockDim.x)*gridDim.x;
     for (int64_t lane=static_cast<int64_t>(blockIdx.x)*blockDim.x+threadIdx.x;
          lane<sample_count; lane+=stride) {
@@ -520,7 +566,7 @@ __global__ void utd_diffraction_tape_accumulate_backward_kernel(
         if (cotangent == 0.0f) continue;
         const TapeRowContext row = load_tape_row(
             lane, sidx, TAPE_ROW_TABLE_ARGS, sample_count, axis, plane,
-            wavelength, cell_area, seed, total_edge_length, tx_pol);
+            wavelength, cell_area, seed, total_edge_length, tx_pol, points, cell);
         TapeRowSeeds seeds = tape_seeds_zero();
         utd::Dual value;
         if (grad_source != nullptr) {
@@ -586,7 +632,7 @@ __global__ void utd_diffraction_tape_accumulate_jvp_kernel(
     int64_t sample_count, int state_count,
     int axis, float plane, int r0, int r1, float wavelength, float cell_area,
     int seed, float total_edge_length,
-    const float *tx_pol) {
+    const float *tx_pol, PointTapeArgs points) {
     const int64_t stride = static_cast<int64_t>(blockDim.x)*gridDim.x;
     for (int64_t lane=static_cast<int64_t>(blockIdx.x)*blockDim.x+threadIdx.x;
          lane<sample_count; lane+=stride) {
@@ -595,7 +641,7 @@ __global__ void utd_diffraction_tape_accumulate_jvp_kernel(
         if (sidx<0 || sidx>=state_count || cell<0 || cell>=r0*r1) continue;
         const TapeRowContext row = load_tape_row(
             lane, sidx, TAPE_ROW_TABLE_ARGS, sample_count, axis, plane,
-            wavelength, cell_area, seed, total_edge_length, tx_pol);
+            wavelength, cell_area, seed, total_edge_length, tx_pol, points, cell);
         TapeRowSeeds seeds = tape_seeds_zero();
         if (tangent_source != nullptr) {
             seeds.src = utd::make_f3(
@@ -1530,6 +1576,135 @@ std::vector<at::Tensor> channel_mc_surface_group_edge_candidates_cuda(
         plane_tol);
 }
 
+namespace {
+
+PointTapeArgs point_tape_args(const PointTapeTensors& tensors) {
+    PointTapeArgs args;
+    if (!tensors.points.defined() || tensors.points.numel() == 0) return args;
+    args.lane = tensors.lane.data_ptr<int>();
+    args.points = tensors.points.data_ptr<float>();
+    args.radius = tensors.point_radius > 0.0 ? static_cast<float>(tensors.point_radius) : 0.0f;
+    args.relative_radius =
+        tensors.point_radius > 0.0 ? 0.0f : static_cast<float>(-tensors.point_radius);
+    args.edge_samples = tensors.edge_samples;
+    return args;
+}
+
+// One tape entry per (sampling lane, point receiver) of the receiver range
+// [point_begin, point_begin + point_count): entry e = j * lanes + lane. A lane draws its edge
+// state, edge parameter and Keller-cone azimuth exactly as the grid tape row reads them; the
+// entry is active when the cone ray passes within the capture radius of receiver j, beyond the
+// edge. It also writes the visibility legs: source -> point off the wedge (along the face-normal
+// bisector) -> receiver.
+__global__ void point_diffraction_tape_kernel(
+    const int *sample_state, const float *edge_pos, const float *edge_dir, const float *t_min,
+    const float *t_max, const float *n0, const float *nn, const float *source, const float *points,
+    int64_t lanes, int64_t point_begin, int64_t point_count, int state_count, int seed,
+    PointTapeArgs capture, bool *tape_active, int *tape_state, int *tape_cell, float *tape_u,
+    int *tape_lane, float *leg_source, float *leg_edge, float *leg_receiver) {
+    const int64_t total = lanes * point_count;
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t entry = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x; entry < total;
+         entry += stride) {
+        const int64_t lane = entry % lanes;
+        const int64_t receiver = point_begin + entry / lanes;
+        const int sidx = sample_state[lane];
+        const float u = dfr_uniform(static_cast<unsigned int>(lane), 0u, static_cast<unsigned int>(seed));
+        tape_state[entry] = sidx;
+        tape_cell[entry] = static_cast<int>(receiver);
+        tape_u[entry] = u;
+        tape_lane[entry] = static_cast<int>(lane);
+        tape_active[entry] = false;
+        const utd::float3a rx = load_utd3(points, static_cast<int>(receiver));
+        for (int axis = 0; axis < 3; ++axis) {
+            leg_receiver[3 * entry + axis] = axis == 0 ? rx.x : (axis == 1 ? rx.y : rx.z);
+            leg_source[3 * entry + axis] = 0.0f;
+            leg_edge[3 * entry + axis] = 0.0f;
+        }
+        if (sidx < 0 || sidx >= state_count) continue;
+        const utd::float3a src = load_utd3(source, sidx);
+        const utd::float3a eh = utd::safe_normalize(load_utd3(edge_dir, sidx), utd::make_f3(0, 0, 1));
+        const float length = fmaxf(t_max[sidx] - t_min[sidx], 0.0f);
+        const utd::float3a edge_point =
+            utd::f3_add(load_utd3(edge_pos, sidx), utd::f3_mul(eh, t_min[sidx] + u * length));
+        const utd::float3a incident =
+            utd::safe_normalize(utd::f3_sub(edge_point, src), utd::make_f3(0, 0, 1));
+        const float axial = fminf(fmaxf(utd::f3_dot(incident, eh), -1.f), 1.f);
+        const float radial = sqrtf(fmaxf(1.0f - axial * axial, 0.f));
+        const utd::float3a basis0 = utd::stable_perp_basis(eh, incident);
+        const utd::float3a basis1 =
+            utd::safe_normalize(utd::f3_cross(eh, basis0), utd::make_f3(0, 1, 0));
+        float sa, ca;
+        sincosf(2.0f * utd::UTD_PI *
+                    dfr_uniform(static_cast<unsigned int>(lane), 1u, static_cast<unsigned int>(seed)),
+                &sa, &ca);
+        const utd::float3a ko = utd::safe_normalize(
+            utd::f3_add(utd::f3_mul(eh, axial),
+                        utd::f3_mul(utd::f3_add(utd::f3_mul(basis0, ca), utd::f3_mul(basis1, sa)), radial)),
+            basis0);
+        const utd::float3a offset = utd::f3_sub(rx, edge_point);
+        const float t = utd::f3_dot(offset, ko);
+        if (!(t > 0.0f)) continue;
+        const float distance_sq = fmaxf(utd::f3_dot(offset, offset) - t * t, 0.0f);
+        const float radius = point_tape_radius(capture, rx, src);
+        if (!(distance_sq < radius * radius)) continue;
+        utd::float3a end = edge_point;
+        const utd::float3a bisector = utd::f3_add(load_utd3(n0, sidx), load_utd3(nn, sidx));
+        const float bisector_sq = utd::f3_dot(bisector, bisector);
+        if (bisector_sq > 1.0e-12f) {
+            const float scale = fmaxf(1.0f, fmaxf(fabsf(edge_point.x), fmaxf(fabsf(edge_point.y), fabsf(edge_point.z))));
+            end = utd::f3_add(edge_point, utd::f3_mul(bisector, 1.0e-4f * scale / sqrtf(bisector_sq)));
+        }
+        leg_source[3 * entry] = src.x;
+        leg_source[3 * entry + 1] = src.y;
+        leg_source[3 * entry + 2] = src.z;
+        leg_edge[3 * entry] = end.x;
+        leg_edge[3 * entry + 1] = end.y;
+        leg_edge[3 * entry + 2] = end.z;
+        tape_active[entry] = true;
+    }
+}
+
+}  // namespace
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+channel_mc_point_diffraction_tape_cuda(
+    at::Tensor sample_state, at::Tensor edge_pos, at::Tensor edge_dir, at::Tensor t_min,
+    at::Tensor t_max, at::Tensor n0, at::Tensor nn, at::Tensor source, at::Tensor points,
+    int64_t point_begin, int64_t point_count, int64_t seed, double point_radius) {
+    const int64_t lanes = sample_state.numel();
+    const int64_t total = lanes * point_count;
+    const auto options = source.options();
+    auto tape_active = at::empty({total}, options.dtype(at::kBool));
+    auto tape_state = at::empty({total}, options.dtype(at::kInt));
+    auto tape_cell = at::empty({total}, options.dtype(at::kInt));
+    auto tape_u = at::empty({total}, options);
+    auto tape_lane = at::empty({total}, options.dtype(at::kInt));
+    auto leg_source = at::empty({total, 3}, options);
+    auto leg_edge = at::empty({total, 3}, options);
+    auto leg_receiver = at::empty({total, 3}, options);
+    if (total > 0) {
+        PointTapeTensors tensors;
+        tensors.lane = tape_lane;
+        tensors.points = points;
+        tensors.point_radius = point_radius;
+        const PointTapeArgs capture = point_tape_args(tensors);
+        const auto stream = at::cuda::getCurrentCUDAStream();
+        const int blocks = static_cast<int>(std::min<int64_t>(
+            (total + kDiffractionBlockSize - 1) / kDiffractionBlockSize, 65535));
+        point_diffraction_tape_kernel<<<blocks, kDiffractionBlockSize, 0, stream>>>(
+            sample_state.data_ptr<int>(), edge_pos.data_ptr<float>(), edge_dir.data_ptr<float>(),
+            t_min.data_ptr<float>(), t_max.data_ptr<float>(), n0.data_ptr<float>(),
+            nn.data_ptr<float>(), source.data_ptr<float>(), points.data_ptr<float>(), lanes,
+            point_begin, point_count, static_cast<int>(edge_pos.size(0)), static_cast<int>(seed),
+            capture, tape_active.data_ptr<bool>(), tape_state.data_ptr<int>(),
+            tape_cell.data_ptr<int>(), tape_u.data_ptr<float>(), tape_lane.data_ptr<int>(),
+            leg_source.data_ptr<float>(), leg_edge.data_ptr<float>(), leg_receiver.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return {tape_active, tape_state, tape_cell, tape_u, tape_lane, leg_source, leg_edge, leg_receiver};
+}
+
 at::Tensor channel_mc_utd_diffraction_tape_accumulate_cuda(
     at::Tensor tape_active, at::Tensor tape_state, at::Tensor tape_cell, at::Tensor tape_u,
     at::Tensor edge_pos, at::Tensor edge_dir, at::Tensor t_min, at::Tensor t_max,
@@ -1539,7 +1714,9 @@ at::Tensor channel_mc_utd_diffraction_tape_accumulate_cuda(
     at::Tensor material_valid, at::Tensor thickness, int64_t axis, double plane,
     double c0min, double c0max, double c1min, double c1max,
     int64_t r0, int64_t r1, double wavelength, double cell_area, int64_t seed, double total_edge_length,
-    at::Tensor tx_pol) {
+    at::Tensor tx_pol,
+    const PointTapeTensors& point_tensors) {
+    const PointTapeArgs point_tape = point_tape_args(point_tensors);
     auto output=at::empty({r1,r0},source.options());
     const auto stream=at::cuda::getCurrentCUDAStream();
     C10_CUDA_CHECK(cudaMemsetAsync(
@@ -1557,7 +1734,7 @@ at::Tensor channel_mc_utd_diffraction_tape_accumulate_cuda(
         static_cast<int>(axis),static_cast<float>(plane),static_cast<float>(c0min),static_cast<float>(c0max),
         static_cast<float>(c1min),static_cast<float>(c1max),static_cast<int>(r0),static_cast<int>(r1),
         static_cast<float>(wavelength),static_cast<float>(cell_area),static_cast<int>(seed),static_cast<float>(total_edge_length),
-        tx_pol.data_ptr<float>());
+        tx_pol.data_ptr<float>(),point_tape);
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     return output;
 }
@@ -1595,7 +1772,9 @@ channel_mc_utd_diffraction_tape_accumulate_backward_cuda(
     bool need_materials, bool need_source, bool need_frequency,
     int64_t axis, double plane,
     int64_t r0, int64_t r1, double wavelength, double cell_area, int64_t seed,
-    double total_edge_length, double wavelength_dfreq, at::Tensor tx_pol) {
+    double total_edge_length, double wavelength_dfreq, at::Tensor tx_pol,
+    const PointTapeTensors& point_tensors) {
+    const PointTapeArgs point_tape = point_tape_args(point_tensors);
     TORCH_CHECK(grad_output.is_cuda(), "grad_output must be a CUDA tensor");
     TORCH_CHECK(grad_output.scalar_type() == at::kFloat, "grad_output must be float32");
     TORCH_CHECK(grad_output.dim() == 2, "grad_output must have 2 dimensions");
@@ -1642,7 +1821,7 @@ channel_mc_utd_diffraction_tape_accumulate_backward_cuda(
         static_cast<int>(seed), static_cast<float>(total_edge_length),
         static_cast<float>(wavelength_dfreq),
         grad_output.stride(0), grad_output.stride(1),
-        tx_pol.data_ptr<float>());
+        tx_pol.data_ptr<float>(), point_tape);
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     return {grad_eta_r, grad_sigma, grad_gain, grad_thickness, grad_source,
             grad_frequency};
@@ -1661,7 +1840,9 @@ at::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp_cuda(
     bool has_tangent_thickness, bool has_tangent_source,
     int64_t axis, double plane,
     int64_t r0, int64_t r1, double wavelength, double cell_area, int64_t seed,
-    double total_edge_length, double wavelength_tangent, at::Tensor tx_pol) {
+    double total_edge_length, double wavelength_tangent, at::Tensor tx_pol,
+    const PointTapeTensors& point_tensors) {
+    const PointTapeArgs point_tape = point_tape_args(point_tensors);
     auto output_tangent = diffraction_zero_filled({r1, r0}, source.options());
     const int64_t samples = tape_active.numel();
     if (samples == 0) return output_tangent;
@@ -1691,7 +1872,7 @@ at::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp_cuda(
         static_cast<int>(r0), static_cast<int>(r1),
         static_cast<float>(wavelength), static_cast<float>(cell_area),
         static_cast<int>(seed), static_cast<float>(total_edge_length),
-        tx_pol.data_ptr<float>());
+        tx_pol.data_ptr<float>(), point_tape);
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     return output_tangent;
 }

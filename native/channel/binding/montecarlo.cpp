@@ -172,11 +172,17 @@ torch::Tensor channel_mc_slab_reflection_accumulate_jvp(
     torch::Tensor solid_angle, double cell_area, double wavelength_tangent,
     torch::Tensor tx_pol, torch::Tensor points, double point_radius);
 torch::Tensor channel_mc_diffraction_state_wi(torch::Tensor state_edge_pos, torch::Tensor state_src);
+pybind11::tuple channel_mc_point_diffraction_tape(
+    torch::Tensor sample_state, torch::Tensor edge_pos, torch::Tensor edge_dir,
+    torch::Tensor t_min, torch::Tensor t_max, torch::Tensor n0, torch::Tensor nn,
+    torch::Tensor source, torch::Tensor points, int64_t point_begin, int64_t point_count,
+    int64_t seed, double point_radius);
 torch::Tensor channel_mc_utd_diffraction_tape_accumulate(
     torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,
     torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,
     torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,int64_t,double,double,double,double,double,
-    int64_t,int64_t,double,double,int64_t,double,torch::Tensor);
+    int64_t,int64_t,double,double,int64_t,double,torch::Tensor,
+    torch::Tensor tape_lane, torch::Tensor points, double point_radius, int64_t edge_samples);
 pybind11::tuple channel_mc_utd_diffraction_tape_accumulate_backward(
     torch::Tensor tape_active, torch::Tensor tape_state, torch::Tensor tape_cell,
     torch::Tensor tape_u, torch::Tensor edge_pos, torch::Tensor edge_dir,
@@ -189,7 +195,8 @@ pybind11::tuple channel_mc_utd_diffraction_tape_accumulate_backward(
     bool need_materials, bool need_source, bool need_frequency,
     int64_t axis, double plane, int64_t r0, int64_t r1, double wavelength,
     double cell_area, int64_t seed, double total_edge_length,
-    double wavelength_dfreq, torch::Tensor tx_pol);
+    double wavelength_dfreq, torch::Tensor tx_pol,
+    torch::Tensor tape_lane, torch::Tensor points, double point_radius, int64_t edge_samples);
 torch::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp(
     torch::Tensor tape_active, torch::Tensor tape_state, torch::Tensor tape_cell,
     torch::Tensor tape_u, torch::Tensor edge_pos, torch::Tensor edge_dir,
@@ -205,7 +212,8 @@ torch::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp(
     bool has_tangent_thickness, bool has_tangent_source,
     int64_t axis, double plane, int64_t r0, int64_t r1, double wavelength,
     double cell_area, int64_t seed, double total_edge_length,
-    double wavelength_tangent, torch::Tensor tx_pol);
+    double wavelength_tangent, torch::Tensor tx_pol,
+    torch::Tensor tape_lane, torch::Tensor points, double point_radius, int64_t edge_samples);
 torch::Tensor channel_mc_selected_edge_indices(torch::Tensor selected);
 pybind11::tuple channel_mc_diffraction_state_pack(
     torch::Tensor edge_indices,
@@ -354,6 +362,10 @@ void register_montecarlo(pybind11::module_ &module) {
         "mc_diffraction_state_wi",
         &channel_mc_diffraction_state_wi,
         "Compute MC diffraction incident directions with a CUDA kernel.");
+    module.def(
+        "mc_point_diffraction_tape",
+        &channel_mc_point_diffraction_tape,
+        "Build the capture-sphere diffraction tape of point receivers with a CUDA kernel.");
     module.def(
         "mc_utd_diffraction_tape_accumulate",
         &channel_mc_utd_diffraction_tape_accumulate,

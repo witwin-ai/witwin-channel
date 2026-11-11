@@ -1353,7 +1353,25 @@ def mc_slab_reflection_accumulate_ad(
     )
 
 
-def mc_utd_diffraction_tape_accumulate(*args: object) -> torch.Tensor:
+def _point_tape_args(
+    point_tape: tuple[torch.Tensor, torch.Tensor, float, int] | None, reference: torch.Tensor,
+) -> tuple[object, ...]:
+    """Trailing (tape_lane, points, point_radius, edge_samples) of the diffraction tape ops."""
+
+    if point_tape is None:
+        return (
+            reference.new_empty((0,), dtype=torch.int32),
+            reference.new_empty((0, 3)),
+            -0.01,
+            0,
+        )
+    lane, points, radius, edge_samples = point_tape
+    return (lane, points, float(radius), int(edge_samples))
+
+
+def mc_utd_diffraction_tape_accumulate(
+    *args: object, point_tape: tuple[torch.Tensor, torch.Tensor, float, int] | None = None,
+) -> torch.Tensor:
     """Accumulate UTD diffraction power over the sampled Keller-cone tape.
 
     Convention. The convention this family adopts is a Monte Carlo per-sample
@@ -1370,9 +1388,17 @@ def mc_utd_diffraction_tape_accumulate(*args: object) -> torch.Tensor:
     diffracted field level or the cell-by-cell lit set of a radiomap built on
     that hardcoded unit-magnitude vertical source; the short-dipole source
     pattern alone separates the two, so a level delta is expected.
+
+    ``point_tape = (tape_lane, points, point_radius, edge_samples)`` switches to point
+    receivers: ``tape_cell`` names the receiver, the result is ``(1, P)`` (pass resolution0 = P,
+    resolution1 = 1) and a deposit is the flux through the capture sphere's cross-section.
     """
 
-    output = _required_native_op("mc_utd_diffraction_tape_accumulate")(*args)
+    reference = args[13]
+    assert isinstance(reference, torch.Tensor)
+    output = _required_native_op("mc_utd_diffraction_tape_accumulate")(
+        *args, *_point_tape_args(point_tape, reference)
+    )
     if not isinstance(output, torch.Tensor):
         raise TypeError(
             "_channel.mc_utd_diffraction_tape_accumulate must return a tensor"
@@ -1404,6 +1430,7 @@ def mc_utd_diffraction_tape_accumulate_backward(
     need_frequency: bool, grid_axis: int, grid_position: float, grid_resolution0: int,
     grid_resolution1: int, wavelength: float, grid_cell_area: float, seed: int,
     total_edge_length: float, wavelength_dfreq: float,
+    point_tape: tuple[torch.Tensor, torch.Tensor, float, int] | None = None,
 ) -> tuple[torch.Tensor, ...]:
     gradients = _required_native_op("mc_utd_diffraction_tape_accumulate_backward")(
         *tape_tensors,
@@ -1428,6 +1455,7 @@ def mc_utd_diffraction_tape_accumulate_backward(
         float(total_edge_length),
         float(wavelength_dfreq),
         tx_pol,
+        *_point_tape_args(point_tape, material_eta_r),
     )
     if not isinstance(gradients, tuple) or len(gradients) != 6:
         raise TypeError(
@@ -1446,6 +1474,7 @@ def mc_utd_diffraction_tape_accumulate_jvp(
     tangent_source: torch.Tensor | None, *, tx_pol: torch.Tensor, grid_axis: int,
     grid_position: float, grid_resolution0: int, grid_resolution1: int, wavelength: float,
     grid_cell_area: float, seed: int, total_edge_length: float, wavelength_tangent: float,
+    point_tape: tuple[torch.Tensor, torch.Tensor, float, int] | None = None,
 ) -> torch.Tensor:
     output = _required_native_op("mc_utd_diffraction_tape_accumulate_jvp")(
         *tape_tensors,
@@ -1478,6 +1507,7 @@ def mc_utd_diffraction_tape_accumulate_jvp(
         float(total_edge_length),
         float(wavelength_tangent),
         tx_pol,
+        *_point_tape_args(point_tape, material_eta_r),
     )
     if not isinstance(output, torch.Tensor):
         raise TypeError(
@@ -1543,6 +1573,7 @@ class _McDiffractionMapAdFunction(torch.autograd.Function):
             params["seed"],
             params["total_edge_length"],
             params["tx_pol"],
+            point_tape=params.get("point_tape"),
         )
 
     @staticmethod
@@ -1629,6 +1660,7 @@ class _McDiffractionMapAdFunction(torch.autograd.Function):
             grid_cell_area=params["grid_cell_area"],
             seed=params["seed"],
             total_edge_length=params["total_edge_length"],
+            point_tape=params.get("point_tape"),
             wavelength_dfreq=-wavelength * wavelength / _LIGHT_SPEED_M_PER_S_AD,
         )
         grad_frequency = (
@@ -1722,6 +1754,7 @@ class _McDiffractionMapAdFunction(torch.autograd.Function):
                 grid_cell_area=params["grid_cell_area"],
                 seed=params["seed"],
                 total_edge_length=params["total_edge_length"],
+                point_tape=params.get("point_tape"),
                 wavelength_tangent=(-wavelength * wavelength / _LIGHT_SPEED_M_PER_S_AD)
                 * tangent_frequency,
             )
@@ -1735,6 +1768,7 @@ def mc_utd_diffraction_tape_accumulate_ad(
     grid_axis: int, grid_position: float, grid_coord0_min: float, grid_coord0_max: float,
     grid_coord1_min: float, grid_coord1_max: float, grid_resolution0: int, grid_resolution1: int,
     wavelength: float, grid_cell_area: float, seed: int, total_edge_length: float,
+    point_tape: tuple[torch.Tensor, torch.Tensor, float, int] | None = None,
 ) -> torch.Tensor:
     """Differentiable :func:`mc_utd_diffraction_tape_accumulate` (one tx)."""
 
@@ -1756,6 +1790,7 @@ def mc_utd_diffraction_tape_accumulate_ad(
         "grid_cell_area": float(grid_cell_area),
         "seed": int(seed),
         "total_edge_length": float(total_edge_length),
+        "point_tape": point_tape,
     }
     return _McDiffractionMapAdFunction.apply(
         tx_anchor,
@@ -1775,6 +1810,51 @@ def mc_utd_diffraction_tape_accumulate_ad(
 # -------------------------------------------------------------------------
 # basic sampling
 # -------------------------------------------------------------------------
+@dataclass(frozen=True, slots=True)
+class PointDiffractionTape:
+    """Capture-sphere diffraction tape of a point-receiver range and its visibility legs."""
+
+    active: torch.Tensor
+    state: torch.Tensor
+    cell: torch.Tensor
+    u: torch.Tensor
+    lane: torch.Tensor
+    leg_source: torch.Tensor
+    leg_edge: torch.Tensor
+    leg_receiver: torch.Tensor
+
+
+def mc_point_diffraction_tape(
+    sample_state: torch.Tensor, states: tuple[torch.Tensor, ...], points: torch.Tensor, *,
+    point_begin: int, point_count: int, seed: int, point_radius: float,
+) -> PointDiffractionTape:
+    """One tape entry per (lane, receiver) of ``points[point_begin:point_begin + point_count]``.
+
+    ``states`` are the packed edge state tables (``edge_pos, edge_dir, t_min, t_max, n0, nn,
+    ..., src, ...``) in the order ``deterministic_diffraction_state_pack`` returns them after
+    its edge-index column.
+    """
+
+    out = required_symbol("mc_point_diffraction_tape")(
+        sample_state,
+        states[0],
+        states[1],
+        states[2],
+        states[3],
+        states[4],
+        states[5],
+        states[9],
+        points,
+        int(point_begin),
+        int(point_count),
+        int(seed),
+        float(point_radius),
+    )
+    if not isinstance(out, tuple) or len(out) != 8:
+        raise TypeError("_channel.mc_point_diffraction_tape must return 8 tensors")
+    return PointDiffractionTape(*out)
+
+
 def mc_reflection_rays(
     tx_positions: torch.Tensor, *, bounds: torch.Tensor | None, sample_count: int, seed: int,
 ) -> dict[str, torch.Tensor]:

@@ -1,5 +1,5 @@
 // Copyright Xingyu Chen.
-// Receiver block arguments shared by the MC reflection bindings and kernels.
+// Receiver block arguments shared by the MC reflection and diffraction bindings and kernels.
 
 #pragma once
 
@@ -22,4 +22,14 @@ struct ReflectionReceiverArgs {
     double cell_area = 0.0;
     at::Tensor points;
     double point_radius = 0.0;
+};
+
+// Point-receiver diffraction tape: when `points` holds P > 0 rows, the tape entries name a
+// receiver in tape_cell, their sampling lane in `lane`, and the edge weight divides by
+// edge_samples lanes; the capture radius follows ReflectionReceiverArgs::point_radius.
+struct PointTapeTensors {
+    at::Tensor lane;
+    at::Tensor points;
+    double point_radius = 0.0;
+    int64_t edge_samples = 0;
 };

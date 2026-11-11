@@ -234,7 +234,7 @@ at::Tensor channel_mc_utd_diffraction_tape_accumulate_cuda(
     at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,
     at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,
     at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,at::Tensor,int64_t,double,double,double,double,double,
-    int64_t,int64_t,double,double,int64_t,double,at::Tensor);
+    int64_t,int64_t,double,double,int64_t,double,at::Tensor,const PointTapeTensors&);
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
 channel_mc_utd_diffraction_tape_accumulate_backward_cuda(
     at::Tensor tape_active, at::Tensor tape_state, at::Tensor tape_cell, at::Tensor tape_u,
@@ -247,7 +247,8 @@ channel_mc_utd_diffraction_tape_accumulate_backward_cuda(
     bool need_materials, bool need_source, bool need_frequency,
     int64_t axis, double plane,
     int64_t r0, int64_t r1, double wavelength, double cell_area, int64_t seed,
-    double total_edge_length, double wavelength_dfreq, at::Tensor tx_pol);
+    double total_edge_length, double wavelength_dfreq, at::Tensor tx_pol,
+    const PointTapeTensors& point_tape);
 at::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp_cuda(
     at::Tensor tape_active, at::Tensor tape_state, at::Tensor tape_cell, at::Tensor tape_u,
     at::Tensor edge_pos, at::Tensor edge_dir, at::Tensor t_min, at::Tensor t_max,
@@ -261,7 +262,13 @@ at::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp_cuda(
     bool has_tangent_thickness, bool has_tangent_source,
     int64_t axis, double plane,
     int64_t r0, int64_t r1, double wavelength, double cell_area, int64_t seed,
-    double total_edge_length, double wavelength_tangent, at::Tensor tx_pol);
+    double total_edge_length, double wavelength_tangent, at::Tensor tx_pol,
+    const PointTapeTensors& point_tape);
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
+channel_mc_point_diffraction_tape_cuda(
+    at::Tensor sample_state, at::Tensor edge_pos, at::Tensor edge_dir, at::Tensor t_min,
+    at::Tensor t_max, at::Tensor n0, at::Tensor nn, at::Tensor source, at::Tensor points,
+    int64_t point_begin, int64_t point_count, int64_t seed, double point_radius);
 at::Tensor channel_mc_selected_edge_indices_cuda(at::Tensor selected);
 std::vector<at::Tensor> channel_mc_diffraction_state_pack_cuda(
     at::Tensor edge_indices,
@@ -781,6 +788,65 @@ torch::Tensor channel_mc_diffraction_state_wi(torch::Tensor state_edge_pos, torc
     return channel_mc_diffraction_state_wi_cuda(state_edge_pos, state_src);
 }
 
+namespace {
+
+// Point-receiver tape arguments of the diffraction tape ops; an empty `points` table is the
+// grid tape.
+PointTapeTensors point_tape_tensors(
+    const torch::Tensor& tape_lane, const torch::Tensor& points, double point_radius,
+    int64_t edge_samples, const torch::Tensor& tape_active) {
+    PointTapeTensors tensors;
+    TORCH_CHECK(points.is_cuda() && points.scalar_type() == at::kFloat && points.dim() == 2 &&
+                    points.size(1) == 3,
+                "points must be a float32 CUDA tensor of shape (P, 3)");
+    if (points.size(0) == 0) return tensors;
+    TORCH_CHECK(tape_lane.is_cuda() && tape_lane.scalar_type() == at::kInt &&
+                    tape_lane.numel() == tape_active.numel(),
+                "tape_lane must be an int32 CUDA tensor with one entry per tape row");
+    TORCH_CHECK(std::isfinite(point_radius) && point_radius != 0.0,
+                "point_radius must be finite and non-zero");
+    TORCH_CHECK(edge_samples > 0, "edge_samples must be positive for a point tape");
+    tensors.lane = tape_lane.contiguous();
+    tensors.points = points.contiguous();
+    tensors.point_radius = point_radius;
+    tensors.edge_samples = edge_samples;
+    return tensors;
+}
+
+}  // namespace
+
+pybind11::tuple channel_mc_point_diffraction_tape(
+    torch::Tensor sample_state, torch::Tensor edge_pos, torch::Tensor edge_dir,
+    torch::Tensor t_min, torch::Tensor t_max, torch::Tensor n0, torch::Tensor nn,
+    torch::Tensor source, torch::Tensor points, int64_t point_begin, int64_t point_count,
+    int64_t seed, double point_radius) {
+    TORCH_CHECK(sample_state.is_cuda() && sample_state.scalar_type() == at::kInt &&
+                    sample_state.dim() == 1,
+                "sample_state must be a rank-1 int32 CUDA tensor");
+    TORCH_CHECK(points.is_cuda() && points.scalar_type() == at::kFloat && points.dim() == 2 &&
+                    points.size(1) == 3,
+                "points must be a float32 CUDA tensor of shape (P, 3)");
+    TORCH_CHECK(point_begin >= 0 && point_count >= 0 && point_begin + point_count <= points.size(0),
+                "point range is out of bounds");
+    TORCH_CHECK(std::isfinite(point_radius) && point_radius != 0.0,
+                "point_radius must be finite and non-zero");
+    for (const auto* tensor : {&edge_pos, &edge_dir, &n0, &nn, &source})
+        TORCH_CHECK(tensor->is_cuda() && tensor->scalar_type() == at::kFloat && tensor->dim() == 2 &&
+                        tensor->size(1) == 3 && tensor->size(0) == edge_pos.size(0),
+                    "edge state vectors must be float32 CUDA tensors of shape (S, 3)");
+    for (const auto* tensor : {&t_min, &t_max})
+        TORCH_CHECK(tensor->is_cuda() && tensor->scalar_type() == at::kFloat &&
+                        tensor->numel() == edge_pos.size(0),
+                    "edge parameter bounds must have one entry per state");
+    auto out = channel_mc_point_diffraction_tape_cuda(
+        sample_state.contiguous(), edge_pos.contiguous(), edge_dir.contiguous(), t_min.contiguous(),
+        t_max.contiguous(), n0.contiguous(), nn.contiguous(), source.contiguous(),
+        points.contiguous(), point_begin, point_count, seed, point_radius);
+    return pybind11::make_tuple(std::get<0>(out), std::get<1>(out), std::get<2>(out),
+                                std::get<3>(out), std::get<4>(out), std::get<5>(out),
+                                std::get<6>(out), std::get<7>(out));
+}
+
 torch::Tensor channel_mc_utd_diffraction_tape_accumulate(
     torch::Tensor tape_active,torch::Tensor tape_state,torch::Tensor tape_cell,torch::Tensor tape_u,
     torch::Tensor edge_pos,torch::Tensor edge_dir,torch::Tensor t_min,torch::Tensor t_max,
@@ -789,13 +855,15 @@ torch::Tensor channel_mc_utd_diffraction_tape_accumulate(
     torch::Tensor eta_r,torch::Tensor sigma,torch::Tensor mu_r,torch::Tensor gain,
     torch::Tensor material_valid,torch::Tensor thickness,int64_t axis,double plane,double c0min,double c0max,
     double c1min,double c1max,int64_t r0,int64_t r1,double wavelength,double cell_area,int64_t seed,double total_edge_length,
-    torch::Tensor tx_pol) {
+    torch::Tensor tx_pol,
+    torch::Tensor tape_lane, torch::Tensor points, double point_radius, int64_t edge_samples) {
     TORCH_CHECK(tx_pol.is_cuda() && tx_pol.scalar_type() == at::kFloat && tx_pol.numel() == 3,
                 "tx_pol must be a float32 CUDA tensor with 3 elements");
     return channel_mc_utd_diffraction_tape_accumulate_cuda(
         tape_active,tape_state,tape_cell,tape_u,edge_pos,edge_dir,t_min,t_max,n0,nn,prim0,prim1,
         exterior_angle,source,source_power,eta_r,sigma,mu_r,gain,material_valid,thickness,axis,plane,
-        c0min,c0max,c1min,c1max,r0,r1,wavelength,cell_area,seed,total_edge_length,tx_pol.contiguous());
+        c0min,c0max,c1min,c1max,r0,r1,wavelength,cell_area,seed,total_edge_length,tx_pol.contiguous(),
+        point_tape_tensors(tape_lane, points, point_radius, edge_samples, tape_active));
 }
 
 pybind11::tuple channel_mc_utd_diffraction_tape_accumulate_backward(
@@ -810,7 +878,8 @@ pybind11::tuple channel_mc_utd_diffraction_tape_accumulate_backward(
     bool need_materials, bool need_source, bool need_frequency,
     int64_t axis, double plane, int64_t r0, int64_t r1, double wavelength,
     double cell_area, int64_t seed, double total_edge_length,
-    double wavelength_dfreq, torch::Tensor tx_pol) {
+    double wavelength_dfreq, torch::Tensor tx_pol,
+    torch::Tensor tape_lane, torch::Tensor points, double point_radius, int64_t edge_samples) {
     TORCH_CHECK(tx_pol.is_cuda() && tx_pol.scalar_type() == at::kFloat && tx_pol.numel() == 3,
                 "tx_pol must be a float32 CUDA tensor with 3 elements");
     auto gradients = channel_mc_utd_diffraction_tape_accumulate_backward_cuda(
@@ -819,7 +888,7 @@ pybind11::tuple channel_mc_utd_diffraction_tape_accumulate_backward(
         eta_r, sigma, mu_r, gain, material_valid, thickness, grad_output,
         need_materials, need_source, need_frequency, axis, plane, r0, r1,
         wavelength, cell_area, seed, total_edge_length, wavelength_dfreq,
-        tx_pol.contiguous());
+        tx_pol.contiguous(), point_tape_tensors(tape_lane, points, point_radius, edge_samples, tape_active));
     return pybind11::make_tuple(
         std::get<0>(gradients), std::get<1>(gradients), std::get<2>(gradients),
         std::get<3>(gradients), std::get<4>(gradients), std::get<5>(gradients));
@@ -840,7 +909,8 @@ torch::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp(
     bool has_tangent_thickness, bool has_tangent_source,
     int64_t axis, double plane, int64_t r0, int64_t r1, double wavelength,
     double cell_area, int64_t seed, double total_edge_length,
-    double wavelength_tangent, torch::Tensor tx_pol) {
+    double wavelength_tangent, torch::Tensor tx_pol,
+    torch::Tensor tape_lane, torch::Tensor points, double point_radius, int64_t edge_samples) {
     TORCH_CHECK(tx_pol.is_cuda() && tx_pol.scalar_type() == at::kFloat && tx_pol.numel() == 3,
                 "tx_pol must be a float32 CUDA tensor with 3 elements");
     return channel_mc_utd_diffraction_tape_accumulate_jvp_cuda(
@@ -851,7 +921,7 @@ torch::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp(
         has_tangent_eta_r, has_tangent_sigma, has_tangent_gain,
         has_tangent_thickness, has_tangent_source, axis, plane, r0, r1,
         wavelength, cell_area, seed, total_edge_length, wavelength_tangent,
-        tx_pol.contiguous());
+        tx_pol.contiguous(), point_tape_tensors(tape_lane, points, point_radius, edge_samples, tape_active));
 }
 
 torch::Tensor channel_mc_selected_edge_indices(torch::Tensor selected) {
