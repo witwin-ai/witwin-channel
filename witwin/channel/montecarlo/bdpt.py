@@ -15,7 +15,7 @@ from witwin.core import Scene, SceneSnapshot
 
 from witwin.channel import build_info
 from witwin.channel.capabilities import (
-    capabilities,
+    _BDPT_AD_DIFFERENTIABLE_PARAMETERS, capabilities,
     config_metadata,
     serialize_config,
 )
@@ -2874,18 +2874,7 @@ def make_launch_state(
 # only for the enumerated discrete blocks (fixed-winner endpoints / mesh
 # vertices, inherited from the enumerated engine); the stochastic sampler keeps
 # hit geometry frozen (ad_geometry='enumerated_blocks_only').
-_AD_DIFFERENTIABLE_PARAMETERS = (
-    "layer_eps_r",
-    "layer_sigma_e",
-    "layer_thickness",
-    "roughness_sigma_h",
-    "roughness_corr_x",
-    "roughness_corr_y",
-    "bsdf_table_values",
-    "phase_screen_heights",
-    "frequency",
-    "tx_power",
-)
+_AD_DIFFERENTIABLE_PARAMETERS = _BDPT_AD_DIFFERENTIABLE_PARAMETERS
 _AD_GEOMETRY_SCOPE = "enumerated_blocks_only"
 
 

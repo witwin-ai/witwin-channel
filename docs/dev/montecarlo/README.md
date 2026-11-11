@@ -130,8 +130,11 @@ used by focused contract tests, but are not compatibility promises. The parent
   Torch restart/normalization, incident TE/TM, and wall-product expressions are
   not production backends or compatibility routes. Scattering retains only its
   independently owned event utilities.
-- BDPT supports only `ad_mode="none"`. Any other mode is rejected by
-  `Config`; detached or zero gradients are not a substitute.
+- BDPT accepts `ad_mode="none"`, `"jvp"`, and `"vjp"` (fixed topology). It
+  differentiates layer/material parameters, roughness and BSDF tables,
+  frequency, and transmitter power (power and coherent combine domains). It
+  refuses transmitter/receiver position and mesh-vertex leaves before launch;
+  `capabilities()` records exactly this scope.
 
 ## BDPT sampler and accumulation
 
