@@ -445,6 +445,61 @@ def _host_values(value: object) -> torch.Tensor | None:
     return None
 
 
+def _require_finite(label: str, name: str, value: object) -> None:
+    host = _host_values(value)
+    if host is not None and not bool(torch.isfinite(host).all()):
+        raise ValueError(f"{label} {name} must be finite, got {host.tolist()}")
+
+
+def _require_host_range(label: str, name: str, value: object, positive: bool, legal: str) -> None:
+    host = _host_values(value)
+    if host is None:
+        return
+    in_range = (host > 0.0) if positive else (host >= 0.0)
+    if not bool((in_range & torch.isfinite(host)).all()):
+        raise ValueError(f"{label} {name} must be {legal}, got {host.tolist()}")
+
+
+def _endpoint_label(view: _EndpointView) -> str:
+    if view.source.role == "tx":
+        kind = "transmitter"
+    elif isinstance(view, _ReceiverGridView):
+        kind = "ReceiverGrid"
+    else:
+        kind = "receiver"
+    return f"{kind} {int(view.source.antenna_id)}"
+
+
+def _validate_one_endpoint(view: _EndpointView) -> None:
+    label = _endpoint_label(view)
+    grid = isinstance(view, _ReceiverGridView)
+    _require_finite(label, "origin" if grid else "position", view.position)
+    _require_finite(label, "orientation", view.orientation)
+    if isinstance(view, _ReceiverGridView):
+        _require_finite(label, "x_axis", view.x_axis)
+        _require_finite(label, "y_axis", view.y_axis)
+        _require_host_range(
+            label, "spacing entries", view.source.spacing, True, "finite and positive"
+        )
+    if isinstance(view, _TransmitterView):
+        _require_host_range(label, "power_w", view.power_w, False, "finite and non-negative")
+
+
+def _refuse_coincident_endpoints(views: tuple[_EndpointView, ...]) -> None:
+    transmitters = [
+        (view, _host_values(view.position)) for view in views if isinstance(view, _TransmitterView)
+    ]
+    for receiver in views:
+        at = _host_values(receiver.position) if isinstance(receiver, _ReceiverPointView) else None
+        for transmitter, origin in transmitters if at is not None else ():
+            if origin is not None and bool(torch.equal(origin.to(at.dtype), at)):
+                raise ValueError(
+                    f"receiver {int(receiver.source.antenna_id)} is at the same position as "
+                    f"transmitter {int(transmitter.source.antenna_id)} ({at.tolist()}); the "
+                    "free-space field is singular at zero distance"
+                )
+
+
 def _validate_endpoint_values(views: tuple[_EndpointView, ...]) -> None:
     """Refuse non-finite endpoint data before any native work.
 
@@ -453,51 +508,8 @@ def _validate_endpoint_values(views: tuple[_EndpointView, ...]) -> None:
     """
 
     for view in views:
-        source = view.source
-        kind = "transmitter" if source.role == "tx" else (
-            "ReceiverGrid" if isinstance(view, _ReceiverGridView) else "receiver"
-        )
-        label = f"{kind} {int(source.antenna_id)}"
-        checks: list[tuple[str, object]] = [
-            ("origin" if isinstance(view, _ReceiverGridView) else "position", view.position),
-            ("orientation", view.orientation),
-        ]
-        if isinstance(view, _ReceiverGridView):
-            checks += [("x_axis", view.x_axis), ("y_axis", view.y_axis)]
-        for name, value in checks:
-            host = _host_values(value)
-            if host is not None and not bool(torch.isfinite(host).all()):
-                raise ValueError(
-                    f"{label} {name} must be finite, got {host.tolist()}"
-                )
-        if isinstance(view, _ReceiverGridView):
-            host = _host_values(source.spacing)
-            if host is not None and not bool(((host > 0.0) & torch.isfinite(host)).all()):
-                raise ValueError(
-                    f"{label} spacing entries must be finite and positive, got {host.tolist()}"
-                )
-        if isinstance(view, _TransmitterView):
-            host = _host_values(view.power_w)
-            if host is not None and not bool(((host >= 0.0) & torch.isfinite(host)).all()):
-                raise ValueError(
-                    f"{label} power_w must be finite and non-negative, got {host.tolist()}"
-                )
-    transmitters = [
-        (view, _host_values(view.position)) for view in views if isinstance(view, _TransmitterView)
-    ]
-    for receiver in views:
-        if not isinstance(receiver, _ReceiverPointView):
-            continue
-        at = _host_values(receiver.position)
-        if at is None:
-            continue
-        for transmitter, origin in transmitters:
-            if origin is not None and bool(torch.equal(origin.to(at.dtype), at)):
-                raise ValueError(
-                    f"receiver {int(receiver.source.antenna_id)} is at the same position as "
-                    f"transmitter {int(transmitter.source.antenna_id)} ({at.tolist()}); the "
-                    "free-space field is singular at zero distance"
-                )
+        _validate_one_endpoint(view)
+    _refuse_coincident_endpoints(views)
 
 
 def require_single_receiver_layout(

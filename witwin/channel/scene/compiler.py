@@ -783,6 +783,25 @@ def _versions(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[int, int, int, 
     )
 
 
+def _readable_versions(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[int, int, int, int]:
+    """Read the four version domains, restating the two tensor kinds that cannot report one."""
+
+    try:
+        return _versions(scene_or_snapshot)
+    except RuntimeError as error:
+        if "doesn't have storage" in str(error):
+            from witwin.channel.scene.endpoints import FUNCTORCH_MESSAGE
+
+            raise NotImplementedError(FUNCTORCH_MESSAGE) from error
+        if "Inference tensors" not in str(error):
+            raise
+        raise ValueError(
+            "the scene holds tensors created under torch.inference_mode(); Channel tracks "
+            "scene edits through tensor version counters, which inference tensors do not "
+            "have. Build the scene outside torch.inference_mode() (solving inside it is fine)"
+        ) from error
+
+
 def _source_structures(
     scene_or_snapshot: Scene | SceneSnapshot,
 ) -> tuple[tuple[Structure, object | None, object | None], ...]:
@@ -912,6 +931,29 @@ def _face_cleanup(
             "face; the mesh has no face with area"
         )
     return torch.from_numpy(keep), dropped_degenerate, dropped_duplicate
+
+
+def _validated_mesh(
+    label: str, vertices: torch.Tensor, faces: torch.Tensor, uv: torch.Tensor | None,
+    face_uv: torch.Tensor | None,
+) -> tuple[torch.Tensor, torch.Tensor | None, tuple[int, ...] | None, int, int]:
+    """Validate one structure's tables and return its kept faces and drop counts."""
+
+    _require_finite_table(label, "vertices", vertices)
+    if uv is not None and face_uv is not None:
+        if face_uv.ndim != 2 or tuple(face_uv.shape) != tuple(faces.shape):
+            raise ValueError(f"{label}: face_uv must have one (3,) row per mesh face")
+        _require_finite_table(label, "uv", uv)
+    keep, dropped_degenerate, dropped_duplicate = _checked_topology(
+        label, faces, int(vertices.shape[0]), face_uv, None if uv is None else int(uv.shape[0])
+    )
+    if keep is None:
+        return faces, face_uv, None, 0, 0
+    kept_faces = tuple(int(index) for index in keep.nonzero().flatten())
+    faces = faces[keep.to(device=faces.device)]
+    if face_uv is not None:
+        face_uv = face_uv[keep.to(device=face_uv.device)]
+    return faces, face_uv, kept_faces, dropped_degenerate, dropped_duplicate
 
 
 _TOPOLOGY_CHECK_LIMIT = 64
@@ -1061,20 +1103,9 @@ def _runtime_structures(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[_Runt
         face_uv = structure.face_uv
         if (uv is None) != (face_uv is None):
             raise ValueError("Core mesh uv and face_uv must be provided together")
-        _require_finite_table(label, "vertices", vertices)
-        if uv is not None and face_uv is not None:
-            if face_uv.ndim != 2 or tuple(face_uv.shape) != tuple(faces.shape):
-                raise ValueError(f"{label}: face_uv must have one (3,) row per mesh face")
-            _require_finite_table(label, "uv", uv)
-        keep, dropped_degenerate, dropped_duplicate = _checked_topology(
-            label, faces, int(vertices.shape[0]), face_uv, None if uv is None else int(uv.shape[0])
+        faces, face_uv, kept_faces, dropped_degenerate, dropped_duplicate = _validated_mesh(
+            label, vertices, faces, uv, face_uv
         )
-        kept_faces: tuple[int, ...] | None = None
-        if keep is not None:
-            kept_faces = tuple(int(index) for index in keep.nonzero().flatten())
-            faces = faces[keep.to(device=faces.device)]
-            if face_uv is not None:
-                face_uv = face_uv[keep.to(device=face_uv.device)]
         runtime.append(
             _RuntimeStructure(
                 source=structure,
@@ -1545,20 +1576,7 @@ def compile(
     if not isinstance(scene_or_snapshot, (Scene, SceneSnapshot)):
         raise TypeError("scene_or_snapshot must be a witwin.core Scene or SceneSnapshot")
     frequency_value = _frequency_value(reference_frequency_hz)
-    try:
-        versions = _versions(scene_or_snapshot)
-    except RuntimeError as error:
-        if "doesn't have storage" in str(error):
-            from witwin.channel.scene.endpoints import FUNCTORCH_MESSAGE
-
-            raise NotImplementedError(FUNCTORCH_MESSAGE) from error
-        if "Inference tensors" not in str(error):
-            raise
-        raise ValueError(
-            "the scene holds tensors created under torch.inference_mode(); Channel tracks "
-            "scene edits through tensor version counters, which inference tensors do not "
-            "have. Build the scene outside torch.inference_mode() (solving inside it is fine)"
-        ) from error
+    versions = _readable_versions(scene_or_snapshot)
     key = _cache_key(
         scene_or_snapshot,
         versions,

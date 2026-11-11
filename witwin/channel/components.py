@@ -165,6 +165,35 @@ def component_max_depth(
 MAX_ENUMERATED_CHAIN_DEPTH = 5
 
 
+def _require_bool(where: str, value: object) -> object:
+    if type(value) is not bool:
+        raise TypeError(f"{where} must be True or False, got {value!r}")
+    return value
+
+
+def _require_int(where: str, value: object, optional: bool) -> object:
+    if isinstance(value, bool) or not isinstance(value, numbers.Integral):
+        raise TypeError(
+            f"{where} must be an int{' or None' if optional else ''}, "
+            f"got {type(value).__name__} {value!r}"
+        )
+    return operator.index(value)
+
+
+def _require_real(where: str, value: object) -> object:
+    if isinstance(value, bool) or not isinstance(value, numbers.Real):
+        raise TypeError(f"{where} must be a real number, got {type(value).__name__} {value!r}")
+    if not math.isfinite(float(value)):
+        raise ValueError(f"{where} must be finite, got {value!r}")
+    return value
+
+
+def _require_str(where: str, value: object) -> object:
+    if not isinstance(value, str):
+        raise TypeError(f"{where} must be a str, got {type(value).__name__} {value!r}")
+    return value
+
+
 def validate_config_fields(config: object) -> None:
     """Check every scalar ``Config`` field against its declared type before any range check.
 
@@ -176,36 +205,22 @@ def validate_config_fields(config: object) -> None:
 
     solver_config = type(config).__module__.removeprefix("witwin.channel.")
     for item in dataclasses.fields(config):  # type: ignore[arg-type]
-        if item.name.startswith("_"):
-            continue
         kinds = {part.strip() for part in str(item.type).split("|")}
         value = getattr(config, item.name)
-        if value is None and "None" in kinds:
+        if item.name.startswith("_") or (value is None and "None" in kinds):
             continue
         where = f"{solver_config} Config.{item.name}"
+        checked = value
         if kinds <= {"bool"}:
-            if type(value) is not bool:
-                raise TypeError(f"{where} must be True or False, got {value!r}")
+            checked = _require_bool(where, value)
         elif kinds <= {"int", "None"}:
-            if isinstance(value, bool) or not isinstance(value, numbers.Integral):
-                raise TypeError(
-                    f"{where} must be an int{' or None' if 'None' in kinds else ''}, "
-                    f"got {type(value).__name__} {value!r}"
-                )
-            if type(value) is not int:
-                object.__setattr__(config, item.name, operator.index(value))
+            checked = _require_int(where, value, "None" in kinds)
         elif kinds <= {"float", "None"}:
-            if isinstance(value, bool) or not isinstance(value, numbers.Real):
-                raise TypeError(
-                    f"{where} must be a real number, got {type(value).__name__} {value!r}"
-                )
-            if not math.isfinite(float(value)):
-                raise ValueError(f"{where} must be finite, got {value!r}")
+            checked = _require_real(where, value)
         elif kinds <= {"str"}:
-            if not isinstance(value, str):
-                raise TypeError(
-                    f"{where} must be a str, got {type(value).__name__} {value!r}"
-                )
+            checked = _require_str(where, value)
+        if checked is not value:
+            object.__setattr__(config, item.name, checked)
 
 
 def require_config_type(config: object, expected: type, solver: str) -> None:

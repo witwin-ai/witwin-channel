@@ -513,6 +513,16 @@ def build_path_table(
 # --- Pipeline -------------------------------------------------------------
 
 
+def _link_zero_gradients(
+    config: Config, scene: SolverScene, path_gain: torch.Tensor, field: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Keep reverse-mode outputs on the graph when no surviving path depends on a live leaf."""
+
+    if config.ad_mode != "vjp":
+        return path_gain, field
+    return link_zero_gradient(path_gain, scene), link_zero_gradient(field, scene)
+
+
 def _validate_requested_components(config: Config) -> None:
     if config.isb_boundary_taper and config.ad_mode != "none":
         # ISB boundary taper gate 3: the C1 clearance-factor AD
@@ -876,9 +886,7 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
         component_power["diffraction"] = exact_diffraction
         if not config.coherent:
             path_gain = path_gain - previous_diffraction + exact_diffraction
-    if config.ad_mode == "vjp":
-        path_gain = link_zero_gradient(path_gain, scene)
-        field = link_zero_gradient(field, scene)
+    path_gain, field = _link_zero_gradients(config, scene, path_gain, field)
     if ad_instrumented:
         torch.cuda.synchronize()
         forward_time_ms = (perf_counter() - solve_start) * 1.0e3

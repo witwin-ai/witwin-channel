@@ -571,10 +571,12 @@ def evaluate_enumerated_paths(
         tx_polarizations = transmitter_polarizations_as_stored(scene, device=device)
         rx_positions, _ = receiver_positions_and_layout(scene, device=device)
         rx_polarizations = None
+        diffraction_tx_polarizations = None
     else:
         tx_positions = endpoint_tensors.tx_positions
         tx_power = endpoint_tensors.tx_power
         tx_polarizations = endpoint_tensors.tx_polarizations
+        diffraction_tx_polarizations = tx_polarizations
         rx_positions = endpoint_tensors.rx_positions
         rx_polarizations = endpoint_tensors.rx_polarizations
     field_tx_power = (
@@ -671,9 +673,7 @@ def evaluate_enumerated_paths(
                 rx_positions,
                 frequency_hz=frequency_hz,
                 isb_boundary_taper_width=isb_boundary_taper_width,
-                tx_polarizations=(
-                    tx_polarizations if endpoint_tensors is not None else None
-                ),
+                tx_polarizations=diffraction_tx_polarizations,
             )
         )
         launch_count += diffraction_launches
