@@ -431,9 +431,11 @@ __device__ bool tape_row_value(
         utd::f3_sub(edge_point, src), eh, false);
     const utd::Basis3T<T> out_edge = utd::diffraction_edge_basis(
         utd::f3_sub(target, edge_point), eh, true);
+    T face0_cos, face1_cos;
+    utd::reciprocal_face_cosines(gphi, gphi_p, p.wedgeN, face0_cos, face1_cos);
     if (c.valid0) {
         p.face0Operator = slab_face_operator_t<T>(
-            utd::fabsf(utd::sinf(gphi_p)),
+            face0_cos,
             fad::seeded<T>(c.eps0, seeds.eps0),
             fad::seeded<T>(c.sigma0, seeds.sigma0),
             fad::seeded<T>(c.gain0, seeds.gain0),
@@ -442,7 +444,7 @@ __device__ bool tape_row_value(
     }
     if (c.valid1) {
         p.face1Operator = slab_face_operator_t<T>(
-            utd::fabsf(utd::sinf(p.wedgeN * utd::UTD_PI - gphi)),
+            face1_cos,
             fad::seeded<T>(c.eps1, seeds.eps1),
             fad::seeded<T>(c.sigma1, seeds.sigma1),
             fad::seeded<T>(c.gain1, seeds.gain1),
@@ -863,6 +865,8 @@ __global__ void diffraction_edge_geometry_kernel(
     float *__restrict__ n0,
     float *__restrict__ n1,
     float *__restrict__ exterior_angle,
+    int *__restrict__ wedge_face0,
+    int *__restrict__ wedge_face1,
     int64_t edge_count,
     float plane_tol) {
     constexpr float edge_epsilon = 1.0e-6f;
@@ -888,7 +892,7 @@ __global__ void diffraction_edge_geometry_kernel(
         const float3 end = channel::math::load_vec3(vertices, v1);
         const float3 vector = channel::math::sub(end, start);
         const float length = fmaxf(channel::math::length_rn_xzy(vector), 1.0e-12f);
-        const float3 dir = make_float3(
+        float3 dir = make_float3(
             __fdiv_rn(vector.x, length),
             __fdiv_rn(vector.y, length),
             __fdiv_rn(vector.z, length));
@@ -913,6 +917,29 @@ __global__ void diffraction_edge_geometry_kernel(
         const float output_interior_angle = acosf(output_clamped_neg_dot);
         const float out_exterior_angle = interior ? (two_pi - output_interior_angle) : two_pi;
 
+        // Orient the edge so that n0 x dir points from the edge into face 0: the UTD angles are measured from
+        // that in-face direction, so a reversed edge (or a flipped winding on a boundary edge) would otherwise
+        // measure them from the missing half-plane.
+        const int face_zero = interior ? (choose_first ? safe0 : safe1) : safe0;
+        const int face_other = interior ? (choose_first ? safe1 : safe0) : safe1;
+        const float3 opposite_zero = channel::math::load_vec3(vertices, opposite_vertex(faces, face_zero, v0, v1));
+        const float3 into_zero = channel::math::sub(opposite_zero, start);
+        if (valid0 && channel::math::dot_rn_xzy(channel::math::cross(out_n0, dir), into_zero) < 0.0f) {
+            dir = channel::math::scale(dir, -1.0f);
+        }
+        // With outward normals each face of a convex wedge lies behind the other face's plane; a wedge whose
+        // faces both lie in front of each other's planes is concave (exterior angle below pi) and does not
+        // diffract into the open region the coefficient assumes.
+        bool concave = false;
+        if (interior) {
+            const float3 opposite_other =
+                channel::math::load_vec3(vertices, opposite_vertex(faces, face_other, v0, v1));
+            const float other_in_front =
+                channel::math::dot_rn_xzy(channel::math::sub(opposite_other, start), out_n0);
+            const float zero_in_front = channel::math::dot_rn_xzy(into_zero, out_n1);
+            concave = other_in_front > plane_tol && zero_in_front > plane_tol;
+        }
+
         bool coplanar = false;
         if (interior) {
             const float selected_normal_dot = channel::math::dot_rn_xzy(n0_cand, n1_cand);
@@ -928,7 +955,7 @@ __global__ void diffraction_edge_geometry_kernel(
         const float selected_normal_dot = channel::math::dot_rn_xzy(n0_cand, n1_cand);
         const bool selected_wedge_angle = boundary || (interior && selected_normal_dot < 1.0f);
         selected[edge] =
-            (interior || boundary) && !coplanar && length > edge_epsilon && selected_wedge_angle;
+            (interior || boundary) && !coplanar && !concave && length > edge_epsilon && selected_wedge_angle;
 
         channel::math::store_vec3(edge_pos, edge, channel::math::scale(channel::math::add(start, end), 0.5f));
         channel::math::store_vec3(edge_dir, edge, dir);
@@ -938,6 +965,10 @@ __global__ void diffraction_edge_geometry_kernel(
         channel::math::store_vec3(n0, edge, out_n0);
         channel::math::store_vec3(n1, edge, out_n1);
         exterior_angle[edge] = out_exterior_angle;
+        // Faces in the order of the exported normals; a boundary (half-plane) edge is one sheet, so both of its
+        // faces carry the sheet's own face and material.
+        wedge_face0[edge] = valid0 ? face_zero : f0;
+        wedge_face1[edge] = interior ? face_other : (boundary ? f0 : f1);
     }
 }
 
@@ -1278,6 +1309,8 @@ std::vector<at::Tensor> diffraction_edge_geometry_cuda_impl(
     auto n0 = at::empty({edge_count, 3}, float_options);
     auto n1 = at::empty({edge_count, 3}, float_options);
     auto exterior_angle = at::empty({edge_count}, float_options);
+    auto wedge_face0 = at::empty({edge_count}, face0.options());
+    auto wedge_face1 = at::empty({edge_count}, face1.options());
 
     if (edge_count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(vertices.get_device()).stream();
@@ -1299,6 +1332,8 @@ std::vector<at::Tensor> diffraction_edge_geometry_cuda_impl(
             n0.data_ptr<float>(),
             n1.data_ptr<float>(),
             exterior_angle.data_ptr<float>(),
+            wedge_face0.data_ptr<int>(),
+            wedge_face1.data_ptr<int>(),
             edge_count,
             static_cast<float>(plane_tol));
         C10_CUDA_KERNEL_LAUNCH_CHECK();
@@ -1313,8 +1348,8 @@ std::vector<at::Tensor> diffraction_edge_geometry_cuda_impl(
         line_max,
         n0,
         n1,
-        face0,
-        face1,
+        wedge_face0,
+        wedge_face1,
         exterior_angle,
     };
 }

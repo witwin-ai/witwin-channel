@@ -171,10 +171,10 @@ def test_coherent_converges_to_deterministic_coherent():
     assert _GATE_LOW <= ratio <= _GATE_HIGH, f"coherent ratio {ratio} outside [0.5, 2]"
 
 
-def test_coherent_is_below_incoherent_here():
-    """The wedge fixture has 4 diffraction rows per bin that partially cancel,
- so coherent combine is strictly below the incoherent estimate (proves the
- phasor sum is active, not a relabelled incoherent accumulation)."""
+def test_coherent_differs_from_incoherent_like_the_deterministic_phasor_sum():
+    """The wedge fixture's diffraction rows interfere, so the coherent combine differs from the
+ incoherent estimate on the same side as the deterministic phasor sum does (proves the phasor
+ sum is active, not a relabelled incoherent accumulation)."""
 
     _skip_unless_native()
     scene = wedge_diffraction_scene()
@@ -207,7 +207,22 @@ def test_coherent_is_below_incoherent_here():
             )
         ).sum()
     )
-    assert coherent < incoherent
+    deterministic = {
+        mode: float(
+            _diffraction(
+                deterministic_solve(
+                    scene,
+                    DeterministicConfig(components={"diffraction"}, max_depth=1, coherent=mode),
+                    reference_frequency_hz=3.0e9,
+                )
+            ).sum()
+        )
+        for mode in (False, True)
+    }
+    expected = deterministic[True] - deterministic[False]
+    assert abs(expected) > 1.0e-2 * deterministic[False]
+    assert (coherent - incoherent) * expected > 0.0
+    assert abs(coherent - incoherent) > 1.0e-2 * incoherent
 
 
 def test_three_mis_modes_consistent_under_coherent():

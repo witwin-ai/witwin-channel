@@ -218,16 +218,12 @@ def sommerfeld_coefficient(
     return complex((total - go) * math.sqrt(distance_l) * np.exp(1j * K * distance_l))
 
 
-HALF_PLANE_XFAIL = pytest.mark.xfail(
-    strict=True, reason="A-2/A-3 (M0-3): PEC half-plane coefficient 3-106% off the exact solution")
-
-
-@HALF_PLANE_XFAIL
 @pytest.mark.parametrize("polarization", ["soft", "hard"])
 @pytest.mark.parametrize("phi_deg", HALF_PLANE_ANGLES)
 def test_pec_half_plane_matches_sommerfeld(accuracy, polarization, phi_deg):
     """Tolerance: UTD's own asymptotic error against the exact solution (computed here in float64)
-    plus 1e-3 for float32 and the 800 m finite edge (its end-point contributions are excluded)."""
+    plus 1e-3 for float32 and the 800 m finite edge (its end-point contributions are excluded; the
+    stationary row keeps the aperture factor 1 - 2/(pi v), v ~ 600 Fresnel units, about 9e-4)."""
 
     phi = math.radians(phi_deg)
     s_prime, s = HALF_PLANE_S_PRIME, HALF_PLANE_S
@@ -252,11 +248,6 @@ def _right_angle_wedge() -> list:
     return [face_o, face_n]
 
 
-WEDGE_XFAIL = pytest.mark.xfail(
-    strict=True, reason="A-2 (M0-3): PEC wedge coefficient 2-10% low, varying with s and s'")
-
-
-@WEDGE_XFAIL
 @pytest.mark.parametrize("polarization", ["soft", "hard"])
 @pytest.mark.parametrize("phi_deg", [100.0, 180.0, 240.0])
 def test_right_angle_wedge_matches_textbook_utd(accuracy, polarization, phi_deg):
