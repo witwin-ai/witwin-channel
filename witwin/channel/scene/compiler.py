@@ -37,6 +37,7 @@ from witwin.channel.runtime import (
     bdpt_zero_matrix,
     mc_receiver_grid_points,
     mc_transmitter_tensors,
+    requested_trace_backend,
 )
 from witwin.channel.scene.endpoints import (
     ReceiverGrid,
@@ -1312,10 +1313,14 @@ def compile(
         raise TypeError("scene_or_snapshot must be a witwin.core Scene or SceneSnapshot")
     frequency_value = _frequency_value(reference_frequency_hz)
     versions = _versions(scene_or_snapshot)
-    key = _cache_key(
-        scene_or_snapshot,
-        versions,
-        _frequency_identity(reference_frequency_hz, frequency_value),
+    trace_backend = requested_trace_backend()
+    key = (
+        _cache_key(
+            scene_or_snapshot,
+            versions,
+            _frequency_identity(reference_frequency_hz, frequency_value),
+        ),
+        trace_backend,
     )
     cached = _REGISTRY.get(key)
     if cached is not None and cached.source is scene_or_snapshot:
@@ -1330,6 +1335,7 @@ def compile(
             candidate.rayd
             for candidate in reusable
             if _rayd_input_identity(candidate.source) == rayd_input_identity
+            and candidate.rayd.requested_trace_backend == trace_backend
             and candidate.topology_version == topology_version
             and candidate.geometry_version == geometry_version
         ),

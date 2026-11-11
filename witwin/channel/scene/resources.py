@@ -16,7 +16,13 @@ from witwin.core import PhaseScreen, SurfaceRoughness
 
 from witwin.channel.constants import C0
 from witwin.channel.materials import layer_stack_rt
-from witwin.channel.runtime import mc_pack_vec3, required_symbol as _required_native_op
+from witwin.channel.runtime import (
+    mc_pack_vec3,
+    record_scene_trace_backend,
+    require_device_supported,
+    required_symbol as _required_native_op,
+    requested_trace_backend,
+)
 
 if TYPE_CHECKING:
     from witwin.channel.scene.compiler import AssignmentStore, MaterialStore
@@ -60,7 +66,7 @@ __all__ = [
 def rayd_scene_create(
     vertices: list[torch.Tensor], faces: list[torch.Tensor], uv: list[torch.Tensor],
     face_uv: list[torch.Tensor], to_world_left: list[torch.Tensor],
-    to_world_right: list[torch.Tensor], mesh_flags: list[int],
+    to_world_right: list[torch.Tensor], mesh_flags: list[int], trace_backend: str,
 ) -> object:
     resource = _required_native_op("rayd_scene_create")(
         vertices,
@@ -70,9 +76,11 @@ def rayd_scene_create(
         to_world_left,
         to_world_right,
         mesh_flags,
+        trace_backend,
     )
     if resource is None or not bool(getattr(resource, "available", False)):
         raise RuntimeError("_channel.rayd_scene_create returned an invalid resource")
+    record_scene_trace_backend(resource)
     return resource
 
 
@@ -106,6 +114,7 @@ class RayDSceneResource:
     resource: object | None = None
     mesh_tensors: tuple[tuple[torch.Tensor, ...], ...] = ()
     reason: str | None = None
+    requested_trace_backend: str = "auto"
     runtime_cache: dict[str, object] = field(
         default_factory=dict, compare=False, repr=False
     )
@@ -115,6 +124,14 @@ class RayDSceneResource:
         return self.resource is not None and bool(
             getattr(self.resource, "available", False)
         )
+
+    @property
+    def trace_backend(self) -> str | None:
+        """The tracer RayD selected for this scene, ``"optix"`` or ``"cuda"``."""
+
+        if not self.available:
+            return None
+        return str(getattr(self.resource, "trace_backend"))
 
     def require_resource(self) -> object:
         if not self.available:
@@ -173,12 +190,18 @@ def build_scene_from_structures(structures: tuple[object, ...]) -> RayDSceneReso
     `_channel`. It does not import a RayD Python package or dispatcher.
     """
 
+    trace_backend = requested_trace_backend()
     if not structures:
-        return RayDSceneResource(reason="scene has no structures")
+        return RayDSceneResource(
+            reason="scene has no structures", requested_trace_backend=trace_backend
+        )
     if not torch.cuda.is_available():
-        return RayDSceneResource(reason="CUDA is unavailable")
+        return RayDSceneResource(
+            reason="CUDA is unavailable", requested_trace_backend=trace_backend
+        )
 
-    device = torch.device("cuda")
+    device = torch.device("cuda", torch.cuda.current_device())
+    require_device_supported(device.index)
     vertices: list[torch.Tensor] = []
     faces: list[torch.Tensor] = []
     uv: list[torch.Tensor] = []
@@ -236,8 +259,13 @@ def build_scene_from_structures(structures: tuple[object, ...]) -> RayDSceneReso
         to_world_left,
         to_world_right,
         mesh_flags,
+        trace_backend,
     )
-    return RayDSceneResource(resource=resource, mesh_tensors=tuple(keepalive))
+    return RayDSceneResource(
+        resource=resource,
+        mesh_tensors=tuple(keepalive),
+        requested_trace_backend=trace_backend,
+    )
 
 
 _BOUNDARY_EDGE_POLICIES = {"exclude", "half_plane"}
