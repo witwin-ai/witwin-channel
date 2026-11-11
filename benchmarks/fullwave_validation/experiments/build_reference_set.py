@@ -18,8 +18,15 @@ if __package__ in {None, ""}:
 from benchmarks.fullwave_validation import reference_set as rs  # noqa: E402
 
 
-# A calibration case serves the cases whose dipole axis it shares by symmetry.
+# A calibration case serves the cases whose dipole axis it shares by symmetry; a case at another
+# frequency or grid names its own calibration case.
 _CALIBRATION = {"z": "empty_z", "x": "empty_x", "y": "empty_x"}
+
+
+def _calibration_case(case: rs.ReferenceCase) -> str:
+    return case.calibration or _CALIBRATION[case.polarization]
+
+
 _CALIBRATION_MIN_DISTANCE_M = 0.2
 
 
@@ -67,7 +74,7 @@ def calibration_constant(case: rs.ReferenceCase, data_dir: Path) -> complex:
 
     import tidy3d as td
 
-    empty = rs.load_reference_case(_CALIBRATION[case.polarization])
+    empty = rs.load_reference_case(_calibration_case(case))
     plane = rs.extract_planes(td.SimulationData.from_file(str(data_dir / f"{empty.case_id}.hdf5")),
                               empty)[0]
     points = rs.plane_points(plane["x"], plane["y"], plane["z"])
@@ -99,7 +106,7 @@ def extract(args: argparse.Namespace) -> None:
             "field_component": "E" + case.polarization, "decimation": rs.DECIMATION,
             "normalization": "conj(Tidy3D phasor) / C: the exact unit-dipole field exp(-jkr)/r "
                              "times the transverse dipole projection, near-field terms included",
-            "calibration_case": _CALIBRATION[case.polarization],
+            "calibration_case": _calibration_case(case),
             "calibration_constant": [scale.real, scale.imag],
             "field_decay": _field_decay(data),
         }

@@ -46,6 +46,10 @@ class Block:
     def is_plate(self) -> bool:
         return min(self.size) == 0.0
 
+    @property
+    def is_slab(self) -> bool:
+        return self.material["kind"] == "slab"
+
 
 @dataclass(frozen=True, slots=True)
 class ReferenceCase:
@@ -60,6 +64,9 @@ class ReferenceCase:
     planes_z: tuple[float, ...]
     domain_bounds_xyz: tuple[tuple[float, float], ...]
     spec: dict[str, Any]
+    refine: tuple[dict[str, Any], ...] = ()
+    run_time_periods: float = 60.0
+    calibration: str | None = None
 
     @property
     def fingerprint(self) -> str:
@@ -95,16 +102,20 @@ def load_reference_case(case_id: str) -> ReferenceCase:
     for raw in geometry["blocks"]:
         name = material_name if raw["material"] == "$material" else raw["material"]
         blocks.append(Block(tuple(raw["center"]), tuple(raw["size"]), dict(manifest["materials"][name])))
-    spec = {"case_id": case_id, "frequency_hz": manifest["frequency_hz"], "case": entry,
+    frequency_hz = float(entry.get("frequency_hz", manifest["frequency_hz"]))
+    spec = {"case_id": case_id, "frequency_hz": frequency_hz, "case": entry,
             "geometry": geometry, "blocks": [
                 {"center": b.center, "size": b.size, "material": b.material} for b in blocks]}
     return ReferenceCase(
-        case_id=case_id, role=entry["role"], frequency_hz=float(manifest["frequency_hz"]),
+        case_id=case_id, role=entry["role"], frequency_hz=frequency_hz,
         polarization=entry["polarization"], grid_m=float(entry["grid_m"]), blocks=tuple(blocks),
         tx_position=tuple(geometry["tx_position"]),
         analysis_bounds_xy=tuple(tuple(row) for row in geometry["analysis_bounds_xy"]),
         planes_z=tuple(geometry["planes_z"]),
-        domain_bounds_xyz=tuple(tuple(row) for row in geometry["domain_bounds_xyz"]), spec=spec)
+        domain_bounds_xyz=tuple(tuple(row) for row in geometry["domain_bounds_xyz"]), spec=spec,
+        refine=tuple(entry.get("refine", ())),
+        run_time_periods=float(entry.get("run_time_periods", 60.0)),
+        calibration=entry.get("calibration"))
 
 
 # --------------------------------------------------------------------------- Tidy3D
@@ -116,15 +127,16 @@ def build_tidy3d_simulation(case: ReferenceCase) -> Any:
     um = METERS_TO_MICROMETERS
     structures = []
     for index, block in enumerate(case.blocks):
-        if block.material["kind"] == "pec":
-            medium = td.PECMedium(name="pec")
-        else:
-            medium = td.Medium(permittivity=block.material["eps_r"],
-                               conductivity=block.material["sigma_e"] / um, name="dielectric")
-        structures.append(td.Structure(
-            geometry=td.Box(center=tuple(v * um for v in block.center),
-                            size=tuple(v * um for v in block.size)),
-            medium=medium, name=f"block-{index}"))
+        for part, (center, size, material) in enumerate(_volumes(block)):
+            if material["kind"] == "pec":
+                medium = td.PECMedium(name="pec")
+            else:
+                medium = td.Medium(permittivity=material["eps_r"],
+                                   conductivity=material["sigma_e"] / um, name="dielectric")
+            name = f"block-{index}" if not block.is_slab else f"block-{index}-layer-{part}"
+            structures.append(td.Structure(
+                geometry=td.Box(center=tuple(v * um for v in center), size=tuple(v * um for v in size)),
+                medium=medium, name=name))
     (x0, x1), (y0, y1) = case.analysis_bounds_xy
     component = "E" + case.polarization
     monitors = [
@@ -137,13 +149,95 @@ def build_tidy3d_simulation(case: ReferenceCase) -> Any:
         source_time=td.GaussianPulse(freq0=case.frequency_hz, fwidth=case.frequency_hz / 5.0),
         name="tx")
     bounds = case.domain_bounds_xyz
-    return td.Simulation(
+    if case.refine:
+        axes = [td.UniformGrid(dl=case.grid_m * um) for _ in range(3)]
+        for axis, steps in _refined_steps(case).items():
+            axes[axis] = td.CustomGrid(dl=tuple(step * um for step in steps))
+        grid_spec = td.GridSpec(grid_x=axes[0], grid_y=axes[1], grid_z=axes[2])
+    else:
+        grid_spec = td.GridSpec.uniform(dl=case.grid_m * um)
+    simulation = td.Simulation(
         center=tuple((lo + hi) / 2 * um for lo, hi in bounds),
         size=tuple((hi - lo) * um for lo, hi in bounds),
-        grid_spec=td.GridSpec.uniform(dl=case.grid_m * um), structures=tuple(structures),
+        grid_spec=grid_spec, structures=tuple(structures),
         sources=(source,), monitors=tuple(monitors),
         boundary_spec=td.BoundarySpec.all_sides(boundary=td.PML(num_layers=12)),
-        run_time=60.0 / case.frequency_hz, shutoff=1.0e-7)
+        run_time=case.run_time_periods / case.frequency_hz, shutoff=1.0e-7)
+    _require_lattice_grid(case, simulation)
+    return simulation
+
+
+def _require_lattice_grid(case: ReferenceCase, simulation: Any) -> None:
+    """Fail unless every ``grid_m`` lattice node of the domain, plate plane and monitor is a grid node.
+
+    A domain size that is not a whole number of cells makes Tidy3D stretch the cells; a
+    zero-thickness plate between nodes then has no tangential field node and disappears.
+    """
+
+    for axis, name in enumerate("xyz"):
+        nodes = np.asarray(getattr(simulation.grid.boundaries, name)) / METERS_TO_MICROMETERS
+        lo, hi = case.domain_bounds_xyz[axis]
+        wanted = [lo + case.grid_m * n for n in range(_whole(hi - lo, case.grid_m) + 1)]
+        wanted += [block.center[axis] for block in case.blocks if block.size[axis] == 0.0]
+        if axis == 2:
+            wanted += list(case.planes_z)
+        for value in wanted:
+            if np.min(np.abs(nodes - value)) > 1.0e-9:
+                raise ValueError(f"{case.case_id}: {name} = {value} m is not a grid node")
+
+
+def _volumes(block: Block) -> list[tuple[tuple[float, ...], tuple[float, ...], dict[str, Any]]]:
+    """Homogeneous boxes of a block: the block itself, or one box per layer of a slab block.
+
+    A slab's layers are stacked along its thinnest axis from the low side; the stack must fill it.
+    """
+
+    if not block.is_slab:
+        return [(block.center, block.size, block.material)]
+    axis = int(np.argmin(block.size))
+    layers = block.material["layers"]
+    if not math.isclose(sum(layer["thickness_m"] for layer in layers), block.size[axis],
+                        rel_tol=1.0e-9, abs_tol=1.0e-12):
+        raise ValueError("slab layers must fill the block thickness")
+    volumes = []
+    start = float(block.lo[axis])
+    for layer in layers:
+        center, size = list(block.center), list(block.size)
+        center[axis] = start + 0.5 * layer["thickness_m"]
+        size[axis] = layer["thickness_m"]
+        volumes.append((tuple(center), tuple(size), {"kind": "dielectric", **layer}))
+        start += layer["thickness_m"]
+    return volumes
+
+
+def _refined_steps(case: ReferenceCase) -> dict[int, list[float]]:
+    """Per refined axis, the cell sizes: ``grid_m`` everywhere, ``dl`` inside each refined range.
+
+    Range ends and the domain bounds lie on the ``grid_m`` lattice and ``dl`` divides ``grid_m``,
+    so every node of the uniform lattice stays a grid node.
+    """
+
+    steps: dict[int, list[float]] = {}
+    for axis_name in sorted({row["axis"] for row in case.refine}):
+        axis = _AXES[axis_name]
+        lo, hi = case.domain_bounds_xyz[axis]
+        cuts = sorted((row["range"][0], row["range"][1], row["dl"]) for row in case.refine
+                      if row["axis"] == axis_name)
+        sizes: list[float] = []
+        position = lo
+        for start, stop, dl in [*cuts, (hi, hi, case.grid_m)]:
+            sizes += [case.grid_m] * _whole(start - position, case.grid_m)
+            sizes += [dl] * _whole(stop - start, dl)
+            position = stop
+        steps[axis] = sizes
+    return steps
+
+
+def _whole(length: float, step: float) -> int:
+    count = round(length / step)
+    if count < 0 or not math.isclose(count * step, length, rel_tol=0.0, abs_tol=1.0e-9):
+        raise ValueError(f"length {length} is not a whole number of {step} m cells")
+    return int(count)
 
 
 def extract_planes(simulation_data: Any, case: ReferenceCase) -> list[dict[str, np.ndarray]]:
@@ -160,9 +254,24 @@ def extract_planes(simulation_data: Any, case: ReferenceCase) -> list[dict[str, 
         x = np.asarray(values.coords["x"], dtype=np.float64) / METERS_TO_MICROMETERS
         y = np.asarray(values.coords["y"], dtype=np.float64) / METERS_TO_MICROMETERS
         field = np.asarray(values, dtype=np.complex128)
-        planes.append({"x": x[::DECIMATION], "y": y[::DECIMATION], "z": float(z),
-                       "field": field[::DECIMATION, ::DECIMATION]})
+        if not case.refine:
+            planes.append({"x": x[::DECIMATION], "y": y[::DECIMATION], "z": float(z),
+                           "field": field[::DECIMATION, ::DECIMATION]})
+            continue
+        # A refined axis has extra nodes; keep the nodes of the uniform decimated lattice.
+        rows, cols = _lattice_nodes(y, case.grid_m), _lattice_nodes(x, case.grid_m)
+        planes.append({"x": x[cols], "y": y[rows], "z": float(z), "field": field[np.ix_(rows, cols)]})
     return planes
+
+
+def _lattice_nodes(coords: np.ndarray, grid_m: float) -> np.ndarray:
+    pitch = DECIMATION * grid_m
+    wanted = coords[0] + pitch * np.arange(int(np.floor((coords[-1] - coords[0]) / pitch + 1.0e-6)) + 1)
+    index = np.searchsorted(coords, wanted - 1.0e-9)
+    index = np.minimum(index, coords.size - 1)
+    if np.max(np.abs(coords[index] - wanted)) > 1.0e-9:
+        raise ValueError("monitor nodes do not contain the uniform decimated lattice")
+    return index
 
 
 # --------------------------------------------------------------------------- dipole calibration
@@ -291,6 +400,25 @@ def _silhouette(block: Block, a: np.ndarray, b: np.ndarray, tx: np.ndarray) -> b
     return lit.count(True) == 1
 
 
+def _point_in_domain(case: ReferenceCase, point: np.ndarray) -> bool:
+    return all(lo <= value <= hi for value, (lo, hi) in zip(point, case.domain_bounds_xyz))
+
+
+def _segment_in_domain(case: ReferenceCase, a: np.ndarray, b: np.ndarray) -> bool:
+    """True when the closed segment a-b meets the simulated domain box."""
+
+    t0, t1 = 0.0, 1.0
+    for axis, (lo, hi) in enumerate(case.domain_bounds_xyz):
+        d = b[axis] - a[axis]
+        if d == 0.0:
+            if not lo <= a[axis] <= hi:
+                return False
+            continue
+        ta, tb = (lo - a[axis]) / d, (hi - a[axis]) / d
+        t0, t1 = max(t0, min(ta, tb)), min(t1, max(ta, tb))
+    return t0 <= t1
+
+
 def _vertex_visible(
     case: ReferenceCase, block: Block, vertex: np.ndarray, points: np.ndarray,
 ) -> np.ndarray:
@@ -332,7 +460,10 @@ def classify_regions(case: ReferenceCase, x: np.ndarray, y: np.ndarray, z: float
     boundary &= ndimage.binary_erosion(valid, iterations=1, border_value=1)
     distance = ndimage.distance_transform_edt(~boundary, sampling=(float(np.diff(y)[0]),
                                                                    float(np.diff(x)[0])))
-    edges = [(block, a, b) for block in case.blocks for a, b in _edges(block)]
+    # Edges and edge ends outside the simulated domain lie in or beyond the PML: a structure that
+    # crosses the domain stands for an unbounded one there, so they are not physical edges.
+    edges = [(block, a, b) for block in case.blocks for a, b in _edges(block)
+             if _segment_in_domain(case, a, b)]
     nearest_s = np.full(valid.shape, np.inf)
     nearest_sp = np.ones(valid.shape)
     corner = np.zeros_like(valid)
@@ -362,12 +493,14 @@ def classify_regions(case: ReferenceCase, x: np.ndarray, y: np.ndarray, z: float
             continue
         seen = ~_segments_blocked(case, lifted_middle[None, None], points)
         for end_u, vertex in ((0.0, a), (length, b)):
+            if not _point_in_domain(case, vertex):
+                continue
             s_end = np.linalg.norm(points - vertex, axis=-1)
             sp_end = float(np.linalg.norm(vertex - tx))
             fresnel = np.sqrt(wavelength * s_end * sp_end / (s_end + sp_end))
             corner |= seen & (np.abs(u_star - end_u) < CORNER_FRESNEL_FRACTION * fresnel)
     width = 0.5 * np.sqrt(wavelength * nearest_s * (nearest_s + nearest_sp) / nearest_sp)
-    transition = distance < width
+    transition = (distance < width) if boundary.any() else np.zeros_like(valid)
     labels = np.where(los, LIT, SHADOW).astype(np.uint8)
     labels[transition] = TRANSITION
     labels[corner] = CORNER
@@ -431,14 +564,21 @@ _BOX_FACES = ((0, 2, 1), (0, 3, 2), (4, 5, 6), (4, 6, 7), (0, 1, 5), (0, 5, 4), 
               (2, 3, 7), (2, 7, 6), (3, 0, 4), (3, 4, 7))
 
 
-def _block_mesh(block: Block) -> tuple[list[list[float]], list[tuple[int, int, int]], str]:
+def _block_mesh(
+    block: Block, tx: np.ndarray,
+) -> tuple[list[list[float]], list[tuple[int, int, int]], str]:
+    """Triangles of a block: a box, a plate, or for a slab a plate in its face towards ``tx``."""
+
     lo, hi = block.lo, block.hi
-    if block.is_plate:
-        axis = block.size.index(0.0)
+    if block.is_plate or block.is_slab:
+        axis = int(np.argmin(block.size))
+        plane = float(block.center[axis])
+        if block.is_slab:
+            plane = float(hi[axis] if tx[axis] > block.center[axis] else lo[axis])
         u, v = [a for a in range(3) if a != axis]
         vertices = []
         for cu, cv in ((lo[u], lo[v]), (hi[u], lo[v]), (hi[u], hi[v]), (lo[u], hi[v])):
-            vertex = [float(block.center[axis])] * 3
+            vertex = [plane] * 3
             vertex[u], vertex[v] = float(cu), float(cv)
             vertices.append(vertex)
         return vertices, [(0, 1, 2), (0, 2, 3)], "surface"
@@ -459,11 +599,15 @@ def build_channel_scene(case: ReferenceCase, plane: dict[str, Any]) -> Any:
     for index, block in enumerate(case.blocks):
         if block.material["kind"] == "pec":
             material = PhysicalMaterial.perfect_conductor(name="pec")
+        elif block.is_slab:
+            material = PhysicalMaterial(layers=tuple(MaterialLayer(
+                thickness_m=layer["thickness_m"], eps_r=layer["eps_r"], sigma_e=layer["sigma_e"])
+                for layer in block.material["layers"]), name="slab")
         else:
             material = PhysicalMaterial(layers=(MaterialLayer(
                 thickness_m=min(block.size) / 2.0, eps_r=block.material["eps_r"],
                 sigma_e=block.material["sigma_e"]),), name="dielectric")
-        vertices, faces, fill_mode = _block_mesh(block)
+        vertices, faces, fill_mode = _block_mesh(block, np.asarray(case.tx_position))
         mesh = Mesh(torch.tensor(vertices, dtype=torch.float32), torch.tensor(faces, dtype=torch.int32),
                     recenter=False, fill_mode=fill_mode, topology_diagnostics=False)
         structures.append(Structure(mesh, material, name=f"block-{index}", surface_id=index + 1))

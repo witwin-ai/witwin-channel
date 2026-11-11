@@ -7,7 +7,16 @@
   "frequency_hz": 5000000000.0,
   "materials": {
     "pec": {"kind": "pec"},
-    "dielectric": {"kind": "dielectric", "eps_r": 4.0, "sigma_e": 0.01}
+    "dielectric": {"kind": "dielectric", "eps_r": 4.0, "sigma_e": 0.01},
+    "concrete_5g": {"kind": "dielectric", "eps_r": 5.24, "sigma_e": 0.1627},
+    "concrete_3g5": {"kind": "dielectric", "eps_r": 5.24, "sigma_e": 0.1231},
+    "concrete_wall_5g": {"kind": "slab", "layers": [{"thickness_m": 0.1, "eps_r": 5.24, "sigma_e": 0.1627}]},
+    "concrete_wall_2g4": {"kind": "slab", "layers": [{"thickness_m": 0.1, "eps_r": 5.24, "sigma_e": 0.0916}]},
+    "layered_wall": {"kind": "slab", "layers": [
+      {"thickness_m": 0.02, "eps_r": 3.0, "sigma_e": 0.001},
+      {"thickness_m": 0.15, "eps_r": 6.5, "sigma_e": 0.05},
+      {"thickness_m": 0.02, "eps_r": 3.0, "sigma_e": 0.001}]},
+    "concrete_ground_3g5": {"kind": "slab", "layers": [{"thickness_m": 30.0, "eps_r": 5.24, "sigma_e": 0.1231}]}
   },
   "geometries": {
     "beam": {
@@ -53,6 +62,70 @@
       "analysis_bounds_xy": [[-0.56, 0.56], [-0.26, 0.26]],
       "planes_z": [-0.1],
       "domain_bounds_xyz": [[-0.6, 0.6], [-0.3, 0.3], [-0.2, 0.2]]
+    },
+    "wall": {
+      "description": "Infinite 0.1 m slab wall in x = 0.1..0.2 (through the PML); reflection at 0-80 degrees and transmission",
+      "blocks": [{"center": [0.15, 0.0, 0.0], "size": [0.1, 40.0, 40.0], "material": "$material"}],
+      "tx_position": [-0.1, -0.5, 0.0],
+      "analysis_bounds_xy": [[-0.42, 0.46], [-0.66, 0.66]],
+      "planes_z": [-0.06, -0.18],
+      "domain_bounds_xyz": [[-0.48, 0.52], [-0.72, 0.72], [-0.26, 0.2]]
+    },
+    "wall_layered": {
+      "description": "Infinite symmetric three-layer wall (2 / 15 / 2 cm) in x = 0.1..0.29 (through the PML)",
+      "blocks": [{"center": [0.195, 0.0, 0.0], "size": [0.19, 40.0, 40.0], "material": "layered_wall"}],
+      "tx_position": [-0.1, -0.5, 0.0],
+      "analysis_bounds_xy": [[-0.42, 0.46], [-0.66, 0.66]],
+      "planes_z": [-0.06, -0.18],
+      "domain_bounds_xyz": [[-0.48, 0.52], [-0.72, 0.72], [-0.26, 0.2]]
+    },
+    "trihedral": {
+      "description": "Inner corner of three finite PEC plates (ground z = 0, walls x = 0.3 and y = 0.3, 0.35 m high): up to three bounces",
+      "blocks": [
+        {"center": [-0.1, -0.1, 0.0], "size": [0.8, 0.8, 0.0], "material": "pec"},
+        {"center": [0.3, -0.1, 0.175], "size": [0.0, 0.8, 0.35], "material": "pec"},
+        {"center": [-0.1, 0.3, 0.175], "size": [0.8, 0.0, 0.35], "material": "pec"}
+      ],
+      "tx_position": [0.02, -0.12, 0.2],
+      "analysis_bounds_xy": [[-0.56, 0.36], [-0.56, 0.36]],
+      "planes_z": [0.08, 0.26],
+      "domain_bounds_xyz": [[-0.62, 0.42], [-0.62, 0.42], [-0.12, 0.48]]
+    },
+    "double_edge": {
+      "description": "Two parallel PEC screens infinite in y and below their edges (x = -0.1, top 0.05; x = 0.15, top -0.05): double diffraction",
+      "blocks": [
+        {"center": [-0.1, 0.0, -19.95], "size": [0.0, 40.0, 40.0], "material": "pec"},
+        {"center": [0.15, 0.0, -20.05], "size": [0.0, 40.0, 40.0], "material": "pec"}
+      ],
+      "tx_position": [-0.4, 0.03, 0.0],
+      "analysis_bounds_xy": [[-0.5, 0.5], [-0.24, 0.24]],
+      "planes_z": [-0.15, 0.1],
+      "domain_bounds_xyz": [[-0.56, 0.56], [-0.3, 0.3], [-0.3, 0.2]]
+    },
+    "wall_column": {
+      "description": "Infinite PEC column (0.2 m square, through the PML in z) 0.2 m in front of an infinite 0.1 m concrete wall: reflection-diffraction chains",
+      "blocks": [
+        {"center": [0.0, 0.0, 0.0], "size": [0.2, 0.2, 40.0], "material": "pec"},
+        {"center": [0.35, 0.0, 0.0], "size": [0.1, 40.0, 40.0], "material": "concrete_wall_5g"}
+      ],
+      "tx_position": [-0.35, -0.25, 0.0],
+      "analysis_bounds_xy": [[-0.5, 0.28], [-0.5, 0.5]],
+      "planes_z": [-0.06],
+      "domain_bounds_xyz": [[-0.56, 0.44], [-0.56, 0.56], [-0.2, 0.2]]
+    },
+    "canyon": {
+      "description": "Four concrete blocks (0.4 m square, 0.2-0.3 m high) on a concrete ground with two crossing 0.3 m streets",
+      "blocks": [
+        {"center": [0.0, 0.0, -15.0], "size": [40.0, 40.0, 30.0], "material": "concrete_ground_3g5"},
+        {"center": [-0.35, -0.35, 0.125], "size": [0.4, 0.4, 0.25], "material": "concrete_3g5"},
+        {"center": [0.35, -0.35, 0.15], "size": [0.4, 0.4, 0.3], "material": "concrete_3g5"},
+        {"center": [-0.35, 0.35, 0.15], "size": [0.4, 0.4, 0.3], "material": "concrete_3g5"},
+        {"center": [0.35, 0.35, 0.1], "size": [0.4, 0.4, 0.2], "material": "concrete_3g5"}
+      ],
+      "tx_position": [0.03, -0.7, 0.12],
+      "analysis_bounds_xy": [[-0.8, 0.8], [-0.8, 0.8]],
+      "planes_z": [0.06, 0.16],
+      "domain_bounds_xyz": [[-0.86, 0.86], [-0.86, 0.86], [-0.1, 0.4]]
     }
   },
   "cases": {
@@ -65,6 +138,27 @@
     "cube_z": {"geometry": "cube", "polarization": "z", "grid_m": 0.002, "material": "pec", "role": "fit"},
     "cube_x": {"geometry": "cube", "polarization": "x", "grid_m": 0.002, "material": "pec", "role": "holdout"},
     "three_cube_z": {"geometry": "three_cube", "polarization": "z", "grid_m": 0.0025, "material": "pec", "role": "holdout"},
-    "cube_dielectric_z": {"geometry": "cube", "polarization": "z", "grid_m": 0.002, "material": "dielectric", "role": "holdout"}
+    "cube_dielectric_z": {"geometry": "cube", "polarization": "z", "grid_m": 0.002, "material": "dielectric", "role": "holdout"},
+    "empty_z_refined": {"geometry": "empty", "polarization": "z", "grid_m": 0.002, "material": "pec", "role": "calibration", "refine": [{"axis": "x", "range": [0.1, 0.3], "dl": 0.0005}]},
+    "empty_z_3g5": {"geometry": "empty", "polarization": "z", "grid_m": 0.0025, "material": "pec", "role": "calibration", "frequency_hz": 3500000000.0},
+    "empty_x_3g5": {"geometry": "empty", "polarization": "x", "grid_m": 0.0025, "material": "pec", "role": "calibration", "frequency_hz": 3500000000.0},
+    "empty_z_2g4": {"geometry": "empty", "polarization": "z", "grid_m": 0.004, "material": "pec", "role": "calibration", "frequency_hz": 2400000000.0},
+    "wall_concrete_z": {"geometry": "wall", "polarization": "z", "grid_m": 0.002, "material": "concrete_wall_5g", "role": "coverage", "refine": [{"axis": "x", "range": [0.1, 0.2], "dl": 0.001}]},
+    "wall_concrete_y": {"geometry": "wall", "polarization": "y", "grid_m": 0.002, "material": "concrete_wall_5g", "role": "coverage", "refine": [{"axis": "x", "range": [0.1, 0.2], "dl": 0.001}]},
+    "wall_layered_z": {"geometry": "wall_layered", "polarization": "z", "grid_m": 0.002, "material": "layered_wall", "role": "coverage", "refine": [{"axis": "x", "range": [0.1, 0.29], "dl": 0.0005}]},
+    "wall_layered_y": {"geometry": "wall_layered", "polarization": "y", "grid_m": 0.002, "material": "layered_wall", "role": "coverage", "refine": [{"axis": "x", "range": [0.1, 0.29], "dl": 0.0005}]},
+    "wall_concrete_z_2g4": {"geometry": "wall", "polarization": "z", "grid_m": 0.004, "material": "concrete_wall_2g4", "role": "coverage", "frequency_hz": 2400000000.0, "calibration": "empty_z_2g4", "refine": [{"axis": "x", "range": [0.1, 0.2], "dl": 0.002}]},
+    "cube_concrete_z": {"geometry": "cube", "polarization": "z", "grid_m": 0.002, "material": "concrete_5g", "role": "coverage"},
+    "trihedral_z": {"geometry": "trihedral", "polarization": "z", "grid_m": 0.002, "material": "pec", "role": "coverage", "run_time_periods": 80},
+    "trihedral_x": {"geometry": "trihedral", "polarization": "x", "grid_m": 0.002, "material": "pec", "role": "coverage", "run_time_periods": 80},
+    "double_edge_y": {"geometry": "double_edge", "polarization": "y", "grid_m": 0.002, "material": "pec", "role": "coverage", "run_time_periods": 80},
+    "double_edge_z": {"geometry": "double_edge", "polarization": "z", "grid_m": 0.002, "material": "pec", "role": "coverage", "run_time_periods": 80},
+    "wall_column_z": {"geometry": "wall_column", "polarization": "z", "grid_m": 0.002, "material": "pec", "role": "coverage", "run_time_periods": 80, "refine": [{"axis": "x", "range": [0.3, 0.4], "dl": 0.001}]},
+    "wall_column_y": {"geometry": "wall_column", "polarization": "y", "grid_m": 0.002, "material": "pec", "role": "coverage", "run_time_periods": 80, "refine": [{"axis": "x", "range": [0.3, 0.4], "dl": 0.001}]},
+    "canyon_z_3g5": {"geometry": "canyon", "polarization": "z", "grid_m": 0.0025, "material": "concrete_3g5", "role": "coverage", "frequency_hz": 3500000000.0, "calibration": "empty_z_3g5", "run_time_periods": 80},
+    "empty_z_fine": {"geometry": "empty", "polarization": "z", "grid_m": 0.001, "material": "pec", "role": "calibration"},
+    "wall_concrete_z_fine": {"geometry": "wall", "polarization": "z", "grid_m": 0.001, "material": "concrete_wall_5g", "role": "convergence", "calibration": "empty_z_fine", "refine": [{"axis": "x", "range": [0.1, 0.2], "dl": 0.0005}]},
+    "cube_concrete_x": {"geometry": "cube", "polarization": "x", "grid_m": 0.002, "material": "concrete_5g", "role": "coverage"},
+    "canyon_x_3g5": {"geometry": "canyon", "polarization": "x", "grid_m": 0.0025, "material": "concrete_3g5", "role": "coverage", "frequency_hz": 3500000000.0, "calibration": "empty_x_3g5", "run_time_periods": 80}
   }
 }
