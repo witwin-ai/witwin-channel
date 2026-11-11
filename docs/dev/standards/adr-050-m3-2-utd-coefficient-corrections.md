@@ -1,6 +1,6 @@
 # ADR-050: Textbook UTD coefficient, reciprocal face angles and the dipole source in diffraction
 
-- **Status:** Accepted.
+- **Status:** Accepted; accepted by the owner, 2026-11-15.
 - **Date:** 2026-11-10.
 - **Decision ID:** `m3-2-utd-coefficient-corrections`.
 - **Scope:** every diffraction family that evaluates RayD's shared UTD coefficient: deterministic
@@ -95,3 +95,10 @@ each end removes `|F(inf) - F(v)| ~ 1/(pi v)` with `v ~ 600`.
   record does not change it.
 - The face angle rule is a heuristic, like Luebbers'. It agrees with Luebbers on both reflection
   shadow boundaries and with KP for perfect conductors at every angle.
+
+## Owner acceptance
+
+Accepted by the owner, 2026-11-15: the symmetric face-angle rule (mean of the incidence and
+observation sines), the refit of the corner-weight constants (`C_BLEND`, the corner sigmoid width)
+against the full-wave reference with the corrected finite-edge factor, and the resulting movement
+of every diffraction value.
