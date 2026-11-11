@@ -84,25 +84,34 @@ def test_coherent_refuses_ad_mode():
 def test_default_off_is_bit_identical_to_incoherent():
     """Gate (a): OFF path untouched, bitwise-equal to the incoherent reference.
 
- The OFF path never enters the coherent kernel; it must be reproducible
- bit-for-bit across runs and must reproduce the deterministic incoherent
- component power exactly (both consume the same enumerated first-order UTD
- evaluation and the same power accumulator). The single point receiver makes
- the cross-solver reduction bit-exact.
- """
+    The OFF path never enters the coherent kernel; it must be reproducible
+    bit-for-bit across runs. It consumes the same enumerated first-order UTD
+    rows as the deterministic solver and reduces each cell as a fixed-order
+    float64 sum cast to float32 once, so it equals that reduction of the
+    deterministic solver's exported per-row powers bit for bit. The
+    deterministic solver itself sums the same rows with float32 atomics, so its
+    cell differs from the float64 reduction by float32 rounding of the partial
+    sums only: at most (rows - 1) half-ulps of the sum, bounded below by
+    rows * eps32 * sum.
+    """
 
     _skip_unless_native()
     scene = wedge_diffraction_scene()
 
-    reference = _diffraction(
-        deterministic_solve(
-            scene,
-            DeterministicConfig(
-                components={"diffraction"}, max_depth=1, coherent=False
-            ),
-            reference_frequency_hz=3.0e9,
-        )
+    deterministic = deterministic_solve(
+        scene,
+        DeterministicConfig(
+            components={"diffraction"}, max_depth=1, coherent=False, export_paths=True
+        ),
+        reference_frequency_hz=3.0e9,
     )
+    reference = _diffraction(deterministic)
+    rows = deterministic.paths.path_gain[deterministic.paths.valid]
+    assert rows.numel() >= 1
+    # The scene's edge set gives the receiver several diffraction rows, so the
+    # reduction order matters below float32 resolution.
+    float64_reduction = rows.to(torch.float64).sum().to(torch.float32)
+
     off_a = _diffraction(
         bdpt_solve(
             scene,
@@ -129,7 +138,9 @@ def test_default_off_is_bit_identical_to_incoherent():
     )
 
     assert torch.equal(off_a, off_b)
-    assert torch.equal(off_a.reshape(()), reference.reshape(()))
+    assert torch.equal(off_a.reshape(()), float64_reduction)
+    bound = rows.numel() * torch.finfo(torch.float32).eps * float(float64_reduction)
+    assert abs(float(reference.reshape(())) - float(float64_reduction)) <= bound
 
 
 def test_coherent_converges_to_deterministic_coherent():
