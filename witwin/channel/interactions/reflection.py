@@ -57,14 +57,16 @@ _BOUNDS_RELATIVE = 1.0e-4
 _TREE_RELATIVE = 1.0e-4
 # Slack on the back-trace intersection parameter; ten times the EPC solve's own slack.
 _SEGMENT_PARAMETER_SLACK = 1.0e-3
-# Upper bound of EPC candidates per launch; the memory-derived chunk may be smaller.
-_MULTIBOUNCE_PAIR_CHUNK_SIZE = 1 << 20
+# Upper bound of reflection EPC candidates per launch; the memory-derived chunk may be smaller.
+_EPC_MAX_CANDIDATES = 1 << 20
+# Upper bound of diffraction (receiver x state) lanes per launch, read by diffraction discovery.
+_MULTIBOUNCE_PAIR_CHUNK_SIZE = 4_194_304
 _MULTIBOUNCE_DISCOVERY_RAYS = 262_144
 # Transient EPC working set per candidate and per bounce (inputs, RayD outputs and
 # its staging copies), and the share of free device memory one chunk may use.
 _EPC_BYTES_PER_CANDIDATE = 192
 _EPC_BYTES_PER_BOUNCE = 192
-_EPC_CHUNK_MEMORY_LIMIT = 256 << 20
+_EPC_CHUNK_MEMORY_LIMIT = 512 << 20
 # Discovery traces at most this many transmitters' rays per launch.
 _DISCOVERY_TX_CHUNK = 32
 _DISCOVERY_DIRECTIONS: dict[tuple[torch.device, int], torch.Tensor] = {}
@@ -213,11 +215,11 @@ def epc_candidate_chunk(depth: int, device: torch.device) -> int:
     """Candidates per EPC launch, sized from free device memory and the launch cap."""
 
     if torch.device(device).type != "cuda":
-        return _MULTIBOUNCE_PAIR_CHUNK_SIZE
+        return _EPC_MAX_CANDIDATES
     free_bytes, _total = torch.cuda.mem_get_info(device)
     budget = min(int(free_bytes) // 4, _EPC_CHUNK_MEMORY_LIMIT)
     per_candidate = _EPC_BYTES_PER_CANDIDATE + _EPC_BYTES_PER_BOUNCE * int(depth)
-    return max(1, min(_MULTIBOUNCE_PAIR_CHUNK_SIZE, budget // per_candidate))
+    return max(1, min(_EPC_MAX_CANDIDATES, budget // per_candidate))
 
 
 def _frontier_node_limit(depth: int, device: torch.device) -> int:

@@ -66,7 +66,7 @@ not depend on `max_depth`. `discovery="rays"` uses ray discovery at every depth.
 `discovery="exhaustive"` never switches and raises `ValueError` before any EPC work when its
 frontier does not fit.
 
-**Memory and launch length.** EPC chunks are sized from free memory, at most 256 MiB and
+**Memory and launch length.** EPC chunks are sized from free memory, at most 512 MiB and
 `2^20` candidates per launch; tree and receiver-test launches are at most `2^25` pair tests.
 
 **Metadata.** Path and Deterministic `Config.discovery` (default `"auto"`). Results carry
