@@ -30,11 +30,11 @@ from witwin.channel.scene.endpoints import (
 )
 from witwin.channel.interactions.reflection import (
     ReflectionEpcQuery,
-    iter_reflection_multibounce_epc_requests,
-    iter_reflection_order1_epc_requests,
-    prepare_reflection_multibounce_plan,
-    prepare_reflection_order1_plan,
+    iter_reflection_epc_requests,
+    prepare_reflection_discovery_plan,
     query_reflection_epc,
+    reflection_min_segment_length,
+    reflection_plane_groups,
 )
 from witwin.channel.interactions.transmission import (
     _EVENT_PROBABILITY_FLOOR,
@@ -1801,13 +1801,12 @@ def _gather_leg_order1(
     group_count = int(groups["group_count"])
     if group_count <= 0:
         return
-    plan = prepare_reflection_order1_plan(
-        group_count=group_count,
-        representative_faces=groups["representative_faces"].contiguous(),
-        face_group_id=geom.face_group_id,
+    plane_groups = reflection_plane_groups(
+        compiled, groups, tri_a=geom.tri_a, normals=geom.normals
     )
+    plan = prepare_reflection_discovery_plan(plane_groups, min_depth=1, max_depth=1)
     source_positions = source.reshape(1, 3)
-    for request in iter_reflection_order1_epc_requests(
+    for request in iter_reflection_epc_requests(
         plan,
         tx_positions=source_positions,
         rx_positions=samples.position,
@@ -1832,6 +1831,7 @@ def _gather_leg_order1(
                 surface_group_members=groups["surface_group_members"],
                 max_bounces=1,
                 visibility_ignore_mode=1,
+                min_segment_length=reflection_min_segment_length(plane_groups),
             )
         )
         selected = topology_kernels.deterministic_reflection_order1_compact(
@@ -1880,25 +1880,22 @@ def _gather_leg_multibounce(
     group_count = int(groups["group_count"])
     if group_count <= 0:
         return
-    plan = prepare_reflection_multibounce_plan(
-        group_count=group_count,
-        representative_faces=groups["representative_faces"].contiguous(),
-        face_group_id=geom.face_group_id,
-        min_depth=2,
-        max_depth=int(max_leg_depth),
+    plane_groups = reflection_plane_groups(
+        compiled, groups, tri_a=geom.tri_a, normals=geom.normals
+    )
+    plan = prepare_reflection_discovery_plan(
+        plane_groups, min_depth=2, max_depth=int(max_leg_depth)
     )
     source_positions = source.reshape(1, 3)
-    for request in iter_reflection_multibounce_epc_requests(
+    for request in iter_reflection_epc_requests(
         plan,
         tx_positions=source_positions,
         rx_positions=samples.position,
-        sequence_reference=tx_power_ref,
         tri_a=geom.tri_a,
         normals=geom.normals,
         trace_group_chains=lambda tx, *, face_group_id, max_depth: _trace_group_chains(
             compiled.rayd, tx, face_group_id=face_group_id, max_depth=max_depth
         ),
-        record_candidate_count=lambda candidate_count: None,
     ):
         depth = int(request.depth)
         epc_inputs = request.epc_inputs
@@ -1916,6 +1913,7 @@ def _gather_leg_multibounce(
                 surface_group_members=groups["surface_group_members"],
                 max_bounces=depth,
                 visibility_ignore_mode=1,
+                min_segment_length=reflection_min_segment_length(plane_groups),
             )
         )
         selected = topology_kernels.deterministic_reflection_sequence_compact(

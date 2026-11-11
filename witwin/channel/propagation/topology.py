@@ -246,6 +246,9 @@ class PathExecutionStats:
     # Candidate edge ids whose distinct count is diagnostics metadata; counted
     # only when a caller asks, so a solve without diagnostics pays nothing.
     selected_edge_ids: torch.Tensor | None = field(default=None, compare=False, repr=False)
+    # Reflection candidate sources per depth and whether they are provably complete; None when
+    # reflection was not requested.
+    reflection_discovery: dict[str, object] | None = field(default=None, compare=False)
 
     def resolved_selected_edge_count(self) -> int:
         """Distinct selected edges: the stored count, or the native count of the candidate ids."""

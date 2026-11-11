@@ -387,6 +387,31 @@
       "device_trap": false,
       "compile_options": []
     },
+    "native/channel/kernels/discovery.cu": {
+      "kernels": [
+        "group_bounds_accumulate_kernel",
+        "group_bounds_init_kernel",
+        "group_occupancy_kernel",
+        "group_planes_kernel",
+        "image_tree_flags_kernel",
+        "image_tree_write_kernel",
+        "receiver_candidate_count_kernel",
+        "receiver_candidate_write_kernel"
+      ],
+      "launches": [
+        "group_bounds_accumulate_kernel",
+        "group_bounds_init_kernel",
+        "group_occupancy_kernel",
+        "group_planes_kernel",
+        "image_tree_flags_kernel",
+        "image_tree_write_kernel",
+        "receiver_candidate_count_kernel",
+        "receiver_candidate_write_kernel"
+      ],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
     "native/channel/kernels/evaluated_paths.cu": {
       "kernels": [
         "compact_contract_flags_kernel",
@@ -714,7 +739,6 @@
         "deterministic_face_group_keys_kernel",
         "deterministic_face_group_members_kernel",
         "deterministic_face_group_sort_key_kernel",
-        "deterministic_face_sequence_chunk_kernel",
         "deterministic_gather_rows_kernel",
         "deterministic_los_topology_all_kernel",
         "deterministic_los_topology_compact_kernel",
@@ -753,7 +777,6 @@
         "deterministic_face_group_keys_kernel",
         "deterministic_face_group_members_kernel",
         "deterministic_face_group_sort_key_kernel",
-        "deterministic_face_sequence_chunk_kernel",
         "deterministic_gather_rows_kernel",
         "deterministic_los_topology_all_kernel",
         "deterministic_los_topology_compact_kernel",

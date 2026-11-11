@@ -20,6 +20,22 @@ All notable changes to `witwin-channel` are documented in this file.
   moving-transmitter scripts, and user guides under `docs/user/`.
 - The public API snapshot gains the two modules above; no existing export
   changed.
+- Path and Deterministic `Config.discovery` (`"auto"`, `"exhaustive"`,
+  `"rays"`) selects the reflection candidate source; result metadata publishes
+  `complete` (true only when every reflection depth came from a provably
+  complete source) and `discovery` (requested source and source per depth).
+  The public API snapshot records the two `Config` contracts changing.
+
+### Changed
+
+- Reflection candidates come from an image tree with conservative beam pruning
+  and an image-method receiver test, validated by one RayD EPC validator, per
+  depth; the 100,000-sequence switch between exhaustive and ray discovery is
+  gone, so the rows of a depth no longer depend on `max_depth`. Degenerate
+  paths (a segment shorter than 1e-5 of the scene diagonal, e.g. two
+  reflection points on a shared edge, or repeated reflections on one plane)
+  are no longer reported. Depth-3 reflection on a 64 x 64 grid of the 4x4
+  synthetic city drops from 418 ms / 2.15 GB to about 14 ms / 0.1 GB.
 
 ### Fixed
 

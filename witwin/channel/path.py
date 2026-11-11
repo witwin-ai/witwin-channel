@@ -31,6 +31,8 @@ from witwin.channel.components import (
     validate_scatter_chain,
     validate_scattering_quadrature,
     validate_vocabulary,
+    DISCOVERY_MODES,
+    discovery_metadata,
     validated_components,
 )
 from witwin.core import Scene, SceneSnapshot
@@ -122,6 +124,11 @@ class Config:
     # projection-validated optimum is 0.5 (artifacts/isb-taper/report.json).
     isb_boundary_taper: bool = False
     isb_boundary_taper_width: float = 0.5
+    # Reflection candidate source: "auto" (complete image tree, ray discovery only past its
+    # cost budget), "exhaustive" (every plane-group sequence) or "rays" (ray discovery). The
+    # result metadata's "complete" says whether the paths found are provably all of them.
+    discovery: str = "auto"
+
     def __post_init__(self) -> None:
         validate_config_fields(self)
         validate_max_depth(self.max_depth)
@@ -150,6 +157,7 @@ class Config:
         validate_vocabulary("path max_paths_scope", self.max_paths_scope, _VALID_MAX_PATHS_SCOPES)
         validate_coupled_candidate_limit(self.coupled_candidate_limit)
         validate_vocabulary("path ad_mode", self.ad_mode, _VALID_AD_MODES)
+        validate_vocabulary("path discovery", self.discovery, DISCOVERY_MODES)
         object.__setattr__(self, "components", components)
 
 
@@ -1082,7 +1090,7 @@ def _metadata(
     path_native_available: bool, transmission_path_count: int = 0, scattering_path_count: int = 0,
     ad_companion_launches: int = 0, ad_tape_bytes: int = 0, forward_time_ms: float = 0.0,
     peak_memory_bytes: int = 0, scattering_info: dict[str, Any] | None = None,
-    transmission_dropped_rows: int = 0,
+    transmission_dropped_rows: int = 0, reflection_discovery: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     # diffraction AD: the real registered-companion accounting. vjp retains
     # tape and schedules its companions on the user's later backward; jvp
@@ -1160,7 +1168,9 @@ def _metadata(
             if config.coupled_paths
             else "not_requested",
         },
+        "discovery": discovery_metadata(config.discovery, reflection_discovery),
     }
+    metadata["complete"] = bool(metadata["discovery"]["complete"])
     if "transmission" in config.components:
         # Endpoint-connection thin_sheet contract.
         metadata["transmission"] = {
@@ -1898,6 +1908,7 @@ def _pipeline_solve_base(
         peak_memory_bytes=peak_memory_bytes,
         scattering_info=scattering_info,
         transmission_dropped_rows=transmission_dropped_rows(sidecars),
+        reflection_discovery=sidecars.execution.reflection_discovery,
     )
     tx_positions, _tx_power = transmitter_tensors(scene)
     rx_positions = receiver_positions(scene, reference=tx_positions)

@@ -63,6 +63,7 @@ def test_reflection_epc_paths_forward_exports_direct_plane_path_table_fields():
         surface_group_members,
         1,
         1,
+        0.0,
     )
 
     valid, path_length, resolved_prim_ids, surface_group_ids, hit_positions, normals = out
