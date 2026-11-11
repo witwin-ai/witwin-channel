@@ -67,6 +67,7 @@ from witwin.channel.materials import (
     face_geometry_id_table,
     face_material_field_bundle,
     face_material_tensors,
+    has_multilayer_material,
 )
 from witwin.channel.scene.compiler import (
     _frequency_scalar,

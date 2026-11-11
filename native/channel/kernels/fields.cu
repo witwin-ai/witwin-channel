@@ -11,6 +11,7 @@
 #include "math.cuh"
 #include "ordered_sum.cuh"
 #include <rayd/field_transport.cuh>
+#include "layered_reflection.cuh"
 #include "../tensor_checks.h"
 
 #include <algorithm>
@@ -24,6 +25,7 @@ namespace {
 constexpr int kBlockSize = 256;
 namespace field = rayd::shared::diffraction;
 namespace transport = rayd::shared::field_transport;
+namespace layered = channel::layered_reflection;
 
 
 
@@ -155,6 +157,8 @@ __global__ void reflection_sequence_kernel(
     const float* mu_r,
     const float* gain,
     const float* thickness,
+    const int* bounce_material,
+    layered::LayerTables layers,
     FrequencyColumns columns,
     c10::complex<float>* field_vector,
     c10::complex<float>* coefficient,
@@ -190,7 +194,7 @@ __global__ void reflection_sequence_kernel(
                 field::f3_sub(hit, previous), outgoing);
             total_length += field::safe_length(field::f3_sub(hit, previous));
             const int64_t scalar = index * depth + bounce;
-            value = transport::reflect_complex3(
+            value = layered::reflect_layered(
                 value,
                 incident,
                 load_sequence3(interaction_normals, index, bounce, depth),
@@ -200,6 +204,8 @@ __global__ void reflection_sequence_kernel(
                 gain[scalar],
                 thickness[scalar],
                 frequency_hz,
+                bounce_material[scalar],
+                layers,
                 outgoing);
             previous = hit;
         }
@@ -270,6 +276,8 @@ __global__ void coupled_rd_field_kernel(
     const float* reflection_mu_r,
     const float* reflection_gain,
     const float* reflection_thickness,
+    const int* reflection_material,
+    layered::LayerTables layers,
     const float* wedge_eps_r0,
     const float* wedge_sigma_e0,
     const float* wedge_mu_r0,
@@ -331,7 +339,7 @@ __global__ void coupled_rd_field_kernel(
             const field::float3a tx_axis = field::project_to_wedge_plane(
                 channel::math::load_field_vec3(tx_polarization, index), source_to_hit);
             field::float3a reflected_direction;
-            field::Complex3 reflected = transport::reflect_complex3(
+            field::Complex3 reflected = layered::reflect_layered(
                 field::cplx_scale_real(tx_axis, field::cplx(1.0f, 0.0f)),
                 source_to_hit,
                 normal,
@@ -341,6 +349,8 @@ __global__ void coupled_rd_field_kernel(
                 reflection_gain[index],
                 reflection_thickness[index],
                 frequency_hz,
+                reflection_material[index],
+                layers,
                 reflected_direction);
             const float unfolded_distance = field::safe_length(
                 field::f3_sub(edge, diffraction_source));
@@ -371,8 +381,10 @@ __global__ void coupled_rd_field_kernel(
         pair.incidentDerivativeJones = field::jones_zero();
         pair.face0Material.present = 1.0f;
         pair.face1Material.present = 1.0f;
+        float pair_face0_cos, pair_face1_cos;
+        field::pair_face_cosines(pair, diffraction_target, pair_face0_cos, pair_face1_cos);
         pair.face0Operator = transport::slab_face_operator(
-            fabsf(field::f3_dot(pair.n0, incident_direction)),
+            pair_face0_cos,
             wedge_eps_r0[index],
             wedge_sigma_e0[index],
             wedge_mu_r0[index],
@@ -385,7 +397,7 @@ __global__ void coupled_rd_field_kernel(
             input_edge_basis,
             output_edge_basis);
         pair.face1Operator = transport::slab_face_operator(
-            fabsf(field::f3_dot(pair.nn, incident_direction)),
+            pair_face1_cos,
             wedge_eps_r1[index],
             wedge_sigma_e1[index],
             wedge_mu_r1[index],
@@ -414,7 +426,7 @@ __global__ void coupled_rd_field_kernel(
 
         field::float3a final_direction = outgoing_direction;
         if (reverse) {
-            value = transport::reflect_complex3(
+            value = layered::reflect_layered(
                 value,
                 field::safe_normalize(field::f3_sub(hit, edge), outgoing_direction),
                 normal,
@@ -424,6 +436,8 @@ __global__ void coupled_rd_field_kernel(
                 reflection_gain[index],
                 reflection_thickness[index],
                 frequency_hz,
+                reflection_material[index],
+                layers,
                 final_direction);
         }
         const int64_t base = index * 3;
@@ -551,8 +565,10 @@ __global__ void coupled_dd_field_kernel(
         pair1.incidentDerivativeJones = field::jones_zero();
         pair1.face0Material.present = 1.0f;
         pair1.face1Material.present = 1.0f;
+        float pair1_face0_cos, pair1_face1_cos;
+        field::pair_face_cosines(pair1, q2, pair1_face0_cos, pair1_face1_cos);
         pair1.face0Operator = transport::slab_face_operator(
-            fabsf(field::f3_dot(pair1.n0, incident_direction1)),
+            pair1_face0_cos,
             wedge1_eps_r0[index],
             wedge1_sigma_e0[index],
             wedge1_mu_r0[index],
@@ -565,7 +581,7 @@ __global__ void coupled_dd_field_kernel(
             input_edge_basis1,
             output_edge_basis1);
         pair1.face1Operator = transport::slab_face_operator(
-            fabsf(field::f3_dot(pair1.nn, incident_direction1)),
+            pair1_face1_cos,
             wedge1_eps_r1[index],
             wedge1_sigma_e1[index],
             wedge1_mu_r1[index],
@@ -616,8 +632,10 @@ __global__ void coupled_dd_field_kernel(
         pair2.incidentDerivativeJones = field::jones_zero();
         pair2.face0Material.present = 1.0f;
         pair2.face1Material.present = 1.0f;
+        float pair2_face0_cos, pair2_face1_cos;
+        field::pair_face_cosines(pair2, dst, pair2_face0_cos, pair2_face1_cos);
         pair2.face0Operator = transport::slab_face_operator(
-            fabsf(field::f3_dot(pair2.n0, incident_direction2)),
+            pair2_face0_cos,
             wedge2_eps_r0[index],
             wedge2_sigma_e0[index],
             wedge2_mu_r0[index],
@@ -630,7 +648,7 @@ __global__ void coupled_dd_field_kernel(
             input_edge_basis2,
             output_edge_basis2);
         pair2.face1Operator = transport::slab_face_operator(
-            fabsf(field::f3_dot(pair2.nn, incident_direction2)),
+            pair2_face1_cos,
             wedge2_eps_r1[index],
             wedge2_sigma_e1[index],
             wedge2_mu_r1[index],
@@ -877,13 +895,48 @@ void check_reflection_sequence_inputs(
                 "reflection endpoint tensors must match source rows");
 }
 
+// Layer store view of a reflection request: per-bounce material ids (N, D) plus the compiled CSR layer
+// tables. Material ids outside the store fall back to the scalar slab view in the kernel.
+layered::LayerTables reflection_layer_tables(
+    const at::Tensor& bounce_material,
+    const at::Tensor& layer_offset,
+    const at::Tensor& layer_count,
+    const at::Tensor& layer_thickness_m,
+    const at::Tensor& layer_eps_r,
+    const at::Tensor& layer_sigma_e,
+    const at::Tensor& layer_mu_r,
+    int64_t count,
+    int64_t depth) {
+    using channel::check_tensor;
+    check_tensor(bounce_material, "bounce_material", at::kInt, 2);
+    TORCH_CHECK(bounce_material.size(0) == count && bounce_material.size(1) == depth,
+                "bounce_material must have shape (N, D)");
+    check_tensor(layer_offset, "layer_offset", at::kInt, 1);
+    check_tensor(layer_count, "layer_count", at::kInt, 1);
+    TORCH_CHECK(layer_count.size(0) == layer_offset.size(0), "layer_count must match layer_offset");
+    for (const auto& tensor : {layer_thickness_m, layer_eps_r, layer_sigma_e, layer_mu_r})
+        check_tensor(tensor, "layer table", at::kFloat, 1);
+    TORCH_CHECK(layer_eps_r.size(0) == layer_thickness_m.size(0) && layer_sigma_e.size(0) == layer_thickness_m.size(0) &&
+                    layer_mu_r.size(0) == layer_thickness_m.size(0),
+                "layer tables must share one length");
+    layered::LayerTables tables;
+    tables.offset = layer_offset.data_ptr<int>();
+    tables.count = layer_count.data_ptr<int>();
+    tables.thickness_m = layer_thickness_m.data_ptr<float>();
+    tables.eps_r = layer_eps_r.data_ptr<float>();
+    tables.sigma_e = layer_sigma_e.data_ptr<float>();
+    tables.mu_r = layer_mu_r.data_ptr<float>();
+    tables.material_count = layer_count.size(0);
+    return tables;
+}
+
 void launch_reflection_sequence(
     const at::Tensor& source, const at::Tensor& target, const at::Tensor& interaction_positions,
     const at::Tensor& interaction_normals, const at::Tensor& tx_power,
     const at::Tensor& tx_polarization, const at::Tensor& rx_polarization, const at::Tensor& eps_r,
     const at::Tensor& sigma_e, const at::Tensor& mu_r, const at::Tensor& gain,
-    const at::Tensor& thickness, const FrequencyColumns& columns,
-    c10::complex<float>* field_vector, c10::complex<float>* coefficient,
+    const at::Tensor& thickness, const at::Tensor& bounce_material, const layered::LayerTables& layers,
+    const FrequencyColumns& columns, c10::complex<float>* field_vector, c10::complex<float>* coefficient,
     c10::complex<float>* path_field, float* path_gain, float* path_length, float* delay,
     float* direction) {
     const int64_t count = source.size(0);
@@ -906,6 +959,8 @@ void launch_reflection_sequence(
         mu_r.data_ptr<float>(),
         gain.data_ptr<float>(),
         thickness.data_ptr<float>(),
+        bounce_material.data_ptr<int>(),
+        layers,
         columns,
         field_vector,
         coefficient,
@@ -932,10 +987,20 @@ pybind11::dict channel_field_reflection_sequence(
     at::Tensor mu_r,
     at::Tensor gain,
     at::Tensor thickness,
+    at::Tensor bounce_material,
+    at::Tensor layer_offset,
+    at::Tensor layer_count,
+    at::Tensor layer_thickness_m,
+    at::Tensor layer_eps_r,
+    at::Tensor layer_sigma_e,
+    at::Tensor layer_mu_r,
     double frequency_hz) {
     check_reflection_sequence_inputs(
         source, target, interaction_positions, interaction_normals, tx_power, tx_polarization,
         rx_polarization, eps_r, sigma_e, mu_r, gain, thickness);
+    const layered::LayerTables layers = reflection_layer_tables(
+        bounce_material, layer_offset, layer_count, layer_thickness_m, layer_eps_r, layer_sigma_e,
+        layer_mu_r, source.size(0), interaction_positions.size(1));
     TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
     const int64_t count = source.size(0);
     auto complex_options = source.options().dtype(at::kComplexFloat);
@@ -948,7 +1013,8 @@ pybind11::dict channel_field_reflection_sequence(
     auto direction = at::empty_like(source);
     launch_reflection_sequence(
         source, target, interaction_positions, interaction_normals, tx_power, tx_polarization,
-        rx_polarization, eps_r, sigma_e, mu_r, gain, thickness, single_frequency(frequency_hz),
+        rx_polarization, eps_r, sigma_e, mu_r, gain, thickness, bounce_material, layers,
+        single_frequency(frequency_hz),
         field_vector.data_ptr<c10::complex<float>>(), coefficient.data_ptr<c10::complex<float>>(),
         path_field.data_ptr<c10::complex<float>>(), path_gain.data_ptr<float>(),
         path_length.data_ptr<float>(), delay.data_ptr<float>(), direction.data_ptr<float>());
@@ -976,10 +1042,20 @@ pybind11::dict channel_field_reflection_sequence_columns(
     at::Tensor mu_r,
     at::Tensor gain,
     at::Tensor thickness,
+    at::Tensor bounce_material,
+    at::Tensor layer_offset,
+    at::Tensor layer_count,
+    at::Tensor layer_thickness_m,
+    at::Tensor layer_eps_r,
+    at::Tensor layer_sigma_e,
+    at::Tensor layer_mu_r,
     std::vector<double> frequencies_hz) {
     check_reflection_sequence_inputs(
         source, target, interaction_positions, interaction_normals, tx_power, tx_polarization,
         rx_polarization, eps_r, sigma_e, mu_r, gain, thickness);
+    const layered::LayerTables layers = reflection_layer_tables(
+        bounce_material, layer_offset, layer_count, layer_thickness_m, layer_eps_r, layer_sigma_e,
+        layer_mu_r, source.size(0), interaction_positions.size(1));
     const auto chunks = frequency_column_chunks(frequencies_hz);
     const int64_t count = source.size(0);
     const int64_t columns = static_cast<int64_t>(frequencies_hz.size());
@@ -989,7 +1065,7 @@ pybind11::dict channel_field_reflection_sequence_columns(
     for (const auto& chunk : chunks) {
         launch_reflection_sequence(
             source, target, interaction_positions, interaction_normals, tx_power, tx_polarization,
-            rx_polarization, eps_r, sigma_e, mu_r, gain, thickness, chunk,
+            rx_polarization, eps_r, sigma_e, mu_r, gain, thickness, bounce_material, layers, chunk,
             field_vector.data_ptr<c10::complex<float>>(), nullptr,
             path_field.data_ptr<c10::complex<float>>(), nullptr, nullptr, nullptr, nullptr);
     }
@@ -1017,6 +1093,13 @@ pybind11::dict channel_field_coupled_rd(
     at::Tensor reflection_mu_r,
     at::Tensor reflection_gain,
     at::Tensor reflection_thickness,
+    at::Tensor reflection_material,
+    at::Tensor layer_offset,
+    at::Tensor layer_count,
+    at::Tensor layer_thickness_m,
+    at::Tensor layer_eps_r,
+    at::Tensor layer_sigma_e,
+    at::Tensor layer_mu_r,
     at::Tensor wedge_eps_r0,
     at::Tensor wedge_sigma_e0,
     at::Tensor wedge_mu_r0,
@@ -1067,6 +1150,9 @@ pybind11::dict channel_field_coupled_rd(
              {edge_line_max, "edge_line_max"}})
         check_flat_tensor(named.first, named.second, at::kFloat);
     const int64_t count = source.size(0);
+    const layered::LayerTables layers = reflection_layer_tables(
+        reflection_material, layer_offset, layer_count, layer_thickness_m, layer_eps_r, layer_sigma_e,
+        layer_mu_r, count, 1);
     for (const auto& tensor : {target,
                                reflection_position,
                                reflection_normal,
@@ -1126,6 +1212,8 @@ pybind11::dict channel_field_coupled_rd(
             reflection_mu_r.data_ptr<float>(),
             reflection_gain.data_ptr<float>(),
             reflection_thickness.data_ptr<float>(),
+            reflection_material.data_ptr<int>(),
+            layers,
             wedge_eps_r0.data_ptr<float>(),
             wedge_sigma_e0.data_ptr<float>(),
             wedge_mu_r0.data_ptr<float>(),
@@ -1978,6 +2066,8 @@ __device__ void reflection_chain_eval(
     const float* mu_r,
     const float* gain,
     const float* thickness,
+    const int* bounce_material,
+    const layered::LayerTables& layers,
     float frequency_hz,
     ReflectionChain& chain) {
     field::float3a previous = load3f(source, index);
@@ -2001,7 +2091,7 @@ __device__ void reflection_chain_eval(
             incident, load_sequence3f(interaction_normals, index, bounce, depth));
         field::Complex r_te;
         field::Complex r_tm;
-        transport::slab_fresnel(
+        layered::face_fresnel(
             frame.cos_theta,
             eps_r[scalar],
             sigma_e[scalar],
@@ -2009,6 +2099,8 @@ __device__ void reflection_chain_eval(
             gain[scalar],
             thickness[scalar],
             frequency_hz,
+            bounce_material[scalar],
+            layers,
             r_te,
             r_tm);
         const field::Complex e_s = transport::complex3_dot_real(value, frame.s_axis);
@@ -2076,6 +2168,8 @@ __global__ void reflection_sequence_backward_kernel(
     const float* mu_r,
     const float* gain,
     const float* thickness,
+    const int* bounce_material,
+    layered::LayerTables layers,
     float frequency_hz,
     const c10::complex<float>* grad_field_vector,
     const c10::complex<float>* grad_coefficient,
@@ -2101,7 +2195,8 @@ __global__ void reflection_sequence_backward_kernel(
         reflection_chain_eval(
             index, depth, source, target, interaction_positions,
             interaction_normals, tx_power, tx_polarization, rx_polarization,
-            eps_r, sigma_e, mu_r, gain, thickness, frequency_hz, chain);
+            eps_r, sigma_e, mu_r, gain, thickness, bounce_material, layers,
+            frequency_hz, chain);
 
         const field::Complex3 value_final = field::c3_scale(
             chain.value_chain, chain.propagation);
@@ -2225,44 +2320,45 @@ __global__ void reflection_sequence_backward_kernel(
             const float b_mu = mu_r[scalar_index];
             const float b_gain = gain[scalar_index];
             const float b_thickness = thickness[scalar_index];
+            const int b_material = bounce_material[scalar_index];
             DualC r_te_dual;
             DualC r_tm_dual;
             if (grad_eps_r != nullptr) {
-                ad::slab_fresnel_dual(
+                layered::face_fresnel_dual(
                     frame.cos_theta, b_eps, b_sigma, b_mu, b_gain, b_thickness,
-                    frequency_hz, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                    frequency_hz, b_material, layers, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
                     r_te_dual, r_tm_dual);
                 grad_eps_r[scalar_index] =
                     adj_dot(g_r_te, r_te_dual.d) + adj_dot(g_r_tm, r_tm_dual.d);
             }
             if (grad_sigma_e != nullptr) {
-                ad::slab_fresnel_dual(
+                layered::face_fresnel_dual(
                     frame.cos_theta, b_eps, b_sigma, b_mu, b_gain, b_thickness,
-                    frequency_hz, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+                    frequency_hz, b_material, layers, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
                     r_te_dual, r_tm_dual);
                 grad_sigma_e[scalar_index] =
                     adj_dot(g_r_te, r_te_dual.d) + adj_dot(g_r_tm, r_tm_dual.d);
             }
             if (grad_gain != nullptr) {
-                ad::slab_fresnel_dual(
+                layered::face_fresnel_dual(
                     frame.cos_theta, b_eps, b_sigma, b_mu, b_gain, b_thickness,
-                    frequency_hz, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+                    frequency_hz, b_material, layers, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
                     r_te_dual, r_tm_dual);
                 grad_gain[scalar_index] =
                     adj_dot(g_r_te, r_te_dual.d) + adj_dot(g_r_tm, r_tm_dual.d);
             }
             if (grad_thickness != nullptr) {
-                ad::slab_fresnel_dual(
+                layered::face_fresnel_dual(
                     frame.cos_theta, b_eps, b_sigma, b_mu, b_gain, b_thickness,
-                    frequency_hz, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+                    frequency_hz, b_material, layers, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
                     r_te_dual, r_tm_dual);
                 grad_thickness[scalar_index] =
                     adj_dot(g_r_te, r_te_dual.d) + adj_dot(g_r_tm, r_tm_dual.d);
             }
             if (grad_frequency != nullptr) {
-                ad::slab_fresnel_dual(
+                layered::face_fresnel_dual(
                     frame.cos_theta, b_eps, b_sigma, b_mu, b_gain, b_thickness,
-                    frequency_hz, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+                    frequency_hz, b_material, layers, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
                     r_te_dual, r_tm_dual);
                 g_freq +=
                     adj_dot(g_r_te, r_te_dual.d) + adj_dot(g_r_tm, r_tm_dual.d);
@@ -2271,9 +2367,9 @@ __global__ void reflection_sequence_backward_kernel(
                 continue;
 
             // Geometry enters the Fresnel only through cos_theta.
-            ad::slab_fresnel_dual(
+            layered::face_fresnel_dual(
                 frame.cos_theta, b_eps, b_sigma, b_mu, b_gain, b_thickness,
-                frequency_hz, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                frequency_hz, b_material, layers, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
                 r_te_dual, r_tm_dual);
             const float g_cos_theta =
                 adj_dot(g_r_te, r_te_dual.d) + adj_dot(g_r_tm, r_tm_dual.d);
@@ -2386,6 +2482,8 @@ __global__ void reflection_sequence_jvp_kernel(
     const float* mu_r,
     const float* gain,
     const float* thickness,
+    const int* bounce_material,
+    layered::LayerTables layers,
     float frequency_hz,
     const float* tangent_eps_r,
     const float* tangent_sigma_e,
@@ -2441,7 +2539,7 @@ __global__ void reflection_sequence_jvp_kernel(
             const int64_t scalar_index = index * depth + bounce;
             DualC r_te_dual;
             DualC r_tm_dual;
-            ad::slab_fresnel_dual(
+            layered::face_fresnel_dual(
                 frame.cos_theta.v,
                 eps_r[scalar_index],
                 sigma_e[scalar_index],
@@ -2449,6 +2547,8 @@ __global__ void reflection_sequence_jvp_kernel(
                 gain[scalar_index],
                 thickness[scalar_index],
                 frequency_hz,
+                bounce_material[scalar_index],
+                layers,
                 frame.cos_theta.d,
                 tangent_eps_r != nullptr ? tangent_eps_r[scalar_index] : 0.0f,
                 tangent_sigma_e != nullptr ? tangent_sigma_e[scalar_index] : 0.0f,
@@ -2602,6 +2702,13 @@ pybind11::dict channel_field_reflection_sequence_backward(
     at::Tensor mu_r,
     at::Tensor gain,
     at::Tensor thickness,
+    at::Tensor bounce_material,
+    at::Tensor layer_offset,
+    at::Tensor layer_count,
+    at::Tensor layer_thickness_m,
+    at::Tensor layer_eps_r,
+    at::Tensor layer_sigma_e,
+    at::Tensor layer_mu_r,
     double frequency_hz,
     pybind11::object grad_field_vector,
     pybind11::object grad_coefficient,
@@ -2620,6 +2727,9 @@ pybind11::dict channel_field_reflection_sequence_backward(
         source, target, interaction_positions, interaction_normals, tx_power,
         tx_polarization, rx_polarization, eps_r, sigma_e, mu_r, gain, thickness,
         frequency_hz);
+    const layered::LayerTables layers = reflection_layer_tables(
+        bounce_material, layer_offset, layer_count, layer_thickness_m, layer_eps_r, layer_sigma_e,
+        layer_mu_r, source.size(0), depth);
     const int64_t count = source.size(0);
     at::Tensor gfv_storage;
     at::Tensor gc_storage;
@@ -2699,6 +2809,8 @@ pybind11::dict channel_field_reflection_sequence_backward(
                 mu_r.data_ptr<float>(),
                 gain.data_ptr<float>(),
                 thickness.data_ptr<float>(),
+                bounce_material.data_ptr<int>(),
+                layers,
                 static_cast<float>(frequency_hz),
                 gfv ? gfv->data_ptr<c10::complex<float>>() : nullptr,
                 gc ? gc->data_ptr<c10::complex<float>>() : nullptr,
@@ -2764,6 +2876,13 @@ pybind11::dict channel_field_reflection_sequence_jvp(
     at::Tensor mu_r,
     at::Tensor gain,
     at::Tensor thickness,
+    at::Tensor bounce_material,
+    at::Tensor layer_offset,
+    at::Tensor layer_count,
+    at::Tensor layer_thickness_m,
+    at::Tensor layer_eps_r,
+    at::Tensor layer_sigma_e,
+    at::Tensor layer_mu_r,
     double frequency_hz,
     pybind11::object tangent_eps_r,
     pybind11::object tangent_sigma_e,
@@ -2778,6 +2897,9 @@ pybind11::dict channel_field_reflection_sequence_jvp(
         source, target, interaction_positions, interaction_normals, tx_power,
         tx_polarization, rx_polarization, eps_r, sigma_e, mu_r, gain, thickness,
         frequency_hz);
+    const layered::LayerTables layers = reflection_layer_tables(
+        bounce_material, layer_offset, layer_count, layer_thickness_m, layer_eps_r, layer_sigma_e,
+        layer_mu_r, source.size(0), depth);
     const int64_t count = source.size(0);
     at::Tensor te_storage;
     at::Tensor ts_storage;
@@ -2839,6 +2961,8 @@ pybind11::dict channel_field_reflection_sequence_jvp(
                 mu_r.data_ptr<float>(),
                 gain.data_ptr<float>(),
                 thickness.data_ptr<float>(),
+                bounce_material.data_ptr<int>(),
+                layers,
                 static_cast<float>(frequency_hz),
                 grad_ptr<float>(t_eps),
                 grad_ptr<float>(t_sigma),

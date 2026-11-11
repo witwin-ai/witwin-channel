@@ -538,6 +538,13 @@
         "--fmad=false"
       ]
     },
+    "native/channel/kernels/layered_reflection.cuh": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
     "native/channel/kernels/los.cu": {
       "kernels": [
         "apply_los_visibility_kernel",

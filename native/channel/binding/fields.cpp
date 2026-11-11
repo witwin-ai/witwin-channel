@@ -663,6 +663,13 @@ pybind11::dict channel_field_reflection_sequence_columns(
     torch::Tensor mu_r,
     torch::Tensor gain,
     torch::Tensor thickness,
+    torch::Tensor bounce_material,
+    torch::Tensor layer_offset,
+    torch::Tensor layer_count,
+    torch::Tensor layer_thickness_m,
+    torch::Tensor layer_eps_r,
+    torch::Tensor layer_sigma_e,
+    torch::Tensor layer_mu_r,
     std::vector<double> frequencies_hz);
 pybind11::dict channel_field_transmission_sequence(
     torch::Tensor path_valid,

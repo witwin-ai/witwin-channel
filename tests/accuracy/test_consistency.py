@@ -60,25 +60,34 @@ def test_reciprocity_swap_tx_rx(accuracy, components):
 
 
 def test_coupled_reflection_diffraction_is_reciprocal(accuracy):
-    """The coupled R-D / D-R rows alone (coupled minus uncoupled solve) are reciprocal under a swap."""
+    """The coupled R-D / D-R rows (one reflection and one diffraction) are reciprocal under a swap.
+
+    Each direction's coupled rows are summed per pair; an R-D row of one direction is the D-R row of
+    the other. Double-diffraction rows are excluded: their discovery prunes the two edges
+    asymmetrically, which is a candidate-set question, not the coupled field.
+    """
     from witwin.channel.path import Config, solve
 
     city = sc.city(2)
     points = [p.position.tolist() for p in sc.receiver_points(city.extent_m, 4, seed=5)]
     a_side, b_side = points[:2], points[2:]
 
-    def pair_field(tx_points, rx_points, coupled):
+    def coupled_pairs(tx_points, rx_points):
         scene = Scene(structures=city.structures,
                       endpoints=[*(antenna("tx", p) for p in tx_points), *(antenna("rx", p) for p in rx_points)])
-        config = Config(components={"los", "reflection", "diffraction"}, max_depth=2, coupled_paths=coupled)
-        return _pair_matrix(solve(scene, config, reference_frequency_hz=FREQ))
+        config = Config(components={"los", "reflection", "diffraction"}, max_depth=2, coupled_paths=True)
+        result = solve(scene, config, reference_frequency_hz=FREQ)
+        types = result.types[:, 0, :, 0, :]
+        mixed = result.valid[:, 0, :, 0, :] & (types == 1).any(-1) & (types == 2).any(-1)
+        a = torch.where(mixed, result.a[:, 0, :, 0, :, 0], torch.zeros_like(result.a[:, 0, :, 0, :, 0]))
+        return torch.stack([a.sum(-1), a.abs().sum(-1).to(a.dtype)])
 
-    forward = pair_field(a_side, b_side, True) - pair_field(a_side, b_side, False)
-    backward = pair_field(b_side, a_side, True) - pair_field(b_side, a_side, False)
-    scale = forward[1].real.abs().clamp_min(1e-30)
-    assert float(scale.max()) > 0.0
+    forward = coupled_pairs(a_side, b_side)
+    backward = coupled_pairs(b_side, a_side)
+    scale = forward[1].real.clamp_min(1e-30)
+    assert float(forward[1].real.min()) > 0.0
     error = ((forward[0] - backward[0].transpose(0, 1)).abs() / scale).max().item()
-    accuracy.check("coupled rows", error, coefficient_tolerance(2 * sc.PITCH_M * 3))
+    accuracy.check("coupled R-D/D-R rows", error, coefficient_tolerance(2 * sc.PITCH_M * 3))
 
 
 def _radiomap(subdiv: int, welded: bool, components: set[str], depth: int = 1) -> torch.Tensor:
@@ -272,7 +281,7 @@ def _multilayer_image_power(tx, point) -> float:
 
     z = (0.0, 0.0, 1.0)
     image = np.array([2 * WALL_X - tx[0], tx[1], tx[2]])
-    cos_i = abs(WALL_X - tx[0]) / float(np.linalg.norm(np.asarray(point) - image))
+    cos_i = abs(point[0] - image[0]) / float(np.linalg.norm(np.asarray(point) - image))
     stack = EM.layer_stack_rt([(t, e, s, 1.0) for t, e, s in _MULTILAYER_WALL], cos_i, FREQ)
     value, _, _ = O.specular_reflection(tx, point, np.array([WALL_X, 0.0, 0.0]), (-1.0, 0.0, 0.0), FREQ, z, z,
                                         r_te=complex(stack.r_te), r_tm=-complex(stack.r_tm))

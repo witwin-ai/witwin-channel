@@ -87,7 +87,7 @@ def test_field_backward_callbacks_pack_requested_gradients(monkeypatch) -> None:
         "field_reflection_sequence_backward",
         lambda *a, **k: reflection_output,
     )
-    requested = [False] * 15
+    requested = [False] * 16
     for index in (0, 1, 2, 3, 7, 8, 10, 11, 12):
         requested[index] = True
     reflection_ctx = SimpleNamespace(
@@ -95,12 +95,13 @@ def test_field_backward_callbacks_pack_requested_gradients(monkeypatch) -> None:
         saved_tensors=(scalar,) * 12,
         frequency_value=3.0e9,
         frequency_meta=None,
+        layers=None,
     )
     with torch.no_grad():
         reflection_grads = fields._FieldReflectionSequenceAdFunction.backward(
             reflection_ctx, scalar, scalar, scalar, scalar, scalar, scalar, scalar
         )
-    assert len(reflection_grads) == 15
+    assert len(reflection_grads) == 16
     assert reflection_grads[2] is scalar and reflection_grads[11] is scalar
     assert reflection_grads[12] is scalar
 

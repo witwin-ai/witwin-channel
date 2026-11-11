@@ -306,6 +306,7 @@ def field_reflection_sequence(
 
 def field_transport_columns(
     *arguments: torch.Tensor, depth: int, frequencies_hz: tuple[float, ...],
+    layers: ReflectionLayers | None = None,
 ) -> dict[str, torch.Tensor]:
     """Free-space (``depth == 0``) or reflection field at several carrier frequencies.
 
@@ -326,7 +327,8 @@ def field_transport_columns(
     for value in arguments:
         validate_cuda_tensor("field input", value, dtype=torch.float32, ndim=value.ndim)
     count = int(arguments[0].shape[0])
-    out = _required_native_op(name)(*arguments, list(frequencies))
+    native_layers = () if depth == 0 else _native_layers(layers, arguments[7])
+    out = _required_native_op(name)(*arguments, *native_layers, list(frequencies))
     if not isinstance(out, dict) or set(out) != {"field_vector", "path_field"}:
         raise TypeError(f"_channel.{name} returned invalid fields")
     columns = len(frequencies)
@@ -710,13 +712,13 @@ def field_reflection_sequence_backward(
     interaction_normals: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
     rx_polarization: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor,
     gain: torch.Tensor, thickness: torch.Tensor, *, layers: ReflectionLayers | None = None,
-    frequency_hz: float,
-    grad_field_vector: torch.Tensor | None = None, grad_coefficient: torch.Tensor | None = None,
-    grad_path_field: torch.Tensor | None = None, grad_path_gain: torch.Tensor | None = None,
-    grad_path_length: torch.Tensor | None = None, grad_delay: torch.Tensor | None = None,
-    grad_direction: torch.Tensor | None = None, need_grad_eps_r: bool = True,
-    need_grad_sigma_e: bool = True, need_grad_gain: bool = False, need_grad_thickness: bool = True,
-    need_grad_frequency: bool = True, need_grad_geometry: bool = False,
+    frequency_hz: float, grad_field_vector: torch.Tensor | None = None,
+    grad_coefficient: torch.Tensor | None = None, grad_path_field: torch.Tensor | None = None,
+    grad_path_gain: torch.Tensor | None = None, grad_path_length: torch.Tensor | None = None,
+    grad_delay: torch.Tensor | None = None, grad_direction: torch.Tensor | None = None,
+    need_grad_eps_r: bool = True, need_grad_sigma_e: bool = True, need_grad_gain: bool = False,
+    need_grad_thickness: bool = True, need_grad_frequency: bool = True,
+    need_grad_geometry: bool = False,
 ) -> dict[str, torch.Tensor | None]:
     if layers is not None and layers.multilayer and (need_grad_eps_r or need_grad_sigma_e or need_grad_thickness):
         raise NotImplementedError(_MULTILAYER_MATERIAL_AD_ERROR)
@@ -772,11 +774,10 @@ def field_reflection_sequence_jvp(
     interaction_normals: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
     rx_polarization: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor,
     gain: torch.Tensor, thickness: torch.Tensor, *, layers: ReflectionLayers | None = None,
-    frequency_hz: float,
-    tangent_eps_r: torch.Tensor | None = None, tangent_sigma_e: torch.Tensor | None = None,
-    tangent_gain: torch.Tensor | None = None, tangent_thickness: torch.Tensor | None = None,
-    tangent_frequency: float = 0.0, tangent_source: torch.Tensor | None = None,
-    tangent_target: torch.Tensor | None = None,
+    frequency_hz: float, tangent_eps_r: torch.Tensor | None = None,
+    tangent_sigma_e: torch.Tensor | None = None, tangent_gain: torch.Tensor | None = None,
+    tangent_thickness: torch.Tensor | None = None, tangent_frequency: float = 0.0,
+    tangent_source: torch.Tensor | None = None, tangent_target: torch.Tensor | None = None,
     tangent_interaction_positions: torch.Tensor | None = None,
     tangent_interaction_normals: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:

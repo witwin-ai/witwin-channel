@@ -3174,6 +3174,7 @@ def wideband_payload(
             *trailing,
             depth=inputs.depth,
             frequencies_hz=frequencies_hz,
+            layers=inputs.layers,
         )
         if complex3:
             count = int(inputs.tx_power.shape[0])
