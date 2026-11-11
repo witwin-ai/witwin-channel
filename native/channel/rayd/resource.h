@@ -8,6 +8,7 @@
 
 #include <memory>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -28,6 +29,8 @@ public:
     const rayd::torch::SceneResource &resource() const noexcept { return resource_; }
     bool available() const noexcept { return resource_.valid(); }
     int device_index() const { return resource_.device_index(); }
+    // The tracer RayD resolved for this scene: "optix" or "cuda".
+    std::string trace_backend() const;
     const rayd::torch::SceneEdgeRecordsResult &edge_records();
 
 private:

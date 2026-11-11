@@ -30,6 +30,7 @@ ENTRY_POINTS: dict[str, str] = {
     f"{PACKAGE}.montecarlo.bdpt": "the Monte Carlo BDPT solver entry point",
     f"{PACKAGE}.importers": "the scene importer entry point",
     f"{PACKAGE}.presets": "the material and antenna-pattern preset entry point",
+    f"{PACKAGE}.__main__": "the `python -m witwin.channel doctor` command",
 }
 
 

@@ -1,0 +1,65 @@
+Witwin Channel
+Copyright (c) 2026 Xingyu Chen. All rights reserved.
+Witwin Channel is licensed under the terms in LICENSE.
+
+The compiled extension (witwin/channel/_channel) includes or is built from the
+third-party components below.
+
+-------------------------------------------------------------------------------
+RayD
+https://github.com/Asixa/RayD
+Statically linked into the _channel extension (the commit is recorded in
+witwin/channel/rayd.lock.json and in witwin.channel.build_info()).
+
+BSD 3-Clause License
+
+Copyright (c) 2025, Xingyu Chen <xic063@ucsd.edu>
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-------------------------------------------------------------------------------
+NVIDIA OptiX SDK headers
+https://github.com/NVIDIA/optix-dev
+The extension is compiled against the OptiX 8.1 SDK headers and embeds OptiX
+device programs (PTX) generated from RayD sources with them. No OptiX library is
+shipped: the OptiX runtime is part of the NVIDIA display driver and is loaded
+from the driver at run time when available. The headers are
+Copyright (c) NVIDIA CORPORATION & AFFILIATES and are subject to the NVIDIA
+OptiX SDK license.
+
+-------------------------------------------------------------------------------
+NVIDIA CUDA libraries
+The extension links the CUDA runtime (libcudart) and cuSOLVER dynamically. No
+CUDA library is shipped in this package; they come from the CUDA build of
+PyTorch and the NVIDIA driver at run time.
+
+-------------------------------------------------------------------------------
+pybind11
+https://github.com/pybind/pybind11
+The extension is compiled against the pybind11 headers shipped with PyTorch.
+Copyright (c) 2016 Wenzel Jakob <wenzel.jakob@epfl.ch>, All rights reserved.
+Licensed under the BSD 3-Clause License
+(https://github.com/pybind/pybind11/blob/master/LICENSE).

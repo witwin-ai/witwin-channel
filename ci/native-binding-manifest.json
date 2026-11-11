@@ -4321,7 +4321,8 @@
         ["face_uv", "std::vector<torch::Tensor>", null],
         ["to_world_left", "std::vector<torch::Tensor>", null],
         ["to_world_right", "std::vector<torch::Tensor>", null],
-        ["mesh_flags", "std::vector<int64_t>", null]
+        ["mesh_flags", "std::vector<int64_t>", null],
+        ["trace_backend", "const std::string &", null]
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.scene.resources.rayd_scene_create"]
@@ -4576,6 +4577,18 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.geometry.rayd_visibility_forward"]
+    },
+    {
+      "name": "runtime_probe",
+      "target": "channel_runtime_probe",
+      "return_type": "pybind11::dict",
+      "doc": "Report the CUDA driver version and whether OptiX can trace on a device.",
+      "parameters": [
+        ["device_index", "int64_t", null],
+        ["probe_optix", "bool", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.runtime.runtime_probe"]
     },
     {
       "name": "scattering_chain_ensemble_eval",

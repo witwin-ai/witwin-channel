@@ -17,7 +17,7 @@ import pytest
 from ci import wheel_smoke
 
 
-def _write_wheel(path: Path, *, name: str, version: str) -> bytes:
+def _write_wheel(path: Path, *, name: str, version: str, tag: str = "cp311") -> bytes:
     metadata = Message()
     metadata["Metadata-Version"] = "2.1"
     metadata["Name"] = name
@@ -31,9 +31,16 @@ def _write_wheel(path: Path, *, name: str, version: str) -> bytes:
     members.update(
         {
             f"{dist_info}/METADATA": metadata.as_bytes(),
-            f"{dist_info}/WHEEL": b"Wheel-Version: 1.0\nGenerator: tests\nRoot-Is-Purelib: false\nTag: cp311-cp311-win_amd64\n",
+            f"{dist_info}/WHEEL": (
+                "Wheel-Version: 1.0\nGenerator: tests\nRoot-Is-Purelib: false\n"
+                f"Tag: {tag}-{tag}-win_amd64\n"
+            ).encode(),
+            f"{dist_info}/entry_points.txt": (
+                b"[console_scripts]\nwitwin-channel-doctor = witwin.channel.deployment:main\n"
+            ),
             f"{dist_info}/licenses/LICENSE": (repository_root / "LICENSE").read_bytes(),
-            "witwin/channel/_channel.cp311-win_amd64.pyd": b"native",
+            f"{dist_info}/licenses/NOTICE": (repository_root / "NOTICE").read_bytes(),
+            f"witwin/channel/_channel.{tag}-win_amd64.pyd": b"native",
             "witwin/channel/_channel.build-fingerprint": b"f" * 64 + b"\n",
             "witwin/channel/rayd.lock.json": (
                 repository_root / "dependencies" / "rayd.lock.json"
@@ -131,7 +138,38 @@ def test_wheel_content_audit_rejects_tampered_license(tmp_path: Path):
     _replace_member(wheel, license_member, b"tampered")
     _refresh_record(wheel)
 
-    with pytest.raises(ValueError, match="license bytes differ"):
+    with pytest.raises(ValueError, match="licenses/LICENSE differs"):
+        wheel_smoke._audit_wheel_contents(wheel)
+
+
+def test_wheel_content_audit_rejects_tampered_notice(tmp_path: Path):
+    wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
+    _write_wheel(wheel, name="witwin-channel", version="0.1.0")
+    _replace_member(wheel, "witwin_channel-0.1.0.dist-info/licenses/NOTICE", b"tampered")
+    _refresh_record(wheel)
+
+    with pytest.raises(ValueError, match="licenses/NOTICE differs"):
+        wheel_smoke._audit_wheel_contents(wheel)
+
+
+@pytest.mark.parametrize("tag", ["cp310", "cp312", "cp313"])
+def test_wheel_content_audit_follows_the_python_tag(tmp_path: Path, tag: str):
+    wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
+    _write_wheel(wheel, name="witwin-channel", version="0.1.0", tag=tag)
+
+    assert wheel_smoke._audit_wheel_contents(wheel) == f"witwin/channel/_channel.{tag}-win_amd64.pyd"
+
+
+def test_wheel_content_audit_rejects_an_extension_for_another_python(tmp_path: Path):
+    wheel = tmp_path / "witwin_channel-0.1.0-py3-none-any.whl"
+    _write_wheel(wheel, name="witwin-channel", version="0.1.0", tag="cp312")
+    _replace_member(
+        wheel, "witwin_channel-0.1.0.dist-info/WHEEL",
+        b"Wheel-Version: 1.0\nGenerator: tests\nRoot-Is-Purelib: false\nTag: cp311-cp311-win_amd64\n",
+    )
+    _refresh_record(wheel)
+
+    with pytest.raises(ValueError, match="exactly one packaged _channel extension"):
         wheel_smoke._audit_wheel_contents(wheel)
 
 
@@ -220,7 +258,7 @@ def test_wheel_content_audit_rejects_casefold_duplicate(tmp_path: Path):
         "witwin_channel-0.1.0.data/scripts/run.py",
         "other_root/file.py",
         "witwin/channel/untracked_injection.py",
-        "witwin_channel-0.1.0.dist-info/entry_points.txt",
+        "witwin_channel-0.1.0.dist-info/direct_url.json",
     ],
 )
 def test_wheel_content_audit_rejects_nonallowlisted_members(tmp_path: Path, member: str):

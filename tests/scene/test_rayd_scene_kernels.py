@@ -147,13 +147,20 @@ def test_rayd_scene_builder_preserves_native_order_flags_uv_and_keepalive(
         captured.append(args)
         return native_owner
 
+    checked: list[int] = []
     monkeypatch.setattr(rayd_scene.torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(rayd_scene.torch.cuda, "current_device", lambda: 0)
     monkeypatch.setattr(rayd_scene.torch, "device", lambda _name: real_device("cpu"))
+    monkeypatch.setattr(rayd_scene, "require_device_supported", checked.append)
     monkeypatch.setattr(rayd_scene, "rayd_scene_create", create)
+    monkeypatch.setenv("WITWIN_CHANNEL_TRACE_BACKEND", "cuda")
 
     scene = rayd_scene.build_scene_from_structures(structures)
-    vertices, faces, exported_uv, exported_face_uv, left, right, flags = captured[0]
+    vertices, faces, exported_uv, exported_face_uv, left, right, flags, backend = captured[0]
 
+    assert checked == [0]
+    assert backend == "cuda"
+    assert scene.requested_trace_backend == "cuda"
     assert scene.resource is native_owner
     assert len(captured) == 1
     assert flags == [2, 2]
@@ -218,6 +225,7 @@ def test_scene_create_preserves_native_argument_order(monkeypatch: pytest.Monkey
         to_world_left,
         to_world_right,
         mesh_flags,
+        "optix",
     )
 
     assert result is owner
@@ -230,6 +238,7 @@ def test_scene_create_preserves_native_argument_order(monkeypatch: pytest.Monkey
             to_world_left,
             to_world_right,
             mesh_flags,
+            "optix",
         )
     ]
 

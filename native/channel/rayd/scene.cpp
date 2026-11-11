@@ -3,11 +3,41 @@
 
 #include "resource.h"
 
+#include <cuda_runtime_api.h>
+
 #include <cstdint>
 #include <memory>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
+
+namespace {
+
+rayd::torch::SceneTraceBackend parse_trace_backend(const std::string &name) {
+    if (name == "auto")
+        return rayd::torch::SceneTraceBackend::Auto;
+    if (name == "optix")
+        return rayd::torch::SceneTraceBackend::Optix;
+    if (name == "cuda")
+        return rayd::torch::SceneTraceBackend::Cuda;
+    throw std::invalid_argument(
+        "trace backend must be 'auto', 'optix' or 'cuda', got '" + name + "'");
+}
+
+}  // namespace
+
+std::string RayDSceneResource::trace_backend() const {
+    switch (rayd::torch::scene_trace_backend(resource_)) {
+    case rayd::torch::SceneTraceBackend::Optix:
+        return "optix";
+    case rayd::torch::SceneTraceBackend::Cuda:
+        return "cuda";
+    case rayd::torch::SceneTraceBackend::Auto:
+        break;
+    }
+    throw std::runtime_error("RayD reported an unresolved scene trace backend");
+}
 
 const rayd::torch::SceneEdgeRecordsResult &RayDSceneResource::edge_records() {
     if (!edge_records_.has_value()) {
@@ -23,7 +53,10 @@ std::shared_ptr<RayDSceneResource> channel_rayd_scene_create(
     std::vector<torch::Tensor> face_uv,
     std::vector<torch::Tensor> to_world_left,
     std::vector<torch::Tensor> to_world_right,
-    std::vector<int64_t> mesh_flags) {
+    std::vector<int64_t> mesh_flags,
+    const std::string &trace_backend) {
+    rayd::torch::SceneOptions options;
+    options.trace_backend = parse_trace_backend(trace_backend);
     const size_t mesh_count = vertices.size();
     if (mesh_count == 0)
         throw std::runtime_error("rayd_scene_create requires at least one mesh");
@@ -53,7 +86,21 @@ std::shared_ptr<RayDSceneResource> channel_rayd_scene_create(
         });
     }
     return std::make_shared<RayDSceneResource>(
-        rayd::torch::create_scene(std::move(meshes)));
+        rayd::torch::create_scene(std::move(meshes), options));
+}
+
+pybind11::dict channel_runtime_probe(int64_t device_index, bool probe_optix) {
+    pybind11::dict probe;
+    int driver_version = 0;
+    const cudaError_t driver_status = cudaDriverGetVersion(&driver_version);
+    probe["cuda_driver_version"] = driver_status == cudaSuccess ? driver_version : 0;
+    if (!probe_optix)
+        return probe;
+    const rayd::torch::OptixAvailability optix =
+        rayd::torch::optix_availability(static_cast<int>(device_index));
+    probe["optix_available"] = optix.available;
+    probe["optix_reason"] = optix.reason;
+    return probe;
 }
 
 pybind11::tuple channel_rayd_scene_edge_records(RayDSceneResource &scene) {

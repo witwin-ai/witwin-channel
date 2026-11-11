@@ -110,17 +110,36 @@ non-contractual metadata.
 runtime_diagnostics() -> dict[str, Any]
 ```
 
-Returns an import-safe report covering the package, PyTorch/CUDA runtime,
-active device, native build, declared SM policy, and pipeline-cache status.
-It is diagnostic output, not a fallback or capability override.
+Returns a report of the package, Python, PyTorch/CUDA runtime, active GPU, native
+build and trace backend (schema `witwin.channel.deployment.v2`). It loads the
+native extension and, with a GPU present, probes the driver and OptiX on the
+active device. It is diagnostic output, not a fallback or capability override.
+
+| Key | Meaning |
+| --- | --- |
+| `torch`, `cuda_runtime`, `torch_cuda_build`, `cuda_available` | PyTorch version, its CUDA version (`None` for a CPU-only build), and whether a GPU is visible |
+| `device` | active GPU: `index`, `name`, `sm`, `total_memory_bytes`, `code_mode` (`sass`, `ptx-jit` or `unsupported`), `supported`, `problems` |
+| `cuda_driver_version` | CUDA driver API version, for example `12080` |
+| `build_sm_architectures` | `{"sass": [...], "ptx": [...]}` from `build_info()["cuda_architectures"]` |
+| `trace_backend` | `requested` (`WITWIN_CHANNEL_TRACE_BACKEND`, default `auto`), `optix` (`available`, `reason`) and `scenes` (device and selected backend of each live compiled scene) |
+| `native_build` | `build_info()` |
+| `errors` | import failures of PyTorch or the extension, each with its remedy |
 
 ```python
 diagnostics = channel.runtime_diagnostics()
 print(diagnostics["deployment_abi"])
-print(diagnostics["declared_sm_architectures"])
+print(diagnostics["build_sm_architectures"])
 print(diagnostics.get("device"))
+print(diagnostics["trace_backend"])
 print(diagnostics["errors"])
 ```
+
+`python -m witwin.channel doctor` formats the same report with a verdict and
+remedies; `--json` prints the dictionary.
+
+Scene compilation checks the active GPU and driver once per device before any
+native work and raises `witwin.channel.runtime.UnsupportedDeviceError` when the
+build cannot run there.
 
 ## `pipeline_cache_key`
 
@@ -136,8 +155,9 @@ pipeline_cache_key(
 ) -> str
 ```
 
-Produces a deterministic SHA-256 digest for the pipeline-cache ABI. The API
-generates a key; it does not implement a pipeline cache.
+Produces a deterministic SHA-256 digest of the inputs that identify one
+compiled solve pipeline. Channel does not persist pipelines itself; the OptiX
+program cache is the driver's on-disk cache.
 
 | Parameter | Description |
 | --- | --- |

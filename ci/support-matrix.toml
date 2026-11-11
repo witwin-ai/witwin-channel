@@ -1,17 +1,40 @@
-schema_version = 1
+# The release wheel matrix. ci/wheel_matrix.py turns it into the build matrix, CUDA flags and
+# checks of .github/workflows/publish-witwin-channel.yml; tests/test_supported_runtime_matrix.py
+# keeps pyproject.toml consistent with it.
+schema_version = 2
 
-[[runtime]]
-python = "3.11"
-python_spec = ">=3.11,<3.12"
-torch = "2.10"
-torch_spec = "==2.10.0"
+# CPython minors, one wheel each per platform and PyTorch release.
+pythons = ["3.10", "3.11", "3.12", "3.13"]
+platforms = ["manylinux_2_28_x86_64", "win_amd64"]
+
 cuda_runtime = "12.8"
 cuda_toolkit = "12.8.1"
 constraints = "constraints/ci-py311-cu128.txt"
-verified_sm = [120]
-declared_unverified_sm = [70, 75, 80, 86, 87, 89, 90, 100, 101]
-ptx_forward_compatibility_sm = 120
-binary_abi = "versioned-libtorch-python-extension"
-libtorch_stable_abi = false
-stable_abi_floor_for_eligible_artifacts = "2.10"
+
+# Native code in every x86_64 wheel. sm_87 (Jetson Orin) and sm_101 (Jetson Thor) run only
+# their own cubins and exist only on aarch64 boards, so x86_64 wheels do not carry them.
+sass = [70, 75, 80, 86, 89, 90, 100, 120]
+# Forward-compatible PTX for GPUs newer than every cubin.
+ptx = [120]
+
+# PyPI rejects files over 100 MiB without a granted exception.
+max_wheel_mib = 90
+
+# The extension links the non-stable LibTorch C++ ABI, so each wheel works with exactly one
+# PyTorch release. A wheel filename cannot name the PyTorch release, so PyPI carries one
+# release ("pypi"); wheels for the other ("release-asset") carry a local version such as
+# 0.6.0+torch211 and are attached to the GitHub release.
+[[torch]]
+version = "2.10.0"
+channel = "pypi"
+
+[[torch]]
+version = "2.11.0"
+channel = "release-asset"
+
+# GPUs with recorded runtime evidence (solver, no-fallback and AD gates on that hardware).
+[[verified]]
+sm = 120
+platform = "win_amd64"
 evidence = "docs/dev/baselines/0892d855b27ee851521a181f5158b0bf41091eda/static/environment.json"
+
