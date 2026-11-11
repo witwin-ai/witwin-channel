@@ -66,7 +66,7 @@ from witwin.channel.scene.endpoints import (
     link_zero_gradient,
     orientation_matrix,
     pattern_field_response,
-    steering_vector,
+    steering_from_positions,
 )
 
 if TYPE_CHECKING:
@@ -1193,11 +1193,6 @@ def _unit_vector(theta: torch.Tensor, phi: torch.Tensor) -> torch.Tensor:
     )
 
 
-def _local_direction(direction: torch.Tensor, orientation: torch.Tensor) -> torch.Tensor:
-    rotation = orientation_matrix(orientation).to(device=direction.device)
-    return direction @ rotation
-
-
 def _receiver_cell_counts(receivers: Sequence[Receiver]) -> tuple[int, ...]:
     return tuple(
         int(receiver.shape[0]) * int(receiver.shape[1])
@@ -1309,20 +1304,41 @@ def _cached_antenna_layout(
     return layout
 
 
+def _antenna_frame(
+    endpoint: _AntennaEndpoint, device: torch.device, store: Any = None, key: object = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """World element offsets and local-to-world rotation of one endpoint on ``device``.
+
+    Built exactly as ``steering_vector`` builds them; the rotation also maps directions
+    into the endpoint-local pattern frame. Cached on the endpoint store, so a solve
+    uploads neither.
+    """
+
+    cache = None if store is None or key is None else store._lazy
+    cached = None if cache is None else cache.get(("antenna_frame", key, device))
+    if cached is not None:
+        return cached  # type: ignore[no-any-return]
+    rotation = orientation_matrix(endpoint.orientation).to(device=device)
+    positions = endpoint.array.positions.to(device=device) @ rotation.T
+    frame = (positions, rotation)
+    if cache is not None:
+        cache[("antenna_frame", key, device)] = frame
+    return frame
+
+
 def _endpoint_weights(
     endpoint: _AntennaEndpoint, directions: torch.Tensor, *, frequency_hz: float,
-    conjugate_pattern: bool,
+    conjugate_pattern: bool, frame: tuple[torch.Tensor, torch.Tensor] | None = None,
 ) -> torch.Tensor:
-    steering = steering_vector(
-        endpoint.array,
-        directions,
-        frequency_hz=frequency_hz,
-        orientation=endpoint.orientation,
-    )
-    pattern = pattern_field_response(
-        endpoint.pattern,
-        _local_direction(directions, endpoint.orientation),
-    )
+    if frame is None:
+        frame = _antenna_frame(endpoint, directions.device)
+    positions, rotation = frame
+    if isinstance(frequency_hz, torch.Tensor):
+        frequency_hz = float(frequency_hz.detach())
+    if frequency_hz <= 0.0:
+        raise ValueError("frequency_hz must be positive")
+    steering = steering_from_positions(positions, directions, frequency_hz=frequency_hz)
+    pattern = pattern_field_response(endpoint.pattern, directions @ rotation)
     if conjugate_pattern:
         pattern = pattern.conj()
     return steering * pattern.unsqueeze(-1)
@@ -1331,6 +1347,7 @@ def _endpoint_weights(
 def _grouped_endpoint_factor(
     endpoints: Sequence[_AntennaEndpoint], layout: tuple[list[int], list[torch.Tensor] | None],
     directions: torch.Tensor, *, num_ant: int, frequency_hz: float, conjugate_pattern: bool,
+    store: Any = None, side: str = "",
 ) -> torch.Tensor:
     """Batch steering/pattern weights over endpoints sharing one antenna value.
 
@@ -1345,29 +1362,26 @@ def _grouped_endpoint_factor(
     """
 
     representatives, rows = layout
-    if rows is None:
+
+    def weights(representative: int, value: torch.Tensor) -> torch.Tensor:
+        endpoint = endpoints[representative]
         return _endpoint_weights(
-            endpoints[representatives[0]],
-            directions,
+            endpoint,
+            value,
             frequency_hz=frequency_hz,
             conjugate_pattern=conjugate_pattern,
+            frame=_antenna_frame(endpoint, value.device, store, (side, representative)),
         )
+
+    if rows is None:
+        return weights(representatives[0], directions)
     out = torch.empty(
         (directions.shape[0], *directions.shape[1:-1], num_ant),
         dtype=torch.complex64,
         device=directions.device,
     )
     for representative, index in zip(representatives, rows, strict=True):
-        out.index_copy_(
-            0,
-            index,
-            _endpoint_weights(
-                endpoints[representative],
-                directions.index_select(0, index),
-                frequency_hz=frequency_hz,
-                conjugate_pattern=conjugate_pattern,
-            ),
-        )
+        out.index_copy_(0, index, weights(representative, directions.index_select(0, index)))
     return out
 
 
@@ -1502,6 +1516,8 @@ def pack_synthetic_arrays(
         num_ant=num_tx_ant,
         frequency_hz=frequency_hz,
         conjugate_pattern=False,
+        store=store,
+        side="tx",
     ).permute(1, 0, 3, 2)
 
     # (rx, tx, path, rx_ant) -> (rx, rx_ant, tx, path)
@@ -1512,6 +1528,8 @@ def pack_synthetic_arrays(
         num_ant=num_rx_ant,
         frequency_hz=frequency_hz,
         conjugate_pattern=True,
+        store=store,
+        side="rx",
     ).permute(0, 3, 1, 2)
     factor = rx_factor[:, :, :, None, :] * tx_factor[:, None, :, :, :]
 
@@ -1552,24 +1570,22 @@ def pack_synthetic_arrays(
 
 def _grouped_pattern(
     endpoints: Sequence[_AntennaEndpoint], layout: tuple[list[int], list[torch.Tensor] | None],
-    directions: torch.Tensor,
+    directions: torch.Tensor, *, store: Any = None, side: str = "",
 ) -> torch.Tensor:
     """Pattern response per direction row, evaluated once per antenna-value group."""
 
     representatives, rows = layout
 
-    def response(endpoint: _AntennaEndpoint, value: torch.Tensor) -> torch.Tensor:
-        return pattern_field_response(
-            endpoint.pattern, _local_direction(value, endpoint.orientation)
-        )
+    def response(representative: int, value: torch.Tensor) -> torch.Tensor:
+        endpoint = endpoints[representative]
+        _, rotation = _antenna_frame(endpoint, value.device, store, (side, representative))
+        return pattern_field_response(endpoint.pattern, value @ rotation)
 
     if rows is None:
-        return response(endpoints[representatives[0]], directions)
+        return response(representatives[0], directions)
     out = torch.empty(directions.shape[:-1], dtype=torch.complex64, device=directions.device)
     for representative, index in zip(representatives, rows, strict=True):
-        out.index_copy_(
-            0, index, response(endpoints[representative], directions.index_select(0, index))
-        )
+        out.index_copy_(0, index, response(representative, directions.index_select(0, index)))
     return out
 
 
@@ -1656,9 +1672,11 @@ def pack_explicit_arrays(
         tx_store, "rx_antenna_groups", scene.receivers, (1,) * num_rx, departure.device
     )
     pattern_factor *= _grouped_pattern(
-        scene.transmitters, tx_layout, departure.movedim(2, 0)
+        scene.transmitters, tx_layout, departure.movedim(2, 0), store=tx_store, side="tx"
     ).movedim(0, 2)
-    pattern_factor *= _grouped_pattern(scene.receivers, rx_layout, arrival).conj()
+    pattern_factor *= _grouped_pattern(
+        scene.receivers, rx_layout, arrival, store=tx_store, side="rx"
+    ).conj()
     a = a * pattern_factor.unsqueeze(-1)
     field_xyz = field_xyz * pattern_factor.unsqueeze(-1)
     metadata = dict(result.metadata)

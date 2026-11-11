@@ -115,6 +115,14 @@ def steering_vector(
     if orientation is not None:
         rotation = orientation_matrix(orientation).to(device=device)
         positions = positions @ rotation.T
+    return steering_from_positions(positions, direction, frequency_hz=frequency_hz)
+
+
+def steering_from_positions(
+    positions: torch.Tensor, direction: torch.Tensor, *, frequency_hz: float,
+) -> torch.Tensor:
+    """``exp(+j k r·u)`` for world-frame element offsets ``positions`` of shape ``(A, 3)``."""
+
     unit = direction.to(dtype=torch.float32)
     unit = unit / torch.linalg.vector_norm(unit, dim=-1, keepdim=True).clamp_min(
         torch.finfo(torch.float32).tiny
