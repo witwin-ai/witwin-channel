@@ -758,6 +758,23 @@ def _evaluate_diffraction_fields(
     return material, launch_count
 
 
+def _layered_coupled_op(
+    op: Callable[..., dict[str, torch.Tensor]], compiled: object, material: dict[str, torch.Tensor],
+    reflection_face: torch.Tensor, ad_enabled: bool,
+) -> Callable[..., dict[str, torch.Tensor]]:
+    """Give the coupled reflection leg the layer store when the scene has a multilayer material."""
+
+    if not has_multilayer_material(compiled):
+        return op
+    if ad_enabled:
+        raise NotImplementedError(
+            "coupled reflection-diffraction derivatives with a multilayer reflecting material are "
+            "not supported; disable coupled_paths or use ad_mode='none'"
+        )
+    layers = field_kernels.reflection_layers(material, reflection_face.unsqueeze(1), multilayer=True)
+    return partial(op, layers=layers)
+
+
 def _evaluate_coupled_fields(
     scene: Scene, compiled: object, topology: PathTopology, geometry: PathGeometry,
     source: torch.Tensor, target: torch.Tensor, source_power: torch.Tensor, tx_pol: torch.Tensor,
@@ -900,18 +917,9 @@ def _evaluate_coupled_fields(
                     edge_line_min,
                     edge_line_max,
                 )
-            if has_multilayer_material(compiled):
-                if ad_enabled:
-                    raise NotImplementedError(
-                        "coupled reflection-diffraction derivatives with a multilayer reflecting "
-                        "material are not supported; disable coupled_paths or use ad_mode='none'"
-                    )
-                coupled_field_op = partial(
-                    coupled_field_op,
-                    layers=field_kernels.reflection_layers(
-                        material, reflection_face.unsqueeze(1), multilayer=True
-                    ),
-                )
+            coupled_field_op = _layered_coupled_op(
+                coupled_field_op, compiled, material, reflection_face, ad_enabled
+            )
             evaluated = coupled_field_op(
                 *coupled_args,
                 reflection_materials,

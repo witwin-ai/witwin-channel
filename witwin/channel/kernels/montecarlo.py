@@ -1056,6 +1056,14 @@ def mc_slab_reflection_accumulate_jvp(
     return output
 
 
+def _refuse_multilayer_material_ad(params: dict[str, object], *requested: bool) -> None:
+    if params.get("multilayer", False) and any(requested):
+        raise NotImplementedError(
+            "material derivatives (eta_r, sigma_e, thickness) of reflection off a multilayer "
+            "material are not supported; gain and frequency derivatives are"
+        )
+
+
 class _McReflectionMapAdFunction(torch.autograd.Function):
     """Differentiable slab reflection radiomap for one transmitter.
 
@@ -1158,11 +1166,7 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
         need_gain = bool(ctx.needs_input_grad[3])
         need_thickness = bool(ctx.needs_input_grad[4])
         need_materials = need_eta or need_sigma or need_gain or need_thickness
-        if ctx.params.get("multilayer", False) and (need_eta or need_sigma or need_thickness):
-            raise NotImplementedError(
-                "material derivatives (eta_r, sigma_e, thickness) of reflection off a multilayer "
-                "material are not supported; gain and frequency derivatives are"
-            )
+        _refuse_multilayer_material_ad(ctx.params, need_eta, need_sigma, need_thickness)
         need_frequency = bool(ctx.needs_input_grad[5])
         grad_anchor = None
         if need_anchor:
@@ -1267,13 +1271,9 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
         )
         tangent_frequency = _ad_frequency_tangent(t_frequency)
         params = ctx.params
-        if ctx.params.get("multilayer", False) and any(
-            value is not None for value in (tangent_eta, tangent_sigma, tangent_thickness)
-        ):
-            raise NotImplementedError(
-                "material derivatives (eta_r, sigma_e, thickness) of reflection off a multilayer "
-                "material are not supported; gain and frequency derivatives are"
-            )
+        _refuse_multilayer_material_ad(
+            ctx.params, *(value is not None for value in (tangent_eta, tangent_sigma, tangent_thickness))
+        )
         if (
             tangent_eta is None
             and tangent_sigma is None
