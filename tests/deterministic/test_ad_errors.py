@@ -15,7 +15,7 @@ def test_deterministic_accepts_fixed_topology_ad_modes(ad_mode):
 
 
 def test_deterministic_rejects_unknown_ad_modes():
-    with pytest.raises(RuntimeError, match="ad_mode"):
+    with pytest.raises(ValueError, match="ad_mode"):
         Config(ad_mode="forward")
 
 

@@ -1,0 +1,48 @@
+<!-- Small Mitsuba 3 / Sionna RT style scene authored for the importer tests. -->
+<scene version="3.0.0">
+    <default name="half_height" value="10"/>
+
+    <bsdf type="itu-radio-material" id="concrete">
+        <string name="type" value="concrete"/>
+        <float name="thickness" value="0.2"/>
+    </bsdf>
+    <bsdf type="twosided" id="glass">
+        <bsdf type="itu-radio-material">
+            <string name="type" value="glass"/>
+        </bsdf>
+    </bsdf>
+    <bsdf type="radio-material" id="custom">
+        <float name="relative_permittivity" value="4.5"/>
+        <float name="conductivity" value="0.02"/>
+        <float name="thickness" value="0.05"/>
+        <float name="scattering_coefficient" value="0.3"/>
+    </bsdf>
+    <bsdf type="diffuse" id="mat-itu_wood"/>
+
+    <shape type="rectangle" id="ground">
+        <transform name="to_world">
+            <scale value="50"/>
+        </transform>
+        <ref id="concrete"/>
+    </shape>
+    <shape type="cube" id="building">
+        <transform name="to_world">
+            <scale x="5" y="10" z="$half_height"/>
+            <translate x="20" z="$half_height"/>
+        </transform>
+        <ref id="custom" name="bsdf"/>
+    </shape>
+    <shape type="ply" id="wall">
+        <string name="filename" value="meshes/wall.ply"/>
+        <boolean name="face_normals" value="true"/>
+        <ref id="glass" name="bsdf"/>
+    </shape>
+    <shape type="ply" id="kiosk">
+        <string name="filename" value="meshes/kiosk.ply"/>
+        <transform name="to_world">
+            <rotate z="1" angle="90"/>
+            <translate value="-20 0 0"/>
+        </transform>
+        <ref id="mat-itu_wood" name="bsdf"/>
+    </shape>
+</scene>

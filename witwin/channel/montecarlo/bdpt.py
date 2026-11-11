@@ -24,10 +24,10 @@ from witwin.channel.components import (
     DEFAULT_COMPONENTS as _DEFAULT_COMPONENTS,
     component_availability_status,
     component_max_depth,
-    validate_bounce_depth,
-    validate_max_depth,
-    validate_samples,
+    require_config_type, validate_bounce_depth, validate_chain_depth_cap, validate_config_fields,
+    validate_coupled_candidate_limit, validate_coupled_gate, validate_max_depth, validate_samples,
     validate_seed,
+    validate_vocabulary,
     validate_workspace_limit_bytes,
     validated_components,
 )
@@ -115,7 +115,7 @@ from witwin.channel.runtime import (
     required_symbol as _required_native_op,
     validate_cuda_tensor,
 )
-from witwin.channel.scene.compiler import compile as compile_scene
+from witwin.channel.scene.compiler import compile as compile_scene, record_dropped_faces
 from witwin.channel.scene.endpoints import (
     ReceiverGrid,
     ReceiverPoint,
@@ -125,6 +125,7 @@ from witwin.channel.scene.endpoints import (
     bind_solver_scene,
     first_receiver_grid,
     require_compiled,
+    require_single_receiver_layout,
     validate_scalar_endpoint_features,
     vector3_tuple as _vector3_tuple,
 )
@@ -151,9 +152,9 @@ def _validate_coherent_combine(coherent: bool, components: frozenset[str]) -> No
         return
     refused = components & {"transmission", "scattering"}
     if refused:
-        raise RuntimeError(
-            "coherent combine supports only {los, reflection, diffraction} "
-            f"components; refused for {sorted(refused)}"
+        raise ValueError(
+            "coherent=True supports only the components {los, reflection, "
+            f"diffraction}}; remove {sorted(refused)} or set coherent=False"
         )
 
 
@@ -188,7 +189,9 @@ def _validate_scattering_order(max_scattering_order: int) -> None:
     so ``__post_init__`` stays within its maintenance-complexity budget.
     """
     if max_scattering_order < 1:
-        raise ValueError("max_scattering_order must be >= 1")
+        raise ValueError(
+            f"max_scattering_order must be a positive int, got {max_scattering_order}"
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -234,6 +237,7 @@ class Config:
     workspace_limit_bytes: int | None = 1 << 30
 
     def __post_init__(self) -> None:
+        validate_config_fields(self)
         validate_samples(self.samples)
         validate_seed(self.seed)
         validate_max_depth(self.max_depth)
@@ -241,9 +245,13 @@ class Config:
             self.max_depth if self.max_light_depth is None else self.max_light_depth
         )
         if max_light_depth < 0:
-            raise ValueError("max_light_depth must be non-negative")
+            raise ValueError(
+                f"max_light_depth must be None or a non-negative int, got {max_light_depth}"
+            )
         if self.max_diffraction_order not in {0, 1}:
-            raise ValueError("max_diffraction_order must be 0 or 1")
+            raise ValueError(
+                f"max_diffraction_order must be 0 or 1, got {self.max_diffraction_order}"
+            )
         _validate_scattering_order(self.max_scattering_order)
         components = validated_components(
             self.components,
@@ -252,44 +260,39 @@ class Config:
         validate_bounce_depth(
             self.max_depth,
             components,
-            error_message="BDPT scattering requires max_depth >= 1",
+            error_message=(
+                "BDPT requires max_depth >= 1 for components "
+                f"{sorted(components - {'los'})}, got max_depth={self.max_depth}"
+            ),
         )
+        validate_chain_depth_cap("BDPT", self.max_depth, components)
         if "diffraction" in components and self.max_diffraction_order == 0:
-            raise RuntimeError("diffraction requires max_diffraction_order > 0")
-        if self.coupled_paths:
-            if self.max_depth < 2:
-                raise RuntimeError("coupled paths require max_depth >= 2")
-            if not {"reflection", "diffraction"}.issubset(components):
-                raise RuntimeError(
-                    "coupled paths require reflection and diffraction components"
-                )
-        if (
-            self.coupled_candidate_limit <= 0
-            or self.coupled_candidate_limit > 1_000_000
-        ):
-            raise ValueError("coupled_candidate_limit must be in [1, 1000000]")
-        if self.mis not in _VALID_MIS:
-            raise ValueError(f"mis must be one of {sorted(_VALID_MIS)}")
-        if self.power_heuristic_beta <= 0.0:
-            raise ValueError("power_heuristic_beta must be positive")
-        if self.receiver_strategy not in _VALID_RECEIVER_STRATEGIES:
             raise ValueError(
-                f"receiver_strategy must be one of {sorted(_VALID_RECEIVER_STRATEGIES)}"
+                "the 'diffraction' component requires max_diffraction_order=1, got 0"
             )
-        if self.accumulation_strategy not in _VALID_ACCUMULATION_STRATEGIES:
+        validate_coupled_gate(
+            coupled_paths=self.coupled_paths,
+            max_depth=self.max_depth,
+            components=components,
+        )
+        validate_coupled_candidate_limit(self.coupled_candidate_limit)
+        validate_vocabulary("mis", self.mis, _VALID_MIS)
+        if not self.power_heuristic_beta > 0.0:
             raise ValueError(
-                f"accumulation_strategy must be one of {sorted(_VALID_ACCUMULATION_STRATEGIES)}"
+                f"power_heuristic_beta must be positive and finite, got {self.power_heuristic_beta!r}"
             )
+        validate_vocabulary("receiver_strategy", self.receiver_strategy, _VALID_RECEIVER_STRATEGIES)
+        validate_vocabulary(
+            "accumulation_strategy", self.accumulation_strategy, _VALID_ACCUMULATION_STRATEGIES
+        )
         if self.sample_streams <= 0:
-            raise ValueError("sample_streams must be positive")
+            raise ValueError(f"sample_streams must be a positive int, got {self.sample_streams}")
         if self.max_exported_paths is not None and self.max_exported_paths < 0:
-            raise ValueError("max_exported_paths must be non-negative")
-        if self.ad_mode not in _VALID_AD_MODES:
             raise ValueError(
-                "ad_mode must be one of "
-                f"{sorted(_VALID_AD_MODES)} (ADR-022 lifted the BDPT AD "
-                "refusal to fixed-topology jvp/vjp)"
+                "max_exported_paths must be None or a non-negative int, got "
+                f"{self.max_exported_paths}"
             )
+        validate_vocabulary("BDPT ad_mode", self.ad_mode, _VALID_AD_MODES)
         _validate_coherent_combine(self.coherent, components)
         _validate_ad_readiness(self.ad_mode, components)
         validate_workspace_limit_bytes(self.workspace_limit_bytes)
@@ -3474,7 +3477,7 @@ def _evaluated_connection_samples(
 
 def _single_class_discrete_connection_samples(
     scene: SolverScene, config: Config, *, component: str, component_id: int,
-    tx_power: torch.Tensor | None = None,
+    tx_power: torch.Tensor | None = None, dropped_rows: list[int] | None = None,
 ) -> dict[str, torch.Tensor] | None:
     """Enumerate one delta-like path class as unit-mass discrete connections.
 
@@ -3487,7 +3490,7 @@ def _single_class_discrete_connection_samples(
     its own body.
     """
 
-    paths, _ = evaluate_enumerated_paths(
+    paths, sidecars = evaluate_enumerated_paths(
         scene,
         _BDPTTopologyOptions(
             max_depth=int(config.max_depth),
@@ -3498,6 +3501,9 @@ def _single_class_discrete_connection_samples(
             ad_mode=config.ad_mode,
         ),
     )
+    transaction = sidecars.capacity_transaction
+    if dropped_rows is not None and transaction is not None:
+        dropped_rows.append(transaction.terminal_check())
     selected = torch.nonzero(
         paths.topology.component_id == component_id, as_tuple=False
     ).flatten()
@@ -3538,7 +3544,7 @@ def _diffraction_discrete_connection_samples(
 
 def _transmission_discrete_connection_samples(
     scene: SolverScene, config: Config, *, tx_power: torch.Tensor | None = None,
-) -> dict[str, torch.Tensor] | None:
+) -> tuple[dict[str, torch.Tensor] | None, int]:
     """Enumerate pure straight-segment transmission paths with unit discrete mass.
 
     transmission polarization. Pure specular transmission is delta-like exactly as reflection is,
@@ -3546,12 +3552,16 @@ def _transmission_discrete_connection_samples(
     reproducing the deterministic full-Jones layer-stack field
     (``field_transmission_sequence``) instead of the retired straight-chain TE/TM
     mean. Mixed reflection+transmission chains are not enumerable and stay with
-    the event-selected shooting sampler (native full-Jones field).
+    the event-selected shooting sampler (native full-Jones field). Also returns
+    the endpoint pairs dropped for crossing more walls than ``max_depth``.
     """
 
-    return _single_class_discrete_connection_samples(
-        scene, config, component="transmission", component_id=5, tx_power=tx_power
+    dropped_rows: list[int] = []
+    samples = _single_class_discrete_connection_samples(
+        scene, config, component="transmission", component_id=5, tx_power=tx_power,
+        dropped_rows=dropped_rows,
     )
+    return samples, sum(dropped_rows)
 
 
 def _coupled_discrete_connection_samples(
@@ -3647,6 +3657,7 @@ def _collect_coherent_connection_samples(
     dict[str, torch.Tensor],
     dict[str, torch.Tensor] | None,
     int,
+    int,
     dict[str, int],
     dict[int, Any],
     int,
@@ -3715,7 +3726,7 @@ def _collect_coherent_connection_samples(
                 "scattering",
             )
         }
-        return component_matrices, None, 0, empty_event_counts, {}, launch_count
+        return component_matrices, None, 0, 0, empty_event_counts, {}, launch_count
 
     estimate_samples = (
         sample_blocks[0]
@@ -3750,6 +3761,7 @@ def _collect_coherent_connection_samples(
         component_matrices,
         estimate_samples,
         0,
+        0,
         empty_event_counts,
         {},
         launch_count,
@@ -3768,32 +3780,32 @@ def _validate(scene: SolverScene, config: Config) -> ReceiverGrid | None:
 
 
 def _reject_live_geometry_through_sampler(scene: SolverScene, config: Config) -> None:
-    """BDPT AD: mesh-vertex geometry is frozen for the stochastic sampler
-    (``ad_geometry='enumerated_blocks_only'``).
+    """Refuse endpoint-position and mesh-vertex AD leaves before any launch.
 
-    Reflection/diffraction/transmission (pure) and LoS route through the shared
-    enumerated engine, which owns geometry adjoints; but the mixed-transmission
-    shooting walk and the scattering NEE draw hit points from the stochastic
-    sampler, whose geometry is not differentiable in v1. If a mesh-vertex leaf
-    participates in AD and one of those stochastic blocks will run, refuse
-    loudly instead of silently detaching. Purely-enumerated component sets keep
-    their geometry gradients untouched."""
+    BDPT differentiates material, frequency and transmitter-power leaves. Its
+    sampled estimator does not carry endpoint-position or mesh-vertex
+    derivatives through every block, so such a leaf would come back with no
+    gradient or a partial one; it is refused instead.
+    """
 
     if config.ad_mode == "none":
         return
-    sampler_active = bool(scene.structures) and bool(
-        {"transmission", "scattering"} & set(config.components)
-    )
-    if not sampler_active:
-        return
-    if _ad_geometry_live(*(structure.vertices for structure in scene.structures)):
-        raise RuntimeError(
-            "BDPT ad_geometry='enumerated_blocks_only' (ADR-022): a mesh-vertex "
-            "gradient would reach the stochastic transmission/scattering sampler, "
-            "whose hit-point geometry is frozen in v1; the geometry gradient is "
-            "refused loudly rather than silently detached. Restrict AD to a "
-            "purely-enumerated component set or to material/frequency/tx_power "
-            "leaves."
+    live: list[str] = []
+    for index, transmitter in enumerate(scene.transmitters):
+        if _ad_geometry_live(transmitter.position):
+            live.append(f"transmitter[{index}].position")
+    for index, receiver in enumerate(scene.receivers):
+        if _ad_geometry_live(receiver.position):
+            live.append(f"receiver[{index}].position")
+    for index, structure in enumerate(scene.structures):
+        if _ad_geometry_live(structure.vertices):
+            live.append(f"structure[{index}].vertices")
+    if live:
+        raise NotImplementedError(
+            f"witwin.channel.montecarlo.bdpt ad_mode={config.ad_mode!r} differentiates "
+            "material, frequency and transmitter-power leaves only; "
+            f"{', '.join(live)} carries a gradient or tangent. Detach it, or use "
+            "witwin.channel.deterministic or witwin.channel.path for geometry derivatives"
         )
 
 
@@ -3869,6 +3881,7 @@ def _collect_connection_samples(
     dict[str, torch.Tensor],
     dict[str, torch.Tensor] | None,
     int,
+    int,
     dict[str, int],
     dict[int, Any],
     int,
@@ -3906,6 +3919,7 @@ def _collect_connection_samples(
 
     estimate_samples: dict[str, torch.Tensor] | None = None
     transmission_chain_count = 0
+    transmission_dropped_rows = 0
     event_counts = {"transmit": 0, "reflect": 0, "scatter": 0, "scattering_nee_rows": 0}
     scattering_runtimes: dict[int, Any] = {}
     if endpoint_only:
@@ -4007,8 +4021,10 @@ def _collect_connection_samples(
             # polarization-agnostic straight-chain TE/TM mean with the full-Jones
             # layer-stack field. Mixed reflection+transmission chains are handled
             # separately by the event-selected shooting sampler below.
-            transmission_samples = _transmission_discrete_connection_samples(
-                topology_scene, config, tx_power=enumerated_tx_power
+            transmission_samples, transmission_dropped_rows = (
+                _transmission_discrete_connection_samples(
+                    topology_scene, config, tx_power=enumerated_tx_power
+                )
             )
             if transmission_samples is not None:
                 sample_blocks.append(transmission_samples)
@@ -4080,6 +4096,7 @@ def _collect_connection_samples(
         component_matrices,
         estimate_samples,
         transmission_chain_count,
+        transmission_dropped_rows,
         event_counts,
         scattering_runtimes,
         launch_count,
@@ -4220,14 +4237,19 @@ def _build_metadata(
     scene: SolverScene, config: Config, *, prep: _SolvePrep, workspace: _EndpointWorkspace,
     estimate_samples: dict[str, torch.Tensor] | None, path_gain: torch.Tensor,
     variance: torch.Tensor | None, launch_count: int, transmission_chain_count: int,
-    event_counts: dict[str, int], scattering_runtimes: dict[int, Any],
-    component_maps: dict[str, torch.Tensor] | None, ledger: AdLaunchLedger | None = None,
+    transmission_dropped_rows: int, event_counts: dict[str, int],
+    scattering_runtimes: dict[int, Any], component_maps: dict[str, torch.Tensor] | None,
+    ledger: AdLaunchLedger | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
     launch_state = workspace.launch_state
     endpoint_subpaths = workspace.endpoint_subpaths
     selected_accumulation = prep.selected_accumulation
-    reflection_available = prep.reflection_available
-    diffraction_available = prep.diffraction_available
+    # A scene without structures has nothing to reflect or diffract from; like the
+    # other solvers it reports the component enabled and returns the LoS answer.
+    reflection_available = prep.reflection_available or not scene.structures
+    diffraction_available = prep.diffraction_available or (
+        not scene.structures and config.max_diffraction_order > 0
+    )
     info = prep.info
     workspace_bytes = prep.workspace_bytes
     native_max_depth = prep.native_max_depth
@@ -4256,6 +4278,8 @@ def _build_metadata(
         # component_mask bit 8 marks transmitted subpaths (component classification).
         metadata["transmission"] = {
             "straight_chain_paths": int(transmission_chain_count),
+            # Endpoint pairs whose straight segment crosses more walls than max_depth.
+            "dropped_rows_over_max_depth": int(transmission_dropped_rows),
             "event_counts": {
                 "transmit": int(event_counts["transmit"]),
                 "reflect": int(event_counts["reflect"]),
@@ -4327,6 +4351,7 @@ def _solve_pipeline(
         component_matrices,
         estimate_samples,
         transmission_chain_count,
+        transmission_dropped_rows,
         event_counts,
         scattering_runtimes,
         launch_count,
@@ -4354,6 +4379,7 @@ def _solve_pipeline(
         variance=variance,
         launch_count=launch_count,
         transmission_chain_count=transmission_chain_count,
+        transmission_dropped_rows=transmission_dropped_rows,
         event_counts=event_counts,
         scattering_runtimes=scattering_runtimes,
         component_maps=component_maps,
@@ -4378,13 +4404,16 @@ def solve(  # type: ignore[no-untyped-def]
 ) -> Result:
     """Run the native CUDA/OptiX BDPT pipeline."""
 
+    require_config_type(config, Config, "witwin.channel.montecarlo.bdpt")
     endpoint_views = _endpoint_views(scene)
+    require_single_receiver_layout(endpoint_views, solver="witwin.channel.montecarlo.bdpt")
     if (
         any(isinstance(view, ReceiverGrid) for view in endpoint_views)
         and config.receiver_strategy != "grid_area"
     ):
-        raise RuntimeError(
-            "receiver_strategy='point_sphere' requires point receivers"
+        raise ValueError(
+            f"receiver_strategy={config.receiver_strategy!r} requires point receivers "
+            "only, but the scene has a ReceiverGrid; use receiver_strategy='grid_area'"
         )
     _validate_scalar_endpoint_boundary(endpoint_views)
     validate_scalar_endpoint_features(
@@ -4395,12 +4424,14 @@ def solve(  # type: ignore[no-untyped-def]
     compiled = compile_scene(
         scene, reference_frequency_hz=reference_frequency_hz
     )
-    return _solve_pipeline(
+    result = _solve_pipeline(
         bind_solver_scene(compiled),
         config,
         build_info_fn=build_info,
         transmitter_tensors_fn=transmitter_tensors,
     )
+    record_dropped_faces(result, compiled)
+    return result
 
 
 __all__ = ["BDPTPathSamples", "Config", "Result", "solve"]

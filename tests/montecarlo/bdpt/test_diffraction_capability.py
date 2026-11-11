@@ -59,7 +59,7 @@ def test_bdpt_diffraction_errors_when_order_disabled():
         pytest.skip("CUDA is required for BDPT diffraction capability")
 
     with pytest.raises(
-        RuntimeError, match="diffraction requires max_diffraction_order"
+        ValueError, match="'diffraction' component requires max_diffraction_order=1, got 0"
     ):
         solve(
             wedge_diffraction_scene(),

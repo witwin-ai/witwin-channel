@@ -20,8 +20,8 @@ _INSTALLED_TORCH = torch.__version__.split("+", maxsplit=1)[0]
 
 def _supported_torch_specs() -> list[str]:
     with (REPO_ROOT / "ci" / "support-matrix.toml").open("rb") as stream:
-        runtimes = tomllib.load(stream)["runtime"]
-    return [runtime["torch_spec"] for runtime in runtimes]
+        releases = tomllib.load(stream)["torch"]
+    return [f"=={release['version']}" for release in releases]
 
 
 @pytest.mark.parametrize("installed_torch", [_INSTALLED_TORCH])

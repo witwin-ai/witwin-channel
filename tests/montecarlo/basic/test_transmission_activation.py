@@ -20,7 +20,10 @@ from witwin.channel.scene.endpoints import SolverScene
 
 def _failure_state() -> CapacityFailureState:
     state = object.__new__(CapacityFailureState)
-    object.__setattr__(state, "bits", torch.zeros(1, dtype=torch.int32))
+    record = torch.zeros(2, dtype=torch.int32)
+    object.__setattr__(state, "record", record)
+    object.__setattr__(state, "bits", record[0:1])
+    object.__setattr__(state, "dropped_rows", record[1:2])
     return state
 
 

@@ -208,17 +208,18 @@
     "native/channel/kernels/capacity.cu": {
       "kernels": [
         "capacity_failure_component_maps_sanitize_kernel",
-        "capacity_failure_terminal_check_kernel",
         "enumerated_capacity_failure_sanitize_kernel",
         "enumerated_capacity_failure_vector_sanitize_kernel"
       ],
       "launches": [
         "capacity_failure_component_maps_sanitize_kernel",
-        "capacity_failure_terminal_check_kernel",
         "enumerated_capacity_failure_sanitize_kernel",
         "enumerated_capacity_failure_vector_sanitize_kernel"
       ],
-      "host_synchronization": [],
+      "host_synchronization": [
+        "cudaMemcpyAsync",
+        "cudaStreamSynchronize"
+      ],
       "device_trap": false,
       "compile_options": []
     },
@@ -354,6 +355,7 @@
     },
     "native/channel/kernels/evaluated_paths.cu": {
       "kernels": [
+        "compact_capacity_control_record_kernel",
         "compact_contract_flags_kernel",
         "compact_control_record_kernel",
         "compact_pair_histogram_kernel",
@@ -384,6 +386,7 @@
         "validate_rows_kernel"
       ],
       "launches": [
+        "compact_capacity_control_record_kernel",
         "compact_contract_flags_kernel",
         "compact_control_record_kernel",
         "compact_pair_histogram_kernel",

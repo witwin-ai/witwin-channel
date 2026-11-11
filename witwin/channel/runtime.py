@@ -7,9 +7,8 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import AbstractContextManager, contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dataclass_field
 import enum
-from enum import StrEnum
 from functools import lru_cache, wraps
 import functools
 import hashlib
@@ -21,6 +20,7 @@ from pathlib import Path
 import re
 import sys
 from types import ModuleType
+import weakref
 from typing import Any, ParamSpec, Protocol, TypeVar, cast
 
 import torch
@@ -308,6 +308,45 @@ def _runtime_identity() -> tuple[str, str, str]:
     return torch_version, cuda_version, cxx_abi
 
 
+def torch_install_command(torch_version: str, cuda_version: str) -> str:
+    """Return the pip command that installs one CUDA build of PyTorch."""
+
+    tag = "cu" + cuda_version.replace(".", "")
+    return (
+        f"pip install torch=={torch_version} "
+        f"--index-url https://download.pytorch.org/whl/{tag}"
+    )
+
+
+def cpu_only_torch_message(torch_version: str, *, cuda_version: str = "12.8") -> str:
+    """Explain that the active PyTorch has no CUDA support and how to replace it."""
+
+    base = torch_version.split("+", maxsplit=1)[0]
+    return (
+        f"the installed PyTorch {torch_version} is a CPU-only build; Channel needs a "
+        f"CUDA build of PyTorch. Install it with: {torch_install_command(base, cuda_version)}"
+    )
+
+
+def _runtime_mismatch_message(
+    info: Mapping[str, object], running: Mapping[str, str], fields: list[str],
+) -> str:
+    built_torch = str(info["torch_version"])
+    built_cuda = str(info["cuda_version"])
+    if "cuda_version" in fields and not running["cuda_version"]:
+        return "_channel cannot load: " + cpu_only_torch_message(
+            running["torch_version"], cuda_version=built_cuda
+        )
+    details = ", ".join(
+        f"{name} built for {info[name]!s}, running {running[name]}" for name in fields
+    )
+    return (
+        "_channel does not match the active Torch runtime "
+        f"({details}). This Channel build needs PyTorch {built_torch} with CUDA "
+        f"{built_cuda}: {torch_install_command(built_torch, built_cuda)}"
+    )
+
+
 def _expected_fingerprint(info: Mapping[str, object]) -> str:
     payload = {name: info[name] for name in _FINGERPRINT_FIELDS}
     canonical = json.dumps(
@@ -428,8 +467,7 @@ def _validate_build_info(raw_info: object) -> dict[str, object]:
     ]
     if mismatched_runtime_fields:
         raise ExtensionABIError(
-            "_channel does not match the active Torch runtime: "
-            + ", ".join(mismatched_runtime_fields)
+            _runtime_mismatch_message(info, runtime_values, mismatched_runtime_fields)
         )
 
     fingerprint = str(info["build_fingerprint"])
@@ -463,11 +501,20 @@ def _validate_extension(
     return module
 
 
+def _import_packaged_module() -> object:
+    try:
+        return importlib.import_module("._channel", package="witwin.channel")
+    except ImportError as exc:
+        if torch.version.cuda is None:
+            raise ExtensionLoadError(
+                "_channel cannot load: " + cpu_only_torch_message(str(torch.__version__))
+            ) from exc
+        raise
+
+
 @lru_cache(maxsize=1)
 def _load_packaged_extension() -> object:
-    module = importlib.import_module(
-        "._channel", package="witwin.channel"
-    )
+    module = _import_packaged_module()
     return _validate_extension(
         module,
         packaged=True,
@@ -569,6 +616,188 @@ def _clear_loader_caches() -> None:
     _load_developer_extension.cache_clear()
     _load_native_extension.cache_clear()
     _validated_native_build_info.cache_clear()
+    require_device_supported.cache_clear()
+
+
+# --- GPU, driver and trace backend checks ------------------------------
+
+TRACE_BACKEND_ENV = "WITWIN_CHANNEL_TRACE_BACKEND"
+TRACE_BACKENDS = ("auto", "optix", "cuda")
+SKIP_DEVICE_CHECK_ENV = "WITWIN_CHANNEL_SKIP_DEVICE_CHECK"
+
+# Channel and RayD device code uses Volta warp intrinsics; nothing below sm_70 runs it.
+MIN_COMPUTE_CAPABILITY = 70
+# Jetson and embedded architectures run only their own cubin, and their cubins run
+# nowhere else (the same rule RayD's device check applies).
+EXACT_CUBIN_COMPUTE_CAPABILITIES = frozenset({72, 87, 101, 110})
+# The first CUDA driver API version that loads cubins built by a CUDA 12 toolkit.
+MIN_CUDA_DRIVER_VERSION = 12000
+
+_SCENE_TRACE_BACKENDS: weakref.WeakSet[Any] = weakref.WeakSet()
+
+
+class UnsupportedDeviceError(RuntimeError):
+    """The active GPU or driver cannot run the installed Channel build."""
+
+
+def requested_trace_backend() -> str:
+    """Return the trace backend new scenes request: ``auto``, ``optix`` or ``cuda``."""
+
+    raw = os.environ.get(TRACE_BACKEND_ENV)
+    value = "auto" if raw is None or not raw.strip() else raw.strip().lower()
+    if value not in TRACE_BACKENDS:
+        raise ValueError(
+            f"{TRACE_BACKEND_ENV} must be one of {', '.join(TRACE_BACKENDS)}; got {raw!r}"
+        )
+    return value
+
+
+def record_scene_trace_backend(resource: object) -> None:
+    """Remember a live native scene so diagnostics can report its trace backend."""
+
+    _SCENE_TRACE_BACKENDS.add(resource)
+
+
+def scene_trace_backends() -> list[dict[str, object]]:
+    """Return the device and selected trace backend of every live compiled scene."""
+
+    return [
+        {"device_index": int(cast(Any, scene).device_index),
+         "trace_backend": str(cast(Any, scene).trace_backend)}
+        for scene in list(_SCENE_TRACE_BACKENDS)
+    ]
+
+
+def runtime_probe(device_index: int, *, probe_optix: bool = True) -> dict[str, object]:
+    """Return the CUDA driver API version and, optionally, the OptiX probe for a device."""
+
+    probe = cast(Any, required_symbol("runtime_probe"))(int(device_index), bool(probe_optix))
+    return dict(probe)
+
+
+def build_targets(architectures: list[object]) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    """Split ``build_info()["cuda_architectures"]`` into cubin and PTX SM numbers."""
+
+    sass: set[int] = set()
+    ptx: set[int] = set()
+    for entry in architectures:
+        match = re.fullmatch(r"(\d+)-(real|virtual)", str(entry))
+        if match is None:
+            raise ExtensionABIError(f"unrecognized CUDA architecture entry {entry!r}")
+        (sass if match.group(2) == "real" else ptx).add(int(match.group(1)))
+    return tuple(sorted(sass)), tuple(sorted(ptx))
+
+
+def _cubin_runs(arch: int, sm: int) -> bool:
+    if arch == sm:
+        return True
+    if arch in EXACT_CUBIN_COMPUTE_CAPABILITIES or sm in EXACT_CUBIN_COMPUTE_CAPABILITIES:
+        return False
+    return arch // 10 == sm // 10 and arch < sm
+
+
+def device_code_mode(sm: int, sass: tuple[int, ...], ptx: tuple[int, ...]) -> str:
+    """How a GPU runs this build: ``sass``, ``ptx-jit`` or ``unsupported``."""
+
+    if sm < MIN_COMPUTE_CAPABILITY:
+        return "unsupported"
+    if any(_cubin_runs(arch, sm) for arch in sass):
+        return "sass"
+    if sm not in EXACT_CUBIN_COMPUTE_CAPABILITIES and any(arch <= sm for arch in ptx):
+        return "ptx-jit"
+    return "unsupported"
+
+
+def _driver_version_text(version: int) -> str:
+    return f"{version // 1000}.{(version % 1000) // 10}"
+
+
+def device_support_problems(
+    sm: int, architectures: list[object], driver_version: int, *, cuda_version: str,
+) -> list[str]:
+    """Return why a GPU and driver cannot run a build; empty when they can."""
+
+    sass, ptx = build_targets(architectures)
+    problems: list[str] = []
+    mode = device_code_mode(sm, sass, ptx)
+    if sm < MIN_COMPUTE_CAPABILITY:
+        problems.append(
+            f"Channel needs compute capability 7.0 (Volta) or newer; sm_{sm} cannot run "
+            "it, from a wheel or from source"
+        )
+    elif mode == "unsupported":
+        problems.append(
+            f"the build has no CUDA code for sm_{sm} (cubins: "
+            f"{', '.join(f'sm_{a}' for a in sass) or 'none'}; PTX: "
+            f"{', '.join(f'compute_{a}' for a in ptx) or 'none'})"
+        )
+    if 0 < driver_version < MIN_CUDA_DRIVER_VERSION:
+        problems.append(
+            f"the NVIDIA driver supports CUDA {_driver_version_text(driver_version)}; "
+            "Channel needs a driver for CUDA 12 or newer (R525+, R555+ for OptiX)"
+        )
+    elif mode == "ptx-jit" and cuda_version:
+        major, _, minor = cuda_version.partition(".")
+        needed = int(major) * 1000 + int(minor or 0) * 10
+        if 0 < driver_version < needed:
+            problems.append(
+                f"sm_{sm} runs this build only by JIT-compiling its PTX, which needs a "
+                f"driver for CUDA {cuda_version}; the driver supports CUDA "
+                f"{_driver_version_text(driver_version)}"
+            )
+    return problems
+
+
+def unsupported_device_message(
+    *, device_index: int, name: str, sm: int, architectures: list[object], problems: list[str],
+) -> str:
+    """Format the error for a GPU or driver that cannot run the installed build."""
+
+    lines = [
+        f"Channel cannot run on CUDA device {device_index} '{name}' "
+        f"(compute capability {sm // 10}.{sm % 10}, sm_{sm}):"
+    ]
+    lines += [f"  - {problem}" for problem in problems]
+    lines.append(f"This build contains CUDA code for: {', '.join(map(str, architectures))}.")
+    if sm >= MIN_COMPUTE_CAPABILITY:
+        lines.append(
+            "Fix: update the NVIDIA driver if it is named above; otherwise build Channel "
+            f"from source for this GPU (CHANNEL_DEV_CUDA_ARCH={sm} scripts/dev_build.sh, or "
+            f"CMAKE_ARGS=-DCMAKE_CUDA_ARCHITECTURES={sm}-real; see CONTRIBUTING.md). "
+            "`python -m witwin.channel doctor` prints the full report."
+        )
+    lines.append(f"Set {SKIP_DEVICE_CHECK_ENV}=1 to skip this check.")
+    return "\n".join(lines)
+
+
+@lru_cache(maxsize=None)
+def require_device_supported(device_index: int) -> None:
+    """Fail before native scene work when a GPU or driver cannot run this build."""
+
+    if os.environ.get(SKIP_DEVICE_CHECK_ENV, "").strip().lower() in ("1", "true", "yes", "on"):
+        return
+    if torch.version.cuda is None:
+        raise UnsupportedDeviceError(cpu_only_torch_message(str(torch.__version__)))
+    info = build_info()
+    architectures = cast(list[object], info["cuda_architectures"])
+    major, minor = torch.cuda.get_device_capability(device_index)
+    sm = major * 10 + minor
+    driver_version = int(cast(Any, runtime_probe(device_index, probe_optix=False)[
+        "cuda_driver_version"
+    ]))
+    problems = device_support_problems(
+        sm, architectures, driver_version, cuda_version=str(info["cuda_version"])
+    )
+    if problems:
+        raise UnsupportedDeviceError(
+            unsupported_device_message(
+                device_index=device_index,
+                name=torch.cuda.get_device_name(device_index),
+                sm=sm,
+                architectures=architectures,
+                problems=problems,
+            )
+        )
 
 
 # --- Validated access to Channel extension symbols ----------------------
@@ -909,8 +1138,8 @@ def _ad_reject_fixed_inputs(
         if needs_input_grad[index]:
             raise NotImplementedError(
                 f"{op_name} does not differentiate {name}: tx_power, the "
-                "polarizations, mu_r, material ids and valid masks stay fixed "
-                "under the plan 07 fixed-topology contract"
+                "polarizations, mu_r, material ids and valid masks are constants "
+                "of the fixed-topology derivative; detach this input"
             )
 
 
@@ -921,8 +1150,8 @@ def _ad_reject_fixed_tangents(op_name: str, tangents: tuple[tuple[object, str], 
         ):
             raise NotImplementedError(
                 f"{op_name} does not differentiate {name}: tx_power, the "
-                "polarizations, mu_r, material ids and valid masks stay fixed "
-                "under the plan 07 fixed-topology contract"
+                "polarizations, mu_r, material ids and valid masks are constants "
+                "of the fixed-topology derivative; detach this input"
             )
 
 
@@ -1315,24 +1544,77 @@ class CapacityFailureBit(enum.IntFlag):
     SEGMENT_PENETRATION_FAILURE = 1 << 7
 
 
-@dataclass(frozen=True, slots=True, eq=False)
-class CapacityFailureState:
-    """One solve-owned CUDA ``int32[1]`` failure bitmask.
+_CAPACITY_FAILURE_DESCRIPTIONS = {
+    CapacityFailureBit.DIFFRACTION_STATE_OVERFLOW: "diffraction state capacity exceeded",
+    CapacityFailureBit.DIFFRACTION_PATH_OVERFLOW: "diffraction path capacity exceeded",
+    CapacityFailureBit.DIFFRACTION_PATH_CONTRACT_ERROR: "diffraction path rows violated their contract",
+    CapacityFailureBit.PAIR_CAPACITY_OVERFLOW: "endpoint-pair capacity exceeded",
+    CapacityFailureBit.PAIR_CONTRACT_ERROR: (
+        "path rows referenced an endpoint, material or layer outside the compiled scene"
+    ),
+    CapacityFailureBit.COUPLED_CANDIDATE_OVERFLOW: "coupled candidate capacity exceeded",
+    CapacityFailureBit.REFLECTION_CANDIDATE_OVERFLOW: "reflection candidate capacity exceeded",
+    CapacityFailureBit.SEGMENT_PENETRATION_FAILURE: (
+        "a transmission segment could not be traced (non-finite or out-of-range endpoint "
+        "coordinates, or inconsistent penetration rows)"
+    ),
+}
 
-    Construction is metadata-only. Intermediate native operations atomically
-    accumulate bits on the active CUDA stream and never read them on the host.
+
+def decode_capacity_failure_bits(bits: int) -> tuple[str, ...]:
+    """Return the names of the set failure bits, low bit first; unknown bits are named by value."""
+
+    if type(bits) is not int:
+        raise TypeError("bits must be an int")
+    names = [flag.name for flag in CapacityFailureBit if bits & int(flag) and flag.name]
+    unknown = bits & ~int(sum(int(flag) for flag in CapacityFailureBit))
+    if unknown:
+        names.append(f"UNKNOWN_0x{unknown & 0xFFFFFFFF:08x}")
+    return tuple(names)
+
+
+class CapacityError(RuntimeError):
+    """A solve's device work reported a failure; no partial result was returned.
+
+    ``bits`` is the raw failure bitmask and ``bit_names`` its decoded names.
     """
 
-    bits: torch.Tensor
+    def __init__(self, bits: int) -> None:
+        self.bits = int(bits)
+        self.bit_names = decode_capacity_failure_bits(self.bits)
+        details = "; ".join(
+            f"{name}: {_CAPACITY_FAILURE_DESCRIPTIONS[CapacityFailureBit[name]]}"
+            if name in CapacityFailureBit.__members__
+            else name
+            for name in self.bit_names
+        )
+        super().__init__(f"the solve failed and returned no result: {details}")
+
+
+@dataclass(frozen=True, slots=True, eq=False)
+class CapacityFailureState:
+    """One solve-owned CUDA ``int32[2]`` record: failure bitmask, then dropped-row count.
+
+    Construction is metadata-only. Native operations atomically update the
+    record on the active CUDA stream; the host reads it once per solve.
+    """
+
+    record: torch.Tensor
+    # The int32[1] failure bitmask view that native operations OR into.
+    bits: torch.Tensor = dataclass_field(init=False)
+    # The int32[1] count of rows dropped for exceeding their hit capacity.
+    dropped_rows: torch.Tensor = dataclass_field(init=False)
 
     def __post_init__(self) -> None:
-        validate_cuda_tensor("bits", self.bits, dtype=torch.int32, ndim=1)
-        if self.bits.shape != (1,):
-            raise ValueError("bits must have shape (1,)")
+        validate_cuda_tensor("record", self.record, dtype=torch.int32, ndim=1)
+        if self.record.shape != (2,):
+            raise ValueError("record must have shape (2,)")
+        object.__setattr__(self, "bits", self.record[0:1])
+        object.__setattr__(self, "dropped_rows", self.record[1:2])
 
     @property
     def device(self) -> torch.device:
-        return self.bits.device
+        return self.record.device
 
 
 def require_host_count(name: str, value: object) -> int:
@@ -1389,15 +1671,17 @@ class CapacityExecutionCounts:
 
 @dataclass(slots=True, eq=False)
 class SolveCapacityTransaction:
-    """Solve-scoped owner of one failure state and one terminal observation.
+    """Solve-scoped owner of one failure record and its single host observation.
 
-    The transaction is orchestration state only. It never reads the CUDA
-    bitmask. Solvers pass ``failure_state`` unchanged to every capacity
-    intermediate and call ``terminal_check`` once after result sanitization.
+    Solvers pass ``failure_state`` unchanged to every capacity intermediate.
+    The record reaches the host exactly once: either inside an existing compact
+    count copy (``observe``) or, where a solve has no compact boundary, through
+    one read at result finalization (``terminal_check``). A non-zero bitmask
+    raises :class:`CapacityError`, so no partial result is returned.
     """
 
     failure_state: CapacityFailureState
-    _terminal_enqueued: bool = False
+    _observed_dropped_rows: int | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.failure_state, CapacityFailureState):
@@ -1408,29 +1692,50 @@ class SolveCapacityTransaction:
         return self.failure_state.device
 
     @property
-    def terminal_enqueued(self) -> bool:
-        return self._terminal_enqueued
+    def observed(self) -> bool:
+        return self._observed_dropped_rows is not None
 
-    def terminal_check(self) -> None:
-        """Enqueue the runtime terminal observer exactly once."""
+    @property
+    def dropped_rows(self) -> int:
+        """Rows dropped for exceeding their hit capacity; available after observation."""
 
-        if self._terminal_enqueued:
-            raise RuntimeError("capacity transaction terminal check already enqueued")
-        capacity_failure_terminal_check(self.failure_state)
-        self._terminal_enqueued = True
+        if self._observed_dropped_rows is None:
+            raise RuntimeError("capacity transaction has not been observed")
+        return self._observed_dropped_rows
+
+    def observe(self, bits: int, dropped_rows: int) -> None:
+        """Record the host copy of the failure record and raise if any bit is set."""
+
+        if self._observed_dropped_rows is not None:
+            raise RuntimeError("capacity transaction already observed")
+        if type(bits) is not int or type(dropped_rows) is not int:
+            raise TypeError("observed capacity values must be ints")
+        if dropped_rows < 0:
+            raise ValueError("dropped_rows must be non-negative")
+        self._observed_dropped_rows = dropped_rows
+        if bits != 0:
+            raise CapacityError(bits)
+
+    def terminal_check(self) -> int:
+        """Observe the record once if no compact boundary did, and return the dropped rows."""
+
+        if self._observed_dropped_rows is None:
+            bits, dropped_rows = capacity_failure_state_read(self.failure_state)
+            self.observe(bits, dropped_rows)
+        return self.dropped_rows
 
 
 def create_capacity_failure_state(reference: torch.Tensor) -> CapacityFailureState:
-    """Create a native-zeroed failure state on ``reference``'s CUDA device."""
+    """Create a native-zeroed failure record on ``reference``'s CUDA device."""
 
     if not isinstance(reference, torch.Tensor):
         raise TypeError("reference must be a torch.Tensor")
     if not reference.is_cuda:
         raise ValueError("reference must be a CUDA tensor")
-    bits = cast(Any, required_symbol("capacity_failure_state_create"))(reference)
-    if not isinstance(bits, torch.Tensor):
+    record = cast(Any, required_symbol("capacity_failure_state_create"))(reference)
+    if not isinstance(record, torch.Tensor):
         raise TypeError("native capacity failure state must be a tensor")
-    return CapacityFailureState(bits=bits)
+    return CapacityFailureState(record=record)
 
 
 def create_solve_capacity_transaction(reference: torch.Tensor) -> SolveCapacityTransaction:
@@ -1451,20 +1756,21 @@ def require_capacity_failure_state(state: object, *, device: torch.device) -> Ca
     return state
 
 
-def capacity_failure_terminal_check(failure_state: CapacityFailureState) -> None:
-    """Enqueue the one terminal failure observation for a capacity solve."""
+def capacity_failure_state_read(failure_state: CapacityFailureState) -> tuple[int, int]:
+    """Copy the failure record to the host once (one copy, one stream sync)."""
 
     if not isinstance(failure_state, CapacityFailureState):
         raise TypeError("failure_state must be a CapacityFailureState")
-    cast(Any, required_symbol("capacity_failure_terminal_check"))(
-        failure_state.bits
+    bits, dropped_rows = cast(Any, required_symbol("capacity_failure_state_read"))(
+        failure_state.record
     )
+    return int(bits), int(dropped_rows)
 
 
 # --- Stable CUDA profiler annotations for architecture evidence ---------
 
 
-class CudaProfileRange(StrEnum):
+class CudaProfileRange(str, enum.Enum):
     """Closed set of semantic ranges consumed by performance evidence."""
 
     ENUMERATED_PENETRATION_DISCOVERY = (
@@ -1482,7 +1788,7 @@ class CudaProfileRange(StrEnum):
     DIFFRACTION_TOTAL_STAGE = "witwin.channel:diffraction_total_stage"
 
 
-class CudaProfileMark(StrEnum):
+class CudaProfileMark(str, enum.Enum):
     """Closed set of semantic point annotations consumed by the runner."""
 
     OPTIX_TRAVERSAL = "witwin.channel:optix_traversal"
@@ -1531,6 +1837,7 @@ __all__ = [
     "AD_STATUSES",
     "AdLaunchLedger",
     "CHANNEL_ABI_VERSION",
+    "CapacityError",
     "CapacityExecutionCounts",
     "CapacityFailureBit",
     "CapacityFailureState",
@@ -1543,15 +1850,24 @@ __all__ = [
     "MemoryEstimate",
     "NativeSymbolError",
     "REQUIRED_METADATA_FIELDS",
+    "SKIP_DEVICE_CHECK_ENV",
     "SolveCapacityTransaction",
+    "TRACE_BACKENDS",
+    "TRACE_BACKEND_ENV",
+    "UnsupportedDeviceError",
     "bdpt_zero_matrix",
     "build_info",
-    "capacity_failure_terminal_check",
+    "build_targets",
+    "capacity_failure_state_read",
     "checked_product",
     "create_capacity_failure_state",
     "create_solve_capacity_transaction",
     "cuda_profile_mark",
     "cuda_profile_range",
+    "cpu_only_torch_message",
+    "decode_capacity_failure_bits",
+    "device_code_mode",
+    "device_support_problems",
     "disable_functorch",
     "enforce_memory_budget",
     "estimate_monte_carlo_memory",
@@ -1567,11 +1883,18 @@ __all__ = [
     "noop_metadata",
     "optional_symbol",
     "profiled_cuda_range",
+    "record_scene_trace_backend",
+    "require_device_supported",
     "require_capacity_failure_state",
     "require_host_count",
     "require_tensor",
     "required_symbol",
+    "requested_trace_backend",
+    "runtime_probe",
+    "scene_trace_backends",
+    "torch_install_command",
     "transform_level",
+    "unsupported_device_message",
     "unwrap_transform_tensor",
     "uses_cxx11_abi",
     "validate_cuda_tensor",

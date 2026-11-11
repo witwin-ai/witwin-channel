@@ -14,6 +14,54 @@
   (superseded device-resident capacity results), and ADR-032 (controlled
   compact cardinality boundary).
 
+> **Amendment (0.6.0, M1-1/M1-2): over-depth rows are dropped; failures are
+> decoded on the host.** Sections 5 and 7 and the acceptance bullet on overflow
+> are superseded as follows; everything else stands.
+>
+> - *Why.* A segment that crosses more walls than `max_depth` is not a capacity
+>   failure: its transmission path is simply beyond the requested depth. The old
+>   rule failed the whole batch and then trapped on the device, so one blocked
+>   receiver behind two walls at the default `max_depth=1` destroyed the CUDA
+>   context of the process (audit finding S-1, also reached through NaN/huge
+>   endpoints, S-3). That violated "every legal input leaves the CUDA context
+>   usable".
+> - *Overflow.* Both Channel users (enumerated `EnumeratedFullDistance` and MC
+>   Basic `MonteCarloTargetInset`) request RayD's additive
+>   `SegmentPenetrationOverflowPolicy::DropRow` (RayD ADR-0033 amendment). An
+>   overflowing row is returned inert (no valid slot, `num_hits=0`,
+>   `reached_target=false`), flagged in `overflow`, and counted atomically in
+>   element 1 of the solve's failure record; no failure bit is set and every
+>   other row of the batch stays valid and bitwise unchanged. The enumerated
+>   topology preflight accepts an inert overflow row (and fails the contract
+>   only if an overflow row is not inert); the pack and the MC wall product skip
+>   it because it never reached its target. Inputs that never overflow produce
+>   bitwise-identical results.
+> - *Failure record.* `CapacityFailureState` is a CUDA `int32[2]` record
+>   `[bitmask, dropped_rows]`; native operations still OR into the `int32[1]`
+>   bitmask view. Non-finite segment geometry and contract violations still set
+>   `SEGMENT_PENETRATION_FAILURE` and make the batch inert.
+> - *Terminal observation.* The asynchronous terminal trap and its binding are
+>   deleted. The record reaches the host exactly once per solve: inside the
+>   compact count copy (ADR-032 amendment) for Path, Deterministic, BDPT's
+>   enumerated oracle and the consumer, and through one 8-byte read at result
+>   finalization for MC Basic, which has no compact boundary. A non-zero bitmask
+>   raises `witwin.channel.runtime.CapacityError` listing the decoded bit names,
+>   before any result is returned, so there is still no partial result.
+> - *Metadata.* `metadata["transmission"]["dropped_rows_over_max_depth"]` (Path,
+>   Deterministic, MC Basic, BDPT) and
+>   `PropagationDiagnostics.transmission_dropped_rows` (consumer) report the
+>   dropped count.
+> - *MC wall product depth.* The MC estimator itself does not need "walls ≤
+>   depth": its straight-segment product of per-wall transmittances is defined
+>   for any number of walls, and every extra wall only multiplies by a factor
+>   below one. The bound is the solver-wide meaning of `max_depth` for
+>   transmission (one interaction per crossed wall, the same as
+>   `component_max_depth` in Path and Deterministic). Keeping
+>   `hit_capacity = max_depth` for MC keeps the MC transmission map and the
+>   enumerated transmission rows describing the same path set, so the
+>   MC-versus-Deterministic transmission comparisons stay like-for-like; a larger
+>   MC capacity would silently add paths the other solvers exclude.
+
 ## Context
 
 Channel currently discovers a straight transmission chain by repeatedly calling

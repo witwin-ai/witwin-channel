@@ -17,7 +17,9 @@ std::shared_ptr<RayDSceneResource> channel_rayd_scene_create(
     std::vector<torch::Tensor> face_uv,
     std::vector<torch::Tensor> to_world_left,
     std::vector<torch::Tensor> to_world_right,
-    std::vector<int64_t> mesh_flags);
+    std::vector<int64_t> mesh_flags,
+    const std::string &trace_backend);
+pybind11::dict channel_runtime_probe(int64_t device_index, bool probe_optix);
 pybind11::tuple channel_rayd_scene_edge_records(RayDSceneResource &scene);
 pybind11::tuple channel_rayd_intersect_forward(
     RayDSceneResource &scene,
@@ -40,7 +42,7 @@ pybind11::tuple channel_rayd_segment_penetration_forward(
     int64_t hit_capacity,
     int64_t policy,
     double scene_diagonal,
-    torch::Tensor capacity_failure_state,
+    torch::Tensor capacity_failure_record,
     int64_t failure_bit);
 pybind11::tuple channel_rayd_segment_penetration_forward_tape(
     RayDSceneResource &scene,
@@ -51,7 +53,7 @@ pybind11::tuple channel_rayd_segment_penetration_forward_tape(
     int64_t hit_capacity,
     int64_t policy,
     double scene_diagonal,
-    torch::Tensor capacity_failure_state,
+    torch::Tensor capacity_failure_record,
     int64_t failure_bit);
 pybind11::tuple channel_rayd_segment_penetration_backward(
     RayDSceneResource &scene,
@@ -62,7 +64,7 @@ pybind11::tuple channel_rayd_segment_penetration_backward(
     int64_t hit_capacity,
     int64_t policy,
     double scene_diagonal,
-    torch::Tensor capacity_failure_state,
+    torch::Tensor capacity_failure_record,
     int64_t failure_bit,
     torch::Tensor valid,
     torch::Tensor num_hits,
@@ -99,7 +101,7 @@ pybind11::tuple channel_rayd_segment_penetration_jvp(
     int64_t hit_capacity,
     int64_t policy,
     double scene_diagonal,
-    torch::Tensor capacity_failure_state,
+    torch::Tensor capacity_failure_record,
     int64_t failure_bit,
     torch::Tensor valid,
     torch::Tensor num_hits,
@@ -359,6 +361,7 @@ void register_rayd_geometry(pybind11::module_ &module) {
         module, "RayDSceneResource", pybind11::dynamic_attr())
         .def_property_readonly("available", &RayDSceneResource::available)
         .def_property_readonly("device_index", &RayDSceneResource::device_index)
+        .def_property_readonly("trace_backend", &RayDSceneResource::trace_backend)
         .def(
             "require_resource",
             [](RayDSceneResource &scene) -> RayDSceneResource & { return scene; },
@@ -367,6 +370,10 @@ void register_rayd_geometry(pybind11::module_ &module) {
         "rayd_scene_create",
         &channel_rayd_scene_create,
         "Create a typed RayD native scene resource.");
+    module.def(
+        "runtime_probe",
+        &channel_runtime_probe,
+        "Report the CUDA driver version and whether OptiX can trace on a device.");
     module.def(
         "rayd_scene_edge_records",
         &channel_rayd_scene_edge_records,

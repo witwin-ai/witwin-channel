@@ -28,25 +28,51 @@ def _constraints():
 
 
 def test_supported_runtime_matrix_matches_project_metadata_and_constraints():
-    project = _load_toml("pyproject.toml")
-    matrix = _load_toml("ci/support-matrix.toml")["runtime"]
+    project = _load_toml("pyproject.toml")["project"]
+    matrix = _load_toml("ci/support-matrix.toml")
 
-    assert len(matrix) == 1
-    runtime = matrix[0]
-    assert runtime["python_spec"] == project["project"]["requires-python"]
-    assert f"torch{runtime['torch_spec']}" in project["project"]["dependencies"]
-    assert runtime["constraints"] == "constraints/ci-py311-cu128.txt"
-    assert runtime["cuda_toolkit"] == "12.8.1"
-    assert runtime["verified_sm"] == [120]
-    assert runtime["declared_unverified_sm"] == [70, 75, 80, 86, 87, 89, 90, 100, 101]
+    assert matrix["schema_version"] == 2
+    pythons = [tuple(int(part) for part in python.split(".")) for python in matrix["pythons"]]
+    assert pythons == sorted(pythons)
+    lowest, highest = pythons[0], pythons[-1]
+    assert project["requires-python"] == (
+        f">={lowest[0]}.{lowest[1]},<{highest[0]}.{highest[1] + 1}"
+    )
+    classifiers = set(project["classifiers"])
+    assert {f"Programming Language :: Python :: {python}" for python in matrix["pythons"]} <= (
+        classifiers
+    )
+    pypi = [torch for torch in matrix["torch"] if torch["channel"] == "pypi"]
+    assert len(pypi) == 1
+    assert f"torch=={pypi[0]['version']}" in project["dependencies"]
+    assert "witwin>=0.4,<0.5" in project["dependencies"]
+    assert {torch["channel"] for torch in matrix["torch"]} <= {"pypi", "release-asset"}
+    assert matrix["constraints"] == "constraints/ci-py311-cu128.txt"
+    assert matrix["cuda_toolkit"] == "12.8.1"
+    assert set(matrix["platforms"]) == {"manylinux_2_28_x86_64", "win_amd64"}
+    assert matrix["ptx"] and max(matrix["ptx"]) >= max(matrix["sass"])
+    assert 0 < matrix["max_wheel_mib"] < 100
+    for verified in matrix["verified"]:
+        assert verified["sm"] in matrix["sass"]
+        assert (ROOT / verified["evidence"]).is_file()
 
     constraints = _constraints()
-    assert constraints["torch"] == "2.10.0"
+    assert constraints["torch"] == pypi[0]["version"]
     assert constraints["scikit-build-core"] == "0.12.2"
     assert constraints["cmake"] == "4.3.0"
     assert constraints["ninja"] == "1.13.0"
     assert constraints["pytest"] == "8.4.2"
     assert constraints["ruff"] == "0.15.10"
+
+
+def test_project_metadata_names_the_license_and_ships_the_notice():
+    project = _load_toml("pyproject.toml")["project"]
+
+    assert project["license"].startswith("LicenseRef-")
+    assert project["license-files"] == ["LICENSE", "NOTICE"]
+    assert (ROOT / "NOTICE").is_file()
+    assert {"Homepage", "Repository", "Issues", "License"} <= set(project["urls"])
+    assert project["scripts"] == {"witwin-channel-doctor": "witwin.channel.deployment:main"}
 
 
 def test_build_requirements_are_bounded_and_have_exact_ci_constraints():

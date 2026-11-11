@@ -6,17 +6,17 @@
 #include "registry.h"
 
 torch::Tensor channel_capacity_failure_state_create(torch::Tensor reference);
-void channel_capacity_failure_terminal_check(torch::Tensor failure_state);
+pybind11::tuple channel_capacity_failure_state_read(torch::Tensor record);
 
 void register_runtime(pybind11::module_ &module) {
     module.def(
         "capacity_failure_state_create",
         &channel_capacity_failure_state_create,
-        "Create a zeroed device-resident capacity failure state.",
+        "Create a zeroed device-resident capacity failure record.",
         pybind11::arg("reference"));
     module.def(
-        "capacity_failure_terminal_check",
-        &channel_capacity_failure_terminal_check,
-        "Enqueue the terminal device failure for a capacity transaction.",
-        pybind11::arg("failure_state"));
+        "capacity_failure_state_read",
+        &channel_capacity_failure_state_read,
+        "Copy a capacity failure record to the host once and return (bits, dropped_rows).",
+        pybind11::arg("record"));
 }

@@ -57,8 +57,8 @@ BDPT oracle through `evaluate_enumerated_paths`. The engine owns one pair-major
 `EnumeratedFullDistance` RayD batch, the compile-cached policy diagonal, the
 device actual-count sidecar, and the typed solve transaction. This solver
 sanitizes after scattering, completes accumulation, optional PathTable export,
-and `Result` construction, then enqueues the runtime-owned terminal observer
-exactly once. It does not reconstruct or specialize the penetration route.
+and `Result` construction; the transaction is observed once inside the compact
+count copy and a failed one raises `CapacityError`. It does not reconstruct or specialize the penetration route.
 
 Under ADR-030, `deterministic.kernels.diffraction_pair` owns a dormant native
 source-lane pair-reduction primal/VJP/JVP family. One warp owns each endpoint

@@ -1214,6 +1214,9 @@ class PropagationDiagnostics:
     # reports zero tape however many companions it launched.
     ad_companion_launches: int = 0
     ad_tape_bytes: int = 0
+    # Source-sink pairs left without a transmission path because their straight
+    # segment crosses more walls than max_depth.
+    transmission_dropped_rows: int = 0
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -2248,7 +2251,7 @@ def require_fixed_los_geometry_live(rows: FixedLoSRows, decided: bool) -> None:
         raise RuntimeError(
             "fixed LoS geometry liveness disagrees with the decision taken "
             f"above the frequency-column loop (decided {decided}); every "
-            "column must answer the same ADR-038 question"
+            "column must make the same forward-mode liveness decision"
         )
 
 
@@ -2266,6 +2269,15 @@ _STABLE_ID = 16
 # structural packing; the number continues the same vocabulary so a caller
 # reading a bitmask never has to learn two encodings.
 _SLOT_BLOCK = 32
+# A frozen row whose interaction face index is outside the compiled scene's faces.
+_FACE_BOUNDS = 64
+_CONTRACT_BITS = (
+    (_INDEX_BOUNDS, "a source_index or sink_index outside the current endpoint batches"),
+    (_PAIR_ORDER, "rows out of pair-major order"),
+    (_STABLE_ID, "a source_id or sink_id that does not match the endpoint stable_ids"),
+    (_SLOT_BLOCK, "a row pairing endpoints of different slots"),
+    (_FACE_BOUNDS, "a primitive_sequence face index outside the compiled scene's faces"),
+)
 
 VALIDATION_D2H_COPIES = 1
 VALIDATION_D2H_BYTES = 4
@@ -2310,7 +2322,7 @@ def _order_violation(pair_index: torch.Tensor, in_bounds: torch.Tensor) -> torch
 def _contract_error(
     topology: PropagationTopology, sources: EndpointBatch, sinks: EndpointBatch,
     source_row_index: torch.Tensor, sink_row_index: torch.Tensor, pair_index: torch.Tensor,
-    slot_broken: torch.Tensor | None,
+    slot_broken: torch.Tensor | None, face_count: int | None = None,
 ) -> torch.Tensor:
     """One device-resident int32 bitmask covering every frozen row."""
 
@@ -2331,6 +2343,8 @@ def _contract_error(
         | _bit(_order_violation(pair_index, in_bounds), _PAIR_ORDER)
         | _bit(identity_broken.any(), _STABLE_ID)
     )
+    if face_count is not None and topology.primitive_sequence.shape[1]:
+        error = error | _bit((topology.primitive_sequence >= face_count).any(), _FACE_BOUNDS)
     if slot_broken is None:
         return error
     return error | _bit((slot_broken & in_bounds).any(), _SLOT_BLOCK)
@@ -2374,7 +2388,7 @@ def _pair_segmentation(pair_index: torch.Tensor, pair_count: int) -> torch.Tenso
 
 def prepared_row_gather(
     topology: PropagationTopology, sources: EndpointBatch, sinks: EndpointBatch, *,
-    slot_count: int = 1,
+    slot_count: int = 1, face_count: int | None = None,
 ) -> PreparedRows:
     """Validate frozen rows and bind them to the current endpoint batches.
 
@@ -2422,12 +2436,14 @@ def prepared_row_gather(
                 sink_row_index,
                 pair_index,
                 slot_broken,
+                face_count,
             ).item()
         )
         if error != 0:
+            reasons = "; ".join(text for bit, text in _CONTRACT_BITS if error & bit)
             raise ValueError(
-                "frozen topology validation failed against the current "
-                f"endpoint batches (error bitmask {error})"
+                "frozen topology validation failed against the current endpoint "
+                f"batches and compiled scene: {reasons} (error bitmask {error})"
             )
     return PreparedRows(
         source=sources.positions_m.index_select(0, source_row_index).contiguous(),
@@ -2650,8 +2666,8 @@ class GeometryLiveness:
             raise RuntimeError(
                 "fixed-topology geometry liveness disagrees with the decision "
                 f"taken above the frequency-column loop (depth {depth}, "
-                f"decided {decided}); every column must answer the same ADR-038 "
-                "question"
+                f"decided {decided}); every column must make the same forward-mode "
+                "liveness decision"
             )
 
 
@@ -3175,12 +3191,55 @@ def _preflight_evaluate(
             f"AD mode {request.ad_mode!r} is unsupported for components "
             f"{unsupported_ad}"
         )
+    _require_fresh_source(compiled)
+    _require_scene_device(compiled, request.sources, request.sinks)
+    from witwin.channel.scene.endpoints import require_no_functorch_transform
+
+    require_no_functorch_transform(
+        (request.sources.positions_m, request.sinks.positions_m, request.reference_frequency_hz)
+    )
     if request.response == "polarimetric_transport":
         _require_polarimetric_inputs(request)
     require_primal_only_ad_inputs(compiled, request)
     require_first_order_request(compiled, request)
     compiled.require_reference_frequency(request.reference_frequency_hz)
     return compiled, request
+
+
+def _require_fresh_source(compiled: CompiledScene) -> None:
+    """Refuse a compiled scene whose source world was edited after compilation.
+
+    Four host integer comparisons between the version domains recorded at
+    compile time and the source scene's current ones; no device work. An edit
+    that bypasses the tensor version counter (``tensor.data = ...``) is not
+    visible here or to the solvers.
+    """
+
+    moved = WorldProvenance.of(compiled).moved_domain(WorldProvenance.of(compiled.source))
+    if moved is not None:
+        raise ValueError(
+            f"the compiled scene is stale: its source scene's {moved} changed after "
+            "witwin.channel.scene.compile(); compile the scene again before evaluating"
+        )
+
+
+def _require_scene_device(
+    compiled: CompiledScene, sources: EndpointBatch, sinks: EndpointBatch,
+) -> None:
+    """Refuse endpoint batches on another GPU than the compiled scene, before native work."""
+
+    if sources.device != sinks.device:
+        raise ValueError(
+            f"sources are on {sources.device} but sinks are on {sinks.device}; both "
+            "endpoint batches must be on the compiled scene's device"
+        )
+    scene_device = compiled.geometry.vertices.device
+    if scene_device.type == "cuda" and sources.device != scene_device:
+        raise ValueError(
+            f"endpoint batches are on {sources.device} but the compiled scene lives on "
+            f"{scene_device}; move the EndpointBatch tensors to {scene_device}, or compile "
+            "the scene under that device"
+        )
 
 
 def _require_polarimetric_inputs(request: PropagationRequest) -> None:
@@ -3458,7 +3517,9 @@ def _path_batch(
     )
 
 
-def _diagnostics(sidecars: object, compact: _ConsumerRows, ad_mode: str) -> PropagationDiagnostics:
+def _diagnostics(
+    sidecars: object, compact: _ConsumerRows, ad_mode: str, transmission_dropped_rows: int,
+) -> PropagationDiagnostics:
     execution = sidecars.execution
     return PropagationDiagnostics(
         discovery_launch_count=int(execution.launch_count),
@@ -3472,6 +3533,7 @@ def _diagnostics(sidecars: object, compact: _ConsumerRows, ad_mode: str) -> Prop
         validation_sync_count=0,
         ad_companion_launches=int(execution.ad_companion_launches),
         ad_tape_bytes=tape_bytes(execution.ad_tape_bytes, ad_mode),
+        transmission_dropped_rows=transmission_dropped_rows,
     )
 
 
@@ -3481,6 +3543,7 @@ def evaluate(compiled_scene: CompiledScene, request: PropagationRequest) -> Prop
     from witwin.channel.propagation.enumerated import (
         evaluate_enumerated_paths,
         sanitize_enumerated_capacity_transaction,
+        transmission_dropped_rows,
     )
 
     compiled, request = _preflight_evaluate(compiled_scene, request)
@@ -3488,7 +3551,9 @@ def evaluate(compiled_scene: CompiledScene, request: PropagationRequest) -> Prop
     config = _ConsumerConfig(
         max_depth=request.max_depth,
         components=request.components,
-        max_paths=request.max_paths,
+        # One row past the limit is requested so an overflow is detected from the
+        # exact count the compaction already copies, with no further host read.
+        max_paths=None if request.max_paths is None else request.max_paths + 1,
         ad_mode=request.ad_mode,
     )
     evaluated, sidecars = evaluate_enumerated_paths(
@@ -3498,9 +3563,14 @@ def evaluate(compiled_scene: CompiledScene, request: PropagationRequest) -> Prop
         defer_capacity_terminal=True,
     )
     evaluated, sidecars = sanitize_enumerated_capacity_transaction(evaluated, sidecars)
-    if sidecars.capacity_transaction is not None:
-        sidecars.capacity_transaction.terminal_check()
+    dropped_rows = transmission_dropped_rows(sidecars)
     compact = _compact(evaluated, getattr(sidecars, "compact_metadata", None))
+    if request.max_paths is not None and compact.path_count > request.max_paths:
+        raise RuntimeError(
+            f"the request has more than max_paths={request.max_paths} paths; the batch "
+            "is all-or-nothing and is never truncated. Raise max_paths, or split the "
+            "endpoint batches"
+        )
     paths = _path_batch(
         compact,
         pair_count=request.sources.count * request.sinks.count,
@@ -3516,7 +3586,7 @@ def evaluate(compiled_scene: CompiledScene, request: PropagationRequest) -> Prop
         paths=paths,
         convention=_CONVENTION,
         capabilities=_CAPABILITIES,
-        diagnostics=_diagnostics(sidecars, compact, request.ad_mode),
+        diagnostics=_diagnostics(sidecars, compact, request.ad_mode, dropped_rows),
     )
 
 
@@ -3727,8 +3797,13 @@ def _preflight_reevaluate(
     if not isinstance(request, FixedTopologyRequest):
         raise TypeError("request must be a FixedTopologyRequest")
     _require_current_world(compiled, request)
+    _require_fresh_source(compiled)
+    _require_scene_device(compiled, request.sources, request.sinks)
     if request.frozen_topology.device != request.sources.device:
-        raise ValueError("fixed topology and endpoint batches must share a device")
+        raise ValueError(
+            f"the frozen topology is on {request.frozen_topology.device} but the endpoint "
+            f"batches are on {request.sources.device}; they must share a device"
+        )
     compiled.require_reference_frequency(request.reference_frequency_hz)
     if not _CAPABILITIES.supports_fixed_topology:
         raise NotImplementedError(
@@ -3862,6 +3937,7 @@ def _reevaluate_prepared(
         request.sources,
         request.sinks,
         slot_count=request.slot_count,
+        face_count=int(compiled.geometry.faces.shape[0]),
     )
     bases = (
         (

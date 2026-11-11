@@ -25,45 +25,40 @@ void channel::capacity::validate_failure_state(
 
 at::Tensor channel_capacity_failure_state_create(at::Tensor reference) {
     TORCH_CHECK(reference.is_cuda(), "reference must be a CUDA tensor");
-    auto failure_state = at::empty({1}, reference.options().dtype(at::kInt));
+    // Element 0 is the failure bitmask, element 1 the dropped-row count.
+    auto record = at::empty({2}, reference.options().dtype(at::kInt));
     cudaStream_t stream =
         at::cuda::getCurrentCUDAStream(reference.get_device()).stream();
     C10_CUDA_CHECK(cudaMemsetAsync(
-        failure_state.data_ptr<int>(), 0, sizeof(int), stream));
-    return failure_state;
+        record.data_ptr<int>(), 0, 2 * sizeof(int), stream));
+    return record;
 }
 
-// ==== Section: Capacity failure terminal check ====
+// ==== Section: Capacity failure observation ====
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
+#include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
+#include "torch_cuda.h"
 
 #include "../tensor_checks.h"
 
-namespace {
+#include <array>
 
-__global__ void capacity_failure_terminal_check_kernel(
-    const int *__restrict__ failure_state) {
-    if (failure_state[0] != 0) {
-        asm volatile("trap;");
-    }
-}
-
-}  // namespace
-
-void channel_capacity_failure_terminal_check(at::Tensor failure_state) {
-    channel::check_tensor(
-        failure_state, "failure_state", at::kInt, 1);
-    TORCH_CHECK(
-        failure_state.size(0) == 1,
-        "failure_state must have shape (1,)");
-
+pybind11::tuple channel_capacity_failure_state_read(at::Tensor record) {
+    channel::check_tensor(record, "record", at::kInt, 1);
+    TORCH_CHECK(record.size(0) == 2, "record must have shape (2,)");
+    std::array<int, 2> host{0, 0};
     cudaStream_t stream =
-        at::cuda::getCurrentCUDAStream(failure_state.get_device()).stream();
-    capacity_failure_terminal_check_kernel<<<1, 1, 0, stream>>>(
-        failure_state.data_ptr<int>());
-    // A post-launch status query could observe this deliberately tiny trap
-    // before the caller's next normal synchronization boundary.
+        at::cuda::getCurrentCUDAStream(record.get_device()).stream();
+    C10_CUDA_CHECK(cudaMemcpyAsync(
+        host.data(),
+        record.data_ptr<int>(),
+        sizeof(host),
+        cudaMemcpyDeviceToHost,
+        stream));
+    C10_CUDA_CHECK(cudaStreamSynchronize(stream));
+    return pybind11::make_tuple(host[0], host[1]);
 }
 
 // ==== Section: Enumerated capacity sanitization ====

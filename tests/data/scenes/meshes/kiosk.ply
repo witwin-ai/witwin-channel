@@ -1,0 +1,24 @@
+ply
+format ascii 1.0
+comment Closed 2 m x 1 m x 3 m box with quad faces.
+element vertex 8
+property float x
+property float y
+property float z
+element face 6
+property list uchar int vertex_indices
+end_header
+-1 -0.5 0
+1 -0.5 0
+1 0.5 0
+-1 0.5 0
+-1 -0.5 3
+1 -0.5 3
+1 0.5 3
+-1 0.5 3
+4 0 1 5 4
+4 1 2 6 5
+4 2 3 7 6
+4 3 0 4 7
+4 4 5 6 7
+4 3 2 1 0

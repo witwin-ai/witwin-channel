@@ -4,6 +4,10 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+import dataclasses
+import math
+import numbers
+import operator
 
 
 VALID_COMPONENTS = frozenset(
@@ -30,9 +34,19 @@ MAX_SCATTER_CHAIN_DEPTH = 16
 
 
 def validated_components(components: Iterable[str], *, error_message: str) -> frozenset[str]:
+    if isinstance(components, (str, bytes)) or not isinstance(
+        components, (set, frozenset, tuple, list)
+    ):
+        raise TypeError(
+            "components must be a set, frozenset, tuple or list of component names "
+            f"from {sorted(VALID_COMPONENTS)}, got {type(components).__name__}"
+        )
     normalized = frozenset(components)
     if not normalized or not normalized.issubset(VALID_COMPONENTS):
-        raise ValueError(error_message.format(valid=sorted(VALID_COMPONENTS)))
+        raise ValueError(
+            error_message.format(valid=sorted(VALID_COMPONENTS))
+            + f", got {sorted(map(str, normalized))}"
+        )
     return normalized
 
 
@@ -142,32 +156,132 @@ def component_max_depth(
 # hoisted into a shared base would be a public-contract change.
 
 
+# Error classes are the same in all four solvers: a field of the wrong type
+# raises TypeError; a value outside its legal range or vocabulary, and a field
+# combination the solver does not accept, raise ValueError. Every message names
+# the field and its legal range and repeats the rejected value.
+
+# Largest chain depth the enumerated reflection/transmission engines accept.
+MAX_ENUMERATED_CHAIN_DEPTH = 5
+
+
+def _require_bool(where: str, value: object) -> object:
+    if type(value) is not bool:
+        raise TypeError(f"{where} must be True or False, got {value!r}")
+    return value
+
+
+def _require_int(where: str, value: object, optional: bool) -> object:
+    if isinstance(value, bool) or not isinstance(value, numbers.Integral):
+        raise TypeError(
+            f"{where} must be an int{' or None' if optional else ''}, "
+            f"got {type(value).__name__} {value!r}"
+        )
+    return operator.index(value)
+
+
+def _require_real(where: str, value: object) -> object:
+    if isinstance(value, bool) or not isinstance(value, numbers.Real):
+        raise TypeError(f"{where} must be a real number, got {type(value).__name__} {value!r}")
+    if not math.isfinite(float(value)):
+        raise ValueError(f"{where} must be finite, got {value!r}")
+    return value
+
+
+def _require_str(where: str, value: object) -> object:
+    if not isinstance(value, str):
+        raise TypeError(f"{where} must be a str, got {type(value).__name__} {value!r}")
+    return value
+
+
+def validate_config_fields(config: object) -> None:
+    """Check every scalar ``Config`` field against its declared type before any range check.
+
+    ``int`` fields reject ``bool``, ``float`` and strings; ``float`` fields accept
+    real numbers (not ``bool``) and must be finite; ``bool`` and ``str`` fields must
+    have exactly that type. Integer-like values (for example a NumPy integer) are
+    stored as Python ``int``.
+    """
+
+    solver_config = type(config).__module__.removeprefix("witwin.channel.")
+    for item in dataclasses.fields(config):  # type: ignore[arg-type]
+        kinds = {part.strip() for part in str(item.type).split("|")}
+        value = getattr(config, item.name)
+        if item.name.startswith("_") or (value is None and "None" in kinds):
+            continue
+        where = f"{solver_config} Config.{item.name}"
+        checked = value
+        if kinds <= {"bool"}:
+            checked = _require_bool(where, value)
+        elif kinds <= {"int", "None"}:
+            checked = _require_int(where, value, "None" in kinds)
+        elif kinds <= {"float", "None"}:
+            checked = _require_real(where, value)
+        elif kinds <= {"str"}:
+            checked = _require_str(where, value)
+        if checked is not value:
+            object.__setattr__(config, item.name, checked)
+
+
+def require_config_type(config: object, expected: type, solver: str) -> None:
+    """Refuse a ``Config`` of another solver (or any other object) before any work."""
+
+    if not isinstance(config, expected):
+        raise TypeError(
+            f"{solver}.solve() requires config to be "
+            f"{expected.__module__}.{expected.__qualname__}, got "
+            f"{type(config).__module__}.{type(config).__qualname__}"
+        )
+
+
+def validate_vocabulary(name: str, value: str, allowed: Iterable[str]) -> None:
+    """Refuse a string field outside its vocabulary, naming the legal values."""
+
+    legal = sorted(allowed)
+    if value not in legal:
+        raise ValueError(f"{name} must be one of {legal}, got {value!r}")
+
+
 def validate_max_depth(max_depth: int) -> None:
     """Validate the interaction-depth budget shared by all four solvers."""
 
     if max_depth < 0:
-        raise ValueError("max_depth must be non-negative")
+        raise ValueError(f"max_depth must be a non-negative int, got {max_depth}")
+
+
+def validate_chain_depth_cap(solver: str, max_depth: int, components: frozenset[str]) -> None:
+    """Refuse a reflection/transmission chain deeper than the enumerated engines accept."""
+
+    if max_depth > MAX_ENUMERATED_CHAIN_DEPTH and components & DEPTH_CAPPED_COMPONENTS:
+        raise ValueError(
+            f"{solver} max_depth must be in [0, {MAX_ENUMERATED_CHAIN_DEPTH}] when "
+            f"components include {sorted(components & DEPTH_CAPPED_COMPONENTS)}, "
+            f"got {max_depth}"
+        )
 
 
 def validate_samples(samples: int) -> None:
     """Validate the Monte Carlo sample count."""
 
     if samples <= 0:
-        raise ValueError("samples must be positive")
+        raise ValueError(f"samples must be a positive int, got {samples}")
 
 
 def validate_seed(seed: int) -> None:
     """Validate the Monte Carlo RNG seed."""
 
     if seed < 0:
-        raise ValueError("seed must be non-negative")
+        raise ValueError(f"seed must be a non-negative int, got {seed}")
 
 
 def validate_workspace_limit_bytes(workspace_limit_bytes: int | None) -> None:
     """Validate the Monte Carlo workspace budget (``None`` means unbounded)."""
 
     if workspace_limit_bytes is not None and workspace_limit_bytes < 0:
-        raise ValueError("workspace_limit_bytes must be non-negative")
+        raise ValueError(
+            "workspace_limit_bytes must be None or a non-negative int, got "
+            f"{workspace_limit_bytes}"
+        )
 
 
 def validate_bounce_depth(
@@ -180,43 +294,43 @@ def validate_bounce_depth(
     """
 
     if max_depth < 1 and components & BOUNCE_COMPONENTS:
-        raise RuntimeError(error_message)
+        raise ValueError(error_message)
 
 
 def validate_isb_boundary_taper(width: float) -> None:
     """Validate the ISB boundary taper width bound."""
 
     if not (0.0 < width <= 4.0):
-        raise ValueError("isb_boundary_taper_width must be in (0, 4]")
+        raise ValueError(f"isb_boundary_taper_width must be in (0, 4], got {width!r}")
 
 
 def validate_scatter_chain(
     *, max_depth: int, samples_per_m2: float, max_rows: int, components: frozenset[str],
 ) -> None:
-    """Validate the coherent scattering enumerated scatter-chain config (shared)."""
+    """Validate the enumerated scatter-chain config (shared)."""
 
-    if max_depth < 0:
-        raise ValueError("scattering_chain_max_depth must be non-negative")
-    if max_depth > MAX_SCATTER_CHAIN_DEPTH:
+    if not 0 <= max_depth <= MAX_SCATTER_CHAIN_DEPTH:
         raise ValueError(
-            "scattering_chain_max_depth cannot exceed 16 (2 * kMaxAdDepth); each "
-            "specular leg is bounded by the native kMaxAdDepth = 8"
+            f"scattering_chain_max_depth must be in [0, {MAX_SCATTER_CHAIN_DEPTH}] "
+            f"(each specular leg holds at most 8 bounces), got {max_depth}"
         )
-    if samples_per_m2 <= 0.0:
-        raise ValueError("scattering_chain_samples_per_m2 must be positive")
+    if not samples_per_m2 > 0.0:
+        raise ValueError(
+            f"scattering_chain_samples_per_m2 must be positive, got {samples_per_m2!r}"
+        )
     if max_rows <= 0:
-        raise ValueError("scattering_chain_max_rows must be positive")
+        raise ValueError(f"scattering_chain_max_rows must be a positive int, got {max_rows}")
     if max_depth >= 1 and "scattering" not in components:
-        raise RuntimeError(
-            "scattering_chain_max_depth >= 1 requires the 'scattering' component "
-            "(ADR-021 D1 appends component_id=6 scatter-chain rows)"
+        raise ValueError(
+            f"scattering_chain_max_depth={max_depth} requires the 'scattering' "
+            "component; set scattering_chain_max_depth=0 or add 'scattering'"
         )
 
 
 def validate_coupled_gate(
     *, coupled_paths: bool, max_depth: int, components: frozenset[str],
 ) -> None:
-    """Validate the coupled reflection-diffraction opt-in gate (coupled reflection and diffraction).
+    """Validate the coupled reflection-diffraction opt-in gate.
 
     Split from the candidate-limit rule below because the path solver checks
     the two at different points in its ``__post_init__``.
@@ -224,21 +338,45 @@ def validate_coupled_gate(
 
     if coupled_paths:
         if max_depth < 2:
-            raise RuntimeError(
-                "coupled reflection-diffraction paths require max_depth >= 2"
+            raise ValueError(
+                f"coupled_paths=True requires max_depth >= 2, got {max_depth}"
             )
         if not {"reflection", "diffraction"}.issubset(components):
-            raise RuntimeError(
-                "coupled paths require both reflection and diffraction components"
+            raise ValueError(
+                "coupled_paths=True requires both 'reflection' and 'diffraction' in "
+                f"components, got {sorted(components)}"
             )
 
 
 def validate_coupled_candidate_limit(coupled_candidate_limit: int) -> None:
-    """Validate the coupled reflection and diffraction coupled candidate work/safety budget."""
+    """Validate the coupled candidate work/safety budget."""
 
-    if coupled_candidate_limit <= 0:
-        raise ValueError("coupled_candidate_limit must be positive")
-    if coupled_candidate_limit > MAX_COUPLED_CANDIDATES:
+    if not 1 <= coupled_candidate_limit <= MAX_COUPLED_CANDIDATES:
         raise ValueError(
-            "coupled_candidate_limit cannot exceed the hard limit of 1000000"
+            f"coupled_candidate_limit must be in [1, {MAX_COUPLED_CANDIDATES}], "
+            f"got {coupled_candidate_limit}"
         )
+
+
+def validate_scattering_quadrature(
+    *, samples_per_m2: float, max_paths_per_pair: int, power_threshold: float,
+) -> None:
+    """Validate the rough-surface scattering quadrature fields of the enumerated solvers."""
+
+    if not samples_per_m2 > 0.0:
+        raise ValueError(
+            f"scattering_samples_per_m2 must be positive, got {samples_per_m2!r}"
+        )
+    if max_paths_per_pair <= 0:
+        raise ValueError(
+            f"scattering_max_paths_per_pair must be a positive int, got {max_paths_per_pair}"
+        )
+    if not power_threshold >= 0.0:
+        raise ValueError(
+            f"scattering_power_threshold must be non-negative, got {power_threshold!r}"
+        )
+
+
+def validate_max_paths(max_paths: int | None, name: str = "max_paths") -> None:
+    if max_paths is not None and max_paths <= 0:
+        raise ValueError(f"{name} must be None or a positive int, got {max_paths}")

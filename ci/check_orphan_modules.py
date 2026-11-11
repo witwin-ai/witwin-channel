@@ -15,9 +15,10 @@ from pathlib import Path
 PACKAGE = "witwin.channel"
 DEFAULT_PACKAGE_PATH = Path("witwin/channel")
 
-# The stable public API, per CLAUDE.md: the package root and the four solver
-# entry points. The root exports only what Channel owns, so it does not reach a
-# solver; each solver is a module a caller imports directly.
+# The stable public API, per CLAUDE.md: the package root, the four solver entry
+# points and the importer/preset modules. The root exports only what Channel
+# owns, so it does not reach a solver; each solver is a module a caller imports
+# directly.
 ENTRY_POINTS: dict[str, str] = {
     PACKAGE: (
         "the package root and the public surface frozen in "
@@ -27,6 +28,9 @@ ENTRY_POINTS: dict[str, str] = {
     f"{PACKAGE}.deterministic": "the Deterministic solver entry point",
     f"{PACKAGE}.montecarlo.basic": "the Monte Carlo Basic solver entry point",
     f"{PACKAGE}.montecarlo.bdpt": "the Monte Carlo BDPT solver entry point",
+    f"{PACKAGE}.importers": "the scene importer entry point",
+    f"{PACKAGE}.presets": "the material and antenna-pattern preset entry point",
+    f"{PACKAGE}.__main__": "the `python -m witwin.channel doctor` command",
 }
 
 

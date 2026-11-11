@@ -45,7 +45,7 @@ def test_path_config_validates_inputs():
         Config(max_paths_scope="global")
     with pytest.raises(ValueError, match="coupled_candidate_limit"):
         Config(coupled_candidate_limit=0)
-    with pytest.raises(ValueError, match="hard limit"):
+    with pytest.raises(ValueError, match=r"must be in \[1, 1000000\], got 1000001"):
         Config(coupled_candidate_limit=1_000_001)
 
     with pytest.raises(ValueError, match="ad_mode"):
@@ -69,11 +69,11 @@ def test_path_config_rejects_retired_capacity_fields(field):
 
 
 def test_path_config_rejects_invalid_coupled_requests_before_solve():
-    with pytest.raises(RuntimeError, match="max_depth >= 2"):
+    with pytest.raises(ValueError, match="max_depth >= 2"):
         Config(
             max_depth=1,
             components={"reflection", "diffraction"},
             coupled_paths=True,
         )
-    with pytest.raises(RuntimeError, match="both reflection and diffraction"):
+    with pytest.raises(ValueError, match="both 'reflection' and 'diffraction'"):
         Config(max_depth=2, components={"reflection"}, coupled_paths=True)

@@ -1,46 +1,44 @@
 # Supported runtime matrix
 
-Phase 2 intentionally declares only combinations backed by the accepted local
-baseline. A package version range is not a claim that every Python, Torch, or
-CUDA combination inside a broader ecosystem is supported.
+The machine-readable policy is [`ci/support-matrix.toml`](../../ci/support-matrix.toml). The
+release workflow derives its job matrix, CUDA flags, expected SASS/PTX and size limit from it
+through `ci/wheel_matrix.py`, and `tests/test_supported_runtime_matrix.py` keeps
+`pyproject.toml` consistent with it.
 
-| Python | Torch | Torch CUDA runtime | Native CUDA toolkit | Verified GPU | Status |
-| --- | --- | --- | --- | --- | --- |
-| CPython 3.11 | 2.10 | 12.8 | 12.9 | SM 120 | supported |
+| Axis | Values |
+| --- | --- |
+| CPython | 3.10, 3.11, 3.12, 3.13 |
+| Platforms | `manylinux_2_28_x86_64`, `win_amd64` |
+| PyTorch | 2.10.0 (wheels on PyPI), 2.11.0 (wheels with a `+torch211` local version on the GitHub release); CUDA 12.8 builds |
+| CUDA toolkit | 12.8.1 |
+| Cubins | sm_70, 75, 80, 86, 89, 90, 100, 120 |
+| PTX | compute_120 |
+| Wheel size limit | 90 MiB |
+| Runtime-verified | sm_120 on Windows (evidence in the `[[verified]]` table) |
 
-The package metadata expresses the same compatibility boundary as bounded
-ranges: Python `>=3.11,<3.12`, Torch `==2.10.0`, scikit-build-core
-`>=0.12,<0.13`, CMake `>=4.3,<4.4`, and Ninja `>=1.13,<1.14`. CI pins the
-accepted concrete versions in `constraints/ci-py311-cu128.txt`.
+Every architecture that is built but not verified is expected to work and has no recorded
+runtime evidence yet; CONTRIBUTING.md "Verifying a GPU architecture" lists the steps that add
+it.
 
-`cuda_runtime` means the CUDA ABI reported by `torch.version.cuda`; it is not
-the host compiler version. The accepted baseline used a Torch CUDA 12.8 runtime
-and CUDA toolkit/NVCC 12.9. Builds declare SASS for SM 75, 80, 86, 89, and 120,
-plus PTX for SM 120. Only SM 120 has runtime acceptance evidence. The other
-architectures remain `declared_unverified` until the complete solver and AD
-gates run on matching hardware.
+`cuda_runtime` means the CUDA version reported by `torch.version.cuda`; it is not the compiler
+version. Python 3.10 compatibility of the package is checked statically (mypy and Ruff target
+3.10); the wheel smoke runs on each built Python.
 
-The machine-readable policy is `ci/support-matrix.toml`. Its evidence path
-points to the committed Phase 0 environment manifest. Changes to a supported
-row require a fresh baseline, full unit/contract/acceptance gates, the four
-solver runtime matrix, AD gates, and wheel smoke on the proposed combination.
+Why the PyTorch pin is exact, and why only one PyTorch release goes to PyPI, is explained in
+CONTRIBUTING.md "Supported platforms and the PyTorch pin".
 
 ## Reproducing the CI environment
 
-Start from CPython 3.11, then resolve the absolute constraint path before
-enabling PEP 517 build isolation:
+Start from CPython 3.11, then resolve the absolute constraint path before enabling PEP 517 build
+isolation:
 
-```powershell
-$constraint = (Resolve-Path constraints/ci-py311-cu128.txt).Path
-$env:PIP_CONSTRAINT = $constraint
-python -m pip install --constraint $constraint pip==25.3 setuptools==80.9.0 wheel==0.45.1
-python -m pip install --constraint $constraint --index-url https://download.pytorch.org/whl/cu128 torch==2.10.0
-python -m pip install --constraint $constraint build cmake ninja numpy pytest coverage ruff scikit-build-core
-python -m pip install --no-build-isolation --editable .
+```bash
+constraint=$(realpath constraints/ci-py311-cu128.txt)
+export PIP_CONSTRAINT=$constraint
+python -m pip install --constraint "$constraint" --index-url https://download.pytorch.org/whl/cu128 torch==2.10.0
+python -m pip install --constraint "$constraint" build cmake ninja numpy pytest coverage ruff scikit-build-core
 ```
 
-Constraints restrict versions but do not select a CUDA wheel source. The CI job
-must explicitly use the official CUDA 12.8 Torch wheel index documented in
-[PyTorch 2.10 installation instructions](https://pytorch.org/get-started/previous-versions/#v2100).
-Release evidence must record the resolved package set, `torch.version.cuda`,
-toolkit/compiler version, native build fingerprint, and GPU SM.
+Constraints restrict versions but do not select a CUDA wheel source; PyTorch must come from the
+CUDA 12.8 index. Release evidence records the resolved package set, `torch.version.cuda`, the
+toolkit version, the native build fingerprint and the GPU SM.

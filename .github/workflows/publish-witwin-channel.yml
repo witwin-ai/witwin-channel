@@ -1,5 +1,10 @@
 name: Build and publish witwin-channel
 
+# The wheel matrix (Python minors, PyTorch releases, platforms, CUDA targets, size limit) lives in
+# ci/support-matrix.toml; ci/wheel_matrix.py turns it into the job matrices and checks below.
+# PyPI receives the wheels for the "pypi" PyTorch release. Wheels for "release-asset" PyTorch
+# releases carry a local version (0.6.0+torch211) and are attached to the GitHub release.
+
 on:
   release:
     types: [published]
@@ -13,24 +18,6 @@ on:
         options:
           - windows-smoke
           - full
-          - windows-release-recovery
-          - publish-recovery-artifacts
-      source_sha:
-        description: Release source commit for Windows recovery
-        required: false
-        type: string
-      release_tag:
-        description: Existing release tag for Windows recovery
-        required: false
-        type: string
-      linux_artifact_run_id:
-        description: Prior run containing channel-wheel-linux
-        required: false
-        type: string
-      windows_artifact_run_id:
-        description: Prior run containing channel-wheel-windows
-        required: false
-        type: string
 
 concurrency:
   group: channel-distributions-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.sha || github.event_name }}
@@ -42,16 +29,21 @@ permissions:
 
 env:
   CORE_COMMIT: 46c826d969654912461d2e18b6cb87df9cc3df8f
-  RAYD_COMMIT: e4a63d2a7630fcc5f69b2375b11b1ef9f7e2caec
+  RAYD_COMMIT: 918528ebc81415ac9888b683a249db7dce72fc5b
   RAYD_REPOSITORY_URL: https://github.com/Asixa/RayD
-  FULL_CUDA_ARCHITECTURES: 70-real;75-real;80-real;86-real;87-real;89-real;90-real;100-real;101-real;120-real;120-virtual
-  FULL_EXPECTED_SASS: 70,75,80,86,87,89,90,100,101,120
-  FULL_EXPECTED_PTX: "120"
 
 jobs:
   metadata:
-    name: Validate release metadata and CI policy
+    name: Validate release metadata and derive the wheel matrix
     runs-on: ubuntu-22.04
+    outputs:
+      build: ${{ steps.matrix.outputs.build }}
+      cuda_architectures: ${{ steps.matrix.outputs.cuda_architectures }}
+      gencode: ${{ steps.matrix.outputs.gencode }}
+      expected_sass: ${{ steps.matrix.outputs.expected_sass }}
+      expected_ptx: ${{ steps.matrix.outputs.expected_ptx }}
+      max_wheel_mib: ${{ steps.matrix.outputs.max_wheel_mib }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Check out Channel
         uses: actions/checkout@v5
@@ -73,89 +65,48 @@ jobs:
             tests/test_ci_tiers.py \
             tests/kernels/test_rayd_lock_cmake.py::test_rayd_lock_is_machine_readable_and_complete
 
+      - name: Derive the wheel matrix
+        id: matrix
+        working-directory: channel
+        shell: bash
+        env:
+          SMOKE: ${{ github.event_name == 'workflow_dispatch' && inputs.scope == 'windows-smoke' && '--smoke' || '' }}
+        run: python ci/wheel_matrix.py github-outputs $SMOKE | tee -a "$GITHUB_OUTPUT"
+
+      - name: Read the project version
+        id: version
+        working-directory: channel
+        shell: bash
+        run: |
+          python - <<'PY' | tee -a "$GITHUB_OUTPUT"
+          import tomllib
+          from pathlib import Path
+          project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]
+          print(f"version={project['version']}")
+          PY
+
       - name: Validate release tag and version
         if: github.event_name == 'release'
         working-directory: channel
         shell: bash
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          python - <<'PY'
-          import os
-          import re
-          import tomllib
-          from pathlib import Path
-
-          tag = os.environ["RELEASE_TAG"]
-          match = re.fullmatch(r"witwin-channel-v(?P<version>[0-9A-Za-z.+_-]+)", tag)
-          if match is None:
-              raise SystemExit(
-                  f"release tag {tag!r} must match 'witwin-channel-v<version>'"
-              )
-          project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))[
-              "project"
-          ]
-          if project["name"] != "witwin-channel":
-              raise SystemExit(f"unexpected package name: {project['name']!r}")
-          if project["version"] != match.group("version"):
-              raise SystemExit(
-                  f"tag version {match.group('version')!r} does not match "
-                  f"project version {project['version']!r}"
-              )
-          PY
-
-      - name: Validate Windows release recovery request
-        if: >-
-          github.event_name == 'workflow_dispatch' &&
-          (inputs.scope == 'windows-release-recovery' ||
-          inputs.scope == 'publish-recovery-artifacts')
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SOURCE_SHA: ${{ inputs.source_sha }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
-          LINUX_ARTIFACT_RUN_ID: ${{ inputs.linux_artifact_run_id }}
-          WINDOWS_ARTIFACT_RUN_ID: ${{ inputs.windows_artifact_run_id }}
-          RECOVERY_SCOPE: ${{ inputs.scope }}
-        run: |
-          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$RELEASE_TAG" == "witwin-channel-v0.5.0" ]]
-          [[ "$LINUX_ARTIFACT_RUN_ID" =~ ^[0-9]+$ ]]
-          tag_sha="$(
-            gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" \
-              --jq '.object.sha'
-          )"
-          run_sha="$(
-            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${LINUX_ARTIFACT_RUN_ID}" \
-              --jq '.head_sha'
-          )"
-          [[ "$tag_sha" == "$SOURCE_SHA" ]]
-          [[ "$run_sha" == "$SOURCE_SHA" ]]
-          artifact_count="$(
-            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${LINUX_ARTIFACT_RUN_ID}/artifacts" \
-              --jq '[.artifacts[] | select(.name == "channel-wheel-linux" and (.expired | not))] | length'
-          )"
-          [[ "$artifact_count" == "1" ]]
-          if [[ "$RECOVERY_SCOPE" == "publish-recovery-artifacts" ]]; then
-            [[ "$WINDOWS_ARTIFACT_RUN_ID" =~ ^[0-9]+$ ]]
-            windows_run_conclusion="$(
-              gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${WINDOWS_ARTIFACT_RUN_ID}" \
-                --jq '.conclusion'
-            )"
-            [[ "$windows_run_conclusion" == "success" ]]
-            windows_artifact_count="$(
-              gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${WINDOWS_ARTIFACT_RUN_ID}/artifacts" \
-                --jq '[.artifacts[] | select(.name == "channel-wheel-windows" and (.expired | not))] | length'
-            )"
-            [[ "$windows_artifact_count" == "1" ]]
+          if [[ "$RELEASE_TAG" != "witwin-channel-v$VERSION" ]]; then
+            echo "release tag $RELEASE_TAG must be witwin-channel-v$VERSION" >&2
+            exit 1
           fi
 
   build-windows:
-    name: Wheel / Windows / Python 3.11 / Torch 2.10
-    if: github.event_name == 'release' || inputs.scope != 'publish-recovery-artifacts'
+    name: Wheel / Windows / Python ${{ matrix.python }} / Torch ${{ matrix.torch }}
     needs: metadata
     runs-on: windows-2022
-    timeout-minutes: 150
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.metadata.outputs.build) }}
     env:
       CMAKE_BUILD_PARALLEL_LEVEL: "3"
       CMAKE_C_COMPILER_LAUNCHER: sccache
@@ -166,13 +117,16 @@ jobs:
       SCCACHE_CACHE_SIZE: 1G
       SCCACHE_BASEDIRS: ${{ github.workspace }}
       SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+      CHANNEL_CUDA_GENCODE_FLAGS: ${{ needs.metadata.outputs.gencode }}
+      RAYD_TORCH_CUDA_GENCODE_FLAGS: ${{ needs.metadata.outputs.gencode }}
+      EXPECTED_SASS: ${{ needs.metadata.outputs.expected_sass }}
+      EXPECTED_PTX: ${{ needs.metadata.outputs.expected_ptx }}
     steps:
       - name: Check out Channel
         uses: actions/checkout@v5
         with:
           path: channel
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.scope == 'windows-release-recovery' && inputs.source_sha || github.sha }}
 
       - name: Check out locked Stage-I Core
         uses: actions/checkout@v5
@@ -198,10 +152,10 @@ jobs:
           path: optix
           persist-credentials: false
 
-      - name: Set up Python 3.11
+      - name: Set up Python ${{ matrix.python }}
         uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python }}
           cache: pip
           cache-dependency-path: channel/constraints/ci-py311-cu128.txt
 
@@ -214,10 +168,10 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ github.workspace }}\.cache\channel-sccache
-          key: channel-sccache-v1-windows-py311-cu128-${{ inputs.scope || 'release' }}-${{ github.sha }}
+          key: channel-sccache-v2-windows-${{ matrix.python_tag }}-torch${{ matrix.torch }}-${{ inputs.scope || 'release' }}-${{ github.sha }}
           restore-keys: |
-            channel-sccache-v1-windows-py311-cu128-${{ inputs.scope || 'release' }}-
-            channel-sccache-v1-windows-py311-cu128-
+            channel-sccache-v2-windows-${{ matrix.python_tag }}-torch${{ matrix.torch }}-${{ inputs.scope || 'release' }}-
+            channel-sccache-v2-windows-${{ matrix.python_tag }}-torch${{ matrix.torch }}-
 
       - name: Install minimal CUDA 12.8 toolkit
         uses: Jimver/cuda-toolkit@v0.2.35
@@ -225,7 +179,7 @@ jobs:
           cuda: "12.8.1"
           method: local
           sub-packages: '["nvcc", "cudart", "cuobjdump", "visual_studio_integration", "cublas", "cublas_dev", "cusparse", "cusparse_dev", "cusolver", "cusolver_dev"]'
-          log-file-suffix: "channel-windows-py311"
+          log-file-suffix: "channel-windows-${{ matrix.python_tag }}-torch${{ matrix.torch }}"
 
       - name: Set up MSVC x64
         uses: ilammy/msvc-dev-cmd@v1
@@ -247,26 +201,14 @@ jobs:
           if ($dirty) { throw "RayD checkout is dirty: $dirty" }
           if (-not (Test-Path -LiteralPath rayd/drjit/scripts/verify_cuda_binary_arches.py -PathType Leaf)) { throw "RayD CUDA architecture verifier is missing" }
 
+      - name: Select the PyTorch release
+        if: matrix.channel != 'pypi'
+        shell: pwsh
+        run: python channel/ci/wheel_matrix.py select-torch --pyproject channel/pyproject.toml --torch ${{ matrix.torch }} --local "${{ matrix.local }}"
+
       - name: Configure CUDA build profile
         shell: pwsh
         run: |
-          $arches = $env:FULL_CUDA_ARCHITECTURES
-          $expectedSass = $env:FULL_EXPECTED_SASS
-          $gencode = @(
-            '--generate-code=arch=compute_70,code=[sm_70,sm_75]'
-            '--generate-code=arch=compute_80,code=[sm_80,sm_86,sm_87,sm_89]'
-            '--generate-code=arch=compute_90,code=sm_90'
-            '--generate-code=arch=compute_100,code=[sm_100,sm_101]'
-            '--generate-code=arch=compute_120,code=[sm_120,compute_120]'
-          ) -join ' '
-          if ('${{ github.event_name }}' -eq 'workflow_dispatch' -and '${{ inputs.scope }}' -eq 'windows-smoke') {
-            $arches = '87-real;120-real;120-virtual'
-            $expectedSass = '87,120'
-            $gencode = @(
-              '--generate-code=arch=compute_87,code=sm_87'
-              '--generate-code=arch=compute_120,code=[sm_120,compute_120]'
-            ) -join ' '
-          }
           $cudaRoot = $env:CUDA_PATH
           if (-not $cudaRoot) {
             $nvcc = (Get-Command nvcc -ErrorAction Stop).Source
@@ -274,13 +216,9 @@ jobs:
           }
           "CUDA_HOME=$cudaRoot" >> $env:GITHUB_ENV
           "CUDA_PATH=$cudaRoot" >> $env:GITHUB_ENV
-          "CHANNEL_CUDA_GENCODE_FLAGS=$gencode" >> $env:GITHUB_ENV
-          "RAYD_TORCH_CUDA_GENCODE_FLAGS=$gencode" >> $env:GITHUB_ENV
-          "EXPECTED_SASS=$expectedSass" >> $env:GITHUB_ENV
-          "EXPECTED_PTX=$env:FULL_EXPECTED_PTX" >> $env:GITHUB_ENV
           $rayd = (Resolve-Path -LiteralPath rayd).Path.Replace('\', '/')
           $optix = (Resolve-Path -LiteralPath optix/include).Path.Replace('\', '/')
-          "CMAKE_ARGS=-DRAYD_SOURCE_DIR=$rayd -DOPTIX_INCLUDE_DIR=$optix -DCMAKE_CUDA_ARCHITECTURES=$arches -DCHANNEL_RELEASE_BUILD=ON" >> $env:GITHUB_ENV
+          "CMAKE_ARGS=-DRAYD_SOURCE_DIR=$rayd -DOPTIX_INCLUDE_DIR=$optix -DCMAKE_CUDA_ARCHITECTURES=${{ needs.metadata.outputs.cuda_architectures }} -DCHANNEL_RELEASE_BUILD=ON" >> $env:GITHUB_ENV
 
       - name: Install build dependencies
         shell: pwsh
@@ -290,7 +228,7 @@ jobs:
             "cmake>=4.3,<4.4" `
             "ninja>=1.13,<1.14" `
             "scikit-build-core>=0.12,<0.13"
-          python -m pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cu128
+          python -m pip install torch==${{ matrix.torch }} --index-url https://download.pytorch.org/whl/cu128
           python -m pip install --no-deps ./core
 
       - name: Build Windows wheel
@@ -304,40 +242,45 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $elapsedMinutes = ((Get-Date) - $startedAt).TotalMinutes
           "Windows Channel wheel build: {0:N2} minutes" -f $elapsedMinutes
-          if ($elapsedMinutes -ge 100) {
-            Write-Warning "Windows Channel wheel build exceeded the previous 100-minute target; continuing with artifact verification."
-          }
 
       - name: Verify Windows wheel
         shell: pwsh
         run: |
           $wheel = (Get-ChildItem channel/dist/*.whl -File -ErrorAction Stop).FullName
+          python channel/ci/wheel_matrix.py check-size $wheel --max-mib ${{ needs.metadata.outputs.max_wheel_mib }}
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python rayd/drjit/scripts/verify_cuda_binary_arches.py `
             --stem _channel `
             --expected-sass $env:EXPECTED_SASS `
             --expected-ptx $env:EXPECTED_PTX `
             $wheel
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m twine check $wheel
-          python -c "import sys,zipfile; n=zipfile.ZipFile(sys.argv[1]).namelist(); e=[x for x in n if '/_channel' in x and x.endswith('.pyd')]; assert len(e)==1,e; assert not any(x.startswith('rayd/') for x in n), 'RayD Python package leaked into Channel wheel'" $wheel
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $coreWheel = (Get-ChildItem core/dist/*.whl -File -ErrorAction Stop).FullName
           python channel/ci/wheel_smoke.py $wheel `
             --core-wheel $coreWheel `
             --output channel/dist/windows-wheel-smoke.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           sccache --show-stats
 
       - name: Upload Windows wheel
         uses: actions/upload-artifact@v4
         with:
-          name: channel-wheel-windows
+          name: channel-wheel-${{ matrix.channel }}-windows-${{ matrix.python_tag }}-torch${{ matrix.torch }}
           path: channel/dist/*.whl
           if-no-files-found: error
 
   build-linux:
-    name: Wheel / manylinux_2_28 / Python 3.11 / Torch 2.10
+    name: Wheel / manylinux_2_28 / Python ${{ matrix.python }} / Torch ${{ matrix.torch }}
     if: github.event_name == 'release' || inputs.scope == 'full'
     needs: metadata
     runs-on: ubuntu-22.04
-    timeout-minutes: 150
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.metadata.outputs.build) }}
     env:
       SCCACHE_DIR: ${{ github.workspace }}/.cache/channel-sccache
       SCCACHE_CACHE_SIZE: 1G
@@ -376,7 +319,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python }}
           cache: pip
           cache-dependency-path: channel/constraints/ci-py311-cu128.txt
 
@@ -391,9 +334,9 @@ jobs:
           path: |
             ${{ github.workspace }}/.cache/channel-sccache
             ${{ github.workspace }}/.cache/cibuildwheel
-          key: channel-sccache-v1-linux-py311-cu128-full-${{ github.sha }}
+          key: channel-sccache-v2-linux-${{ matrix.python_tag }}-torch${{ matrix.torch }}-${{ github.sha }}
           restore-keys: |
-            channel-sccache-v1-linux-py311-cu128-full-
+            channel-sccache-v2-linux-${{ matrix.python_tag }}-torch${{ matrix.torch }}-
 
       - name: Verify locked clean RayD source
         shell: bash
@@ -426,6 +369,11 @@ jobs:
           assert Path("rayd/drjit/scripts/verify_cuda_binary_arches.py").is_file()
           PY
 
+      - name: Select the PyTorch release
+        if: matrix.channel != 'pypi'
+        shell: bash
+        run: python channel/ci/wheel_matrix.py select-torch --pyproject channel/pyproject.toml --torch "${{ matrix.torch }}" --local "${{ matrix.local }}"
+
       - name: Expose sccache to manylinux
         shell: bash
         run: |
@@ -443,7 +391,7 @@ jobs:
       - name: Build and repair manylinux_2_28 wheel
         uses: pypa/cibuildwheel@v3.3.0
         env:
-          CIBW_BUILD: cp311-manylinux_x86_64
+          CIBW_BUILD: ${{ matrix.python_tag }}-manylinux_x86_64
           CIBW_SKIP: "*-musllinux_*"
           CIBW_CACHE_PATH: ${{ github.workspace }}/.cache/cibuildwheel
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
@@ -476,9 +424,9 @@ jobs:
             LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
             RAYD_SOURCE_DIR=/host${{ github.workspace }}/rayd
             OPTIX_INCLUDE_DIR=/host${{ github.workspace }}/optix/include
-            CMAKE_ARGS="-DRAYD_SOURCE_DIR=/host${{ github.workspace }}/rayd -DOPTIX_INCLUDE_DIR=/host${{ github.workspace }}/optix/include -DCMAKE_CUDA_ARCHITECTURES=70-real;75-real;80-real;86-real;87-real;89-real;90-real;100-real;101-real;120-real;120-virtual -DCHANNEL_RELEASE_BUILD=ON"
-            CHANNEL_CUDA_GENCODE_FLAGS="--generate-code=arch=compute_70,code=[sm_70,sm_75] --generate-code=arch=compute_80,code=[sm_80,sm_86,sm_87,sm_89] --generate-code=arch=compute_90,code=sm_90 --generate-code=arch=compute_100,code=[sm_100,sm_101] --generate-code=arch=compute_120,code=[sm_120,compute_120]"
-            RAYD_TORCH_CUDA_GENCODE_FLAGS="--generate-code=arch=compute_70,code=[sm_70,sm_75] --generate-code=arch=compute_80,code=[sm_80,sm_86,sm_87,sm_89] --generate-code=arch=compute_90,code=sm_90 --generate-code=arch=compute_100,code=[sm_100,sm_101] --generate-code=arch=compute_120,code=[sm_120,compute_120]"
+            CMAKE_ARGS="-DRAYD_SOURCE_DIR=/host${{ github.workspace }}/rayd -DOPTIX_INCLUDE_DIR=/host${{ github.workspace }}/optix/include -DCMAKE_CUDA_ARCHITECTURES=${{ needs.metadata.outputs.cuda_architectures }} -DCHANNEL_RELEASE_BUILD=ON"
+            CHANNEL_CUDA_GENCODE_FLAGS="${{ needs.metadata.outputs.gencode }}"
+            RAYD_TORCH_CUDA_GENCODE_FLAGS="${{ needs.metadata.outputs.gencode }}"
             CMAKE_BUILD_PARALLEL_LEVEL=2
             CMAKE_C_COMPILER_LAUNCHER=/host${{ github.workspace }}/.cache/sccache-bin/sccache
             CMAKE_CXX_COMPILER_LAUNCHER=/host${{ github.workspace }}/.cache/sccache-bin/sccache
@@ -493,7 +441,7 @@ jobs:
             git config --global --add safe.directory /host${{ github.workspace }}/rayd &&
             pip install --upgrade pip build twine &&
             pip install "cmake>=4.3,<4.4" "ninja>=1.13,<1.14" "scikit-build-core>=0.12,<0.13" &&
-            pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cu128
+            pip install torch==${{ matrix.torch }} --index-url https://download.pytorch.org/whl/cu128
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >-
             auditwheel repair --plat manylinux_2_28_x86_64
             --exclude libcuda.so.1
@@ -515,8 +463,8 @@ jobs:
             -w {dest_dir} {wheel} &&
             python /host${{ github.workspace }}/rayd/drjit/scripts/verify_cuda_binary_arches.py
             --stem _channel
-            --expected-sass 70,75,80,86,87,89,90,100,101,120
-            --expected-ptx 120
+            --expected-sass ${{ needs.metadata.outputs.expected_sass }}
+            --expected-ptx ${{ needs.metadata.outputs.expected_ptx }}
             {dest_dir}/*.whl &&
             /host${{ github.workspace }}/.cache/sccache-bin/sccache --show-stats &&
             chown -R --reference=/host${{ github.workspace }}
@@ -528,29 +476,24 @@ jobs:
       - name: Verify Linux wheel metadata
         shell: bash
         run: |
+          python channel/ci/wheel_matrix.py check-size channel/dist/*.whl --max-mib ${{ needs.metadata.outputs.max_wheel_mib }}
           python -m pip install build twine
-          # Torch 2.10 no longer depends on numpy, and Core is installed
-          # --no-deps below, so numpy must arrive explicitly for the smoke.
+          # Torch no longer depends on numpy, and Core is installed --no-deps
+          # below, so numpy must arrive explicitly for the smoke.
           python -m pip install numpy
-          python -m pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cu128
+          python -m pip install torch==${{ matrix.torch }} --index-url https://download.pytorch.org/whl/cu128
           python -m pip install --no-deps ./core
           python -m build core --wheel --outdir core/dist
           python -m twine check channel/dist/*.whl
           python - <<'PY'
-          import importlib.metadata
-          import importlib.util
           import subprocess
           import sys
           import tempfile
           import zipfile
           from pathlib import Path
 
-          # The propagation consumer contract version has exactly one home: the
-          # checked-in module. This smoke used to restate it as a literal, and
-          # the literal went stale at 2 while the source moved to 6 - so the
-          # only gate that reads the INSTALLED value was comparing it against a
-          # number nothing else believed. Read it from the same helper the wheel
-          # smoke uses instead of growing a third copy.
+          # The consumer contract version has one home, the checked-in module;
+          # read it through the wheel smoke helper instead of restating it.
           sys.path.insert(0, str(Path("channel/ci").resolve()))
           import wheel_smoke
 
@@ -618,6 +561,7 @@ jobs:
               "consumer_fixed_los_gather",
               "consumer_fixed_los_gather_backward",
               "consumer_fixed_los_gather_jvp",
+              "runtime_probe",
           }}
           missing = sorted(name for name in required if not hasattr(native, name))
           assert not missing, missing
@@ -628,70 +572,52 @@ jobs:
       - name: Upload Linux wheel
         uses: actions/upload-artifact@v4
         with:
-          name: channel-wheel-linux
+          name: channel-wheel-${{ matrix.channel }}-linux-${{ matrix.python_tag }}-torch${{ matrix.torch }}
           path: channel/dist/*.whl
           if-no-files-found: error
 
   validate-wheels:
     name: Validate complete wheel set
-    if: >-
-      always() &&
-      ((inputs.scope == 'publish-recovery-artifacts' &&
-      needs.build-windows.result == 'skipped' &&
-      needs.build-linux.result == 'skipped') ||
-      (needs.build-windows.result == 'success' &&
-      (needs.build-linux.result == 'success' || needs.build-linux.result == 'skipped')))
-    needs: [build-windows, build-linux]
+    if: github.event_name == 'release' || inputs.scope == 'full'
+    needs: [metadata, build-windows, build-linux]
     runs-on: ubuntu-22.04
     steps:
-      - name: Download wheel artifacts
-        if: inputs.scope != 'publish-recovery-artifacts'
+      - name: Check out Channel
+        uses: actions/checkout@v5
+        with:
+          path: channel
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Download PyPI wheels
         uses: actions/download-artifact@v4
         with:
-          pattern: channel-wheel-*
-          path: dist
+          pattern: channel-wheel-pypi-*
+          path: dist/pypi
           merge-multiple: true
 
-      - name: Download recovered Linux wheel
-        if: >-
-          github.event_name == 'workflow_dispatch' &&
-          (inputs.scope == 'windows-release-recovery' ||
-          inputs.scope == 'publish-recovery-artifacts')
+      - name: Download release-asset wheels
         uses: actions/download-artifact@v4
         with:
-          name: channel-wheel-linux
-          path: dist
-          github-token: ${{ github.token }}
-          run-id: ${{ inputs.linux_artifact_run_id }}
+          pattern: channel-wheel-release-asset-*
+          path: dist/release-asset
+          merge-multiple: true
 
-      - name: Download recovered Windows wheel
-        if: github.event_name == 'workflow_dispatch' && inputs.scope == 'publish-recovery-artifacts'
-        uses: actions/download-artifact@v4
-        with:
-          name: channel-wheel-windows
-          path: dist
-          github-token: ${{ github.token }}
-          run-id: ${{ inputs.windows_artifact_run_id }}
-
-      - name: Validate artifact count and tags
+      - name: Validate wheel names, count and size
         shell: bash
         env:
-          EXPECTED_COUNT: ${{ (needs.build-linux.result == 'success' || inputs.scope == 'windows-release-recovery' || inputs.scope == 'publish-recovery-artifacts') && '2' || '1' }}
+          VERSION: ${{ needs.metadata.outputs.version }}
         run: |
+          python channel/ci/wheel_matrix.py check-wheels dist/pypi --channel pypi --version "$VERSION"
+          python channel/ci/wheel_matrix.py check-wheels dist/release-asset --channel release-asset --version "$VERSION"
           python - <<'PY'
-          import os
-          import re
           import zipfile
           from pathlib import Path
 
-          wheels = sorted(Path("dist").glob("*.whl"))
-          assert len(wheels) == int(os.environ["EXPECTED_COUNT"]), wheels
-          names = [wheel.name for wheel in wheels]
-          assert any(name.endswith("-cp311-cp311-win_amd64.whl") for name in names)
-          if len(wheels) == 2:
-              assert any("manylinux_2_28_x86_64.whl" in name for name in names)
-          for wheel in wheels:
-              assert re.match(r"witwin_channel-0\.5\.0-", wheel.name), wheel
+          for wheel in sorted(Path("dist").glob("*/*.whl")):
               members = zipfile.ZipFile(wheel).namelist()
               extensions = [
                   name
@@ -705,12 +631,8 @@ jobs:
   publish:
     name: Publish witwin-channel to PyPI
     if: >-
-      always() &&
-      needs.validate-wheels.result == 'success' &&
-      ((github.event_name == 'release' && github.event.action == 'published') ||
-      (github.event_name == 'workflow_dispatch' &&
-      (inputs.scope == 'windows-release-recovery' ||
-      inputs.scope == 'publish-recovery-artifacts')))
+      github.event_name == 'release' && github.event.action == 'published' &&
+      needs.validate-wheels.result == 'success'
     needs: validate-wheels
     runs-on: ubuntu-latest
     environment:
@@ -721,36 +643,39 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - name: Download wheel artifacts
-        if: inputs.scope != 'publish-recovery-artifacts'
+      - name: Download PyPI wheels
         uses: actions/download-artifact@v4
         with:
-          pattern: channel-wheel-*
+          pattern: channel-wheel-pypi-*
           path: dist
           merge-multiple: true
-
-      - name: Download recovered Linux wheel
-        if: >-
-          github.event_name == 'workflow_dispatch' &&
-          (inputs.scope == 'windows-release-recovery' ||
-          inputs.scope == 'publish-recovery-artifacts')
-        uses: actions/download-artifact@v4
-        with:
-          name: channel-wheel-linux
-          path: dist
-          github-token: ${{ github.token }}
-          run-id: ${{ inputs.linux_artifact_run_id }}
-
-      - name: Download recovered Windows wheel
-        if: github.event_name == 'workflow_dispatch' && inputs.scope == 'publish-recovery-artifacts'
-        uses: actions/download-artifact@v4
-        with:
-          name: channel-wheel-windows
-          path: dist
-          github-token: ${{ github.token }}
-          run-id: ${{ inputs.windows_artifact_run_id }}
 
       - name: Publish wheels
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist
+
+  release-assets:
+    name: Attach the other PyTorch builds to the GitHub release
+    if: >-
+      github.event_name == 'release' && github.event.action == 'published' &&
+      needs.validate-wheels.result == 'success'
+    needs: validate-wheels
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Download release-asset wheels
+        uses: actions/download-artifact@v4
+        with:
+          pattern: channel-wheel-release-asset-*
+          path: dist
+          merge-multiple: true
+
+      - name: Upload to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" dist/*.whl --repo "$GITHUB_REPOSITORY"

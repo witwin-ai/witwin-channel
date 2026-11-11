@@ -543,7 +543,17 @@ def _finish_capacity_boundary(
         return evaluated, sidecars
     evaluated, sidecars = sanitize_enumerated_capacity_transaction(evaluated, sidecars)
     transaction.terminal_check()
-    return evaluated, replace(sidecars, capacity_transaction=None)
+    return evaluated, sidecars
+
+
+def transmission_dropped_rows(sidecars: EvaluatedPathSidecars) -> int:
+    """Return the transmission rows dropped for crossing more walls than ``max_depth``.
+
+    Observes the solve's capacity transaction if the compact boundary did not.
+    """
+
+    transaction = sidecars.capacity_transaction
+    return 0 if transaction is None else transaction.terminal_check()
 
 
 def evaluate_enumerated_paths(
@@ -571,10 +581,12 @@ def evaluate_enumerated_paths(
         tx_polarizations = transmitter_polarizations_as_stored(scene, device=device)
         rx_positions, _ = receiver_positions_and_layout(scene, device=device)
         rx_polarizations = None
+        diffraction_tx_polarizations = None
     else:
         tx_positions = endpoint_tensors.tx_positions
         tx_power = endpoint_tensors.tx_power
         tx_polarizations = endpoint_tensors.tx_polarizations
+        diffraction_tx_polarizations = tx_polarizations
         rx_positions = endpoint_tensors.rx_positions
         rx_polarizations = endpoint_tensors.rx_polarizations
     field_tx_power = (
@@ -671,6 +683,7 @@ def evaluate_enumerated_paths(
                 rx_positions,
                 frequency_hz=frequency_hz,
                 isb_boundary_taper_width=isb_boundary_taper_width,
+                tx_polarizations=diffraction_tx_polarizations,
             )
         )
         launch_count += diffraction_launches
@@ -803,6 +816,7 @@ def evaluate_enumerated_paths(
         sink_stable_ids=(
             endpoint_tensors.rx_stable_ids if endpoint_tensors is not None else None
         ),
+        capacity_transaction=capacity_transaction,
     )
     sidecars = replace(
         sidecars,

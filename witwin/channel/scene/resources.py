@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 import math
+import re
 from typing import TYPE_CHECKING, Sequence
 
 import numpy as np
@@ -16,7 +17,13 @@ from witwin.core import PhaseScreen, SurfaceRoughness
 
 from witwin.channel.constants import C0
 from witwin.channel.materials import layer_stack_rt
-from witwin.channel.runtime import mc_pack_vec3, required_symbol as _required_native_op
+from witwin.channel.runtime import (
+    mc_pack_vec3,
+    record_scene_trace_backend,
+    require_device_supported,
+    required_symbol as _required_native_op,
+    requested_trace_backend,
+)
 
 if TYPE_CHECKING:
     from witwin.channel.scene.compiler import AssignmentStore, MaterialStore
@@ -60,7 +67,7 @@ __all__ = [
 def rayd_scene_create(
     vertices: list[torch.Tensor], faces: list[torch.Tensor], uv: list[torch.Tensor],
     face_uv: list[torch.Tensor], to_world_left: list[torch.Tensor],
-    to_world_right: list[torch.Tensor], mesh_flags: list[int],
+    to_world_right: list[torch.Tensor], mesh_flags: list[int], trace_backend: str,
 ) -> object:
     resource = _required_native_op("rayd_scene_create")(
         vertices,
@@ -70,9 +77,11 @@ def rayd_scene_create(
         to_world_left,
         to_world_right,
         mesh_flags,
+        trace_backend,
     )
     if resource is None or not bool(getattr(resource, "available", False)):
         raise RuntimeError("_channel.rayd_scene_create returned an invalid resource")
+    record_scene_trace_backend(resource)
     return resource
 
 
@@ -106,6 +115,7 @@ class RayDSceneResource:
     resource: object | None = None
     mesh_tensors: tuple[tuple[torch.Tensor, ...], ...] = ()
     reason: str | None = None
+    requested_trace_backend: str = "auto"
     runtime_cache: dict[str, object] = field(
         default_factory=dict, compare=False, repr=False
     )
@@ -115,6 +125,14 @@ class RayDSceneResource:
         return self.resource is not None and bool(
             getattr(self.resource, "available", False)
         )
+
+    @property
+    def trace_backend(self) -> str | None:
+        """The tracer RayD selected for this scene, ``"optix"`` or ``"cuda"``."""
+
+        if not self.available:
+            return None
+        return str(getattr(self.resource, "trace_backend"))
 
     def require_resource(self) -> object:
         if not self.available:
@@ -127,7 +145,10 @@ class RayDSceneResource:
         cached = self.runtime_cache.get("edge_records")
         if cached is not None:
             return cached  # type: ignore[return-value]
-        values = rayd_scene_edge_records(self.require_resource())
+        try:
+            values = rayd_scene_edge_records(self.require_resource())
+        except RuntimeError as error:
+            raise _channel_edge_error(error) from error
         if len(values) != 12:
             raise RuntimeError(
                 f"RayD edge_records returned {len(values)} tensors, expected 12"
@@ -147,6 +168,21 @@ class RayDSceneResource:
         )
         self.runtime_cache["edge_records"] = records
         return records
+
+
+def _channel_edge_error(error: RuntimeError) -> Exception:
+    """Restate a RayD edge-topology refusal in Channel terms; other errors pass through."""
+
+    message = str(error)
+    if "edges_enabled" not in message:
+        return error
+    mesh = re.search(r"mesh (\d+)", message)
+    which = f"enabled structure {mesh.group(1)}" if mesh else "a structure"
+    return ValueError(
+        f"{which} has no diffraction edge topology: an edge is shared by more faces "
+        "than supported, or its edge records exceed the 32-bit index range. Remove "
+        "coincident faces or split the mesh into several structures"
+    )
 
 
 def _empty_tensor(
@@ -173,11 +209,17 @@ def build_scene_from_structures(structures: tuple[object, ...]) -> RayDSceneReso
     `_channel`. It does not import a RayD Python package or dispatcher.
     """
 
+    trace_backend = requested_trace_backend()
     if not structures:
-        return RayDSceneResource(reason="scene has no structures")
+        return RayDSceneResource(
+            reason="scene has no structures", requested_trace_backend=trace_backend
+        )
     if not torch.cuda.is_available():
-        return RayDSceneResource(reason="CUDA is unavailable")
+        return RayDSceneResource(
+            reason="CUDA is unavailable", requested_trace_backend=trace_backend
+        )
 
+    require_device_supported(torch.cuda.current_device())
     device = torch.device("cuda")
     vertices: list[torch.Tensor] = []
     faces: list[torch.Tensor] = []
@@ -228,16 +270,24 @@ def build_scene_from_structures(structures: tuple[object, ...]) -> RayDSceneReso
             )
         )
 
-    resource = rayd_scene_create(
-        vertices,
-        faces,
-        uv,
-        face_uv,
-        to_world_left,
-        to_world_right,
-        mesh_flags,
+    try:
+        resource = rayd_scene_create(
+            vertices,
+            faces,
+            uv,
+            face_uv,
+            to_world_left,
+            to_world_right,
+            mesh_flags,
+            trace_backend,
+        )
+    except RuntimeError as error:
+        raise _channel_edge_error(error) from error
+    return RayDSceneResource(
+        resource=resource,
+        mesh_tensors=tuple(keepalive),
+        requested_trace_backend=trace_backend,
     )
-    return RayDSceneResource(resource=resource, mesh_tensors=tuple(keepalive))
 
 
 _BOUNDARY_EDGE_POLICIES = {"exclude", "half_plane"}
@@ -1013,6 +1063,11 @@ N_PHI_O = 64
 # needs k0*l >= ~6 and moderate RMS slope sqrt(2)*sigma_h/l <= 0.5.
 MIN_K0_CORR_LENGTH = 6.0
 MAX_RMS_SLOPE = 0.5
+# The Beckmann series needs about (2*k0*sigma_h)^2 terms per lobe sample, so the
+# table build time grows with (k0*sigma_h)^2. Above this bound (g = 4096, a few
+# thousand terms, roughly 15 s of table build) a surface is far in the
+# geometric-optics regime and is refused rather than left to run for minutes.
+MAX_K0_RMS_HEIGHT = 32.0
 
 
 def _kirchhoff_diffuse_lobe_series(q_par_x, q_par_y, q_n, sigma_h, lx, ly, n_terms: int = 64):
@@ -1270,12 +1325,25 @@ def build_kirchhoff_table(
     rms_slope_max = math.sqrt(2.0) * sigma_h / l_min
     tangent_plane_ok = k0_l_min >= MIN_K0_CORR_LENGTH
     slope_ok = rms_slope_max <= MAX_RMS_SLOPE
-    if not (tangent_plane_ok and slope_ok):
+    k0_sigma_h = k0 * sigma_h
+    series_ok = k0_sigma_h <= MAX_K0_RMS_HEIGHT
+    if not (tangent_plane_ok and slope_ok and series_ok):
+        violated = [
+            text
+            for ok, text in (
+                (tangent_plane_ok, f"k0*corr_length >= {MIN_K0_CORR_LENGTH:g} (got {k0_l_min:.3g})"),
+                (slope_ok, f"RMS slope sqrt(2)*sigma_h/l <= {MAX_RMS_SLOPE:g} (got {rms_slope_max:.3g})"),
+                (
+                    series_ok,
+                    f"k0*rms_height_m <= {MAX_K0_RMS_HEIGHT:g} (got {k0_sigma_h:.3g}; at "
+                    f"{frequency_hz:.4g} Hz rms_height_m must be at most "
+                    f"{MAX_K0_RMS_HEIGHT / k0:.3g} m)",
+                ),
+            )
+            if not ok
+        ]
         raise ValueError(
-            "kirchhoff_domain_exceeded: ensemble Kirchhoff requires "
-            f"k0*corr_length >= {MIN_K0_CORR_LENGTH:g} "
-            f"(got {k0_l_min:.3g}) and RMS slope sqrt(2)*sigma_h/l <= "
-            f"{MAX_RMS_SLOPE:g} (got {rms_slope_max:.3g})"
+            "kirchhoff_domain_exceeded: ensemble Kirchhoff requires " + " and ".join(violated)
         )
 
     anisotropic = lx != ly

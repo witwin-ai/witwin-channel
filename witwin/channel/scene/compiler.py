@@ -10,7 +10,10 @@ from dataclasses import dataclass, field, fields
 import hashlib
 import math
 from threading import RLock
+from typing import TypeVar
+import weakref
 
+import numpy as np
 import torch
 
 from witwin.core import (
@@ -37,6 +40,7 @@ from witwin.channel.runtime import (
     bdpt_zero_matrix,
     mc_receiver_grid_points,
     mc_transmitter_tensors,
+    requested_trace_backend,
 )
 from witwin.channel.scene.endpoints import (
     ReceiverGrid,
@@ -402,6 +406,31 @@ class CompiledScene:
             if not math.isfinite(value) or value < 0.0:
                 raise ValueError(f"{name} must be finite and non-negative")
 
+    def __reduce_ex__(self, protocol: object) -> object:
+        raise TypeError(
+            "a CompiledScene owns a native RayD scene on one GPU and cannot be pickled or "
+            "copied; pass the witwin.core Scene and call witwin.channel.scene.compile() again"
+        )
+
+    def __deepcopy__(self, memo: object) -> CompiledScene:
+        self.__reduce_ex__(None)
+        raise AssertionError("unreachable")
+
+    @property
+    def dropped_faces(self) -> dict[str, int]:
+        """Faces removed at compile: ``degenerate`` (repeated vertex index) and ``duplicate``."""
+
+        return {
+            "degenerate": sum(
+                int(getattr(structure, "dropped_degenerate_faces", 0))
+                for structure in self.structures
+            ),
+            "duplicate": sum(
+                int(getattr(structure, "dropped_duplicate_faces", 0))
+                for structure in self.structures
+            ),
+        }
+
     def require_reference_frequency(self, reference_frequency_hz: float | torch.Tensor) -> None:
         """Reject a request/compile frequency mismatch before native work."""
 
@@ -617,6 +646,7 @@ class CompiledScene:
         return tuple(tokens)
 
 
+_ResultT = TypeVar("_ResultT")
 _GEOMETRY_MODE_IDS = {"thin_sheet": 0, "volumetric": 1}
 _SCATTER_MODEL_SMOOTH = 0
 _SCATTER_MODEL_KIRCHHOFF = 1
@@ -630,6 +660,10 @@ class _RuntimeStructure:
     faces: torch.Tensor
     uv: torch.Tensor | None
     face_uv: torch.Tensor | None
+    # Authored local index of every kept face, or None when no face was dropped.
+    kept_faces: tuple[int, ...] | None = None
+    dropped_degenerate_faces: int = 0
+    dropped_duplicate_faces: int = 0
 
     @property
     def name(self) -> str:
@@ -659,6 +693,8 @@ class _RuntimeStructure:
         return int(self.source.material_id)
 
     def primitive_id(self, local_index: int) -> int:
+        if self.kept_faces is not None:
+            local_index = self.kept_faces[local_index]
         return int(self.source.primitive_id(local_index))
 
 
@@ -676,9 +712,15 @@ class _CompileRegistry:
                 self._compiled.move_to_end(key)
             return value
 
-    def candidates(self) -> tuple[CompiledScene, ...]:
+    def candidates(self, runtime_device: object) -> tuple[CompiledScene, ...]:
+        """Cached runtimes built on ``runtime_device``, most recent first."""
+
         with self._lock:
-            return tuple(reversed(self._compiled.values()))
+            return tuple(
+                compiled
+                for key, compiled in reversed(self._compiled.items())
+                if key[0][-2] == runtime_device
+            )
 
     def put(self, key: tuple[object, ...], compiled: CompiledScene) -> None:
         with self._lock:
@@ -742,6 +784,25 @@ def _versions(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[int, int, int, 
     )
 
 
+def _readable_versions(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[int, int, int, int]:
+    """Read the four version domains, restating the two tensor kinds that cannot report one."""
+
+    try:
+        return _versions(scene_or_snapshot)
+    except RuntimeError as error:
+        if "doesn't have storage" in str(error):
+            from witwin.channel.scene.endpoints import FUNCTORCH_MESSAGE
+
+            raise NotImplementedError(FUNCTORCH_MESSAGE) from error
+        if "Inference tensors" not in str(error):
+            raise
+        raise ValueError(
+            "the scene holds tensors created under torch.inference_mode(); Channel tracks "
+            "scene edits through tensor version counters, which inference tensors do not "
+            "have. Build the scene outside torch.inference_mode() (solving inside it is fine)"
+        ) from error
+
+
 def _source_structures(
     scene_or_snapshot: Scene | SceneSnapshot,
 ) -> tuple[tuple[Structure, object | None, object | None], ...]:
@@ -753,11 +814,210 @@ def _source_structures(
     )
 
 
+# RayD emits one diffraction wedge per pair of faces sharing an edge and refuses
+# an edge shared by more faces than this.
+_MAX_EDGE_INCIDENT_FACES = 256
+_INT32_MAX = 2**31 - 1
+# Largest vertex count whose sorted index triples pack into one int64 key.
+_SINGLE_KEY_VERTEX_LIMIT = 2**21 - 1
+
+
+def _structure_label(index: int, structure: Structure) -> str:
+    name = f" {structure.name!r}" if structure.name else ""
+    return f"structure {index}{name}"
+
+
+def _require_index_table(
+    label: str, name: str, table: torch.Tensor, row_count: int, target: str,
+) -> None:
+    """Reject an index table entry outside ``[0, row_count)`` before any native work."""
+
+    if table.dtype == torch.bool or table.dtype.is_floating_point or table.dtype.is_complex:
+        raise TypeError(f"{label}: {name} must be an integer tensor, got {table.dtype}")
+    if row_count > _INT32_MAX:
+        raise ValueError(
+            f"{label}: {row_count} {target} exceed the 32-bit index range "
+            f"(at most {_INT32_MAX})"
+        )
+    if table.numel() == 0:
+        return
+    host = table.detach().to(device="cpu", dtype=torch.int64)
+    bad = (host < 0) | (host >= row_count)
+    if bool(bad.any()):
+        row = int(bad.any(dim=1).nonzero()[0, 0])
+        value = int(host[row][bad[row]][0])
+        raise ValueError(
+            f"{label}: {name}[{row}] holds index {value}, outside the valid range "
+            f"[0, {row_count}) of its {row_count} {target}"
+        )
+
+
+def _require_finite_table(label: str, name: str, table: torch.Tensor) -> None:
+    if table.numel() and not bool(torch.isfinite(table.detach()).all()):
+        row = int((~torch.isfinite(table.detach())).reshape(table.shape[0], -1).any(dim=1)
+                  .nonzero()[0, 0])
+        raise ValueError(f"{label}: {name}[{row}] is not finite (NaN or infinite coordinate)")
+
+
+def _face_cleanup(
+    label: str, faces: torch.Tensor, vertex_count: int,
+) -> tuple[torch.Tensor | None, int, int]:
+    """Return the kept-face mask (None when all faces are kept) and the dropped counts.
+
+    A face that repeats a vertex index has zero area by construction; a face whose
+    vertex index set equals an earlier face's (in either winding) is an exact
+    duplicate. Both are decided from indices only, so the result does not change
+    when the same mesh is deformed. An edge shared by more distinct faces than the
+    edge topology supports is rejected here with the structure and edge named.
+    """
+
+    host = faces.detach().to(device="cpu", dtype=torch.int64).numpy()
+    face_count = int(host.shape[0])
+    if face_count == 0:
+        return None, 0, 0
+    first, second, third = host[:, 0], host[:, 1], host[:, 2]
+    low = np.minimum(np.minimum(first, second), third)
+    high = np.maximum(np.maximum(first, second), third)
+    middle = first + second + third - low - high
+    degenerate = (low == middle) | (middle == high)
+    # A stable sort keeps the earliest face first in every group of equal index
+    # sets, so every later member of a group is a duplicate.
+    if vertex_count <= _SINGLE_KEY_VERTEX_LIMIT:
+        face_key = (low * vertex_count + middle) * vertex_count + high
+        order = np.argsort(face_key, kind="stable")
+        grouped = face_key[order]
+        repeat = np.zeros(face_count, dtype=bool)
+        repeat[1:] = grouped[1:] == grouped[:-1]
+    else:
+        order = np.lexsort((high, middle, low))
+        repeat = np.zeros(face_count, dtype=bool)
+        repeat[1:] = (
+            (low[order][1:] == low[order][:-1])
+            & (middle[order][1:] == middle[order][:-1])
+            & (high[order][1:] == high[order][:-1])
+        )
+    duplicate = np.zeros(face_count, dtype=bool)
+    duplicate[order[repeat]] = True
+    duplicate &= ~degenerate
+    keep = ~(degenerate | duplicate)
+    if keep.any():
+        low, middle, high = low[keep], middle[keep], high[keep]
+        edge_keys = np.sort(
+            np.concatenate(
+                (
+                    low * vertex_count + middle,
+                    middle * vertex_count + high,
+                    low * vertex_count + high,
+                )
+            )
+        )
+        starts = np.flatnonzero(np.diff(edge_keys, prepend=-1) != 0)
+        counts = np.diff(np.append(starts, edge_keys.shape[0]))
+        worst = int(counts.argmax())
+        if int(counts[worst]) > _MAX_EDGE_INCIDENT_FACES:
+            v0, v1 = divmod(int(edge_keys[starts[worst]]), vertex_count)
+            raise ValueError(
+                f"{label}: the edge between vertices {v0} and {v1} is shared by "
+                f"{int(counts[worst])} distinct faces; at most "
+                f"{_MAX_EDGE_INCIDENT_FACES} faces may share one edge. Split the "
+                "fan into several structures or weld it into fewer faces"
+            )
+    dropped_degenerate = int(degenerate.sum())
+    dropped_duplicate = int(duplicate.sum())
+    if dropped_degenerate == 0 and dropped_duplicate == 0:
+        return None, 0, 0
+    if not bool(keep.any()):
+        raise ValueError(
+            f"{label}: every face repeats a vertex index or duplicates an earlier "
+            "face; the mesh has no face with area"
+        )
+    return torch.from_numpy(keep), dropped_degenerate, dropped_duplicate
+
+
+def _validated_mesh(
+    label: str, vertices: torch.Tensor, faces: torch.Tensor, uv: torch.Tensor | None,
+    face_uv: torch.Tensor | None,
+) -> tuple[torch.Tensor, torch.Tensor | None, tuple[int, ...] | None, int, int]:
+    """Validate one structure's tables and return its kept faces and drop counts."""
+
+    _require_finite_table(label, "vertices", vertices)
+    if uv is not None and face_uv is not None:
+        if face_uv.ndim != 2 or tuple(face_uv.shape) != tuple(faces.shape):
+            raise ValueError(f"{label}: face_uv must have one (3,) row per mesh face")
+        _require_finite_table(label, "uv", uv)
+    keep, dropped_degenerate, dropped_duplicate = _checked_topology(
+        label, faces, int(vertices.shape[0]), face_uv, None if uv is None else int(uv.shape[0])
+    )
+    if keep is None:
+        return faces, face_uv, None, 0, 0
+    kept_faces = tuple(int(index) for index in keep.nonzero().flatten())
+    faces = faces[keep.to(device=faces.device)]
+    if face_uv is not None:
+        face_uv = face_uv[keep.to(device=face_uv.device)]
+    return faces, face_uv, kept_faces, dropped_degenerate, dropped_duplicate
+
+
+_TOPOLOGY_CHECK_LIMIT = 64
+_TOPOLOGY_CHECKS: OrderedDict[tuple[object, ...], tuple[object, ...]] = OrderedDict()
+_TOPOLOGY_CHECK_LOCK = RLock()
+
+
+def _tensor_token(value: torch.Tensor | None) -> tuple[object, ...] | None:
+    if value is None:
+        return ()
+    if value.is_inference():
+        return None
+    return (id(value), int(value._version), tuple(value.shape), value.device)
+
+
+def _checked_topology(
+    label: str, faces: torch.Tensor, vertex_count: int, face_uv: torch.Tensor | None,
+    uv_count: int | None,
+) -> tuple[torch.Tensor | None, int, int]:
+    """Range-check the face and face-UV tables and decide which faces to keep.
+
+    The result depends only on the index tables and the vertex/UV counts, so it is
+    remembered per (tensor identity, mutation version) and an unchanged mesh pays
+    the host pass once rather than on every recompile.
+    """
+
+    faces_token = _tensor_token(faces)
+    uv_token = _tensor_token(face_uv)
+    key = (
+        None
+        if faces_token is None or uv_token is None
+        else (faces_token, uv_token, vertex_count, uv_count)
+    )
+    if key is not None:
+        with _TOPOLOGY_CHECK_LOCK:
+            hit = _TOPOLOGY_CHECKS.get(key)
+            if hit is not None and hit[0]() is faces and hit[1]() is (face_uv if face_uv is not None else faces):
+                _TOPOLOGY_CHECKS.move_to_end(key)
+                return hit[2]  # type: ignore[return-value]
+    _require_index_table(label, "faces", faces, vertex_count, "vertices")
+    if face_uv is not None and uv_count is not None:
+        _require_index_table(label, "face_uv", face_uv, uv_count, "uv rows")
+    result = _face_cleanup(label, faces, vertex_count)
+    if key is not None:
+        with _TOPOLOGY_CHECK_LOCK:
+            _TOPOLOGY_CHECKS[key] = (
+                weakref.ref(faces),
+                weakref.ref(face_uv if face_uv is not None else faces),
+                result,
+            )
+            while len(_TOPOLOGY_CHECKS) > _TOPOLOGY_CHECK_LIMIT:
+                _TOPOLOGY_CHECKS.popitem(last=False)
+    return result
+
+
 def _runtime_structures(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[_RuntimeStructure, ...]:
     runtime: list[_RuntimeStructure] = []
-    for structure, rigid_motion, deformation in _source_structures(scene_or_snapshot):
+    for structure_index, (structure, rigid_motion, deformation) in enumerate(
+        _source_structures(scene_or_snapshot)
+    ):
         if not structure.enabled:
             continue
+        label = _structure_label(structure_index, structure)
         geometry = structure.geometry
         vertices, faces = geometry.to_mesh()
         if not isinstance(vertices, torch.Tensor) or not isinstance(faces, torch.Tensor):
@@ -844,6 +1104,9 @@ def _runtime_structures(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[_Runt
         face_uv = structure.face_uv
         if (uv is None) != (face_uv is None):
             raise ValueError("Core mesh uv and face_uv must be provided together")
+        faces, face_uv, kept_faces, dropped_degenerate, dropped_duplicate = _validated_mesh(
+            label, vertices, faces, uv, face_uv
+        )
         runtime.append(
             _RuntimeStructure(
                 source=structure,
@@ -859,6 +1122,9 @@ def _runtime_structures(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[_Runt
                     if face_uv is None
                     else face_uv.to(dtype=torch.int32).contiguous()
                 ),
+                kept_faces=kept_faces,
+                dropped_degenerate_faces=dropped_degenerate,
+                dropped_duplicate_faces=dropped_duplicate,
             )
         )
     return tuple(runtime)
@@ -1303,6 +1569,25 @@ def _assignment_input_identity(
     )
 
 
+def _reusable_rayd(
+    reusable: tuple[CompiledScene, ...], rayd_input_identity: tuple[object, ...],
+    topology_version: int, geometry_version: int, trace_backend: str,
+) -> RayDSceneResource | None:
+    """Return a cached RayD scene built from the same geometry for the same trace backend."""
+
+    return next(
+        (
+            candidate.rayd
+            for candidate in reusable
+            if _rayd_input_identity(candidate.source) == rayd_input_identity
+            and candidate.rayd.requested_trace_backend == trace_backend
+            and candidate.topology_version == topology_version
+            and candidate.geometry_version == geometry_version
+        ),
+        None,
+    )
+
+
 def compile(
     scene_or_snapshot: Scene | SceneSnapshot, *, reference_frequency_hz: float | torch.Tensor,
 ) -> CompiledScene:
@@ -1311,11 +1596,15 @@ def compile(
     if not isinstance(scene_or_snapshot, (Scene, SceneSnapshot)):
         raise TypeError("scene_or_snapshot must be a witwin.core Scene or SceneSnapshot")
     frequency_value = _frequency_value(reference_frequency_hz)
-    versions = _versions(scene_or_snapshot)
-    key = _cache_key(
-        scene_or_snapshot,
-        versions,
-        _frequency_identity(reference_frequency_hz, frequency_value),
+    versions = _readable_versions(scene_or_snapshot)
+    trace_backend = requested_trace_backend()
+    key = (
+        _cache_key(
+            scene_or_snapshot,
+            versions,
+            _frequency_identity(reference_frequency_hz, frequency_value),
+        ),
+        trace_backend,
     )
     cached = _REGISTRY.get(key)
     if cached is not None and cached.source is scene_or_snapshot:
@@ -1323,17 +1612,10 @@ def compile(
 
     structures = _runtime_structures(scene_or_snapshot)
     topology_version, geometry_version, material_version, assignment_version = versions
-    reusable = _REGISTRY.candidates()
+    reusable = _REGISTRY.candidates(key[0][-2])
     rayd_input_identity = _rayd_input_identity(scene_or_snapshot)
-    rayd = next(
-        (
-            candidate.rayd
-            for candidate in reusable
-            if _rayd_input_identity(candidate.source) == rayd_input_identity
-            and candidate.topology_version == topology_version
-            and candidate.geometry_version == geometry_version
-        ),
-        None,
+    rayd = _reusable_rayd(
+        reusable, rayd_input_identity, topology_version, geometry_version, trace_backend
     )
     if rayd is None:
         rayd = build_scene_from_structures(structures)
@@ -1445,6 +1727,15 @@ def compile(
     )
     _REGISTRY.put(key, compiled)
     return compiled
+
+
+def record_dropped_faces(result: _ResultT, compiled: CompiledScene) -> _ResultT:
+    """Add ``metadata["dropped_faces"]`` to a solver result when compile removed faces."""
+
+    dropped = compiled.dropped_faces
+    if any(dropped.values()):
+        result.metadata["dropped_faces"] = dict(dropped)  # type: ignore[attr-defined]
+    return result
 
 
 LIGHT_SPEED_M_PER_S = 299_792_458.0

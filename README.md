@@ -7,9 +7,9 @@ solvers for deterministic fields, explicit propagation paths, and Monte Carlo
 radiomaps through the `witwin.channel` Python package.
 
 > **Project status**
-> Version 0.4 is a breaking replacement for the earlier 0.3 API. The supported
-> runtime requires an NVIDIA GPU and the packaged native extension; APIs may
-> continue to evolve before 1.0.
+> Channel requires an NVIDIA GPU and runs only through its compiled CUDA
+> extension. It is pre-1.0: public APIs may change between minor releases, and
+> each release's changes are listed in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Capabilities
 
@@ -85,50 +85,68 @@ Complete signatures, parameter tables, tensor layouts, methods, exceptions,
 and usage patterns are collected in the
 [`docs/api-reference`](docs/api-reference/index.md) API Reference.
 
-## Requirements
-
-- CPython 3.11.
-- PyTorch 2.10 with CUDA 12.8 runtime support.
-- Windows x64 on an NVIDIA GPU with compute capability 12.0 for the currently
-  runtime-verified row. Release wheels must contain the repository-wide native
-  SASS set, including SM87, and compute_120 PTX; SM87 runtime validation remains
-  separate evidence.
-- witwin==0.4.0 for the logical world contracts.
-- An ABI-compatible `witwin-channel` wheel, or a source build against the
-  repository-locked RayD integration.
-
-Channel has no production CPU compute backend. Missing CUDA, an unsupported
-GPU architecture, an incompatible extension, or a required native capability
-raises an error before returning a partial result.
-
-`_channel` uses the versioned LibTorch/Python extension ABI. The Stage-I wheel
-is CPython 3.11 / Torch 2.10.0 only and is not advertised as a LibTorch Stable
-ABI binary. Linux release wheels are compiled inside a real
-`manylinux_2_28` environment.
-
 ## Installation
 
-Install an approved wheel into an environment that already contains the
-matching CUDA-enabled PyTorch build:
+### Prerequisites
 
-```powershell
-python -m pip install .\witwin_channel-0.5.0-cp311-cp311-win_amd64.whl --no-deps
+| Item | Requirement |
+| --- | --- |
+| OS | Linux x86_64 (glibc 2.28 or newer) or Windows x64 |
+| GPU | NVIDIA, compute capability 7.0 (Volta) or newer. Wheels contain native code for sm_70, 75, 80, 86, 89, 90, 100 and 120 and PTX for newer GPUs. Jetson (sm_87, sm_101) needs a source build. |
+| NVIDIA driver | R525 or newer (CUDA 12); R555 or newer to use OptiX; R570 or newer for RTX 50-series (Blackwell). Without a usable OptiX runtime Channel traces on its slower pure-CUDA backend. |
+| Python | CPython 3.10, 3.11, 3.12 or 3.13 |
+| PyTorch | the exact CUDA 12.8 build the wheel names (PyTorch 2.10.0 for the PyPI wheels) |
+
+No CUDA toolkit, OptiX SDK or compiler is needed to install a wheel.
+
+### pip (Linux and Windows)
+
+Install the CUDA 12.8 build of PyTorch first: the PyTorch wheels on PyPI are CPU-only on
+Windows, and Channel cannot use them.
+
+```bash
+pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cu128
+pip install witwin-channel
+python -m witwin.channel doctor
 ```
 
-For a source build, select the intended RayD checkout explicitly and keep the
-build in the same Python environment as PyTorch:
+`doctor` (also installed as `witwin-channel-doctor`) prints the driver, GPU, PyTorch, build,
+OptiX and trace backend it found, a verdict, and how to fix each problem.
 
-```powershell
-conda activate witwin2
-$env:CMAKE_ARGS = "-DRAYD_SOURCE_DIR=E:/Code/witwin-platform/RayD"
-python -m pip install . --no-build-isolation --no-deps
-```
+Builds for PyTorch 2.11 are attached to each GitHub release as wheels with a `+torch211` local
+version; install one by URL after `pip install torch==2.11.0 --index-url
+https://download.pytorch.org/whl/cu128`. Every Channel wheel works with exactly one PyTorch
+release, because the extension links PyTorch's C++ API, which changes between releases.
 
-When `RAYD_SOURCE_DIR` is omitted, the build may use the unique locked
-`rayd-torch` 0.8.0 source bundle after validating its clean metadata, complete
-source manifest, RECORD ownership, and eight-header integration identity.
-Discovery never scans a Conda prefix or loads an arbitrary global build.
-Do not mix files from the 0.3 and 0.4 implementations in one environment.
+### Docker
+
+The [`Dockerfile`](Dockerfile) builds the wheel from a checkout and installs it in a CUDA 12.8
+image. Run containers with `--gpus all`; the image sets
+`NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics`, which the NVIDIA container toolkit needs
+to expose the driver's OptiX runtime.
+
+### From source
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the toolchain (CUDA 12.8, the locked RayD commit,
+OptiX 8.1 headers) and the build commands for Linux and Windows.
+
+### Troubleshooting
+
+- **`PyTorch ... is a CPU-only build`**: reinstall PyTorch from the CUDA index as shown above.
+- **`_channel does not match the active Torch runtime`**: the installed PyTorch is not the
+  release this Channel wheel was built for; the message names both and the install command.
+- **`Channel cannot run on CUDA device ...`**: the GPU or driver is not covered by the build (for
+  example a pre-Volta GPU, a Jetson, or a driver older than CUDA 12). The message names the GPU,
+  its SM, the build's targets and the fix.
+- **OptiX unavailable**: common in containers started without the `graphics` driver capability
+  and on drivers older than R555. Channel then uses its pure-CUDA trace backend for every solver;
+  it is several times slower on tracing-heavy scenes. `doctor` shows the reason.
+- **Choosing the trace backend**: `WITWIN_CHANNEL_TRACE_BACKEND=auto` (default: OptiX when usable),
+  `optix` (fail if OptiX is unusable) or `cuda`. It is read when a scene is compiled.
+- **First run is slow**: the first solve in a fresh environment compiles OptiX programs (about
+  4 s for LoS or reflection and about 14 s with diffraction on an RTX A6000); the driver caches
+  them on disk, so later processes start in about 1-2 s. GPUs newer than every cubin in the wheel
+  JIT-compile the PTX once in the same way.
 
 ## Quick start
 
@@ -197,45 +215,16 @@ print(channel.runtime_diagnostics())
 print(channel.build_info())
 ```
 
-These records identify the package, CUDA architecture, native ABI, build
-fingerprint, and locked RayD source used by the running extension.
+`runtime_diagnostics()` reports the package, Python, PyTorch, GPU and its support status, the
+driver's CUDA version, the cubin and PTX targets of the build, the OptiX probe, the requested
+trace backend and the backend each compiled scene uses. `build_info()` identifies the native
+ABI, build fingerprint and locked RayD source of the running extension.
 
 ## Development
 
-Repository development and validation use the `witwin2` Conda environment:
-
-```powershell
-conda run -n witwin2 python ci/run_ci_tier.py quick
-conda run -n witwin2 python ci/run_ci_tier.py cuda
-```
-
-The quick tier needs no native extension and runs on every push and pull
-request (`.github/workflows/quick-tier.yml`). The cuda tier and the full test
-suite need one. The test suite never picks a build directory on its own: when
-no packaged extension is installed, name the build to test explicitly.
-
-```powershell
-$env:WITWIN_CHANNEL_DEVELOPER_OVERRIDE = "1"
-$env:WITWIN_CHANNEL_EXTENSION_PATH = "<absolute path to the _channel extension>"
-$env:WITWIN_CHANNEL_EXPECTED_FINGERPRINT = "<contents of _channel.build-fingerprint beside it>"
-```
-
-Without these variables, pytest stops and lists the local builds under
-`build/` and `artifacts/` with their build times, so you can see whether a
-build is older than the source you are testing.
-
-On Linux, two scripts do this for a checkout. `scripts/dev_build.sh --rayd
-<RayD checkout at the locked commit>` configures and builds the extension with
-CMake and Ninja into `build/dev-<arch>` (`CHANNEL_DEV_CUDA_ARCH`, default 86),
-and `source scripts/dev_env.sh` exports the three variables for that build.
-The `dev` optional-dependency extra lists the test and lint tools at their CI
-versions.
-After a RayD change, `python tools/relock_rayd.py --rayd <RayD checkout>`
-re-locks `dependencies/rayd.lock.json` to that checkout's HEAD.
-
-Architecture and domain-owner documentation lives next to the implementation
-under [`witwin/channel`](witwin/channel). Contributor rules and the
-full native validation matrix are defined in [`AGENTS.md`](AGENTS.md).
+[`CONTRIBUTING.md`](CONTRIBUTING.md) covers building the extension, the test tiers, re-locking
+RayD and releasing. Contributor rules are in [`AGENTS.md`](AGENTS.md). Architecture and
+domain-owner documentation lives under [`docs/dev`](docs/dev).
 
 ## Citation
 

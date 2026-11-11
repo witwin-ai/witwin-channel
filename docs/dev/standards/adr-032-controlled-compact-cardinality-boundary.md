@@ -11,6 +11,24 @@
   (dormant deterministic diffraction reducer), and ADR-031 (rejected raw
   reflection capacity experiment).
 
+> **Amendment (0.6.0, M1-2): the count copy also carries the solve failure
+> record.** When a solve owns a capacity transaction (today: requested
+> transmission), `enumerated_canonical_compact` receives the solve's
+> `int32[2]` failure record and its control record grows from one `int64` to
+> two: element 0 is still `K` or the negative contract code, element 1 packs the
+> solve's failure bitmask (low 32 bits) and dropped-row count (high 32 bits).
+> It is still **one** device-to-host copy and **one** synchronization of the
+> caller's current stream; the copy is 16 bytes instead of 8 for those solves,
+> and solves without a transaction keep the 8-byte record unchanged. A solve
+> with a transaction performs this copy even when it has zero candidates, so the
+> failure record is always observed exactly once. A non-zero bitmask makes the
+> compact owner return no rows and the caller raises `CapacityError`; no partial
+> result is published. Solves with no compact boundary (MC Basic grid
+> accumulation) read the 8-byte record once at result finalization instead. The
+> copy budget below therefore reads "at most one count copy per compact call, of
+> 8 bytes, or 16 bytes when the call carries the solve failure record; the
+> synchronization count is unchanged".
+
 ## Context
 
 ADR-029 treated elimination of a device-selected count transfer as a primary

@@ -24,10 +24,13 @@ from witwin.channel.components import (
     DEFAULT_COMPONENTS as _DEFAULT_COMPONENTS,
     component_availability_status,
     component_max_depth,
+    require_config_type,
     validate_bounce_depth,
+    validate_config_fields,
     validate_max_depth,
     validate_samples,
     validate_seed,
+    validate_vocabulary,
     validate_workspace_limit_bytes,
     validated_components,
 )
@@ -75,6 +78,7 @@ from witwin.channel.runtime import (
     AdLaunchLedger,
     CapacityFailureState,
     SolveCapacityTransaction,
+    _participates_in_ad,
     create_solve_capacity_transaction,
     enforce_memory_budget,
     estimate_monte_carlo_memory,
@@ -84,6 +88,7 @@ from witwin.channel.scene.compiler import (
     LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,
     compile as compile_scene,
     receiver_grid_points,
+    record_dropped_faces,
     receiver_positions,
     transmitter_polarizations_as_stored,
     transmitter_positions,
@@ -98,6 +103,7 @@ from witwin.channel.scene.endpoints import (
     first_receiver_grid,
     receiver_positions_ad,
     require_compiled,
+    require_single_receiver_layout,
     scene_vertex_table,
     transmitter_positions_ad,
     validate_scalar_endpoint_features,
@@ -126,22 +132,22 @@ class Config:
     workspace_limit_bytes: int | None = 1 << 30
 
     def __post_init__(self) -> None:
+        validate_config_fields(self)
         validate_samples(self.samples)
         validate_max_depth(self.max_depth)
         validate_seed(self.seed)
         components = validated_components(
-            self.components, error_message="components must be a subset of {valid}"
+            self.components, error_message="components must be a non-empty subset of {valid}"
         )
         validate_bounce_depth(
             self.max_depth,
             components,
-            error_message="MC basic scattering requires max_depth >= 1",
+            error_message=(
+                "Monte Carlo basic requires max_depth >= 1 for components "
+                f"{sorted(components - {'los'})}, got max_depth={self.max_depth}"
+            ),
         )
-        if self.ad_mode not in _VALID_AD_MODES:
-            raise ValueError(
-                "montecarlo_basic ad_mode must be one of "
-                f"{sorted(_VALID_AD_MODES)}"
-            )
+        validate_vocabulary("montecarlo_basic ad_mode", self.ad_mode, _VALID_AD_MODES)
         validate_workspace_limit_bytes(self.workspace_limit_bytes)
         object.__setattr__(self, "components", components)
 
@@ -413,6 +419,21 @@ def _sample_directions(count: int, *, reference: torch.Tensor) -> torch.Tensor:
     return montecarlo_kernels.mc_sample_directions(count, reference)
 
 
+def _transmission_capacity_metadata(
+    config: Config, capacity_transaction: SolveCapacityTransaction | None,
+) -> dict[str, Any]:
+    """Observe the solve's failure record once and report the dropped transmission cells.
+
+    A failed solve raises ``CapacityError`` here and returns no result.
+    """
+
+    dropped = capacity_transaction.terminal_check() if capacity_transaction is not None else 0
+    if "transmission" not in config.components:
+        return {}
+    # Grid cells whose straight tx->cell segment crosses more walls than max_depth.
+    return {"transmission": {"dropped_rows_over_max_depth": int(dropped)}}
+
+
 def transmission_component_map(
     scene: SolverScene, rayd: RayDSceneResource, grid: ReceiverGrid, *, max_depth: int,
     device: torch.device, failure_state: CapacityFailureState, los: torch.Tensor | None = None,
@@ -429,8 +450,8 @@ def transmission_component_map(
     path class and stay zero here, so los + transmission never double counts.
     A single eps_r=1 vacuum wall has unit power transmittance, which makes
     this map reproduce the unobstructed LoS map exactly (acceptance test);
-    the mandatory ``max_depth + 1`` probe makes over-capacity chains poison the
-    shared solve transaction instead of returning a truncated map.
+    a segment crossing more than ``max_depth`` walls is dropped (zero in this
+    map) and counted in the solve's failure record, never truncated.
     """
 
     if not scene.structures:
@@ -1207,6 +1228,33 @@ def _validate_ad_config(config: Config) -> None:
             )
 
 
+def _reject_vertex_leaves(scene: SolverScene, config: Config) -> None:
+    """Refuse mesh-vertex AD leaves for the blocks that do not differentiate them.
+
+    Only the straight transmission chain carries mesh-vertex derivatives; the
+    reflection, diffraction and scattering maps would silently drop them.
+    """
+
+    if config.ad_mode == "none":
+        return
+    blocks = sorted(set(config.components) & {"reflection", "diffraction", "scattering"})
+    if not blocks:
+        return
+    live = [
+        f"structure[{index}].vertices"
+        for index, structure in enumerate(scene.structures)
+        if _participates_in_ad(structure.vertices)
+    ]
+    if live:
+        raise NotImplementedError(
+            f"witwin.channel.montecarlo.basic ad_mode={config.ad_mode!r} does not "
+            f"differentiate mesh vertices through {blocks}; {', '.join(live)} carries "
+            "a gradient or tangent. Detach it, restrict components to "
+            "{'los', 'transmission'}, or use witwin.channel.deterministic or "
+            "witwin.channel.path for vertex derivatives"
+        )
+
+
 def _receiver_count(scene: SolverScene) -> int:
     return sum(
         int(receiver.shape[0]) * int(receiver.shape[1])
@@ -1349,6 +1397,7 @@ def solve_pipeline(  # type: ignore[no-untyped-def]
     if not torch.cuda.is_available():
         raise RuntimeError("witwin.channel.montecarlo.basic requires CUDA")
     _validate_ad_config(config)
+    _reject_vertex_leaves(scene, config)
     ad = config.ad_mode != "none"
     if ad:
         require_frequency_ad_constant_materials_fn(
@@ -1581,6 +1630,7 @@ def solve_pipeline(  # type: ignore[no-untyped-def]
             component_power["transmission"] = torch.zeros_like(component_power["los"])
         if "scattering" in config.components:
             component_power["scattering"] = torch.zeros_like(component_power["los"])
+    transmission_metadata = _transmission_capacity_metadata(config, capacity_transaction)
     metadata = make_solver_metadata(
         config=config,
         path_count=path_count,
@@ -1589,6 +1639,7 @@ def solve_pipeline(  # type: ignore[no-untyped-def]
         diffraction_available=diffraction_available,
         ad_ledger=ledger,
     )
+    metadata.update(transmission_metadata)
     if "scattering" in config.components:
         metadata["scattering"] = {
             "component_mask_bit": 16,
@@ -1620,8 +1671,6 @@ def solve_pipeline(  # type: ignore[no-untyped-def]
         diagnostics=diagnostics,
         component_maps=component_maps,
     )
-    if capacity_transaction is not None:
-        capacity_transaction.terminal_check()
     return result
 
 
@@ -1636,7 +1685,20 @@ def solve(  # type: ignore[no-untyped-def]
 ) -> Result:
     """Run the Monte Carlo Basic solver pipeline."""
 
+    require_config_type(config, Config, "witwin.channel.montecarlo.basic")
     endpoint_views = _endpoint_views(scene)
+    # Without an enabled structure every non-LoS component is exactly zero for any
+    # receiver, so only a scene with geometry needs the grid.
+    has_geometry = any(
+        getattr(item, "structure", item).enabled for item in scene.structures
+    )
+    require_single_receiver_layout(
+        endpoint_views,
+        solver="witwin.channel.montecarlo.basic",
+        grid_only_components=(
+            frozenset(config.components) - {"los"} if has_geometry else frozenset()
+        ),
+    )
     _validate_scalar_endpoint_boundary(endpoint_views)
     validate_scalar_endpoint_features(
         tuple(view for view in endpoint_views if view.source.role == "tx"),
@@ -1646,7 +1708,7 @@ def solve(  # type: ignore[no-untyped-def]
     compiled = compile_scene(
         scene, reference_frequency_hz=reference_frequency_hz
     )
-    return solve_pipeline(
+    result = solve_pipeline(
         bind_solver_scene(compiled),
         config,
         build_info_fn=build_info,
@@ -1656,6 +1718,8 @@ def solve(  # type: ignore[no-untyped-def]
             _require_frequency_ad_constant_materials
         ),
     )
+    record_dropped_faces(result, compiled)
+    return result
 
 
 __all__ = ["Config", "Result", "solve"]

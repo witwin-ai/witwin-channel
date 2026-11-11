@@ -263,7 +263,7 @@
           "name": "PropagationDiagnostics",
           "kind": "class",
           "target": "witwin.channel.propagation.consumer.PropagationDiagnostics",
-          "contract_sha256": "444c08cbf0100b3f2443af842b09f83ac9ca693f6b1a857b8dedd1357622d7ec"
+          "contract_sha256": "926559f7d289792ccf8fdf2d99f8b07b17be3ac6e170c3a77bbe5c774c68e9a0"
         },
         {
           "name": "PropagationEvaluation",
@@ -404,6 +404,136 @@
           "target": "witwin.channel.propagation.consumer.replicate_over_slots",
           "contract_sha256": "daacec1a190fbe3e4d9b210ccdbc2d127d5c3b30e5afc91cf0936d46a675ae3c",
           "signature": "(prepared: PreparedFixedTopology, slot_count: int, *, source_count: int, sink_count: int)"
+        }
+      ]
+    },
+    {
+      "module": "witwin.channel.importers",
+      "exports": [
+        {
+          "name": "ImportedScene",
+          "kind": "class",
+          "target": "witwin.channel.importers.ImportedScene",
+          "contract_sha256": "bed3be8b075afeda1dbe84dddc5531f2c61896b92c3e6f0a0d477c42357f9108"
+        },
+        {
+          "name": "MeshData",
+          "kind": "class",
+          "target": "witwin.channel.importers.MeshData",
+          "contract_sha256": "72796c7e3879f20bf8df19cea7e1c00be2caab3554ada657aa124dba73d0d62d"
+        },
+        {
+          "name": "StructureReport",
+          "kind": "class",
+          "target": "witwin.channel.importers.StructureReport",
+          "contract_sha256": "6981a70f36546365c5c0cdc2b603192182a484fbb33f383fb6be29bfac2ea2a1"
+        },
+        {
+          "name": "build_structures",
+          "kind": "function",
+          "target": "witwin.channel.importers.build_structures",
+          "contract_sha256": "b508cbedca0ba6a3630e6e4b225d37c62cfdc2d3bbd16e1f0ef053ddabd6adec",
+          "signature": "(meshes: Sequence[MeshData], materials: MaterialSpec | MaterialMap, *, merge: bool=True, weld: bool=True, weld_tolerance: float | None=None, warnings: Sequence[str]=())"
+        },
+        {
+          "name": "load_mesh",
+          "kind": "function",
+          "target": "witwin.channel.importers.load_mesh",
+          "contract_sha256": "4f8576c87938d611a38e7a4780c8463e4876d39ac2cc1b410e9fffab795c977d",
+          "signature": "(path: StrPath, materials: MaterialSpec | MaterialMap, *, merge: bool=True, weld: bool=True, weld_tolerance: float | None=None, up_axis: str='z')"
+        },
+        {
+          "name": "load_mitsuba",
+          "kind": "function",
+          "target": "witwin.channel.importers.load_mitsuba",
+          "contract_sha256": "a09cb9ef0e11c06b76ee1838634f51ac811db001d63525648f378e7bba2f2bbd",
+          "signature": "(path: StrPath, *, frequency_hz: float | tuple[float, float], materials: Mapping[str, MaterialSpec] | None=None, default_material: MaterialSpec | None=None, merge_shapes: bool=True, weld: bool=True, weld_tolerance: float | None=None, dispersive: bool=True)"
+        },
+        {
+          "name": "read_gltf",
+          "kind": "function",
+          "target": "witwin.channel.importers.read_gltf",
+          "contract_sha256": "830dc803e3c04808aaca7876e364e7a64281180049978f16a4accd9289ed290e",
+          "signature": "(path: StrPath, *, up_axis: str='z')"
+        },
+        {
+          "name": "read_obj",
+          "kind": "function",
+          "target": "witwin.channel.importers.read_obj",
+          "contract_sha256": "b9251c360f32691e199e0e49c4a92d9f721097c4ec7eff79a93c9fedf09760e2",
+          "signature": "(path: StrPath)"
+        },
+        {
+          "name": "read_ply",
+          "kind": "function",
+          "target": "witwin.channel.importers.read_ply",
+          "contract_sha256": "5d0d264626018eaa66e18178146701e788a288516cc0083080e348199dc3af92",
+          "signature": "(path: StrPath, *, name: str | None=None, material: str | None=None)"
+        },
+        {
+          "name": "weld_vertices",
+          "kind": "function",
+          "target": "witwin.channel.importers.weld_vertices",
+          "contract_sha256": "4911ae93726f704f8858f270c90da4ce501e95884a76de27db3c0870d2b33b53",
+          "signature": "(vertices: np.ndarray, faces: np.ndarray, *, tolerance: float)"
+        }
+      ]
+    },
+    {
+      "module": "witwin.channel.presets",
+      "exports": [
+        {
+          "name": "ITU_MATERIALS",
+          "kind": "unresolved",
+          "target": "witwin.channel.presets.ITU_MATERIALS",
+          "contract_sha256": "51ab46c592026b55a34ef362f8115d6c78fe9b4291b6e87f59bf71ec913a7cd3"
+        },
+        {
+          "name": "ItuBand",
+          "kind": "class",
+          "target": "witwin.channel.presets.ItuBand",
+          "contract_sha256": "ee149f2339f82af589eacaa0ba875aa8d37cc9686b037813710c266757bd3f84"
+        },
+        {
+          "name": "ItuBandDispersion",
+          "kind": "class",
+          "target": "witwin.channel.presets.ItuBandDispersion",
+          "contract_sha256": "80327f2403e97245e17110d991cf3ba7b9a68f32a6a6e7e121a67db05319740a"
+        },
+        {
+          "name": "dipole_pattern",
+          "kind": "function",
+          "target": "witwin.channel.presets.dipole_pattern",
+          "contract_sha256": "4f6134cda7a37d8661b8779325e636ca15a40fb825a77c39650b6daf32b6c4ce",
+          "signature": "(kind: Literal['short', 'half_wave']='half_wave')"
+        },
+        {
+          "name": "itu_material",
+          "kind": "function",
+          "target": "witwin.channel.presets.itu_material",
+          "contract_sha256": "18c9185e36f641d2da1905dd2437690b4e6176dc87a1c2aa18c59dce3e9047e0",
+          "signature": "(name: str, frequency_hz: float | tuple[float, float], *, dispersive: bool=True, thickness_m: float=0.1, material_name: str | None=None, **material_kwargs: Any)"
+        },
+        {
+          "name": "itu_material_names",
+          "kind": "function",
+          "target": "witwin.channel.presets.itu_material_names",
+          "contract_sha256": "2ba77d0310d616779f93a28ea440033d2f2292eca33208d9080d73a0e4084deb",
+          "signature": "()"
+        },
+        {
+          "name": "itu_properties",
+          "kind": "function",
+          "target": "witwin.channel.presets.itu_properties",
+          "contract_sha256": "1b7b0f096d462b350fae70f76deb762eb193a65d3cf8ca42fc7c843e395e7cab",
+          "signature": "(name: str, frequency_hz: float)"
+        },
+        {
+          "name": "tr38901_pattern",
+          "kind": "function",
+          "target": "witwin.channel.presets.tr38901_pattern",
+          "contract_sha256": "889b3b967031dfd58a256786e42ced3c34e76881f6754401fbac06296436e23b",
+          "signature": "(*, max_gain_dbi: float=8.0, beamwidth_deg: float=65.0, side_lobe_db: float=30.0)"
         }
       ]
     }

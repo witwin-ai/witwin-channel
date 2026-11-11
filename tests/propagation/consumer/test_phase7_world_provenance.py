@@ -368,12 +368,11 @@ def test_a_compiled_scene_that_drifted_from_its_live_world_is_reported() -> None
             rediscovery_required(compiled, prepared, revalidate_source=True)
             == "geometry_version"
         )
-        # Without the caller asking, the stale pair still answers for the world
-        # it describes. That is the documented boundary, not a wrong answer.
-        stale = _replay(compiled, prepared, sources, sinks)
-        assert torch.equal(
-            stale.paths.geometry.delay_s, reference.paths.geometry.delay_s
-        )
+        # Replaying on the stale compiled scene is refused before native work:
+        # reevaluate compares the compiled versions with its source scene.
+        with pytest.raises(ValueError, match="the compiled scene is stale"):
+            _replay(compiled, prepared, sources, sinks)
+        assert reference.paths.path_count > 0
         # A recompile of the mutated world is refused by the default rule.
         current = compile_scene(scene, reference_frequency_hz=FREQUENCY_HZ)
         assert current is not compiled
