@@ -359,6 +359,11 @@ def _expand_image_tree(
     """One more plane group on every frontier node, in lexicographic order, chunked per launch."""
 
     nodes_per_launch = max(1, _PAIR_TESTS_PER_LAUNCH // max(groups.group_count, 1))
+    if frontier.size == 0:
+        width = int(frontier.node_sequences.shape[1]) + 1
+        return _ImageTreeFrontier(
+            frontier.node_tx, frontier.node_sequences.new_empty((0, width)), frontier.node_images
+        )
     parts: list[dict[str, torch.Tensor]] = []
     for start in range(0, frontier.size, nodes_per_launch):
         parts.append(
