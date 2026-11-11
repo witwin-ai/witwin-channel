@@ -100,7 +100,7 @@ def test_reflection_solver_uses_native_field_kernel_when_available(monkeypatch):
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native reflection is not built")
     calls = 0
-    native_field = field_kernels.field_reflection_sequence
+    native_field = field_kernels.field_canonical_rows
 
     def count_native_call(*args, **kwargs):
         nonlocal calls
@@ -108,7 +108,7 @@ def test_reflection_solver_uses_native_field_kernel_when_available(monkeypatch):
         return native_field(*args, **kwargs)
 
     monkeypatch.setattr(
-        field_kernels, "field_reflection_sequence", count_native_call
+        field_kernels, "field_canonical_rows", count_native_call
     )
     result = solve(
         same_side_wall_reflection_scene(),
@@ -150,14 +150,14 @@ def test_reflection_solver_requires_native_field_kernel(monkeypatch):
 
     def fail_native_kernel(*args, **kwargs):
         raise RuntimeError(
-            "_channel.field_reflection_sequence CUDA kernel is required"
+            "_channel.field_canonical_rows CUDA kernel is required"
         )
 
     monkeypatch.setattr(
-        field_kernels, "field_reflection_sequence", fail_native_kernel
+        field_kernels, "field_canonical_rows", fail_native_kernel
     )
     with pytest.raises(
-        RuntimeError, match="field_reflection_sequence CUDA kernel is required"
+        RuntimeError, match="field_canonical_rows CUDA kernel is required"
     ):
         solve(
             same_side_wall_reflection_scene(),

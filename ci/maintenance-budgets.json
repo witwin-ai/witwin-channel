@@ -109,7 +109,7 @@
       "reason": "Core-world runtime structure projection is frozen at the Phase-2 compiler boundary pending focused decomposition."
     },
     "witwin/channel/propagation/fields.py::evaluate_path_fields": {
-      "ceiling": 24,
+      "ceiling": 22,
       "expires_on": "2027-01-31",
       "owner": "propagation maintainers",
       "reason": "Phase-3 explicit endpoint geometry added one typed field-dispatch branch while preserving the existing component owners; the measured dispatcher surface is frozen."

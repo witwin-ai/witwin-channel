@@ -320,24 +320,24 @@ def test_three_bounce_reflection_mixes_depth_two_and_three_blocks():
     )
 
 
-def test_two_bounce_reflection_uses_native_sequence_field(monkeypatch):
+def test_two_bounce_reflection_uses_native_canonical_field_launch(monkeypatch):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic multi-bounce reflection")
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native reflection is not built")
 
-    original = field_kernels.field_reflection_sequence
+    original = field_kernels.field_canonical_rows
     calls = 0
 
-    def count_native_sequence_field(*args, **kwargs):
+    def count_native_canonical_field(*args, **kwargs):
         nonlocal calls
         calls += 1
         return original(*args, **kwargs)
 
     monkeypatch.setattr(
         field_kernels,
-        "field_reflection_sequence",
-        count_native_sequence_field,
+        "field_canonical_rows",
+        count_native_canonical_field,
     )
     result = solve(
         two_wall_multibounce_scene(),
