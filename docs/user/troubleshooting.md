@@ -81,7 +81,7 @@ wheel JIT-compiles the PTX once in the same way.
 | `required glTF extensions are not supported: ['KHR_draco_mesh_compression']` | Re-export without mesh compression. |
 | Many `welded_vertices` in the report | Normal for exports that split vertices along seams; welding restores shared edges. Use `weld=False` to compare. |
 | Radiomap is empty in places you expect coverage | The transmitter or receiver plane may be inside a building, or below the ground. Check the scene bounds and heights. |
-| A map looks transposed | Grid maps are returned as `(T, n_y, n_x)`: the first map axis follows the grid's `y_axis`. |
+| A map looks transposed | Grid maps are returned as `(T, rows, cols)` for `ReceiverGrid(shape=(rows, cols))`: the first map axis follows the grid's `x_axis`, the second its `y_axis`. Show `path_gain[t].T` with `origin="lower"` for x to the right. |
 
 ## Material and frequency errors
 

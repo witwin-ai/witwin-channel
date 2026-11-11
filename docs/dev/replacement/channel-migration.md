@@ -887,3 +887,22 @@ What changes:
   still imports no solver module.
 
 `montecarlo.bdpt.Config.max_diffraction_order` is unchanged.
+
+## 0.6.0: one grid axis order and layout-independent diffraction
+
+- A scene with exactly one `ReceiverGrid(shape=(rows, cols))` now returns
+  `[T, rows, cols]` from every solver, with entry `[t, i, j]` at grid sample
+  `(row i, column j)` (Core's row-major convention). Deterministic and BDPT
+  previously returned `[T, cols, rows]`; MC Basic returned a flat `[T, cols *
+  rows]` `path_gain` in column order and `[T, cols, rows]` `component_maps`.
+  Code that transposed the old maps for plotting should now plot
+  `path_gain[t].T` with `origin="lower"`; code that indexed the MC Basic flat
+  `path_gain` should use `path_gain[t, i, j]` or `path_gain[t].reshape(-1)[i *
+  cols + j]`. MC Basic `component_maps` and the BDPT grid outputs are transposed
+  views; call `.contiguous()` before `.view()`. Other receiver layouts are
+  unchanged (`[T, R]`, receiver row-major).
+- Deterministic diffraction power no longer depends on the receiver layout. A
+  single grid previously replaced `component_power["diffraction"]` (and, with
+  `coherent=False`, part of `path_gain`) with a per-cell vector sum; it now uses
+  the same accumulation as point receivers and every other component.
+  `diagnostics["diffraction_accumulation"]` is always `scalar_path_accumulation`.

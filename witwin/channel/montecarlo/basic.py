@@ -2093,6 +2093,15 @@ def solve_pipeline(  # type: ignore[no-untyped-def]
             name: value.view(value.shape[0], value.shape[2])
             for name, value in component_maps.items()
         }
+    else:
+        # The native maps are [T, cols, rows]; the grid result is [T, rows, cols] with
+        # entry [t, row, col] at the grid sample (row, col), like every other solver.
+        rows, cols = grid.shape
+        path_gain = mc_grid_maps_to_matrix(
+            path_gain.view(path_gain.shape[0], int(cols), int(rows)),
+            rows=int(rows), cols=int(cols), ad=ad,
+        ).view(path_gain.shape[0], int(rows), int(cols))
+        component_maps = {name: value.transpose(1, 2) for name, value in component_maps.items()}
     transmission_metadata = _transmission_capacity_metadata(config, capacity_transaction)
     metadata = make_solver_metadata(
         config=config,

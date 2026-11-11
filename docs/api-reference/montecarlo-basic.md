@@ -87,7 +87,7 @@ Result(
 
 | Field | Description |
 | --- | --- |
-| `path_gain` | `float32` total power gain; point receivers normally produce `(R, T)`, while a grid may produce `(T, H, W)`. |
+| `path_gain` | `float32` total power gain; `[T, R]` for points or mixed receivers, `[T, rows, cols]` for exactly one grid (see the [receiver layout](index.md#receiver-layout-and-grid-axis-order)). |
 | `component_power` | Component-name to CUDA power tensor. |
 | `metadata` | Sample count, seed, components, build identity, execution counts, and phase convention. |
 | `diagnostics` | Additional diagnostics when requested; otherwise `None`. |

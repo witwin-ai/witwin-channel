@@ -50,9 +50,9 @@ def test_receiver_layout_preserves_point_and_grid_storage_contracts():
 
     grid_layout = endpoints.ReceiverLayout("grid", 6, (2, 3))
     grid_values = endpoints.apply_receiver_layout(point_values, grid_layout)
-    expected = point_values.reshape(2, 2, 3).transpose(1, 2).contiguous()
+    expected = point_values.reshape(2, 2, 3)
 
-    assert grid_values.shape == (2, 3, 2)
+    assert grid_values.shape == (2, 2, 3)
     assert grid_values.is_contiguous()
     assert torch.equal(grid_values, expected)
 

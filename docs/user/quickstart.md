@@ -56,7 +56,7 @@ result = solve(
     scene, Config(max_depth=2, components={"los", "reflection", "diffraction"}),
     reference_frequency_hz=f,
 )
-path_gain = result.path_gain[0]  # (n_y, n_x): first axis follows the grid's y_axis
+path_gain = result.path_gain[0]  # (rows, cols): first axis follows the grid's x_axis
 ```
 
 The first solve in a fresh process compiles OptiX programs and takes a few

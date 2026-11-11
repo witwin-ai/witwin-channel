@@ -171,7 +171,7 @@ def test_deterministic_backend_passes_explicit_reference_frequency(monkeypatch):
     observed: dict[str, object] = {}
 
     class Result:
-        field = torch.zeros((1, spec.y.size, spec.x.size), dtype=torch.complex64)
+        field = torch.zeros((1, spec.x.size, spec.y.size), dtype=torch.complex64)
         component_fields: dict[str, torch.Tensor] = {}
         metadata = {"counts": {"path_count": 0}}
 

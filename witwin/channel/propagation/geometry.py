@@ -80,10 +80,9 @@ class ReceiverLayout:
         if self.kind == "grid":
             if self.grid_shape is None:
                 raise ValueError("grid layout requires grid_shape")
+            # Receivers are row-major (row * cols + col), so the grid view is a reshape.
             rows, cols = self.grid_shape
-            return (
-                values.reshape(values.shape[0], rows, cols).transpose(1, 2).contiguous()
-            )
+            return values.reshape(values.shape[0], rows, cols)
         if self.kind == "point":
             return values.contiguous()
         raise ValueError(f"receiver layout kind is not accepted: {self.kind}")

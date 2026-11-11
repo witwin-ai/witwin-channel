@@ -136,9 +136,10 @@ def _solve_maps(
         ),
         reference_frequency_hz=_FREQUENCY_HZ,
     )
-    field = result.field.detach().cpu().numpy()[0]
+    # The solver's grid maps are [rows, cols] = (nx, ny); this helper returns (ny, nx).
+    field = result.field.detach().cpu().numpy()[0].T
     component = {
-        name: values.detach().cpu().numpy()[0]
+        name: values.detach().cpu().numpy()[0].T
         for name, values in result.component_fields.items()
         if values.numel() > 0
     }

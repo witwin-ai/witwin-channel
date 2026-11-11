@@ -401,7 +401,7 @@ class _McGridMapsToMatrixAdFunction(torch.autograd.Function):
             return None, None, None
         return (
             mc_los_component_maps_from_matrix(
-                _ad_native_tensor(grad_matrix), rows=ctx.rows, cols=ctx.cols
+                _ad_native_tensor(grad_matrix).contiguous(), rows=ctx.rows, cols=ctx.cols
             ),
             None,
             None,

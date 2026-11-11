@@ -50,13 +50,10 @@ def test_receiver_grid_uses_mc_basic_public_layout():
         device=torch.device("cuda"),
         reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
     )
-    expected = (
-        expected_flat.reshape(len(transmitters), *grid.shape)
-        .transpose(1, 2)
-        .contiguous()
-    )
+    # Core's row-major grid: entry [t, row, col] is sample (row, col).
+    expected = expected_flat.reshape(len(transmitters), *grid.shape)
 
-    assert result.path_gain.shape == (1, 3, 2)
+    assert result.path_gain.shape == (1, 2, 3)
     torch.testing.assert_close(result.path_gain, expected, rtol=1.0e-5, atol=1.0e-8)
     for tensor in result.component_power.values():
         assert tensor.shape == result.path_gain.shape

@@ -40,8 +40,8 @@ def test_bdpt_component_maps_use_public_grid_layout_and_sum_to_total():
     )
 
     assert result.component_maps is not None
-    assert result.component_maps["los"].shape == (1, 3, 2)
-    assert result.component_maps["reflection"].shape == (1, 3, 2)
-    assert result.component_maps["diffraction"].shape == (1, 3, 2)
-    assert result.path_gain.shape == (1, 3, 2)
+    assert result.component_maps["los"].shape == (1, 2, 3)
+    assert result.component_maps["reflection"].shape == (1, 2, 3)
+    assert result.component_maps["diffraction"].shape == (1, 2, 3)
+    assert result.path_gain.shape == (1, 2, 3)
     torch.testing.assert_close(result.path_gain, result.component_maps["los"])

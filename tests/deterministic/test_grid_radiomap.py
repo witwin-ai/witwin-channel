@@ -18,10 +18,10 @@ def test_grid_radiomap_outputs_total_and_component_maps():
         reference_frequency_hz=3.0e9,
     )
 
-    assert result.path_gain.shape == (1, 3, 2)
+    assert result.path_gain.shape == (1, 2, 3)
     assert set(result.component_power) == {"los", "reflection", "diffraction"}
     torch.testing.assert_close(
         result.path_gain, result.component_power["los"], rtol=1.0e-5, atol=1.0e-8
     )
     assert result.diagnostics is not None
-    assert result.diagnostics["path_gain_shape"] == (1, 3, 2)
+    assert result.diagnostics["path_gain_shape"] == (1, 2, 3)

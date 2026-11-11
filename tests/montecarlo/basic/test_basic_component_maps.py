@@ -256,12 +256,8 @@ def test_basic_solver_returns_los_component_map_for_receiver_grid():
 
     assert result.component_maps is not None
     assert result.component_maps["los"].shape == (1, 4, 4)
-    torch.testing.assert_close(
-        result.component_maps["los"].reshape(1, -1),
-        result.path_gain,
-        rtol=0.0,
-        atol=0.0,
-    )
+    assert result.path_gain.shape == (1, 4, 4)
+    torch.testing.assert_close(result.component_maps["los"], result.path_gain, rtol=0.0, atol=0.0)
 
 
 def test_basic_solver_los_component_map_uses_public_yx_grid_layout():
@@ -279,7 +275,7 @@ def test_basic_solver_los_component_map_uses_public_yx_grid_layout():
     result = _solve(scene, Config(samples=128, seed=3, components={"los"}))
 
     assert result.component_maps is not None
-    assert result.component_maps["los"].shape == (1, 3, 2)
+    assert result.component_maps["los"].shape == (1, 2, 3)
 
     transmitter = _transmitters(scene)[0]
     tx = transmitter.position.to(device=result.path_gain.device)
@@ -287,13 +283,8 @@ def test_basic_solver_los_component_map_uses_public_yx_grid_layout():
     if pol is None:
         pol = transmitter.position.new_tensor([0.0, 0.0, 1.0])
     pol = pol.to(device=result.path_gain.device)
-    points = (
-        grid.points()
-        .reshape(*grid.shape, 3)
-        .transpose(0, 1)
-        .reshape(-1, 3)
-        .to(device=result.path_gain.device)
-    )
+    # Core's row-major grid: the flattened map is in receiver order.
+    points = grid.points().reshape(-1, 3).to(device=result.path_gain.device)
     diff = tx[None, :] - points
     distance = torch.linalg.vector_norm(diff, dim=1).clamp_min(1.0e-6)
     wavelength = 299_792_458.0 / _FREQUENCY_HZ
@@ -317,7 +308,7 @@ def test_basic_solver_los_component_map_uses_public_yx_grid_layout():
     )
     torch.testing.assert_close(
         result.path_gain,
-        expected.reshape(1, -1),
+        expected.reshape(1, *grid.shape),
         rtol=1e-6,
         atol=1e-12,
     )
@@ -370,7 +361,7 @@ def test_basic_solver_returns_native_reflection_component_map_when_available():
     )
     torch.testing.assert_close(
         result.path_gain,
-        result.component_maps["reflection"].reshape(1, -1),
+        result.component_maps["reflection"],
         rtol=1e-5,
         atol=1e-8,
     )
@@ -398,7 +389,7 @@ def test_basic_solver_returns_native_diffraction_component_map_when_available():
     )
     torch.testing.assert_close(
         result.path_gain,
-        result.component_maps["diffraction"].reshape(1, -1),
+        result.component_maps["diffraction"],
         rtol=1e-5,
         atol=1e-8,
     )

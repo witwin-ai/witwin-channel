@@ -95,9 +95,9 @@ def main() -> None:
         torch.cuda.synchronize()
         print(f"{label}: {1e3 * (time.perf_counter() - start):.1f} ms")
 
-    # Grid maps come back as (T, n_y, n_x): the first map axis follows the grid's
-    # y_axis and the second its x_axis, which is the image layout imshow expects.
-    path_gain = result.path_gain[0]
+    # Grid maps come back as (T, rows, cols): the first map axis follows the grid's
+    # x_axis and the second its y_axis; transpose for imshow's (y, x) image layout.
+    path_gain = result.path_gain[0].T
     covered = int((path_gain > 0).sum())
     print(f"radiomap {tuple(path_gain.shape)}, {covered} of {path_gain.numel()} cells reached")
     for name, power in result.component_power.items():

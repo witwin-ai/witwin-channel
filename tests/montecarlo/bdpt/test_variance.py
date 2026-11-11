@@ -90,5 +90,5 @@ def test_bdpt_grid_variance_uses_public_non_square_layout():
     )
 
     assert result.variance is not None
-    assert result.path_gain.shape == (1, 3, 2)
-    assert result.variance.shape == (1, 3, 2)
+    assert result.path_gain.shape == (1, 2, 3)
+    assert result.variance.shape == (1, 2, 3)

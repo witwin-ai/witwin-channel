@@ -92,8 +92,13 @@ def test_two_grids_concatenate_the_single_grid_estimates() -> None:
     for grid, columns in ((a, slice(0, 16)), (b, slice(16, 22))):
         single = _solve(_wall_scene(grid), config)
         rows, cols = grid.shape
+        assert single.path_gain.shape == (1, rows, cols)
+        torch.testing.assert_close(
+            both.path_gain[:, columns], single.path_gain.reshape(1, rows * cols), rtol=1e-5,
+            atol=1e-12,
+        )
         for name in ("los", "reflection", "transmission"):
-            expected = single.component_maps[name].transpose(1, 2).reshape(1, rows * cols)
+            expected = single.component_maps[name].reshape(1, rows * cols)
             torch.testing.assert_close(
                 both.component_maps[name][:, columns], expected, rtol=1e-5, atol=1e-12
             )

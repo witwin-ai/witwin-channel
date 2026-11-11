@@ -64,6 +64,28 @@ Dimension symbols used throughout this reference:
 | `F` | Frequency-offset column count |
 | `S` | Slot or time-label count |
 
+### Receiver layout and grid axis order
+
+Every solver uses the same receiver layout for `path_gain`, deterministic
+`field`/`component_power`/`component_fields`, Monte Carlo `component_maps` and
+BDPT `variance`:
+
+- **Exactly one `ReceiverGrid`** of `shape=(rows, cols)`: `[T, rows, cols]`,
+  following Core's row-major grid convention. Entry `[t, i, j]` is grid sample
+  `(row i, column j)` at `origin + i * spacing[0] * x_axis + j * spacing[1] *
+  y_axis`, so the second axis runs along `x_axis` and the third along `y_axis`.
+  To show it as an image with x to the right and y up, use
+  `imshow(path_gain[t].T, origin="lower")`.
+- **Any other layout** (points only, several grids, grids and points mixed):
+  `[T, R]`, with columns following `scene.receivers`; a grid contributes its
+  samples in row-major order (`i * cols + j`).
+
+So for a single grid, `path_gain[t].reshape(-1)[k]` is the same receiver `k` in
+every solver and equals the point-receiver result at that sample. Deterministic
+and MC Basic `path_gain` are contiguous; MC Basic `component_maps` and the BDPT
+grid outputs are transposed views of the native `[T, cols, rows]` maps (call
+`.contiguous()` before `.view()`).
+
 ## Minimal solver example
 
 ```python

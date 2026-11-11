@@ -41,11 +41,13 @@ def solve_deterministic(spec: CaseSpec) -> FieldMap:
         ),
         reference_frequency_hz=spec.frequency_hz,
     )
+    # The grid is shape (x.size, y.size), so the solver map is [T, x, y]; FieldMap is (y, x).
     field = result.field.detach().cpu().numpy()
-    if field.shape != (1, spec.y.size, spec.x.size):
+    if field.shape != (1, spec.x.size, spec.y.size):
         raise RuntimeError(f"unexpected deterministic field shape: {field.shape}")
+    field = field.transpose(0, 2, 1)
     component_fields = {
-        name: values.detach().cpu().numpy()[0]
+        name: values.detach().cpu().numpy()[0].T
         for name, values in result.component_fields.items()
         if values.numel() > 0
     }

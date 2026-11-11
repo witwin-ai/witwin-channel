@@ -133,9 +133,9 @@ WALL_X = 12.0
 
 def _cell_centres() -> list[tuple[float, float, float]]:
     ox, oy, oz = GRID_ORIGIN
-    # Grid results are flattened y-major (row j along the second axis, column i along the first).
+    # Grid results are [T, rows, cols]: row i along the grid x axis, column j along y.
     return [(ox + i * GRID_SPACING, oy + j * GRID_SPACING, oz)
-            for j in range(GRID_SHAPE[1]) for i in range(GRID_SHAPE[0])]
+            for i in range(GRID_SHAPE[0]) for j in range(GRID_SHAPE[1])]
 
 
 def _wall() -> list:

@@ -109,7 +109,7 @@ result = solve(
     Config(max_depth=0, components={"los"}),
     reference_frequency_hz=3.5e9,
 )
-print(result.path_gain.shape)  # (R, T); a grid may produce (T, H, W)
+print(result.path_gain.shape)  # (T, R); one ReceiverGrid gives (T, rows, cols)
 print(result.field.dtype)      # torch.complex64
 ```
 
