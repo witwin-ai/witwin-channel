@@ -436,6 +436,8 @@ def test_gradient_is_stable_across_seeds():
 # ---------------------------------------------------------------------------
 
 _DIFFRACTION_SAMPLES = 4096
+# Samples per seed of the cross-seed gradient spread test (see its docstring).
+_SEED_SPREAD_SAMPLES = 262144
 
 
 def _diffraction_scene(
@@ -464,11 +466,13 @@ def _diffraction_scene(
     )
 
 
-def _solve_diffraction(scene: Scene, ad_mode: str, seed: int = _SEED):
+def _solve_diffraction(
+    scene: Scene, ad_mode: str, seed: int = _SEED, samples: int = _DIFFRACTION_SAMPLES,
+):
     return solve(
         scene,
         Config(
-            samples=_DIFFRACTION_SAMPLES,
+            samples=samples,
             seed=seed,
             components={"diffraction"},
             max_depth=1,
@@ -768,6 +772,14 @@ def test_diffraction_gradient_is_stable_across_seeds():
  The diffraction map resamples its edge points and cone azimuths per
  seed, so this is the real Monte Carlo gradient-variance check; the bound
  reflects the sampling noise of the estimator at this sample count.
+
+ The face term depends on each cone lane's observation angle, so the eps_r
+ gradient has a heavier tail than the primal. Its relative standard
+ deviation across seeds is 0.32 at 4096 samples (200 seeds), 0.14 at 16384
+ (200 seeds), 0.088 at 65536 (50 seeds) and 0.035 at 262144 (20 seeds),
+ against 0.17, 0.08, 0.044 and 0.024 for the primal. The 0.15 bound on a
+ five-seed spread needs a deviation well below 0.15, so this test draws
+ 262144 samples per seed (a few short launches on a 4x4 grid per solve).
  """
 
     scene = _diffraction_scene()
@@ -776,7 +788,9 @@ def test_diffraction_gradient_is_stable_across_seeds():
     leaf.requires_grad_(True)
     try:
         for seed in (1, 2, 3, 4, 5):
-            _loss(_solve_diffraction(scene, "vjp", seed=seed)).backward()
+            _loss(
+                _solve_diffraction(scene, "vjp", seed=seed, samples=_SEED_SPREAD_SAMPLES)
+            ).backward()
             gradients.append(leaf.grad.detach().clone())
             leaf.grad = None
     finally:
