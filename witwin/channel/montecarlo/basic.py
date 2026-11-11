@@ -1676,6 +1676,26 @@ def _matrix_columns(output: torch.Tensor, block: ReceiverBlock, *, ad: bool) -> 
     return mc_grid_maps_to_matrix(output, rows=int(rows), cols=int(cols), ad=ad)
 
 
+def _public_layout(
+    path_gain: torch.Tensor, component_maps: dict[str, torch.Tensor], grid: ReceiverGrid | None, *,
+    ad: bool,
+) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+    """Public result layout: ``[T, R]`` receiver columns, or ``[T, rows, cols]`` for one grid."""
+
+    if grid is None:
+        return path_gain, {
+            name: value.view(value.shape[0], value.shape[2])
+            for name, value in component_maps.items()
+        }
+    # The native maps are [T, cols, rows]; the grid result is [T, rows, cols] with
+    # entry [t, row, col] at the grid sample (row, col), like every other solver.
+    rows, cols = (int(size) for size in grid.shape)
+    path_gain = mc_grid_maps_to_matrix(
+        path_gain.view(path_gain.shape[0], cols, rows), rows=rows, cols=cols, ad=ad,
+    ).view(path_gain.shape[0], rows, cols)
+    return path_gain, {name: value.transpose(1, 2) for name, value in component_maps.items()}
+
+
 def _layout_maps(columns: list[torch.Tensor]) -> torch.Tensor:
     matrix = columns[0] if len(columns) == 1 else torch.cat(columns, dim=1)
     return matrix.view(matrix.shape[0], 1, matrix.shape[1])
@@ -2091,21 +2111,7 @@ def solve_pipeline(  # type: ignore[no-untyped-def]
         component_power["transmission"] = finalized["transmission_power"]
     if "scattering" in config.components:
         component_power["scattering"] = finalized["scattering_power"]
-    if flat_layout:
-        # Receiver-order columns [T, R], aligned with path_gain.
-        component_maps = {
-            name: value.view(value.shape[0], value.shape[2])
-            for name, value in component_maps.items()
-        }
-    elif grid is not None:
-        # The native maps are [T, cols, rows]; the grid result is [T, rows, cols] with
-        # entry [t, row, col] at the grid sample (row, col), like every other solver.
-        rows, cols = grid.shape
-        path_gain = mc_grid_maps_to_matrix(
-            path_gain.view(path_gain.shape[0], int(cols), int(rows)),
-            rows=int(rows), cols=int(cols), ad=ad,
-        ).view(path_gain.shape[0], int(rows), int(cols))
-        component_maps = {name: value.transpose(1, 2) for name, value in component_maps.items()}
+    path_gain, component_maps = _public_layout(path_gain, component_maps, grid, ad=ad)
     transmission_metadata = _transmission_capacity_metadata(config, capacity_transaction)
     metadata = make_solver_metadata(
         config=config,
