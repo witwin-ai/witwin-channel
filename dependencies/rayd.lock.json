@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "repository_url": "https://github.com/Asixa/RayD",
-  "commit": "93affb2d4a5cf2a65f8f2fa0eeddbbf647f52f4a",
+  "commit": "7bbb44b910afadad94fa933a69d157a5775b50db",
   "integration_abi": {
     "kind": "source-header-set-sha256",
     "entrypoint": "include/rayd/integration.h",
@@ -11,11 +11,11 @@
       {"path": "include/rayd/penetration.h", "sha256": "53a54479cdb1dfd944168560536df605bae0cf584334272f7ee4769ad1eb0465"},
       {"path": "include/rayd/reflection.h", "sha256": "e7decb547d45cbf03fe810785aabc059f6ed43eda1a48165aa18297bf0746d73"},
       {"path": "include/rayd/scattering.h", "sha256": "67bfa850df5f4ef95f24f4456124c9b5d4bdc9d97b4292f419b078ee8e63e20b"},
-      {"path": "include/rayd/scene.h", "sha256": "892b20c3c8da21cef888c466cb26f787b0830f8e65b81babed815ec63363a4ed"},
+      {"path": "include/rayd/scene.h", "sha256": "d2c62d78fe755f276496437321973005792b864d725995071744766b2d060a03"},
       {"path": "include/rayd/transmission.h", "sha256": "2ee0a6b5170f371a74e2ed69cde429b43ec8cee5f31f5f0366fa8337168372e1"},
       {"path": "include/rayd/visibility.h", "sha256": "95796526b7a94c580b28cca652d1859b63f9792c9eaf0115bd1d44ca75e85125"}
     ],
-    "sha256": "e543a63e618dd74de8c5e178108cc46f3197c03b8306e37ed1bae5518050a788",
+    "sha256": "8aaffa5e32450aa5c61de9a2988779e358f2df116310249762304ba42dcb4588",
     "api_version": 8,
     "identity": "rayd.torch.integration"
   },
@@ -23,6 +23,6 @@
     "distribution": "rayd-torch",
     "distribution_version": "0.8.0",
     "metadata_path": "rayd/torch/_source/rayd-source.json",
-    "manifest_sha256": "87e1d29473da23e60ebde70a46f5dd389c8cce7fb43c8797aacc2ea82e3ef22f"
+    "manifest_sha256": "33148714ba929fec75aaac2147823e82423b710a8f3b4b167f4b5bf036f3680c"
   }
 }
