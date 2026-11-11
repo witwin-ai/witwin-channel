@@ -116,8 +116,10 @@ namespace fad = rayd::torch::field_transport_ad;
 __device__ __forceinline__ unsigned int dfr_hash(unsigned int x) {
     x^=x>>16; x*=0x7feb352du; x^=x>>15; x*=0x846ca68bu; x^=x>>16; return x;
 }
+// The lane is hashed before it meets the stream and seed words (as in RayD's samplers), so
+// seeds closer together than the lane count draw unrelated values.
 __device__ __forceinline__ float dfr_uniform(unsigned int lane,unsigned int stream,unsigned int seed) {
-    const unsigned int h=dfr_hash(lane^(stream*0x9e3779b9u)^seed);
+    const unsigned int h=dfr_hash(dfr_hash(lane)^(stream*0x9e3779b9u)^seed);
     return static_cast<float>(h&0x00ffffffu)*(1.0f/16777216.0f);
 }
 

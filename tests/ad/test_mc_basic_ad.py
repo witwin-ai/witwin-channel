@@ -847,3 +847,34 @@ def test_ad_mode_none_keeps_primal_contract():
     )
     assert primal.metadata["kernel"]["ad_status"] == "none"
     assert ad.metadata["kernel"]["ad_status"] == "vjp"
+
+def _seed_mean_and_error(scene: Scene, leaf: torch.Tensor, seeds) -> tuple[float, float]:
+    values = []
+    leaf.requires_grad_(True)
+    try:
+        for seed in seeds:
+            _loss(_solve_diffraction(scene, "vjp", seed=seed)).backward()
+            values.append(float(leaf.grad.abs().max() * leaf.grad.flatten()[leaf.grad.abs().argmax()].sign()))
+            leaf.grad = None
+    finally:
+        leaf.requires_grad_(False)
+        leaf.grad = None
+    stacked = torch.tensor(values, dtype=torch.float64)
+    return float(stacked.mean()), float(stacked.std() / len(values) ** 0.5)
+
+
+def test_diffraction_seeds_closer_than_the_sample_count_draw_independent_streams():
+    """Adjacent seeds (all below the 4096-lane sample count) estimate the same mean as seeds
+    spread over the high bits. When the samplers XORed the raw lane with the seed, adjacent
+    seeds only permuted one set of draws and their gradient mean sat 7 standard errors away
+    from the spread seeds' mean."""
+
+    scene = _diffraction_scene()
+    leaf = _material_leaf(scene, "eps_r")
+    count = 128
+    adjacent, adjacent_error = _seed_mean_and_error(scene, leaf, range(1, count + 1))
+    spread, spread_error = _seed_mean_and_error(
+        scene, leaf, [index * 65537 for index in range(1, count + 1)]
+    )
+    combined_error = (adjacent_error**2 + spread_error**2) ** 0.5
+    assert abs(adjacent - spread) <= 4.0 * combined_error

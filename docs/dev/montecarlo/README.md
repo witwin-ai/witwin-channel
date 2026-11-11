@@ -102,16 +102,12 @@ used by focused contract tests, but are not compatibility promises. The parent
   area-sample count independently of `samples` (default: `samples`); the receiver pairs run
   natively with fixed-order per-receiver sums. Basic diffraction samplers (RayD's
   Keller-cone sample tape and the point-receiver sampler) draw
-  `hash(lane ^ stream_constant ^ seed)`; with the raw seed, seeds below the lane
-  count only permuted one set of hash inputs, so nearby seeds were strongly
-  correlated (200 adjacent seeds at 4096 samples gave an eps_r gradient mean of
-  -1.79e-7 +- 0.04e-7 and a primal of 1.308e-6 +- 0.016e-6, against -2.27e-7 and
-  1.382e-6 from 200 spread seeds and -2.20e-7 / 1.365e-6 at 262144 samples).
-  Basic therefore hands those samplers `lane_stream_seed(seed)`, a splitmix64 mix
-  of the user seed to 31 bits (the same 200 adjacent seeds now give -2.16e-7 +- 0.05e-7
-  and 1.351e-6 +- 0.017e-6, within one standard error of the large-sample values). Two seeds still share their lane-hash inputs with
-  probability `samples / 2**31` (a XOR with a 31-bit seed cannot do better); the
-  complete fix hashes the lane before the XOR inside RayD. Migration:
+  `hash(hash(lane) ^ stream_constant ^ seed)`. Hashing the lane first makes seeds
+  closer together than the lane count independent: with `hash(lane ^ ... ^ seed)`
+  they only permuted one set of draws (200 adjacent seeds at 4096 samples gave an
+  eps_r gradient mean of -1.79e-7 +- 0.04e-7 against -2.27e-7 from spread seeds).
+  Two seeds now share a draw only where `hash(l1) ^ hash(l2)` equals the seed
+  difference, about samples^2 / 2^32 lanes. Migration:
   scenes that previously raised for point, multiple or mixed receivers now solve;
   the single-grid layout is unchanged.
 - BDPT carries complex3/Jones fields for coherent events, but scalar throughput
