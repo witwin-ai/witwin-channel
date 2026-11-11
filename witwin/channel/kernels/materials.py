@@ -17,7 +17,7 @@ from witwin.channel.kernels.spec import (
     real,
     save,
     tensor,
-    value,
+    opaque,
 )
 from witwin.channel.runtime import (
     _ad_first_order_only,
@@ -61,13 +61,13 @@ _STACK_PRIMALS = (
 _EM_LAYER_STACK_EVAL = _native.op("em_layer_stack_eval", _STACK_PRIMALS, real("frequency_hz"))
 _EM_LAYER_STACK_BACKWARD = _native.op(
     "em_layer_stack_backward", _STACK_PRIMALS, real("frequency_hz"),
-    value("grad_outputs", convert=list), flag("need_cos_theta"), flag("need_layers"),
+    opaque("grad_outputs", convert=list), flag("need_cos_theta"), flag("need_layers"),
     flag("need_frequency"),
 )
 _EM_LAYER_STACK_JVP = _native.op(
-    "em_layer_stack_jvp", _STACK_PRIMALS, real("frequency_hz"), value("tangent_cos_theta"),
-    value("tangent_layer_thickness"), value("tangent_layer_eps_r"),
-    value("tangent_layer_sigma_e"), real("tangent_frequency"),
+    "em_layer_stack_jvp", _STACK_PRIMALS, real("frequency_hz"), opaque("tangent_cos_theta"),
+    opaque("tangent_layer_thickness"), opaque("tangent_layer_eps_r"),
+    opaque("tangent_layer_sigma_e"), real("tangent_frequency"),
 )
 _MC_FACE_MATERIAL_TENSORS = _native.op(
     "mc_face_material_tensors",
@@ -221,8 +221,8 @@ def mc_face_material_tensors(
 # autograd
 # ---------------------------------------------------------------------------
 _STACK_AD = AdInputs(
-    "em_layer_stack_ad", _STACK_PRIMALS, value("frequency", grad="diff"),
-    value("frequency_value"),
+    "em_layer_stack_ad", _STACK_PRIMALS, opaque("frequency", grad="diff"),
+    opaque("frequency_value"),
 )
 _STACK_PRIMAL_NAMES = _STACK_AD.names[:8]
 

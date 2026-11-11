@@ -57,6 +57,7 @@ _FORBIDDEN_NAME = re.compile(r"(?:^|_)(?:v\d+|w[i]p)(?:_|$)", re.IGNORECASE)
 KNOWN_SPLIT_OWNER_SYMBOLS = frozenset({"bdpt_accumulate_connection_samples"})
 # ``NativeOps.op`` declares one native operation's ABI argument list (witwin/channel/kernels/spec.py).
 SPEC_DECLARATION = "op"
+SPEC_RESOLVER = "NativeOps"
 
 
 def _module_name(path: Path, package_root: Path) -> str:
@@ -212,8 +213,16 @@ class _Indexer(ast.NodeVisitor):
 
 
 def _has_dynamic_dispatch(tree: ast.AST) -> bool:
+    # The resolver handed to ``NativeOps`` looks a declared symbol up; it is not a dynamic site.
+    resolvers = {
+        id(inner)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and _call_name(node.func) == SPEC_RESOLVER
+        for inner in ast.walk(node)
+    }
     return any(
         isinstance(node, ast.Call)
+        and id(node) not in resolvers
         and _call_name(node.func) in DISPATCH_CALLS
         and bool(node.args)
         and not isinstance(node.args[0], ast.Constant)

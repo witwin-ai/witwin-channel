@@ -19,7 +19,7 @@ from witwin.channel.kernels.spec import (
     real,
     save,
     tensor,
-    value,
+    opaque,
 )
 from witwin.channel.runtime import (
     _ad_first_order_only,
@@ -131,13 +131,13 @@ _ENSEMBLE_CHECKS = (
 _ENSEMBLE_EVAL = _native.op("scattering_ensemble_eval", _ENSEMBLE_PRIMALS, _ENSEMBLE_SCALARS)
 _ENSEMBLE_EVAL_BACKWARD = _native.op(
     "scattering_ensemble_eval_backward", _ENSEMBLE_PRIMALS, _ENSEMBLE_SCALARS,
-    value("grad_gain"), value("grad_amplitude"), value("grad_length"), flag("need_grad_rows"),
+    opaque("grad_gain"), opaque("grad_amplitude"), opaque("grad_length"), flag("need_grad_rows"),
     flag("need_grad_samples"), flag("need_grad_tables"), flag("need_grad_coef"),
 )
 _ENSEMBLE_EVAL_JVP = _native.op(
     "scattering_ensemble_eval_jvp", _ENSEMBLE_PRIMALS, _ENSEMBLE_SCALARS,
     *(
-        value(f"t_{name}")
+        opaque(f"t_{name}")
         for name in (
             "wo_rows", "r2_rows", "cos_o_rows", "n_o", "t1r", "t2r", "wi_local", "cos_i", "r1",
             "a_te2", "a_tm2", "weights", "fte_flat", "ftm_flat",
@@ -179,7 +179,7 @@ _PATCH_EVAL_BACKWARD = _native.op(
 _PATCH_EVAL_JVP = _native.op(
     "scattering_patch_integral_eval_jvp", _PATCH_PRIMALS, real("k0"),
     *(
-        value(f"t_{name}")
+        opaque(f"t_{name}")
         for name in ("heights", "r_te", "r_tm", "d_i", "d_o", "r1_rows", "r2_rows", "centroids")
     ),
     real("tangent_k0"),
@@ -523,7 +523,8 @@ def _validate_chain_leg(prefix: str, named: dict[str, torch.Tensor], rows: int) 
         raise ValueError(f"{prefix}_positions must have shape ({rows}, {dmax}, 3)")
     if tuple(normals.shape) != (rows, dmax, 3):
         raise ValueError(f"{prefix}_normals must have shape ({rows}, {dmax}, 3)")
-    for name in (f"{prefix}_{field}" for field in ("eps_r", "sigma_e", "mu_r", "gain", "thickness")):
+    fields = ("eps_r", "sigma_e", "mu_r", "gain", "thickness")
+    for name in (f"{prefix}_{field}" for field in fields):
         _CHAIN_ENSEMBLE_EVAL.checks(named, name)
         if tuple(named[name].shape) != (rows, dmax):
             raise ValueError(f"{name} must have shape ({rows}, {dmax})")
@@ -626,8 +627,8 @@ def scattering_chain_ensemble_eval(
 # ---------------------------------------------------------------------------
 # Fixed inputs refuse a gradient or tangent instead of silently detaching (scattering AD).
 _ENSEMBLE_AD = AdInputs(
-    "scattering_ensemble_eval_ad", _ENSEMBLE_PRIMALS, value("coef", grad="diff"),
-    value("threshold"), value("coef_value"),
+    "scattering_ensemble_eval_ad", _ENSEMBLE_PRIMALS, opaque("coef", grad="diff"),
+    opaque("threshold"), opaque("coef_value"),
 )
 _ENSEMBLE_ROW_INPUTS = ("wo_rows", "r2_rows", "cos_o_rows")
 _ENSEMBLE_SAMPLE_INPUTS = (
@@ -641,8 +642,8 @@ _ENSEMBLE_GRAD_KEYS = {
     "f_tm_flat": "grad_f_tm",
 }
 _PATCH_AD = AdInputs(
-    "scattering_patch_integral_eval_ad", _PATCH_PRIMALS, value("k0", grad="diff"),
-    value("k0_value"),
+    "scattering_patch_integral_eval_ad", _PATCH_PRIMALS, opaque("k0", grad="diff"),
+    opaque("k0_value"),
 )
 _PATCH_GEOMETRY_INPUTS = ("d_i", "d_o", "r1_rows", "r2_rows", "centroids")
 _PATCH_DIFF_INPUTS = ("heights", "r_te", "r_tm", "d_i", "d_o", "r1_rows", "r2_rows", "centroids")
@@ -843,7 +844,11 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
         )
         return _PATCH_AD.grads(
             ctx,
-            **{name: out[f"grad_{name}"] for name in _PATCH_DIFF_INPUTS if _PATCH_AD.need(ctx, name)},
+            **{
+                name: out[f"grad_{name}"]
+                for name in _PATCH_DIFF_INPUTS
+                if _PATCH_AD.need(ctx, name)
+            },
             k0=grad_k0,
         )
 
@@ -924,7 +929,7 @@ _TABLE_BUILD_BACKWARD = _native.op(
 )
 _TABLE_BUILD_JVP = _native.op(
     "kirchhoff_table_build_jvp", _TABLE_BUILD_TABLES, _TABLE_BUILD_SCALARS,
-    value("t_layer_thickness_m"), value("t_layer_eps_r"), value("t_layer_sigma_e"),
+    opaque("t_layer_thickness_m"), opaque("t_layer_eps_r"), opaque("t_layer_sigma_e"),
     real("t_sigma_h"), real("t_corr_x"), real("t_corr_y"), real("t_frequency"),
 )
 
@@ -1012,18 +1017,18 @@ def _scalar_tangent(tensor: torch.Tensor | None) -> float:
 # The apply inputs of the build AD; fixed inputs fail loudly instead of silently detaching.
 _TABLE_BUILD_AD = AdInputs(
     "kirchhoff_table_build_ad",
-    *(value(f"rough_{name}", grad="diff") for name in ("sigma_h", "corr_x", "corr_y")),
-    *(value(name, grad="diff") for name in ("layer_thickness_m", "layer_eps_r", "layer_sigma_e")),
-    value("layer_mu_r", grad="fixed"),
-    value("frequency", grad="diff"),
+    *(opaque(f"rough_{name}", grad="diff") for name in ("sigma_h", "corr_x", "corr_y")),
+    *(opaque(name, grad="diff") for name in ("layer_thickness_m", "layer_eps_r", "layer_sigma_e")),
+    opaque("layer_mu_r", grad="fixed"),
+    opaque("frequency", grad="diff"),
     *(
-        value(name)
+        opaque(name)
         for name in (
             "f_te_built", "f_tm_built", "s_te", "s_tm", "a_te", "a_tm", "r_diff_te", "r_diff_tm",
         )
     ),
-    *(value(name, grad="fixed") for name in ("cos_i", "phi_i", "cos_o", "phi_o")),
-    value("frequency_value"),
+    *(opaque(name, grad="fixed") for name in ("cos_i", "phi_i", "cos_o", "phi_o")),
+    opaque("frequency_value"),
 )
 _TABLE_BUILD_ROUGH = ("rough_sigma_h", "rough_corr_x", "rough_corr_y")
 _TABLE_BUILD_LAYERS = ("layer_thickness_m", "layer_eps_r", "layer_sigma_e")
@@ -1123,9 +1128,9 @@ class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
         _t_cos_i: Any, _t_phi_i: Any, _t_cos_o: Any, _t_phi_o: Any, _t_frequency_value: Any,
     ) -> Any:
         tangents = (
-            t_sigma_h, t_corr_x, t_corr_y, t_thickness, t_eps, t_sigma, t_mu_r, t_frequency, _t_f_te,
-            _t_f_tm, _t_s_te, _t_s_tm, _t_a_te, _t_a_tm, _t_r_diff_te, _t_r_diff_tm, _t_cos_i,
-            _t_phi_i, _t_cos_o, _t_phi_o, _t_frequency_value,
+            t_sigma_h, t_corr_x, t_corr_y, t_thickness, t_eps, t_sigma, t_mu_r, t_frequency,
+            _t_f_te, _t_f_tm, _t_s_te, _t_s_tm, _t_a_te, _t_a_tm, _t_r_diff_te, _t_r_diff_tm,
+            _t_cos_i, _t_phi_i, _t_cos_o, _t_phi_o, _t_frequency_value,
         )
         _TABLE_BUILD_AD.reject_fixed_tangents(tangents)
         saved = ctx.saved_tensors

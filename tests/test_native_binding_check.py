@@ -166,6 +166,17 @@ def test_a_declared_op_reached_only_from_dead_code_is_reported(tmp_path: Path) -
     assert check.check_invariants(repo) == ["native symbol has no production caller: beta"]
 
 
+def test_the_declaration_resolver_does_not_make_symbol_literals_dispatch_sites(
+    tmp_path: Path,
+) -> None:
+    kernels = _SPEC_KERNELS.replace(
+        '_BETA = _native.op("beta", tensor("values"))\n', ""
+    ).replace("    return _BETA(values)", '    return "beta"')
+    repo = _repo(tmp_path, kernels, _SOLVER_USES_BOTH)
+
+    assert check.check_invariants(repo) == ["native symbol has no Python dispatch site: beta"]
+
+
 @pytest.mark.parametrize(
     ("declaration", "problem"),
     [

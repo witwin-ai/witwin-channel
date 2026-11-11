@@ -16,7 +16,7 @@ from witwin.channel.kernels.spec import (
     integer,
     save,
     tensor,
-    value,
+    opaque,
 )
 from witwin.channel.runtime import (
     _ad_first_order_only,
@@ -66,14 +66,14 @@ _ACCUMULATE_FLAT_FWD64 = _native.op(
 _ACCUMULATE_FLAT_BACKWARD = _native.op(
     "deterministic_accumulate_flat_backward", _ACCUM_IDS, tensor("component_field_real"),
     tensor("component_field_imag"), tensor("field_total_real"), tensor("field_total_imag"),
-    tensor("power_total"), value("grad_power_total"), value("grad_field_total_real"),
-    value("grad_field_total_imag"), value("grad_component_power"),
-    value("grad_component_field_real"), value("grad_component_field_imag"), _ACCUM_CONFIG,
+    tensor("power_total"), opaque("grad_power_total"), opaque("grad_field_total_real"),
+    opaque("grad_field_total_imag"), opaque("grad_component_power"),
+    opaque("grad_component_field_real"), opaque("grad_component_field_imag"), _ACCUM_CONFIG,
 )
 _ACCUMULATE_FLAT_JVP = _native.op(
     "deterministic_accumulate_flat_jvp", _ACCUM_IDS, tensor("component_field_real"),
-    tensor("component_field_imag"), tensor("power_total"), value("tangent_path_gain"),
-    value("tangent_field_real"), value("tangent_field_imag"), _ACCUM_CONFIG,
+    tensor("component_field_imag"), tensor("power_total"), opaque("tangent_path_gain"),
+    opaque("tangent_field_real"), opaque("tangent_field_imag"), _ACCUM_CONFIG,
 )
 # Output name, rank of the six accumulator outputs.
 _ACCUM_OUTPUT_RANKS = (
@@ -108,8 +108,9 @@ def deterministic_accumulate_flat(
         raise TypeError(
             "_channel.deterministic_accumulate_flat must return a dict"
         )
+    outputs = cast(dict[str, torch.Tensor], exported)
     for name, ndim in _ACCUM_OUTPUT_RANKS:
-        validate_cuda_tensor(name, exported[name], dtype=torch.float32, ndim=ndim)  # type: ignore[literal-required]
+        validate_cuda_tensor(name, outputs[name], dtype=torch.float32, ndim=ndim)
     # Six materialized slots (coupled reflection and diffraction): los / reflection / diffraction /
     # transmission / scattering / coupled.
     expected_component_shape = (6, int(num_tx), int(num_rx))

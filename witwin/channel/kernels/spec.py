@@ -31,7 +31,7 @@ __all__ = [
     "real",
     "save",
     "tensor",
-    "value",
+    "opaque",
 ]
 
 Grad = Literal["none", "diff", "fixed"]
@@ -120,7 +120,7 @@ def flag(name: str) -> Arg:
     return Arg(name, convert=bool)
 
 
-def value(
+def opaque(
     name: str, *, convert: Callable[[Any], Any] | None = None, grad: Grad = "none",
     tangent: bool = True, abi: str | None = None,
 ) -> Arg:
@@ -177,7 +177,7 @@ class NativeOp:
         return self.args[self._index[name]]
 
     def check(self, values: Sequence[object], *names: str) -> None:
-        """Validate ``values`` (one per argument) in declaration order, or only ``names`` in order."""
+        """Validate ``values`` (one per argument) in declaration order, or ``names`` in order."""
 
         if names:
             for name in names:
@@ -188,7 +188,7 @@ class NativeOp:
             arg.check(item)
 
     def checks(self, mapping: Mapping[str, object], *names: str) -> None:
-        """Validate the named values of ``mapping`` (declaration order unless ``names`` is given)."""
+        """Validate the values of ``mapping`` in declaration order, or ``names`` in order."""
 
         for name in names or tuple(name for name in self.names if name in mapping):
             self.args[self._index[name]].check(mapping[name])
@@ -199,14 +199,13 @@ class NativeOp:
         The symbol resolves before any argument is converted, as in a hand-written call.
         """
 
-        if len(values) != len(self.args):
-            raise TypeError(
-                f"{self.symbol} takes {len(self.args)} arguments; got {len(values)}"
-            )
         function = self._resolve(self.symbol)
-        return function(
-            *(item if arg.convert is None else arg.convert(item) for arg, item in zip(self.args, values))
+        converted = tuple(
+            item if arg.convert is None else arg.convert(item)
+            for arg, item in zip(self.args, values)
         )
+        # Values past the declaration are forwarded as given; the extension rejects a bad arity.
+        return function(*converted, *values[len(converted):])
 
 
 class NativeOps:
@@ -289,7 +288,8 @@ class AdInputs:
         """Refuse a live tangent on any fixed input (first fixed input in order)."""
 
         _ad_reject_fixed_tangents(
-            self.op_name, tuple((tangents[position], name) for position, name in self._fixed_tangents)
+            self.op_name,
+            tuple((tangents[position], name) for position, name in self._fixed_tangents),
         )
 
     def tangent(self, tangents: Sequence[Any], name: str) -> Any:
@@ -323,6 +323,18 @@ class AdInputs:
             if needs[position]:
                 result[position] = item
         return tuple(result)
+
+    def output_grads(
+        self, ctx: Any, out: Mapping[str, Any], keys: Mapping[str, str], **values: Any,
+    ) -> tuple[Any, ...]:
+        """Gradient slots read as ``out[keys[name]]`` only for the inputs that need them.
+
+        ``values`` adds slots computed by the caller (also masked by ``needs_input_grad``).
+        """
+
+        needs = ctx.needs_input_grad
+        read = {name: out[key] for name, key in keys.items() if needs[self._index[name]]}
+        return self.grads(ctx, **read, **values)
 
     def place(self, **values: Any) -> tuple[Any, ...]:
         """One slot per input holding the named values unmasked, None elsewhere."""

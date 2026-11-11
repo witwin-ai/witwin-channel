@@ -8,6 +8,7 @@ import pytest
 import torch
 import witwin.channel.materials as public_materials
 from witwin.channel.kernels import materials as kernels
+from witwin.channel.kernels import spec
 from witwin.channel import runtime
 
 
@@ -60,6 +61,7 @@ def test_material_functional_uses_canonical_dependencies():
 
 def test_material_autograd_uses_canonical_dependencies():
     assert kernels.disable_functorch is runtime.disable_functorch
+    # The AD plumbing is runtime's, used directly or through the declared AD inputs.
     for name in (
         "_ad_checked_tangent",
         "_ad_frequency_grad",
@@ -70,7 +72,9 @@ def test_material_autograd_uses_canonical_dependencies():
         "_ad_reject_fixed_inputs",
         "_ad_reject_fixed_tangents",
     ):
-        assert getattr(kernels, name) is getattr(runtime, name)
+        owners = [module for module in (kernels, spec) if hasattr(module, name)]
+        assert owners
+        assert all(getattr(module, name) is getattr(runtime, name) for module in owners)
     for name in (
         "_EM_LAYER_STACK_FIELDS",
         "em_layer_stack_backward",
