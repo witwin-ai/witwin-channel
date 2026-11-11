@@ -2337,12 +2337,10 @@ def _chain_ensemble_evaluate(
     )
     if op_a is None or (ad_mode != "none" and op_a_ad is None):
         raise RuntimeError(
-            "ADR-021 D1 requires the native Op A chain facade "
-            "'scattering_chain_ensemble_eval' (and its '_ad' companion under "
-            "ad_mode != 'none'); it is owned by the ADR-021 D2 native chain "
-            "kernels (witwin.channel.kernels.scattering) and is not yet wired "
-            "into this append path. Enable scattering_chain_max_depth only "
-            "once the D5 wave has landed."
+            "scattering_chain_max_depth >= 1 requires the native scatter-chain "
+            "operator 'scattering_chain_ensemble_eval', and under ad_mode != 'none' "
+            "also its derivative companion, which this build does not provide; use "
+            f"ad_mode='none' or scattering_chain_max_depth=0 (got ad_mode={ad_mode!r})"
         )
 
     ad_enabled = ad_mode != "none"
