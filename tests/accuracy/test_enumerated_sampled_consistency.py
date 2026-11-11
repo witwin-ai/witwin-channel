@@ -135,8 +135,9 @@ def test_mc_basic_known_gaps_to_incoherent_deterministic(accuracy, name):
     pytest.param("transmission", lambda: _wall(5.0, PhysicalMaterial(eps_r=4.0, sigma_e=0.01)),
                  (0.0, 0.0, 1.0), (8.0, -3.0, 1.0), id="transmission"),
 ])
-def test_mc_basic_point_components_equal_deterministic_cell_centres(accuracy, component, structures,
-                                                                    tx, origin):
+def test_mc_basic_point_components_equal_deterministic_cell_centres(
+    accuracy, component, structures, tx, origin,
+):
     """MC Basic evaluates LoS and straight transmission analytically at each cell centre."""
 
     from witwin.channel.montecarlo import basic
