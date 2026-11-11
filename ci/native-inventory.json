@@ -700,6 +700,8 @@
         "path_gather_kernel",
         "path_los_compact_kernel",
         "path_los_visibility_inputs_kernel",
+        "path_pack_first_row_kernel",
+        "path_pack_padded_kernel",
         "path_reflection_candidates_kernel",
         "path_sort_key_kernel",
         "path_visibility_flags_kernel"
@@ -737,6 +739,8 @@
         "path_gather_kernel",
         "path_los_compact_kernel",
         "path_los_visibility_inputs_kernel",
+        "path_pack_first_row_kernel",
+        "path_pack_padded_kernel",
         "path_reflection_candidates_kernel",
         "path_sort_key_kernel",
         "path_visibility_flags_kernel"

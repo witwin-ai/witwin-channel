@@ -1503,32 +1503,6 @@ def test_mc_sample_directions_requires_native_cuda_kernel(monkeypatch):
         topology_kernels.mc_sample_directions(1, reference)
 
 
-def test_mc_transmitter_tensors_creates_cuda_positions_and_power():
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for MC transmitter tensors")
-
-    result = runtime.mc_transmitter_tensors(
-        (1.0, 2.0, 3.0, 4.0, 5.0, 6.0),
-        (0.5, 2.0),
-    )
-
-    expected_positions = torch.tensor(
-        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
-        device="cuda",
-        dtype=torch.float32,
-    )
-    expected_power = torch.tensor([0.5, 2.0], device="cuda", dtype=torch.float32)
-    torch.testing.assert_close(result["positions"], expected_positions)
-    torch.testing.assert_close(result["power"], expected_power)
-
-
-def test_mc_transmitter_tensors_requires_native_cuda_helper(monkeypatch):
-    monkeypatch.setattr(runtime, "native_extension", lambda: None)
-
-    with pytest.raises(RuntimeError, match="mc_transmitter_tensors CUDA kernel is required"):
-        runtime.mc_transmitter_tensors((0.0, 0.0, 0.0), (1.0,))
-
-
 def test_mc_pack_vec3_interleaves_cuda_vectors():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC vec3 packing")

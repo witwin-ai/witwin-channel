@@ -883,27 +883,6 @@ def bdpt_zero_matrix(reference: torch.Tensor, *, rows: int, cols: int) -> torch.
     return out
 
 
-def mc_transmitter_tensors(
-    flat_positions: tuple[float, ...], powers: tuple[float, ...],
-) -> dict[str, torch.Tensor]:
-    if len(flat_positions) % 3 != 0:
-        raise ValueError("flat_positions must contain xyz triples")
-    if len(flat_positions) // 3 != len(powers):
-        raise ValueError("powers must match flat_positions")
-    exported = cast(Callable[..., object], _required_native_op("mc_transmitter_tensors"))(flat_positions, powers)
-    if not isinstance(exported, dict):
-        raise TypeError("_channel.mc_transmitter_tensors must return a dict")
-    validate_cuda_tensor(
-        "positions",
-        exported["positions"],
-        dtype=torch.float32,
-        ndim=2,
-        trailing_shape=(3,),
-    )
-    validate_cuda_tensor("power", exported["power"], dtype=torch.float32, ndim=1)
-    return exported
-
-
 def mc_pack_vec3(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     validate_cuda_tensor("x", x, dtype=torch.float32, ndim=1)
     validate_cuda_tensor("y", y, dtype=torch.float32, ndim=1)
@@ -1878,7 +1857,6 @@ __all__ = [
     "make_metadata",
     "mc_pack_vec3",
     "mc_receiver_grid_points",
-    "mc_transmitter_tensors",
     "native_extension",
     "noop_metadata",
     "optional_symbol",

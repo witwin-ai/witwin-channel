@@ -3834,18 +3834,6 @@
       "python_owners": ["witwin.channel.kernels.montecarlo.mc_transmission_wall_product_jvp"]
     },
     {
-      "name": "mc_transmitter_tensors",
-      "target": "channel_mc_transmitter_tensors",
-      "return_type": "pybind11::dict",
-      "doc": "Create transmitter position and power CUDA tensors through native code.",
-      "parameters": [
-        ["flat_positions", "pybind11::sequence", null],
-        ["powers", "pybind11::sequence", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.runtime.mc_transmitter_tensors"]
-    },
-    {
       "name": "mc_utd_diffraction_tape_accumulate",
       "target": "channel_mc_utd_diffraction_tape_accumulate",
       "return_type": "torch::Tensor",
@@ -4107,6 +4095,21 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.topology.path_merge_blocks"]
+    },
+    {
+      "name": "path_pack_padded",
+      "target": "channel_path_pack_padded",
+      "return_type": "pybind11::dict",
+      "doc": "Pack pair-contiguous evaluated paths into padded per-pair path tensors with angles.",
+      "parameters": [
+        ["rows", "pybind11::dict", null],
+        ["tx_positions", "torch::Tensor", null],
+        ["rx_positions", "torch::Tensor", null],
+        ["pair_offsets", "torch::Tensor", null],
+        ["width", "int64_t", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.topology.path_pack_padded"]
     },
     {
       "name": "path_reflection_candidates",

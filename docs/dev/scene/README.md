@@ -43,14 +43,43 @@ solver-neutral propagation consumer among them. `require_compiled` resolves
 `CompiledScene` inside the call, and `resources` annotates the stores under
 `TYPE_CHECKING`, for that reason.
 
+## Endpoint store
+
+`bind_solver_scene` attaches one `EndpointStore` to the `SolverScene`. It holds
+every endpoint tensor a solve reads, on the CUDA device: transmitter positions,
+powers and world-frame polarizations, flattened receiver positions (a
+`ReceiverGrid` through the native grid generator), per-receiver polarizations
+and a per-row polarization view in which a grid is one broadcast row. The store
+is built in batched operations - one stack per field, one batched orientation
+and normalization per (device, dtype, orientation kind) group, one host-to-device
+copy of a packed float32 buffer - and cached on the `CompiledScene` under
+`endpoint_token(source)`. The token is host-only: per endpoint its identity and,
+for each tensor leaf, the tensor identity, `_version` and `requires_grad`
+(snapshot rigid motions likewise). It reads no tensor data and is meant to key
+any endpoint-only cache. A binding whose endpoint leaves participate in AD
+(reverse `requires_grad` or a forward-mode tangent) builds the store per solve
+and does not cache it, so the leaves stay on the graph through one stack.
+Validation of endpoint values runs when a store is built, not on every solve.
+
+The batched polarization reproduces the per-endpoint `rotation @ unit`
+product bit for bit: the 3x3 matrix-vector product sums `(r1*u1 + r2*u2) + r0*u0`
+on the host BLAS and `(r0*u0 + r2*u2) + r1*u1` on CUDA, and the batched code
+uses that per-device order.
+
+`endpoint_store(scene)` returns the bound store, or builds an uncached one when
+a caller rebinds endpoints (explicit-array expansion binds its own; a BDPT
+sub-scene over one grid builds one per call). The module-level helpers
+(`transmitter_positions`, `receiver_positions`,
+`transmitter_polarizations_as_stored` in `compiler`;
+`transmitter_polarizations_f32`, `receiver_polarizations_f32`,
+`receiver_polarization_rows`, `transmitter_positions_ad`,
+`receiver_positions_ad` in `endpoints`) all read the store.
+
 The two same-named `transmitter_polarizations` owners the audit reported are
-resolved by name rather than by unification, because their bodies are not
-interchangeable. `scene.endpoints.transmitter_polarizations_f32` casts to
-float32, calls `.contiguous()`, and builds its empty case on the requested
-`device`; `scene.compiler.transmitter_polarizations_as_stored` uploads the
-stored vectors as they are and takes its empty case from the native transmitter
-builder. Both are live, each has its own callers, and merging them would be a
-behaviour change rather than a rename.
+resolved by name rather than by unification.
+`scene.endpoints.transmitter_polarizations_f32` is the float32 store field;
+`scene.compiler.transmitter_polarizations_as_stored` keeps the dtype the scene
+stored. Both are live and each has its own callers.
 
 `scene.resources` also holds the compile-time Kirchhoff/phase-screen
 construction that used to sit in a root `scattering` module. That module read
