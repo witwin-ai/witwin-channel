@@ -26,8 +26,9 @@ def test_bdpt_radiomap_peak_memory_stays_bounded():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for BDPT memory measurement")
 
+    # Offset by half a spacing so no sample lies on the transmitter at (0, -1, 0.5).
     grid = make_receiver_grid(
-        origin=torch.tensor([0.0, -1.0, 0.0]),
+        origin=torch.tensor([0.0, -1.0, 0.05]),
         x_axis=torch.tensor([0.0, 1.0, 0.0]),
         y_axis=torch.tensor([0.0, 0.0, 1.0]),
         shape=(64, 64),
