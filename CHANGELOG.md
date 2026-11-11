@@ -41,8 +41,26 @@ All notable changes to `witwin-channel` are documented in this file.
   must accept 7 and the new field; requests that do not set `discovery` keep
   today's rows. The public API snapshot records the three changed contracts.
 
+- `witwin.channel.propagation.consumer.check_endpoint_separation(sources,
+  sinks, reference_frequency_hz=...)` refuses a source/sink pair closer than the
+  coincidence tolerance below, naming the pair, with one one-byte device read.
+  `evaluate` and `reevaluate` never read endpoint coordinates, so separation is
+  a documented caller precondition there. The public API snapshot records the
+  new export; `CONTRACT_VERSION` and every existing schema are unchanged.
+
 ### Changed
 
+- Coincident endpoints are refused by every solver before endpoint upload: a
+  point receiver or any `ReceiverGrid` sample within
+  `max(wavelength / (4 pi), 2^-20 * coordinate magnitude)` of a transmitter
+  (6.8 mm at 3.5 GHz) raises `ValueError` naming the receiver, the grid cell
+  `(row, column)` and the transmitter. Before, only a point receiver at exactly
+  the transmitter position was refused; a grid cell on a transmitter returned
+  0-like values in Deterministic/Path and a 4.6e7 path gain in MC Basic/BDPT.
+  The point-receiver message now reads "coincides with transmitter" instead of
+  "is at the same position as transmitter". Results of accepted inputs are
+  unchanged. Migration: shift a radio-map grid origin by half a spacing when a
+  sample falls on a transmitter.
 - Reflection candidates come from an image tree with conservative beam pruning
   and an image-method receiver test, validated by one RayD EPC validator, per
   depth; the 100,000-sequence switch between exhaustive and ray discovery is
