@@ -63,6 +63,7 @@ from witwin.channel.scene.endpoints import (
     link_zero_gradient,
     orientation_matrix,
     pattern_field_response,
+    refuse_coincident_endpoints,
     steering_from_positions,
 )
 
@@ -1610,6 +1611,9 @@ def explicit_array_scene(scene: SolverScene) -> tuple[SolverScene, int, int]:
                     single_element=True,
                 )
             )
+    refuse_coincident_endpoints(
+        (*expanded_tx, *expanded_rx), scene.compiled.materials.frequency_hz
+    )
     return (
         replace(
             scene,

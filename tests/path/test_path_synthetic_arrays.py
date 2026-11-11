@@ -468,3 +468,21 @@ def test_distinct_antenna_orientations_are_evaluated_separately():
     )
     # The two unrotated receivers share one evaluation; each rotated one has its own.
     assert len(calls) == 3
+
+
+def test_explicit_array_element_on_a_receiver_element_is_refused():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for explicit path topology")
+    # The array centres are 0.5 m apart, but the receiver's first element sits on
+    # the transmitter's second element.
+    elements = _ula(2, 0.5)
+    offset = elements[1] - elements[0]
+    scene = Scene(
+        structures=[],
+        endpoints=[
+            make_transmitter(torch.zeros(3), element_positions=elements, synthetic_array=False),
+            make_receiver(offset.clone(), element_positions=elements, synthetic_array=False),
+        ],
+    )
+    with pytest.raises(ValueError, match="coincides with transmitter"):
+        solve(scene, Config(components={"los"}), reference_frequency_hz=1.0e9)

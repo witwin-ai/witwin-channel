@@ -83,6 +83,18 @@ wheel JIT-compiles the PTX once in the same way.
 | Radiomap is empty in places you expect coverage | The transmitter or receiver plane may be inside a building, or below the ground. Check the scene bounds and heights. |
 | A map looks transposed | Grid maps are returned as `(T, rows, cols)` for `ReceiverGrid(shape=(rows, cols))`: the first map axis follows the grid's `x_axis`, the second its `y_axis`. Show `path_gain[t].T` with `origin="lower"` for x to the right. |
 
+## Endpoint errors
+
+- `... cell (row r, column c) ... coincides with transmitter ...`: a radio-map
+  sample lies on a transmitter, or closer than wavelength/(4*pi) (6.8 mm at
+  3.5 GHz) to it, where the far-field model every solver uses is undefined.
+  Shift the grid origin by half a spacing, or move the transmitter. The same
+  rule applies to point receivers. A transmitter on a grid line between
+  sample centres is fine. Receivers within a few wavelengths of a transmitter
+  are accepted, but their values are a far-field extrapolation.
+- The propagation consumer does not check endpoint separation itself; call
+  `consumer.check_endpoint_separation` when the endpoint batches change.
+
 ## Material and frequency errors
 
 - `frequency_offsets_hz is not supported on a scene with frequency-dependent

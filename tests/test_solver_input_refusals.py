@@ -195,8 +195,46 @@ def test_non_finite_endpoints_are_refused_before_native_work_in_every_solver() -
 @pytest.mark.parametrize("solver", list(MODULES))
 def test_receiver_at_the_transmitter_position_is_refused_in_every_solver(solver: str) -> None:
     scene = Scene(structures=[_wall()], endpoints=[_tx((0.0, -1.0, 0.5)), _rx((0.0, -1.0, 0.5))])
-    with pytest.raises(ValueError, match="is at the same position as transmitter"):
+    with pytest.raises(ValueError, match=r"receiver \d+ at .* coincides with transmitter"):
         _solve(solver, scene, components={"los"})
+
+
+def _radiomap_grid() -> ReceiverGrid:
+    return _grid(origin=(-2.0, -2.0, 1.5), shape=(8, 8), spacing=(0.5, 0.5))
+
+
+@pytest.mark.parametrize("solver", list(MODULES))
+@pytest.mark.parametrize("offset", [0.0, 1.0e-4], ids=["on_cell", "near_cell"])
+def test_grid_cell_at_a_transmitter_is_refused_by_cell_in_every_solver(
+    solver: str, offset: float, monkeypatch,
+) -> None:
+    import witwin.channel.scene.endpoints as endpoints
+
+    def no_store(*_args, **_kwargs):
+        raise AssertionError("the refusal must come before endpoint upload")
+
+    monkeypatch.setattr(endpoints, "build_endpoint_store", no_store)
+    tx = _tx((0.0, offset, 1.5))
+    scene = Scene(structures=[_wall()], endpoints=[tx, _radiomap_grid()])
+    with pytest.raises(
+        ValueError,
+        match=rf"cell \(row 4, column 4\) .* coincides with transmitter {int(tx.antenna_id)}",
+    ):
+        _solve(solver, scene, components={"los", "reflection"})
+
+
+@pytest.mark.parametrize("solver", list(MODULES))
+def test_transmitter_between_grid_centres_is_solved_in_every_solver(solver: str) -> None:
+    scene = Scene(structures=[_wall()], endpoints=[_tx((0.0, 0.25, 1.5)), _radiomap_grid()])
+    result = _solve(solver, scene, components={"los", "reflection"})
+    values = result.a if solver == "path" else result.path_gain
+    assert bool(torch.isfinite(torch.as_tensor(values).abs()).all())
+    if solver != "path":
+        gain = result.path_gain.reshape(-1)
+        # The two cells a quarter spacing from the transmitter see the strongest
+        # field, and it stays below unity: the far-field formula is still defined.
+        assert int(torch.argmax(gain)) in (4 * 8 + 4, 4 * 8 + 5)
+        assert 0.0 < float(gain.max()) < 1.0
 
 
 @pytest.mark.parametrize("solver", list(MODULES))

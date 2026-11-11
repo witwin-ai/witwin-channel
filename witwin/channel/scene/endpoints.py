@@ -510,25 +510,194 @@ def _validate_one_endpoint(view: _EndpointView) -> None:
         _require_host_range(label, "power_w", view.power_w, False, "finite and non-negative")
 
 
-def _refuse_coincident_endpoints(views: tuple[_EndpointView, ...]) -> None:
-    transmitters = [
-        (view, _host_values(view.position)) for view in views if isinstance(view, _TransmitterView)
-    ]
-    for receiver in views:
-        at = _host_values(receiver.position) if isinstance(receiver, _ReceiverPointView) else None
-        for transmitter, origin in transmitters if at is not None else ():
-            if origin is not None and at is not None and bool(
-                torch.equal(origin.to(at.dtype), at)
-            ):
-                raise ValueError(
-                    f"receiver {int(receiver.source.antenna_id)} is at the same position as "
-                    f"transmitter {int(transmitter.source.antenna_id)} ({at.tolist()}); the "
-                    "free-space field is singular at zero distance"
+_FAR_FIELD_FRACTION = 1.0 / (4.0 * math.pi)
+# Eight to sixteen float32 ulps of a coordinate, per metre of its magnitude.
+COORDINATE_RESOLUTION = 2.0**-20
+_GRID_SCAN_CELLS = 1 << 20
+
+
+def coincidence_tolerance_m(frequency_hz: float, magnitude_m: float) -> float:
+    """Endpoint separation below which free-space propagation is undefined.
+
+    The larger of wavelength / (4 pi), inside which the isotropic free-space path
+    gain (wavelength / (4 pi d))^2 exceeds one, and ``COORDINATE_RESOLUTION``
+    times the largest coordinate magnitude ``magnitude_m``, below which a
+    float32 distance cannot be told from zero.
+    """
+
+    return max(_C0 / float(frequency_hz) * _FAR_FIELD_FRACTION, COORDINATE_RESOLUTION * magnitude_m)
+
+
+def _format_point(value: torch.Tensor) -> str:
+    return "(" + ", ".join(f"{float(item):.6g}" for item in value) + ")"
+
+
+def _coincidence_message(
+    receiver: str, at: torch.Tensor, transmitter: _TransmitterView, origin: torch.Tensor,
+    distance: float, tolerance: float, frequency_hz: float,
+    remedy: str = "Move the receiver or transmitter apart",
+) -> str:
+    return (
+        f"{receiver} at {_format_point(at)} coincides with transmitter "
+        f"{int(transmitter.source.antenna_id)} at {_format_point(origin)}: the distance "
+        f"{distance:.3g} m is below the coincidence tolerance {tolerance:.3g} m (the larger of "
+        f"wavelength/(4*pi) at {frequency_hz:.6g} Hz and the float32 coordinate resolution), "
+        f"where free-space propagation is undefined. {remedy}"
+    )
+
+
+def _grid_scan(
+    origin: torch.Tensor, steps: torch.Tensor, rows: torch.Tensor, cols: torch.Tensor,
+    point: torch.Tensor, tolerance: float,
+) -> tuple[int, tuple[int, int, float] | None]:
+    """Count the samples of a ``rows x cols`` block within ``tolerance``; return the nearest."""
+
+    count = 0
+    nearest: tuple[int, int, float] | None = None
+    chunk = max(1, _GRID_SCAN_CELLS // max(int(cols.numel()), 1))
+    for start in range(0, int(rows.numel()), chunk):
+        block = rows[start : start + chunk]
+        cells = (
+            origin
+            + block[:, None, None].to(origin.dtype) * steps[0]
+            + cols[None, :, None].to(origin.dtype) * steps[1]
+        )
+        distance = torch.linalg.vector_norm(cells - point, dim=-1)
+        inside = distance <= tolerance
+        count += int(inside.sum())
+        if bool(inside.any()):
+            flat = int(torch.argmin(distance))
+            row, col = divmod(flat, int(cols.numel()))
+            value = float(distance.reshape(-1)[flat])
+            if nearest is None or value < nearest[2]:
+                nearest = (int(block[row]), int(cols[col]), value)
+    return count, nearest
+
+
+def _grid_samples_near(
+    origin: torch.Tensor, steps: torch.Tensor, shape: tuple[int, int], point: torch.Tensor,
+    tolerance: float,
+) -> tuple[int, tuple[int, int, float] | None]:
+    """Grid samples ``origin + row * steps[0] + col * steps[1]`` within ``tolerance`` of ``point``.
+
+    Solved analytically: the in-plane least-squares coordinates of ``point`` and
+    the tolerance ellipse bound a small index box, and only that box is scanned.
+    """
+
+    extents = (int(shape[0]), int(shape[1]))
+    if extents[0] <= 0 or extents[1] <= 0:
+        return 0, None
+    active = [axis for axis in (0, 1) if extents[axis] > 1]
+    offset = point - origin
+    coordinates = [0.0, 0.0]
+    half_width = [0.0, 0.0]
+    residual = offset
+    if active:
+        basis = steps[active]
+        gram = basis @ basis.T
+        scale = float(torch.prod(torch.diagonal(gram)))
+        if not scale > 0.0 or float(torch.linalg.det(gram)) <= 1.0e-12 * scale:
+            return _grid_scan(
+                origin, steps, torch.arange(extents[0]), torch.arange(extents[1]), point,
+                tolerance,
+            )
+        solution = torch.linalg.solve(gram, basis @ offset)
+        residual = offset - solution @ basis
+        inverse = torch.linalg.inv(gram)
+        for slot, axis in enumerate(active):
+            coordinates[axis] = float(solution[slot])
+            half_width[axis] = float(inverse[slot, slot])
+    out_of_plane = float(residual @ residual)
+    if out_of_plane > tolerance * tolerance:
+        return 0, None
+    in_plane = tolerance * tolerance - out_of_plane
+    ranges = []
+    for axis in (0, 1):
+        half = math.sqrt(in_plane * half_width[axis])
+        low = max(0, math.ceil(coordinates[axis] - half - 1.0e-9))
+        high = min(extents[axis] - 1, math.floor(coordinates[axis] + half + 1.0e-9))
+        if low > high:
+            return 0, None
+        ranges.append(torch.arange(low, high + 1))
+    return _grid_scan(origin, steps, ranges[0], ranges[1], point, tolerance)
+
+
+def _refuse_point_receiver(
+    label: str, at: torch.Tensor, transmitters: list[tuple[_TransmitterView, torch.Tensor]],
+    frequency_hz: float,
+) -> None:
+    for transmitter, origin in transmitters:
+        distance = float(torch.linalg.vector_norm(at - origin))
+        magnitude = float(torch.maximum(at.abs().max(), origin.abs().max()))
+        tolerance = coincidence_tolerance_m(frequency_hz, magnitude)
+        if distance <= tolerance:
+            raise ValueError(
+                _coincidence_message(
+                    label, at, transmitter, origin, distance, tolerance, frequency_hz
                 )
+            )
 
 
-def _validate_endpoint_values(views: tuple[_EndpointView, ...]) -> None:
-    """Refuse non-finite endpoint data before any native work.
+def _refuse_grid_receiver(
+    receiver: _ReceiverGridView, origin_at: torch.Tensor,
+    transmitters: list[tuple[_TransmitterView, torch.Tensor]], frequency_hz: float,
+) -> None:
+    axes = [_host_values(receiver.x_axis), _host_values(receiver.y_axis)]
+    spacing = _host_values(receiver.source.spacing)
+    if axes[0] is None or axes[1] is None or spacing is None:
+        return
+    spacing = spacing.to(torch.float64)
+    steps = torch.stack(
+        (axes[0].to(torch.float64) * spacing[0], axes[1].to(torch.float64) * spacing[1])
+    )
+    rows, cols = receiver.shape
+    reach = origin_at.abs() + max(rows - 1, 0) * steps[0].abs() + max(cols - 1, 0) * steps[1].abs()
+    for transmitter, origin in transmitters:
+        magnitude = float(torch.maximum(reach.max(), origin.abs().max()))
+        tolerance = coincidence_tolerance_m(frequency_hz, magnitude)
+        count, nearest = _grid_samples_near(origin_at, steps, (rows, cols), origin, tolerance)
+        if nearest is None:
+            continue
+        row, col, distance = nearest
+        cell = origin_at + row * steps[0] + col * steps[1]
+        others = f"; {count - 1} more cell(s) of the grid are as close" if count > 1 else ""
+        raise ValueError(
+            _coincidence_message(
+                f"{_endpoint_label(receiver)} cell (row {row}, column {col})", cell, transmitter,
+                origin, distance, tolerance, frequency_hz,
+                "Move the transmitter or shift the grid origin so no sample lies this "
+                f"close{others}",
+            )
+        )
+
+
+def refuse_coincident_endpoints(views: tuple[_EndpointView, ...], frequency_hz: float) -> None:
+    """Refuse a receiver sample within the coincidence tolerance of a transmitter.
+
+    Point receivers and every ``ReceiverGrid`` sample are checked on the host
+    without materializing a grid. CUDA-resident coordinates are not read, since
+    that would synchronize the device on every solve.
+    """
+
+    transmitters = []
+    for view in views:
+        origin = _host_values(view.position) if isinstance(view, _TransmitterView) else None
+        if origin is not None:
+            transmitters.append((cast(_TransmitterView, view), origin.to(torch.float64)))
+    for receiver in views if transmitters else ():
+        at = None if isinstance(receiver, _TransmitterView) else _host_values(receiver.position)
+        if at is None:
+            continue
+        if isinstance(receiver, _ReceiverGridView):
+            _refuse_grid_receiver(receiver, at.to(torch.float64), transmitters, frequency_hz)
+        else:
+            _refuse_point_receiver(
+                _endpoint_label(receiver), at.to(torch.float64), transmitters, frequency_hz
+            )
+
+
+def _validate_endpoint_values(views: tuple[_EndpointView, ...], frequency_hz: float) -> None:
+    """Refuse non-finite endpoint data and coincident endpoints before any native work.
 
     Host-resident values are checked here; reading a CUDA-resident value would
     synchronize the device on every solve, so those are left to the caller.
@@ -536,7 +705,7 @@ def _validate_endpoint_values(views: tuple[_EndpointView, ...]) -> None:
 
     for view in views:
         _validate_one_endpoint(view)
-    _refuse_coincident_endpoints(views)
+    refuse_coincident_endpoints(views, frequency_hz)
 
 
 def require_single_receiver_layout(
@@ -1017,7 +1186,7 @@ def bind_solver_scene(compiled: CompiledScene) -> SolverScene:
         views = _endpoint_views(compiled.source)
         require_no_functorch_transform([view.position for view in views])
         _validate_scalar_endpoint_boundary(views)
-        _validate_endpoint_values(views)
+        _validate_endpoint_values(views, compiled.materials.frequency_hz)
         transmitters = tuple(view for view in views if isinstance(view, _TransmitterView))
         receivers = tuple(view for view in views if not isinstance(view, _TransmitterView))
         store = None
