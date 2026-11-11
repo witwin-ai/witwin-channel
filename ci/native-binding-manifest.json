@@ -4054,6 +4054,21 @@
       "python_owners": ["witwin.channel.kernels.topology.path_merge_blocks"]
     },
     {
+      "name": "path_pack_padded",
+      "target": "channel_path_pack_padded",
+      "return_type": "pybind11::dict",
+      "doc": "Pack pair-contiguous evaluated paths into padded per-pair path tensors with angles.",
+      "parameters": [
+        ["rows", "pybind11::dict", null],
+        ["tx_positions", "torch::Tensor", null],
+        ["rx_positions", "torch::Tensor", null],
+        ["pair_offsets", "torch::Tensor", null],
+        ["width", "int64_t", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.topology.path_pack_padded"]
+    },
+    {
       "name": "path_reflection_candidates",
       "target": "channel_path_reflection_candidates",
       "return_type": "pybind11::dict",

@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <limits>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "path_compaction.cuh"
@@ -4123,4 +4124,265 @@ at::Tensor channel_deterministic_sort_order(
     sort_by_1d(tx_id);
     sort_by_1d(rx_id);
     return order;
+}
+
+// ==== Section: Path result padding ====
+namespace {
+
+constexpr unsigned long long kNoFirstRow = ~0ULL;
+
+__global__ void path_pack_first_row_kernel(int64_t row_count, int64_t num_tx,
+                                           const int* __restrict__ tx_id,
+                                           const int* __restrict__ rx_id,
+                                           const int64_t* __restrict__ pair_offsets,
+                                           unsigned long long* __restrict__ first_row,
+                                           unsigned long long* __restrict__ max_count) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t row = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x; row < row_count;
+         row += stride) {
+        const int64_t pair = static_cast<int64_t>(rx_id[row]) * num_tx + tx_id[row];
+        atomicMin(first_row + pair, static_cast<unsigned long long>(row));
+        const int64_t count = pair_offsets[pair + 1] - pair_offsets[pair];
+        atomicMax(max_count, static_cast<unsigned long long>(count));
+    }
+}
+
+// Matches torch.linalg.vector_norm over a contiguous vec3 on CUDA, which sums
+// (x*x + z*z) + y*y without contraction, then the clamp/acos/atan2 sequence of
+// the endpoint angle helper, NaN propagating as torch.clamp does.
+__device__ void path_endpoint_angles(float x, float y, float z, float* theta, float* phi) {
+    const float norm =
+        sqrtf(__fadd_rn(__fadd_rn(__fmul_rn(x, x), __fmul_rn(z, z)), __fmul_rn(y, y)));
+    const float tiny = 1.17549435e-38f;
+    const float safe = norm != norm ? norm : (norm < tiny ? tiny : norm);
+    float cosine = __fdiv_rn(z, safe);
+    if (cosine == cosine) {
+        cosine = cosine < -1.0f ? -1.0f : (cosine > 1.0f ? 1.0f : cosine);
+    }
+    *theta = acosf(cosine);
+    *phi = atan2f(y, x);
+}
+
+__global__ void path_pack_padded_kernel(
+    int64_t slot_count, int64_t width, int64_t depth_width, int64_t num_tx,
+    const unsigned long long* __restrict__ first_row, const int64_t* __restrict__ pair_offsets,
+    const int* __restrict__ tx_id, const int* __restrict__ rx_id, const int* __restrict__ depth,
+    const int* __restrict__ component_id, const int* __restrict__ edge_id,
+    const int* __restrict__ interaction_type, const int* __restrict__ primitive_sequence,
+    const int* __restrict__ material_sequence, const float* __restrict__ positions,
+    const float* __restrict__ normals, const c10::complex<float>* __restrict__ coefficient,
+    const float* __restrict__ delay, const c10::complex<float>* __restrict__ field_xyz,
+    const float* __restrict__ field_direction, const float* __restrict__ tx_positions,
+    const float* __restrict__ rx_positions, c10::complex<float>* __restrict__ out_a,
+    float* __restrict__ out_tau, float* __restrict__ out_theta_t, float* __restrict__ out_phi_t,
+    float* __restrict__ out_theta_r, float* __restrict__ out_phi_r, bool* __restrict__ out_valid,
+    int* __restrict__ out_interaction_type, int* __restrict__ out_primitive_id,
+    int* __restrict__ out_material_id, float* __restrict__ out_position,
+    float* __restrict__ out_normal, c10::complex<float>* __restrict__ out_field_xyz,
+    float* __restrict__ out_field_direction, int* __restrict__ out_num_paths) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t slot = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         slot < slot_count; slot += stride) {
+        const int64_t pair = slot / width;
+        const int64_t rank = slot - pair * width;
+        const int64_t count = pair_offsets[pair + 1] - pair_offsets[pair];
+        if (rank == 0) {
+            out_num_paths[pair] = static_cast<int>(count);
+        }
+        const unsigned long long first = first_row[pair];
+        if (rank >= count || first == kNoFirstRow) {
+            out_a[slot] = c10::complex<float>(0.0f, 0.0f);
+            out_tau[slot] = -1.0f;
+            out_theta_t[slot] = 0.0f;
+            out_phi_t[slot] = 0.0f;
+            out_theta_r[slot] = 0.0f;
+            out_phi_r[slot] = 0.0f;
+            out_valid[slot] = false;
+            for (int64_t k = 0; k < depth_width; ++k) {
+                const int64_t at = slot * depth_width + k;
+                out_interaction_type[at] = 0;
+                out_primitive_id[at] = -1;
+                out_material_id[at] = -1;
+                for (int c = 0; c < 3; ++c) {
+                    out_position[at * 3 + c] = 0.0f;
+                    out_normal[at * 3 + c] = 0.0f;
+                }
+            }
+            for (int c = 0; c < 3; ++c) {
+                out_field_xyz[slot * 3 + c] = c10::complex<float>(0.0f, 0.0f);
+                out_field_direction[slot * 3 + c] = 0.0f;
+            }
+            continue;
+        }
+        const int64_t row = static_cast<int64_t>(first) + rank;
+        const float* tx = tx_positions + static_cast<int64_t>(tx_id[row]) * 3;
+        const float* rx = rx_positions + static_cast<int64_t>(rx_id[row]) * 3;
+        float departure[3];
+        float arrival[3];
+        for (int c = 0; c < 3; ++c) {
+            departure[c] = __fsub_rn(rx[c], tx[c]);
+            arrival[c] = departure[c];
+        }
+        const int row_depth = depth[row];
+        if (depth_width > 0 && row_depth > 0) {
+            int64_t last = row_depth - 1;
+            last = last < depth_width ? last : depth_width - 1;
+            const float* first_point = positions + row * depth_width * 3;
+            const float* last_point = positions + (row * depth_width + last) * 3;
+            for (int c = 0; c < 3; ++c) {
+                departure[c] = __fsub_rn(first_point[c], tx[c]);
+                arrival[c] = __fsub_rn(rx[c], last_point[c]);
+            }
+        }
+        path_endpoint_angles(departure[0], departure[1], departure[2], out_theta_t + slot,
+                             out_phi_t + slot);
+        path_endpoint_angles(-arrival[0], -arrival[1], -arrival[2], out_theta_r + slot,
+                             out_phi_r + slot);
+        out_a[slot] = coefficient[row];
+        out_tau[slot] = delay[row];
+        out_valid[slot] = true;
+        const bool diffraction_row = component_id[row] == 2 && row_depth > 0;
+        for (int64_t k = 0; k < depth_width; ++k) {
+            const int64_t at = slot * depth_width + k;
+            const int64_t source = row * depth_width + k;
+            const int type = interaction_type[source];
+            out_interaction_type[at] = type;
+            out_primitive_id[at] =
+                (k == 0 && diffraction_row) ? edge_id[row] : primitive_sequence[source];
+            out_material_id[at] = material_sequence[source];
+            for (int c = 0; c < 3; ++c) {
+                const float normal = normals[source * 3 + c];
+                out_position[at * 3 + c] = positions[source * 3 + c];
+                out_normal[at * 3 + c] = (type == 2 && !isfinite(normal)) ? 0.0f : normal;
+            }
+        }
+        for (int c = 0; c < 3; ++c) {
+            out_field_xyz[slot * 3 + c] = field_xyz[row * 3 + c];
+            out_field_direction[slot * 3 + c] = field_direction[row * 3 + c];
+        }
+    }
+}
+
+} // namespace
+
+std::vector<at::Tensor> channel_path_pack_padded_cuda(
+    at::Tensor tx_id, at::Tensor rx_id, at::Tensor depth, at::Tensor component_id,
+    at::Tensor edge_id, at::Tensor interaction_type, at::Tensor primitive_sequence,
+    at::Tensor material_sequence, at::Tensor positions, at::Tensor normals, at::Tensor coefficient,
+    at::Tensor delay, at::Tensor field_xyz, at::Tensor field_direction, at::Tensor tx_positions,
+    at::Tensor rx_positions, at::Tensor pair_offsets, int64_t width) {
+    const int64_t row_count = tx_id.size(0);
+    const int64_t depth_width = interaction_type.size(1);
+    check_vec3_table(tx_positions, "tx_positions");
+    check_vec3_table(rx_positions, "rx_positions");
+    const int64_t num_tx = tx_positions.size(0);
+    const int64_t num_rx = rx_positions.size(0);
+    const int64_t pair_count = num_tx * num_rx;
+    for (const auto& [value, name] :
+         std::array<std::pair<const at::Tensor*, const char*>, 5>{{{&tx_id, "tx_id"},
+                                                                   {&rx_id, "rx_id"},
+                                                                   {&depth, "depth"},
+                                                                   {&component_id, "component_id"},
+                                                                   {&edge_id, "edge_id"}}}) {
+        check_cuda_tensor(*value, name, at::kInt, 1);
+        TORCH_CHECK(value->size(0) == row_count, name, " must have one entry per row");
+    }
+    for (const auto& [value, name] : std::array<std::pair<const at::Tensor*, const char*>, 3>{
+             {{&interaction_type, "interaction_type"},
+              {&primitive_sequence, "primitive_sequence"},
+              {&material_sequence, "material_sequence"}}}) {
+        check_cuda_tensor(*value, name, at::kInt, 2);
+        TORCH_CHECK(value->size(0) == row_count && value->size(1) == depth_width, name,
+                    " must have shape (row, depth)");
+    }
+    for (const auto& [value, name] : std::array<std::pair<const at::Tensor*, const char*>, 2>{
+             {{&positions, "interaction_positions"}, {&normals, "interaction_normals"}}}) {
+        check_cuda_tensor(*value, name, at::kFloat, 3);
+        TORCH_CHECK(value->size(0) == row_count && value->size(1) == depth_width &&
+                        value->size(2) == 3,
+                    name, " must have shape (row, depth, 3)");
+    }
+    check_cuda_tensor(coefficient, "coefficient", at::kComplexFloat, 1);
+    check_cuda_tensor(delay, "delay_s", at::kFloat, 1);
+    check_cuda_tensor(field_xyz, "field_xyz", at::kComplexFloat, 2);
+    check_cuda_tensor(field_direction, "field_direction", at::kFloat, 2);
+    check_cuda_tensor(pair_offsets, "pair_offsets", at::kLong, 1);
+    TORCH_CHECK(coefficient.size(0) == row_count && delay.size(0) == row_count,
+                "row fields must match row count");
+    TORCH_CHECK(field_xyz.size(0) == row_count && field_xyz.size(1) == 3 &&
+                    field_direction.size(0) == row_count && field_direction.size(1) == 3,
+                "field_xyz and field_direction must have shape (row, 3)");
+    TORCH_CHECK(pair_offsets.size(0) == pair_count + 1,
+                "pair_offsets must have pair_count + 1 entries");
+    TORCH_CHECK(width >= -1, "width must be -1 (measure) or non-negative");
+    const int device = tx_id.get_device();
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
+    auto long_options = pair_offsets.options();
+    auto first_row = at::empty({std::max<int64_t>(pair_count, 1)}, long_options);
+    auto max_count = at::empty({1}, long_options);
+    C10_CUDA_CHECK(cudaMemsetAsync(first_row.data_ptr<int64_t>(), 0xFF,
+                                   first_row.numel() * sizeof(int64_t), stream));
+    C10_CUDA_CHECK(cudaMemsetAsync(max_count.data_ptr<int64_t>(), 0, sizeof(int64_t), stream));
+    if (row_count > 0) {
+        path_pack_first_row_kernel<<<static_cast<int>(launch_blocks(row_count)), kPathBlockSize, 0,
+                                     stream>>>(
+            row_count, num_tx, tx_id.data_ptr<int>(), rx_id.data_ptr<int>(),
+            pair_offsets.data_ptr<int64_t>(),
+            reinterpret_cast<unsigned long long*>(first_row.data_ptr<int64_t>()),
+            reinterpret_cast<unsigned long long*>(max_count.data_ptr<int64_t>()));
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    if (width < 0) {
+        // The padded width is the largest per-pair path count; reading it is the one host
+        // synchronization of padded packing, taken only when the caller cannot derive it.
+        int64_t host_width = 0;
+        if (row_count > 0) {
+            C10_CUDA_CHECK(cudaMemcpyAsync(&host_width, max_count.data_ptr<int64_t>(),
+                                           sizeof(int64_t), cudaMemcpyDeviceToHost, stream));
+            C10_CUDA_CHECK(cudaStreamSynchronize(stream));
+        }
+        width = host_width;
+    }
+    auto float_options = tx_positions.options();
+    auto int_options = tx_id.options();
+    const int64_t slot_count = pair_count * width;
+    auto out_a = at::empty({slot_count}, coefficient.options());
+    auto out_tau = at::empty({slot_count}, float_options);
+    auto out_theta_t = at::empty({slot_count}, float_options);
+    auto out_phi_t = at::empty({slot_count}, float_options);
+    auto out_theta_r = at::empty({slot_count}, float_options);
+    auto out_phi_r = at::empty({slot_count}, float_options);
+    auto out_valid = at::empty({slot_count}, float_options.dtype(at::kBool));
+    auto out_interaction_type = at::empty({slot_count, depth_width}, int_options);
+    auto out_primitive_id = at::empty({slot_count, depth_width}, int_options);
+    auto out_material_id = at::empty({slot_count, depth_width}, int_options);
+    auto out_position = at::empty({slot_count, depth_width, 3}, float_options);
+    auto out_normal = at::empty({slot_count, depth_width, 3}, float_options);
+    auto out_field_xyz = at::empty({slot_count, 3}, coefficient.options());
+    auto out_field_direction = at::empty({slot_count, 3}, float_options);
+    auto out_num_paths = channel::empty_zero_cuda({pair_count}, int_options, stream);
+    if (slot_count > 0) {
+        path_pack_padded_kernel<<<static_cast<int>(launch_blocks(slot_count)), kPathBlockSize, 0,
+                                  stream>>>(
+            slot_count, width, depth_width, num_tx,
+            reinterpret_cast<const unsigned long long*>(first_row.data_ptr<int64_t>()),
+            pair_offsets.data_ptr<int64_t>(), tx_id.data_ptr<int>(), rx_id.data_ptr<int>(),
+            depth.data_ptr<int>(), component_id.data_ptr<int>(), edge_id.data_ptr<int>(),
+            interaction_type.data_ptr<int>(), primitive_sequence.data_ptr<int>(),
+            material_sequence.data_ptr<int>(), positions.data_ptr<float>(),
+            normals.data_ptr<float>(), coefficient.data_ptr<c10::complex<float>>(),
+            delay.data_ptr<float>(), field_xyz.data_ptr<c10::complex<float>>(),
+            field_direction.data_ptr<float>(), tx_positions.data_ptr<float>(),
+            rx_positions.data_ptr<float>(), out_a.data_ptr<c10::complex<float>>(),
+            out_tau.data_ptr<float>(), out_theta_t.data_ptr<float>(), out_phi_t.data_ptr<float>(),
+            out_theta_r.data_ptr<float>(), out_phi_r.data_ptr<float>(), out_valid.data_ptr<bool>(),
+            out_interaction_type.data_ptr<int>(), out_primitive_id.data_ptr<int>(),
+            out_material_id.data_ptr<int>(), out_position.data_ptr<float>(),
+            out_normal.data_ptr<float>(), out_field_xyz.data_ptr<c10::complex<float>>(),
+            out_field_direction.data_ptr<float>(), out_num_paths.data_ptr<int>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return {out_a,        out_tau,    out_theta_t,          out_phi_t,           out_theta_r,
+            out_phi_r,    out_valid,  out_interaction_type, out_primitive_id,    out_material_id,
+            out_position, out_normal, out_field_xyz,        out_field_direction, out_num_paths};
 }

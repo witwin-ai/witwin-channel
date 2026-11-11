@@ -60,6 +60,9 @@ pybind11::dict channel_path_los_export(
     double frequency_hz,
     torch::Tensor tx_pol);
 torch::Tensor channel_path_concat_vec3(pybind11::sequence blocks);
+pybind11::dict channel_path_pack_padded(pybind11::dict rows, torch::Tensor tx_positions,
+                                        torch::Tensor rx_positions, torch::Tensor pair_offsets,
+                                        int64_t width);
 pybind11::dict channel_path_los_visibility_inputs(
     torch::Tensor tx_positions,
     torch::Tensor rx_positions,
@@ -562,6 +565,9 @@ void register_path(pybind11::module_ &module) {
         "path_concat_vec3",
         &channel_path_concat_vec3,
         "Concatenate path vec3 storage blocks with a CUDA kernel.");
+    module.def(
+        "path_pack_padded", &channel_path_pack_padded,
+        "Pack pair-contiguous evaluated paths into padded per-pair path tensors with angles.");
     module.def(
         "path_los_visibility_inputs",
         &channel_path_los_visibility_inputs,

@@ -48,6 +48,7 @@ from witwin.channel.propagation.enumerated import (
     transmission_dropped_rows,
 )
 from witwin.channel.propagation.consumer import compact_evaluated_paths
+from witwin.channel.kernels import topology as topology_kernels
 from witwin.channel.scene.compiler import (
     compile as compile_scene,
     receiver_positions as _shared_receiver_positions,
@@ -888,12 +889,109 @@ def endpoint_angles(direction: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor
     return theta.to(torch.float32), phi.to(torch.float32)
 
 
+_PATH_RESULT_SCHEMA = {
+    "schema": "PathResult",
+    "schema_version": 1,
+    "max_paths_scope": "per_pair",
+    "stable_order": "input_order_within_receiver_antenna_transmitter_antenna_pair",
+}
+_EVALUATED_PATH_SEMANTICS = {
+    "coefficient_semantics": "unit_excitation_dimensionless_receiver_projection",
+    "coupled_coefficient_semantics": "unified_complex3_jones",
+    "interaction_geometry": "canonical_topology",
+}
+
+
+def _pack_evaluated_paths_native(
+    paths: "EvaluatedPaths", *, num_rx: int, num_tx: int, tx_positions: torch.Tensor,
+    rx_positions: torch.Tensor, pair_offsets: torch.Tensor, width: int | None,
+    metadata: dict[str, Any] | None,
+) -> PathResult:
+    """Pad pair-contiguous evaluated rows and derive their angles in one native pass."""
+
+    topology = paths.topology
+    geometry = paths.geometry
+    fields = paths.fields
+    rows = {
+        "tx_id": topology.tx_id,
+        "rx_id": topology.rx_id,
+        "depth": topology.depth,
+        "component_id": topology.component_id,
+        "edge_id": topology.edge_id,
+        "interaction_type": topology.interaction_type,
+        "primitive_sequence": topology.primitive_sequence,
+        "material_sequence": topology.material_sequence,
+        "interaction_positions": geometry.interaction_positions,
+        "interaction_normals": geometry.interaction_normals,
+        "coefficient": fields.coefficient,
+        "delay_s": geometry.delay_s,
+        "field_xyz": fields.field_xyz,
+        "field_direction": geometry.field_direction,
+    }
+    rows = {
+        name: value.to(dtype=dtype).contiguous()
+        for (name, dtype, _), value in zip(
+            topology_kernels.PATH_PACK_ROW_FIELDS, rows.values(), strict=True
+        )
+    }
+    packed = topology_kernels.path_pack_padded(
+        rows,
+        tx_positions=tx_positions.to(dtype=torch.float32).contiguous(),
+        rx_positions=rx_positions.to(dtype=torch.float32).contiguous(),
+        pair_offsets=pair_offsets,
+        width=width,
+    )
+    max_depth = int(topology.interaction_type.shape[1])
+    path_width = int(packed["tau"].shape[0]) // max(num_rx * num_tx, 1)
+    path_shape = (num_rx, 1, num_tx, 1, path_width)
+    result_metadata = dict(metadata or {})
+    result_metadata.update(_PATH_RESULT_SCHEMA)
+    result_metadata.update(_EVALUATED_PATH_SEMANTICS)
+    return PathResult(
+        a=packed["a"].reshape(*path_shape, 1),
+        tau=packed["tau"].reshape(path_shape),
+        theta_t=packed["theta_t"].reshape(path_shape),
+        phi_t=packed["phi_t"].reshape(path_shape),
+        theta_r=packed["theta_r"].reshape(path_shape),
+        phi_r=packed["phi_r"].reshape(path_shape),
+        valid=packed["valid"].reshape(path_shape),
+        interaction_type=packed["interaction_type"].reshape(*path_shape, max_depth),
+        primitive_id=packed["primitive_id"].reshape(*path_shape, max_depth),
+        material_id=packed["material_id"].reshape(*path_shape, max_depth),
+        position=packed["position"].reshape(*path_shape, max_depth, 3),
+        normal=packed["normal"].reshape(*path_shape, max_depth, 3),
+        num_paths=packed["num_paths"].reshape(num_rx, 1, num_tx, 1),
+        metadata=result_metadata,
+        field_xyz=packed["field_xyz"].reshape(*path_shape, 3),
+        field_direction=packed["field_direction"].reshape(*path_shape, 3),
+    )
+
+
 def from_evaluated_paths(
     paths: "EvaluatedPaths", *, num_rx: int, num_tx: int, tx_positions: torch.Tensor,
     rx_positions: torch.Tensor, metadata: dict[str, Any] | None = None,
+    pair_offsets: torch.Tensor | None = None, width: int | None = None,
 ) -> PathResult:
-    """Pack evaluated propagation rows without losing event sequences."""
+    """Pack evaluated propagation rows without losing event sequences.
 
+    With ``pair_offsets`` (the canonical compaction's per-pair segmentation of
+    rows whose pairs are contiguous) the padding, angles and fills run in one
+    native pass, and ``width`` (when the caller knows the largest pair count)
+    skips its one host read. Without it the rows are packed with
+    differentiable tensor operations, which an AD solve needs.
+    """
+
+    if pair_offsets is not None:
+        return _pack_evaluated_paths_native(
+            paths,
+            num_rx=num_rx,
+            num_tx=num_tx,
+            tx_positions=tx_positions,
+            rx_positions=rx_positions,
+            pair_offsets=pair_offsets,
+            width=width,
+            metadata=metadata,
+        )
     topology = paths.topology
     geometry = paths.geometry
     fields = paths.fields
@@ -1677,6 +1775,19 @@ def _validate_runtime(config: Config) -> tuple[bool, bool, bool]:
     return reflection_available, diffraction_available, path_native_available
 
 
+def _known_path_width(config: Config, path_count: int, pair_count: int) -> int | None:
+    """Largest per-pair path count when the host already knows it, else None."""
+
+    if path_count == 0:
+        return 0
+    if pair_count == 1:
+        return path_count
+    if config.components == frozenset({"los"}):
+        # Line of sight contributes at most one path per pair.
+        return 1
+    return None
+
+
 def _component_path_count(evaluated: Any, config: Config, component: str) -> int:
     """Exported rows of one optional component; read from the device only when requested."""
 
@@ -1737,11 +1848,16 @@ def _pipeline_solve_base(
         source_ids, sink_ids = _stable_endpoint_id_lookups(
             scene, device=evaluated.device
         )
-        evaluated = compact_evaluated_paths(
+        compacted = compact_evaluated_paths(
             evaluated,
             source_stable_ids=source_ids,
             sink_stable_ids=sink_ids,
-        ).evaluated
+        )
+        evaluated = compacted.evaluated
+        pair_offsets = getattr(compacted, "pair_offsets", None)
+    else:
+        compact_metadata = getattr(sidecars, "compact_metadata", None)
+        pair_offsets = None if compact_metadata is None else compact_metadata.pair_offsets
     path_count = evaluated.row_count
     if ad_instrumented:
         torch.cuda.synchronize()
@@ -1773,14 +1889,27 @@ def _pipeline_solve_base(
         # on a graph whose gradients are not the path derivatives.
         tx_positions = tx_positions.detach()
         rx_positions = rx_positions.detach()
+    num_tx = int(tx_positions.shape[0])
+    num_rx = int(rx_positions.shape[0])
+    native_packing: dict[str, Any] = {}
+    if (
+        pack_evaluated_paths is from_evaluated_paths
+        and config.ad_mode == "none"
+        and pair_offsets is not None
+    ):
+        native_packing = {
+            "pair_offsets": pair_offsets,
+            "width": _known_path_width(config, path_count, num_tx * num_rx),
+        }
     return _DeferredPathResult(
         result=pack_evaluated_paths(
             evaluated,
-            num_rx=int(rx_positions.shape[0]),
-            num_tx=int(tx_positions.shape[0]),
+            num_rx=num_rx,
+            num_tx=num_tx,
             tx_positions=tx_positions,
             rx_positions=rx_positions,
             metadata=result_metadata,
+            **native_packing,
         ),
         capacity_transaction=sidecars.capacity_transaction,
     )
