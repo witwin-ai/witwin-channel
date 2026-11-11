@@ -145,6 +145,19 @@ def test_out_of_domain_roughness_raises():
         build_kirchhoff_table(steep, _lossy_layers(60e9, 0.1), 60e9, device=DEVICE)
 
 
+@pytest.mark.parametrize("frequency_hz", [300e9, 1e12])
+def test_very_rough_surface_is_refused_quickly(frequency_hz):
+    """k0*sigma_h above the series bound fails at once instead of building for minutes."""
+
+    import time
+
+    rough = SurfaceRoughness(rms_height_m=0.01, correlation_length_x_m=0.2, correlation_length_y_m=0.2)
+    start = time.perf_counter()
+    with pytest.raises(ValueError, match=r"kirchhoff_domain_exceeded: .*k0\*rms_height_m <= 32"):
+        build_kirchhoff_table(rough, _lossy_layers(frequency_hz, 0.1), frequency_hz, device=DEVICE)
+    assert time.perf_counter() - start < 5.0
+
+
 def test_domain_metadata(table_60ghz):
     table = table_60ghz
     assert table.tangent_plane_ok and table.slope_ok
