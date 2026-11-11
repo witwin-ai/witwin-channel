@@ -446,3 +446,204 @@ python benchmarks/fullwave_validation/experiments/build_reference_set.py estimat
 python benchmarks/fullwave_validation/experiments/build_reference_set.py submit --tasks tasks.json --data-dir out --max-credits 20
 python benchmarks/fullwave_validation/experiments/build_reference_set.py extract --tasks tasks.json --data-dir out
 ```
+
+## Coverage cases (`role: coverage`)
+
+The fit and holdout cases cover free-standing PEC wedges, a half-plane and
+cubes. The coverage cases test the rest of what the deterministic solver claims:
+
+- lossy and multilayer wall reflection and transmission;
+- reflection up to third order;
+- double diffraction;
+- reflection-diffraction chains;
+- lossy dielectric wedges;
+- a ground plane;
+- horizontal and vertical polarization;
+- two more frequencies.
+
+The 23 Tidy3D tasks cost 3.60 FlexCredits. They are 15 stored maps, 5 free-space
+calibrations, a 1 mm convergence run, and two discarded trihedral runs (described
+below).
+
+| Case | Scene | Claim under test |
+| --- | --- | --- |
+| `wall_concrete_z`, `_y` | infinite 0.1 m concrete slab (eps_r 5.24, 0.163 S/m), through the PML | reflection off a lossy wall at 0-80 degrees, TE and TM (the TM case crosses Brewster at 66 degrees); thin-wall transmission |
+| `wall_layered_z`, `_y` | infinite symmetric wall: 2 / 15 / 2 cm with eps_r 3 / 6.5 / 3 | multilayer reflection and transmission |
+| `wall_concrete_z_2g4` | concrete wall at 2.4 GHz | frequency dependence of material and spreading |
+| `cube_concrete_z`, `_x` | single-cube layout, concrete | lossy dielectric wedge diffraction |
+| `trihedral_z`, `_x` | inner corner of three finite PEC plates | reflection depth 1-3 with polarization, plate edges |
+| `double_edge_y`, `_z` | two parallel PEC screens, infinite in y | double diffraction behind both screens |
+| `wall_column_z`, `_y` | infinite PEC column 0.2 m in front of an infinite concrete wall | reflection-diffraction chains |
+| `canyon_z_3g5`, `_x_3g5` | four concrete blocks with crossing streets on a concrete ground, 3.5 GHz | a small city: everything above at once |
+
+**Grids and calibration.**
+- Dielectric walls refine only the axis normal to the wall:
+  - 1 mm or 0.5 mm inside the slab, 2 mm elsewhere.
+  - Range ends lie on the 2 mm lattice, and extraction keeps only the decimated
+    lattice nodes, so the maps are still uniform and interpolation-free.
+- Every structure that crosses the PML stands for an unbounded one:
+  - In Channel it becomes a 40 m block.
+  - `classify_regions` ignores the edges and edge ends outside the simulated domain.
+- 5 GHz cases use the existing `empty_z` / `empty_x` calibration.
+  - The refined grid (`empty_z_refined`) shifts that constant by 1.7 degrees and
+    leaves its magnitude unchanged.
+- 3.5 GHz and 2.4 GHz cases have their own free-space runs. Their constant is flat
+  to +-0.4 % and their phase drift is -4.4 degrees/m (z) and -3.6 degrees/m.
+- A 1 mm run of `wall_concrete_z` (`wall_concrete_z_fine`, map not stored) agrees
+  with the 2 mm reference to 0.09-0.11 dB RMS and 0.1 % NMSE in every region.
+  This converges both the dielectric interface and the slab interior.
+
+**Grid guard.**
+- `build_tidy3d_simulation` refuses a case whose 2 mm lattice, zero-thickness plate
+  or monitor plane is not a grid node.
+- The guard exists because of the first trihedral run. Its z extent, 0.6 m, came
+  out as 300.0000001 cells, so Tidy3D stretched the grid to 301 cells. The z = 0
+  ground plate then fell between nodes and vanished: the stored field had no
+  ground reflection at all.
+- Those maps were discarded and the case was rerun.
+
+### Results
+
+**Results** (`max_depth` 3 for the trihedral, screens, wall-column and canyon
+cases, 2 otherwise; coupled paths on). Entries are RMS dB error / complex NMSE.
+
+| Case / plane | lit | shadow | transition | corner |
+| --- | --- | --- | --- | --- |
+| `wall_concrete_z` -0.06 / -0.18 | 0.68 / 0.013, 1.10 / 0.007 | 0.83 / 0.046, 0.68 / 0.052 | - | - |
+| `wall_concrete_y` -0.06 / -0.18 | 1.11 / 0.009, 0.35 / 0.002 | 0.72 / 0.042, 0.97 / 0.057 | - | - |
+| `wall_layered_z` | 0.84 / 0.014, 1.15 / 0.009 | 1.67 / 0.242, 1.42 / 0.349 | - | - |
+| `wall_layered_y` | 1.26 / 0.009, 0.76 / 0.004 | 1.98 / 0.143, 2.75 / 0.247 | - | - |
+| `wall_concrete_z_2g4` | 1.03 / 0.054, 1.09 / 0.018 | 0.88 / 0.031, 0.71 / 0.026 | - | - |
+| `cube_concrete_z` 0.1 | 0.37 / 0.006 | 3.91 / 0.164 (+1.9 dB bias) | 0.93 / 0.022 | 1.74 / 0.013 |
+| `cube_concrete_x` 0.1 | 0.37 / 0.003 | 3.44 / 0.168 (+1.7 dB bias) | 0.97 / 0.035 | 1.23 / 0.007 |
+| `trihedral_z` 0.08 / 0.26 | 0.69 / 0.003, 0.71 / 0.008 | 0.32, 1.06 | 0.44, 0.57 | 0.77, 0.77 |
+| `trihedral_x` 0.08 / 0.26 | 0.79 / 0.006, 0.97 / 0.008 | 4.23 / 1.65, 3.67 / 0.61 | 1.57, 1.57 | 0.77, 4.33 / 1.34 |
+| `double_edge_y` -0.15 / 0.1 | 0.70, 0.27 | 1.62 / 0.134, 0.16 | -, 2.26 | - |
+| `double_edge_z` -0.15 / 0.1 | 1.59, 0.11 | 1.95 / 0.077, 0.07 | -, 1.49 | - |
+| `wall_column_z` / `_y` | 1.09, 1.12 | 2.94 / 0.140, 1.85 / 0.079 | 0.74, 1.47 | - |
+| `canyon_z_3g5` 0.06 / 0.16 | 1.77 / 0.039, 1.54 / 0.060 | 4.23 / 1.56, 2.51 / 0.52 | 2.85, 2.34 | 2.22, 2.23 |
+| `canyon_x_3g5` 0.06 / 0.16 | 2.61 / 0.030, 3.06 / 0.045 | 1.50 / 1.04, 1.71 / 0.43 | 2.95, 2.62 | 3.22, 2.26 |
+
+### Validated claims
+
+- **Multi-bounce specular reflection.**
+  - Inside the trihedral corner, Channel's LoS-plus-reflection field equals
+    eight-image theory to 1e-9 NMSE at depths 1, 2 and 3.
+  - The full-wave field agrees with that image field to 0.3-1.2 % NMSE in the
+    inner 0.44 m square. The remainder is diffraction from the finite plates.
+  - The lit regions agree to 0.7-1.0 dB.
+- **Lossy wall reflection, TE and TM, through Brewster:** 0.35-1.1 dB.
+- **Thin-wall transmission, magnitude and phase.**
+  - Shadow NMSE is 3-6 %.
+  - An independent straight-ray layer-stack model, which carries the
+    `exp(+j k d cos(theta))` carrier correction for the slab thickness, gives the
+    same NMSE.
+  - Without that correction the NMSE would be 2.8, so Channel's phase reference
+    is right.
+- **Double diffraction behind two screens:** 1.6-2.0 dB.
+- **Frequency scaling at 2.4 and 3.5 GHz:** no frequency-specific error appears.
+
+### Model-class residuals (tolerances, not defects)
+
+- **Layered-wall transmitted region:** 1.4-2.8 dB, NMSE 0.14-0.35.
+  - The independent straight-ray layer-stack model gives the same numbers to 0.01 dB.
+  - The difference from full-wave is the thin-sheet model: no refraction, no
+    lateral displacement of the internal multiple reflections.
+- **Concrete-cube deep shadow:** +1.7-1.9 dB too bright.
+  - Full-wave puts the concrete shadow 2.2 dB (z) and 3.1 dB (x) below the PEC
+    cube's. Channel's finite-conductivity wedge coefficient puts it only 0.7 and 1.3 dB
+    below.
+  - Luebbers-type face coefficients leave the incident-shadow terms PEC-like.
+- **Wall planes under the transmitter:** errors from the dipole's near field and
+  axis null. Channel's antennas are far-field.
+- **Canyon:** `max_depth` 4 lowers the shadow error further than 3 does.
+
+### Defects found (candidates for fixes; physics unchanged here)
+
+- **D1: reflection in-face tolerance scales with the face size.**
+  - Location: `native/channel/kernels/paths.cu`, `kReflectionBaryEps = 1e-4` on barycentrics.
+  - A hit up to 1e-4 x the face size past a boundary edge still counts, so on large
+    faces the reflection support overshoots the edge and misses the UTD RSB term.
+  - Measured on the screens:
+
+    | Screen size | Overshoot past the edge |
+    | ---: | ---: |
+    | 40 m | 3.96 mm |
+    | 4 m | 0.38 mm |
+    | 0.4 m | 0 |
+
+  - Effect: the `double_edge` RSB p95 jump excess is 6.3 / 4.3 dB. With a 1.2 m
+    screen it is 2.4 / 0.0 dB.
+- **D2: dielectric UTD face reflection uses the edge-plane angle.**
+  - Location: `utd::reciprocal_face_cosines`, which uses `(|sin phi| + |sin phi'|) / 2`.
+  - Geometric-optics reflection uses the 3D incidence angle, `sin(beta0) sin(phi')`
+    at the boundary.
+  - Channel-only probe on a concrete half-plane, sampled across its RSB:
+
+    | Edge type | Incidence | Residual jump, fraction of R |
+    | --- | --- | ---: |
+    | PEC | any skew | 0.002 |
+    | Concrete | no skew | 0.002 |
+    | Concrete | 45-degree skew | 0.26-0.28 |
+
+- **D3: UTD face operator uses half-space Fresnel; reflection uses the layer stack.**
+  - The UTD face operator evaluates half-space Fresnel from one (eta, sigma) per face.
+  - Geometric-optics reflection uses the full layer stack.
+  - RSB residual, no skew:
+
+    | Face material | Residual jump, fraction of R |
+    | --- | ---: |
+    | 0.1 m concrete slab | 0.05 |
+    | 6 mm glass | 0.38-0.42 |
+    | the layered wall | 0.54-0.60 |
+
+  - Effect, with D2: `cube_concrete` RSB excess 3.8 / 2.1 dB, against 0.8 / 0.05 dB for PEC.
+- **D4: coupled chains do not compensate a reflected path blocked by another object.**
+  - Where another object shadows a reflected path, the coupled R-D/D-R component
+    is continuous: its step is 0.3-0.8 % of R. The total field therefore steps by
+    the full |R|.
+  - Measured in a Channel-only probe of the wall-column alley. A PEC wall behaves
+    the same.
+  - Effect: `wall_column` RSB excess 5.4 / 2.4 dB; canyon RSB excess 2.8-8.6 dB.
+- **D5: coincident edges of separate structures are diffracted independently.**
+  - Each separate structure's coincident boundary edges are diffracted as their
+    own half-planes or convex wedges. Examples: plates meeting at a corner, and
+    building bases standing on a ground.
+  - `trihedral_x`:
+
+    | Region | Separate plates | One welded mesh |
+    | --- | ---: | ---: |
+    | shadow | 4.23 dB / 1.65 | 1.61 dB / 0.10 |
+    | corner | 4.33 dB / 1.34 | 2.15 dB / 0.49 |
+
+  - `canyon_z` shadow: 4.23 dB / 1.56 as built, 2.92 dB / 0.85 with the block
+    bases hidden 5 cm below the ground.
+  - City imports that place building meshes on a ground mesh have this geometry.
+- **D6 (minor): a receiver exactly on an RSB loses half the reflected field.**
+  - At that receiver the reflection counts as visible while the diffraction takes
+    the far-side value, so the total is off by R/2 on that one sample.
+- **Unexplained: canyon LoS boundaries.**
+  - At the LoS boundaries of the blocks standing on the ground, the field is
+    compensated only to 25 % of the LoS (median, Channel-only probe). On the free
+    concrete cube it is 4 %.
+  - Canyon ISB excess is 2.0-3.7 dB. The cause is not isolated.
+
+### Gate
+
+**What the gate checks.**
+- `tests/accuracy/test_fullwave.py` gives every coverage region and boundary a
+  ceiling under the same rule as the fit cases.
+- Each metric that one of the defects above explains is not given a wider
+  ceiling. Instead it runs as a strict xfail in
+  `test_deterministic_fullwave_known_gaps`, against the error the model class
+  reaches without that defect. There are 23 such metrics.
+- Each xfail reason records the measured value and its diagnosis.
+- A fix makes its xfail pass unexpectedly. The fixer then moves that metric into
+  the ordinary ceilings.
+
+**Cost.** The gate solves 23 cases in about 12 s.
+
+**Harness tests.** `tests/validation/test_fullwave_reference_set.py` checks:
+- the stored labels and fingerprints;
+- slab and refined-grid construction;
+- the grid guard (with Tidy3D installed).
