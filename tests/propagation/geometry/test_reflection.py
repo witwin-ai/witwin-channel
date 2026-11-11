@@ -77,6 +77,7 @@ def test_reflection_epc_query_names_raw_geometry_and_preserves_identity(monkeypa
         "surface_group_members",
         "max_bounces",
         "visibility_ignore_mode",
+        "min_segment_length",
     ]
     assert [field.name for field in fields(result)] == [
         "visible",
@@ -100,6 +101,7 @@ def test_reflection_epc_query_names_raw_geometry_and_preserves_identity(monkeypa
             surface_group_members,
             2,
             1,
+            0.0,
         )
     ]
     assert result.visible is raw[0]

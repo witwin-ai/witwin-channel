@@ -111,3 +111,14 @@ def test_solve_refuses_another_solvers_config(solver: str, other: str) -> None:
 def test_solve_refuses_a_non_config(solver: str) -> None:
     with pytest.raises(TypeError, match="requires config to be"):
         _module(solver).solve(Scene(), {"max_depth": 1}, reference_frequency_hz=3.5e9)
+
+
+@pytest.mark.parametrize("solver", ["deterministic", "path"])
+def test_discovery_accepts_the_three_sources_and_refuses_others(solver: str) -> None:
+    config_type = _module(solver).Config
+    for value in ("auto", "exhaustive", "rays"):
+        assert config_type(discovery=value).discovery == value
+    assert config_type().discovery == "auto"
+    for bad in ("tree", "Auto", ""):
+        with pytest.raises(ValueError, match="discovery must be one of"):
+            config_type(discovery=bad)
