@@ -259,17 +259,6 @@ def _evaluated_paths_capacity_pack_jvp_native(*args: object) -> object:
     return _required_native_op("evaluated_paths_capacity_pack_jvp")(*args)
 
 
-def _enumerated_capacity_failure_vector_sanitize_native(
-    failure_state_bits: torch.Tensor, values: torch.Tensor,
-) -> torch.Tensor:
-    output = _required_native_op("enumerated_capacity_failure_vector_sanitize")(
-        failure_state_bits, values
-    )
-    if not isinstance(output, torch.Tensor):
-        raise TypeError("native enumerated vector sanitizer returned a non-tensor")
-    return output
-
-
 def _candidate_tensors(paths: EvaluatedPaths) -> tuple[torch.Tensor, ...]:
     topology = paths.topology
     geometry = paths.geometry
@@ -434,65 +423,6 @@ def enumerated_capacity_failure_sanitize(
     return EvaluatedPaths(topology=topology, geometry=geometry, fields=fields)
 
 
-class _EnumeratedCapacityFailureVectorSanitizeFunction(torch.autograd.Function):
-    """Failure-aware complex-vector identity with native VJP/JVP copies."""
-
-    @staticmethod
-    def forward(failure_state_bits, values):
-        return _enumerated_capacity_failure_vector_sanitize_native(
-            failure_state_bits, values
-        )
-
-    @staticmethod
-    def setup_context(ctx, inputs, output):
-        del output
-        ctx.set_materialize_grads(False)
-        failure_state_bits = torch.autograd.forward_ad.unpack_dual(inputs[0]).primal
-        ctx.save_for_backward(failure_state_bits)
-        ctx.save_for_forward(failure_state_bits)
-
-    @staticmethod
-    @_ad_first_order_only
-    def backward(ctx, grad_output):
-        if grad_output is None or not ctx.needs_input_grad[1]:
-            return None, None
-        (failure_state_bits,) = ctx.saved_tensors
-        grad_values = _enumerated_capacity_failure_vector_sanitize_native(
-            failure_state_bits, grad_output
-        )
-        return None, grad_values
-
-    @staticmethod
-    def jvp(ctx, _failure_tangent, values_tangent):
-        values_tangent = _ad_native_tangent_or_none(values_tangent)
-        if values_tangent is None:
-            return None
-        (failure_state_bits,) = (
-            _ad_native_tensor(value) for value in ctx.saved_tensors
-        )
-        with disable_functorch():
-            return _enumerated_capacity_failure_vector_sanitize_native(
-                failure_state_bits, values_tangent
-            )
-
-
-def enumerated_capacity_failure_vector_sanitize(
-    values: torch.Tensor, *, failure_state: CapacityFailureState,
-) -> torch.Tensor:
-    """Sanitize the deterministic diffraction vector sidecar on failure."""
-
-    if not isinstance(values, torch.Tensor):
-        raise TypeError("diffraction_vector_field must be a torch.Tensor")
-    if not values.is_cuda or values.dtype != torch.complex64:
-        raise ValueError("diffraction_vector_field must be a CUDA complex64 tensor")
-    if values.ndim != 3 or values.shape[2] != 3:
-        raise ValueError("diffraction_vector_field must have shape (T, R, 3)")
-    require_capacity_failure_state(failure_state, device=values.device)
-    return _EnumeratedCapacityFailureVectorSanitizeFunction.apply(
-        failure_state.bits, values
-    )
-
-
 def sanitize_enumerated_capacity_transaction(
     paths: EvaluatedPaths, sidecars: EvaluatedPathSidecars,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
@@ -506,12 +436,7 @@ def sanitize_enumerated_capacity_transaction(
     sanitized = enumerated_capacity_failure_sanitize(
         paths, failure_state=transaction.failure_state
     )
-    vector_field = sidecars.diffraction_vector_field
-    if vector_field is not None:
-        vector_field = enumerated_capacity_failure_vector_sanitize(
-            vector_field, failure_state=transaction.failure_state
-        )
-    return sanitized, replace(sidecars, diffraction_vector_field=vector_field)
+    return sanitized, sidecars
 
 
 # --- The canonical typed engine for enumerated propagation paths ------------
@@ -775,7 +700,6 @@ def evaluate_enumerated_paths(
     visibility_rejection_count = 0
     candidate_count = 0
     guardrail_count = 0
-    diffraction_vector_field = None
     capacity_execution: CapacityExecutionCounts | None = None
     capacity_transaction: SolveCapacityTransaction | None = None
 
@@ -820,17 +744,15 @@ def evaluate_enumerated_paths(
         candidate_count += int(reflection_candidates)
         blocks.append(block)
     if "diffraction" in components and config.max_depth >= 1:
-        block, diffraction_launches, diffraction_vector_field = (
-            _diffraction_topology_order1(
-                scene,
-                compiled,
-                tx_positions,
-                tx_power,
-                rx_positions,
-                frequency_hz=frequency_hz,
-                isb_boundary_taper_width=isb_boundary_taper_width,
-                tx_polarizations=diffraction_tx_polarizations,
-            )
+        block, diffraction_launches = _diffraction_topology_order1(
+            scene,
+            compiled,
+            tx_positions,
+            tx_power,
+            rx_positions,
+            frequency_hz=frequency_hz,
+            isb_boundary_taper_width=isb_boundary_taper_width,
+            tx_polarizations=diffraction_tx_polarizations,
         )
         launch_count += diffraction_launches
         candidate_count += int(block["valid"].numel())
@@ -960,7 +882,6 @@ def evaluate_enumerated_paths(
                 discovery_record.metadata(discovery) if discovery_record is not None else None
             ),
         ),
-        diffraction_vector_field=diffraction_vector_field,
         capacity_execution=capacity_execution,
         capacity_transaction=capacity_transaction,
     )

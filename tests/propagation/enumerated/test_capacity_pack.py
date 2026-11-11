@@ -11,7 +11,6 @@ import torch
 from witwin.channel.propagation import enumerated as capacity_module
 from witwin.channel.propagation.enumerated import (
     enumerated_capacity_failure_sanitize,
-    enumerated_capacity_failure_vector_sanitize,
 )
 from witwin.channel.propagation.rows import (
     EvaluatedPaths,
@@ -145,15 +144,8 @@ def _with_continuous(paths: EvaluatedPaths, values: dict[str, torch.Tensor]) -> 
 def test_failure_sanitizers_preserve_success_and_zero_invalid_poison() -> None:
     paths = _paths([True, False, True])
     state = create_capacity_failure_state(paths.topology.valid)
-    vector = torch.complex(
-        torch.arange(18, device="cuda", dtype=torch.float32).reshape(2, 3, 3),
-        torch.ones((2, 3, 3), device="cuda"),
-    ).transpose(0, 1)
 
     output = enumerated_capacity_failure_sanitize(paths, failure_state=state)
-    vector_output = enumerated_capacity_failure_vector_sanitize(
-        vector, failure_state=state
-    )
 
     assert output.topology.valid.tolist() == [True, False, True]
     for name, source in _continuous(paths).items():
@@ -164,20 +156,14 @@ def test_failure_sanitizers_preserve_success_and_zero_invalid_poison() -> None:
             assert torch.equal(invalid, torch.full_like(invalid, -1.0))
         else:
             assert torch.count_nonzero(invalid).item() == 0
-    torch.testing.assert_close(vector_output, vector)
-    assert vector_output.is_contiguous()
 
 
-def test_mixed_capacity_failure_makes_paths_and_vector_sidecar_fully_inert() -> None:
+def test_mixed_capacity_failure_makes_paths_fully_inert() -> None:
     paths = _paths([True, False, True])
     state = create_capacity_failure_state(paths.topology.valid)
     state.bits.fill_(int(CapacityFailureBit.SEGMENT_PENETRATION_FAILURE))
-    vector = torch.full((2, 4, 3), complex(float("nan"), float("nan")), device="cuda")
 
     output = enumerated_capacity_failure_sanitize(paths, failure_state=state)
-    vector_output = enumerated_capacity_failure_vector_sanitize(
-        vector, failure_state=state
-    )
 
     assert not output.topology.valid.any().item()
     assert output.topology.tx_id.tolist() == [-1, -1, -1]
@@ -187,49 +173,6 @@ def test_mixed_capacity_failure_makes_paths_and_vector_sidecar_fully_inert() -> 
             assert torch.equal(value, torch.full_like(value, -1.0))
         else:
             assert torch.count_nonzero(value).item() == 0
-    assert torch.count_nonzero(vector_output).item() == 0
-    assert not torch.isnan(vector_output.real).any().item()
-    assert not torch.signbit(vector_output.real).any().item()
-    assert not torch.signbit(vector_output.imag).any().item()
-
-
-def test_vector_failure_sanitizer_is_native_vjp_jvp_identity_on_success() -> None:
-    base = torch.complex(
-        torch.arange(18, device="cuda", dtype=torch.float32).reshape(2, 3, 3),
-        torch.ones((2, 3, 3), device="cuda"),
-    )
-    values = base.transpose(0, 1).detach().requires_grad_(True)
-    state = create_capacity_failure_state(values)
-    output = enumerated_capacity_failure_vector_sanitize(values, failure_state=state)
-    cotangent = (
-        torch.complex(torch.ones_like(output.real), torch.full_like(output.real, 2.0))
-        .transpose(0, 1)
-        .contiguous()
-        .transpose(0, 1)
-    )
-    (gradient,) = torch.autograd.grad(
-        output,
-        (values,),
-        grad_outputs=(cotangent,),
-    )
-    torch.testing.assert_close(gradient, cotangent)
-
-    tangent = (
-        torch.complex(
-            torch.full_like(values.real, 3.0), torch.full_like(values.real, -4.0)
-        )
-        .transpose(0, 1)
-        .contiguous()
-        .transpose(0, 1)
-    )
-    with torch.autograd.forward_ad.dual_level():
-        dual = torch.autograd.forward_ad.make_dual(values.detach(), tangent)
-        dual_output = enumerated_capacity_failure_vector_sanitize(
-            dual, failure_state=state
-        )
-        actual_tangent = torch.autograd.forward_ad.unpack_dual(dual_output).tangent
-        assert actual_tangent is not None
-        torch.testing.assert_close(actual_tangent, tangent)
 
 
 def test_enumerated_failure_sanitizer_vjp_jvp_are_native_and_dual() -> None:

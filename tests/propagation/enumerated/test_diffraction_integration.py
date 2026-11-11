@@ -138,7 +138,7 @@ def _fixture(monkeypatch, events, *, states_per_tx: int, tx_count: int = 2):
 def test_every_transmitter_is_packed_planned_and_exported_in_one_call_per_stage(monkeypatch):
     events: list[str] = []
     scene, compiled, queries, compacts = _fixture(monkeypatch, events, states_per_tx=3)
-    block, launches, vector_field = diffraction._diffraction_topology_order1(
+    block, launches = diffraction._diffraction_topology_order1(
         scene, compiled, torch.zeros((2, 3)), torch.ones(2), torch.ones((4, 3)), frequency_hz=3.0e9
     )
     assert events == ["pack2", "visibility:True", "export", "compact"]
@@ -146,17 +146,13 @@ def test_every_transmitter_is_packed_planned_and_exported_in_one_call_per_stage(
     assert queries[0].state_count == 6 and queries[0].capacity == 24
     (rows,) = block["blocks"]
     assert sorted(set(rows["tx_id"].tolist())) == [0, 1]
-    # Every (tx, rx) pair received three unit vector-field contributions.
-    torch.testing.assert_close(
-        vector_field[:, :, 0], torch.full((2, 4), 3.0, dtype=torch.complex64)
-    )
 
 
 def test_receiver_chunks_shift_receiver_ids(monkeypatch):
     monkeypatch.setattr(diffraction, "_MULTIBOUNCE_PAIR_CHUNK_SIZE", 12)
     events: list[str] = []
     scene, compiled, queries, compacts = _fixture(monkeypatch, events, states_per_tx=3)
-    block, launches, _ = diffraction._diffraction_topology_order1(
+    block, launches = diffraction._diffraction_topology_order1(
         scene, compiled, torch.zeros((2, 3)), torch.ones(2), torch.ones((4, 3)), frequency_hz=3.0e9
     )
     assert launches == 2
@@ -173,7 +169,7 @@ def test_no_visible_state_capacity_calls_no_exporter(monkeypatch):
         "query_diffraction_order1",
         lambda _query: pytest.fail("empty state capacity must not call the exporter"),
     )
-    block, launches, _ = diffraction._diffraction_topology_order1(
+    block, launches = diffraction._diffraction_topology_order1(
         scene, compiled, torch.zeros((2, 3)), torch.ones(2), torch.ones((4, 3)), frequency_hz=3.0e9
     )
     assert launches == 0

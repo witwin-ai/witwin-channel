@@ -105,7 +105,6 @@ def _evaluated_paths_fixture() -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
             ad_companion_launches=96,
             ad_tape_bytes=97,
         ),
-        diffraction_vector_field=field_xyz * 3.0,
     )
     return evaluated, sidecars
 

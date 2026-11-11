@@ -98,7 +98,6 @@ def _evaluated_paths(
     evaluated = EvaluatedPaths(topology=topology, geometry=geometry, fields=fields)
     sidecars = EvaluatedPathSidecars(
         execution=PathExecutionStats(101, 102, 103, 104, 105, 106, 107),
-        diffraction_vector_field=complex_vector * 3.0,
     )
     return evaluated, sidecars
 
@@ -222,7 +221,6 @@ def test_typed_scattering_append_preserves_prefix_and_sidecars(
     assert typed_sidecars.execution.selected_edge_count == 103
     assert typed_sidecars.execution.ad_companion_launches == 106
     assert typed_sidecars.execution.ad_tape_bytes == 107
-    assert typed_sidecars.diffraction_vector_field is sidecars.diffraction_vector_field
     assert info["path_count"] == 2
 
 

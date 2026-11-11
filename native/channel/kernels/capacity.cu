@@ -111,30 +111,6 @@ int launch_blocks(int64_t count) {
     return static_cast<int>((count + kBlockSize - 1) / kBlockSize);
 }
 
-__global__ void enumerated_capacity_failure_vector_sanitize_kernel(
-    const int *failure_state,
-    const cfloat *input,
-    cfloat *output,
-    int64_t dim0,
-    int64_t dim1,
-    int64_t stride0,
-    int64_t stride1,
-    int64_t stride2) {
-    const int64_t count = dim0 * dim1 * 3;
-    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
-    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         index < count;
-         index += stride) {
-        const int64_t component = index % 3;
-        const int64_t column = (index / 3) % dim1;
-        const int64_t row = index / (dim1 * 3);
-        const int64_t source = row * stride0 + column * stride1 + component * stride2;
-        output[index] = failure_state[0] == 0
-            ? input[source]
-            : cfloat(0.0f, 0.0f);
-    }
-}
-
 }  // namespace
 
 pybind11::dict channel_enumerated_capacity_failure_sanitize(
@@ -194,32 +170,6 @@ pybind11::dict channel_enumerated_capacity_failure_sanitize(
     result["valid"] = output_valid;
     output.append_to(result);
     return result;
-}
-
-at::Tensor channel_enumerated_capacity_failure_vector_sanitize(
-    at::Tensor failure_state,
-    at::Tensor values) {
-    TORCH_CHECK(values.is_cuda(), "diffraction_vector_field must be a CUDA tensor");
-    TORCH_CHECK(
-        values.scalar_type() == at::kComplexFloat,
-        "diffraction_vector_field must use complex64");
-    TORCH_CHECK(values.dim() == 3, "diffraction_vector_field must have rank 3");
-    TORCH_CHECK(values.size(2) == 3, "diffraction_vector_field must end in vec3");
-    channel::capacity::validate_failure_state(failure_state, values);
-    const c10::cuda::CUDAGuard device_guard(values.device());
-    auto output = at::empty(values.sizes(), values.options());
-    const int64_t count = values.numel();
-    if (count > 0) {
-        cudaStream_t stream =
-            at::cuda::getCurrentCUDAStream(values.get_device()).stream();
-        enumerated_capacity_failure_vector_sanitize_kernel<<<
-            launch_blocks(count), kBlockSize, 0, stream>>>(
-            failure_state.data_ptr<int>(), values.data_ptr<cfloat>(),
-            output.data_ptr<cfloat>(), values.size(0), values.size(1),
-            values.stride(0), values.stride(1), values.stride(2));
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-    return output;
 }
 
 // ==== Section: Monte Carlo capacity sanitization ====

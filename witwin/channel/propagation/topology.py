@@ -263,7 +263,6 @@ class EvaluatedPathSidecars:
     """Non-row and optional data separated from ``EvaluatedPaths``."""
 
     execution: PathExecutionStats
-    diffraction_vector_field: torch.Tensor | None
     capacity_execution: CapacityExecutionCounts | None = None
     capacity_transaction: SolveCapacityTransaction | None = None
     compact_metadata: topology_kernels.ExactPairMetadata | None = None
@@ -415,7 +414,6 @@ def evaluated_paths_from_result(paths: object) -> tuple[EvaluatedPaths, Evaluate
             ad_companion_launches=0,
             ad_tape_bytes=0,
         ),
-        diffraction_vector_field=None,
     )
     return evaluated, sidecars
 

@@ -1932,21 +1932,6 @@
       "python_owners": ["witwin.channel.propagation.enumerated._EnumeratedCapacityFailureSanitizeFunction"]
     },
     {
-      "name": "enumerated_capacity_failure_vector_sanitize",
-      "target": "channel_enumerated_capacity_failure_vector_sanitize",
-      "return_type": "torch::Tensor",
-      "doc": "Sanitize the enumerated diffraction vector sidecar before terminal failure.",
-      "parameters": [
-        ["failure_state", "torch::Tensor", null],
-        ["values", "torch::Tensor", null]
-      ],
-      "pybind_arguments": [
-        ["failure_state", null],
-        ["values", null]
-      ],
-      "python_owners": ["witwin.channel.propagation.enumerated._enumerated_capacity_failure_vector_sanitize_native"]
-    },
-    {
       "name": "enumerated_exact_pair_metadata",
       "target": "channel_enumerated_exact_pair_metadata",
       "return_type": "pybind11::dict",

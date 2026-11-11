@@ -351,13 +351,12 @@ def _deterministic_diffraction_states(
 
 
 def _diffraction_block(
-    out: DiffractionOrder1Geometry, *, rx_start: int, rx_count: int, vector_field: torch.Tensor,
+    out: DiffractionOrder1Geometry, *, rx_start: int,
 ) -> dict[str, torch.Tensor] | None:
     """Compact one batched exporter output into a diffraction topology block.
 
     The rows carry the exporter's UTD vector field as ``field_xyz`` and no scalar fields; the
-    field stage evaluates those. The vector fields are summed per (tx, rx) into
-    ``vector_field`` before any scalar reduction, which would lose vector coherence.
+    field stage evaluates those.
     """
 
     with cuda_profile_range(CudaProfileRange.DIFFRACTION_TOPOLOGY_PACKING):
@@ -379,8 +378,6 @@ def _diffraction_block(
         )
     if int(block["valid"].shape[0]) == 0:
         return None
-    pair = block["tx_id"].to(dtype=torch.long) * rx_count + block["rx_id"].to(dtype=torch.long)
-    vector_field.view(-1, 3).index_add_(0, pair, block["field_xyz"])
     return _ensure_topology_fields(block)
 
 
@@ -418,7 +415,7 @@ def _diffraction_topology_order1(
     scene: Scene, compiled: object, tx_positions: torch.Tensor, tx_power: torch.Tensor,
     rx_positions: torch.Tensor, *, frequency_hz: float, isb_boundary_taper_width: float = 0.0,
     tx_polarizations: torch.Tensor | None = None,
-) -> tuple[dict[str, torch.Tensor], int, torch.Tensor]:
+) -> tuple[dict[str, torch.Tensor], int]:
     """Order-1 diffraction topology for every transmitter and receiver.
 
     ``tx_polarizations`` carries explicit per-transmitter polarizations when the
@@ -447,11 +444,6 @@ def _diffraction_topology_order1(
                 }
             ),
             0,
-            torch.zeros(
-                (int(tx_positions.shape[0]), int(rx_positions.shape[0]), 3),
-                device=device,
-                dtype=torch.complex64,
-            ),
         )
     if not rayd.available:
         raise RuntimeError(
@@ -471,11 +463,6 @@ def _diffraction_topology_order1(
     wavelength = _LIGHT_SPEED_M_PER_S / float(frequency_hz)
     handle = rayd.require_resource()
     blocks: list[dict[str, torch.Tensor]] = []
-    vector_field = torch.zeros(
-        (int(tx_positions.shape[0]), int(rx_positions.shape[0]), 3),
-        device=device,
-        dtype=torch.complex64,
-    )
     launch_count = 0
     rx_count = int(rx_positions.shape[0])
     plan = prepare_diffraction_order1_plan(
@@ -523,13 +510,10 @@ def _diffraction_topology_order1(
                     )
                 )
             launch_count += 1
-            block = _diffraction_block(
-                out, rx_start=rx_start, rx_count=rx_count, vector_field=vector_field
-            )
+            block = _diffraction_block(out, rx_start=rx_start)
             if block is not None:
                 blocks.append(block)
     return (
         _ensure_topology_fields(concatenate_path_blocks(blocks, device=device)),
         launch_count,
-        vector_field,
     )

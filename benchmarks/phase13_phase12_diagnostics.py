@@ -203,9 +203,14 @@ def _diffraction(
     rx = receiver_positions(scene, device=device, reference=tx)
     if int(tx.shape[0]) != 1:
         raise RuntimeError("canonical Munich diagnostic requires exactly one transmitter")
-    _, _, field = _diffraction_topology_order1(
+    block, _ = _diffraction_topology_order1(
         scene, compiled, tx, tx_power, rx, frequency_hz=float(scene.frequency)
     )
+    rx_count = int(rx.shape[0])
+    field = torch.zeros((int(tx.shape[0]) * rx_count, 3), device=device, dtype=torch.complex64)
+    for rows in block["blocks"]:
+        pair = rows["tx_id"].to(dtype=torch.long) * rx_count + rows["rx_id"].to(dtype=torch.long)
+        field.index_add_(0, pair, rows["field_xyz"])
     target = torch.view_as_real(field).reshape(-1, 6).contiguous()
     if variant == "baseline":
         return {"target": target}, {"mode": "old_compact_atomic_target"}

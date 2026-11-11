@@ -274,11 +274,7 @@ def test_engine_observes_shared_failure_once_after_field_sanitization(monkeypatc
         ad_companion_launches=0,
         ad_tape_bytes=0,
     )
-    vector_sidecar = torch.zeros((1, 1, 3), dtype=torch.complex64)
-    sidecars = EvaluatedPathSidecars(
-        execution=execution_before,
-        diffraction_vector_field=vector_sidecar,
-    )
+    sidecars = EvaluatedPathSidecars(execution=execution_before)
     tx = torch.tensor([[0.0, 0.0, 0.0]])
     rx = torch.tensor([[1.0, 0.0, 0.0]])
     scene = SolverScene(

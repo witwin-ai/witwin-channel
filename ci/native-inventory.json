@@ -248,13 +248,11 @@
     "native/channel/kernels/capacity.cu": {
       "kernels": [
         "capacity_failure_component_maps_sanitize_kernel",
-        "enumerated_capacity_failure_sanitize_kernel",
-        "enumerated_capacity_failure_vector_sanitize_kernel"
+        "enumerated_capacity_failure_sanitize_kernel"
       ],
       "launches": [
         "capacity_failure_component_maps_sanitize_kernel",
-        "enumerated_capacity_failure_sanitize_kernel",
-        "enumerated_capacity_failure_vector_sanitize_kernel"
+        "enumerated_capacity_failure_sanitize_kernel"
       ],
       "host_synchronization": [
         "cudaMemcpyAsync",

@@ -58,7 +58,8 @@ would change the totals consistently for all components.
 
 ## Not changed
 
-The diffraction stage still builds the `diffraction_vector_field` sidecar (and its
-capacity sanitizer); no solver reads it after this change. Removing the sidecar
-touches `interactions.diffraction`, the engine and one native binding and is left
-to the diffraction owner.
+The diffraction stage still built the `diffraction_vector_field` sidecar (and its
+capacity sanitizer) after this change, with no reader. The M3-7 fused field kernel
+change removed it: the Torch `index_add_` in `interactions.diffraction`, the engine
+plumbing, the `EvaluatedPathSidecars` field, and the native
+`enumerated_capacity_failure_vector_sanitize` binding and kernel.

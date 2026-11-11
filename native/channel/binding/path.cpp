@@ -313,9 +313,6 @@ pybind11::dict channel_enumerated_capacity_failure_sanitize(
     torch::Tensor path_field,
     torch::Tensor field_xyz,
     torch::Tensor coefficient);
-torch::Tensor channel_enumerated_capacity_failure_vector_sanitize(
-    torch::Tensor failure_state,
-    torch::Tensor values);
 torch::Tensor channel_deterministic_normalize_vec3(torch::Tensor values, double eps);
 torch::Tensor channel_deterministic_reflect_points(
     torch::Tensor points,
@@ -754,12 +751,6 @@ void register_path_deterministic(pybind11::module_ &module) {
         pybind11::arg("path_field"),
         pybind11::arg("field_xyz"),
         pybind11::arg("coefficient"));
-    module.def(
-        "enumerated_capacity_failure_vector_sanitize",
-        &channel_enumerated_capacity_failure_vector_sanitize,
-        "Sanitize the enumerated diffraction vector sidecar before terminal failure.",
-        pybind11::arg("failure_state"),
-        pybind11::arg("values"));
     module.def(
         "deterministic_normalize_vec3",
         &channel_deterministic_normalize_vec3,
