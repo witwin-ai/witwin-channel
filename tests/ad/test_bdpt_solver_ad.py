@@ -446,6 +446,9 @@ def _tx_power_endpoint_only_scene(power: torch.Tensor) -> Scene:
         (_tx_power_same_side_scene, frozenset({"los"})),
         (_tx_power_endpoint_only_scene, frozenset({"los"})),
         (_tx_power_same_side_scene, frozenset({"reflection"})),
+        # LoS plus enumerated reflection: two connection blocks concatenated
+        # before accumulation.
+        (_tx_power_same_side_scene, frozenset({"los", "reflection"})),
         (_tx_power_scattering_scene, frozenset({"scattering"})),
     ),
 )

@@ -3842,6 +3842,57 @@ def _composed_sampler(
     )
 
 
+class _BdptConcatAdFunction(torch.autograd.Function):
+    """Row concatenation of connection blocks that keeps the contribution graph.
+
+    The native concat packs the rows; the contribution cotangent splits back to
+    the blocks and the tangents concatenate in the same row order (structural
+    only)."""
+
+    @staticmethod
+    def forward(blocks, *contributions):  # type: ignore[no-untyped-def]
+        packed = dict(bdpt_concat_connection_samples(tuple(blocks)))
+        return packed.pop("contribution"), packed
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):  # type: ignore[no-untyped-def]
+        ctx.set_materialize_grads(False)
+        ctx.sizes = [int(value.shape[0]) for value in inputs[1:]]
+        ctx.device = inputs[1].device
+        ctx.mark_non_differentiable(*(v for v in output[1].values() if isinstance(v, torch.Tensor)))
+
+    @staticmethod
+    def backward(ctx, grad_contribution, _grad_packed):  # type: ignore[no-untyped-def]
+        if grad_contribution is None:
+            return (None, *(None for _ in ctx.sizes))
+        return (None, *torch.split(grad_contribution, ctx.sizes))
+
+    @staticmethod
+    def jvp(ctx, _t_blocks, *t_contributions):  # type: ignore[no-untyped-def]
+        parts = []
+        for size, tangent in zip(ctx.sizes, t_contributions, strict=True):
+            tangent = _ad_native_tangent_or_none(tangent)
+            parts.append(
+                tangent
+                if tangent is not None
+                else torch.zeros((size,), device=ctx.device, dtype=torch.float32)
+            )
+        return torch.cat(parts), None
+
+
+def _concat_connection_samples_ad(blocks: list[dict[str, torch.Tensor]]) -> dict[str, torch.Tensor]:
+    """Concatenated connection blocks whose contribution stays differentiable."""
+
+    detached = [
+        {name: value.detach() if name == "contribution" else value for name, value in block.items()}
+        for block in blocks
+    ]
+    contribution, packed = _BdptConcatAdFunction.apply(
+        detached, *(block["contribution"] for block in blocks)
+    )
+    return {**packed, "contribution": contribution}
+
+
 def _accumulate_blocks(
     config: Config, sample_blocks: list[dict[str, torch.Tensor]], *, prep: _SolvePrep,
     workspace: _EndpointWorkspace,
@@ -3855,11 +3906,12 @@ def _accumulate_blocks(
             )
             for component in _COMPONENT_ORDER
         }
-    estimate_samples = (
-        sample_blocks[0]
-        if len(sample_blocks) == 1
-        else bdpt_concat_connection_samples(tuple(sample_blocks))
-    )
+    if len(sample_blocks) == 1:
+        estimate_samples = sample_blocks[0]
+    elif config.ad_mode != "none":
+        estimate_samples = _concat_connection_samples_ad(sample_blocks)
+    else:
+        estimate_samples = bdpt_concat_connection_samples(tuple(sample_blocks))
     accumulated = _accumulate_connection_samples(
         config,
         estimate_samples,
