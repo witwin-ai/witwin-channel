@@ -757,7 +757,7 @@ def _evaluate_coupled_fields(
     ledger: AdLaunchLedger | None, material: dict[str, torch.Tensor] | None, groups: PathRowGroups,
     outputs: _FieldOutputs, launch_count: int,
 ) -> tuple[dict[str, torch.Tensor] | None, int]:
-    if any(groups.count(group) > 0 for group in (_RD_GROUP, _DR_GROUP, _DD_GROUP)):
+    if groups.has_rows(_RD_GROUP, _DR_GROUP, _DD_GROUP):
         if material is None:
             material = face_material_field_bundle(compiled, device=device)
         rayd = compiled.rayd
@@ -958,8 +958,7 @@ def evaluate_path_fields(
     count = paths.row_count
     if count == 0:
         return paths, execution
-    if row_groups.row_count != count:
-        raise ValueError("row groups must cover every evaluated path row")
+    row_groups.require_row_count(count)
     ad_enabled = ad_mode != "none"
     # diffraction AD metadata: one ledger entry per registered differentiable
     # Function, tape bytes mirroring each Function's save_for_backward set.

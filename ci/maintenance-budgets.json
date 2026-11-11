@@ -114,12 +114,6 @@
       "owner": "propagation maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
-    "witwin/channel/kernels/topology.py::deterministic_reflection_epc_input_batch": {
-      "ceiling": 18,
-      "expires_on": "2027-01-31",
-      "owner": "propagation maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
-    },
     "witwin/channel/runtime.py::_validate_build_info": {
       "ceiling": 24,
       "expires_on": "2027-01-31",

@@ -292,6 +292,13 @@ class PathRowGroups:
     def count(self, group: int) -> int:
         return self.counts[group] if 0 <= group < len(self.counts) else 0
 
+    def has_rows(self, *groups: int) -> bool:
+        return any(self.count(group) > 0 for group in groups)
+
+    def require_row_count(self, row_count: int) -> None:
+        if self.row_count != row_count:
+            raise ValueError("row groups must cover every evaluated path row")
+
     def rows(self, group: int) -> torch.Tensor | None:
         """Row indices of one non-empty group, or None when the group holds every row."""
 
