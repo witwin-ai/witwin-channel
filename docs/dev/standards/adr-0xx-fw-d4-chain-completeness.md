@@ -70,7 +70,7 @@ Full-wave gate, before -> after. The exterior test and the chain depth were meas
 | `wall_column_y` plane 0 RSB | 2.37 dB | 2.15 dB | 1.40 dB | 0.98 dB |
 | `canyon_x_3g5` plane 0 RSB | 4.52 dB | 4.39 dB | 1.21 dB | 1.14 dB |
 | `canyon_z_3g5` plane 0 RSB | 8.61 dB | 8.61 dB | 5.64 dB | 5.55 dB |
-| `beam_y` plane 0 shadow NMSE | 0.136 | 0.135 | 0.157 | 0.161 |
+| `beam_y` plane 0 shadow NMSE | 0.136 | 0.135 | 0.157 | 0.164 |
 
 `wall_column_z`, `wall_column_y` and `canyon_x_3g5` plane 0 RSB are strict xfails this change flips (the last
 step to their final values is fw-d3). The canyon RSB left (5.55 / 4.65 dB on `canyon_z`) is at second-order

@@ -117,17 +117,18 @@ _CASES = {
 # gradient must account for the whole primal change.
 _CONTINUOUS = (
     "control-rx", "diagonal-rx", "diagonal-wall", "isb-rx-diffraction", "isb-rx-diffraction-flipped",
+    "rsb-rx-diffraction-flipped", "rsb-wall-diffraction",
 )
 # Geometric optics alone: a row appears or disappears and nothing else covers
 # the jump. Fixed-winner AD drops the jump by design.
 _GO_ONLY = ("rsb-rx", "rsb-wall", "isb-rx")
 # Geometric optics plus edge diffraction should be continuous across both
-# shadow boundaries. Here the diffraction rows leave the jump in place, at the
-# reflection boundary for either winding.
+# shadow boundaries. With the wall's normal facing away from the transmitter a
+# residual of about 9 % of the peak is left within micrometres of the
+# reflection boundary, where the reflection's in-face test and the
+# diffraction's float band choose their sides independently.
 _DIFFRACTION_GAPS = (
     "rsb-rx-diffraction",
-    "rsb-rx-diffraction-flipped",
-    "rsb-wall-diffraction",
 )
 
 
