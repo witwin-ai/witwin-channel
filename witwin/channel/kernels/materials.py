@@ -9,16 +9,22 @@ from typing import Any, cast
 
 import torch
 
+from witwin.channel.kernels.spec import (
+    AdInputs,
+    NativeOps,
+    flag,
+    frequency_meta,
+    real,
+    save,
+    tensor,
+    value,
+)
 from witwin.channel.runtime import (
-    _ad_checked_tangent,
     _ad_first_order_only,
     _ad_frequency_grad,
     _ad_frequency_tangent,
     _ad_frequency_value,
-    _ad_native_tangent_or_none,
     _ad_native_tensor,
-    _ad_reject_fixed_inputs,
-    _ad_reject_fixed_tangents,
     disable_functorch,
     required_symbol as _required_native_op,
     validate_cuda_tensor,
@@ -36,6 +42,42 @@ __all__ = [
 ]
 
 
+_native = NativeOps(lambda symbol: _required_native_op(symbol))
+
+# The CSR layer store shared by every layer-stack operation, in ABI order.
+_LAYER_CSR = (
+    tensor("layer_offset", torch.int32, 1),
+    tensor("layer_count", torch.int32, 1),
+    tensor("layer_thickness_m", torch.float32, 1, grad="diff"),
+    tensor("layer_eps_r", torch.float32, 1, grad="diff"),
+    tensor("layer_sigma_e", torch.float32, 1, grad="diff"),
+    tensor("layer_mu_r", torch.float32, 1, grad="fixed"),
+)
+_STACK_PRIMALS = (
+    tensor("cos_theta", torch.float32, 1, grad="diff"),
+    tensor("material_id", torch.int32, 1),
+    _LAYER_CSR,
+)
+_EM_LAYER_STACK_EVAL = _native.op("em_layer_stack_eval", _STACK_PRIMALS, real("frequency_hz"))
+_EM_LAYER_STACK_BACKWARD = _native.op(
+    "em_layer_stack_backward", _STACK_PRIMALS, real("frequency_hz"),
+    value("grad_outputs", convert=list), flag("need_cos_theta"), flag("need_layers"),
+    flag("need_frequency"),
+)
+_EM_LAYER_STACK_JVP = _native.op(
+    "em_layer_stack_jvp", _STACK_PRIMALS, real("frequency_hz"), value("tangent_cos_theta"),
+    value("tangent_layer_thickness"), value("tangent_layer_eps_r"),
+    value("tangent_layer_sigma_e"), real("tangent_frequency"),
+)
+_MC_FACE_MATERIAL_TENSORS = _native.op(
+    "mc_face_material_tensors",
+    tensor("material_eps_r", torch.float32, 1),
+    tensor("material_sigma_e", torch.float32, 1),
+    tensor("material_mu_r", torch.float32, 1),
+    tensor("face_material_id", torch.int32, 1),
+)
+
+
 # ---------------------------------------------------------------------------
 # contracts
 # ---------------------------------------------------------------------------
@@ -43,29 +85,18 @@ def _validate_layer_csr(
     layer_offset: torch.Tensor, layer_count: torch.Tensor, layer_thickness_m: torch.Tensor,
     layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, device: int,
 ) -> None:
-    validate_cuda_tensor("layer_offset", layer_offset, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("layer_count", layer_count, dtype=torch.int32, ndim=1)
+    csr = (layer_offset, layer_count, layer_thickness_m, layer_eps_r, layer_sigma_e, layer_mu_r)
+    _LAYER_CSR[0].check(layer_offset)
+    _LAYER_CSR[1].check(layer_count)
     if layer_count.shape != layer_offset.shape:
         raise ValueError("layer_count must match layer_offset length")
-    for name, tensor in (
-        ("layer_thickness_m", layer_thickness_m),
-        ("layer_eps_r", layer_eps_r),
-        ("layer_sigma_e", layer_sigma_e),
-        ("layer_mu_r", layer_mu_r),
-    ):
-        validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=1)
-        if tensor.shape != layer_thickness_m.shape:
-            raise ValueError(f"{name} must match layer_thickness_m length")
-    for name, tensor in (
-        ("layer_offset", layer_offset),
-        ("layer_count", layer_count),
-        ("layer_thickness_m", layer_thickness_m),
-        ("layer_eps_r", layer_eps_r),
-        ("layer_sigma_e", layer_sigma_e),
-        ("layer_mu_r", layer_mu_r),
-    ):
-        if tensor.get_device() != device:
-            raise ValueError(f"{name} must share the op device")
+    for arg, tensor_value in zip(_LAYER_CSR[2:], csr[2:], strict=True):
+        arg.check(tensor_value)
+        if tensor_value.shape != layer_thickness_m.shape:
+            raise ValueError(f"{arg.name} must match layer_thickness_m length")
+    for arg, tensor_value in zip(_LAYER_CSR, csr, strict=True):
+        if tensor_value.get_device() != device:
+            raise ValueError(f"{arg.name} must share the op device")
 
 
 validate_layer_csr = _validate_layer_csr
@@ -92,34 +123,21 @@ def em_layer_stack_eval(
     layer_count: torch.Tensor, layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor,
     layer_sigma_e: torch.Tensor, layer_mu_r: torch.Tensor, *, frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor("cos_theta", cos_theta, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("material_id", material_id, dtype=torch.int32, ndim=1)
+    _EM_LAYER_STACK_EVAL.check((cos_theta, material_id), "cos_theta", "material_id")
     count = int(cos_theta.shape[0])
     if material_id.shape != (count,):
         raise ValueError("material_id must match cos_theta length")
     if material_id.get_device() != cos_theta.get_device():
         raise ValueError("material_id must share cos_theta device")
     _validate_layer_csr(
-        layer_offset,
-        layer_count,
-        layer_thickness_m,
-        layer_eps_r,
-        layer_sigma_e,
-        layer_mu_r,
+        layer_offset, layer_count, layer_thickness_m, layer_eps_r, layer_sigma_e, layer_mu_r,
         cos_theta.get_device(),
     )
     if frequency_hz <= 0.0:
         raise ValueError("frequency_hz must be positive")
-    out = _required_native_op("em_layer_stack_eval")(
-        cos_theta,
-        material_id,
-        layer_offset,
-        layer_count,
-        layer_thickness_m,
-        layer_eps_r,
-        layer_sigma_e,
-        layer_mu_r,
-        float(frequency_hz),
+    out = _EM_LAYER_STACK_EVAL(
+        cos_theta, material_id, layer_offset, layer_count, layer_thickness_m, layer_eps_r,
+        layer_sigma_e, layer_mu_r, frequency_hz,
     )
     if not isinstance(out, dict):
         raise TypeError("_channel.em_layer_stack_eval must return a dict")
@@ -155,20 +173,10 @@ def em_layer_stack_backward(
     grad_outputs = tuple(
         None if value is None else value.contiguous() for value in grad_outputs
     )
-    out = _required_native_op("em_layer_stack_backward")(
-        cos_theta,
-        material_id,
-        layer_offset,
-        layer_count,
-        layer_thickness_m,
-        layer_eps_r,
-        layer_sigma_e,
-        layer_mu_r,
-        float(frequency_hz),
-        list(grad_outputs),
-        bool(need_cos_theta),
-        bool(need_layers),
-        bool(need_frequency),
+    out = _EM_LAYER_STACK_BACKWARD(
+        cos_theta, material_id, layer_offset, layer_count, layer_thickness_m, layer_eps_r,
+        layer_sigma_e, layer_mu_r, frequency_hz, grad_outputs, need_cos_theta, need_layers,
+        need_frequency,
     )
     if not isinstance(out, dict):
         raise TypeError("_channel.em_layer_stack_backward must return a dict")
@@ -183,21 +191,10 @@ def em_layer_stack_jvp(
     tangent_layer_eps_r: torch.Tensor | None, tangent_layer_sigma_e: torch.Tensor | None,
     tangent_frequency: float,
 ) -> dict[str, torch.Tensor]:
-    out = _required_native_op("em_layer_stack_jvp")(
-        cos_theta,
-        material_id,
-        layer_offset,
-        layer_count,
-        layer_thickness_m,
-        layer_eps_r,
-        layer_sigma_e,
-        layer_mu_r,
-        float(frequency_hz),
-        tangent_cos_theta,
-        tangent_layer_thickness,
-        tangent_layer_eps_r,
-        tangent_layer_sigma_e,
-        float(tangent_frequency),
+    out = _EM_LAYER_STACK_JVP(
+        cos_theta, material_id, layer_offset, layer_count, layer_thickness_m, layer_eps_r,
+        layer_sigma_e, layer_mu_r, frequency_hz, tangent_cos_theta, tangent_layer_thickness,
+        tangent_layer_eps_r, tangent_layer_sigma_e, tangent_frequency,
     )
     if not isinstance(out, dict):
         raise TypeError("_channel.em_layer_stack_jvp must return a dict")
@@ -208,25 +205,13 @@ def mc_face_material_tensors(
     material_eps_r: torch.Tensor, material_sigma_e: torch.Tensor, material_mu_r: torch.Tensor,
     face_material_id: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor("material_eps_r", material_eps_r, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor(
-        "material_sigma_e", material_sigma_e, dtype=torch.float32, ndim=1
-    )
-    validate_cuda_tensor("material_mu_r", material_mu_r, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor(
-        "face_material_id", face_material_id, dtype=torch.int32, ndim=1
-    )
+    values = (material_eps_r, material_sigma_e, material_mu_r, face_material_id)
+    _MC_FACE_MATERIAL_TENSORS.check(values)
     if material_sigma_e.shape != material_eps_r.shape:
         raise ValueError("material_sigma_e must match material_eps_r shape")
     if material_mu_r.shape != material_eps_r.shape:
         raise ValueError("material_mu_r must match material_eps_r shape")
-
-    exported = _required_native_op("mc_face_material_tensors")(
-        material_eps_r,
-        material_sigma_e,
-        material_mu_r,
-        face_material_id,
-    )
+    exported = _MC_FACE_MATERIAL_TENSORS(*values)
     if not isinstance(exported, dict):
         raise TypeError("_channel.mc_face_material_tensors must return a dict")
     return exported
@@ -235,6 +220,13 @@ def mc_face_material_tensors(
 # ---------------------------------------------------------------------------
 # autograd
 # ---------------------------------------------------------------------------
+_STACK_AD = AdInputs(
+    "em_layer_stack_ad", _STACK_PRIMALS, value("frequency", grad="diff"),
+    value("frequency_value"),
+)
+_STACK_PRIMAL_NAMES = _STACK_AD.names[:8]
+
+
 class _EmLayerStackAdFunction(torch.autograd.Function):
     """Differentiable layer-stack r/t coefficients and power budgets.
 
@@ -252,51 +244,30 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
         frequency: Any, frequency_value: Any,
     ) -> Any:
         out = em_layer_stack_eval(
-            cos_theta,
-            material_id,
-            layer_offset,
-            layer_count,
-            layer_thickness_m,
-            layer_eps_r,
-            layer_sigma_e,
-            layer_mu_r,
-            frequency_hz=frequency_value,
+            cos_theta, material_id, layer_offset, layer_count, layer_thickness_m, layer_eps_r,
+            layer_sigma_e, layer_mu_r, frequency_hz=frequency_value,
         )
         return tuple(out[name] for name in _EM_LAYER_STACK_FIELDS)
 
     @staticmethod
     def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
-        frequency = inputs[8]
-        primals = tuple(
-            torch.autograd.forward_ad.unpack_dual(value).primal
-            for value in inputs[:8]
-        )
-        ctx.frequency_value = inputs[9]
-        ctx.frequency_meta = (
-            (frequency.dtype, frequency.device)
-            if isinstance(frequency, torch.Tensor)
-            else None
-        )
-        ctx.save_for_backward(*primals)
-        ctx.save_for_forward(*primals)
+        primals = _STACK_AD.primals(inputs, *_STACK_PRIMAL_NAMES)
+        ctx.frequency_value = _STACK_AD.get(inputs, "frequency_value")
+        ctx.frequency_meta = frequency_meta(_STACK_AD.get(inputs, "frequency"))
+        save(ctx, *primals)
 
     @staticmethod
     @_ad_first_order_only
     def backward(ctx: Any, *grad_outputs: Any) -> Any:
-        none_grads = (None,) * 10
-        _ad_reject_fixed_inputs(
-            "em_layer_stack_ad",
-            ctx.needs_input_grad,
-            ((7, "layer_mu_r"),),
-        )
-        need_cos = bool(ctx.needs_input_grad[0])
-        need_layers = any(bool(ctx.needs_input_grad[i]) for i in (4, 5, 6))
-        need_frequency = bool(ctx.needs_input_grad[8])
+        _STACK_AD.reject_fixed_grads(ctx)
+        need_cos = _STACK_AD.need(ctx, "cos_theta")
+        need_layers = _STACK_AD.needs(ctx, "layer_thickness_m", "layer_eps_r", "layer_sigma_e")
+        need_frequency = _STACK_AD.need(ctx, "frequency")
         if not (need_cos or need_layers or need_frequency) or all(
             value is None for value in grad_outputs
         ):
-            return none_grads
+            return _STACK_AD.none
         saved = cast(_LayerStackSaved, ctx.saved_tensors)
         out = em_layer_stack_backward(
             *saved,
@@ -311,51 +282,26 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
             if need_frequency
             else None
         )
-        return (
-            out["grad_cos_theta"] if need_cos else None,
-            None,
-            None,
-            None,
-            out["grad_layer_thickness_m"] if ctx.needs_input_grad[4] else None,
-            out["grad_layer_eps_r"] if ctx.needs_input_grad[5] else None,
-            out["grad_layer_sigma_e"] if ctx.needs_input_grad[6] else None,
-            None,
-            grad_frequency,
-            None,
+        return _STACK_AD.grads(
+            ctx,
+            cos_theta=out["grad_cos_theta"] if need_cos else None,
+            layer_thickness_m=out["grad_layer_thickness_m"] if need_layers else None,
+            layer_eps_r=out["grad_layer_eps_r"] if need_layers else None,
+            layer_sigma_e=out["grad_layer_sigma_e"] if need_layers else None,
+            frequency=grad_frequency,
         )
 
     @staticmethod
-    def jvp(
-        ctx: Any, t_cos_theta: Any, _t_material_id: Any, _t_layer_offset: Any, _t_layer_count: Any,
-        t_layer_thickness: Any, t_layer_eps_r: Any, t_layer_sigma_e: Any, t_layer_mu_r: Any,
-        t_frequency: Any, _t_frequency_value: Any,
-    ) -> Any:
-        _ad_reject_fixed_tangents(
-            "em_layer_stack_ad", ((t_layer_mu_r, "layer_mu_r"),)
-        )
+    def jvp(ctx: Any, *tangents: Any) -> Any:
+        _STACK_AD.reject_fixed_tangents(tangents)
         saved = ctx.saved_tensors
-        tangent_cos = _ad_checked_tangent(
-            "em_layer_stack_ad tangent_cos_theta",
-            _ad_native_tangent_or_none(t_cos_theta),
-            tuple(saved[0].shape),
-        )
+        tangent_cos = _STACK_AD.checked_tangent(tangents, "cos_theta", tuple(saved[0].shape))
         layer_shape = tuple(saved[4].shape)
-        tangent_thickness = _ad_checked_tangent(
-            "em_layer_stack_ad tangent_layer_thickness_m",
-            _ad_native_tangent_or_none(t_layer_thickness),
-            layer_shape,
+        tangent_thickness, tangent_eps, tangent_sigma = (
+            _STACK_AD.checked_tangent(tangents, name, layer_shape)
+            for name in ("layer_thickness_m", "layer_eps_r", "layer_sigma_e")
         )
-        tangent_eps = _ad_checked_tangent(
-            "em_layer_stack_ad tangent_layer_eps_r",
-            _ad_native_tangent_or_none(t_layer_eps_r),
-            layer_shape,
-        )
-        tangent_sigma = _ad_checked_tangent(
-            "em_layer_stack_ad tangent_layer_sigma_e",
-            _ad_native_tangent_or_none(t_layer_sigma_e),
-            layer_shape,
-        )
-        tangent_frequency = _ad_frequency_tangent(t_frequency)
+        tangent_frequency = _ad_frequency_tangent(_STACK_AD.tangent(tangents, "frequency"))
         if (
             tangent_cos is None
             and tangent_thickness is None
@@ -394,15 +340,7 @@ def em_layer_stack_ad(
     if frequency_value is None:
         frequency_value = _ad_frequency_value(frequency)
     values = _EmLayerStackAdFunction.apply(
-        cos_theta,
-        material_id,
-        layer_offset,
-        layer_count,
-        layer_thickness_m,
-        layer_eps_r,
-        layer_sigma_e,
-        layer_mu_r,
-        frequency,
-        float(frequency_value),
+        cos_theta, material_id, layer_offset, layer_count, layer_thickness_m, layer_eps_r,
+        layer_sigma_e, layer_mu_r, frequency, float(frequency_value),
     )
     return dict(zip(_EM_LAYER_STACK_FIELDS, values, strict=True))
