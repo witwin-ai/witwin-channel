@@ -15,6 +15,7 @@ namespace {
 constexpr float kTransmissionCosFloor = 1.0e-6f;
 constexpr float kDegenerateSinSq = 1.0e-12f;
 constexpr int kThinSheetGeometryMode = 0;
+constexpr int64_t kSharedTermBytes = int64_t{64} << 20;
 
 struct ZeroLayerSeed {
     __device__ ad::LayerSeed operator()(int) const {
@@ -638,41 +639,59 @@ __global__ void wall_product_backward_kernel(
     }
 }
 
-// One thread owns one shared layer derivative; one final thread owns frequency.
-// Each owner adds in ascending row then slot order, so VJP bits are independent
-// of CUDA block scheduling.
-__global__ void wall_product_shared_backward_kernel(
+// Shared-leaf VJP, stage one: one thread per row writes, for every penetrated wall slot, the
+// cotangent term g * prod_{other walls} T * dT/dp of each layer parameter of that wall's material
+// (material-local index 3 * layer + parameter) and of frequency (index term_stride - 1), plus the
+// material's first layer and layer count. Slots that contribute nothing get first layer -1.
+// Rows [row_begin, row_end) are written at entry (row - row_begin) * hit_capacity + slot.
+__global__ void wall_product_shared_terms_kernel(
     CHANNEL_MC_WALL_PRODUCT_COMMON_KERNEL_PARAMS,
     OptionalFloatView grad_scaled,
     OptionalFloatView grad_transmittance,
-    float* grad_layer_thickness,
-    float* grad_layer_eps,
-    float* grad_layer_sigma,
-    float* grad_frequency) {
-    const int64_t output_count = layer_total * 3 + 1;
-    for (int64_t output_index =
-             static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         output_index < output_count;
-         output_index += static_cast<int64_t>(blockDim.x) * gridDim.x) {
-        const bool frequency_owner = output_index == layer_total * 3;
-        const int64_t owned_layer = frequency_owner ? -1 : output_index / 3;
-        const int owned_parameter = frequency_owner ? -1 : output_index % 3;
-        float gradient = 0.0f;
+    int64_t row_begin,
+    int64_t row_end,
+    int64_t term_stride,
+    float* terms,
+    int* entry_first,
+    int* entry_count) {
+    for (int64_t row = row_begin + static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         row < row_end;
+         row += static_cast<int64_t>(blockDim.x) * gridDim.x) {
+        const int64_t entry_base = (row - row_begin) * hit_capacity;
+        for (int64_t slot = 0; slot < hit_capacity; ++slot)
+            entry_first[entry_base + slot] = -1;
+        if (*failure_state != 0 ||
+            !row_contract_valid(valid, num_hits, row, hit_capacity, failure_state, failure_bit))
+            continue;
+        const int count = num_hits[row];
+        if (!reached_target[row] || count == 0)
+            continue;
+        const int64_t row_base = row * hit_capacity;
+        const RowMaterialPreflight preflight = preflight_row_materials(
+            primitive_id,
+            row_base,
+            count,
+            face_material_id,
+            face_count,
+            geometry_mode_id,
+            layer_offset,
+            layer_count,
+            material_count,
+            layer_total,
+            failure_state,
+            failure_bit);
+        if (!preflight.contract_valid || *failure_state != 0)
+            continue;
+        const int64_t direction_base = row * 3;
+        const DualVec3 ray_direction = load_fixed_vec3(direction, direction_base);
 
-        for (int64_t row = 0; row < row_count; ++row) {
-            if (*failure_state != 0)
-                return;
-            if (!row_contract_valid(
-                    valid, num_hits, row, hit_capacity, failure_state, failure_bit))
-                return;
-            const int count = num_hits[row];
-            if (!reached_target[row] || count == 0)
-                continue;
-            const int64_t row_base = row * hit_capacity;
-            const RowMaterialPreflight preflight = preflight_row_materials(
+        int effective_count = 0;
+        bool stopped_before_next_wall = false;
+        for (int slot = 0; slot < preflight.first_blocker; ++slot) {
+            const int64_t primitive_slot = row_base + slot;
+            const int material = row_material(
                 primitive_id,
-                row_base,
-                count,
+                primitive_slot,
                 face_material_id,
                 face_count,
                 geometry_mode_id,
@@ -682,20 +701,53 @@ __global__ void wall_product_shared_backward_kernel(
                 layer_total,
                 failure_state,
                 failure_bit);
-            if (!preflight.contract_valid)
-                return;
-            if (*failure_state != 0)
-                return;
-            const int64_t direction_base = row * 3;
-            const DualVec3 ray_direction = load_fixed_vec3(direction, direction_base);
+            em::LayerView layers{
+                layer_offset, layer_count, layer_thickness, layer_eps,
+                layer_sigma, layer_mu, material};
+            const float wall_value = wall_transmittance_dual(
+                ray_direction,
+                load_fixed_vec3(normal, primitive_slot * 3),
+                polarization,
+                direction_base,
+                layers,
+                frequency_hz,
+                0.0f,
+                ZeroLayerSeed{}).value;
+            effective_count = slot + 1;
+            if (!(wall_value > 0.0f)) {
+                stopped_before_next_wall = true;
+                break;
+            }
+        }
+        if (!stopped_before_next_wall && preflight.first_blocker < count)
+            continue;
 
-            int effective_count = 0;
-            bool stopped_before_next_wall = false;
-            for (int slot = 0; slot < preflight.first_blocker; ++slot) {
-                const int64_t primitive_slot = row_base + slot;
-                const int material = row_material(
+        const float g_scaled = optional_load1(grad_scaled, row);
+        const float g_trans =
+            optional_load1(grad_transmittance, row) +
+            g_scaled * base_power[row];
+        for (int slot = 0; slot < effective_count; ++slot) {
+            const int64_t primitive_slot = row_base + slot;
+            const int material = row_material(
+                primitive_id,
+                primitive_slot,
+                face_material_id,
+                face_count,
+                geometry_mode_id,
+                layer_offset,
+                layer_count,
+                material_count,
+                layer_total,
+                failure_state,
+                failure_bit);
+            float product_except = 1.0f;
+            for (int other = 0; other < effective_count; ++other) {
+                if (other == slot)
+                    continue;
+                const int64_t other_primitive_slot = row_base + other;
+                const int other_material = row_material(
                     primitive_id,
-                    primitive_slot,
+                    other_primitive_slot,
                     face_material_id,
                     face_count,
                     geometry_mode_id,
@@ -705,124 +757,121 @@ __global__ void wall_product_shared_backward_kernel(
                     layer_total,
                     failure_state,
                     failure_bit);
-                if (material < 0)
-                    return;
-                em::LayerView layers{
+                em::LayerView other_layers{
                     layer_offset, layer_count, layer_thickness, layer_eps,
-                    layer_sigma, layer_mu, material};
-                const float wall_value = wall_transmittance_dual(
+                    layer_sigma, layer_mu, other_material};
+                const float other_value = wall_transmittance_dual(
                     ray_direction,
-                    load_fixed_vec3(normal, primitive_slot * 3),
+                    load_fixed_vec3(normal, other_primitive_slot * 3),
                     polarization,
                     direction_base,
-                    layers,
+                    other_layers,
                     frequency_hz,
                     0.0f,
                     ZeroLayerSeed{}).value;
-                effective_count = slot + 1;
-                if (!(wall_value > 0.0f)) {
-                    stopped_before_next_wall = true;
-                    break;
-                }
+                product_except = product_except * other_value;
             }
-            if (!stopped_before_next_wall && preflight.first_blocker < count)
-                continue;
-
-            const float g_scaled = optional_load1(grad_scaled, row);
-            const float g_trans =
-                optional_load1(grad_transmittance, row) +
-                g_scaled * base_power[row];
-            for (int slot = 0; slot < effective_count; ++slot) {
-                const int64_t primitive_slot = row_base + slot;
-                const int material = row_material(
-                    primitive_id,
-                    primitive_slot,
-                    face_material_id,
-                    face_count,
-                    geometry_mode_id,
-                    layer_offset,
-                    layer_count,
-                    material_count,
-                    layer_total,
-                    failure_state,
-                    failure_bit);
-                if (material < 0)
-                    return;
-                const int first = layer_offset[material];
-                const int material_layers = layer_count[material];
-                if (!frequency_owner &&
-                    (owned_layer < static_cast<int64_t>(first) ||
-                     owned_layer >= static_cast<int64_t>(first) +
-                         static_cast<int64_t>(material_layers)))
-                    continue;
-
-                float product_except = 1.0f;
-                for (int other = 0; other < effective_count; ++other) {
-                    if (other == slot)
-                        continue;
-                    const int64_t other_primitive_slot = row_base + other;
-                    const int other_material = row_material(
-                        primitive_id,
-                        other_primitive_slot,
-                        face_material_id,
-                        face_count,
-                        geometry_mode_id,
-                        layer_offset,
-                        layer_count,
-                        material_count,
-                        layer_total,
-                        failure_state,
-                        failure_bit);
-                    if (other_material < 0)
-                        return;
-                    em::LayerView other_layers{
-                        layer_offset, layer_count, layer_thickness, layer_eps,
-                        layer_sigma, layer_mu, other_material};
-                    const float other_value = wall_transmittance_dual(
+            em::LayerView layers{
+                layer_offset, layer_count, layer_thickness, layer_eps,
+                layer_sigma, layer_mu, material};
+            const int first = layer_offset[material];
+            const int material_layers = layer_count[material];
+            const int64_t entry = entry_base + slot;
+            float* entry_terms = terms + entry * term_stride;
+            const DualFloat frequency_derivative = wall_transmittance_dual(
+                ray_direction,
+                load_fixed_vec3(normal, primitive_slot * 3),
+                polarization,
+                direction_base,
+                layers,
+                frequency_hz,
+                1.0f,
+                ZeroLayerSeed{});
+            entry_terms[term_stride - 1] =
+                g_trans * product_except * frequency_derivative.tangent;
+            for (int local = 0; local < material_layers; ++local) {
+                for (int parameter = 0; parameter < 3; ++parameter) {
+                    const DualFloat derivative = wall_transmittance_dual(
                         ray_direction,
-                        load_fixed_vec3(normal, other_primitive_slot * 3),
+                        load_fixed_vec3(normal, primitive_slot * 3),
                         polarization,
                         direction_base,
-                        other_layers,
+                        layers,
                         frequency_hz,
                         0.0f,
-                        ZeroLayerSeed{}).value;
-                    product_except = product_except * other_value;
+                        BasisLayerSeed{first + local, parameter});
+                    entry_terms[3 * local + parameter] =
+                        g_trans * product_except * derivative.tangent;
                 }
-                em::LayerView layers{
-                    layer_offset, layer_count, layer_thickness, layer_eps,
-                    layer_sigma, layer_mu, material};
-                const DualFloat derivative = frequency_owner
-                    ? wall_transmittance_dual(
-                          ray_direction,
-                          load_fixed_vec3(normal, primitive_slot * 3),
-                          polarization,
-                          direction_base,
-                          layers,
-                          frequency_hz,
-                          1.0f,
-                          ZeroLayerSeed{})
-                    : wall_transmittance_dual(
-                          ray_direction,
-                          load_fixed_vec3(normal, primitive_slot * 3),
-                          polarization,
-                          direction_base,
-                          layers,
-                          frequency_hz,
-                          0.0f,
-                          BasisLayerSeed{
-                              static_cast<int>(owned_layer), owned_parameter});
-                gradient = gradient + g_trans * product_except * derivative.tangent;
+            }
+            entry_first[entry] = first;
+            entry_count[entry] = material_layers;
+        }
+    }
+}
+
+// Shared-leaf VJP, stage two: one warp owns one output (3 per layer, then frequency) and adds
+// the stage-one terms of its leaf in ascending row, then slot order on lane 0, continuing from
+// the value a previous row chunk stored. The order is the serial row order, so the bits do not
+// depend on block scheduling or on the chunking.
+__global__ void wall_product_shared_reduce_kernel(
+    int64_t entry_count_total,
+    int64_t layer_total,
+    int64_t term_stride,
+    const float* terms,
+    const int* entry_first,
+    const int* entry_count,
+    const int* failure_state,
+    float* grad_layer_thickness,
+    float* grad_layer_eps,
+    float* grad_layer_sigma,
+    float* grad_frequency) {
+    constexpr int kWarp = 32;
+    const int lane = static_cast<int>(threadIdx.x) % kWarp;
+    const int64_t warps_per_block = blockDim.x / kWarp;
+    const int64_t output_count = layer_total * 3 + 1;
+    for (int64_t output_index =
+             static_cast<int64_t>(blockIdx.x) * warps_per_block + threadIdx.x / kWarp;
+         output_index < output_count;
+         output_index += static_cast<int64_t>(gridDim.x) * warps_per_block) {
+        if (*failure_state != 0)
+            return;
+        const bool frequency_owner = output_index == layer_total * 3;
+        const int64_t owned_layer = frequency_owner ? -1 : output_index / 3;
+        const int owned_parameter = frequency_owner ? -1 : static_cast<int>(output_index % 3);
+        float* destination = frequency_owner
+            ? grad_frequency
+            : owned_parameter == 0 ? grad_layer_thickness + owned_layer
+            : owned_parameter == 1 ? grad_layer_eps + owned_layer
+                                   : grad_layer_sigma + owned_layer;
+        float gradient = lane == 0 ? *destination : 0.0f;
+        for (int64_t chunk = 0; chunk < entry_count_total; chunk += kWarp) {
+            const int64_t entry = chunk + lane;
+            bool contributes = false;
+            float term = 0.0f;
+            if (entry < entry_count_total) {
+                const int first = entry_first[entry];
+                if (first >= 0) {
+                    if (frequency_owner) {
+                        contributes = true;
+                        term = terms[entry * term_stride + term_stride - 1];
+                    } else if (owned_layer >= first &&
+                               owned_layer < static_cast<int64_t>(first) + entry_count[entry]) {
+                        contributes = true;
+                        term = terms[entry * term_stride +
+                                     3 * (owned_layer - first) + owned_parameter];
+                    }
+                }
+            }
+            const unsigned mask = __ballot_sync(0xffffffffu, contributes);
+            for (int source = 0; source < kWarp; ++source) {
+                const float value = __shfl_sync(0xffffffffu, term, source);
+                if (lane == 0 && ((mask >> source) & 1u) != 0u)
+                    gradient = gradient + value;
             }
         }
-        if (frequency_owner)
-            grad_frequency[0] = gradient;
-        else if (owned_parameter == 0)
-            grad_layer_thickness[owned_layer] = gradient;
-        else if (owned_parameter == 1)
-            grad_layer_eps[owned_layer] = gradient;
-        else
-            grad_layer_sigma[owned_layer] = gradient;
+        if (lane == 0)
+            *destination = gradient;
     }
 }
 
@@ -1225,21 +1274,43 @@ pybind11::tuple channel_mc_transmission_wall_product_backward(
             grad_direction.data_ptr<float>(), grad_normal.data_ptr<float>(),
             grad_base_power.data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
-        const int64_t shared_outputs = shape.layers * 3 + 1;
-        wall_product_shared_backward_kernel<<<
-            launch_blocks(shared_outputs), kBlockSize, 0, stream>>>(
-            shape.rows, shape.hit_capacity, valid.data_ptr<bool>(), num_hits.data_ptr<int>(),
-            reached_target.data_ptr<bool>(), direction.data_ptr<float>(), normal.data_ptr<float>(),
-            global_primitive_id.data_ptr<int>(), face_material_id.data_ptr<int>(), face_material_id.numel(),
-            geometry_mode_id.data_ptr<int>(), layer_offset.data_ptr<int>(), layer_count.data_ptr<int>(),
-            layer_thickness_m.data_ptr<float>(), layer_eps_r.data_ptr<float>(), layer_sigma_e.data_ptr<float>(),
-            layer_mu_r.data_ptr<float>(), shape.materials, shape.layers,
-            pair_polarization.data_ptr<float>(), base_power.data_ptr<float>(),
-            static_cast<float>(frequency_hz), capacity_failure_state.data_ptr<int>(),
-            static_cast<int>(failure_bit), grad_scaled, grad_trans,
-            grad_layer_thickness.data_ptr<float>(), grad_layer_eps.data_ptr<float>(),
-            grad_layer_sigma.data_ptr<float>(), grad_frequency.data_ptr<float>());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
+        // Row chunks bound the stage-one workspace at kSharedTermBytes.
+        const int64_t term_stride = shape.layers * 3 + 1;
+        const int64_t entry_bytes =
+            shape.hit_capacity * (term_stride * static_cast<int64_t>(sizeof(float)) +
+                                  2 * static_cast<int64_t>(sizeof(int)));
+        const int64_t chunk_rows = std::max<int64_t>(
+            1, std::min<int64_t>(shape.rows, kSharedTermBytes / std::max<int64_t>(entry_bytes, 1)));
+        const int64_t chunk_entries = chunk_rows * shape.hit_capacity;
+        auto terms = at::empty({chunk_entries * term_stride}, base_power.options());
+        auto entry_first = at::empty({chunk_entries}, num_hits.options());
+        auto entry_layers = at::empty({chunk_entries}, num_hits.options());
+        const int64_t shared_outputs = term_stride;
+        constexpr int kReduceWarpsPerBlock = kBlockSize / 32;
+        const int reduce_blocks = static_cast<int>(
+            (shared_outputs + kReduceWarpsPerBlock - 1) / kReduceWarpsPerBlock);
+        for (int64_t row_begin = 0; row_begin < shape.rows; row_begin += chunk_rows) {
+            const int64_t row_end = std::min(shape.rows, row_begin + chunk_rows);
+            wall_product_shared_terms_kernel<<<launch_blocks(row_end - row_begin), kBlockSize, 0, stream>>>(
+                shape.rows, shape.hit_capacity, valid.data_ptr<bool>(), num_hits.data_ptr<int>(),
+                reached_target.data_ptr<bool>(), direction.data_ptr<float>(), normal.data_ptr<float>(),
+                global_primitive_id.data_ptr<int>(), face_material_id.data_ptr<int>(), face_material_id.numel(),
+                geometry_mode_id.data_ptr<int>(), layer_offset.data_ptr<int>(), layer_count.data_ptr<int>(),
+                layer_thickness_m.data_ptr<float>(), layer_eps_r.data_ptr<float>(), layer_sigma_e.data_ptr<float>(),
+                layer_mu_r.data_ptr<float>(), shape.materials, shape.layers,
+                pair_polarization.data_ptr<float>(), base_power.data_ptr<float>(),
+                static_cast<float>(frequency_hz), capacity_failure_state.data_ptr<int>(),
+                static_cast<int>(failure_bit), grad_scaled, grad_trans, row_begin, row_end, term_stride,
+                terms.data_ptr<float>(), entry_first.data_ptr<int>(), entry_layers.data_ptr<int>());
+            C10_CUDA_KERNEL_LAUNCH_CHECK();
+            wall_product_shared_reduce_kernel<<<reduce_blocks, kBlockSize, 0, stream>>>(
+                (row_end - row_begin) * shape.hit_capacity, shape.layers, term_stride,
+                terms.data_ptr<float>(), entry_first.data_ptr<int>(), entry_layers.data_ptr<int>(),
+                capacity_failure_state.data_ptr<int>(), grad_layer_thickness.data_ptr<float>(),
+                grad_layer_eps.data_ptr<float>(), grad_layer_sigma.data_ptr<float>(),
+                grad_frequency.data_ptr<float>());
+            C10_CUDA_KERNEL_LAUNCH_CHECK();
+        }
         const int64_t total = std::max(
             std::max(shape.rows * 3, shape.rows * shape.hit_capacity * 3),
             std::max(shape.layers, shape.rows));

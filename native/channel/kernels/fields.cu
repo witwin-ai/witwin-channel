@@ -9,6 +9,7 @@
 #include "torch_cuda.h"
 
 #include "math.cuh"
+#include "ordered_sum.cuh"
 #include <rayd/field_transport.cuh>
 #include "../tensor_checks.h"
 
@@ -1285,7 +1286,7 @@ __global__ void free_space_backward_kernel(
         if (grad_frequency != nullptr) {
             const T g_freq = g_carrier.real() * eval.carrier_dfreq.real() +
                              g_carrier.imag() * eval.carrier_dfreq.imag();
-            atomicAdd(grad_frequency, g_freq);
+            grad_frequency[index] = g_freq;
         }
         if (grad_source == nullptr && grad_target == nullptr)
             continue;
@@ -1581,6 +1582,10 @@ pybind11::dict channel_field_free_space_backward(
     at::Tensor grad_frequency = need_grad_frequency
                                     ? zero_filled({1}, source.options())
                                     : at::Tensor();
+    // Per-row frequency cotangents, summed below in a fixed order.
+    at::Tensor row_frequency = need_grad_frequency
+                                   ? zero_filled({count}, source.options())
+                                   : at::Tensor();
     at::Tensor grad_source = need_grad_geometry
                                  ? zero_filled({count, 3}, source.options())
                                  : at::Tensor();
@@ -1610,7 +1615,7 @@ pybind11::dict channel_field_free_space_backward(
                     grad_ptr<float>(gpl),
                     grad_ptr<float>(gd),
                     grad_ptr<float>(gdir),
-                    need_grad_frequency ? grad_frequency.data_ptr<float>()
+                    need_grad_frequency ? row_frequency.data_ptr<float>()
                                         : nullptr,
                     need_grad_geometry ? grad_source.data_ptr<float>() : nullptr,
                     need_grad_geometry ? grad_target.data_ptr<float>() : nullptr);
@@ -1631,13 +1636,23 @@ pybind11::dict channel_field_free_space_backward(
                     grad_ptr<double>(gpl),
                     grad_ptr<double>(gd),
                     grad_ptr<double>(gdir),
-                    need_grad_frequency ? grad_frequency.data_ptr<double>()
+                    need_grad_frequency ? row_frequency.data_ptr<double>()
                                         : nullptr,
                     need_grad_geometry ? grad_source.data_ptr<double>() : nullptr,
                     need_grad_geometry ? grad_target.data_ptr<double>()
                                        : nullptr);
         }
         C10_CUDA_KERNEL_LAUNCH_CHECK();
+        if (need_grad_frequency) {
+            if (real_dtype == at::kFloat)
+                channel::ordered_sum::add_sum<float>(
+                    row_frequency.data_ptr<float>(), count, grad_frequency.data_ptr<float>(),
+                    source.options(), stream);
+            else
+                channel::ordered_sum::add_sum<double>(
+                    row_frequency.data_ptr<double>(), count, grad_frequency.data_ptr<double>(),
+                    source.options(), stream);
+        }
     }
     out["grad_frequency"] = need_grad_frequency
                                 ? pybind11::cast(grad_frequency)
@@ -2142,7 +2157,7 @@ __global__ void reflection_sequence_backward_kernel(
             }
         }
         if (grad_frequency != nullptr)
-            atomicAdd(grad_frequency, g_freq);
+            grad_frequency[index] = g_freq;
         if (!need_geometry)
             continue;
 
@@ -2469,6 +2484,10 @@ pybind11::dict channel_field_reflection_sequence_backward(
     at::Tensor grad_frequency = need_grad_frequency
                                     ? zero_filled({1}, source.options())
                                     : at::Tensor();
+    // Per-row frequency cotangents, summed below in a fixed order.
+    at::Tensor row_frequency = need_grad_frequency
+                                   ? zero_filled({count}, source.options())
+                                   : at::Tensor();
     at::Tensor grad_source;
     at::Tensor grad_target;
     at::Tensor grad_positions;
@@ -2517,12 +2536,16 @@ pybind11::dict channel_field_reflection_sequence_backward(
                 need_grad_gain ? grad_gain_out.data_ptr<float>() : nullptr,
                 need_grad_thickness ? grad_thickness_out.data_ptr<float>()
                                     : nullptr,
-                need_grad_frequency ? grad_frequency.data_ptr<float>() : nullptr,
+                need_grad_frequency ? row_frequency.data_ptr<float>() : nullptr,
                 need_grad_geometry ? grad_source.data_ptr<float>() : nullptr,
                 need_grad_geometry ? grad_target.data_ptr<float>() : nullptr,
                 need_grad_geometry ? grad_positions.data_ptr<float>() : nullptr,
                 need_grad_geometry ? grad_normals.data_ptr<float>() : nullptr);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
+        if (need_grad_frequency)
+            channel::ordered_sum::add_sum<float>(
+                row_frequency.data_ptr<float>(), count, grad_frequency.data_ptr<float>(),
+                source.options(), stream);
     }
     pybind11::dict out;
     out["grad_eps_r"] = need_grad_eps_r ? pybind11::cast(grad_eps)
@@ -2988,7 +3011,7 @@ __global__ void rough_scale_backward_kernel(
                         (-4.0f * k0 * cos_b[b] * cos_b[b] * sigma[b] * sigma[b]) * dk0_df;
                 }
             }
-            atomicAdd(out_grad_frequency, grad_factor * df);
+            out_grad_frequency[row] = grad_factor * df;
         }
     }
 }
@@ -3254,8 +3277,11 @@ pybind11::dict channel_field_rough_reflection_scale_backward(
         grad_normals = zero_filled({count, depth, 3}, normals.options());
         grad_source = zero_filled({count, 3}, source.options());
     }
+    at::Tensor row_frequency;
     if (need_frequency) {
         grad_frequency = zero_filled({1}, path_gain.options());
+        // Per-row frequency cotangents, summed below in a fixed order.
+        row_frequency = zero_filled({count}, path_gain.options());
     }
     const bool any_grad =
         g_fv != nullptr || g_coef != nullptr || g_pf != nullptr || g_pg != nullptr;
@@ -3278,9 +3304,13 @@ pybind11::dict channel_field_rough_reflection_scale_backward(
             need_geometry ? grad_positions.data_ptr<float>() : nullptr,
             need_geometry ? grad_normals.data_ptr<float>() : nullptr,
             need_geometry ? grad_source.data_ptr<float>() : nullptr,
-            need_frequency ? grad_frequency.data_ptr<float>() : nullptr,
+            need_frequency ? row_frequency.data_ptr<float>() : nullptr,
             need_field, need_geometry, need_frequency);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
+        if (need_frequency)
+            channel::ordered_sum::add_sum<float>(
+                row_frequency.data_ptr<float>(), count, grad_frequency.data_ptr<float>(),
+                path_gain.options(), stream);
     }
     pybind11::dict out;
     out["grad_field_vector"] =
