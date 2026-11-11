@@ -62,7 +62,7 @@ from witwin.channel.propagation.geometry import (
     diffraction_edge_geometry as _diffraction_edge_geometry,
 )
 from witwin.channel.scene.endpoints import (
-    receiver_polarizations_f32,
+    receiver_polarization_rows,
     transmitter_polarizations_f32,
 )
 from witwin.channel.materials import (
@@ -1053,7 +1053,7 @@ def evaluate_path_fields(
         else endpoint_tx_polarizations
     )
     rx_pol_batch = (
-        receiver_polarizations_f32(scene, device=device)
+        receiver_polarization_rows(scene, device=device)
         if endpoint_rx_polarizations is None
         else endpoint_rx_polarizations
     )

@@ -43,14 +43,43 @@ solver-neutral propagation consumer among them. `require_compiled` resolves
 `CompiledScene` inside the call, and `resources` annotates the stores under
 `TYPE_CHECKING`, for that reason.
 
+## Endpoint store
+
+`bind_solver_scene` attaches one `EndpointStore` to the `SolverScene`. It holds
+every endpoint tensor a solve reads, on the CUDA device: transmitter positions,
+powers and world-frame polarizations, flattened receiver positions (a
+`ReceiverGrid` through the native grid generator), per-receiver polarizations
+and a per-row polarization view in which a grid is one broadcast row. The store
+is built in batched operations - one stack per field, one batched orientation
+and normalization per (device, dtype, orientation kind) group, one host-to-device
+copy of a packed float32 buffer - and cached on the `CompiledScene` under
+`endpoint_token(source)`. The token is host-only: per endpoint its identity and,
+for each tensor leaf, the tensor identity, `_version` and `requires_grad`
+(snapshot rigid motions likewise). It reads no tensor data and is meant to key
+any endpoint-only cache. A binding whose endpoint leaves participate in AD
+(reverse `requires_grad` or a forward-mode tangent) builds the store per solve
+and does not cache it, so the leaves stay on the graph through one stack.
+Validation of endpoint values runs when a store is built, not on every solve.
+
+The batched polarization reproduces the per-endpoint `rotation @ unit`
+product bit for bit: the 3x3 matrix-vector product sums `(r1*u1 + r2*u2) + r0*u0`
+on the host BLAS and `(r0*u0 + r2*u2) + r1*u1` on CUDA, and the batched code
+uses that per-device order.
+
+`endpoint_store(scene)` returns the bound store, or builds an uncached one when
+a caller rebinds endpoints (explicit-array expansion binds its own; a BDPT
+sub-scene over one grid builds one per call). The module-level helpers
+(`transmitter_positions`, `receiver_positions`,
+`transmitter_polarizations_as_stored` in `compiler`;
+`transmitter_polarizations_f32`, `receiver_polarizations_f32`,
+`receiver_polarization_rows`, `transmitter_positions_ad`,
+`receiver_positions_ad` in `endpoints`) all read the store.
+
 The two same-named `transmitter_polarizations` owners the audit reported are
-resolved by name rather than by unification, because their bodies are not
-interchangeable. `scene.endpoints.transmitter_polarizations_f32` casts to
-float32, calls `.contiguous()`, and builds its empty case on the requested
-`device`; `scene.compiler.transmitter_polarizations_as_stored` uploads the
-stored vectors as they are and takes its empty case from the native transmitter
-builder. Both are live, each has its own callers, and merging them would be a
-behaviour change rather than a rename.
+resolved by name rather than by unification.
+`scene.endpoints.transmitter_polarizations_f32` is the float32 store field;
+`scene.compiler.transmitter_polarizations_as_stored` keeps the dtype the scene
+stored. Both are live and each has its own callers.
 
 `scene.resources` also holds the compile-time Kirchhoff/phase-screen
 construction that used to sit in a root `scattering` module. That module read
@@ -59,6 +88,44 @@ evaluation, and everything it held was compile-time resource construction this
 module already cached. The float64 NumPy build sits behind an explicit banner
 inside the file: the CPU-compute policy line is drawn there, and nothing below
 it may grow into per-solve physics.
+
+## Compile cache
+
+`compile` keys a runtime on Channel's own state of the source world, not on the
+Core version domains, because those also count the scene's own antennas and no
+compiled resource depends on them (solvers read endpoints from the source when
+they bind it; the consumer takes them from its endpoint batches). The state is
+read from host attributes only: object identity, scalar fields, and per tensor
+its identity, `_version`, storage address and `requires_grad`, split into the
+same four domains as Core (topology, geometry, material, assignment) minus the
+endpoints. A warm hit therefore costs one walk of those attributes and never
+hashes the world. The Core versions are still read when a new runtime is built,
+for provenance.
+
+- The RayD scene, geometry tables, penetration diagonals and runtime structures
+  are shared by every runtime whose topology and geometry state are equal;
+  materials by material state and frequency; assignments by topology,
+  assignment and material IDs.
+- The registry holds one runtime per (source, frequency, device, trace
+  backend). A recompile of an edited source replaces all of its runtimes at
+  once. Least recently used runtimes are dropped above `_CACHE_BYTE_LIMIT`
+  (1 GiB of device memory, each shared resource counted once; the newest
+  runtime is always kept) or `_CACHE_ENTRY_LIMIT` (64) runtimes.
+- When only vertex values change on the same geometry objects with the same
+  faces and UVs, the first such compile rebuilds the RayD scene with the
+  changed meshes created refittable and later compiles refit them in place
+  through RayD's typed `update_mesh_vertices` + `sync_scene`. Building
+  refittable on the first change, not on the second, costs nothing extra (that
+  compile rebuilds anyway) and confines the uncompacted refittable GAS to the
+  meshes that actually moved. Every runtime on a refit scene came from the same,
+  now edited, objects and is dropped; `RayDSceneResource.generation` lets a held
+  one report itself stale. A refit scene traces bitwise like a fresh build
+  (RayD parity test); only the primitive reported for an exact tie between
+  coincident triangles may depend on the BVH. Snapshots with per-instant
+  motion or deformation objects rebuild instead of refitting.
+- `CompiledScene.stale_domain()` names the domain that changed since compile
+  (or `geometry_version` after a refit); the consumer's freshness check and
+  `rediscovery_required(revalidate_source=True)` use it.
 
 ## Numerical and AD contract
 

@@ -153,6 +153,7 @@ def test_rayd_scene_builder_preserves_native_order_flags_uv_and_keepalive(
     monkeypatch.setattr(rayd_scene.torch, "device", lambda _name: real_device("cpu"))
     monkeypatch.setattr(rayd_scene, "require_device_supported", checked.append)
     monkeypatch.setattr(rayd_scene, "rayd_scene_create", create)
+    monkeypatch.setattr(rayd_scene, "_allocated_device_bytes", lambda: 0)
     monkeypatch.setenv("WITWIN_CHANNEL_TRACE_BACKEND", "cuda")
 
     scene = rayd_scene.build_scene_from_structures(structures)

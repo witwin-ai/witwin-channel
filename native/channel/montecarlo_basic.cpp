@@ -168,9 +168,6 @@ std::tuple<at::Tensor, at::Tensor> channel_mc_los_visibility_inputs_cuda(
     at::Tensor tx_positions,
     int64_t tx_index,
     int64_t rx_count);
-std::tuple<at::Tensor, at::Tensor> channel_mc_transmitter_tensors_cuda(
-    const std::vector<float> &positions_host,
-    const std::vector<float> &power_host);
 at::Tensor channel_mc_pack_vec3_cuda(at::Tensor x, at::Tensor y, at::Tensor z);
 at::Tensor channel_mc_receiver_grid_points_cuda(
     at::Tensor reference,
@@ -305,28 +302,6 @@ std::vector<at::Tensor> channel_mc_surface_group_edge_candidates_cuda(
 
 torch::Tensor channel_mc_sample_directions(int64_t count, torch::Tensor reference) {
     return channel_mc_sample_directions_cuda(count, reference);
-}
-
-pybind11::dict channel_mc_transmitter_tensors(
-    pybind11::sequence flat_positions,
-    pybind11::sequence powers) {
-    TORCH_CHECK(flat_positions.size() % 3 == 0, "flat_positions must contain xyz triples");
-    TORCH_CHECK(flat_positions.size() / 3 == powers.size(), "powers must match flat_positions");
-    std::vector<float> positions_host;
-    std::vector<float> power_host;
-    positions_host.reserve(flat_positions.size());
-    power_host.reserve(powers.size());
-    for (auto item : flat_positions) {
-        positions_host.push_back(static_cast<float>(pybind11::cast<double>(item)));
-    }
-    for (auto item : powers) {
-        power_host.push_back(static_cast<float>(pybind11::cast<double>(item)));
-    }
-    auto [positions, power] = channel_mc_transmitter_tensors_cuda(positions_host, power_host);
-    pybind11::dict out;
-    out["positions"] = positions;
-    out["power"] = power;
-    return out;
 }
 
 torch::Tensor channel_mc_pack_vec3(torch::Tensor x, torch::Tensor y, torch::Tensor z) {

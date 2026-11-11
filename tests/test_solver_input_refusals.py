@@ -89,11 +89,12 @@ def test_mc_basic_solves_point_receivers(components) -> None:
 
 
 @pytest.mark.parametrize("layout", ["two_grids", "grid_and_point"])
-def test_bdpt_refuses_multiple_or_mixed_receivers(monkeypatch, layout: str) -> None:
-    _forbid_compile(monkeypatch, "bdpt")
+def test_bdpt_solves_multiple_or_mixed_receivers_as_one_flat_list(layout: str) -> None:
     receivers = [_grid(), _grid(shape=(2, 2))] if layout == "two_grids" else [_grid(), _rx()]
-    with pytest.raises(ValueError, match="accepts either exactly one ReceiverGrid or only point receivers"):
-        _solve("bdpt", Scene(structures=[_wall()], endpoints=[_tx(), *receivers]), components={"los"})
+    result = _solve("bdpt", Scene(structures=[_wall()], endpoints=[_tx(), *receivers]), components={"los"})
+    assert result.path_gain.shape == (1, 16 + (4 if layout == "two_grids" else 1))
+    assert result.component_maps is None
+    assert float(result.path_gain.sum()) > 0.0
 
 
 @pytest.mark.parametrize("layout", ["two_grids", "grid_and_point"])

@@ -11,6 +11,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 static_assert(
     rayd::torch::kIntegrationApiVersion == 8u,
@@ -32,6 +33,11 @@ public:
     // The tracer RayD resolved for this scene: "optix" or "cuda".
     std::string trace_backend() const;
     const rayd::torch::SceneEdgeRecordsResult &edge_records();
+    // Stages new vertices for each listed refittable mesh and commits them in one RayD sync; cached edge records are
+    // dropped and read again on next use.
+    void update_vertices(
+        const std::vector<int64_t> &mesh_indices,
+        const std::vector<at::Tensor> &vertices);
 
 private:
     rayd::torch::SceneResource resource_;

@@ -57,6 +57,19 @@ __global__ void bdpt_launch_state_kernel(
     light_seed[linear] = static_cast<int64_t>(splitmix64(base ^ 0x1111111111111111ULL) & 0x7fffffffffffffffULL);
 }
 
+// Uniform sphere direction of launch sample ``index`` of the stream ``seed``.
+__device__ void launch_direction(unsigned long long seed, int64_t index, float* out) {
+    unsigned long long base = seed ^ (static_cast<unsigned long long>(index) * 0xd1b54a32d192ed03ULL);
+    float u0 = uniform01_from_u64(splitmix64(base ^ 0x57c5d1f5f8c0a9b3ULL));
+    float u1 = uniform01_from_u64(splitmix64(base ^ 0xa24baed4963ee407ULL));
+    float z = 1.0f - 2.0f * u0;
+    float phi = static_cast<float>(2.0 * kPi) * u1;
+    float radial = sqrtf(fmaxf(1.0f - z * z, 0.0f));
+    out[0] = radial * cosf(phi);
+    out[1] = radial * sinf(phi);
+    out[2] = z;
+}
+
 __global__ void bdpt_sample_directions_kernel(
     int64_t count,
     unsigned long long seed,
@@ -65,16 +78,47 @@ __global__ void bdpt_sample_directions_kernel(
     if (index >= count) {
         return;
     }
-    unsigned long long base = seed ^ (static_cast<unsigned long long>(index) * 0xd1b54a32d192ed03ULL);
-    float u0 = uniform01_from_u64(splitmix64(base ^ 0x57c5d1f5f8c0a9b3ULL));
-    float u1 = uniform01_from_u64(splitmix64(base ^ 0xa24baed4963ee407ULL));
-    float z = 1.0f - 2.0f * u0;
-    float phi = static_cast<float>(2.0 * kPi) * u1;
-    float radial = sqrtf(fmaxf(1.0f - z * z, 0.0f));
-    float* out = directions + index * 3;
-    out[0] = radial * cosf(phi);
-    out[1] = radial * sinf(phi);
-    out[2] = z;
+    launch_direction(seed, index, directions + index * 3);
+}
+
+// Wavefront light endpoints for the global samples [first, first + count) of all
+// transmitters: sample g belongs to transmitter g / samples and draws the same
+// launch direction as bdpt_sample_directions with seed + tx * 65537.
+__global__ void bdpt_wavefront_launch_kernel(
+    int64_t count,
+    int64_t first,
+    int64_t samples,
+    unsigned long long seed,
+    int64_t tx_count,
+    const float* tx_positions,
+    const float* tx_polarization,
+    float* origin,
+    float* direction,
+    float* field_real,
+    float* field_imag,
+    float* pdf_forward,
+    float* path_length,
+    uint8_t* component_mask,
+    bool* valid) {
+    int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (index >= count) {
+        return;
+    }
+    const int64_t global = first + index;
+    const int64_t tx = global / samples;
+    const int64_t sample = global - tx * samples;
+    const bool is_valid = tx < tx_count;
+    const int64_t source = is_valid ? tx : 0;
+    for (int axis = 0; axis < 3; ++axis) {
+        origin[index * 3 + axis] = tx_positions[source * 3 + axis];
+        field_real[index * 3 + axis] = is_valid ? tx_polarization[source * 3 + axis] : 0.0f;
+        field_imag[index * 3 + axis] = 0.0f;
+    }
+    launch_direction(seed + static_cast<unsigned long long>(tx) * 65537ULL, sample, direction + index * 3);
+    pdf_forward[index] = is_valid ? static_cast<float>(1.0 / (4.0 * kPi)) : 0.0f;
+    path_length[index] = 0.0f;
+    component_mask[index] = 1;
+    valid[index] = is_valid;
 }
 
 }  // namespace
@@ -114,6 +158,47 @@ channel_bdpt_launch_state_cuda(
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return {tx_id, sample_id, stream_id, light_seed};
+}
+
+void channel_bdpt_wavefront_launch_cuda(
+    int64_t count,
+    int64_t first,
+    int64_t samples,
+    int64_t seed,
+    const at::Tensor& tx_positions,
+    const at::Tensor& tx_polarization,
+    at::Tensor& origin,
+    at::Tensor& direction,
+    at::Tensor& field_real,
+    at::Tensor& field_imag,
+    at::Tensor& pdf_forward,
+    at::Tensor& path_length,
+    at::Tensor& component_mask,
+    at::Tensor& valid) {
+    TORCH_CHECK(count >= 0 && first >= 0 && samples > 0 && seed >= 0, "invalid wavefront launch range");
+    if (count == 0) {
+        return;
+    }
+    constexpr int threads = 256;
+    const int blocks = static_cast<int>((count + threads - 1) / threads);
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(tx_positions.get_device()).stream();
+    bdpt_wavefront_launch_kernel<<<blocks, threads, 0, stream>>>(
+        count,
+        first,
+        samples,
+        static_cast<unsigned long long>(seed),
+        tx_positions.size(0),
+        tx_positions.data_ptr<float>(),
+        tx_polarization.data_ptr<float>(),
+        origin.data_ptr<float>(),
+        direction.data_ptr<float>(),
+        field_real.data_ptr<float>(),
+        field_imag.data_ptr<float>(),
+        pdf_forward.data_ptr<float>(),
+        path_length.data_ptr<float>(),
+        component_mask.data_ptr<uint8_t>(),
+        valid.data_ptr<bool>());
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 
 at::Tensor channel_bdpt_sample_directions_cuda(int64_t count, at::Tensor reference, int64_t seed) {

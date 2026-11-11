@@ -74,6 +74,7 @@ __all__ = [
     "path_los_export",
     "path_los_visibility_inputs",
     "path_merge_blocks",
+    "path_pack_padded",
     "path_reflection_candidates",
 ]
 
@@ -1667,6 +1668,64 @@ def path_concat_vec3(blocks: tuple[torch.Tensor, ...] | list[torch.Tensor]) -> t
     out = _required_native_op("path_concat_vec3")(tuple(blocks))
     validate_cuda_tensor("out", out, dtype=torch.float32, ndim=2, trailing_shape=(3,))
     return out
+
+
+PATH_PACK_ROW_FIELDS = (
+    ("tx_id", torch.int32, 1),
+    ("rx_id", torch.int32, 1),
+    ("depth", torch.int32, 1),
+    ("component_id", torch.int32, 1),
+    ("edge_id", torch.int32, 1),
+    ("interaction_type", torch.int32, 2),
+    ("primitive_sequence", torch.int32, 2),
+    ("material_sequence", torch.int32, 2),
+    ("interaction_positions", torch.float32, 3),
+    ("interaction_normals", torch.float32, 3),
+    ("coefficient", torch.complex64, 1),
+    ("delay_s", torch.float32, 1),
+    ("field_xyz", torch.complex64, 2),
+    ("field_direction", torch.float32, 2),
+)
+_PATH_PACK_OUTPUT_FIELDS = (
+    "a", "tau", "theta_t", "phi_t", "theta_r", "phi_r", "valid", "interaction_type",
+    "primitive_id", "material_id", "position", "normal", "field_xyz", "field_direction",
+    "num_paths",
+)
+
+
+def path_pack_padded(
+    rows: dict[str, torch.Tensor], *, tx_positions: torch.Tensor, rx_positions: torch.Tensor,
+    pair_offsets: torch.Tensor, width: int | None,
+) -> dict[str, torch.Tensor]:
+    """Pad evaluated rows into ``(pair, width, ...)`` path tensors with endpoint angles.
+
+    ``pair_offsets`` segments rows by ``pair = rx * num_tx + tx`` and each pair's rows
+    must be contiguous in row order (canonical compaction output, or at most one row
+    per pair). ``width=None`` measures the largest pair count, which is one host
+    synchronization; a known width takes none.
+    """
+
+    for name, dtype, ndim in PATH_PACK_ROW_FIELDS:
+        validate_cuda_tensor(name, rows[name], dtype=dtype, ndim=ndim)
+    validate_cuda_tensor(
+        "tx_positions", tx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor(
+        "rx_positions", rx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
+    )
+    validate_cuda_tensor("pair_offsets", pair_offsets, dtype=torch.int64, ndim=1)
+    if width is not None and width < 0:
+        raise ValueError("width must be non-negative")
+    packed = _required_native_op("path_pack_padded")(
+        {name: rows[name] for name, _, _ in PATH_PACK_ROW_FIELDS},
+        tx_positions,
+        rx_positions,
+        pair_offsets,
+        -1 if width is None else int(width),
+    )
+    if not isinstance(packed, dict) or set(packed) != set(_PATH_PACK_OUTPUT_FIELDS):
+        raise TypeError("_channel.path_pack_padded returned bad fields")
+    return packed
 
 
 # -------------------------------------------------------------------------

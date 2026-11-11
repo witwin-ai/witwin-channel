@@ -36,7 +36,7 @@ def test_public_ad_capability_advertises_fixed_topology_jvp_vjp():
         # No estimator for visibility/topology discontinuities: path
         # birth/death and shadow transitions stay out of contract.
         "visibility_discontinuity_estimator": False,
-        "differentiable_solvers": ["path", "deterministic", "montecarlo_basic"],
+        "differentiable_solvers": ["path", "deterministic", "montecarlo_basic", "montecarlo_bdpt"],
         "differentiable_inputs": [
             "material_eps_r",
             "material_sigma_e",
@@ -53,7 +53,7 @@ def test_public_ad_capability_advertises_fixed_topology_jvp_vjp():
             # path solver's coupled mesh-vertex AD refusal.
             "deterministic": ["scattering", "coupled_paths_mesh_vertex"],
             "montecarlo_basic": ["scattering"],
-            "montecarlo_bdpt": ["all"],
+            "montecarlo_bdpt": ["tx_position", "rx_position", "mesh_vertices"],
         },
         # Monte Carlo Basic exposes native LoS AD as a supported primitive.
         "low_level_primitives": [
@@ -67,8 +67,12 @@ def test_public_ad_capability_advertises_fixed_topology_jvp_vjp():
         assert solver["ad_modes"] == ["none", "jvp", "vjp"]
         assert "scattering" in solver["ad_excluded"]
     bdpt = manifest["solvers"]["montecarlo_bdpt"]
-    assert bdpt["supports_ad"] is False
-    assert bdpt["ad_modes"] == ["none"]
+    assert bdpt["supports_ad"] is True
+    assert bdpt["ad_modes"] == ["none", "jvp", "vjp"]
+    assert bdpt["coherent_combine"]["supports_ad"] is True
+    assert bdpt["ad_excluded"] == ["tx_position", "rx_position", "mesh_vertices"]
+    assert "frequency" in bdpt["ad_differentiable_inputs"]
+    assert "tx_power" in bdpt["ad_differentiable_inputs"]
 
 
 @pytest.mark.parametrize(

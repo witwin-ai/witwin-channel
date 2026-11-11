@@ -38,8 +38,6 @@ from witwin.channel.interactions.reflection import (
 )
 from witwin.channel.interactions.transmission import (
     _EVENT_PROBABILITY_FLOOR,
-    _splitmix64,
-    event_selection_seed,
     scale_aware_epsilon,
     scene_diagonal_m,
 )
@@ -47,6 +45,7 @@ from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel.kernels import materials as material_kernels
 from witwin.channel.kernels import scattering as scattering_kernels
 from witwin.channel.kernels import topology as topology_kernels
+from witwin.channel.kernels.montecarlo import bdpt_counter_uniforms
 from witwin.channel.kernels.scattering import (
     scattering_event_probabilities,
     scattering_table_eval_ad,
@@ -2847,8 +2846,6 @@ SCATTERING_EVENT_TYPE = 3
 
 # Distinct seed stream for the two direction-sampling uniforms so the event
 # SELECTION uniforms stay bit-identical to the two-way event stream.
-_DIRECTION_SEED_SALT = 0x5CA77E12D5B7A31F
-_MASK63 = (1 << 63) - 1
 _DEGENERATE_SIN_SQ = 1.0e-12
 
 
@@ -2868,17 +2865,16 @@ def scatter_direction_uniforms(
 ) -> torch.Tensor:
     """Reproducible ``[count, 2]`` uniforms for Kirchhoff direction sampling.
 
-    Derived like the two-way event-selection seeds but salted into a distinct
-    stream, so the selection uniforms of :func:`witwin.channel.interactions.transmission.event_uniforms`
-    are untouched (bit-identical smooth-face behavior).
+    Native counter-based draws of global samples ``tx_index * count + i`` in a
+    stream distinct from the event-selection uniforms of
+    :func:`witwin.channel.interactions.transmission.event_uniforms`.
     """
 
-    generator = torch.Generator(device=device)
-    salted = _splitmix64(
-        event_selection_seed(seed, tx_index, depth) ^ _DIRECTION_SEED_SALT
+    reference = torch.empty((0,), device=device, dtype=torch.float32)
+    return bdpt_counter_uniforms(
+        reference, int(count), seed=int(seed), first=int(tx_index) * int(count),
+        depth=int(depth), stream="scatter_direction",
     )
-    generator.manual_seed(salted & _MASK63)
-    return torch.rand((int(count), 2), device=device, generator=generator)
 
 
 def three_way_rough_probabilities(

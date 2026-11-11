@@ -33,6 +33,12 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
     double frequency_hz,
     at::Tensor tx_pol);
 at::Tensor channel_path_concat_vec3_cuda(std::vector<at::Tensor> blocks);
+std::vector<at::Tensor> channel_path_pack_padded_cuda(
+    at::Tensor tx_id, at::Tensor rx_id, at::Tensor depth, at::Tensor component_id,
+    at::Tensor edge_id, at::Tensor interaction_type, at::Tensor primitive_sequence,
+    at::Tensor material_sequence, at::Tensor positions, at::Tensor normals, at::Tensor coefficient,
+    at::Tensor delay, at::Tensor field_xyz, at::Tensor field_direction, at::Tensor tx_positions,
+    at::Tensor rx_positions, at::Tensor pair_offsets, int64_t width);
 std::tuple<at::Tensor, at::Tensor, at::Tensor> channel_path_los_visibility_inputs_cuda(
     at::Tensor tx_positions,
     at::Tensor rx_positions,
@@ -181,6 +187,30 @@ pybind11::dict channel_path_los_export(
 
 torch::Tensor channel_path_concat_vec3(pybind11::sequence blocks) {
     return channel_path_concat_vec3_cuda(tensor_sequence(blocks, "blocks"));
+}
+
+pybind11::dict channel_path_pack_padded(pybind11::dict rows, torch::Tensor tx_positions,
+                                        torch::Tensor rx_positions, torch::Tensor pair_offsets,
+                                        int64_t width) {
+    auto field = [&rows](const char* name) {
+        TORCH_CHECK(rows.contains(name), "path_pack_padded rows are missing ", name);
+        return rows[name].cast<at::Tensor>();
+    };
+    auto packed = channel_path_pack_padded_cuda(
+        field("tx_id"), field("rx_id"), field("depth"), field("component_id"), field("edge_id"),
+        field("interaction_type"), field("primitive_sequence"), field("material_sequence"),
+        field("interaction_positions"), field("interaction_normals"), field("coefficient"),
+        field("delay_s"), field("field_xyz"), field("field_direction"), tx_positions, rx_positions,
+        pair_offsets, width);
+    static const char* const names[] = {
+        "a",        "tau",    "theta_t",          "phi_t",           "theta_r",
+        "phi_r",    "valid",  "interaction_type", "primitive_id",    "material_id",
+        "position", "normal", "field_xyz",        "field_direction", "num_paths"};
+    pybind11::dict out;
+    for (size_t index = 0; index < packed.size(); ++index) {
+        out[names[index]] = packed[index];
+    }
+    return out;
 }
 
 pybind11::dict channel_path_los_visibility_inputs(

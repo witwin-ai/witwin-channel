@@ -23,6 +23,8 @@ from witwin.core import (
     quat_multiply,
 )
 
+from witwin.channel.runtime import is_transform_wrapped_tensor
+
 if TYPE_CHECKING:
     from witwin.channel.scene.compiler import CompiledScene
 
@@ -115,6 +117,14 @@ def steering_vector(
     if orientation is not None:
         rotation = orientation_matrix(orientation).to(device=device)
         positions = positions @ rotation.T
+    return steering_from_positions(positions, direction, frequency_hz=frequency_hz)
+
+
+def steering_from_positions(
+    positions: torch.Tensor, direction: torch.Tensor, *, frequency_hz: float,
+) -> torch.Tensor:
+    """``exp(+j k r·u)`` for world-frame element offsets ``positions`` of shape ``(A, 3)``."""
+
     unit = direction.to(dtype=torch.float32)
     unit = unit / torch.linalg.vector_norm(unit, dim=-1, keepdim=True).clamp_min(
         torch.finfo(torch.float32).tiny
@@ -175,7 +185,8 @@ def validate_scalar_endpoint_features(
     """Reject endpoint features that a scalar/power solver cannot consume."""
 
     for endpoint in (*tuple(transmitters), *tuple(receivers)):
-        if endpoint.array.num_antennas != 1:
+        antennas = getattr(endpoint, "num_antennas", None)
+        if (endpoint.array.num_antennas if antennas is None else antennas) != 1:
             raise ValueError(f"{solver} does not support antenna arrays")
         if endpoint.pattern.kind != "isotropic":
             raise ValueError(
@@ -254,6 +265,13 @@ class _EndpointView:
     @property
     def pattern(self):
         return self.source.pattern
+
+    @property
+    def num_antennas(self) -> int:
+        positions = self.source.element_positions
+        if positions is None or self.single_element:
+            return 1
+        return int(positions.shape[0])
 
     @property
     def array(self) -> _AntennaArrayView:
@@ -335,6 +353,7 @@ class SolverScene:
     receivers: tuple[_ReceiverPointView | _ReceiverGridView, ...]
     frequency: float | torch.Tensor
     metadata: object
+    endpoint_store: EndpointStore | None = None
 
 
 def _as_quaternion(orientation: torch.Tensor) -> torch.Tensor:
@@ -553,30 +572,457 @@ def require_no_functorch_transform(values: Sequence[object]) -> None:
     """Refuse tensors wrapped by ``torch.func`` (``grad``/``jvp``/``vmap``) before native work."""
 
     for value in values:
-        if isinstance(value, torch.Tensor) and torch._C._functorch.is_functorch_wrapped_tensor(value):
+        if isinstance(value, torch.Tensor) and is_transform_wrapped_tensor(value):
             raise NotImplementedError(FUNCTORCH_MESSAGE)
 
 
+# --- Endpoint store -------------------------------------------------------
+
+def _leaf_state(value: object) -> object:
+    if isinstance(value, torch.Tensor):
+        return (id(value), value._version, value.requires_grad)
+    return value
+
+
+def endpoint_token(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[object, ...]:
+    """Host-only identity of every endpoint input a solve reads.
+
+    Each endpoint contributes its object identity plus, for every tensor leaf,
+    the tensor identity, mutation ``_version`` and ``requires_grad`` flag
+    (snapshot rigid motions likewise). Endpoint objects are frozen, so equal
+    tokens mean equal endpoint values. The token reads no tensor data,
+    launches nothing and never synchronizes; it keys the cached
+    :class:`EndpointStore` and is meant to key any endpoint-only cache.
+    """
+
+    leaf = _leaf_state
+    grid_type = CoreReceiverGrid
+    token: list[object] = []
+    append = token.append
+    if isinstance(scene_or_snapshot, Scene):
+        pairs = ((endpoint, None) for endpoint in scene_or_snapshot.endpoints)
+    else:
+        pairs = (
+            (state.antenna, state.rigid_motion) for state in scene_or_snapshot.endpoints
+        )
+    for endpoint, motion in pairs:
+        append(id(endpoint))
+        append(leaf(endpoint.position))
+        append(leaf(endpoint.orientation))
+        append(leaf(endpoint.polarization))
+        append(leaf(endpoint.element_positions))
+        append(leaf(endpoint.weights))
+        append(leaf(endpoint.power_w))
+        if type(endpoint) is grid_type:
+            append(leaf(endpoint.x_axis))
+            append(leaf(endpoint.y_axis))
+            append(leaf(endpoint.spacing))
+        if motion is not None:
+            append((id(motion), leaf(motion.translation), leaf(motion.rotation)))
+    return tuple(token)
+
+
+def _participates_in_ad(value: object) -> bool:
+    if not isinstance(value, torch.Tensor):
+        return False
+    if value.requires_grad:
+        return True
+    return torch.autograd.forward_ad.unpack_dual(value).tangent is not None
+
+
+def _endpoint_tensors(view: _EndpointView) -> tuple[object, ...]:
+    values: tuple[object, ...] = (
+        view.position,
+        view.orientation_override if view.orientation_override is not None
+        else view.source.orientation,
+        view.source.polarization,
+        view.source.element_positions,
+        view.source.weights,
+    )
+    if isinstance(view, _TransmitterView):
+        values += (view.source.power_w,)
+    return values
+
+
+def _rotation_matrices(orientation: torch.Tensor) -> torch.Tensor:
+    """Batched ``witwin.core.antenna_orientation_matrix`` over ``(n, 3)`` or ``(n, 4)``."""
+
+    if orientation.shape[-1] == 4:
+        w, x, y, z = orientation.unbind(-1)
+        rows = (
+            (1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)),
+            (2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)),
+            (2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)),
+        )
+    else:
+        yaw, pitch, roll = orientation.unbind(-1)
+        cy, sy = torch.cos(yaw), torch.sin(yaw)
+        cp, sp = torch.cos(pitch), torch.sin(pitch)
+        cr, sr = torch.cos(roll), torch.sin(roll)
+        rows = (
+            (cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr),
+            (sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr),
+            (-sp, cp * sr, cp * cr),
+        )
+    return torch.stack([torch.stack(row, dim=-1) for row in rows], dim=-2)
+
+
+def _rotate(rotation: torch.Tensor, unit: torch.Tensor) -> torch.Tensor:
+    """Batched ``rotation @ unit`` summed in the order of the per-vector product it replaces.
+
+    A 3x3 matrix-vector product on the host BLAS sums ``(r1*u1 + r2*u2) + r0*u0``
+    and on CUDA ``(r0*u0 + r2*u2) + r1*u1``; the fixed per-device order keeps every
+    oriented polarization bit-identical to that product.
+    """
+
+    terms = [rotation[..., k] * unit[..., None, k] for k in range(3)]
+    if unit.device.type == "cpu":
+        return (terms[1] + terms[2]) + terms[0]
+    return (terms[0] + terms[2]) + terms[1]
+
+
+def _world_polarizations(views: Sequence[_EndpointView]) -> torch.Tensor:
+    """World-frame unit polarization of every endpoint, in view order, as ``(n, 3)``.
+
+    Endpoints are grouped by device, dtype and orientation kind; each group is one
+    batched norm, rotation and product, equal bit for bit to evaluating
+    ``_EndpointView.polarization`` one endpoint at a time.
+    """
+
+    groups: dict[tuple[object, ...], list[int]] = {}
+    polarizations: list[torch.Tensor] = []
+    orientations: list[torch.Tensor] = []
+    defaults: dict[tuple[object, ...], torch.Tensor] = {}
+    for index, view in enumerate(views):
+        position = view.position
+        polarization = view.source.polarization
+        if polarization is None:
+            horizontal = view.source.pattern.kind == "horizontal"
+            key = ("polarization", horizontal, position.device, position.dtype)
+            polarization = defaults.get(key)
+            if polarization is None:
+                polarization = position.new_tensor(
+                    (1.0, 0.0, 0.0) if horizontal else (0.0, 0.0, 1.0)
+                )
+                defaults[key] = polarization
+        orientation = (
+            view.source.orientation
+            if view.orientation_override is None
+            else view.orientation_override
+        )
+        if orientation is None:
+            key = ("orientation", position.device, position.dtype)
+            orientation = defaults.get(key)
+            if orientation is None:
+                orientation = position.new_zeros((3,))
+                defaults[key] = orientation
+        polarizations.append(polarization)
+        orientations.append(orientation)
+        group = (
+            polarization.device,
+            polarization.dtype,
+            orientation.device,
+            orientation.dtype,
+            int(orientation.shape[0]),
+        )
+        groups.setdefault(group, []).append(index)
+    results: list[torch.Tensor] = []
+    order: list[int] = []
+    for indices in groups.values():
+        polarization = torch.stack([polarizations[index] for index in indices])
+        orientation = torch.stack([orientations[index] for index in indices])
+        norm = torch.linalg.vector_norm(polarization, dim=-1)
+        if polarization.device.type == "cpu" and not bool(
+            (torch.isfinite(norm) & (norm > 0.0)).all()
+        ):
+            raise ValueError("polarization must be finite and non-zero")
+        unit = polarization / norm.unsqueeze(-1)
+        results.append(_rotate(_rotation_matrices(orientation), unit).contiguous())
+        order.extend(indices)
+    if len(results) == 1:
+        return results[0]
+    device = results[0].device
+    stacked = torch.cat([value.to(device=device) for value in results])
+    inverse = torch.empty(len(order), dtype=torch.long)
+    inverse[torch.tensor(order, dtype=torch.long)] = torch.arange(len(order))
+    return stacked.index_select(0, inverse.to(device=device))
+
+
+def _tx_power_values(transmitters: Sequence[_TransmitterView]) -> torch.Tensor:
+    powers = [transmitter.power_w for transmitter in transmitters]
+    if not any(isinstance(power, torch.Tensor) for power in powers):
+        return torch.tensor([float(power) for power in powers], dtype=torch.float32)
+    return torch.stack(
+        [
+            power.reshape(()).to(dtype=torch.float32)
+            if isinstance(power, torch.Tensor)
+            else torch.tensor(
+                float(power), dtype=torch.float32, device=transmitter.position.device
+            )
+            for transmitter, power in zip(transmitters, powers, strict=True)
+        ]
+    )
+
+
+def _upload(parts: Sequence[torch.Tensor], *, device: torch.device) -> list[torch.Tensor]:
+    """Move float32 parts to ``device`` with one copy and return views of the result."""
+
+    if not parts:
+        return []
+    if any(_participates_in_ad(part) for part in parts):
+        # Separate copies keep each part's own graph: a shared buffer would put
+        # every field on the graph of any differentiable one.
+        return [part.to(device=device) for part in parts]
+    flat = [part.reshape(-1) for part in parts]
+    if all(part.device == flat[0].device for part in flat):
+        buffer = torch.cat(flat).to(device=device)
+    else:
+        buffer = torch.cat([part.to(device=device) for part in flat])
+    views: list[torch.Tensor] = []
+    offset = 0
+    for part in parts:
+        count = part.numel()
+        views.append(buffer[offset : offset + count].view(part.shape))
+        offset += count
+    return views
+
+
+@dataclass(frozen=True, slots=True)
+class EndpointStore:
+    """Device-resident endpoint tensors of one solver scene, built once per endpoint token.
+
+    Row order follows the scene: transmitters in order; receivers flattened in
+    order with a ``ReceiverGrid`` contributing its cells row-major. Grid cell
+    positions come from the native grid generator and a grid's polarization is
+    one broadcast row, so nothing scales per cell on the host. ``tx_positions``
+    and point ``rx_positions_live`` keep any differentiable endpoint leaf on the
+    graph through one stack.
+    """
+
+    transmitters: tuple[_TransmitterView, ...]
+    receivers: tuple[_ReceiverPointView | _ReceiverGridView, ...]
+    device: torch.device
+    differentiable: bool
+    tx_positions: torch.Tensor
+    tx_power: torch.Tensor
+    tx_polarizations: torch.Tensor
+    tx_polarizations_stored: torch.Tensor
+    rx_positions: torch.Tensor
+    rx_positions_live: torch.Tensor | None
+    rx_polarizations: torch.Tensor
+    receiver_polarizations: torch.Tensor
+    receiver_cell_counts: tuple[int, ...]
+    _lazy: dict[str, object]
+
+    @property
+    def tx_count(self) -> int:
+        return int(self.tx_positions.shape[0])
+
+    @property
+    def rx_count(self) -> int:
+        return int(self.rx_positions.shape[0])
+
+    def receiver_polarization_rows(self, receiver_index: int) -> torch.Tensor:
+        """Broadcast ``(cells, 3)`` float32 polarization of one receiver."""
+
+        return self.receiver_polarizations[receiver_index].expand(
+            self.receiver_cell_counts[receiver_index], 3
+        )
+
+    def stable_ids(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """Device ``int64`` stable antenna ids per transmitter and per flattened receiver row."""
+
+        cached = self._lazy.get("stable_ids")
+        if cached is None:
+            source = torch.tensor(
+                [int(view.source.antenna_id) for view in self.transmitters], dtype=torch.int64
+            )
+            sink = torch.repeat_interleave(
+                torch.tensor(
+                    [int(view.source.antenna_id) for view in self.receivers], dtype=torch.int64
+                ),
+                torch.tensor(self.receiver_cell_counts, dtype=torch.int64),
+            )
+            cached = (source.to(device=self.device), sink.to(device=self.device))
+            self._lazy["stable_ids"] = cached
+        return cached  # type: ignore[return-value]
+
+
+def _receiver_cells(receiver: object) -> int:
+    if isinstance(receiver, ReceiverGrid):
+        return int(receiver.shape[0]) * int(receiver.shape[1])
+    if isinstance(receiver, ReceiverPoint):
+        return 1
+    raise TypeError(f"receiver type is not accepted: {type(receiver)!r}")
+
+
+def _transmitter_parts(
+    transmitters: tuple[_TransmitterView, ...],
+) -> tuple[list[torch.Tensor], torch.Tensor]:
+    """Host float32 positions, powers and polarizations, plus the stored-dtype polarizations."""
+
+    if not transmitters:
+        empty = torch.empty((0, 3), dtype=torch.float32)
+        return [empty, torch.empty((0,), dtype=torch.float32), empty], empty
+    stored = _world_polarizations(transmitters)
+    positions = torch.stack([view.position for view in transmitters]).to(torch.float32)
+    return [positions, _tx_power_values(transmitters), stored.to(torch.float32)], stored
+
+
+def _receiver_rows(
+    receivers: tuple[_ReceiverPointView | _ReceiverGridView, ...], cell_counts: tuple[int, ...],
+    point_positions: torch.Tensor | None, receiver_polarizations: torch.Tensor,
+    reference: torch.Tensor,
+) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+    """Per-row position and polarization blocks: one per grid, one per run of point receivers."""
+
+    from witwin.channel.scene.compiler import receiver_grid_points
+
+    position_blocks: list[torch.Tensor] = []
+    polarization_blocks: list[torch.Tensor] = []
+    point_cursor = 0
+    index = 0
+    while index < len(receivers):
+        receiver = receivers[index]
+        if isinstance(receiver, ReceiverGrid):
+            position_blocks.append(receiver_grid_points(receiver, reference=reference))
+            polarization_blocks.append(
+                receiver_polarizations[index].expand(cell_counts[index], 3)
+            )
+            index += 1
+            continue
+        stop = index
+        while stop < len(receivers) and not isinstance(receivers[stop], ReceiverGrid):
+            stop += 1
+        assert point_positions is not None
+        run = stop - index
+        position_blocks.append(point_positions[point_cursor : point_cursor + run])
+        polarization_blocks.append(receiver_polarizations[index:stop])
+        point_cursor += run
+        index = stop
+    return position_blocks, polarization_blocks
+
+
+def _join_rows(
+    position_blocks: list[torch.Tensor], polarization_blocks: list[torch.Tensor],
+    device: torch.device,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if not position_blocks:
+        empty = torch.empty((0, 3), device=device, dtype=torch.float32)
+        return empty, empty
+    if len(position_blocks) == 1:
+        return position_blocks[0], polarization_blocks[0]
+    from witwin.channel.kernels.topology import path_concat_vec3
+
+    positions = path_concat_vec3([block.detach().contiguous() for block in position_blocks])
+    return positions, torch.cat(polarization_blocks)
+
+
+def build_endpoint_store(
+    transmitters: Sequence[_TransmitterView],
+    receivers: Sequence[_ReceiverPointView | _ReceiverGridView], *, device: torch.device,
+) -> EndpointStore:
+    """Stack, orient and upload every endpoint tensor of one scene in batched operations."""
+
+    transmitters = tuple(transmitters)
+    receivers = tuple(receivers)
+    cell_counts = tuple(_receiver_cells(receiver) for receiver in receivers)
+    points = [receiver for receiver in receivers if isinstance(receiver, ReceiverPoint)]
+    differentiable = any(
+        _participates_in_ad(value)
+        for view in (*transmitters, *receivers)
+        for value in _endpoint_tensors(view)
+    )
+    host_parts, tx_stored = _transmitter_parts(transmitters)
+    if points:
+        host_parts.append(torch.stack([view.position for view in points]).to(torch.float32))
+    if receivers:
+        host_parts.append(_world_polarizations(receivers).to(torch.float32))
+    uploaded = _upload(host_parts, device=device)
+    tx_positions, tx_power, tx_polarizations = uploaded[:3]
+    point_positions = uploaded[3] if points else None
+    receiver_polarizations = (
+        uploaded[-1] if receivers else torch.empty((0, 3), device=device, dtype=torch.float32)
+    )
+    rx_positions, rx_polarizations = _join_rows(
+        *_receiver_rows(
+            receivers,
+            cell_counts,
+            point_positions,
+            receiver_polarizations,
+            tx_positions.detach() if transmitters else torch.empty((0, 3), device=device),
+        ),
+        device,
+    )
+    return EndpointStore(
+        transmitters=transmitters,
+        receivers=receivers,
+        device=device,
+        differentiable=differentiable,
+        tx_positions=tx_positions,
+        tx_power=tx_power,
+        tx_polarizations=tx_polarizations,
+        tx_polarizations_stored=(
+            tx_polarizations if tx_stored.dtype == torch.float32 else tx_stored.to(device=device)
+        ),
+        rx_positions=rx_positions,
+        rx_positions_live=(
+            point_positions if receivers and len(points) == len(receivers) else None
+        ),
+        rx_polarizations=rx_polarizations,
+        receiver_polarizations=receiver_polarizations,
+        receiver_cell_counts=cell_counts,
+        _lazy={},
+    )
+
+
+def endpoint_store(scene: object, *, device: torch.device | None = None) -> EndpointStore:
+    """The scene's bound :class:`EndpointStore`, or a fresh one for re-bound endpoints."""
+
+    target = torch.device("cuda") if device is None else torch.device(device)
+    if target.type == "cuda" and target.index is None:
+        target = torch.device("cuda", torch.cuda.current_device())
+    store = getattr(scene, "endpoint_store", None)
+    if (
+        store is not None
+        and store.device == target
+        and store.transmitters is scene.transmitters
+        and store.receivers is scene.receivers
+    ):
+        return store
+    return build_endpoint_store(scene.transmitters, scene.receivers, device=target)
+
+
 def bind_solver_scene(compiled: CompiledScene) -> SolverScene:
-    views = _endpoint_views(compiled.source)
     require_no_functorch_transform(
-        [view.position for view in views]
-        + [getattr(structure, "vertices", None) for structure in compiled.structures]
+        [getattr(structure, "vertices", None) for structure in compiled.structures]
         + [compiled.reference_frequency_hz]
     )
-    _validate_scalar_endpoint_boundary(views)
-    _validate_endpoint_values(views)
+    token = endpoint_token(compiled.source)
+    device = torch.device("cuda", torch.cuda.current_device()) if torch.cuda.is_available() else None
+    cached = compiled._endpoint_store_cache
+    if cached is not None and cached[0] == token and cached[1].device == device:
+        store = cached[1]
+        transmitters, receivers = store.transmitters, store.receivers
+    else:
+        views = _endpoint_views(compiled.source)
+        require_no_functorch_transform([view.position for view in views])
+        _validate_scalar_endpoint_boundary(views)
+        _validate_endpoint_values(views)
+        transmitters = tuple(view for view in views if isinstance(view, _TransmitterView))
+        receivers = tuple(view for view in views if not isinstance(view, _TransmitterView))
+        store = None
+        if device is not None:
+            store = build_endpoint_store(transmitters, receivers, device=device)
+            compiled._endpoint_store_cache = None if store.differentiable else (token, store)
     return SolverScene(
         compiled=compiled,
         structures=compiled.structures,
-        transmitters=tuple(
-            view for view in views if isinstance(view, _TransmitterView)
-        ),
-        receivers=tuple(
-            view for view in views if not isinstance(view, _TransmitterView)
-        ),
+        transmitters=transmitters,
+        receivers=receivers,
         frequency=compiled.reference_frequency_hz,
         metadata=compiled.source.metadata,
+        endpoint_store=store,
     )
 
 
@@ -716,17 +1162,11 @@ def scene_vertex_table(scene: object, compiled: object) -> torch.Tensor:
 def transmitter_positions_ad(
     scene: object, native: torch.Tensor, *, device: torch.device,
 ) -> torch.Tensor:
-    """Live transmitter positions (the native builder flattens to host floats)."""
+    """Live transmitter positions: one stack of the scene leaves, on the graph when they are."""
 
     if not scene.transmitters:
         return native
-    return torch.stack(
-        [
-            transmitter.position.to(device=device, dtype=torch.float32)
-            for transmitter in scene.transmitters
-        ],
-        dim=0,
-    )
+    return endpoint_store(scene, device=device).tx_positions
 
 
 def receiver_positions_ad(
@@ -739,17 +1179,10 @@ def receiver_positions_ad(
     mark requires_grad, so nothing is silently zeroed here.
     """
 
-    if not scene.receivers or not all(
-        isinstance(receiver, ReceiverPoint) for receiver in scene.receivers
-    ):
+    if not scene.receivers:
         return native
-    return torch.stack(
-        [
-            receiver.position.to(device=device, dtype=torch.float32)
-            for receiver in scene.receivers
-        ],
-        dim=0,
-    )
+    live = endpoint_store(scene, device=device).rx_positions_live
+    return native if live is None else live
 
 
 _MATERIAL_AD_FIELDS = (
@@ -814,20 +1247,16 @@ def transmitter_polarizations_f32(scene: object, *, device: torch.device) -> tor
     """Transmitter polarizations as a contiguous float32 ``(N, 3)`` tensor.
 
     Row order matches the transmitter order of the logical scene. The vectors
-    are already unit and oriented by the Core transmitter model, so this only
-    stacks them, casts to float32, and makes the result contiguous.
+    are unit and oriented by the Core transmitter model; they come from the
+    scene's endpoint store, so a solve neither recomputes nor re-uploads them.
 
     This is NOT :func:`witwin.channel.scene.compiler.transmitter_polarizations_as_stored`,
-    which is a straight device upload: it keeps whatever dtype and layout the
-    scene stored, and its empty case comes from the native transmitter builder
-    rather than ``device``. Both are live and each has its own callers; the two
-    names record the difference instead of hiding it behind one spelling.
+    which keeps whatever dtype the scene stored. Both are live and each has its
+    own callers; the two names record the difference instead of hiding it
+    behind one spelling.
     """
 
-    values = [tx.polarization for tx in scene.transmitters]
-    if not values:
-        return torch.empty((0, 3), device=device, dtype=torch.float32)
-    return torch.stack(values).to(device=device, dtype=torch.float32).contiguous()
+    return endpoint_store(scene, device=device).tx_polarizations
 
 
 def receiver_polarizations_f32(
@@ -837,26 +1266,28 @@ def receiver_polarizations_f32(
 
     With ``grid``, one grid polarization is broadcast over that grid's points.
     Without it, the scene's receivers are expanded in order: a grid contributes
-    one row per point, a point receiver one row.
+    one row per point, a point receiver one row. :func:`receiver_polarization_rows`
+    returns the same values without materializing the per-cell copy.
     """
 
+    store = endpoint_store(scene, device=device)
     if grid is not None:
-        return (
-            grid.polarization.to(device=device, dtype=torch.float32)
-            .expand(grid.shape[0] * grid.shape[1], 3)
-            .contiguous()
+        index = next(
+            (position for position, receiver in enumerate(store.receivers) if receiver is grid),
+            None,
         )
-    values: list[torch.Tensor] = []
-    for receiver in scene.receivers:
-        if isinstance(receiver, ReceiverGrid):
-            values.extend([receiver.polarization] * (receiver.shape[0] * receiver.shape[1]))
-        elif isinstance(receiver, ReceiverPoint):
-            values.append(receiver.polarization)
-        else:
-            raise TypeError(f"receiver type is not accepted: {type(receiver)!r}")
-    if not values:
-        return torch.empty((0, 3), device=device, dtype=torch.float32)
-    return torch.stack(values).to(device=device, dtype=torch.float32).contiguous()
+        if index is None:
+            return _world_polarizations((grid,)).to(device=device, dtype=torch.float32).expand(
+                grid.shape[0] * grid.shape[1], 3
+            ).contiguous()
+        return store.receiver_polarization_rows(index).contiguous()
+    return store.rx_polarizations.contiguous()
+
+
+def receiver_polarization_rows(scene: object, *, device: torch.device) -> torch.Tensor:
+    """Float32 ``(N, 3)`` receiver polarizations per flattened row; a grid is a broadcast view."""
+
+    return endpoint_store(scene, device=device).rx_polarizations
 
 
 __all__: list[str] = []

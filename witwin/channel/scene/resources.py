@@ -61,6 +61,7 @@ __all__ = [
     "pdf_reverse",
     "rayd_scene_create",
     "rayd_scene_edge_records",
+    "rayd_scene_update_vertices",
     "realization_phase_screens",
     "realization_seed",
     "refine_edge_geometry",
@@ -88,6 +89,12 @@ def rayd_scene_create(
         raise RuntimeError("_channel.rayd_scene_create returned an invalid resource")
     record_scene_trace_backend(resource)
     return resource
+
+
+def rayd_scene_update_vertices(
+    resource: object, mesh_indices: list[int], vertices: list[torch.Tensor],
+) -> None:
+    _required_native_op("rayd_scene_update_vertices")(resource, mesh_indices, vertices)
 
 
 def rayd_scene_edge_records(resource: object) -> tuple[torch.Tensor, ...]:
@@ -124,6 +131,13 @@ class RayDSceneResource:
     runtime_cache: dict[str, object] = field(
         default_factory=dict, compare=False, repr=False
     )
+    # Which meshes were created refittable, one flag per mesh in build order.
+    dynamic_meshes: tuple[bool, ...] = ()
+    # Device bytes the native scene took when it was built (edge records are counted
+    # with the runtime cache that holds them).
+    native_bytes: int = 0
+    # Advances on every in-place vertex refit; a compiled scene records the value it was built at.
+    generation: int = 0
 
     @property
     def available(self) -> bool:
@@ -174,6 +188,34 @@ class RayDSceneResource:
         self.runtime_cache["edge_records"] = records
         return records
 
+    def refit(self, mesh_indices: Sequence[int], vertices: Sequence[torch.Tensor]) -> None:
+        """Replace the vertices of refittable meshes in place and commit them natively.
+
+        Every cached value derived from the geometry is dropped, the edge records are
+        read again on next use, and ``generation`` advances so that compiled scenes
+        built at the previous geometry can tell that their geometry differs from it.
+        """
+
+        resource = self.require_resource()
+        indices = [int(index) for index in mesh_indices]
+        if any(not self.dynamic_meshes[index] for index in indices):
+            raise RuntimeError("only meshes created refittable can be refit in place")
+        device = torch.device("cuda", int(getattr(resource, "device_index")))
+        mesh_vertices = [
+            value.detach().to(device=device, dtype=torch.float32).contiguous()
+            for value in vertices
+        ]
+        policy = self.runtime_cache.get("edge_policy")
+        self.runtime_cache.clear()
+        object.__setattr__(self, "generation", self.generation + 1)
+        rayd_scene_update_vertices(resource, indices, mesh_vertices)
+        if policy is not None:
+            self.runtime_cache["edge_policy"] = policy
+        tensors = list(self.mesh_tensors)
+        for index, value in zip(indices, mesh_vertices):
+            tensors[index] = (value, *tensors[index][1:])
+        object.__setattr__(self, "mesh_tensors", tuple(tensors))
+
 
 def _channel_edge_error(error: RuntimeError) -> Exception:
     """Restate a RayD edge-topology refusal in Channel terms; other errors pass through."""
@@ -207,11 +249,20 @@ def _mesh_flags(*, use_face_normals: bool, edges_enabled: bool, dynamic: bool) -
     return flags
 
 
-def build_scene_from_structures(structures: tuple[object, ...]) -> RayDSceneResource:
+def _allocated_device_bytes() -> int:
+    """Bytes the caching allocator holds for tensors on the current device (a host counter)."""
+
+    return int(torch.cuda.memory_allocated())
+
+
+def build_scene_from_structures(
+    structures: tuple[object, ...], *, dynamic: Sequence[bool] = (),
+) -> RayDSceneResource:
     """Build a typed RayD native scene from Channel structures.
 
     This function uses the RayD native core source-linked into
     `_channel`. It does not import a RayD Python package or dispatcher.
+    ``dynamic`` marks the meshes created refittable (default: none).
     """
 
     trace_backend = requested_trace_backend()
@@ -226,6 +277,10 @@ def build_scene_from_structures(structures: tuple[object, ...]) -> RayDSceneReso
 
     require_device_supported(torch.cuda.current_device())
     device = torch.device("cuda")
+    dynamic_flags = tuple(bool(flag) for flag in dynamic) or (False,) * len(structures)
+    if len(dynamic_flags) != len(structures):
+        raise ValueError("dynamic must hold one flag per structure")
+    allocated_before = _allocated_device_bytes()
     vertices: list[torch.Tensor] = []
     faces: list[torch.Tensor] = []
     uv: list[torch.Tensor] = []
@@ -235,7 +290,7 @@ def build_scene_from_structures(structures: tuple[object, ...]) -> RayDSceneReso
     mesh_flags: list[int] = []
     keepalive: list[tuple[torch.Tensor, ...]] = []
 
-    for structure in structures:
+    for structure, mesh_dynamic in zip(structures, dynamic_flags):
         mesh_vertices = structure.vertices.to(
             device=device, dtype=torch.float32
         ).contiguous()
@@ -262,7 +317,7 @@ def build_scene_from_structures(structures: tuple[object, ...]) -> RayDSceneReso
         to_world_left.append(mesh_to_world_left)
         to_world_right.append(mesh_to_world_right)
         mesh_flags.append(
-            _mesh_flags(use_face_normals=False, edges_enabled=True, dynamic=False)
+            _mesh_flags(use_face_normals=False, edges_enabled=True, dynamic=mesh_dynamic)
         )
         keepalive.append(
             (
@@ -288,11 +343,16 @@ def build_scene_from_structures(structures: tuple[object, ...]) -> RayDSceneReso
         )
     except RuntimeError as error:
         raise _channel_edge_error(error) from error
-    return RayDSceneResource(
+    scene = RayDSceneResource(
         resource=resource,
         mesh_tensors=tuple(keepalive),
         requested_trace_backend=trace_backend,
+        dynamic_meshes=dynamic_flags,
     )
+    object.__setattr__(
+        scene, "native_bytes", max(0, _allocated_device_bytes() - allocated_before)
+    )
+    return scene
 
 
 _BOUNDARY_EDGE_POLICIES = {"exclude", "half_plane"}

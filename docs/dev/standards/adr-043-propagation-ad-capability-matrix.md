@@ -224,8 +224,9 @@ and contradicted the ledger's own contract.
   gradient now gets a `NotImplementedError` naming the owner. There was no
   correct second-order answer behind that silence.
 - `diffraction` with `ad_mode` in `{jvp, vjp}` now raises at the pre-flight
-  instead of raising an `IndexError` deeper in. The primal behaviour is
-  unchanged and still broken, on purpose, with a pinned regression test.
+  instead of raising an `IndexError` deeper in. The primal `IndexError` was
+  later fixed as a deliberate, separate decision (the diffraction topology now
+  takes the request's source polarizations); the AD column stays `{"none"}`.
 
 ## Alternatives rejected
 

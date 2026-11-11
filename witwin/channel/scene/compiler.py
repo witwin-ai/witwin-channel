@@ -6,7 +6,8 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from dataclasses import dataclass, field, fields
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field, fields, is_dataclass, replace
 import hashlib
 import math
 from threading import RLock
@@ -39,13 +40,12 @@ from witwin.channel.kernels import topology as topology_kernels
 from witwin.channel.runtime import (
     bdpt_zero_matrix,
     mc_receiver_grid_points,
-    mc_transmitter_tensors,
     requested_trace_backend,
 )
 from witwin.channel.scene.endpoints import (
     ReceiverGrid,
-    ReceiverPoint,
     SolverScene,
+    endpoint_store,
     vector3_tuple,
 )
 from witwin.channel.scene.resources import (
@@ -377,6 +377,15 @@ class CompiledScene:
     _fixed_reevaluation_tables_cache: tuple[tuple, dict] | None = field(
         default=None, repr=False, compare=False
     )
+    # The structure, material and assignment state this runtime was compiled
+    # from, and the RayD refit generation it was built at; None for a runtime
+    # assembled by hand, which has no source state to be stale against.
+    _world: _WorldState | None = field(default=None, repr=False, compare=False)
+    _rayd_generation: int = field(default=0, repr=False, compare=False)
+    # (endpoint token, EndpointStore) of the last non-differentiable binding.
+    _endpoint_store_cache: tuple[tuple, object] | None = field(
+        default=None, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         if not isinstance(self.source, (Scene, SceneSnapshot)):
@@ -405,6 +414,27 @@ class CompiledScene:
                 raise TypeError(f"{name} must be a float")
             if not math.isfinite(value) or value < 0.0:
                 raise ValueError(f"{name} must be finite and non-negative")
+
+    def stale_domain(self) -> str | None:
+        """Name the world domain that changed in the source since compilation, or ``None``.
+
+        Compares the structure, material and assignment state recorded at
+        compile time with the source's current state, using host attributes only
+        (no device work, no synchronization). The scene's own antennas are not
+        part of it: no compiled resource depends on them. Returns
+        ``"geometry_version"`` as well when the shared RayD scene was refit for a
+        newer compile of the same, edited, structures.
+        """
+
+        recorded = getattr(self, "_world", None)
+        if recorded is None:
+            return None
+        moved = recorded.moved_domain(world_state(self.source))
+        if moved is not None:
+            return moved
+        if self._rayd_generation != self.rayd.generation:
+            return "geometry_version"
+        return None
 
     def __reduce_ex__(self, protocol: object) -> object:
         raise TypeError(
@@ -650,7 +680,6 @@ _ResultT = TypeVar("_ResultT")
 _GEOMETRY_MODE_IDS = {"thin_sheet": 0, "volumetric": 1}
 _SCATTER_MODEL_SMOOTH = 0
 _SCATTER_MODEL_KIRCHHOFF = 1
-_CACHE_LIMIT = 32
 
 
 @dataclass(frozen=True, slots=True)
@@ -660,8 +689,8 @@ class _RuntimeStructure:
     faces: torch.Tensor
     uv: torch.Tensor | None
     face_uv: torch.Tensor | None
-    # Authored local index of every kept face, or None when no face was dropped.
-    kept_faces: tuple[int, ...] | None = None
+    # Authored local index (int64, host) of every kept face, or None when no face was dropped.
+    kept_face_index: torch.Tensor | None = None
     dropped_degenerate_faces: int = 0
     dropped_duplicate_faces: int = 0
 
@@ -692,42 +721,495 @@ class _RuntimeStructure:
         assert self.source.material_id is not None
         return int(self.source.material_id)
 
-    def primitive_id(self, local_index: int) -> int:
-        if self.kept_faces is not None:
-            local_index = self.kept_faces[local_index]
-        return int(self.source.primitive_id(local_index))
+
+# ---------------------------------------------------------------------------
+# World state: what a compiled runtime depends on, read from host attributes.
+# ---------------------------------------------------------------------------
+#
+# The Core version domains also count the scene's own antennas, which no
+# compiled resource depends on: endpoints are read live from the source scene
+# when a solver binds it, and the propagation consumer takes them from its
+# endpoint batches. Channel therefore keys its runtimes on its own state of the
+# structures, materials and assignments. Every token is built from host-side
+# attributes only - Python object identity, scalar fields, and per tensor its
+# identity, mutation counter, storage address and ``requires_grad`` - so it
+# launches nothing, reads no device memory and never synchronizes. An in-place
+# edit advances the mutation counter, a ``tensor.data`` swap moves the storage
+# address, and an attribute reassignment changes the identity.
+
+_ATOMIC_STATE_TYPES = frozenset(
+    {type(None), bool, int, float, complex, str, bytes}
+)
+_FIELD_NAMES: dict[type, tuple[str, ...] | None] = {}
+
+
+def _field_names(kind: type) -> tuple[str, ...] | None:
+    names = _FIELD_NAMES.get(kind, ())
+    if names != ():
+        return names
+    if is_dataclass(kind):
+        resolved: tuple[str, ...] | None = tuple(item.name for item in fields(kind))
+    else:
+        slots = tuple(
+            name
+            for klass in kind.__mro__
+            for name in getattr(klass, "__slots__", ())
+            if name not in ("__weakref__", "__dict__")
+        )
+        resolved = slots or None
+    _FIELD_NAMES[kind] = resolved
+    return resolved
+
+
+def _append_container_state(value: object, out: list[object], seen: set[int]) -> None:
+    out.append(len(value))  # type: ignore[arg-type]
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            out.append(key if type(key) in _ATOMIC_STATE_TYPES else id(key))
+            _append_state(item, out, seen)
+        return
+    for item in value:  # type: ignore[attr-defined]
+        _append_state(item, out, seen)
+
+
+def _append_state(value: object, out: list[object], seen: set[int]) -> None:
+    """Append the host-visible mutation state of ``value`` to ``out``."""
+
+    kind = type(value)
+    if kind in _ATOMIC_STATE_TYPES:
+        out.append(value)
+        return
+    if isinstance(value, torch.Tensor):
+        out.append((id(value), value._version, value.data_ptr(), value.requires_grad))
+        return
+    marker = id(value)
+    if marker in seen:
+        out.append(("seen", marker))
+        return
+    seen.add(marker)
+    if kind is tuple or kind is list or isinstance(value, Mapping):
+        _append_container_state(value, out, seen)
+        return
+    out.append((kind, marker))
+    instance_dict = getattr(value, "__dict__", None)
+    if instance_dict is not None and not is_dataclass(kind):
+        for name, item in instance_dict.items():
+            if not name.endswith("_cache"):
+                out.append(name)
+                _append_state(item, out, seen)
+        return
+    names = _field_names(kind)
+    if names is None:
+        return
+    for name in names:
+        _append_state(getattr(value, name, None), out, seen)
+
+
+def _state(value: object) -> tuple[object, ...]:
+    out: list[object] = []
+    _append_state(value, out, set())
+    return tuple(out)
+
+
+def _tensor_state(value: torch.Tensor | None) -> tuple[object, ...] | None:
+    if value is None:
+        return None
+    return (id(value), value._version, value.data_ptr(), value.requires_grad)
+
+
+def _geometry_object_state(geometry: object) -> tuple[object, ...]:
+    """State of everything a geometry's world vertices come from (faces excluded).
+
+    Tensors and scalars, which is what Core geometry attributes are, take the
+    inline path; anything else goes through the general walk.
+    """
+
+    values = getattr(geometry, "__dict__", None)
+    if values is None:
+        return _state(geometry)
+    out: list[object] = [type(geometry), id(geometry), len(values)]
+    seen: set[int] | None = None
+    tensor = torch.Tensor
+    for name, value in values.items():
+        kind = type(value)
+        if kind is tensor or kind is torch.nn.Parameter:
+            if name != "_faces_tensor":
+                out.append((id(value), value._version, value.data_ptr(), value.requires_grad))
+        elif kind in _ATOMIC_STATE_TYPES:
+            out.append(value)
+        elif not name.endswith("_cache"):
+            if seen is None:
+                seen = {id(geometry)}
+            out.append(name)
+            _append_state(value, out, seen)
+    return tuple(out)
+
+
+@dataclass(frozen=True, slots=True, eq=False)
+class _SourcePlan:
+    """The fixed shape of one frozen Core scene or snapshot, derived once per object."""
+
+    # (structure, rigid_motion, deformation) of every enabled structure, in order.
+    rows: tuple[tuple[Structure, object | None, object | None], ...]
+    # Per enabled structure: stable IDs, primitive IDs and geometry identity.
+    topology_static: tuple[tuple[object, ...], ...]
+    # Per enabled structure: the IDs and phase-screen identity of its assignment.
+    assignment_static: tuple[tuple[object, ...], ...]
+    materials: tuple[tuple[int, object], ...]
+    edge_policy: object
+
+
+_PLAN_LOCK = RLock()
+_PLANS: dict[int, tuple[weakref.ref, _SourcePlan]] = {}
+
+
+def _source_plan(scene_or_snapshot: Scene | SceneSnapshot) -> _SourcePlan:
+    key = id(scene_or_snapshot)
+    with _PLAN_LOCK:
+        hit = _PLANS.get(key)
+        if hit is not None and hit[0]() is scene_or_snapshot:
+            return hit[1]
+    rows = tuple(item for item in _source_structures(scene_or_snapshot) if item[0].enabled)
+    topology_static = tuple(
+        (
+            int(structure.structure_id),
+            int(structure.surface_id),
+            None if structure.primitive_ids is None else tuple(structure.primitive_ids),
+            type(structure.geometry),
+            id(structure.geometry),
+        )
+        for structure, _, _ in rows
+    )
+    assignment_static = tuple(
+        (
+            int(structure.structure_id),
+            int(structure.surface_id),
+            int(structure.assignment_id),
+            int(structure.material_id),
+            id(structure.phase_screen),
+        )
+        for structure, _, _ in rows
+    )
+    materials: dict[int, object] = {}
+    for structure, _, _ in rows:
+        materials[int(structure.material_id)] = structure.material
+    plan = _SourcePlan(
+        rows=rows,
+        topology_static=topology_static,
+        assignment_static=assignment_static,
+        materials=tuple(sorted(materials.items())),
+        edge_policy=scene_or_snapshot.metadata.get("imported_edge_policy"),
+    )
+
+    def _forget(_: object, key: int = key) -> None:
+        with _PLAN_LOCK:
+            entry = _PLANS.get(key)
+            if entry is not None and entry[0]() is None:
+                del _PLANS[key]
+
+    with _PLAN_LOCK:
+        _PLANS[key] = (weakref.ref(scene_or_snapshot, _forget), plan)
+    return plan
+
+
+@dataclass(frozen=True, slots=True, eq=False)
+class _WorldState:
+    """Channel's view of one Core world: the four domains its runtimes depend on.
+
+    The domains mirror the Core version domains restricted to structures,
+    materials and assignments; endpoints are not part of any of them.
+    """
+
+    plan: _SourcePlan
+    # Per enabled structure: the face and face-UV table states.
+    topology_rows: tuple[tuple[object, ...], ...]
+    # Per enabled structure: geometry, UV, rigid motion and deformation states.
+    geometry_rows: tuple[tuple[object, ...], ...]
+    # Snapshot instant, dynamic sources and the edge policy.
+    geometry_extra: tuple[object, ...]
+    material: tuple[object, ...]
+    assignment: tuple[object, ...]
+
+    def rayd_key(self) -> tuple[object, ...]:
+        """Everything the RayD scene, geometry tables and diagonals are built from."""
+
+        return (
+            self.plan.topology_static,
+            self.topology_rows,
+            self.geometry_rows,
+            self.geometry_extra,
+        )
+
+    def layout_key(self) -> tuple[object, ...]:
+        """What must hold for an in-place refit: the same objects with the same faces and UVs."""
+
+        return (
+            self.plan.topology_static,
+            self.topology_rows,
+            tuple(
+                (row[0][1], row[1], id(motion), id(deformation))
+                for row, (_, motion, deformation) in zip(self.geometry_rows, self.plan.rows)
+            ),
+            self.geometry_extra,
+        )
+
+    def material_key(self) -> tuple[object, ...]:
+        return (self.plan.materials, self.material)
+
+    def assignment_key(self) -> tuple[object, ...]:
+        return (
+            self.plan.topology_static,
+            self.topology_rows,
+            self.plan.assignment_static,
+            tuple(material_id for material_id, _ in self.plan.materials),
+            self.assignment,
+        )
+
+    def moved_domain(self, current: _WorldState) -> str | None:
+        """Name the Core-style domain that differs from ``current``, or ``None``."""
+
+        if (
+            self.plan.topology_static != current.plan.topology_static
+            or self.topology_rows != current.topology_rows
+        ):
+            return "topology_version"
+        if self.material_key() != current.material_key():
+            return "material_version"
+        if (
+            self.plan.assignment_static != current.plan.assignment_static
+            or self.assignment != current.assignment
+        ):
+            return "assignment_version"
+        if (
+            self.geometry_rows != current.geometry_rows
+            or self.geometry_extra != current.geometry_extra
+        ):
+            return "geometry_version"
+        return None
+
+    def same_world(self, current: _WorldState) -> bool:
+        return (
+            self.geometry_rows == current.geometry_rows
+            and self.topology_rows == current.topology_rows
+            and self.material == current.material
+            and self.assignment == current.assignment
+            and self.geometry_extra == current.geometry_extra
+            and (
+                self.plan is current.plan
+                or (
+                    self.plan.topology_static == current.plan.topology_static
+                    and self.plan.assignment_static == current.plan.assignment_static
+                    and self.plan.materials == current.plan.materials
+                )
+            )
+        )
+
+
+def _translated_state_error(error: RuntimeError) -> Exception:
+    """Restate the two tensor kinds whose mutation state cannot be read."""
+
+    if "doesn't have storage" in str(error) or "Cannot access data pointer" in str(error):
+        from witwin.channel.scene.endpoints import FUNCTORCH_MESSAGE
+
+        return NotImplementedError(FUNCTORCH_MESSAGE)
+    if "Inference tensors" not in str(error):
+        return error
+    return ValueError(
+        "the scene holds tensors created under torch.inference_mode(); Channel tracks "
+        "scene edits through tensor version counters, which inference tensors do not "
+        "have. Build the scene outside torch.inference_mode() (solving inside it is fine)"
+    )
+
+
+def world_state(scene_or_snapshot: Scene | SceneSnapshot) -> _WorldState:
+    """Read the structure, material and assignment state of a Core world on the host."""
+
+    try:
+        return _world_state(scene_or_snapshot)
+    except RuntimeError as error:
+        translated = _translated_state_error(error)
+        if translated is error:
+            raise
+        raise translated from error
+
+
+_NO_TOPOLOGY_STATE: tuple[object, ...] = (None, None)
+
+
+def _world_state(scene_or_snapshot: Scene | SceneSnapshot) -> _WorldState:
+    plan = _source_plan(scene_or_snapshot)
+    topology_rows: list[tuple[object, ...]] = []
+    geometry_rows: list[tuple[object, ...]] = []
+    assignment: list[object] = []
+    for structure, motion, deformation in plan.rows:
+        geometry = structure.geometry
+        faces = getattr(geometry, "_faces_tensor", None)
+        face_uv = structure.face_uv
+        topology_rows.append(
+            _NO_TOPOLOGY_STATE
+            if faces is None and face_uv is None
+            else (_tensor_state(faces), _tensor_state(face_uv))
+        )
+        uv = structure.uv
+        geometry_rows.append(
+            (
+                _geometry_object_state(geometry),
+                None if uv is None else _tensor_state(uv),
+                None if motion is None else _state(motion),
+                None if deformation is None else _state(deformation),
+            )
+        )
+        screen = structure.phase_screen
+        if screen is not None:
+            assignment.append(_state(screen))
+    if isinstance(scene_or_snapshot, SceneSnapshot):
+        geometry_extra: tuple[object, ...] = (
+            _state(scene_or_snapshot.time_s),
+            _state(scene_or_snapshot._dynamic_sources),
+            scene_or_snapshot._dynamic_revision,
+            _state(plan.edge_policy),
+        )
+    else:
+        geometry_extra = (_state(plan.edge_policy),)
+    material: list[object] = []
+    for _, material_object in plan.materials:
+        material.append(_state(material_object))
+    return _WorldState(
+        plan=plan,
+        topology_rows=tuple(topology_rows),
+        geometry_rows=tuple(geometry_rows),
+        geometry_extra=geometry_extra,
+        material=tuple(material),
+        assignment=tuple(assignment),
+    )
+
+
+# Compiled runtimes kept for reuse are bounded by the device bytes they hold. The
+# newest runtime is always kept, so one scene larger than the bound still reuses.
+_CACHE_BYTE_LIMIT = 1 << 30
+_CACHE_ENTRY_LIMIT = 64
+
+
+def _tensor_bytes(value: object, seen: set[int], depth: int = 0) -> int:
+    """Device bytes held by the tensors in ``value``, each storage counted once."""
+
+    if isinstance(value, torch.Tensor):
+        if value.device.type != "cuda":
+            return 0
+        storage = value.untyped_storage()
+        key = storage.data_ptr()
+        if key in seen:
+            return 0
+        seen.add(key)
+        return int(storage.nbytes())
+    if depth > 3:
+        return 0
+    if isinstance(value, (tuple, list)):
+        return sum(_tensor_bytes(item, seen, depth + 1) for item in value)
+    if isinstance(value, dict):
+        return sum(_tensor_bytes(item, seen, depth + 1) for item in value.values())
+    if is_dataclass(value) and not isinstance(value, type):
+        return sum(
+            _tensor_bytes(getattr(value, item.name), seen, depth + 1) for item in fields(value)
+        )
+    return 0
+
+
+def _resident_bytes(entries: Iterable[CompiledScene]) -> int:
+    """Device bytes the cached runtimes keep alive, each shared resource counted once."""
+
+    seen_storages: set[int] = set()
+    seen_rayd: set[int] = set()
+    total = 0
+    for compiled in entries:
+        if id(compiled.rayd) not in seen_rayd:
+            seen_rayd.add(id(compiled.rayd))
+            total += compiled.rayd.native_bytes
+            total += _tensor_bytes(compiled.rayd.runtime_cache, seen_storages)
+        total += _tensor_bytes(
+            (compiled.geometry, compiled.materials, compiled.assignments), seen_storages
+        )
+        total += _tensor_bytes(
+            tuple(structure.vertices for structure in compiled.structures), seen_storages
+        )
+    return total
 
 
 class _CompileRegistry:
-    """Small Channel-owned LRU keyed only by logical versions/runtime identity."""
+    """Channel-owned runtime cache: one slot per source, frequency, device and backend.
+
+    A slot holds the runtime compiled from the source's current world. A
+    recompile of the same source after its world changed replaces every slot of
+    that source at once, so an edited scene never keeps its previous runtimes
+    alive. Least recently used runtimes are dropped while the cache holds more
+    than ``_CACHE_BYTE_LIMIT`` device bytes or ``_CACHE_ENTRY_LIMIT`` runtimes.
+    """
 
     def __init__(self) -> None:
         self._lock = RLock()
         self._compiled: OrderedDict[tuple[object, ...], CompiledScene] = OrderedDict()
 
-    def get(self, key: tuple[object, ...]) -> CompiledScene | None:
+    def get(
+        self, key: tuple[object, ...], source: object, state: _WorldState,
+    ) -> CompiledScene | None:
         with self._lock:
             value = self._compiled.get(key)
-            if value is not None:
-                self._compiled.move_to_end(key)
+            if (
+                value is None
+                or value.source is not source
+                or value._world is None
+                or value._rayd_generation != value.rayd.generation
+                or not value._world.same_world(state)
+            ):
+                return None
+            self._compiled.move_to_end(key)
             return value
 
     def candidates(self, runtime_device: object) -> tuple[CompiledScene, ...]:
-        """Cached runtimes built on ``runtime_device``, most recent first."""
+        """Current cached runtimes built on ``runtime_device``, most recent first."""
 
         with self._lock:
             return tuple(
                 compiled
                 for key, compiled in reversed(self._compiled.items())
-                if key[0][-2] == runtime_device
+                if key[2] == runtime_device
+                and compiled._rayd_generation == compiled.rayd.generation
             )
 
     def put(self, key: tuple[object, ...], compiled: CompiledScene) -> None:
         with self._lock:
+            source_id = key[0]
+            for stale in [
+                other
+                for other, value in self._compiled.items()
+                if other[0] == source_id
+                and value._world is not None
+                and compiled._world is not None
+                and not value._world.same_world(compiled._world)
+            ]:
+                del self._compiled[stale]
             self._compiled[key] = compiled
             self._compiled.move_to_end(key)
-            while len(self._compiled) > _CACHE_LIMIT:
+            while len(self._compiled) > 1 and (
+                len(self._compiled) > _CACHE_ENTRY_LIMIT
+                or _resident_bytes(self._compiled.values()) > _CACHE_BYTE_LIMIT
+            ):
                 self._compiled.popitem(last=False)
+
+    def drop_rayd(self, rayd: RayDSceneResource) -> None:
+        """Forget every runtime built on ``rayd`` (its geometry is about to be refit)."""
+
+        with self._lock:
+            for key in [key for key, value in self._compiled.items() if value.rayd is rayd]:
+                del self._compiled[key]
+
+    def resident_bytes(self) -> int:
+        with self._lock:
+            return _resident_bytes(self._compiled.values())
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._compiled)
 
     def clear(self) -> None:
         with self._lock:
@@ -790,17 +1272,10 @@ def _readable_versions(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[int, i
     try:
         return _versions(scene_or_snapshot)
     except RuntimeError as error:
-        if "doesn't have storage" in str(error):
-            from witwin.channel.scene.endpoints import FUNCTORCH_MESSAGE
-
-            raise NotImplementedError(FUNCTORCH_MESSAGE) from error
-        if "Inference tensors" not in str(error):
+        translated = _translated_state_error(error)
+        if translated is error:
             raise
-        raise ValueError(
-            "the scene holds tensors created under torch.inference_mode(); Channel tracks "
-            "scene edits through tensor version counters, which inference tensors do not "
-            "have. Build the scene outside torch.inference_mode() (solving inside it is fine)"
-        ) from error
+        raise translated from error
 
 
 def _source_structures(
@@ -937,7 +1412,7 @@ def _face_cleanup(
 def _validated_mesh(
     label: str, vertices: torch.Tensor, faces: torch.Tensor, uv: torch.Tensor | None,
     face_uv: torch.Tensor | None,
-) -> tuple[torch.Tensor, torch.Tensor | None, tuple[int, ...] | None, int, int]:
+) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None, int, int]:
     """Validate one structure's tables and return its kept faces and drop counts."""
 
     _require_finite_table(label, "vertices", vertices)
@@ -950,11 +1425,11 @@ def _validated_mesh(
     )
     if keep is None:
         return faces, face_uv, None, 0, 0
-    kept_faces = tuple(int(index) for index in keep.nonzero().flatten())
+    kept_face_index = keep.nonzero().flatten()
     faces = faces[keep.to(device=faces.device)]
     if face_uv is not None:
         face_uv = face_uv[keep.to(device=face_uv.device)]
-    return faces, face_uv, kept_faces, dropped_degenerate, dropped_duplicate
+    return faces, face_uv, kept_face_index, dropped_degenerate, dropped_duplicate
 
 
 _TOPOLOGY_CHECK_LIMIT = 64
@@ -967,7 +1442,7 @@ def _tensor_token(value: torch.Tensor | None) -> tuple[object, ...] | None:
         return ()
     if value.is_inference():
         return None
-    return (id(value), int(value._version), tuple(value.shape), value.device)
+    return (id(value), int(value._version), value.data_ptr(), tuple(value.shape), value.device)
 
 
 def _checked_topology(
@@ -1010,12 +1485,127 @@ def _checked_topology(
     return result
 
 
-def _runtime_structures(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[_RuntimeStructure, ...]:
+def _rebound_structures(
+    structures: tuple[_RuntimeStructure, ...], state: _WorldState,
+) -> tuple[_RuntimeStructure, ...]:
+    """Reuse runtime structures for another source whose structures have the same geometry."""
+
+    if all(
+        runtime.source is row[0] for runtime, row in zip(structures, state.plan.rows)
+    ):
+        return structures
+    return tuple(
+        runtime if runtime.source is row[0] else replace(runtime, source=row[0])
+        for runtime, row in zip(structures, state.plan.rows)
+    )
+
+
+def _snapshot_vertices(
+    geometry: object, vertices: torch.Tensor, rigid_motion: object | None,
+    deformation: object | None,
+) -> torch.Tensor:
+    """Apply a snapshot's deformation and rigid motion to a structure's world vertices."""
+
+    if deformation is not None:
+        if not isinstance(geometry, Mesh):
+            raise TypeError(
+                "Channel snapshot deformation currently requires "
+                "witwin.core.Mesh geometry"
+            )
+        local_vertices = (
+            deformation.vertices
+            if deformation.vertices is not None
+            else geometry.vertices + deformation.offsets
+        )
+        if local_vertices.shape != geometry.vertices.shape:
+            raise ValueError(
+                "snapshot deformation must match the authored local mesh"
+            )
+        if geometry.recenter:
+            bounds_min = local_vertices.amin(dim=0)
+            bounds_max = local_vertices.amax(dim=0)
+            local_vertices = local_vertices - 0.5 * (bounds_min + bounds_max)
+        local_vertices = local_vertices * geometry.scale.to(
+            device=local_vertices.device, dtype=local_vertices.dtype
+        )
+        authored_rotation_value = geometry.rotation.to(
+            device=local_vertices.device,
+            dtype=local_vertices.dtype,
+        )
+        authored_rotation = quat_to_rotation_matrix(
+            authored_rotation_value
+            if authored_rotation_value.shape == (4,)
+            else quat_from_euler(
+                authored_rotation_value[0],
+                authored_rotation_value[1],
+                authored_rotation_value[2],
+                device=authored_rotation_value.device,
+                dtype=authored_rotation_value.dtype,
+            )
+        )
+        vertices = (
+            local_vertices @ authored_rotation.T
+            + geometry.position.to(
+                device=local_vertices.device,
+                dtype=local_vertices.dtype,
+            )
+        )
+    if rigid_motion is not None:
+        if rigid_motion.rotation is not None:
+            rigid_rotation_value = rigid_motion.rotation
+            if not isinstance(rigid_rotation_value, torch.Tensor):
+                rigid_rotation_value = torch.as_tensor(
+                    rigid_rotation_value,
+                    device=vertices.device,
+                    dtype=vertices.dtype,
+                )
+            rotation = quat_to_rotation_matrix(
+                rigid_rotation_value
+                if rigid_rotation_value.shape == (4,)
+                else quat_from_euler(
+                    rigid_rotation_value[2],
+                    rigid_rotation_value[1],
+                    rigid_rotation_value[0],
+                    device=rigid_rotation_value.device,
+                    dtype=rigid_rotation_value.dtype,
+                )
+            )
+            vertices = vertices @ rotation.T
+        if rigid_motion.translation is not None:
+            vertices = vertices + rigid_motion.translation
+    return vertices
+
+
+def _runtime_structures(
+    scene_or_snapshot: Scene | SceneSnapshot, state: _WorldState,
+    donors: dict[tuple[object, ...], _RuntimeStructure],
+) -> tuple[_RuntimeStructure, ...]:
+    """World-space meshes of the enabled structures.
+
+    A structure whose geometry object and state equal one a cached runtime
+    already holds reuses that runtime's validated world vertices and faces
+    instead of evaluating and validating its mesh again.
+    """
+
     runtime: list[_RuntimeStructure] = []
+    row_index = -1
     for structure_index, (structure, rigid_motion, deformation) in enumerate(
         _source_structures(scene_or_snapshot)
     ):
         if not structure.enabled:
+            continue
+        row_index += 1
+        donor = donors.get(
+            (
+                id(structure.geometry),
+                state.topology_rows[row_index],
+                state.geometry_rows[row_index],
+            )
+        )
+        if donor is not None:
+            runtime.append(
+                donor if donor.source is structure else replace(donor, source=structure)
+            )
             continue
         label = _structure_label(structure_index, structure)
         geometry = structure.geometry
@@ -1026,73 +1616,7 @@ def _runtime_structures(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[_Runt
             raise ValueError("Core mesh vertices must have shape (V, 3)")
         if faces.ndim != 2 or faces.shape[1] != 3:
             raise ValueError("Core mesh faces must have shape (F, 3)")
-        if deformation is not None:
-            if not isinstance(geometry, Mesh):
-                raise TypeError(
-                    "Channel snapshot deformation currently requires "
-                    "witwin.core.Mesh geometry"
-                )
-            local_vertices = (
-                deformation.vertices
-                if deformation.vertices is not None
-                else geometry.vertices + deformation.offsets
-            )
-            if local_vertices.shape != geometry.vertices.shape:
-                raise ValueError(
-                    "snapshot deformation must match the authored local mesh"
-                )
-            if geometry.recenter:
-                bounds_min = local_vertices.amin(dim=0)
-                bounds_max = local_vertices.amax(dim=0)
-                local_vertices = local_vertices - 0.5 * (bounds_min + bounds_max)
-            local_vertices = local_vertices * geometry.scale.to(
-                device=local_vertices.device, dtype=local_vertices.dtype
-            )
-            authored_rotation_value = geometry.rotation.to(
-                device=local_vertices.device,
-                dtype=local_vertices.dtype,
-            )
-            authored_rotation = quat_to_rotation_matrix(
-                authored_rotation_value
-                if authored_rotation_value.shape == (4,)
-                else quat_from_euler(
-                    authored_rotation_value[0],
-                    authored_rotation_value[1],
-                    authored_rotation_value[2],
-                    device=authored_rotation_value.device,
-                    dtype=authored_rotation_value.dtype,
-                )
-            )
-            vertices = (
-                local_vertices @ authored_rotation.T
-                + geometry.position.to(
-                    device=local_vertices.device,
-                    dtype=local_vertices.dtype,
-                )
-            )
-        if rigid_motion is not None:
-            if rigid_motion.rotation is not None:
-                rigid_rotation_value = rigid_motion.rotation
-                if not isinstance(rigid_rotation_value, torch.Tensor):
-                    rigid_rotation_value = torch.as_tensor(
-                        rigid_rotation_value,
-                        device=vertices.device,
-                        dtype=vertices.dtype,
-                    )
-                rotation = quat_to_rotation_matrix(
-                    rigid_rotation_value
-                    if rigid_rotation_value.shape == (4,)
-                    else quat_from_euler(
-                        rigid_rotation_value[2],
-                        rigid_rotation_value[1],
-                        rigid_rotation_value[0],
-                        device=rigid_rotation_value.device,
-                        dtype=rigid_rotation_value.dtype,
-                    )
-                )
-                vertices = vertices @ rotation.T
-            if rigid_motion.translation is not None:
-                vertices = vertices + rigid_motion.translation
+        vertices = _snapshot_vertices(geometry, vertices, rigid_motion, deformation)
         if (
             structure.primitive_ids is not None
             and len(structure.primitive_ids) != int(faces.shape[0])
@@ -1104,8 +1628,8 @@ def _runtime_structures(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[_Runt
         face_uv = structure.face_uv
         if (uv is None) != (face_uv is None):
             raise ValueError("Core mesh uv and face_uv must be provided together")
-        faces, face_uv, kept_faces, dropped_degenerate, dropped_duplicate = _validated_mesh(
-            label, vertices, faces, uv, face_uv
+        faces, face_uv, kept_face_index, dropped_degenerate, dropped_duplicate = (
+            _validated_mesh(label, vertices, faces, uv, face_uv)
         )
         runtime.append(
             _RuntimeStructure(
@@ -1122,7 +1646,7 @@ def _runtime_structures(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[_Runt
                     if face_uv is None
                     else face_uv.to(dtype=torch.int32).contiguous()
                 ),
-                kept_faces=kept_faces,
+                kept_face_index=kept_face_index,
                 dropped_degenerate_faces=dropped_degenerate,
                 dropped_duplicate_faces=dropped_duplicate,
             )
@@ -1153,6 +1677,50 @@ def _compile_penetration_scene_diagonals(
     return enumerated, montecarlo
 
 
+def _face_counts(structures: tuple[_RuntimeStructure, ...]) -> torch.Tensor:
+    return torch.tensor(
+        [int(structure.faces.shape[0]) for structure in structures], dtype=torch.int64
+    )
+
+
+def _face_id_columns(
+    structures: tuple[_RuntimeStructure, ...],
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Per-face structure, surface and stable primitive IDs, built as whole columns.
+
+    A face's default primitive ID is ``structure_id << 32 | authored local index``;
+    authored ``primitive_ids`` replace it, and dropped faces keep their authored
+    local index through ``kept_face_index``.
+    """
+
+    counts = _face_counts(structures)
+    structure_ids = torch.tensor(
+        [structure.structure_id for structure in structures], dtype=torch.int64
+    )
+    surface_ids = torch.tensor(
+        [int(structure.source.surface_id) for structure in structures], dtype=torch.int64
+    )
+    face_structure_id = structure_ids.repeat_interleave(counts)
+    face_surface_id = surface_ids.repeat_interleave(counts)
+    offsets = torch.cumsum(counts, dim=0) - counts
+    total = int(counts.sum())
+    local = torch.arange(total, dtype=torch.int64) - offsets.repeat_interleave(counts)
+    primitive = (face_structure_id << 32) | local
+    for structure, offset, count in zip(structures, offsets.tolist(), counts.tolist()):
+        authored = structure.source.primitive_ids
+        kept = structure.kept_face_index
+        if authored is None and kept is None:
+            continue
+        if authored is None:
+            values = (int(structure.structure_id) << 32) | kept
+        else:
+            values = torch.tensor(authored, dtype=torch.int64)
+            if kept is not None:
+                values = values.index_select(0, kept)
+        primitive[offset : offset + count] = values
+    return face_structure_id, face_surface_id, primitive
+
+
 def _compile_geometry(
     structures: tuple[_RuntimeStructure, ...], version: int, *, rayd: RayDSceneResource,
 ) -> GeometryStore:
@@ -1176,20 +1744,7 @@ def _compile_geometry(
         )
 
     records = rayd.edge_records()
-    structure_ids: list[int] = []
-    primitive_ids: list[int] = []
-    for structure in structures:
-        face_count = int(structure.faces.shape[0])
-        structure_ids.extend((structure.structure_id,) * face_count)
-        primitive_ids.extend(
-            structure.primitive_id(index) for index in range(face_count)
-        )
-    stable_primitives = torch.tensor(primitive_ids, dtype=torch.int64)
-    surface_ids = [
-        int(structure.source.surface_id)
-        for structure in structures
-        for _ in range(int(structure.faces.shape[0]))
-    ]
+    structure_ids, surface_ids, primitive_ids = _face_id_columns(structures)
     return GeometryStore(
         vertices=records.vertices,
         faces=records.faces,
@@ -1199,9 +1754,9 @@ def _compile_geometry(
         edge_param_range=bdpt_zero_matrix(
             records.vertices, rows=records.edge_v0.shape[0], cols=2
         ),
-        face_structure_id=torch.tensor(structure_ids, dtype=torch.int64),
-        face_surface_id=torch.tensor(surface_ids, dtype=torch.int64),
-        face_primitive_id=stable_primitives,
+        face_structure_id=structure_ids,
+        face_surface_id=surface_ids,
+        face_primitive_id=primitive_ids,
         structure_uv_presence=tuple(
             (structure.uv is not None, structure.face_uv is not None)
             for structure in structures
@@ -1419,17 +1974,20 @@ def _compile_assignments(
     structures: tuple[_RuntimeStructure, ...], *, material_row_by_id: dict[int, int],
     geometry: GeometryStore, version: int,
 ) -> AssignmentStore:
-    face_rows: list[int] = []
     phase_screens: dict[int, PhaseScreen] = {}
     for structure_index, structure in enumerate(structures):
-        row = material_row_by_id[structure.material_id]
-        face_rows.extend((row,) * int(structure.faces.shape[0]))
         if structure.phase_screen is not None:
             phase_screens[structure_index] = structure.phase_screen
     structure_rows = [
         material_row_by_id[structure.material_id] for structure in structures
     ]
-    face_rows_tensor = torch.tensor(face_rows, dtype=torch.int32)
+    face_rows_tensor = (
+        torch.tensor(structure_rows, dtype=torch.int32).repeat_interleave(
+            _face_counts(structures)
+        )
+        if structures
+        else torch.empty((0,), dtype=torch.int32)
+    )
     adjacency = geometry.edge_adj_faces
     edge_face_rows = face_rows_tensor.to(device=adjacency.device)
     if adjacency.shape[0]:
@@ -1477,115 +2035,105 @@ def _compile_assignments(
     )
 
 
-def _cache_key(
-    scene_or_snapshot: Scene | SceneSnapshot, versions: tuple[int, int, int, int],
-    frequency_identity: tuple[object, ...],
-) -> tuple[object, ...]:
-    runtime_device = (
-        torch.cuda.current_device() if torch.cuda.is_available() else "no-cuda"
-    )
-    return (
-        id(scene_or_snapshot),
-        *versions,
-        frequency_identity,
-        runtime_device,
-        MATERIAL_ABI_VERSION,
-    )
+def _participates_in_ad(value: torch.Tensor) -> bool:
+    if value.requires_grad or value.grad_fn is not None:
+        return True
+    return torch.autograd.forward_ad.unpack_dual(value).tangent is not None
 
 
-def _rayd_input_identity(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[object, ...]:
-    edge_policy = scene_or_snapshot.metadata.get("imported_edge_policy")
-    states = tuple(
-        item
-        for item in _source_structures(scene_or_snapshot)
-        if item[0].enabled
-    )
-    if isinstance(scene_or_snapshot, SceneSnapshot) and any(
-        motion is not None or deformation is not None
-        for _, motion, deformation in states
+def _reusable_structures(structures: tuple[_RuntimeStructure, ...]) -> bool:
+    """Whether runtime structures may serve another compile (no autograd graph to share)."""
+
+    return not any(_participates_in_ad(structure.vertices) for structure in structures)
+
+
+def _structure_donors(
+    candidates: tuple[CompiledScene, ...],
+) -> dict[tuple[object, ...], _RuntimeStructure]:
+    """Graph-free runtime structures of cached runtimes, keyed by geometry object and state."""
+
+    donors: dict[tuple[object, ...], _RuntimeStructure] = {}
+    for candidate in candidates:
+        world = candidate._world
+        if world is None:
+            continue
+        for structure, topology, geometry in zip(
+            candidate.structures, world.topology_rows, world.geometry_rows
+        ):
+            if geometry[2] is None and geometry[3] is None and not _participates_in_ad(
+                structure.vertices
+            ):
+                donors.setdefault((id(structure.source.geometry), topology, geometry), structure)
+    return donors
+
+
+def _same_faces(left: _RuntimeStructure, right: _RuntimeStructure) -> bool:
+    if left.vertices.shape != right.vertices.shape or left.faces.shape != right.faces.shape:
+        return False
+    if (left.kept_face_index is None) != (right.kept_face_index is None):
+        return False
+    if left.kept_face_index is not None and not torch.equal(
+        left.kept_face_index, right.kept_face_index
     ):
-        source_scene = getattr(scene_or_snapshot, "_source_scene", None)
-        if source_scene is not None:
-            return ("dynamic-source", id(source_scene), edge_policy)
-    return (
-        edge_policy,
-        *(
-            (
-                id(structure.geometry),
-                id(structure.uv),
-                id(structure.face_uv),
-                id(rigid_motion),
-                id(deformation),
-            )
-            for structure, rigid_motion, deformation in states
-        )
-    )
+        return False
+    if left.faces is right.faces:
+        return True
+    if left.faces.device != right.faces.device:
+        return False
+    return bool(torch.equal(left.faces, right.faces))
 
 
-def _geometry_mapping_identity(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[object, ...]:
-    return (
-        _rayd_input_identity(scene_or_snapshot),
-        tuple(
-            (
-                int(structure.structure_id),
-                int(structure.surface_id),
-                None
-                if structure.primitive_ids is None
-                else tuple(int(value) for value in structure.primitive_ids),
-            )
-            for structure, _, _ in _source_structures(scene_or_snapshot)
-            if structure.enabled
-        ),
-    )
+def _changed_meshes(
+    donor: CompiledScene, state: _WorldState, structures: tuple[_RuntimeStructure, ...],
+) -> list[int] | None:
+    """Indices of the meshes whose vertices moved, or None when an in-place refit cannot apply."""
+
+    world = donor._world
+    if (
+        world is None
+        or not donor.rayd.available
+        or len(donor.structures) != len(structures)
+        or world.layout_key() != state.layout_key()
+    ):
+        return None
+    changed: list[int] = []
+    for index, (old, new) in enumerate(zip(donor.structures, structures)):
+        if world.geometry_rows[index] == state.geometry_rows[index]:
+            continue
+        if not _same_faces(old, new):
+            return None
+        changed.append(index)
+    return changed
 
 
-def _material_input_identity(
-    scene_or_snapshot: Scene | SceneSnapshot,
-) -> tuple[tuple[int, int], ...]:
-    materials = {
-        int(structure.material_id): structure.material
-        for structure, _, _ in _source_structures(scene_or_snapshot)
-        if structure.enabled
-    }
-    return tuple(
-        (material_id, id(material))
-        for material_id, material in sorted(materials.items())
-    )
+def _refit_or_build(
+    structures: tuple[_RuntimeStructure, ...], state: _WorldState,
+    candidates: tuple[CompiledScene, ...],
+) -> RayDSceneResource:
+    """Refit a cached RayD scene in place when only vertices moved; otherwise build one.
 
+    A refit candidate holds the very same geometry objects with the same faces
+    and UVs, so every runtime that shares its RayD scene was compiled from a
+    world that has since been edited in place and is dropped from the cache. A
+    mesh is created refittable the first time its vertices change without a
+    topology change: that compile rebuilds the scene anyway, and later vertex
+    changes of that mesh then refit instead of rebuilding.
+    """
 
-def _assignment_input_identity(
-    scene_or_snapshot: Scene | SceneSnapshot,
-) -> tuple[tuple[object, ...], ...]:
-    return tuple(
-        (
-            int(structure.structure_id),
-            int(structure.surface_id),
-            int(structure.assignment_id),
-            int(structure.material_id),
-            id(structure.phase_screen),
-        )
-        for structure, _, _ in _source_structures(scene_or_snapshot)
-        if structure.enabled
-    )
-
-
-def _reusable_rayd(
-    reusable: tuple[CompiledScene, ...], rayd_input_identity: tuple[object, ...],
-    topology_version: int, geometry_version: int, trace_backend: str,
-) -> RayDSceneResource | None:
-    """Return a cached RayD scene built from the same geometry for the same trace backend."""
-
-    return next(
-        (
-            candidate.rayd
-            for candidate in reusable
-            if _rayd_input_identity(candidate.source) == rayd_input_identity
-            and candidate.rayd.requested_trace_backend == trace_backend
-            and candidate.topology_version == topology_version
-            and candidate.geometry_version == geometry_version
-        ),
-        None,
-    )
+    for donor in candidates:
+        changed = _changed_meshes(donor, state, structures)
+        if not changed:
+            continue
+        rayd = donor.rayd
+        if all(rayd.dynamic_meshes[index] for index in changed):
+            _REGISTRY.drop_rayd(rayd)
+            rayd.refit(changed, [structures[index].vertices for index in changed])
+            return rayd
+        dynamic = list(rayd.dynamic_meshes)
+        for index in changed:
+            dynamic[index] = True
+        return build_scene_from_structures(structures, dynamic=dynamic)
+    return build_scene_from_structures(structures)
 
 
 def compile(
@@ -1596,106 +2144,101 @@ def compile(
     if not isinstance(scene_or_snapshot, (Scene, SceneSnapshot)):
         raise TypeError("scene_or_snapshot must be a witwin.core Scene or SceneSnapshot")
     frequency_value = _frequency_value(reference_frequency_hz)
-    versions = _readable_versions(scene_or_snapshot)
+    state = world_state(scene_or_snapshot)
     trace_backend = requested_trace_backend()
+    runtime_device = torch.cuda.current_device() if torch.cuda.is_available() else "no-cuda"
     key = (
-        _cache_key(
-            scene_or_snapshot,
-            versions,
-            _frequency_identity(reference_frequency_hz, frequency_value),
-        ),
+        id(scene_or_snapshot),
+        _frequency_identity(reference_frequency_hz, frequency_value),
+        runtime_device,
         trace_backend,
+        MATERIAL_ABI_VERSION,
     )
-    cached = _REGISTRY.get(key)
-    if cached is not None and cached.source is scene_or_snapshot:
+    cached = _REGISTRY.get(key, scene_or_snapshot, state)
+    if cached is not None:
         return cached
 
-    structures = _runtime_structures(scene_or_snapshot)
-    topology_version, geometry_version, material_version, assignment_version = versions
-    reusable = _REGISTRY.candidates(key[0][-2])
-    rayd_input_identity = _rayd_input_identity(scene_or_snapshot)
-    rayd = _reusable_rayd(
-        reusable, rayd_input_identity, topology_version, geometry_version, trace_backend
+    topology_version, geometry_version, material_version, assignment_version = (
+        _readable_versions(scene_or_snapshot)
     )
-    if rayd is None:
-        rayd = build_scene_from_structures(structures)
-        from witwin.channel.scene.resources import resolve_scene_edge_policy
-
-        rayd.runtime_cache["edge_policy"] = resolve_scene_edge_policy(
-            scene_or_snapshot
-        )
-    geometry_mapping_identity = _geometry_mapping_identity(scene_or_snapshot)
-    geometry = next(
+    reusable = tuple(
+        candidate
+        for candidate in _REGISTRY.candidates(runtime_device)
+        if candidate.rayd.requested_trace_backend == trace_backend
+    )
+    rayd_key = state.rayd_key()
+    donor = next(
         (
-            candidate.geometry
+            candidate
             for candidate in reusable
-            if candidate.rayd is rayd
-            and _geometry_mapping_identity(candidate.source)
-            == geometry_mapping_identity
-            and candidate.topology_version == topology_version
-            and candidate.geometry_version == geometry_version
+            if candidate._world is not None and candidate._world.rayd_key() == rayd_key
         ),
         None,
     )
-    if geometry is None:
-        geometry = _compile_geometry(structures, geometry_version, rayd=rayd)
+    if donor is not None:
+        rayd = donor.rayd
+        geometry = donor.geometry
+        diagonals = (
+            donor.enumerated_penetration_scene_diagonal_m,
+            donor.montecarlo_penetration_scene_diagonal_m,
+        )
+        structures = (
+            _rebound_structures(donor.structures, state)
+            if _reusable_structures(donor.structures)
+            else _runtime_structures(scene_or_snapshot, state, {})
+        )
+    else:
+        structures = _runtime_structures(
+            scene_or_snapshot, state, _structure_donors(reusable)
+        )
+        if structures and torch.cuda.is_available():
+            rayd = _refit_or_build(structures, state, reusable)
+        else:
+            rayd = build_scene_from_structures(structures)
+        if "edge_policy" not in rayd.runtime_cache:
+            from witwin.channel.scene.resources import resolve_scene_edge_policy
 
-    logical_materials = _unique_materials(structures)
-    material_input_identity = _material_input_identity(scene_or_snapshot)
+            rayd.runtime_cache["edge_policy"] = resolve_scene_edge_policy(scene_or_snapshot)
+        geometry = _compile_geometry(structures, geometry_version, rayd=rayd)
+        diagonals = _compile_penetration_scene_diagonals(structures, rayd=rayd)
+
+    material_key = state.material_key()
     materials = next(
         (
             candidate.materials
             for candidate in reusable
-            if _material_input_identity(candidate.source)
-            == material_input_identity
-            and candidate.material_version == material_version
+            if candidate._world is not None
             and candidate.materials.frequency_hz == frequency_value
+            and candidate._world.material_key() == material_key
         ),
         None,
     )
     if materials is None:
         materials = _compile_materials(
-            logical_materials, frequency_value, material_version
+            _unique_materials(structures), frequency_value, material_version
         )
-    material_row_by_id = {
-        int(material_id): row
-        for row, material_id in enumerate(materials.material_id.tolist())
-    }
-    assignment_input_identity = _assignment_input_identity(scene_or_snapshot)
+    assignment_key = state.assignment_key()
     assignments = next(
         (
             candidate.assignments
             for candidate in reusable
             if candidate.geometry is geometry
-            and _assignment_input_identity(candidate.source)
-            == assignment_input_identity
-            and candidate.topology_version == topology_version
-            and candidate.assignment_version == assignment_version
+            and candidate._world is not None
+            and candidate._world.assignment_key() == assignment_key
         ),
         None,
     )
     if assignments is None:
+        material_row_by_id = {
+            int(material_id): row
+            for row, material_id in enumerate(materials.material_id.tolist())
+        }
         assignments = _compile_assignments(
             structures,
             material_row_by_id=material_row_by_id,
             geometry=geometry,
             version=assignment_version,
         )
-    diagonals = next(
-        (
-            (
-                candidate.enumerated_penetration_scene_diagonal_m,
-                candidate.montecarlo_penetration_scene_diagonal_m,
-            )
-            for candidate in reusable
-            if candidate.rayd is rayd
-            and candidate.topology_version == topology_version
-            and candidate.geometry_version == geometry_version
-        ),
-        None,
-    )
-    if diagonals is None:
-        diagonals = _compile_penetration_scene_diagonals(structures, rayd=rayd)
 
     compiled = CompiledScene(
         source=scene_or_snapshot,
@@ -1724,6 +2267,8 @@ def compile(
         time_s=getattr(scene_or_snapshot, "time_s", None),
         enumerated_penetration_scene_diagonal_m=diagonals[0],
         montecarlo_penetration_scene_diagonal_m=diagonals[1],
+        _world=state,
+        _rayd_generation=rayd.generation,
     )
     _REGISTRY.put(key, compiled)
     return compiled
@@ -1768,72 +2313,27 @@ def receiver_grid_points(grid: ReceiverGrid, *, reference: torch.Tensor) -> torc
     )
 
 
-def host_vec3_tensor(flat_positions: tuple[float, ...]) -> torch.Tensor:
-    powers = tuple(1.0 for _ in range(len(flat_positions) // 3))
-    return mc_transmitter_tensors(flat_positions, powers)["positions"]
-
-
 def receiver_positions(
     scene: object, *, device: torch.device, reference: torch.Tensor | None = None,
 ) -> torch.Tensor:
-    if (
-        len(scene.receivers) == 1
-        and isinstance(scene.receivers[0], ReceiverGrid)
-        and reference is not None
-    ):
-        return receiver_grid_points(scene.receivers[0], reference=reference)
-    blocks: list[torch.Tensor] = []
-    grid_reference = reference
+    """Flattened receiver positions from the scene's endpoint store (grids generated natively)."""
 
-    for receiver in scene.receivers:
-        if isinstance(receiver, ReceiverPoint):
-            block = receiver.position.reshape(1, 3).to(device=device)
-            blocks.append(block)
-            if grid_reference is None:
-                grid_reference = block
-        elif isinstance(receiver, ReceiverGrid):
-            if grid_reference is None:
-                grid_reference = host_vec3_tensor(())
-            blocks.append(receiver_grid_points(receiver, reference=grid_reference))
-        else:
-            raise TypeError(f"receiver type is not accepted: {type(receiver)!r}")
-    if not blocks:
-        return host_vec3_tensor(())
-    if len(blocks) == 1:
-        return blocks[0]
-    return topology_kernels.path_concat_vec3(blocks)
+    return endpoint_store(scene, device=device).rx_positions
 
 
 def transmitter_positions(
     scene: object, *, device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    if not scene.transmitters:
-        exported = mc_transmitter_tensors((), ())
-        return exported["positions"], exported["power"]
-    positions = torch.stack(
-        tuple(transmitter.position for transmitter in scene.transmitters)
-    ).to(device=device, dtype=torch.float32)
-    powers = torch.stack(
-        tuple(
-            power.reshape(())
-            if isinstance((power := transmitter.power_w), torch.Tensor)
-            else positions.new_tensor(float(power))
-            for transmitter in scene.transmitters
-        )
-    ).to(device=device, dtype=torch.float32)
-    return positions, powers
+    """Transmitter positions and powers from the scene's endpoint store."""
+
+    store = endpoint_store(scene, device=device)
+    return store.tx_positions, store.tx_power
 
 
 def transmitter_polarizations_as_stored(scene: object, *, device: torch.device) -> torch.Tensor:
     """Return transmitter polarizations with the scene's stored dtype and layout."""
 
-    if not scene.transmitters:
-        return host_vec3_tensor(())
-    return torch.stack(
-        tuple(transmitter.polarization for transmitter in scene.transmitters)
-    ).to(
-        device=device
-    )
+    return endpoint_store(scene, device=device).tx_polarizations_stored
 
 
 __all__ = ["clear_compile_cache", "compile"]

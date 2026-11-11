@@ -22,7 +22,6 @@ _SAMPLING_OWNER_NAMES = (
 _NATIVE_BUFFER_OWNER_NAMES = (
     "mc_pack_vec3",
     "mc_receiver_grid_points",
-    "mc_transmitter_tensors",
 )
 
 _FROZEN_NATIVE_BUFFER_OWNER_NAMES = (

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
 import torch
 
 from witwin.channel import path as path_module
@@ -225,7 +226,9 @@ def test_solver_passes_typed_rows_and_only_execution_ad_sidecars(monkeypatch):
         lambda _scene, *, reference: torch.zeros_like(reference),
     )
 
-    result = path_module._solve_base(object(), Config(components={"los", "scattering"}))
+    result = path_module._solve_base(
+        object(), Config(components={"los", "transmission", "scattering"})
+    )
 
     assert result.result is sentinel
     assert result.capacity_transaction is None
@@ -244,3 +247,112 @@ def test_solver_passes_typed_rows_and_only_execution_ad_sidecars(monkeypatch):
     assert captured_metadata["scattering_path_count"] == 1
     assert "launch_count" not in captured_metadata
     assert "diffraction_vector_field" not in captured_metadata
+
+def _to_cuda(paths: EvaluatedPaths) -> EvaluatedPaths:
+    def move(record, **overrides):
+        values = {
+            name: getattr(record, name).cuda()
+            if isinstance(getattr(record, name), torch.Tensor)
+            else getattr(record, name)
+            for name, spec in record.__dataclass_fields__.items()
+            if spec.init and name not in overrides
+        }
+        return type(record)(**values, **overrides)
+
+    topology = move(paths.topology)
+    geometry = move(paths.geometry, row_identity=topology.row_identity)
+    fields = move(paths.fields, row_identity=topology.row_identity)
+    return EvaluatedPaths(topology=topology, geometry=geometry, fields=fields)
+
+
+def _bitwise_equal(left: torch.Tensor, right: torch.Tensor) -> bool:
+    if left.shape != right.shape or left.dtype != right.dtype:
+        return False
+    if left.dtype == torch.bool:
+        return torch.equal(left, right)
+    return torch.equal(left.contiguous().view(torch.uint8), right.contiguous().view(torch.uint8))
+
+
+_PACKED_FIELDS = (
+    "a", "tau", "theta_t", "phi_t", "theta_r", "phi_r", "valid", "interaction_type",
+    "primitive_id", "material_id", "position", "normal", "num_paths", "field_xyz",
+    "field_direction",
+)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA")
+@pytest.mark.parametrize("width", [None, 7])
+def test_native_padding_matches_tensor_packing_bit_for_bit(width):
+    paths, _ = _evaluated_paths_fixture()
+    paths = _to_cuda(paths)
+    tx = torch.tensor([[0.0, 0.0, 0.0]], device="cuda")
+    rx = torch.tensor([[30.0, 20.0, 10.0]], device="cuda")
+    reference = from_evaluated_paths(
+        paths, num_rx=1, num_tx=1, tx_positions=tx, rx_positions=rx, metadata={"k": 1}
+    )
+    native = from_evaluated_paths(
+        paths, num_rx=1, num_tx=1, tx_positions=tx, rx_positions=rx, metadata={"k": 1},
+        pair_offsets=torch.tensor([0, 7], device="cuda", dtype=torch.int64), width=width,
+    )
+    for name in _PACKED_FIELDS:
+        assert _bitwise_equal(getattr(native, name), getattr(reference, name)), name
+    assert native.metadata == reference.metadata
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA")
+def test_native_padding_places_unsorted_single_row_pairs():
+    num_tx, num_rx = 2, 3
+    tx_id = torch.tensor([0, 0, 1, 1], dtype=torch.int32)
+    rx_id = torch.tensor([0, 2, 1, 2], dtype=torch.int32)
+    rows = int(tx_id.numel())
+    value = torch.arange(1, rows + 1, dtype=torch.float32)
+    topology = PathTopology(
+        valid=torch.ones(rows, dtype=torch.bool),
+        tx_id=tx_id,
+        rx_id=rx_id,
+        depth=torch.zeros(rows, dtype=torch.int32),
+        component_id=torch.zeros(rows, dtype=torch.int32),
+        primitive_id=torch.full((rows,), -1, dtype=torch.int32),
+        edge_id=torch.full((rows,), -1, dtype=torch.int32),
+        material_id=torch.full((rows,), -1, dtype=torch.int32),
+        primitive_sequence=torch.empty((rows, 0), dtype=torch.int32),
+        material_sequence=torch.empty((rows, 0), dtype=torch.int32),
+        interaction_type=torch.empty((rows, 0), dtype=torch.int32),
+    )
+    field_xyz = torch.complex(value[:, None].expand(rows, 3).clone(), torch.zeros((rows, 3)))
+    geometry = PathGeometry(
+        row_identity=topology.row_identity,
+        path_length_m=value,
+        delay_s=value * 1.0e-9,
+        field_direction=torch.ones((rows, 3)),
+        interaction_position=torch.zeros((rows, 3)),
+        interaction_normal=torch.zeros((rows, 3)),
+        interaction_positions=torch.empty((rows, 0, 3)),
+        interaction_normals=torch.empty((rows, 0, 3)),
+    )
+    fields = PathFields(
+        row_identity=topology.row_identity,
+        path_gain=value,
+        path_field=torch.complex(value, value),
+        field_xyz=field_xyz,
+        coefficient=torch.complex(value, -value),
+    )
+    paths = _to_cuda(EvaluatedPaths(topology=topology, geometry=geometry, fields=fields))
+    pair = rx_id.to(torch.int64) * num_tx + tx_id
+    counts = torch.bincount(pair, minlength=num_tx * num_rx)
+    offsets = torch.cat((torch.zeros(1, dtype=torch.int64), counts.cumsum(0))).cuda()
+    tx = torch.tensor([[0.0, 0.0, 10.0], [5.0, 0.0, 10.0]], device="cuda")
+    rx = torch.tensor([[1.0, 2.0, 1.5], [3.0, -4.0, 1.5], [-6.0, 2.0, 1.5]], device="cuda")
+    native = from_evaluated_paths(
+        paths, num_rx=num_rx, num_tx=num_tx, tx_positions=tx, rx_positions=rx,
+        pair_offsets=offsets, width=None,
+    )
+    assert native.max_num_paths == 1
+    for row in range(rows):
+        r, t = int(rx_id[row]), int(tx_id[row])
+        assert bool(native.valid[r, 0, t, 0, 0])
+        assert float(native.a[r, 0, t, 0, 0, 0].real) == float(value[row])
+        assert float(native.field_xyz[r, 0, t, 0, 0, 0].real) == float(value[row])
+    assert int(native.num_paths.sum()) == rows
+    assert not bool(native.valid[0, 0, 1, 0, 0])
+    assert float(native.tau[0, 0, 1, 0, 0]) == -1.0

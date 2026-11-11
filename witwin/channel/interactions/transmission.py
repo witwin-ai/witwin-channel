@@ -20,6 +20,7 @@ from witwin.channel.propagation.penetration import (
 )
 from witwin.channel.propagation.topology import _empty_path_block
 from witwin.channel.propagation.topology import _ensure_topology_fields
+from witwin.channel.kernels.montecarlo import bdpt_counter_uniforms
 from witwin.channel.kernels.topology import (
     enumerated_transmission_topology_pack,
 )
@@ -169,10 +170,6 @@ def _transmission_topology(
 _MIN_EPSILON_M = 1.0e-6
 _RELATIVE_EPSILON = 1.0e-6
 _EVENT_PROBABILITY_FLOOR = 0.05
-_SPLITMIX_GAMMA = 0x9E3779B97F4A7C15
-_SPLITMIX_MUL0 = 0xBF58476D1CE4E5B9
-_SPLITMIX_MUL1 = 0x94D049BB133111EB
-_MASK64 = (1 << 64) - 1
 
 _LAYER_CSR_FIELDS = (
     "layer_offset",
@@ -213,31 +210,20 @@ def scale_aware_epsilon(position: torch.Tensor, *, scene_diagonal: float) -> tor
     return (position.abs().amax(dim=-1) * _RELATIVE_EPSILON).clamp_min(floor)
 
 
-def _splitmix64(value: int) -> int:
-    value = (value + _SPLITMIX_GAMMA) & _MASK64
-    value = ((value ^ (value >> 30)) * _SPLITMIX_MUL0) & _MASK64
-    value = ((value ^ (value >> 27)) * _SPLITMIX_MUL1) & _MASK64
-    return (value ^ (value >> 31)) & _MASK64
-
-
-def event_selection_seed(seed: int, tx_index: int, depth: int) -> int:
-    """Deterministic per-(seed, tx, depth) generator seed via the native
-    splitmix64 mixing pattern (matches bdpt_paths.cu)."""
-
-    mixed = _splitmix64(int(seed))
-    mixed = _splitmix64(mixed ^ (((int(tx_index) + 1) * 0xD1B54A32D192ED03) & _MASK64))
-    mixed = _splitmix64(mixed ^ (((int(depth) + 1) * 0x8CB92BA72F3D8DD7) & _MASK64))
-    return mixed & ((1 << 63) - 1)
-
-
 def event_uniforms(
     count: int, *, seed: int, tx_index: int, depth: int, device: torch.device,
 ) -> torch.Tensor:
-    """Reproducible per-sample uniforms for reflect/transmit event selection."""
+    """Native counter-based uniforms for reflect/transmit event selection.
 
-    generator = torch.Generator(device=device)
-    generator.manual_seed(event_selection_seed(seed, tx_index, depth))
-    return torch.rand((int(count),), device=device, generator=generator)
+    Sample ``i`` of transmitter ``tx_index`` is global sample ``tx_index * count + i``,
+    so these are the draws the fused BDPT wavefront makes in-kernel.
+    """
+
+    reference = torch.empty((0,), device=device, dtype=torch.float32)
+    return bdpt_counter_uniforms(
+        reference, int(count), seed=int(seed), first=int(tx_index) * int(count),
+        depth=int(depth), stream="event_selection",
+    )
 
 
 def unpolarized_power_budgets(stack: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
