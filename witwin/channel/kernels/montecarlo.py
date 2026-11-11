@@ -381,6 +381,51 @@ def mc_los_grid_maps_ad(
     return _McLosGridMapsAdFunction.apply(matrix, visible, int(rows), int(cols))
 
 
+class _McGridMapsToMatrixAdFunction(torch.autograd.Function):
+    """Native AD for the grid-map-to-matrix layout, the inverse of the matrix-to-map layout."""
+
+    @staticmethod
+    def forward(maps, rows, cols):
+        return mc_los_component_maps_adjoint(maps, None)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        ctx.rows = int(inputs[1])
+        ctx.cols = int(inputs[2])
+
+    @staticmethod
+    @_ad_first_order_only
+    def backward(ctx, grad_matrix):
+        if grad_matrix is None or not ctx.needs_input_grad[0]:
+            return None, None, None
+        return (
+            mc_los_component_maps_from_matrix(
+                _ad_native_tensor(grad_matrix), rows=ctx.rows, cols=ctx.cols
+            ),
+            None,
+            None,
+        )
+
+    @staticmethod
+    def jvp(ctx, t_maps, _t_rows, _t_cols):
+        tangent = _ad_native_tangent_or_none(t_maps)
+        if tangent is None:
+            return None
+        with disable_functorch():
+            return mc_los_component_maps_adjoint(_ad_native_tensor(tangent), None)
+
+
+def mc_grid_maps_to_matrix(
+    maps: torch.Tensor, *, rows: int, cols: int, ad: bool = False,
+) -> torch.Tensor:
+    """``[T, rows * cols]`` receiver-order matrix of grid maps ``[T, cols, rows]``."""
+
+    if ad:
+        return _McGridMapsToMatrixAdFunction.apply(maps, int(rows), int(cols))
+    return mc_los_component_maps_adjoint(maps, None)
+
+
 def mc_zero_matrix(reference: torch.Tensor, *, rows: int, cols: int) -> torch.Tensor:
     validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=2)
     if rows < 0 or cols < 0:

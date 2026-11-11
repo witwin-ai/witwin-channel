@@ -40,6 +40,7 @@ from witwin.channel.kernels.montecarlo import (
     mc_apply_los_visibility,
     mc_capacity_failure_component_maps_sanitize,
     mc_component_map_buffer,
+    mc_grid_maps_to_matrix,
     mc_finalize_component_maps,
     mc_finalize_component_maps_ad,
     mc_los_component_maps_from_matrix,
@@ -530,7 +531,7 @@ def transmission_matrix(
     frequency_value = _frequency_scalar(scene)
     tx_pol = transmitter_polarizations_as_stored(scene, device=device)
     pair_polarization = tx_pol.repeat_interleave(rx_count, dim=0)
-    flat_base_power = base_power.reshape(-1)
+    flat_base_power = base_power.view(-1)
     vertices = scene_vertex_table(scene, compiled) if ad else None
     if ad and ledger is not None:
         ledger.add(vertices, origins, targets)  # type: ignore[attr-defined]
@@ -708,7 +709,7 @@ def _block_deposit_params(
         }
     points = receiver_positions(
         replace(scene, receivers=block.receivers), device=reference.device, reference=reference
-    ).contiguous()
+    )
     return {
         "grid_axis": 2,
         "grid_position": 0.0,
@@ -735,7 +736,7 @@ def _scene_bounds(rayd: RayDSceneResource) -> torch.Tensor:
     cached = cache.get("mc_scene_bounds")
     if cached is not None and cached[0] == key:  # type: ignore[index]
         return cached[1]  # type: ignore[index, no-any-return]
-    bounds = montecarlo_kernels.mc_scene_bounds(vertices.detach().contiguous())
+    bounds = montecarlo_kernels.mc_scene_bounds(vertices.detach())
     cache["mc_scene_bounds"] = (key, bounds)
     return bounds
 
@@ -1544,17 +1545,18 @@ def _initial_los_state(
     return los, 0, 0
 
 
-def _matrix_columns(output: torch.Tensor, block: ReceiverBlock) -> torch.Tensor:
+def _matrix_columns(output: torch.Tensor, block: ReceiverBlock, *, ad: bool) -> torch.Tensor:
     """``[T, count]`` receiver-order columns of one block output (grid maps are transposed)."""
 
     if block.grid is None:
-        return output.reshape(output.shape[0], block.count)
-    return output.transpose(1, 2).reshape(output.shape[0], block.count)
+        return output.view(output.shape[0], block.count)
+    rows, cols = block.grid.shape
+    return mc_grid_maps_to_matrix(output, rows=int(rows), cols=int(cols), ad=ad)
 
 
 def _layout_maps(columns: list[torch.Tensor]) -> torch.Tensor:
     matrix = columns[0] if len(columns) == 1 else torch.cat(columns, dim=1)
-    return matrix.reshape(matrix.shape[0], 1, matrix.shape[1])
+    return matrix.view(matrix.shape[0], 1, matrix.shape[1])
 
 
 def _layout_specular_maps(  # type: ignore[no-untyped-def]
@@ -1587,7 +1589,10 @@ def _layout_specular_maps(  # type: ignore[no-untyped-def]
     maps: dict[str, torch.Tensor] = {}
     if "reflection" in config.components:
         maps["reflection"] = _layout_maps(
-            [_matrix_columns(out, block) for out, block in zip(reflection.outputs, blocks)]
+            [
+                _matrix_columns(out, block, ad=reflection_ad)
+                for out, block in zip(reflection.outputs, blocks)
+            ]
         )
     if wants_diffraction:
         columns = []
@@ -1605,7 +1610,7 @@ def _layout_specular_maps(  # type: ignore[no-untyped-def]
                 ad=ad,
                 ledger=ledger if ad else None,
             )
-            columns.append(_matrix_columns(grid_map, block))
+            columns.append(_matrix_columns(grid_map, block, ad=ad))
         maps["diffraction"] = _layout_maps(columns)
     return maps
 
@@ -1629,7 +1634,7 @@ def _layout_scattering_map(  # type: ignore[no-untyped-def]
         ad=ad,
         ledger=ledger if ad else None,
     )
-    return matrix.reshape(matrix.shape[0], 1, matrix.shape[1]), stats
+    return matrix.view(matrix.shape[0], 1, matrix.shape[1]), stats
 
 
 def _receiver_layout_component_maps(  # type: ignore[no-untyped-def]
@@ -1650,7 +1655,7 @@ def _receiver_layout_component_maps(  # type: ignore[no-untyped-def]
     has_rows = bool(scene.structures) and tx_count > 0 and rx_count > 0
     maps: dict[str, torch.Tensor] = {}
     if "los" in config.components:
-        maps["los"] = los.reshape(tx_count, 1, rx_count)
+        maps["los"] = los.view(tx_count, 1, rx_count)
     if has_rows:
         maps.update(
             _layout_specular_maps(
@@ -1676,7 +1681,7 @@ def _receiver_layout_component_maps(  # type: ignore[no-untyped-def]
             ad=ad,
             ledger=ledger if ad else None,
         )
-        maps["transmission"] = matrix.reshape(tx_count, 1, rx_count)
+        maps["transmission"] = matrix.view(tx_count, 1, rx_count)
         path_count += tx_count * rx_count
         contribution_capacity += int(matrix.numel())
     scattering_stats = None
@@ -1962,7 +1967,7 @@ def solve_pipeline(  # type: ignore[no-untyped-def]
     if flat_layout:
         # Receiver-order columns [T, R], aligned with path_gain.
         component_maps = {
-            name: value.reshape(value.shape[0], value.shape[2])
+            name: value.view(value.shape[0], value.shape[2])
             for name, value in component_maps.items()
         }
     transmission_metadata = _transmission_capacity_metadata(config, capacity_transaction)
