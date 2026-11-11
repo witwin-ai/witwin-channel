@@ -45,12 +45,13 @@ __all__ = [
     "deterministic_diffraction_state_pack",
     "deterministic_diffraction_state_pack_selected",
     "deterministic_face_anchor_points",
-    "deterministic_face_sequence_chunk",
     "deterministic_gather_topology_block",
     "deterministic_los_topology_block",
-    "deterministic_mapped_face_sequence_chunk",
     "deterministic_pad_topology_sequences",
     "deterministic_reflection_epc_input_batch",
+    "reflection_group_tables",
+    "reflection_image_tree_expand",
+    "reflection_receiver_candidates",
     "deterministic_reflection_order1_compact",
     "deterministic_reflection_sequence_compact",
     "deterministic_reflection_topology_compact",
@@ -1128,16 +1129,89 @@ def reflection_epc_candidate_count(
     return int(tx_count) * int(rx_count) * int(sequence_count)
 
 
+def reflection_group_tables(
+    *, vertices: torch.Tensor, faces: torch.Tensor, face_group_id: torch.Tensor,
+    representative_faces: torch.Tensor, tri_a: torch.Tensor, normals: torch.Tensor,
+    tolerance: float,
+) -> dict[str, torch.Tensor]:
+    """Per plane group: the representative plane, the axis-aligned bounds and an occupancy grid.
+
+    The occupancy grid sets every in-plane cell a member triangle's bounds (grown by
+    ``tolerance``) overlap, so a point in an unset cell lies on no member triangle.
+    """
+
+    validate_cuda_tensor("vertices", vertices, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    validate_cuda_tensor("faces", faces, dtype=torch.int32, ndim=2, trailing_shape=(3,))
+    validate_cuda_tensor("face_group_id", face_group_id, dtype=torch.int32, ndim=1)
+    validate_cuda_tensor("representative_faces", representative_faces, dtype=torch.int64, ndim=1)
+    validate_cuda_tensor("tri_a", tri_a, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    validate_cuda_tensor("normals", normals, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    exported = _required_native_op("reflection_group_tables")(
+        vertices, faces, face_group_id, representative_faces, tri_a, normals, float(tolerance)
+    )
+    if not isinstance(exported, dict) or set(exported) != {
+        "plane_point", "plane_normal", "bounds", "occupancy"
+    }:
+        raise TypeError("_channel.reflection_group_tables must return the plane group tables")
+    return dict(exported)
+
+
+def reflection_image_tree_expand(
+    *, node_tx: torch.Tensor, node_sequences: torch.Tensor, node_images: torch.Tensor,
+    plane_point: torch.Tensor, plane_normal: torch.Tensor, bounds: torch.Tensor,
+    occupancy: torch.Tensor, node_start: int, node_end: int, tolerance: float, prune: bool,
+) -> dict[str, torch.Tensor]:
+    """Children ``(node, group)`` of image-tree nodes ``[node_start, node_end)`` in lexicographic order.
+
+    With ``prune`` a child is dropped only when the beam of its parent provably misses the group.
+    """
+
+    validate_cuda_tensor("node_tx", node_tx, dtype=torch.int32, ndim=1)
+    validate_cuda_tensor("node_sequences", node_sequences, dtype=torch.int32, ndim=2)
+    validate_cuda_tensor("node_images", node_images, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    exported = _required_native_op("reflection_image_tree_expand")(
+        node_tx, node_sequences, node_images, plane_point, plane_normal, bounds, occupancy,
+        int(node_start), int(node_end), float(tolerance), bool(prune),
+    )
+    if not isinstance(exported, dict) or set(exported) != {"node_tx", "node_sequences", "node_images"}:
+        raise TypeError("_channel.reflection_image_tree_expand must return the child node tables")
+    return dict(exported)
+
+
+def reflection_receiver_candidates(
+    *, tx_positions: torch.Tensor, rx_positions: torch.Tensor, sequences: torch.Tensor,
+    sequence_tx: torch.Tensor, plane_point: torch.Tensor, plane_normal: torch.Tensor,
+    bounds: torch.Tensor, occupancy: torch.Tensor, sequence_start: int, sequence_end: int,
+    box_tolerance: float, segment_tolerance: float, min_segment_length: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """``(sequence, receiver)`` pairs the image method cannot rule out, in ``(sequence, rx)`` order."""
+
+    validate_cuda_tensor("tx_positions", tx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    validate_cuda_tensor("rx_positions", rx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    validate_cuda_tensor("sequences", sequences, dtype=torch.int32, ndim=2)
+    validate_cuda_tensor("sequence_tx", sequence_tx, dtype=torch.int32, ndim=1)
+    exported = _required_native_op("reflection_receiver_candidates")(
+        tx_positions, rx_positions, sequences, sequence_tx, plane_point, plane_normal, bounds,
+        occupancy, int(sequence_start), int(sequence_end), float(box_tolerance), float(segment_tolerance),
+        float(min_segment_length),
+    )
+    if not isinstance(exported, dict) or set(exported) != {"candidate_sequence", "candidate_receiver"}:
+        raise TypeError("_channel.reflection_receiver_candidates must return the candidate lists")
+    return exported["candidate_sequence"], exported["candidate_receiver"]
+
+
 def deterministic_reflection_epc_input_batch(
     *, tx_positions: torch.Tensor, rx_positions: torch.Tensor, sequences: torch.Tensor,
     tri_a: torch.Tensor, normals: torch.Tensor, candidate_start: int, candidate_end: int,
-    sequence_tx: torch.Tensor | None = None,
+    sequence_tx: torch.Tensor | None = None, candidate_sequence: torch.Tensor | None = None,
+    candidate_receiver: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
     """EPC inputs for candidates ``[candidate_start, candidate_end)`` over every transmitter.
 
     Shared sequences enumerate ``(tx, rx, sequence)`` with the sequence fastest; with
     ``sequence_tx`` each sequence belongs to one transmitter and enumerates
-    ``(sequence, rx)`` with the receiver fastest.
+    ``(sequence, rx)`` with the receiver fastest. Explicit ``candidate_sequence`` and
+    ``candidate_receiver`` lists (with ``sequence_tx``) name each candidate directly.
     """
 
     for name, value in (
@@ -1163,12 +1237,25 @@ def deterministic_reflection_epc_input_batch(
         validate_cuda_tensor("sequence_tx", sequence_tx, dtype=torch.int32, ndim=1)
         if sequence_tx.shape != (int(sequences.shape[0]),):
             raise ValueError("sequence_tx must match sequences")
-    total = reflection_epc_candidate_count(
-        tx_count=int(tx_positions.shape[0]),
-        rx_count=int(rx_positions.shape[0]),
-        sequence_count=int(sequences.shape[0]),
-        per_transmitter=int(sequence_tx.shape[0]) > 0,
-    )
+    if (candidate_sequence is None) != (candidate_receiver is None):
+        raise ValueError("candidate_sequence and candidate_receiver must be given together")
+    if candidate_sequence is None or candidate_receiver is None:
+        candidate_sequence = torch.empty((0,), device=sequences.device, dtype=torch.int32)
+        candidate_receiver = candidate_sequence
+        total = reflection_epc_candidate_count(
+            tx_count=int(tx_positions.shape[0]),
+            rx_count=int(rx_positions.shape[0]),
+            sequence_count=int(sequences.shape[0]),
+            per_transmitter=int(sequence_tx.shape[0]) > 0,
+        )
+    else:
+        validate_cuda_tensor("candidate_sequence", candidate_sequence, dtype=torch.int32, ndim=1)
+        validate_cuda_tensor("candidate_receiver", candidate_receiver, dtype=torch.int32, ndim=1)
+        if candidate_receiver.shape != candidate_sequence.shape:
+            raise ValueError("candidate_receiver must match candidate_sequence")
+        if int(sequence_tx.shape[0]) == 0:
+            raise ValueError("explicit candidates require sequence_tx")
+        total = int(candidate_sequence.shape[0])
     if not 0 <= candidate_start <= candidate_end <= total:
         raise ValueError("candidate range is out of bounds")
     exported = _required_native_op("deterministic_reflection_epc_input_batch")(
@@ -1176,6 +1263,8 @@ def deterministic_reflection_epc_input_batch(
         rx_positions,
         sequences,
         sequence_tx,
+        candidate_sequence,
+        candidate_receiver,
         tri_a,
         normals,
         int(candidate_start),
@@ -1320,83 +1409,6 @@ def deterministic_reflection_topology_compact(
     return block
 
 
-def deterministic_face_sequence_chunk(
-    reference: torch.Tensor, *, face_count: int, depth: int, start: int, end: int,
-    adjacent_distinct: bool = False,
-) -> torch.Tensor:
-    if not isinstance(reference, torch.Tensor):
-        raise TypeError("reference must be a torch.Tensor")
-    if not reference.is_cuda:
-        raise ValueError("reference must be a CUDA tensor")
-    if face_count <= 0:
-        raise ValueError("face_count must be positive")
-    if depth <= 0:
-        raise ValueError("depth must be positive")
-    if start < 0:
-        raise ValueError("start must be non-negative")
-    if end < start:
-        raise ValueError("end must be greater than or equal to start")
-    out = _required_native_op("deterministic_face_sequence_chunk")(
-        reference,
-        int(face_count),
-        int(depth),
-        int(start),
-        int(end),
-        bool(adjacent_distinct),
-    )
-    if not isinstance(out, torch.Tensor):
-        raise TypeError(
-            "_channel.deterministic_face_sequence_chunk must return a tensor"
-        )
-    validate_cuda_tensor("out", out, dtype=torch.int32, ndim=2)
-    if out.shape != (int(end) - int(start), int(depth)):
-        raise ValueError(
-            "_channel.deterministic_face_sequence_chunk returned bad shape"
-        )
-    return out
-
-
-def deterministic_mapped_face_sequence_chunk(
-    face_ids: torch.Tensor, *, depth: int, start: int, end: int, adjacent_distinct: bool = False,
-) -> torch.Tensor:
-    if not isinstance(face_ids, torch.Tensor):
-        raise TypeError("face_ids must be a torch.Tensor")
-    if face_ids.dtype not in {torch.int32, torch.int64}:
-        raise TypeError("face_ids must have dtype torch.int32 or torch.int64")
-    if not face_ids.is_cuda:
-        raise ValueError("face_ids must be a CUDA tensor")
-    if face_ids.ndim != 1:
-        raise ValueError("face_ids must be one-dimensional")
-    if not face_ids.is_contiguous():
-        raise ValueError("face_ids must be contiguous")
-    if depth <= 0:
-        raise ValueError("depth must be positive")
-    if start < 0:
-        raise ValueError("start must be non-negative")
-    if end < start:
-        raise ValueError("end must be greater than or equal to start")
-    out = _required_native_op("deterministic_mapped_face_sequence_chunk")(
-        face_ids,
-        int(depth),
-        int(start),
-        int(end),
-        bool(adjacent_distinct),
-    )
-    if not isinstance(out, torch.Tensor):
-        raise TypeError(
-            "_channel.deterministic_mapped_face_sequence_chunk must return a tensor"
-        )
-    validate_cuda_tensor("out", out, dtype=torch.int32, ndim=2)
-    if out.shape != (int(end) - int(start), int(depth)):
-        raise ValueError(
-            "_channel.deterministic_mapped_face_sequence_chunk returned bad shape"
-        )
-    return out
-
-
-# -------------------------------------------------------------------------
-# primitives
-# -------------------------------------------------------------------------
 def deterministic_component_counts(component_id: torch.Tensor) -> dict[str, int]:
     validate_cuda_tensor("component_id", component_id, dtype=torch.int32, ndim=1)
     exported = _required_native_op("deterministic_component_counts")(component_id)

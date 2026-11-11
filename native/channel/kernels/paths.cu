@@ -274,6 +274,8 @@ __global__ void deterministic_face_anchor_points_kernel(
 // (transmitter, receiver, sequence). With shared sequences (sequence_tx null)
 // c = (tx * rx_count + rx) * sequence_count + sequence; with per-transmitter
 // sequences c = sequence * rx_count + rx and sequence_tx names the transmitter.
+// With explicit candidate lists, candidate c is (candidate_sequence[c],
+// candidate_receiver[c]) and sequence_tx names the transmitter.
 template <typename index_t>
 __global__ void deterministic_reflection_epc_input_batch_kernel(
     int64_t candidate_count,
@@ -282,6 +284,8 @@ __global__ void deterministic_reflection_epc_input_batch_kernel(
     int64_t depth,
     int64_t rx_count,
     const int* __restrict__ sequence_tx,
+    const int* __restrict__ candidate_sequence,
+    const int* __restrict__ candidate_receiver,
     const float* __restrict__ tx_positions,
     const float* __restrict__ rx_positions,
     const index_t* __restrict__ sequences,
@@ -302,7 +306,11 @@ __global__ void deterministic_reflection_epc_input_batch_kernel(
         int64_t sequence_index = 0;
         int64_t rx_id = 0;
         int64_t tx_id = 0;
-        if (sequence_tx == nullptr) {
+        if (candidate_sequence != nullptr) {
+            sequence_index = candidate_sequence[candidate];
+            rx_id = candidate_receiver[candidate];
+            tx_id = sequence_tx[sequence_index];
+        } else if (sequence_tx == nullptr) {
             const int64_t endpoint_pair = candidate / sequence_count;
             sequence_index = candidate - endpoint_pair * sequence_count;
             tx_id = endpoint_pair / rx_count;
@@ -331,51 +339,6 @@ __global__ void deterministic_reflection_epc_input_batch_kernel(
                 direct_plane_points[out_base + axis] = tri_a[face_base + axis];
                 direct_plane_normals[out_base + axis] = normals[face_base + axis];
             }
-        }
-    }
-}
-
-template <typename face_id_t>
-__global__ void deterministic_face_sequence_chunk_kernel(
-    int64_t row_count,
-    int64_t face_count,
-    int64_t depth,
-    int64_t start,
-    bool adjacent_distinct,
-    const face_id_t* __restrict__ face_ids,
-    int* __restrict__ out) {
-    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
-    for (int64_t row = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         row < row_count;
-         row += stride) {
-        int64_t value = start + row;
-        int64_t divisor = 1;
-        const int64_t base = adjacent_distinct && depth > 1 ? face_count - 1 : face_count;
-        for (int64_t power = 1; power < depth; ++power) {
-            divisor *= base;
-        }
-        int64_t previous = -1;
-        for (int64_t column = 0; column < depth; ++column) {
-            int64_t digit = 0;
-            if (adjacent_distinct && depth > 1) {
-                if (column == 0) {
-                    digit = value / divisor;
-                    value -= digit * divisor;
-                    divisor = divisor > 1 ? divisor / base : 1;
-                } else {
-                    const int64_t raw_digit = value / divisor;
-                    value -= raw_digit * divisor;
-                    divisor = divisor > 1 ? divisor / base : 1;
-                    digit = raw_digit < previous ? raw_digit : raw_digit + 1;
-                }
-                previous = digit;
-            } else {
-                digit = value / divisor;
-                value -= digit * divisor;
-                divisor = divisor > 1 ? divisor / face_count : 1;
-            }
-            const int mapped = face_ids == nullptr ? static_cast<int>(digit) : static_cast<int>(face_ids[digit]);
-            out[row * depth + column] = mapped;
         }
     }
 }
@@ -1011,6 +974,8 @@ pybind11::dict channel_deterministic_reflection_epc_input_batch(
     at::Tensor rx_positions,
     at::Tensor sequences,
     at::Tensor sequence_tx,
+    at::Tensor candidate_sequence,
+    at::Tensor candidate_receiver,
     at::Tensor tri_a,
     at::Tensor normals,
     int64_t candidate_start,
@@ -1031,6 +996,16 @@ pybind11::dict channel_deterministic_reflection_epc_input_batch(
     TORCH_CHECK(
         shared || sequence_tx.size(0) == sequences.size(0),
         "sequence_tx must be empty or match sequences");
+    check_cuda_tensor(candidate_sequence, "candidate_sequence", at::kInt, 1);
+    check_cuda_tensor(candidate_receiver, "candidate_receiver", at::kInt, 1);
+    const bool listed = candidate_sequence.size(0) > 0;
+    TORCH_CHECK(
+        candidate_receiver.size(0) == candidate_sequence.size(0),
+        "candidate_receiver must match candidate_sequence");
+    TORCH_CHECK(!listed || !shared, "explicit candidates require per-transmitter sequences");
+    TORCH_CHECK(candidate_sequence.get_device() == tx_positions.get_device() &&
+                    candidate_receiver.get_device() == tx_positions.get_device(),
+                "candidate lists must share tx device");
     const int device = tx_positions.get_device();
     TORCH_CHECK(rx_positions.get_device() == device, "rx_positions must share tx device");
     TORCH_CHECK(sequences.get_device() == device, "sequences must share tx device");
@@ -1041,7 +1016,8 @@ pybind11::dict channel_deterministic_reflection_epc_input_batch(
     const int64_t rx_count = rx_positions.size(0);
     const int64_t sequence_count = sequences.size(0);
     const int64_t depth = sequences.size(1);
-    const int64_t total = shared ? tx_count * rx_count * sequence_count : sequence_count * rx_count;
+    const int64_t total = listed ? candidate_sequence.size(0)
+        : (shared ? tx_count * rx_count * sequence_count : sequence_count * rx_count);
     TORCH_CHECK(candidate_start >= 0, "candidate_start must be non-negative");
     TORCH_CHECK(candidate_end >= candidate_start, "candidate_end must not precede candidate_start");
     TORCH_CHECK(candidate_end <= total, "candidate_end is out of range");
@@ -1072,6 +1048,8 @@ pybind11::dict channel_deterministic_reflection_epc_input_batch(
                 depth,
                 rx_count,
                 shared ? nullptr : sequence_tx.data_ptr<int>(),
+                listed ? candidate_sequence.data_ptr<int>() : nullptr,
+                listed ? candidate_receiver.data_ptr<int>() : nullptr,
                 tx_positions.data_ptr<float>(),
                 rx_positions.data_ptr<float>(),
                 sequence_data,
@@ -1089,112 +1067,6 @@ pybind11::dict channel_deterministic_reflection_epc_input_batch(
             launch(sequences.data_ptr<int64_t>());
         } else {
             launch(sequences.data_ptr<int>());
-        }
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-    return out;
-}
-
-at::Tensor channel_deterministic_face_sequence_chunk(
-    at::Tensor reference,
-    int64_t face_count,
-    int64_t depth,
-    int64_t start,
-    int64_t end,
-    bool adjacent_distinct) {
-    TORCH_CHECK(reference.is_cuda(), "reference must be a CUDA tensor");
-    TORCH_CHECK(face_count > 0, "face_count must be positive");
-    TORCH_CHECK(depth > 0, "depth must be positive");
-    TORCH_CHECK(start >= 0, "start must be non-negative");
-    TORCH_CHECK(end >= start, "end must be greater than or equal to start");
-    int64_t total = face_count;
-    if (adjacent_distinct && depth > 1 && face_count == 1) {
-        total = 0;
-    } else {
-        const int64_t base = adjacent_distinct && depth > 1 ? face_count - 1 : face_count;
-        for (int64_t power = 1; power < depth; ++power) {
-            TORCH_CHECK(total <= std::numeric_limits<int64_t>::max() / base, "face sequence count overflows int64");
-            total *= base;
-        }
-    }
-    TORCH_CHECK(end <= total, "end exceeds total face sequence count");
-    const int64_t row_count = end - start;
-    auto out = at::empty({row_count, depth}, reference.options().dtype(at::kInt));
-    if (row_count > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(reference.get_device()).stream();
-        deterministic_face_sequence_chunk_kernel<int><<<
-            static_cast<int>(launch_blocks(row_count)),
-            kPathBlockSize,
-            0,
-            stream>>>(
-            row_count,
-            face_count,
-            depth,
-            start,
-            adjacent_distinct,
-            nullptr,
-            out.data_ptr<int>());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-    return out;
-}
-
-at::Tensor channel_deterministic_mapped_face_sequence_chunk(
-    at::Tensor face_ids,
-    int64_t depth,
-    int64_t start,
-    int64_t end,
-    bool adjacent_distinct) {
-    TORCH_CHECK(face_ids.is_cuda(), "face_ids must be a CUDA tensor");
-    TORCH_CHECK(face_ids.is_contiguous(), "face_ids must be contiguous");
-    TORCH_CHECK(face_ids.dim() == 1, "face_ids must be one-dimensional");
-    TORCH_CHECK(face_ids.scalar_type() == at::kLong || face_ids.scalar_type() == at::kInt, "face_ids must be int64 or int32");
-    TORCH_CHECK(depth > 0, "depth must be positive");
-    TORCH_CHECK(start >= 0, "start must be non-negative");
-    TORCH_CHECK(end >= start, "end must be greater than or equal to start");
-    const int64_t face_count = face_ids.size(0);
-    TORCH_CHECK(face_count > 0, "face_ids must not be empty");
-    int64_t total = face_count;
-    if (adjacent_distinct && depth > 1 && face_count == 1) {
-        total = 0;
-    } else {
-        const int64_t base = adjacent_distinct && depth > 1 ? face_count - 1 : face_count;
-        for (int64_t power = 1; power < depth; ++power) {
-            TORCH_CHECK(total <= std::numeric_limits<int64_t>::max() / base, "face sequence count overflows int64");
-            total *= base;
-        }
-    }
-    TORCH_CHECK(end <= total, "end exceeds total face sequence count");
-    const int64_t row_count = end - start;
-    auto out = at::empty({row_count, depth}, face_ids.options().dtype(at::kInt));
-    if (row_count > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(face_ids.get_device()).stream();
-        if (face_ids.scalar_type() == at::kLong) {
-            deterministic_face_sequence_chunk_kernel<int64_t><<<
-                static_cast<int>(launch_blocks(row_count)),
-                kPathBlockSize,
-                0,
-                stream>>>(
-                row_count,
-                face_count,
-                depth,
-                start,
-                adjacent_distinct,
-                face_ids.data_ptr<int64_t>(),
-                out.data_ptr<int>());
-        } else {
-            deterministic_face_sequence_chunk_kernel<int><<<
-                static_cast<int>(launch_blocks(row_count)),
-                kPathBlockSize,
-                0,
-                stream>>>(
-                row_count,
-                face_count,
-                depth,
-                start,
-                adjacent_distinct,
-                face_ids.data_ptr<int>(),
-                out.data_ptr<int>());
         }
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }

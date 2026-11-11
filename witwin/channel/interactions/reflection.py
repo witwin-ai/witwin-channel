@@ -1,15 +1,16 @@
 # Copyright Xingyu Chen.
-# Reflection: discovery planning, EPC geometry, and enumerated orchestration.
+# Reflection: candidate discovery, EPC geometry, and enumerated orchestration.
 
-"""Reflection: discovery planning, EPC geometry, and enumerated orchestration."""
+"""Reflection: candidate discovery, EPC geometry, and enumerated orchestration."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterator, Protocol, TYPE_CHECKING
 
 import torch
 
+from witwin.channel.components import DISCOVERY_MODES
 from witwin.channel.materials import face_geometry_id_table, face_material_id_table
 from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel.kernels import topology as topology_kernels
@@ -27,56 +28,46 @@ from witwin.channel.propagation.topology import _ensure_topology_fields
 if TYPE_CHECKING:
     from witwin.channel.scene.endpoints import SolverScene as Scene
 
-_ORDER1_EXHAUSTIVE_GROUP_LIMIT = 4096
-_MAX_MULTIBOUNCE_FACE_SEQUENCES = 100_000
-_MULTIBOUNCE_SEQUENCE_CHUNK_SIZE = 65_536
+# "auto" builds the complete image tree per depth and hands a depth (and every deeper one) to
+# ray discovery only when the tree's cost exceeds the budget below; "exhaustive" is the
+# unpruned tree; "rays" is ray discovery at every depth.
+# Source names recorded per depth in result metadata.
+SOURCE_IMAGE_TREE = "image_tree"
+SOURCE_EXHAUSTIVE = "exhaustive"
+SOURCE_RAYS = "rays"
+
+# Pair tests (image-tree children or sequence/receiver pairs) one depth of the complete
+# source may spend under "auto" before that depth moves to ray discovery.
+_COMPLETE_PAIR_BUDGET = 1 << 31
+# Pair tests per native launch; keeps every candidate-generation kernel to a few milliseconds.
+_PAIR_TESTS_PER_LAUNCH = 1 << 25
+# Below this many sequence/receiver pairs every pair goes to the EPC validator directly; above
+# it the image-method receiver test selects the pairs first. The test also runs at any size when
+# a plane group has more members than _DIRECT_GROUP_SIZE, because the validator's cost for a
+# point outside a group grows with the group's member count.
+_RECEIVER_TEST_MIN_PAIRS = 1 << 20
+_DIRECT_GROUP_SIZE = 64
+# Share of free device memory the image-tree frontier of one depth may hold.
+_FRONTIER_MEMORY_SHARE = 8
+# Validity and pruning tolerances, relative to the scene diagonal. A path segment shorter than
+# _MIN_SEGMENT_RELATIVE is invalid; candidate pruning uses half of it and inflates plane-group
+# bounds by _BOUNDS_RELATIVE so it never rejects a path the validator accepts.
+_MIN_SEGMENT_RELATIVE = 1.0e-5
+_BOUNDS_RELATIVE = 1.0e-4
+_TREE_RELATIVE = 1.0e-4
+# Slack on the back-trace intersection parameter; ten times the EPC solve's own slack.
+_SEGMENT_PARAMETER_SLACK = 1.0e-3
 # Upper bound of EPC candidates per launch; the memory-derived chunk may be smaller.
-_MULTIBOUNCE_PAIR_CHUNK_SIZE = 4_194_304
+_MULTIBOUNCE_PAIR_CHUNK_SIZE = 1 << 20
 _MULTIBOUNCE_DISCOVERY_RAYS = 262_144
 # Transient EPC working set per candidate and per bounce (inputs, RayD outputs and
 # its staging copies), and the share of free device memory one chunk may use.
 _EPC_BYTES_PER_CANDIDATE = 192
 _EPC_BYTES_PER_BOUNCE = 192
-_EPC_CHUNK_MEMORY_LIMIT = 2 << 30
+_EPC_CHUNK_MEMORY_LIMIT = 256 << 20
 # Discovery traces at most this many transmitters' rays per launch.
 _DISCOVERY_TX_CHUNK = 32
 _DISCOVERY_DIRECTIONS: dict[tuple[torch.device, int], torch.Tensor] = {}
-
-
-def _face_sequence_count(face_count: int, depth: int, *, adjacent_distinct: bool) -> int:
-    if adjacent_distinct and depth > 1:
-        if face_count <= 1:
-            return 0
-        return int(face_count) * int(face_count - 1) ** int(depth - 1)
-    return int(face_count) ** int(depth)
-
-
-def _face_sequence_chunks(
-    face_count: int, depth: int, *, chunk_size: int, reference: torch.Tensor,
-    face_ids: torch.Tensor | None = None, adjacent_distinct: bool = False,
-) -> object:
-    total = _face_sequence_count(face_count, depth, adjacent_distinct=adjacent_distinct)
-    for start in range(0, total, chunk_size):
-        end = min(start + chunk_size, total)
-        if face_ids is None:
-            sequences = topology_kernels.deterministic_face_sequence_chunk(
-                reference,
-                face_count=face_count,
-                depth=depth,
-                start=start,
-                end=end,
-                adjacent_distinct=adjacent_distinct,
-            )
-        else:
-            sequences = topology_kernels.deterministic_mapped_face_sequence_chunk(
-                face_ids,
-                depth=depth,
-                start=start,
-                end=end,
-                adjacent_distinct=adjacent_distinct,
-            )
-        if int(sequences.shape[0]) > 0:
-            yield sequences
 
 
 class TraceReflectionGroupChains(Protocol):
@@ -89,23 +80,56 @@ class RecordReflectionCandidateCount(Protocol):
     def __call__(self, candidate_count: int) -> None: ...
 
 
-@dataclass(frozen=True, slots=True)
-class ReflectionOrder1Plan:
-    exhaustive: bool
-    group_count: int
-    representative_faces: torch.Tensor
-    base_sequences: torch.Tensor | None
-    face_group_id: torch.Tensor | None
+def validate_reflection_discovery(value: object) -> str:
+    """The candidate source name, or a ``ValueError`` naming the accepted ones."""
+
+    if not isinstance(value, str) or value not in DISCOVERY_MODES:
+        raise ValueError(
+            f"discovery must be one of {', '.join(map(repr, DISCOVERY_MODES))}, "
+            f"got {value!r}"
+        )
+    return value
+
+
+@dataclass(slots=True)
+class ReflectionDiscoveryRecord:
+    """Which candidate source produced each reflection depth of one solve."""
+
+    sources: dict[int, str] = field(default_factory=dict)
+
+    @property
+    def complete(self) -> bool:
+        return all(source != SOURCE_RAYS for source in self.sources.values())
+
+    def metadata(self, requested: str) -> dict[str, object]:
+        return {
+            "requested": requested,
+            "sources": {str(depth): self.sources[depth] for depth in sorted(self.sources)},
+            "complete": self.complete,
+        }
 
 
 @dataclass(frozen=True, slots=True)
-class ReflectionMultibouncePlan:
-    exhaustive: bool
+class ReflectionPlaneGroups:
+    """Coplanar plane groups with the per-group tables candidate generation reads."""
+
     group_count: int
     representative_faces: torch.Tensor
-    face_group_id: torch.Tensor | None
+    face_group_id: torch.Tensor
+    plane_point: torch.Tensor
+    plane_normal: torch.Tensor
+    bounds: torch.Tensor
+    occupancy: torch.Tensor
+    scene_scale_m: float
+    max_group_size: int = 1
+
+
+@dataclass(frozen=True, slots=True)
+class ReflectionDiscoveryPlan:
+    groups: ReflectionPlaneGroups
     min_depth: int
     max_depth: int
+    discovery: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,6 +138,75 @@ class ReflectionEpcRequest:
 
     depth: int
     epc_inputs: dict[str, torch.Tensor]
+
+
+def reflection_plane_groups(
+    compiled: object, groups: dict[str, torch.Tensor | int], *, tri_a: torch.Tensor,
+    normals: torch.Tensor,
+) -> ReflectionPlaneGroups:
+    """Plane-group tables of a compiled scene, cached per RayD scene like the groups themselves."""
+
+    rayd = compiled.rayd
+    cache = getattr(rayd, "runtime_cache", None)
+    cached = cache.get("reflection_plane_groups") if cache is not None else None
+    if cached is not None:
+        return cached  # type: ignore[return-value]
+    records = rayd.edge_records()
+    representative_faces = groups["representative_faces"].contiguous()
+    face_group_id = groups["face_group_id"].to(dtype=torch.int32).contiguous()
+    group_count = int(groups["group_count"])
+    scale = max(float(getattr(compiled, "enumerated_penetration_scene_diagonal_m", 0.0) or 0.0), 1.0e-3)
+    tables = (
+        topology_kernels.reflection_group_tables(
+            vertices=records.vertices.detach().to(dtype=torch.float32).contiguous(),
+            faces=records.faces.to(dtype=torch.int32).contiguous(),
+            face_group_id=face_group_id,
+            representative_faces=representative_faces.to(dtype=torch.int64),
+            tri_a=tri_a.contiguous(),
+            normals=normals.contiguous(),
+            tolerance=_BOUNDS_RELATIVE * scale,
+        )
+        if group_count > 0
+        else {
+            "plane_point": tri_a.new_empty((0, 3)),
+            "plane_normal": tri_a.new_empty((0, 3)),
+            "bounds": tri_a.new_empty((0, 6)),
+            "occupancy": torch.empty((0, 32), device=tri_a.device, dtype=torch.int32),
+        }
+    )
+    result = ReflectionPlaneGroups(
+        group_count=group_count,
+        representative_faces=representative_faces,
+        face_group_id=groups["face_group_id"].to(dtype=torch.long).contiguous(),
+        plane_point=tables["plane_point"],
+        plane_normal=tables["plane_normal"],
+        bounds=tables["bounds"],
+        occupancy=tables["occupancy"],
+        scene_scale_m=scale,
+        max_group_size=(
+            int(groups["surface_group_members"].numel()) // group_count if group_count > 0 else 1
+        ),
+    )
+    if cache is not None:
+        cache["reflection_plane_groups"] = result
+    return result
+
+
+def reflection_min_segment_length(groups: ReflectionPlaneGroups) -> float:
+    """Shortest valid path segment, metres: a fixed fraction of the scene diagonal."""
+
+    return _MIN_SEGMENT_RELATIVE * groups.scene_scale_m
+
+
+def prepare_reflection_discovery_plan(
+    groups: ReflectionPlaneGroups, *, min_depth: int, max_depth: int, discovery: str = "auto",
+) -> ReflectionDiscoveryPlan:
+    return ReflectionDiscoveryPlan(
+        groups=groups,
+        min_depth=int(min_depth),
+        max_depth=int(max_depth),
+        discovery=validate_reflection_discovery(discovery),
+    )
 
 
 def epc_candidate_chunk(depth: int, device: torch.device) -> int:
@@ -127,16 +220,30 @@ def epc_candidate_chunk(depth: int, device: torch.device) -> int:
     return max(1, min(_MULTIBOUNCE_PAIR_CHUNK_SIZE, budget // per_candidate))
 
 
+def _frontier_node_limit(depth: int, device: torch.device) -> int:
+    """Image-tree nodes of one depth that fit the frontier's share of free device memory."""
+
+    if torch.device(device).type != "cuda":
+        return 1 << 24
+    free_bytes, _total = torch.cuda.mem_get_info(device)
+    per_node = 4 * (int(depth) + 1) + 12 + 8
+    return max(1, int(free_bytes) // _FRONTIER_MEMORY_SHARE // per_node)
+
+
 def _epc_requests(
     depth: int, *, tx_positions: torch.Tensor, rx_positions: torch.Tensor, sequences: torch.Tensor,
     tri_a: torch.Tensor, normals: torch.Tensor, sequence_tx: torch.Tensor | None = None,
+    candidate_sequence: torch.Tensor | None = None, candidate_receiver: torch.Tensor | None = None,
 ) -> Iterator[ReflectionEpcRequest]:
-    total = topology_kernels.reflection_epc_candidate_count(
-        tx_count=int(tx_positions.shape[0]),
-        rx_count=int(rx_positions.shape[0]),
-        sequence_count=int(sequences.shape[0]),
-        per_transmitter=sequence_tx is not None,
-    )
+    if candidate_sequence is not None:
+        total = int(candidate_sequence.shape[0])
+    else:
+        total = topology_kernels.reflection_epc_candidate_count(
+            tx_count=int(tx_positions.shape[0]),
+            rx_count=int(rx_positions.shape[0]),
+            sequence_count=int(sequences.shape[0]),
+            per_transmitter=sequence_tx is not None,
+        )
     if total <= 0:
         return
     chunk = epc_candidate_chunk(depth, sequences.device)
@@ -152,6 +259,8 @@ def _epc_requests(
                 candidate_start=start,
                 candidate_end=min(start + chunk, total),
                 sequence_tx=sequence_tx,
+                candidate_sequence=candidate_sequence,
+                candidate_receiver=candidate_receiver,
             ),
         )
 
@@ -159,11 +268,14 @@ def _epc_requests(
 def _unique_tx_chains(chains: torch.Tensor, *, depth: int, group_count: int) -> torch.Tensor:
     """Distinct ``(tx, group_1..group_depth)`` rows of chains reaching ``depth``, sorted.
 
-    ``chains`` is ``(T, N, max_depth)`` plane-group ids with -1 past each ray's last hit.
+    ``chains`` is ``(T, N, max_depth)`` plane-group ids with -1 past each ray's last hit. A chain
+    that repeats a plane group in consecutive bounces is not a specular path and is skipped.
     """
 
     tx_count, ray_count, _width = chains.shape
     reached = chains[:, :, depth - 1] >= 0
+    for column in range(1, depth):
+        reached = reached & (chains[:, :, column] != chains[:, :, column - 1])
     radix = max(int(group_count), 1)
     if tx_count * radix**depth < 2**62:
         tx_column = torch.arange(tx_count, device=chains.device, dtype=torch.int64)
@@ -188,175 +300,240 @@ def _unique_tx_chains(chains: torch.Tensor, *, depth: int, group_count: int) -> 
     return torch.unique(tagged[reached], dim=0)
 
 
-def _discovered_sequences(
-    *, tx_positions: torch.Tensor, face_group_id: torch.Tensor, representative_faces: torch.Tensor,
-    group_count: int, min_depth: int, max_depth: int,
-    trace_group_chains: TraceReflectionGroupChains,
-) -> Iterator[tuple[int, torch.Tensor, torch.Tensor]]:
-    """Plane-group chains each transmitter's discovery rays reach, as per-transmitter sequences.
+class _RayChains:
+    """Plane-group chains traced once per solve from every transmitter, read per depth."""
 
-    Yields ``(depth, sequences, sequence_tx)`` per transmitter chunk and depth; one trace
-    launch covers every transmitter of the chunk.
+    def __init__(
+        self, tx_positions: torch.Tensor, groups: ReflectionPlaneGroups, max_depth: int,
+        trace_group_chains: TraceReflectionGroupChains,
+    ) -> None:
+        self._chunks: list[tuple[int, torch.Tensor]] = []
+        tx_count = int(tx_positions.shape[0])
+        for tx_start in range(0, tx_count, _DISCOVERY_TX_CHUNK):
+            tx_chunk = tx_positions[tx_start : tx_start + _DISCOVERY_TX_CHUNK].contiguous()
+            chunk_count = int(tx_chunk.shape[0])
+            chains = trace_group_chains(
+                tx_chunk, face_group_id=groups.face_group_id, max_depth=max_depth
+            ).reshape(chunk_count, -1, max_depth)
+            self._chunks.append((tx_start, chains))
+        self._group_count = groups.group_count
+
+    def sequences(self, depth: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """``(sequences [S, depth] int32 group ids, sequence_tx [S] int32)`` in lexicographic order."""
+
+        rows = [
+            (tx_start, _unique_tx_chains(chains, depth=depth, group_count=self._group_count))
+            for tx_start, chains in self._chunks
+        ]
+        sequences = torch.cat([r[:, 1:] for _start, r in rows]).to(dtype=torch.int32).contiguous()
+        sequence_tx = torch.cat([r[:, 0] + start for start, r in rows]).to(dtype=torch.int32)
+        return sequences, sequence_tx.contiguous()
+
+
+@dataclass(slots=True)
+class _ImageTreeFrontier:
+    node_tx: torch.Tensor
+    node_sequences: torch.Tensor
+    node_images: torch.Tensor
+
+    @property
+    def size(self) -> int:
+        return int(self.node_tx.shape[0])
+
+
+def _image_tree_roots(tx_positions: torch.Tensor) -> _ImageTreeFrontier:
+    tx_count = int(tx_positions.shape[0])
+    device = tx_positions.device
+    return _ImageTreeFrontier(
+        node_tx=torch.arange(tx_count, device=device, dtype=torch.int32),
+        node_sequences=torch.empty((tx_count, 0), device=device, dtype=torch.int32),
+        node_images=tx_positions.to(dtype=torch.float32).contiguous(),
+    )
+
+
+def _expand_image_tree(
+    frontier: _ImageTreeFrontier, groups: ReflectionPlaneGroups, *, prune: bool,
+) -> _ImageTreeFrontier:
+    """One more plane group on every frontier node, in lexicographic order, chunked per launch."""
+
+    nodes_per_launch = max(1, _PAIR_TESTS_PER_LAUNCH // max(groups.group_count, 1))
+    parts: list[dict[str, torch.Tensor]] = []
+    for start in range(0, frontier.size, nodes_per_launch):
+        parts.append(
+            topology_kernels.reflection_image_tree_expand(
+                node_tx=frontier.node_tx,
+                node_sequences=frontier.node_sequences,
+                node_images=frontier.node_images,
+                plane_point=groups.plane_point,
+                plane_normal=groups.plane_normal,
+                bounds=groups.bounds,
+                occupancy=groups.occupancy,
+                node_start=start,
+                node_end=min(start + nodes_per_launch, frontier.size),
+                tolerance=_TREE_RELATIVE * groups.scene_scale_m,
+                prune=prune,
+            )
+        )
+    if len(parts) == 1:
+        part = parts[0]
+        return _ImageTreeFrontier(part["node_tx"], part["node_sequences"], part["node_images"])
+    return _ImageTreeFrontier(
+        torch.cat([p["node_tx"] for p in parts]),
+        torch.cat([p["node_sequences"] for p in parts]).contiguous(),
+        torch.cat([p["node_images"] for p in parts]).contiguous(),
+    )
+
+
+def _candidate_requests(
+    depth: int, *, sequences: torch.Tensor, sequence_tx: torch.Tensor,
+    groups: ReflectionPlaneGroups, tx_positions: torch.Tensor, rx_positions: torch.Tensor,
+    tri_a: torch.Tensor, normals: torch.Tensor,
+    record_candidate_count: RecordReflectionCandidateCount | None,
+) -> Iterator[ReflectionEpcRequest]:
+    """EPC requests for per-transmitter group sequences against every receiver.
+
+    Small products go to the validator whole; larger ones first keep only the
+    ``(sequence, receiver)`` pairs the image method cannot rule out.
     """
 
-    tx_count = int(tx_positions.shape[0])
-    for tx_start in range(0, tx_count, _DISCOVERY_TX_CHUNK):
-        tx_chunk = tx_positions[tx_start : tx_start + _DISCOVERY_TX_CHUNK].contiguous()
-        chunk_count = int(tx_chunk.shape[0])
-        chains = trace_group_chains(
-            tx_chunk, face_group_id=face_group_id, max_depth=max_depth
-        ).reshape(chunk_count, -1, max_depth)
-        for depth in range(min_depth, max_depth + 1):
-            rows = _unique_tx_chains(chains, depth=depth, group_count=group_count)
-            if int(rows.shape[0]) == 0:
-                continue
-            sequences = representative_faces[rows[:, 1:]].contiguous()
-            sequence_tx = (rows[:, 0] + tx_start).to(dtype=torch.int32).contiguous()
-            yield depth, sequences, sequence_tx
-
-
-def prepare_reflection_order1_plan(
-    *, group_count: int, representative_faces: torch.Tensor, face_group_id: torch.Tensor,
-) -> ReflectionOrder1Plan:
-    exhaustive = group_count <= _ORDER1_EXHAUSTIVE_GROUP_LIMIT
-    base_sequences = (
-        topology_kernels.deterministic_mapped_face_sequence_chunk(
-            representative_faces,
-            depth=1,
-            start=0,
-            end=group_count,
-        )
-        if exhaustive
-        else None
-    )
-    selected_face_group_id = (
-        None if exhaustive else face_group_id.to(dtype=torch.long).contiguous()
-    )
-    return ReflectionOrder1Plan(
-        exhaustive=exhaustive,
-        group_count=group_count,
-        representative_faces=representative_faces,
-        base_sequences=base_sequences,
-        face_group_id=selected_face_group_id,
-    )
-
-
-def iter_reflection_order1_epc_requests(
-    plan: ReflectionOrder1Plan, *, tx_positions: torch.Tensor, rx_positions: torch.Tensor,
-    tri_a: torch.Tensor, normals: torch.Tensor, trace_group_chains: TraceReflectionGroupChains,
-) -> Iterator[ReflectionEpcRequest]:
-    """First-order EPC requests for every transmitter, in transmitter-batched launches."""
-
+    sequence_count = int(sequences.shape[0])
     rx_count = int(rx_positions.shape[0])
-    if plan.group_count <= 0 or rx_count <= 0 or int(tx_positions.shape[0]) <= 0:
+    if sequence_count == 0 or rx_count == 0:
         return
-    if plan.exhaustive:
-        assert plan.base_sequences is not None
-        yield from _epc_requests(
-            1,
-            tx_positions=tx_positions,
-            rx_positions=rx_positions,
-            sequences=plan.base_sequences,
-            tri_a=tri_a,
-            normals=normals,
-        )
-        return
-    assert plan.face_group_id is not None
-    for depth, sequences, sequence_tx in _discovered_sequences(
-        tx_positions=tx_positions,
-        face_group_id=plan.face_group_id,
-        representative_faces=plan.representative_faces,
-        group_count=plan.group_count,
-        min_depth=1,
-        max_depth=1,
-        trace_group_chains=trace_group_chains,
-    ):
+    face_sequences = groups.representative_faces[sequences.to(dtype=torch.long)].contiguous()
+    pairs = sequence_count * rx_count
+    if pairs <= _RECEIVER_TEST_MIN_PAIRS and groups.max_group_size <= _DIRECT_GROUP_SIZE:
+        if record_candidate_count is not None:
+            record_candidate_count(pairs)
         yield from _epc_requests(
             depth,
             tx_positions=tx_positions,
             rx_positions=rx_positions,
-            sequences=sequences,
+            sequences=face_sequences,
             tri_a=tri_a,
             normals=normals,
             sequence_tx=sequence_tx,
         )
-
-
-def prepare_reflection_multibounce_plan(
-    *, group_count: int, representative_faces: torch.Tensor, face_group_id: torch.Tensor,
-    min_depth: int, max_depth: int,
-) -> ReflectionMultibouncePlan:
-    exhaustive = all(
-        _face_sequence_count(group_count, depth, adjacent_distinct=True)
-        <= _MAX_MULTIBOUNCE_FACE_SEQUENCES
-        for depth in range(min_depth, max_depth + 1)
-    )
-    selected_face_group_id = (
-        None if exhaustive else face_group_id.to(dtype=torch.long).contiguous()
-    )
-    return ReflectionMultibouncePlan(
-        exhaustive=exhaustive,
-        group_count=group_count,
-        representative_faces=representative_faces,
-        face_group_id=selected_face_group_id,
-        min_depth=min_depth,
-        max_depth=max_depth,
-    )
-
-
-def iter_reflection_multibounce_epc_requests(
-    plan: ReflectionMultibouncePlan, *, tx_positions: torch.Tensor, rx_positions: torch.Tensor,
-    sequence_reference: torch.Tensor, tri_a: torch.Tensor, normals: torch.Tensor,
-    trace_group_chains: TraceReflectionGroupChains,
-    record_candidate_count: RecordReflectionCandidateCount,
-) -> Iterator[ReflectionEpcRequest]:
-    """Multi-bounce EPC requests for every transmitter, in transmitter-batched launches."""
-
-    if int(rx_positions.shape[0]) <= 0 or int(tx_positions.shape[0]) <= 0:
         return
-    if plan.exhaustive:
-        for depth in range(plan.min_depth, plan.max_depth + 1):
-            candidate_count = _face_sequence_count(
-                plan.group_count, depth, adjacent_distinct=True
-            )
-            record_candidate_count(candidate_count)
-            chunk_size = min(_MULTIBOUNCE_SEQUENCE_CHUNK_SIZE, max(candidate_count, 1))
-            for sequences in _face_sequence_chunks(
-                plan.group_count,
-                depth,
-                chunk_size=chunk_size,
-                reference=sequence_reference,
-                face_ids=plan.representative_faces,
-                adjacent_distinct=True,
-            ):
+    sequences_per_launch = max(1, _PAIR_TESTS_PER_LAUNCH // rx_count)
+    min_segment = 0.5 * reflection_min_segment_length(groups)
+    box = _BOUNDS_RELATIVE * groups.scene_scale_m
+    for start in range(0, sequence_count, sequences_per_launch):
+        candidate_sequence, candidate_receiver = topology_kernels.reflection_receiver_candidates(
+            tx_positions=tx_positions.to(dtype=torch.float32).contiguous(),
+            rx_positions=rx_positions.to(dtype=torch.float32).contiguous(),
+            sequences=sequences,
+            sequence_tx=sequence_tx,
+            plane_point=groups.plane_point,
+            plane_normal=groups.plane_normal,
+            bounds=groups.bounds,
+            occupancy=groups.occupancy,
+            sequence_start=start,
+            sequence_end=min(start + sequences_per_launch, sequence_count),
+            box_tolerance=box,
+            segment_tolerance=_SEGMENT_PARAMETER_SLACK,
+            min_segment_length=min_segment,
+        )
+        if record_candidate_count is not None:
+            record_candidate_count(int(candidate_sequence.shape[0]))
+        yield from _epc_requests(
+            depth,
+            tx_positions=tx_positions,
+            rx_positions=rx_positions,
+            sequences=face_sequences,
+            tri_a=tri_a,
+            normals=normals,
+            sequence_tx=sequence_tx,
+            candidate_sequence=candidate_sequence,
+            candidate_receiver=candidate_receiver,
+        )
+
+
+def iter_reflection_epc_requests(
+    plan: ReflectionDiscoveryPlan, *, tx_positions: torch.Tensor, rx_positions: torch.Tensor,
+    tri_a: torch.Tensor, normals: torch.Tensor, trace_group_chains: TraceReflectionGroupChains,
+    record: ReflectionDiscoveryRecord | None = None,
+    record_candidate_count: RecordReflectionCandidateCount | None = None,
+) -> Iterator[ReflectionEpcRequest]:
+    """EPC requests of depths ``min_depth..max_depth`` for every transmitter.
+
+    Each depth's candidate source is chosen from that depth's own cost alone, so the rows of a
+    depth do not depend on ``max_depth``. Every complete source yields the same valid rows.
+    """
+
+    groups = plan.groups
+    tx_count = int(tx_positions.shape[0])
+    rx_count = int(rx_positions.shape[0])
+    if groups.group_count <= 0 or rx_count <= 0 or tx_count <= 0 or plan.max_depth < plan.min_depth:
+        return
+    device = tx_positions.device
+    auto = plan.discovery == "auto"
+    # Depth 1 of a small product pairs every plane group with every endpoint pair directly.
+    shared_first_depth = (
+        tx_count * groups.group_count * rx_count <= _RECEIVER_TEST_MIN_PAIRS
+        and groups.max_group_size <= _DIRECT_GROUP_SIZE
+    )
+    rays_from = 1 if plan.discovery == SOURCE_RAYS else None
+    rays: _RayChains | None = None
+    frontier = _image_tree_roots(tx_positions)
+    for depth in range(1, plan.max_depth + 1):
+        if rays_from is None and not (depth == 1 and shared_first_depth and plan.max_depth == 1):
+            expansion = frontier.size * groups.group_count
+            limit = _frontier_node_limit(depth, device)
+            if auto and expansion > _COMPLETE_PAIR_BUDGET:
+                rays_from = depth
+            else:
+                if plan.discovery == SOURCE_EXHAUSTIVE and expansion > limit:
+                    raise ValueError(
+                        f"discovery='exhaustive' needs {expansion} plane-group sequences at "
+                        f"reflection depth {depth}, more than the {limit} that fit in device "
+                        "memory; use discovery='auto'"
+                    )
+                frontier = _expand_image_tree(
+                    frontier, groups, prune=plan.discovery != SOURCE_EXHAUSTIVE
+                )
+                if auto and (
+                    frontier.size * rx_count > _COMPLETE_PAIR_BUDGET or frontier.size > limit
+                ):
+                    rays_from = depth
+        if rays_from is not None:
+            if rays is None:
+                rays = _RayChains(tx_positions, groups, plan.max_depth, trace_group_chains)
+            if record is not None:
+                record.sources[depth] = SOURCE_RAYS
+            if depth < plan.min_depth:
+                continue
+            sequences, sequence_tx = rays.sequences(depth)
+        else:
+            if record is not None:
+                record.sources[depth] = (
+                    SOURCE_EXHAUSTIVE if plan.discovery == SOURCE_EXHAUSTIVE else SOURCE_IMAGE_TREE
+                )
+            if depth < plan.min_depth:
+                continue
+            if depth == 1 and shared_first_depth:
+                if record_candidate_count is not None:
+                    record_candidate_count(tx_count * groups.group_count * rx_count)
                 yield from _epc_requests(
-                    depth,
+                    1,
                     tx_positions=tx_positions,
                     rx_positions=rx_positions,
-                    sequences=sequences,
+                    sequences=groups.representative_faces.reshape(-1, 1),
                     tri_a=tri_a,
                     normals=normals,
                 )
-        return
-    assert plan.face_group_id is not None
-    for depth, sequences, sequence_tx in _discovered_sequences(
-        tx_positions=tx_positions,
-        face_group_id=plan.face_group_id,
-        representative_faces=plan.representative_faces,
-        group_count=plan.group_count,
-        min_depth=plan.min_depth,
-        max_depth=plan.max_depth,
-        trace_group_chains=trace_group_chains,
-    ):
-        record_candidate_count(int(sequences.shape[0]))
-        yield from _epc_requests(
+                continue
+            sequences, sequence_tx = frontier.node_sequences, frontier.node_tx
+        yield from _candidate_requests(
             depth,
+            sequences=sequences,
+            sequence_tx=sequence_tx,
+            groups=groups,
             tx_positions=tx_positions,
             rx_positions=rx_positions,
-            sequences=sequences,
             tri_a=tri_a,
             normals=normals,
-            sequence_tx=sequence_tx,
+            record_candidate_count=record_candidate_count,
         )
 
 
@@ -374,6 +551,8 @@ class ReflectionEpcQuery:
     surface_group_members: torch.Tensor
     max_bounces: int
     visibility_ignore_mode: int
+    # Shortest valid path segment, metres; 0 accepts every segment length.
+    min_segment_length: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -400,6 +579,7 @@ def query_reflection_epc(query: ReflectionEpcQuery) -> ReflectionEpcGeometry:
         query.surface_group_members,
         query.max_bounces,
         query.visibility_ignore_mode,
+        float(query.min_segment_length),
     )
     return ReflectionEpcGeometry(
         visible=raw[0],
@@ -442,7 +622,7 @@ def _discovery_directions(device: torch.device, ray_count: int) -> torch.Tensor:
 
 def _discovered_group_chains(
     rayd: object, tx_positions: torch.Tensor, *, face_group_id: torch.Tensor, max_depth: int,
-    ray_count: int = _MULTIBOUNCE_DISCOVERY_RAYS,
+    ray_count: int | None = None,
 ) -> torch.Tensor:
     """Trace specular chains from every transmitter and map them to plane groups.
 
@@ -453,6 +633,7 @@ def _discovered_group_chains(
     """
 
     device = face_group_id.device
+    ray_count = _MULTIBOUNCE_DISCOVERY_RAYS if ray_count is None else int(ray_count)
     tx_positions = tx_positions.reshape(-1, 3)
     tx_count = int(tx_positions.shape[0])
     directions = _discovery_directions(device, ray_count)
@@ -486,7 +667,7 @@ def _reflection_geometry_tables(compiled: object, device: torch.device) -> tuple
 
 def _reflection_blocks(
     requests: Iterator[ReflectionEpcRequest], *, rayd: object, groups: dict[str, torch.Tensor],
-    face_material_id: torch.Tensor, on_epc: object,
+    face_material_id: torch.Tensor, on_epc: object, min_segment_length: float,
 ) -> list[dict[str, torch.Tensor]]:
     blocks: list[dict[str, torch.Tensor]] = []
     for request in requests:
@@ -505,6 +686,7 @@ def _reflection_blocks(
                 surface_group_members=groups["surface_group_members"],
                 max_bounces=int(request.depth),
                 visibility_ignore_mode=1,
+                min_segment_length=min_segment_length,
             )
         )
         on_epc()
@@ -523,87 +705,11 @@ def _reflection_blocks(
     return blocks
 
 
-def _reflection_topology_order1(
-    scene: Scene, compiled: object, tx_positions: torch.Tensor, tx_power: torch.Tensor,
-    rx_positions: torch.Tensor, *, frequency_hz: float,
-) -> tuple[dict[str, torch.Tensor], int]:
-    """First-order reflection topology for every transmitter and receiver.
-
-    The rows carry EPC geometry and path length only; the field stage evaluates their fields.
-    """
-
-    device = tx_positions.device
-    rayd = compiled.rayd
-    if not scene.structures or tx_positions.numel() == 0 or rx_positions.numel() == 0:
-        return _empty_reflection_block(device), 0
-    if not rayd.available:
-        raise RuntimeError(
-            "deterministic reflection requires RayD native scene capability"
-        )
-    faces, normals, tri_a = _reflection_geometry_tables(compiled, device)
-    if faces.shape[0] == 0:
-        return _empty_reflection_block(device), 0
-
-    face_material_id = face_material_id_table(compiled, device=device)
-    # Enumerate one candidate per coplanar face group so that a wall meshed
-    # from several coplanar triangles yields exactly one specular path, and
-    # every planar facade (not one representative per structure) is covered.
-    # The EPC kernel resolves the actual containing triangle per path.
-    groups = _cached_coplanar_face_groups(
-        rayd,
-        tri_a,
-        normals,
-        face_geometry_id_table(compiled, "face_surface_id", device=device),
-    )
-    group_count = int(groups["group_count"])
-    if group_count <= 0:
-        return _empty_reflection_block(device), 0
-    plan = prepare_reflection_order1_plan(
-        group_count=group_count,
-        representative_faces=groups["representative_faces"].contiguous(),
-        face_group_id=groups["face_group_id"],
-    )
-    launch_count = 0
-
-    def trace_group_chains(
-        tx: torch.Tensor, *, face_group_id: torch.Tensor, max_depth: int,
-    ) -> torch.Tensor:
-        nonlocal launch_count
-        chains = _discovered_group_chains(
-            rayd, tx, face_group_id=face_group_id, max_depth=max_depth
-        )
-        launch_count += 1
-        return chains
-
-    def count_epc() -> None:
-        nonlocal launch_count
-        launch_count += 1
-
-    blocks = _reflection_blocks(
-        iter_reflection_order1_epc_requests(
-            plan,
-            tx_positions=tx_positions,
-            rx_positions=rx_positions,
-            tri_a=tri_a,
-            normals=normals,
-            trace_group_chains=trace_group_chains,
-        ),
-        rayd=rayd,
-        groups=groups,
-        face_material_id=face_material_id,
-        on_epc=count_epc,
-    )
-    return _ensure_topology_fields(
-        concatenate_path_blocks(blocks, device=device)
-    ), launch_count
-
-
-def _reflection_topology_multibounce(
-    scene: Scene, compiled: object, tx_positions: torch.Tensor, tx_power: torch.Tensor,
-    rx_positions: torch.Tensor, *, frequency_hz: float, min_depth: int, max_depth: int,
-    max_paths: int | None,
+def _reflection_topology(
+    scene: Scene, compiled: object, tx_positions: torch.Tensor, rx_positions: torch.Tensor, *,
+    min_depth: int, max_depth: int, discovery: str, record: ReflectionDiscoveryRecord | None,
 ) -> tuple[dict[str, torch.Tensor], int, int]:
-    """Multi-bounce reflection topology for every transmitter and receiver.
+    """Reflection topology of depths ``min_depth..max_depth`` for every transmitter and receiver.
 
     The rows carry EPC geometry and path length only; the field stage evaluates their fields.
     """
@@ -613,34 +719,28 @@ def _reflection_topology_multibounce(
     if not scene.structures or tx_positions.numel() == 0 or rx_positions.numel() == 0:
         return _empty_reflection_block(device), 0, 0
     if not rayd.available:
-        raise RuntimeError(
-            "deterministic multibounce reflection requires RayD native scene capability"
-        )
+        raise RuntimeError("deterministic reflection requires RayD native scene capability")
     faces, normals, tri_a = _reflection_geometry_tables(compiled, device)
     if int(faces.shape[0]) == 0 or max_depth < min_depth:
         return _empty_reflection_block(device), 0, 0
 
     face_material_id = face_material_id_table(compiled, device=device)
-    # Coplanar plane groups carry the specular semantics (dedup, adjacency,
-    # visibility-ignore scope). When the exhaustive plane-sequence space fits
-    # the planning guard, enumerate it exactly; otherwise discover reachable
-    # plane chains by tracing rays from the transmitters and validate only
-    # those.
+    # One candidate per coplanar plane group: a wall meshed from several coplanar triangles
+    # yields one specular path, and the EPC validator resolves the containing triangle.
     groups = _cached_coplanar_face_groups(
         rayd,
         tri_a,
         normals,
         face_geometry_id_table(compiled, "face_surface_id", device=device),
     )
-    plan = prepare_reflection_multibounce_plan(
-        group_count=int(groups["group_count"]),
-        representative_faces=groups["representative_faces"].contiguous(),
-        face_group_id=groups["face_group_id"],
-        min_depth=min_depth,
-        max_depth=max_depth,
+    plane_groups = reflection_plane_groups(compiled, groups, tri_a=tri_a, normals=normals)
+    if plane_groups.group_count <= 0:
+        return _empty_reflection_block(device), 0, 0
+    plan = prepare_reflection_discovery_plan(
+        plane_groups, min_depth=min_depth, max_depth=max_depth, discovery=discovery
     )
     launch_count = 0
-    theoretical_candidate_count = 0
+    candidate_count = 0
 
     def trace_group_chains(
         tx: torch.Tensor, *, face_group_id: torch.Tensor, max_depth: int,
@@ -652,32 +752,33 @@ def _reflection_topology_multibounce(
         launch_count += 1
         return chains
 
-    def record_candidate_count(candidate_count: int) -> None:
-        nonlocal theoretical_candidate_count
-        theoretical_candidate_count += candidate_count
+    def record_candidate_count(count: int) -> None:
+        nonlocal candidate_count
+        candidate_count += count
 
     def count_epc() -> None:
         nonlocal launch_count
         launch_count += 1
 
     blocks = _reflection_blocks(
-        iter_reflection_multibounce_epc_requests(
+        iter_reflection_epc_requests(
             plan,
             tx_positions=tx_positions,
             rx_positions=rx_positions,
-            sequence_reference=tx_power.to(dtype=torch.float32).contiguous(),
             tri_a=tri_a,
             normals=normals,
             trace_group_chains=trace_group_chains,
+            record=record,
             record_candidate_count=record_candidate_count,
         ),
         rayd=rayd,
         groups=groups,
         face_material_id=face_material_id,
         on_epc=count_epc,
+        min_segment_length=reflection_min_segment_length(plane_groups),
     )
     return (
         _ensure_topology_fields(concatenate_path_blocks(blocks, device=device)),
         launch_count,
-        theoretical_candidate_count,
+        candidate_count,
     )

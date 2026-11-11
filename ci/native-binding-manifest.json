@@ -1377,22 +1377,6 @@
       "python_owners": ["witwin.channel.kernels.geometry.deterministic_face_groups"]
     },
     {
-      "name": "deterministic_face_sequence_chunk",
-      "target": "channel_deterministic_face_sequence_chunk",
-      "return_type": "torch::Tensor",
-      "doc": "Generate deterministic face sequence chunks with native CUDA.",
-      "parameters": [
-        ["reference", "torch::Tensor", null],
-        ["face_count", "int64_t", null],
-        ["depth", "int64_t", null],
-        ["start", "int64_t", null],
-        ["end", "int64_t", null],
-        ["adjacent_distinct", "bool", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.topology.deterministic_face_sequence_chunk"]
-    },
-    {
       "name": "deterministic_field_from_power_phase",
       "target": "channel_deterministic_field_from_power_phase",
       "return_type": "pybind11::dict",
@@ -1465,21 +1449,6 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.topology.deterministic_los_topology_block"]
-    },
-    {
-      "name": "deterministic_mapped_face_sequence_chunk",
-      "target": "channel_deterministic_mapped_face_sequence_chunk",
-      "return_type": "torch::Tensor",
-      "doc": "Generate mapped deterministic face sequence chunks with native CUDA.",
-      "parameters": [
-        ["face_ids", "torch::Tensor", null],
-        ["depth", "int64_t", null],
-        ["start", "int64_t", null],
-        ["end", "int64_t", null],
-        ["adjacent_distinct", "bool", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.topology.deterministic_mapped_face_sequence_chunk"]
     },
     {
       "name": "deterministic_normalize_vec3",
@@ -1572,6 +1541,8 @@
         ["rx_positions", "torch::Tensor", null],
         ["sequences", "torch::Tensor", null],
         ["sequence_tx", "torch::Tensor", null],
+        ["candidate_sequence", "torch::Tensor", null],
+        ["candidate_receiver", "torch::Tensor", null],
         ["tri_a", "torch::Tensor", null],
         ["normals", "torch::Tensor", null],
         ["candidate_start", "int64_t", null],
@@ -4481,7 +4452,8 @@
         ["surface_group_size", "torch::Tensor", null],
         ["surface_group_members", "torch::Tensor", null],
         ["max_bounces", "int64_t", null],
-        ["visibility_ignore_mode", "int64_t", null]
+        ["visibility_ignore_mode", "int64_t", null],
+        ["min_segment_length", "double", null]
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.geometry._RaydReflectionEpcPathsAdFunction", "witwin.channel.kernels.geometry.rayd_reflection_epc_paths_forward"]
@@ -4788,6 +4760,67 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.geometry.rayd_visibility_forward"]
+    },
+    {
+      "name": "reflection_group_tables",
+      "target": "channel_reflection_group_tables",
+      "return_type": "pybind11::dict",
+      "doc": "Build reflection plane-group plane and bound tables with native CUDA.",
+      "parameters": [
+        ["vertices", "torch::Tensor", null],
+        ["faces", "torch::Tensor", null],
+        ["face_group_id", "torch::Tensor", null],
+        ["representative_faces", "torch::Tensor", null],
+        ["tri_a", "torch::Tensor", null],
+        ["normals", "torch::Tensor", null],
+        ["tolerance", "double", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.topology.reflection_group_tables"]
+    },
+    {
+      "name": "reflection_image_tree_expand",
+      "target": "channel_reflection_image_tree_expand",
+      "return_type": "pybind11::dict",
+      "doc": "Expand reflection image-tree nodes by one plane group with native CUDA.",
+      "parameters": [
+        ["node_tx", "torch::Tensor", null],
+        ["node_sequences", "torch::Tensor", null],
+        ["node_images", "torch::Tensor", null],
+        ["plane_point", "torch::Tensor", null],
+        ["plane_normal", "torch::Tensor", null],
+        ["bounds", "torch::Tensor", null],
+        ["occupancy", "torch::Tensor", null],
+        ["node_start", "int64_t", null],
+        ["node_end", "int64_t", null],
+        ["tolerance", "double", null],
+        ["prune", "bool", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.topology.reflection_image_tree_expand"]
+    },
+    {
+      "name": "reflection_receiver_candidates",
+      "target": "channel_reflection_receiver_candidates",
+      "return_type": "pybind11::dict",
+      "doc": "Select reflection sequence and receiver candidates with native CUDA.",
+      "parameters": [
+        ["tx_positions", "torch::Tensor", null],
+        ["rx_positions", "torch::Tensor", null],
+        ["sequences", "torch::Tensor", null],
+        ["sequence_tx", "torch::Tensor", null],
+        ["plane_point", "torch::Tensor", null],
+        ["plane_normal", "torch::Tensor", null],
+        ["bounds", "torch::Tensor", null],
+        ["occupancy", "torch::Tensor", null],
+        ["sequence_start", "int64_t", null],
+        ["sequence_end", "int64_t", null],
+        ["box_tolerance", "double", null],
+        ["segment_tolerance", "double", null],
+        ["min_segment_length", "double", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.topology.reflection_receiver_candidates"]
     },
     {
       "name": "runtime_probe",

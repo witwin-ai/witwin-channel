@@ -584,6 +584,7 @@ Python_add_library(
     native/channel/rayd/reflection.cpp
     native/channel/rayd/diffraction.cpp
     native/channel/kernels/paths.cu
+    native/channel/kernels/discovery.cu
     native/channel/kernels/evaluated_paths.cu
     native/channel/kernels/deterministic.cu
     native/channel/kernels/fields.cu
