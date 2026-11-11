@@ -8,7 +8,6 @@ from __future__ import annotations
 import argparse
 import ast
 from dataclasses import asdict, dataclass, replace
-import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -18,11 +17,18 @@ PACKAGE = "witwin.channel"
 DEFAULT_PACKAGE_PATH = Path("witwin/channel")
 DEFAULT_ALLOWLIST_PATH = Path("ci/import_graph_allowlist.json")
 
-# This digest locks the exact baseline debt entries. Removing an active
-# allowance is valid, but adding or relocating one requires an intentional
-# baseline update. The current baseline contains solver-001 and mc-enum-001.
-FROZEN_BASELINE_DIGEST = (
-    "843b4d13686db168c791034e6af432c261cddbd0ae95a1d51480c0bdcd55dddf"
+# The debt universe: every (rule, source, target) edge the allowlist may ever name. Entries are
+# matched by file, rule and canonical module edge, never by line, so moving or removing other
+# imports in the file changes nothing. The allowlist may drop an entry; adding one, or
+# pointing an entry at another edge, needs a change here.
+FROZEN_DEBT_UNIVERSE = frozenset(
+    {
+        (
+            "mc_enumerated_dependency",
+            "witwin.channel.montecarlo.bdpt",
+            "witwin.channel.propagation.enumerated",
+        ),
+    }
 )
 
 _DEBT_GROUP_BY_RULE = {
@@ -569,23 +575,41 @@ def scan_package(package_root: Path) -> list[Violation]:
     return sorted({violation for edge in edges for violation in classify_edge(edge)})
 
 
-def _entry_key(entry: dict[str, Any]) -> tuple[str, int, int, str, str, str]:
+DebtKey = tuple[str, str, str, str]
+
+
+def _entry_key(entry: dict[str, Any]) -> DebtKey:
     return (
         str(entry["path"]),
-        int(entry["line"]),
-        int(entry["column"]),
         str(entry["rule"]),
         str(entry["source"]),
         str(entry["target"]),
     )
 
 
-def _baseline_digest(debts: dict[str, Any]) -> str:
-    baseline = {name: group["baseline"] for name, group in sorted(debts.items())}
-    canonical = json.dumps(
-        baseline, sort_keys=True, separators=(",", ":"), ensure_ascii=True
-    ).encode("utf-8")
-    return hashlib.sha256(canonical).hexdigest()
+def _violation_key(violation: Violation) -> DebtKey:
+    return (violation.path, violation.rule, violation.source, violation.target)
+
+
+def _universe_issues(debts: dict[str, Any]) -> list[str]:
+    issues = []
+    for name, group in sorted(debts.items()):
+        entries = group.get("baseline", []) if isinstance(group, dict) else []
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            if "line" in entry or "column" in entry:
+                issues.append(
+                    f"debt group {name!r} entry {entry.get('id')!r} pins a line or column; "
+                    "entries name a file and a module edge only"
+                )
+            edge = (str(entry.get("rule")), str(entry.get("source")), str(entry.get("target")))
+            if edge not in FROZEN_DEBT_UNIVERSE:
+                issues.append(
+                    f"frozen import debt universe changed: {name!r} entry {entry.get('id')!r} "
+                    f"names {edge}, which is not in FROZEN_DEBT_UNIVERSE"
+                )
+    return issues
 
 
 def load_allowlist(path: Path) -> dict[str, Any]:
@@ -601,7 +625,7 @@ def load_allowlist(path: Path) -> dict[str, Any]:
 def _partition_violations(
     violations: list[Violation], debt_names: set[str]
 ) -> tuple[
-    dict[str, set[tuple[str, int, int, str, str, str]]],
+    dict[str, set[DebtKey]],
     list[Violation],
     list[str],
 ]:
@@ -615,13 +639,11 @@ def _partition_violations(
         elif group not in actual_by_group:
             issues.append(f"allowlist is missing debt group {group!r}")
         else:
-            actual_by_group[group].add(violation.key())
+            actual_by_group[group].add(_violation_key(violation))
     return actual_by_group, hard_violations, issues
 
 
-def _check_debt_group(
-    name: str, group: object, actual: set[tuple[str, int, int, str, str, str]],
-) -> list[str]:
+def _check_debt_group(name: str, group: object, actual: set[DebtKey]) -> list[str]:
     if not isinstance(group, dict):
         return [f"debt group {name!r} must be an object"]
     baseline_entries = group.get("baseline")
@@ -657,11 +679,11 @@ def _check_debt_group(
         if entry_id in baseline_by_id
     }
     issues.extend(
-        f"unallowlisted {name} violation: {_format_key(key)}"
+        f"unallowlisted {name} violation: {_format_debt(key)}"
         for key in sorted(actual - allowed)
     )
     issues.extend(
-        f"stale {name} allowance: {_format_key(key)}"
+        f"stale {name} allowance: {_format_debt(key)}"
         for key in sorted(allowed - actual)
     )
     return issues
@@ -669,13 +691,7 @@ def _check_debt_group(
 
 def check_allowlist(violations: list[Violation], allowlist: dict[str, Any]) -> list[str]:
     debts = allowlist["debts"]
-    issues: list[str] = []
-    digest = _baseline_digest(debts)
-    if digest != FROZEN_BASELINE_DIGEST:
-        issues.append(
-            "frozen import debt universe changed: "
-            f"expected {FROZEN_BASELINE_DIGEST}, got {digest}"
-        )
+    issues = _universe_issues(debts)
     actual_by_group, hard_violations, partition_issues = _partition_violations(
         violations, set(debts)
     )
@@ -688,6 +704,11 @@ def check_allowlist(violations: list[Violation], allowlist: dict[str, Any]) -> l
         for violation in hard_violations
     )
     return issues
+
+
+def _format_debt(key: DebtKey) -> str:
+    path, rule, source, target = key
+    return f"{path}: [{rule}] {source} -> {target}"
 
 
 def _format_key(key: tuple[str, int, int, str, str, str]) -> str:

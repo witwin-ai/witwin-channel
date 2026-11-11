@@ -6,17 +6,7 @@
       "allowed": []
     },
     "solver_to_solver": {
-      "baseline": [
-        {
-          "id": "solver-001",
-          "path": "witwin/channel/montecarlo/bdpt/solver.py",
-          "line": 27,
-          "column": 0,
-          "rule": "solver_to_solver",
-          "source": "witwin.channel.montecarlo.bdpt.solver",
-          "target": "witwin.channel.path"
-        }
-      ],
+      "baseline": [],
       "allowed": []
     },
     "mc_enumerated_dependency": {
@@ -24,8 +14,6 @@
         {
           "id": "mc-enum-001",
           "path": "witwin/channel/montecarlo/bdpt.py",
-          "line": 99,
-          "column": 0,
           "rule": "mc_enumerated_dependency",
           "source": "witwin.channel.montecarlo.bdpt",
           "target": "witwin.channel.propagation.enumerated",
