@@ -242,6 +242,19 @@ def validate_vocabulary(name: str, value: str, allowed: Iterable[str]) -> None:
         raise ValueError(f"{name} must be one of {legal}, got {value!r}")
 
 
+# Reflection candidate sources of the enumerated solvers. "auto" and "exhaustive" are complete
+# for every requested depth; "rays" (ray discovery) is never complete.
+DISCOVERY_MODES = ("auto", "exhaustive", "rays")
+
+
+def discovery_metadata(requested: str, record: dict[str, object] | None) -> dict[str, object]:
+    """The ``discovery`` result block: requested source, source per depth, and completeness."""
+
+    if record is None:
+        return {"requested": requested, "sources": {}, "complete": True}
+    return dict(record)
+
+
 def validate_max_depth(max_depth: int) -> None:
     """Validate the interaction-depth budget shared by all four solvers."""
 

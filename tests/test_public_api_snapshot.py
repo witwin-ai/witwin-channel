@@ -51,3 +51,19 @@ def test_curated_public_api_matches_frozen_snapshot():
     assert expected["schema_version"] == 1
     assert len(public_modules) == len(set(public_modules)) == 8
     assert _current_snapshot(public_modules) == expected
+
+def test_dataclass_contracts_include_inherited_fields():
+    """A field added to a shared base class must change every derived Config contract."""
+
+    manifest = api_manifest(ROOT, ["witwin.channel.path", "witwin.channel.deterministic"])
+    fields = {
+        module["module"]: [field["name"] for field in contract["fields"]]
+        for module in manifest["modules"]
+        for contract in module["objects"]
+        if contract["name"] == "Config"
+    }
+    assert fields["witwin.channel.path"][:2] == ["max_depth", "components"]
+    assert "discovery" in fields["witwin.channel.path"]
+    assert fields["witwin.channel.deterministic"][: len(fields["witwin.channel.path"])] == (
+        fields["witwin.channel.path"]
+    )

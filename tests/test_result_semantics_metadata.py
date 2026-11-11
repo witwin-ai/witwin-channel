@@ -30,9 +30,11 @@ def test_estimator_metadata_validates_its_vocabulary():
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="solves need CUDA")
 @pytest.mark.parametrize("solver,config,expected", [
-    ("path", {}, ("enumerated", "point_sample", "none", None)),
-    ("deterministic", {}, ("enumerated", "point_sample", "coherent", None)),
-    ("deterministic", {"coherent": False}, ("enumerated", "point_sample", "incoherent", None)),
+    ("path", {}, ("enumerated", "point_sample", "none", True)),
+    ("deterministic", {}, ("enumerated", "point_sample", "coherent", True)),
+    ("deterministic", {"coherent": False}, ("enumerated", "point_sample", "incoherent", True)),
+    ("path", {"discovery": "rays"}, ("enumerated", "point_sample", "none", False)),
+    ("deterministic", {"discovery": "rays"}, ("enumerated", "point_sample", "coherent", False)),
     ("montecarlo.basic", {"samples": 256}, ("sampled", "cell_average", "incoherent", False)),
     ("montecarlo.bdpt", {"samples": 64}, ("sampled", "point_sample", "incoherent", False)),
     ("montecarlo.bdpt", {"samples": 64, "coherent": True},
@@ -41,11 +43,14 @@ def test_estimator_metadata_validates_its_vocabulary():
 def test_every_solver_publishes_result_semantics(solver, config, expected):
     import importlib
 
-    from tests.support.scenes import empty_space_los_scene
+    from tests.support.scenes import same_side_wall_reflection_scene
 
     module = importlib.import_module(f"witwin.channel.{solver}")
     result = module.solve(
-        empty_space_los_scene(), module.Config(components={"los"}, **config),
+        same_side_wall_reflection_scene(),
+        module.Config(components={"los", "reflection"}, **config),
         reference_frequency_hz=3.0e9,
     )
     assert tuple(result.metadata[key] for key in _KEYS) == expected
+    if expected[0] == "enumerated":
+        assert result.metadata["complete"] is result.metadata["discovery"]["complete"]

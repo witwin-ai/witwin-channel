@@ -22,14 +22,17 @@ Values in 0.6.0:
 
 | Solver | estimator | quantity | combine | complete |
 | --- | --- | --- | --- | --- |
-| `path` | enumerated | point_sample | none | `None` |
-| `deterministic` | enumerated | point_sample | coherent / incoherent (`Config.coherent`) | `None` |
+| `path` | enumerated | point_sample | none | from discovery |
+| `deterministic` | enumerated | point_sample | coherent / incoherent (`Config.coherent`) | from discovery |
 | `montecarlo.basic` | sampled | cell_average | incoherent | `False` |
 | `montecarlo.bdpt` | sampled | point_sample | coherent / incoherent (`Config.coherent`) | `False` |
 
-`complete` is `None` for the enumerated solvers until the discovery stage
-publishes it; the enumerated engine's `discovery=` option sets it in the same
-key. MC Basic is labelled `cell_average` because its reflection, diffraction and
+For `path` and `deterministic`, `complete` is the discovery stage's per-depth
+result (`metadata["discovery"]["complete"]`: true only when every reflection depth
+came from a complete source, so `discovery="rays"` gives `False`); the solver
+publishes it once, through the helper, next to the `discovery` block. The
+propagation consumer has no result metadata dictionary and does not publish these
+keys; adding them is a consumer contract change. MC Basic is labelled `cell_average` because its reflection, diffraction and
 scattering estimators deposit over the cell (or a point receiver's capture
 sphere); its LoS and transmission components are evaluated at the cell centre
 (the MC consistency gate checks them against the deterministic cell centres to

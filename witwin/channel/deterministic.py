@@ -9,7 +9,11 @@ from dataclasses import dataclass
 
 from typing import ClassVar
 
-from witwin.channel.components import require_config_type, validate_vocabulary
+from witwin.channel.components import (
+    discovery_metadata,
+    require_config_type,
+    validate_vocabulary,
+)
 
 from typing import Any
 
@@ -582,6 +586,7 @@ def _metadata(
     component_counts: dict[str, int], launch_count: int, ad_companion_launches: int = 0,
     ad_tape_bytes: int = 0, forward_time_ms: float = 0.0, peak_memory_bytes: int = 0,
     scattering_info: dict[str, Any] | None = None, transmission_dropped_rows: int = 0,
+    reflection_discovery: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     capability = {
         "rayd_native": bool(native_info["uses_rayd_native"]),
@@ -625,6 +630,7 @@ def _metadata(
     )
     requested_config = serialize_config(config)
     effective_config = dict(requested_config)
+    discovery = discovery_metadata(config.discovery, reflection_discovery)
     metadata = {
         "max_depth": config.max_depth,
         "coherent": config.coherent,
@@ -638,7 +644,7 @@ def _metadata(
             estimator="enumerated",
             quantity="point_sample",
             combine="coherent" if config.coherent else "incoherent",
-            complete=None,
+            complete=bool(discovery["complete"]),
         ),
         "components": components,
         "counts": {
@@ -673,6 +679,7 @@ def _metadata(
         # Coupled higher-order compensator family (coupled reflection and diffraction>D/D->R + coupled double diffraction
         # D->D); mirrors the path solver's coupled_paths metadata block.
         "coupled_paths": _coupled_paths_metadata(config, component_counts),
+        "discovery": discovery,
     }
     if metadata_transmission is not None:
         metadata["transmission"] = metadata_transmission
@@ -804,6 +811,7 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
         peak_memory_bytes=peak_memory_bytes,
         scattering_info=scattering_info,
         transmission_dropped_rows=transmission_dropped_rows(sidecars),
+        reflection_discovery=sidecars.execution.reflection_discovery,
     )
     diagnostics = None
     if config.diagnostics:

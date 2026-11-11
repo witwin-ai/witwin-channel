@@ -66,6 +66,76 @@ struct ScatterTables {
     const int* dims;
 };
 
+// Forward-mode tangents of one wavefront pass: input tangents of the
+// differentiable leaves (null pointers are zero tangents) and the per-sample
+// tangent state of one chunk, laid out like State.
+struct Tangent {
+    const float* face_eps_r;
+    const float* face_sigma_e;
+    const float* face_gain;
+    const float* face_thickness;
+    const float* layer_thickness_m;
+    const float* layer_eps_r;
+    const float* layer_sigma_e;
+    const float* f_te;
+    const float* f_tm;
+    const float* tx_power;
+    float frequency;
+    float* field_real;
+    float* field_imag;
+    float* carrier;
+    float* nee_p_te;
+    float* nee_p_tm;
+};
+
+// Event codes of the replay tape.
+constexpr uint8_t kTapeNone = 0;
+constexpr uint8_t kTapeReflect = 1;
+constexpr uint8_t kTapeTransmit = 2;
+constexpr uint8_t kTapeScatter = 3;
+// Flag: the subpath had scattered before this event (the carrier is live).
+constexpr uint8_t kTapeCarried = 8;
+// Scatter record lanes: wi_local[3], wo_local[3], s[3], p[3], p_te, p_tm.
+constexpr int kTapeScatterLanes = 14;
+
+// Per-bounce replay tape of one chunk for the reverse pass. Slot (bounce b,
+// sample i) is b * capacity + i. The step kernel records each event's incoming
+// state; the connect kernel adds the cotangents of the state after the event
+// (field, for mixed connections) and of the scatter vertex powers (p_te, p_tm).
+struct Tape {
+    int64_t capacity;
+    uint8_t* code;
+    int* prim;
+    float* direction;
+    float* normal;
+    float* field_real;
+    float* field_imag;
+    float* carrier;
+    float* scale;
+    float* scatter;
+    float* g_field_real;
+    float* g_field_imag;
+    float* g_p;
+};
+
+// Gradient accumulators of the reverse pass (double, zero-initialized).
+struct Gradients {
+    double* face_eps_r;
+    double* face_sigma_e;
+    double* face_gain;
+    double* face_thickness;
+    double* layer_thickness_m;
+    double* layer_eps_r;
+    double* layer_sigma_e;
+    double* f_te;
+    double* f_tm;
+    double* tx_power;
+    double* frequency;
+    // Upstream cotangents of the [tx, rx] transmission and scattering matrices.
+    const float* grad_transmission;
+    const float* grad_scattering;
+};
+
 #if defined(__CUDACC__)
 
 struct TableView {

@@ -711,6 +711,35 @@ def api_manifest(repo: Path, public_modules: Sequence[str]) -> dict[str, object]
         indices[module] = _module_index(module, path, tree)
         class_module_overrides[module] = _class_module_overrides(tree)
 
+    def resolve_class(module: str, name: str) -> tuple[str, ast.ClassDef] | None:
+        if module not in indices:
+            return None
+        definitions, imports = indices[module]
+        if isinstance(definitions.get(name), ast.ClassDef):
+            return module, definitions[name]  # type: ignore[return-value]
+        if name in imports and imports[name][1] is not None:
+            target_module, target_name = imports[name]
+            return resolve_class(target_module, target_name)  # type: ignore[arg-type]
+        return None
+
+    def dataclass_fields_with_bases(module: str, node: ast.ClassDef) -> list[dict[str, object]]:
+        """Dataclass fields in construction order: inherited repository fields first."""
+
+        fields: list[dict[str, object]] = []
+        for base in node.bases:
+            resolved = resolve_class(module, ast.unparse(base))
+            if resolved is not None:
+                fields.extend(dataclass_fields_with_bases(*resolved))
+        for own in _dataclass_fields(node):
+            index = next(
+                (i for i, field in enumerate(fields) if field["name"] == own["name"]), None
+            )
+            if index is None:
+                fields.append(own)
+            else:
+                fields[index] = own
+        return fields
+
     def describe(module: str, name: str, seen: set[tuple[str, str]]) -> dict[str, object]:
         key = (module, name)
         if key in seen:
@@ -721,6 +750,8 @@ def api_manifest(repo: Path, public_modules: Sequence[str]) -> dict[str, object]
         definitions, imports = indices[module]
         if name in definitions:
             description = _describe_definition(module, definitions[name])
+            if description.get("dataclass"):
+                description["fields"] = dataclass_fields_with_bases(module, definitions[name])
             if isinstance(definitions[name], ast.ClassDef) and (
                 compatibility_module := class_module_overrides[module].get(name)
             ):

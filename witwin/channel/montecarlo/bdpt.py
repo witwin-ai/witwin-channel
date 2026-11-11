@@ -74,9 +74,9 @@ from witwin.channel.kernels.montecarlo import (
     bdpt_subpath_intersection_inputs,
     bdpt_transmitted_light_subpath_state,
     bdpt_transmitter_tensors, bdpt_wavefront_transmission, bdpt_scatter_table_stack,
-    bdpt_zero_matrix,
+    BDPT_WAVEFRONT_GRADIENTS, bdpt_wavefront_backward, bdpt_wavefront_jvp, bdpt_zero_matrix,
 )
-from witwin.channel.materials import face_material_field_bundle
+from witwin.channel.materials import face_material_field_bundle, has_multilayer_material
 from witwin.channel.interactions.scattering import (
     MASK_SCATTERING,
     local_frames,
@@ -3753,10 +3753,10 @@ def _wavefront_eligible(config: Config, runtimes: dict[int, Any]) -> bool:
     event-composed sampler with the same native counter-based random numbers.
     """
 
-    return config.ad_mode == "none"
+    return True
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass
 class _Wavefront:
     """Arguments of one solve's fused wavefront calls."""
 
@@ -3767,12 +3767,16 @@ class _Wavefront:
     materials: dict[str, torch.Tensor]
     runtimes: dict[int, Any]
     emit_mixed: bool
+    scatter_stack: dict[str, torch.Tensor] | None = None
+    counts: torch.Tensor | None = None
 
-    def run(
-        self, base: dict[str, torch.Tensor], rows_capacity: int | None = None,
-    ) -> dict[str, Any]:
+    def __post_init__(self) -> None:
+        if self.runtimes:
+            self.scatter_stack = bdpt_scatter_table_stack(self.runtimes, self.materials)
+
+    def positional(self, first: torch.Tensor, second: torch.Tensor) -> tuple[Any, ...]:
         workspace = self.workspace
-        return bdpt_wavefront_transmission(  # type: ignore[no-any-return]
+        return (
             self.prep.rayd,
             workspace.tx_reference,
             workspace.tx_power,
@@ -3780,24 +3784,236 @@ class _Wavefront:
             workspace.rx_positions,
             workspace.rx_polarization,
             self.materials,
-            base["transmission"],
-            base["scattering"],
-            scatter=(
-                bdpt_scatter_table_stack(self.runtimes, self.materials) if self.runtimes else None
-            ),
-            frequency_hz=_host_frequency(self.scene),
-            samples=self.prep.native_samples,
-            max_depth=self.prep.native_max_depth,
-            seed=int(self.config.seed),
-            mis_mode=_bdpt_mis_mode_id(self.config.mis),
-            beta=self.config.power_heuristic_beta,
-            emit_mixed=self.emit_mixed,
-            max_scattering_order=int(self.config.max_scattering_order),
-            scene_diagonal=scene_diagonal_m(self.scene) if self.runtimes else 0.0,
-            chunk_samples=_WAVEFRONT_CHUNK_SAMPLES,
-            pair_tile=_WAVEFRONT_PAIR_TILE,
-            rows_capacity=rows_capacity,
+            first,
+            second,
         )
+
+    def arguments(
+        self, f_te: torch.Tensor | None = None, f_tm: torch.Tensor | None = None,
+    ) -> dict[str, Any]:
+        scatter = self.scatter_stack
+        if scatter is not None and f_te is not None and f_tm is not None:
+            scatter = {**scatter, "f_te": f_te, "f_tm": f_tm}
+        return {
+            "scatter": scatter,
+            "frequency_hz": _host_frequency(self.scene),
+            "samples": self.prep.native_samples,
+            "max_depth": self.prep.native_max_depth,
+            "seed": int(self.config.seed),
+            "mis_mode": _bdpt_mis_mode_id(self.config.mis),
+            "beta": self.config.power_heuristic_beta,
+            "emit_mixed": self.emit_mixed,
+            "max_scattering_order": int(self.config.max_scattering_order),
+            "scene_diagonal": scene_diagonal_m(self.scene) if self.runtimes else 0.0,
+            "chunk_samples": _WAVEFRONT_CHUNK_SAMPLES,
+            "pair_tile": _WAVEFRONT_PAIR_TILE,
+        }
+
+    def run(
+        self, base: dict[str, torch.Tensor], rows_capacity: int | None = None,
+    ) -> dict[str, Any]:
+        return bdpt_wavefront_transmission(  # type: ignore[no-any-return]
+            *self.positional(base["transmission"], base["scattering"]),
+            rows_capacity=rows_capacity, **self.arguments(),
+        )
+
+
+# Differentiable leaves of the wavefront, in BDPT_WAVEFRONT_GRADIENTS order:
+# (gradient name, material bundle field or None for the table / power /
+# frequency leaves).
+_WAVEFRONT_MATERIAL_LEAVES = (
+    ("face_eps_r", "eps_r"),
+    ("face_sigma_e", "sigma_e"),
+    ("face_gain", "gain"),
+    ("face_thickness", "thickness"),
+    ("layer_thickness_m", "layer_thickness_m"),
+    ("layer_eps_r", "layer_eps_r"),
+    ("layer_sigma_e", "layer_sigma_e"),
+)
+# The reverse pass replays the wavefront in chunks of this many samples (its
+# per-bounce tape is held for one chunk at a time).
+_WAVEFRONT_AD_CHUNK_SAMPLES = 1 << 16
+
+
+def _reject_frozen_wavefront_leaves(materials: dict[str, torch.Tensor]) -> None:
+    for name in ("mu_r", "layer_mu_r"):
+        value = materials[name]
+        if value.requires_grad or torch.autograd.forward_ad.unpack_dual(value).tangent is not None:
+            raise NotImplementedError(
+                f"witwin.channel.montecarlo.bdpt does not differentiate {name}: the "
+                "permeability is a constant of the fixed-topology derivative; detach it"
+            )
+
+
+class _BdptWavefrontAdFunction(torch.autograd.Function):
+    """Fixed-topology derivative of the fused wavefront estimate.
+
+    Inputs: the wavefront runner, the base transmission / scattering matrices,
+    then the leaves of ``BDPT_WAVEFRONT_GRADIENTS`` (``None`` when absent).
+    Outputs: base plus the sampled estimate (or the base alone when the estimate
+    is already in the base as accumulated rows). Hits, event choices, visibility,
+    lobe densities and MIS weights are frozen; the tangent comes from one native
+    forward-mode pass, the gradient from one native replay-and-reverse pass.
+    """
+
+    @staticmethod
+    def forward(runner, base_transmission, base_scattering, *leaves):  # type: ignore[no-untyped-def]
+        return runner.forward(base_transmission, base_scattering)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):  # type: ignore[no-untyped-def]
+        ctx.set_materialize_grads(False)
+        ctx.runner = inputs[0]
+
+    @staticmethod
+    @_ad_first_order_only
+    def backward(ctx, grad_transmission, grad_scattering):  # type: ignore[no-untyped-def]
+        leaf_needs = ctx.needs_input_grad[3:]
+        needs = tuple(
+            name for name, need in zip(BDPT_WAVEFRONT_GRADIENTS, leaf_needs, strict=True) if need
+        )
+        grads: dict[str, torch.Tensor] = {}
+        if needs and (grad_transmission is not None or grad_scattering is not None):
+            grads = ctx.runner.backward(grad_transmission, grad_scattering, needs)
+        leaf_grads = tuple(grads.get(name) for name in BDPT_WAVEFRONT_GRADIENTS)
+        return (None, grad_transmission, grad_scattering, *ctx.runner.cast_grads(leaf_grads))
+
+    @staticmethod
+    def jvp(ctx, _t_runner, t_base_transmission, t_base_scattering, *_t_leaves):  # type: ignore[no-untyped-def]
+        return ctx.runner.tangents(t_base_transmission, t_base_scattering)
+
+
+@dataclass
+class _WavefrontAdRunner:
+    """Native passes behind :class:`_BdptWavefrontAdFunction` for one solve.
+
+    Under forward AD the single native pass computes primal and tangent
+    together; ``leaf_tangents`` holds the unpacked leaf tangents.
+    """
+
+    wavefront: _Wavefront
+    leaves: tuple[torch.Tensor | None, ...]
+    include_estimate: bool
+    leaf_tangents: dict[str, object] | None = None
+    tangent_out: tuple[torch.Tensor, torch.Tensor] | None = None
+
+    def _arguments(self) -> dict[str, Any]:
+        return self.wavefront.arguments(self.leaves[7], self.leaves[8])
+
+    def forward(self, base_transmission: torch.Tensor, base_scattering: torch.Tensor):  # type: ignore[no-untyped-def]
+        wavefront = self.wavefront
+        if self.leaf_tangents is not None:
+            tangents = dict(self.leaf_tangents)
+            tangents["base_transmission"] = torch.zeros_like(base_transmission)
+            tangents["base_scattering"] = torch.zeros_like(base_scattering)
+            out = bdpt_wavefront_jvp(
+                *wavefront.positional(base_transmission, base_scattering),
+                tangents=tangents, **self._arguments(),
+            )
+            self.tangent_out = (out["tangent_transmission"], out["tangent_scattering"])
+        elif self.include_estimate:
+            out = bdpt_wavefront_transmission(
+                *wavefront.positional(base_transmission, base_scattering), **self._arguments()
+            )
+        else:
+            return base_transmission.clone(), base_scattering.clone()
+        wavefront.counts = out["counts"]
+        if not self.include_estimate:
+            return base_transmission.clone(), base_scattering.clone()
+        return out["transmission"], out["scattering"]
+
+    def tangents(self, t_base_transmission, t_base_scattering):  # type: ignore[no-untyped-def]
+        if self.tangent_out is None:
+            raise RuntimeError("BDPT wavefront tangents need the forward-mode pass")
+        sampled = self.tangent_out
+        out: list[torch.Tensor] = []
+        for base, value in zip((t_base_transmission, t_base_scattering), sampled, strict=True):
+            base = _ad_native_tangent_or_none(base)
+            out.append(value if base is None else base + value)
+        return tuple(out)
+
+    def backward(self, grad_transmission, grad_scattering, needs):  # type: ignore[no-untyped-def]
+        wavefront = self.wavefront
+        reference = wavefront.workspace.tx_reference
+        shape = (wavefront.workspace.tx_count, wavefront.workspace.rx_count)
+        zeros = torch.zeros(shape, device=reference.device, dtype=torch.float32)
+        arguments = self._arguments()
+        arguments["chunk_samples"] = _WAVEFRONT_AD_CHUNK_SAMPLES
+        return bdpt_wavefront_backward(
+            *wavefront.positional(
+                zeros if grad_transmission is None else grad_transmission.to(torch.float32),
+                zeros if grad_scattering is None else grad_scattering.to(torch.float32),
+            ),
+            needs=needs, **arguments,
+        )
+
+    def cast_grads(self, grads):  # type: ignore[no-untyped-def]
+        out: list[torch.Tensor | None] = []
+        for name, leaf, grad in zip(BDPT_WAVEFRONT_GRADIENTS, self.leaves, grads, strict=True):
+            if grad is None or leaf is None:
+                out.append(None)
+            elif name == "frequency":
+                out.append(_ad_frequency_grad(grad, (leaf.dtype, leaf.device)))
+            else:
+                out.append(grad.to(dtype=leaf.dtype))
+        return tuple(out)
+
+
+def _wavefront_leaf_tangents(leaves: tuple[torch.Tensor | None, ...]) -> dict[str, object]:
+    """Forward-mode tangents of the wavefront leaves (absent tangents are omitted)."""
+
+    leaf_tangents: dict[str, object] = {}
+    for name, leaf in zip(BDPT_WAVEFRONT_GRADIENTS, leaves, strict=True):
+        if leaf is None:
+            continue
+        tangent = _ad_native_tangent_or_none(torch.autograd.forward_ad.unpack_dual(leaf).tangent)
+        if tangent is None:
+            continue
+        if name == "frequency":
+            leaf_tangents[name] = _ad_frequency_tangent(tangent)
+        else:
+            leaf_tangents[name] = tangent.to(torch.float32)
+    # The native pass takes both table tangents or neither.
+    for name, other in (("f_te", 8), ("f_tm", 7)):
+        partner = leaves[other]
+        if name in leaf_tangents and BDPT_WAVEFRONT_GRADIENTS[other] not in leaf_tangents:
+            assert partner is not None
+            leaf_tangents[BDPT_WAVEFRONT_GRADIENTS[other]] = torch.zeros(
+                partner.shape, device=partner.device, dtype=torch.float32
+            )
+    return leaf_tangents
+
+
+def _wavefront_ad_estimate(
+    wavefront: _Wavefront, base: dict[str, torch.Tensor], *, include_estimate: bool,
+    ledger: AdLaunchLedger | None = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Differentiable wavefront estimate of the transmission and scattering matrices."""
+
+    materials = wavefront.materials
+    _reject_frozen_wavefront_leaves(materials)
+    stack = wavefront.scatter_stack
+    frequency = wavefront.scene.frequency
+    leaves: tuple[torch.Tensor | None, ...] = (
+        *(materials[field_name] for _, field_name in _WAVEFRONT_MATERIAL_LEAVES),
+        None if stack is None else stack["f_te"],
+        None if stack is None else stack["f_tm"],
+        wavefront.workspace.tx_power,
+        frequency if isinstance(frequency, torch.Tensor) else None,
+    )
+    leaf_tangents = (
+        _wavefront_leaf_tangents(leaves) if wavefront.config.ad_mode == "jvp" else None
+    )
+    if ledger is not None:
+        ledger.add(*(leaf for leaf in leaves if leaf is not None))
+    runner = _WavefrontAdRunner(
+        wavefront=wavefront, leaves=leaves, include_estimate=include_estimate,
+        leaf_tangents=leaf_tangents,
+    )
+    transmission, scattering = _BdptWavefrontAdFunction.apply(
+        runner, base["transmission"], base["scattering"], *leaves
+    )
+    return transmission, scattering
 
 
 def _wavefront_counts(counts: torch.Tensor, *, rows_counted: bool) -> dict[str, torch.Tensor]:
@@ -3848,6 +4064,57 @@ def _composed_sampler(
     )
 
 
+class _BdptConcatAdFunction(torch.autograd.Function):
+    """Row concatenation of connection blocks that keeps the contribution graph.
+
+    The native concat packs the rows; the contribution cotangent splits back to
+    the blocks and the tangents concatenate in the same row order (structural
+    only)."""
+
+    @staticmethod
+    def forward(blocks, *contributions):  # type: ignore[no-untyped-def]
+        packed = dict(bdpt_concat_connection_samples(tuple(blocks)))
+        return packed.pop("contribution"), packed
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):  # type: ignore[no-untyped-def]
+        ctx.set_materialize_grads(False)
+        ctx.sizes = [int(value.shape[0]) for value in inputs[1:]]
+        ctx.device = inputs[1].device
+        ctx.mark_non_differentiable(*(v for v in output[1].values() if isinstance(v, torch.Tensor)))
+
+    @staticmethod
+    def backward(ctx, grad_contribution, _grad_packed):  # type: ignore[no-untyped-def]
+        if grad_contribution is None:
+            return (None, *(None for _ in ctx.sizes))
+        return (None, *torch.split(grad_contribution, ctx.sizes))
+
+    @staticmethod
+    def jvp(ctx, _t_blocks, *t_contributions):  # type: ignore[no-untyped-def]
+        parts = []
+        for size, tangent in zip(ctx.sizes, t_contributions, strict=True):
+            tangent = _ad_native_tangent_or_none(tangent)
+            parts.append(
+                tangent
+                if tangent is not None
+                else torch.zeros((size,), device=ctx.device, dtype=torch.float32)
+            )
+        return torch.cat(parts), None
+
+
+def _concat_connection_samples_ad(blocks: list[dict[str, torch.Tensor]]) -> dict[str, torch.Tensor]:
+    """Concatenated connection blocks whose contribution stays differentiable."""
+
+    detached = [
+        {name: value.detach() if name == "contribution" else value for name, value in block.items()}
+        for block in blocks
+    ]
+    contribution, packed = _BdptConcatAdFunction.apply(
+        detached, *(block["contribution"] for block in blocks)
+    )
+    return {**packed, "contribution": contribution}
+
+
 def _accumulate_blocks(
     config: Config, sample_blocks: list[dict[str, torch.Tensor]], *, prep: _SolvePrep,
     workspace: _EndpointWorkspace,
@@ -3861,11 +4128,12 @@ def _accumulate_blocks(
             )
             for component in _COMPONENT_ORDER
         }
-    estimate_samples = (
-        sample_blocks[0]
-        if len(sample_blocks) == 1
-        else bdpt_concat_connection_samples(tuple(sample_blocks))
-    )
+    if len(sample_blocks) == 1:
+        estimate_samples = sample_blocks[0]
+    elif config.ad_mode != "none":
+        estimate_samples = _concat_connection_samples_ad(sample_blocks)
+    else:
+        estimate_samples = bdpt_concat_connection_samples(tuple(sample_blocks))
     accumulated = _accumulate_connection_samples(
         config,
         estimate_samples,
@@ -3904,6 +4172,31 @@ def _enumerated_components(config: Config, prep: _SolvePrep) -> frozenset[str]:
     return frozenset(
         component for component, ok in available.items() if component in config.components and ok
     )
+
+
+def _apply_wavefront_estimate(
+    wavefront: _Wavefront, matrices: dict[str, torch.Tensor], rows_pass: dict[str, Any] | None, *,
+    ad: bool, ledger: AdLaunchLedger | None = None,
+) -> dict[str, Any]:
+    """Add the wavefront estimate to the accumulated matrices (in place).
+
+    Without a rows pass the wavefront adds its mixed-chain and scatter
+    next-event estimates without materializing rows. After a rows pass the
+    matrices already hold the estimate; under AD the wavefront companion then
+    adds only its derivative. Returns the call whose counts the metadata reads.
+    """
+
+    if rows_pass is not None and not ad:
+        return rows_pass
+    if ad:
+        matrices["transmission"], matrices["scattering"] = _wavefront_ad_estimate(
+            wavefront, matrices, include_estimate=rows_pass is None, ledger=ledger
+        )
+        return rows_pass if rows_pass is not None else {"counts": wavefront.counts}
+    sampled = wavefront.run(matrices)
+    matrices["transmission"] = sampled["transmission"]
+    matrices["scattering"] = sampled["scattering"]
+    return sampled
 
 
 def _collect_connection_samples(
@@ -4010,13 +4303,9 @@ def _collect_connection_samples(
     estimate_samples, matrices = _accumulate_blocks(
         config, sample_blocks, prep=prep, workspace=workspace
     )
-    if wavefront is not None and sampled is None:
-        # The fused wavefront adds its mixed-chain and scatter next-event estimates
-        # to the accumulated matrices without materializing rows.
-        sampled = wavefront.run(matrices)
-        matrices["transmission"] = sampled["transmission"]
-        matrices["scattering"] = sampled["scattering"]
-        launch_count += 3
+    if wavefront is not None:
+        launch_count += 3 if sampled is None else 0
+        sampled = _apply_wavefront_estimate(wavefront, matrices, sampled, ad=ad, ledger=ledger)
     if sampled is not None:
         device_counts.update(
             _wavefront_counts(sampled["counts"], rows_counted=estimate_samples is not None and rows_needed)
@@ -4364,6 +4653,13 @@ def solve(  # type: ignore[no-untyped-def]
     compiled = compile_scene(
         scene, reference_frequency_hz=reference_frequency_hz
     )
+    if "reflection" in frozenset(config.components) and has_multilayer_material(compiled):
+        # BDPT's sampled connections still use the single-slab reflection law; refuse rather than
+        # mix it with the layered law of the enumerated paths.
+        raise NotImplementedError(
+            "BDPT does not yet evaluate reflection off multilayer materials; use the "
+            "deterministic, path or Monte Carlo basic solver, or a single-layer material"
+        )
     result = _solve_pipeline(
         bind_solver_scene(compiled),
         config,

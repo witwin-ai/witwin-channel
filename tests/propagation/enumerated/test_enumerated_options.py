@@ -15,7 +15,7 @@ _SHARED = (
     "max_depth", "components", "max_paths", "max_paths_scope", "ad_mode", "coupled_paths",
     "coupled_candidate_limit", "scattering_samples_per_m2", "scattering_max_paths_per_pair",
     "scattering_power_threshold", "scattering_chain_max_depth", "scattering_chain_samples_per_m2",
-    "scattering_chain_max_rows", "isb_boundary_taper", "isb_boundary_taper_width",
+    "scattering_chain_max_rows", "isb_boundary_taper", "isb_boundary_taper_width", "discovery",
 )
 _DETERMINISTIC_TERMINAL = (
     "coherent", "return_field", "export_paths", "sort_key", "diagnostics", "scattering_coherent",
@@ -53,6 +53,8 @@ def test_shared_validation_runs_for_every_entry(config_type):
         config_type(max_depth=6, components={"reflection"})
     with pytest.raises(ValueError, match="ad_mode must be one of"):
         config_type(ad_mode="forward")
+    with pytest.raises(ValueError, match="discovery must be one of"):
+        config_type(discovery="images")
     with pytest.raises(ValueError, match="max_depth >= 2"):
         config_type(components={"reflection", "diffraction"}, coupled_paths=True)
     with pytest.raises(TypeError, match="max_diffraction_order"):

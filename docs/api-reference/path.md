@@ -34,6 +34,7 @@ Config(
     scattering_chain_max_rows: int = 256,
     isb_boundary_taper: bool = False,
     isb_boundary_taper_width: float = 0.5,
+    discovery: str = "auto",
 )
 ```
 
@@ -63,6 +64,7 @@ every field the request does not expose at its default.
 | `scattering_chain_max_rows` | Positive retained chain rows per pair. |
 | `isb_boundary_taper` | Enable the default-off ISB continuity taper. |
 | `isb_boundary_taper_width` | Fresnel-penumbra width multiplier; defaults to 0.5. |
+| `discovery` | Reflection candidate source: `"auto"` (complete image tree; a depth whose tree exceeds the cost budget, and every deeper one, uses ray discovery), `"exhaustive"` (every plane-group sequence; fails before work if it cannot fit in memory) or `"rays"` (ray discovery, never complete). `metadata["complete"]` is true only when every reflection depth came from a complete source; `metadata["discovery"]["sources"]` names the source per depth. |
 
 ```python
 config = Config(

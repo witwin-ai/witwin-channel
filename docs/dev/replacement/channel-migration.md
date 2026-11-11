@@ -862,9 +862,9 @@ the two cannot drift.
 
 `path.Config` and `deterministic.Config` now derive from one engine-owned
 dataclass, `witwin.channel.propagation.enumerated.EnumeratedOptions`, which is
-the single owner of the 15 options both entries share (`max_depth`,
+the single owner of the 16 options both entries share (`max_depth`,
 `components`, `max_paths`, `max_paths_scope`, `ad_mode`, the coupled, scattering,
-scatter-chain and ISB-taper options). Keyword construction is unchanged:
+scatter-chain and ISB-taper options, and `discovery`). Keyword construction is unchanged:
 `path.Config(max_depth=2)` and `deterministic.Config(coherent=False)` work as
 before, with the same defaults and validation.
 

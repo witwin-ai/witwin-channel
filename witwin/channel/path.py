@@ -18,6 +18,7 @@ from witwin.channel.components import (
     apply_exported_path_counts,
     component_availability_status,
     component_max_depth,
+    discovery_metadata,
     require_config_type,
 )
 from witwin.core import Scene, SceneSnapshot
@@ -1004,7 +1005,7 @@ def _metadata(
     path_native_available: bool, transmission_path_count: int = 0, scattering_path_count: int = 0,
     ad_companion_launches: int = 0, ad_tape_bytes: int = 0, forward_time_ms: float = 0.0,
     peak_memory_bytes: int = 0, scattering_info: dict[str, Any] | None = None,
-    transmission_dropped_rows: int = 0,
+    transmission_dropped_rows: int = 0, reflection_discovery: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     # diffraction AD: the real registered-companion accounting. vjp retains
     # tape and schedules its companions on the user's later backward; jvp
@@ -1060,6 +1061,7 @@ def _metadata(
         transmission_path_count=transmission_path_count,
         scattering_path_count=scattering_path_count,
     )
+    discovery = discovery_metadata(config.discovery, reflection_discovery)
     metadata = {
         "solver": "path",
         "device": "cuda",
@@ -1074,7 +1076,10 @@ def _metadata(
         "phase_convention": dict(UNIT_EXCITATION_PHASE_CONVENTION),
         "coefficient_semantics": "unit_excitation_dimensionless_receiver_projection",
         **estimator_metadata(
-            estimator="enumerated", quantity="point_sample", combine="none", complete=None
+            estimator="enumerated",
+            quantity="point_sample",
+            combine="none",
+            complete=bool(discovery["complete"]),
         ),
         "coupled_paths": {
             "requested": config.coupled_paths,
@@ -1085,6 +1090,7 @@ def _metadata(
             if config.coupled_paths
             else "not_requested",
         },
+        "discovery": discovery,
     }
     if "transmission" in config.components:
         # Endpoint-connection thin_sheet contract.
@@ -1823,6 +1829,7 @@ def _pipeline_solve_base(
         peak_memory_bytes=peak_memory_bytes,
         scattering_info=scattering_info,
         transmission_dropped_rows=transmission_dropped_rows(sidecars),
+        reflection_discovery=sidecars.execution.reflection_discovery,
     )
     tx_positions, _tx_power = transmitter_tensors(scene)
     rx_positions = receiver_positions(scene, reference=tx_positions)

@@ -60,9 +60,9 @@ accumulate JVP looped every row for every output cell (`O(cells x rows)`).
    - rows: a counting pass, the one sanctioned row-count copy, and a second
      pass that writes exactly those rows (sorted by sample, bounce, receiver)
      into the connection-sample schema for the compact export and the variance.
-   Under `jvp` / `vjp` the event-composed sampler still runs (AD companions);
-   it draws the same random numbers and returns bitwise the same primal.
-   `Result.metadata["sampler"]` names the one used.
+   It also serves `jvp` / `vjp` (decision 7). The event-composed sampler and its
+   per-event AD companions remain in the tree but are no longer dispatched.
+   `Result.metadata["sampler"]` is `"wavefront"` whenever sampled chains run.
 3. **Random numbers.** Every sampler uniform is a pure function
    `u = h(seed, stream, g, depth)` of the global sample index
    `g = tx * samples + i` (splitmix64 mixing, 24 high bits, always in
@@ -83,6 +83,25 @@ accumulate JVP looped every row for every output cell (`O(cells x rows)`).
    (`O(rows log rows)`). The power and coherent accumulate JVPs use the same
    sorted reduction (row-parallel, deterministic) instead of the per-cell row
    loop. Metadata names the kernel `sorted_segment_reduce`.
+
+7. **Fixed-topology AD on the wavefront.** Hits, event choices, visibility,
+   lobe densities, event probabilities and MIS weights are frozen.
+   `bdpt_wavefront_jvp` runs primal and tangent in one pass (tangent Jones
+   field, post-scatter carrier and scatter-vertex powers; table tangents through
+   `eval_te_tm`). `bdpt_wavefront_backward` replays the wavefront in chunks of
+   `2^16` samples with the same counter RNG and RayD queries, records each
+   event on a per-bounce tape, turns `grad[tx, rx]` into per-vertex field and
+   P_te/P_tm cotangents (receivers walked in a fixed order, no atomics on the
+   tape), and walks each sample's events backwards (adjoint of the linear Jones
+   map plus one dual per parameter; `eval_te_tm_grad` for table values). Leaf
+   gradients (face eps_r/sigma_e/gain/thickness, layer thickness/eps_r/sigma_e,
+   f_te/f_tm, tx_power, frequency) accumulate in double with atomics and are
+   cast to float once. Evidence: `tests/ad/test_bdpt_wavefront_ad.py` (primal
+   bitwise equal to `none`, same-seed and seed-mean FD, jvp/vjp duality) and
+   same-seed agreement with the event-composed `vjp` (mixed chains identical
+   directional sums; single-order scatter within 6e-6). The event-composed
+   `jvp` returned zero tangents for sampled paths and its `vjp` NaN at
+   `max_scattering_order=3`.
 
 ## Consequences
 

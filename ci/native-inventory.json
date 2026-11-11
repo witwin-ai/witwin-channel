@@ -141,7 +141,9 @@
         "bdpt_sorted_keys_kernel",
         "bdpt_sorted_power_finalize_kernel",
         "bdpt_sorted_scatter_kernel",
+        "bdpt_wavefront_cast_kernel",
         "bdpt_wavefront_connect_accumulate_kernel",
+        "bdpt_wavefront_connect_backward_kernel",
         "bdpt_wavefront_finalize_kernel",
         "bdpt_wavefront_pack_rows_kernel",
         "bdpt_wavefront_visibility_inputs_kernel"
@@ -172,10 +174,12 @@
         "bdpt_sorted_keys_kernel",
         "bdpt_sorted_power_finalize_kernel",
         "bdpt_sorted_scatter_kernel",
-        "bdpt_wavefront_connect_accumulate_kernel",
+        "bdpt_wavefront_cast_kernel",
+        "bdpt_wavefront_connect_backward_kernel",
         "bdpt_wavefront_finalize_kernel",
         "bdpt_wavefront_pack_rows_kernel",
-        "bdpt_wavefront_visibility_inputs_kernel"
+        "bdpt_wavefront_visibility_inputs_kernel",
+        "kernel"
       ],
       "host_synchronization": [
         "cudaMemcpyAsync",
@@ -191,6 +195,7 @@
         "bdpt_reflected_light_subpaths_kernel",
         "bdpt_sensor_endpoint_subpaths_kernel",
         "bdpt_transmitted_light_subpaths_kernel",
+        "bdpt_wavefront_reverse_kernel",
         "bdpt_wavefront_step_kernel",
         "reflected_subpath_backward_kernel",
         "reflected_subpath_jvp_kernel",
@@ -203,7 +208,8 @@
         "bdpt_reflected_light_subpaths_kernel",
         "bdpt_sensor_endpoint_subpaths_kernel",
         "bdpt_transmitted_light_subpaths_kernel",
-        "bdpt_wavefront_step_kernel",
+        "bdpt_wavefront_reverse_kernel",
+        "kernel",
         "reflected_subpath_backward_kernel",
         "reflected_subpath_jvp_kernel",
         "transmitted_subpath_backward_kernel",
@@ -381,6 +387,31 @@
       "device_trap": false,
       "compile_options": []
     },
+    "native/channel/kernels/discovery.cu": {
+      "kernels": [
+        "group_bounds_accumulate_kernel",
+        "group_bounds_init_kernel",
+        "group_occupancy_kernel",
+        "group_planes_kernel",
+        "image_tree_flags_kernel",
+        "image_tree_write_kernel",
+        "receiver_candidate_count_kernel",
+        "receiver_candidate_write_kernel"
+      ],
+      "launches": [
+        "group_bounds_accumulate_kernel",
+        "group_bounds_init_kernel",
+        "group_occupancy_kernel",
+        "group_planes_kernel",
+        "image_tree_flags_kernel",
+        "image_tree_write_kernel",
+        "receiver_candidate_count_kernel",
+        "receiver_candidate_write_kernel"
+      ],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
     "native/channel/kernels/evaluated_paths.cu": {
       "kernels": [
         "compact_contract_flags_kernel",
@@ -537,6 +568,13 @@
       "compile_options": [
         "--fmad=false"
       ]
+    },
+    "native/channel/kernels/layered_reflection.cuh": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
     },
     "native/channel/kernels/los.cu": {
       "kernels": [
@@ -701,7 +739,6 @@
         "deterministic_face_group_keys_kernel",
         "deterministic_face_group_members_kernel",
         "deterministic_face_group_sort_key_kernel",
-        "deterministic_face_sequence_chunk_kernel",
         "deterministic_gather_rows_kernel",
         "deterministic_los_topology_all_kernel",
         "deterministic_los_topology_compact_kernel",
@@ -740,7 +777,6 @@
         "deterministic_face_group_keys_kernel",
         "deterministic_face_group_members_kernel",
         "deterministic_face_group_sort_key_kernel",
-        "deterministic_face_sequence_chunk_kernel",
         "deterministic_gather_rows_kernel",
         "deterministic_los_topology_all_kernel",
         "deterministic_los_topology_compact_kernel",

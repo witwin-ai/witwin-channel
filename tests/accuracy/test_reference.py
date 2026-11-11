@@ -104,9 +104,6 @@ def test_two_ray_ground_reflection(accuracy, solver, pol, distance):
 
 SINGLE_SLAB = ((0.1, 5.24, 0.123, 1.0),)
 MULTI_SLAB = ((0.02, 3.0, 0.001, 1.0), (0.15, 6.5, 0.05, 1.0), (0.02, 3.0, 0.001, 1.0))
-# Reflection off a multilayer wall equals the first layer's reflection alone today.
-MULTILAYER_REFLECTION_XFAIL = pytest.mark.xfail(
-    strict=True, reason="A-1 (M0-3): multilayer reflection evaluates only the first layer")
 
 
 def _material(layers: tuple[tuple[float, float, float, float], ...]) -> PhysicalMaterial:
@@ -116,7 +113,7 @@ def _material(layers: tuple[tuple[float, float, float, float], ...]) -> Physical
 
 @pytest.mark.parametrize("layers", [
     pytest.param(SINGLE_SLAB, id="single"),
-    pytest.param(MULTI_SLAB, id="multilayer", marks=MULTILAYER_REFLECTION_XFAIL),
+    pytest.param(MULTI_SLAB, id="multilayer"),
 ])
 @pytest.mark.parametrize("pol", [VERTICAL, (0.0, 1.0, 0.0)], ids=["TE", "TM"])
 @pytest.mark.parametrize("offset", [1.0, 4.0, 15.0])

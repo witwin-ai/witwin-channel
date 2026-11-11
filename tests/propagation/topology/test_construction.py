@@ -12,9 +12,7 @@ from witwin.channel import runtime
 
 _OWNER_NAMES = (
     "deterministic_face_anchor_points",
-    "deterministic_face_sequence_chunk",
     "deterministic_los_topology_block",
-    "deterministic_mapped_face_sequence_chunk",
     "deterministic_pad_topology_sequences",
     "deterministic_reflection_epc_input_batch",
     "deterministic_repeat_range",

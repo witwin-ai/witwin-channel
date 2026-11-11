@@ -10,7 +10,7 @@ from witwin.channel.deterministic import Config, PathTable, Result, solve
 
 ## `Config`
 
-Frozen dataclass; values cannot be changed after construction. The first 15
+Frozen dataclass; values cannot be changed after construction. The first 16
 fields are the shared enumerated options, defined once and inherited by both
 `deterministic.Config` and `path.Config` (see "Shared enumerated options" in
 [`path`](path.md)); the last six are read only by the deterministic terminal
@@ -33,6 +33,7 @@ Config(
     scattering_chain_max_rows: int = 256,
     isb_boundary_taper: bool = False,
     isb_boundary_taper_width: float = 0.5,
+    discovery: str = "auto",
     coherent: bool = True,
     return_field: bool = True,
     export_paths: bool = False,
@@ -59,6 +60,7 @@ Config(
 | `scattering_chain_max_rows` | Positive per-pair retained chain-row limit. |
 | `isb_boundary_taper` | Enable the default-off ISB continuity taper. |
 | `isb_boundary_taper_width` | Fresnel-penumbra width multiplier; defaults to 0.5. |
+| `discovery` | Reflection candidate source: `"auto"` (complete image tree; a depth whose tree exceeds the cost budget, and every deeper one, uses ray discovery), `"exhaustive"` (every plane-group sequence; fails before work if it cannot fit in memory) or `"rays"` (ray discovery, never complete). `metadata["complete"]` is true only when every reflection depth came from a complete source; `metadata["discovery"]["sources"]` names the source per depth. |
 | `coherent` | Coherently combine deterministic complex-field contributions. |
 | `return_field` | Preserve complex field output. |
 | `export_paths` | Produce a compact `PathTable`. |

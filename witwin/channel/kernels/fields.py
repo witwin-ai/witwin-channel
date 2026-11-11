@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import torch
 
 from witwin.channel.materials import validate_layer_csr as _validate_layer_csr
@@ -26,6 +28,8 @@ from witwin.channel.runtime import (
 )
 
 __all__ = [
+    "ReflectionLayers",
+    "reflection_layers",
     "_CoupledRdPrepareAdFunction",
     "_FieldCoupledDdAdFunction",
     "_FieldCoupledRdAdFunction",
@@ -174,11 +178,71 @@ def field_project_complex3(
     return out
 
 
+@dataclass(frozen=True, slots=True)
+class ReflectionLayers:
+    """Per-bounce material ids (N, D) and the compiled CSR layer store of a reflection request.
+
+    ``multilayer`` records, from the host-side material store, whether any material has more than
+    one layer; such faces reflect as their whole stack.
+    """
+
+    bounce_material: torch.Tensor
+    layer_offset: torch.Tensor
+    layer_count: torch.Tensor
+    layer_thickness_m: torch.Tensor
+    layer_eps_r: torch.Tensor
+    layer_sigma_e: torch.Tensor
+    layer_mu_r: torch.Tensor
+    multilayer: bool
+
+    def native(self) -> tuple[torch.Tensor, ...]:
+        return (
+            self.bounce_material, self.layer_offset, self.layer_count, self.layer_thickness_m,
+            self.layer_eps_r, self.layer_sigma_e, self.layer_mu_r,
+        )
+
+
+def reflection_layers(
+    material: dict[str, torch.Tensor], face_id: torch.Tensor, *, multilayer: bool,
+) -> ReflectionLayers:
+    """Layer request of reflection rows hitting ``face_id`` (N, D), from the per-face material bundle."""
+
+    return ReflectionLayers(
+        bounce_material=material["material_id"][face_id].contiguous(),
+        layer_offset=material["layer_offset"],
+        layer_count=material["layer_count"],
+        layer_thickness_m=material["layer_thickness_m"],
+        layer_eps_r=material["layer_eps_r"],
+        layer_sigma_e=material["layer_sigma_e"],
+        layer_mu_r=material["layer_mu_r"],
+        multilayer=bool(multilayer),
+    )
+
+
+def _native_layers(layers: ReflectionLayers | None, like: torch.Tensor) -> tuple[torch.Tensor, ...]:
+    """Native layer arguments; without a layer request every face uses its scalar slab view."""
+
+    if layers is not None:
+        return layers.native()
+    # Never read: an empty layer store marks every face single-layer.
+    index = torch.empty(like.shape, device=like.device, dtype=torch.int32)
+    empty_i = torch.empty((0,), device=like.device, dtype=torch.int32)
+    empty_f = torch.empty((0,), device=like.device, dtype=torch.float32)
+    return (index, empty_i, empty_i, empty_f, empty_f, empty_f, empty_f)
+
+
+_MULTILAYER_MATERIAL_AD_ERROR = (
+    "material derivatives (eps_r, sigma_e, thickness) of reflection off a multilayer material are not "
+    "supported; geometry, gain and frequency derivatives are"
+)
+
+
 def field_reflection_sequence(
     source: torch.Tensor, target: torch.Tensor, interaction_positions: torch.Tensor,
     interaction_normals: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
     rx_polarization: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor,
-    gain: torch.Tensor, thickness: torch.Tensor, *, frequency_hz: float,
+    gain: torch.Tensor, thickness: torch.Tensor, *, layers: ReflectionLayers | None = None,
+    frequency_hz: float,
 ) -> dict[str, torch.Tensor]:
     for name, value in (
         ("source", source),
@@ -228,6 +292,7 @@ def field_reflection_sequence(
         mu_r,
         gain,
         thickness,
+        *_native_layers(layers, eps_r),
         float(frequency_hz),
     )
     return _validate_enumerated_field_result(
@@ -241,6 +306,7 @@ def field_reflection_sequence(
 
 def field_transport_columns(
     *arguments: torch.Tensor, depth: int, frequencies_hz: tuple[float, ...],
+    layers: ReflectionLayers | None = None,
 ) -> dict[str, torch.Tensor]:
     """Free-space (``depth == 0``) or reflection field at several carrier frequencies.
 
@@ -261,7 +327,8 @@ def field_transport_columns(
     for value in arguments:
         validate_cuda_tensor("field input", value, dtype=torch.float32, ndim=value.ndim)
     count = int(arguments[0].shape[0])
-    out = _required_native_op(name)(*arguments, list(frequencies))
+    native_layers = () if depth == 0 else _native_layers(layers, arguments[7])
+    out = _required_native_op(name)(*arguments, *native_layers, list(frequencies))
     if not isinstance(out, dict) or set(out) != {"field_vector", "path_field"}:
         raise TypeError(f"_channel.{name} returned invalid fields")
     columns = len(frequencies)
@@ -371,7 +438,9 @@ def field_coupled_rd(
     reflection_material: tuple[torch.Tensor, ...], wedge_material0: tuple[torch.Tensor, ...],
     wedge_material1: tuple[torch.Tensor, ...], edge_line_min: torch.Tensor,
     edge_line_max: torch.Tensor, *, frequency_hz: float, reverse: bool,
+    layers: ReflectionLayers | None = None,
 ) -> dict[str, torch.Tensor]:
+    """``layers.bounce_material`` has shape (N, 1): the reflection face of each row."""
     vectors = (
         source,
         target,
@@ -415,6 +484,7 @@ def field_coupled_rd(
         tx_polarization,
         rx_polarization,
         *reflection_material,
+        *_native_layers(layers, reflection_material[0].unsqueeze(1)),
         *wedge_material0,
         *wedge_material1,
         edge_line_min,
@@ -641,14 +711,17 @@ def field_reflection_sequence_backward(
     source: torch.Tensor, target: torch.Tensor, interaction_positions: torch.Tensor,
     interaction_normals: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
     rx_polarization: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor,
-    gain: torch.Tensor, thickness: torch.Tensor, *, frequency_hz: float,
-    grad_field_vector: torch.Tensor | None = None, grad_coefficient: torch.Tensor | None = None,
-    grad_path_field: torch.Tensor | None = None, grad_path_gain: torch.Tensor | None = None,
-    grad_path_length: torch.Tensor | None = None, grad_delay: torch.Tensor | None = None,
-    grad_direction: torch.Tensor | None = None, need_grad_eps_r: bool = True,
-    need_grad_sigma_e: bool = True, need_grad_gain: bool = False, need_grad_thickness: bool = True,
-    need_grad_frequency: bool = True, need_grad_geometry: bool = False,
+    gain: torch.Tensor, thickness: torch.Tensor, *, layers: ReflectionLayers | None = None,
+    frequency_hz: float, grad_field_vector: torch.Tensor | None = None,
+    grad_coefficient: torch.Tensor | None = None, grad_path_field: torch.Tensor | None = None,
+    grad_path_gain: torch.Tensor | None = None, grad_path_length: torch.Tensor | None = None,
+    grad_delay: torch.Tensor | None = None, grad_direction: torch.Tensor | None = None,
+    need_grad_eps_r: bool = True, need_grad_sigma_e: bool = True, need_grad_gain: bool = False,
+    need_grad_thickness: bool = True, need_grad_frequency: bool = True,
+    need_grad_geometry: bool = False,
 ) -> dict[str, torch.Tensor | None]:
+    if layers is not None and layers.multilayer and (need_grad_eps_r or need_grad_sigma_e or need_grad_thickness):
+        raise NotImplementedError(_MULTILAYER_MATERIAL_AD_ERROR)
     out = _required_native_op("field_reflection_sequence_backward")(
         source,
         target,
@@ -662,6 +735,7 @@ def field_reflection_sequence_backward(
         mu_r,
         gain,
         thickness,
+        *_native_layers(layers, eps_r),
         float(frequency_hz),
         grad_field_vector,
         grad_coefficient,
@@ -699,14 +773,18 @@ def field_reflection_sequence_jvp(
     source: torch.Tensor, target: torch.Tensor, interaction_positions: torch.Tensor,
     interaction_normals: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
     rx_polarization: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor,
-    gain: torch.Tensor, thickness: torch.Tensor, *, frequency_hz: float,
-    tangent_eps_r: torch.Tensor | None = None, tangent_sigma_e: torch.Tensor | None = None,
-    tangent_gain: torch.Tensor | None = None, tangent_thickness: torch.Tensor | None = None,
-    tangent_frequency: float = 0.0, tangent_source: torch.Tensor | None = None,
-    tangent_target: torch.Tensor | None = None,
+    gain: torch.Tensor, thickness: torch.Tensor, *, layers: ReflectionLayers | None = None,
+    frequency_hz: float, tangent_eps_r: torch.Tensor | None = None,
+    tangent_sigma_e: torch.Tensor | None = None, tangent_gain: torch.Tensor | None = None,
+    tangent_thickness: torch.Tensor | None = None, tangent_frequency: float = 0.0,
+    tangent_source: torch.Tensor | None = None, tangent_target: torch.Tensor | None = None,
     tangent_interaction_positions: torch.Tensor | None = None,
     tangent_interaction_normals: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
+    if layers is not None and layers.multilayer and (
+        tangent_eps_r is not None or tangent_sigma_e is not None or tangent_thickness is not None
+    ):
+        raise NotImplementedError(_MULTILAYER_MATERIAL_AD_ERROR)
     out = _required_native_op("field_reflection_sequence_jvp")(
         source,
         target,
@@ -720,6 +798,7 @@ def field_reflection_sequence_jvp(
         mu_r,
         gain,
         thickness,
+        *_native_layers(layers, eps_r),
         float(frequency_hz),
         tangent_eps_r,
         tangent_sigma_e,
@@ -1324,7 +1403,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
     def forward(
         source, target, interaction_positions, interaction_normals, tx_power, tx_polarization,
         rx_polarization, eps_r, sigma_e, mu_r, gain, thickness, frequency, frequency_value,
-        liveness,
+        liveness, layers,
     ):
         out = _required_native_op("field_reflection_sequence")(
             source,
@@ -1339,6 +1418,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
             mu_r,
             gain,
             thickness,
+            *_native_layers(layers, eps_r),
             frequency_value,
         )
         return tuple(out[name] for name in _FIELD_AD_OUTPUT_FIELDS)
@@ -1359,6 +1439,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
         )
         # Both decided by the wrapper, where forward duals are still visible.
         ctx.geometry_live, ctx.direction_live = inputs[14]
+        ctx.layers = inputs[15]
         ctx.save_for_backward(*primals)
         ctx.save_for_forward(*primals)
         mark_dead_outputs(ctx, output)
@@ -1369,7 +1450,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
         ctx, grad_field_vector, grad_coefficient, grad_path_field, grad_path_gain, grad_path_length,
         grad_delay, grad_direction,
     ):
-        none_grads = (None,) * 15
+        none_grads = (None,) * 16
         _ad_reject_fixed_inputs(
             "field_reflection_sequence_ad",
             ctx.needs_input_grad,
@@ -1432,6 +1513,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
             mu_r,
             gain,
             thickness,
+            layers=ctx.layers,
             frequency_hz=ctx.frequency_value,
             grad_field_vector=grad_field_vector,
             grad_coefficient=grad_coefficient,
@@ -1468,12 +1550,14 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
             grad_frequency,
             None,
             None,
+            None,
         )
 
     @staticmethod
     def jvp(
         ctx, t_source, t_target, t_positions, t_normals, t_tx_power, t_tx_pol, t_rx_pol, t_eps_r,
         t_sigma_e, t_mu_r, t_gain, t_thickness, t_frequency, _t_frequency_value, _t_liveness,
+        _t_layers,
     ):
         _ad_reject_fixed_tangents(
             "field_reflection_sequence_ad",
@@ -1538,6 +1622,7 @@ class _FieldReflectionSequenceAdFunction(torch.autograd.Function):
         with disable_functorch():
             out = field_reflection_sequence_jvp(
                 *(_ad_native_tensor(value) for value in saved),
+                layers=ctx.layers,
                 frequency_hz=ctx.frequency_value,
                 tangent_eps_r=tangent_eps,
                 tangent_sigma_e=tangent_sigma,
@@ -1556,8 +1641,9 @@ def field_reflection_sequence_ad(
     source: torch.Tensor, target: torch.Tensor, interaction_positions: torch.Tensor,
     interaction_normals: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
     rx_polarization: torch.Tensor, eps_r: torch.Tensor, sigma_e: torch.Tensor, mu_r: torch.Tensor,
-    gain: torch.Tensor, thickness: torch.Tensor, *, frequency: torch.Tensor | float,
-    frequency_value: float | None = None, direction_live: bool = False,
+    gain: torch.Tensor, thickness: torch.Tensor, *, layers: ReflectionLayers | None = None,
+    frequency: torch.Tensor | float, frequency_value: float | None = None,
+    direction_live: bool = False,
 ) -> dict[str, torch.Tensor]:
     """Differentiable :func:`field_reflection_sequence` (materials + frequency).
 
@@ -1586,6 +1672,7 @@ def field_reflection_sequence_ad(
         ad_liveness(
             direction_live, source, target, interaction_positions, interaction_normals
         ),
+        layers,
     )
     return dict(zip(_FIELD_AD_OUTPUT_FIELDS, values, strict=True))
 
@@ -2210,6 +2297,7 @@ class _FieldCoupledRdAdFunction(torch.autograd.Function):
             refl_mu_r,
             refl_gain,
             refl_thickness,
+            *_native_layers(None, refl_eps_r.unsqueeze(1)),
             w0_eps_r,
             w0_sigma_e,
             w0_mu_r,

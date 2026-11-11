@@ -90,8 +90,8 @@ Result metadata of every solver carries `estimator` (`enumerated` or
 `sampled`), `quantity` (`point_sample` at the receiver position or
 `cell_average` over the cell or capture region), `combine` (`coherent`,
 `incoherent`, or `none` for uncombined rows) and `complete` (whether every path
-within the requested bounds was found; `None` when the solve does not report
-it).
+within the requested bounds was found; for `path` and `deterministic` it is
+`metadata["discovery"]["complete"]`, and the sampled solvers report `False`).
 
 ## Minimal solver example
 

@@ -171,6 +171,7 @@ def _epc_forward(case: dict[str, object], rayd=None, source=None, receiver=None)
         group_members,
         case["depth"],
         1,
+        0.0,
     )
     assert bool(out[0].all())
     return out, plane_points, plane_normals
