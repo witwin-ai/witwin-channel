@@ -242,9 +242,9 @@ def test_basic_scattering_is_seed_reproducible():
 def test_basic_results_unchanged_when_scattering_not_requested():
     """Regression guard: without the scattering component, roughness is
  never read - a rough-material scene reproduces the smooth variant of
- the same scene. Reruns of the SAME scene are bit-identical; across the
- two Scene instances the reflection map is compared at float tolerance
- because its atomic accumulation order varies with the BVH build."""
+ the same scene. Reruns of the SAME scene agree to the atomic-reordering
+ envelope of the reflection map; across the two Scene instances the map is
+ compared at float tolerance because its order also varies with the BVH build."""
 
     _require_native()
     grid = make_receiver_grid(
@@ -258,8 +258,11 @@ def test_basic_results_unchanged_when_scattering_not_requested():
     rough_scene = _grid_scene([_wall(_material(_roughness()))], grid)
     rough_run = _solve(rough_scene, config)
     rough_rerun = _solve(rough_scene, config)
+    # The reflection map deposits float32 rows with atomicAdd, so a rerun of the same
+    # scene may reorder a cell's sum: measured up to two float32 ulp (about 1e-7
+    # relative; one cell in roughly six reruns here). Empty cells stay exactly zero.
     torch.testing.assert_close(
-        rough_run.path_gain, rough_rerun.path_gain, rtol=0.0, atol=0.0
+        rough_run.path_gain, rough_rerun.path_gain, rtol=2.5e-7, atol=0.0
     )
     smooth_run = _solve(_grid_scene([_wall(_material(None))], grid), config)
     torch.testing.assert_close(
