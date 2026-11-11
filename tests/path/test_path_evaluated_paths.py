@@ -225,7 +225,9 @@ def test_solver_passes_typed_rows_and_only_execution_ad_sidecars(monkeypatch):
         lambda _scene, *, reference: torch.zeros_like(reference),
     )
 
-    result = path_module._solve_base(object(), Config(components={"los", "scattering"}))
+    result = path_module._solve_base(
+        object(), Config(components={"los", "transmission", "scattering"})
+    )
 
     assert result.result is sentinel
     assert result.capacity_transaction is None

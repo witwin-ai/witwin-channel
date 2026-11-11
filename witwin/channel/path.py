@@ -60,6 +60,8 @@ from witwin.channel.scene.endpoints import (
     SolverScene,
     Transmitter,
     bind_solver_scene,
+    build_endpoint_store,
+    endpoint_store,
     link_zero_gradient,
     orientation_matrix,
     pattern_field_response,
@@ -1098,16 +1100,13 @@ def _local_direction(direction: torch.Tensor, orientation: torch.Tensor) -> torc
     return direction @ rotation
 
 
-def _flatten_receivers(receivers: Sequence[Receiver]) -> list[Receiver]:
-    flattened: list[Receiver] = []
-    for receiver in receivers:
-        count = (
-            receiver.shape[0] * receiver.shape[1]
-            if isinstance(receiver, ReceiverGrid)
-            else 1
-        )
-        flattened.extend([receiver] * count)
-    return flattened
+def _receiver_cell_counts(receivers: Sequence[Receiver]) -> tuple[int, ...]:
+    return tuple(
+        int(receiver.shape[0]) * int(receiver.shape[1])
+        if isinstance(receiver, ReceiverGrid)
+        else 1
+        for receiver in receivers
+    )
 
 
 class _AntennaEndpoint(Protocol):
@@ -1128,70 +1127,170 @@ class _AntennaEndpoint(Protocol):
     def pattern(self) -> Any: ...
 
 
-def _synthetic_endpoint_factor(
-    endpoints: Sequence[_AntennaEndpoint], directions: torch.Tensor, *, num_ant: int,
-    frequency_hz: float, conjugate_pattern: bool,
-) -> torch.Tensor:
-    """Batch steering/pattern weights over endpoints sharing the same object.
+def _value_key(value: torch.Tensor | None, fallback: object) -> object:
+    if value is None:
+        return fallback
+    if value.device.type == "cpu":
+        detached = value.detach()
+        return ("value", detached.dtype, tuple(detached.shape), detached.numpy().tobytes())
+    return ("tensor", id(value), int(value._version))
 
-    ``directions`` has shape ``(endpoint, *batch, 3)`` where ``directions[i]``
-    is the far-field direction for ``endpoints[i]``. ``steering_vector`` and
-    ``AntennaPattern.field_response`` are per-direction operations (the only
-    reductions are the fixed length-3 vec3 contractions inside each element),
-    so evaluating a group of endpoints in one batched launch is numerically
-    identical to evaluating them one at a time. Endpoints that reference the
-    same object (for example every element of one ``ReceiverGrid``) share
-    array/orientation/pattern and are batched together, collapsing a per-
-    endpoint Python loop into one native launch per distinct endpoint object.
-    Returns ``(endpoint, *batch, num_ant)``.
+
+def _antenna_group_key(endpoint: Any, index: int) -> object:
+    """Value identity of everything the far-field steering and pattern of an endpoint read.
+
+    Endpoints with equal keys are evaluated in one batch. Batching changes the
+    row count of the steering and local-frame matrix products, whose rounding
+    the CUDA BLAS may pick by row count, so only antennas whose response is exact
+    under any batching share a key: a single centre element (zero steering
+    phase) that is unrotated or isotropic. Every other endpoint keeps a key of
+    its own and is evaluated exactly as alone.
     """
 
-    groups: dict[int, list[int]] = {}
+    source = endpoint.source
+    orientation = (
+        source.orientation
+        if endpoint.orientation_override is None
+        else endpoint.orientation_override
+    )
+    position = endpoint.position
+    elements = None if endpoint.single_element else source.element_positions
+    centre = elements is None or (
+        elements.device.type == "cpu" and elements.shape[0] == 1 and not bool(elements.any())
+    )
+    unrotated = orientation is None or (
+        orientation.device.type == "cpu"
+        and orientation.shape == (3,)
+        and not bool(orientation.any())
+    )
+    if not (centre and (unrotated or source.pattern.kind == "isotropic")):
+        return ("own", index)
+    return (
+        source.pattern,
+        _value_key(orientation, ("zero", position.dtype)),
+        _value_key(elements, ("centre", position.dtype)),
+    )
+
+
+def _antenna_groups(endpoints: Sequence[Any]) -> list[list[int]]:
+    """Endpoint indices grouped by antenna array, orientation and pattern value."""
+
+    groups: dict[object, list[int]] = {}
     for index, endpoint in enumerate(endpoints):
-        groups.setdefault(id(endpoint), []).append(index)
+        groups.setdefault(_antenna_group_key(endpoint, index), []).append(index)
+    return list(groups.values())
 
-    def _weights(endpoint: _AntennaEndpoint, sub: torch.Tensor) -> torch.Tensor:
-        steering = steering_vector(
-            endpoint.array,
-            sub,
+
+def _cached_antenna_layout(
+    scene_store: Any, name: str, endpoints: Sequence[Any], cell_counts: tuple[int, ...],
+    device: torch.device,
+) -> tuple[list[int], list[torch.Tensor] | None]:
+    """Group representatives and, for several groups, the flat row indices of each group."""
+
+    cache = None if scene_store is None else scene_store._lazy
+    cached = None if cache is None else cache.get(name)
+    if cached is not None:
+        return cached  # type: ignore[no-any-return]
+    groups = _antenna_groups(endpoints)
+    representatives = [group[0] for group in groups]
+    rows: list[torch.Tensor] | None = None
+    if len(groups) > 1:
+        group_of = torch.empty((len(endpoints),), dtype=torch.int64)
+        for group_index, group in enumerate(groups):
+            group_of[torch.tensor(group, dtype=torch.int64)] = group_index
+        flat_group = torch.repeat_interleave(
+            group_of, torch.tensor(cell_counts, dtype=torch.int64)
+        )
+        rows = [
+            torch.nonzero(flat_group == group_index).reshape(-1).to(device=device)
+            for group_index in range(len(groups))
+        ]
+    layout = (representatives, rows)
+    if cache is not None:
+        cache[name] = layout
+    return layout
+
+
+def _endpoint_weights(
+    endpoint: _AntennaEndpoint, directions: torch.Tensor, *, frequency_hz: float,
+    conjugate_pattern: bool,
+) -> torch.Tensor:
+    steering = steering_vector(
+        endpoint.array,
+        directions,
+        frequency_hz=frequency_hz,
+        orientation=endpoint.orientation,
+    )
+    pattern = pattern_field_response(
+        endpoint.pattern,
+        _local_direction(directions, endpoint.orientation),
+    )
+    if conjugate_pattern:
+        pattern = pattern.conj()
+    return steering * pattern.unsqueeze(-1)
+
+
+def _grouped_endpoint_factor(
+    endpoints: Sequence[_AntennaEndpoint], layout: tuple[list[int], list[torch.Tensor] | None],
+    directions: torch.Tensor, *, num_ant: int, frequency_hz: float, conjugate_pattern: bool,
+) -> torch.Tensor:
+    """Batch steering/pattern weights over endpoints sharing one antenna value.
+
+    ``directions`` has shape ``(row, *batch, 3)`` where row ``i`` belongs to the
+    endpoint the layout assigns it. ``steering_vector`` and the pattern response
+    are per-direction operations (the only reductions are the fixed length-3
+    vec3 contractions inside each element), so one batched evaluation per
+    distinct array/orientation/pattern value equals evaluating every endpoint on
+    its own. The built-in pattern kinds and a user ``custom`` callable both run
+    through ``pattern_field_response``, once per group. Returns
+    ``(row, *batch, num_ant)``.
+    """
+
+    representatives, rows = layout
+    if rows is None:
+        return _endpoint_weights(
+            endpoints[representatives[0]],
+            directions,
             frequency_hz=frequency_hz,
-            orientation=endpoint.orientation,
+            conjugate_pattern=conjugate_pattern,
         )
-        pattern = pattern_field_response(
-            endpoint.pattern,
-            _local_direction(sub, endpoint.orientation),
-        )
-        if conjugate_pattern:
-            pattern = pattern.conj()
-        return steering * pattern.unsqueeze(-1)
-
-    if len(groups) == 1:
-        # Single shared endpoint object: evaluate every direction in one launch
-        # with no scatter (the common single-grid case).
-        return _weights(endpoints[0], directions)
-
     out = torch.empty(
-        (len(endpoints), *directions.shape[1:-1], num_ant),
+        (directions.shape[0], *directions.shape[1:-1], num_ant),
         dtype=torch.complex64,
         device=directions.device,
     )
-    for indices in groups.values():
-        idx = torch.tensor(indices, device=directions.device, dtype=torch.long)
+    for representative, index in zip(representatives, rows, strict=True):
         out.index_copy_(
-            0, idx, _weights(endpoints[indices[0]], directions.index_select(0, idx))
+            0,
+            index,
+            _endpoint_weights(
+                endpoints[representative],
+                directions.index_select(0, index),
+                frequency_hz=frequency_hz,
+                conjugate_pattern=conjugate_pattern,
+            ),
         )
     return out
 
 
 def _stack_endpoint_weights(
     endpoints: Sequence[object], *, attribute: str, device: torch.device,
+    cell_counts: tuple[int, ...] | None = None,
 ) -> torch.Tensor | None:
     values = [getattr(endpoint, attribute) for endpoint in endpoints]
     if not values or all(value is None for value in values):
         return None
     if any(value is None for value in values):
         raise ValueError(f"{attribute} must be configured on every endpoint or none")
-    return torch.stack(values).to(device=device, dtype=torch.complex64)
+    stacked = torch.stack(values).to(device=device, dtype=torch.complex64)
+    if cell_counts is None or all(count == 1 for count in cell_counts):
+        return stacked
+    return torch.repeat_interleave(
+        stacked,
+        torch.tensor(cell_counts, dtype=torch.int64, device=device),
+        dim=0,
+        output_size=sum(cell_counts),
+    )
 
 
 def _validate_endpoint_weight_coverage(endpoints: Sequence[object], *, attribute: str) -> None:
@@ -1202,64 +1301,84 @@ def _validate_endpoint_weight_coverage(endpoints: Sequence[object], *, attribute
         raise ValueError(f"{attribute} must be configured on every endpoint or none")
 
 
+def _synthetic_antenna_counts(
+    transmitters: Sequence[Transmitter], receivers: Sequence[Receiver],
+) -> tuple[int, int]:
+    endpoints = [*transmitters, *receivers]
+    if any(not endpoint.synthetic_array for endpoint in endpoints):
+        raise ValueError("explicit arrays require per-element topology tracing")
+    tx_antennas = {transmitter.num_antennas for transmitter in transmitters}
+    rx_antennas = {receiver.num_antennas for receiver in receivers}
+    if len(tx_antennas) > 1 or len(rx_antennas) > 1:
+        raise ValueError("all endpoints on each side must use the same antenna count")
+    return next(iter(tx_antennas), 1), next(iter(rx_antennas), 1)
+
+
+def _store_memo(store: Any, name: str, build: Callable[[], Any]) -> Any:
+    """Memoize an endpoint-only value on the scene's endpoint store (built once per token)."""
+
+    if store is None:
+        return build()
+    cache = store._lazy
+    if name not in cache:
+        cache[name] = build()
+    return cache[name]
+
+
 def validate_synthetic_array_scene(scene: SolverScene) -> None:
     """Reject unavailable synthetic layouts before native scene allocation."""
 
-    flat_receivers = _flatten_receivers(scene.receivers)
-    endpoints = [*scene.transmitters, *flat_receivers]
-    if any(not endpoint.synthetic_array for endpoint in endpoints):
-        raise ValueError("explicit arrays require per-element topology tracing")
-    tx_antennas = {transmitter.array.num_antennas for transmitter in scene.transmitters}
-    rx_antennas = {receiver.array.num_antennas for receiver in flat_receivers}
-    if len(tx_antennas) > 1 or len(rx_antennas) > 1:
-        raise ValueError("all endpoints on each side must use the same antenna count")
-    _validate_endpoint_weight_coverage(scene.transmitters, attribute="precoding")
-    _validate_endpoint_weight_coverage(flat_receivers, attribute="combining")
+    def validate() -> bool:
+        _synthetic_antenna_counts(scene.transmitters, scene.receivers)
+        _validate_endpoint_weight_coverage(scene.transmitters, attribute="precoding")
+        _validate_endpoint_weight_coverage(scene.receivers, attribute="combining")
+        return True
+
+    _store_memo(getattr(scene, "endpoint_store", None), "synthetic_layout_valid", validate)
 
 
 def pack_synthetic_arrays(
     result: PathResult, *, frequency_hz: float, transmitters: Sequence[Transmitter],
-    receivers: Sequence[Receiver],
+    receivers: Sequence[Receiver], store: Any = None,
 ) -> PathResult:
     """Expand centre-reference paths using far-field array phase weighting.
 
     Synthetic arrays share one geometric path set across their elements. An
     explicit array must instead trace the element positions and is rejected
     here so that a far-field approximation is never reported as explicit.
+    ``store`` is the scene's endpoint store, which caches the antenna grouping.
     """
 
     if frequency_hz <= 0.0:
         raise ValueError("frequency_hz must be positive")
-    flat_receivers = _flatten_receivers(receivers)
-    if len(transmitters) != result.num_tx or len(flat_receivers) != result.num_rx:
+    cell_counts = _store_memo(store, "cell_counts", lambda: _receiver_cell_counts(receivers))
+    if len(transmitters) != result.num_tx or sum(cell_counts) != result.num_rx:
         raise ValueError("endpoint counts must match the centre-reference result")
     if result.num_tx_ant != 1 or result.num_rx_ant != 1:
         raise ValueError("synthetic packing requires a single-antenna centre result")
-    endpoints = [*transmitters, *flat_receivers]
-    if any(not endpoint.synthetic_array for endpoint in endpoints):
-        raise ValueError("explicit arrays require per-element topology tracing")
-    tx_antennas = {transmitter.array.num_antennas for transmitter in transmitters}
-    rx_antennas = {receiver.array.num_antennas for receiver in flat_receivers}
-    if len(tx_antennas) > 1 or len(rx_antennas) > 1:
-        raise ValueError("all endpoints on each side must use the same antenna count")
-    num_tx_ant = next(iter(tx_antennas), 1)
-    num_rx_ant = next(iter(rx_antennas), 1)
-    tx_weights = _stack_endpoint_weights(
-        transmitters, attribute="precoding", device=result.a.device
+    num_tx_ant, num_rx_ant = _store_memo(
+        store, "synthetic_antenna_counts", lambda: _synthetic_antenna_counts(transmitters, receivers)
     )
-    rx_weights = _stack_endpoint_weights(
-        flat_receivers, attribute="combining", device=result.a.device
+    tx_weights, rx_weights = _store_memo(
+        store,
+        "synthetic_weights",
+        lambda: (
+            _stack_endpoint_weights(transmitters, attribute="precoding", device=result.a.device),
+            _stack_endpoint_weights(
+                receivers, attribute="combining", device=result.a.device, cell_counts=cell_counts
+            ),
+        ),
+    )
+    metadata = dict(result.metadata)
+    metadata.update(
+        {
+            "array_semantics": "synthetic_far_field_phase_weighting",
+            "array_phase_convention": "exp(+j*k*element_position_dot_endpoint_direction)",
+            "num_rx_ant": num_rx_ant,
+            "num_tx_ant": num_tx_ant,
+        }
     )
     if result.num_tx == 0 or result.num_rx == 0:
-        metadata = dict(result.metadata)
-        metadata.update(
-            {
-                "array_semantics": "synthetic_far_field_phase_weighting",
-                "array_phase_convention": "exp(+j*k*element_position_dot_endpoint_direction)",
-                "num_rx_ant": num_rx_ant,
-                "num_tx_ant": num_tx_ant,
-            }
-        )
         return replace(
             result,
             metadata=metadata,
@@ -1267,6 +1386,7 @@ def pack_synthetic_arrays(
             rx_weights=rx_weights,
         )
 
+    device = result.a.device
     theta_t = result.theta_t[:, 0, :, 0]
     phi_t = result.phi_t[:, 0, :, 0]
     theta_r = result.theta_r[:, 0, :, 0]
@@ -1274,26 +1394,22 @@ def pack_synthetic_arrays(
     departure = _unit_vector(theta_t, phi_t)
     arrival_source_direction = _unit_vector(theta_r, phi_r)
 
-    tx_factors: list[torch.Tensor] = []
-    for tx_id, transmitter in enumerate(transmitters):
-        direction = departure[:, tx_id]
-        steering = steering_vector(
-            transmitter.array,
-            direction,
-            frequency_hz=frequency_hz,
-            orientation=transmitter.orientation,
-        )
-        pattern = pattern_field_response(
-            transmitter.pattern,
-            _local_direction(direction, transmitter.orientation),
-        )
-        tx_factors.append(steering * pattern.unsqueeze(-1))
-    # (rx, tx, path, tx_ant) -> (rx, tx, tx_ant, path)
-    tx_factor = torch.stack(tx_factors, dim=1).permute(0, 1, 3, 2)
+    # (tx, rx, path, tx_ant) -> (rx, tx, tx_ant, path)
+    tx_factor = _grouped_endpoint_factor(
+        transmitters,
+        _cached_antenna_layout(
+            store, "tx_antenna_groups", transmitters, (1,) * len(transmitters), device
+        ),
+        departure.transpose(0, 1),
+        num_ant=num_tx_ant,
+        frequency_hz=frequency_hz,
+        conjugate_pattern=False,
+    ).permute(1, 0, 3, 2)
 
     # (rx, tx, path, rx_ant) -> (rx, rx_ant, tx, path)
-    rx_factor = _synthetic_endpoint_factor(
-        flat_receivers,
+    rx_factor = _grouped_endpoint_factor(
+        receivers,
+        _cached_antenna_layout(store, "rx_antenna_groups", receivers, cell_counts, device),
         arrival_source_direction,
         num_ant=num_rx_ant,
         frequency_hz=frequency_hz,
@@ -1313,15 +1429,6 @@ def pack_synthetic_arrays(
 
     a = expand_path(result.a) * factor.unsqueeze(-1)
     field_xyz = expand_path(result.field_xyz) * factor.unsqueeze(-1)
-    metadata = dict(result.metadata)
-    metadata.update(
-        {
-            "array_semantics": "synthetic_far_field_phase_weighting",
-            "array_phase_convention": "exp(+j*k*element_position_dot_endpoint_direction)",
-            "num_rx_ant": num_rx_ant,
-            "num_tx_ant": num_tx_ant,
-        }
-    )
     return replace(
         result,
         a=a.to(torch.complex64),
@@ -1345,13 +1452,36 @@ def pack_synthetic_arrays(
     )
 
 
+def _grouped_pattern(
+    endpoints: Sequence[_AntennaEndpoint], layout: tuple[list[int], list[torch.Tensor] | None],
+    directions: torch.Tensor,
+) -> torch.Tensor:
+    """Pattern response per direction row, evaluated once per antenna-value group."""
+
+    representatives, rows = layout
+
+    def response(endpoint: _AntennaEndpoint, value: torch.Tensor) -> torch.Tensor:
+        return pattern_field_response(
+            endpoint.pattern, _local_direction(value, endpoint.orientation)
+        )
+
+    if rows is None:
+        return response(endpoints[representatives[0]], directions)
+    out = torch.empty(directions.shape[:-1], dtype=torch.complex64, device=directions.device)
+    for representative, index in zip(representatives, rows, strict=True):
+        out.index_copy_(
+            0, index, response(endpoints[representative], directions.index_select(0, index))
+        )
+    return out
+
+
 def explicit_array_scene(scene: SolverScene) -> tuple[SolverScene, int, int]:
     """Expand point-endpoint arrays into independently traced scene endpoints."""
 
     if any(isinstance(receiver, ReceiverGrid) for receiver in scene.receivers):
         raise ValueError("explicit arrays currently require point receivers")
-    tx_counts = {tx.array.num_antennas for tx in scene.transmitters}
-    rx_counts = {rx.array.num_antennas for rx in scene.receivers}
+    tx_counts = {tx.num_antennas for tx in scene.transmitters}
+    rx_counts = {rx.num_antennas for rx in scene.receivers}
     if len(tx_counts) > 1 or len(rx_counts) > 1:
         raise ValueError("all explicit endpoints on each side must share antenna count")
     _validate_endpoint_weight_coverage(scene.transmitters, attribute="precoding")
@@ -1388,6 +1518,9 @@ def explicit_array_scene(scene: SolverScene) -> tuple[SolverScene, int, int]:
             scene,
             transmitters=tuple(expanded_tx),
             receivers=tuple(expanded_rx),
+            endpoint_store=build_endpoint_store(
+                expanded_tx, expanded_rx, device=torch.device("cuda", torch.cuda.current_device())
+            ),
         ),
         num_rx_ant,
         num_tx_ant,
@@ -1417,16 +1550,17 @@ def pack_explicit_arrays(
     pattern_factor = torch.ones_like(theta_t, dtype=torch.complex64)
     departure = _unit_vector(theta_t, phi_t)
     arrival = _unit_vector(theta_r, phi_r)
-    for tx_id, transmitter in enumerate(scene.transmitters):
-        pattern_factor[:, :, tx_id] *= pattern_field_response(
-            transmitter.pattern,
-            _local_direction(departure[:, :, tx_id], transmitter.orientation),
-        )
-    for rx_id, receiver in enumerate(scene.receivers):
-        pattern_factor[rx_id] *= pattern_field_response(
-            receiver.pattern,
-            _local_direction(arrival[rx_id], receiver.orientation),
-        ).conj()
+    tx_store = getattr(scene, "endpoint_store", None)
+    tx_layout = _cached_antenna_layout(
+        tx_store, "tx_antenna_groups", scene.transmitters, (1,) * num_tx, departure.device
+    )
+    rx_layout = _cached_antenna_layout(
+        tx_store, "rx_antenna_groups", scene.receivers, (1,) * num_rx, departure.device
+    )
+    pattern_factor *= _grouped_pattern(
+        scene.transmitters, tx_layout, departure.movedim(2, 0)
+    ).movedim(0, 2)
+    pattern_factor *= _grouped_pattern(scene.receivers, rx_layout, arrival).conj()
     a = a * pattern_factor.unsqueeze(-1)
     field_xyz = field_xyz * pattern_factor.unsqueeze(-1)
     metadata = dict(result.metadata)
@@ -1492,19 +1626,9 @@ class _DeferredPathResult:
 def _stable_endpoint_id_lookups(
     scene: Scene, *, device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    source_ids = tuple(int(view.source.antenna_id) for view in scene.transmitters)
-    sink_ids: list[int] = []
-    for view in scene.receivers:
-        sample_count = (
-            int(view.shape[0]) * int(view.shape[1])
-            if hasattr(view, "shape")
-            else 1
-        )
-        sink_ids.extend((int(view.source.antenna_id),) * sample_count)
-    return (
-        torch.tensor(source_ids, device=device, dtype=torch.int64),
-        torch.tensor(sink_ids, device=device, dtype=torch.int64),
-    )
+    store: Any = endpoint_store(scene, device=device)
+    source_ids, sink_ids = store.stable_ids()
+    return source_ids, sink_ids
 
 
 def _transmitter_tensors(scene: Scene) -> tuple[torch.Tensor, torch.Tensor]:
@@ -1551,6 +1675,16 @@ def _validate_runtime(config: Config) -> tuple[bool, bool, bool]:
     ):
         raise RuntimeError("requested scattering paths require max_depth >= 1")
     return reflection_available, diffraction_available, path_native_available
+
+
+def _component_path_count(evaluated: Any, config: Config, component: str) -> int:
+    """Exported rows of one optional component; read from the device only when requested."""
+
+    if component not in config.components:
+        return 0
+    return int(
+        (evaluated.topology.component_id == _COMPONENT_ID[component]).sum().item()
+    )
 
 
 def _pipeline_solve_base(
@@ -1622,16 +1756,8 @@ def _pipeline_solve_base(
         reflection_available=reflection_available,
         diffraction_available=diffraction_available,
         path_native_available=path_native_available,
-        transmission_path_count=int(
-            (evaluated.topology.component_id == _COMPONENT_ID["transmission"])
-            .sum()
-            .item()
-        ),
-        scattering_path_count=int(
-            (evaluated.topology.component_id == _COMPONENT_ID["scattering"])
-            .sum()
-            .item()
-        ),
+        transmission_path_count=_component_path_count(evaluated, config, "transmission"),
+        scattering_path_count=_component_path_count(evaluated, config, "scattering"),
         ad_companion_launches=sidecars.execution.ad_companion_launches,
         ad_tape_bytes=sidecars.execution.ad_tape_bytes,
         forward_time_ms=forward_time_ms,
@@ -1686,6 +1812,7 @@ def _pipeline_solve(
         frequency_hz=scene.frequency,
         transmitters=scene.transmitters,
         receivers=scene.receivers,
+        store=getattr(scene, "endpoint_store", None),
     )
     if deferred.capacity_transaction is not None:
         deferred.capacity_transaction.terminal_check()

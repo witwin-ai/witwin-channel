@@ -333,3 +333,138 @@ def test_partial_endpoint_weights_fail_before_native_solve(monkeypatch, syntheti
             Config(components={"los"}),
             reference_frequency_hz=1.0e9,
         )
+
+def _multi_receiver_centre_result(num_rx: int) -> PathResult:
+    generator = torch.Generator().manual_seed(3)
+    ragged = RaggedPathSoA.from_flat(
+        num_rx=num_rx,
+        num_rx_ant=1,
+        num_tx=1,
+        num_tx_ant=1,
+        rx_id=torch.arange(num_rx, dtype=torch.int32),
+        tx_id=torch.zeros(num_rx, dtype=torch.int32),
+        field=torch.ones((num_rx, 1), dtype=torch.complex64),
+        delay_s=torch.full((num_rx,), 1.0e-9),
+        theta_t=torch.rand(num_rx, generator=generator) * math.pi,
+        phi_t=torch.rand(num_rx, generator=generator) * 2.0 * math.pi,
+        theta_r=torch.rand(num_rx, generator=generator) * math.pi,
+        phi_r=torch.rand(num_rx, generator=generator) * 2.0 * math.pi,
+        interaction_type=torch.empty((num_rx, 0), dtype=torch.int32),
+        primitive_id=torch.empty((num_rx, 0), dtype=torch.int32),
+        material_id=torch.empty((num_rx, 0), dtype=torch.int32),
+        position=torch.empty((num_rx, 0, 3)),
+        normal=torch.empty((num_rx, 0, 3)),
+    )
+    return PathResult.from_ragged(ragged)
+
+
+def _single_centre_result(centre: PathResult, index: int) -> PathResult:
+    return PathResult.from_ragged(
+        RaggedPathSoA.from_flat(
+            num_rx=1,
+            num_rx_ant=1,
+            num_tx=1,
+            num_tx_ant=1,
+            rx_id=torch.zeros(1, dtype=torch.int32),
+            tx_id=torch.zeros(1, dtype=torch.int32),
+            field=torch.ones((1, 1), dtype=torch.complex64),
+            delay_s=torch.full((1,), 1.0e-9),
+            theta_t=centre.theta_t[index, 0, 0, 0, :1],
+            phi_t=centre.phi_t[index, 0, 0, 0, :1],
+            theta_r=centre.theta_r[index, 0, 0, 0, :1],
+            phi_r=centre.phi_r[index, 0, 0, 0, :1],
+            interaction_type=torch.empty((1, 0), dtype=torch.int32),
+            primitive_id=torch.empty((1, 0), dtype=torch.int32),
+            material_id=torch.empty((1, 0), dtype=torch.int32),
+            position=torch.empty((1, 0, 3)),
+            normal=torch.empty((1, 0, 3)),
+        )
+    )
+
+
+def test_equal_antennas_share_one_pattern_evaluation_and_match_per_endpoint_values():
+    calls: list[int] = []
+
+    def field(direction: torch.Tensor) -> torch.Tensor:
+        calls.append(int(direction.numel()))
+        return (1.0 + direction[..., 0]).to(torch.complex64)
+
+    pattern = AntennaPattern("custom", field)
+    receivers = [
+        _solver_receiver(torch.tensor([float(index), 1.0, 1.5]), pattern=pattern)
+        for index in range(6)
+    ]
+    transmitter = [_solver_transmitter(torch.zeros(3))]
+    centre = _multi_receiver_centre_result(6)
+    grouped = pack_synthetic_arrays(
+        centre, frequency_hz=3.5e9, transmitters=transmitter, receivers=receivers
+    )
+    assert len(calls) == 1
+
+    for index, receiver in enumerate(receivers):
+        single = pack_synthetic_arrays(
+            _single_centre_result(centre, index),
+            frequency_hz=3.5e9,
+            transmitters=transmitter,
+            receivers=[receiver],
+        )
+        assert torch.equal(grouped.a[index : index + 1], single.a)
+
+
+def test_rotated_arrays_keep_their_per_endpoint_evaluation():
+    calls: list[int] = []
+
+    def field(direction: torch.Tensor) -> torch.Tensor:
+        calls.append(int(direction.numel()))
+        return (1.0 + direction[..., 0]).to(torch.complex64)
+
+    pattern = AntennaPattern("custom", field)
+    receivers = [
+        _solver_receiver(
+            torch.tensor([float(index), 1.0, 1.5]),
+            element_positions=_ula(2, 0.05),
+            orientation=torch.tensor([0.3, 0.1, 0.0]),
+            pattern=pattern,
+        )
+        for index in range(3)
+    ]
+    transmitter = [_solver_transmitter(torch.zeros(3))]
+    centre = _multi_receiver_centre_result(3)
+    grouped = pack_synthetic_arrays(
+        centre, frequency_hz=3.5e9, transmitters=transmitter, receivers=receivers
+    )
+    assert len(calls) == 3
+    for index, receiver in enumerate(receivers):
+        single = pack_synthetic_arrays(
+            _single_centre_result(centre, index),
+            frequency_hz=3.5e9,
+            transmitters=transmitter,
+            receivers=[receiver],
+        )
+        assert torch.equal(grouped.a[index : index + 1], single.a)
+
+
+def test_distinct_antenna_orientations_are_evaluated_separately():
+    calls: list[int] = []
+
+    def field(direction: torch.Tensor) -> torch.Tensor:
+        calls.append(int(direction.numel()))
+        return (1.0 + direction[..., 2]).to(torch.complex64)
+
+    pattern = AntennaPattern("custom", field)
+    receivers = [
+        _solver_receiver(
+            torch.tensor([float(index), 1.0, 1.5]),
+            orientation=torch.tensor([0.2 * (index % 2), 0.0, 0.0]),
+            pattern=pattern,
+        )
+        for index in range(4)
+    ]
+    pack_synthetic_arrays(
+        _multi_receiver_centre_result(4),
+        frequency_hz=3.5e9,
+        transmitters=[_solver_transmitter(torch.zeros(3))],
+        receivers=receivers,
+    )
+    # The two unrotated receivers share one evaluation; each rotated one has its own.
+    assert len(calls) == 3
