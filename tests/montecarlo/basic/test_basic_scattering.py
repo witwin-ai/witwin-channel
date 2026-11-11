@@ -294,13 +294,21 @@ def test_basic_scattering_requires_unobstructed_incident_segment():
     assert result.metadata["contribution_capacity"] == 1
 
 
-def test_basic_point_receivers_refuse_scattering():
+def test_basic_point_receiver_scattering_equals_the_cell_center_value():
     _require_native()
-    scene = Scene(
-        structures=[_wall(_material(_roughness()))],
-        endpoints=[make_transmitter(_TX), make_receiver(_RX)],
+    structures = [_wall(_material(_roughness()))]
+    point = _solve(
+        Scene(structures=structures, endpoints=[make_transmitter(_TX), make_receiver(_RX)]),
+        Config(samples=1024, seed=5, components={"scattering"}),
     )
-    # MC basic carries scattering on grid maps only; with point receivers it
-    # refuses instead of reporting an "enabled" zero.
-    with pytest.raises(ValueError, match=r"computes \['scattering'\] only on a ReceiverGrid"):
-        _solve(scene, Config(samples=1024, seed=5, components={"los", "scattering"}))
+    cell = _solve(_grid_scene(structures), Config(samples=1024, seed=5, components={"scattering"}))
+    assert point.component_maps["scattering"].shape == (1, 1)
+    value = float(point.component_maps["scattering"][0, 0])
+    assert value > 0.0
+    torch.testing.assert_close(
+        point.component_maps["scattering"].reshape(-1),
+        cell.component_maps["scattering"].reshape(-1),
+        rtol=1e-6,
+        atol=0.0,
+    )
+

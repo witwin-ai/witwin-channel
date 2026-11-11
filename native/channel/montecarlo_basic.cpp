@@ -3,7 +3,9 @@
 
 #include <torch/extension.h>
 #include "tensor_checks.h"
+#include <cmath>
 #include <vector>
+#include "kernels/reflection_receivers.h"
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_mc_finalize_component_maps_cuda(
     at::Tensor los,
@@ -185,18 +187,24 @@ at::Tensor channel_mc_receiver_grid_points_cuda(
     double y_axis_z,
     double spacing0,
     double spacing1);
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_mc_reflection_launch_inputs_cuda(
-    at::Tensor tx_positions,
-    int64_t tx_index,
-    int64_t sample_count);
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_mc_reflection_rays_cuda(
+    at::Tensor tx_positions, at::Tensor bounds, bool use_bounds, int64_t sample_count, int64_t seed);
+at::Tensor channel_mc_scene_bounds_cuda(at::Tensor vertices);
+void channel_mc_reflection_final_segment_cuda(
+    at::Tensor ray_o, at::Tensor ray_d, at::Tensor trace_valid, at::Tensor trace_t,
+    at::Tensor trace_prim, at::Tensor face_normals, at::Tensor material_valid,
+    const ReflectionReceiverArgs& receivers, double wavelength, bool first_block,
+    at::Tensor final_o, at::Tensor final_d, at::Tensor final_tmax, at::Tensor final_offset,
+    at::Tensor final_active);
+std::tuple<at::Tensor, at::Tensor, at::Tensor> channel_mc_reflection_append_final_cuda(
+    at::Tensor trace_valid, at::Tensor trace_t, at::Tensor trace_prim, at::Tensor final_valid,
+    at::Tensor final_t, at::Tensor final_prim, at::Tensor final_offset);
 at::Tensor channel_mc_slab_reflection_accumulate_cuda(
     at::Tensor ray_o, at::Tensor ray_d, at::Tensor trace_valid, at::Tensor trace_t,
     at::Tensor trace_prim, at::Tensor face_normals, at::Tensor eta_r, at::Tensor sigma,
     at::Tensor gain, at::Tensor material_valid, at::Tensor thickness,
-    int64_t contribution_depth, int64_t axis, double plane_position,
-    double coord0_min, double coord0_max, double coord1_min, double coord1_max,
-    int64_t resolution0, int64_t resolution1, double wavelength,
-    double solid_angle_per_ray, double cell_area, at::Tensor tx_pol);
+    int64_t contribution_depth, const ReflectionReceiverArgs& receivers, double wavelength,
+    at::Tensor solid_angle, at::Tensor tx_pol);
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
 channel_mc_slab_reflection_accumulate_backward_cuda(
     at::Tensor ray_o, at::Tensor ray_d, at::Tensor trace_valid, at::Tensor trace_t,
@@ -204,11 +212,8 @@ channel_mc_slab_reflection_accumulate_backward_cuda(
     at::Tensor gain, at::Tensor material_valid, at::Tensor thickness,
     at::Tensor grad_output,
     bool need_materials, bool need_frequency,
-    int64_t contribution_depth, int64_t axis, double plane_position,
-    double coord0_min, double coord0_max, double coord1_min, double coord1_max,
-    int64_t resolution0, int64_t resolution1, double wavelength,
-    double solid_angle_per_ray, double cell_area, double wavelength_dfreq,
-    at::Tensor tx_pol);
+    int64_t contribution_depth, const ReflectionReceiverArgs& receivers, double wavelength,
+    at::Tensor solid_angle, double wavelength_dfreq, at::Tensor tx_pol);
 at::Tensor channel_mc_slab_reflection_accumulate_jvp_cuda(
     at::Tensor ray_o, at::Tensor ray_d, at::Tensor trace_valid, at::Tensor trace_t,
     at::Tensor trace_prim, at::Tensor face_normals, at::Tensor eta_r, at::Tensor sigma,
@@ -217,11 +222,8 @@ at::Tensor channel_mc_slab_reflection_accumulate_jvp_cuda(
     at::Tensor tangent_thickness,
     bool has_tangent_eta_r, bool has_tangent_sigma, bool has_tangent_gain,
     bool has_tangent_thickness,
-    int64_t contribution_depth, int64_t axis, double plane_position,
-    double coord0_min, double coord0_max, double coord1_min, double coord1_max,
-    int64_t resolution0, int64_t resolution1, double wavelength,
-    double solid_angle_per_ray, double cell_area, double wavelength_tangent,
-    at::Tensor tx_pol);
+    int64_t contribution_depth, const ReflectionReceiverArgs& receivers, double wavelength,
+    at::Tensor solid_angle, double wavelength_tangent, at::Tensor tx_pol);
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_mc_face_material_tensors_cuda(
     at::Tensor material_eps_r,
     at::Tensor material_sigma_e,
@@ -464,29 +466,11 @@ torch::Tensor channel_mc_receiver_grid_points(
         spacing1);
 }
 
-pybind11::dict channel_mc_reflection_launch_inputs(
-    torch::Tensor tx_positions,
-    int64_t tx_index,
-    int64_t sample_count) {
-    auto [ray_o, ray_tmax, active, tx_pol] =
-        channel_mc_reflection_launch_inputs_cuda(tx_positions, tx_index, sample_count);
-    pybind11::dict out;
-    out["ray_o"] = ray_o;
-    out["ray_tmax"] = ray_tmax;
-    out["active"] = active;
-    out["tx_pol"] = tx_pol;
-    return out;
-}
+namespace {
 
-torch::Tensor channel_mc_slab_reflection_accumulate(
-    torch::Tensor ray_o, torch::Tensor ray_d, torch::Tensor trace_valid,
-    torch::Tensor trace_t, torch::Tensor trace_prim, torch::Tensor face_normals,
-    torch::Tensor eta_r, torch::Tensor sigma, torch::Tensor gain,
-    torch::Tensor material_valid, torch::Tensor thickness,
-    int64_t contribution_depth, int64_t axis, double plane_position,
-    double coord0_min, double coord0_max, double coord1_min, double coord1_max,
-    int64_t resolution0, int64_t resolution1, double wavelength,
-    double solid_angle_per_ray, double cell_area, torch::Tensor tx_pol) {
+void check_reflection_trace(
+    const torch::Tensor& ray_o, const torch::Tensor& ray_d, const torch::Tensor& trace_valid,
+    const torch::Tensor& trace_t, const torch::Tensor& trace_prim, const torch::Tensor& face_normals) {
     TORCH_CHECK(ray_o.is_cuda() && ray_d.is_cuda(), "reflection rays must be CUDA tensors");
     TORCH_CHECK(ray_o.scalar_type() == at::kFloat && ray_d.scalar_type() == at::kFloat,
                 "reflection rays must be float32");
@@ -501,22 +485,174 @@ torch::Tensor channel_mc_slab_reflection_accumulate(
     TORCH_CHECK(trace_valid.size(0) == ray_o.size(0), "trace batch must match rays");
     TORCH_CHECK(face_normals.scalar_type() == at::kFloat && face_normals.dim() == 2 && face_normals.size(1) == 3,
                 "face_normals must have shape (F, 3)");
+}
+
+ReflectionReceiverArgs reflection_receivers(
+    int64_t axis, double plane_position, double coord0_min, double coord0_max, double coord1_min,
+    double coord1_max, int64_t resolution0, int64_t resolution1, double cell_area,
+    const torch::Tensor& points, double point_radius, const torch::Tensor& reference) {
+    ReflectionReceiverArgs args;
+    TORCH_CHECK(points.is_cuda() && points.scalar_type() == at::kFloat && points.dim() == 2 &&
+                    points.size(1) == 3 && points.get_device() == reference.get_device(),
+                "points must be a float32 CUDA tensor of shape (P, 3)");
+    if (points.size(0) > 0) {
+        TORCH_CHECK(std::isfinite(point_radius) && point_radius != 0.0,
+                    "point_radius must be finite and non-zero");
+        args.points = points.contiguous();
+        args.point_radius = point_radius;
+        return args;
+    }
+    TORCH_CHECK(axis >= 0 && axis <= 2, "axis must be 0, 1, or 2");
+    TORCH_CHECK(resolution0 > 0 && resolution1 > 0, "grid resolution must be positive");
+    TORCH_CHECK(cell_area > 0.0, "cell_area must be positive");
+    args.axis = axis;
+    args.plane_position = plane_position;
+    args.coord0_min = coord0_min;
+    args.coord0_max = coord0_max;
+    args.coord1_min = coord1_min;
+    args.coord1_max = coord1_max;
+    args.resolution0 = resolution0;
+    args.resolution1 = resolution1;
+    args.cell_area = cell_area;
+    return args;
+}
+
+void check_solid_angle(const torch::Tensor& solid_angle, const torch::Tensor& reference) {
+    TORCH_CHECK(solid_angle.is_cuda() && solid_angle.scalar_type() == at::kFloat &&
+                    solid_angle.numel() == 1 && solid_angle.get_device() == reference.get_device(),
+                "solid_angle must be a float32 CUDA tensor with one element");
+}
+
+void check_tx_pol(const torch::Tensor& tx_pol) {
+    TORCH_CHECK(tx_pol.is_cuda() && tx_pol.scalar_type() == at::kFloat && tx_pol.numel() == 3,
+                "tx_pol must be a float32 CUDA tensor with 3 elements");
+}
+
+}  // namespace
+
+pybind11::dict channel_mc_reflection_rays(
+    torch::Tensor tx_positions, pybind11::object bounds, int64_t sample_count, int64_t seed) {
+    TORCH_CHECK(tx_positions.is_cuda() && tx_positions.scalar_type() == at::kFloat &&
+                    tx_positions.dim() == 2 && tx_positions.size(1) == 3,
+                "tx_positions must be a float32 CUDA tensor of shape (T, 3)");
+    TORCH_CHECK(sample_count > 0, "sample_count must be positive");
+    torch::Tensor bounds_tensor;
+    const bool use_bounds = !bounds.is_none();
+    if (use_bounds) {
+        bounds_tensor = bounds.cast<torch::Tensor>();
+        TORCH_CHECK(bounds_tensor.is_cuda() && bounds_tensor.scalar_type() == at::kFloat &&
+                        bounds_tensor.numel() == 6 &&
+                        bounds_tensor.get_device() == tx_positions.get_device(),
+                    "bounds must be a float32 CUDA tensor with 6 elements");
+        bounds_tensor = bounds_tensor.contiguous();
+    }
+    auto [ray_o, ray_d, active, solid_angle] = channel_mc_reflection_rays_cuda(
+        tx_positions.contiguous(), bounds_tensor, use_bounds, sample_count, seed);
+    pybind11::dict out;
+    out["ray_o"] = ray_o;
+    out["ray_d"] = ray_d;
+    out["active"] = active;
+    out["solid_angle"] = solid_angle;
+    return out;
+}
+
+torch::Tensor channel_mc_scene_bounds(torch::Tensor vertices) {
+    TORCH_CHECK(vertices.is_cuda() && vertices.scalar_type() == at::kFloat && vertices.dim() == 2 &&
+                    vertices.size(1) == 3 && vertices.size(0) > 0,
+                "vertices must be a non-empty float32 CUDA tensor of shape (V, 3)");
+    return channel_mc_scene_bounds_cuda(vertices.contiguous());
+}
+
+void channel_mc_reflection_final_segment(
+    torch::Tensor ray_o, torch::Tensor ray_d, torch::Tensor trace_valid, torch::Tensor trace_t,
+    torch::Tensor trace_prim, torch::Tensor face_normals, torch::Tensor material_valid,
+    int64_t axis, double plane_position, double coord0_min, double coord0_max,
+    double coord1_min, double coord1_max, int64_t resolution0, int64_t resolution1,
+    double cell_area, torch::Tensor points, double point_radius, double wavelength,
+    bool first_block, torch::Tensor final_o, torch::Tensor final_d, torch::Tensor final_tmax,
+    torch::Tensor final_offset, torch::Tensor final_active) {
+    check_reflection_trace(ray_o, ray_d, trace_valid, trace_t, trace_prim, face_normals);
+    TORCH_CHECK(material_valid.scalar_type() == at::kBool &&
+                    material_valid.numel() == face_normals.size(0),
+                "material_valid must cover every face");
+    const int64_t rays = ray_o.size(0);
+    for (const auto* tensor : {&final_o, &final_d})
+        TORCH_CHECK(tensor->is_cuda() && tensor->scalar_type() == at::kFloat && tensor->is_contiguous() &&
+                        tensor->sizes() == ray_o.sizes(),
+                    "final_o and final_d must be contiguous float32 (N, 3) tensors");
+    for (const auto* tensor : {&final_tmax, &final_offset})
+        TORCH_CHECK(tensor->is_cuda() && tensor->scalar_type() == at::kFloat && tensor->is_contiguous() &&
+                        tensor->dim() == 1 && tensor->size(0) == rays,
+                    "final_tmax and final_offset must be contiguous float32 (N,) tensors");
+    TORCH_CHECK(final_active.is_cuda() && final_active.scalar_type() == at::kBool &&
+                    final_active.is_contiguous() && final_active.dim() == 1 && final_active.size(0) == rays,
+                "final_active must be a contiguous bool (N,) tensor");
+    TORCH_CHECK(wavelength > 0.0, "wavelength must be positive");
+    const ReflectionReceiverArgs receivers = reflection_receivers(
+        axis, plane_position, coord0_min, coord0_max, coord1_min, coord1_max, resolution0,
+        resolution1, cell_area, points, point_radius, ray_o);
+    channel_mc_reflection_final_segment_cuda(
+        ray_o.contiguous(), ray_d.contiguous(), trace_valid.contiguous(), trace_t.contiguous(),
+        trace_prim.contiguous(), face_normals.contiguous(), material_valid.contiguous(), receivers,
+        wavelength, first_block, final_o, final_d, final_tmax, final_offset, final_active);
+}
+
+pybind11::tuple channel_mc_reflection_append_final(
+    torch::Tensor trace_valid, torch::Tensor trace_t, torch::Tensor trace_prim,
+    torch::Tensor final_valid, torch::Tensor final_t, torch::Tensor final_prim,
+    torch::Tensor final_offset) {
+    TORCH_CHECK(trace_valid.is_cuda() && trace_valid.scalar_type() == at::kBool && trace_valid.dim() == 2,
+                "trace_valid must be a rank-2 bool CUDA tensor");
+    TORCH_CHECK(trace_t.scalar_type() == at::kFloat && trace_t.sizes() == trace_valid.sizes(),
+                "trace_t must match trace_valid");
+    TORCH_CHECK(trace_prim.scalar_type() == at::kInt && trace_prim.sizes() == trace_valid.sizes(),
+                "trace_prim must match trace_valid");
+    const int64_t rays = trace_valid.size(0);
+    TORCH_CHECK(final_valid.scalar_type() == at::kBool && final_valid.numel() == rays,
+                "final_valid must have one entry per ray");
+    TORCH_CHECK(final_t.scalar_type() == at::kFloat && final_t.numel() == rays,
+                "final_t must have one entry per ray");
+    TORCH_CHECK(final_prim.scalar_type() == at::kInt && final_prim.numel() == rays,
+                "final_prim must have one entry per ray");
+    TORCH_CHECK(final_offset.scalar_type() == at::kFloat && final_offset.numel() == rays,
+                "final_offset must have one entry per ray");
+    auto [valid, t, prim] = channel_mc_reflection_append_final_cuda(
+        trace_valid.contiguous(), trace_t.contiguous(), trace_prim.contiguous(),
+        final_valid.contiguous(), final_t.contiguous(), final_prim.contiguous(),
+        final_offset.contiguous());
+    pybind11::tuple out(3);
+    out[0] = valid;
+    out[1] = t;
+    out[2] = prim;
+    return out;
+}
+
+torch::Tensor channel_mc_slab_reflection_accumulate(
+    torch::Tensor ray_o, torch::Tensor ray_d, torch::Tensor trace_valid,
+    torch::Tensor trace_t, torch::Tensor trace_prim, torch::Tensor face_normals,
+    torch::Tensor eta_r, torch::Tensor sigma, torch::Tensor gain,
+    torch::Tensor material_valid, torch::Tensor thickness,
+    int64_t contribution_depth, int64_t axis, double plane_position,
+    double coord0_min, double coord0_max, double coord1_min, double coord1_max,
+    int64_t resolution0, int64_t resolution1, double wavelength,
+    torch::Tensor solid_angle, double cell_area, torch::Tensor tx_pol,
+    torch::Tensor points, double point_radius) {
+    check_reflection_trace(ray_o, ray_d, trace_valid, trace_t, trace_prim, face_normals);
     TORCH_CHECK(eta_r.sizes() == sigma.sizes() && eta_r.sizes() == gain.sizes() &&
                 eta_r.sizes() == material_valid.sizes() && eta_r.sizes() == thickness.sizes(),
                 "per-face material tensors must have matching shape");
     TORCH_CHECK(eta_r.numel() == face_normals.size(0), "materials must cover every face");
-    TORCH_CHECK(axis >= 0 && axis <= 2, "axis must be 0, 1, or 2");
-    TORCH_CHECK(resolution0 > 0 && resolution1 > 0, "grid resolution must be positive");
-    TORCH_CHECK(wavelength > 0.0 && cell_area > 0.0, "wavelength and cell_area must be positive");
-    TORCH_CHECK(tx_pol.is_cuda() && tx_pol.scalar_type() == at::kFloat && tx_pol.numel() == 3,
-                "tx_pol must be a float32 CUDA tensor with 3 elements");
+    TORCH_CHECK(wavelength > 0.0, "wavelength must be positive");
+    check_solid_angle(solid_angle, ray_o);
+    check_tx_pol(tx_pol);
+    const ReflectionReceiverArgs receivers = reflection_receivers(
+        axis, plane_position, coord0_min, coord0_max, coord1_min, coord1_max, resolution0,
+        resolution1, cell_area, points, point_radius, ray_o);
     return channel_mc_slab_reflection_accumulate_cuda(
         ray_o.contiguous(), ray_d.contiguous(), trace_valid.contiguous(), trace_t.contiguous(),
         trace_prim.contiguous(), face_normals.contiguous(), eta_r.contiguous(), sigma.contiguous(),
         gain.contiguous(), material_valid.contiguous(), thickness.contiguous(), contribution_depth,
-        axis, plane_position, coord0_min, coord0_max, coord1_min, coord1_max,
-        resolution0, resolution1, wavelength, solid_angle_per_ray, cell_area,
-        tx_pol.contiguous());
+        receivers, wavelength, solid_angle.contiguous(), tx_pol.contiguous());
 }
 
 pybind11::tuple channel_mc_slab_reflection_accumulate_backward(
@@ -529,20 +665,22 @@ pybind11::tuple channel_mc_slab_reflection_accumulate_backward(
     int64_t contribution_depth, int64_t axis, double plane_position,
     double coord0_min, double coord0_max, double coord1_min, double coord1_max,
     int64_t resolution0, int64_t resolution1, double wavelength,
-    double solid_angle_per_ray, double cell_area, double wavelength_dfreq,
-    torch::Tensor tx_pol) {
-    TORCH_CHECK(tx_pol.is_cuda() && tx_pol.scalar_type() == at::kFloat && tx_pol.numel() == 3,
-                "tx_pol must be a float32 CUDA tensor with 3 elements");
+    torch::Tensor solid_angle, double cell_area, double wavelength_dfreq,
+    torch::Tensor tx_pol, torch::Tensor points, double point_radius) {
+    check_reflection_trace(ray_o, ray_d, trace_valid, trace_t, trace_prim, face_normals);
+    check_solid_angle(solid_angle, ray_o);
+    check_tx_pol(tx_pol);
+    const ReflectionReceiverArgs receivers = reflection_receivers(
+        axis, plane_position, coord0_min, coord0_max, coord1_min, coord1_max, resolution0,
+        resolution1, cell_area, points, point_radius, ray_o);
     auto [grad_eta_r, grad_sigma, grad_gain, grad_thickness, grad_frequency] =
         channel_mc_slab_reflection_accumulate_backward_cuda(
             ray_o.contiguous(), ray_d.contiguous(), trace_valid.contiguous(),
             trace_t.contiguous(), trace_prim.contiguous(), face_normals.contiguous(),
             eta_r.contiguous(), sigma.contiguous(), gain.contiguous(),
             material_valid.contiguous(), thickness.contiguous(), grad_output,
-            need_materials, need_frequency, contribution_depth, axis, plane_position,
-            coord0_min, coord0_max, coord1_min, coord1_max,
-            resolution0, resolution1, wavelength, solid_angle_per_ray, cell_area,
-            wavelength_dfreq, tx_pol.contiguous());
+            need_materials, need_frequency, contribution_depth, receivers, wavelength,
+            solid_angle.contiguous(), wavelength_dfreq, tx_pol.contiguous());
     pybind11::tuple out(5);
     out[0] = grad_eta_r;
     out[1] = grad_sigma;
@@ -564,10 +702,14 @@ torch::Tensor channel_mc_slab_reflection_accumulate_jvp(
     int64_t contribution_depth, int64_t axis, double plane_position,
     double coord0_min, double coord0_max, double coord1_min, double coord1_max,
     int64_t resolution0, int64_t resolution1, double wavelength,
-    double solid_angle_per_ray, double cell_area, double wavelength_tangent,
-    torch::Tensor tx_pol) {
-    TORCH_CHECK(tx_pol.is_cuda() && tx_pol.scalar_type() == at::kFloat && tx_pol.numel() == 3,
-                "tx_pol must be a float32 CUDA tensor with 3 elements");
+    torch::Tensor solid_angle, double cell_area, double wavelength_tangent,
+    torch::Tensor tx_pol, torch::Tensor points, double point_radius) {
+    check_reflection_trace(ray_o, ray_d, trace_valid, trace_t, trace_prim, face_normals);
+    check_solid_angle(solid_angle, ray_o);
+    check_tx_pol(tx_pol);
+    const ReflectionReceiverArgs receivers = reflection_receivers(
+        axis, plane_position, coord0_min, coord0_max, coord1_min, coord1_max, resolution0,
+        resolution1, cell_area, points, point_radius, ray_o);
     return channel_mc_slab_reflection_accumulate_jvp_cuda(
         ray_o.contiguous(), ray_d.contiguous(), trace_valid.contiguous(),
         trace_t.contiguous(), trace_prim.contiguous(), face_normals.contiguous(),
@@ -578,10 +720,8 @@ torch::Tensor channel_mc_slab_reflection_accumulate_jvp(
         has_tangent_gain ? tangent_gain.contiguous() : tangent_gain,
         has_tangent_thickness ? tangent_thickness.contiguous() : tangent_thickness,
         has_tangent_eta_r, has_tangent_sigma, has_tangent_gain,
-        has_tangent_thickness, contribution_depth, axis, plane_position,
-        coord0_min, coord0_max, coord1_min, coord1_max,
-        resolution0, resolution1, wavelength, solid_angle_per_ray, cell_area,
-        wavelength_tangent, tx_pol.contiguous());
+        has_tangent_thickness, contribution_depth, receivers, wavelength,
+        solid_angle.contiguous(), wavelength_tangent, tx_pol.contiguous());
 }
 
 torch::Tensor channel_mc_diffraction_discover_edges(

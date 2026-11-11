@@ -66,27 +66,45 @@ def _forbid_compile(monkeypatch, solver: str) -> None:
     monkeypatch.setattr(module, "compile_scene", fail)
 
 
-@pytest.mark.parametrize("components", [{"reflection"}, {"los", "diffraction"}, {"los", "transmission"}])
-def test_mc_basic_refuses_non_los_components_on_point_receivers(monkeypatch, components) -> None:
+def test_mc_basic_refuses_diffraction_on_point_receivers(monkeypatch) -> None:
     _forbid_compile(monkeypatch, "basic")
-    with pytest.raises(ValueError, match=r"computes .* only on a ReceiverGrid; with point receivers"):
-        _solve("basic", Scene(structures=[_wall()], endpoints=[_tx(), _rx()]), components=components)
+    with pytest.raises(ValueError, match="samples diffraction only on a ReceiverGrid"):
+        _solve(
+            "basic", Scene(structures=[_wall()], endpoints=[_tx(), _rx()]),
+            components={"los", "diffraction"},
+        )
 
 
-def test_mc_basic_still_solves_los_on_point_receivers() -> None:
-    result = _solve("basic", Scene(structures=[_wall()], endpoints=[_tx(), _rx()]), components={"los"})
-    assert float(result.path_gain.sum()) > 0.0
+@pytest.mark.parametrize("components", [{"reflection"}, {"los", "transmission"}, {"los"}])
+def test_mc_basic_solves_point_receivers(components) -> None:
+    result = _solve(
+        "basic", Scene(structures=[_wall()], endpoints=[_tx(), _rx()]), components=components,
+        samples=1 << 18,
+    )
+    assert result.path_gain.shape == (1, 1)
+    for name in components:
+        assert result.component_maps[name].shape == (1, 1)
+    if "los" in components or "reflection" in components:
+        assert float(result.path_gain.sum()) > 0.0
 
 
-@pytest.mark.parametrize("solver", ["basic", "bdpt"])
 @pytest.mark.parametrize("layout", ["two_grids", "grid_and_point"])
-def test_monte_carlo_refuses_multiple_or_mixed_receivers(
-    monkeypatch, solver: str, layout: str,
-) -> None:
-    _forbid_compile(monkeypatch, solver)
+def test_bdpt_refuses_multiple_or_mixed_receivers(monkeypatch, layout: str) -> None:
+    _forbid_compile(monkeypatch, "bdpt")
     receivers = [_grid(), _grid(shape=(2, 2))] if layout == "two_grids" else [_grid(), _rx()]
     with pytest.raises(ValueError, match="accepts either exactly one ReceiverGrid or only point receivers"):
-        _solve(solver, Scene(structures=[_wall()], endpoints=[_tx(), *receivers]), components={"los"})
+        _solve("bdpt", Scene(structures=[_wall()], endpoints=[_tx(), *receivers]), components={"los"})
+
+
+@pytest.mark.parametrize("layout", ["two_grids", "grid_and_point"])
+def test_mc_basic_solves_multiple_or_mixed_receivers(layout: str) -> None:
+    receivers = [_grid(), _grid(shape=(2, 2))] if layout == "two_grids" else [_grid(), _rx()]
+    result = _solve(
+        "basic", Scene(structures=[_wall()], endpoints=[_tx(), *receivers]),
+        components={"los", "reflection"},
+    )
+    expected = 20 if layout == "two_grids" else 17
+    assert result.path_gain.shape == (1, expected)
 
 
 @pytest.mark.parametrize("leaf", ["tx", "rx", "vertices"])

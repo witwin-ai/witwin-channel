@@ -119,7 +119,7 @@
           "name": "Config",
           "kind": "class",
           "target": "witwin.channel.montecarlo.basic.Config",
-          "contract_sha256": "f14655e0720f7eea08382272eac5163c13acee66a117c61f45551e22a91dcc8d"
+          "contract_sha256": "57702b0a1b40234fc5cc8f5a88ab6c195329ee58dbb5ed074b04d7b0fde0b95f"
         },
         {
           "name": "Result",

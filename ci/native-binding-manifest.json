@@ -3452,18 +3452,6 @@
       "python_owners": ["witwin.channel.runtime.mc_pack_vec3"]
     },
     {
-      "name": "mc_point_component_power",
-      "target": "channel_bdpt_point_component_power",
-      "return_type": "pybind11::dict",
-      "doc": "Reduce point-receiver MC component powers with CUDA kernels.",
-      "parameters": [
-        ["path_gain", "torch::Tensor", null],
-        ["include_los", "bool", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.mc_point_component_power"]
-    },
-    {
       "name": "mc_receiver_grid_points",
       "target": "channel_mc_receiver_grid_points",
       "return_type": "torch::Tensor",
@@ -3497,17 +3485,70 @@
       "python_owners": ["witwin.channel.kernels.montecarlo.mc_reflection_ad_max_depth"]
     },
     {
-      "name": "mc_reflection_launch_inputs",
-      "target": "channel_mc_reflection_launch_inputs",
-      "return_type": "pybind11::dict",
-      "doc": "Prepare RayD reflection launch tensors with a CUDA kernel.",
+      "name": "mc_reflection_append_final",
+      "target": "channel_mc_reflection_append_final",
+      "return_type": "pybind11::tuple",
+      "doc": "Append the bounded final-segment hit to the reflection trace table.",
       "parameters": [
-        ["tx_positions", "torch::Tensor", null],
-        ["tx_index", "int64_t", null],
-        ["sample_count", "int64_t", null]
+        ["trace_valid", "torch::Tensor", null],
+        ["trace_t", "torch::Tensor", null],
+        ["trace_prim", "torch::Tensor", null],
+        ["final_valid", "torch::Tensor", null],
+        ["final_t", "torch::Tensor", null],
+        ["final_prim", "torch::Tensor", null],
+        ["final_offset", "torch::Tensor", null]
       ],
       "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.mc_reflection_launch_inputs"]
+      "python_owners": ["witwin.channel.kernels.montecarlo.mc_reflection_append_final"]
+    },
+    {
+      "name": "mc_reflection_final_segment",
+      "target": "channel_mc_reflection_final_segment",
+      "return_type": "void",
+      "doc": "Write the bounded final reflected segment each receiver block needs, in place.",
+      "parameters": [
+        ["ray_o", "torch::Tensor", null],
+        ["ray_d", "torch::Tensor", null],
+        ["trace_valid", "torch::Tensor", null],
+        ["trace_t", "torch::Tensor", null],
+        ["trace_prim", "torch::Tensor", null],
+        ["face_normals", "torch::Tensor", null],
+        ["material_valid", "torch::Tensor", null],
+        ["axis", "int64_t", null],
+        ["plane_position", "double", null],
+        ["coord0_min", "double", null],
+        ["coord0_max", "double", null],
+        ["coord1_min", "double", null],
+        ["coord1_max", "double", null],
+        ["resolution0", "int64_t", null],
+        ["resolution1", "int64_t", null],
+        ["cell_area", "double", null],
+        ["points", "torch::Tensor", null],
+        ["point_radius", "double", null],
+        ["wavelength", "double", null],
+        ["first_block", "bool", null],
+        ["final_o", "torch::Tensor", null],
+        ["final_d", "torch::Tensor", null],
+        ["final_tmax", "torch::Tensor", null],
+        ["final_offset", "torch::Tensor", null],
+        ["final_active", "torch::Tensor", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.montecarlo.mc_reflection_final_segment"]
+    },
+    {
+      "name": "mc_reflection_rays",
+      "target": "channel_mc_reflection_rays",
+      "return_type": "pybind11::dict",
+      "doc": "Generate seeded, bounds-folded lattice launch rays for every transmitter.",
+      "parameters": [
+        ["tx_positions", "torch::Tensor", null],
+        ["bounds", "pybind11::object", null],
+        ["sample_count", "int64_t", null],
+        ["seed", "int64_t", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.montecarlo.mc_reflection_rays"]
     },
     {
       "name": "mc_sample_directions",
@@ -3520,6 +3561,17 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.topology.mc_sample_directions"]
+    },
+    {
+      "name": "mc_scene_bounds",
+      "target": "channel_mc_scene_bounds",
+      "return_type": "torch::Tensor",
+      "doc": "Reduce scene vertices to their axis-aligned bounds with a CUDA kernel.",
+      "parameters": [
+        ["vertices", "torch::Tensor", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.montecarlo.mc_scene_bounds"]
     },
     {
       "name": "mc_selected_edge_indices",
@@ -3559,9 +3611,11 @@
         ["resolution0", "int64_t", null],
         ["resolution1", "int64_t", null],
         ["wavelength", "double", null],
-        ["solid_angle_per_ray", "double", null],
+        ["solid_angle", "torch::Tensor", null],
         ["cell_area", "double", null],
-        ["tx_pol", "torch::Tensor", null]
+        ["tx_pol", "torch::Tensor", null],
+        ["points", "torch::Tensor", null],
+        ["point_radius", "double", null]
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.montecarlo.mc_slab_reflection_accumulate"]
@@ -3596,10 +3650,12 @@
         ["resolution0", "int64_t", null],
         ["resolution1", "int64_t", null],
         ["wavelength", "double", null],
-        ["solid_angle_per_ray", "double", null],
+        ["solid_angle", "torch::Tensor", null],
         ["cell_area", "double", null],
         ["wavelength_dfreq", "double", null],
-        ["tx_pol", "torch::Tensor", null]
+        ["tx_pol", "torch::Tensor", null],
+        ["points", "torch::Tensor", null],
+        ["point_radius", "double", null]
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.montecarlo.mc_slab_reflection_accumulate_backward"]
@@ -3639,10 +3695,12 @@
         ["resolution0", "int64_t", null],
         ["resolution1", "int64_t", null],
         ["wavelength", "double", null],
-        ["solid_angle_per_ray", "double", null],
+        ["solid_angle", "torch::Tensor", null],
         ["cell_area", "double", null],
         ["wavelength_tangent", "double", null],
-        ["tx_pol", "torch::Tensor", null]
+        ["tx_pol", "torch::Tensor", null],
+        ["points", "torch::Tensor", null],
+        ["point_radius", "double", null]
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.montecarlo.mc_slab_reflection_accumulate_jvp"]
