@@ -66,13 +66,13 @@ def _forbid_compile(monkeypatch, solver: str) -> None:
     monkeypatch.setattr(module, "compile_scene", fail)
 
 
-def test_mc_basic_refuses_diffraction_on_point_receivers(monkeypatch) -> None:
-    _forbid_compile(monkeypatch, "basic")
-    with pytest.raises(ValueError, match="samples diffraction only on a ReceiverGrid"):
-        _solve(
-            "basic", Scene(structures=[_wall()], endpoints=[_tx(), _rx()]),
-            components={"los", "diffraction"},
-        )
+def test_mc_basic_solves_diffraction_on_point_receivers() -> None:
+    result = _solve(
+        "basic", Scene(structures=[_wall()], endpoints=[_tx(), _rx()]),
+        components={"los", "diffraction"},
+    )
+    assert result.path_gain.shape == (1, 1)
+    assert result.component_maps["diffraction"].shape == (1, 1)
 
 
 @pytest.mark.parametrize("components", [{"reflection"}, {"los", "transmission"}, {"los"}])
