@@ -1245,6 +1245,22 @@ def _point_diffraction_map(  # type: ignore[no-untyped-def]
     return total
 
 
+def lane_stream_seed(seed: int) -> int:
+    """The seed handed to the lane-hashed diffraction samplers, mixed from the user seed.
+
+    Those samplers draw ``hash(lane ^ stream_constant ^ seed)``. With the raw seed, two
+    seeds below the lane count only permute the same set of hash inputs, so nearby seeds
+    reuse one set of cone azimuths. Mixing spreads every seed over all 31 bits, so two
+    seeds share inputs only with probability about ``samples / 2**31``.
+    """
+
+    value = (int(seed) + 0x9E3779B97F4A7C15) & 0xFFFFFFFFFFFFFFFF
+    value = ((value ^ (value >> 30)) * 0xBF58476D1CE4E5B9) & 0xFFFFFFFFFFFFFFFF
+    value = ((value ^ (value >> 27)) * 0x94D049BB133111EB) & 0xFFFFFFFFFFFFFFFF
+    value ^= value >> 31
+    return value >> 33
+
+
 def diffraction_component_map(
     scene: SolverScene, rayd: RayDSceneResource, grid: ReceiverGrid | None, *, samples: int,
     seed: int, device: torch.device, material_tensors: MaterialTensors,
@@ -1255,6 +1271,7 @@ def diffraction_component_map(
     """Keller-cone diffraction deposits ``[T, rows, cols]`` on ``grid``, or ``[T, 1, P]`` at
     point receivers ``points`` (capture spheres of ``point_radius``) when ``grid`` is None."""
 
+    seed = lane_stream_seed(seed)
     def map_shape() -> tuple[int, int]:
         if grid is not None:
             dim0, dim1 = component_grid_shape(grid)
