@@ -49,5 +49,5 @@ def test_curated_public_api_matches_frozen_snapshot():
     public_modules = [module["module"] for module in expected["modules"]]
 
     assert expected["schema_version"] == 1
-    assert len(public_modules) == len(set(public_modules)) == 7
+    assert len(public_modules) == len(set(public_modules)) == 8
     assert _current_snapshot(public_modules) == expected

@@ -408,6 +408,78 @@
       ]
     },
     {
+      "module": "witwin.channel.importers",
+      "exports": [
+        {
+          "name": "ImportedScene",
+          "kind": "class",
+          "target": "witwin.channel.importers.ImportedScene",
+          "contract_sha256": "bed3be8b075afeda1dbe84dddc5531f2c61896b92c3e6f0a0d477c42357f9108"
+        },
+        {
+          "name": "MeshData",
+          "kind": "class",
+          "target": "witwin.channel.importers.MeshData",
+          "contract_sha256": "72796c7e3879f20bf8df19cea7e1c00be2caab3554ada657aa124dba73d0d62d"
+        },
+        {
+          "name": "StructureReport",
+          "kind": "class",
+          "target": "witwin.channel.importers.StructureReport",
+          "contract_sha256": "6981a70f36546365c5c0cdc2b603192182a484fbb33f383fb6be29bfac2ea2a1"
+        },
+        {
+          "name": "build_structures",
+          "kind": "function",
+          "target": "witwin.channel.importers.build_structures",
+          "contract_sha256": "b508cbedca0ba6a3630e6e4b225d37c62cfdc2d3bbd16e1f0ef053ddabd6adec",
+          "signature": "(meshes: Sequence[MeshData], materials: MaterialSpec | MaterialMap, *, merge: bool=True, weld: bool=True, weld_tolerance: float | None=None, warnings: Sequence[str]=())"
+        },
+        {
+          "name": "load_mesh",
+          "kind": "function",
+          "target": "witwin.channel.importers.load_mesh",
+          "contract_sha256": "4f8576c87938d611a38e7a4780c8463e4876d39ac2cc1b410e9fffab795c977d",
+          "signature": "(path: StrPath, materials: MaterialSpec | MaterialMap, *, merge: bool=True, weld: bool=True, weld_tolerance: float | None=None, up_axis: str='z')"
+        },
+        {
+          "name": "load_mitsuba",
+          "kind": "function",
+          "target": "witwin.channel.importers.load_mitsuba",
+          "contract_sha256": "a09cb9ef0e11c06b76ee1838634f51ac811db001d63525648f378e7bba2f2bbd",
+          "signature": "(path: StrPath, *, frequency_hz: float | tuple[float, float], materials: Mapping[str, MaterialSpec] | None=None, default_material: MaterialSpec | None=None, merge_shapes: bool=True, weld: bool=True, weld_tolerance: float | None=None, dispersive: bool=True)"
+        },
+        {
+          "name": "read_gltf",
+          "kind": "function",
+          "target": "witwin.channel.importers.read_gltf",
+          "contract_sha256": "830dc803e3c04808aaca7876e364e7a64281180049978f16a4accd9289ed290e",
+          "signature": "(path: StrPath, *, up_axis: str='z')"
+        },
+        {
+          "name": "read_obj",
+          "kind": "function",
+          "target": "witwin.channel.importers.read_obj",
+          "contract_sha256": "b9251c360f32691e199e0e49c4a92d9f721097c4ec7eff79a93c9fedf09760e2",
+          "signature": "(path: StrPath)"
+        },
+        {
+          "name": "read_ply",
+          "kind": "function",
+          "target": "witwin.channel.importers.read_ply",
+          "contract_sha256": "5d0d264626018eaa66e18178146701e788a288516cc0083080e348199dc3af92",
+          "signature": "(path: StrPath, *, name: str | None=None, material: str | None=None)"
+        },
+        {
+          "name": "weld_vertices",
+          "kind": "function",
+          "target": "witwin.channel.importers.weld_vertices",
+          "contract_sha256": "4911ae93726f704f8858f270c90da4ce501e95884a76de27db3c0870d2b33b53",
+          "signature": "(vertices: np.ndarray, faces: np.ndarray, *, tolerance: float)"
+        }
+      ]
+    },
+    {
       "module": "witwin.channel.presets",
       "exports": [
         {
