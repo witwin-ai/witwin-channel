@@ -94,3 +94,33 @@ def test_native_tx_visibility_plan_matches_frozen_four_sample_contract() -> None
     assert empty_plan.active.dtype == torch.bool
     assert empty_plan.active.shape == (0,)
     assert empty_plan.active.is_contiguous()
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
+def test_batched_visibility_plan_matches_each_transmitter_plan() -> None:
+    if not build_info()["uses_rayd_native"]:
+        pytest.skip("RayD native diffraction is not built")
+
+    scene = wedge_diffraction_scene()
+    compiled = compile_scene(scene, reference_frequency_hz=3.0e9)
+    rayd = compiled.rayd
+    tx_positions = torch.tensor(
+        [[0.0, -1.0, 0.5], [2.5, 2.0, 0.4], [-1.0, 3.0, 1.5]], device="cuda"
+    )
+    power = torch.tensor([1.0, 2.0, 0.5], device="cuda")
+    edges = diffraction.selected_diffraction_edges(rayd, preserve_imported_edges=True)
+    states, source_index = diffraction._batched_diffraction_states(edges, tx_positions, power)
+    batched = diffraction.plan_tx_visible_diffraction_states(
+        rayd, states, tx_positions[0], per_state_source=True
+    )
+    per_tx = []
+    for index in range(3):
+        single = _deterministic_diffraction_states(
+            rayd, tx_positions[index].contiguous(), power, index, edges=edges
+        )
+        per_tx.append(diffraction.plan_tx_visible_diffraction_states(rayd, single, tx_positions[index]).active)
+        count = int(single[0].shape[0])
+        for column in range(12):
+            assert torch.equal(states[column][index * count : (index + 1) * count], single[column])
+    assert torch.equal(batched.active, torch.cat(per_tx))
+    assert bool(batched.active.any())
+    assert source_index.tolist() == sorted(source_index.tolist())

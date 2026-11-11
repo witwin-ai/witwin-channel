@@ -14,8 +14,6 @@ from witwin.channel import runtime
 
 
 _OWNER_NAMES = (
-    "deterministic_delay_to_path_length",
-    "deterministic_diffraction_vector_field",
     "deterministic_field_from_power_phase",
     "deterministic_los_field",
     "deterministic_pack_complex",

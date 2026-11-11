@@ -1275,39 +1275,6 @@
       "python_owners": ["witwin.channel.kernels.topology.deterministic_concat_topology_blocks"]
     },
     {
-      "name": "deterministic_delay_to_path_length",
-      "target": "channel_deterministic_delay_to_path_length",
-      "return_type": "torch::Tensor",
-      "doc": "Convert deterministic path delays to path lengths with a CUDA kernel.",
-      "parameters": [
-        ["delay_s", "torch::Tensor", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.fields.deterministic_delay_to_path_length"]
-    },
-    {
-      "name": "deterministic_diffraction_order1_compact",
-      "target": "channel_deterministic_diffraction_order1_compact",
-      "return_type": "pybind11::dict",
-      "doc": "Compact deterministic first-order diffraction RayD outputs with native CUDA.",
-      "parameters": [
-        ["valid", "torch::Tensor", null],
-        ["rx_id", "torch::Tensor", null],
-        ["depth", "torch::Tensor", null],
-        ["edge_id", "torch::Tensor", null],
-        ["delay", "torch::Tensor", null],
-        ["x_re", "torch::Tensor", null],
-        ["x_im", "torch::Tensor", null],
-        ["y_re", "torch::Tensor", null],
-        ["y_im", "torch::Tensor", null],
-        ["z_re", "torch::Tensor", null],
-        ["z_im", "torch::Tensor", null],
-        ["interaction_position", "torch::Tensor", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.topology.deterministic_diffraction_order1_compact"]
-    },
-    {
       "name": "deterministic_diffraction_state_pack",
       "target": "channel_deterministic_diffraction_state_pack",
       "return_type": "pybind11::tuple",
@@ -1354,20 +1321,28 @@
       "python_owners": ["witwin.channel.kernels.topology.deterministic_diffraction_state_pack_selected"]
     },
     {
-      "name": "deterministic_diffraction_vector_field",
-      "target": "channel_deterministic_diffraction_vector_field",
+      "name": "deterministic_diffraction_topology_compact",
+      "target": "channel_deterministic_diffraction_topology_compact",
       "return_type": "pybind11::dict",
-      "doc": "Convert RayD diffraction vector components into scalar deterministic fields with a CUDA kernel.",
+      "doc": "Compact batched order-1 diffraction exports into topology rows with native CUDA.",
       "parameters": [
+        ["valid", "torch::Tensor", null],
+        ["tx_id", "torch::Tensor", null],
+        ["rx_id", "torch::Tensor", null],
+        ["rx_offset", "int64_t", null],
+        ["depth", "torch::Tensor", null],
+        ["edge_id", "torch::Tensor", null],
+        ["delay", "torch::Tensor", null],
         ["x_re", "torch::Tensor", null],
         ["x_im", "torch::Tensor", null],
         ["y_re", "torch::Tensor", null],
         ["y_im", "torch::Tensor", null],
         ["z_re", "torch::Tensor", null],
-        ["z_im", "torch::Tensor", null]
+        ["z_im", "torch::Tensor", null],
+        ["interaction_position", "torch::Tensor", null]
       ],
       "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.fields.deterministic_diffraction_vector_field"]
+      "python_owners": ["witwin.channel.kernels.topology.deterministic_diffraction_topology_compact"]
     },
     {
       "name": "deterministic_face_anchor_points",
@@ -1723,28 +1698,6 @@
       "python_owners": ["witwin.channel.kernels.geometry.deterministic_surface_face_groups"]
     },
     {
-      "name": "deterministic_topology_base_fields",
-      "target": "channel_deterministic_topology_base_fields",
-      "return_type": "pybind11::dict",
-      "doc": "Fill deterministic topology base path fields with native CUDA.",
-      "parameters": [
-        ["rx_id", "torch::Tensor", null],
-        ["path_length_m", "torch::Tensor", null],
-        ["delay_s", "torch::Tensor", null],
-        ["path_gain", "torch::Tensor", null],
-        ["tx_index", "int64_t", null],
-        ["component_id", "int64_t", null],
-        ["depth_source", "torch::Tensor", null],
-        ["depth_value", "int64_t", null],
-        ["primitive_source", "torch::Tensor", null],
-        ["primitive_value", "int64_t", null],
-        ["edge_source", "torch::Tensor", null],
-        ["edge_value", "int64_t", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.topology.deterministic_topology_base_fields"]
-    },
-    {
       "name": "deterministic_topology_default_fields",
       "target": "channel_deterministic_topology_default_fields",
       "return_type": "pybind11::dict",
@@ -1777,7 +1730,8 @@
         ["edge_position", "torch::Tensor", null],
         ["edge_direction", "torch::Tensor", null],
         ["edge_t_min", "torch::Tensor", null],
-        ["edge_t_max", "torch::Tensor", null]
+        ["edge_t_max", "torch::Tensor", null],
+        ["state_source", "std::optional<torch::Tensor>", null]
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.geometry.diffraction_tx_visible_state_plan"]
@@ -4197,7 +4151,8 @@
         ["state_limit", "int64_t", null],
         ["capacity", "int64_t", null],
         ["wavelength", "double", null],
-        ["isb_taper_width_scale", "double", null]
+        ["isb_taper_width_scale", "double", null],
+        ["state_source_index", "std::optional<torch::Tensor>", null]
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.geometry.rayd_diffraction_paths_order1_forward"]

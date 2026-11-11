@@ -667,8 +667,15 @@ def diffraction_tx_visible_state_plan(
     scene_resource: object, tx: torch.Tensor, edge_index: torch.Tensor, edge_position: torch.Tensor,
     edge_direction: torch.Tensor, edge_t_min: torch.Tensor, edge_t_max: torch.Tensor,
     n0: torch.Tensor, n1: torch.Tensor, prim0: torch.Tensor, prim1: torch.Tensor,
-    exterior_angle: torch.Tensor, source: torch.Tensor, source_power: torch.Tensor,
+    exterior_angle: torch.Tensor, source: torch.Tensor, source_power: torch.Tensor, *,
+    per_state_source: bool = False,
 ) -> torch.Tensor:
+    """Transmitter visibility of every diffraction state.
+
+    With ``per_state_source`` each state is checked against its own ``source`` row, so one
+    launch serves the states of several transmitters; ``tx`` is still validated.
+    """
+
     validate_cuda_tensor("tx", tx, dtype=torch.float32, ndim=1, trailing_shape=(3,))
     validate_cuda_tensor(
         "edge_index", edge_index, dtype=torch.int32, ndim=1, require_contiguous=False
@@ -755,6 +762,7 @@ def diffraction_tx_visible_state_plan(
         edge_direction,
         edge_t_min,
         edge_t_max,
+        source.contiguous() if per_state_source else None,
     )
     if not isinstance(active, torch.Tensor):
         raise TypeError(

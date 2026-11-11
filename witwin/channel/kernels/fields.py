@@ -38,8 +38,6 @@ __all__ = [
     "_FieldTransmissionSequenceAdFunction",
     "ad_liveness",
     "coupled_rd_prepare_ad",
-    "deterministic_delay_to_path_length",
-    "deterministic_diffraction_vector_field",
     "deterministic_field_from_power_phase",
     "deterministic_los_field",
     "deterministic_pack_complex",
@@ -3451,56 +3449,6 @@ def deterministic_los_field(
     if exported["path_gain"].shape != path_gain.shape:
         raise ValueError("_channel.deterministic_los_field returned bad shape")
     return exported
-
-
-def deterministic_diffraction_vector_field(
-    x_re: torch.Tensor, x_im: torch.Tensor, y_re: torch.Tensor, y_im: torch.Tensor,
-    z_re: torch.Tensor, z_im: torch.Tensor,
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor("x_re", x_re, dtype=torch.float32, ndim=1)
-    for name, tensor in {
-        "x_im": x_im,
-        "y_re": y_re,
-        "y_im": y_im,
-        "z_re": z_re,
-        "z_im": z_im,
-    }.items():
-        validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=1)
-        if tensor.shape != x_re.shape:
-            raise ValueError(f"{name} must match x_re")
-
-    exported = _required_native_op("deterministic_diffraction_vector_field")(
-        x_re, x_im, y_re, y_im, z_re, z_im
-    )
-    if not isinstance(exported, dict):
-        raise TypeError(
-            "_channel.deterministic_diffraction_vector_field must return a dict"
-        )
-    validate_cuda_tensor(
-        "path_gain", exported["path_gain"], dtype=torch.float32, ndim=1
-    )
-    validate_cuda_tensor(
-        "field_real", exported["field_real"], dtype=torch.float32, ndim=1
-    )
-    validate_cuda_tensor(
-        "field_imag", exported["field_imag"], dtype=torch.float32, ndim=1
-    )
-    if exported["path_gain"].shape != x_re.shape:
-        raise ValueError(
-            "_channel.deterministic_diffraction_vector_field returned bad shape"
-        )
-    return exported
-
-
-def deterministic_delay_to_path_length(delay_s: torch.Tensor) -> torch.Tensor:
-    validate_cuda_tensor("delay_s", delay_s, dtype=torch.float32, ndim=1)
-    path_length = _required_native_op("deterministic_delay_to_path_length")(delay_s)
-    validate_cuda_tensor("path_length_m", path_length, dtype=torch.float32, ndim=1)
-    if path_length.shape != delay_s.shape:
-        raise ValueError(
-            "_channel.deterministic_delay_to_path_length returned bad shape"
-        )
-    return path_length
 
 
 def deterministic_pack_complex(field_real: torch.Tensor, field_imag: torch.Tensor) -> torch.Tensor:

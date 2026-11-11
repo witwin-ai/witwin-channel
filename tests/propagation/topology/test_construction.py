@@ -18,7 +18,6 @@ _OWNER_NAMES = (
     "deterministic_pad_topology_sequences",
     "deterministic_reflection_epc_input_batch",
     "deterministic_repeat_range",
-    "deterministic_topology_base_fields",
     "deterministic_topology_default_fields",
 )
 
@@ -40,7 +39,7 @@ def test_topology_construction_uses_only_canonical_dependencies():
         is topology._validate_deterministic_topology_block
     )
     assert (
-        topology.deterministic_topology_base_fields.__globals__[
+        topology.deterministic_diffraction_topology_compact.__globals__[
             "_validate_path_block"
         ]
         is topology._validate_path_block

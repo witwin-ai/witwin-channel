@@ -674,16 +674,20 @@ __global__ void diffraction_state_pack_kernel(
     float *__restrict__ state_exterior_angle,
     float *__restrict__ state_src,
     float *__restrict__ state_src_power,
-    int64_t state_count) {
+    int64_t state_count,
+    int64_t edge_state_count) {
+    // State `state` packs edge `edge_indices[state % edge_state_count]` for transmitter
+    // `state / edge_state_count`; a single transmitter has edge_state_count == state_count.
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
-    const float tx_x = tx[0];
-    const float tx_y = tx[1];
-    const float tx_z = tx[2];
-    const float power = tx_power[0];
     for (int64_t state = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
          state < state_count;
          state += stride) {
-        const int edge = edge_indices[state];
+        const int64_t source = state / edge_state_count;
+        const float tx_x = tx[source * 3 + 0];
+        const float tx_y = tx[source * 3 + 1];
+        const float tx_z = tx[source * 3 + 2];
+        const float power = tx_power[source];
+        const int edge = edge_indices[state - source * edge_state_count];
         state_edge_index[state] = edge;
         state_line_min[state] = line_min[edge];
         state_line_max[state] = line_max[edge];
@@ -1130,10 +1134,17 @@ std::vector<at::Tensor> diffraction_state_pack_cuda_impl(
     CHANNEL_DIFFRACTION_CHECK_STATE_PACK_TENSORS();
     CHANNEL_DIFFRACTION_CHECK_STATE_PACK_POWER();
     CHANNEL_DIFFRACTION_CHECK_STATE_PACK_SHAPES();
-    TORCH_CHECK(tx.size(0) == 3, "tx must have shape (3,)");
+    // tx is one (3,) transmitter, or a flattened (T * 3,) table that packs every edge state once per
+    // transmitter with tx_power[t] (then tx_power_index must be 0 and tx_power must hold T rows).
+    TORCH_CHECK(tx.size(0) % 3 == 0 && tx.size(0) > 0, "tx must have shape (3,) or (T * 3,)");
+    const int64_t tx_count = tx.size(0) / 3;
+    TORCH_CHECK(
+        tx_count == 1 || (tx_power_index == 0 && tx_power.dim() == 1 && tx_power.size(0) == tx_count),
+        "a transmitter table needs one tx_power row per transmitter and tx_power_index 0");
     TORCH_CHECK(edge_pos.get_device() == edge_indices.get_device(), "edge tensors must be on the same device");
 
-    const int64_t state_count = edge_indices.size(0);
+    const int64_t edge_state_count = edge_indices.size(0);
+    const int64_t state_count = edge_state_count * tx_count;
     auto int_options = edge_indices.options();
     auto float_options = edge_pos.options();
     CHANNEL_DIFFRACTION_ALLOCATE_STATE_PACK();
@@ -1145,7 +1156,8 @@ std::vector<at::Tensor> diffraction_state_pack_cuda_impl(
             edge_indices.data_ptr<int>(),
             CHANNEL_DIFFRACTION_STATE_PACK_INPUT_POINTERS(),
             CHANNEL_DIFFRACTION_STATE_PACK_OUTPUT_POINTERS(),
-            state_count);
+            state_count,
+            edge_state_count);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
 

@@ -64,9 +64,6 @@ def _fixture(monkeypatch, events: list[str], *, selected: bool = True):
     # The discovery stage evaluates no fields: the field stage owns every reflection row.
     for name in ("deterministic_pack_complex", "field_reflection_sequence"):
         monkeypatch.setattr(field_kernels, name, _forbidden(name))
-    monkeypatch.setattr(
-        reflection.topology_kernels, "deterministic_topology_base_fields", _forbidden("base")
-    )
 
     def compact(**kwargs):
         events.append("compact")
