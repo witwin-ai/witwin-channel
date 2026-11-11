@@ -625,10 +625,7 @@ def _participates_in_ad(value: object) -> bool:
         return False
     if value.requires_grad:
         return True
-    return (
-        torch.autograd.forward_ad._current_level >= 0
-        and torch.autograd.forward_ad.unpack_dual(value).tangent is not None
-    )
+    return torch.autograd.forward_ad.unpack_dual(value).tangent is not None
 
 
 def _endpoint_tensors(view: _EndpointView) -> tuple[object, ...]:
@@ -857,50 +854,28 @@ def _receiver_cells(receiver: object) -> int:
     raise TypeError(f"receiver type is not accepted: {type(receiver)!r}")
 
 
-def build_endpoint_store(
-    transmitters: Sequence[_TransmitterView],
-    receivers: Sequence[_ReceiverPointView | _ReceiverGridView], *, device: torch.device,
-) -> EndpointStore:
-    """Stack, orient and upload every endpoint tensor of one scene in batched operations."""
+def _transmitter_parts(
+    transmitters: tuple[_TransmitterView, ...],
+) -> tuple[list[torch.Tensor], torch.Tensor]:
+    """Host float32 positions, powers and polarizations, plus the stored-dtype polarizations."""
+
+    if not transmitters:
+        empty = torch.empty((0, 3), dtype=torch.float32)
+        return [empty, torch.empty((0,), dtype=torch.float32), empty], empty
+    stored = _world_polarizations(transmitters)
+    positions = torch.stack([view.position for view in transmitters]).to(torch.float32)
+    return [positions, _tx_power_values(transmitters), stored.to(torch.float32)], stored
+
+
+def _receiver_rows(
+    receivers: tuple[_ReceiverPointView | _ReceiverGridView, ...], cell_counts: tuple[int, ...],
+    point_positions: torch.Tensor | None, receiver_polarizations: torch.Tensor,
+    reference: torch.Tensor,
+) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+    """Per-row position and polarization blocks: one per grid, one per run of point receivers."""
 
     from witwin.channel.scene.compiler import receiver_grid_points
 
-    transmitters = tuple(transmitters)
-    receivers = tuple(receivers)
-    cell_counts = tuple(_receiver_cells(receiver) for receiver in receivers)
-    points = [receiver for receiver in receivers if isinstance(receiver, ReceiverPoint)]
-    differentiable = any(
-        _participates_in_ad(value)
-        for view in (*transmitters, *receivers)
-        for value in _endpoint_tensors(view)
-    )
-    tx_count = len(transmitters)
-    host_parts: list[torch.Tensor] = []
-    if tx_count:
-        tx_positions = torch.stack([view.position for view in transmitters]).to(torch.float32)
-        tx_stored = _world_polarizations(transmitters)
-        host_parts += [tx_positions, _tx_power_values(transmitters), tx_stored.to(torch.float32)]
-    else:
-        empty = torch.empty((0, 3), dtype=torch.float32)
-        tx_stored = empty
-        host_parts += [empty, torch.empty((0,), dtype=torch.float32), empty]
-    if points:
-        host_parts.append(torch.stack([view.position for view in points]).to(torch.float32))
-    if receivers:
-        host_parts.append(_world_polarizations(receivers).to(torch.float32))
-    uploaded = _upload(host_parts, device=device)
-    tx_positions, tx_power, tx_polarizations = uploaded[:3]
-    point_positions = uploaded[3] if points else None
-    receiver_polarizations = (
-        uploaded[-1] if receivers else torch.empty((0, 3), device=device, dtype=torch.float32)
-    )
-    tx_polarizations_stored = (
-        tx_polarizations
-        if tx_stored.dtype == torch.float32
-        else tx_stored.to(device=device)
-    )
-
-    reference = tx_positions if tx_count else torch.empty((0, 3), device=device)
     position_blocks: list[torch.Tensor] = []
     polarization_blocks: list[torch.Tensor] = []
     point_cursor = 0
@@ -908,7 +883,7 @@ def build_endpoint_store(
     while index < len(receivers):
         receiver = receivers[index]
         if isinstance(receiver, ReceiverGrid):
-            position_blocks.append(receiver_grid_points(receiver, reference=reference.detach()))
+            position_blocks.append(receiver_grid_points(receiver, reference=reference))
             polarization_blocks.append(
                 receiver_polarizations[index].expand(cell_counts[index], 3)
             )
@@ -923,17 +898,60 @@ def build_endpoint_store(
         polarization_blocks.append(receiver_polarizations[index:stop])
         point_cursor += run
         index = stop
-    if not position_blocks:
-        rx_positions = torch.empty((0, 3), device=device, dtype=torch.float32)
-        rx_polarizations = rx_positions
-    elif len(position_blocks) == 1:
-        rx_positions = position_blocks[0]
-        rx_polarizations = polarization_blocks[0]
-    else:
-        from witwin.channel.kernels.topology import path_concat_vec3
+    return position_blocks, polarization_blocks
 
-        rx_positions = path_concat_vec3([block.detach().contiguous() for block in position_blocks])
-        rx_polarizations = torch.cat(polarization_blocks)
+
+def _join_rows(
+    position_blocks: list[torch.Tensor], polarization_blocks: list[torch.Tensor],
+    device: torch.device,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if not position_blocks:
+        empty = torch.empty((0, 3), device=device, dtype=torch.float32)
+        return empty, empty
+    if len(position_blocks) == 1:
+        return position_blocks[0], polarization_blocks[0]
+    from witwin.channel.kernels.topology import path_concat_vec3
+
+    positions = path_concat_vec3([block.detach().contiguous() for block in position_blocks])
+    return positions, torch.cat(polarization_blocks)
+
+
+def build_endpoint_store(
+    transmitters: Sequence[_TransmitterView],
+    receivers: Sequence[_ReceiverPointView | _ReceiverGridView], *, device: torch.device,
+) -> EndpointStore:
+    """Stack, orient and upload every endpoint tensor of one scene in batched operations."""
+
+    transmitters = tuple(transmitters)
+    receivers = tuple(receivers)
+    cell_counts = tuple(_receiver_cells(receiver) for receiver in receivers)
+    points = [receiver for receiver in receivers if isinstance(receiver, ReceiverPoint)]
+    differentiable = any(
+        _participates_in_ad(value)
+        for view in (*transmitters, *receivers)
+        for value in _endpoint_tensors(view)
+    )
+    host_parts, tx_stored = _transmitter_parts(transmitters)
+    if points:
+        host_parts.append(torch.stack([view.position for view in points]).to(torch.float32))
+    if receivers:
+        host_parts.append(_world_polarizations(receivers).to(torch.float32))
+    uploaded = _upload(host_parts, device=device)
+    tx_positions, tx_power, tx_polarizations = uploaded[:3]
+    point_positions = uploaded[3] if points else None
+    receiver_polarizations = (
+        uploaded[-1] if receivers else torch.empty((0, 3), device=device, dtype=torch.float32)
+    )
+    rx_positions, rx_polarizations = _join_rows(
+        *_receiver_rows(
+            receivers,
+            cell_counts,
+            point_positions,
+            receiver_polarizations,
+            tx_positions.detach() if transmitters else torch.empty((0, 3), device=device),
+        ),
+        device,
+    )
     return EndpointStore(
         transmitters=transmitters,
         receivers=receivers,
@@ -942,7 +960,9 @@ def build_endpoint_store(
         tx_positions=tx_positions,
         tx_power=tx_power,
         tx_polarizations=tx_polarizations,
-        tx_polarizations_stored=tx_polarizations_stored,
+        tx_polarizations_stored=(
+            tx_polarizations if tx_stored.dtype == torch.float32 else tx_stored.to(device=device)
+        ),
         rx_positions=rx_positions,
         rx_positions_live=(
             point_positions if receivers and len(points) == len(receivers) else None
