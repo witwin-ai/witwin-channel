@@ -17,6 +17,7 @@ from witwin.channel.propagation.penetration import (
     SegmentPenetrationResult,
     SegmentPenetrationTapeResult,
 )
+from witwin.channel.kernels.spec import AdInputs, NativeOps, opaque, tensor as tensor_arg
 from witwin.channel.runtime import (
     CapacityFailureBit,
     CapacityFailureState,
@@ -65,6 +66,161 @@ __all__ = [
     "rayd_trace_reflections_forward",
     "rayd_visibility_forward",
 ]
+
+_native = NativeOps(lambda symbol: _required_native_op(symbol))
+_COUPLED_CHAIN_GEOMETRY_FORWARD = _native.op(
+    "coupled_chain_geometry_forward",
+    opaque("scene"), tensor_arg("source"), tensor_arg("receiver"), tensor_arg("edge_point"),
+    tensor_arg("edge_id"), tensor_arg("prefix_faces"), tensor_arg("prefix_plane_points"),
+    tensor_arg("prefix_plane_normals"), tensor_arg("suffix_faces"),
+    tensor_arg("suffix_plane_points"), tensor_arg("suffix_plane_normals"),
+    tensor_arg("surface_group_id"), tensor_arg("surface_group_size"),
+    tensor_arg("surface_group_members"), opaque("min_segment_length"),
+)
+_COUPLED_DD_GEOMETRY_FORWARD = _native.op(
+    "coupled_dd_geometry_forward",
+    opaque("scene"), tensor_arg("source"), tensor_arg("receiver"), tensor_arg("edge1_id"),
+    tensor_arg("edge1_pos"), tensor_arg("edge1_dir"), tensor_arg("edge1_t_min"),
+    tensor_arg("edge1_t_max"), tensor_arg("edge2_id"), tensor_arg("edge2_pos"),
+    tensor_arg("edge2_dir"), tensor_arg("edge2_t_min"), tensor_arg("edge2_t_max"),
+)
+_DETERMINISTIC_FACE_GROUPS = _native.op(
+    "deterministic_face_groups",
+    tensor_arg("tri_a"), tensor_arg("normals"), tensor_arg("surface_ids"), opaque("quantization"),
+)
+_DETERMINISTIC_NORMALIZE_VEC3 = _native.op(
+    "deterministic_normalize_vec3",
+    tensor_arg("values"), opaque("eps"),
+)
+_DIFFRACTION_TX_VISIBLE_STATE_PLAN = _native.op(
+    "diffraction_tx_visible_state_plan",
+    opaque("scene"), tensor_arg("tx"), tensor_arg("edge_position"), tensor_arg("edge_direction"),
+    tensor_arg("edge_t_min"), tensor_arg("edge_t_max"), opaque("state_source"),
+)
+_MC_DIFFRACTION_EDGE_GEOMETRY = _native.op(
+    "mc_diffraction_edge_geometry",
+    tensor_arg("vertices"), tensor_arg("faces"), tensor_arg("face_normals"), tensor_arg("edge_v0"),
+    tensor_arg("edge_v1"), tensor_arg("face0"), tensor_arg("face1"), opaque("plane_tol"),
+)
+_MC_SURFACE_GROUP_EDGE_CANDIDATES = _native.op(
+    "mc_surface_group_edge_candidates",
+    tensor_arg("vertices"), tensor_arg("faces"), tensor_arg("face_normals"), tensor_arg("edge_v0"),
+    tensor_arg("edge_v1"), tensor_arg("face0"), tensor_arg("face1"), tensor_arg("selected"),
+    opaque("plane_tol"),
+)
+_RAYD_DIFFRACTION_PATHS_ORDER1_FORWARD = _native.op(
+    "rayd_diffraction_paths_order1_forward",
+    opaque("scene"), tensor_arg("tx_pos"), tensor_arg("tx_pol"), tensor_arg("rx_pos"),
+    tensor_arg("active"), tensor_arg("state_edge_index"), tensor_arg("state_edge_pos"),
+    tensor_arg("state_edge_dir"), tensor_arg("state_edge_t_min"), tensor_arg("state_edge_t_max"),
+    tensor_arg("state_n0"), tensor_arg("state_n1"), tensor_arg("state_prim0"),
+    tensor_arg("state_prim1"), tensor_arg("state_exterior_angle"), tensor_arg("state_src"),
+    tensor_arg("state_src_power"), tensor_arg("material_eta_r"), tensor_arg("material_sigma"),
+    tensor_arg("material_mu_r"), tensor_arg("material_gain"), tensor_arg("material_valid"),
+    opaque("state_limit"), opaque("capacity"), opaque("wavelength"),
+    opaque("isb_taper_width_scale"), opaque("state_source_index"),
+)
+_RAYD_DIFFRACTION_SAMPLE_TAPE_FORWARD = _native.op(
+    "rayd_diffraction_sample_tape_forward",
+    opaque("scene"), opaque("active"), tensor_arg("state_edge_index"), tensor_arg("state_edge_pos"),
+    tensor_arg("state_edge_dir"), tensor_arg("state_edge_t_min"), tensor_arg("state_edge_t_max"),
+    tensor_arg("state_n0"), tensor_arg("state_n1"), tensor_arg("state_prim0"),
+    tensor_arg("state_prim1"), tensor_arg("state_exterior_angle"), tensor_arg("state_src"),
+    tensor_arg("state_src_power"), opaque("state_wi"), opaque("state_d0"),
+    tensor_arg("material_eta_r"), tensor_arg("material_sigma"), tensor_arg("material_mu_r"),
+    tensor_arg("material_gain"), tensor_arg("material_valid"), opaque("state_limit"),
+    opaque("grid_axis"), opaque("grid_position"), opaque("grid_coord0_min"),
+    opaque("grid_coord0_max"), opaque("grid_coord1_min"), opaque("grid_coord1_max"),
+    opaque("grid_resolution0"), opaque("grid_resolution1"), opaque("grid_cell_area"),
+    opaque("wavelength"), opaque("direct_samples"), opaque("keller_samples"),
+    opaque("suffix_samples"), opaque("seed"), opaque("max_order"), opaque("recursive_state_limit"),
+    opaque("recursive_active"), opaque("recursive_state_edge_index"),
+    opaque("recursive_state_edge_pos"), opaque("recursive_state_edge_dir"),
+    opaque("recursive_state_edge_t_min"), opaque("recursive_state_edge_t_max"),
+    opaque("recursive_state_n0"), opaque("recursive_state_n1"), opaque("recursive_state_prim0"),
+    opaque("recursive_state_prim1"), opaque("recursive_state_exterior_angle"),
+    opaque("export_tape"), opaque("sample_state_index"), opaque("sample_edge_weight"),
+)
+_RAYD_REFLECTION_EPC_PATHS_BACKWARD = _native.op(
+    "rayd_reflection_epc_paths_backward",
+    opaque("scene"), tensor_arg("source"), tensor_arg("receiver"), tensor_arg("sequence"),
+    tensor_arg("plane_points"), tensor_arg("plane_normals"), tensor_arg("valid"),
+    tensor_arg("bounce_count"), opaque("grad_points"), opaque("grad_normals"),
+    opaque("grad_path_length"), opaque("need_grad_vertices"), opaque("need_grad_source"),
+    opaque("need_grad_receiver"),
+)
+_RAYD_REFLECTION_EPC_PATHS_FORWARD = _native.op(
+    "rayd_reflection_epc_paths_forward",
+    opaque("scene"), tensor_arg("source"), tensor_arg("receiver"), opaque("active"),
+    tensor_arg("expected_prim_ids"), tensor_arg("direct_plane_points"),
+    tensor_arg("direct_plane_normals"), tensor_arg("surface_group_id"),
+    tensor_arg("surface_group_size"), tensor_arg("surface_group_members"), opaque("max_bounces"),
+    opaque("visibility_ignore_mode"), opaque("min_segment_length"),
+)
+_RAYD_REFLECTION_EPC_PATHS_JVP = _native.op(
+    "rayd_reflection_epc_paths_jvp",
+    opaque("scene"), tensor_arg("source"), tensor_arg("receiver"), tensor_arg("sequence"),
+    tensor_arg("plane_points"), tensor_arg("plane_normals"), tensor_arg("valid"),
+    tensor_arg("bounce_count"), opaque("tangent_vertices"), opaque("tangent_source"),
+    opaque("tangent_receiver"),
+)
+_RAYD_SCENE_FACE_NORMALS_BACKWARD = _native.op(
+    "rayd_scene_face_normals_backward",
+    opaque("scene"), tensor_arg("grad_face_normals"),
+)
+_RAYD_SCENE_FACE_NORMALS_JVP = _native.op(
+    "rayd_scene_face_normals_jvp",
+    opaque("scene"), tensor_arg("tangent_vertices"),
+)
+_RAYD_SEGMENT_PENETRATION_BACKWARD = _native.op(
+    "rayd_segment_penetration_backward",
+    opaque("scene"), tensor_arg("origins"), tensor_arg("targets"), opaque("input_active"),
+    opaque("input_active_any"), opaque("hit_capacity"), opaque("policy"), opaque("scene_diagonal"),
+    tensor_arg("capacity_failure_record"), opaque("failure_bit"), tensor_arg("valid"),
+    tensor_arg("num_hits"), tensor_arg("reached_target"), tensor_arg("overflow"),
+    tensor_arg("distance"), tensor_arg("direction"), tensor_arg("hit_t"), tensor_arg("position"),
+    tensor_arg("normal"), tensor_arg("geometric_normal"), tensor_arg("global_primitive_id"),
+    tensor_arg("tape_primitive_id"), tensor_arg("tape_barycentric"),
+    tensor_arg("tape_restart_epsilon"), tensor_arg("tape_restart_branch"),
+    tensor_arg("tape_restart_tie_mask"), tensor_arg("tape_direction_denominator_branch"),
+    opaque("grad_distance"), opaque("grad_direction"), opaque("grad_t"), opaque("grad_position"),
+    opaque("grad_normal"), opaque("grad_geometric_normal"), opaque("need_grad_vertices"),
+    opaque("need_grad_origins"), opaque("need_grad_targets"),
+)
+_RAYD_SEGMENT_PENETRATION_FORWARD = _native.op(
+    "rayd_segment_penetration_forward",
+    opaque("scene"), tensor_arg("origins"), tensor_arg("targets"), opaque("input_active"),
+    opaque("input_active_any"), opaque("hit_capacity"), opaque("policy"), opaque("scene_diagonal"),
+    tensor_arg("capacity_failure_record"), opaque("failure_bit"),
+)
+_RAYD_SEGMENT_PENETRATION_FORWARD_TAPE = _native.op(
+    "rayd_segment_penetration_forward_tape",
+    opaque("scene"), tensor_arg("origins"), tensor_arg("targets"), opaque("input_active"),
+    opaque("input_active_any"), opaque("hit_capacity"), opaque("policy"), opaque("scene_diagonal"),
+    tensor_arg("capacity_failure_record"), opaque("failure_bit"),
+)
+_RAYD_SEGMENT_PENETRATION_JVP = _native.op(
+    "rayd_segment_penetration_jvp",
+    opaque("scene"), tensor_arg("origins"), tensor_arg("targets"), opaque("input_active"),
+    opaque("input_active_any"), opaque("hit_capacity"), opaque("policy"), opaque("scene_diagonal"),
+    tensor_arg("capacity_failure_record"), opaque("failure_bit"), tensor_arg("valid"),
+    tensor_arg("num_hits"), tensor_arg("reached_target"), tensor_arg("overflow"),
+    tensor_arg("distance"), tensor_arg("direction"), tensor_arg("hit_t"), tensor_arg("position"),
+    tensor_arg("normal"), tensor_arg("geometric_normal"), tensor_arg("global_primitive_id"),
+    tensor_arg("tape_primitive_id"), tensor_arg("tape_barycentric"),
+    tensor_arg("tape_restart_epsilon"), tensor_arg("tape_restart_branch"),
+    tensor_arg("tape_restart_tie_mask"), tensor_arg("tape_direction_denominator_branch"),
+    opaque("tangent_vertices"), opaque("tangent_origins"), opaque("tangent_targets"),
+)
+_RAYD_TRACE_REFLECTIONS_FORWARD = _native.op(
+    "rayd_trace_reflections_forward",
+    opaque("scene"), tensor_arg("ray_o"), tensor_arg("ray_d"), tensor_arg("ray_tmax"),
+    opaque("active"), opaque("max_bounces"),
+)
+_RAYD_VISIBILITY_FORWARD = _native.op(
+    "rayd_visibility_forward",
+    opaque("scene"), tensor_arg("start"), tensor_arg("end"), opaque("active"),
+)
 
 
 # ---------------------------------------------------------------------------
@@ -207,7 +363,7 @@ def rayd_segment_penetration_forward(
         scene_diagonal=scene_diagonal,
         failure_state=failure_state,
     )
-    values = _required_native_op("rayd_segment_penetration_forward")(*args)
+    values = _RAYD_SEGMENT_PENETRATION_FORWARD(*args)
     return _segment_penetration_result(
         values, hit_capacity=hit_capacity, failure_state=failure_state
     )
@@ -231,7 +387,7 @@ def rayd_segment_penetration_forward_tape(
         scene_diagonal=scene_diagonal,
         failure_state=failure_state,
     )
-    values = _required_native_op("rayd_segment_penetration_forward_tape")(*args)
+    values = _RAYD_SEGMENT_PENETRATION_FORWARD_TAPE(*args)
     expected = len(_SEGMENT_PENETRATION_RESULT_FIELDS) + len(
         _SEGMENT_PENETRATION_TAPE_FIELDS
     )
@@ -297,7 +453,7 @@ def rayd_segment_penetration_backward(
     ):
         if type(value) is not bool:
             raise TypeError(f"{name} must be a bool")
-    values = _required_native_op("rayd_segment_penetration_backward")(
+    values = _RAYD_SEGMENT_PENETRATION_BACKWARD(
         *args,
         *_segment_penetration_tape_args(tape),
         grad_distance,
@@ -350,7 +506,7 @@ def rayd_segment_penetration_jvp(
     _ad_check_tangent_vec3("tangent_vertices", tangent_vertices, None)
     _ad_check_tangent_vec3("tangent_origins", tangent_origins, rows)
     _ad_check_tangent_vec3("tangent_targets", tangent_targets, rows)
-    values = _required_native_op("rayd_segment_penetration_jvp")(
+    values = _RAYD_SEGMENT_PENETRATION_JVP(
         *args,
         *_segment_penetration_tape_args(tape),
         tangent_vertices,
@@ -373,7 +529,7 @@ def rayd_visibility_forward(
     validate_cuda_tensor("end", end, dtype=torch.float32, ndim=2, trailing_shape=(3,))
     if active is not None:
         validate_cuda_tensor("active", active, dtype=torch.bool, ndim=1)
-    out = _required_native_op("rayd_visibility_forward")(
+    out = _RAYD_VISIBILITY_FORWARD(
         _rayd_scene_resource(scene_resource),
         start,
         end,
@@ -406,7 +562,7 @@ def rayd_diffraction_sample_tape_forward(*args: object) -> tuple[torch.Tensor, .
             "rayd_diffraction_sample_tape_forward requires a typed RayD scene resource"
         )
     native_args = (_rayd_scene_resource(args[0]), *args[1:])
-    out = _required_native_op("rayd_diffraction_sample_tape_forward")(
+    out = _RAYD_DIFFRACTION_SAMPLE_TAPE_FORWARD(
         *native_args,
     )
     if not isinstance(out, (tuple, list)):
@@ -422,7 +578,7 @@ def rayd_trace_reflections_forward(*args: object) -> tuple[torch.Tensor, ...]:
             "rayd_trace_reflections_forward requires a typed RayD scene resource"
         )
     native_args = (_rayd_scene_resource(args[0]), *args[1:])
-    out = _required_native_op("rayd_trace_reflections_forward")(
+    out = _RAYD_TRACE_REFLECTIONS_FORWARD(
         *native_args,
     )
     if not isinstance(out, (tuple, list)):
@@ -438,7 +594,7 @@ def rayd_reflection_epc_paths_forward(*args: object) -> tuple[torch.Tensor, ...]
             "rayd_reflection_epc_paths_forward requires a typed RayD scene resource"
         )
     native_args = (_rayd_scene_resource(args[0]), *args[1:])
-    out = _required_native_op("rayd_reflection_epc_paths_forward")(
+    out = _RAYD_REFLECTION_EPC_PATHS_FORWARD(
         *native_args,
     )
     if not isinstance(out, (tuple, list)):
@@ -459,7 +615,7 @@ def coupled_chain_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
     if not args:
         raise TypeError("coupled_chain_geometry_forward requires a typed RayD scene resource")
     native_args = (_rayd_scene_resource(args[0]), *args[1:])
-    out = _required_native_op("coupled_chain_geometry_forward")(*native_args)
+    out = _COUPLED_CHAIN_GEOMETRY_FORWARD(*native_args)
     if not isinstance(out, dict):
         raise TypeError("_channel.coupled_chain_geometry_forward must return a dict")
     required = {
@@ -517,7 +673,7 @@ def coupled_dd_geometry_forward(*args: object) -> CoupledDdGeometryOutputs:
             "coupled_dd_geometry_forward requires a typed RayD scene resource"
         )
     native_args = (_rayd_scene_resource(args[0]), *args[1:])
-    out = _required_native_op("coupled_dd_geometry_forward")(
+    out = _COUPLED_DD_GEOMETRY_FORWARD(
         *native_args,
     )
     if not isinstance(out, dict):
@@ -571,7 +727,7 @@ def rayd_diffraction_paths_order1_forward(*args: object) -> tuple[torch.Tensor, 
             "rayd_diffraction_paths_order1_forward requires a typed RayD scene resource"
         )
     native_args = (_rayd_scene_resource(args[0]), *args[1:])
-    out = _required_native_op("rayd_diffraction_paths_order1_forward")(
+    out = _RAYD_DIFFRACTION_PATHS_ORDER1_FORWARD(
         *native_args,
     )
     if not isinstance(out, (tuple, list)):
@@ -676,7 +832,7 @@ def diffraction_tx_visible_state_plan(
     if any(tensor.get_device() != tx.get_device() for tensor in state_tensors):
         raise ValueError("tx and diffraction state tensors must share one CUDA device")
 
-    active = _required_native_op("diffraction_tx_visible_state_plan")(
+    active = _DIFFRACTION_TX_VISIBLE_STATE_PLAN(
         _rayd_scene_resource(scene_resource),
         tx,
         edge_position,
@@ -707,7 +863,7 @@ def deterministic_normalize_vec3(values: torch.Tensor, *, eps: float = 1.0e-6) -
     )
     if eps <= 0.0:
         raise ValueError("eps must be positive")
-    out = _required_native_op("deterministic_normalize_vec3")(values, float(eps))
+    out = _DETERMINISTIC_NORMALIZE_VEC3(values, float(eps))
     if not isinstance(out, torch.Tensor):
         raise TypeError(
             "_channel.deterministic_normalize_vec3 must return a tensor"
@@ -736,7 +892,7 @@ def deterministic_face_groups(
         raise ValueError("surface_ids must match tri_a")
     if quantization <= 0.0:
         raise ValueError("quantization must be positive")
-    exported = _required_native_op("deterministic_face_groups")(
+    exported = _DETERMINISTIC_FACE_GROUPS(
         tri_a,
         normals,
         surface_ids,
@@ -819,7 +975,7 @@ def mc_diffraction_edge_geometry(
         or face1.shape != edge_v0.shape
     ):
         raise ValueError("edge_v1, face0, and face1 must match edge_v0 shape")
-    geometry = _required_native_op("mc_diffraction_edge_geometry")(
+    geometry = _MC_DIFFRACTION_EDGE_GEOMETRY(
         vertices,
         faces,
         face_normals,
@@ -880,7 +1036,7 @@ def mc_surface_group_edge_candidates(
         raise ValueError("edge_v1, face0, and face1 must match edge_v0 shape")
     if selected.shape != edge_v0.shape:
         raise ValueError("selected must match edge_v0 shape")
-    candidates = _required_native_op("mc_surface_group_edge_candidates")(
+    candidates = _MC_SURFACE_GROUP_EDGE_CANDIDATES(
         vertices,
         faces,
         face_normals,
@@ -975,7 +1131,7 @@ def rayd_reflection_epc_paths_backward(
     _ad_check_optional_grad("grad_points", grad_points, ((rows, bounces, 3),))
     _ad_check_optional_grad("grad_normals", grad_normals, ((rows, bounces, 3),))
     _ad_check_optional_grad("grad_path_length", grad_path_length, ((rows,),))
-    out = _required_native_op("rayd_reflection_epc_paths_backward")(
+    out = _RAYD_REFLECTION_EPC_PATHS_BACKWARD(
         _rayd_scene_resource(scene_resource),
         source,
         receiver,
@@ -1011,7 +1167,7 @@ def rayd_reflection_epc_paths_jvp(
     _ad_check_tangent_vec3("tangent_vertices", tangent_vertices, None)
     _ad_check_tangent_vec3("tangent_source", tangent_source, rows)
     _ad_check_tangent_vec3("tangent_receiver", tangent_receiver, rows)
-    out = _required_native_op("rayd_reflection_epc_paths_jvp")(
+    out = _RAYD_REFLECTION_EPC_PATHS_JVP(
         _rayd_scene_resource(scene_resource),
         source,
         receiver,
@@ -1031,6 +1187,20 @@ def rayd_reflection_epc_paths_jvp(
     return tuple(out)
 
 
+_EPC_PATHS_AD = AdInputs(
+    "rayd_reflection_epc_paths_ad", opaque("scene_resource"),
+    *(opaque(name, grad="diff") for name in ("vertices", "source", "receiver")),
+    *(
+        opaque(name)
+        for name in (
+            "sequence", "plane_points", "plane_normals", "surface_group_id",
+            "surface_group_size", "surface_group_members", "max_bounces",
+            "visibility_ignore_mode",
+        )
+    ),
+)
+
+
 class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
     """Fixed-winner differentiable RayD reflection EPC paths through the direct typed C++ boundary.
 
@@ -1047,7 +1217,7 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
         plane_points: Any, plane_normals: Any, surface_group_id: Any, surface_group_size: Any,
         surface_group_members: Any, max_bounces: Any, visibility_ignore_mode: Any,
     ) -> Any:
-        out = _required_native_op("rayd_reflection_epc_paths_forward")(
+        out = _RAYD_REFLECTION_EPC_PATHS_FORWARD(
             scene_resource,
             source,
             receiver,
@@ -1119,7 +1289,7 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
     @staticmethod
     @_ad_first_order_only
     def backward(ctx: Any, *grad_outputs: Any) -> Any:
-        none_grads = (None,) * 12
+        none_grads = _EPC_PATHS_AD.none
         grad_path_length = grad_outputs[1]
         grad_hits = grad_outputs[4]
         grad_unit_normals = grad_outputs[5]
@@ -1134,9 +1304,9 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
             valid,
             bounce_count,
         ) = ctx.saved_tensors
-        need_grad_vertices = bool(ctx.needs_input_grad[1])
-        need_grad_source = bool(ctx.needs_input_grad[2])
-        need_grad_receiver = bool(ctx.needs_input_grad[3])
+        need_grad_vertices = _EPC_PATHS_AD.need(ctx, "vertices")
+        need_grad_source = _EPC_PATHS_AD.need(ctx, "source")
+        need_grad_receiver = _EPC_PATHS_AD.need(ctx, "receiver")
         if not (need_grad_vertices or need_grad_source or need_grad_receiver):
             return none_grads
         grad_vertices, grad_source, grad_receiver = rayd_reflection_epc_paths_backward(
@@ -1162,19 +1332,8 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
                 "rayd_reflection_epc_paths_ad vertices must be the scene"
                 " global vertex table"
             )
-        return (
-            None,
-            grad_vertices if need_grad_vertices else None,
-            grad_source if need_grad_source else None,
-            grad_receiver if need_grad_receiver else None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+        return _EPC_PATHS_AD.grads(
+            ctx, vertices=grad_vertices, source=grad_source, receiver=grad_receiver
         )
 
     @staticmethod
@@ -1303,7 +1462,7 @@ def rayd_scene_face_normals_backward(
         raise ValueError("grad_face_normals must be a CUDA tensor")
     if grad_face_normals.ndim != 2 or grad_face_normals.shape[1] != 3:
         raise ValueError("grad_face_normals must have shape (F, 3)")
-    out = _required_native_op("rayd_scene_face_normals_backward")(
+    out = _RAYD_SCENE_FACE_NORMALS_BACKWARD(
         _rayd_scene_resource(scene_resource),
         grad_face_normals,
     )
@@ -1320,7 +1479,7 @@ def rayd_scene_face_normals_jvp(
     _ad_check_tangent_vec3("tangent_vertices", tangent_vertices, None)
     if tangent_vertices is None:
         raise ValueError("tangent_vertices is required")
-    out = _required_native_op("rayd_scene_face_normals_jvp")(
+    out = _RAYD_SCENE_FACE_NORMALS_JVP(
         _rayd_scene_resource(scene_resource),
         tangent_vertices,
     )
@@ -1329,6 +1488,12 @@ def rayd_scene_face_normals_jvp(
             "_channel.rayd_scene_face_normals_jvp must return a tensor"
         )
     return out
+
+
+_FACE_NORMALS_AD = AdInputs(
+    "rayd_face_normals_ad", opaque("scene_resource"), opaque("vertices", grad="diff"),
+    opaque("raw_face_normals"),
+)
 
 
 class _RaydFaceNormalsAdFunction(torch.autograd.Function):
@@ -1355,19 +1520,19 @@ class _RaydFaceNormalsAdFunction(torch.autograd.Function):
     @staticmethod
     @_ad_first_order_only
     def backward(ctx: Any, grad_face_normals: Any) -> Any:
-        if ctx.needs_input_grad[2]:
+        if _FACE_NORMALS_AD.need(ctx, "raw_face_normals"):
             raise RuntimeError(
                 "rayd_face_normals_ad differentiates the vertex table only;"
                 " the raw face-normal export is a detached scene record"
             )
-        if grad_face_normals is None or not ctx.needs_input_grad[1]:
-            return (None, None, None)
+        if grad_face_normals is None or not _FACE_NORMALS_AD.need(ctx, "vertices"):
+            return _FACE_NORMALS_AD.none
         grad_vertices = rayd_scene_face_normals_backward(ctx.scene_resource, grad_face_normals)
         if tuple(grad_vertices.shape) != ctx.vertices_shape:
             raise RuntimeError(
                 "rayd_face_normals_ad vertices must be the scene global vertex table"
             )
-        return (None, grad_vertices, None)
+        return _FACE_NORMALS_AD.place(vertices=grad_vertices)
 
     @staticmethod
     def jvp(ctx: Any, _grad_handle: Any, grad_vertices: Any, _grad_raw_face_normals: Any) -> Any:
@@ -1465,6 +1630,19 @@ def _segment_penetration_tape_values(
     )
 
 
+_SEGMENT_PENETRATION_AD = AdInputs(
+    "rayd_segment_penetration_ad", opaque("scene_resource"),
+    *(opaque(name, grad="diff") for name in ("vertices", "origins", "targets")),
+    *(
+        opaque(name)
+        for name in (
+            "input_active", "input_active_any", "hit_capacity", "policy", "scene_diagonal",
+            "failure_state",
+        )
+    ),
+)
+
+
 class _RaydSegmentPenetrationAdFunction(torch.autograd.Function):
     """Fixed-winner segment geometry with native RayD VJP and JVP companions."""
 
@@ -1542,13 +1720,13 @@ class _RaydSegmentPenetrationAdFunction(torch.autograd.Function):
     @staticmethod
     @_ad_first_order_only
     def backward(ctx: Any, *grad_outputs: Any) -> Any:
-        none_grads = (None,) * 10
+        none_grads = _SEGMENT_PENETRATION_AD.none
         continuous_grads = grad_outputs[4:10]
         if not any(value is not None for value in continuous_grads):
             return none_grads
-        need_grad_vertices = bool(ctx.needs_input_grad[1])
-        need_grad_origins = bool(ctx.needs_input_grad[2])
-        need_grad_targets = bool(ctx.needs_input_grad[3])
+        need_grad_vertices = _SEGMENT_PENETRATION_AD.need(ctx, "vertices")
+        need_grad_origins = _SEGMENT_PENETRATION_AD.need(ctx, "origins")
+        need_grad_targets = _SEGMENT_PENETRATION_AD.need(ctx, "targets")
         if not (need_grad_vertices or need_grad_origins or need_grad_targets):
             return none_grads
         origins, targets, input_active, tape = (
@@ -1584,17 +1762,9 @@ class _RaydSegmentPenetrationAdFunction(torch.autograd.Function):
                 "rayd_segment_penetration_ad vertices must be the scene global"
                 " vertex table"
             )
-        return (
-            None,
-            gradients.grad_vertices if need_grad_vertices else None,
-            gradients.grad_origins if need_grad_origins else None,
-            gradients.grad_targets if need_grad_targets else None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+        return _SEGMENT_PENETRATION_AD.grads(
+            ctx, vertices=gradients.grad_vertices, origins=gradients.grad_origins,
+            targets=gradients.grad_targets,
         )
 
     @staticmethod

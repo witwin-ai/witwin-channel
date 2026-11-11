@@ -10,7 +10,17 @@ import pytest
 from witwin.channel.kernels import montecarlo as mc_sampling
 from witwin.channel.kernels import geometry as ops
 from witwin.channel import runtime
+from witwin.channel.kernels.spec import NativeOp
 from witwin.channel.scene import resources as rayd_scene
+
+
+def _dispatches(fn, symbol: str) -> bool:
+    """True when ``fn`` calls the declared native operation ``symbol`` of its module."""
+
+    return any(
+        isinstance(fn.__globals__.get(name), NativeOp) and fn.__globals__[name].symbol == symbol
+        for name in fn.__code__.co_names
+    )
 
 
 def test_channel_extension_loader_has_no_artifact_fallback():
@@ -36,8 +46,7 @@ def test_rayd_visibility_uses_channel_bridge():
 
     assert "_required_rayd_op" not in source
     assert "torch.ops" not in source
-    assert "_required_native_op" in source
-    assert "rayd_visibility_forward" in source
+    assert _dispatches(ops.rayd_visibility_forward, "rayd_visibility_forward")
 
 
 def test_diffraction_visibility_plan_uses_channel_bridge():
@@ -45,8 +54,9 @@ def test_diffraction_visibility_plan_uses_channel_bridge():
 
     assert "_required_rayd_op" not in source
     assert "torch.ops" not in source
-    assert "_required_native_op" in source
-    assert "diffraction_tx_visible_state_plan" in source
+    assert _dispatches(
+        ops.diffraction_tx_visible_state_plan, "diffraction_tx_visible_state_plan"
+    )
 
 
 def test_rayd_diffraction_sample_tape_uses_channel_bridge():
@@ -54,7 +64,7 @@ def test_rayd_diffraction_sample_tape_uses_channel_bridge():
         source = inspect.getsource(fn)
         assert "_required_rayd_op" not in source
         assert "torch.ops" not in source
-        assert "_required_native_op" in source
+        assert _dispatches(fn, fn.__name__)
 
 
 def test_mc_diffraction_discovery_requires_native_symbols(monkeypatch):
@@ -96,7 +106,7 @@ def test_rayd_path_exports_use_channel_bridge():
         source = inspect.getsource(fn)
         assert "_required_rayd_op" not in source
         assert "torch.ops" not in source
-        assert "_required_native_op" in source
+        assert _dispatches(fn, fn.__name__)
 
 
 def test_simplified_coherent_diffraction_grid_api_is_not_public():
