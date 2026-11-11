@@ -43,7 +43,6 @@ from witwin.channel.capabilities import (
 from witwin.channel import build_info
 from witwin.channel.runtime import make_metadata
 from witwin.channel.constants import PHASE_CONVENTION
-from witwin.channel.scene.endpoints import ReceiverGrid
 from witwin.channel.kernels.topology import (
     deterministic_component_counts,
 )
@@ -778,19 +777,6 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
         # ensemble-only or empty-realization scene.
         scattering_coherent=config.scattering_coherent,
     )
-    exact_diffraction = None
-    if (
-        sidecars.diffraction_vector_field is not None
-        and len(scene.receivers) == 1
-        and isinstance(scene.receivers[0], ReceiverGrid)
-    ):
-        vector_field = sidecars.diffraction_vector_field
-        exact_diffraction_flat = vector_field.abs().square().sum(dim=-1)
-        exact_diffraction = apply_receiver_layout(exact_diffraction_flat, layout)
-        previous_diffraction = component_power["diffraction"]
-        component_power["diffraction"] = exact_diffraction
-        if not config.coherent:
-            path_gain = path_gain - previous_diffraction + exact_diffraction
     path_gain, field = _link_zero_gradients(config, scene, path_gain, field)
     if ad_instrumented:
         torch.cuda.synchronize()
@@ -823,11 +809,7 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
             "coherent": config.coherent,
             "accumulation_mode": "coherent" if config.coherent else "incoherent",
             "native_launch_count": sidecars.execution.launch_count,
-            "diffraction_accumulation": (
-                "exact_vector_coherent_paths"
-                if exact_diffraction is not None
-                else "scalar_path_accumulation"
-            ),
+            "diffraction_accumulation": "scalar_path_accumulation",
             "visibility_rejection_count": (
                 sidecars.execution.visibility_rejection_count
             ),

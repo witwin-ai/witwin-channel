@@ -216,12 +216,6 @@ def _layout_pair(coherent):
     return solve([receiver_grid]), solve(points)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="A single ReceiverGrid replaces the diffraction power with the per-cell vector sum "
-    "|sum E|^2; point receivers keep the per-row accumulation. Measured on the wedge scene: up "
-    "to 2.47x relative difference (coherent) and 1.46x (incoherent).",
-)
 @pytest.mark.parametrize("coherent", [True, False])
 def test_diffraction_accumulation_is_independent_of_receiver_layout(coherent):
     """A grid cell and a point receiver at the same position get the same diffraction power."""
