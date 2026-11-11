@@ -292,7 +292,6 @@ def test_engine_observes_shared_failure_once_after_field_sanitization(monkeypatc
     config = SimpleNamespace(
         components={"transmission"},
         max_depth=1,
-        max_diffraction_order=0,
         coupled_paths=False,
         max_paths=None,
         max_paths_scope="global",

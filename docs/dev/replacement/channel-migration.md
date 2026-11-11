@@ -857,3 +857,33 @@ one-copy/four-byte/one-synchronization budget.
 under `propagation_consumer`, generated from
 `witwin.channel.propagation.consumer.capabilities()` rather than restated, so
 the two cannot drift.
+
+## 0.6.0: shared enumerated options
+
+`path.Config` and `deterministic.Config` now derive from one engine-owned
+dataclass, `witwin.channel.propagation.enumerated.EnumeratedOptions`, which is
+the single owner of the 15 options both entries share (`max_depth`,
+`components`, `max_paths`, `max_paths_scope`, `ad_mode`, the coupled, scattering,
+scatter-chain and ISB-taper options). Keyword construction is unchanged:
+`path.Config(max_depth=2)` and `deterministic.Config(coherent=False)` work as
+before, with the same defaults and validation.
+
+What changes:
+
+- `deterministic.Config.max_diffraction_order` is removed. It accepted only 0
+  or 1, and 0 together with the `"diffraction"` component was already refused,
+  so it never changed a result. Remove the argument; `"diffraction" in
+  components` is the only diffraction switch. The deterministic result
+  metadata no longer has a `max_diffraction_order` key.
+- `deterministic.Config` field order changed: the 15 shared fields come first,
+  then `coherent`, `return_field`, `export_paths`, `sort_key`, `diagnostics`
+  and `scattering_coherent`. Positional construction (never documented) must
+  switch to keywords; `requested_config`/`effective_config` metadata lists the
+  fields in the new order.
+- A deterministic `max_paths_scope` error now names the solver
+  (`deterministic max_paths_scope must be one of ...`).
+- The propagation consumer builds an `EnumeratedOptions` from its request;
+  its public types, signatures and `CONTRACT_VERSION` are unchanged, and it
+  still imports no solver module.
+
+`montecarlo.bdpt.Config.max_diffraction_order` is unchanged.

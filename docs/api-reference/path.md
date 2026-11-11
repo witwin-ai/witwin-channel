@@ -37,6 +37,15 @@ Config(
 )
 ```
 
+### Shared enumerated options
+
+`path.Config` is exactly the shared enumerated option set: every field below is
+defined once, in the engine's `EnumeratedOptions`, and inherited with the same
+name, default and validation by `deterministic.Config`. The only difference is
+`max_paths_scope`, which defaults to `"per_pair"` here and is restricted to it.
+The propagation consumer builds the same options from its request and leaves
+every field the request does not expose at its default.
+
 | Parameter | Description |
 | --- | --- |
 | `max_depth` | Maximum reflection/transmission depth. Depth-capped components support at most 5. |

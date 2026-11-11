@@ -7,22 +7,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from witwin.channel.components import (
-    AD_MODES as _VALID_AD_MODES,
-    DEFAULT_COMPONENTS as _DEFAULT_COMPONENTS,
-    require_config_type,
-    validate_chain_depth_cap,
-    validate_config_fields,
-    validate_coupled_candidate_limit,
-    validate_coupled_gate,
-    validate_isb_boundary_taper,
-    validate_max_depth,
-    validate_max_paths,
-    validate_scatter_chain,
-    validate_scattering_quadrature,
-    validate_vocabulary,
-    validated_components,
-)
+from typing import ClassVar
+
+from witwin.channel.components import require_config_type, validate_vocabulary
 
 from typing import Any
 
@@ -33,6 +20,7 @@ from witwin.channel.scene.compiler import compile as compile_scene, record_dropp
 from witwin.channel.scene.endpoints import bind_solver_scene, link_zero_gradient
 
 from witwin.channel.propagation.enumerated import (
+    EnumeratedOptions,
     evaluate_enumerated_paths,
 )
 from witwin.channel.interactions.scattering import (
@@ -90,7 +78,6 @@ if TYPE_CHECKING:
 # penetrations); scattering is single-bounce in v1.
 # Default component set is unchanged: the new components are strictly opt-in.
 _VALID_SORT_KEYS = frozenset({"receiver_transmitter_depth_component"})
-_VALID_MAX_PATHS_SCOPES = frozenset({"global", "per_pair"})
 
 
 def _validate_scattering_coherent(*, scattering_coherent: bool, components: frozenset[str]) -> None:
@@ -109,108 +96,29 @@ def _validate_scattering_coherent(*, scattering_coherent: bool, components: froz
 
 
 @dataclass(frozen=True, slots=True)
-class Config:
-    max_depth: int = 1
-    max_diffraction_order: int = 1
-    components: frozenset[str] | set[str] | tuple[str, ...] | list[str] = (
-        _DEFAULT_COMPONENTS
-    )
+class Config(EnumeratedOptions):
+    """Deterministic solver options: the shared enumerated options plus the terminal stage's."""
+
     coherent: bool = True
     return_field: bool = True
     export_paths: bool = False
-    max_paths: int | None = None
-    max_paths_scope: str = "global"
     sort_key: str = "receiver_transmitter_depth_component"
     diagnostics: bool = False
-    ad_mode: str = "none"
-    # Coupled reflection-diffraction paths (coupled reflection and diffraction). Opt-in; when set the
-    # deterministic grid solver enumerates the R->D / D->R compensator rows
-    # (component ids 3/4) and accumulates their coherent contribution into a
-    # dedicated coupled field slot. coupled_candidate_limit is a per-receiver-
-    # block work/safety budget: the deterministic engine streams coupled
-    # discovery over receiver blocks sized so each block stays under it.
-    coupled_paths: bool = False
-    coupled_candidate_limit: int = 1_000_000
-    # Rough-surface scattering quadrature (rough scattering). The patch density is a
-    # fixed per-area sample count with a documented per-face cap of 4096
-    # samples; per (tx, rx) pair only the strongest samples up to
-    # scattering_max_paths_per_pair survive (dropped power is reported in the
-    # scattering metadata, never silently redistributed) and samples below
-    # scattering_power_threshold (absolute path_gain floor) are discarded.
-    scattering_samples_per_m2: float = 8.0
-    scattering_max_paths_per_pair: int = 4096
-    scattering_power_threshold: float = 0.0
-    # Coherent scattering combine (coherent scattering). DEFAULT-OFF opt-in. OFF keeps
-    # the scattering slot an incoherent POWER sum bit-identical to today; ON
-    # sums the complex path_field of scattering rows per (tx, rx) and finalizes
-    # |sum|^2. It is physical only
-    # for realization-coherent phase-screen rows, which carry a true complex
-    # field; ensemble rows are zero-phase power rows, so the pipeline refuses an
-    # ensemble-only solve loudly. Requires the 'scattering' component.
+    # Coherent scattering combine, off by default. Off keeps the scattering slot an
+    # incoherent power sum; on sums the complex path_field of scattering rows per
+    # (tx, rx) and finalizes |sum|^2. It is physical only for realization-coherent
+    # phase-screen rows; an ensemble-only solve is refused. Requires 'scattering'.
     scattering_coherent: bool = False
-    # Enumerated scatter-chain path class (coherent scattering). DEFAULT-OFF opt-in:
-    # scattering_chain_max_depth = 0 disables chain discovery so the pipeline is
-    # byte-identical to today. When >= 1 it is the cap on d1 + d2, the combined
-    # specular reflection depth of the two legs around the single diffuse vertex
-    # (TX --C1(d1)--> v_s --C2(d2)--> RX with 1 <= d1 + d2 <= cap). Each leg is
-    # independently bounded by the native kMaxAdDepth = 8, so the public cap is
-    # 2 * 8 = 16. The chain-sample vertices are drawn at a documented lower
-    # density (scattering_chain_samples_per_m2) than the single-bounce sampler,
-    # and only the strongest scattering_chain_max_rows joined rows per (tx, rx)
-    # survive. Requires the 'scattering' component.
-    scattering_chain_max_depth: int = 0
-    scattering_chain_samples_per_m2: float = 2.0
-    scattering_chain_max_rows: int = 256
-    # ISB boundary taper. DEFAULT-OFF visual-continuity heuristic: the
-    # hard LoS occlusion gate becomes a C1 membership taper tau(c / (width * w_F))
-    # and the compensating order-1 diffraction odd step spreads over the same
-    # congruent window. OFF (the default) is bit-identical to the hard gate and
-    # the unchanged diffraction window for every existing caller (enforced by a
-    # bitwise regression test); the switch must never default ON. The width
-    # scales the Fresnel penumbra w_F of the grazed silhouette edge; the
-    # projection-validated optimum is 0.5 (artifacts/isb-taper/report.json).
-    isb_boundary_taper: bool = False
-    isb_boundary_taper_width: float = 0.5
+
+    _option_owner: ClassVar[str] = "deterministic"
+
     def __post_init__(self) -> None:
-        validate_config_fields(self)
-        validate_max_depth(self.max_depth)
-        validate_isb_boundary_taper(self.isb_boundary_taper_width)
-        validate_scattering_quadrature(
-            samples_per_m2=self.scattering_samples_per_m2,
-            max_paths_per_pair=self.scattering_max_paths_per_pair,
-            power_threshold=self.scattering_power_threshold,
-        )
-        if self.max_diffraction_order not in (0, 1):
-            raise ValueError(
-                f"max_diffraction_order must be 0 or 1, got {self.max_diffraction_order}"
-            )
-
-        components = validated_components(
-            self.components,
-            error_message="components must be a non-empty subset of {valid}",
-        )
+        EnumeratedOptions.__post_init__(self)
         _validate_scattering_coherent(
-            scattering_coherent=self.scattering_coherent, components=components
+            scattering_coherent=self.scattering_coherent,
+            components=frozenset(self.components),
         )
-        validate_scatter_chain(
-            max_depth=self.scattering_chain_max_depth,
-            samples_per_m2=self.scattering_chain_samples_per_m2,
-            max_rows=self.scattering_chain_max_rows,
-            components=components,
-        )
-        validate_chain_depth_cap("deterministic", self.max_depth, components)
-        validate_coupled_gate(
-            coupled_paths=self.coupled_paths,
-            max_depth=self.max_depth,
-            components=components,
-        )
-        validate_coupled_candidate_limit(self.coupled_candidate_limit)
-        validate_max_paths(self.max_paths)
-        validate_vocabulary("max_paths_scope", self.max_paths_scope, _VALID_MAX_PATHS_SCOPES)
         validate_vocabulary("sort_key", self.sort_key, _VALID_SORT_KEYS)
-        validate_vocabulary("deterministic ad_mode", self.ad_mode, _VALID_AD_MODES)
-
-        object.__setattr__(self, "components", components)
 
 
 # --- Results --------------------------------------------------------------
@@ -536,13 +444,8 @@ def _validate_requested_components(config: Config) -> None:
         )
     if "reflection" in config.components and config.max_depth < 1:
         raise RuntimeError("deterministic reflection requires max_depth >= 1")
-    if "diffraction" in config.components:
-        if config.max_depth < 1:
-            raise RuntimeError("deterministic diffraction requires max_depth >= 1")
-        if config.max_diffraction_order < 1:
-            raise RuntimeError(
-                "deterministic diffraction requires max_diffraction_order >= 1"
-            )
+    if "diffraction" in config.components and config.max_depth < 1:
+        raise RuntimeError("deterministic diffraction requires max_depth >= 1")
 
 
 def _validate_scattering_coherent_mode(scattering_info: dict[str, Any] | None) -> None:
@@ -724,7 +627,6 @@ def _metadata(
     effective_config = dict(requested_config)
     metadata = {
         "max_depth": config.max_depth,
-        "max_diffraction_order": config.max_diffraction_order,
         "coherent": config.coherent,
         "return_field": config.return_field,
         "export_paths": config.export_paths,

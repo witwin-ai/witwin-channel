@@ -151,7 +151,6 @@ def test_reduced_munich_native_depth_one_through_three_exports_reflection_paths(
         scene,
         Config(
             max_depth=max_depth,
-            max_diffraction_order=1,
             components={"los", "reflection", "diffraction"},
             coherent=False,
             return_field=False,

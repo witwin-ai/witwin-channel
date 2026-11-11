@@ -7,9 +7,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, ClassVar, Protocol
 
 import torch
+from witwin.channel.components import (
+    AD_MODES,
+    DEFAULT_COMPONENTS,
+    validate_chain_depth_cap,
+    validate_config_fields,
+    validate_coupled_candidate_limit,
+    validate_coupled_gate,
+    validate_isb_boundary_taper,
+    validate_max_depth,
+    validate_max_paths,
+    validate_scatter_chain,
+    validate_scattering_quadrature,
+    validate_vocabulary,
+    validated_components,
+)
 from witwin.channel.scene.endpoints import require_compiled
 
 from witwin.channel.materials import (
@@ -113,6 +128,85 @@ class EnumeratedPathConfig(Protocol):
     components: frozenset[str] | set[str] | tuple[str, ...] | list[str]
     max_paths: int | None
     max_paths_scope: str
+
+
+# --- Shared enumerated options --------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class EnumeratedOptions:
+    """The options the enumerated engine reads; the single owner of every shared field.
+
+    ``path.Config`` and ``deterministic.Config`` derive from it and add only the fields
+    their terminal stage reads; the consumer builds one from its request.
+    """
+
+    max_depth: int = 1
+    components: frozenset[str] | set[str] | tuple[str, ...] | list[str] = DEFAULT_COMPONENTS
+    max_paths: int | None = None
+    max_paths_scope: str = "global"
+    ad_mode: str = "none"
+    # Coupled reflection-diffraction rows (R->D, D->R and D->D). Opt-in.
+    # coupled_candidate_limit bounds the candidate work of one discovery call (one
+    # receiver block when the caller streams receivers).
+    coupled_paths: bool = False
+    coupled_candidate_limit: int = 1_000_000
+    # Rough-surface scattering quadrature: a fixed per-area sample density (per-face
+    # cap of 4096 samples), the per-(tx, rx) strongest-rows cap, and an absolute
+    # path_gain floor. Dropped power is reported in the scattering metadata.
+    scattering_samples_per_m2: float = 8.0
+    scattering_max_paths_per_pair: int = 4096
+    scattering_power_threshold: float = 0.0
+    # Scatter-chain rows (TX --C1(d1)--> v_s --C2(d2)--> RX). Off at 0; when >= 1 it
+    # caps d1 + d2, the combined specular depth of the two legs around the single
+    # diffuse vertex. Each leg is bounded by the native kMaxAdDepth = 8, so the cap
+    # is 16. Chain vertices use their own lower sample density and only the
+    # strongest scattering_chain_max_rows rows per (tx, rx) survive. Requires the
+    # 'scattering' component.
+    scattering_chain_max_depth: int = 0
+    scattering_chain_samples_per_m2: float = 2.0
+    scattering_chain_max_rows: int = 256
+    # ISB boundary taper, an off-by-default visual-continuity heuristic: the hard
+    # LoS occlusion gate becomes a C1 taper tau(c / (width * w_F)) and the order-1
+    # diffraction odd step spreads over the same window. Off is bit-identical to
+    # the hard gate. The width scales the Fresnel penumbra w_F of the grazed edge.
+    isb_boundary_taper: bool = False
+    isb_boundary_taper_width: float = 0.5
+
+    # Name used in validation messages, and the accepted max_paths_scope values.
+    _option_owner: ClassVar[str] = "enumerated"
+    _max_paths_scopes: ClassVar[frozenset[str]] = frozenset({"global", "per_pair"})
+
+    def __post_init__(self) -> None:
+        owner = self._option_owner
+        validate_config_fields(self)
+        validate_max_depth(self.max_depth)
+        validate_isb_boundary_taper(self.isb_boundary_taper_width)
+        validate_scattering_quadrature(
+            samples_per_m2=self.scattering_samples_per_m2,
+            max_paths_per_pair=self.scattering_max_paths_per_pair,
+            power_threshold=self.scattering_power_threshold,
+        )
+        components = validated_components(
+            self.components, error_message="components must be a non-empty subset of {valid}"
+        )
+        validate_scatter_chain(
+            max_depth=self.scattering_chain_max_depth,
+            samples_per_m2=self.scattering_chain_samples_per_m2,
+            max_rows=self.scattering_chain_max_rows,
+            components=components,
+        )
+        validate_chain_depth_cap(owner, self.max_depth, components)
+        validate_coupled_gate(
+            coupled_paths=self.coupled_paths, max_depth=self.max_depth, components=components,
+        )
+        validate_coupled_candidate_limit(self.coupled_candidate_limit)
+        validate_max_paths(self.max_paths)
+        validate_vocabulary(
+            f"{owner} max_paths_scope", self.max_paths_scope, self._max_paths_scopes
+        )
+        validate_vocabulary(f"{owner} ad_mode", self.ad_mode, AD_MODES)
+        object.__setattr__(self, "components", components)
 
 
 # --- Native failure sanitizers for complete evaluated enumerated path rows ---
@@ -487,8 +581,6 @@ def _path_components(config: EnumeratedPathConfig) -> set[str]:
         components.discard("diffraction")
         components.discard("transmission")
         components.discard("scattering")
-    if int(getattr(config, "max_diffraction_order", 1)) == 0:
-        components.discard("diffraction")
     return components
 
 
@@ -557,6 +649,71 @@ def transmission_dropped_rows(sidecars: EvaluatedPathSidecars) -> int:
     return 0 if transaction is None else transaction.terminal_check()
 
 
+@dataclass(frozen=True, slots=True)
+class BoundEnumeratedEndpoints:
+    """Engine endpoint tensors from either scene-owned endpoints or an explicit batch."""
+
+    tx_positions: torch.Tensor
+    tx_power: torch.Tensor
+    tx_polarizations: torch.Tensor
+    rx_positions: torch.Tensor
+    # Set only for an explicit batch: scene-owned endpoints keep their own
+    # polarization and antenna handling inside the field stage.
+    rx_polarizations: torch.Tensor | None
+    explicit_tx_polarizations: torch.Tensor | None
+    tx_stable_ids: torch.Tensor | None
+    rx_stable_ids: torch.Tensor | None
+
+    @property
+    def explicit(self) -> bool:
+        return self.explicit_tx_polarizations is not None
+
+
+def bind_enumerated_endpoints(
+    scene: Scene, endpoint_tensors: EnumeratedEndpointTensors | None, *, device: torch.device,
+) -> BoundEnumeratedEndpoints:
+    """The one adapter from a scene's endpoints, or an explicit batch, to engine tensors."""
+
+    if endpoint_tensors is None:
+        tx_positions, tx_power = transmitter_tensors(scene, device=device)
+        rx_positions, _ = receiver_positions_and_layout(scene, device=device)
+        return BoundEnumeratedEndpoints(
+            tx_positions=tx_positions,
+            tx_power=tx_power,
+            tx_polarizations=transmitter_polarizations_as_stored(scene, device=device),
+            rx_positions=rx_positions,
+            rx_polarizations=None,
+            explicit_tx_polarizations=None,
+            tx_stable_ids=None,
+            rx_stable_ids=None,
+        )
+    return BoundEnumeratedEndpoints(
+        tx_positions=endpoint_tensors.tx_positions,
+        tx_power=endpoint_tensors.tx_power,
+        tx_polarizations=endpoint_tensors.tx_polarizations,
+        rx_positions=endpoint_tensors.rx_positions,
+        rx_polarizations=endpoint_tensors.rx_polarizations,
+        explicit_tx_polarizations=endpoint_tensors.tx_polarizations,
+        tx_stable_ids=endpoint_tensors.tx_stable_ids,
+        rx_stable_ids=endpoint_tensors.rx_stable_ids,
+    )
+
+
+def explicit_endpoint_scene(compiled: object) -> Scene:
+    """A solver scene over ``compiled`` whose endpoints come only from an explicit batch."""
+
+    from witwin.channel.scene.endpoints import SolverScene
+
+    return SolverScene(
+        compiled=compiled,
+        structures=compiled.structures,  # type: ignore[attr-defined]
+        transmitters=(),
+        receivers=(),
+        frequency=compiled.reference_frequency_hz,  # type: ignore[attr-defined]
+        metadata=compiled.source.metadata,  # type: ignore[attr-defined]
+    )
+
+
 def evaluate_enumerated_paths(
     scene: Scene, config: EnumeratedPathConfig, *, frequency_value: float | None = None,
     coupled_rx_streaming: bool = False, defer_capacity_terminal: bool = False,
@@ -577,19 +734,13 @@ def evaluate_enumerated_paths(
 
     _require_defer_capacity_terminal(defer_capacity_terminal)
     device = torch.device("cuda")
-    if endpoint_tensors is None:
-        tx_positions, tx_power = transmitter_tensors(scene, device=device)
-        tx_polarizations = transmitter_polarizations_as_stored(scene, device=device)
-        rx_positions, _ = receiver_positions_and_layout(scene, device=device)
-        rx_polarizations = None
-        diffraction_tx_polarizations = None
-    else:
-        tx_positions = endpoint_tensors.tx_positions
-        tx_power = endpoint_tensors.tx_power
-        tx_polarizations = endpoint_tensors.tx_polarizations
-        diffraction_tx_polarizations = tx_polarizations
-        rx_positions = endpoint_tensors.rx_positions
-        rx_polarizations = endpoint_tensors.rx_polarizations
+    endpoints = bind_enumerated_endpoints(scene, endpoint_tensors, device=device)
+    tx_positions = endpoints.tx_positions
+    tx_power = endpoints.tx_power
+    tx_polarizations = endpoints.tx_polarizations
+    rx_positions = endpoints.rx_positions
+    rx_polarizations = endpoints.rx_polarizations
+    diffraction_tx_polarizations = endpoints.explicit_tx_polarizations
     field_tx_power = (
         tx_power.detach()
         if bool(getattr(config, "_detach_field_tx_power", False))
@@ -758,11 +909,9 @@ def evaluate_enumerated_paths(
             ad_mode=ad_mode,
             frequency_value=frequency_hz,
             isb_boundary_taper_width=isb_boundary_taper_width,
-            endpoint_tx_polarizations=(
-                tx_polarizations if endpoint_tensors is not None else None
-            ),
+            endpoint_tx_polarizations=endpoints.explicit_tx_polarizations,
             endpoint_rx_polarizations=rx_polarizations,
-            explicit_endpoint_geometry=endpoint_tensors is not None,
+            explicit_endpoint_geometry=endpoints.explicit,
         )
         sidecars = replace(
             sidecars,
@@ -775,16 +924,8 @@ def evaluate_enumerated_paths(
                 pair_count=int(tx_positions.shape[0]) * int(rx_positions.shape[0]),
                 num_tx=int(tx_positions.shape[0]),
                 num_rx=int(rx_positions.shape[0]),
-                source_stable_ids=(
-                    endpoint_tensors.tx_stable_ids
-                    if endpoint_tensors is not None
-                    else None
-                ),
-                sink_stable_ids=(
-                    endpoint_tensors.rx_stable_ids
-                    if endpoint_tensors is not None
-                    else None
-                ),
+                source_stable_ids=endpoints.tx_stable_ids,
+                sink_stable_ids=endpoints.rx_stable_ids,
             ),
         )
         return _finish_capacity_boundary(
@@ -812,12 +953,8 @@ def evaluate_enumerated_paths(
         visibility_rejection_count=visibility_rejection_count,
         candidate_count=candidate_count,
         guardrail_count=guardrail_count,
-        source_stable_ids=(
-            endpoint_tensors.tx_stable_ids if endpoint_tensors is not None else None
-        ),
-        sink_stable_ids=(
-            endpoint_tensors.rx_stable_ids if endpoint_tensors is not None else None
-        ),
+        source_stable_ids=endpoints.tx_stable_ids,
+        sink_stable_ids=endpoints.rx_stable_ids,
         capacity_transaction=capacity_transaction,
     )
     sidecars = replace(
@@ -840,11 +977,9 @@ def evaluate_enumerated_paths(
         ad_mode=ad_mode,
         frequency_value=frequency_hz,
         isb_boundary_taper_width=isb_boundary_taper_width,
-        endpoint_tx_polarizations=(
-            tx_polarizations if endpoint_tensors is not None else None
-        ),
+        endpoint_tx_polarizations=endpoints.explicit_tx_polarizations,
         endpoint_rx_polarizations=rx_polarizations,
-        explicit_endpoint_geometry=endpoint_tensors is not None,
+        explicit_endpoint_geometry=endpoints.explicit,
     )
     sidecars = replace(sidecars, execution=execution)
     return _finish_capacity_boundary(

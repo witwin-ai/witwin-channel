@@ -196,7 +196,7 @@ def _target(group: str, munich_xml: Path, sionna_root: Path) -> Callable[[], obj
         return lambda: solve_basic(scene, config)
     scene = _munich_scene(munich_xml, sionna_root)
     config = DeterministicConfig(
-        max_depth=1, max_diffraction_order=1, components={"diffraction"},
+        max_depth=1, components={"diffraction"},
         coherent=True, return_field=True, export_paths=True,
     )
     return lambda: solve_deterministic(scene, config)

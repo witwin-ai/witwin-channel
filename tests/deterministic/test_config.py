@@ -10,7 +10,6 @@ def test_config_defaults_match_public_contract():
     config = Config()
 
     assert config.max_depth == 1
-    assert config.max_diffraction_order == 1
     assert config.components == frozenset({"los", "reflection", "diffraction"})
     assert config.coherent is True
     assert config.return_field is True
@@ -109,8 +108,6 @@ def test_coupled_paths_config_validation(kwargs, message):
     ("kwargs", "message"),
     [
         ({"max_depth": -1}, "max_depth must be a non-negative int, got -1"),
-        ({"max_diffraction_order": -1}, "max_diffraction_order must be 0 or 1"),
-        ({"max_diffraction_order": 2}, "max_diffraction_order must be 0 or 1, got 2"),
         ({"components": set()}, "components must be a non-empty subset"),
         ({"components": {"los", "scatter"}}, "components must be a non-empty subset"),
         ({"max_paths": 0}, "max_paths must be None or a positive int, got 0"),
@@ -135,3 +132,8 @@ def test_config_rejects_invalid_values(kwargs, message):
 def test_config_rejects_retired_capacity_fields(field):
     with pytest.raises(TypeError, match=rf"unexpected keyword argument '{field}'"):
         Config(**{field: 1})
+
+def test_config_has_no_diffraction_order_knob():
+    # The 'diffraction' component is the only diffraction switch.
+    with pytest.raises(TypeError, match="unexpected keyword argument 'max_diffraction_order'"):
+        Config(max_diffraction_order=1)

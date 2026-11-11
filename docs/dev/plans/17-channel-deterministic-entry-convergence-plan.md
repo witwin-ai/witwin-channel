@@ -2,9 +2,16 @@
 
 ## Status
 
-Proposed. Needs a decision on D1-D4 (section 8) and an accepted ADR before
-Phase 1 lands. Nothing in this plan changes physics, numerical order, launch
-configuration, or AD support.
+Superseded in part by the 0.6.0 architecture decisions (analysis report
+section 10.13): `path` stays a public entry, and its `Config` and
+`deterministic.Config` both derive from `EnumeratedOptions` with flat
+inheritance instead of nesting under `options`. Done for 0.6.0: the Phase 0.3
+row-equivalence gate (`tests/propagation/test_entry_row_equivalence.py`),
+Phase 1.1 (`EnumeratedOptions`), Phase 1.5 (`max_diffraction_order` deleted
+from `deterministic`), Phase 2.1 (`_ConsumerConfig` deleted) and Phase 2.2 (one
+endpoint adapter, `bind_enumerated_endpoints`). The consumer diffraction primal
+was already fixed. Merging `path` into `deterministic` and deleting `PathTable`
+are not part of 0.6.0.
 
 ## 1. Answer
 

@@ -3200,19 +3200,6 @@ _CONVENTION = PropagationConvention()
 
 
 @dataclass(frozen=True, slots=True)
-class _ConsumerConfig:
-    max_depth: int
-    components: frozenset[str]
-    max_paths: int | None
-    ad_mode: str
-    max_paths_scope: str = "global"
-    max_diffraction_order: int = 1
-    coupled_paths: bool = False
-    isb_boundary_taper: bool = False
-    isb_boundary_taper_width: float = 0.5
-
-
-@dataclass(frozen=True, slots=True)
 class _ConsumerRows:
     evaluated: EvaluatedPaths
     path_count: int
@@ -3373,8 +3360,8 @@ def _solver_scene(
 
     from witwin.channel.propagation.enumerated import (
         EnumeratedEndpointTensors,
+        explicit_endpoint_scene,
     )
-    from witwin.channel.scene.endpoints import SolverScene
 
     assert sources.powers_w is not None
     endpoint_tensors = EnumeratedEndpointTensors(
@@ -3386,14 +3373,7 @@ def _solver_scene(
         tx_stable_ids=sources.stable_ids,
         rx_stable_ids=sinks.stable_ids,
     )
-    return SolverScene(
-        compiled=compiled,
-        structures=compiled.structures,
-        transmitters=(),
-        receivers=(),
-        frequency=compiled.reference_frequency_hz,
-        metadata=compiled.source.metadata,
-    ), endpoint_tensors
+    return explicit_endpoint_scene(compiled), endpoint_tensors
 
 
 def _compact(evaluated: object, metadata: ExactPairMetadata | None) -> _ConsumerRows:
@@ -3604,6 +3584,7 @@ def evaluate(compiled_scene: CompiledScene, request: PropagationRequest) -> Prop
     """Discover and evaluate one all-or-nothing compact propagation batch."""
 
     from witwin.channel.propagation.enumerated import (
+        EnumeratedOptions,
         evaluate_enumerated_paths,
         sanitize_enumerated_capacity_transaction,
         transmission_dropped_rows,
@@ -3611,7 +3592,8 @@ def evaluate(compiled_scene: CompiledScene, request: PropagationRequest) -> Prop
 
     compiled, request = _preflight_evaluate(compiled_scene, request)
     scene, endpoint_tensors = _solver_scene(compiled, request.sources, request.sinks)
-    config = _ConsumerConfig(
+    # Every option the request does not expose stays at its engine default.
+    config = EnumeratedOptions(
         max_depth=request.max_depth,
         components=request.components,
         # One row past the limit is requested so an overflow is detected from the

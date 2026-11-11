@@ -61,7 +61,6 @@ def run(coupled: bool) -> dict[str, object]:
     config = Config(
         components=COMPONENTS,
         max_depth=spec.max_depth,
-        max_diffraction_order=1,
         coherent=True,
         return_field=True,
         export_paths=True,

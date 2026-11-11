@@ -10,31 +10,19 @@ import math
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeAlias, cast
 
 import torch
 
 from witwin.channel.components import (
-    AD_MODES as _VALID_AD_MODES,
-    DEFAULT_COMPONENTS as _DEFAULT_COMPONENTS,
     apply_exported_path_counts,
     component_availability_status,
     component_max_depth,
     require_config_type,
-    validate_chain_depth_cap,
-    validate_config_fields,
-    validate_coupled_candidate_limit,
-    validate_coupled_gate,
-    validate_isb_boundary_taper,
-    validate_max_depth,
-    validate_max_paths,
-    validate_scatter_chain,
-    validate_scattering_quadrature,
-    validate_vocabulary,
-    validated_components,
 )
 from witwin.core import Scene, SceneSnapshot
 from witwin.channel.propagation.enumerated import (
+    EnumeratedOptions,
     evaluate_enumerated_paths,
 )
 from witwin.channel.interactions.scattering import (
@@ -75,82 +63,15 @@ if TYPE_CHECKING:
 
 # --- Configuration --------------------------------------------------------
 
-# Public component set. transmission exports specular wall-penetration paths
-# (transmission); scattering exports single-bounce incoherent Kirchhoff patch paths
-# (rough scattering). transmission depth is capped like reflection (chains count wall
-# penetrations); scattering is single-bounce in v1.
-# Default component set is unchanged: the new components are strictly opt-in.
-_VALID_MAX_PATHS_SCOPES = frozenset({"per_pair"})
-
 
 @dataclass(frozen=True, slots=True)
-class Config:
-    max_depth: int = 1
-    components: frozenset[str] | set[str] | tuple[str, ...] | list[str] = (
-        _DEFAULT_COMPONENTS
-    )
-    max_paths: int | None = None
+class Config(EnumeratedOptions):
+    """Path solver options: the shared enumerated options with a per-pair path cap."""
+
     max_paths_scope: str = "per_pair"
-    ad_mode: str = "none"
-    coupled_paths: bool = False
-    coupled_candidate_limit: int = 1_000_000
-    # Rough-surface scattering quadrature (rough scattering): fixed per-area sample
-    # density (per-face cap of 4096 samples), a per-pair strongest-paths cap,
-    # and an absolute path_gain floor for exported patch paths.
-    scattering_samples_per_m2: float = 8.0
-    scattering_max_paths_per_pair: int = 4096
-    scattering_power_threshold: float = 0.0
-    # Enumerated scatter-chain path class (coherent scattering). DEFAULT-OFF opt-in:
-    # scattering_chain_max_depth = 0 disables chain discovery so exported paths
-    # are byte-identical to today. When >= 1 it caps d1 + d2, the combined
-    # specular reflection depth of the two legs around the single diffuse vertex
-    # (TX --C1(d1)--> v_s --C2(d2)--> RX). Each leg is bounded by the native
-    # kMaxAdDepth = 8, so the public cap is 2 * 8 = 16. Chain vertices are drawn
-    # at a documented lower density (scattering_chain_samples_per_m2) and only
-    # the strongest scattering_chain_max_rows joined rows per (tx, rx) survive.
-    # Requires the 'scattering' component.
-    scattering_chain_max_depth: int = 0
-    scattering_chain_samples_per_m2: float = 2.0
-    scattering_chain_max_rows: int = 256
-    # ISB boundary taper. DEFAULT-OFF visual-continuity heuristic: the
-    # hard LoS occlusion gate becomes a C1 membership taper tau(c / (width * w_F))
-    # and the compensating order-1 diffraction odd step spreads over the same
-    # congruent window. OFF (the default) is bit-identical to the hard gate and
-    # the unchanged diffraction window for every existing caller (enforced by a
-    # bitwise regression test); the switch must never default ON. The width
-    # scales the Fresnel penumbra w_F of the grazed silhouette edge; the
-    # projection-validated optimum is 0.5 (artifacts/isb-taper/report.json).
-    isb_boundary_taper: bool = False
-    isb_boundary_taper_width: float = 0.5
-    def __post_init__(self) -> None:
-        validate_config_fields(self)
-        validate_max_depth(self.max_depth)
-        validate_isb_boundary_taper(self.isb_boundary_taper_width)
-        validate_scattering_quadrature(
-            samples_per_m2=self.scattering_samples_per_m2,
-            max_paths_per_pair=self.scattering_max_paths_per_pair,
-            power_threshold=self.scattering_power_threshold,
-        )
-        components = validated_components(
-            self.components, error_message="components must be a non-empty subset of {valid}"
-        )
-        validate_scatter_chain(
-            max_depth=self.scattering_chain_max_depth,
-            samples_per_m2=self.scattering_chain_samples_per_m2,
-            max_rows=self.scattering_chain_max_rows,
-            components=components,
-        )
-        validate_chain_depth_cap("path", self.max_depth, components)
-        validate_coupled_gate(
-            coupled_paths=self.coupled_paths,
-            max_depth=self.max_depth,
-            components=components,
-        )
-        validate_max_paths(self.max_paths)
-        validate_vocabulary("path max_paths_scope", self.max_paths_scope, _VALID_MAX_PATHS_SCOPES)
-        validate_coupled_candidate_limit(self.coupled_candidate_limit)
-        validate_vocabulary("path ad_mode", self.ad_mode, _VALID_AD_MODES)
-        object.__setattr__(self, "components", components)
+
+    _option_owner: ClassVar[str] = "path"
+    _max_paths_scopes: ClassVar[frozenset[str]] = frozenset({"per_pair"})
 
 
 # --- Ragged per-link storage ----------------------------------------------

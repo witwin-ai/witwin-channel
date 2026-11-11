@@ -349,7 +349,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     scene = _load_scene(args)
     config = Config(
         max_depth=int(args.max_depth),
-        max_diffraction_order=1,
         components=set(COMPONENTS),
         coherent=False,
         return_field=False,

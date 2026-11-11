@@ -10,59 +10,61 @@ from witwin.channel.deterministic import Config, PathTable, Result, solve
 
 ## `Config`
 
-Frozen dataclass; values cannot be changed after construction.
+Frozen dataclass; values cannot be changed after construction. The first 15
+fields are the shared enumerated options, defined once and inherited by both
+`deterministic.Config` and `path.Config` (see "Shared enumerated options" in
+[`path`](path.md)); the last six are read only by the deterministic terminal
+stage.
 
 ```text
 Config(
     max_depth: int = 1,
-    max_diffraction_order: int = 1,
     components = frozenset({"los", "reflection", "diffraction"}),
-    coherent: bool = True,
-    return_field: bool = True,
-    export_paths: bool = False,
     max_paths: int | None = None,
     max_paths_scope: str = "global",
-    sort_key: str = "receiver_transmitter_depth_component",
-    diagnostics: bool = False,
     ad_mode: str = "none",
     coupled_paths: bool = False,
     coupled_candidate_limit: int = 1_000_000,
     scattering_samples_per_m2: float = 8.0,
     scattering_max_paths_per_pair: int = 4096,
     scattering_power_threshold: float = 0.0,
-    scattering_coherent: bool = False,
     scattering_chain_max_depth: int = 0,
     scattering_chain_samples_per_m2: float = 2.0,
     scattering_chain_max_rows: int = 256,
     isb_boundary_taper: bool = False,
     isb_boundary_taper_width: float = 0.5,
+    coherent: bool = True,
+    return_field: bool = True,
+    export_paths: bool = False,
+    sort_key: str = "receiver_transmitter_depth_component",
+    diagnostics: bool = False,
+    scattering_coherent: bool = False,
 )
 ```
 
 | Parameter | Description |
 | --- | --- |
 | `max_depth` | Maximum reflection/transmission depth. Depth-capped components support at most 5. |
-| `max_diffraction_order` | Maximum diffraction order; the current public capability is first order. |
-| `components` | Supported subset of `los`, `reflection`, `diffraction`, `transmission`, and `scattering`. |
-| `coherent` | Coherently combine deterministic complex-field contributions. |
-| `return_field` | Preserve complex field output. |
-| `export_paths` | Produce a compact `PathTable`. |
-| `max_paths` | Optional positive global exported-row limit. |
-| `max_paths_scope` | Must be `"global"`. |
-| `sort_key` | Stable path ordering policy. |
-| `diagnostics` | Collect additional diagnostic records. |
+| `components` | Supported subset of `los`, `reflection`, `diffraction`, `transmission`, and `scattering`. `"diffraction"` is the only diffraction switch (first order). |
+| `max_paths` | Optional positive exported-row limit, applied per `max_paths_scope`. |
+| `max_paths_scope` | `"global"` (default) or `"per_pair"`. |
 | `ad_mode` | `"none"`, `"jvp"`, or `"vjp"`. |
 | `coupled_paths` | Enable supported reflection-diffraction coupled paths. |
 | `coupled_candidate_limit` | Positive fail-loud candidate limit. |
 | `scattering_samples_per_m2` | Positive rough-surface sample density. |
 | `scattering_max_paths_per_pair` | Positive per-pair scattering-row limit. |
 | `scattering_power_threshold` | Non-negative absolute gain threshold for exported scattering rows. |
-| `scattering_coherent` | Select the supported coherent scattering-combination policy. |
 | `scattering_chain_max_depth` | Combined reflection depth around a coherent scattering vertex; 0 disables chains. |
 | `scattering_chain_samples_per_m2` | Positive chain-vertex sample density. |
 | `scattering_chain_max_rows` | Positive per-pair retained chain-row limit. |
 | `isb_boundary_taper` | Enable the default-off ISB continuity taper. |
 | `isb_boundary_taper_width` | Fresnel-penumbra width multiplier; defaults to 0.5. |
+| `coherent` | Coherently combine deterministic complex-field contributions. |
+| `return_field` | Preserve complex field output. |
+| `export_paths` | Produce a compact `PathTable`. |
+| `sort_key` | Stable path ordering policy. |
+| `diagnostics` | Collect additional diagnostic records. |
+| `scattering_coherent` | Select the supported coherent scattering-combination policy. |
 
 Invalid values or unsupported combinations raise `TypeError`, `ValueError`,
 `NotImplementedError`, or `RuntimeError` during configuration or solve
