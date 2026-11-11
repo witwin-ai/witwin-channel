@@ -119,17 +119,25 @@ def deterministic_plane(case: rs.ReferenceCase, plane: dict) -> tuple[np.ndarray
 
     result = solve(rs.build_channel_scene(case, plane), Config(
         components=frozenset({"los", "reflection", "diffraction", "transmission"}),
-        max_depth=_DEPTH.get(case.case_id, 2), max_diffraction_order=1, coherent=True,
+        max_depth=_DEPTH.get(case.case_id, 2), coherent=True,
         return_field=True, coupled_paths=True, coupled_candidate_limit=1_000_000,
         isb_boundary_taper=False), reference_frequency_hz=case.frequency_hz)
+    # The grid is shape (x.size, y.size), so solver maps are [1, x, y]; the planes are (y, x).
     shape = plane["field"].shape
-    field = result.field.detach().cpu().numpy().reshape(shape)
-    los = result.component_fields["los"].detach().cpu().numpy().reshape(shape)
+
+    def plane_layout(values) -> np.ndarray:
+        array = values.detach().cpu().numpy()
+        if array.shape != (1, shape[1], shape[0]):
+            raise AssertionError(f"unexpected solver map shape {array.shape} for plane {shape}")
+        return array[0].T
+
+    field = plane_layout(result.field)
+    los = plane_layout(result.component_fields["los"])
     far = rs.dipole_field(case, rs.plane_points(plane["x"], plane["y"], plane["z"]), near_field=False)
     visible = np.abs(los) > 0
     ratio = los[visible] / far[visible]
     scale = complex(np.median(ratio.real), np.median(ratio.imag))
-    components = {name: values.detach().cpu().numpy().reshape(shape) / scale
+    components = {name: plane_layout(values) / scale
                   for name, values in result.component_fields.items() if values.numel() > 0}
     return field / scale, components, float(np.max(np.abs(ratio / scale - 1.0)))
 
