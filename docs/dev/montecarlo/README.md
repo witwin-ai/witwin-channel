@@ -151,6 +151,10 @@ used by focused contract tests, but are not compatibility promises. The parent
   (a pure function of seed, stream, global sample index and depth), so they
   give the same estimate. `metadata["sampler"]` names the one used.
 - Metadata counts stay on the device and are read in one copy per solve.
+- Limitation: a mixed reflection+transmission chain is estimated by connecting
+  the vertex after a specular event straight to the receiver (a
+  point-to-receiver connection, not an image-method path). It has no
+  deterministic reference; its evidence is statistical (ADR-049).
 - With only enumerated components (the default `los`, `reflection`,
   `diffraction`, and coupled paths) every row is a unit-mass discrete
   connection: the estimate does not depend on `samples` or `seed`, and `mis` /

@@ -87,6 +87,20 @@ accumulate JVP looped every row for every output cell (`O(cells x rows)`).
 - The mixed-chain sampler no longer scales its memory or launch count with
   `samples x receivers`; the workspace estimate counts one chunk and one tile.
 
+## Estimator limitation (mixed chains)
+
+The mixed reflection+transmission estimator connects the light vertex after a
+specular event (a point on a wall, carrying the sampled Jones field) straight
+to the receiver through one connection segment. A specular chain has measure
+zero in that connection; the estimator is a point-to-receiver radiometric
+connection, not an image-method path, so it is not the field the deterministic
+solver would assign to a reflect-then-transmit path and there is no
+deterministic reference for it (deterministic transmission is straight-segment
+only). Its equivalence evidence is therefore statistical: same-seed agreement
+between implementations and means over seeds against the previous sampler.
+Straight transmission, reflection and diffraction stay enumerated and agree
+with the deterministic solver by construction.
+
 ## Acceptance evidence
 
 Recorded in `docs/dev/montecarlo/README.md` ("BDPT wavefront evidence") and the
