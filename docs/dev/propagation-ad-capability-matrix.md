@@ -92,7 +92,6 @@ outside the hot path (result assembly, refusal checks); it is never physics.
 |---|---|---|---|---|---|---|---|
 | discovery/diffraction | every leaf | jvp | REF | host-declaration | witwin/channel/propagation/consumer.py | tests/propagation/consumer/test_phase9_ad_matrix.py::test_diffraction_ad_is_refused_before_any_native_work | refusal |
 | discovery/diffraction | every leaf | vjp | REF | host-declaration | witwin/channel/propagation/consumer.py | tests/propagation/consumer/test_phase9_ad_matrix.py::test_diffraction_ad_is_refused_before_any_native_work | refusal |
-| discovery/diffraction | primal reachability | none | YES | host-declaration | witwin/channel/interactions/diffraction.py | tests/propagation/consumer/test_phase9_ad_matrix.py::test_diffraction_primal_evaluates_while_its_ad_column_stays_refused | primal |
 
 ### 2.6 Higher order
 
