@@ -88,12 +88,14 @@ allocation above the pre-solve baseline, LoS + reflection, `discovery="auto"`:
 
 | Case | 0.5.0 (report) | This change |
 | --- | ---: | ---: |
-| Depth 3, 64 x 64 grid | 418 ms / 2,155 MiB | 13.9 ms / 97 MiB, longest kernel 0.8 ms |
-| Depth 2, 64 x 64 grid | 21.9 ms / 1,301 MiB | 9.3 ms / 146 MiB |
-| Depth 4, 64 x 64 grid | 22.8 ms / 437 MiB (rays, incomplete) | 86.6 ms / 97 MiB (complete) |
-| Depth 5, 64 x 64 grid | 29.2 ms / 652 MiB (rays) | 130 ms / 379 MiB (depths 1-4 tree, 5 rays; longest kernel 50 ms) |
-| Depth 1, 128 x 128 grid | 13.6 ms | 5.9 ms |
-| Depth 1, 128 x 128 grid, 41,472 triangles | 51 ms | 7.7 ms |
+| Depth 3, 64 x 64 grid | 418 ms / 2,155 MiB | 13.6 ms / 97 MiB, longest kernel 0.8 ms |
+| Depth 3, 64 x 64 grid, `discovery="exhaustive"` | - | 16.4 ms / 85 MiB |
+| Depth 3, 64 x 64 grid, `discovery="rays"` | - | 11.4 ms / 191 MiB (incomplete) |
+| Depth 2, 64 x 64 grid | 21.9 ms / 1,301 MiB | 7.4 ms / 40 MiB |
+| Depth 4, 64 x 64 grid | 22.8 ms / 437 MiB (rays, incomplete) | 73.0 ms / 97 MiB (complete) |
+| Depth 5, 64 x 64 grid | 29.2 ms / 652 MiB (rays) | 122.7 ms / 502 MiB (depths 1-4 tree, 5 rays; longest kernel 38 ms) |
+| Depth 1, 128 x 128 grid | 13.6 ms | 6.2 ms |
+| Depth 1, 128 x 128 grid, 41,472 triangles | 51 ms | 6.9 ms |
 
 Image-tree sizes on that scene (unpruned in parentheses): depth 2 632 (1,056), depth 3 13,190
 (33,792), depth 4 263,433 (1,081,344). Receiver-test survivors at 4,096 receivers: depth 2
