@@ -500,13 +500,11 @@ def scattering_patch_integral_eval_jvp(
 # ---------------------------------------------------------------------------
 # Coherent scattering-chain kernels.
 #
-# Op A (``scattering_chain_ensemble_eval``) generalizes op 1 to a specular
-# reflection chain C1 -> diffuse vertex v_s -> chain C2 in the power domain;
-# Op B (``scattering_chain_realization_eval``) generalizes op 2 to the coherent
-# 2x2 Jones sandwich with a phase-screen realization at the vertex. Both carry
-# two padded per-leg blocks ``[R, Dmax, ...]`` with ``Dmax = kMaxAdDepth = 8``
-#. The facades are thin: validate the spec tables, dispatch
-# the required native symbol, and assert the returned key-set exactly.
+# ``scattering_chain_ensemble_eval`` generalizes op 1 to a specular reflection
+# chain C1 -> diffuse vertex v_s -> chain C2 in the power domain. It carries two
+# padded per-leg blocks ``[R, Dmax, ...]`` with ``Dmax = kMaxAdDepth = 8``. The
+# facade is thin: validate the spec tables, dispatch the required native symbol,
+# and assert the returned key-set exactly.
 # ---------------------------------------------------------------------------
 
 _K_MAX_AD_DEPTH = 8

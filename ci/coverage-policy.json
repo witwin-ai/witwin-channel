@@ -50,8 +50,8 @@
       "members": [
         "_validate_enumerated_field_result",
         "_validate_wedge_valid",
+        "field_coupled_chain",
         "field_coupled_dd",
-        "field_coupled_rd",
         "field_diffraction_wedge",
         "field_free_space",
         "field_free_space_backward",

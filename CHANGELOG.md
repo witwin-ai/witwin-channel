@@ -42,6 +42,18 @@ All notable changes to `witwin-channel` are documented in this file.
   reflection points on a shared edge, or repeated reflections on one plane)
   are no longer reported. Depth-3 reflection on a 64 x 64 grid of the 4x4
   synthetic city drops from 418 ms / 2.15 GB to about 14 ms / 0.1 GB.
+- `coupled_paths=True` now adds interaction chains: reflections with one
+  diffraction anywhere, up to `max_depth` interactions (at `max_depth=2` the
+  former reflection-diffraction and diffraction-reflection rows), plus double
+  diffraction. Candidates join transmitter and receiver image-tree halves on a
+  shared edge instead of enumerating every (group, edge) pair; the 1,000,000
+  candidate cap is gone and `coupled_candidate_limit` only sizes validator
+  launches. Double diffraction pairs transmitter-visible with
+  receiver-visible edges and gates each visibility leg on the previous one.
+  The 4x4 synthetic city with a 64 x 64 grid drops from about 910 ms to about
+  66 ms (shared GPU). Metadata geometry tags read
+  `native_interaction_chains` (Path) and `native_interaction_chains_plus_dd`
+  (Deterministic).
 
 ### Fixed
 

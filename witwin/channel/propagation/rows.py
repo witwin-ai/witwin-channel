@@ -257,8 +257,9 @@ COMPONENT_ROW_GROUPS = 8
 class PathRowGroups:
     """Host row counts and a device order that list each field-stage group's rows.
 
-    Group ``c`` holds the rows of component ``c`` (reflection excepted), group
-    ``8 + d`` the reflection rows of depth ``d``, and the last group every other row. Rows of
+    Group ``c`` holds the rows of component ``c`` (reflection excepted; the interaction chains
+    with an interior diffraction, components ``8 + s``, share group 3), group ``8 + d`` the
+    reflection rows of depth ``d``, and the last group every other row. Rows of
     one group appear in ascending row order inside ``order``. ``order`` is None when the rows
     are already grouped, in which case every row belongs to the single non-empty group.
     """

@@ -174,22 +174,22 @@ at::Tensor channel_rayd_scene_face_normals_backward(
 at::Tensor channel_rayd_scene_face_normals_jvp(
     RayDSceneResource &scene,
     torch::Tensor tangent_vertices);
-pybind11::dict channel_coupled_rd_geometry_forward(
+pybind11::dict channel_coupled_chain_geometry_forward(
     RayDSceneResource &scene,
     torch::Tensor source,
     torch::Tensor receiver,
-    torch::Tensor face_id,
-    torch::Tensor plane_point,
-    torch::Tensor plane_normal,
+    torch::Tensor edge_point,
     torch::Tensor edge_id,
-    torch::Tensor edge_pos,
-    torch::Tensor edge_dir,
-    torch::Tensor edge_t_min,
-    torch::Tensor edge_t_max,
+    torch::Tensor prefix_faces,
+    torch::Tensor prefix_plane_points,
+    torch::Tensor prefix_plane_normals,
+    torch::Tensor suffix_faces,
+    torch::Tensor suffix_plane_points,
+    torch::Tensor suffix_plane_normals,
     torch::Tensor surface_group_id,
     torch::Tensor surface_group_size,
     torch::Tensor surface_group_members,
-    bool reverse);
+    double min_segment_length);
 pybind11::dict channel_coupled_dd_geometry_forward(
     RayDSceneResource &scene,
     torch::Tensor source,
@@ -365,9 +365,9 @@ void register_rayd_geometry(pybind11::module_ &module) {
         &channel_rayd_scene_face_normals_jvp,
         "Call the typed RayD face-normal table JVP.");
     module.def(
-        "coupled_rd_geometry_forward",
-        &channel_coupled_rd_geometry_forward,
-        "Construct one-reflection/one-diffraction geometry with typed RayD EPC and visibility; no field coefficient is evaluated.");
+        "coupled_chain_geometry_forward",
+        &channel_coupled_chain_geometry_forward,
+        "Validate interaction-chain candidates (reflections, one diffraction, reflections) with typed RayD EPC and visibility; no field coefficient is evaluated.");
     module.def(
         "coupled_dd_geometry_forward",
         &channel_coupled_dd_geometry_forward,

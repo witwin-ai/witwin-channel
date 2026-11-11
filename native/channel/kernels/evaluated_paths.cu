@@ -28,14 +28,18 @@ namespace {
 constexpr int kBlockSize = 256;
 constexpr int kGlobalScope = 0;
 constexpr int kPerPairScope = 1;
-// Packed outer sort key: component (3 bits), depth (8 bits), tx, rx, invalid.
-constexpr int kComponentKeyBits = 3;
+// Packed outer sort key: component (4 bits), depth (8 bits), tx, rx, invalid.
+constexpr int kComponentKeyBits = 4;
 constexpr int kDepthKeyBits = 8;
 constexpr int kComponentKeyLimit = 1 << kComponentKeyBits;
 constexpr int kDepthKeyLimit = 1 << kDepthKeyBits;
-// Field-stage row groups: one per component id, reflection split by depth,
-// and one trailing group for rows outside both.
+// Field-stage row groups: one per component id below 8, reflection split by depth,
+// and one trailing group for rows outside both. Interaction chains whose diffraction is
+// interior (component 8 + slot) share group 3 with the chains whose diffraction is last.
 constexpr int kComponentRowGroups = 8;
+constexpr int kChainLastComponent = 3;
+constexpr int kChainFirstComponent = 4;
+constexpr int kChainInteriorComponentBase = 8;
 using channel::check_tensor;
 
 int index_bits(int64_t count) {
@@ -55,7 +59,24 @@ __device__ __forceinline__ int row_group(int component, int depth, int64_t width
     if (component == 1) {
         return depth >= 0 && depth <= width ? kComponentRowGroups + depth : overflow;
     }
+    if (component > kChainInteriorComponentBase && component < kComponentKeyLimit) {
+        return kChainLastComponent;
+    }
     return component >= 0 && component < kComponentRowGroups ? component : overflow;
+}
+
+// Diffraction slot of a single-diffraction chain row, or -1 for any other component.
+__device__ __forceinline__ int chain_diffraction_slot(int component, int depth) {
+    if (component == kChainLastComponent) {
+        return depth - 1;
+    }
+    if (component == kChainFirstComponent) {
+        return 0;
+    }
+    if (component > kChainInteriorComponentBase && component < kComponentKeyLimit) {
+        return component - kChainInteriorComponentBase;
+    }
+    return -1;
 }
 
 __device__ __forceinline__ uint64_t biased_key(int value) {
@@ -209,14 +230,12 @@ __device__ int event_type(int component, int depth, int64_t slot, int64_t width)
     if (component == 6 && depth > 0 && slot == 0) {
         return 8;
     }
-    if (width >= 2 && depth >= 2 && slot < 2) {
-        if (component == 3) {
-            return slot == 0 ? 1 : 2;
+    if (width >= 2 && depth >= 2 && slot < depth) {
+        const int diffraction = chain_diffraction_slot(component, depth);
+        if (diffraction >= 0) {
+            return slot == diffraction ? 2 : 1;
         }
-        if (component == 4) {
-            return slot == 0 ? 2 : 1;
-        }
-        if (component == 7) {
+        if (component == 7 && slot < 2) {
             return 2;
         }
     }

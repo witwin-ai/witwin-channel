@@ -60,18 +60,6 @@
       "owner": "propagation maintainers",
       "reason": "The legacy scattering-only final reorder validates alias mode and differentiable compact mode in one internal facade; its exact Phase-3 surface is frozen."
     },
-    "witwin/channel/propagation/fields.py::_evaluate_coupled_fields": {
-      "ceiling": 17,
-      "expires_on": "2027-01-31",
-      "owner": "propagation maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
-    },
-    "witwin/channel/kernels/fields.py::_FieldCoupledRdAdFunction.backward": {
-      "ceiling": 19,
-      "expires_on": "2027-01-31",
-      "owner": "propagation maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
-    },
     "witwin/channel/kernels/fields.py::_FieldDiffractionWedgeAdFunction.backward": {
       "ceiling": 23,
       "expires_on": "2027-01-31",

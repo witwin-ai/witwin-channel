@@ -15,7 +15,7 @@ from witwin.channel import runtime
 
 
 _OWNER_NAMES = (
-    "field_coupled_rd",
+    "field_coupled_chain",
     "field_diffraction_wedge",
     "field_free_space",
     "field_free_space_backward",

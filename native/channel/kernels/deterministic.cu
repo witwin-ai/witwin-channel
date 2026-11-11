@@ -159,16 +159,15 @@ constexpr int kAccumSlotCount = 6;
 constexpr int kScatteringSlot = 4;
 constexpr int kCoupledSlot = 5;
 
-// Path component ids: 0=los, 1=reflection, 2=diffraction, 3/4=coupled
-// reflection-diffraction and its reciprocal (coupled reflection and diffraction), 7=coupled double
-// diffraction (coupled double diffraction). Ids 3/4/7 all map to the single coherent coupled slot
-// 5 and sum in-cell. 5=transmission, 6=scattering. Ids without a slot return -1
-// and are dropped by the scatter/gather gates.
+// Path component ids: 0=los, 1=reflection, 2=diffraction, 5=transmission, 6=scattering;
+// the interaction chains (3: diffraction last, 4: diffraction first, 9..15: diffraction at an
+// interior slot) and double diffraction (7) all map to the single coherent coupled slot 5 and
+// sum in-cell. Ids without a slot return -1 and are dropped by the scatter/gather gates.
 __device__ __forceinline__ int accum_slot(int component_id) {
     if (component_id >= 0 && component_id < kComponentCount) {
         return component_id;
     }
-    if (component_id == 3 || component_id == 4 || component_id == 7) {
+    if (component_id == 3 || component_id == 4 || component_id == 7 || (component_id > 8 && component_id < 16)) {
         return kCoupledSlot;
     }
     if (component_id == 5) {

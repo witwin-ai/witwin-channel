@@ -84,12 +84,25 @@ def _interaction_type_sequence(
     scattering = (component_id == 6) & (depth > 0)
     result[scattering, 0] = 8
     if width >= 2:
-        reflection_diffraction = (component_id == 3) & (depth >= 2)
-        result[reflection_diffraction, 0] = 1
-        result[reflection_diffraction, 1] = 2
-        diffraction_reflection = (component_id == 4) & (depth >= 2)
-        result[diffraction_reflection, 0] = 2
-        result[diffraction_reflection, 1] = 1
+        # Single-diffraction chains: reflections everywhere but the diffraction slot, which is
+        # last for component 3, first for 4 and slot s for 8 + s (s >= 1).
+        diffraction_slot = torch.where(
+            component_id == 3,
+            depth.to(dtype=torch.int64) - 1,
+            torch.where(
+                component_id == 4,
+                torch.zeros_like(depth, dtype=torch.int64),
+                torch.where(
+                    (component_id > 8) & (component_id < 16),
+                    component_id.to(dtype=torch.int64) - 8,
+                    torch.full_like(depth, -1, dtype=torch.int64),
+                ),
+            ),
+        )
+        chain = (diffraction_slot >= 0) & (depth >= 2)
+        chain_slots = active & chain.reshape(-1, 1)
+        result[chain_slots] = 1
+        result[chain_slots & (slots == diffraction_slot.reshape(-1, 1))] = 2
         # component_id 7 = double diffraction: two sequential edge (DIFFRACTION)
         # events. Both slots carry the edge object ids in primitive_sequence, so
         # the canonical dedup key keeps distinct edge pairs distinct.

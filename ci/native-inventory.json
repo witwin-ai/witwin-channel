@@ -254,32 +254,30 @@
     },
     "native/channel/kernels/coupled.cu": {
       "kernels": [
+        "coupled_active_either_mask_kernel",
         "coupled_active_mask_kernel",
+        "coupled_chain_backward_kernel",
+        "coupled_chain_field_kernel",
+        "coupled_chain_finalize_kernel",
+        "coupled_chain_jvp_kernel",
         "coupled_dd_backward_kernel",
         "coupled_dd_finalize_kernel",
         "coupled_dd_jvp_kernel",
         "coupled_dd_prepare_kernel",
-        "coupled_prepare_backward_kernel",
-        "coupled_prepare_jvp_kernel",
-        "coupled_rd_backward_kernel",
-        "coupled_rd_finalize_kernel",
-        "coupled_rd_jvp_kernel",
-        "coupled_rd_prepare_kernel",
         "project_complex3_backward_kernel",
         "project_complex3_jvp_kernel"
       ],
       "launches": [
+        "coupled_active_either_mask_kernel",
         "coupled_active_mask_kernel",
+        "coupled_chain_backward_kernel",
+        "coupled_chain_field_kernel",
+        "coupled_chain_finalize_kernel",
+        "coupled_chain_jvp_kernel",
         "coupled_dd_backward_kernel",
         "coupled_dd_finalize_kernel",
         "coupled_dd_jvp_kernel",
         "coupled_dd_prepare_kernel",
-        "coupled_prepare_backward_kernel",
-        "coupled_prepare_jvp_kernel",
-        "coupled_rd_backward_kernel",
-        "coupled_rd_finalize_kernel",
-        "coupled_rd_jvp_kernel",
-        "coupled_rd_prepare_kernel",
         "project_complex3_backward_kernel",
         "project_complex3_jvp_kernel"
       ],
@@ -365,6 +363,11 @@
     },
     "native/channel/kernels/discovery.cu": {
       "kernels": [
+        "chain_candidate_flags_kernel",
+        "chain_candidate_write_kernel",
+        "chain_double_expand_kernel",
+        "chain_node_edge_flags_kernel",
+        "chain_node_edge_write_kernel",
         "group_bounds_accumulate_kernel",
         "group_bounds_init_kernel",
         "group_occupancy_kernel",
@@ -375,6 +378,11 @@
         "receiver_candidate_write_kernel"
       ],
       "launches": [
+        "chain_candidate_flags_kernel",
+        "chain_candidate_write_kernel",
+        "chain_double_expand_kernel",
+        "chain_node_edge_flags_kernel",
+        "chain_node_edge_write_kernel",
         "group_bounds_accumulate_kernel",
         "group_bounds_init_kernel",
         "group_occupancy_kernel",
@@ -468,7 +476,6 @@
     "native/channel/kernels/fields.cu": {
       "kernels": [
         "coupled_dd_field_kernel",
-        "coupled_rd_field_kernel",
         "free_space_backward_kernel",
         "free_space_fwd_kernel",
         "free_space_jvp_kernel",
@@ -484,7 +491,6 @@
       ],
       "launches": [
         "coupled_dd_field_kernel",
-        "coupled_rd_field_kernel",
         "free_space_backward_kernel",
         "free_space_fwd_kernel",
         "free_space_jvp_kernel",

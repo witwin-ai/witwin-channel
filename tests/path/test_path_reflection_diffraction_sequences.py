@@ -9,7 +9,6 @@ from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config as DeterministicConfig
 from witwin.channel.deterministic import solve as solve_deterministic
 from witwin.channel.path import Config, solve
-from witwin.channel.kernels import geometry as geometry_kernels
 
 
 def _require_native() -> None:
@@ -62,7 +61,7 @@ def test_solve_exports_bounded_reflection_diffraction_sequences():
         reference_frequency_hz=3.0e9,
     )
 
-    assert result.metadata["coupled_paths"]["geometry"] == "native_1r1d_reciprocal"
+    assert result.metadata["coupled_paths"]["geometry"] == "native_interaction_chains"
     assert result.metadata["coupled_paths"]["coefficient"] == "unified_complex3_jones"
     active = result.interaction_type[result.valid]
     assert bool((active == torch.tensor([1, 2], device=active.device)).all(dim=1).any())
@@ -102,20 +101,3 @@ def test_flat_solve_exports_finite_coupled_power():
     coupled = (active[:, 0] != 0) & (active[:, 1] != 0) & (active[:, 0] != active[:, 1])
     assert bool(coupled.any())
     assert torch.isfinite(result.a[result.valid][coupled]).all()
-
-
-def test_coupled_topology_rejects_candidate_space_before_kernel_launch(monkeypatch):
-    _require_native()
-    monkeypatch.setattr(
-        geometry_kernels,
-        "coupled_rd_geometry_forward",
-        lambda *_args, **_kwargs: pytest.fail("coupled kernel launched before guard"),
-    )
-    config = Config(
-        components={"reflection", "diffraction"},
-        max_depth=2,
-        coupled_paths=True,
-        coupled_candidate_limit=1,
-    )
-    with pytest.raises(RuntimeError, match="exceeding coupled_candidate_limit=1"):
-        solve(coupled_wall_wedge_scene(), config, reference_frequency_hz=3.0e9)

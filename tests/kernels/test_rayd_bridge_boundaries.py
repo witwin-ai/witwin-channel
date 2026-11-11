@@ -24,7 +24,7 @@ WRAPPERS_BY_SOURCE = {
         "channel_rayd_segment_penetration_forward_tape",
         "channel_rayd_segment_penetration_backward",
         "channel_rayd_segment_penetration_jvp",
-        "channel_coupled_rd_geometry_forward",
+        "channel_coupled_chain_geometry_forward",
         "channel_coupled_dd_geometry_forward",
     },
     "reflection.cpp": {

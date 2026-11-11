@@ -139,6 +139,57 @@ pybind11::dict channel_reflection_receiver_candidates(
     double box_tolerance,
     double segment_tolerance,
     double min_segment_length);
+pybind11::dict channel_chain_node_edges(
+    torch::Tensor node_sequences,
+    torch::Tensor node_images,
+    torch::Tensor plane_point,
+    torch::Tensor plane_normal,
+    torch::Tensor bounds,
+    torch::Tensor occupancy,
+    torch::Tensor edge_position,
+    torch::Tensor edge_direction,
+    torch::Tensor edge_t_min,
+    torch::Tensor edge_t_max,
+    int64_t node_start,
+    int64_t node_end,
+    double tolerance);
+pybind11::dict channel_chain_candidates(
+    torch::Tensor lane_offsets,
+    int64_t lane_start,
+    int64_t lane_end,
+    torch::Tensor plane_point,
+    torch::Tensor plane_normal,
+    torch::Tensor bounds,
+    torch::Tensor occupancy,
+    torch::Tensor edge_position,
+    torch::Tensor edge_direction,
+    torch::Tensor edge_t_min,
+    torch::Tensor edge_t_max,
+    torch::Tensor a_edge_offsets,
+    torch::Tensor a_endpoint,
+    torch::Tensor a_node,
+    torch::Tensor a_endpoints,
+    torch::Tensor a_node_sequences,
+    torch::Tensor a_node_images,
+    torch::Tensor b_edge_offsets,
+    torch::Tensor b_endpoint,
+    torch::Tensor b_node,
+    torch::Tensor b_endpoints,
+    torch::Tensor b_node_sequences,
+    torch::Tensor b_node_images,
+    double box_tolerance,
+    double segment_tolerance,
+    double min_segment_length,
+    double edge_epsilon);
+pybind11::dict channel_chain_double_candidates(
+    torch::Tensor pair_offsets,
+    int64_t lane_start,
+    int64_t lane_end,
+    int64_t rx_count,
+    torch::Tensor tx_offsets,
+    torch::Tensor tx_edges,
+    torch::Tensor rx_offsets,
+    torch::Tensor rx_edges);
 pybind11::dict channel_deterministic_reflection_epc_input_batch(
     torch::Tensor tx_positions,
     torch::Tensor rx_positions,
@@ -553,6 +604,18 @@ void register_path_deterministic(pybind11::module_ &module) {
         "reflection_receiver_candidates",
         &channel_reflection_receiver_candidates,
         "Select reflection sequence and receiver candidates with native CUDA.");
+    module.def(
+        "chain_node_edges",
+        &channel_chain_node_edges,
+        "Select image-tree node and diffraction edge pairs of interaction chains with native CUDA.");
+    module.def(
+        "chain_candidates",
+        &channel_chain_candidates,
+        "Join interaction-chain halves on shared edges and select candidates with native CUDA.");
+    module.def(
+        "chain_double_candidates",
+        &channel_chain_double_candidates,
+        "Expand double-diffraction candidates from endpoint-visible edges with native CUDA.");
     module.def(
         "deterministic_reflection_epc_input_batch",
         &channel_deterministic_reflection_epc_input_batch,
