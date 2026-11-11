@@ -671,6 +671,9 @@ def evaluate_enumerated_paths(
                 rx_positions,
                 frequency_hz=frequency_hz,
                 isb_boundary_taper_width=isb_boundary_taper_width,
+                tx_polarizations=(
+                    tx_polarizations if endpoint_tensors is not None else None
+                ),
             )
         )
         launch_count += diffraction_launches
