@@ -224,7 +224,7 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "runs-on: ubuntu-22.04" in workflow
     assert "manylinux_2_28" in workflow
 
-    locked_rayd = "22d30ca05ae940fb7f2f6b8443b49708b7110757"
+    locked_rayd = "58f54f13bfdaefeb5e8d53c2c4c397f9c98884ec"
     locked_core = "46c826d969654912461d2e18b6cb87df9cc3df8f"
     lock = json.loads((ROOT / "dependencies" / "rayd.lock.json").read_text(encoding="utf-8"))
     assert lock["commit"] == locked_rayd
