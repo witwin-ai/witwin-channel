@@ -805,6 +805,27 @@ def _first_hit_wedges(
     )
 
 
+def _reflection_layer_bundle(
+    scene: SolverScene, device: torch.device,
+) -> tuple[tuple[torch.Tensor, ...] | None, bool]:
+    """Per-face material ids and CSR layer store, so multilayer faces reflect as their stack.
+
+    Returns ``(None, False)`` when every material has a single layer: the slab law then needs no
+    layer store.
+    """
+
+    from witwin.channel.materials import face_material_field_bundle, has_multilayer_material
+
+    if not has_multilayer_material(scene):
+        return None, False
+    bundle = face_material_field_bundle(scene, device=device)
+    return (
+        bundle["material_id"], bundle["layer_offset"], bundle["layer_count"],
+        bundle["layer_thickness_m"], bundle["layer_eps_r"], bundle["layer_sigma_e"],
+        bundle["layer_mu_r"],
+    ), True
+
+
 def _accumulate_reflection_block(
     scene: SolverScene, block_params: dict[str, object], *, ray_o: torch.Tensor,
     ray_d: torch.Tensor, full_trace: tuple[torch.Tensor, ...], face_normals: torch.Tensor,
@@ -822,10 +843,11 @@ def _accumulate_reflection_block(
         "point_radius": float(block_params["point_radius"]),  # type: ignore[arg-type]
         **deposit,
     }
+    layers, multilayer = _reflection_layer_bundle(scene, ray_o.device)
     if not ad:
         return mc_slab_reflection_accumulate(  # type: ignore[arg-type]
             ray_o, ray_d, *full_trace, face_normals, eta_r, sigma, gain, valid, thickness,
-            **common,
+            layers=layers, **common,
         )
     # Same accumulate kernel behind the autograd Function; the caller scales by the tx power.
     if ledger is not None:
@@ -834,7 +856,7 @@ def _accumulate_reflection_block(
         )
     return mc_slab_reflection_accumulate_ad(  # type: ignore[arg-type]
         tx_live, eta_r, sigma, gain, thickness, scene.frequency, ray_o, ray_d, *full_trace,
-        face_normals, valid, **common,
+        face_normals, valid, layers=layers, multilayer=multilayer, **common,
     )
 
 

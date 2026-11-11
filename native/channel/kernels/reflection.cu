@@ -12,6 +12,7 @@
 #include "reflection_receivers.h"
 #include <rayd/field_transport.cuh>
 #include <src/field_transport_ad.cuh>
+#include "layered_reflection.cuh"
 
 #include <algorithm>
 #include <tuple>
@@ -56,6 +57,8 @@ __device__ __forceinline__ void plane_coords(float3 v, int axis, float &a, float
     else { a = v.x; b = v.y; }
 }
 
+namespace layered = channel::layered_reflection;
+
 __device__ __forceinline__ void slab_coefficients(
     float cos_theta,
     float eta_r,
@@ -63,17 +66,21 @@ __device__ __forceinline__ void slab_coefficients(
     float gain,
     float thickness,
     float wavelength,
+    int material,
+    const layered::LayerTables &layers,
     Complex &r_te,
     Complex &r_tm) {
     rayd::shared::diffraction::Complex shared_te;
     rayd::shared::diffraction::Complex shared_tm;
-    transport::legacy_slab_fresnel(
+    layered::legacy_face_fresnel(
         cos_theta,
         eta_r,
         sigma,
         gain,
         thickness,
         wavelength,
+        material,
+        layers,
         shared_te,
         shared_tm);
     r_te = cmath::complex(shared_te.re, shared_te.im);
@@ -231,6 +238,8 @@ __global__ void slab_reflection_accumulate_kernel(
     const float *__restrict__ gain,
     const bool *__restrict__ material_valid,
     const float *__restrict__ thickness,
+    const int *__restrict__ face_material,
+    layered::LayerTables layers,
     float *__restrict__ output,
     int64_t ray_count,
     int trace_depth,
@@ -270,7 +279,7 @@ __global__ void slab_reflection_accumulate_kernel(
             const float3 p_out = cmath::normalize_rsqrt_safe(cmath::cross(s_hat, reflected));
             Complex r_te, r_tm;
             slab_coefficients(fabsf(cmath::dot(direction, normal)), eta_r[prim], sigma[prim],
-                              gain[prim], thickness[prim], wavelength, r_te, r_tm);
+                              gain[prim], thickness[prim], wavelength, face_material[prim], layers, r_te, r_tm);
             const Complex e_s = cmath::complex3_dot_real(field, s_hat);
             const Complex e_p = cmath::complex3_dot_real(field, p_in);
             field = cmath::complex3_add(cmath::complex3_axis(s_hat, cmath::complex_mul(r_te, e_s)),
@@ -526,6 +535,8 @@ __global__ void slab_reflection_accumulate_backward_kernel(
     const float *__restrict__ gain,
     const bool *__restrict__ material_valid,
     const float *__restrict__ thickness,
+    const int *__restrict__ face_material,
+    layered::LayerTables layers,
     const float *__restrict__ grad_output,
     float *__restrict__ grad_eta_r,
     float *__restrict__ grad_sigma,
@@ -575,7 +586,7 @@ __global__ void slab_reflection_accumulate_backward_kernel(
                 reflection_bounce_frame(face_normals, prim, direction);
             Complex r_te, r_tm;
             slab_coefficients(frame.cos_theta, eta_r[prim], sigma[prim],
-                              gain[prim], thickness[prim], wavelength, r_te, r_tm);
+                              gain[prim], thickness[prim], wavelength, face_material[prim], layers, r_te, r_tm);
             const Complex e_s = cmath::complex3_dot_real(field, frame.s_hat);
             const Complex e_p = cmath::complex3_dot_real(field, frame.p_in);
             field = cmath::complex3_add(cmath::complex3_axis(frame.s_hat, cmath::complex_mul(r_te, e_s)),
@@ -629,7 +640,7 @@ __global__ void slab_reflection_accumulate_backward_kernel(
             const Complex e_p = cmath::complex3_dot_real(field_before, frame.p_in);
             Complex r_te, r_tm;
             slab_coefficients(frame.cos_theta, eta_r[prim], sigma[prim],
-                              gain[prim], thickness[prim], wavelength, r_te, r_tm);
+                              gain[prim], thickness[prim], wavelength, face_material[prim], layers, r_te, r_tm);
             // field_after = s_hat * (r_te * e_s) + p_out * (r_tm * e_p); the axis expansions are
             // real-linear, so their adjoints are the same real-axis dots.
             const Complex g_w_te = cmath::complex3_dot_real(g_field, frame.s_hat);
@@ -656,9 +667,9 @@ __global__ void slab_reflection_accumulate_backward_kernel(
                 constexpr float kSeedWavelength[5] = {0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
                 rayd::shared::diffraction::Complex dual_r_te, dual_r_tm;
                 rayd::shared::diffraction::Complex d_te[5], d_tm[5];
-                ad::legacy_slab_fresnel_dual_multi<5>(
+                layered::legacy_face_fresnel_dual_multi<5>(
                     frame.cos_theta, eta_r[prim], sigma[prim], gain[prim], thickness[prim], wavelength,
-                    kSeedEps, kSeedSigma, kSeedGain, kSeedThickness, kSeedWavelength, dual_r_te,
+                    face_material[prim], layers, kSeedEps, kSeedSigma, kSeedGain, kSeedThickness, kSeedWavelength, dual_r_te,
                     dual_r_tm, d_te, d_tm);
                 if (need_materials) {
                     warp_aggregated_add(grad_eta_r, prim, adj_dot_local(g_r_te, d_te[0]) + adj_dot_local(g_r_tm, d_tm[0]));
@@ -688,6 +699,8 @@ __global__ void slab_reflection_accumulate_jvp_kernel(
     const float *__restrict__ gain,
     const bool *__restrict__ material_valid,
     const float *__restrict__ thickness,
+    const int *__restrict__ face_material,
+    layered::LayerTables layers,
     const float *__restrict__ tangent_eta_r,
     const float *__restrict__ tangent_sigma,
     const float *__restrict__ tangent_gain,
@@ -726,11 +739,11 @@ __global__ void slab_reflection_accumulate_jvp_kernel(
             // tangents from its dual companion.
             Complex r_te, r_tm;
             slab_coefficients(frame.cos_theta, eta_r[prim], sigma[prim],
-                              gain[prim], thickness[prim], wavelength, r_te, r_tm);
+                              gain[prim], thickness[prim], wavelength, face_material[prim], layers, r_te, r_tm);
             ad::DualC dual_te, dual_tm;
-            ad::legacy_slab_fresnel_dual(
+            layered::legacy_face_fresnel_dual(
                 frame.cos_theta, eta_r[prim], sigma[prim], gain[prim],
-                thickness[prim], wavelength,
+                thickness[prim], wavelength, face_material[prim], layers,
                 tangent_eta_r != nullptr ? tangent_eta_r[prim] : 0.0f,
                 tangent_sigma != nullptr ? tangent_sigma[prim] : 0.0f,
                 tangent_gain != nullptr ? tangent_gain[prim] : 0.0f,
@@ -970,14 +983,40 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> channel_mc_reflection_append_fina
     return {out_valid, out_t, out_prim};
 }
 
+// Layer view of an MC reflection request: [face_material (F), layer_offset, layer_count,
+// layer_thickness_m, layer_eps_r, layer_sigma_e, layer_mu_r].
+layered::LayerTables mc_layer_tables(const std::vector<at::Tensor>& layers, int64_t face_count) {
+    TORCH_CHECK(layers.size() == 7, "reflection layers must hold face_material and six CSR layer tables");
+    for (size_t i = 0; i < layers.size(); ++i) {
+        TORCH_CHECK(layers[i].is_cuda() && layers[i].is_contiguous() && layers[i].dim() == 1,
+                    "reflection layer tensors must be contiguous one-dimensional CUDA tensors");
+        TORCH_CHECK(layers[i].scalar_type() == (i < 3 ? at::kInt : at::kFloat),
+                    "reflection layer tensor has the wrong dtype");
+    }
+    TORCH_CHECK(layers[0].size(0) == face_count, "face_material must cover every face");
+    TORCH_CHECK(layers[2].size(0) == layers[1].size(0), "layer_count must match layer_offset");
+    for (size_t i = 4; i < 7; ++i)
+        TORCH_CHECK(layers[i].size(0) == layers[3].size(0), "layer tables must share one length");
+    layered::LayerTables tables;
+    tables.offset = layers[1].data_ptr<int>();
+    tables.count = layers[2].data_ptr<int>();
+    tables.thickness_m = layers[3].data_ptr<float>();
+    tables.eps_r = layers[4].data_ptr<float>();
+    tables.sigma_e = layers[5].data_ptr<float>();
+    tables.mu_r = layers[6].data_ptr<float>();
+    tables.material_count = layers[2].size(0);
+    return tables;
+}
+
 at::Tensor channel_mc_slab_reflection_accumulate_cuda(
     at::Tensor ray_o, at::Tensor ray_d, at::Tensor trace_valid, at::Tensor trace_t,
     at::Tensor trace_prim, at::Tensor face_normals, at::Tensor eta_r, at::Tensor sigma,
-    at::Tensor gain, at::Tensor material_valid, at::Tensor thickness,
+    at::Tensor gain, at::Tensor material_valid, at::Tensor thickness, std::vector<at::Tensor> layers,
     int64_t contribution_depth, const ReflectionReceiverArgs& receivers, double wavelength,
     at::Tensor solid_angle, at::Tensor tx_pol) {
     const int64_t ray_count = ray_o.size(0);
     const int trace_depth = static_cast<int>(trace_valid.size(1));
+    const layered::LayerTables tables = mc_layer_tables(layers, eta_r.numel());
     auto output = reflection_zero_filled(receiver_output_shape(receivers), ray_o.options());
     if (ray_count == 0 || contribution_depth <= 0) return output;
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(ray_o.get_device()).stream();
@@ -987,6 +1026,7 @@ at::Tensor channel_mc_slab_reflection_accumulate_cuda(
             trace_t.data_ptr<float>(), trace_prim.data_ptr<int>(), face_normals.data_ptr<float>(),
             eta_r.data_ptr<float>(), sigma.data_ptr<float>(), gain.data_ptr<float>(),
             material_valid.data_ptr<bool>(), thickness.data_ptr<float>(),
+            layers[0].data_ptr<int>(), tables,
             output.data_ptr<float>() + offset, ray_count, trace_depth,
             static_cast<int>(contribution_depth), rx, static_cast<float>(wavelength),
             solid_angle.data_ptr<float>(), tx_pol.data_ptr<float>());
@@ -1007,7 +1047,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
 channel_mc_slab_reflection_accumulate_backward_cuda(
     at::Tensor ray_o, at::Tensor ray_d, at::Tensor trace_valid, at::Tensor trace_t,
     at::Tensor trace_prim, at::Tensor face_normals, at::Tensor eta_r, at::Tensor sigma,
-    at::Tensor gain, at::Tensor material_valid, at::Tensor thickness,
+    at::Tensor gain, at::Tensor material_valid, at::Tensor thickness, std::vector<at::Tensor> layers,
     at::Tensor grad_output,
     bool need_materials, bool need_frequency,
     int64_t contribution_depth, const ReflectionReceiverArgs& receivers, double wavelength,
@@ -1023,6 +1063,7 @@ channel_mc_slab_reflection_accumulate_backward_cuda(
                 "grad_output must match the reflection receiver output");
     const int64_t ray_count = ray_o.size(0);
     const int trace_depth = static_cast<int>(trace_valid.size(1));
+    const layered::LayerTables tables = mc_layer_tables(layers, eta_r.numel());
     auto face_options = eta_r.options();
     auto grad_eta_r = reflection_zero_filled({eta_r.size(0)}, face_options);
     auto grad_sigma = reflection_zero_filled({eta_r.size(0)}, face_options);
@@ -1047,6 +1088,7 @@ channel_mc_slab_reflection_accumulate_backward_cuda(
             trace_t.data_ptr<float>(), trace_prim.data_ptr<int>(), face_normals.data_ptr<float>(),
             eta_r.data_ptr<float>(), sigma.data_ptr<float>(), gain.data_ptr<float>(),
             material_valid.data_ptr<bool>(), thickness.data_ptr<float>(),
+            layers[0].data_ptr<int>(), tables,
             grad_output.data_ptr<float>() + offset * stride0,
             need_materials ? grad_eta_r.data_ptr<float>() : nullptr,
             need_materials ? grad_sigma.data_ptr<float>() : nullptr,
@@ -1068,7 +1110,7 @@ channel_mc_slab_reflection_accumulate_backward_cuda(
 at::Tensor channel_mc_slab_reflection_accumulate_jvp_cuda(
     at::Tensor ray_o, at::Tensor ray_d, at::Tensor trace_valid, at::Tensor trace_t,
     at::Tensor trace_prim, at::Tensor face_normals, at::Tensor eta_r, at::Tensor sigma,
-    at::Tensor gain, at::Tensor material_valid, at::Tensor thickness,
+    at::Tensor gain, at::Tensor material_valid, at::Tensor thickness, std::vector<at::Tensor> layers,
     at::Tensor tangent_eta_r, at::Tensor tangent_sigma, at::Tensor tangent_gain,
     at::Tensor tangent_thickness,
     bool has_tangent_eta_r, bool has_tangent_sigma, bool has_tangent_gain,
@@ -1081,6 +1123,7 @@ at::Tensor channel_mc_slab_reflection_accumulate_jvp_cuda(
         kReflectionAdMaxDepth);
     const int64_t ray_count = ray_o.size(0);
     const int trace_depth = static_cast<int>(trace_valid.size(1));
+    const layered::LayerTables tables = mc_layer_tables(layers, eta_r.numel());
     auto output_tangent = reflection_zero_filled(receiver_output_shape(receivers), ray_o.options());
     if (ray_count == 0 || contribution_depth <= 0) return output_tangent;
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(ray_o.get_device()).stream();
@@ -1090,6 +1133,7 @@ at::Tensor channel_mc_slab_reflection_accumulate_jvp_cuda(
             trace_t.data_ptr<float>(), trace_prim.data_ptr<int>(), face_normals.data_ptr<float>(),
             eta_r.data_ptr<float>(), sigma.data_ptr<float>(), gain.data_ptr<float>(),
             material_valid.data_ptr<bool>(), thickness.data_ptr<float>(),
+            layers[0].data_ptr<int>(), tables,
             has_tangent_eta_r ? tangent_eta_r.data_ptr<float>() : nullptr,
             has_tangent_sigma ? tangent_sigma.data_ptr<float>() : nullptr,
             has_tangent_gain ? tangent_gain.data_ptr<float>() : nullptr,

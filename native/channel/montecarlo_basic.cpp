@@ -215,14 +215,14 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> channel_mc_reflection_append_fina
 at::Tensor channel_mc_slab_reflection_accumulate_cuda(
     at::Tensor ray_o, at::Tensor ray_d, at::Tensor trace_valid, at::Tensor trace_t,
     at::Tensor trace_prim, at::Tensor face_normals, at::Tensor eta_r, at::Tensor sigma,
-    at::Tensor gain, at::Tensor material_valid, at::Tensor thickness,
+    at::Tensor gain, at::Tensor material_valid, at::Tensor thickness, std::vector<at::Tensor> layers,
     int64_t contribution_depth, const ReflectionReceiverArgs& receivers, double wavelength,
     at::Tensor solid_angle, at::Tensor tx_pol);
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
 channel_mc_slab_reflection_accumulate_backward_cuda(
     at::Tensor ray_o, at::Tensor ray_d, at::Tensor trace_valid, at::Tensor trace_t,
     at::Tensor trace_prim, at::Tensor face_normals, at::Tensor eta_r, at::Tensor sigma,
-    at::Tensor gain, at::Tensor material_valid, at::Tensor thickness,
+    at::Tensor gain, at::Tensor material_valid, at::Tensor thickness, std::vector<at::Tensor> layers,
     at::Tensor grad_output,
     bool need_materials, bool need_frequency,
     int64_t contribution_depth, const ReflectionReceiverArgs& receivers, double wavelength,
@@ -230,7 +230,7 @@ channel_mc_slab_reflection_accumulate_backward_cuda(
 at::Tensor channel_mc_slab_reflection_accumulate_jvp_cuda(
     at::Tensor ray_o, at::Tensor ray_d, at::Tensor trace_valid, at::Tensor trace_t,
     at::Tensor trace_prim, at::Tensor face_normals, at::Tensor eta_r, at::Tensor sigma,
-    at::Tensor gain, at::Tensor material_valid, at::Tensor thickness,
+    at::Tensor gain, at::Tensor material_valid, at::Tensor thickness, std::vector<at::Tensor> layers,
     at::Tensor tangent_eta_r, at::Tensor tangent_sigma, at::Tensor tangent_gain,
     at::Tensor tangent_thickness,
     bool has_tangent_eta_r, bool has_tangent_sigma, bool has_tangent_gain,
@@ -629,7 +629,7 @@ torch::Tensor channel_mc_slab_reflection_accumulate(
     torch::Tensor ray_o, torch::Tensor ray_d, torch::Tensor trace_valid,
     torch::Tensor trace_t, torch::Tensor trace_prim, torch::Tensor face_normals,
     torch::Tensor eta_r, torch::Tensor sigma, torch::Tensor gain,
-    torch::Tensor material_valid, torch::Tensor thickness,
+    torch::Tensor material_valid, torch::Tensor thickness, std::vector<torch::Tensor> layers,
     int64_t contribution_depth, int64_t axis, double plane_position,
     double coord0_min, double coord0_max, double coord1_min, double coord1_max,
     int64_t resolution0, int64_t resolution1, double wavelength,
@@ -649,7 +649,7 @@ torch::Tensor channel_mc_slab_reflection_accumulate(
     return channel_mc_slab_reflection_accumulate_cuda(
         ray_o.contiguous(), ray_d.contiguous(), trace_valid.contiguous(), trace_t.contiguous(),
         trace_prim.contiguous(), face_normals.contiguous(), eta_r.contiguous(), sigma.contiguous(),
-        gain.contiguous(), material_valid.contiguous(), thickness.contiguous(), contribution_depth,
+        gain.contiguous(), material_valid.contiguous(), thickness.contiguous(), layers, contribution_depth,
         receivers, wavelength, solid_angle.contiguous(), tx_pol.contiguous());
 }
 
@@ -657,7 +657,7 @@ pybind11::tuple channel_mc_slab_reflection_accumulate_backward(
     torch::Tensor ray_o, torch::Tensor ray_d, torch::Tensor trace_valid,
     torch::Tensor trace_t, torch::Tensor trace_prim, torch::Tensor face_normals,
     torch::Tensor eta_r, torch::Tensor sigma, torch::Tensor gain,
-    torch::Tensor material_valid, torch::Tensor thickness,
+    torch::Tensor material_valid, torch::Tensor thickness, std::vector<torch::Tensor> layers,
     torch::Tensor grad_output,
     bool need_materials, bool need_frequency,
     int64_t contribution_depth, int64_t axis, double plane_position,
@@ -676,7 +676,7 @@ pybind11::tuple channel_mc_slab_reflection_accumulate_backward(
             ray_o.contiguous(), ray_d.contiguous(), trace_valid.contiguous(),
             trace_t.contiguous(), trace_prim.contiguous(), face_normals.contiguous(),
             eta_r.contiguous(), sigma.contiguous(), gain.contiguous(),
-            material_valid.contiguous(), thickness.contiguous(), grad_output,
+            material_valid.contiguous(), thickness.contiguous(), layers, grad_output,
             need_materials, need_frequency, contribution_depth, receivers, wavelength,
             solid_angle.contiguous(), wavelength_dfreq, tx_pol.contiguous());
     pybind11::tuple out(5);
@@ -692,7 +692,7 @@ torch::Tensor channel_mc_slab_reflection_accumulate_jvp(
     torch::Tensor ray_o, torch::Tensor ray_d, torch::Tensor trace_valid,
     torch::Tensor trace_t, torch::Tensor trace_prim, torch::Tensor face_normals,
     torch::Tensor eta_r, torch::Tensor sigma, torch::Tensor gain,
-    torch::Tensor material_valid, torch::Tensor thickness,
+    torch::Tensor material_valid, torch::Tensor thickness, std::vector<torch::Tensor> layers,
     torch::Tensor tangent_eta_r, torch::Tensor tangent_sigma,
     torch::Tensor tangent_gain, torch::Tensor tangent_thickness,
     bool has_tangent_eta_r, bool has_tangent_sigma, bool has_tangent_gain,
@@ -712,7 +712,7 @@ torch::Tensor channel_mc_slab_reflection_accumulate_jvp(
         ray_o.contiguous(), ray_d.contiguous(), trace_valid.contiguous(),
         trace_t.contiguous(), trace_prim.contiguous(), face_normals.contiguous(),
         eta_r.contiguous(), sigma.contiguous(), gain.contiguous(),
-        material_valid.contiguous(), thickness.contiguous(),
+        material_valid.contiguous(), thickness.contiguous(), layers,
         has_tangent_eta_r ? tangent_eta_r.contiguous() : tangent_eta_r,
         has_tangent_sigma ? tangent_sigma.contiguous() : tangent_sigma,
         has_tangent_gain ? tangent_gain.contiguous() : tangent_gain,

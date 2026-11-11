@@ -102,3 +102,27 @@ Accepted by the owner, 2026-11-15: the symmetric face-angle rule (mean of the in
 observation sines), the refit of the corner-weight constants (`C_BLEND`, the corner sigmoid width)
 against the full-wave reference with the corrected finite-edge factor, and the resulting movement
 of every diffraction value.
+
+## Amendment (2026-11-15): edge-fixed face operator, coupled legs, corner rows
+
+- **Corner-row parity, root cause.** The OptiX/CUDA disagreement on corner rows
+  (`tests/scene/test_trace_backend.py`, x- and z-polarized) was not an ill-conditioned corner model.
+  The face reflection operator aligned the outgoing face s axis to the incoming one by the sign of
+  their dot product; on a corner row of the wedge fixture the two axes are exactly perpendicular, so
+  rounding picked the sign of the whole face term. Precise math and `--use_fast_math` fell on opposite
+  sides (1.4e-6 versus 2.6e-8 in a standalone kernel), and so did the OptiX PTX (fast math) and the
+  CUDA tracer, which is why the CUDA value looked like the fast-math one. RayD now builds the operator
+  in the edge-fixed bases (Luebbers' form, RayD ADR-0047 amendment); the corner row is 2.565e-8 for
+  host, precise GPU and fast-math GPU alike.
+- **Coupled legs.** Channel's coupled R-D, D-R and D-D field kernels (primal in `fields.cu`, duals in
+  `coupled.cu`, in lockstep) evaluate their face operators with `utd::pair_face_cosines`, the same
+  reciprocal rule, instead of the incident-direction cosine on both faces.
+  `tests/accuracy/test_consistency.py::test_coupled_reflection_diffraction_is_reciprocal` checks the
+  coupled rows alone under a transmitter/receiver swap.
+- **Corner-weight refit.** The owner accepted refitting `C_BLEND` and the corner sigmoid width
+  against the full-wave reference with the corrected finite-edge factor. The reference arrays
+  (`artifacts/fullwave/*`, Tidy3D/Maxwell runs of the single and three cube scenes) are not on this
+  machine, and regenerating them needs either the external Tidy3D service or multi-second full-wave
+  GPU kernels, both outside the shared-GPU rules. The constants are therefore unchanged; the parity
+  tests pass without a refit because their failure had the cause above.
+

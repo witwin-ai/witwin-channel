@@ -79,6 +79,16 @@ def _cached_material_table(
     return value
 
 
+def has_multilayer_material(scene_or_compiled: "Scene | CompiledScene") -> bool:
+    """Whether any compiled material has more than one layer (read from the host material store)."""
+    from witwin.channel.scene.endpoints import require_compiled
+
+    counts = require_compiled(scene_or_compiled).materials.layer_count
+    if counts.is_cuda:
+        raise RuntimeError("the compiled material store must stay on the host")
+    return bool((counts > 1).any())
+
+
 def face_material_tensors(
     scene_or_compiled: "Scene | CompiledScene", *, device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:

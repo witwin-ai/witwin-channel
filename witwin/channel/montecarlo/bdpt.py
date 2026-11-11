@@ -76,7 +76,7 @@ from witwin.channel.kernels.montecarlo import (
     bdpt_transmitter_tensors, bdpt_wavefront_transmission, bdpt_scatter_table_stack,
     BDPT_WAVEFRONT_GRADIENTS, bdpt_wavefront_backward, bdpt_wavefront_jvp, bdpt_zero_matrix,
 )
-from witwin.channel.materials import face_material_field_bundle
+from witwin.channel.materials import face_material_field_bundle, has_multilayer_material
 from witwin.channel.interactions.scattering import (
     MASK_SCATTERING,
     local_frames,
@@ -4637,6 +4637,13 @@ def solve(  # type: ignore[no-untyped-def]
     compiled = compile_scene(
         scene, reference_frequency_hz=reference_frequency_hz
     )
+    if "reflection" in frozenset(config.components) and has_multilayer_material(compiled):
+        # BDPT's sampled connections still use the single-slab reflection law; refuse rather than
+        # mix it with the layered law of the enumerated paths.
+        raise NotImplementedError(
+            "BDPT does not yet evaluate reflection off multilayer materials; use the "
+            "deterministic, path or Monte Carlo basic solver, or a single-layer material"
+        )
     result = _solve_pipeline(
         bind_solver_scene(compiled),
         config,
