@@ -169,10 +169,6 @@ def test_diffraction_paths_match_for_x_polarized_sources(monkeypatch):
     _assert_parity(optix, cuda)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="RayD's CUDA diffraction path exporter fixes the source polarization to +x",
-)
 def test_diffraction_paths_match_for_vertically_polarized_sources(monkeypatch):
     if not _optix_available():
         pytest.skip("OptiX is needed as the parity reference")
