@@ -33,7 +33,6 @@ __all__ = [
     "_PATH_BLOCK_SCHEMA",
     "_validate_deterministic_topology_block",
     "_validate_path_block",
-    "_validate_path_reflection_candidates",
     "_validate_topology_extra_fields",
     "COMPACT_CONTINUOUS_FIELDS",
     "CanonicalCompactRows",
@@ -45,7 +44,6 @@ __all__ = [
     "deterministic_diffraction_state_pack",
     "deterministic_diffraction_state_pack_selected",
     "deterministic_face_anchor_points",
-    "deterministic_gather_topology_block",
     "deterministic_los_topology_block",
     "deterministic_pad_topology_sequences",
     "deterministic_reflection_epc_input_batch",
@@ -56,9 +54,7 @@ __all__ = [
     "deterministic_reflection_sequence_compact",
     "deterministic_reflection_topology_compact",
     "deterministic_diffraction_topology_compact",
-    "deterministic_repeat_range",
     "deterministic_selected_edge_count",
-    "deterministic_sort_order",
     "deterministic_topology_default_fields",
     "enumerated_canonical_compact",
     "enumerated_exact_pair_metadata",
@@ -68,15 +64,9 @@ __all__ = [
     "mc_sample_directions",
     "mc_selected_edge_indices",
     "path_concat_vec3",
-    "path_diffraction_block",
-    "path_filter_block",
-    "path_filter_los",
-    "path_finalize_blocks",
     "path_los_export",
     "path_los_visibility_inputs",
-    "path_merge_blocks",
     "path_pack_padded",
-    "path_reflection_candidates",
 ]
 
 
@@ -240,51 +230,6 @@ def deterministic_concat_topology_blocks(
     return exported
 
 
-def deterministic_gather_topology_block(
-    block: dict[str, torch.Tensor], order: torch.Tensor, *, max_count: int, sequence_width: int,
-) -> dict[str, torch.Tensor]:
-    if sequence_width < 0:
-        raise ValueError("sequence_width must be non-negative")
-    if max_count < -1:
-        raise ValueError("max_count must be -1 or non-negative")
-    _validate_path_block("block", block)
-    field_presence = {
-        key: key in block for key, _dtype in _DETERMINISTIC_TOPOLOGY_EXTRA_SCHEMA
-    }
-    _validate_topology_extra_fields("block", block, int(sequence_width), field_presence)
-    validate_cuda_tensor("order", order, dtype=torch.long, ndim=1)
-    if order.get_device() != block["valid"].get_device():
-        raise ValueError("order must share block device")
-
-    exported = _required_native_op("deterministic_gather_topology_block")(
-        block,
-        order,
-        int(max_count),
-        int(sequence_width),
-    )
-    if not isinstance(exported, dict):
-        raise TypeError(
-            "_channel.deterministic_gather_topology_block must return a dict"
-        )
-    _validate_path_block("deterministic_gather_topology_block", exported)
-    _validate_topology_extra_fields(
-        "deterministic_gather_topology_block",
-        exported,
-        int(sequence_width),
-        field_presence,
-    )
-    expected_count = (
-        int(order.shape[0])
-        if max_count < 0
-        else min(int(order.shape[0]), int(max_count))
-    )
-    if exported["valid"].shape != (expected_count,):
-        raise ValueError(
-            "_channel.deterministic_gather_topology_block returned bad path count"
-        )
-    return exported
-
-
 def path_los_visibility_inputs(
     tx_positions: torch.Tensor, rx_positions: torch.Tensor, tx_id: torch.Tensor,
     rx_id: torch.Tensor,
@@ -316,190 +261,6 @@ def path_los_visibility_inputs(
             "_channel.path_los_visibility_inputs returned bad active shape"
         )
     return exported
-
-
-def path_filter_los(
-    tx_id: torch.Tensor, rx_id: torch.Tensor, path_length_m: torch.Tensor, delay_s: torch.Tensor,
-    path_gain: torch.Tensor, visible: torch.Tensor,
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor("tx_id", tx_id, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("rx_id", rx_id, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("path_length_m", path_length_m, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("delay_s", delay_s, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("path_gain", path_gain, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("visible", visible, dtype=torch.bool, ndim=1)
-    for name, tensor in {
-        "rx_id": rx_id,
-        "path_length_m": path_length_m,
-        "delay_s": delay_s,
-        "path_gain": path_gain,
-        "visible": visible,
-    }.items():
-        if tensor.shape != tx_id.shape:
-            raise ValueError(f"{name} must match tx_id")
-    block = _required_native_op("path_filter_los")(
-        tx_id, rx_id, path_length_m, delay_s, path_gain, visible
-    )
-    _validate_path_block("path_filter_los", block)
-    return block
-
-
-def _validate_path_reflection_candidates(name: str, candidates: dict[str, torch.Tensor]) -> None:
-    _validate_path_block(name, candidates)
-    path_count = candidates["valid"].shape
-    for key in ("seg0_start", "seg0_end", "seg1_start", "seg1_end"):
-        tensor = candidates.get(key)
-        if not isinstance(tensor, torch.Tensor):
-            raise TypeError(f"{name}.{key} must be a torch.Tensor")
-        validate_cuda_tensor(
-            f"{name}.{key}", tensor, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-        )
-        if tensor.shape[0] != path_count[0]:
-            raise ValueError(f"{name}.{key} must share the path count")
-    active = candidates.get("active")
-    if not isinstance(active, torch.Tensor):
-        raise TypeError(f"{name}.active must be a torch.Tensor")
-    validate_cuda_tensor(f"{name}.active", active, dtype=torch.bool, ndim=1)
-    if tuple(active.shape) != path_count:
-        raise ValueError(f"{name}.active must share the path count")
-
-
-def path_filter_block(
-    block: dict[str, torch.Tensor], visible0: torch.Tensor, visible1: torch.Tensor,
-) -> dict[str, torch.Tensor]:
-    _validate_path_block("block", block)
-    validate_cuda_tensor("visible0", visible0, dtype=torch.bool, ndim=1)
-    validate_cuda_tensor("visible1", visible1, dtype=torch.bool, ndim=1)
-    if visible0.shape != block["valid"].shape or visible1.shape != block["valid"].shape:
-        raise ValueError("visible masks must share the path count")
-    out = _required_native_op("path_filter_block")(block, visible0, visible1)
-    if not isinstance(out, dict):
-        raise TypeError("_channel.path_filter_block must return a dict")
-    _validate_path_block("path_filter_block", out)
-    return out
-
-
-def path_diffraction_block(
-    rayd_output: tuple[torch.Tensor, ...], *, tx_index: int,
-) -> dict[str, torch.Tensor]:
-    if not isinstance(rayd_output, tuple) or len(rayd_output) != 18:
-        raise TypeError(
-            "rayd_output must be the 18-tensor RayD diffraction path tuple"
-        )
-    for index in (1, 3, 4, 5):
-        validate_cuda_tensor(
-            f"rayd_output[{index}]",
-            rayd_output[index],
-            dtype=torch.int32 if index != 1 else torch.bool,
-            ndim=1,
-        )
-    for index in (8, 9, 10, 11, 12, 13, 14):
-        validate_cuda_tensor(
-            f"rayd_output[{index}]", rayd_output[index], dtype=torch.float32, ndim=1
-        )
-    capacity = rayd_output[1].shape
-    for index in (3, 4, 5, 8, 9, 10, 11, 12, 13, 14):
-        if rayd_output[index].shape != capacity:
-            raise ValueError("RayD diffraction path tensors must share capacity")
-    if tx_index < 0:
-        raise ValueError("tx_index must be non-negative")
-    out = _required_native_op("path_diffraction_block")(rayd_output, int(tx_index))
-    if not isinstance(out, dict):
-        raise TypeError("_channel.path_diffraction_block must return a dict")
-    _validate_path_block("path_diffraction_block", out)
-    return out
-
-
-def path_merge_blocks(
-    blocks: tuple[dict[str, torch.Tensor], ...] | list[dict[str, torch.Tensor]], *, tx_count: int,
-    max_depth: int,
-) -> dict[str, torch.Tensor]:
-    if not blocks:
-        raise ValueError("blocks must not be empty")
-    for index, block in enumerate(blocks):
-        _validate_path_block(f"blocks[{index}]", block)
-    if tx_count < 0:
-        raise ValueError("tx_count must be non-negative")
-    if max_depth < 0:
-        raise ValueError("max_depth must be non-negative")
-    out = _required_native_op("path_merge_blocks")(
-        tuple(blocks), int(tx_count), int(max_depth)
-    )
-    if not isinstance(out, dict):
-        raise TypeError("_channel.path_merge_blocks must return a dict")
-    _validate_path_block("path_merge_blocks", out)
-    return out
-
-
-def path_finalize_blocks(
-    los: dict[str, torch.Tensor], reflection: dict[str, torch.Tensor],
-    diffraction: dict[str, torch.Tensor], *, max_paths: int | None, tx_count: int, max_depth: int,
-) -> dict[str, torch.Tensor]:
-    _validate_path_block("los", los)
-    _validate_path_block("reflection", reflection)
-    _validate_path_block("diffraction", diffraction)
-    if tx_count < 0:
-        raise ValueError("tx_count must be non-negative")
-    if max_depth < 0:
-        raise ValueError("max_depth must be non-negative")
-    max_paths_value = -1 if max_paths is None else int(max_paths)
-    if max_paths_value < -1:
-        raise ValueError("max_paths must be positive")
-    finalized = _required_native_op("path_finalize_blocks")(
-        los,
-        reflection,
-        diffraction,
-        max_paths_value,
-        int(tx_count),
-        int(max_depth),
-    )
-    _validate_path_block("path_finalize_blocks", finalized)
-    return finalized
-
-
-# -------------------------------------------------------------------------
-# candidates
-# -------------------------------------------------------------------------
-def path_reflection_candidates(
-    vertices: torch.Tensor, faces: torch.Tensor, face_normals: torch.Tensor,
-    face_gain: torch.Tensor, tx_positions: torch.Tensor, tx_power: torch.Tensor,
-    rx_positions: torch.Tensor, *, frequency_hz: float,
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor(
-        "vertices", vertices, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("faces", faces, dtype=torch.int32, ndim=2, trailing_shape=(3,))
-    validate_cuda_tensor(
-        "face_normals", face_normals, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("face_gain", face_gain, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor(
-        "tx_positions", tx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("tx_power", tx_power, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor(
-        "rx_positions", rx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    if face_normals.shape[0] != faces.shape[0] or face_gain.shape[0] != faces.shape[0]:
-        raise ValueError("face_normals and face_gain must match faces")
-    if tx_power.shape[0] != tx_positions.shape[0]:
-        raise ValueError("tx_power must match tx_positions")
-    if frequency_hz <= 0.0:
-        raise ValueError("frequency_hz must be positive")
-    candidates = _required_native_op("path_reflection_candidates")(
-        vertices,
-        faces,
-        face_normals,
-        face_gain,
-        tx_positions,
-        tx_power,
-        rx_positions,
-        float(frequency_hz),
-    )
-    if not isinstance(candidates, dict):
-        raise TypeError("_channel.path_reflection_candidates must return a dict")
-    _validate_path_reflection_candidates("path_reflection_candidates", candidates)
-    return candidates
 
 
 # -------------------------------------------------------------------------
@@ -826,46 +587,6 @@ def deterministic_reflection_sequence_compact(
     return exported
 
 
-def deterministic_sort_order(
-    valid: torch.Tensor, tx_id: torch.Tensor, rx_id: torch.Tensor, depth: torch.Tensor,
-    component_id: torch.Tensor, primitive_id: torch.Tensor, edge_id: torch.Tensor,
-    primitive_sequence: torch.Tensor,
-) -> torch.Tensor:
-    validate_cuda_tensor("valid", valid, dtype=torch.bool, ndim=1)
-    for name, tensor in (
-        ("tx_id", tx_id),
-        ("rx_id", rx_id),
-        ("depth", depth),
-        ("component_id", component_id),
-        ("primitive_id", primitive_id),
-        ("edge_id", edge_id),
-    ):
-        validate_cuda_tensor(name, tensor, dtype=torch.int32, ndim=1)
-        if tensor.shape != valid.shape:
-            raise ValueError(f"{name} must match valid")
-    validate_cuda_tensor(
-        "primitive_sequence", primitive_sequence, dtype=torch.int32, ndim=2
-    )
-    if primitive_sequence.shape[0] != valid.shape[0]:
-        raise ValueError("primitive_sequence must match valid rows")
-    out = _required_native_op("deterministic_sort_order")(
-        valid,
-        tx_id,
-        rx_id,
-        depth,
-        component_id,
-        primitive_id,
-        edge_id,
-        primitive_sequence,
-    )
-    if not isinstance(out, torch.Tensor):
-        raise TypeError("_channel.deterministic_sort_order must return a tensor")
-    validate_cuda_tensor("out", out, dtype=torch.long, ndim=1)
-    if out.shape != valid.shape:
-        raise ValueError("_channel.deterministic_sort_order returned bad shape")
-    return out
-
-
 # -------------------------------------------------------------------------
 # construction
 # -------------------------------------------------------------------------
@@ -1078,25 +799,6 @@ def deterministic_pad_topology_sequences(
             "_channel.deterministic_pad_topology_sequences returned bad interaction shape"
         )
     return exported
-
-
-def deterministic_repeat_range(
-    reference: torch.Tensor, *, start: int, end: int, repeats: int,
-) -> torch.Tensor:
-    validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=1)
-    if end < start:
-        raise ValueError("end must be greater than or equal to start")
-    if repeats <= 0:
-        raise ValueError("repeats must be positive")
-    out = _required_native_op("deterministic_repeat_range")(
-        reference, int(start), int(end), int(repeats)
-    )
-    validate_cuda_tensor("out", out, dtype=torch.int32, ndim=1)
-    if out.shape != ((int(end) - int(start)) * int(repeats),):
-        raise ValueError(
-            "_channel.deterministic_repeat_range returned bad shape"
-        )
-    return out
 
 
 def deterministic_face_anchor_points(vertices: torch.Tensor, faces: torch.Tensor) -> torch.Tensor:

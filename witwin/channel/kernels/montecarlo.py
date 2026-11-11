@@ -10,14 +10,7 @@ import math
 
 import torch
 
-from witwin.channel.materials import validate_layer_csr as _validate_layer_csr
-from witwin.channel.propagation.geometry import (
-    BDPT_INTERSECTION_FIELDS as _BDPT_INTERSECTION_FIELDS,
-)
-from witwin.channel.propagation.topology import (
-    mc_sample_directions,  # noqa: F401
-    path_los_export,
-)
+from witwin.channel.kernels.topology import path_los_export
 from witwin.channel.runtime import (
     CapacityFailureBit,
     CapacityFailureState,
@@ -32,10 +25,7 @@ from witwin.channel.runtime import (
     _ad_reject_fixed_inputs,
     _ad_reject_fixed_tangents,
     _rayd_scene_resource,
-    bdpt_zero_matrix,  # noqa: F401
     disable_functorch,
-    mc_pack_vec3,  # noqa: F401
-    mc_receiver_grid_points,  # noqa: F401
     require_capacity_failure_state,
     required_symbol,
     required_symbol as _required_native_op,
@@ -449,15 +439,6 @@ def mc_store_scaled_component_map(
         )
     validate_cuda_tensor("maps", out, dtype=torch.float32, ndim=3)
     return out
-
-
-def mc_los_component_maps(los: torch.Tensor) -> torch.Tensor:
-    validate_cuda_tensor("los", los, dtype=torch.float32, ndim=3)
-    maps = _required_native_op("mc_los_component_maps")(los)
-    if not isinstance(maps, torch.Tensor):
-        raise TypeError("_channel.mc_los_component_maps must return a tensor")
-    validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
-    return maps
 
 
 def mc_los_component_maps_from_matrix(los: torch.Tensor, *, rows: int, cols: int) -> torch.Tensor:
@@ -2058,73 +2039,6 @@ def mc_diffraction_state_wi(state_edge_pos: torch.Tensor, state_src: torch.Tenso
     return state_wi
 
 
-def mc_diffraction_state_pack(
-    edge_indices: torch.Tensor, edge_pos: torch.Tensor, edge_dir: torch.Tensor,
-    line_min: torch.Tensor, line_max: torch.Tensor, n0: torch.Tensor, n1: torch.Tensor,
-    face0: torch.Tensor, face1: torch.Tensor, exterior_angle: torch.Tensor, tx: torch.Tensor,
-    tx_power: torch.Tensor,
-) -> tuple[torch.Tensor, ...]:
-    validate_cuda_tensor("edge_indices", edge_indices, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor(
-        "edge_pos", edge_pos, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor(
-        "edge_dir", edge_dir, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("line_min", line_min, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("line_max", line_max, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("n0", n0, dtype=torch.float32, ndim=2, trailing_shape=(3,))
-    validate_cuda_tensor("n1", n1, dtype=torch.float32, ndim=2, trailing_shape=(3,))
-    validate_cuda_tensor("face0", face0, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("face1", face1, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("exterior_angle", exterior_angle, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("tx", tx, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("tx_power", tx_power, dtype=torch.float32, ndim=0)
-    if tx.shape[0] != 3:
-        raise ValueError("tx must have shape (3,)")
-    states = required_symbol("mc_diffraction_state_pack")(
-        edge_indices,
-        edge_pos,
-        edge_dir,
-        line_min,
-        line_max,
-        n0,
-        n1,
-        face0,
-        face1,
-        exterior_angle,
-        tx,
-        tx_power,
-    )
-    if not isinstance(states, tuple) or len(states) != 12:
-        raise TypeError(
-            "_channel.mc_diffraction_state_pack must return 12 tensors"
-        )
-    validate_cuda_tensor("state_edge_index", states[0], dtype=torch.int32, ndim=1)
-    validate_cuda_tensor(
-        "state_edge_pos", states[1], dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor(
-        "state_edge_dir", states[2], dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("state_line_min", states[3], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("state_line_max", states[4], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor(
-        "state_n0", states[5], dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor(
-        "state_n1", states[6], dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("state_face0", states[7], dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("state_face1", states[8], dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("state_exterior_angle", states[9], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor(
-        "state_src", states[10], dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("state_src_power", states[11], dtype=torch.float32, ndim=1)
-    return states
-
-
 # -------------------------------------------------------------------------
 # basic transmission
 # -------------------------------------------------------------------------
@@ -2618,32 +2532,6 @@ __all__ = [
 ]
 
 
-# -------------------------------------------------------------------------
-# bdpt maps
-# -------------------------------------------------------------------------
-def bdpt_store_point_component_column(
-    target: torch.Tensor, source: torch.Tensor, *, rx_index: int,
-) -> torch.Tensor:
-    validate_cuda_tensor("target", target, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("source", source, dtype=torch.float32, ndim=3)
-    if source.shape[0] != target.shape[0] or source.shape[1:] != (1, 1):
-        raise ValueError("source must have shape (tx, 1, 1)")
-    if rx_index < 0 or rx_index >= target.shape[1]:
-        raise ValueError("rx_index is out of range")
-    native = _required_native_op("bdpt_store_point_component_column")
-    out = native(target, source, int(rx_index))
-    if not isinstance(out, torch.Tensor):
-        raise TypeError(
-            "_channel.bdpt_store_point_component_column must return a tensor"
-        )
-    validate_cuda_tensor("out", out, dtype=torch.float32, ndim=2)
-    if out.shape != target.shape:
-        raise ValueError(
-            "_channel.bdpt_store_point_component_column returned an unexpected shape"
-        )
-    return out
-
-
 def bdpt_finalize_point_components(
     los: torch.Tensor, reflection: torch.Tensor, diffraction: torch.Tensor,
     transmission: torch.Tensor, scattering: torch.Tensor,
@@ -2681,20 +2569,6 @@ def bdpt_finalize_point_components(
         "transmission_power",
         "scattering_power",
     ):
-        validate_cuda_tensor(name, exported[name], dtype=torch.float32, ndim=0)
-    return exported
-
-
-def bdpt_point_component_power(
-    path_gain: torch.Tensor, *, include_los: bool,
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor("path_gain", path_gain, dtype=torch.float32, ndim=2)
-    exported = _required_native_op("bdpt_point_component_power")(
-        path_gain, bool(include_los)
-    )
-    if not isinstance(exported, dict):
-        raise TypeError("_channel.bdpt_point_component_power must return a dict")
-    for name in ("los", "reflection", "diffraction"):
         validate_cuda_tensor(name, exported[name], dtype=torch.float32, ndim=0)
     return exported
 
@@ -2768,58 +2642,6 @@ def bdpt_receiver_grid_points(
     return points
 
 
-def bdpt_los_export(
-    tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor,
-    tx_polarizations: torch.Tensor, *, frequency_hz: float,
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor(
-        "tx_positions", tx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("tx_power", tx_power, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor(
-        "rx_positions", rx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor(
-        "tx_polarizations",
-        tx_polarizations,
-        dtype=torch.float32,
-        ndim=2,
-        trailing_shape=(3,),
-    )
-    if tx_power.shape[0] != tx_positions.shape[0]:
-        raise ValueError("tx_power must have one value per transmitter")
-    if tx_polarizations.shape != tx_positions.shape:
-        raise ValueError("tx_polarizations must match tx_positions shape")
-    if frequency_hz <= 0.0:
-        raise ValueError("frequency_hz must be positive")
-    exported = _required_native_op("bdpt_los_export")(
-        tx_positions,
-        tx_power,
-        rx_positions,
-        float(frequency_hz),
-        tx_polarizations,
-    )
-    if not isinstance(exported, dict):
-        raise TypeError("_channel.bdpt_los_export must return a dict")
-    validate_cuda_tensor(
-        "path_gain_matrix", exported["path_gain_matrix"], dtype=torch.float32, ndim=2
-    )
-    return exported
-
-
-def bdpt_los_component_maps(los: torch.Tensor) -> torch.Tensor:
-    validate_cuda_tensor("los", los, dtype=torch.float32, ndim=3)
-    maps = _required_native_op("bdpt_los_component_maps")(los)
-    if not isinstance(maps, torch.Tensor):
-        raise TypeError("_channel.bdpt_los_component_maps must return a tensor")
-    validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
-    if maps.shape != los.shape:
-        raise ValueError(
-            "_channel.bdpt_los_component_maps returned an unexpected shape"
-        )
-    return maps
-
-
 def bdpt_los_component_maps_from_matrix(los: torch.Tensor, *, rows: int, cols: int) -> torch.Tensor:
     validate_cuda_tensor("los", los, dtype=torch.float32, ndim=2)
     if rows < 0 or cols < 0:
@@ -2839,100 +2661,6 @@ def bdpt_los_component_maps_from_matrix(los: torch.Tensor, *, rows: int, cols: i
             "_channel.bdpt_los_component_maps_from_matrix returned an unexpected shape"
         )
     return maps
-
-
-def bdpt_los_visibility_inputs(
-    tx_positions: torch.Tensor, *, tx_index: int, rx_count: int,
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor(
-        "tx_positions", tx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    if rx_count < 0:
-        raise ValueError("rx_count must be non-negative")
-    exported = _required_native_op("bdpt_los_visibility_inputs")(
-        tx_positions, int(tx_index), int(rx_count)
-    )
-    if not isinstance(exported, dict):
-        raise TypeError("_channel.bdpt_los_visibility_inputs must return a dict")
-    validate_cuda_tensor(
-        "start", exported["start"], dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("active", exported["active"], dtype=torch.bool, ndim=1)
-    return exported
-
-
-def bdpt_apply_los_visibility(
-    maps: torch.Tensor, los: torch.Tensor, visible: torch.Tensor, *, tx_index: int,
-) -> torch.Tensor:
-    validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
-    validate_cuda_tensor("los", los, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("visible", visible, dtype=torch.bool, ndim=1)
-    if maps.shape[0] != los.shape[0] or los.shape[1] != maps.shape[1] * maps.shape[2]:
-        raise ValueError("los must match maps flattened grid layout")
-    out = _required_native_op("bdpt_apply_los_visibility")(
-        maps, los, visible, int(tx_index)
-    )
-    if not isinstance(out, torch.Tensor):
-        raise TypeError(
-            "_channel.bdpt_apply_los_visibility must return a tensor"
-        )
-    validate_cuda_tensor("maps", out, dtype=torch.float32, ndim=3)
-    return out
-
-
-def bdpt_component_map_buffer(
-    reference: torch.Tensor, *, tx_count: int, dim0: int, dim1: int,
-) -> torch.Tensor:
-    validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=2)
-    if tx_count < 0 or dim0 < 0 or dim1 < 0:
-        raise ValueError("tx_count, dim0, and dim1 must be non-negative")
-    maps = _required_native_op("bdpt_component_map_buffer")(
-        reference, int(tx_count), int(dim0), int(dim1)
-    )
-    if not isinstance(maps, torch.Tensor):
-        raise TypeError(
-            "_channel.bdpt_component_map_buffer must return a tensor"
-        )
-    validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
-    if maps.shape != (tx_count, dim0, dim1):
-        raise ValueError(
-            "_channel.bdpt_component_map_buffer returned an unexpected shape"
-        )
-    return maps
-
-
-def bdpt_store_component_map(
-    maps: torch.Tensor, source: torch.Tensor, *, tx_index: int,
-) -> torch.Tensor:
-    validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
-    validate_cuda_tensor("source", source, dtype=torch.float32, ndim=2)
-    out = _required_native_op("bdpt_store_component_map")(maps, source, int(tx_index))
-    if not isinstance(out, torch.Tensor):
-        raise TypeError("_channel.bdpt_store_component_map must return a tensor")
-    validate_cuda_tensor("maps", out, dtype=torch.float32, ndim=3)
-    return out
-
-
-def bdpt_store_scaled_component_map(
-    maps: torch.Tensor, source: torch.Tensor, scale_values: torch.Tensor, *, tx_index: int,
-    scale_index: int,
-) -> torch.Tensor:
-    validate_cuda_tensor("maps", maps, dtype=torch.float32, ndim=3)
-    validate_cuda_tensor("source", source, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("scale_values", scale_values, dtype=torch.float32, ndim=1)
-    out = _required_native_op("bdpt_store_scaled_component_map")(
-        maps,
-        source,
-        scale_values,
-        int(tx_index),
-        int(scale_index),
-    )
-    if not isinstance(out, torch.Tensor):
-        raise TypeError(
-            "_channel.bdpt_store_scaled_component_map must return a tensor"
-        )
-    validate_cuda_tensor("maps", out, dtype=torch.float32, ndim=3)
-    return out
 
 
 def bdpt_finalize_component_maps(
@@ -3386,15 +3114,6 @@ def _bdpt_mis_mode_id(mis: str) -> int:
     raise ValueError("mis is not supported")
 
 
-def bdpt_empty_subpath_state(reference: torch.Tensor) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=2)
-    exported = _required_native_op("bdpt_empty_subpath_state")(reference)
-    _validate_bdpt_subpath_state(
-        "_channel.bdpt_empty_subpath_state", exported, 0
-    )
-    return exported
-
-
 def bdpt_endpoint_subpath_state(
     tx_positions: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
     rx_positions: torch.Tensor, rx_polarization: torch.Tensor, launch_tx_id: torch.Tensor,
@@ -3459,184 +3178,6 @@ def bdpt_endpoint_subpath_state(
         int(rx_positions.shape[0]),
     )
     return {"light": light, "sensor": sensor}
-
-
-def bdpt_subpath_intersection_inputs(subpath: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-    _validate_bdpt_subpath_state("subpath", subpath, None)
-    exported = _required_native_op("bdpt_subpath_intersection_inputs")(subpath)
-    if not isinstance(exported, dict):
-        raise TypeError(
-            "_channel.bdpt_subpath_intersection_inputs must return a dict"
-        )
-    if set(exported) != {"ray_o", "ray_d", "ray_tmax", "active"}:
-        raise ValueError(
-            "_channel.bdpt_subpath_intersection_inputs returned unexpected fields"
-        )
-    validate_cuda_tensor(
-        "ray_o", exported["ray_o"], dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor(
-        "ray_d", exported["ray_d"], dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("ray_tmax", exported["ray_tmax"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("active", exported["active"], dtype=torch.bool, ndim=1)
-    if (
-        exported["ray_o"].shape != subpath["origin"].shape
-        or exported["ray_d"].shape != subpath["direction"].shape
-    ):
-        raise ValueError(
-            "_channel.bdpt_subpath_intersection_inputs returned bad ray shape"
-        )
-    if exported["active"].shape != subpath["valid"].shape:
-        raise ValueError(
-            "_channel.bdpt_subpath_intersection_inputs returned bad active shape"
-        )
-    if exported["ray_tmax"].shape != (0,):
-        raise ValueError(
-            "_channel.bdpt_subpath_intersection_inputs returned bad ray_tmax shape"
-        )
-    return exported
-
-
-def _validate_bdpt_intersection(
-    light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor],
-) -> int:
-    _validate_bdpt_subpath_state("light", light, None)
-    if not isinstance(intersection, dict) or set(intersection) != set(
-        _BDPT_INTERSECTION_FIELDS
-    ):
-        raise ValueError("intersection returned unexpected fields")
-    count = int(light["origin"].shape[0])
-    validate_cuda_tensor(
-        "intersection.t", intersection["t"], dtype=torch.float32, ndim=1
-    )
-    validate_cuda_tensor(
-        "intersection.p",
-        intersection["p"],
-        dtype=torch.float32,
-        ndim=2,
-        trailing_shape=(3,),
-    )
-    validate_cuda_tensor(
-        "intersection.n",
-        intersection["n"],
-        dtype=torch.float32,
-        ndim=2,
-        trailing_shape=(3,),
-    )
-    validate_cuda_tensor(
-        "intersection.global_prim_id",
-        intersection["global_prim_id"],
-        dtype=torch.int32,
-        ndim=1,
-    )
-    return count
-
-def bdpt_reflected_light_subpath_state(
-    light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor], *,
-    material_gain: torch.Tensor, material_valid: torch.Tensor, material_eps_r: torch.Tensor,
-    material_sigma_e: torch.Tensor, material_mu_r: torch.Tensor, material_thickness: torch.Tensor,
-    frequency_hz: float,
-) -> dict[str, torch.Tensor]:
-    count = _validate_bdpt_intersection(light, intersection)
-    validate_cuda_tensor("material_gain", material_gain, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("material_valid", material_valid, dtype=torch.bool, ndim=1)
-    validate_cuda_tensor("material_eps_r", material_eps_r, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor(
-        "material_sigma_e", material_sigma_e, dtype=torch.float32, ndim=1
-    )
-    validate_cuda_tensor("material_mu_r", material_mu_r, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor(
-        "material_thickness", material_thickness, dtype=torch.float32, ndim=1
-    )
-    if int(material_gain.shape[0]) != int(material_valid.shape[0]):
-        raise ValueError("material_gain and material_valid must have matching length")
-    for name, tensor in (
-        ("material_eps_r", material_eps_r),
-        ("material_sigma_e", material_sigma_e),
-        ("material_mu_r", material_mu_r),
-        ("material_thickness", material_thickness),
-    ):
-        if int(tensor.shape[0]) != int(material_gain.shape[0]):
-            raise ValueError(f"{name} must match material_gain length")
-    if frequency_hz <= 0.0:
-        raise ValueError("frequency_hz must be positive")
-    if (
-        material_gain.get_device() != light["origin"].get_device()
-        or material_valid.get_device() != light["origin"].get_device()
-        or material_eps_r.get_device() != light["origin"].get_device()
-        or material_sigma_e.get_device() != light["origin"].get_device()
-        or material_mu_r.get_device() != light["origin"].get_device()
-        or material_thickness.get_device() != light["origin"].get_device()
-    ):
-        raise ValueError("material tensors must share light device")
-    for name in ("t", "p", "n", "global_prim_id"):
-        if int(intersection[name].shape[0]) != count:
-            raise ValueError("intersection must match light subpath count")
-        if intersection[name].get_device() != light["origin"].get_device():
-            raise ValueError("intersection tensors must share light device")
-    exported = _required_native_op("bdpt_reflected_light_subpath_state")(
-        light,
-        intersection,
-        material_gain,
-        material_valid,
-        material_eps_r,
-        material_sigma_e,
-        material_mu_r,
-        material_thickness,
-        float(frequency_hz),
-    )
-    _validate_bdpt_subpath_state(
-        "_channel.bdpt_reflected_light_subpath_state", exported, count
-    )
-    return exported
-
-
-def bdpt_transmitted_light_subpath_state(
-    light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor], *,
-    face_material_id: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor, frequency_hz: float,
-) -> dict[str, torch.Tensor]:
-    count = _validate_bdpt_intersection(light, intersection)
-    validate_cuda_tensor(
-        "face_material_id", face_material_id, dtype=torch.int32, ndim=1
-    )
-    device = light["origin"].get_device()
-    if face_material_id.get_device() != device:
-        raise ValueError("face_material_id must share light device")
-    _validate_layer_csr(
-        layer_offset,
-        layer_count,
-        layer_thickness_m,
-        layer_eps_r,
-        layer_sigma_e,
-        layer_mu_r,
-        device,
-    )
-    if frequency_hz <= 0.0:
-        raise ValueError("frequency_hz must be positive")
-    for name in ("t", "p", "n", "global_prim_id"):
-        if int(intersection[name].shape[0]) != count:
-            raise ValueError("intersection must match light subpath count")
-        if intersection[name].get_device() != device:
-            raise ValueError("intersection tensors must share light device")
-    exported = _required_native_op("bdpt_transmitted_light_subpath_state")(
-        light,
-        intersection,
-        face_material_id,
-        layer_offset,
-        layer_count,
-        layer_thickness_m,
-        layer_eps_r,
-        layer_sigma_e,
-        layer_mu_r,
-        float(frequency_hz),
-    )
-    _validate_bdpt_subpath_state(
-        "_channel.bdpt_transmitted_light_subpath_state", exported, count
-    )
-    return exported
 
 
 def bdpt_endpoint_connection_samples(
@@ -3898,127 +3439,6 @@ def bdpt_connection_variance(
     if tuple(variance.shape) != (int(tx_count), int(rx_count)):
         raise ValueError("_channel.bdpt_connection_variance returned bad shape")
     return variance
-
-
-def bdpt_mis_weights(
-    pdf: torch.Tensor, strategy_pdf_sum: torch.Tensor, *, mis: str, beta: float = 2.0,
-) -> torch.Tensor:
-    validate_cuda_tensor("pdf", pdf, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor(
-        "strategy_pdf_sum", strategy_pdf_sum, dtype=torch.float32, ndim=0
-    )
-    mode_id = _bdpt_mis_mode_id(mis)
-    if beta <= 0.0:
-        raise ValueError("beta must be positive")
-
-    weights = _required_native_op("bdpt_mis_weights")(
-        pdf, strategy_pdf_sum, int(mode_id), float(beta)
-    )
-    if not isinstance(weights, torch.Tensor):
-        raise TypeError("_channel.bdpt_mis_weights must return a tensor")
-    validate_cuda_tensor("weights", weights, dtype=torch.float32, ndim=1)
-    if weights.shape != pdf.shape:
-        raise ValueError(
-            "_channel.bdpt_mis_weights returned an unexpected shape"
-        )
-    return weights
-
-
-# -------------------------------------------------------------------------
-# bdpt sampling
-# -------------------------------------------------------------------------
-def bdpt_sample_directions(count: int, reference: torch.Tensor, *, seed: int) -> torch.Tensor:
-    if count < 0:
-        raise ValueError("count must be non-negative")
-    if seed < 0:
-        raise ValueError("seed must be non-negative")
-    validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=2)
-    directions = _required_native_op("bdpt_sample_directions")(
-        int(count), reference, int(seed)
-    )
-    if not isinstance(directions, torch.Tensor):
-        raise TypeError("_channel.bdpt_sample_directions must return a tensor")
-    validate_cuda_tensor(
-        "directions", directions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    return directions
-
-
-def bdpt_reflection_launch_inputs(
-    tx_positions: torch.Tensor, *, tx_index: int, sample_count: int,
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor(
-        "tx_positions", tx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    if sample_count < 0:
-        raise ValueError("sample_count must be non-negative")
-    exported = _required_native_op("bdpt_reflection_launch_inputs")(
-        tx_positions, int(tx_index), int(sample_count)
-    )
-    if not isinstance(exported, dict):
-        raise TypeError(
-            "_channel.bdpt_reflection_launch_inputs must return a dict"
-        )
-    validate_cuda_tensor(
-        "ray_o", exported["ray_o"], dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("ray_tmax", exported["ray_tmax"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("active", exported["active"], dtype=torch.bool, ndim=1)
-    validate_cuda_tensor(
-        "tx_pol", exported["tx_pol"], dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("tx_id", exported["tx_id"], dtype=torch.int32, ndim=1)
-    validate_cuda_tensor(
-        "light_seed", exported["light_seed"], dtype=torch.int64, ndim=1
-    )
-    return exported
-
-
-def bdpt_pack_vec3(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
-    validate_cuda_tensor("x", x, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("y", y, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("z", z, dtype=torch.float32, ndim=1)
-    packed = _required_native_op("bdpt_pack_vec3")(x, y, z)
-    if not isinstance(packed, torch.Tensor):
-        raise TypeError("_channel.bdpt_pack_vec3 must return a tensor")
-    validate_cuda_tensor(
-        "packed", packed, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    return packed
-
-
-# -------------------------------------------------------------------------
-# BDPT counter-based sampling and the fused wavefront
-# -------------------------------------------------------------------------
-_BDPT_UNIFORM_STREAMS = {"event_selection": 0, "scatter_direction": 1}
-
-
-def bdpt_counter_uniforms(
-    reference: torch.Tensor, count: int, *, seed: int, first: int, depth: int, stream: str,
-) -> torch.Tensor:
-    """Counter-based uniforms of global samples ``[first, first + count)`` at ``depth``.
-
-    ``event_selection`` returns ``[count]``; ``scatter_direction`` returns
-    ``[count, 2]``. The wavefront step draws the identical event uniforms in-kernel.
-    """
-
-    if not isinstance(reference, torch.Tensor) or not reference.is_cuda:
-        raise ValueError("reference must be a CUDA tensor")
-    if stream not in _BDPT_UNIFORM_STREAMS:
-        raise ValueError(f"stream must be one of {sorted(_BDPT_UNIFORM_STREAMS)}")
-    if count < 0 or seed < 0 or first < 0 or depth < 0:
-        raise ValueError("count, seed, first and depth must be non-negative")
-    lanes = 1 if stream == "event_selection" else 2
-    out = _required_native_op("bdpt_counter_uniforms")(
-        reference, int(count), lanes, int(seed), int(first), int(depth),
-        _BDPT_UNIFORM_STREAMS[stream],
-    )
-    if not isinstance(out, torch.Tensor):
-        raise TypeError("_channel.bdpt_counter_uniforms must return a tensor")
-    expected = (int(count),) if lanes == 1 else (int(count), 2)
-    if tuple(out.shape) != expected:
-        raise ValueError("_channel.bdpt_counter_uniforms returned a bad shape")
-    return out
 
 
 _BDPT_WAVEFRONT_MATERIAL_FIELDS = (

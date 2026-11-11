@@ -17,7 +17,6 @@
 namespace {
 
 constexpr int kBlockSize = 256;
-constexpr float kLightSpeed = 299792458.0f;
 constexpr float kPi = 3.14159265358979323846f;
 
 using channel::check_tensor;
@@ -28,35 +27,6 @@ using channel::math::Complex;
 using channel::math::Complex3;
 using Float3 = channel::math::Vec3;
 namespace cmath = channel::math;
-
-/// -k*d reduced mod 2*pi in double precision: the f32 product loses
-/// ~k*d*2^-24 of phase, which shifts coherent multipath nulls at mmWave
-/// ranges (matches the reference cplx_exp_neg_kd convention).
-__device__ float neg_kd_phase(float k, float d) {
-    return transport::precise_neg_kd(k, d);
-}
-
-__global__ void deterministic_los_field_kernel(
-    const float *__restrict__ input_path_gain,
-    const float *__restrict__ path_length_m,
-    float frequency_hz,
-    int64_t count,
-    float *__restrict__ path_gain,
-    float *__restrict__ field_real,
-    float *__restrict__ field_imag) {
-    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
-    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         index < count;
-         index += stride) {
-        const float gain = fmaxf(input_path_gain[index], 0.0f);
-        const float wavelength = kLightSpeed / frequency_hz;
-        const float phase = neg_kd_phase(2.0f * kPi / wavelength, path_length_m[index]);
-        const float amplitude = sqrtf(gain);
-        path_gain[index] = input_path_gain[index];
-        field_real[index] = amplitude * cosf(phase);
-        field_imag[index] = amplitude * sinf(phase);
-    }
-}
 
 __global__ void deterministic_pack_complex_kernel(
     const float *__restrict__ field_real,
@@ -89,76 +59,7 @@ __global__ void deterministic_phase_from_field_kernel(
     }
 }
 
-__global__ void deterministic_phase_from_length_kernel(
-    const float *__restrict__ path_length_m,
-    float frequency_hz,
-    int64_t count,
-    float *__restrict__ phase_rad) {
-    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
-    const float scale = 2.0f * kPi * frequency_hz / kLightSpeed;
-    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         index < count;
-         index += stride) {
-        float phase = fmodf(scale * path_length_m[index], 2.0f * kPi);
-        if (phase < 0.0f) {
-            phase += 2.0f * kPi;
-        }
-        phase_rad[index] = phase;
-    }
-}
-
-__global__ void deterministic_field_from_power_phase_kernel(
-    const float *__restrict__ path_gain,
-    const float *__restrict__ phase_rad,
-    int64_t count,
-    float *__restrict__ field_real,
-    float *__restrict__ field_imag) {
-    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
-    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         index < count;
-         index += stride) {
-        const float amplitude = sqrtf(fmaxf(path_gain[index], 0.0f));
-        const float phase = -phase_rad[index];
-        field_real[index] = amplitude * cosf(phase);
-        field_imag[index] = amplitude * sinf(phase);
-    }
-}
-
 }  // namespace
-
-pybind11::dict channel_deterministic_los_field(
-    at::Tensor path_gain_input,
-    at::Tensor path_length_m,
-    double frequency_hz) {
-    check_tensor(path_gain_input, "path_gain", at::kFloat, 1);
-    check_tensor(path_length_m, "path_length_m", at::kFloat, 1);
-    TORCH_CHECK(path_length_m.sizes() == path_gain_input.sizes(), "path_length_m must match path_gain");
-    TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
-
-    const int64_t count = path_gain_input.size(0);
-    auto path_gain = at::empty({count}, path_gain_input.options());
-    auto field_real = at::empty({count}, path_gain_input.options());
-    auto field_imag = at::empty({count}, path_gain_input.options());
-    if (count > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(path_gain_input.get_device()).stream();
-        const int block_count = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
-        deterministic_los_field_kernel<<<block_count, kBlockSize, 0, stream>>>(
-            path_gain_input.data_ptr<float>(),
-            path_length_m.data_ptr<float>(),
-            static_cast<float>(frequency_hz),
-            count,
-            path_gain.data_ptr<float>(),
-            field_real.data_ptr<float>(),
-            field_imag.data_ptr<float>());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-
-    pybind11::dict out;
-    out["path_gain"] = path_gain;
-    out["field_real"] = field_real;
-    out["field_imag"] = field_imag;
-    return out;
-}
 
 at::Tensor channel_deterministic_pack_complex(at::Tensor field_real, at::Tensor field_imag) {
     check_tensor(field_real, "field_real", at::kFloat, 1);
@@ -221,48 +122,6 @@ pybind11::dict channel_deterministic_zero_field_phase(at::Tensor reference) {
     pybind11::dict out;
     out["path_field"] = path_field;
     out["phase_rad"] = phase;
-    return out;
-}
-
-at::Tensor channel_deterministic_phase_from_length(at::Tensor path_length_m, double frequency_hz) {
-    check_tensor(path_length_m, "path_length_m", at::kFloat, 1);
-    TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
-    auto phase = at::empty_like(path_length_m);
-    const int64_t count = path_length_m.size(0);
-    if (count > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(path_length_m.get_device()).stream();
-        const int block_count = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
-        deterministic_phase_from_length_kernel<<<block_count, kBlockSize, 0, stream>>>(
-            path_length_m.data_ptr<float>(),
-            static_cast<float>(frequency_hz),
-            count,
-            phase.data_ptr<float>());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-    return phase;
-}
-
-pybind11::dict channel_deterministic_field_from_power_phase(at::Tensor path_gain, at::Tensor phase_rad) {
-    check_tensor(path_gain, "path_gain", at::kFloat, 1);
-    check_tensor(phase_rad, "phase_rad", at::kFloat, 1);
-    TORCH_CHECK(phase_rad.sizes() == path_gain.sizes(), "phase_rad must match path_gain");
-    auto field_real = at::empty_like(path_gain);
-    auto field_imag = at::empty_like(path_gain);
-    const int64_t count = path_gain.size(0);
-    if (count > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(path_gain.get_device()).stream();
-        const int block_count = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
-        deterministic_field_from_power_phase_kernel<<<block_count, kBlockSize, 0, stream>>>(
-            path_gain.data_ptr<float>(),
-            phase_rad.data_ptr<float>(),
-            count,
-            field_real.data_ptr<float>(),
-            field_imag.data_ptr<float>());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-    pybind11::dict out;
-    out["field_real"] = field_real;
-    out["field_imag"] = field_imag;
     return out;
 }
 

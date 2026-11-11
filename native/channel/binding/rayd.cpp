@@ -25,13 +25,6 @@ void channel_rayd_scene_update_vertices(
     RayDSceneResource &scene,
     std::vector<int64_t> mesh_indices,
     std::vector<torch::Tensor> vertices);
-pybind11::tuple channel_rayd_intersect_forward(
-    RayDSceneResource &scene,
-    torch::Tensor ray_o,
-    torch::Tensor ray_d,
-    torch::Tensor ray_tmax,
-    pybind11::object active,
-    int64_t flags);
 pybind11::tuple channel_rayd_visibility_forward(
     RayDSceneResource &scene,
     torch::Tensor start,
@@ -148,68 +141,6 @@ pybind11::tuple channel_rayd_reflection_epc_paths_forward(
     int64_t max_bounces,
     int64_t visibility_ignore_mode,
     double min_segment_length);
-pybind11::tuple channel_rayd_intersect_backward(
-    RayDSceneResource &scene,
-    torch::Tensor ray_o,
-    torch::Tensor ray_d,
-    torch::Tensor ray_tmax,
-    pybind11::object active,
-    torch::Tensor tape_prim_id,
-    torch::Tensor tape_barycentric,
-    pybind11::object grad_t,
-    pybind11::object grad_p,
-    pybind11::object grad_n,
-    pybind11::object grad_geo_n,
-    pybind11::object grad_uv,
-    pybind11::object grad_barycentric,
-    bool need_grad_vertices,
-    bool need_grad_ray_o,
-    bool need_grad_ray_d,
-    bool need_grad_ray_tmax);
-pybind11::tuple channel_rayd_intersect_jvp(
-    RayDSceneResource &scene,
-    torch::Tensor ray_o,
-    torch::Tensor ray_d,
-    pybind11::object active,
-    torch::Tensor tape_prim_id,
-    torch::Tensor tape_barycentric,
-    pybind11::object tangent_vertices,
-    pybind11::object tangent_ray_o,
-    pybind11::object tangent_ray_d,
-    int64_t flags);
-pybind11::tuple channel_rayd_trace_reflections_forward_tape(
-    RayDSceneResource &scene,
-    torch::Tensor ray_o,
-    torch::Tensor ray_d,
-    torch::Tensor ray_tmax,
-    pybind11::object active,
-    int64_t max_bounces);
-pybind11::tuple channel_rayd_trace_reflections_backward(
-    RayDSceneResource &scene,
-    torch::Tensor ray_o,
-    torch::Tensor ray_d,
-    torch::Tensor ray_tmax,
-    pybind11::object active,
-    torch::Tensor tape_prim_id,
-    torch::Tensor tape_barycentric,
-    torch::Tensor tape_hit_points,
-    torch::Tensor tape_normals,
-    torch::Tensor image_sources,
-    pybind11::object grad_t,
-    pybind11::object grad_image_sources);
-pybind11::tuple channel_rayd_trace_reflections_jvp(
-    RayDSceneResource &scene,
-    torch::Tensor ray_o,
-    torch::Tensor ray_d,
-    pybind11::object active,
-    torch::Tensor tape_prim_id,
-    torch::Tensor tape_barycentric,
-    torch::Tensor tape_hit_points,
-    torch::Tensor tape_normals,
-    pybind11::object tangent_vertices,
-    pybind11::object tangent_ray_o,
-    pybind11::object tangent_ray_d,
-    torch::Tensor image_sources);
 pybind11::tuple channel_rayd_reflection_epc_paths_backward(
     RayDSceneResource &scene,
     torch::Tensor source,
@@ -390,10 +321,6 @@ void register_rayd_geometry(pybind11::module_ &module) {
         &channel_rayd_scene_update_vertices,
         "Refit listed refittable meshes of a typed RayD scene to new vertices.");
     module.def(
-        "rayd_intersect_forward",
-        &channel_rayd_intersect_forward,
-        "Call typed RayD ray/scene intersection.");
-    module.def(
         "rayd_visibility_forward",
         &channel_rayd_visibility_forward,
         "Call typed RayD segment visibility.");
@@ -421,26 +348,6 @@ void register_rayd_geometry(pybind11::module_ &module) {
         "rayd_reflection_epc_paths_forward",
         &channel_rayd_reflection_epc_paths_forward,
         "Call typed RayD reflection EPC path export.");
-    module.def(
-        "rayd_intersect_backward",
-        &channel_rayd_intersect_backward,
-        "Call the typed RayD fixed-winner intersect VJP.");
-    module.def(
-        "rayd_intersect_jvp",
-        &channel_rayd_intersect_jvp,
-        "Call the typed RayD fixed-winner intersect JVP.");
-    module.def(
-        "rayd_trace_reflections_forward_tape",
-        &channel_rayd_trace_reflections_forward_tape,
-        "Call typed RayD tape-emitting reflection chain tracing.");
-    module.def(
-        "rayd_trace_reflections_backward",
-        &channel_rayd_trace_reflections_backward,
-        "Call the typed RayD fixed-winner reflection chain VJP.");
-    module.def(
-        "rayd_trace_reflections_jvp",
-        &channel_rayd_trace_reflections_jvp,
-        "Call the typed RayD fixed-winner reflection chain JVP.");
     module.def(
         "rayd_reflection_epc_paths_backward",
         &channel_rayd_reflection_epc_paths_backward,

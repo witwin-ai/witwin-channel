@@ -9,7 +9,8 @@ import pytest
 import torch
 
 from witwin.core import SurfaceRoughness
-from witwin.channel.scene.resources import build_kirchhoff_table, eval_bsdf
+from tests.reference.kirchhoff_lookup import eval_table as eval_bsdf
+from witwin.channel.scene.resources import build_kirchhoff_table
 
 _EPS0 = 8.8541878128e-12
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"

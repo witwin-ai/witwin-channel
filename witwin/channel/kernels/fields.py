@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 import torch
 
-from witwin.channel.materials import validate_layer_csr as _validate_layer_csr
+from witwin.channel.kernels.materials import validate_layer_csr as _validate_layer_csr
 from witwin.channel.runtime import (
     _ad_checked_tangent,
     _ad_first_order_only,
@@ -42,11 +42,8 @@ __all__ = [
     "_FieldTransmissionSequenceAdFunction",
     "ad_liveness",
     "coupled_rd_prepare_ad",
-    "deterministic_field_from_power_phase",
-    "deterministic_los_field",
     "deterministic_pack_complex",
     "deterministic_phase_from_field",
-    "deterministic_phase_from_length",
     "deterministic_zero_field_phase",
     "direction_cotangent",
     "direction_tangents",
@@ -3547,35 +3544,6 @@ def field_source_amplitude_scale_ad(
     return _FieldSourceAmplitudeScaleAdFunction.apply(field_vector, tx_power)
 
 
-def deterministic_los_field(
-    path_gain: torch.Tensor, path_length_m: torch.Tensor, *, frequency_hz: float,
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor("path_gain", path_gain, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("path_length_m", path_length_m, dtype=torch.float32, ndim=1)
-    if path_length_m.shape != path_gain.shape:
-        raise ValueError("path_length_m must match path_gain")
-    if frequency_hz <= 0.0:
-        raise ValueError("frequency_hz must be positive")
-
-    exported = _required_native_op("deterministic_los_field")(
-        path_gain, path_length_m, float(frequency_hz)
-    )
-    if not isinstance(exported, dict):
-        raise TypeError("_channel.deterministic_los_field must return a dict")
-    validate_cuda_tensor(
-        "path_gain", exported["path_gain"], dtype=torch.float32, ndim=1
-    )
-    validate_cuda_tensor(
-        "field_real", exported["field_real"], dtype=torch.float32, ndim=1
-    )
-    validate_cuda_tensor(
-        "field_imag", exported["field_imag"], dtype=torch.float32, ndim=1
-    )
-    if exported["path_gain"].shape != path_gain.shape:
-        raise ValueError("_channel.deterministic_los_field returned bad shape")
-    return exported
-
-
 def deterministic_pack_complex(field_real: torch.Tensor, field_imag: torch.Tensor) -> torch.Tensor:
     validate_cuda_tensor("field_real", field_real, dtype=torch.float32, ndim=1)
     validate_cuda_tensor("field_imag", field_imag, dtype=torch.float32, ndim=1)
@@ -3628,45 +3596,3 @@ def deterministic_zero_field_phase(reference: torch.Tensor) -> dict[str, torch.T
         )
     return exported
 
-
-def deterministic_phase_from_length(
-    path_length_m: torch.Tensor, *, frequency_hz: float,
-) -> torch.Tensor:
-    validate_cuda_tensor("path_length_m", path_length_m, dtype=torch.float32, ndim=1)
-    if frequency_hz <= 0.0:
-        raise ValueError("frequency_hz must be positive")
-    phase = _required_native_op("deterministic_phase_from_length")(path_length_m, float(frequency_hz))
-    validate_cuda_tensor("phase_rad", phase, dtype=torch.float32, ndim=1)
-    if phase.shape != path_length_m.shape:
-        raise ValueError(
-            "_channel.deterministic_phase_from_length returned bad shape"
-        )
-    return phase
-
-
-def deterministic_field_from_power_phase(
-    path_gain: torch.Tensor, phase_rad: torch.Tensor,
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor("path_gain", path_gain, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("phase_rad", phase_rad, dtype=torch.float32, ndim=1)
-    if phase_rad.shape != path_gain.shape:
-        raise ValueError("phase_rad must match path_gain")
-    exported = _required_native_op("deterministic_field_from_power_phase")(path_gain, phase_rad)
-    if not isinstance(exported, dict):
-        raise TypeError(
-            "_channel.deterministic_field_from_power_phase must return a dict"
-        )
-    validate_cuda_tensor(
-        "field_real", exported["field_real"], dtype=torch.float32, ndim=1
-    )
-    validate_cuda_tensor(
-        "field_imag", exported["field_imag"], dtype=torch.float32, ndim=1
-    )
-    if (
-        exported["field_real"].shape != path_gain.shape
-        or exported["field_imag"].shape != path_gain.shape
-    ):
-        raise ValueError(
-            "_channel.deterministic_field_from_power_phase returned bad shape"
-        )
-    return exported

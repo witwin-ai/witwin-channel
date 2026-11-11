@@ -13,17 +13,10 @@ from witwin.channel import runtime
 _OWNER_NAMES = (
     "_validate_deterministic_topology_block",
     "_validate_path_block",
-    "_validate_path_reflection_candidates",
     "_validate_topology_extra_fields",
     "deterministic_concat_topology_blocks",
-    "deterministic_gather_topology_block",
-    "path_diffraction_block",
-    "path_filter_block",
-    "path_filter_los",
-    "path_finalize_blocks",
     "path_los_export",
     "path_los_visibility_inputs",
-    "path_merge_blocks",
 )
 
 
@@ -59,16 +52,6 @@ def test_topology_block_helpers_resolve_siblings_in_the_canonical_owner():
         is topology._validate_topology_extra_fields
     )
     assert (
-        topology._validate_path_reflection_candidates.__globals__["_validate_path_block"]
+        topology.deterministic_concat_topology_blocks.__globals__["_validate_path_block"]
         is topology._validate_path_block
     )
-    for name in (
-        "deterministic_concat_topology_blocks",
-        "deterministic_gather_topology_block",
-        "path_diffraction_block",
-        "path_filter_block",
-        "path_filter_los",
-        "path_finalize_blocks",
-        "path_merge_blocks",
-    ):
-        assert getattr(topology, name).__globals__["_validate_path_block"] is topology._validate_path_block

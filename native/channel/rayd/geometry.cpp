@@ -411,30 +411,6 @@ pybind11::tuple channel_rayd_segment_penetration_jvp(
         out.tangent_geometric_normal);
 }
 
-pybind11::tuple channel_rayd_intersect_forward(
-    RayDSceneResource &scene,
-    torch::Tensor ray_o,
-    torch::Tensor ray_d,
-    torch::Tensor ray_tmax,
-    pybind11::object active,
-    int64_t flags) {
-    rayd::torch::IntersectResult out = rayd::torch::intersect_forward(
-        scene.resource(),
-        rayd::torch::RayBatch{ray_o, ray_d, ray_tmax, optional_tensor(active)},
-        flags);
-    return pybind11::make_tuple(
-        out.t,
-        out.p,
-        out.n,
-        out.geo_n,
-        out.uv,
-        out.barycentric,
-        out.shape_id,
-        out.prim_id,
-        out.local_prim_id,
-        out.global_prim_id);
-}
-
 pybind11::tuple channel_rayd_visibility_forward(
     RayDSceneResource &scene,
     torch::Tensor start,
@@ -444,80 +420,6 @@ pybind11::tuple channel_rayd_visibility_forward(
         scene.resource(),
         rayd::torch::VisibilityRequest{start, end, optional_tensor(active)});
     return pybind11::make_tuple(out.visible, out.blocker_prim, out.tape_t);
-}
-
-
-pybind11::tuple channel_rayd_intersect_backward(
-    RayDSceneResource &scene,
-    torch::Tensor ray_o,
-    torch::Tensor ray_d,
-    torch::Tensor ray_tmax,
-    pybind11::object active,
-    torch::Tensor tape_prim_id,
-    torch::Tensor tape_barycentric,
-    pybind11::object grad_t,
-    pybind11::object grad_p,
-    pybind11::object grad_n,
-    pybind11::object grad_geo_n,
-    pybind11::object grad_uv,
-    pybind11::object grad_barycentric,
-    bool need_grad_vertices,
-    bool need_grad_ray_o,
-    bool need_grad_ray_d,
-    bool need_grad_ray_tmax) {
-    rayd::torch::IntersectBackwardRequest request;
-    request.rays = {ray_o, ray_d, ray_tmax, optional_tensor(active)};
-    request.tape_prim_id = tape_prim_id;
-    request.tape_barycentric = tape_barycentric;
-    request.grad_t = optional_tensor(grad_t);
-    request.grad_p = optional_tensor(grad_p);
-    request.grad_n = optional_tensor(grad_n);
-    request.grad_geo_n = optional_tensor(grad_geo_n);
-    request.grad_uv = optional_tensor(grad_uv);
-    request.grad_barycentric = optional_tensor(grad_barycentric);
-    request.need_grad_vertices = need_grad_vertices;
-    request.need_grad_ray_o = need_grad_ray_o;
-    request.need_grad_ray_d = need_grad_ray_d;
-    request.need_grad_ray_tmax = need_grad_ray_tmax;
-    rayd::torch::IntersectBackwardResult out =
-        rayd::torch::intersect_backward(scene.resource(), request);
-    return pybind11::make_tuple(
-        tensor_or_none(out.grad_vertices),
-        tensor_or_none(out.grad_ray_o),
-        tensor_or_none(out.grad_ray_d),
-        tensor_or_none(out.grad_ray_tmax));
-}
-
-pybind11::tuple channel_rayd_intersect_jvp(
-    RayDSceneResource &scene,
-    torch::Tensor ray_o,
-    torch::Tensor ray_d,
-    pybind11::object active,
-    torch::Tensor tape_prim_id,
-    torch::Tensor tape_barycentric,
-    pybind11::object tangent_vertices,
-    pybind11::object tangent_ray_o,
-    pybind11::object tangent_ray_d,
-    int64_t flags) {
-    rayd::torch::IntersectJvpRequest request;
-    request.ray_o = ray_o;
-    request.ray_d = ray_d;
-    request.active = optional_tensor(active);
-    request.tape_prim_id = tape_prim_id;
-    request.tape_barycentric = tape_barycentric;
-    request.tangent_vertices = optional_tensor(tangent_vertices);
-    request.tangent_ray_o = optional_tensor(tangent_ray_o);
-    request.tangent_ray_d = optional_tensor(tangent_ray_d);
-    request.flags = flags;
-    rayd::torch::IntersectJvpResult out =
-        rayd::torch::intersect_jvp(scene.resource(), request);
-    return pybind11::make_tuple(
-        tensor_or_none(out.tangent_t),
-        tensor_or_none(out.tangent_p),
-        tensor_or_none(out.tangent_n),
-        tensor_or_none(out.tangent_geo_n),
-        tensor_or_none(out.tangent_uv),
-        tensor_or_none(out.tangent_barycentric));
 }
 
 pybind11::dict channel_coupled_rd_geometry_forward(

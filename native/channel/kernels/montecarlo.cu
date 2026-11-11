@@ -256,32 +256,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
     return {path_gain, los_power, reflection_power, diffraction_power, transmission_power, scattering_power};
 }
 
-at::Tensor channel_bdpt_component_map_buffer_cuda(
-    at::Tensor reference,
-    int64_t tx_count,
-    int64_t dim0,
-    int64_t dim1) {
-    return channel_mc_component_map_buffer_cuda(
-        reference, tx_count, dim0, dim1);
-}
-
-at::Tensor channel_bdpt_store_component_map_cuda(
-    at::Tensor maps,
-    at::Tensor source,
-    int64_t tx_index) {
-    return channel_mc_store_component_map_cuda(maps, source, tx_index);
-}
-
-at::Tensor channel_bdpt_store_scaled_component_map_cuda(
-    at::Tensor maps,
-    at::Tensor source,
-    at::Tensor scale_values,
-    int64_t tx_index,
-    int64_t scale_index) {
-    return channel_mc_store_scaled_component_map_cuda(
-        maps, source, scale_values, tx_index, scale_index);
-}
-
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_bdpt_finalize_component_maps_cuda(
     at::Tensor los,
     at::Tensor reflection,
@@ -312,8 +286,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
 
 #include <algorithm>
 
-#define check_component_map check_bdpt_point_component_map
-
 namespace {
 
 void check_path_gain(const at::Tensor& tensor) {
@@ -321,13 +293,6 @@ void check_path_gain(const at::Tensor& tensor) {
     TORCH_CHECK(tensor.scalar_type() == at::kFloat, "path_gain must be float32");
     TORCH_CHECK(tensor.dim() == 2, "path_gain must have rank 2");
     TORCH_CHECK(tensor.is_contiguous(), "path_gain must be contiguous");
-}
-
-void check_component_map(const at::Tensor& tensor, const char* name) {
-    TORCH_CHECK(tensor.is_cuda(), name, " must be a CUDA tensor");
-    TORCH_CHECK(tensor.scalar_type() == at::kFloat, name, " must be float32");
-    TORCH_CHECK(tensor.dim() == 3, name, " must have rank 3");
-    TORCH_CHECK(tensor.is_contiguous(), name, " must be contiguous");
 }
 
 __global__ void pack_int2_kernel(
@@ -341,98 +306,6 @@ __global__ void pack_int2_kernel(
     }
     out[index * 2 + 0] = x[index];
     out[index * 2 + 1] = y[index];
-}
-
-__device__ int opposite_vertex(const int* face, int shared0, int shared1) {
-    if (face[0] != shared0 && face[0] != shared1) {
-        return face[0];
-    }
-    if (face[1] != shared0 && face[1] != shared1) {
-        return face[1];
-    }
-    return face[2];
-}
-
-
-
-__global__ void diffraction_edge_count_kernel(
-    int64_t count,
-    const float* vertices,
-    const int* faces,
-    const float* face_normals,
-    const int* edge_v0,
-    const int* edge_v1,
-    const int* face0,
-    const int* face1,
-    int vertical_only,
-    float vertical_ratio_threshold,
-    int boundary_half_plane,
-    float plane_tol,
-    int* selected_count) {
-    constexpr float kEpsilon = 1.0e-6f;
-    constexpr float kNormalCosTol = 1.0f - 1.0e-5f;
-    constexpr float kPi = 3.14159265358979323846f;
-    int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    if (index >= count) {
-        return;
-    }
-
-    const int v0 = edge_v0[index];
-    const int v1 = edge_v1[index];
-    const int f0 = face0[index];
-    const int f1 = face1[index];
-    const bool valid0 = f0 >= 0;
-    const bool valid1 = f1 >= 0;
-    const bool boundary = valid0 && !valid1;
-    const bool interior = valid0 && valid1;
-    if ((!interior && !boundary) || (boundary && !boundary_half_plane)) {
-        return;
-    }
-
-    const float vx = vertices[static_cast<int64_t>(v1) * 3 + 0] - vertices[static_cast<int64_t>(v0) * 3 + 0];
-    const float vy = vertices[static_cast<int64_t>(v1) * 3 + 1] - vertices[static_cast<int64_t>(v0) * 3 + 1];
-    const float vz = vertices[static_cast<int64_t>(v1) * 3 + 2] - vertices[static_cast<int64_t>(v0) * 3 + 2];
-    const float length = sqrtf(vx * vx + vy * vy + vz * vz);
-    if (length <= kEpsilon) {
-        return;
-    }
-
-    const int safe0 = max(f0, 0);
-    const int safe1 = max(f1, 0);
-    const float3 n0 = channel::math::load_normalized_min_length(face_normals, safe0, kEpsilon);
-    const float3 n1 = channel::math::load_normalized_min_length(face_normals, safe1, kEpsilon);
-    const float normal_dot = n0.x * n1.x + n0.y * n1.y + n0.z * n1.z;
-    bool coplanar = false;
-    if (interior && fabsf(normal_dot) >= kNormalCosTol) {
-        const int* face_a = faces + static_cast<int64_t>(safe0) * 3;
-        const int* face_b = faces + static_cast<int64_t>(safe1) * 3;
-        const int opposite_a = opposite_vertex(face_a, v0, v1);
-        const int opposite_b = opposite_vertex(face_b, v0, v1);
-        const float px = vertices[static_cast<int64_t>(v0) * 3 + 0];
-        const float py = vertices[static_cast<int64_t>(v0) * 3 + 1];
-        const float pz = vertices[static_cast<int64_t>(v0) * 3 + 2];
-        const float ax = vertices[static_cast<int64_t>(opposite_a) * 3 + 0] - px;
-        const float ay = vertices[static_cast<int64_t>(opposite_a) * 3 + 1] - py;
-        const float az = vertices[static_cast<int64_t>(opposite_a) * 3 + 2] - pz;
-        const float bx = vertices[static_cast<int64_t>(opposite_b) * 3 + 0] - px;
-        const float by = vertices[static_cast<int64_t>(opposite_b) * 3 + 1] - py;
-        const float bz = vertices[static_cast<int64_t>(opposite_b) * 3 + 2] - pz;
-        const float dist_a = fabsf(ax * n0.x + ay * n0.y + az * n0.z);
-        const float dist_b = fabsf(bx * n0.x + by * n0.y + bz * n0.z);
-        coplanar = dist_a <= plane_tol && dist_b <= plane_tol;
-    }
-
-    const float clamped = fminf(fmaxf(-normal_dot, -1.0f), 1.0f);
-    const float interior_angle = acosf(clamped);
-    const float exterior_angle = interior ? (2.0f * kPi - interior_angle) : (boundary_half_plane ? 2.0f * kPi : 0.0f);
-    const float wedge_n = exterior_angle / kPi;
-    if (coplanar || wedge_n <= 1.0f + kEpsilon) {
-        return;
-    }
-    if (vertical_only && (fabsf(vz) / length) <= vertical_ratio_threshold) {
-        return;
-    }
-    atomicAdd(selected_count, 1);
 }
 
 }  // namespace
@@ -464,67 +337,6 @@ at::Tensor channel_core_pack_int2_cuda(at::Tensor x, at::Tensor y) {
     return out;
 }
 
-int64_t channel_core_diffraction_edge_count_cuda(
-    at::Tensor vertices,
-    at::Tensor faces,
-    at::Tensor face_normals,
-    at::Tensor edge_v0,
-    at::Tensor edge_v1,
-    at::Tensor face0,
-    at::Tensor face1,
-    bool vertical_only,
-    double vertical_ratio,
-    bool boundary_half_plane,
-    double plane_tol) {
-    TORCH_CHECK(vertices.is_cuda() && faces.is_cuda() && face_normals.is_cuda(), "geometry tensors must be CUDA tensors");
-    TORCH_CHECK(edge_v0.is_cuda() && edge_v1.is_cuda() && face0.is_cuda() && face1.is_cuda(), "edge tensors must be CUDA tensors");
-    TORCH_CHECK(vertices.scalar_type() == at::kFloat, "vertices must be float32");
-    TORCH_CHECK(face_normals.scalar_type() == at::kFloat, "face_normals must be float32");
-    TORCH_CHECK(faces.scalar_type() == at::kInt, "faces must be int32");
-    TORCH_CHECK(edge_v0.scalar_type() == at::kInt && edge_v1.scalar_type() == at::kInt, "edge endpoints must be int32");
-    TORCH_CHECK(face0.scalar_type() == at::kInt && face1.scalar_type() == at::kInt, "edge faces must be int32");
-    TORCH_CHECK(vertices.dim() == 2 && vertices.size(1) == 3, "vertices must have shape (N, 3)");
-    TORCH_CHECK(faces.dim() == 2 && faces.size(1) == 3, "faces must have shape (F, 3)");
-    TORCH_CHECK(face_normals.dim() == 2 && face_normals.size(1) == 3, "face_normals must have shape (F, 3)");
-    TORCH_CHECK(edge_v0.dim() == 1 && edge_v1.sizes() == edge_v0.sizes(), "edge endpoint tensors must share shape");
-    TORCH_CHECK(face0.dim() == 1 && face0.sizes() == edge_v0.sizes() && face1.sizes() == edge_v0.sizes(), "edge face tensors must share shape");
-    TORCH_CHECK(vertices.is_contiguous() && faces.is_contiguous() && face_normals.is_contiguous(), "geometry tensors must be contiguous");
-    TORCH_CHECK(edge_v0.is_contiguous() && edge_v1.is_contiguous() && face0.is_contiguous() && face1.is_contiguous(), "edge tensors must be contiguous");
-
-    const int64_t count = edge_v0.numel();
-    auto selected = at::empty({1}, edge_v0.options().dtype(at::kInt));
-    cudaStream_t stream = at::cuda::getCurrentCUDAStream(vertices.get_device()).stream();
-    C10_CUDA_CHECK(cudaMemsetAsync(selected.data_ptr<int>(), 0, sizeof(int), stream));
-    if (count > 0) {
-        constexpr int kBlockSize = 256;
-        int blocks = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
-        diffraction_edge_count_kernel<<<blocks, kBlockSize, 0, stream>>>(
-            count,
-            vertices.data_ptr<float>(),
-            faces.data_ptr<int>(),
-            face_normals.data_ptr<float>(),
-            edge_v0.data_ptr<int>(),
-            edge_v1.data_ptr<int>(),
-            face0.data_ptr<int>(),
-            face1.data_ptr<int>(),
-            vertical_only ? 1 : 0,
-            static_cast<float>(vertical_ratio),
-            boundary_half_plane ? 1 : 0,
-            static_cast<float>(plane_tol),
-            selected.data_ptr<int>());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-    int selected_count = 0;
-    C10_CUDA_CHECK(cudaMemcpyAsync(
-        &selected_count,
-        selected.data_ptr<int>(),
-        sizeof(int),
-        cudaMemcpyDeviceToHost,
-        stream));
-    C10_CUDA_CHECK(cudaStreamSynchronize(stream));
-    return static_cast<int64_t>(selected_count);
-}
-
 at::Tensor channel_bdpt_zero_matrix_cuda(at::Tensor reference, int64_t rows, int64_t cols) {
     TORCH_CHECK(reference.is_cuda(), "reference must be a CUDA tensor");
     TORCH_CHECK(reference.scalar_type() == at::kFloat, "reference must be float32");
@@ -535,27 +347,6 @@ at::Tensor channel_bdpt_zero_matrix_cuda(at::Tensor reference, int64_t rows, int
         C10_CUDA_CHECK(cudaMemsetAsync(out.data_ptr<float>(), 0, out.numel() * sizeof(float), stream));
     }
     return out;
-}
-
-__global__ void bdpt_sum_kernel(int64_t count, const float* values, bool include_los, float* los) {
-    int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    if (!include_los || index >= count) {
-        return;
-    }
-    atomicAdd(los, values[index]);
-}
-
-__global__ void bdpt_store_point_component_column_kernel(
-    int64_t tx_count,
-    int64_t rx_count,
-    int64_t rx_index,
-    const float* source,
-    float* target) {
-    int64_t tx = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    if (tx >= tx_count) {
-        return;
-    }
-    target[tx * rx_count + rx_index] = source[tx];
 }
 
 __global__ void bdpt_finalize_point_components_kernel(
@@ -587,58 +378,6 @@ __global__ void bdpt_finalize_point_components_kernel(
     atomicAdd(diffraction_power, diffraction_value);
     atomicAdd(transmission_power, transmission_value);
     atomicAdd(scattering_power, scattering_value);
-}
-
-std::tuple<at::Tensor, at::Tensor, at::Tensor> channel_bdpt_point_component_power_cuda(
-    at::Tensor path_gain,
-    bool include_los) {
-    check_path_gain(path_gain);
-    auto scalar_options = path_gain.options().dtype(at::kFloat);
-    auto los = at::empty({}, scalar_options);
-    auto reflection = at::empty({}, scalar_options);
-    auto diffraction = at::empty({}, scalar_options);
-    cudaStream_t stream = at::cuda::getCurrentCUDAStream(path_gain.get_device()).stream();
-    C10_CUDA_CHECK(cudaMemsetAsync(los.data_ptr<float>(), 0, sizeof(float), stream));
-    C10_CUDA_CHECK(cudaMemsetAsync(reflection.data_ptr<float>(), 0, sizeof(float), stream));
-    C10_CUDA_CHECK(cudaMemsetAsync(diffraction.data_ptr<float>(), 0, sizeof(float), stream));
-    int64_t count = path_gain.numel();
-    if (count > 0 && include_los) {
-        constexpr int threads = 256;
-        int blocks = static_cast<int>((count + threads - 1) / threads);
-        bdpt_sum_kernel<<<blocks, threads, 0, stream>>>(
-            count,
-            path_gain.data_ptr<float>(),
-            include_los,
-            los.data_ptr<float>());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-    return {los, reflection, diffraction};
-}
-
-at::Tensor channel_bdpt_store_point_component_column_cuda(
-    at::Tensor target,
-    at::Tensor source,
-    int64_t rx_index) {
-    check_path_gain(target);
-    check_component_map(source, "source");
-    TORCH_CHECK(source.size(0) == target.size(0), "source transmitter count must match target");
-    TORCH_CHECK(source.size(1) == 1 && source.size(2) == 1, "source must have shape (tx, 1, 1)");
-    TORCH_CHECK(source.get_device() == target.get_device(), "source must share target device");
-    TORCH_CHECK(rx_index >= 0 && rx_index < target.size(1), "rx_index is out of range");
-    int64_t tx_count = target.size(0);
-    if (tx_count > 0) {
-        constexpr int threads = 256;
-        int blocks = static_cast<int>((tx_count + threads - 1) / threads);
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(target.get_device()).stream();
-        bdpt_store_point_component_column_kernel<<<blocks, threads, 0, stream>>>(
-            tx_count,
-            target.size(1),
-            rx_index,
-            source.data_ptr<float>(),
-            target.data_ptr<float>());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-    return target;
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_bdpt_finalize_point_components_cuda(
@@ -694,8 +433,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
     }
     return {path_gain, los_power, reflection_power, diffraction_power, transmission_power, scattering_power};
 }
-
-#undef check_component_map
 
 // ==== Section: Monte Carlo sampling ====
 #include <ATen/ATen.h>
@@ -766,38 +503,6 @@ namespace {
 constexpr int kMaterialBlockSize = 256;
 
 using channel::check_tensor;
-
-at::Tensor copy_float_vector_to_cuda(const std::vector<float> &values) {
-    auto out = at::empty(
-        {static_cast<int64_t>(values.size())},
-        at::TensorOptions().device(at::kCUDA).dtype(at::kFloat));
-    if (!values.empty()) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(out.get_device()).stream();
-        C10_CUDA_CHECK(cudaMemcpyAsync(
-            out.data_ptr<float>(),
-            values.data(),
-            values.size() * sizeof(float),
-            cudaMemcpyHostToDevice,
-            stream));
-    }
-    return out;
-}
-
-at::Tensor copy_int_vector_to_cuda(const std::vector<int> &values) {
-    auto out = at::empty(
-        {static_cast<int64_t>(values.size())},
-        at::TensorOptions().device(at::kCUDA).dtype(at::kInt));
-    if (!values.empty()) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(out.get_device()).stream();
-        C10_CUDA_CHECK(cudaMemcpyAsync(
-            out.data_ptr<int>(),
-            values.data(),
-            values.size() * sizeof(int),
-            cudaMemcpyHostToDevice,
-            stream));
-    }
-    return out;
-}
 
 __global__ void face_material_tensors_kernel(
     const float *__restrict__ material_eps_r,
@@ -877,96 +582,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_m
         material_sigma_e,
         material_mu_r,
         face_material_id);
-}
-
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_bdpt_face_material_tensors_cuda(
-    at::Tensor material_eps_r,
-    at::Tensor material_sigma_e,
-    at::Tensor material_mu_r,
-    at::Tensor face_material_id) {
-    return face_material_tensors_cuda_impl(
-        material_eps_r,
-        material_sigma_e,
-        material_mu_r,
-        face_material_id);
-}
-
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
-channel_bdpt_face_material_tensors_from_host_cuda(
-    const std::vector<float> &material_eps_r,
-    const std::vector<float> &material_sigma_e,
-    const std::vector<float> &material_mu_r,
-    const std::vector<int> &face_material_id) {
-    TORCH_CHECK(!material_eps_r.empty(), "material_eps_r must not be empty");
-    TORCH_CHECK(
-        material_sigma_e.size() == material_eps_r.size(),
-        "material_sigma_e must match material_eps_r");
-    TORCH_CHECK(material_mu_r.size() == material_eps_r.size(), "material_mu_r must match material_eps_r");
-    for (int material_id : face_material_id) {
-        TORCH_CHECK(material_id >= 0, "face_material_id entries must be non-negative");
-        TORCH_CHECK(
-            static_cast<size_t>(material_id) < material_eps_r.size(),
-            "face_material_id entry is out of range");
-    }
-
-    return channel_bdpt_face_material_tensors_cuda(
-        copy_float_vector_to_cuda(material_eps_r),
-        copy_float_vector_to_cuda(material_sigma_e),
-        copy_float_vector_to_cuda(material_mu_r),
-        copy_int_vector_to_cuda(face_material_id));
-}
-
-// ==== Section: Monte Carlo scattering ====
-#include <ATen/ATen.h>
-#include <ATen/cuda/CUDAContext.h>
-#include <c10/cuda/CUDAException.h>
-#include "torch_cuda.h"
-
-#include "../tensor_checks.h"
-
-namespace {
-
-constexpr int kBlockSize = 256;
-constexpr float kTwoPi = 6.2831853071795864769f;
-constexpr float kC0 = 299792458.0f;
-
-__global__ void scattering_event_kernel(
-    int64_t count, const float* cos_theta, const int* material_id,
-    const float* cap_r_te, const float* cap_r_tm,
-    const float* cap_t_te, const float* cap_t_tm,
-    const float* rough_sigma, const int* scatter_model, int64_t material_count,
-    float frequency, float probability_floor,
-    float* p_scatter, float* p_transmit, float* coherent, bool* rough) {
-    const float k0 = kTwoPi * frequency / kC0;
-    for (int64_t row = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         row < count; row += static_cast<int64_t>(blockDim.x) * gridDim.x) {
-        const int mat=material_id[row];
-        if (mat<0 || mat>=material_count || scatter_model[mat]!=1) {
-            p_scatter[row]=p_transmit[row]=0.0f; coherent[row]=1.0f; rough[row]=false; continue;
-        }
-        const float c=expf(-2.0f*(k0*fabsf(cos_theta[row])*rough_sigma[mat])*(k0*fabsf(cos_theta[row])*rough_sigma[mat]));
-        const float rbar=0.5f*(cap_r_te[row]+cap_r_tm[row]);
-        const float tbar=0.5f*(cap_t_te[row]+cap_t_tm[row]);
-        const float rcoh=rbar*c*c, rdiff=fmaxf(0.0f,rbar-rcoh);
-        const float total=fmaxf(rcoh+rdiff+tbar,1e-12f);
-        float pr=rcoh/total, ps=rdiff/total, pt=tbar/total;
-        if (rcoh>0.0f) pr=fmaxf(pr,probability_floor);
-        if (rdiff>0.0f) ps=fmaxf(ps,probability_floor);
-        if (tbar>0.0f) pt=fmaxf(pt,probability_floor);
-        const float norm=fmaxf(pr+ps+pt,1e-12f);
-        p_scatter[row]=ps/norm; p_transmit[row]=pt/norm; coherent[row]=c; rough[row]=true;
-    }
-}
-
-int blocks(int64_t n) { return static_cast<int>((n+kBlockSize-1)/kBlockSize); }
-
-} // namespace
-
-pybind11::dict channel_scattering_event_probabilities(at::Tensor cos_theta,at::Tensor material_id,at::Tensor cap_r_te,at::Tensor cap_r_tm,at::Tensor cap_t_te,at::Tensor cap_t_tm,at::Tensor rough_sigma,at::Tensor scatter_model,double frequency,double probability_floor){
-    channel::check_flat_tensor(cos_theta,"cos_theta",at::kFloat);channel::check_flat_tensor(material_id,"material_id",at::kInt);channel::check_flat_tensor(cap_r_te,"cap_R_te",at::kFloat);channel::check_flat_tensor(cap_r_tm,"cap_R_tm",at::kFloat);channel::check_flat_tensor(cap_t_te,"cap_T_te",at::kFloat);channel::check_flat_tensor(cap_t_tm,"cap_T_tm",at::kFloat);channel::check_flat_tensor(rough_sigma,"rough_sigma_h_m",at::kFloat);channel::check_flat_tensor(scatter_model,"scatter_model_id",at::kInt);
-    const int64_t count=cos_theta.size(0); TORCH_CHECK(material_id.size(0)==count&&cap_r_te.size(0)==count&&cap_r_tm.size(0)==count&&cap_t_te.size(0)==count&&cap_t_tm.size(0)==count,"per-ray scattering arrays must match cos_theta"); TORCH_CHECK(scatter_model.size(0)==rough_sigma.size(0),"material arrays must match");
-    for(const auto&t:{material_id,cap_r_te,cap_r_tm,cap_t_te,cap_t_tm,rough_sigma,scatter_model})TORCH_CHECK(t.get_device()==cos_theta.get_device(),"scattering tensors must share device");
-    auto ps=at::empty_like(cos_theta),pt=at::empty_like(cos_theta),cr=at::empty_like(cos_theta);auto rb=at::empty({count},cos_theta.options().dtype(at::kBool));if(count>0){auto s=at::cuda::getCurrentCUDAStream(cos_theta.get_device()).stream();scattering_event_kernel<<<blocks(count),kBlockSize,0,s>>>(count,cos_theta.data_ptr<float>(),material_id.data_ptr<int>(),cap_r_te.data_ptr<float>(),cap_r_tm.data_ptr<float>(),cap_t_te.data_ptr<float>(),cap_t_tm.data_ptr<float>(),rough_sigma.data_ptr<float>(),scatter_model.data_ptr<int>(),rough_sigma.size(0),static_cast<float>(frequency),static_cast<float>(probability_floor),ps.data_ptr<float>(),pt.data_ptr<float>(),cr.data_ptr<float>(),rb.data_ptr<bool>());C10_CUDA_KERNEL_LAUNCH_CHECK();}pybind11::dict out;out["p_scatter"]=ps;out["p_transmit"]=pt;out["r_coh_amplitude"]=cr;out["rough"]=rb;return out;
 }
 
 // ==== Section: Monte Carlo scattering receiver pairs ====

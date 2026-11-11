@@ -19,10 +19,7 @@ WRAPPERS_BY_SOURCE = {
         "channel_runtime_probe",
     },
     "geometry.cpp": {
-        "channel_rayd_intersect_forward",
         "channel_rayd_visibility_forward",
-        "channel_rayd_intersect_backward",
-        "channel_rayd_intersect_jvp",
         "channel_rayd_segment_penetration_forward",
         "channel_rayd_segment_penetration_forward_tape",
         "channel_rayd_segment_penetration_backward",
@@ -33,9 +30,6 @@ WRAPPERS_BY_SOURCE = {
     "reflection.cpp": {
         "channel_rayd_trace_reflections_forward",
         "channel_rayd_reflection_epc_paths_forward",
-        "channel_rayd_trace_reflections_forward_tape",
-        "channel_rayd_trace_reflections_backward",
-        "channel_rayd_trace_reflections_jvp",
         "channel_rayd_reflection_epc_paths_backward",
         "channel_rayd_reflection_epc_paths_jvp",
         "channel_rayd_scene_face_normals_backward",
@@ -94,7 +88,7 @@ def test_rayd_wrapper_definitions_are_unique_and_owned_by_responsibility():
         for definition in definitions:
             owners.setdefault(definition, []).append(source_name)
 
-    assert len(expected_wrappers) == 25
+    assert len(expected_wrappers) == 19
     assert set(owners) == expected_wrappers
     assert all(len(source_names) == 1 for source_names in owners.values())
 

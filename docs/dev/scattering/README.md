@@ -8,7 +8,7 @@ like "the scattering owner" while holding only the compile-time half.
 
 | Owner | Runs | Holds |
 |---|---|---|
-| `scene.resources` | compile time | `KirchhoffTable`, `build_kirchhoff_table`, `eval_bsdf`, `sample_directions`, `pdf`, `pdf_reverse`, `PhaseScreenRuntime`, `generate_gaussian_realization`, `realization_seed`, `patch_phase_integral`, the table grid constants, and the lazy per-scene resources built from them |
+| `scene.resources` | compile time | `KirchhoffTable`, `build_kirchhoff_table`, `eval_bsdf`, `pdf`, `pdf_reverse`, `PhaseScreenRuntime`, `generate_gaussian_realization`, `realization_seed`, `patch_phase_integral`, the table grid constants, and the lazy per-scene resources built from them |
 | `kernels.scattering` | per launch | every native facade the three consumers dispatch |
 | `interactions.scattering` | per solve | path evaluation, event policy, topology and packing |
 
@@ -46,7 +46,7 @@ The accepted boundary is deliberately narrow: RayD consumes caller-owned
 resident table/height/geometry tensors and owns complete native operation
 families. Channel continues to own table construction/cache/versioning,
 `KirchhoffRuntimeResources`, `PhaseScreenRuntime`, seeds, topology and C1/C2
-packing, `scattering_event_probabilities`, solver accumulation, RNG/MIS/event
+packing, the BDPT wavefront event selection, solver accumulation, RNG/MIS/event
 policy, and result/metadata assembly. The chain families retain their as-built
 AD difference: ensemble geometry is JVP-only and rejects reverse mode;
 realization geometry keeps both VJP and JVP.

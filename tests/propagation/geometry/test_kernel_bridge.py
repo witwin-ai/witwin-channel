@@ -15,7 +15,6 @@ _CANONICAL_FUNCTION_NAMES = (
     "diffraction_tx_visible_state_plan",
     "rayd_diffraction_paths_order1_forward",
     "rayd_diffraction_sample_tape_forward",
-    "rayd_intersect_forward",
     "rayd_reflection_epc_paths_forward",
     "rayd_trace_reflections_forward",
     "rayd_visibility_forward",
@@ -34,57 +33,6 @@ def test_geometry_bridge_uses_canonical_runtime_and_scene_dependencies():
     assert geometry.validate_cuda_tensor is runtime.validate_cuda_tensor
     assert "_rayd_resource" not in geometry.__dict__
     assert geometry._rayd_scene_resource is runtime._rayd_scene_resource
-
-
-def test_intersection_returns_the_named_tensor_contract(monkeypatch: pytest.MonkeyPatch):
-    ray_o = torch.zeros((2, 3), dtype=torch.float32)
-    ray_d = torch.ones((2, 3), dtype=torch.float32)
-    ray_tmax = torch.empty((0,), dtype=torch.float32)
-    outputs = (
-        torch.ones((2,), dtype=torch.float32),
-        torch.zeros((2, 3), dtype=torch.float32),
-        torch.zeros((2, 3), dtype=torch.float32),
-        torch.zeros((2, 3), dtype=torch.float32),
-        torch.zeros((2, 2), dtype=torch.float32),
-        torch.zeros((2, 3), dtype=torch.float32),
-        torch.zeros((2,), dtype=torch.int32),
-        torch.zeros((2,), dtype=torch.int32),
-        torch.zeros((2,), dtype=torch.int32),
-        torch.zeros((2,), dtype=torch.int32),
-    )
-    native_calls: list[tuple[object, ...]] = []
-
-    def required_symbol(name: str):
-        assert name == "rayd_intersect_forward"
-
-        def intersect(*args: object) -> tuple[torch.Tensor, ...]:
-            native_calls.append(args)
-            return outputs
-
-        return intersect
-
-    monkeypatch.setattr(geometry, "_required_native_op", required_symbol)
-    monkeypatch.setattr(geometry, "validate_cuda_tensor", lambda *_args, **_kwargs: None)
-
-    resource = object()
-    result = geometry.rayd_intersect_forward(
-        resource, ray_o, ray_d, ray_tmax, None, flags=5
-    )
-
-    assert tuple(result) == (
-        "t",
-        "p",
-        "n",
-        "geo_n",
-        "uv",
-        "barycentric",
-        "shape_id",
-        "prim_id",
-        "local_prim_id",
-        "global_prim_id",
-    )
-    assert all(actual is expected for actual, expected in zip(result.values(), outputs))
-    assert native_calls == [(resource, ray_o, ray_d, ray_tmax, None, 5)]
 
 
 def test_diffraction_visibility_plan_dispatches_only_native_numerical_inputs(

@@ -13,18 +13,6 @@
 #include <vector>
 
 torch::Tensor channel_core_pack_int2(torch::Tensor x, torch::Tensor y);
-int64_t channel_core_diffraction_edge_count(
-    torch::Tensor vertices,
-    torch::Tensor faces,
-    torch::Tensor face_normals,
-    torch::Tensor edge_v0,
-    torch::Tensor edge_v1,
-    torch::Tensor face0,
-    torch::Tensor face1,
-    bool vertical_only,
-    double vertical_ratio,
-    bool boundary_half_plane,
-    double plane_tol);
 pybind11::tuple channel_deterministic_diffraction_state_pack(
     torch::Tensor edge_indices,
     torch::Tensor edge_pos,
@@ -68,44 +56,6 @@ pybind11::dict channel_path_los_visibility_inputs(
     torch::Tensor rx_positions,
     torch::Tensor tx_id,
     torch::Tensor rx_id);
-pybind11::dict channel_path_filter_los(
-    torch::Tensor tx_id,
-    torch::Tensor rx_id,
-    torch::Tensor path_length,
-    torch::Tensor delay,
-    torch::Tensor path_gain,
-    torch::Tensor visible);
-pybind11::dict channel_path_reflection_candidates(
-    torch::Tensor vertices,
-    torch::Tensor faces,
-    torch::Tensor face_normals,
-    torch::Tensor face_gain,
-    torch::Tensor tx_positions,
-    torch::Tensor tx_power,
-    torch::Tensor rx_positions,
-    double frequency_hz);
-pybind11::dict channel_path_filter_block(
-    pybind11::dict block,
-    torch::Tensor visible0,
-    torch::Tensor visible1);
-pybind11::dict channel_path_diffraction_block(
-    pybind11::sequence rayd_output,
-    int64_t tx_index);
-pybind11::dict channel_path_merge_blocks(
-    pybind11::sequence blocks,
-    int64_t tx_count,
-    int64_t max_depth);
-pybind11::dict channel_path_finalize_blocks(
-    pybind11::dict los,
-    pybind11::dict reflection,
-    pybind11::dict diffraction,
-    int64_t max_paths,
-    int64_t tx_count,
-    int64_t max_depth);
-pybind11::dict channel_deterministic_los_field(
-    torch::Tensor path_gain,
-    torch::Tensor path_length_m,
-    double frequency_hz);
 // ISB boundary taper (the boundary taper) LoS member; both ops are launched only when the
 // DEFAULT-OFF isb_boundary_taper switch is on.
 torch::Tensor channel_los_silhouette_clearance(
@@ -125,8 +75,6 @@ channel_los_taper_apply(
 torch::Tensor channel_deterministic_pack_complex(torch::Tensor field_real, torch::Tensor field_imag);
 torch::Tensor channel_deterministic_phase_from_field(torch::Tensor field_real, torch::Tensor field_imag);
 pybind11::dict channel_deterministic_zero_field_phase(torch::Tensor reference);
-torch::Tensor channel_deterministic_phase_from_length(torch::Tensor path_length_m, double frequency_hz);
-pybind11::dict channel_deterministic_field_from_power_phase(torch::Tensor path_gain, torch::Tensor phase_rad);
 pybind11::dict channel_deterministic_los_topology_block(
     torch::Tensor tx_id,
     torch::Tensor rx_id,
@@ -156,7 +104,6 @@ pybind11::dict channel_deterministic_pad_topology_sequences(
     torch::Tensor interaction_positions,
     torch::Tensor interaction_normals,
     int64_t width);
-torch::Tensor channel_deterministic_repeat_range(torch::Tensor reference, int64_t start, int64_t end, int64_t repeats);
 torch::Tensor channel_deterministic_face_anchor_points(torch::Tensor vertices, torch::Tensor faces);
 pybind11::dict channel_reflection_group_tables(
     torch::Tensor vertices,
@@ -317,31 +264,12 @@ torch::Tensor channel_enumerated_capacity_failure_vector_sanitize(
     torch::Tensor failure_state,
     torch::Tensor values);
 torch::Tensor channel_deterministic_normalize_vec3(torch::Tensor values, double eps);
-torch::Tensor channel_deterministic_reflect_points(
-    torch::Tensor points,
-    torch::Tensor plane_points,
-    torch::Tensor normals);
 pybind11::dict channel_deterministic_concat_topology_blocks(pybind11::sequence blocks, int64_t sequence_width);
-pybind11::dict channel_deterministic_gather_topology_block(
-    pybind11::dict block,
-    torch::Tensor order,
-    int64_t max_count,
-    int64_t sequence_width);
 pybind11::dict channel_deterministic_face_groups(
     torch::Tensor tri_a,
     torch::Tensor normals,
     torch::Tensor surface_ids,
     double quantization);
-pybind11::dict channel_deterministic_surface_face_groups(torch::Tensor surface_ids);
-torch::Tensor channel_deterministic_sort_order(
-    torch::Tensor valid,
-    torch::Tensor tx_id,
-    torch::Tensor rx_id,
-    torch::Tensor depth,
-    torch::Tensor component_id,
-    torch::Tensor primitive_id,
-    torch::Tensor edge_id,
-    torch::Tensor primitive_sequence);
 pybind11::dict channel_enumerated_canonical_compact(
     pybind11::dict block,
     int64_t pair_count,
@@ -531,10 +459,6 @@ void register_path_core(pybind11::module_ &module) {
         "core_pack_int2",
         &channel_core_pack_int2,
         "Pack two int32 CUDA vectors into an Nx2 tensor.");
-    module.def(
-        "core_diffraction_edge_count",
-        &channel_core_diffraction_edge_count,
-        "Count selected diffraction edges with native CUDA policy logic.");
 }
 
 void register_path_diffraction_state(pybind11::module_ &module) {
@@ -565,30 +489,6 @@ void register_path(pybind11::module_ &module) {
         &channel_path_los_visibility_inputs,
         "Build LoS visibility start/end/active tensors with a CUDA kernel.");
     module.def(
-        "path_filter_los",
-        &channel_path_filter_los,
-        "Compact visible LoS path records with native CUDA kernels.");
-    module.def(
-        "path_reflection_candidates",
-        &channel_path_reflection_candidates,
-        "Generate first-order reflection path candidates and visibility segments with native CUDA kernels.");
-    module.def(
-        "path_filter_block",
-        &channel_path_filter_block,
-        "Compact path records by two visibility masks with native CUDA kernels.");
-    module.def(
-        "path_diffraction_block",
-        &channel_path_diffraction_block,
-        "Convert RayD order-1 diffraction outputs into a compact path block with native CUDA kernels.");
-    module.def(
-        "path_merge_blocks",
-        &channel_path_merge_blocks,
-        "Merge and stable-sort path blocks with native CUDA kernels.");
-    module.def(
-        "path_finalize_blocks",
-        &channel_path_finalize_blocks,
-        "Concatenate, stable-sort, cap, and gather path records with native CUDA kernels.");
-    module.def(
         "deterministic_component_counts",
         &channel_deterministic_component_counts,
         "Count deterministic path components with a CUDA kernel.");
@@ -599,10 +499,6 @@ void register_path(pybind11::module_ &module) {
 }
 
 void register_path_deterministic(pybind11::module_ &module) {
-    module.def(
-        "deterministic_los_field",
-        &channel_deterministic_los_field,
-        "Evaluate deterministic LoS/free-space scalar complex fields with a CUDA kernel.");
     module.def(
         "los_silhouette_clearance",
         &channel_los_silhouette_clearance,
@@ -626,14 +522,6 @@ void register_path_deterministic(pybind11::module_ &module) {
         &channel_deterministic_zero_field_phase,
         "Allocate zero deterministic field and phase storage with native CUDA.");
     module.def(
-        "deterministic_phase_from_length",
-        &channel_deterministic_phase_from_length,
-        "Compute deterministic free-space phase from path length with a CUDA kernel.");
-    module.def(
-        "deterministic_field_from_power_phase",
-        &channel_deterministic_field_from_power_phase,
-        "Compute deterministic scalar complex field components from path power and phase with a CUDA kernel.");
-    module.def(
         "deterministic_los_topology_block",
         &channel_deterministic_los_topology_block,
         "Compact and fill deterministic LoS topology records with a CUDA kernel.");
@@ -649,10 +537,6 @@ void register_path_deterministic(pybind11::module_ &module) {
         "deterministic_pad_topology_sequences",
         &channel_deterministic_pad_topology_sequences,
         "Pad deterministic topology sequence fields with native CUDA.");
-    module.def(
-        "deterministic_repeat_range",
-        &channel_deterministic_repeat_range,
-        "Generate repeated deterministic int32 range indices with native CUDA.");
     module.def(
         "deterministic_face_anchor_points",
         &channel_deterministic_face_anchor_points,
@@ -765,29 +649,13 @@ void register_path_deterministic(pybind11::module_ &module) {
         &channel_deterministic_normalize_vec3,
         "Normalize deterministic vec3 rows with native CUDA.");
     module.def(
-        "deterministic_reflect_points",
-        &channel_deterministic_reflect_points,
-        "Reflect deterministic points about planes with native CUDA.");
-    module.def(
         "deterministic_concat_topology_blocks",
         &channel_deterministic_concat_topology_blocks,
         "Concatenate full deterministic topology blocks with native CUDA copies.");
     module.def(
-        "deterministic_gather_topology_block",
-        &channel_deterministic_gather_topology_block,
-        "Gather and truncate deterministic topology rows with native CUDA.");
-    module.def(
         "deterministic_face_groups",
         &channel_deterministic_face_groups,
         "Group deterministic faces by canonical native CUDA plane keys.");
-    module.def(
-        "deterministic_surface_face_groups",
-        &channel_deterministic_surface_face_groups,
-        "Group deterministic faces by native CUDA surface ids.");
-    module.def(
-        "deterministic_sort_order",
-        &channel_deterministic_sort_order,
-        "Stable-sort deterministic topology rows by native CUDA path keys.");
     module.def(
         "enumerated_canonical_compact",
         &channel_enumerated_canonical_compact,

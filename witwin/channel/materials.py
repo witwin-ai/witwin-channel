@@ -15,16 +15,12 @@ import torch
 from witwin.channel.constants import C0, EPS0, MU0
 from witwin.channel.kernels.materials import (
     mc_face_material_tensors,
-    validate_layer_csr as validate_layer_csr,
 )
 from witwin.channel.runtime import _frequency_participates_in_ad
 
 if TYPE_CHECKING:
     from witwin.channel.scene.compiler import CompiledScene
     from witwin.channel.scene.endpoints import SolverScene as Scene
-
-__all__ = ["validate_layer_csr"]
-
 
 MATERIAL_ABI_VERSION = 3
 DIELECTRIC_MODEL_ID = 1

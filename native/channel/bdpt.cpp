@@ -85,8 +85,6 @@ channel_bdpt_launch_state_cuda(
     int64_t samples,
     int64_t sample_streams,
     int64_t seed);
-at::Tensor channel_bdpt_sample_directions_cuda(int64_t count, at::Tensor reference, int64_t seed);
-std::vector<at::Tensor> channel_bdpt_empty_subpath_state_cuda(at::Tensor reference);
 std::vector<at::Tensor> channel_bdpt_light_endpoint_subpath_state_cuda(
     at::Tensor tx_positions,
     at::Tensor tx_power,
@@ -95,69 +93,6 @@ std::vector<at::Tensor> channel_bdpt_light_endpoint_subpath_state_cuda(
     at::Tensor light_seed);
 std::vector<at::Tensor> channel_bdpt_sensor_endpoint_subpath_state_cuda(
     at::Tensor rx_positions, at::Tensor rx_polarization);
-std::vector<at::Tensor> channel_bdpt_reflected_light_subpath_state_cuda(
-    at::Tensor light_origin,
-    at::Tensor light_direction,
-    at::Tensor light_throughput_real,
-    at::Tensor light_throughput_imag,
-    at::Tensor light_pdf_forward,
-    at::Tensor light_pdf_reverse,
-    at::Tensor light_depth,
-    at::Tensor light_component_mask,
-    at::Tensor light_tx_id,
-    at::Tensor light_rx_id,
-    at::Tensor light_grid_linear_id,
-    at::Tensor light_valid,
-    at::Tensor light_path_length,
-    at::Tensor light_field_real,
-    at::Tensor light_field_imag,
-    at::Tensor light_source_power,
-    at::Tensor hit_t,
-    at::Tensor hit_p,
-    at::Tensor hit_n,
-    at::Tensor hit_global_prim_id,
-    at::Tensor material_gain,
-    at::Tensor material_valid,
-    at::Tensor material_eps_r,
-    at::Tensor material_sigma_e,
-    at::Tensor material_mu_r,
-    at::Tensor material_thickness,
-    double frequency_hz);
-std::vector<at::Tensor> channel_bdpt_transmitted_light_subpath_state_cuda(
-    at::Tensor light_origin,
-    at::Tensor light_direction,
-    at::Tensor light_throughput_real,
-    at::Tensor light_throughput_imag,
-    at::Tensor light_pdf_forward,
-    at::Tensor light_pdf_reverse,
-    at::Tensor light_depth,
-    at::Tensor light_component_mask,
-    at::Tensor light_tx_id,
-    at::Tensor light_rx_id,
-    at::Tensor light_grid_linear_id,
-    at::Tensor light_valid,
-    at::Tensor light_path_length,
-    at::Tensor light_field_real,
-    at::Tensor light_field_imag,
-    at::Tensor light_source_power,
-    at::Tensor hit_t,
-    at::Tensor hit_p,
-    at::Tensor hit_n,
-    at::Tensor hit_global_prim_id,
-    at::Tensor face_material_id,
-    at::Tensor layer_offset,
-    at::Tensor layer_count,
-    at::Tensor layer_thickness_m,
-    at::Tensor layer_eps_r,
-    at::Tensor layer_sigma_e,
-    at::Tensor layer_mu_r,
-    double frequency_hz);
-
-at::Tensor channel_bdpt_mis_weights_cuda(
-    at::Tensor pdf,
-    at::Tensor strategy_pdf_sum,
-    int64_t mode_id,
-    double beta);
 std::tuple<
     at::Tensor,
     at::Tensor,
@@ -293,73 +228,22 @@ at::Tensor channel_bdpt_connection_variance_cuda(
     int64_t samples_per_tx);
 at::Tensor channel_bdpt_zero_matrix_cuda(at::Tensor reference, int64_t rows, int64_t cols);
 at::Tensor channel_core_pack_int2_cuda(at::Tensor x, at::Tensor y);
-int64_t channel_core_diffraction_edge_count_cuda(
-    at::Tensor vertices,
-    at::Tensor faces,
-    at::Tensor face_normals,
-    at::Tensor edge_v0,
-    at::Tensor edge_v1,
-    at::Tensor face0,
-    at::Tensor face1,
-    bool vertical_only,
-    double vertical_ratio,
-    bool boundary_half_plane,
-    double plane_tol);
-std::tuple<at::Tensor, at::Tensor, at::Tensor> channel_bdpt_point_component_power_cuda(
-    at::Tensor path_gain,
-    bool include_los);
-at::Tensor channel_bdpt_store_point_component_column_cuda(
-    at::Tensor target,
-    at::Tensor source,
-    int64_t rx_index);
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_bdpt_finalize_point_components_cuda(
     at::Tensor los,
     at::Tensor reflection,
     at::Tensor diffraction,
     at::Tensor transmission,
     at::Tensor scattering);
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_bdpt_los_export_cuda(
-    at::Tensor tx_positions,
-    at::Tensor tx_power,
-    at::Tensor rx_positions,
-    double frequency_hz,
-    at::Tensor tx_pol);
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_bdpt_finalize_component_maps_cuda(
     at::Tensor los,
     at::Tensor reflection,
     at::Tensor diffraction,
     at::Tensor transmission,
     at::Tensor scattering);
-at::Tensor channel_bdpt_component_map_buffer_cuda(
-    at::Tensor reference,
-    int64_t tx_count,
-    int64_t dim0,
-    int64_t dim1);
-at::Tensor channel_bdpt_store_component_map_cuda(
-    at::Tensor maps,
-    at::Tensor source,
-    int64_t tx_index);
-at::Tensor channel_bdpt_store_scaled_component_map_cuda(
-    at::Tensor maps,
-    at::Tensor source,
-    at::Tensor scale_values,
-    int64_t tx_index,
-    int64_t scale_index);
 std::tuple<at::Tensor, at::Tensor> channel_bdpt_transmitter_tensors_cuda(
     const std::vector<float>& positions_host,
     const std::vector<float>& power_host);
-at::Tensor channel_bdpt_pack_vec3_cuda(at::Tensor x, at::Tensor y, at::Tensor z);
-at::Tensor channel_bdpt_los_component_maps_cuda(at::Tensor los);
 at::Tensor channel_bdpt_los_component_maps_from_matrix_cuda(at::Tensor los, int64_t rows, int64_t cols);
-at::Tensor channel_bdpt_apply_los_visibility_cuda(
-    at::Tensor maps,
-    at::Tensor los,
-    at::Tensor visible,
-    int64_t tx_index);
-std::tuple<at::Tensor, at::Tensor> channel_bdpt_los_visibility_inputs_cuda(
-    at::Tensor tx_positions,
-    int64_t tx_index,
-    int64_t rx_count);
 at::Tensor channel_bdpt_receiver_grid_points_cuda(
     at::Tensor reference,
     int64_t rows,
@@ -375,10 +259,6 @@ at::Tensor channel_bdpt_receiver_grid_points_cuda(
     double y_axis_z,
     double spacing0,
     double spacing1);
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_bdpt_reflection_launch_inputs_cuda(
-    at::Tensor tx_positions,
-    int64_t tx_index,
-    int64_t sample_count);
 std::vector<at::Tensor> channel_deterministic_diffraction_state_pack_cuda(
     at::Tensor edge_indices,
     at::Tensor edge_pos,
@@ -407,17 +287,6 @@ std::vector<at::Tensor> channel_deterministic_diffraction_state_pack_selected_cu
     at::Tensor tx,
     at::Tensor tx_power,
     int64_t tx_power_index);
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_bdpt_face_material_tensors_cuda(
-    at::Tensor material_eps_r,
-    at::Tensor material_sigma_e,
-    at::Tensor material_mu_r,
-    at::Tensor face_material_id);
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
-channel_bdpt_face_material_tensors_from_host_cuda(
-    const std::vector<float>& material_eps_r,
-    const std::vector<float>& material_sigma_e,
-    const std::vector<float>& material_mu_r,
-    const std::vector<int>& face_material_id);
 
 pybind11::dict channel_bdpt_launch_state(
     torch::Tensor reference,
@@ -433,10 +302,6 @@ pybind11::dict channel_bdpt_launch_state(
     out["stream_id"] = stream_id;
     out["light_seed"] = light_seed;
     return out;
-}
-
-pybind11::dict channel_bdpt_empty_subpath_state(torch::Tensor reference) {
-    return subpath_state_to_dict(channel_bdpt_empty_subpath_state_cuda(reference), "bdpt_empty_subpath_state");
 }
 
 pybind11::dict channel_bdpt_endpoint_subpath_state(
@@ -456,123 +321,6 @@ pybind11::dict channel_bdpt_endpoint_subpath_state(
         channel_bdpt_sensor_endpoint_subpath_state_cuda(rx_positions, rx_polarization),
         "bdpt_sensor_endpoint_subpath_state");
     return out;
-}
-
-pybind11::dict channel_bdpt_subpath_intersection_inputs(pybind11::dict subpath) {
-    at::Tensor ray_o = tensor_from_dict(subpath, "origin");
-    at::Tensor ray_d = tensor_from_dict(subpath, "direction");
-    at::Tensor active = tensor_from_dict(subpath, "valid");
-    TORCH_CHECK(ray_o.is_cuda(), "subpath.origin must be a CUDA tensor");
-    TORCH_CHECK(ray_d.is_cuda(), "subpath.direction must be a CUDA tensor");
-    TORCH_CHECK(active.is_cuda(), "subpath.valid must be a CUDA tensor");
-    TORCH_CHECK(ray_o.scalar_type() == at::kFloat, "subpath.origin must be float32");
-    TORCH_CHECK(ray_d.scalar_type() == at::kFloat, "subpath.direction must be float32");
-    TORCH_CHECK(active.scalar_type() == at::kBool, "subpath.valid must be bool");
-    TORCH_CHECK(ray_o.dim() == 2 && ray_o.size(1) == 3, "subpath.origin must have shape (N, 3)");
-    TORCH_CHECK(ray_d.sizes() == ray_o.sizes(), "subpath.direction must match origin");
-    TORCH_CHECK(active.dim() == 1 && active.size(0) == ray_o.size(0), "subpath.valid must match origin");
-    TORCH_CHECK(ray_d.get_device() == ray_o.get_device(), "subpath.direction must share origin device");
-    TORCH_CHECK(active.get_device() == ray_o.get_device(), "subpath.valid must share origin device");
-    pybind11::dict out;
-    out["ray_o"] = ray_o;
-    out["ray_d"] = ray_d;
-    out["ray_tmax"] = at::empty({0}, ray_o.options());
-    out["active"] = active;
-    return out;
-}
-
-pybind11::dict channel_bdpt_reflected_light_subpath_state(
-    pybind11::dict light,
-    pybind11::dict intersection,
-    torch::Tensor material_gain,
-    torch::Tensor material_valid,
-    torch::Tensor material_eps_r,
-    torch::Tensor material_sigma_e,
-    torch::Tensor material_mu_r,
-    torch::Tensor material_thickness,
-    double frequency_hz) {
-    return subpath_state_to_dict(
-        channel_bdpt_reflected_light_subpath_state_cuda(
-            tensor_from_dict(light, "origin"),
-            tensor_from_dict(light, "direction"),
-            tensor_from_dict(light, "throughput_real"),
-            tensor_from_dict(light, "throughput_imag"),
-            tensor_from_dict(light, "pdf_forward"),
-            tensor_from_dict(light, "pdf_reverse"),
-            tensor_from_dict(light, "depth"),
-            tensor_from_dict(light, "component_mask"),
-            tensor_from_dict(light, "tx_id"),
-            tensor_from_dict(light, "rx_id"),
-            tensor_from_dict(light, "grid_linear_id"),
-            tensor_from_dict(light, "valid"),
-            tensor_from_dict(light, "path_length"),
-            tensor_from_dict(light, "field_real"),
-            tensor_from_dict(light, "field_imag"),
-            tensor_from_dict(light, "source_power"),
-            tensor_from_dict(intersection, "t"),
-            tensor_from_dict(intersection, "p"),
-            tensor_from_dict(intersection, "n"),
-            tensor_from_dict(intersection, "global_prim_id"),
-            material_gain,
-            material_valid,
-            material_eps_r,
-            material_sigma_e,
-            material_mu_r,
-            material_thickness,
-            frequency_hz),
-        "bdpt_reflected_light_subpath_state");
-}
-
-pybind11::dict channel_bdpt_transmitted_light_subpath_state(
-    pybind11::dict light,
-    pybind11::dict intersection,
-    torch::Tensor face_material_id,
-    torch::Tensor layer_offset,
-    torch::Tensor layer_count,
-    torch::Tensor layer_thickness_m,
-    torch::Tensor layer_eps_r,
-    torch::Tensor layer_sigma_e,
-    torch::Tensor layer_mu_r,
-    double frequency_hz) {
-    return subpath_state_to_dict(
-        channel_bdpt_transmitted_light_subpath_state_cuda(
-            tensor_from_dict(light, "origin"),
-            tensor_from_dict(light, "direction"),
-            tensor_from_dict(light, "throughput_real"),
-            tensor_from_dict(light, "throughput_imag"),
-            tensor_from_dict(light, "pdf_forward"),
-            tensor_from_dict(light, "pdf_reverse"),
-            tensor_from_dict(light, "depth"),
-            tensor_from_dict(light, "component_mask"),
-            tensor_from_dict(light, "tx_id"),
-            tensor_from_dict(light, "rx_id"),
-            tensor_from_dict(light, "grid_linear_id"),
-            tensor_from_dict(light, "valid"),
-            tensor_from_dict(light, "path_length"),
-            tensor_from_dict(light, "field_real"),
-            tensor_from_dict(light, "field_imag"),
-            tensor_from_dict(light, "source_power"),
-            tensor_from_dict(intersection, "t"),
-            tensor_from_dict(intersection, "p"),
-            tensor_from_dict(intersection, "n"),
-            tensor_from_dict(intersection, "global_prim_id"),
-            face_material_id,
-            layer_offset,
-            layer_count,
-            layer_thickness_m,
-            layer_eps_r,
-            layer_sigma_e,
-            layer_mu_r,
-            frequency_hz),
-        "bdpt_transmitted_light_subpath_state");
-}
-
-torch::Tensor channel_bdpt_mis_weights(
-    torch::Tensor pdf,
-    torch::Tensor strategy_pdf_sum,
-    int64_t mode_id,
-    double beta) {
-    return channel_bdpt_mis_weights_cuda(pdf, strategy_pdf_sum, mode_id, beta);
 }
 
 pybind11::dict channel_bdpt_endpoint_connection_samples(
@@ -665,7 +413,6 @@ pybind11::dict channel_bdpt_accumulate_connection_samples(
     }
     return out;
 }
-
 
 pybind11::dict channel_bdpt_filter_connection_samples(pybind11::dict samples, torch::Tensor visible) {
     channel_bdpt_filter_connection_samples_cuda(
@@ -771,10 +518,6 @@ torch::Tensor channel_bdpt_connection_variance(
         samples_per_tx);
 }
 
-torch::Tensor channel_bdpt_sample_directions(int64_t count, torch::Tensor reference, int64_t seed) {
-    return channel_bdpt_sample_directions_cuda(count, reference, seed);
-}
-
 pybind11::dict channel_bdpt_endpoint_connection_visibility_inputs(
     pybind11::dict light,
     pybind11::dict sensor,
@@ -802,48 +545,6 @@ torch::Tensor channel_core_pack_int2(torch::Tensor x, torch::Tensor y) {
     return channel_core_pack_int2_cuda(x, y);
 }
 
-int64_t channel_core_diffraction_edge_count(
-    torch::Tensor vertices,
-    torch::Tensor faces,
-    torch::Tensor face_normals,
-    torch::Tensor edge_v0,
-    torch::Tensor edge_v1,
-    torch::Tensor face0,
-    torch::Tensor face1,
-    bool vertical_only,
-    double vertical_ratio,
-    bool boundary_half_plane,
-    double plane_tol) {
-    return channel_core_diffraction_edge_count_cuda(
-        vertices,
-        faces,
-        face_normals,
-        edge_v0,
-        edge_v1,
-        face0,
-        face1,
-        vertical_only,
-        vertical_ratio,
-        boundary_half_plane,
-        plane_tol);
-}
-
-pybind11::dict channel_bdpt_point_component_power(torch::Tensor path_gain, bool include_los) {
-    auto [los, reflection, diffraction] = channel_bdpt_point_component_power_cuda(path_gain, include_los);
-    pybind11::dict out;
-    out["los"] = los;
-    out["reflection"] = reflection;
-    out["diffraction"] = diffraction;
-    return out;
-}
-
-torch::Tensor channel_bdpt_store_point_component_column(
-    torch::Tensor target,
-    torch::Tensor source,
-    int64_t rx_index) {
-    return channel_bdpt_store_point_component_column_cuda(target, source, rx_index);
-}
-
 pybind11::dict channel_bdpt_finalize_point_components(
     torch::Tensor los,
     torch::Tensor reflection,
@@ -861,25 +562,6 @@ pybind11::dict channel_bdpt_finalize_point_components(
     out["diffraction_power"] = diffraction_power;
     out["transmission_power"] = transmission_power;
     out["scattering_power"] = scattering_power;
-    return out;
-}
-
-pybind11::dict channel_bdpt_los_export(
-    torch::Tensor tx_positions,
-    torch::Tensor tx_power,
-    torch::Tensor rx_positions,
-    double frequency_hz,
-    torch::Tensor tx_pol) {
-    auto [tx_id, rx_id, path_length, delay, path_gain, path_gain_matrix] =
-        channel_bdpt_los_export_cuda(tx_positions, tx_power, rx_positions, frequency_hz, tx_pol);
-
-    pybind11::dict out;
-    out["tx_id"] = tx_id;
-    out["rx_id"] = rx_id;
-    out["path_length_m"] = path_length;
-    out["delay_s"] = delay;
-    out["path_gain"] = path_gain;
-    out["path_gain_matrix"] = path_gain_matrix;
     return out;
 }
 
@@ -904,30 +586,6 @@ pybind11::dict channel_bdpt_finalize_component_maps(
     return out;
 }
 
-torch::Tensor channel_bdpt_component_map_buffer(
-    torch::Tensor reference,
-    int64_t tx_count,
-    int64_t dim0,
-    int64_t dim1) {
-    return channel_bdpt_component_map_buffer_cuda(reference, tx_count, dim0, dim1);
-}
-
-torch::Tensor channel_bdpt_store_component_map(
-    torch::Tensor maps,
-    torch::Tensor source,
-    int64_t tx_index) {
-    return channel_bdpt_store_component_map_cuda(maps, source, tx_index);
-}
-
-torch::Tensor channel_bdpt_store_scaled_component_map(
-    torch::Tensor maps,
-    torch::Tensor source,
-    torch::Tensor scale_values,
-    int64_t tx_index,
-    int64_t scale_index) {
-    return channel_bdpt_store_scaled_component_map_cuda(maps, source, scale_values, tx_index, scale_index);
-}
-
 pybind11::dict channel_bdpt_transmitter_tensors(
     pybind11::sequence flat_positions,
     pybind11::sequence powers) {
@@ -950,35 +608,8 @@ pybind11::dict channel_bdpt_transmitter_tensors(
     return out;
 }
 
-torch::Tensor channel_bdpt_pack_vec3(torch::Tensor x, torch::Tensor y, torch::Tensor z) {
-    return channel_bdpt_pack_vec3_cuda(x, y, z);
-}
-
-torch::Tensor channel_bdpt_los_component_maps(torch::Tensor los) {
-    return channel_bdpt_los_component_maps_cuda(los);
-}
-
 torch::Tensor channel_bdpt_los_component_maps_from_matrix(torch::Tensor los, int64_t rows, int64_t cols) {
     return channel_bdpt_los_component_maps_from_matrix_cuda(los, rows, cols);
-}
-
-torch::Tensor channel_bdpt_apply_los_visibility(
-    torch::Tensor maps,
-    torch::Tensor los,
-    torch::Tensor visible,
-    int64_t tx_index) {
-    return channel_bdpt_apply_los_visibility_cuda(maps, los, visible, tx_index);
-}
-
-pybind11::dict channel_bdpt_los_visibility_inputs(
-    torch::Tensor tx_positions,
-    int64_t tx_index,
-    int64_t rx_count) {
-    auto [start, active] = channel_bdpt_los_visibility_inputs_cuda(tx_positions, tx_index, rx_count);
-    pybind11::dict out;
-    out["start"] = start;
-    out["active"] = active;
-    return out;
 }
 
 torch::Tensor channel_bdpt_receiver_grid_points(
@@ -1011,22 +642,6 @@ torch::Tensor channel_bdpt_receiver_grid_points(
         y_axis_z,
         spacing0,
         spacing1);
-}
-
-pybind11::dict channel_bdpt_reflection_launch_inputs(
-    torch::Tensor tx_positions,
-    int64_t tx_index,
-    int64_t sample_count) {
-    auto [ray_o, ray_tmax, active, tx_pol, tx_id, light_seed] =
-        channel_bdpt_reflection_launch_inputs_cuda(tx_positions, tx_index, sample_count);
-    pybind11::dict out;
-    out["ray_o"] = ray_o;
-    out["ray_tmax"] = ray_tmax;
-    out["active"] = active;
-    out["tx_pol"] = tx_pol;
-    out["tx_id"] = tx_id;
-    out["light_seed"] = light_seed;
-    return out;
 }
 
 pybind11::tuple channel_deterministic_diffraction_state_pack(
@@ -1089,63 +704,3 @@ pybind11::tuple channel_deterministic_diffraction_state_pack_selected(
         tx_power_index));
 }
 
-pybind11::dict channel_bdpt_face_material_tensors(
-    torch::Tensor material_eps_r,
-    torch::Tensor material_sigma_e,
-    torch::Tensor material_mu_r,
-    torch::Tensor face_material_id) {
-    auto [face_eps_r, face_sigma_e, face_mu_r, face_gain, face_valid] =
-        channel_bdpt_face_material_tensors_cuda(
-            material_eps_r,
-            material_sigma_e,
-            material_mu_r,
-            face_material_id);
-
-    pybind11::dict out;
-    out["eps_r"] = face_eps_r;
-    out["sigma_e"] = face_sigma_e;
-    out["mu_r"] = face_mu_r;
-    out["gain"] = face_gain;
-    out["valid"] = face_valid;
-    return out;
-}
-
-pybind11::dict channel_bdpt_face_material_tensors_from_host(
-    pybind11::sequence material_eps_r,
-    pybind11::sequence material_sigma_e,
-    pybind11::sequence material_mu_r,
-    pybind11::sequence face_material_id) {
-    TORCH_CHECK(material_sigma_e.size() == material_eps_r.size(), "material_sigma_e must match material_eps_r");
-    TORCH_CHECK(material_mu_r.size() == material_eps_r.size(), "material_mu_r must match material_eps_r");
-    std::vector<float> eps_r;
-    std::vector<float> sigma_e;
-    std::vector<float> mu_r;
-    std::vector<int> face_ids;
-    eps_r.reserve(material_eps_r.size());
-    sigma_e.reserve(material_sigma_e.size());
-    mu_r.reserve(material_mu_r.size());
-    face_ids.reserve(face_material_id.size());
-    for (auto item : material_eps_r) {
-        eps_r.push_back(static_cast<float>(pybind11::cast<double>(item)));
-    }
-    for (auto item : material_sigma_e) {
-        sigma_e.push_back(static_cast<float>(pybind11::cast<double>(item)));
-    }
-    for (auto item : material_mu_r) {
-        mu_r.push_back(static_cast<float>(pybind11::cast<double>(item)));
-    }
-    for (auto item : face_material_id) {
-        face_ids.push_back(static_cast<int>(pybind11::cast<int64_t>(item)));
-    }
-
-    auto [face_eps_r, face_sigma_e, face_mu_r, face_gain, face_valid] =
-        channel_bdpt_face_material_tensors_from_host_cuda(eps_r, sigma_e, mu_r, face_ids);
-
-    pybind11::dict out;
-    out["eps_r"] = face_eps_r;
-    out["sigma_e"] = face_sigma_e;
-    out["mu_r"] = face_mu_r;
-    out["gain"] = face_gain;
-    out["valid"] = face_valid;
-    return out;
-}

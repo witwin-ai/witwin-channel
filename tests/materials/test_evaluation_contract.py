@@ -23,7 +23,7 @@ def test_frequency_and_material_guards_have_canonical_owners():
     assert (
         runtime._participates_in_ad is runtime._ad_geometry_live
     )
-    assert "_require_frequency_ad_constant_materials" not in materials_package.__all__
+    assert "_require_frequency_ad_constant_materials" not in getattr(materials_package, "__all__", ())
 
 
 def test_frequency_participation_detects_reverse_and_forward_mode():

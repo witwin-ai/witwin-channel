@@ -20,7 +20,6 @@ from witwin.channel.propagation.penetration import (
 )
 from witwin.channel.propagation.topology import _empty_path_block
 from witwin.channel.propagation.topology import _ensure_topology_fields
-from witwin.channel.kernels.montecarlo import bdpt_counter_uniforms
 from witwin.channel.kernels.topology import (
     enumerated_transmission_topology_pack,
 )
@@ -162,14 +161,12 @@ def _transmission_topology(
 # target-inset batch exports ordered resident wall hits. MC Basic then applies
 # its native incident-polarized wall product; this shared event section owns no
 # second RF estimator.
-# - Shooting (BDPT light-subpath continuation): handled by the native
-# ``bdpt_transmitted_light_subpath_state`` kernel with the exact lateral exit
-# offset; this section only supplies the seeded event-selection utilities.
+# - Shooting (BDPT light-subpath continuation): handled by the native fused
+# wavefront with the exact lateral exit offset.
 
 
 _MIN_EPSILON_M = 1.0e-6
 _RELATIVE_EPSILON = 1.0e-6
-_EVENT_PROBABILITY_FLOOR = 0.05
 
 _LAYER_CSR_FIELDS = (
     "layer_offset",
@@ -208,45 +205,6 @@ def scale_aware_epsilon(position: torch.Tensor, *, scene_diagonal: float) -> tor
 
     floor = max(_MIN_EPSILON_M, float(scene_diagonal) * _RELATIVE_EPSILON)
     return (position.abs().amax(dim=-1) * _RELATIVE_EPSILON).clamp_min(floor)
-
-
-def event_uniforms(
-    count: int, *, seed: int, tx_index: int, depth: int, device: torch.device,
-) -> torch.Tensor:
-    """Native counter-based uniforms for reflect/transmit event selection.
-
-    Sample ``i`` of transmitter ``tx_index`` is global sample ``tx_index * count + i``,
-    so these are the draws the fused BDPT wavefront makes in-kernel.
-    """
-
-    reference = torch.empty((0,), device=device, dtype=torch.float32)
-    return bdpt_counter_uniforms(
-        reference, int(count), seed=int(seed), first=int(tx_index) * int(count),
-        depth=int(depth), stream="event_selection",
-    )
-
-
-def unpolarized_power_budgets(stack: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
-    """(R_eff, T_eff) as the unpolarized TE/TM mean of the smooth-stack power
-    budgets. The mean is acceptable for EVENT PROBABILITIES only; the selected
-    branch's kernel applies the exact polarized Jones coefficients."""
-
-    r_eff = 0.5 * (stack["cap_R_te"] + stack["cap_R_tm"])
-    t_eff = 0.5 * (stack["cap_T_te"] + stack["cap_T_tm"])
-    return r_eff, t_eff
-
-
-def transmission_event_probability(
-    r_eff: torch.Tensor, t_eff: torch.Tensor, *, floor: float = _EVENT_PROBABILITY_FLOOR,
-) -> torch.Tensor:
-    """Event probability p_t = T/(R+T) with a minimum-probability floor when
-    both budgets are nonzero (surface-event selection). Absorption 1-R-T terminates
-    implicitly through the field magnitudes; there is no absorption event."""
-
-    total = (r_eff + t_eff).clamp_min(1.0e-12)
-    p_t = (t_eff / total).clamp(floor, 1.0 - floor)
-    p_t = torch.where(t_eff <= 0.0, torch.zeros_like(p_t), p_t)
-    return torch.where((r_eff <= 0.0) & (t_eff > 0.0), torch.ones_like(p_t), p_t)
 
 
 @profiled_cuda_range(CudaProfileRange.MONTECARLO_BASIC_PENETRATION_DISCOVERY)

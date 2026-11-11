@@ -25,8 +25,6 @@ from witwin.channel.runtime import (
 __all__ = [
     "_EmLayerStackAdFunction",
     "_validate_layer_csr",
-    "bdpt_face_material_tensors",
-    "bdpt_face_material_tensors_from_host",
     "em_layer_stack_ad",
     "em_layer_stack_backward",
     "em_layer_stack_eval",
@@ -69,67 +67,6 @@ def _validate_layer_csr(
 
 
 validate_layer_csr = _validate_layer_csr
-
-
-# ---------------------------------------------------------------------------
-# functional
-# ---------------------------------------------------------------------------
-def bdpt_face_material_tensors(
-    material_eps_r: torch.Tensor, material_sigma_e: torch.Tensor, material_mu_r: torch.Tensor,
-    face_material_id: torch.Tensor,
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor("material_eps_r", material_eps_r, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor(
-        "material_sigma_e", material_sigma_e, dtype=torch.float32, ndim=1
-    )
-    validate_cuda_tensor("material_mu_r", material_mu_r, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor(
-        "face_material_id", face_material_id, dtype=torch.int32, ndim=1
-    )
-    exported = _required_native_op("bdpt_face_material_tensors")(
-        material_eps_r,
-        material_sigma_e,
-        material_mu_r,
-        face_material_id,
-    )
-    if not isinstance(exported, dict):
-        raise TypeError("_channel.bdpt_face_material_tensors must return a dict")
-    validate_cuda_tensor("eps_r", exported["eps_r"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("sigma_e", exported["sigma_e"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("mu_r", exported["mu_r"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("gain", exported["gain"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("valid", exported["valid"], dtype=torch.bool, ndim=1)
-    return exported
-
-
-def bdpt_face_material_tensors_from_host(
-    material_eps_r: tuple[float, ...], material_sigma_e: tuple[float, ...],
-    material_mu_r: tuple[float, ...], face_material_id: tuple[int, ...],
-) -> dict[str, torch.Tensor]:
-    if not material_eps_r:
-        raise ValueError("material_eps_r must not be empty")
-    if len(material_sigma_e) != len(material_eps_r):
-        raise ValueError("material_sigma_e must match material_eps_r")
-    if len(material_mu_r) != len(material_eps_r):
-        raise ValueError("material_mu_r must match material_eps_r")
-    if any(index < 0 or index >= len(material_eps_r) for index in face_material_id):
-        raise ValueError("face_material_id entries must reference a material")
-    exported = _required_native_op("bdpt_face_material_tensors_from_host")(
-        material_eps_r,
-        material_sigma_e,
-        material_mu_r,
-        face_material_id,
-    )
-    if not isinstance(exported, dict):
-        raise TypeError(
-            "_channel.bdpt_face_material_tensors_from_host must return a dict"
-        )
-    validate_cuda_tensor("eps_r", exported["eps_r"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("sigma_e", exported["sigma_e"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("mu_r", exported["mu_r"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("gain", exported["gain"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("valid", exported["valid"], dtype=torch.bool, ndim=1)
-    return exported
 
 
 _EM_LAYER_STACK_FIELDS = (

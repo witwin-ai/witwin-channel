@@ -15,7 +15,6 @@ _OWNER_NAMES = (
     "deterministic_los_topology_block",
     "deterministic_pad_topology_sequences",
     "deterministic_reflection_epc_input_batch",
-    "deterministic_repeat_range",
     "deterministic_topology_default_fields",
 )
 

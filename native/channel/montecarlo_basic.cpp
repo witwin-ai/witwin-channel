@@ -134,7 +134,6 @@ void check_mc_diffraction_discovery_inputs(
 }
 
 }  // namespace
-at::Tensor channel_mc_los_component_maps_cuda(at::Tensor los);
 at::Tensor channel_mc_los_component_maps_from_matrix_cuda(at::Tensor los, int64_t rows, int64_t cols);
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_mc_los_path_gain_backward_cuda(
     at::Tensor tx_positions,
@@ -283,19 +282,6 @@ channel_mc_point_diffraction_tape_cuda(
     at::Tensor t_max, at::Tensor n0, at::Tensor nn, at::Tensor source, at::Tensor points,
     int64_t point_begin, int64_t point_count, int64_t seed, double point_radius);
 at::Tensor channel_mc_selected_edge_indices_cuda(at::Tensor selected);
-std::vector<at::Tensor> channel_mc_diffraction_state_pack_cuda(
-    at::Tensor edge_indices,
-    at::Tensor edge_pos,
-    at::Tensor edge_dir,
-    at::Tensor line_min,
-    at::Tensor line_max,
-    at::Tensor n0,
-    at::Tensor n1,
-    at::Tensor face0,
-    at::Tensor face1,
-    at::Tensor exterior_angle,
-    at::Tensor tx,
-    at::Tensor tx_power);
 std::vector<at::Tensor> channel_mc_diffraction_edge_geometry_cuda(
     at::Tensor vertices,
     at::Tensor faces,
@@ -346,10 +332,6 @@ torch::Tensor channel_mc_store_scaled_component_map(
     int64_t tx_index,
     int64_t scale_index) {
     return channel_mc_store_scaled_component_map_cuda(maps, source, scale_values, tx_index, scale_index);
-}
-
-torch::Tensor channel_mc_los_component_maps(torch::Tensor los) {
-    return channel_mc_los_component_maps_cuda(los);
 }
 
 torch::Tensor channel_mc_los_component_maps_from_matrix(torch::Tensor los, int64_t rows, int64_t cols) {
@@ -917,39 +899,6 @@ torch::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp(
 
 torch::Tensor channel_mc_selected_edge_indices(torch::Tensor selected) {
     return channel_mc_selected_edge_indices_cuda(selected);
-}
-
-pybind11::tuple channel_mc_diffraction_state_pack(
-    torch::Tensor edge_indices,
-    torch::Tensor edge_pos,
-    torch::Tensor edge_dir,
-    torch::Tensor line_min,
-    torch::Tensor line_max,
-    torch::Tensor n0,
-    torch::Tensor n1,
-    torch::Tensor face0,
-    torch::Tensor face1,
-    torch::Tensor exterior_angle,
-    torch::Tensor tx,
-    torch::Tensor tx_power) {
-    auto states = channel_mc_diffraction_state_pack_cuda(
-        edge_indices,
-        edge_pos,
-        edge_dir,
-        line_min,
-        line_max,
-        n0,
-        n1,
-        face0,
-        face1,
-        exterior_angle,
-        tx,
-        tx_power);
-    pybind11::tuple out(states.size());
-    for (size_t i = 0; i < states.size(); ++i) {
-        out[i] = states[i];
-    }
-    return out;
 }
 
 pybind11::tuple channel_mc_diffraction_edge_geometry(

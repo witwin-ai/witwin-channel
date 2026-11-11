@@ -12,7 +12,6 @@ from ci import check_native_bindings as check
 
 
 ROOT = Path(__file__).resolve().parents[1]
-_REPOSITORY_UNCALLED = check.KNOWN_UNCALLED_SYMBOLS
 _REPOSITORY_SPLIT = check.KNOWN_SPLIT_OWNER_SYMBOLS
 
 _BINDING = """\
@@ -73,7 +72,6 @@ def _helper(values):
 
 @pytest.fixture(autouse=True)
 def _no_known_debt(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(check, "KNOWN_UNCALLED_SYMBOLS", frozenset())
     monkeypatch.setattr(check, "KNOWN_SPLIT_OWNER_SYMBOLS", frozenset())
 
 
@@ -136,13 +134,15 @@ def test_a_symbol_without_a_dispatch_site_is_reported(tmp_path: Path) -> None:
 
 def test_known_debt_entries_must_shrink(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo = _repo(tmp_path, _KERNELS, _SOLVER_USES_BOTH)
-    monkeypatch.setattr(check, "KNOWN_UNCALLED_SYMBOLS", frozenset({"alpha"}))
     monkeypatch.setattr(check, "KNOWN_SPLIT_OWNER_SYMBOLS", frozenset({"beta"}))
 
     assert check.check_invariants(repo) == [
-        "KNOWN_UNCALLED_SYMBOLS entry is stale (now called or deleted): alpha",
         "KNOWN_SPLIT_OWNER_SYMBOLS entry is stale (now single-owner or deleted): beta",
     ]
+
+
+def test_there_is_no_uncalled_symbol_allowance() -> None:
+    assert not hasattr(check, "KNOWN_UNCALLED_SYMBOLS")
 
 
 def test_a_generation_suffixed_binding_name_is_rejected(tmp_path: Path) -> None:
@@ -182,7 +182,6 @@ def test_the_cli_reports_a_stale_manifest(
 
 
 def test_the_repository_manifest_is_current(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(check, "KNOWN_UNCALLED_SYMBOLS", _REPOSITORY_UNCALLED)
     monkeypatch.setattr(check, "KNOWN_SPLIT_OWNER_SYMBOLS", _REPOSITORY_SPLIT)
     check._parsed.cache_clear()
     assert check.main(["--repo", str(ROOT)]) == 0

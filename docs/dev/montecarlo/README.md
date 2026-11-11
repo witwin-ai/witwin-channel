@@ -163,12 +163,27 @@ used by focused contract tests, but are not compatibility promises. The parent
   tile of at most `2^20` pairs a visibility query and a fused connect-and-
   accumulate kernel for mixed reflection+transmission vertices and scatter
   next-event rows; no connection row is stored. `export_paths` and
-  `diagnostics` rerun it once to write the counted rows. `jvp` / `vjp` also run
-  on it (fixed topology: `bdpt_wavefront_jvp` one forward pass,
-  `bdpt_wavefront_backward` replay plus reverse walk; ADR-049 decision 7).
-  Random numbers are native and counter-based (a pure function of seed,
-  stream, global sample index and depth). `metadata["sampler"]` names the
-  sampler used; the event-composed sampler remains in the tree, undispatched.
+  `diagnostics` rerun it once to write the counted rows. Every `ad_mode` uses
+  it; random numbers are native and counter-based (a pure function of seed,
+  stream, global sample index and depth). `metadata["sampler"]` is
+  `"wavefront"` whenever sampled chains run.
+- AD (fixed topology: hits, event choices, visibility, lobe densities, event
+  probabilities and MIS weights frozen): `jvp` is one native pass
+  (`bdpt_wavefront_jvp`) that carries a tangent Jones field, tangent
+  post-scatter carrier and tangent scatter-vertex powers next to the primal.
+  `vjp` replays the wavefront (`bdpt_wavefront_backward`, chunks of `2^16`
+  samples): a per-bounce tape records each event's incoming state, a
+  per-vertex connect pass turns `grad[tx, rx]` into field and P_te/P_tm
+  cotangents (receivers walked in a fixed order), and one reverse kernel per
+  chunk walks every sample's events backwards (adjoint of the linear Jones map,
+  one dual per parameter, `eval_te_tm_grad` for the table values). Gradients
+  of face `eps_r`/`sigma_e`/`gain`/`thickness`, layer
+  `thickness`/`eps_r`/`sigma_e`, the stacked `f_te`/`f_tm`, `tx_power` and the
+  frequency accumulate in double (atomic order, cast to float once, like the
+  primal accumulators). Roughness and material dependence of the tables reach
+  their leaves through the tables' autograd graph; `mu_r` leaves are refused.
+  With `export_paths` / `diagnostics` the primal stays the accumulated rows and
+  the wavefront contributes only the derivative.
 - Metadata counts stay on the device and are read in one copy per solve.
 - Limitation: a mixed reflection+transmission chain is estimated by connecting
   the vertex after a specular event straight to the receiver (a
@@ -217,6 +232,25 @@ means over 32 seeds at 65,536 samples differ by |z| <= 0.78 (depth 2) and
 <= 0.69 (depth 3); the sampled mixed share is about 0.7-0.8 % of the
 transmission power here, the rest being the enumerated straight chains,
 identical in both.
+
+### BDPT wavefront AD evidence
+
+Same seeds, 16,384 samples; directional derivatives (random positive
+direction) against the former event-composed sampler's `vjp`, measured before
+its removal:
+
+| scene | leaves | relative difference |
+|---|---|---|
+| two lossy walls, `max_depth=3`, transmission (mixed chains) | face eps_r/sigma_e, layer eps_r/sigma_e/thickness, frequency | 0 (vjp); <= 1.1e-6 (jvp) |
+| rough wall + lossy wall, `max_depth=2`, scattering | face eps_r/sigma_e, layer leaves, frequency, f_te, f_tm | <= 5.8e-6 |
+
+The event-composed `jvp` returned zero tangents for sampled paths and its
+`vjp` returned NaN at `max_scattering_order=3`; the wavefront is finite there
+and passes FD and jvp/vjp duality. Finite differences (same seed, leaves that
+do not move the frozen event probabilities; seed mean of 8 for a layer leaf):
+relative error <= 3.6e-3. `tests/ad/test_bdpt_wavefront_ad.py` pins primal
+bitwise equality with `ad_mode="none"`, FD, duality (<= 1e-4) and the
+export-paths path.
 
 ## Forbidden fallback
 

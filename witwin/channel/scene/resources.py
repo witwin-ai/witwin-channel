@@ -54,7 +54,6 @@ __all__ = [
     "build_phase_screen_resources",
     "build_scene_from_structures",
     "clear_kirchhoff_cache",
-    "eval_bsdf",
     "generate_gaussian_realization",
     "patch_phase_integral",
     "pdf",
@@ -67,7 +66,6 @@ __all__ = [
     "diffraction_edge_vertex_ids",
     "refine_edge_geometry",
     "resolve_scene_edge_policy",
-    "sample_directions",
 ]
 
 
@@ -1179,9 +1177,9 @@ def _phase_screen_rms_slope(
 # once, and are never re-entered per solve.
 #
 # The runtime side of the same subject stays on the production side of the
-# line: ``eval_bsdf``, ``sample_directions``, ``pdf`` and ``pdf_reverse`` are
-# thin facades over ``witwin.channel.kernels.scattering``, so every production
-# eval/sample/PDF/event-budget operation requires native CUDA. Nothing below
+# line: ``pdf`` and ``pdf_reverse`` are thin facades over
+# ``witwin.channel.kernels.scattering``, so every production PDF operation
+# requires native CUDA. Nothing below
 # this banner is a Torch or CPU production alternative, and nothing below it
 # may grow into per-solve physics.
 #
@@ -1825,57 +1823,10 @@ def _kirchhoff_table_arrays(
     return arrays
 
 
-def eval_bsdf(
-    table: KirchhoffTable, valid: torch.Tensor, wi: torch.Tensor, wo: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Bilinear (multilinear) lookup of ``(f_te, f_tm)`` for batched pairs.
-
-    ``wi``/``wo`` are [N, 3] local-frame unit vectors pointing away from the
-    surface. Directions below the horizon return 0.
-    """
-
-    from witwin.channel.kernels.scattering import (
-        scattering_table_eval,
-    )
-
-    return scattering_table_eval(
-        valid.contiguous(), wi.contiguous(), wo.contiguous(), table.f_te, table.f_tm
-    )
-
-
-def sample_directions(
-    table: KirchhoffTable, valid: torch.Tensor, wi: torch.Tensor, u1: torch.Tensor,
-    u2: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Sample outgoing directions by CDF inversion; returns ``(wo, pdf)``.
-
-    Uses the nearest incidence bin (the same convention :func:`pdf` uses, so
-    the sampler and its density are exactly consistent). ``u1`` inverts the
-    marginal CDF over ``cos_theta_o``; ``u2`` the conditional CDF over
-    ``phi_o``; both are linearly remapped inside the selected bin, i.e. the
-    sampled density is piecewise constant per outgoing bin.
-    """
-
-    from witwin.channel.kernels.scattering import (
-        scattering_table_sample,
-    )
-
-    uniforms = torch.stack((u1, u2), dim=1).contiguous()
-    out = scattering_table_sample(
-        valid.contiguous(),
-        wi.contiguous(),
-        uniforms,
-        table.marginal_cdf,
-        table.conditional_cdf,
-        table.sample_density,
-    )
-    return out["wo"], out["pdf_forward"]
-
-
 def pdf(
     table: KirchhoffTable, valid: torch.Tensor, wi: torch.Tensor, wo: torch.Tensor,
 ) -> torch.Tensor:
-    """Solid-angle sampling density of :func:`sample_directions`.
+    """Solid-angle sampling density of the table's CDF direction sampler.
 
     Piecewise constant per outgoing bin and exactly consistent with the
     sampler (same nearest incidence bin, same mass table); integrates to 1

@@ -271,12 +271,6 @@ def _realization_forward_args(case):
     )
 
 
-def _realization_forward(case):
-    return F.scattering_chain_realization_eval(
-        *_realization_forward_args(case), k0=case["k0"], frequency_hz=case["frequency_hz"]
-    )
-
-
 # ---------------------------------------------------------------------------
 # Op A: forward contract.
 # ---------------------------------------------------------------------------
@@ -371,182 +365,12 @@ def test_chain_ensemble_requires_native_kernel(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_chain_ensemble_backward_schema_and_gating():
-    case = _chain_ensemble_case(seed=21)
-    rows = case["rows"]
-    out = F.scattering_chain_ensemble_eval_backward(
-        *_ensemble_forward_args(case),
-        coef=case["coef"], threshold=-1.0, frequency_hz=case["frequency_hz"],
-        grad_gain=torch.ones(rows, device="cuda"),
-        need_grad_chain1=True, need_grad_chain2=False, need_grad_tables=False,
-        need_grad_geometry=False, need_grad_coef=False, need_grad_frequency=False,
-    )
-    expected = set(F._CHAIN_ENSEMBLE_BACKWARD_FIELDS)
-    assert set(out) == expected
-    for key in ("grad_c1_eps_r", "grad_c1_sigma_e", "grad_c1_gain", "grad_c1_thickness"):
-        assert out[key] is not None and out[key].shape == (rows, _DMAX), key
-    # Reverse-mode chain geometry is not emitted this wave; only the twelve native
-    # VJP fields exist, and the off-flag ones are None.
-    for key in ("grad_c2_eps_r", "grad_f_te", "grad_coef", "grad_frequency"):
-        assert out[key] is None, key
-
-
-def test_chain_ensemble_backward_requires_native_kernel(monkeypatch):
-    case = _chain_ensemble_case(seed=22)
-    rows = case["rows"]
-    monkeypatch.setattr(runtime, "native_extension", lambda: None)
-    with pytest.raises(RuntimeError, match="CUDA kernel is required"):
-        F.scattering_chain_ensemble_eval_backward(
-            *_ensemble_forward_args(case),
-            coef=case["coef"], threshold=-1.0, frequency_hz=case["frequency_hz"],
-            grad_gain=torch.ones(rows, device="cuda"),
-            need_grad_chain1=True,
-        )
-
-
-def test_chain_ensemble_jvp_schema():
-    case = _chain_ensemble_case(seed=23)
-    out = F.scattering_chain_ensemble_eval_jvp(
-        *_ensemble_forward_args(case),
-        coef=case["coef"], threshold=-1.0, frequency_hz=case["frequency_hz"],
-        tangent_c1_eps_r=torch.randn(case["rows"], _DMAX, device="cuda"),
-        tangent_coef=0.5,
-    )
-    assert set(out) == {"tangent_gain", "tangent_amplitude", "tangent_length"}
-    for value in out.values():
-        assert value.shape == (case["rows"],)
-        assert value.dtype == torch.float32
-
-
 # ---------------------------------------------------------------------------
 # Op B: forward contract.
 # ---------------------------------------------------------------------------
-
-
-def test_chain_realization_forward_schema():
-    case = _chain_realization_case(seed=31)
-    out = _realization_forward(case)
-    assert set(out) == {"total", "path_field", "path_gain", "integral", "row_value"}
-    n = case["n"]
-    assert out["total"].shape == () and out["total"].dtype == torch.complex64
-    assert out["path_field"].shape == (n,) and out["path_field"].dtype == torch.complex64
-    assert out["path_gain"].shape == (n,) and out["path_gain"].dtype == torch.float32
-    assert out["integral"].shape == (n,) and out["integral"].dtype == torch.complex64
-    assert out["row_value"].shape == (n,) and out["row_value"].dtype == torch.complex64
-    torch.testing.assert_close(out["path_gain"], out["path_field"].abs().square())
-
-
-def test_chain_realization_valid_masks_rows_inert():
-    case = _chain_realization_case(seed=131, rows=6)
-    case["valid"][1::2] = False
-    out = _realization_forward(case)
-    invalid = ~case["valid"]
-    for name in ("path_field", "path_gain", "integral", "row_value"):
-        assert torch.count_nonzero(out[name][invalid]) == 0
-
-
-def test_chain_realization_rejects_wrong_valid_shape():
-    case = _chain_realization_case(seed=132)
-    case["valid"] = case["valid"][:-1]
-    with pytest.raises(ValueError, match="valid must have shape"):
-        _realization_forward(case)
-
-
-def test_chain_realization_degenerate_rows_run():
-    case = _chain_realization_case(seed=32, d1=0, d2=0)
-    out = _realization_forward(case)
-    assert torch.isfinite(out["path_gain"]).all()
-    assert torch.isfinite(out["total"].real) and torch.isfinite(out["total"].imag)
-
-
-def test_chain_realization_forward_rejects_bad_dtype():
-    case = _chain_realization_case(seed=33)
-    args = list(_realization_forward_args(case))
-    args[33] = args[33].double()  # heights wrong dtype
-    with pytest.raises((TypeError, ValueError)):
-        F.scattering_chain_realization_eval(
-            *args, k0=case["k0"], frequency_hz=case["frequency_hz"]
-        )
-
-
-def test_chain_realization_forward_rejects_depth_over_max():
-    case = _chain_realization_case(seed=34)
-    c2 = case["c2"]
-    c2["positions"] = torch.zeros(case["n"], _DMAX + 1, 3, device="cuda")
-    c2["normals"] = torch.zeros(case["n"], _DMAX + 1, 3, device="cuda")
-    c2["eps_r"] = torch.ones(case["n"], _DMAX + 1, device="cuda")
-    c2["sigma_e"] = torch.ones(case["n"], _DMAX + 1, device="cuda")
-    c2["mu_r"] = torch.ones(case["n"], _DMAX + 1, device="cuda")
-    c2["gain"] = torch.ones(case["n"], _DMAX + 1, device="cuda")
-    c2["thickness"] = torch.ones(case["n"], _DMAX + 1, device="cuda")
-    with pytest.raises(ValueError, match="kMaxAdDepth"):
-        _realization_forward(case)
-
-
-def test_chain_realization_requires_native_kernel(monkeypatch):
-    case = _chain_realization_case(seed=35)
-    monkeypatch.setattr(runtime, "native_extension", lambda: None)
-    with pytest.raises(RuntimeError, match="CUDA kernel is required"):
-        _realization_forward(case)
 
 
 # ---------------------------------------------------------------------------
 # Op B: backward / jvp contract.
 # ---------------------------------------------------------------------------
 
-
-def test_chain_realization_backward_schema_and_gating():
-    case = _chain_realization_case(seed=41)
-    n = case["n"]
-    grad_total = torch.ones((), device="cuda", dtype=torch.complex64)
-    out = F.scattering_chain_realization_eval_backward(
-        *_realization_forward_args(case),
-        k0=case["k0"], frequency_hz=case["frequency_hz"], grad_total=grad_total,
-        need_grad_heights=True, need_grad_layers=False, need_grad_chain1=False,
-        need_grad_chain2=False, need_grad_geometry=False, need_grad_k0=False,
-        need_grad_frequency=False,
-    )
-    assert set(out) == set(F._CHAIN_REALIZATION_BACKWARD_FIELDS)
-    assert out["grad_heights"] is not None
-    assert out["grad_heights"].shape == case["heights"].shape
-    for key in ("grad_layer_thickness", "grad_c1_eps_r", "grad_d_i", "grad_k0", "grad_frequency"):
-        assert out[key] is None, key
-    _ = n
-
-
-def test_chain_realization_backward_requires_grad_total_dtype():
-    case = _chain_realization_case(seed=42)
-    with pytest.raises((TypeError, ValueError)):
-        F.scattering_chain_realization_eval_backward(
-            *_realization_forward_args(case),
-            k0=case["k0"], frequency_hz=case["frequency_hz"],
-            grad_total=torch.ones((), device="cuda"),  # float, not complex64
-            need_grad_heights=True,
-        )
-
-
-def test_chain_realization_backward_requires_native_kernel(monkeypatch):
-    case = _chain_realization_case(seed=43)
-    monkeypatch.setattr(runtime, "native_extension", lambda: None)
-    with pytest.raises(RuntimeError, match="CUDA kernel is required"):
-        F.scattering_chain_realization_eval_backward(
-            *_realization_forward_args(case),
-            k0=case["k0"], frequency_hz=case["frequency_hz"],
-            grad_total=torch.ones((), device="cuda", dtype=torch.complex64),
-            need_grad_heights=True,
-        )
-
-
-def test_chain_realization_jvp_schema():
-    case = _chain_realization_case(seed=44)
-    out = F.scattering_chain_realization_eval_jvp(
-        *_realization_forward_args(case),
-        k0=case["k0"], frequency_hz=case["frequency_hz"],
-        tangent_heights=torch.randn_like(case["heights"]),
-        tangent_k0=0.5,
-    )
-    assert set(out) == {"tangent_total", "tangent_path_field", "tangent_path_gain"}
-    n = case["n"]
-    assert out["tangent_total"].shape == () and out["tangent_total"].dtype == torch.complex64
-    assert out["tangent_path_field"].shape == (n,) and out["tangent_path_field"].dtype == torch.complex64
-    assert out["tangent_path_gain"].shape == (n,) and out["tangent_path_gain"].dtype == torch.float32

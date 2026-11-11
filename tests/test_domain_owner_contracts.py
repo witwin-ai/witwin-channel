@@ -48,5 +48,6 @@ def test_materials_package_preserves_public_identity_and_owns_kernel_contracts()
     assert not (package_root / "core" / "materials.py").exists()
     assert (package_root / "materials.py").is_file()
     assert (package_root / "kernels" / "materials.py").is_file()
-    assert public_materials.__all__ == ["validate_layer_csr"]
-    assert public_materials.validate_layer_csr is validate_layer_csr
+    # The owner module does not re-export its kernel facade.
+    assert "validate_layer_csr" not in vars(public_materials)
+    assert callable(validate_layer_csr)

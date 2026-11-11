@@ -10,7 +10,7 @@ import math
 import torch
 
 from witwin.core import normalize_vec3
-from witwin.channel.scene.resources import eval_bsdf
+from tests.reference.kirchhoff_lookup import eval_table as eval_bsdf
 
 
 def _sp_basis(
@@ -89,7 +89,7 @@ def kirchhoff_ensemble_rows(
 # Double-precision autograd oracle for the native scattering AD VJP/JVP.
 #
 # The block above reproduces the removed production Torch physics but leans on
-# the *native* ``eval_bsdf`` table lookup (float32, non-differentiable), so it
+# a non-differentiable float32 table lookup, so it
 # cannot serve as a gradient oracle. The functions below add a self-contained,
 # float64-capable, fully differentiable re-derivation that consumes the native
 # op's *gathered* differentiable inputs directly (``wo_rows``/``r2_rows``/

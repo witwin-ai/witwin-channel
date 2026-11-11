@@ -421,8 +421,6 @@ def test_solver_chain_ad_mode_requires_companion():
     """Require the native scattering derivative companion for AD-mode chain solves."""
 
     _require_cuda_rayd()
-    if scattering_append._ADR021_D5_CHAIN_AD_WIRED:
-        pytest.skip("ADR-021 D5 Op A _ad companion is wired into the append path")
     from witwin.channel.deterministic import solve
 
     scene = _two_wall_scene()

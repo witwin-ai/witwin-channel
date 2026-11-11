@@ -70,20 +70,9 @@ __device__ void launch_direction(unsigned long long seed, int64_t index, float* 
     out[2] = z;
 }
 
-__global__ void bdpt_sample_directions_kernel(
-    int64_t count,
-    unsigned long long seed,
-    float* directions) {
-    int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    if (index >= count) {
-        return;
-    }
-    launch_direction(seed, index, directions + index * 3);
-}
-
 // Wavefront light endpoints for the global samples [first, first + count) of all
-// transmitters: sample g belongs to transmitter g / samples and draws the same
-// launch direction as bdpt_sample_directions with seed + tx * 65537.
+// transmitters: sample g belongs to transmitter g / samples and draws the
+// uniform-sphere launch direction of stream seed + tx * 65537.
 __global__ void bdpt_wavefront_launch_kernel(
     int64_t count,
     int64_t first,
@@ -199,24 +188,6 @@ void channel_bdpt_wavefront_launch_cuda(
         component_mask.data_ptr<uint8_t>(),
         valid.data_ptr<bool>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
-}
-
-at::Tensor channel_bdpt_sample_directions_cuda(int64_t count, at::Tensor reference, int64_t seed) {
-    check_reference(reference);
-    TORCH_CHECK(count >= 0, "count must be non-negative");
-    TORCH_CHECK(seed >= 0, "seed must be non-negative");
-    auto directions = at::empty({count, 3}, reference.options().dtype(at::kFloat));
-    if (count > 0) {
-        constexpr int threads = 256;
-        int blocks = static_cast<int>((count + threads - 1) / threads);
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(reference.get_device()).stream();
-        bdpt_sample_directions_kernel<<<blocks, threads, 0, stream>>>(
-            count,
-            static_cast<unsigned long long>(seed),
-            directions.data_ptr<float>());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-    return directions;
 }
 
 // ==== Section: BDPT result maps ====

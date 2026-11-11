@@ -116,14 +116,6 @@ def apply_receiver_layout(values: torch.Tensor, layout: ReceiverLayout) -> torch
 _PLANE_GROUP_QUANTIZATION = 1.0e-4
 
 
-def _reflect_points(
-    points: torch.Tensor, plane_points: torch.Tensor, normals: torch.Tensor,
-) -> torch.Tensor:
-    return geometry_kernels.deterministic_reflect_points(
-        points.contiguous(), plane_points.contiguous(), normals.contiguous()
-    )
-
-
 def _coplanar_face_groups(
     tri_a: torch.Tensor, normals: torch.Tensor, surface_ids: torch.Tensor, *,
     quantization: float = _PLANE_GROUP_QUANTIZATION,

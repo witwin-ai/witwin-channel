@@ -160,22 +160,18 @@ def test_scene_with_uv_builds_and_traces(with_uv):
     if not _source_linked_rayd_available():
         pytest.skip("RayD native extension is not built")
 
-    from witwin.channel.kernels.geometry import (
-        rayd_intersect_forward,
-    )
+    from witwin.channel.kernels.geometry import rayd_visibility_forward
 
     scene = _uv_scene(with_uv)
     compiled = compile_scene(scene, reference_frequency_hz=3.0e9)
     rayd = compiled.rayd
     assert rayd.available
-    ray_o = torch.tensor([[0.0, 0.0, 0.0]], dtype=torch.float32, device="cuda")
-    ray_d = torch.tensor([[1.0, 0.0, 0.0]], dtype=torch.float32, device="cuda")
-    ray_tmax = torch.tensor([10.0], dtype=torch.float32, device="cuda")
-    active = torch.tensor([True], dtype=torch.bool, device="cuda")
-    hit = rayd_intersect_forward(rayd, ray_o, ray_d, ray_tmax, active, flags=7)
-    torch.testing.assert_close(
-        hit["t"].cpu(), torch.tensor([2.5], dtype=torch.float32)
-    )
+    # The wall sits at x = 2.5: a segment that crosses it is blocked, a shorter one is not.
+    start = torch.zeros((2, 3), dtype=torch.float32, device="cuda")
+    end = torch.tensor([[5.0, 0.0, 0.0], [2.0, 0.0, 0.0]], dtype=torch.float32, device="cuda")
+    active = torch.ones((2,), dtype=torch.bool, device="cuda")
+    visible = rayd_visibility_forward(rayd, start, end, active)[0]
+    assert visible.cpu().tolist() == [False, True]
     # Scene compile keeps working on top of the UV-carrying RayD scene.
     assert compiled.rayd is rayd
 

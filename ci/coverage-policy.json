@@ -35,8 +35,6 @@
       "owner": "materials",
       "reason": "Restores the narrow ratchet the phase-6 kernel consolidation diluted. At 277d8dc these six members were the whole of witwin/channel/materials/kernels/functional.py and carried a 61.5% file floor; that file was 88 statements, 6 of them module level, so the identical constraint over the 82 member statements is 58.68%. The file exemption on kernels/materials.py now only bounds the merged module and is no longer the ratchet.",
       "members": [
-        "bdpt_face_material_tensors",
-        "bdpt_face_material_tensors_from_host",
         "em_layer_stack_backward",
         "em_layer_stack_eval",
         "em_layer_stack_jvp",
@@ -80,19 +78,13 @@
         "_duffy_nodes",
         "_validate_ensemble_inputs",
         "_validate_patch_inputs",
-        "_validate_table_eval_inputs",
         "scattering_ensemble_eval",
         "scattering_ensemble_eval_backward",
         "scattering_ensemble_eval_jvp",
-        "scattering_event_probabilities",
         "scattering_patch_integral_eval",
         "scattering_patch_integral_eval_backward",
         "scattering_patch_integral_eval_jvp",
-        "scattering_table_eval",
-        "scattering_table_eval_backward",
-        "scattering_table_eval_jvp",
-        "scattering_table_pdf",
-        "scattering_table_sample"
+        "scattering_table_pdf"
       ],
       "minimum_statement_percent": 88.9
     }

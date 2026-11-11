@@ -10,7 +10,6 @@
 #include <vector>
 
 torch::Tensor channel_bdpt_zero_matrix(torch::Tensor reference, int64_t rows, int64_t cols);
-pybind11::dict channel_bdpt_point_component_power(torch::Tensor path_gain, bool include_los);
 pybind11::dict channel_mc_finalize_component_maps(
     torch::Tensor los,
     torch::Tensor reflection,
@@ -67,7 +66,6 @@ torch::Tensor channel_mc_diffraction_discover_edges_counted(
     torch::Tensor edge_line_max,
     torch::Tensor edge_adjacent_face1);
 torch::Tensor channel_mc_pack_vec3(torch::Tensor x, torch::Tensor y, torch::Tensor z);
-torch::Tensor channel_mc_los_component_maps(torch::Tensor los);
 torch::Tensor channel_mc_los_component_maps_from_matrix(torch::Tensor los, int64_t rows, int64_t cols);
 pybind11::tuple channel_mc_los_path_gain_backward(
     torch::Tensor tx_positions,
@@ -229,19 +227,6 @@ torch::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp(
     double wavelength_tangent, torch::Tensor tx_pol,
     torch::Tensor tape_lane, torch::Tensor points, double point_radius, int64_t edge_samples);
 torch::Tensor channel_mc_selected_edge_indices(torch::Tensor selected);
-pybind11::tuple channel_mc_diffraction_state_pack(
-    torch::Tensor edge_indices,
-    torch::Tensor edge_pos,
-    torch::Tensor edge_dir,
-    torch::Tensor line_min,
-    torch::Tensor line_max,
-    torch::Tensor n0,
-    torch::Tensor n1,
-    torch::Tensor face0,
-    torch::Tensor face1,
-    torch::Tensor exterior_angle,
-    torch::Tensor tx,
-    torch::Tensor tx_power);
 pybind11::tuple channel_mc_diffraction_edge_geometry(
     torch::Tensor vertices,
     torch::Tensor faces,
@@ -304,10 +289,6 @@ void register_montecarlo(pybind11::module_ &module) {
         "mc_pack_vec3",
         &channel_mc_pack_vec3,
         "Pack three CUDA float vectors into an interleaved vec3 tensor.");
-    module.def(
-        "mc_los_component_maps",
-        &channel_mc_los_component_maps,
-        "Convert MC LoS gains to public component-map grid layout with a CUDA kernel.");
     module.def(
         "mc_los_component_maps_from_matrix",
         &channel_mc_los_component_maps_from_matrix,
@@ -404,10 +385,6 @@ void register_montecarlo(pybind11::module_ &module) {
         "mc_selected_edge_indices",
         &channel_mc_selected_edge_indices,
         "Compact a selected edge mask into deterministic int32 indices with native CUDA kernels.");
-    module.def(
-        "mc_diffraction_state_pack",
-        &channel_mc_diffraction_state_pack,
-        "Pack MC diffraction edge states with a fused CUDA kernel.");
     module.def(
         "mc_diffraction_edge_geometry",
         &channel_mc_diffraction_edge_geometry,
