@@ -1,5 +1,5 @@
 # Copyright Xingyu Chen.
-# Compare Channel solves with independent float64 references: Friis, two-ray, slabs, half-plane, wedge.
+# Compare Channel solves with float64 references: Friis, two-ray, slabs, half-plane, wedge.
 
 from __future__ import annotations
 
@@ -175,7 +175,9 @@ def _half_plane(normal_towards_source: bool = True) -> list:
                     PhysicalMaterial.perfect_conductor())]
 
 
-def _edge_polarizations(polarization: str, phi: float, phi_prime: float) -> tuple[list[float], list[float]]:
+def _edge_polarizations(
+    polarization: str, phi: float, phi_prime: float,
+) -> tuple[list[float], list[float]]:
     """Tx/Rx polarizations that read E_z (soft) or eta*H_z (hard) of the incident and diffracted waves."""
     if polarization == "soft":
         return [0.0, 0.0, 1.0], [0.0, 0.0, 1.0]
@@ -183,8 +185,9 @@ def _edge_polarizations(polarization: str, phi: float, phi_prime: float) -> tupl
     return list(np.cross([0.0, 0.0, 1.0], k_i)), [-math.sin(phi), math.cos(phi), 0.0]
 
 
-def channel_edge_coefficient(structures: list, polarization: str, phi: float, phi_prime: float,
-                             s_prime: float, s: float) -> complex:
+def channel_edge_coefficient(
+    structures: list, polarization: str, phi: float, phi_prime: float, s_prime: float, s: float,
+) -> complex:
     """Diffraction coefficient of the edge on the z axis, extracted from a spherical-wave solve.
 
     Divides the diffracted coefficient by the incident field at the edge, the UTD spreading factor
@@ -202,7 +205,9 @@ def channel_edge_coefficient(structures: list, polarization: str, phi: float, ph
     return complex(value / (incident * math.sqrt(s_prime / (s * (s + s_prime))) * np.exp(-1j * K * s)))
 
 
-def sommerfeld_coefficient(polarization: str, phi: float, phi_prime: float, distance_l: float) -> complex:
+def sommerfeld_coefficient(
+    polarization: str, phi: float, phi_prime: float, distance_l: float,
+) -> complex:
     """Exact plane-wave half-plane diffracted field at ``rho = L``, expressed as a coefficient."""
     total = O.sommerfeld_half_plane(distance_l, phi, phi_prime, K, polarization)
     go = 0j

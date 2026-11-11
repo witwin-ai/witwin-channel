@@ -28,15 +28,18 @@ class SurvivalCase:
     expect: str = "survive"
     timeout_s: float = 300.0
     gpus: int = 1
+    long_gpu_work: bool = False
 
 
 CASES: dict[str, SurvivalCase] = {}
 
 
-def case(name: str, finding: str, *, expect: str = "survive", timeout_s: float = 300.0,
-         gpus: int = 1) -> Callable[[Callable[[], Any]], Callable[[], Any]]:
+def case(
+    name: str, finding: str, *, expect: str = "survive", timeout_s: float = 300.0, gpus: int = 1,
+    long_gpu_work: bool = False,
+) -> Callable[[Callable[[], Any]], Callable[[], Any]]:
     def register(fn: Callable[[], Any]) -> Callable[[], Any]:
-        CASES[name] = SurvivalCase(name, fn, finding, expect, timeout_s, gpus)
+        CASES[name] = SurvivalCase(name, fn, finding, expect, timeout_s, gpus, long_gpu_work)
         return fn
 
     return register
@@ -59,8 +62,10 @@ def _antennas() -> tuple[Any, Any]:
     return tx, rx
 
 
-def _structure(vertices: Any, faces: Any, *, diagnostics: bool = False, material: Any = None,
-               **structure_kw: Any) -> Any:
+def _structure(
+    vertices: Any, faces: Any, *, diagnostics: bool = False, material: Any = None,
+    **structure_kw: Any,
+) -> Any:
     from witwin.core import Mesh, PhysicalMaterial, Structure
 
     mesh = Mesh(vertices, faces, recenter=False, fill_mode="surface", topology_diagnostics=diagnostics)
@@ -78,8 +83,10 @@ def _wall(x: float = 2.5, half: float = 2.0, material: Any = None) -> Any:
     return _structure(v, torch.tensor([[0, 1, 2], [1, 3, 2]]), material=material)
 
 
-def _closed_box(center: tuple[float, float, float] = (3.0, 0.0, 1.0),
-                half: tuple[float, float, float] = (0.5, 0.5, 1.0)) -> Any:
+def _closed_box(
+    center: tuple[float, float, float] = (3.0, 0.0, 1.0),
+    half: tuple[float, float, float] = (0.5, 0.5, 1.0),
+) -> Any:
     cx, cy, cz = center
     hx, hy, hz = half
     v = torch.tensor([[cx + sx * hx, cy + sy * hy, cz + sz * hz]
@@ -210,8 +217,10 @@ def _consumer() -> Any:
     return consumer
 
 
-def _batch(positions: list[list[float]], *, ids: list[int] | None = None, power: bool = False,
-           device: str = "cuda") -> Any:
+def _batch(
+    positions: list[list[float]], *, ids: list[int] | None = None, power: bool = False,
+    device: str = "cuda",
+) -> Any:
     c = _consumer()
     pos = torch.tensor(positions, dtype=torch.float32, device=device).reshape(-1, 3)
     n = pos.shape[0]
@@ -225,8 +234,10 @@ def _batch(positions: list[list[float]], *, ids: list[int] | None = None, power:
     )
 
 
-def _request(source: Any, sink: Any, *, components: frozenset[str] = frozenset({"los", "reflection"}),
-             max_depth: int = 1) -> Any:
+def _request(
+    source: Any, sink: Any, *, components: frozenset[str] = frozenset({"los", "reflection"}),
+    max_depth: int = 1,
+) -> Any:
     return _consumer().PropagationRequest(
         sources=source, sinks=sink, reference_frequency_hz=FREQ, components=components,
         max_depth=max_depth, response="scalar_transport", topology_mode="discover", ad_mode="none")
@@ -465,12 +476,12 @@ def _rough_scene(frequency_hz: float) -> None:
                         reference_frequency_hz=frequency_hz))
 
 
-@case("s8.kirchhoff_300ghz", "S-8", timeout_s=30.0)
+@case("s8.kirchhoff_300ghz", "S-8", timeout_s=30.0, long_gpu_work=True)
 def _() -> None:
     _rough_scene(300e9)
 
 
-@case("s8.kirchhoff_1thz", "S-8", timeout_s=30.0)
+@case("s8.kirchhoff_1thz", "S-8", timeout_s=30.0, long_gpu_work=True)
 def _() -> None:
     _rough_scene(1e12)
 
@@ -500,6 +511,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{item.name:48s} {item.finding:8s} {item.expect}")
         return 0
     item = CASES[args.case]
+    # Shared-GPU rule: at most 8 GiB per process.
+    total = torch.cuda.get_device_properties(0).total_memory
+    torch.cuda.set_per_process_memory_fraction(min(1.0, (8 << 30) / total))
     raised = None
     try:
         item.run()

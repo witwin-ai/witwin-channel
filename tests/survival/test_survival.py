@@ -15,6 +15,9 @@ from tests.survival.cases import CASES, HEALTH_OK
 
 ROOT = Path(__file__).resolve().parents[2]
 SECOND_GPU_ENV = "CHANNEL_SURVIVAL_SECOND_GPU"
+# Cases that keep the GPU busy for tens of seconds (a hang reproduction) run only on request,
+# because a shared GPU's other tenants time out behind them.
+LONG_WORK_ENV = "CHANNEL_SURVIVAL_LONG_GPU_WORK"
 
 # Cases that crash, hang or accept invalid input today, keyed by case name, with the finding ID.
 # They are strict expected failures: a fix makes them pass, which fails the suite until the
@@ -72,6 +75,8 @@ def test_expected_failures_name_real_cases() -> None:
 @pytest.mark.parametrize("name", _params())
 def test_case_leaves_cuda_context_usable(name: str) -> None:
     item = CASES[name]
+    if item.long_gpu_work and os.environ.get(LONG_WORK_ENV) != "1":
+        pytest.skip(f"long GPU work; set {LONG_WORK_ENV}=1 on a GPU nobody else uses")
     env = _environment(item.gpus)
     if env is None:
         pytest.skip(f"needs a second GPU; set {SECOND_GPU_ENV} to its physical index")

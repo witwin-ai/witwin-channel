@@ -30,6 +30,16 @@ class AccuracyRecorder:
             f"{name}: error {error:.3e} exceeds tolerance {tolerance:.3e} {extra or ''}")
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _gpu_memory_cap() -> None:
+    """Shared-GPU rule: at most 8 GiB per process."""
+    import torch
+
+    if torch.cuda.is_available():
+        total = torch.cuda.get_device_properties(0).total_memory
+        torch.cuda.set_per_process_memory_fraction(min(1.0, (8 << 30) / total))
+
+
 @pytest.fixture
 def accuracy(request: pytest.FixtureRequest) -> AccuracyRecorder:
     return AccuracyRecorder(request.node.nodeid.split("::", 1)[-1])

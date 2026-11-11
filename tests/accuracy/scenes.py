@@ -78,8 +78,9 @@ class PathRow:
     point: np.ndarray
 
 
-def deterministic_rows(scene: Scene, components: set[str], max_depth: int = 1,
-                       frequency_hz: float = FREQ) -> list[PathRow]:
+def deterministic_rows(
+    scene: Scene, components: set[str], max_depth: int = 1, frequency_hz: float = FREQ,
+) -> list[PathRow]:
     from witwin.channel.deterministic import Config, solve
 
     result = solve(scene, Config(components=components, max_depth=max_depth, export_paths=True),
@@ -92,8 +93,9 @@ def deterministic_rows(scene: Scene, components: set[str], max_depth: int = 1,
                                                     paths.path_length_m.tolist()))]
 
 
-def path_solver_coefficient(scene: Scene, components: set[str], max_depth: int = 1,
-                            frequency_hz: float = FREQ) -> dict[int, complex]:
+def path_solver_coefficient(
+    scene: Scene, components: set[str], max_depth: int = 1, frequency_hz: float = FREQ,
+) -> dict[int, complex]:
     """Path solver coefficients of the single Tx/Rx pair, summed per interaction depth."""
     from witwin.channel.path import Config, solve
 

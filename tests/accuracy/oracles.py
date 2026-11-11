@@ -32,8 +32,9 @@ def transverse(polarization: np.ndarray, direction: np.ndarray) -> np.ndarray:
     return p - np.dot(p, d) * d
 
 
-def free_space(tx: np.ndarray, rx: np.ndarray, frequency_hz: float, p_tx: np.ndarray,
-               p_rx: np.ndarray) -> complex:
+def free_space(
+    tx: np.ndarray, rx: np.ndarray, frequency_hz: float, p_tx: np.ndarray, p_rx: np.ndarray,
+) -> complex:
     """Friis coefficient ``lambda/(4 pi d) exp(-j k d) (p_tx,perp . p_rx)`` for unit excitation."""
     d_vec = np.asarray(rx, np.float64) - np.asarray(tx, np.float64)
     d = float(np.linalg.norm(d_vec))
@@ -62,10 +63,11 @@ def fresnel_half_space(cos_i: float, eps_c: complex) -> tuple[complex, complex]:
     return complex(r_te), complex(r_tm)
 
 
-def specular_reflection(tx: np.ndarray, rx: np.ndarray, plane_point: np.ndarray, normal: np.ndarray,
-                        frequency_hz: float, p_tx: np.ndarray, p_rx: np.ndarray,
-                        r_te: complex | None = None, r_tm: complex | None = None,
-                        eps_c: complex | None = None) -> tuple[complex, np.ndarray, float]:
+def specular_reflection(
+    tx: np.ndarray, rx: np.ndarray, plane_point: np.ndarray, normal: np.ndarray,
+    frequency_hz: float, p_tx: np.ndarray, p_rx: np.ndarray, r_te: complex | None = None,
+    r_tm: complex | None = None, eps_c: complex | None = None,
+) -> tuple[complex, np.ndarray, float]:
     """Image-method single reflection off an infinite plane.
 
     Returns ``(coefficient, reflection point, unfolded path length)``. Without explicit ``r_te`` /
@@ -112,7 +114,9 @@ def fresnel_integral_complex(x: np.ndarray) -> np.ndarray:
     return scale * ((0.5 - c) - 1j * (0.5 - s))
 
 
-def sommerfeld_half_plane(rho: float, phi: float, phi_i: float, k: float, polarization: str) -> complex:
+def sommerfeld_half_plane(
+    rho: float, phi: float, phi_i: float, k: float, polarization: str,
+) -> complex:
     """Exact total field of a unit plane wave on a PEC half-plane (Sommerfeld, ``exp(+j omega t)``).
 
     The screen occupies ``phi = 0`` (and ``2 pi``); the incident wave ``exp(j k rho cos(phi - phi_i))``
@@ -141,8 +145,9 @@ def _a_pm(beta: float, n: float, sign: int) -> float:
     return float(2.0 * np.cos((2.0 * np.pi * n * big_n - beta) / 2.0) ** 2)
 
 
-def utd_wedge_coefficients(phi: float, phi_p: float, n: float, k: float, distance_l: float,
-                           beta0: float = np.pi / 2) -> tuple[complex, complex]:
+def utd_wedge_coefficients(
+    phi: float, phi_p: float, n: float, k: float, distance_l: float, beta0: float = np.pi / 2,
+) -> tuple[complex, complex]:
     """Kouyoumjian-Pathak UTD coefficients ``(D_soft, D_hard)`` for a PEC wedge of exterior angle ``n pi``.
 
     Angles are measured from the illuminated (``o``) face; ``distance_l`` is the UTD distance

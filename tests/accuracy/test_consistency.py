@@ -101,7 +101,7 @@ def _per_depth(max_depth: int) -> dict[int, tuple[int, float]]:
 
     city = sc.city(4)
     scene = Scene(structures=city.structures,
-                  endpoints=[sc.transmitter(city.extent_m), sc.receiver_grid(city.extent_m, 64)])
+                  endpoints=[sc.transmitter(city.extent_m), sc.receiver_grid(city.extent_m, 16)])
     paths = solve(scene, Config(components={"reflection"}, max_depth=max_depth, export_paths=True),
                   reference_frequency_hz=FREQ).paths
     depth, gain = paths.depth.cpu(), paths.path_gain.double().cpu()
@@ -148,8 +148,9 @@ def _wall() -> list:
     return [surface(v, [[0, 2, 1], [1, 2, 3]], pec)]
 
 
-def _solve_grid(solver: str, structures: list, tx: tuple[float, float, float],
-                components: set[str]) -> torch.Tensor:
+def _solve_grid(
+    solver: str, structures: list, tx: tuple[float, float, float], components: set[str],
+) -> torch.Tensor:
     import importlib
 
     module = importlib.import_module({
@@ -163,7 +164,9 @@ def _solve_grid(solver: str, structures: list, tx: tuple[float, float, float],
     return result.path_gain.reshape(-1).double().cpu()
 
 
-def _solve_points(structures: list, tx: tuple[float, float, float], components: set[str]) -> torch.Tensor:
+def _solve_points(
+    structures: list, tx: tuple[float, float, float], components: set[str],
+) -> torch.Tensor:
     from witwin.channel.path import Config, solve
 
     scene = Scene(structures=structures,
