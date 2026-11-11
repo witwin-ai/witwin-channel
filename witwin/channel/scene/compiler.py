@@ -815,18 +815,30 @@ def _tensor_state(value: torch.Tensor | None) -> tuple[object, ...] | None:
 
 
 def _geometry_object_state(geometry: object) -> tuple[object, ...]:
-    """State of everything a geometry's world vertices come from (faces excluded)."""
+    """State of everything a geometry's world vertices come from (faces excluded).
+
+    Tensors and scalars, which is what Core geometry attributes are, take the
+    inline path; anything else goes through the general walk.
+    """
 
     values = getattr(geometry, "__dict__", None)
     if values is None:
         return _state(geometry)
-    out: list[object] = [type(geometry), id(geometry)]
-    seen: set[int] = {id(geometry)}
+    out: list[object] = [type(geometry), id(geometry), len(values)]
+    seen: set[int] | None = None
+    tensor = torch.Tensor
     for name, value in values.items():
-        if name == "_faces_tensor" or name.endswith("_cache"):
-            continue
-        out.append(name)
-        _append_state(value, out, seen)
+        kind = type(value)
+        if kind is tensor or kind is torch.nn.Parameter:
+            if name != "_faces_tensor":
+                out.append((id(value), value._version, value.data_ptr(), value.requires_grad))
+        elif kind in _ATOMIC_STATE_TYPES:
+            out.append(value)
+        elif not name.endswith("_cache"):
+            if seen is None:
+                seen = {id(geometry)}
+            out.append(name)
+            _append_state(value, out, seen)
     return tuple(out)
 
 
@@ -1018,6 +1030,9 @@ def world_state(scene_or_snapshot: Scene | SceneSnapshot) -> _WorldState:
         raise translated from error
 
 
+_NO_TOPOLOGY_STATE: tuple[object, ...] = (None, None)
+
+
 def _world_state(scene_or_snapshot: Scene | SceneSnapshot) -> _WorldState:
     plan = _source_plan(scene_or_snapshot)
     topology_rows: list[tuple[object, ...]] = []
@@ -1025,16 +1040,18 @@ def _world_state(scene_or_snapshot: Scene | SceneSnapshot) -> _WorldState:
     assignment: list[object] = []
     for structure, motion, deformation in plan.rows:
         geometry = structure.geometry
+        faces = getattr(geometry, "_faces_tensor", None)
+        face_uv = structure.face_uv
         topology_rows.append(
-            (
-                _tensor_state(getattr(geometry, "_faces_tensor", None)),
-                _tensor_state(structure.face_uv),
-            )
+            _NO_TOPOLOGY_STATE
+            if faces is None and face_uv is None
+            else (_tensor_state(faces), _tensor_state(face_uv))
         )
+        uv = structure.uv
         geometry_rows.append(
             (
                 _geometry_object_state(geometry),
-                _tensor_state(structure.uv),
+                None if uv is None else _tensor_state(uv),
                 None if motion is None else _state(motion),
                 None if deformation is None else _state(deformation),
             )
