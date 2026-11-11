@@ -295,11 +295,13 @@ class AdInputs:
     def tangent(self, tangents: Sequence[Any], name: str) -> Any:
         return tangents[self._index[name]]
 
-    def geometry_tangent(self, tangents: Sequence[Any], name: str, primal: torch.Tensor) -> Any:
+    def geometry_tangent(
+        self, tangents: Sequence[Any], name: str, primal: torch.Tensor, label: str | None = None,
+    ) -> Any:
         """The unwrapped tangent of ``name`` checked against its primal shape and dtype."""
 
         return _ad_geometry_tangent(
-            f"{self.op_name} tangent_{name}", tangents[self._index[name]], primal
+            f"{self.op_name} tangent_{label or name}", tangents[self._index[name]], primal
         )
 
     def checked_tangent(

@@ -698,7 +698,7 @@ def test_transmission_wall_product_has_one_owner_and_no_fallback(monkeypatch) ->
         requested.append(name)
         raise RuntimeError("native wall-product symbol is required")
 
-    monkeypatch.setattr(transmission, "required_symbol", missing)
+    monkeypatch.setattr(transmission, "_required_native_op", missing)
     with pytest.raises(RuntimeError, match="native wall-product symbol is required"):
         mc_transmission_wall_product(*inputs, state, frequency_hz=3.5e9)
     assert requested == ["mc_transmission_wall_product"]

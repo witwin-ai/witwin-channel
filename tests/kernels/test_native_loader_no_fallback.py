@@ -73,7 +73,7 @@ def test_mc_diffraction_discovery_requires_native_symbols(monkeypatch):
         mc_sampling.mc_diffraction_discover_edges_counted,
     ):
         source = inspect.getsource(fn)
-        assert "required_symbol" in source
+        assert _dispatches(fn, fn.__name__)
         assert "optional_symbol" not in source
         assert "torch.ops" not in source
 
@@ -88,7 +88,7 @@ def test_mc_diffraction_discovery_requires_native_symbols(monkeypatch):
             f"_channel.{name} CUDA kernel is required"
         )
 
-    monkeypatch.setattr(mc_sampling, "required_symbol", missing)
+    monkeypatch.setattr(mc_sampling, "_required_native_op", missing)
     with pytest.raises(runtime.NativeSymbolError, match="mc_diffraction_discover_edges"):
         mc_sampling.mc_diffraction_discover_edges()
     with pytest.raises(
