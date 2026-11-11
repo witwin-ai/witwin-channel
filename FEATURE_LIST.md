@@ -110,7 +110,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
 ## Native runtime boundary
 
 - `_channel` is the single production extension. It source-links RayD
-  `86f567cbcbefbc42f47f398ce39b420dc264f4ad` (`rayd-torch 0.9.0`) and calls the typed
+  `b97798b3820db8bfb83605c9598c73bc79cb8542` (`rayd-torch 0.9.0`) and calls the typed
   `rayd::torch` C++ API directly; no RayD Python module, second dispatcher,
   copied C ABI, getter table, or dynamic symbol lookup participates.
 - Builds use an explicit validated `RAYD_SOURCE_DIR` first. Without one, they
