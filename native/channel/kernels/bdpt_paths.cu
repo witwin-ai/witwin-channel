@@ -12,6 +12,8 @@
 #include <rayd/field_transport.cuh>
 #include <src/transmission_device.cuh>
 
+#include "bdpt_wavefront.cuh"
+
 #include <vector>
 
 namespace {
@@ -860,39 +862,37 @@ __global__ void bdpt_counter_uniforms_kernel(
     }
 }
 
-// Two-way reflect/transmit selection probability p_t = T/(R+T) of the
-// unpolarized smooth-stack budgets, floored at 0.05 when both are nonzero.
-__device__ float bdpt_transmit_event_probability(
-    float cos_theta,
-    const em::LayerView& layers,
-    int64_t material_count,
-    int64_t layer_total,
-    float frequency_hz) {
-    if (layers.material < 0 || static_cast<int64_t>(layers.material) >= material_count ||
-        !em::layer_material_usable(layers, layer_total)) {
-        return 0.0f;
-    }
-    const em::StackRT te = em::stack_rt(cos_theta, layers, frequency_hz, em::kPolTE);
-    const em::StackRT tm = em::stack_rt(cos_theta, layers, frequency_hz, em::kPolTM);
-    const float r_eff = 0.5f * (te.cap_r + tm.cap_r);
-    const float t_eff = 0.5f * (te.cap_t + tm.cap_t);
-    const float total = fmaxf(r_eff + t_eff, 1.0e-12f);
-    float p = fminf(fmaxf(t_eff / total, 0.05f), 0.95f);
-    if (t_eff <= 0.0f) {
-        p = 0.0f;
-    }
-    if (r_eff <= 0.0f && t_eff > 0.0f) {
-        p = 1.0f;
-    }
-    return p;
-}
 
-// One wavefront bounce of every live light subpath: select reflect or
-// transmit with one counter-based uniform, evaluate only the selected branch,
-// divide the field by sqrt(p_event) and multiply the proposal density by
-// p_event, and update the subpath in place. Dead subpaths are left untouched.
-// counters[0] / counters[1] tally transmit / reflect events and alive counts
-// the subpaths that survive this bounce.
+struct BdptWavefrontMaterials {
+    int64_t face_count;
+    const int* face_material_id;
+    const bool* face_valid;
+    const float* face_gain;
+    const float* face_eps_r;
+    const float* face_sigma_e;
+    const float* face_mu_r;
+    const float* face_thickness;
+    int64_t material_count;
+    int64_t layer_total;
+    const int* layer_offset;
+    const int* layer_count;
+    const float* layer_thickness_m;
+    const float* layer_eps_r;
+    const float* layer_sigma_e;
+    const float* layer_mu_r;
+};
+
+namespace wf = channel::bdpt_wavefront;
+
+// One wavefront bounce of every live light subpath. One counter-based uniform
+// partitions scatter (rough faces only) / transmit / reflect; only the selected
+// branch is evaluated. Reflect and transmit divide the Jones field by
+// sqrt(p_event) and multiply the proposal density by p_event (the rough
+// reflect branch also by the coherent attenuation C_r). Scatter samples a
+// Kirchhoff lobe direction, clears the Jones field, seeds the unpolarized
+// carrier and records the vertex for next-event estimation; it terminates the
+// subpath at max_order scatter events. Dead subpaths are untouched.
+// counters: [0] transmit, [1] reflect, [2] scatter events; alive counts survivors.
 __global__ void bdpt_wavefront_step_kernel(
     int64_t count,
     int64_t first,
@@ -902,138 +902,269 @@ __global__ void bdpt_wavefront_step_kernel(
     const float* hit_p,
     const float* hit_n,
     const int* hit_prim,
-    int64_t face_count,
-    const int* face_material_id,
-    const bool* face_valid,
-    const float* face_gain,
-    const float* face_eps_r,
-    const float* face_sigma_e,
-    const float* face_mu_r,
-    const float* face_thickness,
-    int64_t material_count,
-    int64_t layer_total,
-    const int* layer_offset,
-    const int* layer_count,
-    const float* layer_thickness_m,
-    const float* layer_eps_r,
-    const float* layer_sigma_e,
-    const float* layer_mu_r,
+    BdptWavefrontMaterials materials,
+    wf::ScatterTables tables,
     float frequency_hz,
-    float* origin,
-    float* direction,
-    float* field_real,
-    float* field_imag,
-    float* pdf_forward,
-    float* path_length,
-    uint8_t* component_mask,
-    bool* valid,
+    wf::State state,
     unsigned long long* counters,
     unsigned long long* alive) {
     const int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     bool transmitted = false;
     bool reflected = false;
-    if (index < count && valid[index]) {
+    bool scattered = false;
+    if (index < count) {
+        // A scatter vertex is connected at the bounce that recorded it only.
+        state.component_mask[index] = static_cast<uint8_t>(state.component_mask[index] & ~wf::kMaskScatterVertex);
+    }
+    if (index < count && state.valid[index]) {
         const int64_t base = index * 3;
+        if (tables.enabled && depth == 0) {
+            // The first bounce of a chunk starts every subpath at zero scatter events.
+            state.scatter_count[index] = 0;
+        }
+        float* direction = state.direction + base;
         const int prim = hit_prim[index];
         const float t = hit_t[index];
-        const bool prim_in_range = prim >= 0 && static_cast<int64_t>(prim) < face_count;
-        const int material = prim_in_range ? face_material_id[prim] : -1;
+        const bool prim_in_range = prim >= 0 && static_cast<int64_t>(prim) < materials.face_count;
+        const int material = prim_in_range ? materials.face_material_id[prim] : -1;
         const bool hit_ok = prim_in_range && t >= 0.0f && material >= 0;
         const float cos_theta = fminf(
-            fmaxf(
-                fabsf(direction[base] * hit_n[base] + direction[base + 1] * hit_n[base + 1] +
-                      direction[base + 2] * hit_n[base + 2]),
-                1.0e-6f),
+            fmaxf(fabsf(direction[0] * hit_n[base] + direction[1] * hit_n[base + 1] +
+                        direction[2] * hit_n[base + 2]),
+                  1.0e-6f),
             1.0f);
         const em::LayerView layers{
-            layer_offset,
-            layer_count,
-            layer_thickness_m,
-            layer_eps_r,
-            layer_sigma_e,
-            layer_mu_r,
+            materials.layer_offset,
+            materials.layer_count,
+            materials.layer_thickness_m,
+            materials.layer_eps_r,
+            materials.layer_sigma_e,
+            materials.layer_mu_r,
             material,
         };
-        const float p_transmit = hit_ok
-            ? bdpt_transmit_event_probability(cos_theta, layers, material_count, layer_total, frequency_hz)
-            : 0.0f;
-        const float u = bdpt_counter_uniform(
-            seed,
-            kStreamEventSelection,
-            static_cast<unsigned long long>(first + index),
-            static_cast<unsigned long long>(depth));
-        const bool choose_transmit = hit_ok && u < p_transmit;
-        const utd::Complex3 incoming = {
-            utd::cplx(field_real[base], field_imag[base]),
-            utd::cplx(field_real[base + 1], field_imag[base + 1]),
-            utd::cplx(field_real[base + 2], field_imag[base + 2]),
-        };
-        utd::Complex3 updated = {};
-        float advance = 0.0f;
-        bool ok = false;
-        if (choose_transmit) {
-            ok = static_cast<int64_t>(material) < material_count;
-            if (ok) {
-                const BdptTransmitVertex vertex = bdpt_transmit_vertex(
-                    direction + base, hit_p + base, hit_n + base, incoming, layers, frequency_hz);
-                origin[base] = vertex.exit_point.x;
-                origin[base + 1] = vertex.exit_point.y;
-                origin[base + 2] = vertex.exit_point.z;
-                direction[base] = vertex.direction.x;
-                direction[base + 1] = vertex.direction.y;
-                direction[base + 2] = vertex.direction.z;
-                updated = vertex.field;
-                advance = fmaxf(t, 0.0f) + vertex.jump;
-            }
-        } else {
-            ok = prim_in_range && face_valid[prim] && t >= 0.0f;
-            if (ok) {
-                updated = bdpt_reflect_vertex(
-                    direction + base,
-                    hit_p + base,
-                    hit_n + base,
-                    face_eps_r[prim],
-                    face_sigma_e[prim],
-                    face_mu_r[prim],
-                    face_gain[prim],
-                    face_thickness[prim],
-                    frequency_hz,
-                    incoming,
-                    origin + base,
-                    direction + base);
-                advance = fmaxf(t, 0.0f);
-            }
+        const bool stack_ok = hit_ok && static_cast<int64_t>(material) < materials.material_count &&
+            em::layer_material_usable(layers, materials.layer_total);
+        float r_eff = 0.0f;
+        float t_eff = 0.0f;
+        if (stack_ok) {
+            const em::StackRT te = em::stack_rt(cos_theta, layers, frequency_hz, em::kPolTE);
+            const em::StackRT tm = em::stack_rt(cos_theta, layers, frequency_hz, em::kPolTM);
+            r_eff = 0.5f * (te.cap_r + tm.cap_r);
+            t_eff = 0.5f * (te.cap_t + tm.cap_t);
         }
-        if (!ok) {
-            valid[index] = false;
+        float p_transmit = 0.0f;
+        float p_scatter = 0.0f;
+        float coherent = 1.0f;
+        const bool rough = tables.enabled && hit_ok && static_cast<int64_t>(material) < materials.material_count &&
+            tables.scatter_model[material] == 1 && tables.material_slot[material] >= 0;
+        if (rough) {
+            // Three-way budgets (R_coh, R_diff, T_bar), each positive budget
+            // floored at 0.05 and the triple renormalized.
+            const float k0 = 6.2831853071795864769f * frequency_hz / 299792458.0f;
+            const float roughness = k0 * cos_theta * tables.rough_sigma_h[material];
+            coherent = expf(-2.0f * roughness * roughness);
+            const float r_coh = r_eff * coherent * coherent;
+            const float r_diff = fmaxf(0.0f, r_eff - r_coh);
+            const float total = fmaxf(r_coh + r_diff + t_eff, 1.0e-12f);
+            float pr = r_coh / total;
+            float ps = r_diff / total;
+            float pt = t_eff / total;
+            if (r_coh > 0.0f) pr = fmaxf(pr, 0.05f);
+            if (r_diff > 0.0f) ps = fmaxf(ps, 0.05f);
+            if (t_eff > 0.0f) pt = fmaxf(pt, 0.05f);
+            const float norm = fmaxf(pr + ps + pt, 1.0e-12f);
+            p_scatter = ps / norm;
+            p_transmit = pt / norm;
+        } else if (hit_ok) {
+            const float total = fmaxf(r_eff + t_eff, 1.0e-12f);
+            p_transmit = fminf(fmaxf(t_eff / total, 0.05f), 0.95f);
+            if (t_eff <= 0.0f) p_transmit = 0.0f;
+            if (r_eff <= 0.0f && t_eff > 0.0f) p_transmit = 1.0f;
+        }
+        const unsigned long long global = static_cast<unsigned long long>(first + index);
+        const float u = bdpt_counter_uniform(seed, kStreamEventSelection, global, static_cast<unsigned long long>(depth));
+        const bool choose_scatter = hit_ok && u < p_scatter;
+        const bool choose_transmit = hit_ok && !choose_scatter && u < p_scatter + p_transmit;
+        const bool already_scattered = (state.component_mask[index] & wf::kMaskScattering) != 0;
+        const utd::Complex3 incoming = {
+            utd::cplx(state.field_real[base], state.field_imag[base]),
+            utd::cplx(state.field_real[base + 1], state.field_imag[base + 1]),
+            utd::cplx(state.field_real[base + 2], state.field_imag[base + 2]),
+        };
+        if (choose_scatter) {
+            const int slot = tables.material_slot[material];
+            const wf::TableView table = wf::table_view(tables, slot);
+            float normal[3] = {hit_n[base], hit_n[base + 1], hit_n[base + 2]};
+            const float in[3] = {direction[0], direction[1], direction[2]};
+            if (wf::dot3(in, normal) > 0.0f) {
+                normal[0] = -normal[0];
+                normal[1] = -normal[1];
+                normal[2] = -normal[2];
+            }
+            float t1[3];
+            float t2[3];
+            wf::local_frame(normal, tables.rough_axis_rad[material], t1, t2);
+            const float wi_world[3] = {-in[0], -in[1], -in[2]};
+            const float wi_local[3] = {wf::dot3(wi_world, t1), wf::dot3(wi_world, t2), wf::dot3(wi_world, normal)};
+            float p_te;
+            float p_tm;
+            if (already_scattered) {
+                // The carried unpolarized power splits evenly over TE/TM.
+                const float carried = state.carrier[index] * state.carrier[index];
+                p_te = 0.5f * carried;
+                p_tm = 0.5f * carried;
+            } else {
+                float s[3];
+                wf::cross3(in, normal, s);
+                if (wf::dot3(s, s) > 1.0e-12f) {
+                    wf::normalize3(s);
+                } else {
+                    float substitute_t2[3];
+                    wf::local_frame(in, 0.0f, s, substitute_t2);
+                }
+                float p[3];
+                wf::cross3(s, in, p);
+                const float re[3] = {incoming.x.re, incoming.y.re, incoming.z.re};
+                const float im[3] = {incoming.x.im, incoming.y.im, incoming.z.im};
+                const float sr = wf::dot3(re, s);
+                const float si = wf::dot3(im, s);
+                const float pr = wf::dot3(re, p);
+                const float pi = wf::dot3(im, p);
+                p_te = sr * sr + si * si;
+                p_tm = pr * pr + pi * pi;
+            }
+            const float u0 = bdpt_counter_uniform(seed, kStreamScatterU0, global, static_cast<unsigned long long>(depth));
+            const float u1 = bdpt_counter_uniform(seed, kStreamScatterU1, global, static_cast<unsigned long long>(depth));
+            float wo_local[3];
+            float pdf_lobe = 0.0f;
+            float pdf_lobe_reverse = 0.0f;
+            rayd::shared::scattering::sample_direction(
+                table.marginal, table.conditional, table.density, table.nti, table.npi, table.nto, table.npo, wi_local,
+                u0, u1, wo_local, pdf_lobe, pdf_lobe_reverse);
+            float f_te = 0.0f;
+            float f_tm = 0.0f;
+            rayd::shared::scattering::eval_te_tm(
+                table.f_te, table.f_tm, table.nti, table.npi, table.nto, table.npo, wi_local, wo_local, f_te, f_tm);
+            const float incident_power = fmaxf(p_te + p_tm, 1.0e-20f);
+            const float f_weighted = (p_te * f_te + p_tm * f_tm) / incident_power;
+            const float cos_o = fmaxf(wo_local[2], 0.0f);
+            const bool lobe_ok = pdf_lobe > 0.0f && cos_o > 0.0f;
+            if (lobe_ok) {
+                const float power_scale =
+                    f_weighted * cos_o / (fmaxf(pdf_lobe, 1.0e-12f) * fmaxf(p_scatter, 1.0e-4f));
+                const float hit_point[3] = {hit_p[base], hit_p[base + 1], hit_p[base + 2]};
+                const float epsilon = wf::scale_epsilon(hit_point, tables.epsilon_floor);
+                for (int axis = 0; axis < 3; ++axis) {
+                    const float wo_world = wo_local[0] * t1[axis] + wo_local[1] * t2[axis] + wo_local[2] * normal[axis];
+                    state.nee_position[base + axis] = hit_point[axis];
+                    state.nee_normal[base + axis] = normal[axis];
+                    state.nee_wi_local[base + axis] = wi_local[axis];
+                    direction[axis] = wo_world;
+                    state.origin[base + axis] = hit_point[axis] + wo_world * epsilon;
+                    state.field_real[base + axis] = 0.0f;
+                    state.field_imag[base + axis] = 0.0f;
+                }
+                state.nee_p_te[index] = p_te;
+                state.nee_p_tm[index] = p_tm;
+                state.nee_p_scatter[index] = p_scatter;
+                state.nee_material[index] = material;
+                state.path_length[index] = state.path_length[index] + fmaxf(t, 0.0f);
+                state.nee_path_length[index] = state.path_length[index];
+                state.carrier[index] = sqrtf(incident_power) * sqrtf(power_scale);
+                state.pdf_forward[index] = state.pdf_forward[index] * p_scatter * pdf_lobe;
+                state.component_mask[index] =
+                    static_cast<uint8_t>(state.component_mask[index] | wf::kMaskScattering | wf::kMaskScatterVertex);
+                const int scatter_events = static_cast<int>(state.scatter_count[index]) + 1;
+                state.scatter_count[index] = static_cast<uint8_t>(min(scatter_events, 255));
+                scattered = true;
+                // Order 1 connects and terminates; higher orders continue
+                // until the scatter cap.
+                state.valid[index] = scatter_events < tables.max_order;
+            } else {
+                state.valid[index] = false;
+            }
         } else {
-            const float p_event = choose_transmit ? p_transmit : 1.0f - p_transmit;
-            const float scale = rsqrtf(fmaxf(p_event, 1.0e-4f));
-            field_real[base] = updated.x.re * scale;
-            field_real[base + 1] = updated.y.re * scale;
-            field_real[base + 2] = updated.z.re * scale;
-            field_imag[base] = updated.x.im * scale;
-            field_imag[base + 1] = updated.y.im * scale;
-            field_imag[base + 2] = updated.z.im * scale;
-            pdf_forward[index] = pdf_forward[index] * p_event;
-            path_length[index] = path_length[index] + advance;
-            component_mask[index] = static_cast<uint8_t>(
-                component_mask[index] | (choose_transmit ? 8 : 2));
-            transmitted = choose_transmit;
-            reflected = !choose_transmit;
+            utd::Complex3 updated = {};
+            float advance = 0.0f;
+            float event_amplitude = 1.0f;
+            bool ok = false;
+            if (choose_transmit) {
+                ok = static_cast<int64_t>(material) < materials.material_count;
+                if (ok) {
+                    const BdptTransmitVertex vertex = bdpt_transmit_vertex(
+                        direction, hit_p + base, hit_n + base, incoming, layers, frequency_hz);
+                    state.origin[base] = vertex.exit_point.x;
+                    state.origin[base + 1] = vertex.exit_point.y;
+                    state.origin[base + 2] = vertex.exit_point.z;
+                    direction[0] = vertex.direction.x;
+                    direction[1] = vertex.direction.y;
+                    direction[2] = vertex.direction.z;
+                    updated = vertex.field;
+                    advance = fmaxf(t, 0.0f) + vertex.jump;
+                    event_amplitude = vertex.amplitude;
+                }
+            } else {
+                ok = prim_in_range && materials.face_valid[prim] && t >= 0.0f;
+                if (ok) {
+                    if (already_scattered) {
+                        event_amplitude = sqrtf(fmaxf(materials.face_gain[prim], 0.0f) *
+                                                effective_power_reflectance(
+                                                    direction, hit_n + base, materials.face_eps_r[prim],
+                                                    materials.face_sigma_e[prim], materials.face_mu_r[prim],
+                                                    frequency_hz));
+                    }
+                    updated = bdpt_reflect_vertex(
+                        direction,
+                        hit_p + base,
+                        hit_n + base,
+                        materials.face_eps_r[prim],
+                        materials.face_sigma_e[prim],
+                        materials.face_mu_r[prim],
+                        materials.face_gain[prim],
+                        materials.face_thickness[prim],
+                        frequency_hz,
+                        incoming,
+                        state.origin + base,
+                        direction);
+                    advance = fmaxf(t, 0.0f);
+                }
+            }
+            if (!ok) {
+                state.valid[index] = false;
+            } else {
+                const float p_event = choose_transmit ? p_transmit : 1.0f - p_scatter - p_transmit;
+                float scale = rsqrtf(fmaxf(p_event, 1.0e-4f));
+                if (rough && !choose_transmit) {
+                    scale = scale * coherent;
+                }
+                state.field_real[base] = updated.x.re * scale;
+                state.field_real[base + 1] = updated.y.re * scale;
+                state.field_real[base + 2] = updated.z.re * scale;
+                state.field_imag[base] = updated.x.im * scale;
+                state.field_imag[base + 1] = updated.y.im * scale;
+                state.field_imag[base + 2] = updated.z.im * scale;
+                if (already_scattered) {
+                    state.carrier[index] = state.carrier[index] * event_amplitude * scale;
+                }
+                state.pdf_forward[index] = state.pdf_forward[index] * p_event;
+                state.path_length[index] = state.path_length[index] + advance;
+                state.component_mask[index] = static_cast<uint8_t>(
+                    state.component_mask[index] | (choose_transmit ? wf::kMaskTransmission : wf::kMaskReflection));
+                transmitted = choose_transmit;
+                reflected = !choose_transmit;
+            }
         }
     }
     const int block_transmitted = __syncthreads_count(transmitted);
     const int block_reflected = __syncthreads_count(reflected);
+    const int block_scattered = __syncthreads_count(scattered);
+    const int block_alive = __syncthreads_count(index < count && state.valid[index]);
     if (threadIdx.x == 0) {
-        if (block_transmitted > 0) {
-            atomicAdd(counters, static_cast<unsigned long long>(block_transmitted));
-        }
-        if (block_reflected > 0) {
-            atomicAdd(counters + 1, static_cast<unsigned long long>(block_reflected));
-        }
-        if (block_transmitted + block_reflected > 0) {
-            atomicAdd(alive, static_cast<unsigned long long>(block_transmitted + block_reflected));
+        if (block_transmitted > 0) atomicAdd(counters, static_cast<unsigned long long>(block_transmitted));
+        if (block_reflected > 0) atomicAdd(counters + 1, static_cast<unsigned long long>(block_reflected));
+        if (block_scattered > 0) atomicAdd(counters + 2, static_cast<unsigned long long>(block_scattered));
+        if (block_alive + block_scattered > 0) {
+            atomicAdd(alive, static_cast<unsigned long long>(block_alive + block_scattered));
         }
     }
 }
@@ -2919,36 +3050,38 @@ void channel_bdpt_wavefront_step_cuda(
     const at::Tensor& hit_p,
     const at::Tensor& hit_n,
     const at::Tensor& hit_prim,
-    const at::Tensor& face_material_id,
-    const at::Tensor& face_valid,
-    const at::Tensor& face_gain,
-    const at::Tensor& face_eps_r,
-    const at::Tensor& face_sigma_e,
-    const at::Tensor& face_mu_r,
-    const at::Tensor& face_thickness,
-    const at::Tensor& layer_offset,
-    const at::Tensor& layer_count,
-    const at::Tensor& layer_thickness_m,
-    const at::Tensor& layer_eps_r,
-    const at::Tensor& layer_sigma_e,
-    const at::Tensor& layer_mu_r,
+    const std::vector<at::Tensor>& materials,
+    const channel::bdpt_wavefront::ScatterTables& tables,
     double frequency_hz,
-    at::Tensor& origin,
-    at::Tensor& direction,
-    at::Tensor& field_real,
-    at::Tensor& field_imag,
-    at::Tensor& pdf_forward,
-    at::Tensor& path_length,
-    at::Tensor& component_mask,
-    at::Tensor& valid,
+    const channel::bdpt_wavefront::State& state,
     at::Tensor& counters,
     at::Tensor& alive) {
     if (count == 0) {
         return;
     }
+    // materials: face material id, valid, gain, eps_r, sigma_e, mu_r, thickness,
+    // layer offset, layer count, layer thickness, eps_r, sigma_e, mu_r.
+    const BdptWavefrontMaterials view{
+        materials[0].size(0),
+        materials[0].data_ptr<int>(),
+        materials[1].data_ptr<bool>(),
+        materials[2].data_ptr<float>(),
+        materials[3].data_ptr<float>(),
+        materials[4].data_ptr<float>(),
+        materials[5].data_ptr<float>(),
+        materials[6].data_ptr<float>(),
+        materials[7].size(0),
+        materials[10].size(0),
+        materials[7].data_ptr<int>(),
+        materials[8].data_ptr<int>(),
+        materials[9].data_ptr<float>(),
+        materials[10].data_ptr<float>(),
+        materials[11].data_ptr<float>(),
+        materials[12].data_ptr<float>(),
+    };
     constexpr int threads = 256;
     const int blocks = static_cast<int>((count + threads - 1) / threads);
-    cudaStream_t stream = at::cuda::getCurrentCUDAStream(origin.get_device()).stream();
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(hit_t.get_device()).stream();
     bdpt_wavefront_step_kernel<<<blocks, threads, 0, stream>>>(
         count,
         first,
@@ -2958,31 +3091,10 @@ void channel_bdpt_wavefront_step_cuda(
         hit_p.data_ptr<float>(),
         hit_n.data_ptr<float>(),
         hit_prim.data_ptr<int>(),
-        face_material_id.size(0),
-        face_material_id.data_ptr<int>(),
-        face_valid.data_ptr<bool>(),
-        face_gain.data_ptr<float>(),
-        face_eps_r.data_ptr<float>(),
-        face_sigma_e.data_ptr<float>(),
-        face_mu_r.data_ptr<float>(),
-        face_thickness.data_ptr<float>(),
-        layer_offset.size(0),
-        layer_eps_r.size(0),
-        layer_offset.data_ptr<int>(),
-        layer_count.data_ptr<int>(),
-        layer_thickness_m.data_ptr<float>(),
-        layer_eps_r.data_ptr<float>(),
-        layer_sigma_e.data_ptr<float>(),
-        layer_mu_r.data_ptr<float>(),
+        view,
+        tables,
         static_cast<float>(frequency_hz),
-        origin.data_ptr<float>(),
-        direction.data_ptr<float>(),
-        field_real.data_ptr<float>(),
-        field_imag.data_ptr<float>(),
-        pdf_forward.data_ptr<float>(),
-        path_length.data_ptr<float>(),
-        component_mask.data_ptr<uint8_t>(),
-        valid.data_ptr<bool>(),
+        state,
         reinterpret_cast<unsigned long long*>(counters.data_ptr<int64_t>()),
         reinterpret_cast<unsigned long long*>(alive.data_ptr<int64_t>()));
     C10_CUDA_KERNEL_LAUNCH_CHECK();

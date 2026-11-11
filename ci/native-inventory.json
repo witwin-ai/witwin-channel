@@ -134,6 +134,7 @@
         "bdpt_endpoint_connection_visibility_inputs_kernel",
         "bdpt_filter_connection_samples_kernel",
         "bdpt_finalize_coherent_accumulation_kernel",
+        "bdpt_iota_kernel",
         "bdpt_mis_weights_kernel",
         "bdpt_sorted_coherent_jvp_finalize_kernel",
         "bdpt_sorted_gather_kernel",
@@ -142,6 +143,7 @@
         "bdpt_sorted_scatter_kernel",
         "bdpt_wavefront_connect_accumulate_kernel",
         "bdpt_wavefront_finalize_kernel",
+        "bdpt_wavefront_pack_rows_kernel",
         "bdpt_wavefront_visibility_inputs_kernel"
       ],
       "launches": [
@@ -163,6 +165,7 @@
         "bdpt_endpoint_connection_visibility_inputs_kernel",
         "bdpt_filter_connection_samples_kernel",
         "bdpt_finalize_coherent_accumulation_kernel",
+        "bdpt_iota_kernel",
         "bdpt_mis_weights_kernel",
         "bdpt_sorted_coherent_jvp_finalize_kernel",
         "bdpt_sorted_gather_kernel",
@@ -171,6 +174,7 @@
         "bdpt_sorted_scatter_kernel",
         "bdpt_wavefront_connect_accumulate_kernel",
         "bdpt_wavefront_finalize_kernel",
+        "bdpt_wavefront_pack_rows_kernel",
         "bdpt_wavefront_visibility_inputs_kernel"
       ],
       "host_synchronization": [
@@ -224,6 +228,13 @@
         "finalize_maps_backward_kernel",
         "finalize_maps_jvp_kernel"
       ],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/bdpt_wavefront.cuh": {
+      "kernels": [],
+      "launches": [],
       "host_synchronization": [],
       "device_trap": false,
       "compile_options": []

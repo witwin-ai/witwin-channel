@@ -811,7 +811,7 @@
       "name": "bdpt_wavefront_transmission",
       "target": "channel_bdpt_wavefront_transmission",
       "return_type": "pybind11::dict",
-      "doc": "Run the fused all-transmitter BDPT mixed reflection+transmission wavefront.",
+      "doc": "Run the fused all-transmitter BDPT wavefront: mixed chains and rough-face scatter connections.",
       "parameters": [
         ["scene", "RayDSceneResource&", null],
         ["tx_positions", "torch::Tensor", null],
@@ -820,15 +820,21 @@
         ["rx_positions", "torch::Tensor", null],
         ["rx_polarization", "torch::Tensor", null],
         ["materials", "pybind11::dict", null],
+        ["scatter", "pybind11::object", null],
         ["base_transmission", "torch::Tensor", null],
+        ["base_scattering", "torch::Tensor", null],
         ["frequency_hz", "double", null],
         ["samples", "int64_t", null],
         ["max_depth", "int64_t", null],
         ["seed", "int64_t", null],
         ["mode_id", "int64_t", null],
         ["beta", "double", null],
+        ["emit_mixed", "bool", null],
+        ["max_scattering_order", "int64_t", null],
+        ["scene_diagonal", "double", null],
         ["chunk_samples", "int64_t", null],
-        ["pair_tile", "int64_t", null]
+        ["pair_tile", "int64_t", null],
+        ["rows_capacity", "int64_t", null]
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_wavefront_transmission"]

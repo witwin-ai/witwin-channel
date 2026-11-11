@@ -94,15 +94,21 @@ pybind11::dict channel_bdpt_wavefront_transmission(
     torch::Tensor rx_positions,
     torch::Tensor rx_polarization,
     pybind11::dict materials,
+    pybind11::object scatter,
     torch::Tensor base_transmission,
+    torch::Tensor base_scattering,
     double frequency_hz,
     int64_t samples,
     int64_t max_depth,
     int64_t seed,
     int64_t mode_id,
     double beta,
+    bool emit_mixed,
+    int64_t max_scattering_order,
+    double scene_diagonal,
     int64_t chunk_samples,
-    int64_t pair_tile);
+    int64_t pair_tile,
+    int64_t rows_capacity);
 torch::Tensor channel_bdpt_mis_weights(
     torch::Tensor pdf,
     torch::Tensor strategy_pdf_sum,
@@ -555,7 +561,7 @@ void register_bdpt_components(pybind11::module_ &module) {
     module.def(
         "bdpt_wavefront_transmission",
         &channel_bdpt_wavefront_transmission,
-        "Run the fused all-transmitter BDPT mixed reflection+transmission wavefront.");
+        "Run the fused all-transmitter BDPT wavefront: mixed chains and rough-face scatter connections.");
     module.def(
         "bdpt_transmitter_tensors",
         &channel_bdpt_transmitter_tensors,

@@ -73,7 +73,7 @@ from witwin.channel.kernels.montecarlo import (
     bdpt_store_component_map as bdpt_store_component_map,
     bdpt_subpath_intersection_inputs,
     bdpt_transmitted_light_subpath_state,
-    bdpt_transmitter_tensors, bdpt_wavefront_transmission,
+    bdpt_transmitter_tensors, bdpt_wavefront_transmission, bdpt_scatter_table_stack,
     bdpt_zero_matrix,
 )
 from witwin.channel.materials import face_material_field_bundle
@@ -3741,19 +3741,162 @@ class _CollectedSamples:
 
 
 def _wavefront_eligible(config: Config, runtimes: dict[int, Any]) -> bool:
-    """The fused wavefront owns the sampler unless rows, AD or rough faces are needed.
+    """The fused wavefront owns the sampler unless AD is requested.
 
-    Exported paths and variance diagnostics need the connection rows, AD needs the
-    per-event subpath companions, and rough faces need the Kirchhoff scatter
-    branch; those solves run the event-composed sampler with the same native
-    counter-based random numbers.
+    AD needs the per-event subpath companions; those solves run the
+    event-composed sampler with the same native counter-based random numbers.
     """
 
-    return (
-        config.ad_mode == "none"
-        and not config.export_paths
-        and not config.diagnostics
-        and not runtimes
+    return config.ad_mode == "none"
+
+
+@dataclass(frozen=True, slots=True)
+class _Wavefront:
+    """Arguments of one solve's fused wavefront calls."""
+
+    scene: SolverScene
+    config: Config
+    prep: _SolvePrep
+    workspace: _EndpointWorkspace
+    materials: dict[str, torch.Tensor]
+    runtimes: dict[int, Any]
+    emit_mixed: bool
+
+    def run(
+        self, base: dict[str, torch.Tensor], rows_capacity: int | None = None,
+    ) -> dict[str, Any]:
+        workspace = self.workspace
+        return bdpt_wavefront_transmission(
+            self.prep.rayd,
+            workspace.tx_reference,
+            workspace.tx_power,
+            workspace.tx_polarization,
+            workspace.rx_positions,
+            workspace.rx_polarization,
+            self.materials,
+            base["transmission"],
+            base["scattering"],
+            scatter=(
+                bdpt_scatter_table_stack(self.runtimes, self.materials) if self.runtimes else None
+            ),
+            frequency_hz=_host_frequency(self.scene),
+            samples=self.prep.native_samples,
+            max_depth=self.prep.native_max_depth,
+            seed=int(self.config.seed),
+            mis_mode=_bdpt_mis_mode_id(self.config.mis),
+            beta=self.config.power_heuristic_beta,
+            emit_mixed=self.emit_mixed,
+            max_scattering_order=int(self.config.max_scattering_order),
+            scene_diagonal=scene_diagonal_m(self.scene) if self.runtimes else 0.0,
+            chunk_samples=_WAVEFRONT_CHUNK_SAMPLES,
+            pair_tile=_WAVEFRONT_PAIR_TILE,
+            rows_capacity=rows_capacity,
+        )
+
+
+def _wavefront_counts(counts: torch.Tensor, *, rows_counted: bool) -> dict[str, torch.Tensor]:
+    """Device metadata counts of a wavefront call; rows already in the estimate are not recounted."""
+
+    out = {
+        "transmit": counts[0],
+        "reflect": counts[1],
+        "scatter": counts[2],
+        "scattering_nee_rows": counts[4],
+    }
+    if not rows_counted:
+        out["wavefront_valid_rows"] = counts[3] + counts[4]
+    return out
+
+
+def _composed_sampler(
+    scene: SolverScene, config: Config, *, prep: _SolvePrep, workspace: _EndpointWorkspace,
+    materials: dict[str, torch.Tensor], runtimes: dict[int, Any], emit_mixed: bool,
+    ledger: AdLaunchLedger | None,
+) -> tuple[list[dict[str, torch.Tensor]], dict[str, torch.Tensor]]:
+    """Event-composed sampler with AD companions (same random numbers as the wavefront)."""
+
+    ad = config.ad_mode != "none"
+    return _transmission_sampled_connection_samples(
+        prep.rayd,
+        workspace.tx_reference,
+        workspace.tx_power,
+        workspace.tx_polarization,
+        workspace.rx_positions,
+        workspace.rx_polarization,
+        workspace.endpoint_subpaths["sensor"],
+        materials,
+        # Under AD the carrier stays a live tensor so lambda/frequency chains carry
+        # a gradient; the primal reads the host scalar.
+        frequency_hz=scene.frequency if ad else _host_frequency(scene),
+        samples=prep.native_samples,
+        max_depth=prep.native_max_depth,
+        seed=int(config.seed),
+        mis=config.mis,
+        beta=config.power_heuristic_beta,
+        scattering_runtimes=runtimes,
+        emit_mixed_transmission=emit_mixed,
+        scene_diagonal=scene_diagonal_m(scene),
+        max_scattering_order=int(config.max_scattering_order),
+        ad=ad,
+        ledger=ledger,
+    )
+
+
+def _accumulate_blocks(
+    config: Config, sample_blocks: list[dict[str, torch.Tensor]], *, prep: _SolvePrep,
+    workspace: _EndpointWorkspace,
+) -> tuple[dict[str, torch.Tensor] | None, dict[str, torch.Tensor]]:
+    """Concatenate the row blocks and accumulate them into the component matrices."""
+
+    if not sample_blocks:
+        return None, {
+            component: bdpt_zero_matrix(
+                workspace.tx_reference, rows=workspace.tx_count, cols=workspace.rx_count
+            )
+            for component in _COMPONENT_ORDER
+        }
+    estimate_samples = (
+        sample_blocks[0]
+        if len(sample_blocks) == 1
+        else bdpt_concat_connection_samples(tuple(sample_blocks))
+    )
+    accumulated = _accumulate_connection_samples(
+        config,
+        estimate_samples,
+        tx_count=workspace.tx_count,
+        rx_count=workspace.rx_count,
+        accumulation_strategy=prep.selected_accumulation,
+    )
+    return estimate_samples, {component: accumulated[component] for component in _COMPONENT_ORDER}
+
+
+def _endpoint_only_samples(workspace: _EndpointWorkspace) -> _CollectedSamples:
+    """LoS-only solve without structures: the endpoint connection block is the estimate."""
+
+    matrices = {
+        component: bdpt_zero_matrix(
+            workspace.tx_reference, rows=workspace.tx_count, cols=workspace.rx_count
+        )
+        for component in _COMPONENT_ORDER
+    }
+    matrices["los"] = workspace.endpoint_accumulation["los"]  # type: ignore[index]
+    return _CollectedSamples(
+        matrices=matrices,
+        estimate_samples=workspace.endpoint_connection_samples,
+        launch_count=workspace.launch_count,
+    )
+
+
+def _enumerated_components(config: Config, prep: _SolvePrep) -> frozenset[str]:
+    """Requested delta/UTD classes whose native capability is available."""
+
+    available = {
+        "reflection": prep.reflection_available,
+        "diffraction": prep.diffraction_available,
+        "transmission": prep.transmission_available,
+    }
+    return frozenset(
+        component for component, ok in available.items() if component in config.components and ok
     )
 
 
@@ -3769,20 +3912,12 @@ def _collect_connection_samples(
             scene, config, prep=prep, workspace=workspace, ledger=ledger
         )
     tx_reference = workspace.tx_reference
-    tx_count = workspace.tx_count
-    rx_count = workspace.rx_count
 
     def zero_component_matrix() -> torch.Tensor:
-        return bdpt_zero_matrix(tx_reference, rows=tx_count, cols=rx_count)
+        return bdpt_zero_matrix(tx_reference, rows=workspace.tx_count, cols=workspace.rx_count)
 
     if workspace.endpoint_only:
-        matrices = {component: zero_component_matrix() for component in _COMPONENT_ORDER}
-        matrices["los"] = workspace.endpoint_accumulation["los"]  # type: ignore[index]
-        return _CollectedSamples(
-            matrices=matrices,
-            estimate_samples=workspace.endpoint_connection_samples,
-            launch_count=workspace.launch_count,
-        )
+        return _endpoint_only_samples(workspace)
     ad = config.ad_mode != "none"
     # Live per-tx power under ad reattaches the tx_power gradient onto the
     # enumerated discrete blocks (linear coefficient) and the LoS companion.
@@ -3809,16 +3944,7 @@ def _collect_connection_samples(
         )
         launch_count += 2 if scene.structures else 1
     structured = bool(scene.structures) and prep.native_max_depth >= 1
-    available = {
-        "reflection": prep.reflection_available,
-        "diffraction": prep.diffraction_available,
-        "transmission": prep.transmission_available,
-    }
-    enumerated = frozenset(
-        component
-        for component, ok in available.items()
-        if component in config.components and ok and structured
-    )
+    enumerated = _enumerated_components(config, prep) if structured else frozenset()
     block = _enumerated_discrete_connection_samples(
         workspace.topology_scene, config, components=enumerated, tx_power=enumerated_tx_power
     )
@@ -3842,81 +3968,53 @@ def _collect_connection_samples(
     wavefront_materials: dict[str, torch.Tensor] | None = None
     if transmission_requested or runtimes:
         material_bundle = face_material_field_bundle(scene, device=tx_reference.device)
-        if transmission_requested and _wavefront_eligible(config, runtimes):
+        if _wavefront_eligible(config, runtimes):
             sampler = "wavefront"
             wavefront_materials = material_bundle
         else:
             sampler = "event_composed"
-            mixed_blocks, event_counts = _transmission_sampled_connection_samples(
-                prep.rayd,
-                tx_reference,
-                workspace.tx_power,
-                workspace.tx_polarization,
-                workspace.rx_positions,
-                workspace.rx_polarization,
-                workspace.endpoint_subpaths["sensor"],
-                material_bundle,
-                # Under AD the carrier stays a live tensor so lambda/frequency
-                # chains carry a gradient; the primal reads the host scalar.
-                frequency_hz=scene.frequency if ad else _host_frequency(scene),
-                samples=prep.native_samples,
-                max_depth=prep.native_max_depth,
-                seed=int(config.seed),
-                mis=config.mis,
-                beta=config.power_heuristic_beta,
-                scattering_runtimes=runtimes,
-                emit_mixed_transmission=transmission_requested,
-                scene_diagonal=scene_diagonal_m(scene),
-                ad=ad,
-                ledger=ledger,
+            mixed_blocks, event_counts = _composed_sampler(
+                scene, config, prep=prep, workspace=workspace, materials=material_bundle,
+                runtimes=runtimes, emit_mixed=transmission_requested, ledger=ledger,
             )
             sample_blocks.extend(mixed_blocks)
             device_counts.update(event_counts)
             launch_count += 3
-    estimate_samples = None
-    if sample_blocks:
-        estimate_samples = (
-            sample_blocks[0]
-            if len(sample_blocks) == 1
-            else bdpt_concat_connection_samples(tuple(sample_blocks))
+    wavefront = (
+        None
+        if wavefront_materials is None
+        else _Wavefront(
+            scene=scene, config=config, prep=prep, workspace=workspace,
+            materials=wavefront_materials, runtimes=runtimes, emit_mixed=transmission_requested,
         )
-        accumulated = _accumulate_connection_samples(
-            config,
-            estimate_samples,
-            tx_count=tx_count,
-            rx_count=rx_count,
-            accumulation_strategy=prep.selected_accumulation,
-        )
-        matrices = {component: accumulated[component] for component in _COMPONENT_ORDER}
-    else:
-        matrices = {component: zero_component_matrix() for component in _COMPONENT_ORDER}
-    if wavefront_materials is not None:
-        # The fused wavefront adds its mixed reflection+transmission estimate to
-        # the accumulated transmission matrix without materializing rows.
-        sampled = bdpt_wavefront_transmission(
-            prep.rayd,
-            tx_reference,
-            workspace.tx_power,
-            workspace.tx_polarization,
-            workspace.rx_positions,
-            workspace.rx_polarization,
-            wavefront_materials,
-            matrices["transmission"],
-            frequency_hz=_host_frequency(scene),
-            samples=prep.native_samples,
-            max_depth=prep.native_max_depth,
-            seed=int(config.seed),
-            mis_mode=_bdpt_mis_mode_id(config.mis),
-            beta=config.power_heuristic_beta,
-            chunk_samples=_WAVEFRONT_CHUNK_SAMPLES,
-            pair_tile=_WAVEFRONT_PAIR_TILE,
-        )
-        matrices["transmission"] = sampled["transmission"]
-        counts = sampled["counts"]
-        device_counts["transmit"] = counts[0]
-        device_counts["reflect"] = counts[1]
-        device_counts["wavefront_valid_rows"] = counts[2]
+    )
+    sampled: dict[str, Any] | None = None
+    rows_needed = config.export_paths or config.diagnostics
+    if wavefront is not None and rows_needed:
+        # Exported paths and variance need the rows: one counting pass, the
+        # sanctioned compact-cardinality copy of the row count, and a second pass
+        # (same random numbers, same rows) that writes exactly that many rows.
+        zeros = {name: zero_component_matrix() for name in ("transmission", "scattering")}
+        counted = wavefront.run(zeros)["counts"]
+        row_count = int(counted[3:5].sum())
+        sampled = wavefront.run(zeros, rows_capacity=row_count)
+        if row_count:
+            sample_blocks.append(sampled["rows"])
         launch_count += 3
+    estimate_samples, matrices = _accumulate_blocks(
+        config, sample_blocks, prep=prep, workspace=workspace
+    )
+    if wavefront is not None and sampled is None:
+        # The fused wavefront adds its mixed-chain and scatter next-event estimates
+        # to the accumulated matrices without materializing rows.
+        sampled = wavefront.run(matrices)
+        matrices["transmission"] = sampled["transmission"]
+        matrices["scattering"] = sampled["scattering"]
+        launch_count += 3
+    if sampled is not None:
+        device_counts.update(
+            _wavefront_counts(sampled["counts"], rows_counted=estimate_samples is not None and rows_needed)
+        )
     return _CollectedSamples(
         matrices=matrices,
         estimate_samples=estimate_samples,

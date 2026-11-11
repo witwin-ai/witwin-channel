@@ -11,6 +11,8 @@
 
 #include <cub/cub.cuh>
 
+#include "bdpt_wavefront.cuh"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -3126,21 +3128,121 @@ pybind11::dict channel_bdpt_endpoint_connection_samples_jvp_cuda(
 
 namespace {
 
+namespace wf = channel::bdpt_wavefront;
+
 constexpr int kWavefrontMixedMask = kMaskReflection | kMaskTransmission;
 
+// Optional connection-row output (export and diagnostics): rows land at atomic
+// slots below capacity with a (sample, bounce, receiver) key for a stable sort.
+struct BdptWavefrontRows {
+    int64_t capacity;
+    unsigned long long* cursor;
+    int64_t* key;
+    int* tx_id;
+    int* rx_id;
+    int* component_id;
+    int* light_depth;
+    float* contribution;
+    float* pdf;
+    float* mis_weight;
+    float* path_length;
+};
+
+__device__ void bdpt_wavefront_write_row(
+    const BdptWavefrontRows& rows, int64_t key, int tx, int rx, int component, int depth, float contribution,
+    float pdf, float mis_weight, float path_length) {
+    if (rows.capacity <= 0) {
+        return;
+    }
+    const unsigned long long slot = atomicAdd(rows.cursor, 1ULL);
+    if (slot >= static_cast<unsigned long long>(rows.capacity)) {
+        return;
+    }
+    rows.key[slot] = key;
+    rows.tx_id[slot] = tx;
+    rows.rx_id[slot] = rx;
+    rows.component_id[slot] = component;
+    rows.light_depth[slot] = depth;
+    rows.contribution[slot] = contribution;
+    rows.pdf[slot] = pdf;
+    rows.mis_weight[slot] = mis_weight;
+    rows.path_length[slot] = path_length;
+}
+
+// Radiometric constants of the scatter next-event row.
+struct BdptNeeConstants {
+    float amplitude_sq;   // (lambda / (4 pi))^2
+    float four_pi;
+    float samples;        // samples per transmitter
+};
+
+// Scatter next-event row of a recorded scatter vertex to one receiver:
+// source_power * (P_te f_te + P_tm f_tm) * cos_o * (lambda/4pi)^2 * 4pi /
+// (r^2 * max(p_s, 1e-4) * samples). Returns false when the receiver lies behind
+// the mean plane or the row carries no power.
+__device__ bool bdpt_nee_row(
+    const wf::State& state,
+    const wf::ScatterTables& tables,
+    int64_t light,
+    const float* rx_position,
+    float source_power,
+    const BdptNeeConstants& constants,
+    float* wo_world,
+    float& r2,
+    float& contribution,
+    float* pdf_omega = nullptr) {
+    const float* position = state.nee_position + light * 3;
+    const float* normal = state.nee_normal + light * 3;
+    const float delta[3] = {
+        rx_position[0] - position[0], rx_position[1] - position[1], rx_position[2] - position[2]};
+    r2 = fmaxf(sqrtf(wf::dot3(delta, delta)), 1.0e-6f);
+    for (int axis = 0; axis < 3; ++axis) {
+        wo_world[axis] = delta[axis] / r2;
+    }
+    const float cos_o = wf::dot3(wo_world, normal);
+    contribution = 0.0f;
+    if (!(cos_o > 0.0f)) {
+        return false;
+    }
+    const int material = state.nee_material[light];
+    float t1[3];
+    float t2[3];
+    wf::local_frame(normal, tables.rough_axis_rad[material], t1, t2);
+    const float wo_local[3] = {wf::dot3(wo_world, t1), wf::dot3(wo_world, t2), wf::dot3(wo_world, normal)};
+    const wf::TableView table = wf::table_view(tables, tables.material_slot[material]);
+    float f_te = 0.0f;
+    float f_tm = 0.0f;
+    rayd::shared::scattering::eval_te_tm(
+        table.f_te, table.f_tm, table.nti, table.npi, table.nto, table.npo, state.nee_wi_local + light * 3,
+        wo_local, f_te, f_tm);
+    if (pdf_omega != nullptr) {
+        *pdf_omega = rayd::shared::scattering::table_pdf(
+            table.density, table.nti, table.npi, table.nto, table.npo, state.nee_wi_local + light * 3, wo_local);
+    }
+    const float power_kernel = state.nee_p_te[light] * f_te + state.nee_p_tm[light] * f_tm;
+    const float geometry = fmaxf(cos_o, 0.0f) * constants.amplitude_sq * constants.four_pi / (r2 * r2);
+    contribution = source_power * power_kernel * geometry /
+        (fmaxf(state.nee_p_scatter[light], 1.0e-4f) * constants.samples);
+    return contribution > 0.0f;
+}
+
 // Tile pair p connects light vertex p / rx_tile to receiver rx_begin + p % rx_tile.
-// Only live mixed reflection+transmission vertices facing the receiver are
-// active; inactive pairs are skipped by the visibility query.
+// A pair is active for a live mixed reflection+transmission vertex facing the
+// receiver (segment from the vertex) or for a recorded scatter vertex with a
+// powered next-event row (segment from the vertex offset toward the receiver).
+// Inactive pairs are skipped by the visibility query.
 __global__ void bdpt_wavefront_visibility_inputs_kernel(
     int64_t pairs,
     int64_t rx_tile,
     int64_t rx_begin,
+    int64_t first,
+    int64_t samples,
     int light_depth,
     const unsigned long long* alive,
-    const float* origin,
-    const float* direction,
-    const uint8_t* component_mask,
-    const bool* valid,
+    wf::State state,
+    wf::ScatterTables tables,
+    BdptNeeConstants constants,
+    const float* tx_power,
     const float* rx_positions,
     float* start,
     float* end,
@@ -3151,24 +3253,41 @@ __global__ void bdpt_wavefront_visibility_inputs_kernel(
     }
     const int64_t light = pair / rx_tile;
     const int64_t rx = rx_begin + (pair - light * rx_tile);
-    bool connect = alive[0] > 0ULL && valid[light] &&
-        (component_mask[light] & kWavefrontMixedMask) == kWavefrontMixedMask &&
-        (component_mask[light] & kMaskScattering) == 0;
-    if (connect) {
-        connect = bdpt_connection_geometry(
-            origin + light * 3, direction + light * 3, light_depth, rx_positions + rx * 3)
-            .direction_valid;
+    const int mask = state.component_mask[light];
+    bool connect = false;
+    float offset[3] = {0.0f, 0.0f, 0.0f};
+    const float* origin = state.origin + light * 3;
+    if (alive[0] > 0ULL) {
+        if ((mask & wf::kMaskScatterVertex) != 0) {
+            float wo[3];
+            float r2;
+            float contribution;
+            const int64_t tx = (first + light) / samples;
+            connect = bdpt_nee_row(state, tables, light, rx_positions + rx * 3, tx_power[tx], constants, wo, r2,
+                                   contribution);
+            origin = state.nee_position + light * 3;
+            const float epsilon = wf::scale_epsilon(origin, tables.epsilon_floor);
+            for (int axis = 0; axis < 3; ++axis) {
+                offset[axis] = wo[axis] * epsilon;
+            }
+        } else if (tables.emit_mixed && state.valid[light] &&
+                   (mask & kWavefrontMixedMask) == kWavefrontMixedMask &&
+                   (mask & kMaskScattering) == 0) {
+            connect = bdpt_connection_geometry(
+                origin, state.direction + light * 3, light_depth, rx_positions + rx * 3).direction_valid;
+        }
     }
     for (int axis = 0; axis < 3; ++axis) {
-        start[pair * 3 + axis] = origin[light * 3 + axis];
+        start[pair * 3 + axis] = origin[axis] + offset[axis];
         end[pair * 3 + axis] = rx_positions[rx * 3 + axis];
     }
     active[pair] = connect;
 }
 
-// Visible active pairs evaluate their connection row and add contribution *
-// MIS weight straight into the double [tx, rx] transmission accumulator; no row
-// is stored. valid_rows counts the accumulated rows.
+// Visible active pairs evaluate their row and add contribution * MIS weight
+// straight into the double [tx, rx] transmission (mixed chains) or scattering
+// (next-event rows) accumulator; no row is stored. rows[0] / rows[1] count the
+// accumulated mixed / scatter rows.
 __global__ void bdpt_wavefront_connect_accumulate_kernel(
     int64_t pairs,
     int64_t rx_tile,
@@ -3179,12 +3298,9 @@ __global__ void bdpt_wavefront_connect_accumulate_kernel(
     int light_depth,
     const bool* active,
     const bool* visible,
-    const float* origin,
-    const float* direction,
-    const float* field_real,
-    const float* field_imag,
-    const float* pdf_forward,
-    const float* path_length,
+    wf::State state,
+    wf::ScatterTables tables,
+    BdptNeeConstants constants,
     const float* tx_power,
     const float* rx_positions,
     const float* rx_polarization,
@@ -3193,39 +3309,66 @@ __global__ void bdpt_wavefront_connect_accumulate_kernel(
     int mode_id,
     float beta,
     double* transmission,
-    unsigned long long* valid_rows) {
+    double* scattering,
+    unsigned long long* rows,
+    BdptWavefrontRows row_out,
+    int max_depth) {
     const int64_t pair = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    bool accumulated = false;
+    bool mixed_row = false;
+    bool scatter_row = false;
     if (pair < pairs && active[pair] && visible[pair]) {
         const int64_t light = pair / rx_tile;
         const int64_t rx = rx_begin + (pair - light * rx_tile);
         const int64_t tx = (first + light) / samples;
-        const BdptConnectionRow connection = bdpt_connection_row(
-            origin + light * 3,
-            direction + light * 3,
-            light_depth,
-            field_real + light * 3,
-            field_imag + light * 3,
-            tx_power[tx],
-            pdf_forward[light],
-            path_length[light],
-            rx_positions + rx * 3,
-            rx_polarization + rx * 3,
-            1.0f,
-            true,
-            frequency_hz,
-            inv_samples_per_tx);
-        if (connection.valid) {
-            const float weight = bdpt_single_strategy_mis_weight(connection.pdf, mode_id, beta);
-            atomicAdd(
-                transmission + tx * rx_count + rx,
-                static_cast<double>(connection.contribution) * static_cast<double>(weight));
-            accumulated = true;
+        const int64_t key = ((first + light) * max_depth + (light_depth - 1)) * rx_count + rx;
+        if ((state.component_mask[light] & wf::kMaskScatterVertex) != 0) {
+            float wo[3];
+            float r2;
+            float contribution;
+            float pdf_omega = 0.0f;
+            if (bdpt_nee_row(state, tables, light, rx_positions + rx * 3, tx_power[tx], constants, wo, r2,
+                             contribution, row_out.capacity > 0 ? &pdf_omega : nullptr)) {
+                atomicAdd(scattering + tx * rx_count + rx, static_cast<double>(contribution));
+                scatter_row = true;
+                bdpt_wavefront_write_row(
+                    row_out, key, static_cast<int>(tx), static_cast<int>(rx), kComponentScattering, light_depth,
+                    contribution, fmaxf(state.nee_p_scatter[light], 1.0e-4f) * pdf_omega, 1.0f,
+                    state.nee_path_length[light] + r2);
+            }
+        } else {
+            const BdptConnectionRow connection = bdpt_connection_row(
+                state.origin + light * 3,
+                state.direction + light * 3,
+                light_depth,
+                state.field_real + light * 3,
+                state.field_imag + light * 3,
+                tx_power[tx],
+                state.pdf_forward[light],
+                state.path_length[light],
+                rx_positions + rx * 3,
+                rx_polarization + rx * 3,
+                1.0f,
+                true,
+                frequency_hz,
+                inv_samples_per_tx);
+            if (connection.valid) {
+                const float weight = bdpt_single_strategy_mis_weight(connection.pdf, mode_id, beta);
+                atomicAdd(
+                    transmission + tx * rx_count + rx,
+                    static_cast<double>(connection.contribution) * static_cast<double>(weight));
+                mixed_row = true;
+                bdpt_wavefront_write_row(
+                    row_out, key, static_cast<int>(tx), static_cast<int>(rx),
+                    bdpt_component_from_mask(state.component_mask[light] & 0x1f), light_depth,
+                    connection.contribution, connection.pdf, weight, connection.total_distance);
+            }
         }
     }
-    const int block_rows = __syncthreads_count(accumulated);
-    if (threadIdx.x == 0 && block_rows > 0) {
-        atomicAdd(valid_rows, static_cast<unsigned long long>(block_rows));
+    const int block_mixed = __syncthreads_count(mixed_row);
+    const int block_scatter = __syncthreads_count(scatter_row);
+    if (threadIdx.x == 0) {
+        if (block_mixed > 0) atomicAdd(rows, static_cast<unsigned long long>(block_mixed));
+        if (block_scatter > 0) atomicAdd(rows + 1, static_cast<unsigned long long>(block_scatter));
     }
 }
 
@@ -3244,12 +3387,14 @@ void channel_bdpt_wavefront_visibility_inputs_cuda(
     int64_t pairs,
     int64_t rx_tile,
     int64_t rx_begin,
+    int64_t first,
+    int64_t samples,
     int64_t light_depth,
     const at::Tensor& alive,
-    const at::Tensor& origin,
-    const at::Tensor& direction,
-    const at::Tensor& component_mask,
-    const at::Tensor& valid,
+    const wf::State& state,
+    const wf::ScatterTables& tables,
+    double amplitude_sq,
+    const at::Tensor& tx_power,
     const at::Tensor& rx_positions,
     at::Tensor& start,
     at::Tensor& end,
@@ -3259,17 +3404,22 @@ void channel_bdpt_wavefront_visibility_inputs_cuda(
     }
     constexpr int threads = 256;
     const int blocks = static_cast<int>((pairs + threads - 1) / threads);
-    cudaStream_t stream = at::cuda::getCurrentCUDAStream(origin.get_device()).stream();
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(rx_positions.get_device()).stream();
+    const BdptNeeConstants constants{
+        static_cast<float>(amplitude_sq), static_cast<float>(4.0 * 3.14159265358979323846),
+        static_cast<float>(samples)};
     bdpt_wavefront_visibility_inputs_kernel<<<blocks, threads, 0, stream>>>(
         pairs,
         rx_tile,
         rx_begin,
+        first,
+        samples,
         static_cast<int>(light_depth),
         reinterpret_cast<const unsigned long long*>(alive.data_ptr<int64_t>()),
-        origin.data_ptr<float>(),
-        direction.data_ptr<float>(),
-        component_mask.data_ptr<uint8_t>(),
-        valid.data_ptr<bool>(),
+        state,
+        tables,
+        constants,
+        tx_power.data_ptr<float>(),
         rx_positions.data_ptr<float>(),
         start.data_ptr<float>(),
         end.data_ptr<float>(),
@@ -3286,27 +3436,46 @@ void channel_bdpt_wavefront_connect_accumulate_cuda(
     int64_t light_depth,
     const at::Tensor& active,
     const at::Tensor& visible,
-    const at::Tensor& origin,
-    const at::Tensor& direction,
-    const at::Tensor& field_real,
-    const at::Tensor& field_imag,
-    const at::Tensor& pdf_forward,
-    const at::Tensor& path_length,
+    const wf::State& state,
+    const wf::ScatterTables& tables,
+    double amplitude_sq,
     const at::Tensor& tx_power,
     const at::Tensor& rx_positions,
     const at::Tensor& rx_polarization,
     double frequency_hz,
-    int64_t samples_per_tx,
     int64_t mode_id,
     double beta,
     at::Tensor& transmission,
-    at::Tensor& valid_rows) {
+    at::Tensor& scattering,
+    at::Tensor& rows,
+    const std::vector<at::Tensor>& row_out,
+    int64_t max_depth) {
     if (pairs == 0) {
         return;
     }
+    // row_out: cursor, key, tx, rx, component, depth, contribution, pdf, mis, path length.
+    BdptWavefrontRows row_view{};
+    if (!row_out.empty()) {
+        row_view = {
+            row_out[1].size(0),
+            reinterpret_cast<unsigned long long*>(row_out[0].data_ptr<int64_t>()),
+            row_out[1].data_ptr<int64_t>(),
+            row_out[2].data_ptr<int>(),
+            row_out[3].data_ptr<int>(),
+            row_out[4].data_ptr<int>(),
+            row_out[5].data_ptr<int>(),
+            row_out[6].data_ptr<float>(),
+            row_out[7].data_ptr<float>(),
+            row_out[8].data_ptr<float>(),
+            row_out[9].data_ptr<float>(),
+        };
+    }
     constexpr int threads = 256;
     const int blocks = static_cast<int>((pairs + threads - 1) / threads);
-    cudaStream_t stream = at::cuda::getCurrentCUDAStream(origin.get_device()).stream();
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(rx_positions.get_device()).stream();
+    const BdptNeeConstants constants{
+        static_cast<float>(amplitude_sq), static_cast<float>(4.0 * 3.14159265358979323846),
+        static_cast<float>(samples)};
     bdpt_wavefront_connect_accumulate_kernel<<<blocks, threads, 0, stream>>>(
         pairs,
         rx_tile,
@@ -3317,21 +3486,21 @@ void channel_bdpt_wavefront_connect_accumulate_cuda(
         static_cast<int>(light_depth),
         active.data_ptr<bool>(),
         visible.data_ptr<bool>(),
-        origin.data_ptr<float>(),
-        direction.data_ptr<float>(),
-        field_real.data_ptr<float>(),
-        field_imag.data_ptr<float>(),
-        pdf_forward.data_ptr<float>(),
-        path_length.data_ptr<float>(),
+        state,
+        tables,
+        constants,
         tx_power.data_ptr<float>(),
         rx_positions.data_ptr<float>(),
         rx_polarization.data_ptr<float>(),
         static_cast<float>(frequency_hz),
-        1.0f / static_cast<float>(samples_per_tx),
+        1.0f / static_cast<float>(samples),
         static_cast<int>(mode_id),
         static_cast<float>(beta),
         transmission.data_ptr<double>(),
-        reinterpret_cast<unsigned long long*>(valid_rows.data_ptr<int64_t>()));
+        scattering.data_ptr<double>(),
+        reinterpret_cast<unsigned long long*>(rows.data_ptr<int64_t>()),
+        row_view,
+        static_cast<int>(max_depth));
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 
@@ -3358,4 +3527,102 @@ at::Tensor channel_bdpt_wavefront_finalize_cuda(const at::Tensor& accumulated, c
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return out;
+}
+
+namespace {
+
+__global__ void bdpt_wavefront_pack_rows_kernel(
+    int64_t count,
+    const int* order,
+    const int* tx_id,
+    const int* rx_id,
+    const int* component_id,
+    const int* light_depth,
+    const float* contribution,
+    const float* pdf,
+    const float* mis_weight,
+    const float* path_length,
+    int* out_topology,
+    float* out_contribution,
+    float* out_pdf,
+    float* out_mis_weight,
+    int* out_component_id,
+    bool* out_valid,
+    int* out_tx_id,
+    int* out_rx_id,
+    int* out_grid_linear_id,
+    int* out_light_depth,
+    int* out_sensor_depth,
+    float* out_path_length) {
+    const int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (index >= count) {
+        return;
+    }
+    const int row = order[index];
+    out_topology[index * 4 + 0] = tx_id[row];
+    out_topology[index * 4 + 1] = rx_id[row];
+    out_topology[index * 4 + 2] = component_id[row];
+    out_topology[index * 4 + 3] = light_depth[row];
+    out_contribution[index] = contribution[row];
+    out_pdf[index] = pdf[row];
+    out_mis_weight[index] = mis_weight[row];
+    out_component_id[index] = component_id[row];
+    out_valid[index] = true;
+    out_tx_id[index] = tx_id[row];
+    out_rx_id[index] = rx_id[row];
+    out_grid_linear_id[index] = rx_id[row];
+    out_light_depth[index] = light_depth[row];
+    out_sensor_depth[index] = 0;
+    out_path_length[index] = path_length[row];
+}
+
+__global__ void bdpt_iota_kernel(int64_t count, int* out) {
+    const int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (index < count) {
+        out[index] = static_cast<int>(index);
+    }
+}
+
+}  // namespace
+
+// Sort the wavefront rows by their (sample, bounce, receiver) key and pack the
+// 12-field connection-sample schema in that stable order.
+std::vector<at::Tensor> channel_bdpt_wavefront_pack_rows_cuda(const std::vector<at::Tensor>& row_out) {
+    const int64_t count = row_out[1].size(0);
+    TORCH_CHECK(count <= std::numeric_limits<int>::max(), "wavefront rows support at most 2^31-1 rows");
+    const at::Tensor& reference = row_out[6];
+    auto [topology, contribution, pdf, mis_weight, component_id, valid, tx_id, rx_id, grid_linear_id, light_depth,
+          sensor_depth, path_length] = allocate_connection_samples(reference, count);
+    if (count > 0) {
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(reference.get_device()).stream();
+        constexpr int threads = 256;
+        const int blocks = static_cast<int>((count + threads - 1) / threads);
+        auto rows_in = at::empty({count}, reference.options().dtype(at::kInt));
+        auto order = at::empty({count}, reference.options().dtype(at::kInt));
+        auto keys_out = at::empty({count}, reference.options().dtype(at::kLong));
+        bdpt_iota_kernel<<<blocks, threads, 0, stream>>>(count, rows_in.data_ptr<int>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+        size_t temp_bytes = 0;
+        const auto* keys_in = reinterpret_cast<const unsigned long long*>(row_out[1].data_ptr<int64_t>());
+        auto* keys_sorted = reinterpret_cast<unsigned long long*>(keys_out.data_ptr<int64_t>());
+        C10_CUDA_CHECK(cub::DeviceRadixSort::SortPairs(
+            nullptr, temp_bytes, keys_in, keys_sorted, rows_in.data_ptr<int>(), order.data_ptr<int>(),
+            static_cast<int>(count), 0, 64, stream));
+        auto temp = at::empty({static_cast<int64_t>(std::max<size_t>(temp_bytes, 1))},
+                              reference.options().dtype(at::kByte));
+        C10_CUDA_CHECK(cub::DeviceRadixSort::SortPairs(
+            temp.data_ptr(), temp_bytes, keys_in, keys_sorted, rows_in.data_ptr<int>(), order.data_ptr<int>(),
+            static_cast<int>(count), 0, 64, stream));
+        bdpt_wavefront_pack_rows_kernel<<<blocks, threads, 0, stream>>>(
+            count, order.data_ptr<int>(), row_out[2].data_ptr<int>(), row_out[3].data_ptr<int>(),
+            row_out[4].data_ptr<int>(), row_out[5].data_ptr<int>(), row_out[6].data_ptr<float>(),
+            row_out[7].data_ptr<float>(), row_out[8].data_ptr<float>(), row_out[9].data_ptr<float>(),
+            topology.data_ptr<int>(), contribution.data_ptr<float>(), pdf.data_ptr<float>(),
+            mis_weight.data_ptr<float>(), component_id.data_ptr<int>(), valid.data_ptr<bool>(),
+            tx_id.data_ptr<int>(), rx_id.data_ptr<int>(), grid_linear_id.data_ptr<int>(),
+            light_depth.data_ptr<int>(), sensor_depth.data_ptr<int>(), path_length.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return {topology, contribution, pdf, mis_weight, component_id, valid, tx_id, rx_id, grid_linear_id, light_depth,
+            sensor_depth, path_length};
 }
