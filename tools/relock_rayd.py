@@ -14,14 +14,11 @@
 # version and the source-bundle manifest SHA-256. The distribution version comes
 # from ``torch/pyproject.toml`` at that commit.
 #
-# The manifest digest covers raw file bytes, so it depends on the line endings of
-# the checkout the wheel was built from. The published rayd-torch 0.8.0 wheel was
-# built from a Windows checkout with ``core.autocrlf=true`` (only
-# ``include/rayd/integration.h`` is pinned to LF by RayD's ``.gitattributes``);
-# ``--eol crlf``, the default, reproduces its digest exactly. Use ``--eol lf`` for
-# a wheel built from a Linux checkout. If the published wheel of the locked
-# commit reports another digest, copy ``source_manifest.sha256`` from its
-# ``rayd/torch/_source/rayd-source.json`` into the lock.
+# The manifest digest is the LF-normalized one that ``cmake/resolve_rayd_source.py``
+# checks: every source file hashed with CRLF/CR folded to LF, serialized as RayD's
+# generator writes its manifest. It equals the digest RayD's generator reports for
+# an LF checkout and does not depend on the line endings of the checkout a
+# rayd-torch wheel was built from.
 #
 # It then rewrites ``dependencies/rayd.lock.json`` and replaces every old pinned
 # value (commit, header digests, aggregate digest, manifest digest) by its new
@@ -40,6 +37,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import re
 import subprocess
@@ -81,6 +79,19 @@ def _git(cwd: Path, *arguments: str) -> str:
     return _git_bytes(cwd, *arguments).decode("utf-8").strip()
 
 
+def _resolver():
+    """Load ``cmake/resolve_rayd_source.py``, the owner of the manifest digest."""
+
+    spec = importlib.util.spec_from_file_location(
+        "resolve_rayd_source", ROOT / "cmake" / "resolve_rayd_source.py"
+    )
+    if spec is None or spec.loader is None:
+        raise RelockError("cannot load cmake/resolve_rayd_source.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _normalize_repository_url(url: str) -> str:
     url = url.strip()
     match = re.fullmatch(r"git@([^:]+):(.+)", url)
@@ -89,7 +100,7 @@ def _normalize_repository_url(url: str) -> str:
     return url.removesuffix(".git").rstrip("/")
 
 
-def compute_lock(rayd: Path, rev: str, old_lock: dict, *, eol: str = "crlf") -> dict:
+def compute_lock(rayd: Path, rev: str, old_lock: dict) -> dict:
     """Return the lock for ``rev`` of the RayD checkout ``rayd``."""
     commit = _git(rayd, "rev-parse", "--verify", f"{rev}^{{commit}}")
     origin = _normalize_repository_url(_git(rayd, "remote", "get-url", "origin"))
@@ -97,10 +108,7 @@ def compute_lock(rayd: Path, rev: str, old_lock: dict, *, eol: str = "crlf") -> 
         raise RelockError(
             f"RayD origin is {origin!r}, the lock pins {old_lock['repository_url']!r}"
         )
-    autocrlf = "true" if eol == "crlf" else "false"
-    archive = _git_bytes(
-        rayd, "-c", f"core.autocrlf={autocrlf}", "archive", "--format=tar", commit
-    )
+    archive = _git_bytes(rayd, "-c", "core.autocrlf=false", "archive", "--format=tar", commit)
     with tempfile.TemporaryDirectory(prefix="channel-relock-") as scratch:
         workspace = Path(scratch) / "workspace"
         output = Path(scratch) / "bundle"
@@ -138,6 +146,10 @@ def compute_lock(rayd: Path, rev: str, old_lock: dict, *, eol: str = "crlf") -> 
         if completed.returncode != 0:
             raise RelockError(f"RayD source-bundle generator failed:\n{completed.stderr}")
         metadata = json.loads((output / "rayd-source.json").read_text(encoding="utf-8"))
+        shipped = json.loads((output / "source-files.json").read_text(encoding="utf-8"))
+        manifest_sha256 = _resolver().source_manifest_sha256(
+            output / "source", [entry["path"] for entry in shipped["files"]]
+        )
         pyproject = tomllib.loads(
             (workspace / "torch" / "pyproject.toml").read_text(encoding="utf-8")
         )
@@ -150,7 +162,7 @@ def compute_lock(rayd: Path, rev: str, old_lock: dict, *, eol: str = "crlf") -> 
             f"the lock pins {bundle['distribution']!r}"
         )
     bundle["distribution_version"] = pyproject["project"]["version"]
-    bundle["manifest_sha256"] = metadata["source_manifest"]["sha256"]
+    bundle["manifest_sha256"] = manifest_sha256
     return {
         "schema_version": old_lock["schema_version"],
         "repository_url": old_lock["repository_url"],
@@ -235,10 +247,6 @@ def main() -> int:
     parser.add_argument("--rayd", required=True, type=Path, help="RayD git checkout")
     parser.add_argument("--rev", default="HEAD", help="RayD revision to lock (default HEAD)")
     parser.add_argument("--root", type=Path, default=ROOT, help="Channel checkout to update")
-    parser.add_argument(
-        "--eol", choices=("crlf", "lf"), default="crlf",
-        help="line endings of the checkout the rayd-torch wheel is built from (default crlf)",
-    )
     parser.add_argument("--check", action="store_true", help="report changes without writing")
     arguments = parser.parse_args()
     root = arguments.root.resolve()
@@ -246,7 +254,7 @@ def main() -> int:
     try:
         old_text = lock_path.read_text(encoding="utf-8")
         old = json.loads(old_text)
-        new = compute_lock(arguments.rayd.resolve(), arguments.rev, old, eol=arguments.eol)
+        new = compute_lock(arguments.rayd.resolve(), arguments.rev, old)
         new_text = render_lock(new)
         mapping = replacements(old, new)
     except (RelockError, OSError, KeyError, json.JSONDecodeError) as exc:
