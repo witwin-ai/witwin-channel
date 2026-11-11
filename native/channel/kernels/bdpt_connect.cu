@@ -251,6 +251,96 @@ at::Tensor channel_bdpt_mis_weights_cuda(
 
 namespace {
 
+struct BdptConnectionGeometry {
+    float dx;
+    float dy;
+    float dz;
+    float distance;
+    bool direction_valid;
+};
+
+// Connection segment from a light vertex to a sensor. A vertex past the
+// endpoint (depth > 0) connects only into the half space of its outgoing
+// direction.
+__device__ __forceinline__ BdptConnectionGeometry bdpt_connection_geometry(
+    const float* light_origin,
+    const float* light_direction,
+    int light_path_depth,
+    const float* sensor_origin) {
+    const float dx = sensor_origin[0] - light_origin[0];
+    const float dy = sensor_origin[1] - light_origin[1];
+    const float dz = sensor_origin[2] - light_origin[2];
+    const float distance = fmaxf(sqrtf(dx * dx + dy * dy + dz * dz), 1.0e-6f);
+    const float dir_dot = light_path_depth > 0
+        ? (dx * light_direction[0] + dy * light_direction[1] + dz * light_direction[2]) / distance
+        : 1.0f;
+    return {dx, dy, dz, distance, dir_dot > 0.0f};
+}
+
+struct BdptConnectionRow {
+    bool valid;
+    float pdf;
+    float contribution;
+    float total_distance;
+};
+
+// One light-vertex to sensor connection row: the projected received power of
+// the vertex Jones field over the unfolded path, weighted by the source power
+// and 1/samples_per_tx. ``endpoints_valid`` carries the vertex/sensor validity.
+__device__ BdptConnectionRow bdpt_connection_row(
+    const float* light_origin,
+    const float* light_direction,
+    int light_path_depth,
+    const float* light_field_real,
+    const float* light_field_imag,
+    float light_source_power,
+    float light_pdf_forward,
+    float light_path_length,
+    const float* sensor_origin,
+    const float* sensor_polarization,
+    float sensor_pdf_reverse,
+    bool endpoints_valid,
+    float frequency_hz,
+    float inv_samples_per_tx) {
+    const BdptConnectionGeometry geometry =
+        bdpt_connection_geometry(light_origin, light_direction, light_path_depth, sensor_origin);
+    const float dx = geometry.dx;
+    const float dy = geometry.dy;
+    const float dz = geometry.dz;
+    const float distance = geometry.distance;
+    const bool row_valid = endpoints_valid && geometry.direction_valid;
+    // Proposal density excludes free-space geometry. The deterministic
+    // endpoint connection has unit discrete mass; inverse-square spreading
+    // belongs to the contribution, not to the sampling PDF.
+    const float row_pdf = row_valid
+        ? fmaxf(light_pdf_forward, 0.0f) * fmaxf(sensor_pdf_reverse, 0.0f)
+        : 0.0f;
+    // The free-space spreading acts over the unfolded path (light-subpath
+    // prefix + connection segment), not the last segment alone.
+    const float total_distance = distance + fmaxf(light_path_length, 0.0f);
+    const float wave_number = 2.0f * kPi * frequency_hz / kLightSpeedMPerS;
+    const float amplitude = 1.0f /
+        (2.0f * fmaxf(wave_number, 1.0e-12f) * fmaxf(total_distance, 1.0e-6f));
+    const utd::Complex propagation = utd::cplx_mul_real(
+        utd::cplx_exp_phase(transport::precise_neg_kd(wave_number, total_distance)),
+        amplitude);
+    const utd::Complex3 incident_field = {
+        utd::cplx(light_field_real[0], light_field_imag[0]),
+        utd::cplx(light_field_real[1], light_field_imag[1]),
+        utd::cplx(light_field_real[2], light_field_imag[2])};
+    const utd::Complex3 received_field = utd::c3_scale(incident_field, propagation);
+    const utd::float3a connection_direction = utd::make_f3(dx / distance, dy / distance, dz / distance);
+    const utd::float3a receiver_polarization = utd::make_f3(
+        sensor_polarization[0], sensor_polarization[1], sensor_polarization[2]);
+    const utd::Complex coefficient = transport::project_receiver(
+        received_field, connection_direction, receiver_polarization);
+    const float coefficient_power = utd::cplx_abs_sqr(coefficient);
+    const float row_contribution = row_valid
+        ? light_source_power * coefficient_power * inv_samples_per_tx
+        : 0.0f;
+    return {row_valid, row_pdf, row_contribution, total_distance};
+}
+
 __global__ void bdpt_endpoint_connection_samples_kernel(
     int64_t count,
     int64_t sensor_count,
@@ -301,59 +391,25 @@ __global__ void bdpt_endpoint_connection_samples_kernel(
     const int grid = sensor_grid_linear_id[sensor_index];
     const bool is_valid = light_valid[light_index] && sensor_valid[sensor_index] && tx >= 0 && rx >= 0;
 
-    const float lx = light_origin[light_index * 3 + 0];
-    const float ly = light_origin[light_index * 3 + 1];
-    const float lz = light_origin[light_index * 3 + 2];
-    const float sx = sensor_origin[sensor_index * 3 + 0];
-    const float sy = sensor_origin[sensor_index * 3 + 1];
-    const float sz = sensor_origin[sensor_index * 3 + 2];
-    const float dx = sx - lx;
-    const float dy = sy - ly;
-    const float dz = sz - lz;
-    const float distance = fmaxf(sqrtf(dx * dx + dy * dy + dz * dz), 1.0e-6f);
-    const int light_path_depth = light_depth[light_index];
-    const float dir_dot = light_path_depth > 0
-        ? (dx * light_direction[light_index * 3 + 0] +
-              dy * light_direction[light_index * 3 + 1] +
-              dz * light_direction[light_index * 3 + 2]) /
-            distance
-        : 1.0f;
-    const bool direction_valid = dir_dot > 0.0f;
-    const bool row_valid = is_valid && direction_valid;
-    // Proposal density excludes free-space geometry. The deterministic
-    // endpoint connection has unit discrete mass; inverse-square spreading
-    // belongs to the contribution, not to the sampling PDF.
-    const float row_pdf = row_valid
-        ? fmaxf(light_pdf_forward[light_index], 0.0f) *
-            fmaxf(sensor_pdf_reverse[sensor_index], 0.0f)
-        : 0.0f;
-    // The free-space spreading acts over the unfolded path (light-subpath
-    // prefix + connection segment), not the last segment alone.
-    const float total_distance = distance + fmaxf(light_path_length[light_index], 0.0f);
-    const float wave_number = 2.0f * kPi * frequency_hz / kLightSpeedMPerS;
-    const float amplitude = 1.0f /
-        (2.0f * fmaxf(wave_number, 1.0e-12f) * fmaxf(total_distance, 1.0e-6f));
-    const utd::Complex propagation = utd::cplx_mul_real(
-        utd::cplx_exp_phase(transport::precise_neg_kd(wave_number, total_distance)),
-        amplitude);
-    const int64_t field_offset = light_index * 3;
-    const utd::Complex3 incident_field = {
-        utd::cplx(light_field_real[field_offset], light_field_imag[field_offset]),
-        utd::cplx(light_field_real[field_offset + 1], light_field_imag[field_offset + 1]),
-        utd::cplx(light_field_real[field_offset + 2], light_field_imag[field_offset + 2])};
-    const utd::Complex3 received_field = utd::c3_scale(incident_field, propagation);
-    const utd::float3a connection_direction = utd::make_f3(dx / distance, dy / distance, dz / distance);
-    const int64_t sensor_field_offset = sensor_index * 3;
-    const utd::float3a receiver_polarization = utd::make_f3(
-        sensor_field_real[sensor_field_offset],
-        sensor_field_real[sensor_field_offset + 1],
-        sensor_field_real[sensor_field_offset + 2]);
-    const utd::Complex coefficient = transport::project_receiver(
-        received_field, connection_direction, receiver_polarization);
-    const float coefficient_power = utd::cplx_abs_sqr(coefficient);
-    const float row_contribution = row_valid
-        ? light_source_power[light_index] * coefficient_power * inv_samples_per_tx
-        : 0.0f;
+    const BdptConnectionRow connection = bdpt_connection_row(
+        light_origin + light_index * 3,
+        light_direction + light_index * 3,
+        light_depth[light_index],
+        light_field_real + light_index * 3,
+        light_field_imag + light_index * 3,
+        light_source_power[light_index],
+        light_pdf_forward[light_index],
+        light_path_length[light_index],
+        sensor_origin + sensor_index * 3,
+        sensor_field_real + sensor_index * 3,
+        sensor_pdf_reverse[sensor_index],
+        is_valid,
+        frequency_hz,
+        inv_samples_per_tx);
+    const bool row_valid = connection.valid;
+    const float row_pdf = connection.pdf;
+    const float row_contribution = connection.contribution;
+    const float total_distance = connection.total_distance;
 
     tx_id[index] = tx;
     rx_id[index] = rx;
@@ -754,15 +810,16 @@ __global__ void bdpt_copy_connection_samples_kernel(
     out_path_length_m[dst] = path_length_m[index];
 }
 
+template <typename Counter>
 __global__ void bdpt_count_valid_connection_samples_kernel(
     int64_t count,
     const bool* valid,
-    int* compact_count) {
+    Counter* compact_count) {
     int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (index >= count || !valid[index]) {
         return;
     }
-    atomicAdd(compact_count, 1);
+    atomicAdd(compact_count, Counter{1});
 }
 
 }  // namespace
@@ -856,30 +913,23 @@ void channel_bdpt_filter_connection_samples_cuda(
     }
 }
 
-int64_t channel_bdpt_count_valid_connection_samples_cuda(at::Tensor valid) {
+at::Tensor channel_bdpt_count_valid_connection_samples_cuda(at::Tensor valid) {
     check_bool_cuda(valid, "valid", 1);
     const int64_t count = valid.size(0);
-    int valid_count_host = 0;
+    // The count stays on the device; the caller reads it with the solve's other
+    // metadata counts in one copy.
+    auto valid_count = at::zeros({}, valid.options().dtype(at::kLong));
     if (count > 0) {
-        auto compact_count = at::empty({}, valid.options().dtype(at::kInt));
-        zero_int_tensor(compact_count);
         constexpr int threads = 256;
         int blocks = static_cast<int>((count + threads - 1) / threads);
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(valid.get_device()).stream();
-        bdpt_count_valid_connection_samples_kernel<<<blocks, threads, 0, stream>>>(
+        bdpt_count_valid_connection_samples_kernel<unsigned long long><<<blocks, threads, 0, stream>>>(
             count,
             valid.data_ptr<bool>(),
-            compact_count.data_ptr<int>());
+            reinterpret_cast<unsigned long long*>(valid_count.data_ptr<int64_t>()));
         C10_CUDA_KERNEL_LAUNCH_CHECK();
-        C10_CUDA_CHECK(cudaMemcpyAsync(
-            &valid_count_host,
-            compact_count.data_ptr<int>(),
-            sizeof(int),
-            cudaMemcpyDeviceToHost,
-            stream));
-        C10_CUDA_CHECK(cudaStreamSynchronize(stream));
     }
-    return static_cast<int64_t>(valid_count_host);
+    return valid_count;
 }
 
 std::tuple<
@@ -922,7 +972,7 @@ channel_bdpt_compact_connection_samples_cuda(
         constexpr int threads = 256;
         int blocks = static_cast<int>((count + threads - 1) / threads);
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(contribution.get_device()).stream();
-        bdpt_count_valid_connection_samples_kernel<<<blocks, threads, 0, stream>>>(
+        bdpt_count_valid_connection_samples_kernel<int><<<blocks, threads, 0, stream>>>(
             count,
             valid.data_ptr<bool>(),
             compact_count.data_ptr<int>());
@@ -3065,5 +3115,232 @@ pybind11::dict channel_bdpt_endpoint_connection_samples_jvp_cuda(
     }
     pybind11::dict out;
     out["tangent_contribution"] = tangent_contribution;
+    return out;
+}
+
+// ==== Section: BDPT wavefront connections ====
+
+namespace {
+
+constexpr int kWavefrontMixedMask = kMaskReflection | kMaskTransmission;
+
+// Tile pair p connects light vertex p / rx_tile to receiver rx_begin + p % rx_tile.
+// Only live mixed reflection+transmission vertices facing the receiver are
+// active; inactive pairs are skipped by the visibility query.
+__global__ void bdpt_wavefront_visibility_inputs_kernel(
+    int64_t pairs,
+    int64_t rx_tile,
+    int64_t rx_begin,
+    int light_depth,
+    const unsigned long long* alive,
+    const float* origin,
+    const float* direction,
+    const uint8_t* component_mask,
+    const bool* valid,
+    const float* rx_positions,
+    float* start,
+    float* end,
+    bool* active) {
+    const int64_t pair = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (pair >= pairs) {
+        return;
+    }
+    const int64_t light = pair / rx_tile;
+    const int64_t rx = rx_begin + (pair - light * rx_tile);
+    bool connect = alive[0] > 0ULL && valid[light] &&
+        (component_mask[light] & kWavefrontMixedMask) == kWavefrontMixedMask &&
+        (component_mask[light] & kMaskScattering) == 0;
+    if (connect) {
+        connect = bdpt_connection_geometry(
+            origin + light * 3, direction + light * 3, light_depth, rx_positions + rx * 3)
+            .direction_valid;
+    }
+    for (int axis = 0; axis < 3; ++axis) {
+        start[pair * 3 + axis] = origin[light * 3 + axis];
+        end[pair * 3 + axis] = rx_positions[rx * 3 + axis];
+    }
+    active[pair] = connect;
+}
+
+// Visible active pairs evaluate their connection row and add contribution *
+// MIS weight straight into the double [tx, rx] transmission accumulator; no row
+// is stored. valid_rows counts the accumulated rows.
+__global__ void bdpt_wavefront_connect_accumulate_kernel(
+    int64_t pairs,
+    int64_t rx_tile,
+    int64_t rx_begin,
+    int64_t first,
+    int64_t samples,
+    int64_t rx_count,
+    int light_depth,
+    const bool* active,
+    const bool* visible,
+    const float* origin,
+    const float* direction,
+    const float* field_real,
+    const float* field_imag,
+    const float* pdf_forward,
+    const float* path_length,
+    const float* tx_power,
+    const float* rx_positions,
+    const float* rx_polarization,
+    float frequency_hz,
+    float inv_samples_per_tx,
+    int mode_id,
+    float beta,
+    double* transmission,
+    unsigned long long* valid_rows) {
+    const int64_t pair = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    bool accumulated = false;
+    if (pair < pairs && active[pair] && visible[pair]) {
+        const int64_t light = pair / rx_tile;
+        const int64_t rx = rx_begin + (pair - light * rx_tile);
+        const int64_t tx = (first + light) / samples;
+        const BdptConnectionRow connection = bdpt_connection_row(
+            origin + light * 3,
+            direction + light * 3,
+            light_depth,
+            field_real + light * 3,
+            field_imag + light * 3,
+            tx_power[tx],
+            pdf_forward[light],
+            path_length[light],
+            rx_positions + rx * 3,
+            rx_polarization + rx * 3,
+            1.0f,
+            true,
+            frequency_hz,
+            inv_samples_per_tx);
+        if (connection.valid) {
+            const float weight = bdpt_single_strategy_mis_weight(connection.pdf, mode_id, beta);
+            atomicAdd(
+                transmission + tx * rx_count + rx,
+                static_cast<double>(connection.contribution) * static_cast<double>(weight));
+            accumulated = true;
+        }
+    }
+    const int block_rows = __syncthreads_count(accumulated);
+    if (threadIdx.x == 0 && block_rows > 0) {
+        atomicAdd(valid_rows, static_cast<unsigned long long>(block_rows));
+    }
+}
+
+__global__ void bdpt_wavefront_finalize_kernel(
+    int64_t count, const double* accumulated, const float* base, float* out) {
+    const int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (index >= count) {
+        return;
+    }
+    out[index] = static_cast<float>(accumulated[index] + static_cast<double>(base[index]));
+}
+
+}  // namespace
+
+void channel_bdpt_wavefront_visibility_inputs_cuda(
+    int64_t pairs,
+    int64_t rx_tile,
+    int64_t rx_begin,
+    int64_t light_depth,
+    const at::Tensor& alive,
+    const at::Tensor& origin,
+    const at::Tensor& direction,
+    const at::Tensor& component_mask,
+    const at::Tensor& valid,
+    const at::Tensor& rx_positions,
+    at::Tensor& start,
+    at::Tensor& end,
+    at::Tensor& active) {
+    if (pairs == 0) {
+        return;
+    }
+    constexpr int threads = 256;
+    const int blocks = static_cast<int>((pairs + threads - 1) / threads);
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(origin.get_device()).stream();
+    bdpt_wavefront_visibility_inputs_kernel<<<blocks, threads, 0, stream>>>(
+        pairs,
+        rx_tile,
+        rx_begin,
+        static_cast<int>(light_depth),
+        reinterpret_cast<const unsigned long long*>(alive.data_ptr<int64_t>()),
+        origin.data_ptr<float>(),
+        direction.data_ptr<float>(),
+        component_mask.data_ptr<uint8_t>(),
+        valid.data_ptr<bool>(),
+        rx_positions.data_ptr<float>(),
+        start.data_ptr<float>(),
+        end.data_ptr<float>(),
+        active.data_ptr<bool>());
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+}
+
+void channel_bdpt_wavefront_connect_accumulate_cuda(
+    int64_t pairs,
+    int64_t rx_tile,
+    int64_t rx_begin,
+    int64_t first,
+    int64_t samples,
+    int64_t light_depth,
+    const at::Tensor& active,
+    const at::Tensor& visible,
+    const at::Tensor& origin,
+    const at::Tensor& direction,
+    const at::Tensor& field_real,
+    const at::Tensor& field_imag,
+    const at::Tensor& pdf_forward,
+    const at::Tensor& path_length,
+    const at::Tensor& tx_power,
+    const at::Tensor& rx_positions,
+    const at::Tensor& rx_polarization,
+    double frequency_hz,
+    int64_t samples_per_tx,
+    int64_t mode_id,
+    double beta,
+    at::Tensor& transmission,
+    at::Tensor& valid_rows) {
+    if (pairs == 0) {
+        return;
+    }
+    constexpr int threads = 256;
+    const int blocks = static_cast<int>((pairs + threads - 1) / threads);
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(origin.get_device()).stream();
+    bdpt_wavefront_connect_accumulate_kernel<<<blocks, threads, 0, stream>>>(
+        pairs,
+        rx_tile,
+        rx_begin,
+        first,
+        samples,
+        rx_positions.size(0),
+        static_cast<int>(light_depth),
+        active.data_ptr<bool>(),
+        visible.data_ptr<bool>(),
+        origin.data_ptr<float>(),
+        direction.data_ptr<float>(),
+        field_real.data_ptr<float>(),
+        field_imag.data_ptr<float>(),
+        pdf_forward.data_ptr<float>(),
+        path_length.data_ptr<float>(),
+        tx_power.data_ptr<float>(),
+        rx_positions.data_ptr<float>(),
+        rx_polarization.data_ptr<float>(),
+        static_cast<float>(frequency_hz),
+        1.0f / static_cast<float>(samples_per_tx),
+        static_cast<int>(mode_id),
+        static_cast<float>(beta),
+        transmission.data_ptr<double>(),
+        reinterpret_cast<unsigned long long*>(valid_rows.data_ptr<int64_t>()));
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+}
+
+at::Tensor channel_bdpt_wavefront_finalize_cuda(const at::Tensor& accumulated, const at::Tensor& base) {
+    auto out = at::empty(base.sizes(), base.options());
+    const int64_t count = out.numel();
+    if (count > 0) {
+        constexpr int threads = 256;
+        const int blocks = static_cast<int>((count + threads - 1) / threads);
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(base.get_device()).stream();
+        bdpt_wavefront_finalize_kernel<<<blocks, threads, 0, stream>>>(
+            count, accumulated.data_ptr<double>(), base.data_ptr<float>(), out.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
     return out;
 }

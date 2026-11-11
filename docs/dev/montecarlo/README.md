@@ -133,6 +133,56 @@ used by focused contract tests, but are not compatibility promises. The parent
 - BDPT supports only `ad_mode="none"`. Any other mode is rejected by
   `Config`; detached or zero gradients are not a substitute.
 
+## BDPT sampler and accumulation
+
+- Reflection, diffraction, straight transmission and the coupled classes come
+  from one enumerated-oracle call; each row's component id is its bucket.
+- Mixed reflection+transmission chains are sampled by the fused wavefront
+  (`bdpt_wavefront_transmission`): all transmitters in one wavefront, chunks of
+  `2^18` samples, per bounce one RayD intersection and one native bounce step
+  (event selection, only the selected branch, in-place update, device tallies),
+  and per receiver tile of at most `2^20` pairs a visibility query and a fused
+  connect-and-accumulate kernel that never stores a connection row. AD, rough
+  (Kirchhoff) faces, `export_paths` and `diagnostics` use the event-composed
+  sampler instead; both draw the same native counter-based random numbers
+  (a pure function of seed, stream, global sample index and depth), so they
+  give the same estimate. `metadata["sampler"]` names the one used.
+- Metadata counts stay on the device and are read in one copy per solve.
+- `accumulation_strategy="auto"` picks `atomic` (or `compact` for sparse grid
+  estimates), never `staged`. `staged` and the accumulate JVP are a stable key
+  sort plus a fixed-order reduce-by-key per `(tx, rx, component)`: bitwise
+  reproducible run to run.
+- Design record: ADR-049 (`docs/dev/standards/adr-049-m4-1-bdpt-wavefront.md`).
+
+### BDPT wavefront evidence
+
+Measured 2026-11-10 on the shared RTX GPU 1 under a slot lock while other jobs
+held it at 94-100 % utilization (contended; counts are the primary evidence).
+Scene: lossy front wall, PEC back wall, 1 transmitter, 4 point receivers,
+`components={"transmission"}`, `max_depth=2`. Sampler = the mixed-chain sampler
+call alone; peak = `max_memory_allocated` above the pre-call baseline.
+
+| samples | sampler | kernel launches | host syncs | kernel busy | wall (min of 4) | peak |
+|---:|---|---:|---:|---:|---:|---:|
+| 4,096 | event-composed | 257 | 4 | 0.50 ms | 9.15 ms | 3.7 MiB |
+| 65,536 | event-composed | 257 | 4 | 0.83 ms | 12.10 ms | 59.4 MiB |
+| 1,048,576 | event-composed | 257 | 4 | 6.01 ms | 13.91 ms | 951.0 MiB |
+| 4,096 | wavefront | 11 | 0 | 0.08 ms | 1.56 ms | 1.0 MiB |
+| 65,536 | wavefront | 11 | 0 | 0.17 ms | 1.87 ms | 15.4 MiB |
+| 1,048,576 | wavefront | 32 | 0 | 1.70 ms | 7.75 ms | 61.5 MiB |
+
+Whole solve, 1 M samples, 4 receivers, depth 2: peak 61.5 MiB with the
+wavefront versus 951.0 MiB through the event-composed sampler, for both
+`{"transmission"}` and `{"los", "reflection", "diffraction", "transmission"}`.
+
+Equivalence: for the same seed the wavefront and the event-composed sampler
+return identical `path_gain` and event counts. Against the previous
+`torch.Generator` event uniforms (reproduced in-process), the per-receiver
+means over 32 seeds at 65,536 samples differ by |z| <= 0.78 (depth 2) and
+<= 0.69 (depth 3); the sampled mixed share is about 0.7-0.8 % of the
+transmission power here, the rest being the enumerated straight chains,
+identical in both.
+
 ## Forbidden fallback
 
 Missing CUDA, the channel extension, required native symbols, or RayD

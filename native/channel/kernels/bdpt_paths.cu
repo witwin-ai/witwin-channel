@@ -204,6 +204,55 @@ __device__ float effective_power_reflectance(
     return cmath::complex_abs2(r_te) * e_s * e_s + cmath::complex_abs2(r_tm) * e_p * e_p;
 }
 
+// Specular reflection of the incident Jones field at a surface hit. The vertex
+// moves to the hit point and the direction mirrors about the shading normal;
+// the inputs are read before any output is written, so the outputs may alias
+// the incident direction (in-place wavefront update).
+__device__ utd::Complex3 bdpt_reflect_vertex(
+    const float* incident_direction,
+    const float* hit_point,
+    const float* hit_normal,
+    float eps_r,
+    float sigma_e,
+    float mu_r,
+    float gain,
+    float thickness,
+    float frequency_hz,
+    const utd::Complex3& incoming,
+    float* out_origin,
+    float* out_direction) {
+    const float d0 = incident_direction[0];
+    const float d1 = incident_direction[1];
+    const float d2 = incident_direction[2];
+    const float n0 = hit_normal[0];
+    const float n1 = hit_normal[1];
+    const float n2 = hit_normal[2];
+    const float dot = d0 * n0 + d1 * n1 + d2 * n2;
+    float rx = d0 - 2.0f * dot * n0;
+    float ry = d1 - 2.0f * dot * n1;
+    float rz = d2 - 2.0f * dot * n2;
+    const float inv_len = rsqrtf(fmaxf(rx * rx + ry * ry + rz * rz, 1.0e-20f));
+    utd::float3a reflected;
+    const utd::Complex3 updated = transport::reflect_complex3(
+        incoming,
+        utd::make_f3(d0, d1, d2),
+        utd::make_f3(n0, n1, n2),
+        eps_r,
+        sigma_e,
+        mu_r,
+        gain,
+        thickness,
+        frequency_hz,
+        reflected);
+    out_origin[0] = hit_point[0];
+    out_origin[1] = hit_point[1];
+    out_origin[2] = hit_point[2];
+    out_direction[0] = rx * inv_len;
+    out_direction[1] = ry * inv_len;
+    out_direction[2] = rz * inv_len;
+    return updated;
+}
+
 __global__ void bdpt_light_endpoint_subpaths_kernel(
     int64_t count,
     const float* tx_positions,
@@ -402,24 +451,27 @@ __global__ void bdpt_reflected_light_subpaths_kernel(
     }
     float* dst_origin = origin + index * 3;
     float* dst_direction = direction + index * 3;
+    utd::Complex3 reflected_field = {};
     if (is_valid) {
-        const float* src_direction = light_direction + index * 3;
-        const float* hit_point = hit_p + index * 3;
-        const float* normal = hit_n + index * 3;
-        dst_origin[0] = hit_point[0];
-        dst_origin[1] = hit_point[1];
-        dst_origin[2] = hit_point[2];
-        const float dot =
-            src_direction[0] * normal[0] +
-            src_direction[1] * normal[1] +
-            src_direction[2] * normal[2];
-        float rx = src_direction[0] - 2.0f * dot * normal[0];
-        float ry = src_direction[1] - 2.0f * dot * normal[1];
-        float rz = src_direction[2] - 2.0f * dot * normal[2];
-        const float inv_len = rsqrtf(fmaxf(rx * rx + ry * ry + rz * rz, 1.0e-20f));
-        dst_direction[0] = rx * inv_len;
-        dst_direction[1] = ry * inv_len;
-        dst_direction[2] = rz * inv_len;
+        const int64_t base = index * 3;
+        const utd::Complex3 incoming = {
+            utd::cplx(light_field_real[base], light_field_imag[base]),
+            utd::cplx(light_field_real[base + 1], light_field_imag[base + 1]),
+            utd::cplx(light_field_real[base + 2], light_field_imag[base + 2]),
+        };
+        reflected_field = bdpt_reflect_vertex(
+            light_direction + base,
+            hit_p + base,
+            hit_n + base,
+            material_eps_r[prim],
+            material_sigma_e[prim],
+            material_mu_r[prim],
+            material_gain[prim],
+            material_thickness[prim],
+            frequency_hz,
+            incoming,
+            dst_origin,
+            dst_direction);
     } else {
         dst_origin[0] = 0.0f;
         dst_origin[1] = 0.0f;
@@ -445,27 +497,7 @@ __global__ void bdpt_reflected_light_subpaths_kernel(
     path_length[index] = is_valid ? light_path_length[index] + fmaxf(hit_t[index], 0.0f) : 0.0f;
     if (is_valid) {
         const int64_t base = index * 3;
-        const utd::Complex3 incoming = {
-            utd::cplx(light_field_real[base], light_field_imag[base]),
-            utd::cplx(light_field_real[base + 1], light_field_imag[base + 1]),
-            utd::cplx(light_field_real[base + 2], light_field_imag[base + 2]),
-        };
-        const utd::float3a incident = utd::make_f3(
-            light_direction[base], light_direction[base + 1], light_direction[base + 2]);
-        const utd::float3a normal = utd::make_f3(
-            hit_n[base], hit_n[base + 1], hit_n[base + 2]);
-        utd::float3a reflected;
-        const utd::Complex3 updated = transport::reflect_complex3(
-            incoming,
-            incident,
-            normal,
-            material_eps_r[prim],
-            material_sigma_e[prim],
-            material_mu_r[prim],
-            material_gain[prim],
-            material_thickness[prim],
-            frequency_hz,
-            reflected);
+        const utd::Complex3 updated = reflected_field;
         field_real[base] = updated.x.re;
         field_real[base + 1] = updated.y.re;
         field_real[base + 2] = updated.z.re;
@@ -515,6 +547,107 @@ __device__ void sp_proxy_weights(
     const float e_p = utd::f3_dot(transverse, p_axis) / t_len;
     w_s = e_s * e_s;
     w_p = e_p * e_p;
+}
+
+struct BdptTransmitVertex {
+    utd::float3a exit_point;
+    utd::float3a direction;
+    utd::Complex3 field;
+    float amplitude;
+    float jump;
+};
+
+// Specular transmission of the incident Jones field through the hit wall's
+// layer stack (see bdpt_transmitted_light_subpaths_kernel for the exit point and
+// phase algebra). Pure function of its inputs.
+__device__ BdptTransmitVertex bdpt_transmit_vertex(
+    const float* light_direction,
+    const float* hit_p,
+    const float* hit_n,
+    const utd::Complex3& incoming,
+    const em::LayerView& layers,
+    float frequency_hz) {
+    const utd::float3a incident = utd::safe_normalize(
+        utd::make_f3(
+            light_direction[0],
+            light_direction[1],
+            light_direction[2]),
+        utd::make_f3(0.0f, 0.0f, 1.0f));
+    utd::float3a normal_in = utd::safe_normalize(
+        utd::make_f3(hit_n[0], hit_n[1], hit_n[2]),
+        utd::make_f3(0.0f, 0.0f, 1.0f));
+    // Flip the mean-plane normal toward the incident side.
+    if (utd::f3_dot(incident, normal_in) > 0.0f)
+        normal_in = utd::f3_neg(normal_in);
+    const float cos_theta = fminf(
+        fmaxf(-utd::f3_dot(incident, normal_in), static_cast<float>(kSubpathEps)),
+        1.0f);
+    const float sin_theta = sqrtf(fmaxf(1.0f - cos_theta * cos_theta, 0.0f));
+    const float omega = 2.0f * static_cast<float>(kPi) * frequency_hz;
+    const float k0 = omega / transport::kSpeedOfLight;
+    const float k_par = k0 * sin_theta;
+
+    const em::StackRT te = em::stack_rt(
+        cos_theta, layers, frequency_hz, em::kPolTE);
+    const em::StackRT tm = em::stack_rt(
+        cos_theta, layers, frequency_hz, em::kPolTM);
+
+    // Exact lateral exit point: per-layer Snell angles from the phase index.
+    float total_thickness = 0.0f;
+    float lateral = 0.0f;
+    const int first = layers.layer_offset[layers.material];
+    const int layers_in_wall = layers.layer_count[layers.material];
+    for (int layer = 0; layer < layers_in_wall; ++layer) {
+        const int slot = first + layer;
+        const float thickness = fmaxf(layers.layer_thickness_m[slot], 0.0f);
+        const em::Medium medium = em::make_medium(
+            layers.layer_eps_r[slot], layers.layer_sigma_e[slot], layers.layer_mu_r[slot], omega);
+        const float phase_index = fmaxf(
+            medium.k.re / fmaxf(k0, static_cast<float>(kSubpathEps)),
+            static_cast<float>(utd::UTD_SMALL_EPS));
+        const float sin_layer = sin_theta / phase_index;
+        const float cos_layer = sqrtf(
+            fmaxf(1.0f - sin_layer * sin_layer, 1.0e-6f));
+        total_thickness += thickness;
+        lateral += thickness * (sin_layer / cos_layer);
+    }
+    const utd::float3a u_par = utd::safe_normalize(
+        utd::f3_add(incident, utd::f3_mul(normal_in, cos_theta)),
+        utd::stable_perp_basis(normal_in, incident));
+    const utd::float3a hit_point = utd::make_f3(
+        hit_p[0], hit_p[1], hit_p[2]);
+    const utd::float3a exit_point = utd::f3_add(
+        utd::f3_sub(hit_point, utd::f3_mul(normal_in, total_thickness)),
+        utd::f3_mul(u_par, lateral));
+    const float jump = utd::safe_length(utd::f3_sub(exit_point, hit_point));
+
+    // Jones diag(t_TE, t_TM) in the wall s/p basis; incident and exit bases
+    // coincide because the outgoing direction equals the incident direction.
+    utd::float3a s_axis = utd::f3_cross(normal_in, incident);
+    s_axis = utd::safe_normalize(
+        s_axis, utd::stable_perp_basis(incident, normal_in));
+    const utd::float3a p_axis = utd::safe_normalize(
+        utd::f3_cross(s_axis, incident),
+        utd::stable_perp_basis(incident, s_axis));
+    const utd::Complex e_s = transport::complex3_dot_real(incoming, s_axis);
+    const utd::Complex e_p = transport::complex3_dot_real(incoming, p_axis);
+    utd::Complex3 updated = utd::c3_add(
+        utd::cplx_scale_real(s_axis, utd::cplx_mul(te.t, e_s)),
+        utd::cplx_scale_real(p_axis, utd::cplx_mul(tm.t, e_p)));
+    // exp(+j*k0*jump) * exp(-j*k_par*lateral) == exp(-j*(k_par*lateral - k0*jump)).
+    const utd::Complex compensation = em::c_exp_neg_j(
+        static_cast<double>(k_par) * static_cast<double>(lateral) -
+        static_cast<double>(k0) * static_cast<double>(jump));
+    updated = utd::c3_scale(updated, compensation);
+
+    float w_s;
+    float w_p;
+    sp_proxy_weights(incident, normal_in, w_s, w_p);
+    // The amplitude proxy is the square root of polarization-weighted power.
+    // T_eff mirrors effective_power_reflectance.
+    const float effective_transmittance =
+        fmaxf(te.cap_t * w_s + tm.cap_t * w_p, 0.0f);
+    return {exit_point, incident, updated, sqrtf(effective_transmittance), jump};
 }
 
 // Shooting-context specular transmission through a thin-sheet wall.
@@ -627,93 +760,30 @@ __global__ void bdpt_transmitted_light_subpaths_kernel(
     }
 
     const int64_t base = index * 3;
-    const utd::float3a incident = utd::safe_normalize(
-        utd::make_f3(
-            light_direction[base],
-            light_direction[base + 1],
-            light_direction[base + 2]),
-        utd::make_f3(0.0f, 0.0f, 1.0f));
-    utd::float3a normal_in = utd::safe_normalize(
-        utd::make_f3(hit_n[base], hit_n[base + 1], hit_n[base + 2]),
-        utd::make_f3(0.0f, 0.0f, 1.0f));
-    // Flip the mean-plane normal toward the incident side.
-    if (utd::f3_dot(incident, normal_in) > 0.0f)
-        normal_in = utd::f3_neg(normal_in);
-    const float cos_theta = fminf(
-        fmaxf(-utd::f3_dot(incident, normal_in), static_cast<float>(kSubpathEps)),
-        1.0f);
-    const float sin_theta = sqrtf(fmaxf(1.0f - cos_theta * cos_theta, 0.0f));
-    const float omega = 2.0f * static_cast<float>(kPi) * frequency_hz;
-    const float k0 = omega / transport::kSpeedOfLight;
-    const float k_par = k0 * sin_theta;
-
-    em::LayerView layers{
-        layer_offset,
-        layer_count,
-        layer_thickness_m,
-        layer_eps_r,
-        layer_sigma_e,
-        layer_mu_r,
-        material,
-    };
-    const em::StackRT te = em::stack_rt(
-        cos_theta, layers, frequency_hz, em::kPolTE);
-    const em::StackRT tm = em::stack_rt(
-        cos_theta, layers, frequency_hz, em::kPolTM);
-
-    // Exact lateral exit point: per-layer Snell angles from the phase index.
-    float total_thickness = 0.0f;
-    float lateral = 0.0f;
-    const int first = layer_offset[material];
-    const int layers_in_wall = layer_count[material];
-    for (int layer = 0; layer < layers_in_wall; ++layer) {
-        const int slot = first + layer;
-        const float thickness = fmaxf(layer_thickness_m[slot], 0.0f);
-        const em::Medium medium = em::make_medium(
-            layer_eps_r[slot], layer_sigma_e[slot], layer_mu_r[slot], omega);
-        const float phase_index = fmaxf(
-            medium.k.re / fmaxf(k0, static_cast<float>(kSubpathEps)),
-            static_cast<float>(utd::UTD_SMALL_EPS));
-        const float sin_layer = sin_theta / phase_index;
-        const float cos_layer = sqrtf(
-            fmaxf(1.0f - sin_layer * sin_layer, 1.0e-6f));
-        total_thickness += thickness;
-        lateral += thickness * (sin_layer / cos_layer);
-    }
-    const utd::float3a u_par = utd::safe_normalize(
-        utd::f3_add(incident, utd::f3_mul(normal_in, cos_theta)),
-        utd::stable_perp_basis(normal_in, incident));
-    const utd::float3a hit_point = utd::make_f3(
-        hit_p[base], hit_p[base + 1], hit_p[base + 2]);
-    const utd::float3a exit_point = utd::f3_add(
-        utd::f3_sub(hit_point, utd::f3_mul(normal_in, total_thickness)),
-        utd::f3_mul(u_par, lateral));
-    const float jump = utd::safe_length(utd::f3_sub(exit_point, hit_point));
-
-    // Jones diag(t_TE, t_TM) in the wall s/p basis; incident and exit bases
-    // coincide because the outgoing direction equals the incident direction.
-    utd::float3a s_axis = utd::f3_cross(normal_in, incident);
-    s_axis = utd::safe_normalize(
-        s_axis, utd::stable_perp_basis(incident, normal_in));
-    const utd::float3a p_axis = utd::safe_normalize(
-        utd::f3_cross(s_axis, incident),
-        utd::stable_perp_basis(incident, s_axis));
     const utd::Complex3 incoming = {
         utd::cplx(light_field_real[base], light_field_imag[base]),
         utd::cplx(light_field_real[base + 1], light_field_imag[base + 1]),
         utd::cplx(light_field_real[base + 2], light_field_imag[base + 2]),
     };
-    const utd::Complex e_s = transport::complex3_dot_real(incoming, s_axis);
-    const utd::Complex e_p = transport::complex3_dot_real(incoming, p_axis);
-    utd::Complex3 updated = utd::c3_add(
-        utd::cplx_scale_real(s_axis, utd::cplx_mul(te.t, e_s)),
-        utd::cplx_scale_real(p_axis, utd::cplx_mul(tm.t, e_p)));
-    // exp(+j*k0*jump) * exp(-j*k_par*lateral) == exp(-j*(k_par*lateral - k0*jump)).
-    const utd::Complex compensation = em::c_exp_neg_j(
-        static_cast<double>(k_par) * static_cast<double>(lateral) -
-        static_cast<double>(k0) * static_cast<double>(jump));
-    updated = utd::c3_scale(updated, compensation);
-
+    const BdptTransmitVertex vertex = bdpt_transmit_vertex(
+        light_direction + base,
+        hit_p + base,
+        hit_n + base,
+        incoming,
+        em::LayerView{
+            layer_offset,
+            layer_count,
+            layer_thickness_m,
+            layer_eps_r,
+            layer_sigma_e,
+            layer_mu_r,
+            material,
+        },
+        frequency_hz);
+    const utd::float3a exit_point = vertex.exit_point;
+    const utd::float3a incident = vertex.direction;
+    const utd::Complex3 updated = vertex.field;
+    const float jump = vertex.jump;
     origin[base] = exit_point.x;
     origin[base + 1] = exit_point.y;
     origin[base + 2] = exit_point.z;
@@ -727,14 +797,7 @@ __global__ void bdpt_transmitted_light_subpaths_kernel(
     field_imag[base + 1] = updated.y.im;
     field_imag[base + 2] = updated.z.im;
 
-    float w_s;
-    float w_p;
-    sp_proxy_weights(incident, normal_in, w_s, w_p);
-    // The amplitude proxy is the square root of polarization-weighted power.
-    // T_eff mirrors effective_power_reflectance.
-    const float effective_transmittance =
-        fmaxf(te.cap_t * w_s + tm.cap_t * w_p, 0.0f);
-    const float amplitude = sqrtf(effective_transmittance);
+    const float amplitude = vertex.amplitude;
     throughput_real[index] = light_throughput_real[index] * amplitude;
     throughput_imag[index] = light_throughput_imag[index] * amplitude;
     // Ideal specular transmission is a delta event with unit discrete mass;
@@ -753,6 +816,226 @@ __global__ void bdpt_transmitted_light_subpaths_kernel(
     path_length[index] = light_path_length[index] + fmaxf(hit_t[index], 0.0f) + jump;
     source_power[index] = light_source_power[index];
     event_type[index] = kEventTransmitSpecular;
+}
+
+// ---- Counter-based sampling streams ----
+//
+// A BDPT random number is a pure function of (seed, stream, global sample,
+// depth): sample g of transmitter t is g = t * samples + i. Chunking the
+// wavefront or batching transmitters never changes a draw, and the
+// event-composed sampler draws the identical numbers.
+constexpr unsigned long long kStreamEventSelection = 0x243f6a8885a308d3ULL;
+constexpr unsigned long long kStreamScatterU0 = 0x13198a2e03707344ULL;
+constexpr unsigned long long kStreamScatterU1 = 0xa4093822299f31d0ULL;
+
+__device__ __forceinline__ float bdpt_counter_uniform(
+    unsigned long long seed,
+    unsigned long long stream,
+    unsigned long long sample,
+    unsigned long long depth) {
+    unsigned long long x = splitmix64(seed ^ stream);
+    x = splitmix64(x ^ ((sample + 1ULL) * 0xd1b54a32d192ed03ULL));
+    x = splitmix64(x ^ ((depth + 1ULL) * 0x8cb92ba72f3d8dd7ULL));
+    // 24 high bits: exactly representable in float32, always in [0, 1).
+    return static_cast<float>(x >> 40) * (1.0f / 16777216.0f);
+}
+
+__global__ void bdpt_counter_uniforms_kernel(
+    int64_t count,
+    int64_t lanes,
+    unsigned long long seed,
+    unsigned long long first,
+    unsigned long long depth,
+    unsigned long long stream0,
+    unsigned long long stream1,
+    float* out) {
+    const int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (index >= count) {
+        return;
+    }
+    const unsigned long long sample = first + static_cast<unsigned long long>(index);
+    out[index * lanes] = bdpt_counter_uniform(seed, stream0, sample, depth);
+    if (lanes > 1) {
+        out[index * lanes + 1] = bdpt_counter_uniform(seed, stream1, sample, depth);
+    }
+}
+
+// Two-way reflect/transmit selection probability p_t = T/(R+T) of the
+// unpolarized smooth-stack budgets, floored at 0.05 when both are nonzero.
+__device__ float bdpt_transmit_event_probability(
+    float cos_theta,
+    const em::LayerView& layers,
+    int64_t material_count,
+    int64_t layer_total,
+    float frequency_hz) {
+    if (layers.material < 0 || static_cast<int64_t>(layers.material) >= material_count ||
+        !em::layer_material_usable(layers, layer_total)) {
+        return 0.0f;
+    }
+    const em::StackRT te = em::stack_rt(cos_theta, layers, frequency_hz, em::kPolTE);
+    const em::StackRT tm = em::stack_rt(cos_theta, layers, frequency_hz, em::kPolTM);
+    const float r_eff = 0.5f * (te.cap_r + tm.cap_r);
+    const float t_eff = 0.5f * (te.cap_t + tm.cap_t);
+    const float total = fmaxf(r_eff + t_eff, 1.0e-12f);
+    float p = fminf(fmaxf(t_eff / total, 0.05f), 0.95f);
+    if (t_eff <= 0.0f) {
+        p = 0.0f;
+    }
+    if (r_eff <= 0.0f && t_eff > 0.0f) {
+        p = 1.0f;
+    }
+    return p;
+}
+
+// One wavefront bounce of every live light subpath: select reflect or
+// transmit with one counter-based uniform, evaluate only the selected branch,
+// divide the field by sqrt(p_event) and multiply the proposal density by
+// p_event, and update the subpath in place. Dead subpaths are left untouched.
+// counters[0] / counters[1] tally transmit / reflect events and alive counts
+// the subpaths that survive this bounce.
+__global__ void bdpt_wavefront_step_kernel(
+    int64_t count,
+    int64_t first,
+    int depth,
+    unsigned long long seed,
+    const float* hit_t,
+    const float* hit_p,
+    const float* hit_n,
+    const int* hit_prim,
+    int64_t face_count,
+    const int* face_material_id,
+    const bool* face_valid,
+    const float* face_gain,
+    const float* face_eps_r,
+    const float* face_sigma_e,
+    const float* face_mu_r,
+    const float* face_thickness,
+    int64_t material_count,
+    int64_t layer_total,
+    const int* layer_offset,
+    const int* layer_count,
+    const float* layer_thickness_m,
+    const float* layer_eps_r,
+    const float* layer_sigma_e,
+    const float* layer_mu_r,
+    float frequency_hz,
+    float* origin,
+    float* direction,
+    float* field_real,
+    float* field_imag,
+    float* pdf_forward,
+    float* path_length,
+    uint8_t* component_mask,
+    bool* valid,
+    unsigned long long* counters,
+    unsigned long long* alive) {
+    const int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    bool transmitted = false;
+    bool reflected = false;
+    if (index < count && valid[index]) {
+        const int64_t base = index * 3;
+        const int prim = hit_prim[index];
+        const float t = hit_t[index];
+        const bool prim_in_range = prim >= 0 && static_cast<int64_t>(prim) < face_count;
+        const int material = prim_in_range ? face_material_id[prim] : -1;
+        const bool hit_ok = prim_in_range && t >= 0.0f && material >= 0;
+        const float cos_theta = fminf(
+            fmaxf(
+                fabsf(direction[base] * hit_n[base] + direction[base + 1] * hit_n[base + 1] +
+                      direction[base + 2] * hit_n[base + 2]),
+                1.0e-6f),
+            1.0f);
+        const em::LayerView layers{
+            layer_offset,
+            layer_count,
+            layer_thickness_m,
+            layer_eps_r,
+            layer_sigma_e,
+            layer_mu_r,
+            material,
+        };
+        const float p_transmit = hit_ok
+            ? bdpt_transmit_event_probability(cos_theta, layers, material_count, layer_total, frequency_hz)
+            : 0.0f;
+        const float u = bdpt_counter_uniform(
+            seed,
+            kStreamEventSelection,
+            static_cast<unsigned long long>(first + index),
+            static_cast<unsigned long long>(depth));
+        const bool choose_transmit = hit_ok && u < p_transmit;
+        const utd::Complex3 incoming = {
+            utd::cplx(field_real[base], field_imag[base]),
+            utd::cplx(field_real[base + 1], field_imag[base + 1]),
+            utd::cplx(field_real[base + 2], field_imag[base + 2]),
+        };
+        utd::Complex3 updated = {};
+        float advance = 0.0f;
+        bool ok = false;
+        if (choose_transmit) {
+            ok = static_cast<int64_t>(material) < material_count;
+            if (ok) {
+                const BdptTransmitVertex vertex = bdpt_transmit_vertex(
+                    direction + base, hit_p + base, hit_n + base, incoming, layers, frequency_hz);
+                origin[base] = vertex.exit_point.x;
+                origin[base + 1] = vertex.exit_point.y;
+                origin[base + 2] = vertex.exit_point.z;
+                direction[base] = vertex.direction.x;
+                direction[base + 1] = vertex.direction.y;
+                direction[base + 2] = vertex.direction.z;
+                updated = vertex.field;
+                advance = fmaxf(t, 0.0f) + vertex.jump;
+            }
+        } else {
+            ok = prim_in_range && face_valid[prim] && t >= 0.0f;
+            if (ok) {
+                updated = bdpt_reflect_vertex(
+                    direction + base,
+                    hit_p + base,
+                    hit_n + base,
+                    face_eps_r[prim],
+                    face_sigma_e[prim],
+                    face_mu_r[prim],
+                    face_gain[prim],
+                    face_thickness[prim],
+                    frequency_hz,
+                    incoming,
+                    origin + base,
+                    direction + base);
+                advance = fmaxf(t, 0.0f);
+            }
+        }
+        if (!ok) {
+            valid[index] = false;
+        } else {
+            const float p_event = choose_transmit ? p_transmit : 1.0f - p_transmit;
+            const float scale = rsqrtf(fmaxf(p_event, 1.0e-4f));
+            field_real[base] = updated.x.re * scale;
+            field_real[base + 1] = updated.y.re * scale;
+            field_real[base + 2] = updated.z.re * scale;
+            field_imag[base] = updated.x.im * scale;
+            field_imag[base + 1] = updated.y.im * scale;
+            field_imag[base + 2] = updated.z.im * scale;
+            pdf_forward[index] = pdf_forward[index] * p_event;
+            path_length[index] = path_length[index] + advance;
+            component_mask[index] = static_cast<uint8_t>(
+                component_mask[index] | (choose_transmit ? 8 : 2));
+            transmitted = choose_transmit;
+            reflected = !choose_transmit;
+        }
+    }
+    const int block_transmitted = __syncthreads_count(transmitted);
+    const int block_reflected = __syncthreads_count(reflected);
+    if (threadIdx.x == 0) {
+        if (block_transmitted > 0) {
+            atomicAdd(counters, static_cast<unsigned long long>(block_transmitted));
+        }
+        if (block_reflected > 0) {
+            atomicAdd(counters + 1, static_cast<unsigned long long>(block_reflected));
+        }
+        if (block_transmitted + block_reflected > 0) {
+            atomicAdd(alive, static_cast<unsigned long long>(block_transmitted + block_reflected));
+        }
+    }
 }
 
 }  // namespace
@@ -2590,3 +2873,117 @@ pybind11::dict channel_bdpt_transmitted_light_subpath_state_jvp(
 
 #undef kSubpathEps
 #undef kSubpathEpsilon0
+
+// ==== Section: BDPT wavefront sampler ====
+
+at::Tensor channel_bdpt_counter_uniforms_cuda(
+    at::Tensor reference,
+    int64_t count,
+    int64_t lanes,
+    int64_t seed,
+    int64_t first,
+    int64_t depth,
+    int64_t stream) {
+    TORCH_CHECK(reference.is_cuda(), "reference must be a CUDA tensor");
+    TORCH_CHECK(count >= 0, "count must be non-negative");
+    TORCH_CHECK(lanes == 1 || lanes == 2, "lanes must be 1 or 2");
+    TORCH_CHECK(seed >= 0 && first >= 0 && depth >= 0, "seed, first and depth must be non-negative");
+    TORCH_CHECK(stream == 0 || stream == 1, "stream must be 0 (event selection) or 1 (scatter direction)");
+    auto out = lanes == 1
+        ? at::empty({count}, reference.options().dtype(at::kFloat))
+        : at::empty({count, lanes}, reference.options().dtype(at::kFloat));
+    if (count > 0) {
+        constexpr int threads = 256;
+        const int blocks = static_cast<int>((count + threads - 1) / threads);
+        cudaStream_t cuda_stream = at::cuda::getCurrentCUDAStream(reference.get_device()).stream();
+        bdpt_counter_uniforms_kernel<<<blocks, threads, 0, cuda_stream>>>(
+            count,
+            lanes,
+            static_cast<unsigned long long>(seed),
+            static_cast<unsigned long long>(first),
+            static_cast<unsigned long long>(depth),
+            stream == 0 ? kStreamEventSelection : kStreamScatterU0,
+            kStreamScatterU1,
+            out.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return out;
+}
+
+void channel_bdpt_wavefront_step_cuda(
+    int64_t count,
+    int64_t first,
+    int64_t depth,
+    int64_t seed,
+    const at::Tensor& hit_t,
+    const at::Tensor& hit_p,
+    const at::Tensor& hit_n,
+    const at::Tensor& hit_prim,
+    const at::Tensor& face_material_id,
+    const at::Tensor& face_valid,
+    const at::Tensor& face_gain,
+    const at::Tensor& face_eps_r,
+    const at::Tensor& face_sigma_e,
+    const at::Tensor& face_mu_r,
+    const at::Tensor& face_thickness,
+    const at::Tensor& layer_offset,
+    const at::Tensor& layer_count,
+    const at::Tensor& layer_thickness_m,
+    const at::Tensor& layer_eps_r,
+    const at::Tensor& layer_sigma_e,
+    const at::Tensor& layer_mu_r,
+    double frequency_hz,
+    at::Tensor& origin,
+    at::Tensor& direction,
+    at::Tensor& field_real,
+    at::Tensor& field_imag,
+    at::Tensor& pdf_forward,
+    at::Tensor& path_length,
+    at::Tensor& component_mask,
+    at::Tensor& valid,
+    at::Tensor& counters,
+    at::Tensor& alive) {
+    if (count == 0) {
+        return;
+    }
+    constexpr int threads = 256;
+    const int blocks = static_cast<int>((count + threads - 1) / threads);
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(origin.get_device()).stream();
+    bdpt_wavefront_step_kernel<<<blocks, threads, 0, stream>>>(
+        count,
+        first,
+        static_cast<int>(depth),
+        static_cast<unsigned long long>(seed),
+        hit_t.data_ptr<float>(),
+        hit_p.data_ptr<float>(),
+        hit_n.data_ptr<float>(),
+        hit_prim.data_ptr<int>(),
+        face_material_id.size(0),
+        face_material_id.data_ptr<int>(),
+        face_valid.data_ptr<bool>(),
+        face_gain.data_ptr<float>(),
+        face_eps_r.data_ptr<float>(),
+        face_sigma_e.data_ptr<float>(),
+        face_mu_r.data_ptr<float>(),
+        face_thickness.data_ptr<float>(),
+        layer_offset.size(0),
+        layer_eps_r.size(0),
+        layer_offset.data_ptr<int>(),
+        layer_count.data_ptr<int>(),
+        layer_thickness_m.data_ptr<float>(),
+        layer_eps_r.data_ptr<float>(),
+        layer_sigma_e.data_ptr<float>(),
+        layer_mu_r.data_ptr<float>(),
+        static_cast<float>(frequency_hz),
+        origin.data_ptr<float>(),
+        direction.data_ptr<float>(),
+        field_real.data_ptr<float>(),
+        field_imag.data_ptr<float>(),
+        pdf_forward.data_ptr<float>(),
+        path_length.data_ptr<float>(),
+        component_mask.data_ptr<uint8_t>(),
+        valid.data_ptr<bool>(),
+        reinterpret_cast<unsigned long long*>(counters.data_ptr<int64_t>()),
+        reinterpret_cast<unsigned long long*>(alive.data_ptr<int64_t>()));
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+}

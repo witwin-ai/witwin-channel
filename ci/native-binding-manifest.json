@@ -155,13 +155,30 @@
     {
       "name": "bdpt_count_valid_connection_samples",
       "target": "channel_bdpt_count_valid_connection_samples",
-      "return_type": "int64_t",
+      "return_type": "torch::Tensor",
       "doc": "Count valid BDPT connection samples with CUDA.",
       "parameters": [
         ["samples", "pybind11::dict", null]
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_count_valid_connection_samples"]
+    },
+    {
+      "name": "bdpt_counter_uniforms",
+      "target": "channel_bdpt_counter_uniforms_cuda",
+      "return_type": "at::Tensor",
+      "doc": "Generate counter-based BDPT event or scatter-direction uniforms with a CUDA kernel.",
+      "parameters": [
+        ["reference", "at::Tensor", null],
+        ["count", "int64_t", null],
+        ["lanes", "int64_t", null],
+        ["seed", "int64_t", null],
+        ["first", "int64_t", null],
+        ["depth", "int64_t", null],
+        ["stream", "int64_t", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_counter_uniforms"]
     },
     {
       "name": "bdpt_empty_subpath_state",
@@ -789,6 +806,32 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_transmitter_tensors"]
+    },
+    {
+      "name": "bdpt_wavefront_transmission",
+      "target": "channel_bdpt_wavefront_transmission",
+      "return_type": "pybind11::dict",
+      "doc": "Run the fused all-transmitter BDPT mixed reflection+transmission wavefront.",
+      "parameters": [
+        ["scene", "RayDSceneResource&", null],
+        ["tx_positions", "torch::Tensor", null],
+        ["tx_power", "torch::Tensor", null],
+        ["tx_polarization", "torch::Tensor", null],
+        ["rx_positions", "torch::Tensor", null],
+        ["rx_polarization", "torch::Tensor", null],
+        ["materials", "pybind11::dict", null],
+        ["base_transmission", "torch::Tensor", null],
+        ["frequency_hz", "double", null],
+        ["samples", "int64_t", null],
+        ["max_depth", "int64_t", null],
+        ["seed", "int64_t", null],
+        ["mode_id", "int64_t", null],
+        ["beta", "double", null],
+        ["chunk_samples", "int64_t", null],
+        ["pair_tile", "int64_t", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_wavefront_transmission"]
     },
     {
       "name": "bdpt_zero_matrix",

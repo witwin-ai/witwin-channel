@@ -23,6 +23,13 @@
       "device_trap": false,
       "compile_options": []
     },
+    "native/channel/bdpt_wavefront.cpp": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
     "native/channel/binding/bdpt.cpp": {
       "kernels": [],
       "launches": [],
@@ -132,7 +139,10 @@
         "bdpt_sorted_gather_kernel",
         "bdpt_sorted_keys_kernel",
         "bdpt_sorted_power_finalize_kernel",
-        "bdpt_sorted_scatter_kernel"
+        "bdpt_sorted_scatter_kernel",
+        "bdpt_wavefront_connect_accumulate_kernel",
+        "bdpt_wavefront_finalize_kernel",
+        "bdpt_wavefront_visibility_inputs_kernel"
       ],
       "launches": [
         "bdpt_accumulate_coherent_backward_kernel",
@@ -158,7 +168,10 @@
         "bdpt_sorted_gather_kernel",
         "bdpt_sorted_keys_kernel",
         "bdpt_sorted_power_finalize_kernel",
-        "bdpt_sorted_scatter_kernel"
+        "bdpt_sorted_scatter_kernel",
+        "bdpt_wavefront_connect_accumulate_kernel",
+        "bdpt_wavefront_finalize_kernel",
+        "bdpt_wavefront_visibility_inputs_kernel"
       ],
       "host_synchronization": [
         "cudaMemcpyAsync",
@@ -169,20 +182,24 @@
     },
     "native/channel/kernels/bdpt_paths.cu": {
       "kernels": [
+        "bdpt_counter_uniforms_kernel",
         "bdpt_light_endpoint_subpaths_kernel",
         "bdpt_reflected_light_subpaths_kernel",
         "bdpt_sensor_endpoint_subpaths_kernel",
         "bdpt_transmitted_light_subpaths_kernel",
+        "bdpt_wavefront_step_kernel",
         "reflected_subpath_backward_kernel",
         "reflected_subpath_jvp_kernel",
         "transmitted_subpath_backward_kernel",
         "transmitted_subpath_jvp_kernel"
       ],
       "launches": [
+        "bdpt_counter_uniforms_kernel",
         "bdpt_light_endpoint_subpaths_kernel",
         "bdpt_reflected_light_subpaths_kernel",
         "bdpt_sensor_endpoint_subpaths_kernel",
         "bdpt_transmitted_light_subpaths_kernel",
+        "bdpt_wavefront_step_kernel",
         "reflected_subpath_backward_kernel",
         "reflected_subpath_jvp_kernel",
         "transmitted_subpath_backward_kernel",
@@ -196,12 +213,14 @@
       "kernels": [
         "bdpt_launch_state_kernel",
         "bdpt_sample_directions_kernel",
+        "bdpt_wavefront_launch_kernel",
         "finalize_maps_backward_kernel",
         "finalize_maps_jvp_kernel"
       ],
       "launches": [
         "bdpt_launch_state_kernel",
         "bdpt_sample_directions_kernel",
+        "bdpt_wavefront_launch_kernel",
         "finalize_maps_backward_kernel",
         "finalize_maps_jvp_kernel"
       ],

@@ -578,6 +578,7 @@ Python_add_library(
     native/channel/build_info.cpp
     native/channel/bdpt.cpp
     native/channel/bdpt_ad_dispatch.cpp
+    native/channel/bdpt_wavefront.cpp
     native/channel/rayd/scene.cpp
     native/channel/rayd/geometry.cpp
     native/channel/rayd/reflection.cpp
