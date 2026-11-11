@@ -385,9 +385,11 @@ __device__ bool tape_row_value(
         utd::f3_sub(edge_point, src), eh, false);
     const utd::Basis3T<T> out_edge = utd::diffraction_edge_basis(
         utd::f3_sub(target, edge_point), eh, true);
+    T face0_cos, face1_cos;
+    utd::reciprocal_face_cosines(gphi, gphi_p, p.wedgeN, face0_cos, face1_cos);
     if (c.valid0) {
         p.face0Operator = slab_face_operator_t<T>(
-            utd::fabsf(utd::sinf(gphi_p)),
+            face0_cos,
             fad::seeded<T>(c.eps0, seeds.eps0),
             fad::seeded<T>(c.sigma0, seeds.sigma0),
             fad::seeded<T>(c.gain0, seeds.gain0),
@@ -396,7 +398,7 @@ __device__ bool tape_row_value(
     }
     if (c.valid1) {
         p.face1Operator = slab_face_operator_t<T>(
-            utd::fabsf(utd::sinf(p.wedgeN * utd::UTD_PI - gphi)),
+            face1_cos,
             fad::seeded<T>(c.eps1, seeds.eps1),
             fad::seeded<T>(c.sigma1, seeds.sigma1),
             fad::seeded<T>(c.gain1, seeds.gain1),

@@ -115,19 +115,19 @@ _CASES = {
 }
 # The field is continuous along these trajectories, so the fixed-winner
 # gradient must account for the whole primal change.
-_CONTINUOUS = ("control-rx", "diagonal-rx", "diagonal-wall", "isb-rx-diffraction")
+_CONTINUOUS = (
+    "control-rx", "diagonal-rx", "diagonal-wall", "isb-rx-diffraction", "isb-rx-diffraction-flipped",
+)
 # Geometric optics alone: a row appears or disappears and nothing else covers
 # the jump. Fixed-winner AD drops the jump by design.
 _GO_ONLY = ("rsb-rx", "rsb-wall", "isb-rx")
 # Geometric optics plus edge diffraction should be continuous across both
-# shadow boundaries. Here the diffraction rows leave the jump in place: at the
-# reflection boundary for either winding, and at the incident boundary when the
-# screen faces away from the transmitter.
+# shadow boundaries. Here the diffraction rows leave the jump in place, at the
+# reflection boundary for either winding.
 _DIFFRACTION_GAPS = (
     "rsb-rx-diffraction",
     "rsb-rx-diffraction-flipped",
     "rsb-wall-diffraction",
-    "isb-rx-diffraction-flipped",
 )
 
 

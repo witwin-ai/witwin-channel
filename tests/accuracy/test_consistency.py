@@ -39,8 +39,7 @@ def _pair_matrix(result) -> torch.Tensor:
 
 @pytest.mark.parametrize("components", [
     pytest.param({"los", "reflection"}, id="lr"),
-    pytest.param({"los", "reflection", "diffraction"}, id="lrd", marks=pytest.mark.xfail(
-        strict=True, reason="A-4 (M0-3): diffraction is not reciprocal under a Tx/Rx swap")),
+    pytest.param({"los", "reflection", "diffraction"}, id="lrd"),
 ])
 def test_reciprocity_swap_tx_rx(accuracy, components):
     from witwin.channel.path import Config, solve
@@ -71,15 +70,12 @@ def _radiomap(subdiv: int, welded: bool, components: set[str], depth: int = 1) -
     return result.path_gain.reshape(-1).double()
 
 
-C6 = pytest.mark.xfail(strict=True, reason="C-6: diffraction depends on mesh subdivision")
-
-
 @pytest.mark.parametrize("components,subdiv,welded", [
     pytest.param({"reflection"}, 1, True, id="reflection-s1"),
     pytest.param({"reflection"}, 3, True, id="reflection-s3"),
-    pytest.param({"diffraction"}, 1, True, id="diffraction-s1", marks=C6),
-    pytest.param({"diffraction"}, 3, True, id="diffraction-s3", marks=C6),
-    pytest.param({"diffraction"}, 1, False, id="diffraction-s1-unwelded", marks=C6),
+    pytest.param({"diffraction"}, 1, True, id="diffraction-s1"),
+    pytest.param({"diffraction"}, 3, True, id="diffraction-s3"),
+    pytest.param({"diffraction"}, 1, False, id="diffraction-s1-unwelded"),
 ])
 def test_subdivision_invariance(accuracy, components, subdiv, welded):
     """Subdividing every triangle 4-way keeps the geometry identical, so the radiomap must not move.
@@ -237,7 +233,6 @@ def test_four_solvers_single_pec_wall_reflection(accuracy, solver):
     accuracy.check(solver, float(np.max(np.abs(value / reference - 1.0))), tolerance)
 
 
-@pytest.mark.xfail(strict=True, reason="A-3 (M0-3): screen diffraction depends on the face winding")
 def test_pec_screen_winding_invariance(accuracy):
     """Flipping a PEC screen's triangle winding changes no physics, so the edge field must not move."""
     phi, phi_prime = math.radians(200.0), math.radians(60.0)
