@@ -3,11 +3,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 import dataclasses
 import math
 import numbers
 import operator
+from typing import TypedDict, cast
 
 
 VALID_COMPONENTS = frozenset(
@@ -203,6 +204,7 @@ def validate_config_fields(config: object) -> None:
     """
 
     solver_config = type(config).__module__.removeprefix("witwin.channel.")
+    # Every solver config is a dataclass instance; the parameter is typed for any solver.
     for item in dataclasses.fields(config):  # type: ignore[arg-type]
         kinds = {part.strip() for part in str(item.type).split("|")}
         value = getattr(config, item.name)
@@ -246,12 +248,21 @@ def validate_vocabulary(name: str, value: str, allowed: Iterable[str]) -> None:
 DISCOVERY_MODES = ("auto", "exhaustive", "rays")
 
 
-def discovery_metadata(requested: str, record: dict[str, object] | None) -> dict[str, object]:
+class DiscoveryMetadata(TypedDict):
+    """The ``discovery`` result block of the enumerated solvers."""
+
+    requested: str
+    # Candidate source per reflection depth, keyed by the depth as a string.
+    sources: dict[str, str]
+    complete: bool
+
+
+def discovery_metadata(requested: str, record: Mapping[str, object] | None) -> DiscoveryMetadata:
     """The ``discovery`` result block: requested source, source per depth, and completeness."""
 
     if record is None:
         return {"requested": requested, "sources": {}, "complete": True}
-    return dict(record)
+    return cast(DiscoveryMetadata, dict(record))
 
 
 def validate_max_depth(max_depth: int) -> None:

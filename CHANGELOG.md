@@ -25,6 +25,15 @@ All notable changes to `witwin-channel` are documented in this file.
   `complete` (true only when every reflection depth came from a provably
   complete source) and `discovery` (requested source and source per depth).
   The public API snapshot records the two `Config` contracts changing.
+- Typed result metadata: `path.PathMetadata`, `deterministic.Metadata`,
+  `montecarlo.basic.Metadata` and `montecarlo.bdpt.Metadata` are `TypedDict`s
+  naming the stable keys of each solver's `Result.metadata` (including
+  `estimator`, `quantity`, `combine`, `complete`, `discovery` and the `kernel`
+  record). At run time the metadata is the same plain `dict` with the same keys
+  and values. Each `solve` now annotates `reference_frequency_hz: float |
+  torch.Tensor`, and `PathResult.from_ragged(metadata=...)` accepts any
+  `Mapping`. The public API snapshot records these annotation changes and the
+  four new exports; see the migration note.
 - Propagation consumer `CONTRACT_VERSION` 7: `PropagationRequest.discovery`
   (same vocabulary, default `"auto"`), `PropagationEvaluation.complete` and
   `PropagationCapabilities.discovery_modes`. Migration: a consumer that pins

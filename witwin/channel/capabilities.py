@@ -8,7 +8,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from dataclasses import fields, is_dataclass
-from typing import Any
+from typing import Any, Literal, TypedDict, cast
 
 
 # BDPT AD scope: the parameters its jvp/vjp companions carry, and the leaves
@@ -281,9 +281,19 @@ def solver_capabilities(solver: str) -> dict[str, Any]:
     return deepcopy(_CAPABILITIES["solvers"][solver])
 
 
+class ConfigMetadata(TypedDict):
+    """The requested/effective configuration keys every solver publishes in its metadata."""
+
+    requested_config: dict[str, Any]
+    effective_config: dict[str, Any]
+    requested_max_depth: int
+    effective_max_depth: int
+    component_max_depth: dict[str, int]
+
+
 def config_metadata(
     *, requested: dict[str, Any], effective: dict[str, Any], component_max_depth: dict[str, int],
-) -> dict[str, Any]:
+) -> ConfigMetadata:
     """Build the common requested/effective solver metadata contract."""
 
     return {
@@ -301,10 +311,23 @@ ESTIMATORS = frozenset({"enumerated", "sampled"})
 QUANTITIES = frozenset({"point_sample", "cell_average"})
 COMBINES = frozenset({"coherent", "incoherent", "none"})
 
+Estimator = Literal["enumerated", "sampled"]
+Quantity = Literal["point_sample", "cell_average"]
+Combine = Literal["coherent", "incoherent", "none"]
+
+
+class ResultSemantics(TypedDict):
+    """The result-semantics keys every solver publishes in its metadata."""
+
+    estimator: Estimator
+    quantity: dict[str, Quantity]
+    combine: Combine
+    complete: bool | None
+
 
 def estimator_metadata(
     *, estimator: str, quantity: Mapping[str, str], combine: str, complete: bool | None,
-) -> dict[str, Any]:
+) -> ResultSemantics:
     """The result-semantics keys every solver publishes in its metadata.
 
     ``estimator`` is ``enumerated`` or ``sampled``; ``quantity`` maps each requested
@@ -328,17 +351,18 @@ def estimator_metadata(
         raise ValueError(f"combine must be one of {sorted(COMBINES)}, got {combine!r}")
     if complete is not None and type(complete) is not bool:
         raise TypeError("complete must be a bool or None")
+    # The checks above narrow every value to its vocabulary.
     return {
-        "estimator": estimator,
-        "quantity": dict(sorted(quantity.items())),
-        "combine": combine,
+        "estimator": cast(Estimator, estimator),
+        "quantity": cast("dict[str, Quantity]", dict(sorted(quantity.items()))),
+        "combine": cast(Combine, combine),
         "complete": complete,
     }
 
 
 def component_quantities(
     components: Iterable[str], *, cell_average: Iterable[str] = (),
-) -> dict[str, str]:
+) -> dict[str, Quantity]:
     """``point_sample`` for every component except those listed in ``cell_average``."""
 
     averaged = frozenset(cell_average)
@@ -364,6 +388,11 @@ def serialize_config(config: object) -> dict[str, Any]:
 
 
 __all__ = [
+    "Combine",
+    "ConfigMetadata",
+    "Estimator",
+    "Quantity",
+    "ResultSemantics",
     "capabilities",
     "config_metadata",
     "component_quantities",

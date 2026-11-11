@@ -62,10 +62,16 @@
           "contract_sha256": "9f9530606daaf4415ecd0414704224543c61862f6a6be0ff2d29bf444cf54588"
         },
         {
+          "name": "PathMetadata",
+          "kind": "class",
+          "target": "witwin.channel.path.PathMetadata",
+          "contract_sha256": "c7999a7d0f12ff5e3d2d4738d6df6a3e40fe4a2223ae59d8bb2cf4c81df02de2"
+        },
+        {
           "name": "PathResult",
           "kind": "class",
           "target": "witwin.channel.path.PathResult",
-          "contract_sha256": "a35b121b218962c956327fb2e0c3459dbe216416e5a9a843b17fbd0a2da58cc0"
+          "contract_sha256": "f933f8d62a02dc503b49bed590448a86e8e7fe5a0a1c6318ef387f0b75edf832"
         },
         {
           "name": "RaggedPathSoA",
@@ -77,8 +83,8 @@
           "name": "solve",
           "kind": "function",
           "target": "witwin.channel.path.solve",
-          "contract_sha256": "aabe8ec066b03039ee3464733eae07b535cd86eb7629317e0013e4f4a3a4d377",
-          "signature": "(scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz)"
+          "contract_sha256": "8432ca1a8b5156cde44586d94702ea043d96075d4a9e6a4015627ca5d3700881",
+          "signature": "(scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz: float | torch.Tensor)"
         }
       ]
     },
@@ -92,6 +98,12 @@
           "contract_sha256": "6c4ef1cfbda91086c0ebcdb89e9eb1f9d7ae5e918274e526b2be346cf2b709d6"
         },
         {
+          "name": "Metadata",
+          "kind": "class",
+          "target": "witwin.channel.deterministic.Metadata",
+          "contract_sha256": "0fd5eec1a0c853113853265207539a1d41d62fc3011fe8fac6adb1c1de9c8fe6"
+        },
+        {
           "name": "PathTable",
           "kind": "class",
           "target": "witwin.channel.deterministic.PathTable",
@@ -101,14 +113,14 @@
           "name": "Result",
           "kind": "class",
           "target": "witwin.channel.deterministic.Result",
-          "contract_sha256": "ec52a4ac2292a862e40826a1180aef97f2327ee703d36c1bff222d8b7b6272c7"
+          "contract_sha256": "da82078dfe210d25b6f872146abccefec88bbfab839a0f12b423578731daff66"
         },
         {
           "name": "solve",
           "kind": "function",
           "target": "witwin.channel.deterministic.solve",
-          "contract_sha256": "8f4af64cea0abb6707651803287c7610516b4ea4367ed334e206b9c000e9ccf7",
-          "signature": "(scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz)"
+          "contract_sha256": "e462205d55b7d3a6965a6b2cbf918a67820346ea65005d40fc009713edef0ac6",
+          "signature": "(scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz: float | torch.Tensor)"
         }
       ]
     },
@@ -122,17 +134,23 @@
           "contract_sha256": "57702b0a1b40234fc5cc8f5a88ab6c195329ee58dbb5ed074b04d7b0fde0b95f"
         },
         {
+          "name": "Metadata",
+          "kind": "class",
+          "target": "witwin.channel.montecarlo.basic.Metadata",
+          "contract_sha256": "b9aa66bafc12ae823ac24800a72657822dcf3c92063f7b794b2defee8d4d18ec"
+        },
+        {
           "name": "Result",
           "kind": "class",
           "target": "witwin.channel.montecarlo.basic.Result",
-          "contract_sha256": "b1a09b4335e1156f2b36b15b29b9619eda6facd00d1e83f387efaa045bfaec5f"
+          "contract_sha256": "5e1d9b861793b443e8fb42b9873256a14dfc1afda24813f8b474c014670588e9"
         },
         {
           "name": "solve",
           "kind": "function",
           "target": "witwin.channel.montecarlo.basic.solve",
-          "contract_sha256": "ad954d94f4023d6dd77ad7cdc766650e3268ae39e93c2c6bc2727f64738a9ec3",
-          "signature": "(scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz)"
+          "contract_sha256": "4d950c78399e9b617a2c8b081e213fa827a067a586046b516305da65bd35a14f",
+          "signature": "(scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz: float | torch.Tensor)"
         }
       ]
     },
@@ -152,17 +170,23 @@
           "contract_sha256": "2373e516e1444532b6ae8d497d2d4c87e0b74d111d645bf883a396b2f5c737b8"
         },
         {
+          "name": "Metadata",
+          "kind": "class",
+          "target": "witwin.channel.montecarlo.bdpt.Metadata",
+          "contract_sha256": "2bb4d0c5feca4a95dfc52af8569c30fbca8acefd75b25f2f6d1058d03bd2bcea"
+        },
+        {
           "name": "Result",
           "kind": "class",
           "target": "witwin.channel.montecarlo.bdpt.Result",
-          "contract_sha256": "7ac7d1827cca37ddb33f69db9182ed750f4fc9c8b9bc2b80bc395bd69248c48f"
+          "contract_sha256": "2ce1ee773b7336d80ec31482685823ab35f1b8ef75e6e2b5b0d5051f89a38a2f"
         },
         {
           "name": "solve",
           "kind": "function",
           "target": "witwin.channel.montecarlo.bdpt.solve",
-          "contract_sha256": "fb1e94860091be8697499679c05711daadd4a752ae2dd052874ba2745b48956b",
-          "signature": "(scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz)"
+          "contract_sha256": "8d19af3ee0c5d75362ea1b640074740e1d28bf0dbe1be0e3d23f520fb9c86a52",
+          "signature": "(scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz: float | torch.Tensor)"
         }
       ]
     },

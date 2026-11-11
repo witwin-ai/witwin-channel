@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 import math
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import torch
 
@@ -15,6 +15,8 @@ from witwin.core import Scene, SceneSnapshot
 
 from witwin.channel import build_info
 from witwin.channel.capabilities import (
+    ConfigMetadata,
+    ResultSemantics,
     capabilities,
     component_quantities,
     config_metadata,
@@ -78,6 +80,7 @@ from witwin.channel.propagation.geometry import (
 from witwin.channel.runtime import (
     AdLaunchLedger,
     CapacityFailureState,
+    KernelMetadata,
     SolveCapacityTransaction,
     _participates_in_ad,
     create_solve_capacity_transaction,
@@ -96,6 +99,7 @@ from witwin.channel.scene.compiler import (
 )
 from witwin.channel.scene.endpoints import (
     ReceiverGrid,
+    ReceiverPoint,
     _endpoint_views,
     _validate_scalar_endpoint_boundary,
     axis_aligned_grid_spec as grid_spec,
@@ -174,11 +178,36 @@ class Config:
 # --- Result ---------------------------------------------------------------
 
 
+class _MetadataKeys(ResultSemantics, ConfigMetadata):
+    seed: int
+    samples: int
+    max_depth: int
+    ad_mode: str
+    path_count: int
+    contribution_capacity: int
+    components: dict[str, str]
+    rayd: dict[str, bool]
+    kernel: KernelMetadata
+    semantic_capabilities: dict[str, Any]
+    edge_policy: dict[str, Any]
+
+
+class Metadata(_MetadataKeys, total=False):
+    """The stable keys of ``Result.metadata``; a plain ``dict`` at run time."""
+
+    # Present when the transmission component was requested.
+    transmission: dict[str, Any]
+    # Present when the scattering component was requested.
+    scattering: dict[str, Any]
+    # Present when compilation removed degenerate or duplicate faces.
+    dropped_faces: dict[str, int]
+
+
 @dataclass(frozen=True, slots=True)
 class Result:
     path_gain: torch.Tensor
     component_power: dict[str, torch.Tensor]
-    metadata: dict[str, Any]
+    metadata: Metadata
     diagnostics: dict[str, Any] | None = None
     component_maps: dict[str, torch.Tensor] | None = None
 
@@ -278,7 +307,8 @@ def make_solver_metadata(
 
 
 def los_path_gain(
-    scene: SolverScene, *, device: torch.device, ad: bool = False, ledger: object | None = None,
+    scene: SolverScene, *, device: torch.device, ad: bool = False,
+    ledger: AdLaunchLedger | None = None,
 ) -> torch.Tensor:
     tx_pos, tx_power = transmitter_positions(scene, device=device)
     rx_pos = receiver_positions(scene, device=device, reference=tx_pos)
@@ -296,7 +326,7 @@ def los_path_gain(
         tx_live = transmitter_positions_ad(scene, tx_pos, device=device)
         rx_live = receiver_positions_ad(scene, rx_pos, device=device)
         if ledger is not None:
-            ledger.add(tx_live, tx_power, rx_live)  # type: ignore[attr-defined]
+            ledger.add(tx_live, tx_power, rx_live)
         return mc_los_path_gain_ad(
             tx_live, tx_power, rx_live, tx_pol, frequency=scene.frequency
         )
@@ -311,15 +341,15 @@ def los_path_gain(
 
 
 def apply_point_los_visibility(
-    scene: SolverScene, rayd: object, los: torch.Tensor, *, device: torch.device,
+    scene: SolverScene, rayd: RayDSceneResource, los: torch.Tensor, *, device: torch.device,
 ) -> torch.Tensor:
     """Zero occluded (tx, rx) entries of a point-receiver LoS matrix."""
 
     if not scene.structures or los.numel() == 0:
         return los
-    if not rayd.available:  # type: ignore[attr-defined]
+    if not rayd.available:
         raise RuntimeError("LoS visibility requires RayD native scene capability")
-    handle = rayd.require_resource()  # type: ignore[attr-defined]
+    handle = rayd.require_resource()
     tx_pos, _ = transmitter_positions(scene, device=device)
     rx_pos = receiver_positions(scene, device=device, reference=tx_pos)
     masks: list[torch.Tensor] = []
@@ -382,7 +412,7 @@ MaterialTensors = tuple[
 
 def _grid_los_matrix(
     scene: SolverScene, grid: ReceiverGrid, *, device: torch.device,
-    los: torch.Tensor | None = None, ad: bool = False, ledger: object | None = None,
+    los: torch.Tensor | None = None, ad: bool = False, ledger: AdLaunchLedger | None = None,
 ) -> torch.Tensor:
     if los is not None and len(scene.receivers) == 1 and scene.receivers[0] is grid:
         return los
@@ -411,7 +441,7 @@ def _grid_visibility_masks(
 
 def los_component_map(
     scene: SolverScene, rayd: RayDSceneResource, grid: ReceiverGrid, *, device: torch.device,
-    los: torch.Tensor | None = None, ad: bool = False, ledger: object | None = None,
+    los: torch.Tensor | None = None, ad: bool = False, ledger: AdLaunchLedger | None = None,
 ) -> torch.Tensor:
     los = _grid_los_matrix(scene, grid, device=device, los=los, ad=ad, ledger=ledger)
     if ad:
@@ -425,7 +455,7 @@ def los_component_map(
                 )
             visible = _grid_visibility_masks(scene, rayd, grid, device=device)
         if ledger is not None:
-            ledger.add(visible)  # type: ignore[attr-defined]
+            ledger.add(visible)
         return mc_los_grid_maps_ad(los, visible, rows=grid.shape[0], cols=grid.shape[1])
     maps = mc_los_component_maps_from_matrix(
         los, rows=grid.shape[0], cols=grid.shape[1]
@@ -466,7 +496,7 @@ def _transmission_capacity_metadata(
 def transmission_component_map(
     scene: SolverScene, rayd: RayDSceneResource, grid: ReceiverGrid, *, max_depth: int,
     device: torch.device, failure_state: CapacityFailureState, los: torch.Tensor | None = None,
-    ad: bool = False, ledger: object | None = None,
+    ad: bool = False, ledger: AdLaunchLedger | None = None,
 ) -> torch.Tensor:
     """Straight-penetration transmission radiomap ``[T, rows, cols]`` of one receiver grid."""
 
@@ -492,7 +522,7 @@ def transmission_component_map(
     )
     if ad:
         if ledger is not None:
-            ledger.add()  # type: ignore[attr-defined]
+            ledger.add()
         return mc_los_grid_maps_ad(matrix, None, rows=grid.shape[0], cols=grid.shape[1])
     return mc_los_component_maps_from_matrix(
         matrix, rows=grid.shape[0], cols=grid.shape[1]
@@ -502,7 +532,7 @@ def transmission_component_map(
 def transmission_matrix(
     scene: SolverScene, rayd: RayDSceneResource, rx_pos: torch.Tensor, *, max_depth: int,
     device: torch.device, failure_state: CapacityFailureState,
-    base_power: torch.Tensor | None = None, ad: bool = False, ledger: object | None = None,
+    base_power: torch.Tensor | None = None, ad: bool = False, ledger: AdLaunchLedger | None = None,
 ) -> torch.Tensor:
     """Straight-penetration transmission path gain ``[T, R]`` at receiver positions ``rx_pos``.
 
@@ -544,7 +574,7 @@ def transmission_matrix(
     flat_base_power = base_power.view(-1)
     vertices = scene_vertex_table(scene, compiled) if ad else None
     if ad and ledger is not None:
-        ledger.add(vertices, origins, targets)  # type: ignore[attr-defined]
+        ledger.add(vertices, origins, targets)
     penetration = straight_transmission_chains(
         rayd,
         origins,
@@ -575,7 +605,7 @@ def transmission_matrix(
     )
     if ad:
         if ledger is not None:
-            ledger.add(  # type: ignore[attr-defined]
+            ledger.add(
                 penetration.direction,
                 penetration.normal,
                 bundle["layer_thickness_m"],
@@ -600,7 +630,7 @@ def transmission_matrix(
 
 def scattering_component_map(
     scene: SolverScene, rayd: RayDSceneResource, grid: ReceiverGrid, *, samples: int, seed: int,
-    device: torch.device, ad: bool = False, ledger: object | None = None,
+    device: torch.device, ad: bool = False, ledger: AdLaunchLedger | None = None,
 ) -> tuple[torch.Tensor, dict[str, int]]:
     """Kirchhoff diffuse scattering radiomap from area-sampled rough faces.
 
@@ -647,7 +677,7 @@ def scattering_component_map(
     )
     if ad:
         if ledger is not None:
-            ledger.add()  # type: ignore[attr-defined]
+            ledger.add()
         return (
             mc_los_grid_maps_ad(matrix, None, rows=grid.shape[0], cols=grid.shape[1]),
             stats,
@@ -665,7 +695,7 @@ class ReceiverBlock:
     """A run of receivers one native deposit launch covers: one grid, or consecutive points."""
 
     grid: ReceiverGrid | None
-    receivers: tuple[object, ...]
+    receivers: tuple[ReceiverPoint | ReceiverGrid, ...]
     column: int
     count: int
 
@@ -675,7 +705,7 @@ def receiver_blocks(scene: SolverScene) -> tuple[ReceiverBlock, ...]:
 
     blocks: list[ReceiverBlock] = []
     column = 0
-    run: list[object] = []
+    run: list[ReceiverPoint | ReceiverGrid] = []
 
     def close_run() -> None:
         nonlocal column
@@ -743,9 +773,9 @@ def _scene_bounds(rayd: RayDSceneResource) -> torch.Tensor:
     vertices = rayd.edge_records().vertices
     key = (int(vertices.data_ptr()), int(vertices.shape[0]))
     cache = rayd.runtime_cache
-    cached = cache.get("mc_scene_bounds")
-    if cached is not None and cached[0] == key:  # type: ignore[index]
-        return cached[1]  # type: ignore[index, no-any-return]
+    cached = cast("tuple[object, torch.Tensor] | None", cache.get("mc_scene_bounds"))
+    if cached is not None and cached[0] == key:
+        return cached[1]
     bounds = montecarlo_kernels.mc_scene_bounds(vertices.detach())
     cache["mc_scene_bounds"] = (key, bounds)
     return bounds
@@ -839,9 +869,10 @@ def _reflection_layer_bundle(
 
 def _accumulate_reflection_block(
     scene: SolverScene, block_params: dict[str, object], *, ray_o: torch.Tensor,
-    ray_d: torch.Tensor, full_trace: tuple[torch.Tensor, ...], face_normals: torch.Tensor,
-    material_tensors: MaterialTensors, tx_live: torch.Tensor, tx_pol: torch.Tensor,
-    solid_angle: torch.Tensor, max_depth: int, wavelength: float, ad: bool, ledger: object | None,
+    ray_d: torch.Tensor, full_trace: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+    face_normals: torch.Tensor, material_tensors: MaterialTensors, tx_live: torch.Tensor,
+    tx_pol: torch.Tensor, solid_angle: torch.Tensor, max_depth: int, wavelength: float, ad: bool,
+    ledger: AdLaunchLedger | None,
 ) -> torch.Tensor:
     eta_r, sigma, _mu_r, gain, valid, thickness = material_tensors
     deposit = {key: value for key, value in block_params.items() if key.startswith("grid_")}
@@ -851,21 +882,21 @@ def _accumulate_reflection_block(
         "wavelength": float(wavelength),
         "solid_angle_per_ray": solid_angle,
         "points": block_params["points"],
-        "point_radius": float(block_params["point_radius"]),  # type: ignore[arg-type]
+        "point_radius": float(cast(float, block_params["point_radius"])),
         **deposit,
     }
     layers, multilayer = _reflection_layer_bundle(scene, ray_o.device)
     if not ad:
-        return mc_slab_reflection_accumulate(  # type: ignore[arg-type]
+        return mc_slab_reflection_accumulate(
             ray_o, ray_d, *full_trace, face_normals, eta_r, sigma, gain, valid, thickness,
             layers=layers, **common,
         )
     # Same accumulate kernel behind the autograd Function; the caller scales by the tx power.
     if ledger is not None:
-        ledger.add(  # type: ignore[attr-defined]
+        ledger.add(
             ray_o, ray_d, *full_trace, face_normals, eta_r, sigma, gain, valid, thickness
         )
-    return mc_slab_reflection_accumulate_ad(  # type: ignore[arg-type]
+    return mc_slab_reflection_accumulate_ad(
         tx_live, eta_r, sigma, gain, thickness, scene.frequency, ray_o, ray_d, *full_trace,
         face_normals, valid, layers=layers, multilayer=multilayer, **common,
     )
@@ -875,7 +906,7 @@ def reflection_block_outputs(
     scene: SolverScene, rayd: RayDSceneResource, blocks: tuple[ReceiverBlock, ...], *, samples: int,
     max_depth: int, seed: int, receiver_radius_m: float | None, device: torch.device,
     material_tensors: MaterialTensors, collect_wedges: bool = False, ad: bool = False,
-    ledger: object | None = None,
+    ledger: AdLaunchLedger | None = None,
 ) -> ReflectionBlocksResult:
     """Specular reflection deposits of every receiver block, one ``[T, ...]`` tensor per block.
 
@@ -955,7 +986,7 @@ def _stack_block_outputs(
 def reflection_component_maps_with_wedges(
     scene: SolverScene, rayd: RayDSceneResource, grid: ReceiverGrid, *, samples: int,
     max_depth: int, device: torch.device, material_tensors: MaterialTensors, seed: int = 0,
-    collect_wedges: bool = False, ad: bool = False, ledger: object | None = None,
+    collect_wedges: bool = False, ad: bool = False, ledger: AdLaunchLedger | None = None,
 ) -> ReflectionComponentResult:
     """Reflection maps ``[T, rows, cols]`` of one receiver grid plus the diffraction wedge events."""
 
@@ -977,10 +1008,10 @@ def reflection_component_maps_with_wedges(
     return ReflectionComponentResult(maps=result.outputs[0], wedge_events=result.wedge_events)
 
 
-def _native_surface_group_edge_candidates(  # type: ignore[no-untyped-def]
-    records, selected: torch.Tensor
+def _native_surface_group_edge_candidates(
+    records: Any, selected: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    return geometry_kernels.mc_surface_group_edge_candidates(  # type: ignore[no-any-return]
+    return geometry_kernels.mc_surface_group_edge_candidates(
         records.vertices,
         records.faces,
         records.face_normals,
@@ -1000,9 +1031,11 @@ def _cached_primitive_edge_candidates(
     cache = rayd.runtime_cache
     cached = cache.get("mc_primitive_edge_candidates")
     if cached is not None:
-        cached_key, cached_candidates = cached  # type: ignore[misc]
+        cached_key, cached_candidates = cast(
+            "tuple[tuple[int, int], tuple[torch.Tensor, torch.Tensor]]", cached
+        )
         if cached_key == key:
-            return cached_candidates  # type: ignore[return-value, no-any-return]
+            return cached_candidates
     candidates = _native_surface_group_edge_candidates(rayd.edge_records(), selected)
     cache["mc_primitive_edge_candidates"] = (key, candidates)
     return candidates
@@ -1092,7 +1125,7 @@ def _diffraction_states_from_edge_indices(
         if edge_geometry is not None
         else _cached_diffraction_edge_geometry(rayd)
     )
-    return deterministic_diffraction_state_pack(  # type: ignore[no-any-return]
+    return deterministic_diffraction_state_pack(
         edge_indices,
         edge_pos,
         edge_dir,
@@ -1132,7 +1165,7 @@ def _diffraction_states(
         face1,
         exterior_angle,
     ) = geometry
-    return deterministic_diffraction_state_pack_selected(  # type: ignore[no-any-return]
+    return deterministic_diffraction_state_pack_selected(
         selected,
         edge_pos,
         edge_dir,
@@ -1149,9 +1182,9 @@ def _diffraction_states(
     )
 
 
-def _tx_diffraction_states(  # type: ignore[no-untyped-def]
+def _tx_diffraction_states(
     scene: SolverScene, rayd: RayDSceneResource, tx: torch.Tensor, tx_power: torch.Tensor,
-    tx_index: int, *, wedge_events, get_edge_geometry, get_edge_candidates,
+    tx_index: int, *, wedge_events: Any, get_edge_geometry: Any, get_edge_candidates: Any,
 ) -> tuple[torch.Tensor, ...] | None:
     """Packed edge states of one transmitter (from its wedge events when given), or None."""
 
@@ -1179,11 +1212,11 @@ def _tx_diffraction_states(  # type: ignore[no-untyped-def]
 _POINT_DIFFRACTION_ENTRIES = 1 << 22
 
 
-def _point_diffraction_map(  # type: ignore[no-untyped-def]
-    handle, states: tuple[torch.Tensor, ...], sample_state_index: torch.Tensor,
+def _point_diffraction_map(
+    handle: Any, states: tuple[torch.Tensor, ...], sample_state_index: torch.Tensor,
     points: torch.Tensor, *, material_tensors: MaterialTensors, tx_anchor: torch.Tensor,
-    tx_pol: torch.Tensor, frequency, wavelength: float, samples: int, seed: int,
-    total_edge_length: float, point_radius: float, ad: bool, ledger: object | None,
+    tx_pol: torch.Tensor, frequency: Any, wavelength: float, samples: int, seed: int,
+    total_edge_length: float, point_radius: float, ad: bool, ledger: AdLaunchLedger | None,
 ) -> torch.Tensor:
     """Capture-sphere diffraction ``[1, P]`` of one transmitter at point receivers.
 
@@ -1212,7 +1245,7 @@ def _point_diffraction_map(  # type: ignore[no-untyped-def]
         active = tape.active & source_clear & receiver_clear
         tape_tensors = (active, tape.state, tape.cell, tape.u)
         point_tape = (tape.lane, points, float(point_radius), int(samples))
-        grid_args = {
+        grid_args: dict[str, Any] = {
             "grid_axis": 2,
             "grid_position": 0.0,
             "grid_coord0_min": 0.0,
@@ -1228,10 +1261,10 @@ def _point_diffraction_map(  # type: ignore[no-untyped-def]
         }
         if ad:
             if ledger is not None:
-                ledger.add(*tape_tensors, *state_tensors, eta_r, sigma, mu_r, gain, valid, thickness)  # type: ignore[attr-defined]
+                ledger.add(*tape_tensors, *state_tensors, eta_r, sigma, mu_r, gain, valid, thickness)
             part = mc_utd_diffraction_tape_accumulate_ad(
                 tx_anchor, eta_r, sigma, gain, thickness, frequency, tape_tensors, state_tensors,
-                mu_r, valid, tx_pol=tx_pol, point_tape=point_tape, **grid_args,  # type: ignore[arg-type]
+                mu_r, valid, tx_pol=tx_pol, point_tape=point_tape, **grid_args,
             )
         else:
             part = mc_utd_diffraction_tape_accumulate(
@@ -1249,7 +1282,7 @@ def diffraction_component_map(
     scene: SolverScene, rayd: RayDSceneResource, grid: ReceiverGrid | None, *, samples: int,
     seed: int, device: torch.device, material_tensors: MaterialTensors,
     wedge_events: tuple[WedgeEventBatch, ...] | None = None, ad: bool = False,
-    ledger: object | None = None, points: torch.Tensor | None = None,
+    ledger: AdLaunchLedger | None = None, points: torch.Tensor | None = None,
     point_radius: float = -_RELATIVE_POINT_RADIUS,
 ) -> torch.Tensor:
     """Keller-cone diffraction deposits ``[T, rows, cols]`` on ``grid``, or ``[T, 1, P]`` at
@@ -1427,7 +1460,7 @@ def diffraction_component_map(
             tape_tensors = (sampled[14], sampled[15], sampled[16], sampled[18])
             state_tensors = tuple(states[1:12])
             if ledger is not None:
-                ledger.add(  # type: ignore[attr-defined]
+                ledger.add(
                     *tape_tensors,
                     *state_tensors,
                     material_eta_r,
@@ -1616,25 +1649,18 @@ def _face_material_tensors(
         tuple((int(t.data_ptr()), int(t._version), tuple(t.shape)) for t in sources),
     )
     cache = compiled.rayd.runtime_cache
-    cached = cache.get("mc_face_material_tensors")
-    if cached is not None and cached[0] == key:  # type: ignore[index]
-        return cached[1]  # type: ignore[index, no-any-return]
+    cached = cast("tuple[object, MaterialTensors] | None", cache.get("mc_face_material_tensors"))
+    if cached is not None and cached[0] == key:
+        return cached[1]
     with torch.no_grad():
         tensors = build()
     cache["mc_face_material_tensors"] = (key, tensors)
     return tensors
 
 
-def _mc_scattering_component(  # type: ignore[no-untyped-def]
-    scene: SolverScene,
-    rayd,
-    grid,
-    config: Config,
-    *,
-    device: torch.device,
-    ad: bool,
-    ledger,
-    zero_component_map,
+def _mc_scattering_component(
+    scene: SolverScene, rayd: RayDSceneResource, grid: Any, config: Config, *, device: torch.device,
+    ad: bool, ledger: Any, zero_component_map: Any,
 ) -> tuple[torch.Tensor, dict[str, int] | None, int, int]:
     """Scattering component map and (path, capacity) row-count deltas.
 
@@ -1675,7 +1701,7 @@ def _validate_native_component_capabilities(
 
 
 def _initial_los_state(
-    scene: SolverScene, config: Config, *, device: torch.device, rayd: object,
+    scene: SolverScene, config: Config, *, device: torch.device, rayd: RayDSceneResource,
     grid: ReceiverGrid | None, ad: bool, ledger: AdLaunchLedger,
 ) -> tuple[torch.Tensor, int, int]:
     if "los" in config.components:
@@ -1722,9 +1748,10 @@ def _layout_maps(columns: list[torch.Tensor]) -> torch.Tensor:
     return matrix.view(matrix.shape[0], 1, matrix.shape[1])
 
 
-def _layout_specular_maps(  # type: ignore[no-untyped-def]
-    scene: SolverScene, config: Config, blocks: tuple[ReceiverBlock, ...], *, rayd,
-    device: torch.device, ad: bool, ledger: AdLaunchLedger, available: bool,
+def _layout_specular_maps(
+    scene: SolverScene, config: Config, blocks: tuple[ReceiverBlock, ...], *,
+    rayd: RayDSceneResource, device: torch.device, ad: bool, ledger: AdLaunchLedger,
+    available: bool,
 ) -> dict[str, torch.Tensor]:
     """Reflection and diffraction ``[T, 1, R]`` maps; absent when nothing is traced."""
 
@@ -1775,16 +1802,16 @@ def _layout_specular_maps(  # type: ignore[no-untyped-def]
                 wedge_events=reflection.wedge_events,
                 ad=ad,
                 ledger=ledger if ad else None,
-                points=params["points"],  # type: ignore[arg-type]
-                point_radius=float(params["point_radius"]),  # type: ignore[arg-type]
+                points=params["points"],
+                point_radius=float(cast(float, params["point_radius"])),
             )
             columns.append(_matrix_columns(block_map, block))
         maps["diffraction"] = _layout_maps(columns)
     return maps
 
 
-def _layout_scattering_map(  # type: ignore[no-untyped-def]
-    scene: SolverScene, config: Config, *, rayd, device: torch.device, ad: bool,
+def _layout_scattering_map(
+    scene: SolverScene, config: Config, *, rayd: RayDSceneResource, device: torch.device, ad: bool,
     ledger: AdLaunchLedger,
 ) -> tuple[torch.Tensor, dict[str, int]]:
     if not rayd.available:
@@ -1805,13 +1832,11 @@ def _layout_scattering_map(  # type: ignore[no-untyped-def]
     return matrix.view(matrix.shape[0], 1, matrix.shape[1]), stats
 
 
-def _receiver_layout_component_maps(  # type: ignore[no-untyped-def]
-    scene: SolverScene, config: Config, *, rayd, los: torch.Tensor, device: torch.device,
-    ad: bool, ledger: AdLaunchLedger, available: bool, path_count: int,
+def _receiver_layout_component_maps(
+    scene: SolverScene, config: Config, *, rayd: RayDSceneResource, los: torch.Tensor,
+    device: torch.device, ad: bool, ledger: AdLaunchLedger, available: bool, path_count: int,
     contribution_capacity: int,
-) -> tuple[
-    dict[str, torch.Tensor], dict[str, int] | None, SolveCapacityTransaction | None, int, int,
-]:
+) -> tuple[dict[str, torch.Tensor], dict[str, int] | None, SolveCapacityTransaction | None, int, int]:
     """Component maps ``[T, 1, R]`` for any receiver layout, columns in receiver order.
 
     Point receivers take reflection in capture spheres; grids keep their cell estimator. LoS,
@@ -1865,16 +1890,11 @@ def _receiver_layout_component_maps(  # type: ignore[no-untyped-def]
     return maps, scattering_stats, capacity_transaction, path_count, contribution_capacity
 
 
-def solve_pipeline(  # type: ignore[no-untyped-def]
-    scene: SolverScene,
-    config: Config,
-    *,
-    build_info_fn=build_info,
-    make_cuda_generator_fn=make_cuda_generator,
-    validate_scalar_endpoint_features_fn=validate_scalar_endpoint_features,
-    require_frequency_ad_constant_materials_fn=(
-        _require_frequency_ad_constant_materials
-    ),
+def solve_pipeline(
+    scene: SolverScene, config: Config, *, build_info_fn: Any=build_info,
+    make_cuda_generator_fn: Any=make_cuda_generator,
+    validate_scalar_endpoint_features_fn: Any=validate_scalar_endpoint_features,
+    require_frequency_ad_constant_materials_fn: Any=_require_frequency_ad_constant_materials,
 ) -> Result:
     validate_scalar_endpoint_features_fn(
         scene.transmitters, scene.receivers, solver="Monte Carlo basic"
@@ -1907,7 +1927,7 @@ def solve_pipeline(  # type: ignore[no-untyped-def]
     make_cuda_generator_fn(config.seed)
     rayd = require_compiled(scene).rayd
     single_grid = len(scene.receivers) == 1 and isinstance(scene.receivers[0], ReceiverGrid)
-    grid = scene.receivers[0] if single_grid else None
+    grid = cast("ReceiverGrid | None", scene.receivers[0] if single_grid else None)
     ledger = AdLaunchLedger()
     los, path_count, contribution_capacity = _initial_los_state(
         scene,
@@ -1922,8 +1942,7 @@ def solve_pipeline(  # type: ignore[no-untyped-def]
     component_maps: dict[str, torch.Tensor] | None = None
     scattering_stats: dict[str, int] | None = None
     capacity_transaction: SolveCapacityTransaction | None = None
-    flat_layout = grid is None
-    if flat_layout:
+    if grid is None:
         (
             component_maps,
             scattering_stats,
@@ -2170,7 +2189,7 @@ def solve_pipeline(  # type: ignore[no-untyped-def]
     result = Result(
         path_gain=path_gain,
         component_power=component_power,
-        metadata=metadata,
+        metadata=cast(Metadata, metadata),
         diagnostics=diagnostics,
         component_maps=component_maps,
     )
@@ -2180,11 +2199,8 @@ def solve_pipeline(  # type: ignore[no-untyped-def]
 # --- Public entry point ---------------------------------------------------
 
 
-def solve(  # type: ignore[no-untyped-def]
-    scene: Scene | SceneSnapshot,
-    config: Config,
-    *,
-    reference_frequency_hz,
+def solve(
+    scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz: float | torch.Tensor,
 ) -> Result:
     """Run the Monte Carlo Basic solver pipeline."""
 
@@ -2213,4 +2229,4 @@ def solve(  # type: ignore[no-untyped-def]
     return result
 
 
-__all__ = ["Config", "Result", "solve"]
+__all__ = ["Config", "Metadata", "Result", "solve"]

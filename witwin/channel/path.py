@@ -7,14 +7,15 @@ from __future__ import annotations
 
 import enum
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeAlias, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeAlias, TypedDict, cast
 
 import torch
 
 from witwin.channel.components import (
+    DiscoveryMetadata,
     apply_exported_path_counts,
     component_availability_status,
     component_max_depth,
@@ -29,9 +30,15 @@ from witwin.channel.propagation.enumerated import (
 from witwin.channel.interactions.scattering import (
     append_scattering_evaluated_paths,
 )
-from witwin.channel.capabilities import component_quantities, estimator_metadata
+from witwin.channel.capabilities import (
+    Combine,
+    Estimator,
+    Quantity,
+    component_quantities,
+    estimator_metadata,
+)
 from witwin.channel.constants import UNIT_EXCITATION_PHASE_CONVENTION
-from witwin.channel.runtime import SolveCapacityTransaction, make_metadata
+from witwin.channel.runtime import KernelMetadata, SolveCapacityTransaction, make_metadata
 from witwin.channel import build_info
 from witwin.channel.propagation.enumerated import (
     sanitize_enumerated_capacity_transaction,
@@ -278,6 +285,51 @@ def _masked_min(values: torch.Tensor, valid: torch.Tensor) -> torch.Tensor:
     return torch.where(torch.isfinite(minima), minima, torch.zeros_like(minima))
 
 
+class PathMetadata(TypedDict, total=False):
+    """The stable keys of ``PathResult.metadata``; a plain ``dict`` at run time.
+
+    A solve publishes the solver, result-semantics, discovery and schema keys; the array keys
+    follow antenna packing. ``PathResult.from_ragged`` keeps any caller-supplied keys as well.
+    """
+
+    solver: str
+    device: str
+    path_count: int
+    effective_max_depth: int
+    component_max_depth: dict[str, int]
+    max_paths_per_pair: int | None
+    native_capabilities: dict[str, bool]
+    components: dict[str, str]
+    kernel: KernelMetadata
+    field_abi: str
+    phase_convention: dict[str, Any]
+    coefficient_semantics: str
+    estimator: Estimator
+    quantity: dict[str, Quantity]
+    combine: Combine
+    complete: bool | None
+    coupled_paths: dict[str, Any]
+    discovery: DiscoveryMetadata
+    # Present when the transmission component was requested.
+    transmission: dict[str, Any]
+    # Present when scattering rows were evaluated.
+    scattering: dict[str, Any]
+    # Present when compilation removed degenerate or duplicate faces.
+    dropped_faces: dict[str, int]
+    schema: str
+    schema_version: int
+    max_paths_scope: str
+    stable_order: str
+    coupled_coefficient_semantics: str
+    interaction_geometry: str
+    array_semantics: str
+    array_phase_convention: str
+    num_rx_ant: int
+    num_tx_ant: int
+    # Present on a result returned by ``PathResult.filter``.
+    filtered_interaction_types: list[int]
+
+
 @dataclass(frozen=True, slots=True)
 class PathResult:
     """Padded public path result with explicit antenna and time dimensions."""
@@ -295,7 +347,7 @@ class PathResult:
     position: torch.Tensor
     normal: torch.Tensor
     num_paths: torch.Tensor
-    metadata: dict[str, Any]
+    metadata: PathMetadata
     field_xyz: torch.Tensor | None = None
     field_direction: torch.Tensor | None = None
     tx_weights: torch.Tensor | None = None
@@ -474,7 +526,7 @@ class PathResult:
     @classmethod
     def from_ragged(
         cls, ragged: RaggedPathSoA, *, max_paths_per_pair: int | None = None,
-        minimum_path_width: int = 0, metadata: dict[str, Any] | None = None,
+        minimum_path_width: int = 0, metadata: Mapping[str, Any] | None = None,
     ) -> "PathResult":
         counts = ragged.pair_offsets[1:] - ragged.pair_offsets[:-1]
         if max_paths_per_pair is None:
@@ -534,7 +586,7 @@ class PathResult:
             dtype=torch.bool,
         )
         valid[linear] = True
-        result_metadata = dict(metadata or {})
+        result_metadata = cast(PathMetadata, dict(metadata or {}))
         result_metadata.update(
             {
                 "schema": "PathResult",
@@ -701,7 +753,7 @@ class PathResult:
             position=self.position[keep],
             normal=self.normal[keep],
         )
-        metadata = dict(self.metadata)
+        metadata = cast(PathMetadata, dict(self.metadata))
         metadata["filtered_interaction_types"] = sorted(requested)
         filtered = PathResult.from_ragged(
             ragged,
@@ -812,13 +864,13 @@ def endpoint_angles(direction: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor
     return theta.to(torch.float32), phi.to(torch.float32)
 
 
-_PATH_RESULT_SCHEMA = {
+_PATH_RESULT_SCHEMA: PathMetadata = {
     "schema": "PathResult",
     "schema_version": 1,
     "max_paths_scope": "per_pair",
     "stable_order": "input_order_within_receiver_antenna_transmitter_antenna_pair",
 }
-_EVALUATED_PATH_SEMANTICS = {
+_EVALUATED_PATH_SEMANTICS: PathMetadata = {
     "coefficient_semantics": "unit_excitation_dimensionless_receiver_projection",
     "coupled_coefficient_semantics": "unified_complex3_jones",
     "interaction_geometry": "canonical_topology",
@@ -867,7 +919,7 @@ def _pack_evaluated_paths_native(
     max_depth = int(topology.interaction_type.shape[1])
     path_width = int(packed["tau"].shape[0]) // max(num_rx * num_tx, 1)
     path_shape = (num_rx, 1, num_tx, 1, path_width)
-    result_metadata = dict(metadata or {})
+    result_metadata = cast(PathMetadata, dict(metadata or {}))
     result_metadata.update(_PATH_RESULT_SCHEMA)
     result_metadata.update(_EVALUATED_PATH_SEMANTICS)
     return PathResult(
@@ -969,7 +1021,7 @@ def from_evaluated_paths(
         position=geometry.interaction_positions,
         normal=interaction_normals,
     )
-    result_metadata = dict(metadata or {})
+    result_metadata = cast(PathMetadata, dict(metadata or {}))
     result_metadata.update(
         {
             "coefficient_semantics": "unit_excitation_dimensionless_receiver_projection",
@@ -1214,7 +1266,7 @@ def _cached_antenna_layout(
     cache = None if scene_store is None else scene_store._lazy
     cached = None if cache is None else cache.get(name)
     if cached is not None:
-        return cached  # type: ignore[no-any-return]
+        return cast("tuple[list[int], list[torch.Tensor] | None]", cached)
     groups = _antenna_groups(endpoints)
     representatives = [group[0] for group in groups]
     rows: list[torch.Tensor] | None = None
@@ -1248,7 +1300,7 @@ def _antenna_frame(
     cache = None if store is None or key is None else store._lazy
     cached = None if cache is None else cache.get(("antenna_frame", key, device))
     if cached is not None:
-        return cached  # type: ignore[no-any-return]
+        return cast("tuple[torch.Tensor, torch.Tensor]", cached)
     rotation = orientation_matrix(endpoint.orientation).to(device=device)
     positions = endpoint.array.positions.to(device=device) @ rotation.T
     frame = (positions, rotation)
@@ -1412,7 +1464,7 @@ def pack_synthetic_arrays(
             ),
         ),
     )
-    metadata = dict(result.metadata)
+    metadata = cast(PathMetadata, dict(result.metadata))
     metadata.update(
         {
             "array_semantics": "synthetic_far_field_phase_weighting",
@@ -1610,7 +1662,7 @@ def pack_explicit_arrays(
     ).conj()
     a = a * pattern_factor.unsqueeze(-1)
     field_xyz = field_xyz * pattern_factor.unsqueeze(-1)
-    metadata = dict(result.metadata)
+    metadata = cast(PathMetadata, dict(result.metadata))
     metadata.update(
         {
             "array_semantics": "explicit_per_element_topology",
@@ -1679,13 +1731,7 @@ def _stable_endpoint_id_lookups(
 
 
 def _transmitter_tensors(scene: Scene) -> tuple[torch.Tensor, torch.Tensor]:
-    # ``follow_imports = "skip"`` hides the compiler module, so the shared
-    # helper is typed ``Any`` here; it declares the (positions, power) tensor
-    # pair returned by witwin.channel.scene.compiler.transmitter_positions.
-    return cast(
-        "tuple[torch.Tensor, torch.Tensor]",
-        _shared_transmitter_positions(scene, device=torch.device("cuda")),
-    )
+    return _shared_transmitter_positions(scene, device=torch.device("cuda"))
 
 
 def _receiver_positions(scene: Scene, *, reference: torch.Tensor) -> torch.Tensor:
@@ -1922,11 +1968,8 @@ def _solve_base(scene: SolverScene, config: Config) -> _DeferredPathResult:
 # signature in ci/public-api-snapshot.json, so annotating it would break the
 # recorded contract hash. mypy only sees this function now that the solver is
 # one module, so the pre-existing shape is silenced here rather than changed.
-def solve(  # type: ignore[no-untyped-def]
-    scene: Scene | SceneSnapshot,
-    config: Config,
-    *,
-    reference_frequency_hz,
+def solve(
+    scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz: float | torch.Tensor,
 ) -> PathResult:
     """Solve canonical paths and pack synthetic or explicit antenna arrays."""
 
@@ -1945,6 +1988,7 @@ def solve(  # type: ignore[no-untyped-def]
 __all__ = [
     "Config",
     "InteractionType",
+    "PathMetadata",
     "PathResult",
     "RaggedPathSoA",
     "solve",
