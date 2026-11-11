@@ -40,6 +40,7 @@ from time import perf_counter
 
 from witwin.channel.scene.endpoints import validate_scalar_endpoint_features
 from witwin.channel.capabilities import (
+    component_quantities,
     config_metadata,
     estimator_metadata,
     serialize_config,
@@ -642,7 +643,7 @@ def _metadata(
         "accumulation_strategy": "coherent" if config.coherent else "incoherent",
         **estimator_metadata(
             estimator="enumerated",
-            quantity="point_sample",
+            quantity=component_quantities(config.components),
             combine="coherent" if config.coherent else "incoherent",
             complete=bool(discovery["complete"]),
         ),

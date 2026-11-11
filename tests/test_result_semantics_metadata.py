@@ -9,36 +9,42 @@ import torch
 from witwin.channel.capabilities import estimator_metadata
 
 _KEYS = ("estimator", "quantity", "combine", "complete")
+_LOS = {"los": "point_sample"}
+_POINTS = {"los": "point_sample", "reflection": "point_sample"}
+_MC = {"los": "point_sample", "reflection": "cell_average"}
 
 
 def test_estimator_metadata_validates_its_vocabulary():
     assert estimator_metadata(
-        estimator="sampled", quantity="cell_average", combine="incoherent", complete=False
-    ) == {"estimator": "sampled", "quantity": "cell_average", "combine": "incoherent",
-          "complete": False}
+        estimator="sampled", quantity={"reflection": "cell_average", "los": "point_sample"},
+        combine="incoherent", complete=False,
+    ) == {"estimator": "sampled", "quantity": {"los": "point_sample", "reflection": "cell_average"},
+          "combine": "incoherent", "complete": False}
     with pytest.raises(ValueError, match="estimator"):
-        estimator_metadata(estimator="mc", quantity="point_sample", combine="none", complete=None)
+        estimator_metadata(estimator="mc", quantity=_LOS, combine="none", complete=None)
     with pytest.raises(ValueError, match="quantity"):
-        estimator_metadata(estimator="enumerated", quantity="cell", combine="none", complete=None)
-    with pytest.raises(ValueError, match="combine"):
-        estimator_metadata(estimator="enumerated", quantity="point_sample", combine="sum",
+        estimator_metadata(estimator="enumerated", quantity={"los": "cell"}, combine="none",
                            complete=None)
-    with pytest.raises(TypeError, match="complete"):
+    with pytest.raises(TypeError, match="quantity"):
         estimator_metadata(estimator="enumerated", quantity="point_sample", combine="none",
-                           complete=1)
+                           complete=None)
+    with pytest.raises(ValueError, match="combine"):
+        estimator_metadata(estimator="enumerated", quantity=_LOS, combine="sum", complete=None)
+    with pytest.raises(TypeError, match="complete"):
+        estimator_metadata(estimator="enumerated", quantity=_LOS, combine="none", complete=1)
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="solves need CUDA")
 @pytest.mark.parametrize("solver,config,expected", [
-    ("path", {}, ("enumerated", "point_sample", "none", True)),
-    ("deterministic", {}, ("enumerated", "point_sample", "coherent", True)),
-    ("deterministic", {"coherent": False}, ("enumerated", "point_sample", "incoherent", True)),
-    ("path", {"discovery": "rays"}, ("enumerated", "point_sample", "none", False)),
-    ("deterministic", {"discovery": "rays"}, ("enumerated", "point_sample", "coherent", False)),
-    ("montecarlo.basic", {"samples": 256}, ("sampled", "cell_average", "incoherent", False)),
-    ("montecarlo.bdpt", {"samples": 64}, ("sampled", "point_sample", "incoherent", False)),
+    ("path", {}, ("enumerated", _POINTS, "none", True)),
+    ("deterministic", {}, ("enumerated", _POINTS, "coherent", True)),
+    ("deterministic", {"coherent": False}, ("enumerated", _POINTS, "incoherent", True)),
+    ("path", {"discovery": "rays"}, ("enumerated", _POINTS, "none", False)),
+    ("deterministic", {"discovery": "rays"}, ("enumerated", _POINTS, "coherent", False)),
+    ("montecarlo.basic", {"samples": 256}, ("sampled", _MC, "incoherent", False)),
+    ("montecarlo.bdpt", {"samples": 64}, ("sampled", _POINTS, "incoherent", False)),
     ("montecarlo.bdpt", {"samples": 64, "coherent": True},
-     ("sampled", "point_sample", "coherent", False)),
+     ("sampled", _POINTS, "coherent", False)),
 ])
 def test_every_solver_publishes_result_semantics(solver, config, expected):
     import importlib

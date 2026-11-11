@@ -16,6 +16,7 @@ from witwin.core import Scene, SceneSnapshot
 from witwin.channel import build_info
 from witwin.channel.capabilities import (
     capabilities,
+    component_quantities,
     config_metadata,
     estimator_metadata,
     serialize_config,
@@ -250,7 +251,11 @@ def make_solver_metadata(
         "kernel": kernel_metadata,
         **estimator_metadata(
             estimator="sampled",
-            quantity="cell_average",
+            # LoS and transmission are evaluated at the receiver; the ray estimators deposit
+            # over the cell or the point receiver's capture sphere.
+            quantity=component_quantities(
+                config.components, cell_average=("reflection", "diffraction", "scattering")
+            ),
             combine="incoherent",
             complete=False,
         ),

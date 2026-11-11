@@ -29,7 +29,7 @@ from witwin.channel.propagation.enumerated import (
 from witwin.channel.interactions.scattering import (
     append_scattering_evaluated_paths,
 )
-from witwin.channel.capabilities import estimator_metadata
+from witwin.channel.capabilities import component_quantities, estimator_metadata
 from witwin.channel.constants import UNIT_EXCITATION_PHASE_CONVENTION
 from witwin.channel.runtime import SolveCapacityTransaction, make_metadata
 from witwin.channel import build_info
@@ -1077,7 +1077,7 @@ def _metadata(
         "coefficient_semantics": "unit_excitation_dimensionless_receiver_projection",
         **estimator_metadata(
             estimator="enumerated",
-            quantity="point_sample",
+            quantity=component_quantities(config.components),
             combine="none",
             complete=bool(discovery["complete"]),
         ),

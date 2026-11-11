@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from dataclasses import fields, is_dataclass
 from typing import Any
@@ -305,26 +306,48 @@ COMBINES = frozenset({"coherent", "incoherent", "none"})
 
 
 def estimator_metadata(
-    *, estimator: str, quantity: str, combine: str, complete: bool | None,
+    *, estimator: str, quantity: Mapping[str, str], combine: str, complete: bool | None,
 ) -> dict[str, Any]:
     """The result-semantics keys every solver publishes in its metadata.
 
-    ``estimator`` is ``enumerated`` or ``sampled``; ``quantity`` says whether a receiver
-    value is a ``point_sample`` at the receiver position or a ``cell_average`` over the
-    receiver's cell or capture region; ``combine`` is how rows reach a receiver value
-    (``none`` when rows are returned uncombined); ``complete`` is whether every path
-    within the requested bounds was found, or ``None`` when the solve does not report it.
+    ``estimator`` is ``enumerated`` or ``sampled``; ``quantity`` maps each requested
+    component to ``point_sample`` (the value at the receiver position) or ``cell_average``
+    (averaged over the receiver's cell or capture region); ``combine`` is how rows reach a
+    receiver value (``none`` when rows are returned uncombined); ``complete`` is whether
+    every path within the requested bounds was found, or ``None`` when the solve does not
+    report it.
     """
 
     if estimator not in ESTIMATORS:
         raise ValueError(f"estimator must be one of {sorted(ESTIMATORS)}, got {estimator!r}")
-    if quantity not in QUANTITIES:
-        raise ValueError(f"quantity must be one of {sorted(QUANTITIES)}, got {quantity!r}")
+    if not isinstance(quantity, Mapping) or not quantity:
+        raise TypeError("quantity must be a non-empty mapping from component to quantity")
+    for component, value in quantity.items():
+        if value not in QUANTITIES:
+            raise ValueError(
+                f"quantity[{component!r}] must be one of {sorted(QUANTITIES)}, got {value!r}"
+            )
     if combine not in COMBINES:
         raise ValueError(f"combine must be one of {sorted(COMBINES)}, got {combine!r}")
     if complete is not None and type(complete) is not bool:
         raise TypeError("complete must be a bool or None")
-    return {"estimator": estimator, "quantity": quantity, "combine": combine, "complete": complete}
+    return {
+        "estimator": estimator,
+        "quantity": dict(sorted(quantity.items())),
+        "combine": combine,
+        "complete": complete,
+    }
+
+
+def component_quantities(
+    components: Iterable[str], *, cell_average: Iterable[str] = (),
+) -> dict[str, str]:
+    """``point_sample`` for every component except those listed in ``cell_average``."""
+
+    averaged = frozenset(cell_average)
+    return {
+        name: "cell_average" if name in averaged else "point_sample" for name in sorted(components)
+    }
 
 
 def serialize_config(config: object) -> dict[str, Any]:
@@ -346,6 +369,7 @@ def serialize_config(config: object) -> dict[str, Any]:
 __all__ = [
     "capabilities",
     "config_metadata",
+    "component_quantities",
     "estimator_metadata",
     "serialize_config",
     "solver_capabilities",

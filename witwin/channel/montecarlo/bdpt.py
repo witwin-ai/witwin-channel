@@ -16,7 +16,7 @@ from witwin.core import Scene, SceneSnapshot
 from witwin.channel import build_info
 from witwin.channel.capabilities import (
     _BDPT_AD_DIFFERENTIABLE_PARAMETERS, capabilities,
-    config_metadata, estimator_metadata,
+    config_metadata, component_quantities, estimator_metadata,
     serialize_config,
 )
 from witwin.channel.components import (
@@ -2980,7 +2980,7 @@ def make_solver_metadata(
         "combine_domain": "coherent" if config.coherent else "power",
         **estimator_metadata(
             estimator="sampled",
-            quantity="point_sample",
+            quantity=component_quantities(config.components),
             combine="coherent" if config.coherent else "incoherent",
             complete=False,
         ),

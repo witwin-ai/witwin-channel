@@ -87,8 +87,9 @@ grid outputs are transposed views of the native `[T, cols, rows]` maps (call
 `.contiguous()` before `.view()`).
 
 Result metadata of every solver carries `estimator` (`enumerated` or
-`sampled`), `quantity` (`point_sample` at the receiver position or
-`cell_average` over the cell or capture region), `combine` (`coherent`,
+`sampled`), `quantity` (a dict from each requested component to
+`point_sample`, the value at the receiver position, or `cell_average`, the
+average over the cell or capture region), `combine` (`coherent`,
 `incoherent`, or `none` for uncombined rows) and `complete` (whether every path
 within the requested bounds was found; for `path` and `deterministic` it is
 `metadata["discovery"]["complete"]`, and the sampled solvers report `False`).
