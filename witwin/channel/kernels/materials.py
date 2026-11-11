@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import torch
 
 from witwin.channel.runtime import (
@@ -129,6 +131,12 @@ def em_layer_stack_eval(
             raise ValueError(f"em_layer_stack_eval returned bad {name} shape")
     return out
 
+# The eight primal tensors the layer-stack AD saves, in ``em_layer_stack_backward`` order.
+_LayerStackSaved = tuple[
+    torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
+    torch.Tensor, torch.Tensor,
+]
+
 
 def em_layer_stack_backward(
     cos_theta: torch.Tensor, material_id: torch.Tensor, layer_offset: torch.Tensor,
@@ -239,9 +247,10 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        cos_theta, material_id, layer_offset, layer_count, layer_thickness_m, layer_eps_r,
-        layer_sigma_e, layer_mu_r, frequency, frequency_value,
-    ):
+        cos_theta: Any, material_id: Any, layer_offset: Any, layer_count: Any,
+        layer_thickness_m: Any, layer_eps_r: Any, layer_sigma_e: Any, layer_mu_r: Any,
+        frequency: Any, frequency_value: Any,
+    ) -> Any:
         out = em_layer_stack_eval(
             cos_theta,
             material_id,
@@ -256,7 +265,7 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
         return tuple(out[name] for name in _EM_LAYER_STACK_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         frequency = inputs[8]
         primals = tuple(
@@ -274,7 +283,7 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, *grad_outputs):
+    def backward(ctx: Any, *grad_outputs: Any) -> Any:
         none_grads = (None,) * 10
         _ad_reject_fixed_inputs(
             "em_layer_stack_ad",
@@ -288,7 +297,7 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
             value is None for value in grad_outputs
         ):
             return none_grads
-        saved = ctx.saved_tensors
+        saved = cast(_LayerStackSaved, ctx.saved_tensors)
         out = em_layer_stack_backward(
             *saved,
             grad_outputs,
@@ -317,9 +326,10 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx, t_cos_theta, _t_material_id, _t_layer_offset, _t_layer_count, t_layer_thickness,
-        t_layer_eps_r, t_layer_sigma_e, t_layer_mu_r, t_frequency, _t_frequency_value,
-    ):
+        ctx: Any, t_cos_theta: Any, _t_material_id: Any, _t_layer_offset: Any, _t_layer_count: Any,
+        t_layer_thickness: Any, t_layer_eps_r: Any, t_layer_sigma_e: Any, t_layer_mu_r: Any,
+        t_frequency: Any, _t_frequency_value: Any,
+    ) -> Any:
         _ad_reject_fixed_tangents(
             "em_layer_stack_ad", ((t_layer_mu_r, "layer_mu_r"),)
         )

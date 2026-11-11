@@ -36,7 +36,11 @@ from witwin.channel.propagation.topology import (
 )
 
 if TYPE_CHECKING:
+    from witwin.channel.interactions.diffraction import DiffractionEdgeGeometry
+    from witwin.channel.interactions.reflection import _ImageTreeFrontier
+    from witwin.channel.scene.compiler import CompiledScene
     from witwin.channel.scene.endpoints import SolverScene as Scene
+    from witwin.channel.scene.resources import RayDSceneResource
 
 
 # Component ids of single-diffraction chains: the diffraction last (reflections then the
@@ -158,11 +162,11 @@ class _ChainContext:
     """Receiver-independent inputs of one chain discovery."""
 
     device: torch.device
-    rayd: object
+    rayd: RayDSceneResource
     plane_groups: ReflectionPlaneGroups
     coplanar_groups: dict[str, torch.Tensor]
     face_material_id: torch.Tensor
-    edges: tuple[object, torch.Tensor]
+    edges: tuple[DiffractionEdgeGeometry, torch.Tensor]
     selected_edges: torch.Tensor
     edge_position: torch.Tensor
     edge_direction: torch.Tensor
@@ -199,7 +203,7 @@ class _ChainHalf:
 
 
 def _prepare_chain_context(
-    scene: Scene, compiled: object, tx_positions: torch.Tensor, rx_positions: torch.Tensor,
+    scene: Scene, compiled: CompiledScene, tx_positions: torch.Tensor, rx_positions: torch.Tensor,
 ) -> _ChainContext | None:
     """The receiver-independent chain context, or ``None`` when no chain can exist."""
 
@@ -283,7 +287,7 @@ def _direct_half(edges: torch.Tensor, endpoints: torch.Tensor) -> _ChainHalf:
 
 
 def _reflected_half(
-    context: _ChainContext, frontier: object, endpoints: torch.Tensor,
+    context: _ChainContext, frontier: _ImageTreeFrontier, endpoints: torch.Tensor,
 ) -> _ChainHalf:
     """The half whose last reflection is an image-tree node: every (node, edge in its beam)."""
 
@@ -613,8 +617,8 @@ def _double_diffraction_blocks(
 
 
 def coupled_reflection_diffraction_topology(
-    scene: Scene, compiled: object, tx_positions: torch.Tensor, rx_positions: torch.Tensor, *,
-    max_depth: int, candidate_limit: int,
+    scene: Scene, compiled: CompiledScene, tx_positions: torch.Tensor, rx_positions: torch.Tensor,
+    *, max_depth: int, candidate_limit: int,
 ) -> tuple[dict[str, torch.Tensor], int, int]:
     """Interaction-chain rows up to ``max_depth`` interactions, and double-diffraction rows.
 

@@ -215,7 +215,9 @@ class EvaluatedPathSidecars:
     row_groups: PathRowGroups | None = None
 
 
-def evaluated_paths_from_result(paths: object) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
+def evaluated_paths_from_result(
+    paths: SimpleNamespace,
+) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     """Normalize one canonical result directly into split typed contracts."""
 
     path_count = int(paths.valid.numel())

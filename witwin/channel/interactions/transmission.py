@@ -33,6 +33,7 @@ from witwin.channel.runtime import (
 )
 
 if TYPE_CHECKING:
+    from witwin.channel.scene.compiler import CompiledScene
     from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
@@ -56,8 +57,8 @@ def _pair_major_endpoints(
 
 @profiled_cuda_range(CudaProfileRange.ENUMERATED_PENETRATION_DISCOVERY)
 def _transmission_topology(
-    scene: Scene, compiled: object, tx_positions: torch.Tensor, rx_positions: torch.Tensor, *,
-    max_depth: int, ad_mode: str, failure_state: CapacityFailureState | None,
+    scene: Scene, compiled: CompiledScene, tx_positions: torch.Tensor, rx_positions: torch.Tensor,
+    *, max_depth: int, ad_mode: str, failure_state: CapacityFailureState | None,
 ) -> tuple[dict[str, torch.Tensor], int, CapacityExecutionCounts | None]:
     """Trace and pack one pair-major RayD penetration batch.
 
@@ -95,7 +96,7 @@ def _transmission_topology(
         )
     origins, targets = _pair_major_endpoints(tx_geometry, rx_geometry)
 
-    penetration_args = {
+    penetration_args: dict[str, Any] = {
         "input_active_any": True,
         "hit_capacity": int(max_depth),
         "policy": SegmentPenetrationPolicy.EnumeratedFullDistance,
@@ -214,7 +215,7 @@ def straight_transmission_chains(
 ) -> SegmentPenetrationResult:
     """Trace one flattened fixed-capacity target-inset penetration batch."""
 
-    common = {
+    common: dict[str, Any] = {
         "input_active_any": int(origins.shape[0]) > 0,
         "hit_capacity": int(max_depth),
         "policy": SegmentPenetrationPolicy.MonteCarloTargetInset,

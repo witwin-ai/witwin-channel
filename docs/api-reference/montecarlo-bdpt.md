@@ -72,7 +72,7 @@ solve(
     scene: witwin.core.Scene | witwin.core.SceneSnapshot,
     config: Config,
     *,
-    reference_frequency_hz,
+    reference_frequency_hz: float | torch.Tensor,
 ) -> Result
 ```
 
@@ -102,7 +102,7 @@ or native failure raises before a partial estimate.
 Result(
     path_gain: torch.Tensor,
     component_power: dict[str, torch.Tensor],
-    metadata: dict[str, Any],
+    metadata: Metadata,
     diagnostics: dict[str, Any] | None = None,
     component_maps: dict[str, torch.Tensor] | None = None,
     variance: torch.Tensor | None = None,
@@ -114,11 +114,33 @@ Result(
 | --- | --- |
 | `path_gain` | `float32` total power gain. |
 | `component_power` | Component-name to power tensor. |
-| `metadata` | Sample, seed, MIS, accumulation, build, and execution records. |
+| `metadata` | `Metadata`: sample, seed, MIS, accumulation and execution records (see [`Metadata`](#metadata)). |
 | `diagnostics` | Optional diagnostics. |
 | `component_maps` | Optional component-name to spatial map. |
 | `variance` | Estimator variance with the same shape as `path_gain`, when available. |
 | `path_samples` | `BDPTPathSamples` when `export_paths=True`; otherwise `None`. |
+
+## `Metadata`
+
+A `TypedDict` naming the stable keys; at run time it is a plain `dict`, so key access, `in`, `.get` and JSON serialization are unchanged. Every solver publishes the result-semantics keys `estimator`, `quantity`, `combine` and `complete` (see the [index](index.md)), the `kernel` execution record, and the requested/effective configuration keys `requested_config`, `effective_config`, `requested_max_depth`, `effective_max_depth` and `component_max_depth`.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `samples`, `seed`, `sample_streams`, `stream_count`, `mis`, `power_heuristic_beta`, `coherent`, `max_depth`, `max_light_depth`, `max_diffraction_order`, `max_scattering_order` | config values | The solve's options. |
+| `combine_domain` | `str` | `coherent` or `power`. |
+| `path_counts_by_strategy`, `valid_contribution_count`, `launch_count`, `workspace_bytes` | `int` / `dict[str, int]` | Execution counts. |
+| `accumulation_strategy`, `sampler` | `str` | Selected accumulation and sampler. |
+| `variance` | `bool` | Whether `Result.variance` is published. |
+| `components` | `dict[str, str]` | Status per component. |
+| `native_capabilities`, `rayd` | `dict[str, bool]` | Native capability flags. |
+| `throughput_domain`, `scattering_depth_rule`, `pdf_domain`, `delta_strategy`, `sampled_delta_mass` | `str` | Estimator conventions. |
+| `field_transport`, `event_classification`, `component_mask_bits`, `mis_capabilities` | `dict` | Estimator conventions. |
+| `ad_status`, `ad_geometry`, `ad_differentiable_parameters` | `str` / `list[str]` | AD scope of the solve. |
+| `kernel` | `KernelMetadata` | Launch, tape, memory and timing record. |
+| `semantic_capabilities` | `dict` | This solver's capability record. |
+| `edge_policy` | `dict` | Diffraction edge selection policy of the scene. |
+| `transmission`, `scattering` | `dict` | Only when that component was requested. |
+| `dropped_faces` | `dict[str, int]` | Only when compilation removed degenerate or duplicate faces. |
 
 ## `BDPTPathSamples`
 

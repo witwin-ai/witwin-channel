@@ -21,6 +21,7 @@ def test_path_public_api_is_single_versionless_contract():
     assert set(path_api.__all__) == {
         "Config",
         "InteractionType",
+        "PathMetadata",
         "PathResult",
         "RaggedPathSoA",
         "solve",

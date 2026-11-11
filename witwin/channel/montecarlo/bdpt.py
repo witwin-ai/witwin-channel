@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import torch
 
@@ -15,7 +15,7 @@ from witwin.core import Scene, SceneSnapshot
 
 from witwin.channel import build_info
 from witwin.channel.capabilities import (
-    _BDPT_AD_DIFFERENTIABLE_PARAMETERS, capabilities,
+    _BDPT_AD_DIFFERENTIABLE_PARAMETERS, ConfigMetadata, ResultSemantics, capabilities,
     config_metadata, component_quantities, estimator_metadata,
     serialize_config,
 )
@@ -79,6 +79,7 @@ from witwin.channel.propagation import EvaluatedPaths, evaluate_enumerated_paths
 from witwin.channel.runtime import (
     AdLaunchLedger,
     bdpt_zero_matrix,
+    KernelMetadata,
     MemoryEstimate,
     _ad_first_order_only,
     _ad_frequency_grad,
@@ -298,11 +299,62 @@ class BDPTPathSamples:
     path_length_m: torch.Tensor
 
 
+class _MetadataKeys(ResultSemantics, ConfigMetadata):
+    samples: int
+    seed: int
+    stream_count: int
+    sample_streams: int
+    mis: str
+    power_heuristic_beta: float
+    combine_domain: str
+    coherent: bool
+    max_depth: int
+    max_light_depth: int | None
+    max_diffraction_order: int
+    path_counts_by_strategy: dict[str, int]
+    valid_contribution_count: int
+    components: dict[str, str]
+    native_capabilities: dict[str, bool]
+    rayd: dict[str, bool]
+    launch_count: int
+    accumulation_strategy: str
+    workspace_bytes: int
+    variance: bool
+    throughput_domain: str
+    max_scattering_order: int
+    scattering_depth_rule: str
+    field_transport: dict[str, str]
+    pdf_domain: str
+    event_classification: dict[str, int]
+    component_mask_bits: dict[str, int]
+    delta_strategy: str
+    sampled_delta_mass: str
+    mis_capabilities: dict[str, Any]
+    ad_status: str
+    ad_geometry: str
+    ad_differentiable_parameters: list[str]
+    kernel: KernelMetadata
+    semantic_capabilities: dict[str, Any]
+    sampler: str
+    edge_policy: dict[str, Any]
+
+
+class Metadata(_MetadataKeys, total=False):
+    """The stable keys of ``Result.metadata``; a plain ``dict`` at run time."""
+
+    # Present when the transmission component was requested.
+    transmission: dict[str, Any]
+    # Present when the scattering component was requested.
+    scattering: dict[str, Any]
+    # Present when compilation removed degenerate or duplicate faces.
+    dropped_faces: dict[str, int]
+
+
 @dataclass(frozen=True, slots=True)
 class Result:
     path_gain: torch.Tensor
     component_power: dict[str, torch.Tensor]
-    metadata: dict[str, Any]
+    metadata: Metadata
     diagnostics: dict[str, Any] | None = None
     component_maps: dict[str, torch.Tensor] | None = None
     variance: torch.Tensor | None = None
@@ -380,7 +432,7 @@ def bdpt_endpoint_connection_samples_backward(
             require_contiguous=False,
         )
     max_paths_value = -1 if max_paths is None else int(max_paths)
-    exported = _required_native_op("bdpt_endpoint_connection_samples_backward")(  # type: ignore[operator]
+    exported = _required_native_op("bdpt_endpoint_connection_samples_backward")(
         light,
         sensor,
         float(frequency_hz),
@@ -424,7 +476,7 @@ def bdpt_endpoint_connection_samples_jvp(
     _validate_bdpt_subpath_state("light", light, None)
     _validate_bdpt_subpath_state("sensor", sensor, None)
     max_paths_value = -1 if max_paths is None else int(max_paths)
-    exported = _required_native_op("bdpt_endpoint_connection_samples_jvp")(  # type: ignore[operator]
+    exported = _required_native_op("bdpt_endpoint_connection_samples_jvp")(
         light,
         sensor,
         float(frequency_hz),
@@ -464,7 +516,7 @@ def bdpt_accumulate_connection_samples_forward_ad(
 
     strategy_ids = {"atomic": 0, "staged": 1, "compact": 2}
     combine_ids = {"power": 0, "coherent": 1}
-    exported = _required_native_op("bdpt_accumulate_connection_samples")(  # type: ignore[operator]
+    exported = _required_native_op("bdpt_accumulate_connection_samples")(
         samples,
         int(tx_count),
         int(rx_count),
@@ -511,7 +563,7 @@ def bdpt_accumulate_connection_samples_backward(
     if combine_domain not in combine_ids:
         raise ValueError("combine_domain must be 'power' or 'coherent'")
     bin_args = _bdpt_accumulate_bin_sum_args(combine_domain, bin_sums)
-    exported = _required_native_op("bdpt_accumulate_connection_samples_backward")(  # type: ignore[operator]
+    exported = _required_native_op("bdpt_accumulate_connection_samples_backward")(
         samples,
         int(tx_count),
         int(rx_count),
@@ -556,7 +608,7 @@ def bdpt_accumulate_connection_samples_jvp(
     if combine_domain not in combine_ids:
         raise ValueError("combine_domain must be 'power' or 'coherent'")
     bin_args = _bdpt_accumulate_bin_sum_args(combine_domain, bin_sums)
-    exported = _required_native_op("bdpt_accumulate_connection_samples_jvp")(  # type: ignore[operator]
+    exported = _required_native_op("bdpt_accumulate_connection_samples_jvp")(
         samples,
         int(tx_count),
         int(rx_count),
@@ -648,22 +700,12 @@ class _BdptEndpointConnectionAdFunction(torch.autograd.Function):
     differentiable output; the other 11 schema fields are frozen structure."""
 
     @staticmethod
-    def forward(  # type: ignore[no-untyped-def]
-        light_field_real,
-        light_field_imag,
-        light_throughput_real,
-        light_throughput_imag,
-        sensor_field_real,
-        sensor_field_imag,
-        sensor_throughput_real,
-        sensor_throughput_imag,
-        frequency,
-        frequency_value,
-        tx_power,
-        base_light,
-        base_sensor,
-        params,
-    ):
+    def forward(
+        light_field_real: Any, light_field_imag: Any, light_throughput_real: Any,
+        light_throughput_imag: Any, sensor_field_real: Any, sensor_field_imag: Any,
+        sensor_throughput_real: Any, sensor_throughput_imag: Any, frequency: Any,
+        frequency_value: Any, tx_power: Any, base_light: Any, base_sensor: Any, params: Any,
+    ) -> Any:
         light = _subpath_with_fields(
             base_light,
             light_field_real,
@@ -691,7 +733,7 @@ class _BdptEndpointConnectionAdFunction(torch.autograd.Function):
         return tuple(out[name] for name in _CONNECTION_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):  # type: ignore[no-untyped-def]
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         (
             light_field_real,
@@ -717,7 +759,7 @@ class _BdptEndpointConnectionAdFunction(torch.autograd.Function):
         )
         ctx.params = params
 
-        def _detach_dict(source):  # type: ignore[no-untyped-def]
+        def _detach_dict(source: Any) -> Any:
             return {
                 name: torch.autograd.forward_ad.unpack_dual(value).primal
                 if isinstance(value, torch.Tensor)
@@ -751,7 +793,7 @@ class _BdptEndpointConnectionAdFunction(torch.autograd.Function):
         ctx.mark_non_differentiable(*structural)
 
     @staticmethod
-    def _light_sensor(ctx):  # type: ignore[no-untyped-def]
+    def _light_sensor(ctx: Any) -> Any:
         saved = ctx.saved_tensors
         light = _subpath_with_fields(
             ctx.base_light, saved[0], saved[1], saved[2], saved[3]
@@ -763,7 +805,7 @@ class _BdptEndpointConnectionAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, *grad_outputs):  # type: ignore[no-untyped-def]
+    def backward(ctx: Any, *grad_outputs: Any) -> Any:
         none_grads = (None,) * 14
         need_field = any(bool(ctx.needs_input_grad[i]) for i in range(8))
         need_frequency = bool(ctx.needs_input_grad[8])
@@ -812,7 +854,7 @@ class _BdptEndpointConnectionAdFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def jvp(ctx, *tangents):  # type: ignore[no-untyped-def]
+    def jvp(ctx: Any, *tangents: Any) -> Any:
         light, sensor = _BdptEndpointConnectionAdFunction._light_sensor(ctx)
         params = ctx.params
         tangent_frequency = _ad_frequency_tangent(tangents[8])
@@ -914,7 +956,9 @@ class _BdptFinalizeAdFunction(torch.autograd.Function):
     both deterministic, no atomics."""
 
     @staticmethod
-    def forward(los, reflection, diffraction, transmission, scattering, kind):  # type: ignore[no-untyped-def]
+    def forward(
+        los: Any, reflection: Any, diffraction: Any, transmission: Any, scattering: Any, kind: Any,
+    ) -> Any:
         forward = (
             bdpt_finalize_point_components
             if kind == "point"
@@ -924,7 +968,7 @@ class _BdptFinalizeAdFunction(torch.autograd.Function):
         return tuple(out[name] for name in _FINALIZE_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):  # type: ignore[no-untyped-def]
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         los, reflection, diffraction, transmission, scattering, kind = inputs
         ctx.kind = kind
@@ -937,7 +981,7 @@ class _BdptFinalizeAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, grad_path_gain, *grad_powers):  # type: ignore[no-untyped-def]
+    def backward(ctx: Any, grad_path_gain: Any, *grad_powers: Any) -> Any:
         if not any(bool(flag) for flag in ctx.needs_input_grad[:5]):
             return (None,) * 6
         backward = (
@@ -965,7 +1009,10 @@ class _BdptFinalizeAdFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def jvp(ctx, t_los, t_reflection, t_diffraction, t_transmission, t_scattering, _t_kind):  # type: ignore[no-untyped-def]
+    def jvp(
+        ctx: Any, t_los: Any, t_reflection: Any, t_diffraction: Any, t_transmission: Any,
+        t_scattering: Any, _t_kind: Any,
+    ) -> Any:
         tangents = {
             "tangent_los": _ad_native_tangent_or_none(t_los),
             "tangent_reflection": _ad_native_tangent_or_none(t_reflection),
@@ -1044,16 +1091,10 @@ class _BdptAccumulateAdFunction(torch.autograd.Function):
     ``S_b`` so the coherent backward needs no re-reduction (retained forward bin sums)."""
 
     @staticmethod
-    def forward(  # type: ignore[no-untyped-def]
-        contribution,
-        coeff_real,
-        coeff_imag,
-        base_samples,
-        tx_count,
-        rx_count,
-        accumulation_strategy,
-        combine_domain,
-    ):
+    def forward(
+        contribution: Any, coeff_real: Any, coeff_imag: Any, base_samples: Any, tx_count: Any,
+        rx_count: Any, accumulation_strategy: Any, combine_domain: Any,
+    ) -> Any:
         samples = dict(base_samples)
         samples["contribution"] = contribution
         matrices, bin_sums = bdpt_accumulate_connection_samples_forward_ad(
@@ -1073,7 +1114,7 @@ class _BdptAccumulateAdFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def setup_context(ctx, inputs, output):  # type: ignore[no-untyped-def]
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         (
             contribution,
@@ -1109,7 +1150,7 @@ class _BdptAccumulateAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, *grad_outputs):  # type: ignore[no-untyped-def]
+    def backward(ctx: Any, *grad_outputs: Any) -> Any:
         grad_matrices = grad_outputs[: len(_ACCUMULATE_MATRIX_FIELDS)]
         none_grads = (None,) * 8
         # The coherent VJP/JVP read the forward-retained bin sums (ctx.bin_sums),
@@ -1150,17 +1191,10 @@ class _BdptAccumulateAdFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def jvp(  # type: ignore[no-untyped-def]
-        ctx,
-        t_contribution,
-        t_coeff_real,
-        t_coeff_imag,
-        _t_base_samples,
-        _t_tx_count,
-        _t_rx_count,
-        _t_strategy,
-        _t_combine,
-    ):
+    def jvp(
+        ctx: Any, t_contribution: Any, t_coeff_real: Any, t_coeff_imag: Any, _t_base_samples: Any,
+        _t_tx_count: Any, _t_rx_count: Any, _t_strategy: Any, _t_combine: Any,
+    ) -> Any:
         # The coherent VJP/JVP read the forward-retained bin sums (ctx.bin_sums),
         # not the sample coefficients, so the saved coeff tensors are unused here.
         contribution, _coeff_real, _coeff_imag = ctx.saved_tensors
@@ -1240,7 +1274,7 @@ def _native_los_connection_samples(
     rayd: Any, light: dict[str, torch.Tensor], sensor: dict[str, torch.Tensor], *,
     scene_has_structures: bool, frequency_hz: float | torch.Tensor, mis: str, beta: float,
     strategy_count: int, ad: bool = False, tx_power: torch.Tensor | None = None,
-    frequency_value: float | None = None, ledger: object | None = None,
+    frequency_value: float | None = None, ledger: AdLaunchLedger | None = None,
 ) -> dict[str, torch.Tensor]:
     if ad:
         # BDPT AD: the LoS direct connection carries both a frequency gradient
@@ -1262,7 +1296,7 @@ def _native_los_connection_samples(
             strategy_count=strategy_count,
         )
         if ledger is not None:
-            ledger.add(  # type: ignore[attr-defined]
+            ledger.add(
                 light["field_real"],
                 light["field_imag"],
                 sensor["field_real"],
@@ -1292,7 +1326,7 @@ def _native_los_connection_samples(
         visibility_inputs["end"],
         visibility_inputs["active"],
     )[0]
-    return bdpt_filter_connection_samples(samples, visible)  # type: ignore[no-any-return]
+    return bdpt_filter_connection_samples(samples, visible)
 
 
 # --- Transmitter/receiver endpoint tensor packing ---------------------------
@@ -1347,7 +1381,7 @@ def receiver_positions(
 def make_launch_state(
     reference: torch.Tensor, *, tx_count: int, config: Config,
 ) -> dict[str, torch.Tensor]:
-    return bdpt_launch_state(  # type: ignore[no-any-return]
+    return bdpt_launch_state(
         reference,
         tx_count=tx_count,
         samples=config.samples,
@@ -1615,7 +1649,7 @@ def _accumulate_connection_samples(
             coeff_real=coeff_real,
             coeff_imag=coeff_imag,
         )
-    return bdpt_accumulate_connection_samples(  # type: ignore[no-any-return]
+    return bdpt_accumulate_connection_samples(
         samples,
         tx_count=tx_count,
         rx_count=rx_count,
@@ -1642,7 +1676,7 @@ def _reduced_light_endpoint_state(
     tx_count = int(tx_reference.shape[0])
     tx_ids = torch.arange(tx_count, device=device, dtype=torch.int32)
     seeds = torch.zeros((tx_count,), device=device, dtype=torch.int64)
-    return bdpt_endpoint_subpath_state(  # type: ignore[no-any-return]
+    return bdpt_endpoint_subpath_state(
         tx_reference,
         tx_power,
         tx_polarization,
@@ -1932,7 +1966,8 @@ def _effective_native_samples(config: Config) -> int:
 
 
 def _effective_native_depth(config: Config) -> int:
-    return min(int(config.max_depth), int(config.max_light_depth))  # type: ignore[arg-type]
+    # Config normalizes an unset max_light_depth to max_depth.
+    return min(int(config.max_depth), int(cast(int, config.max_light_depth)))
 
 
 # Enumerated component id -> BDPT accumulation bucket. LoS 0, reflection 1 and
@@ -2292,7 +2327,7 @@ class _Wavefront:
     def run(
         self, base: dict[str, torch.Tensor], rows_capacity: int | None = None,
     ) -> dict[str, Any]:
-        return bdpt_wavefront_transmission(  # type: ignore[no-any-return]
+        return bdpt_wavefront_transmission(
             *self.positional(base["transmission"], base["scattering"]),
             rows_capacity=rows_capacity, **self.arguments(),
         )
@@ -2341,17 +2376,17 @@ class _BdptWavefrontAdFunction(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(runner, base_transmission, base_scattering, *leaves):  # type: ignore[no-untyped-def]
+    def forward(runner: Any, base_transmission: Any, base_scattering: Any, *leaves: Any) -> Any:
         return runner.forward(base_transmission, base_scattering)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):  # type: ignore[no-untyped-def]
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         ctx.runner = inputs[0]
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, grad_transmission, grad_scattering):  # type: ignore[no-untyped-def]
+    def backward(ctx: Any, grad_transmission: Any, grad_scattering: Any) -> Any:
         leaf_needs = ctx.needs_input_grad[3:]
         needs = tuple(
             name for name, need in zip(BDPT_WAVEFRONT_GRADIENTS, leaf_needs, strict=True) if need
@@ -2363,7 +2398,9 @@ class _BdptWavefrontAdFunction(torch.autograd.Function):
         return (None, grad_transmission, grad_scattering, *ctx.runner.cast_grads(leaf_grads))
 
     @staticmethod
-    def jvp(ctx, _t_runner, t_base_transmission, t_base_scattering, *_t_leaves):  # type: ignore[no-untyped-def]
+    def jvp(
+        ctx: Any, _t_runner: Any, t_base_transmission: Any, t_base_scattering: Any, *_t_leaves: Any,
+    ) -> Any:
         return ctx.runner.tangents(t_base_transmission, t_base_scattering)
 
 
@@ -2384,7 +2421,7 @@ class _WavefrontAdRunner:
     def _arguments(self) -> dict[str, Any]:
         return self.wavefront.arguments(self.leaves[7], self.leaves[8])
 
-    def forward(self, base_transmission: torch.Tensor, base_scattering: torch.Tensor):  # type: ignore[no-untyped-def]
+    def forward(self, base_transmission: torch.Tensor, base_scattering: torch.Tensor) -> Any:
         wavefront = self.wavefront
         if self.leaf_tangents is not None:
             tangents = dict(self.leaf_tangents)
@@ -2406,7 +2443,7 @@ class _WavefrontAdRunner:
             return base_transmission.clone(), base_scattering.clone()
         return out["transmission"], out["scattering"]
 
-    def tangents(self, t_base_transmission, t_base_scattering):  # type: ignore[no-untyped-def]
+    def tangents(self, t_base_transmission: Any, t_base_scattering: Any) -> Any:
         if self.tangent_out is None:
             raise RuntimeError("BDPT wavefront tangents need the forward-mode pass")
         sampled = self.tangent_out
@@ -2416,7 +2453,7 @@ class _WavefrontAdRunner:
             out.append(value if base is None else base + value)
         return tuple(out)
 
-    def backward(self, grad_transmission, grad_scattering, needs):  # type: ignore[no-untyped-def]
+    def backward(self, grad_transmission: Any, grad_scattering: Any, needs: Any) -> Any:
         wavefront = self.wavefront
         reference = wavefront.workspace.tx_reference
         shape = (wavefront.workspace.tx_count, wavefront.workspace.rx_count)
@@ -2431,7 +2468,7 @@ class _WavefrontAdRunner:
             needs=needs, **arguments,
         )
 
-    def cast_grads(self, grads):  # type: ignore[no-untyped-def]
+    def cast_grads(self, grads: Any) -> Any:
         out: list[torch.Tensor | None] = []
         for name, leaf, grad in zip(BDPT_WAVEFRONT_GRADIENTS, self.leaves, grads, strict=True):
             if grad is None or leaf is None:
@@ -2522,25 +2559,25 @@ class _BdptConcatAdFunction(torch.autograd.Function):
     only)."""
 
     @staticmethod
-    def forward(blocks, *contributions):  # type: ignore[no-untyped-def]
+    def forward(blocks: Any, *contributions: Any) -> Any:
         packed = dict(bdpt_concat_connection_samples(tuple(blocks)))
         return packed.pop("contribution"), packed
 
     @staticmethod
-    def setup_context(ctx, inputs, output):  # type: ignore[no-untyped-def]
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         ctx.sizes = [int(value.shape[0]) for value in inputs[1:]]
         ctx.device = inputs[1].device
         ctx.mark_non_differentiable(*(v for v in output[1].values() if isinstance(v, torch.Tensor)))
 
     @staticmethod
-    def backward(ctx, grad_contribution, _grad_packed):  # type: ignore[no-untyped-def]
+    def backward(ctx: Any, grad_contribution: Any, _grad_packed: Any) -> Any:
         if grad_contribution is None:
             return (None, *(None for _ in ctx.sizes))
         return (None, *torch.split(grad_contribution, ctx.sizes))
 
     @staticmethod
-    def jvp(ctx, _t_blocks, *t_contributions):  # type: ignore[no-untyped-def]
+    def jvp(ctx: Any, _t_blocks: Any, *t_contributions: Any) -> Any:
         parts = []
         for size, tangent in zip(ctx.sizes, t_contributions, strict=True):
             tangent = _ad_native_tangent_or_none(tangent)
@@ -2603,7 +2640,8 @@ def _endpoint_only_samples(workspace: _EndpointWorkspace) -> _CollectedSamples:
         )
         for component in _COMPONENT_ORDER
     }
-    matrices["los"] = workspace.endpoint_accumulation["los"]  # type: ignore[index]
+    # An endpoint-only workspace always carries the endpoint accumulation.
+    matrices["los"] = cast("dict[str, torch.Tensor]", workspace.endpoint_accumulation)["los"]
     return _CollectedSamples(
         matrices=matrices,
         estimate_samples=workspace.endpoint_connection_samples,
@@ -2856,7 +2894,7 @@ def _accumulate_and_finalize(
 def _export_paths(
     scene: SolverScene, config: Config, *, workspace: _EndpointWorkspace,
     estimate_samples: dict[str, torch.Tensor] | None,
-) -> ReceiverGrid | None:
+) -> BDPTPathSamples | None:
     endpoint_only = workspace.endpoint_only
     los_light_state = workspace.los_light_state
     endpoint_subpaths = workspace.endpoint_subpaths
@@ -2864,8 +2902,10 @@ def _export_paths(
     path_samples = None
     if config.export_paths:
         if endpoint_only:
+            # An endpoint-only solve requests exactly the LoS component, so the LoS light
+            # endpoint state exists.
             exported_endpoint_samples = bdpt_endpoint_connection_samples(
-                los_light_state,
+                cast("dict[str, torch.Tensor]", los_light_state),
                 endpoint_subpaths["sensor"],
                 frequency_hz=_host_frequency(scene),
                 samples_per_tx=1,
@@ -2919,7 +2959,7 @@ def _build_metadata(
     scene: SolverScene, config: Config, *, prep: _SolvePrep, workspace: _EndpointWorkspace,
     collected: _CollectedSamples, path_gain: torch.Tensor, variance: torch.Tensor | None,
     component_maps: dict[str, torch.Tensor] | None, ledger: AdLaunchLedger | None = None,
-) -> tuple[dict[str, Any], dict[str, Any] | None]:
+) -> tuple[Metadata, dict[str, Any] | None]:
     launch_state = workspace.launch_state
     endpoint_subpaths = workspace.endpoint_subpaths
     selected_accumulation = prep.selected_accumulation
@@ -2992,7 +3032,7 @@ def _build_metadata(
                 else {key: tuple(value.shape) for key, value in component_maps.items()}
             ),
         }
-    return metadata, diagnostics
+    return cast(Metadata, metadata), diagnostics
 
 
 def _solve_pipeline(
@@ -3056,11 +3096,8 @@ def _solve_pipeline(
     )
 # --- Public entry point -----------------------------------------------------
 
-def solve(  # type: ignore[no-untyped-def]
-    scene: Scene | SceneSnapshot,
-    config: Config,
-    *,
-    reference_frequency_hz,
+def solve(
+    scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz: float | torch.Tensor,
 ) -> Result:
     """Run the native CUDA/OptiX BDPT pipeline."""
 
@@ -3100,4 +3137,4 @@ def solve(  # type: ignore[no-untyped-def]
     return result
 
 
-__all__ = ["BDPTPathSamples", "Config", "Result", "solve"]
+__all__ = ["BDPTPathSamples", "Config", "Metadata", "Result", "solve"]

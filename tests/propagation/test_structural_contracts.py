@@ -22,6 +22,14 @@ _TOPOLOGY_CONFIG_FIELDS = {
 _PROTOCOL_NAMES = ("EnumeratedPathConfig", "TopologyConfig")
 
 
+def _protocol_members(protocol: type) -> set[str]:
+    """Field names of a structural config view: annotated members and read-only properties."""
+
+    return set(getattr(protocol, "__annotations__", {})) | {
+        name for name, value in vars(protocol).items() if isinstance(value, property)
+    }
+
+
 def test_topology_config_identity_and_canonical_introspection_owner():
     # The two structural config views share a module but must retain distinct
     # Protocol field sets. The engine reads a
@@ -34,8 +42,8 @@ def test_topology_config_identity_and_canonical_introspection_owner():
     assert scattering_config.__module__ == enumerated.__name__
     assert engine_config is not scattering_config
 
-    engine_fields = set(engine_config.__annotations__)
-    scattering_fields = set(scattering_config.__annotations__)
+    engine_fields = _protocol_members(engine_config)
+    scattering_fields = _protocol_members(scattering_config)
     assert engine_fields == _TOPOLOGY_CONFIG_FIELDS
     assert scattering_fields != _TOPOLOGY_CONFIG_FIELDS
     # Neither absorbs the other: each names at least one field the other does

@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from typing import Any, TypedDict, cast
+
 import torch
 
 from witwin.channel.runtime import (
@@ -20,11 +22,22 @@ from witwin.channel.runtime import (
 # ---------------------------------------------------------------------------
 # accumulation
 # ---------------------------------------------------------------------------
+class AccumulateFlatOutputs(TypedDict):
+    """Per-pair totals and per-component maps of the flat deterministic accumulator."""
+
+    power_total: torch.Tensor
+    field_total_real: torch.Tensor
+    field_total_imag: torch.Tensor
+    component_power: torch.Tensor
+    component_field_real: torch.Tensor
+    component_field_imag: torch.Tensor
+
+
 def deterministic_accumulate_flat(
     valid: torch.Tensor, tx_id: torch.Tensor, rx_id: torch.Tensor, component_id: torch.Tensor,
     path_gain: torch.Tensor, field_real: torch.Tensor, field_imag: torch.Tensor, *, num_tx: int,
     num_rx: int, coherent: bool, scattering_combine_domain: int = 0,
-) -> dict[str, torch.Tensor]:
+) -> AccumulateFlatOutputs:
     if int(scattering_combine_domain) not in (0, 1):
         raise ValueError("scattering_combine_domain must be 0 (power) or 1 (coherent)")
     validate_cuda_tensor("valid", valid, dtype=torch.bool, ndim=1)
@@ -47,7 +60,7 @@ def deterministic_accumulate_flat(
     if num_tx < 0 or num_rx < 0:
         raise ValueError("num_tx and num_rx must be non-negative")
 
-    exported = _required_native_op("deterministic_accumulate_flat")(
+    exported: AccumulateFlatOutputs = _required_native_op("deterministic_accumulate_flat")(
         valid,
         tx_id,
         rx_id,
@@ -206,9 +219,9 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        valid, tx_id, rx_id, component_id, path_gain, field_real, field_imag, num_tx, num_rx,
-        coherent, scattering_combine_domain,
-    ):
+        valid: Any, tx_id: Any, rx_id: Any, component_id: Any, path_gain: Any, field_real: Any,
+        field_imag: Any, num_tx: Any, num_rx: Any, coherent: Any, scattering_combine_domain: Any,
+    ) -> Any:
         op_name = (
             "deterministic_accumulate_flat_fwd64"
             if path_gain.dtype == torch.float64
@@ -230,7 +243,7 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
         return tuple(out[name] for name in _DETERMINISTIC_ACCUM_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         valid, tx_id, rx_id, component_id = (
             torch.autograd.forward_ad.unpack_dual(value).primal for value in inputs[:4]
@@ -264,9 +277,9 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
     @staticmethod
     @_ad_first_order_only
     def backward(
-        ctx, grad_power_total, grad_field_total_real, grad_field_total_imag, grad_component_power,
-        grad_component_field_real, grad_component_field_imag,
-    ):
+        ctx: Any, grad_power_total: Any, grad_field_total_real: Any, grad_field_total_imag: Any,
+        grad_component_power: Any, grad_component_field_real: Any, grad_component_field_imag: Any,
+    ) -> Any:
         none_grads = (None,) * 11
         need_gain = bool(ctx.needs_input_grad[4])
         need_field = bool(ctx.needs_input_grad[5]) or bool(ctx.needs_input_grad[6])
@@ -328,9 +341,10 @@ class _DeterministicAccumulateFlatAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx, _t_valid, _t_tx_id, _t_rx_id, _t_component_id, t_path_gain, t_field_real, t_field_imag,
-        _t_num_tx, _t_num_rx, _t_coherent, _t_scattering_combine_domain,
-    ):
+        ctx: Any, _t_valid: Any, _t_tx_id: Any, _t_rx_id: Any, _t_component_id: Any,
+        t_path_gain: Any, t_field_real: Any, t_field_imag: Any, _t_num_tx: Any, _t_num_rx: Any,
+        _t_coherent: Any, _t_scattering_combine_domain: Any,
+    ) -> Any:
         tangent_gain = _ad_native_tangent_or_none(t_path_gain)
         tangent_real = _ad_native_tangent_or_none(t_field_real)
         tangent_imag = _ad_native_tangent_or_none(t_field_imag)
@@ -371,7 +385,7 @@ def deterministic_accumulate_flat_ad(
     valid: torch.Tensor, tx_id: torch.Tensor, rx_id: torch.Tensor, component_id: torch.Tensor,
     path_gain: torch.Tensor, field_real: torch.Tensor, field_imag: torch.Tensor, *, num_tx: int,
     num_rx: int, coherent: bool, scattering_combine_domain: int = 0,
-) -> dict[str, torch.Tensor]:
+) -> AccumulateFlatOutputs:
     """Differentiable :func:`deterministic_accumulate_flat` (the AD contract)."""
 
     values = _DeterministicAccumulateFlatAdFunction.apply(
@@ -387,4 +401,6 @@ def deterministic_accumulate_flat_ad(
         bool(coherent),
         int(scattering_combine_domain),
     )
-    return dict(zip(_DETERMINISTIC_ACCUM_FIELDS, values, strict=True))
+    return cast(
+        AccumulateFlatOutputs, dict(zip(_DETERMINISTIC_ACCUM_FIELDS, values, strict=True))
+    )

@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Iterator, Protocol, TYPE_CHECKING
+from typing import Callable, Iterator, Protocol, TYPE_CHECKING, cast
 
 import torch
 
@@ -26,7 +26,9 @@ from witwin.channel.propagation.topology import (
 from witwin.channel.propagation.topology import _ensure_topology_fields
 
 if TYPE_CHECKING:
+    from witwin.channel.scene.compiler import CompiledScene
     from witwin.channel.scene.endpoints import SolverScene as Scene
+    from witwin.channel.scene.resources import RayDSceneResource
 
 # "auto" builds the complete image tree per depth and hands a depth (and every deeper one) to
 # ray discovery only when the tree's cost exceeds the budget below; "exhaustive" is the
@@ -79,7 +81,7 @@ class TraceReflectionGroupChains(Protocol):
 
 
 class RecordReflectionCandidateCount(Protocol):
-    def __call__(self, candidate_count: int) -> None: ...
+    def __call__(self, candidate_count: int, /) -> None: ...
 
 
 def validate_reflection_discovery(value: object) -> str:
@@ -143,7 +145,7 @@ class ReflectionEpcRequest:
 
 
 def reflection_plane_groups(
-    compiled: object, groups: dict[str, torch.Tensor | int], *, tri_a: torch.Tensor,
+    compiled: CompiledScene, groups: dict[str, torch.Tensor | int], *, tri_a: torch.Tensor,
     normals: torch.Tensor,
 ) -> ReflectionPlaneGroups:
     """Plane-group tables of a compiled scene, cached per RayD scene like the groups themselves."""
@@ -152,10 +154,10 @@ def reflection_plane_groups(
     cache = getattr(rayd, "runtime_cache", None)
     cached = cache.get("reflection_plane_groups") if cache is not None else None
     if cached is not None:
-        return cached  # type: ignore[return-value]
+        return cast(ReflectionPlaneGroups, cached)
     records = rayd.edge_records()
-    representative_faces = groups["representative_faces"].contiguous()
-    face_group_id = groups["face_group_id"].to(dtype=torch.int32).contiguous()
+    representative_faces = cast(torch.Tensor, groups["representative_faces"]).contiguous()
+    face_group_id = cast(torch.Tensor, groups["face_group_id"]).to(dtype=torch.int32).contiguous()
     group_count = int(groups["group_count"])
     scale = max(float(getattr(compiled, "enumerated_penetration_scene_diagonal_m", 0.0) or 0.0), 1.0e-3)
     tables = (
@@ -179,14 +181,16 @@ def reflection_plane_groups(
     result = ReflectionPlaneGroups(
         group_count=group_count,
         representative_faces=representative_faces,
-        face_group_id=groups["face_group_id"].to(dtype=torch.long).contiguous(),
+        face_group_id=cast(torch.Tensor, groups["face_group_id"]).to(dtype=torch.long).contiguous(),
         plane_point=tables["plane_point"],
         plane_normal=tables["plane_normal"],
         bounds=tables["bounds"],
         occupancy=tables["occupancy"],
         scene_scale_m=scale,
         max_group_size=(
-            int(groups["surface_group_members"].numel()) // group_count if group_count > 0 else 1
+            int(cast(torch.Tensor, groups["surface_group_members"]).numel()) // group_count
+            if group_count > 0
+            else 1
         ),
     )
     if cache is not None:
@@ -571,7 +575,7 @@ def iter_reflection_epc_requests(
 
 @dataclass(frozen=True, slots=True)
 class ReflectionEpcQuery:
-    rayd: object
+    rayd: RayDSceneResource
     source: torch.Tensor
     receiver: torch.Tensor
     active: torch.Tensor | None
@@ -653,8 +657,8 @@ def _discovery_directions(device: torch.device, ray_count: int) -> torch.Tensor:
 
 
 def _discovered_group_chains(
-    rayd: object, tx_positions: torch.Tensor, *, face_group_id: torch.Tensor, max_depth: int,
-    ray_count: int | None = None,
+    rayd: RayDSceneResource, tx_positions: torch.Tensor, *, face_group_id: torch.Tensor,
+    max_depth: int, ray_count: int | None = None,
 ) -> torch.Tensor:
     """Trace specular chains from every transmitter and map them to plane groups.
 
@@ -685,7 +689,9 @@ def _discovered_group_chains(
     return torch.where(hit, face_group_id[prim_chain.clamp_min(0)], -1)
 
 
-def _reflection_geometry_tables(compiled: object, device: torch.device) -> tuple[torch.Tensor, ...]:
+def _reflection_geometry_tables(
+    compiled: CompiledScene, device: torch.device,
+) -> tuple[torch.Tensor, ...]:
     records = compiled.rayd.edge_records()
     faces = records.faces.contiguous()
     normals = geometry_kernels.deterministic_normalize_vec3(
@@ -698,8 +704,9 @@ def _reflection_geometry_tables(compiled: object, device: torch.device) -> tuple
 
 
 def _reflection_blocks(
-    requests: Iterator[ReflectionEpcRequest], *, rayd: object, groups: dict[str, torch.Tensor],
-    face_material_id: torch.Tensor, on_epc: object, min_segment_length: float,
+    requests: Iterator[ReflectionEpcRequest], *, rayd: RayDSceneResource,
+    groups: dict[str, torch.Tensor], face_material_id: torch.Tensor, on_epc: Callable[[], None],
+    min_segment_length: float,
 ) -> list[dict[str, torch.Tensor]]:
     blocks: list[dict[str, torch.Tensor]] = []
     for request in requests:
@@ -738,8 +745,8 @@ def _reflection_blocks(
 
 
 def _reflection_topology(
-    scene: Scene, compiled: object, tx_positions: torch.Tensor, rx_positions: torch.Tensor, *,
-    min_depth: int, max_depth: int, discovery: str, record: ReflectionDiscoveryRecord | None,
+    scene: Scene, compiled: CompiledScene, tx_positions: torch.Tensor, rx_positions: torch.Tensor,
+    *, min_depth: int, max_depth: int, discovery: str, record: ReflectionDiscoveryRecord | None,
 ) -> tuple[dict[str, torch.Tensor], int, int]:
     """Reflection topology of depths ``min_depth..max_depth`` for every transmitter and receiver.
 

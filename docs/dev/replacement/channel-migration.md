@@ -905,3 +905,30 @@ What changes:
   `coherent=False`, part of `path_gain`) with a per-cell vector sum; it now uses
   the same accumulation as point receivers and every other component.
   `diagnostics["diffraction_accumulation"]` is always `scalar_path_accumulation`.
+
+## 0.6.0: typed result metadata
+
+Each solver's `Result.metadata` is now annotated with a `TypedDict` that names
+its stable keys: `witwin.channel.path.PathMetadata`,
+`witwin.channel.deterministic.Metadata`, `witwin.channel.montecarlo.basic.Metadata`
+and `witwin.channel.montecarlo.bdpt.Metadata`. The shared blocks are typed too:
+`estimator`/`quantity`/`combine`/`complete` (`capabilities.ResultSemantics`),
+the requested/effective configuration keys (`capabilities.ConfigMetadata`),
+`discovery` (`components.DiscoveryMetadata`) and `kernel`
+(`runtime.KernelMetadata`).
+
+Nothing changes at run time: `metadata` is the same plain `dict` with the same
+keys, values and order, so indexing, `in`, `.get` and JSON serialization work as
+before. What a static type checker now sees:
+
+- Reading a key that is not declared (for example a typo) is a type error.
+  Code that stores its own keys in a `PathResult` built with
+  `PathResult.from_ragged(metadata=...)` should read them through a
+  `dict[str, Any]` view, e.g. `cast(dict[str, Any], result.metadata)["mine"]`.
+- `PathResult.from_ragged(metadata=...)` accepts any `Mapping[str, Any]`
+  (previously `dict[str, Any]`); it still copies the mapping into a new `dict`.
+- The four `solve` functions annotate `reference_frequency_hz: float |
+  torch.Tensor` (previously unannotated); accepted values are unchanged.
+
+`ci/public-api-snapshot.json` records the changed `Result`/`PathResult`,
+`from_ragged` and `solve` contracts and the four new exports.

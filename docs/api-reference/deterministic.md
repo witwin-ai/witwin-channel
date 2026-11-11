@@ -88,7 +88,7 @@ solve(
     scene: witwin.core.Scene | witwin.core.SceneSnapshot,
     config: Config,
     *,
-    reference_frequency_hz,
+    reference_frequency_hz: float | torch.Tensor,
 ) -> Result
 ```
 
@@ -127,7 +127,7 @@ Result(
     component_power: dict[str, torch.Tensor],
     component_fields: dict[str, torch.Tensor],
     paths: PathTable | None,
-    metadata: dict[str, Any],
+    metadata: Metadata,
     diagnostics: dict[str, Any] | None = None,
 )
 ```
@@ -139,8 +139,27 @@ Result(
 | `component_power` | Component-name to power tensor. |
 | `component_fields` | Component-name to complex-field tensor. |
 | `paths` | Compact `PathTable` when `export_paths=True`; otherwise `None`. |
-| `metadata` | Solver, component, phase, build, and execution records. |
+| `metadata` | `Metadata`: solver, component, phase, build, and execution records (see [`Metadata`](#metadata)). |
 | `diagnostics` | Additional records when requested; otherwise normally `None`. |
+
+## `Metadata`
+
+A `TypedDict` naming the stable keys; at run time it is a plain `dict`, so key access, `in`, `.get` and JSON serialization are unchanged. Every solver publishes the result-semantics keys `estimator`, `quantity`, `combine` and `complete` (see the [index](index.md)), the `kernel` execution record, and the requested/effective configuration keys `requested_config`, `effective_config`, `requested_max_depth`, `effective_max_depth` and `component_max_depth`.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `max_depth`, `coherent`, `return_field`, `export_paths`, `max_paths`, `max_paths_scope`, `sort_key` | config values | The solve's options. |
+| `accumulation_strategy` | `str` | `coherent` or `incoherent`. |
+| `components` | `dict[str, str]` | Status per component (`enabled`, `not_requested`, ...). |
+| `counts` | `dict` | `path_count`, `valid_path_count` and per-component counts. |
+| `capability` | `dict[str, bool]` | Native capability flags used by the solve. |
+| `kernel` | `KernelMetadata` | Launch, tape, memory and timing record. |
+| `field_abi`, `phase_convention`, `coefficient_semantics` | | Field and phase conventions. |
+| `coupled_paths` | `dict` | Coupled interaction-chain record. |
+| `discovery` | `DiscoveryMetadata` | `requested`, `sources` (candidate source per reflection depth) and `complete`. |
+| `semantic_capabilities` | `dict` | This solver's capability record. |
+| `transmission`, `scattering` | `dict` | Only when that component was requested. |
+| `dropped_faces` | `dict[str, int]` | Only when compilation removed degenerate or duplicate faces. |
 
 ## `PathTable`
 

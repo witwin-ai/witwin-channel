@@ -92,6 +92,9 @@ average over the cell or capture region), `combine` (`coherent`,
 `incoherent`, or `none` for uncombined rows) and `complete` (whether every path
 within the requested bounds was found; for `path` and `deterministic` it is
 `metadata["discovery"]["complete"]`, and the sampled solvers report `False`).
+The metadata of each solver is typed as a `TypedDict` (`path.PathMetadata`,
+`deterministic.Metadata`, `montecarlo.basic.Metadata`, `montecarlo.bdpt.Metadata`)
+naming its stable keys; at run time it is a plain `dict`.
 
 ## Minimal solver example
 

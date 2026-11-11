@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import torch
 
@@ -20,7 +20,7 @@ from witwin.channel.runtime import (
     validate_cuda_tensor,
 )
 from witwin.channel.scene.resources import refine_edge_geometry
-from witwin.channel.scene.resources import RayDSceneResource
+from witwin.channel.scene.resources import RayDEdgeRecords, RayDSceneResource
 from witwin.channel.scene.endpoints import ReceiverGrid, ReceiverPoint
 from witwin.channel.scene.compiler import (
     receiver_positions as _native_receiver_positions,
@@ -28,6 +28,7 @@ from witwin.channel.scene.compiler import (
 )
 
 if TYPE_CHECKING:
+    from witwin.channel.scene.compiler import CompiledScene
     from witwin.channel.scene.endpoints import SolverScene as Scene
 
 BDPT_INTERSECTION_FIELDS = _BDPT_INTERSECTION_FIELDS
@@ -36,7 +37,7 @@ BDPT_INTERSECTION_FIELDS = _BDPT_INTERSECTION_FIELDS
 _RAYD_EDGE_INFO_PLANE_TOL = 1.34e-5
 
 
-def diffraction_edge_geometry(records: object) -> tuple[torch.Tensor, ...]:
+def diffraction_edge_geometry(records: RayDEdgeRecords) -> tuple[torch.Tensor, ...]:
     return geometry_kernels.mc_diffraction_edge_geometry(
         records.vertices,
         records.faces,
@@ -60,7 +61,7 @@ def cached_diffraction_edge_geometry(
     )
     cached = cache.get(cache_key)
     if cached is not None:
-        return cached  # type: ignore[return-value]
+        return cast("tuple[torch.Tensor, ...]", cached)
     geometry = diffraction_edge_geometry(rayd.edge_records())
     if not preserve_imported_edges:
         geometry = refine_edge_geometry(rayd, geometry)
@@ -146,7 +147,7 @@ def _cached_coplanar_face_groups(
         return _coplanar_face_groups(tri_a, normals, surface_ids)
     cached = cache.get("deterministic_coplanar_face_groups")
     if cached is not None:
-        return cached  # type: ignore[return-value]
+        return cast("dict[str, torch.Tensor | int]", cached)
     groups = _coplanar_face_groups(tri_a, normals, surface_ids)
     cache["deterministic_coplanar_face_groups"] = groups
     return groups
@@ -203,7 +204,7 @@ def _opposite_vertex_ids(
 
 
 def reflection_epc_paths(
-    compiled: object, vertices: torch.Tensor, source: torch.Tensor, target: torch.Tensor,
+    compiled: CompiledScene, vertices: torch.Tensor, source: torch.Tensor, target: torch.Tensor,
     face_id: torch.Tensor, depth: int,
 ) -> dict[str, torch.Tensor]:
     """Frozen-winner reflection EPC re-solve, published with its validity.
@@ -256,7 +257,7 @@ def reflection_epc_paths(
 
 
 def _reflection_geometry_ad(
-    compiled: object, vertices: torch.Tensor, source: torch.Tensor, target: torch.Tensor,
+    compiled: CompiledScene, vertices: torch.Tensor, source: torch.Tensor, target: torch.Tensor,
     face_id: torch.Tensor, depth: int,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """All-or-nothing fixed-winner reflection hit geometry.
@@ -282,7 +283,7 @@ def _reflection_geometry_ad(
 _C0 = 299792458.0
 
 
-def occluder_boxes(compiled: object) -> tuple[torch.Tensor, torch.Tensor] | None:
+def occluder_boxes(compiled: CompiledScene) -> tuple[torch.Tensor, torch.Tensor] | None:
     """Per-structure axis-aligned box table (box_min, box_max) or ``None``.
 
     Reduces the compiled geometry vertices to one [min, max] box per structure
@@ -399,7 +400,7 @@ def apply_los_taper(
 
 @dataclass(frozen=True, slots=True)
 class VisibilityQuery:
-    rayd: object
+    rayd: RayDSceneResource
     start: torch.Tensor
     end: torch.Tensor
     active: torch.Tensor | None
@@ -421,7 +422,9 @@ def run_visibility_query(query: VisibilityQuery) -> VisibilityResult:
     )
 
 
-def _rayd_visibility_mask(rayd: object, start: torch.Tensor, end: torch.Tensor) -> torch.Tensor:
+def _rayd_visibility_mask(
+    rayd: RayDSceneResource, start: torch.Tensor, end: torch.Tensor,
+) -> torch.Tensor:
     if start.shape[0] == 0:
         return torch.empty((0,), device=start.device, dtype=torch.bool)
     return geometry_kernels.rayd_visibility_forward(
@@ -430,7 +433,8 @@ def _rayd_visibility_mask(rayd: object, start: torch.Tensor, end: torch.Tensor) 
 
 
 def _los_visibility_mask(
-    rayd: object, tx_for_path: torch.Tensor, rx_for_path: torch.Tensor, *, has_structures: bool,
+    rayd: RayDSceneResource, tx_for_path: torch.Tensor, rx_for_path: torch.Tensor, *,
+    has_structures: bool,
 ) -> torch.Tensor | None:
     if not has_structures or tx_for_path.shape[0] == 0:
         return None

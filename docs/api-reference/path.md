@@ -84,7 +84,7 @@ solve(
     scene: witwin.core.Scene | witwin.core.SceneSnapshot,
     config: Config,
     *,
-    reference_frequency_hz,
+    reference_frequency_hz: float | torch.Tensor,
 ) -> PathResult
 ```
 
@@ -150,7 +150,7 @@ PathResult(
     position: torch.Tensor,
     normal: torch.Tensor,
     num_paths: torch.Tensor,
-    metadata: dict[str, Any],
+    metadata: PathMetadata,
     field_xyz: torch.Tensor | None = None,
     field_direction: torch.Tensor | None = None,
     tx_weights: torch.Tensor | None = None,
@@ -173,13 +173,36 @@ axis.
 | `primitive_id`, `material_id` | `(..., P, D) int32` | Per-depth primitive and material IDs. |
 | `position`, `normal` | `(..., P, D, 3) float32` | Interaction points and normals. |
 | `num_paths` | `(R, Ra, T, Ta) int32` | Actual path count per link. |
-| `metadata` | `dict[str, Any]` | Solver, phase, component, build, and execution records. |
+| `metadata` | `PathMetadata` | Solver, phase, component, build, and execution records (see [`PathMetadata`](#pathmetadata)). |
 | `field_xyz` | `(..., P, 3) complex64` | World-Cartesian field; omitted construction input becomes a zero tensor. |
 | `field_direction` | `(..., P, 3) float32` | Field propagation direction. |
 | `tx_weights`, `rx_weights` | complex tensor or `None` | Default array weights captured from the scene. |
 
 A valid empty result has `P == 0`, for example
 `a.shape == (R, Ra, T, Ta, 0, 1)`.
+
+### `PathMetadata`
+
+A `TypedDict` naming the stable keys of `PathResult.metadata`; at run time it is a plain `dict`.
+Every key is optional in the type because `from_ragged` accepts caller metadata, but a `solve`
+result always carries the solver keys below.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `solver`, `device` | `str` | `"path"` and `"cuda"`. |
+| `estimator`, `quantity`, `combine`, `complete` | result semantics | See the [index](index.md). |
+| `path_count`, `effective_max_depth`, `component_max_depth`, `max_paths_per_pair` | `int` / `dict[str, int]` | Path counts and depth budgets. |
+| `native_capabilities` | `dict[str, bool]` | Native capability flags. |
+| `components` | `dict[str, str]` | Status per component. |
+| `kernel` | `KernelMetadata` | Launch, tape, memory and timing record. |
+| `field_abi`, `phase_convention`, `coefficient_semantics`, `coupled_coefficient_semantics`, `interaction_geometry` | | Field and phase conventions. |
+| `coupled_paths` | `dict` | Coupled interaction-chain record. |
+| `discovery` | `DiscoveryMetadata` | `requested`, `sources` (candidate source per reflection depth) and `complete`. |
+| `schema`, `schema_version`, `max_paths_scope`, `stable_order` | | Padded-layout schema. |
+| `array_semantics`, `array_phase_convention`, `num_rx_ant`, `num_tx_ant` | | Antenna-array packing. |
+| `transmission`, `scattering` | `dict` | Only when that component produced rows. |
+| `dropped_faces` | `dict[str, int]` | Only when compilation removed degenerate or duplicate faces. |
+| `filtered_interaction_types` | `list[int]` | Only on a `filter_by_type` result. |
 
 ### Properties
 
@@ -209,7 +232,7 @@ PathResult.from_ragged(
     *,
     max_paths_per_pair: int | None = None,
     minimum_path_width: int = 0,
-    metadata: dict[str, Any] | None = None,
+    metadata: Mapping[str, Any] | None = None,
 ) -> PathResult
 ```
 
@@ -220,7 +243,7 @@ Converts stable pair-grouped ragged rows into the public padded layout.
 | `ragged` | Input `RaggedPathSoA`. |
 | `max_paths_per_pair` | Optional non-negative padded width; input counts must not exceed it. |
 | `minimum_path_width` | Non-negative minimum padded width. |
-| `metadata` | Result metadata; `None` uses an empty dictionary. |
+| `metadata` | Result metadata, copied into a new `dict`; `None` uses an empty dictionary. Keys other than the `PathMetadata` keys are kept. |
 
 When no width is supplied, construction observes the maximum pair count to
 allocate exact output.
