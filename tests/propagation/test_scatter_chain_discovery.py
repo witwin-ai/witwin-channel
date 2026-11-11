@@ -64,7 +64,7 @@ def test_config_enable_valid(cls):
         ({"scattering_chain_max_depth": -1}, ValueError),
         ({"scattering_chain_samples_per_m2": 0.0}, ValueError),
         ({"scattering_chain_max_rows": 0}, ValueError),
-        ({"scattering_chain_max_depth": 2, "components": ["los"]}, RuntimeError),
+        ({"scattering_chain_max_depth": 2, "components": ["los"]}, ValueError),
     ],
 )
 def test_config_validation_rejects(cls, overrides, exc):

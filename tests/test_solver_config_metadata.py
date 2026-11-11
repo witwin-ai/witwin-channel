@@ -45,7 +45,7 @@ def test_deterministic_metadata_reports_effective_component_depths():
 
 
 def test_deterministic_rejects_depth_above_public_capability_at_config_time():
-    with pytest.raises(RuntimeError, match="max_depth <= 5"):
+    with pytest.raises(ValueError, match=r"max_depth must be in \[0, 5\].*got 6"):
         DeterministicConfig(max_depth=6, components={"reflection"})
 
 
@@ -76,12 +76,12 @@ def test_basic_metadata_reports_requested_and_effective_config():
     "component", ["reflection", "diffraction", "transmission", "scattering"]
 )
 def test_montecarlo_configs_reject_zero_depth_scattering_before_solve(config_type, component):
-    with pytest.raises(RuntimeError, match="max_depth >= 1"):
+    with pytest.raises(ValueError, match=r"requires max_depth >= 1 for components .*got max_depth=0"):
         config_type(max_depth=0, components={component})
 
 
 def test_bdpt_rejects_disabled_diffraction_and_accepts_single_strategy_without_mis():
-    with pytest.raises(RuntimeError, match="max_diffraction_order"):
+    with pytest.raises(ValueError, match="requires max_diffraction_order=1, got 0"):
         BdptConfig(components={"diffraction"}, max_diffraction_order=0)
     assert BdptConfig(components={"diffraction"}, mis="none", samples=2).mis == "none"
 
@@ -109,7 +109,7 @@ def test_bdpt_rejects_grid_receiver_strategy_before_scene_build(monkeypatch):
     )
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
 
-    with pytest.raises(RuntimeError, match="requires point receivers"):
+    with pytest.raises(ValueError, match="requires point receivers"):
         bdpt_solve(
             scene,
             BdptConfig(components={"los"}, receiver_strategy="point_sphere"),

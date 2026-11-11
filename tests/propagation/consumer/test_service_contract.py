@@ -18,11 +18,21 @@ def _compiled(frequency: float = 77.0e9):
     from witwin.channel.scene.compiler import CompiledScene
 
     compiled = object.__new__(CompiledScene)
+    # The source carries the same four version domains, so the stand-in is not
+    # stale; the empty CPU geometry means "no GPU-resident scene to match".
     object.__setattr__(
         compiled,
         "source",
-        SimpleNamespace(metadata={}, endpoints=("compiled-endpoint-must-not-run",)),
+        SimpleNamespace(
+            metadata={},
+            endpoints=("compiled-endpoint-must-not-run",),
+            topology_version=7,
+            geometry_version=7,
+            material_version=7,
+            assignment_version=7,
+        ),
     )
+    object.__setattr__(compiled, "geometry", SimpleNamespace(vertices=torch.empty((0, 3)), faces=torch.empty((0, 3))))
     object.__setattr__(compiled, "structures", ())
     # mu_r / layer_mu_r are named by capabilities.primal_only_ad_inputs, so
     # the stand-in has to declare them even though this scene has no material

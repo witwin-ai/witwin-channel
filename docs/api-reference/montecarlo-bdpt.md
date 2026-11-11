@@ -149,7 +149,7 @@ BDPTPathSamples(
 | `mis_weight` | `(N,)` | MIS weight. |
 | `component_id` | `(N,)` | Propagation-component code. |
 | `valid` | `(N,)` | Validity mask. |
-| `tx_id`, `rx_id` | `(N,)` | Stable endpoint IDs. |
+| `tx_id`, `rx_id` | `(N,)` | 0-based transmitter and receiver indices in scene endpoint order, not antenna IDs. |
 | `grid_linear_id` | `(N,)` | Linear receiver-grid index; non-grid cases use the contract sentinel. |
 | `light_depth`, `sensor_depth` | `(N,)` | Light and sensor subpath depths. |
 | `path_length_m` | `(N,)` | Complete path length in metres. |

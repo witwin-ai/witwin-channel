@@ -346,7 +346,14 @@ def _deterministic_diffraction_states(
 def _diffraction_topology_order1(
     scene: Scene, compiled: object, tx_positions: torch.Tensor, tx_power: torch.Tensor,
     rx_positions: torch.Tensor, *, frequency_hz: float, isb_boundary_taper_width: float = 0.0,
+    tx_polarizations: torch.Tensor | None = None,
 ) -> tuple[dict[str, torch.Tensor], int, torch.Tensor]:
+    """Order-1 diffraction topology for every transmitter and receiver.
+
+    ``tx_polarizations`` carries explicit per-transmitter polarizations when the
+    caller binds endpoint batches instead of scene transmitters.
+    """
+
     from witwin.channel.kernels import fields as field_kernels
 
     device = tx_positions.device
@@ -387,7 +394,10 @@ def _diffraction_topology_order1(
     # Per-transmitter polarization threaded into the RayD UTD op: the
     # incident field basis must use the real scene polarization, not a
     # fabricated z-axis vector.
-    tx_polarizations = transmitter_polarizations_f32(scene, device=device)
+    if tx_polarizations is None:
+        tx_polarizations = transmitter_polarizations_f32(scene, device=device)
+    else:
+        tx_polarizations = tx_polarizations.to(device=device, dtype=torch.float32).contiguous()
     wavelength = _LIGHT_SPEED_M_PER_S / float(frequency_hz)
     handle = rayd.require_resource()
     blocks: list[dict[str, torch.Tensor]] = []

@@ -24,12 +24,6 @@
       "owner": "montecarlo/basic maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
-    "witwin/channel/montecarlo/bdpt.py::Config.__post_init__": {
-      "ceiling": 19,
-      "expires_on": "2027-01-31",
-      "owner": "montecarlo/bdpt maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
-    },
     "witwin/channel/montecarlo/bdpt.py::_collect_connection_samples": {
       "ceiling": 36,
       "expires_on": "2027-01-31",

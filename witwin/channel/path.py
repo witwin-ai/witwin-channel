@@ -17,15 +17,20 @@ import torch
 from witwin.channel.components import (
     AD_MODES as _VALID_AD_MODES,
     DEFAULT_COMPONENTS as _DEFAULT_COMPONENTS,
-    DEPTH_CAPPED_COMPONENTS,
     apply_exported_path_counts,
     component_availability_status,
     component_max_depth,
+    require_config_type,
+    validate_chain_depth_cap,
+    validate_config_fields,
     validate_coupled_candidate_limit,
     validate_coupled_gate,
     validate_isb_boundary_taper,
     validate_max_depth,
+    validate_max_paths,
     validate_scatter_chain,
+    validate_scattering_quadrature,
+    validate_vocabulary,
     validated_components,
 )
 from witwin.core import Scene, SceneSnapshot
@@ -46,6 +51,7 @@ from witwin.channel.propagation.consumer import compact_evaluated_paths
 from witwin.channel.scene.compiler import (
     compile as compile_scene,
     receiver_positions as _shared_receiver_positions,
+    record_dropped_faces,
     transmitter_positions as _shared_transmitter_positions,
 )
 from witwin.channel.scene.endpoints import (
@@ -54,6 +60,7 @@ from witwin.channel.scene.endpoints import (
     SolverScene,
     Transmitter,
     bind_solver_scene,
+    link_zero_gradient,
     orientation_matrix,
     pattern_field_response,
     steering_vector,
@@ -113,16 +120,16 @@ class Config:
     isb_boundary_taper: bool = False
     isb_boundary_taper_width: float = 0.5
     def __post_init__(self) -> None:
+        validate_config_fields(self)
         validate_max_depth(self.max_depth)
         validate_isb_boundary_taper(self.isb_boundary_taper_width)
-        if self.scattering_samples_per_m2 <= 0.0:
-            raise ValueError("scattering_samples_per_m2 must be positive")
-        if self.scattering_max_paths_per_pair <= 0:
-            raise ValueError("scattering_max_paths_per_pair must be positive")
-        if self.scattering_power_threshold < 0.0:
-            raise ValueError("scattering_power_threshold must be non-negative")
+        validate_scattering_quadrature(
+            samples_per_m2=self.scattering_samples_per_m2,
+            max_paths_per_pair=self.scattering_max_paths_per_pair,
+            power_threshold=self.scattering_power_threshold,
+        )
         components = validated_components(
-            self.components, error_message="components must be a subset of {valid}"
+            self.components, error_message="components must be a non-empty subset of {valid}"
         )
         validate_scatter_chain(
             max_depth=self.scattering_chain_max_depth,
@@ -130,22 +137,16 @@ class Config:
             max_rows=self.scattering_chain_max_rows,
             components=components,
         )
-        if self.max_depth > 5 and components & DEPTH_CAPPED_COMPONENTS:
-            raise RuntimeError("path reflection/transmission support max_depth <= 5")
+        validate_chain_depth_cap("path", self.max_depth, components)
         validate_coupled_gate(
             coupled_paths=self.coupled_paths,
             max_depth=self.max_depth,
             components=components,
         )
-        if self.max_paths is not None and self.max_paths <= 0:
-            raise ValueError("max_paths must be positive when set")
-        if self.max_paths_scope not in _VALID_MAX_PATHS_SCOPES:
-            raise ValueError("path max_paths_scope must be 'per_pair'")
+        validate_max_paths(self.max_paths)
+        validate_vocabulary("path max_paths_scope", self.max_paths_scope, _VALID_MAX_PATHS_SCOPES)
         validate_coupled_candidate_limit(self.coupled_candidate_limit)
-        if self.ad_mode not in _VALID_AD_MODES:
-            raise ValueError(
-                f"path ad_mode must be one of {sorted(_VALID_AD_MODES)}"
-            )
+        validate_vocabulary("path ad_mode", self.ad_mode, _VALID_AD_MODES)
         object.__setattr__(self, "components", components)
 
 
@@ -1530,8 +1531,8 @@ def _validate_runtime(config: Config) -> tuple[bool, bool, bool]:
         # companion is a documented follow-up; reject taper + AD loudly rather
         # than returning a silently incomplete gradient.
         raise RuntimeError(
-            "isb_boundary_taper does not support ad_mode != 'none' yet "
-            "(ADR-017 gate 3 C1 clearance companion is a follow-up)"
+            "isb_boundary_taper=True supports only ad_mode='none' (the taper has no "
+            f"derivative companion), got ad_mode={config.ad_mode!r}"
         )
     info = build_info()
     reflection_available = bool(info["uses_rayd_native"])
@@ -1640,6 +1641,12 @@ def _pipeline_solve_base(
     )
     tx_positions, _tx_power = transmitter_tensors(scene)
     rx_positions = receiver_positions(scene, reference=tx_positions)
+    if config.ad_mode == "none":
+        # The packed angles are computed from the endpoint positions; without
+        # this a requires_grad position leaf would put an ad_mode="none" result
+        # on a graph whose gradients are not the path derivatives.
+        tx_positions = tx_positions.detach()
+        rx_positions = rx_positions.detach()
     return _DeferredPathResult(
         result=pack_evaluated_paths(
             evaluated,
@@ -1717,12 +1724,16 @@ def solve(  # type: ignore[no-untyped-def]
 ) -> PathResult:
     """Solve canonical paths and pack synthetic or explicit antenna arrays."""
 
+    require_config_type(config, Config, "witwin.channel.path")
     compiled = compile_scene(
         scene, reference_frequency_hz=reference_frequency_hz
     )
-    return _pipeline_solve(
-        bind_solver_scene(compiled), config, solve_base=_solve_base
-    )
+    solver_scene = bind_solver_scene(compiled)
+    result = _pipeline_solve(solver_scene, config, solve_base=_solve_base)
+    if config.ad_mode == "vjp" and not result.a.requires_grad:
+        result = replace(result, a=link_zero_gradient(result.a, solver_scene))
+    record_dropped_faces(result, compiled)
+    return result
 
 
 __all__ = [

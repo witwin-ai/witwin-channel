@@ -3130,7 +3130,7 @@ def kirchhoff_table_build_ad(
     if table.pre_balance_lobe_te is None or table.pre_balance_lobe_tm is None:
         raise ValueError(
             "kirchhoff_table_build_ad requires the AD-saved pre-balance lobes; "
-            "build the table with build_kirchhoff_table (ADR-015 Part C)"
+            "build the table with witwin.channel.scene.resources.build_kirchhoff_table"
         )
     frequency_value = _ad_frequency_value(frequency)
     a_te = table.normalization_applied[..., 0].contiguous()

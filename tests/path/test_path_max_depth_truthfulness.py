@@ -9,7 +9,7 @@ from witwin.channel.path import _metadata
 def test_path_accepts_supported_reflection_depths_and_rejects_above_capability():
     for depth in range(1, 6):
         assert Config(max_depth=depth, components={"reflection"}).max_depth == depth
-    with pytest.raises(RuntimeError, match="max_depth <= 5"):
+    with pytest.raises(ValueError, match=r"path max_depth must be in \[0, 5\].*got 6"):
         Config(max_depth=6, components={"reflection"})
 
 

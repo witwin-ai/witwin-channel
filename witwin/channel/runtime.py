@@ -1138,8 +1138,8 @@ def _ad_reject_fixed_inputs(
         if needs_input_grad[index]:
             raise NotImplementedError(
                 f"{op_name} does not differentiate {name}: tx_power, the "
-                "polarizations, mu_r, material ids and valid masks stay fixed "
-                "under the plan 07 fixed-topology contract"
+                "polarizations, mu_r, material ids and valid masks are constants "
+                "of the fixed-topology derivative; detach this input"
             )
 
 
@@ -1150,8 +1150,8 @@ def _ad_reject_fixed_tangents(op_name: str, tangents: tuple[tuple[object, str], 
         ):
             raise NotImplementedError(
                 f"{op_name} does not differentiate {name}: tx_power, the "
-                "polarizations, mu_r, material ids and valid masks stay fixed "
-                "under the plan 07 fixed-topology contract"
+                "polarizations, mu_r, material ids and valid masks are constants "
+                "of the fixed-topology derivative; detach this input"
             )
 
 

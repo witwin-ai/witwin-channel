@@ -75,7 +75,7 @@ def test_coupled_paths_accepts_reflection_diffraction_depth_two():
     [
         (
             {"coupled_paths": True, "max_depth": 1},
-            "coupled reflection-diffraction paths require max_depth >= 2",
+            r"coupled_paths=True requires max_depth >= 2, got 1",
         ),
         (
             {
@@ -83,7 +83,7 @@ def test_coupled_paths_accepts_reflection_diffraction_depth_two():
                 "max_depth": 2,
                 "components": {"los", "reflection"},
             },
-            "coupled paths require both reflection and diffraction",
+            "coupled_paths=True requires both 'reflection' and 'diffraction'",
         ),
         (
             {
@@ -91,36 +91,36 @@ def test_coupled_paths_accepts_reflection_diffraction_depth_two():
                 "max_depth": 2,
                 "components": {"los", "diffraction"},
             },
-            "coupled paths require both reflection and diffraction",
+            "coupled_paths=True requires both 'reflection' and 'diffraction'",
         ),
-        ({"coupled_candidate_limit": 0}, "coupled_candidate_limit must be positive"),
+        ({"coupled_candidate_limit": 0}, r"coupled_candidate_limit must be in \[1, 1000000\], got 0"),
         (
             {"coupled_candidate_limit": 2_000_000},
-            "coupled_candidate_limit cannot exceed the hard limit",
+            r"coupled_candidate_limit must be in \[1, 1000000\], got 2000000",
         ),
     ],
 )
 def test_coupled_paths_config_validation(kwargs, message):
-    with pytest.raises((RuntimeError, ValueError), match=message):
+    with pytest.raises(ValueError, match=message):
         Config(**kwargs)
 
 
 @pytest.mark.parametrize(
     ("kwargs", "message"),
     [
-        ({"max_depth": -1}, "max_depth must be non-negative"),
+        ({"max_depth": -1}, "max_depth must be a non-negative int, got -1"),
         ({"max_diffraction_order": -1}, "max_diffraction_order must be 0 or 1"),
-        ({"max_diffraction_order": 2}, "max_diffraction_order above 1"),
+        ({"max_diffraction_order": 2}, "max_diffraction_order must be 0 or 1, got 2"),
         ({"components": set()}, "components must be a non-empty subset"),
         ({"components": {"los", "scatter"}}, "components must be a non-empty subset"),
-        ({"max_paths": 0}, "max_paths must be positive"),
+        ({"max_paths": 0}, "max_paths must be None or a positive int, got 0"),
         ({"max_paths_scope": "receiver"}, "max_paths_scope must be"),
         ({"sort_key": "unstable"}, "sort_key must be one of"),
         ({"ad_mode": "forward"}, "deterministic ad_mode must be one of"),
     ],
 )
 def test_config_rejects_invalid_values(kwargs, message):
-    with pytest.raises((RuntimeError, ValueError), match=message):
+    with pytest.raises(ValueError, match=message):
         Config(**kwargs)
 
 

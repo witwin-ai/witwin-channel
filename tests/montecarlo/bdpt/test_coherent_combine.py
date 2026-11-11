@@ -55,12 +55,12 @@ def test_default_is_off():
 
 
 def test_coherent_refuses_transmission():
-    with pytest.raises(RuntimeError, match="coherent combine supports only"):
+    with pytest.raises(ValueError, match=r"coherent=True supports only the components"):
         BDPTConfig(components={"transmission"}, coherent=True)
 
 
 def test_coherent_refuses_scattering():
-    with pytest.raises(RuntimeError, match="coherent combine supports only"):
+    with pytest.raises(ValueError, match=r"coherent=True supports only the components"):
         BDPTConfig(components={"scattering"}, coherent=True)
 
 
