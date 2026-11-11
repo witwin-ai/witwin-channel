@@ -3226,6 +3226,76 @@ __device__ bool bdpt_nee_row(
     return contribution > 0.0f;
 }
 
+// Free-space carrier of a mixed connection for the derivative passes: the
+// propagation factor and its frequency derivative, the receiver axis (the
+// projected receiver polarization) and the received coefficient
+// <propagation * F, rx_axis> whose squared magnitude is the row power.
+struct WavefrontMixedCarrier {
+    utd::Complex propagation;
+    utd::Complex d_propagation_df;
+    utd::float3a rx_axis;
+    utd::Complex3 field;
+    utd::Complex coeff;
+};
+
+__device__ WavefrontMixedCarrier wavefront_mixed_carrier(
+    const float* origin, const float* field_real, const float* field_imag, float path_length,
+    const float* rx_position, const float* rx_polarization, float frequency_hz) {
+    WavefrontMixedCarrier out;
+    const float dx = rx_position[0] - origin[0];
+    const float dy = rx_position[1] - origin[1];
+    const float dz = rx_position[2] - origin[2];
+    const float distance = fmaxf(sqrtf(dx * dx + dy * dy + dz * dz), 1.0e-6f);
+    const float total_distance = distance + fmaxf(path_length, 0.0f);
+    const float wave_number = 2.0f * kPi * frequency_hz / kLightSpeedMPerS;
+    const float k_clamped = fmaxf(wave_number, 1.0e-12f);
+    const float amplitude = 1.0f / (2.0f * k_clamped * fmaxf(total_distance, 1.0e-6f));
+    const utd::Complex carrier_phase = utd::cplx_exp_phase(transport::precise_neg_kd(wave_number, total_distance));
+    out.propagation = utd::cplx_mul_real(carrier_phase, amplitude);
+    const float dk_df = 2.0f * kPi / kLightSpeedMPerS;
+    const float d_amp_df = wave_number > 1.0e-12f ? (-amplitude / k_clamped) * dk_df : 0.0f;
+    const float d_phase_df = -total_distance * dk_df;
+    out.d_propagation_df = utd::cplx(
+        d_amp_df * carrier_phase.re - amplitude * carrier_phase.im * d_phase_df,
+        d_amp_df * carrier_phase.im + amplitude * carrier_phase.re * d_phase_df);
+    const utd::float3a direction = utd::make_f3(dx / distance, dy / distance, dz / distance);
+    out.rx_axis = utd::project_to_wedge_plane(
+        utd::make_f3(rx_polarization[0], rx_polarization[1], rx_polarization[2]), direction);
+    out.field = {
+        utd::cplx(field_real[0], field_imag[0]),
+        utd::cplx(field_real[1], field_imag[1]),
+        utd::cplx(field_real[2], field_imag[2])};
+    out.coeff = transport::complex3_dot_real(utd::c3_scale(out.field, out.propagation), out.rx_axis);
+    return out;
+}
+
+// Scatter next-event terms for the derivative passes: the local outgoing
+// direction toward the receiver and the factor
+// cos_o (lambda/4pi)^2 4pi / (r^2 max(p_s, 1e-4) samples), so that a row is
+// source_power * (P_te f_te + P_tm f_tm) * factor.
+__device__ float wavefront_nee_factor(
+    const wf::State& state, const wf::ScatterTables& tables, int64_t light, const float* rx_position,
+    const BdptNeeConstants& constants, float* wo_local) {
+    const float* position = state.nee_position + light * 3;
+    const float* normal = state.nee_normal + light * 3;
+    const float delta[3] = {
+        rx_position[0] - position[0], rx_position[1] - position[1], rx_position[2] - position[2]};
+    const float r = fmaxf(sqrtf(wf::dot_values(delta, delta)), 1.0e-6f);
+    float wo_world[3];
+    for (int axis = 0; axis < 3; ++axis) {
+        wo_world[axis] = delta[axis] / r;
+    }
+    const float cos_o = wf::dot_values(wo_world, normal);
+    float t1[3];
+    float t2[3];
+    wf::local_frame(normal, tables.rough_axis_rad[state.nee_material[light]], t1, t2);
+    wo_local[0] = wf::dot_values(wo_world, t1);
+    wo_local[1] = wf::dot_values(wo_world, t2);
+    wo_local[2] = cos_o;
+    return fmaxf(cos_o, 0.0f) * constants.amplitude_sq * constants.four_pi / (r * r) /
+        (fmaxf(state.nee_p_scatter[light], 1.0e-4f) * constants.samples);
+}
+
 // Tile pair p connects light vertex p / rx_tile to receiver rx_begin + p % rx_tile.
 // A pair is active for a live mixed reflection+transmission vertex facing the
 // receiver (segment from the vertex) or for a recorded scatter vertex with a
@@ -3287,7 +3357,9 @@ __global__ void bdpt_wavefront_visibility_inputs_kernel(
 // Visible active pairs evaluate their row and add contribution * MIS weight
 // straight into the double [tx, rx] transmission (mixed chains) or scattering
 // (next-event rows) accumulator; no row is stored. rows[0] / rows[1] count the
-// accumulated mixed / scatter rows.
+// accumulated mixed / scatter rows. With kTangent the kernel also adds each
+// row's forward-mode tangent into the double tangent accumulators.
+template <bool kTangent>
 __global__ void bdpt_wavefront_connect_accumulate_kernel(
     int64_t pairs,
     int64_t rx_tile,
@@ -3312,7 +3384,10 @@ __global__ void bdpt_wavefront_connect_accumulate_kernel(
     double* scattering,
     unsigned long long* rows,
     BdptWavefrontRows row_out,
-    int max_depth) {
+    int max_depth,
+    wf::Tangent tangent,
+    double* t_transmission,
+    double* t_scattering) {
     const int64_t pair = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     bool mixed_row = false;
     bool scatter_row = false;
@@ -3330,6 +3405,37 @@ __global__ void bdpt_wavefront_connect_accumulate_kernel(
                              contribution, row_out.capacity > 0 ? &pdf_omega : nullptr)) {
                 atomicAdd(scattering + tx * rx_count + rx, static_cast<double>(contribution));
                 scatter_row = true;
+                if constexpr (kTangent) {
+                    float wo_local[3];
+                    const float factor =
+                        wavefront_nee_factor(state, tables, light, rx_positions + rx * 3, constants, wo_local);
+                    const int material = state.nee_material[light];
+                    const int table_slot = tables.material_slot[material];
+                    const wf::TableView table = wf::table_view(tables, table_slot);
+                    const float* wi_local = state.nee_wi_local + light * 3;
+                    float f_te = 0.0f;
+                    float f_tm = 0.0f;
+                    rayd::shared::scattering::eval_te_tm(
+                        table.f_te, table.f_tm, table.nti, table.npi, table.nto, table.npo, wi_local, wo_local, f_te,
+                        f_tm);
+                    float df_te = 0.0f;
+                    float df_tm = 0.0f;
+                    if (tangent.f_te != nullptr) {
+                        const int64_t offset = tables.table_offset[table_slot];
+                        rayd::shared::scattering::eval_te_tm(
+                            tangent.f_te + offset, tangent.f_tm + offset, table.nti, table.npi, table.nto,
+                            table.npo, wi_local, wo_local, df_te, df_tm);
+                    }
+                    const float p_te = state.nee_p_te[light];
+                    const float p_tm = state.nee_p_tm[light];
+                    const float kernel = p_te * f_te + p_tm * f_tm;
+                    const float d_kernel = tangent.nee_p_te[light] * f_te + p_te * df_te +
+                        tangent.nee_p_tm[light] * f_tm + p_tm * df_tm;
+                    const float t_power = tangent.tx_power != nullptr ? tangent.tx_power[tx] : 0.0f;
+                    const float t_row = (t_power * kernel + tx_power[tx] * d_kernel) * factor -
+                        2.0f * contribution * tangent.frequency / frequency_hz;
+                    atomicAdd(t_scattering + tx * rx_count + rx, static_cast<double>(t_row));
+                }
                 bdpt_wavefront_write_row(
                     row_out, key, static_cast<int>(tx), static_cast<int>(rx), kComponentScattering, light_depth,
                     contribution, fmaxf(state.nee_p_scatter[light], 1.0e-4f) * pdf_omega, 1.0f,
@@ -3357,6 +3463,26 @@ __global__ void bdpt_wavefront_connect_accumulate_kernel(
                     transmission + tx * rx_count + rx,
                     static_cast<double>(connection.contribution) * static_cast<double>(weight));
                 mixed_row = true;
+                if constexpr (kTangent) {
+                    const WavefrontMixedCarrier carrier = wavefront_mixed_carrier(
+                        state.origin + light * 3, state.field_real + light * 3, state.field_imag + light * 3,
+                        state.path_length[light], rx_positions + rx * 3, rx_polarization + rx * 3, frequency_hz);
+                    const utd::Complex3 t_field = {
+                        utd::cplx(tangent.field_real[light * 3], tangent.field_imag[light * 3]),
+                        utd::cplx(tangent.field_real[light * 3 + 1], tangent.field_imag[light * 3 + 1]),
+                        utd::cplx(tangent.field_real[light * 3 + 2], tangent.field_imag[light * 3 + 2])};
+                    const utd::Complex t_propagation =
+                        utd::cplx_mul_real(carrier.d_propagation_df, tangent.frequency);
+                    const utd::Complex3 t_received = utd::c3_add(
+                        utd::c3_scale(t_field, carrier.propagation), utd::c3_scale(carrier.field, t_propagation));
+                    const utd::Complex t_coeff = transport::complex3_dot_real(t_received, carrier.rx_axis);
+                    const float coeff_power = utd::cplx_abs_sqr(carrier.coeff);
+                    const float t_coeff_power = 2.0f * (carrier.coeff.re * t_coeff.re + carrier.coeff.im * t_coeff.im);
+                    const float t_power = tangent.tx_power != nullptr ? tangent.tx_power[tx] : 0.0f;
+                    const float t_row =
+                        inv_samples_per_tx * (t_power * coeff_power + tx_power[tx] * t_coeff_power) * weight;
+                    atomicAdd(t_transmission + tx * rx_count + rx, static_cast<double>(t_row));
+                }
                 bdpt_wavefront_write_row(
                     row_out, key, static_cast<int>(tx), static_cast<int>(rx),
                     bdpt_component_from_mask(state.component_mask[light] & 0x1f), light_depth,
@@ -3369,6 +3495,141 @@ __global__ void bdpt_wavefront_connect_accumulate_kernel(
     if (threadIdx.x == 0) {
         if (block_mixed > 0) atomicAdd(rows, static_cast<unsigned long long>(block_mixed));
         if (block_scatter > 0) atomicAdd(rows + 1, static_cast<unsigned long long>(block_scatter));
+    }
+}
+
+// Reverse connection stage of one bounce and receiver tile: one thread per light
+// vertex walks the tile's receivers in order and, for each visible row with a
+// nonzero upstream cotangent, adds the row's cotangent of the vertex field
+// (mixed chains) or of P_te/P_tm (scatter vertices) into the tape slot of this
+// bounce, plus its direct table, frequency and transmitter-power gradients.
+__global__ void bdpt_wavefront_connect_backward_kernel(
+    int64_t count,
+    int64_t rx_tile,
+    int64_t rx_begin,
+    int64_t first,
+    int64_t samples,
+    int64_t rx_count,
+    int light_depth,
+    const bool* active,
+    const bool* visible,
+    wf::State state,
+    wf::ScatterTables tables,
+    BdptNeeConstants constants,
+    const float* tx_power,
+    const float* rx_positions,
+    const float* rx_polarization,
+    float frequency_hz,
+    float inv_samples_per_tx,
+    int mode_id,
+    float beta,
+    wf::Tape tape,
+    wf::Gradients grads) {
+    const int64_t light = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (light >= count) {
+        return;
+    }
+    const int64_t tx = (first + light) / samples;
+    const float power = tx_power[tx];
+    const bool scatter_vertex = (state.component_mask[light] & wf::kMaskScatterVertex) != 0;
+    const int64_t slot = static_cast<int64_t>(light_depth - 1) * tape.capacity + light;
+    utd::Complex3 g_field = {};
+    float g_p_te = 0.0f;
+    float g_p_tm = 0.0f;
+    float g_frequency = 0.0f;
+    float g_power = 0.0f;
+    for (int64_t j = 0; j < rx_tile && rx_begin + j < rx_count; ++j) {
+        const int64_t pair = light * rx_tile + j;
+        if (!(active[pair] && visible[pair])) {
+            continue;
+        }
+        const int64_t rx = rx_begin + j;
+        if (scatter_vertex) {
+            const float upstream = grads.grad_scattering[tx * rx_count + rx];
+            float wo[3];
+            float r2;
+            float contribution;
+            if (upstream == 0.0f ||
+                !bdpt_nee_row(state, tables, light, rx_positions + rx * 3, power, constants, wo, r2, contribution)) {
+                continue;
+            }
+            float wo_local[3];
+            const float factor = wavefront_nee_factor(state, tables, light, rx_positions + rx * 3, constants, wo_local);
+            const int table_slot = tables.material_slot[state.nee_material[light]];
+            const wf::TableView table = wf::table_view(tables, table_slot);
+            rayd::shared::scattering::TableEvalGrad eval;
+            rayd::shared::scattering::eval_te_tm_grad(
+                table.f_te, table.f_tm, table.nti, table.npi, table.nto, table.npo, state.nee_wi_local + light * 3,
+                wo_local, eval);
+            const float scaled = upstream * power * factor;
+            g_p_te += scaled * eval.te;
+            g_p_tm += scaled * eval.tm;
+            if (eval.active) {
+                const int64_t offset = tables.table_offset[table_slot];
+                const float te_weight = scaled * state.nee_p_te[light];
+                const float tm_weight = scaled * state.nee_p_tm[light];
+                for (int k = 0; k < 16; ++k) {
+                    if (grads.f_te != nullptr && te_weight * eval.cw[k] != 0.0f)
+                        atomicAdd(grads.f_te + offset + eval.idx[k], static_cast<double>(te_weight * eval.cw[k]));
+                    if (grads.f_tm != nullptr && tm_weight * eval.cw[k] != 0.0f)
+                        atomicAdd(grads.f_tm + offset + eval.idx[k], static_cast<double>(tm_weight * eval.cw[k]));
+                }
+            }
+            g_frequency += -2.0f * upstream * contribution / frequency_hz;
+            g_power += upstream * (state.nee_p_te[light] * eval.te + state.nee_p_tm[light] * eval.tm) * factor;
+        } else {
+            const float upstream = grads.grad_transmission[tx * rx_count + rx];
+            if (upstream == 0.0f) {
+                continue;
+            }
+            const BdptConnectionRow connection = bdpt_connection_row(
+                state.origin + light * 3, state.direction + light * 3, light_depth, state.field_real + light * 3,
+                state.field_imag + light * 3, power, state.pdf_forward[light], state.path_length[light],
+                rx_positions + rx * 3, rx_polarization + rx * 3, 1.0f, true, frequency_hz, inv_samples_per_tx);
+            if (!connection.valid) {
+                continue;
+            }
+            const float weight = bdpt_single_strategy_mis_weight(connection.pdf, mode_id, beta);
+            const WavefrontMixedCarrier carrier = wavefront_mixed_carrier(
+                state.origin + light * 3, state.field_real + light * 3, state.field_imag + light * 3,
+                state.path_length[light], rx_positions + rx * 3, rx_polarization + rx * 3, frequency_hz);
+            const float unit = upstream * inv_samples_per_tx * weight;
+            const float scaled = unit * power;
+            // row = scaled |c|^2 with c = sum_k rx_axis_k propagation F_k:
+            // cotangent of F_k is 2 c conj(propagation) rx_axis_k.
+            const utd::Complex c = carrier.coeff;
+            const utd::Complex p = carrier.propagation;
+            const utd::Complex c_conj_p =
+                utd::cplx(2.0f * scaled * (c.re * p.re + c.im * p.im), 2.0f * scaled * (c.im * p.re - c.re * p.im));
+            g_field.x = utd::cplx_add(g_field.x, utd::cplx_mul_real(c_conj_p, carrier.rx_axis.x));
+            g_field.y = utd::cplx_add(g_field.y, utd::cplx_mul_real(c_conj_p, carrier.rx_axis.y));
+            g_field.z = utd::cplx_add(g_field.z, utd::cplx_mul_real(c_conj_p, carrier.rx_axis.z));
+            const utd::Complex d_coeff = transport::complex3_dot_real(
+                utd::c3_scale(carrier.field, carrier.d_propagation_df), carrier.rx_axis);
+            g_frequency += 2.0f * scaled * (c.re * d_coeff.re + c.im * d_coeff.im);
+            g_power += unit * utd::cplx_abs_sqr(c);
+        }
+    }
+    tape.g_field_real[slot * 3] += g_field.x.re;
+    tape.g_field_real[slot * 3 + 1] += g_field.y.re;
+    tape.g_field_real[slot * 3 + 2] += g_field.z.re;
+    tape.g_field_imag[slot * 3] += g_field.x.im;
+    tape.g_field_imag[slot * 3 + 1] += g_field.y.im;
+    tape.g_field_imag[slot * 3 + 2] += g_field.z.im;
+    tape.g_p[slot * 2] += g_p_te;
+    tape.g_p[slot * 2 + 1] += g_p_tm;
+    if (grads.frequency != nullptr && g_frequency != 0.0f) {
+        atomicAdd(grads.frequency, static_cast<double>(g_frequency));
+    }
+    if (grads.tx_power != nullptr && g_power != 0.0f) {
+        atomicAdd(grads.tx_power + tx, static_cast<double>(g_power));
+    }
+}
+
+__global__ void bdpt_wavefront_cast_kernel(int64_t count, const double* values, float* out) {
+    const int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (index < count) {
+        out[index] = static_cast<float>(values[index]);
     }
 }
 
@@ -3449,7 +3710,10 @@ void channel_bdpt_wavefront_connect_accumulate_cuda(
     at::Tensor& scattering,
     at::Tensor& rows,
     const std::vector<at::Tensor>& row_out,
-    int64_t max_depth) {
+    int64_t max_depth,
+    const wf::Tangent* tangent,
+    at::Tensor* t_transmission,
+    at::Tensor* t_scattering) {
     if (pairs == 0) {
         return;
     }
@@ -3476,7 +3740,10 @@ void channel_bdpt_wavefront_connect_accumulate_cuda(
     const BdptNeeConstants constants{
         static_cast<float>(amplitude_sq), static_cast<float>(4.0 * 3.14159265358979323846),
         static_cast<float>(samples)};
-    bdpt_wavefront_connect_accumulate_kernel<<<blocks, threads, 0, stream>>>(
+    const wf::Tangent no_tangent{};
+    auto kernel = tangent != nullptr ? bdpt_wavefront_connect_accumulate_kernel<true>
+                                     : bdpt_wavefront_connect_accumulate_kernel<false>;
+    kernel<<<blocks, threads, 0, stream>>>(
         pairs,
         rx_tile,
         rx_begin,
@@ -3500,8 +3767,80 @@ void channel_bdpt_wavefront_connect_accumulate_cuda(
         scattering.data_ptr<double>(),
         reinterpret_cast<unsigned long long*>(rows.data_ptr<int64_t>()),
         row_view,
-        static_cast<int>(max_depth));
+        static_cast<int>(max_depth),
+        tangent != nullptr ? *tangent : no_tangent,
+        tangent != nullptr ? t_transmission->data_ptr<double>() : nullptr,
+        tangent != nullptr ? t_scattering->data_ptr<double>() : nullptr);
     C10_CUDA_KERNEL_LAUNCH_CHECK();
+}
+
+void channel_bdpt_wavefront_connect_backward_cuda(
+    int64_t count,
+    int64_t rx_tile,
+    int64_t rx_begin,
+    int64_t first,
+    int64_t samples,
+    int64_t light_depth,
+    const at::Tensor& active,
+    const at::Tensor& visible,
+    const wf::State& state,
+    const wf::ScatterTables& tables,
+    double amplitude_sq,
+    const at::Tensor& tx_power,
+    const at::Tensor& rx_positions,
+    const at::Tensor& rx_polarization,
+    double frequency_hz,
+    int64_t mode_id,
+    double beta,
+    const wf::Tape& tape,
+    const wf::Gradients& grads) {
+    if (count == 0) {
+        return;
+    }
+    constexpr int threads = 128;
+    const int blocks = static_cast<int>((count + threads - 1) / threads);
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(rx_positions.get_device()).stream();
+    const BdptNeeConstants constants{
+        static_cast<float>(amplitude_sq), static_cast<float>(4.0 * 3.14159265358979323846),
+        static_cast<float>(samples)};
+    bdpt_wavefront_connect_backward_kernel<<<blocks, threads, 0, stream>>>(
+        count,
+        rx_tile,
+        rx_begin,
+        first,
+        samples,
+        rx_positions.size(0),
+        static_cast<int>(light_depth),
+        active.data_ptr<bool>(),
+        visible.data_ptr<bool>(),
+        state,
+        tables,
+        constants,
+        tx_power.data_ptr<float>(),
+        rx_positions.data_ptr<float>(),
+        rx_polarization.data_ptr<float>(),
+        static_cast<float>(frequency_hz),
+        1.0f / static_cast<float>(samples),
+        static_cast<int>(mode_id),
+        static_cast<float>(beta),
+        tape,
+        grads);
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+}
+
+// Float copy of a double gradient accumulator.
+at::Tensor channel_bdpt_wavefront_cast_cuda(const at::Tensor& values) {
+    auto out = at::empty(values.sizes(), values.options().dtype(at::kFloat));
+    const int64_t count = out.numel();
+    if (count > 0) {
+        constexpr int threads = 256;
+        const int blocks = static_cast<int>((count + threads - 1) / threads);
+        cudaStream_t stream = at::cuda::getCurrentCUDAStream(values.get_device()).stream();
+        bdpt_wavefront_cast_kernel<<<blocks, threads, 0, stream>>>(
+            count, values.data_ptr<double>(), out.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    return out;
 }
 
 // Zero-filled CUDA storage for the wavefront accumulators and counters.

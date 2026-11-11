@@ -162,11 +162,12 @@ used by focused contract tests, but are not compatibility promises. The parent
   tile of at most `2^20` pairs a visibility query and a fused connect-and-
   accumulate kernel for mixed reflection+transmission vertices and scatter
   next-event rows; no connection row is stored. `export_paths` and
-  `diagnostics` rerun it once to write the counted rows. Only `jvp` / `vjp`
-  use the event-composed sampler (AD companions); both draw the same native
-  counter-based random numbers (a pure function of seed, stream, global sample
-  index and depth) and return the same primal. `metadata["sampler"]` names the
-  one used.
+  `diagnostics` rerun it once to write the counted rows. `jvp` / `vjp` also run
+  on it (fixed topology: `bdpt_wavefront_jvp` one forward pass,
+  `bdpt_wavefront_backward` replay plus reverse walk; ADR-049 decision 7).
+  Random numbers are native and counter-based (a pure function of seed,
+  stream, global sample index and depth). `metadata["sampler"]` names the
+  sampler used; the event-composed sampler remains in the tree, undispatched.
 - Metadata counts stay on the device and are read in one copy per solve.
 - Limitation: a mixed reflection+transmission chain is estimated by connecting
   the vertex after a specular event straight to the receiver (a

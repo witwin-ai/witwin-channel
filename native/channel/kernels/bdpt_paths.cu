@@ -884,290 +884,6 @@ struct BdptWavefrontMaterials {
 
 namespace wf = channel::bdpt_wavefront;
 
-// One wavefront bounce of every live light subpath. One counter-based uniform
-// partitions scatter (rough faces only) / transmit / reflect; only the selected
-// branch is evaluated. Reflect and transmit divide the Jones field by
-// sqrt(p_event) and multiply the proposal density by p_event (the rough
-// reflect branch also by the coherent attenuation C_r). Scatter samples a
-// Kirchhoff lobe direction, clears the Jones field, seeds the unpolarized
-// carrier and records the vertex for next-event estimation; it terminates the
-// subpath at max_order scatter events. Dead subpaths are untouched.
-// counters: [0] transmit, [1] reflect, [2] scatter events; alive counts survivors.
-__global__ void bdpt_wavefront_step_kernel(
-    int64_t count,
-    int64_t first,
-    int depth,
-    unsigned long long seed,
-    const float* hit_t,
-    const float* hit_p,
-    const float* hit_n,
-    const int* hit_prim,
-    BdptWavefrontMaterials materials,
-    wf::ScatterTables tables,
-    float frequency_hz,
-    wf::State state,
-    unsigned long long* counters,
-    unsigned long long* alive) {
-    const int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    bool transmitted = false;
-    bool reflected = false;
-    bool scattered = false;
-    if (index < count) {
-        // A scatter vertex is connected at the bounce that recorded it only.
-        state.component_mask[index] = static_cast<uint8_t>(state.component_mask[index] & ~wf::kMaskScatterVertex);
-    }
-    if (index < count && state.valid[index]) {
-        const int64_t base = index * 3;
-        if (tables.enabled && depth == 0) {
-            // The first bounce of a chunk starts every subpath at zero scatter events.
-            state.scatter_count[index] = 0;
-        }
-        float* direction = state.direction + base;
-        const int prim = hit_prim[index];
-        const float t = hit_t[index];
-        const bool prim_in_range = prim >= 0 && static_cast<int64_t>(prim) < materials.face_count;
-        const int material = prim_in_range ? materials.face_material_id[prim] : -1;
-        const bool hit_ok = prim_in_range && t >= 0.0f && material >= 0;
-        const float cos_theta = fminf(
-            fmaxf(fabsf(direction[0] * hit_n[base] + direction[1] * hit_n[base + 1] +
-                        direction[2] * hit_n[base + 2]),
-                  1.0e-6f),
-            1.0f);
-        const em::LayerView layers{
-            materials.layer_offset,
-            materials.layer_count,
-            materials.layer_thickness_m,
-            materials.layer_eps_r,
-            materials.layer_sigma_e,
-            materials.layer_mu_r,
-            material,
-        };
-        const bool stack_ok = hit_ok && static_cast<int64_t>(material) < materials.material_count &&
-            em::layer_material_usable(layers, materials.layer_total);
-        float r_eff = 0.0f;
-        float t_eff = 0.0f;
-        if (stack_ok) {
-            const em::StackRT te = em::stack_rt(cos_theta, layers, frequency_hz, em::kPolTE);
-            const em::StackRT tm = em::stack_rt(cos_theta, layers, frequency_hz, em::kPolTM);
-            r_eff = 0.5f * (te.cap_r + tm.cap_r);
-            t_eff = 0.5f * (te.cap_t + tm.cap_t);
-        }
-        float p_transmit = 0.0f;
-        float p_scatter = 0.0f;
-        float coherent = 1.0f;
-        const bool rough = tables.enabled && hit_ok && static_cast<int64_t>(material) < materials.material_count &&
-            tables.scatter_model[material] == 1 && tables.material_slot[material] >= 0;
-        if (rough) {
-            // Three-way budgets (R_coh, R_diff, T_bar), each positive budget
-            // floored at 0.05 and the triple renormalized.
-            const float k0 = 6.2831853071795864769f * frequency_hz / 299792458.0f;
-            const float roughness = k0 * cos_theta * tables.rough_sigma_h[material];
-            coherent = expf(-2.0f * roughness * roughness);
-            const float r_coh = r_eff * coherent * coherent;
-            const float r_diff = fmaxf(0.0f, r_eff - r_coh);
-            const float total = fmaxf(r_coh + r_diff + t_eff, 1.0e-12f);
-            float pr = r_coh / total;
-            float ps = r_diff / total;
-            float pt = t_eff / total;
-            if (r_coh > 0.0f) pr = fmaxf(pr, 0.05f);
-            if (r_diff > 0.0f) ps = fmaxf(ps, 0.05f);
-            if (t_eff > 0.0f) pt = fmaxf(pt, 0.05f);
-            const float norm = fmaxf(pr + ps + pt, 1.0e-12f);
-            p_scatter = ps / norm;
-            p_transmit = pt / norm;
-        } else if (hit_ok) {
-            const float total = fmaxf(r_eff + t_eff, 1.0e-12f);
-            p_transmit = fminf(fmaxf(t_eff / total, 0.05f), 0.95f);
-            if (t_eff <= 0.0f) p_transmit = 0.0f;
-            if (r_eff <= 0.0f && t_eff > 0.0f) p_transmit = 1.0f;
-        }
-        const unsigned long long global = static_cast<unsigned long long>(first + index);
-        const float u = bdpt_counter_uniform(seed, kStreamEventSelection, global, static_cast<unsigned long long>(depth));
-        const bool choose_scatter = hit_ok && u < p_scatter;
-        const bool choose_transmit = hit_ok && !choose_scatter && u < p_scatter + p_transmit;
-        const bool already_scattered = (state.component_mask[index] & wf::kMaskScattering) != 0;
-        const utd::Complex3 incoming = {
-            utd::cplx(state.field_real[base], state.field_imag[base]),
-            utd::cplx(state.field_real[base + 1], state.field_imag[base + 1]),
-            utd::cplx(state.field_real[base + 2], state.field_imag[base + 2]),
-        };
-        if (choose_scatter) {
-            const int slot = tables.material_slot[material];
-            const wf::TableView table = wf::table_view(tables, slot);
-            float normal[3] = {hit_n[base], hit_n[base + 1], hit_n[base + 2]};
-            const float in[3] = {direction[0], direction[1], direction[2]};
-            if (wf::dot_values(in, normal) > 0.0f) {
-                normal[0] = -normal[0];
-                normal[1] = -normal[1];
-                normal[2] = -normal[2];
-            }
-            float t1[3];
-            float t2[3];
-            wf::local_frame(normal, tables.rough_axis_rad[material], t1, t2);
-            const float wi_world[3] = {-in[0], -in[1], -in[2]};
-            const float wi_local[3] = {wf::dot_values(wi_world, t1), wf::dot_values(wi_world, t2), wf::dot_values(wi_world, normal)};
-            float p_te;
-            float p_tm;
-            if (already_scattered) {
-                // The carried unpolarized power splits evenly over TE/TM.
-                const float carried = state.carrier[index] * state.carrier[index];
-                p_te = 0.5f * carried;
-                p_tm = 0.5f * carried;
-            } else {
-                float s[3];
-                wf::cross_values(in, normal, s);
-                if (wf::dot_values(s, s) > 1.0e-12f) {
-                    wf::unit_values(s);
-                } else {
-                    float substitute_t2[3];
-                    wf::local_frame(in, 0.0f, s, substitute_t2);
-                }
-                float p[3];
-                wf::cross_values(s, in, p);
-                const float re[3] = {incoming.x.re, incoming.y.re, incoming.z.re};
-                const float im[3] = {incoming.x.im, incoming.y.im, incoming.z.im};
-                const float sr = wf::dot_values(re, s);
-                const float si = wf::dot_values(im, s);
-                const float pr = wf::dot_values(re, p);
-                const float pi = wf::dot_values(im, p);
-                p_te = sr * sr + si * si;
-                p_tm = pr * pr + pi * pi;
-            }
-            const float u0 = bdpt_counter_uniform(seed, kStreamScatterU0, global, static_cast<unsigned long long>(depth));
-            const float u1 = bdpt_counter_uniform(seed, kStreamScatterU1, global, static_cast<unsigned long long>(depth));
-            float wo_local[3];
-            float pdf_lobe = 0.0f;
-            float pdf_lobe_reverse = 0.0f;
-            rayd::shared::scattering::sample_direction(
-                table.marginal, table.conditional, table.density, table.nti, table.npi, table.nto, table.npo, wi_local,
-                u0, u1, wo_local, pdf_lobe, pdf_lobe_reverse);
-            float f_te = 0.0f;
-            float f_tm = 0.0f;
-            rayd::shared::scattering::eval_te_tm(
-                table.f_te, table.f_tm, table.nti, table.npi, table.nto, table.npo, wi_local, wo_local, f_te, f_tm);
-            const float incident_power = fmaxf(p_te + p_tm, 1.0e-20f);
-            const float f_weighted = (p_te * f_te + p_tm * f_tm) / incident_power;
-            const float cos_o = fmaxf(wo_local[2], 0.0f);
-            const bool lobe_ok = pdf_lobe > 0.0f && cos_o > 0.0f;
-            if (lobe_ok) {
-                const float power_scale =
-                    f_weighted * cos_o / (fmaxf(pdf_lobe, 1.0e-12f) * fmaxf(p_scatter, 1.0e-4f));
-                const float hit_point[3] = {hit_p[base], hit_p[base + 1], hit_p[base + 2]};
-                const float epsilon = wf::scale_epsilon(hit_point, tables.epsilon_floor);
-                for (int axis = 0; axis < 3; ++axis) {
-                    const float wo_world = wo_local[0] * t1[axis] + wo_local[1] * t2[axis] + wo_local[2] * normal[axis];
-                    state.nee_position[base + axis] = hit_point[axis];
-                    state.nee_normal[base + axis] = normal[axis];
-                    state.nee_wi_local[base + axis] = wi_local[axis];
-                    direction[axis] = wo_world;
-                    state.origin[base + axis] = hit_point[axis] + wo_world * epsilon;
-                    state.field_real[base + axis] = 0.0f;
-                    state.field_imag[base + axis] = 0.0f;
-                }
-                state.nee_p_te[index] = p_te;
-                state.nee_p_tm[index] = p_tm;
-                state.nee_p_scatter[index] = p_scatter;
-                state.nee_material[index] = material;
-                state.path_length[index] = state.path_length[index] + fmaxf(t, 0.0f);
-                state.nee_path_length[index] = state.path_length[index];
-                state.carrier[index] = sqrtf(incident_power) * sqrtf(power_scale);
-                state.pdf_forward[index] = state.pdf_forward[index] * p_scatter * pdf_lobe;
-                state.component_mask[index] =
-                    static_cast<uint8_t>(state.component_mask[index] | wf::kMaskScattering | wf::kMaskScatterVertex);
-                const int scatter_events = static_cast<int>(state.scatter_count[index]) + 1;
-                state.scatter_count[index] = static_cast<uint8_t>(min(scatter_events, 255));
-                scattered = true;
-                // Order 1 connects and terminates; higher orders continue
-                // until the scatter cap.
-                state.valid[index] = scatter_events < tables.max_order;
-            } else {
-                state.valid[index] = false;
-            }
-        } else {
-            utd::Complex3 updated = {};
-            float advance = 0.0f;
-            float event_amplitude = 1.0f;
-            bool ok = false;
-            if (choose_transmit) {
-                ok = static_cast<int64_t>(material) < materials.material_count;
-                if (ok) {
-                    const BdptTransmitVertex vertex = bdpt_transmit_vertex(
-                        direction, hit_p + base, hit_n + base, incoming, layers, frequency_hz);
-                    state.origin[base] = vertex.exit_point.x;
-                    state.origin[base + 1] = vertex.exit_point.y;
-                    state.origin[base + 2] = vertex.exit_point.z;
-                    direction[0] = vertex.direction.x;
-                    direction[1] = vertex.direction.y;
-                    direction[2] = vertex.direction.z;
-                    updated = vertex.field;
-                    advance = fmaxf(t, 0.0f) + vertex.jump;
-                    event_amplitude = vertex.amplitude;
-                }
-            } else {
-                ok = prim_in_range && materials.face_valid[prim] && t >= 0.0f;
-                if (ok) {
-                    if (already_scattered) {
-                        event_amplitude = sqrtf(fmaxf(materials.face_gain[prim], 0.0f) *
-                                                effective_power_reflectance(
-                                                    direction, hit_n + base, materials.face_eps_r[prim],
-                                                    materials.face_sigma_e[prim], materials.face_mu_r[prim],
-                                                    frequency_hz));
-                    }
-                    updated = bdpt_reflect_vertex(
-                        direction,
-                        hit_p + base,
-                        hit_n + base,
-                        materials.face_eps_r[prim],
-                        materials.face_sigma_e[prim],
-                        materials.face_mu_r[prim],
-                        materials.face_gain[prim],
-                        materials.face_thickness[prim],
-                        frequency_hz,
-                        incoming,
-                        state.origin + base,
-                        direction);
-                    advance = fmaxf(t, 0.0f);
-                }
-            }
-            if (!ok) {
-                state.valid[index] = false;
-            } else {
-                const float p_event = choose_transmit ? p_transmit : 1.0f - p_scatter - p_transmit;
-                float scale = rsqrtf(fmaxf(p_event, 1.0e-4f));
-                if (rough && !choose_transmit) {
-                    scale = scale * coherent;
-                }
-                state.field_real[base] = updated.x.re * scale;
-                state.field_real[base + 1] = updated.y.re * scale;
-                state.field_real[base + 2] = updated.z.re * scale;
-                state.field_imag[base] = updated.x.im * scale;
-                state.field_imag[base + 1] = updated.y.im * scale;
-                state.field_imag[base + 2] = updated.z.im * scale;
-                if (already_scattered) {
-                    state.carrier[index] = state.carrier[index] * event_amplitude * scale;
-                }
-                state.pdf_forward[index] = state.pdf_forward[index] * p_event;
-                state.path_length[index] = state.path_length[index] + advance;
-                state.component_mask[index] = static_cast<uint8_t>(
-                    state.component_mask[index] | (choose_transmit ? wf::kMaskTransmission : wf::kMaskReflection));
-                transmitted = choose_transmit;
-                reflected = !choose_transmit;
-            }
-        }
-    }
-    const int block_transmitted = __syncthreads_count(transmitted);
-    const int block_reflected = __syncthreads_count(reflected);
-    const int block_scattered = __syncthreads_count(scattered);
-    const int block_alive = __syncthreads_count(index < count && state.valid[index]);
-    if (threadIdx.x == 0) {
-        if (block_transmitted > 0) atomicAdd(counters, static_cast<unsigned long long>(block_transmitted));
-        if (block_reflected > 0) atomicAdd(counters + 1, static_cast<unsigned long long>(block_reflected));
-        if (block_scattered > 0) atomicAdd(counters + 2, static_cast<unsigned long long>(block_scattered));
-        if (block_alive + block_scattered > 0) {
-            atomicAdd(alive, static_cast<unsigned long long>(block_alive + block_scattered));
-        }
-    }
-}
 
 }  // namespace
 
@@ -2508,6 +2224,131 @@ __global__ void transmitted_subpath_jvp_kernel(
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// Wavefront event tangents. One reflection or transmission event maps the
+// incoming Jones field linearly (F_out = M F_in) and scales the post-scatter
+// carrier by a real amplitude. These return the tangent of M F_in and of the
+// amplitude for one parameter seed and one incoming field tangent, with the
+// same duals as the subpath companions above. A zero seed with a unit incoming
+// tangent e_k gives column k of M (the reverse pass uses M^H).
+// ---------------------------------------------------------------------------
+
+struct EventTangent {
+    field::Complex3 field;
+    float amplitude;
+    float d_amplitude;
+};
+
+struct ReflectSeed {
+    float eps_r;
+    float sigma_e;
+    float gain;
+    float thickness;
+    float frequency;
+};
+
+__device__ EventTangent wavefront_reflect_tangent(
+    const float* incident_direction,
+    const float* hit_n,
+    float eps_r,
+    float sigma_e,
+    float mu_r,
+    float gain,
+    float thickness,
+    float frequency_hz,
+    const ReflectSeed& seed,
+    const field::Complex3& incoming,
+    const field::Complex3& t_incoming) {
+    const field::float3a incident = load3f(incident_direction, 0);
+    const field::float3a normal = load3f(hit_n, 0);
+    const transport::ReflectFrame frame = transport::reflect_frame(incident, normal);
+    ad::DualC r_te, r_tm;
+    ad::slab_fresnel_dual(
+        frame.cos_theta, eps_r, sigma_e, mu_r, gain, thickness, frequency_hz,
+        0.0f, seed.eps_r, seed.sigma_e, seed.gain, seed.thickness, seed.frequency, r_te, r_tm);
+    const field::Complex e_s = transport::complex3_dot_real(incoming, frame.s_axis);
+    const field::Complex e_p = transport::complex3_dot_real(incoming, frame.p_in);
+    const field::Complex t_e_s = transport::complex3_dot_real(t_incoming, frame.s_axis);
+    const field::Complex t_e_p = transport::complex3_dot_real(t_incoming, frame.p_in);
+    const field::Complex t_w_te = field::cplx_add(
+        field::cplx_mul(r_te.d, e_s), field::cplx_mul(r_te.v, t_e_s));
+    const field::Complex t_w_tm = field::cplx_add(
+        field::cplx_mul(r_tm.d, e_p), field::cplx_mul(r_tm.v, t_e_p));
+    EventTangent out;
+    out.field = field::c3_add(
+        field::cplx_scale_real(frame.s_axis, t_w_te),
+        field::cplx_scale_real(frame.p_out, t_w_tm));
+    const ReflectanceGeometry geo = reflectance_geometry(incident_direction, hit_n);
+    float d_reflectance = 0.0f;
+    const float reflectance = effective_reflectance_dual(
+        geo, eps_r, sigma_e, mu_r, frequency_hz, seed.eps_r, seed.sigma_e, seed.frequency, d_reflectance);
+    const float gain_clamped = fmaxf(gain, 0.0f);
+    const float t_gain_clamped = (gain >= 0.0f) ? seed.gain : 0.0f;
+    const float prod = gain_clamped * reflectance;
+    const float t_prod = t_gain_clamped * reflectance + gain_clamped * d_reflectance;
+    out.amplitude = sqrtf(fmaxf(prod, 0.0f));
+    out.d_amplitude = (prod > 0.0f) ? 0.5f / out.amplitude * t_prod : 0.0f;
+    return out;
+}
+
+template <typename SeedFn>
+__device__ EventTangent wavefront_transmit_tangent(
+    const float* incident_direction,
+    const float* hit_n,
+    const em::LayerView& layers,
+    float frequency_hz,
+    float t_frequency,
+    const SeedFn& seed,
+    const field::Complex3& incoming,
+    const field::Complex3& t_incoming) {
+    const TransmitFrozen geo = transmit_frozen(incident_direction, hit_n, 0);
+    const ad::DualStackRT te = ad::stack_rt_dual(
+        geo.cos_theta, layers, frequency_hz, 0.0f, t_frequency, em::kPolTE, seed);
+    const ad::DualStackRT tm = ad::stack_rt_dual(
+        geo.cos_theta, layers, frequency_hz, 0.0f, t_frequency, em::kPolTM, seed);
+    const field::Complex e_s = transport::complex3_dot_real(incoming, geo.s_axis);
+    const field::Complex e_p = transport::complex3_dot_real(incoming, geo.p_axis);
+    const field::Complex t_e_s = transport::complex3_dot_real(t_incoming, geo.s_axis);
+    const field::Complex t_e_p = transport::complex3_dot_real(t_incoming, geo.p_axis);
+    const field::Complex w_te = field::cplx_mul(te.t.v, e_s);
+    const field::Complex w_tm = field::cplx_mul(tm.t.v, e_p);
+    const field::Complex t_w_te = field::cplx_add(
+        field::cplx_mul(te.t.d, e_s), field::cplx_mul(te.t.v, t_e_s));
+    const field::Complex t_w_tm = field::cplx_add(
+        field::cplx_mul(tm.t.d, e_p), field::cplx_mul(tm.t.v, t_e_p));
+    const field::Complex3 updated_pre = field::c3_add(
+        field::cplx_scale_real(geo.s_axis, w_te),
+        field::cplx_scale_real(geo.p_axis, w_tm));
+    const field::Complex3 t_updated_pre = field::c3_add(
+        field::cplx_scale_real(geo.s_axis, t_w_te),
+        field::cplx_scale_real(geo.p_axis, t_w_tm));
+    const DFloat phi = transmit_phi_dual(geo, layers, layers.material, frequency_hz, t_frequency, seed);
+    const field::Complex compensation = em::c_exp_neg_j(static_cast<double>(phi.v));
+    const field::Complex t_compensation = field::cplx(compensation.im * phi.d, -compensation.re * phi.d);
+    EventTangent out;
+    out.field = field::c3_add(
+        field::c3_scale(t_updated_pre, compensation),
+        field::c3_scale(updated_pre, t_compensation));
+    float w_s, w_p;
+    transmit_proxy_weights(geo.incident, geo.normal_in, w_s, w_p);
+    const float raw_transmittance = te.cap_t.v * w_s + tm.cap_t.v * w_p;
+    const float t_raw = te.cap_t.d * w_s + tm.cap_t.d * w_p;
+    out.amplitude = sqrtf(fmaxf(raw_transmittance, 0.0f));
+    out.d_amplitude = (raw_transmittance > 0.0f) ? 0.5f / out.amplitude * t_raw : 0.0f;
+    return out;
+}
+
+// Per-face tangent of the reflection leaves (null arrays are zero tangents).
+__device__ __forceinline__ ReflectSeed reflect_tangent_seed(const channel::bdpt_wavefront::Tangent& tangent, int prim) {
+    return {
+        tangent.face_eps_r != nullptr ? tangent.face_eps_r[prim] : 0.0f,
+        tangent.face_sigma_e != nullptr ? tangent.face_sigma_e[prim] : 0.0f,
+        tangent.face_gain != nullptr ? tangent.face_gain[prim] : 0.0f,
+        tangent.face_thickness != nullptr ? tangent.face_thickness[prim] : 0.0f,
+        tangent.frequency};
+}
+
 }  // namespace
 
 // ===========================================================================
@@ -3007,6 +2848,640 @@ pybind11::dict channel_bdpt_transmitted_light_subpath_state_jvp(
 
 // ==== Section: BDPT wavefront sampler ====
 
+namespace {
+
+constexpr int kStepPrimal = 0;
+constexpr int kStepTangent = 1;
+constexpr int kStepTape = 2;
+
+// One wavefront bounce of every live light subpath. One counter-based uniform
+// partitions scatter (rough faces only) / transmit / reflect; only the selected
+// branch is evaluated. Reflect and transmit divide the Jones field by
+// sqrt(p_event) and multiply the proposal density by p_event (the rough
+// reflect branch also by the coherent attenuation C_r). Scatter samples a
+// Kirchhoff lobe direction, clears the Jones field, seeds the unpolarized
+// carrier and records the vertex for next-event estimation; it terminates the
+// subpath at max_order scatter events. Dead subpaths are untouched.
+// counters: [0] transmit, [1] reflect, [2] scatter events; alive counts survivors.
+// kStepTangent also carries the forward-mode tangent state; kStepTape records
+// each event's incoming state on the replay tape (primal arithmetic unchanged).
+template <int Mode>
+__global__ void bdpt_wavefront_step_kernel(
+    int64_t count,
+    int64_t first,
+    int depth,
+    unsigned long long seed,
+    const float* hit_t,
+    const float* hit_p,
+    const float* hit_n,
+    const int* hit_prim,
+    BdptWavefrontMaterials materials,
+    wf::ScatterTables tables,
+    float frequency_hz,
+    wf::State state,
+    wf::Tangent tangent,
+    wf::Tape tape,
+    unsigned long long* counters,
+    unsigned long long* alive) {
+    const int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    bool transmitted = false;
+    bool reflected = false;
+    bool scattered = false;
+    if (index < count) {
+        // A scatter vertex is connected at the bounce that recorded it only.
+        state.component_mask[index] = static_cast<uint8_t>(state.component_mask[index] & ~wf::kMaskScatterVertex);
+        if constexpr (Mode == kStepTape) {
+            const int64_t slot = static_cast<int64_t>(depth) * tape.capacity + index;
+            tape.code[slot] = wf::kTapeNone;
+            for (int axis = 0; axis < 3; ++axis) {
+                tape.g_field_real[slot * 3 + axis] = 0.0f;
+                tape.g_field_imag[slot * 3 + axis] = 0.0f;
+            }
+            tape.g_p[slot * 2] = 0.0f;
+            tape.g_p[slot * 2 + 1] = 0.0f;
+        }
+    }
+    if (index < count && state.valid[index]) {
+        const int64_t base = index * 3;
+        if (tables.enabled && depth == 0) {
+            // The first bounce of a chunk starts every subpath at zero scatter events.
+            state.scatter_count[index] = 0;
+        }
+        float* direction = state.direction + base;
+        const int prim = hit_prim[index];
+        const float t = hit_t[index];
+        const bool prim_in_range = prim >= 0 && static_cast<int64_t>(prim) < materials.face_count;
+        const int material = prim_in_range ? materials.face_material_id[prim] : -1;
+        const bool hit_ok = prim_in_range && t >= 0.0f && material >= 0;
+        const float cos_theta = fminf(
+            fmaxf(fabsf(direction[0] * hit_n[base] + direction[1] * hit_n[base + 1] +
+                        direction[2] * hit_n[base + 2]),
+                  1.0e-6f),
+            1.0f);
+        const em::LayerView layers{
+            materials.layer_offset,
+            materials.layer_count,
+            materials.layer_thickness_m,
+            materials.layer_eps_r,
+            materials.layer_sigma_e,
+            materials.layer_mu_r,
+            material,
+        };
+        const bool stack_ok = hit_ok && static_cast<int64_t>(material) < materials.material_count &&
+            em::layer_material_usable(layers, materials.layer_total);
+        float r_eff = 0.0f;
+        float t_eff = 0.0f;
+        if (stack_ok) {
+            const em::StackRT te = em::stack_rt(cos_theta, layers, frequency_hz, em::kPolTE);
+            const em::StackRT tm = em::stack_rt(cos_theta, layers, frequency_hz, em::kPolTM);
+            r_eff = 0.5f * (te.cap_r + tm.cap_r);
+            t_eff = 0.5f * (te.cap_t + tm.cap_t);
+        }
+        float p_transmit = 0.0f;
+        float p_scatter = 0.0f;
+        float coherent = 1.0f;
+        const bool rough = tables.enabled && hit_ok && static_cast<int64_t>(material) < materials.material_count &&
+            tables.scatter_model[material] == 1 && tables.material_slot[material] >= 0;
+        if (rough) {
+            // Three-way budgets (R_coh, R_diff, T_bar), each positive budget
+            // floored at 0.05 and the triple renormalized.
+            const float k0 = 6.2831853071795864769f * frequency_hz / 299792458.0f;
+            const float roughness = k0 * cos_theta * tables.rough_sigma_h[material];
+            coherent = expf(-2.0f * roughness * roughness);
+            const float r_coh = r_eff * coherent * coherent;
+            const float r_diff = fmaxf(0.0f, r_eff - r_coh);
+            const float total = fmaxf(r_coh + r_diff + t_eff, 1.0e-12f);
+            float pr = r_coh / total;
+            float ps = r_diff / total;
+            float pt = t_eff / total;
+            if (r_coh > 0.0f) pr = fmaxf(pr, 0.05f);
+            if (r_diff > 0.0f) ps = fmaxf(ps, 0.05f);
+            if (t_eff > 0.0f) pt = fmaxf(pt, 0.05f);
+            const float norm = fmaxf(pr + ps + pt, 1.0e-12f);
+            p_scatter = ps / norm;
+            p_transmit = pt / norm;
+        } else if (hit_ok) {
+            const float total = fmaxf(r_eff + t_eff, 1.0e-12f);
+            p_transmit = fminf(fmaxf(t_eff / total, 0.05f), 0.95f);
+            if (t_eff <= 0.0f) p_transmit = 0.0f;
+            if (r_eff <= 0.0f && t_eff > 0.0f) p_transmit = 1.0f;
+        }
+        const unsigned long long global = static_cast<unsigned long long>(first + index);
+        const float u = bdpt_counter_uniform(seed, kStreamEventSelection, global, static_cast<unsigned long long>(depth));
+        const bool choose_scatter = hit_ok && u < p_scatter;
+        const bool choose_transmit = hit_ok && !choose_scatter && u < p_scatter + p_transmit;
+        const bool already_scattered = (state.component_mask[index] & wf::kMaskScattering) != 0;
+        const utd::Complex3 incoming = {
+            utd::cplx(state.field_real[base], state.field_imag[base]),
+            utd::cplx(state.field_real[base + 1], state.field_imag[base + 1]),
+            utd::cplx(state.field_real[base + 2], state.field_imag[base + 2]),
+        };
+        // Incoming tangent state (the launch field has no tangent).
+        utd::Complex3 t_incoming = {};
+        float t_carrier_in = 0.0f;
+        const float carrier_in = already_scattered ? state.carrier[index] : 0.0f;
+        const float incident_direction[3] = {direction[0], direction[1], direction[2]};
+        const int64_t tape_slot = static_cast<int64_t>(depth) * tape.capacity + index;
+        if constexpr (Mode == kStepTangent) {
+            if (depth > 0) {
+                t_incoming = {
+                    utd::cplx(tangent.field_real[base], tangent.field_imag[base]),
+                    utd::cplx(tangent.field_real[base + 1], tangent.field_imag[base + 1]),
+                    utd::cplx(tangent.field_real[base + 2], tangent.field_imag[base + 2]),
+                };
+                t_carrier_in = already_scattered ? tangent.carrier[index] : 0.0f;
+            }
+        }
+        if constexpr (Mode == kStepTape) {
+            tape.prim[tape_slot] = prim;
+            for (int axis = 0; axis < 3; ++axis) {
+                tape.direction[tape_slot * 3 + axis] = incident_direction[axis];
+                tape.normal[tape_slot * 3 + axis] = hit_n[base + axis];
+                tape.field_real[tape_slot * 3 + axis] = state.field_real[base + axis];
+                tape.field_imag[tape_slot * 3 + axis] = state.field_imag[base + axis];
+            }
+            tape.carrier[tape_slot] = carrier_in;
+        }
+        if (choose_scatter) {
+            const int slot = tables.material_slot[material];
+            const wf::TableView table = wf::table_view(tables, slot);
+            float normal[3] = {hit_n[base], hit_n[base + 1], hit_n[base + 2]};
+            const float in[3] = {direction[0], direction[1], direction[2]};
+            if (wf::dot_values(in, normal) > 0.0f) {
+                normal[0] = -normal[0];
+                normal[1] = -normal[1];
+                normal[2] = -normal[2];
+            }
+            float t1[3];
+            float t2[3];
+            wf::local_frame(normal, tables.rough_axis_rad[material], t1, t2);
+            const float wi_world[3] = {-in[0], -in[1], -in[2]};
+            const float wi_local[3] = {wf::dot_values(wi_world, t1), wf::dot_values(wi_world, t2), wf::dot_values(wi_world, normal)};
+            float p_te;
+            float p_tm;
+            float s[3] = {0.0f, 0.0f, 0.0f};
+            float p[3] = {0.0f, 0.0f, 0.0f};
+            if (already_scattered) {
+                // The carried unpolarized power splits evenly over TE/TM.
+                const float carried = state.carrier[index] * state.carrier[index];
+                p_te = 0.5f * carried;
+                p_tm = 0.5f * carried;
+            } else {
+                wf::cross_values(in, normal, s);
+                if (wf::dot_values(s, s) > 1.0e-12f) {
+                    wf::unit_values(s);
+                } else {
+                    float substitute_t2[3];
+                    wf::local_frame(in, 0.0f, s, substitute_t2);
+                }
+                wf::cross_values(s, in, p);
+                const float re[3] = {incoming.x.re, incoming.y.re, incoming.z.re};
+                const float im[3] = {incoming.x.im, incoming.y.im, incoming.z.im};
+                const float sr = wf::dot_values(re, s);
+                const float si = wf::dot_values(im, s);
+                const float pr = wf::dot_values(re, p);
+                const float pi = wf::dot_values(im, p);
+                p_te = sr * sr + si * si;
+                p_tm = pr * pr + pi * pi;
+            }
+            const float u0 = bdpt_counter_uniform(seed, kStreamScatterU0, global, static_cast<unsigned long long>(depth));
+            const float u1 = bdpt_counter_uniform(seed, kStreamScatterU1, global, static_cast<unsigned long long>(depth));
+            float wo_local[3];
+            float pdf_lobe = 0.0f;
+            float pdf_lobe_reverse = 0.0f;
+            rayd::shared::scattering::sample_direction(
+                table.marginal, table.conditional, table.density, table.nti, table.npi, table.nto, table.npo, wi_local,
+                u0, u1, wo_local, pdf_lobe, pdf_lobe_reverse);
+            float f_te = 0.0f;
+            float f_tm = 0.0f;
+            rayd::shared::scattering::eval_te_tm(
+                table.f_te, table.f_tm, table.nti, table.npi, table.nto, table.npo, wi_local, wo_local, f_te, f_tm);
+            const float incident_power = fmaxf(p_te + p_tm, 1.0e-20f);
+            const float f_weighted = (p_te * f_te + p_tm * f_tm) / incident_power;
+            const float cos_o = fmaxf(wo_local[2], 0.0f);
+            const bool lobe_ok = pdf_lobe > 0.0f && cos_o > 0.0f;
+            if (lobe_ok) {
+                const float power_scale =
+                    f_weighted * cos_o / (fmaxf(pdf_lobe, 1.0e-12f) * fmaxf(p_scatter, 1.0e-4f));
+                const float hit_point[3] = {hit_p[base], hit_p[base + 1], hit_p[base + 2]};
+                const float epsilon = wf::scale_epsilon(hit_point, tables.epsilon_floor);
+                for (int axis = 0; axis < 3; ++axis) {
+                    const float wo_world = wo_local[0] * t1[axis] + wo_local[1] * t2[axis] + wo_local[2] * normal[axis];
+                    state.nee_position[base + axis] = hit_point[axis];
+                    state.nee_normal[base + axis] = normal[axis];
+                    state.nee_wi_local[base + axis] = wi_local[axis];
+                    direction[axis] = wo_world;
+                    state.origin[base + axis] = hit_point[axis] + wo_world * epsilon;
+                    state.field_real[base + axis] = 0.0f;
+                    state.field_imag[base + axis] = 0.0f;
+                }
+                state.nee_p_te[index] = p_te;
+                state.nee_p_tm[index] = p_tm;
+                state.nee_p_scatter[index] = p_scatter;
+                state.nee_material[index] = material;
+                state.path_length[index] = state.path_length[index] + fmaxf(t, 0.0f);
+                state.nee_path_length[index] = state.path_length[index];
+                state.carrier[index] = sqrtf(incident_power) * sqrtf(power_scale);
+                const float lobe_scale = cos_o / (fmaxf(pdf_lobe, 1.0e-12f) * fmaxf(p_scatter, 1.0e-4f));
+                if constexpr (Mode == kStepTangent) {
+                    // The carrier is sqrt((P_te f_te + P_tm f_tm) * lobe_scale); the
+                    // lobe density and event probability are frozen.
+                    float dp_te;
+                    float dp_tm;
+                    if (already_scattered) {
+                        dp_te = carrier_in * t_carrier_in;
+                        dp_tm = dp_te;
+                    } else {
+                        const float t_re[3] = {t_incoming.x.re, t_incoming.y.re, t_incoming.z.re};
+                        const float t_im[3] = {t_incoming.x.im, t_incoming.y.im, t_incoming.z.im};
+                        const float re[3] = {incoming.x.re, incoming.y.re, incoming.z.re};
+                        const float im[3] = {incoming.x.im, incoming.y.im, incoming.z.im};
+                        dp_te = 2.0f * (wf::dot_values(re, s) * wf::dot_values(t_re, s) +
+                                        wf::dot_values(im, s) * wf::dot_values(t_im, s));
+                        dp_tm = 2.0f * (wf::dot_values(re, p) * wf::dot_values(t_re, p) +
+                                        wf::dot_values(im, p) * wf::dot_values(t_im, p));
+                    }
+                    float df_te = 0.0f;
+                    float df_tm = 0.0f;
+                    if (tangent.f_te != nullptr) {
+                        const int64_t offset = tables.table_offset[slot];
+                        rayd::shared::scattering::eval_te_tm(
+                            tangent.f_te + offset, tangent.f_tm + offset, table.nti, table.npi, table.nto,
+                            table.npo, wi_local, wo_local, df_te, df_tm);
+                    }
+                    const float kernel = p_te * f_te + p_tm * f_tm;
+                    const float d_kernel = dp_te * f_te + p_te * df_te + dp_tm * f_tm + p_tm * df_tm;
+                    const float carrier = sqrtf(fmaxf(kernel * lobe_scale, 0.0f));
+                    tangent.carrier[index] = carrier > 0.0f ? 0.5f * lobe_scale * d_kernel / carrier : 0.0f;
+                    tangent.nee_p_te[index] = dp_te;
+                    tangent.nee_p_tm[index] = dp_tm;
+                    for (int axis = 0; axis < 3; ++axis) {
+                        tangent.field_real[base + axis] = 0.0f;
+                        tangent.field_imag[base + axis] = 0.0f;
+                    }
+                }
+                if constexpr (Mode == kStepTape) {
+                    float* lanes = tape.scatter + tape_slot * wf::kTapeScatterLanes;
+                    for (int axis = 0; axis < 3; ++axis) {
+                        lanes[axis] = wi_local[axis];
+                        lanes[3 + axis] = wo_local[axis];
+                        lanes[6 + axis] = s[axis];
+                        lanes[9 + axis] = p[axis];
+                    }
+                    lanes[12] = p_te;
+                    lanes[13] = p_tm;
+                    tape.scale[tape_slot] = lobe_scale;
+                    tape.code[tape_slot] = static_cast<uint8_t>(
+                        wf::kTapeScatter | (already_scattered ? wf::kTapeCarried : 0));
+                }
+                state.pdf_forward[index] = state.pdf_forward[index] * p_scatter * pdf_lobe;
+                state.component_mask[index] =
+                    static_cast<uint8_t>(state.component_mask[index] | wf::kMaskScattering | wf::kMaskScatterVertex);
+                const int scatter_events = static_cast<int>(state.scatter_count[index]) + 1;
+                state.scatter_count[index] = static_cast<uint8_t>(min(scatter_events, 255));
+                scattered = true;
+                // Order 1 connects and terminates; higher orders continue
+                // until the scatter cap.
+                state.valid[index] = scatter_events < tables.max_order;
+            } else {
+                state.valid[index] = false;
+            }
+        } else {
+            utd::Complex3 updated = {};
+            EventTangent event_tangent = {};
+            float advance = 0.0f;
+            float event_amplitude = 1.0f;
+            bool ok = false;
+            if (choose_transmit) {
+                ok = static_cast<int64_t>(material) < materials.material_count;
+                if (ok) {
+                    if constexpr (Mode == kStepTangent) {
+                        const TangentSeed seed{tangent.layer_thickness_m, tangent.layer_eps_r, tangent.layer_sigma_e};
+                        event_tangent = wavefront_transmit_tangent(
+                            incident_direction, hit_n + base, layers, frequency_hz, tangent.frequency, seed, incoming,
+                            t_incoming);
+                    }
+                    const BdptTransmitVertex vertex = bdpt_transmit_vertex(
+                        direction, hit_p + base, hit_n + base, incoming, layers, frequency_hz);
+                    state.origin[base] = vertex.exit_point.x;
+                    state.origin[base + 1] = vertex.exit_point.y;
+                    state.origin[base + 2] = vertex.exit_point.z;
+                    direction[0] = vertex.direction.x;
+                    direction[1] = vertex.direction.y;
+                    direction[2] = vertex.direction.z;
+                    updated = vertex.field;
+                    advance = fmaxf(t, 0.0f) + vertex.jump;
+                    event_amplitude = vertex.amplitude;
+                }
+            } else {
+                ok = prim_in_range && materials.face_valid[prim] && t >= 0.0f;
+                if (ok) {
+                    if constexpr (Mode == kStepTangent) {
+                        event_tangent = wavefront_reflect_tangent(
+                            incident_direction, hit_n + base, materials.face_eps_r[prim], materials.face_sigma_e[prim],
+                            materials.face_mu_r[prim], materials.face_gain[prim], materials.face_thickness[prim],
+                            frequency_hz, reflect_tangent_seed(tangent, prim), incoming, t_incoming);
+                    }
+                    if (already_scattered) {
+                        event_amplitude = sqrtf(fmaxf(materials.face_gain[prim], 0.0f) *
+                                                effective_power_reflectance(
+                                                    direction, hit_n + base, materials.face_eps_r[prim],
+                                                    materials.face_sigma_e[prim], materials.face_mu_r[prim],
+                                                    frequency_hz));
+                    }
+                    updated = bdpt_reflect_vertex(
+                        direction,
+                        hit_p + base,
+                        hit_n + base,
+                        materials.face_eps_r[prim],
+                        materials.face_sigma_e[prim],
+                        materials.face_mu_r[prim],
+                        materials.face_gain[prim],
+                        materials.face_thickness[prim],
+                        frequency_hz,
+                        incoming,
+                        state.origin + base,
+                        direction);
+                    advance = fmaxf(t, 0.0f);
+                }
+            }
+            if (!ok) {
+                state.valid[index] = false;
+            } else {
+                const float p_event = choose_transmit ? p_transmit : 1.0f - p_scatter - p_transmit;
+                float scale = rsqrtf(fmaxf(p_event, 1.0e-4f));
+                if (rough && !choose_transmit) {
+                    scale = scale * coherent;
+                }
+                state.field_real[base] = updated.x.re * scale;
+                state.field_real[base + 1] = updated.y.re * scale;
+                state.field_real[base + 2] = updated.z.re * scale;
+                state.field_imag[base] = updated.x.im * scale;
+                state.field_imag[base + 1] = updated.y.im * scale;
+                state.field_imag[base + 2] = updated.z.im * scale;
+                if (already_scattered) {
+                    state.carrier[index] = state.carrier[index] * event_amplitude * scale;
+                }
+                if constexpr (Mode == kStepTangent) {
+                    const utd::Complex3& t_out = event_tangent.field;
+                    tangent.field_real[base] = t_out.x.re * scale;
+                    tangent.field_real[base + 1] = t_out.y.re * scale;
+                    tangent.field_real[base + 2] = t_out.z.re * scale;
+                    tangent.field_imag[base] = t_out.x.im * scale;
+                    tangent.field_imag[base + 1] = t_out.y.im * scale;
+                    tangent.field_imag[base + 2] = t_out.z.im * scale;
+                    if (already_scattered) {
+                        tangent.carrier[index] =
+                            (t_carrier_in * event_amplitude + carrier_in * event_tangent.d_amplitude) * scale;
+                    }
+                }
+                if constexpr (Mode == kStepTape) {
+                    tape.scale[tape_slot] = scale;
+                    tape.code[tape_slot] = static_cast<uint8_t>(
+                        (choose_transmit ? wf::kTapeTransmit : wf::kTapeReflect) |
+                        (already_scattered ? wf::kTapeCarried : 0));
+                }
+                state.pdf_forward[index] = state.pdf_forward[index] * p_event;
+                state.path_length[index] = state.path_length[index] + advance;
+                state.component_mask[index] = static_cast<uint8_t>(
+                    state.component_mask[index] | (choose_transmit ? wf::kMaskTransmission : wf::kMaskReflection));
+                transmitted = choose_transmit;
+                reflected = !choose_transmit;
+            }
+        }
+    }
+    const int block_transmitted = __syncthreads_count(transmitted);
+    const int block_reflected = __syncthreads_count(reflected);
+    const int block_scattered = __syncthreads_count(scattered);
+    const int block_alive = __syncthreads_count(index < count && state.valid[index]);
+    if (threadIdx.x == 0) {
+        if (block_transmitted > 0) atomicAdd(counters, static_cast<unsigned long long>(block_transmitted));
+        if (block_reflected > 0) atomicAdd(counters + 1, static_cast<unsigned long long>(block_reflected));
+        if (block_scattered > 0) atomicAdd(counters + 2, static_cast<unsigned long long>(block_scattered));
+        if (block_alive + block_scattered > 0) {
+            atomicAdd(alive, static_cast<unsigned long long>(block_alive + block_scattered));
+        }
+    }
+}
+
+
+__device__ __forceinline__ void add_gradient(double* buffer, int64_t index, float value) {
+    if (buffer != nullptr && value != 0.0f) {
+        atomicAdd(buffer + index, static_cast<double>(value));
+    }
+}
+
+__device__ __forceinline__ float real_inner(const utd::Complex3& a, const utd::Complex3& b) {
+    return a.x.re * b.x.re + a.x.im * b.x.im + a.y.re * b.y.re + a.y.im * b.y.im + a.z.re * b.z.re +
+        a.z.im * b.z.im;
+}
+
+__device__ __forceinline__ utd::Complex conj_mul(utd::Complex a, utd::Complex b) {
+    // conj(a) * b
+    return utd::cplx(a.re * b.re + a.im * b.im, a.re * b.im - a.im * b.re);
+}
+
+// out = scale * M^H cot, with the columns of M from unit incoming tangents.
+template <typename ColumnFn>
+__device__ utd::Complex3 adjoint_field(const utd::Complex3& cot, float scale, ColumnFn&& column) {
+    utd::Complex out[3];
+    for (int k = 0; k < 3; ++k) {
+        utd::Complex3 unit = {};
+        if (k == 0) unit.x = utd::cplx(1.0f, 0.0f);
+        if (k == 1) unit.y = utd::cplx(1.0f, 0.0f);
+        if (k == 2) unit.z = utd::cplx(1.0f, 0.0f);
+        const utd::Complex3 col = column(unit);
+        const utd::Complex sum = utd::cplx_add(
+            utd::cplx_add(conj_mul(col.x, cot.x), conj_mul(col.y, cot.y)), conj_mul(col.z, cot.z));
+        out[k] = utd::cplx(sum.re * scale, sum.im * scale);
+    }
+    return {out[0], out[1], out[2]};
+}
+
+// Reverse pass of one chunk: each sample walks its taped events from the last
+// bounce to the first. The field cotangent (dL/dRe + i dL/dIm) and carrier
+// cotangent of the state after event b collect the connection cotangents of
+// that state, then pull back through the event: reflection and transmission by
+// the adjoint of their linear Jones map plus one dual per parameter, scatter
+// through P_te/P_tm and the sampled table values. Parameter gradients
+// accumulate in double.
+__global__ void bdpt_wavefront_reverse_kernel(
+    int64_t count,
+    int bounces,
+    BdptWavefrontMaterials materials,
+    wf::ScatterTables tables,
+    float frequency_hz,
+    wf::Tape tape,
+    wf::Gradients grads) {
+    const int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (index >= count) {
+        return;
+    }
+    utd::Complex3 cot = {};
+    float cot_carrier = 0.0f;
+    float g_frequency = 0.0f;
+    for (int bounce = bounces - 1; bounce >= 0; --bounce) {
+        const int64_t slot = static_cast<int64_t>(bounce) * tape.capacity + index;
+        const uint8_t code = tape.code[slot];
+        cot.x = utd::cplx_add(cot.x, utd::cplx(tape.g_field_real[slot * 3], tape.g_field_imag[slot * 3]));
+        cot.y = utd::cplx_add(cot.y, utd::cplx(tape.g_field_real[slot * 3 + 1], tape.g_field_imag[slot * 3 + 1]));
+        cot.z = utd::cplx_add(cot.z, utd::cplx(tape.g_field_real[slot * 3 + 2], tape.g_field_imag[slot * 3 + 2]));
+        const int event = code & 7;
+        const bool carried = (code & wf::kTapeCarried) != 0;
+        if (event == wf::kTapeNone) {
+            cot = {};
+            cot_carrier = 0.0f;
+            continue;
+        }
+        const int prim = tape.prim[slot];
+        const int material = materials.face_material_id[prim];
+        const float* direction = tape.direction + slot * 3;
+        const float* normal = tape.normal + slot * 3;
+        const utd::Complex3 incoming = {
+            utd::cplx(tape.field_real[slot * 3], tape.field_imag[slot * 3]),
+            utd::cplx(tape.field_real[slot * 3 + 1], tape.field_imag[slot * 3 + 1]),
+            utd::cplx(tape.field_real[slot * 3 + 2], tape.field_imag[slot * 3 + 2]),
+        };
+        const float carrier_in = tape.carrier[slot];
+        const float scale = tape.scale[slot];
+        if (event == wf::kTapeScatter) {
+            const float* lanes = tape.scatter + slot * wf::kTapeScatterLanes;
+            const float p_te = lanes[12];
+            const float p_tm = lanes[13];
+            float cot_p_te = tape.g_p[slot * 2];
+            float cot_p_tm = tape.g_p[slot * 2 + 1];
+            if (cot_carrier != 0.0f) {
+                const int table_slot = tables.material_slot[material];
+                const wf::TableView table = wf::table_view(tables, table_slot);
+                rayd::shared::scattering::TableEvalGrad eval;
+                rayd::shared::scattering::eval_te_tm_grad(
+                    table.f_te, table.f_tm, table.nti, table.npi, table.nto, table.npo, lanes, lanes + 3, eval);
+                const float kernel = p_te * eval.te + p_tm * eval.tm;
+                const float carrier = sqrtf(fmaxf(kernel * scale, 0.0f));
+                if (carrier > 0.0f) {
+                    const float cot_kernel = cot_carrier * 0.5f * scale / carrier;
+                    cot_p_te += cot_kernel * eval.te;
+                    cot_p_tm += cot_kernel * eval.tm;
+                    if (eval.active) {
+                        const int64_t offset = tables.table_offset[table_slot];
+                        for (int k = 0; k < 16; ++k) {
+                            add_gradient(grads.f_te, offset + eval.idx[k], cot_kernel * p_te * eval.cw[k]);
+                            add_gradient(grads.f_tm, offset + eval.idx[k], cot_kernel * p_tm * eval.cw[k]);
+                        }
+                    }
+                }
+            }
+            if (carried) {
+                // P_te = P_tm = carrier^2 / 2.
+                cot_carrier = carrier_in * (cot_p_te + cot_p_tm);
+                cot = {};
+            } else {
+                const float* s = lanes + 6;
+                const float* p = lanes + 9;
+                const float re[3] = {incoming.x.re, incoming.y.re, incoming.z.re};
+                const float im[3] = {incoming.x.im, incoming.y.im, incoming.z.im};
+                const float sr = 2.0f * cot_p_te * wf::dot_values(re, s);
+                const float si = 2.0f * cot_p_te * wf::dot_values(im, s);
+                const float pr = 2.0f * cot_p_tm * wf::dot_values(re, p);
+                const float pi = 2.0f * cot_p_tm * wf::dot_values(im, p);
+                cot = {
+                    utd::cplx(sr * s[0] + pr * p[0], si * s[0] + pi * p[0]),
+                    utd::cplx(sr * s[1] + pr * p[1], si * s[1] + pi * p[1]),
+                    utd::cplx(sr * s[2] + pr * p[2], si * s[2] + pi * p[2]),
+                };
+                cot_carrier = 0.0f;
+            }
+            continue;
+        }
+        const bool field_live = real_inner(cot, cot) > 0.0f;
+        const bool carrier_live = carried && cot_carrier != 0.0f;
+        if (!field_live && !carrier_live) {
+            cot = {};
+            cot_carrier = 0.0f;
+            continue;
+        }
+        const utd::Complex3 zero_field = {};
+        // Gradient of one parameter seed: <cot, scale dF> + cot_carrier * carrier_in * scale * d_amplitude.
+        auto seed_gradient = [&](const EventTangent& t) {
+            float g = scale * real_inner(cot, t.field);
+            if (carrier_live) {
+                g += cot_carrier * carrier_in * scale * t.d_amplitude;
+            }
+            return g;
+        };
+        float amplitude = 0.0f;
+        utd::Complex3 cot_in;
+        if (event == wf::kTapeReflect) {
+            const float eps_r = materials.face_eps_r[prim];
+            const float sigma_e = materials.face_sigma_e[prim];
+            const float mu_r = materials.face_mu_r[prim];
+            const float gain = materials.face_gain[prim];
+            const float thickness = materials.face_thickness[prim];
+            auto reflect = [&](const ReflectSeed& seed, const utd::Complex3& t_in) {
+                return wavefront_reflect_tangent(
+                    direction, normal, eps_r, sigma_e, mu_r, gain, thickness, frequency_hz, seed, incoming, t_in);
+            };
+            const ReflectSeed none{0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+            cot_in = field_live
+                ? adjoint_field(cot, scale, [&](const utd::Complex3& unit) { return reflect(none, unit).field; })
+                : zero_field;
+            const EventTangent t_eps = reflect({1.0f, 0.0f, 0.0f, 0.0f, 0.0f}, zero_field);
+            amplitude = t_eps.amplitude;
+            add_gradient(grads.face_eps_r, prim, seed_gradient(t_eps));
+            add_gradient(grads.face_sigma_e, prim, seed_gradient(reflect({0.0f, 1.0f, 0.0f, 0.0f, 0.0f}, zero_field)));
+            add_gradient(grads.face_gain, prim, seed_gradient(reflect({0.0f, 0.0f, 1.0f, 0.0f, 0.0f}, zero_field)));
+            add_gradient(
+                grads.face_thickness, prim, seed_gradient(reflect({0.0f, 0.0f, 0.0f, 1.0f, 0.0f}, zero_field)));
+            if (grads.frequency != nullptr) {
+                g_frequency += seed_gradient(reflect({0.0f, 0.0f, 0.0f, 0.0f, 1.0f}, zero_field));
+            }
+        } else {
+            const em::LayerView layers{
+                materials.layer_offset,
+                materials.layer_count,
+                materials.layer_thickness_m,
+                materials.layer_eps_r,
+                materials.layer_sigma_e,
+                materials.layer_mu_r,
+                material,
+            };
+            cot_in = field_live
+                ? adjoint_field(cot, scale, [&](const utd::Complex3& unit) {
+                      return wavefront_transmit_tangent(
+                          direction, normal, layers, frequency_hz, 0.0f, ZeroSeed{}, incoming, unit).field;
+                  })
+                : zero_field;
+            const int first_layer = materials.layer_offset[material];
+            const int layer_total = materials.layer_count[material];
+            double* const layer_grads[3] = {grads.layer_thickness_m, grads.layer_eps_r, grads.layer_sigma_e};
+            for (int layer = 0; layer < layer_total; ++layer) {
+                for (int param = 0; param < 3; ++param) {
+                    if (layer_grads[param] == nullptr) {
+                        continue;
+                    }
+                    const EventTangent t = wavefront_transmit_tangent(
+                        direction, normal, layers, frequency_hz, 0.0f, BasisSeed{first_layer + layer, param},
+                        incoming, zero_field);
+                    add_gradient(layer_grads[param], first_layer + layer, seed_gradient(t));
+                }
+            }
+            const EventTangent t_frequency = wavefront_transmit_tangent(
+                direction, normal, layers, frequency_hz, 1.0f, ZeroSeed{}, incoming, zero_field);
+            amplitude = t_frequency.amplitude;
+            if (grads.frequency != nullptr) {
+                g_frequency += seed_gradient(t_frequency);
+            }
+        }
+        cot = cot_in;
+        cot_carrier = carrier_live ? cot_carrier * amplitude * scale : 0.0f;
+    }
+    if (grads.frequency != nullptr && g_frequency != 0.0f) {
+        atomicAdd(grads.frequency, static_cast<double>(g_frequency));
+    }
+}
+
+}  // namespace
+
 at::Tensor channel_bdpt_counter_uniforms_cuda(
     at::Tensor reference,
     int64_t count,
@@ -3041,27 +3516,12 @@ at::Tensor channel_bdpt_counter_uniforms_cuda(
     return out;
 }
 
-void channel_bdpt_wavefront_step_cuda(
-    int64_t count,
-    int64_t first,
-    int64_t depth,
-    int64_t seed,
-    const at::Tensor& hit_t,
-    const at::Tensor& hit_p,
-    const at::Tensor& hit_n,
-    const at::Tensor& hit_prim,
-    const std::vector<at::Tensor>& materials,
-    const channel::bdpt_wavefront::ScatterTables& tables,
-    double frequency_hz,
-    const channel::bdpt_wavefront::State& state,
-    at::Tensor& counters,
-    at::Tensor& alive) {
-    if (count == 0) {
-        return;
-    }
-    // materials: face material id, valid, gain, eps_r, sigma_e, mu_r, thickness,
-    // layer offset, layer count, layer thickness, eps_r, sigma_e, mu_r.
-    const BdptWavefrontMaterials view{
+namespace {
+
+// materials: face material id, valid, gain, eps_r, sigma_e, mu_r, thickness,
+// layer offset, layer count, layer thickness, eps_r, sigma_e, mu_r.
+BdptWavefrontMaterials wavefront_material_view(const std::vector<at::Tensor>& materials) {
+    return {
         materials[0].size(0),
         materials[0].data_ptr<int>(),
         materials[1].data_ptr<bool>(),
@@ -3079,10 +3539,39 @@ void channel_bdpt_wavefront_step_cuda(
         materials[11].data_ptr<float>(),
         materials[12].data_ptr<float>(),
     };
+}
+}  // namespace
+
+void channel_bdpt_wavefront_step_cuda(
+    int64_t count,
+    int64_t first,
+    int64_t depth,
+    int64_t seed,
+    const at::Tensor& hit_t,
+    const at::Tensor& hit_p,
+    const at::Tensor& hit_n,
+    const at::Tensor& hit_prim,
+    const std::vector<at::Tensor>& materials,
+    const channel::bdpt_wavefront::ScatterTables& tables,
+    double frequency_hz,
+    const channel::bdpt_wavefront::State& state,
+    at::Tensor& counters,
+    at::Tensor& alive,
+    const channel::bdpt_wavefront::Tangent* tangent,
+    const channel::bdpt_wavefront::Tape* tape) {
+    if (count == 0) {
+        return;
+    }
+    const BdptWavefrontMaterials view = wavefront_material_view(materials);
     constexpr int threads = 256;
     const int blocks = static_cast<int>((count + threads - 1) / threads);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(hit_t.get_device()).stream();
-    bdpt_wavefront_step_kernel<<<blocks, threads, 0, stream>>>(
+    const channel::bdpt_wavefront::Tangent no_tangent{};
+    const channel::bdpt_wavefront::Tape no_tape{};
+    auto kernel = tangent != nullptr ? bdpt_wavefront_step_kernel<kStepTangent>
+        : tape != nullptr            ? bdpt_wavefront_step_kernel<kStepTape>
+                                     : bdpt_wavefront_step_kernel<kStepPrimal>;
+    kernel<<<blocks, threads, 0, stream>>>(
         count,
         first,
         static_cast<int>(depth),
@@ -3095,7 +3584,30 @@ void channel_bdpt_wavefront_step_cuda(
         tables,
         static_cast<float>(frequency_hz),
         state,
+        tangent != nullptr ? *tangent : no_tangent,
+        tape != nullptr ? *tape : no_tape,
         reinterpret_cast<unsigned long long*>(counters.data_ptr<int64_t>()),
         reinterpret_cast<unsigned long long*>(alive.data_ptr<int64_t>()));
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+}
+
+void channel_bdpt_wavefront_reverse_cuda(
+    int64_t count,
+    int64_t bounces,
+    const std::vector<at::Tensor>& materials,
+    const channel::bdpt_wavefront::ScatterTables& tables,
+    double frequency_hz,
+    const channel::bdpt_wavefront::Tape& tape,
+    const channel::bdpt_wavefront::Gradients& grads,
+    const at::Tensor& reference) {
+    if (count == 0 || bounces == 0) {
+        return;
+    }
+    const BdptWavefrontMaterials view = wavefront_material_view(materials);
+    constexpr int threads = 128;
+    const int blocks = static_cast<int>((count + threads - 1) / threads);
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(reference.get_device()).stream();
+    bdpt_wavefront_reverse_kernel<<<blocks, threads, 0, stream>>>(
+        count, static_cast<int>(bounces), view, tables, static_cast<float>(frequency_hz), tape, grads);
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 }

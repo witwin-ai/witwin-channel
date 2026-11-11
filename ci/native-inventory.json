@@ -141,7 +141,9 @@
         "bdpt_sorted_keys_kernel",
         "bdpt_sorted_power_finalize_kernel",
         "bdpt_sorted_scatter_kernel",
+        "bdpt_wavefront_cast_kernel",
         "bdpt_wavefront_connect_accumulate_kernel",
+        "bdpt_wavefront_connect_backward_kernel",
         "bdpt_wavefront_finalize_kernel",
         "bdpt_wavefront_pack_rows_kernel",
         "bdpt_wavefront_visibility_inputs_kernel"
@@ -172,10 +174,12 @@
         "bdpt_sorted_keys_kernel",
         "bdpt_sorted_power_finalize_kernel",
         "bdpt_sorted_scatter_kernel",
-        "bdpt_wavefront_connect_accumulate_kernel",
+        "bdpt_wavefront_cast_kernel",
+        "bdpt_wavefront_connect_backward_kernel",
         "bdpt_wavefront_finalize_kernel",
         "bdpt_wavefront_pack_rows_kernel",
-        "bdpt_wavefront_visibility_inputs_kernel"
+        "bdpt_wavefront_visibility_inputs_kernel",
+        "kernel"
       ],
       "host_synchronization": [
         "cudaMemcpyAsync",
@@ -191,6 +195,7 @@
         "bdpt_reflected_light_subpaths_kernel",
         "bdpt_sensor_endpoint_subpaths_kernel",
         "bdpt_transmitted_light_subpaths_kernel",
+        "bdpt_wavefront_reverse_kernel",
         "bdpt_wavefront_step_kernel",
         "reflected_subpath_backward_kernel",
         "reflected_subpath_jvp_kernel",
@@ -203,7 +208,8 @@
         "bdpt_reflected_light_subpaths_kernel",
         "bdpt_sensor_endpoint_subpaths_kernel",
         "bdpt_transmitted_light_subpaths_kernel",
-        "bdpt_wavefront_step_kernel",
+        "bdpt_wavefront_reverse_kernel",
+        "kernel",
         "reflected_subpath_backward_kernel",
         "reflected_subpath_jvp_kernel",
         "transmitted_subpath_backward_kernel",
