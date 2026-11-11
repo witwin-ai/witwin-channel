@@ -185,7 +185,9 @@ def test_the_declaration_resolver_does_not_make_symbol_literals_dispatch_sites(
         ('tensor("values"), integer("count"), integer("extra")', "arguments ['values', 'count', 'extra'] differ"),
     ],
 )
-def test_a_declaration_must_match_the_cpp_parameters(tmp_path: Path, declaration: str, problem: str) -> None:
+def test_a_declaration_must_match_the_cpp_parameters(
+    tmp_path: Path, declaration: str, problem: str,
+) -> None:
     kernels = _SPEC_KERNELS.replace('tensor("values"), integer("count")', declaration)
     repo = _repo(tmp_path, kernels, _SOLVER_USES_BOTH)
 
