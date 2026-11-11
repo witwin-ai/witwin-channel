@@ -3195,11 +3195,11 @@ __device__ bool bdpt_nee_row(
     const float* normal = state.nee_normal + light * 3;
     const float delta[3] = {
         rx_position[0] - position[0], rx_position[1] - position[1], rx_position[2] - position[2]};
-    r2 = fmaxf(sqrtf(wf::dot3(delta, delta)), 1.0e-6f);
+    r2 = fmaxf(sqrtf(wf::dot_values(delta, delta)), 1.0e-6f);
     for (int axis = 0; axis < 3; ++axis) {
         wo_world[axis] = delta[axis] / r2;
     }
-    const float cos_o = wf::dot3(wo_world, normal);
+    const float cos_o = wf::dot_values(wo_world, normal);
     contribution = 0.0f;
     if (!(cos_o > 0.0f)) {
         return false;
@@ -3208,7 +3208,7 @@ __device__ bool bdpt_nee_row(
     float t1[3];
     float t2[3];
     wf::local_frame(normal, tables.rough_axis_rad[material], t1, t2);
-    const float wo_local[3] = {wf::dot3(wo_world, t1), wf::dot3(wo_world, t2), wf::dot3(wo_world, normal)};
+    const float wo_local[3] = {wf::dot_values(wo_world, t1), wf::dot_values(wo_world, t2), wf::dot_values(wo_world, normal)};
     const wf::TableView table = wf::table_view(tables, tables.material_slot[material]);
     float f_te = 0.0f;
     float f_tm = 0.0f;

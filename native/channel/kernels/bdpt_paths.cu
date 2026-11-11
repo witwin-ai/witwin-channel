@@ -996,7 +996,7 @@ __global__ void bdpt_wavefront_step_kernel(
             const wf::TableView table = wf::table_view(tables, slot);
             float normal[3] = {hit_n[base], hit_n[base + 1], hit_n[base + 2]};
             const float in[3] = {direction[0], direction[1], direction[2]};
-            if (wf::dot3(in, normal) > 0.0f) {
+            if (wf::dot_values(in, normal) > 0.0f) {
                 normal[0] = -normal[0];
                 normal[1] = -normal[1];
                 normal[2] = -normal[2];
@@ -1005,7 +1005,7 @@ __global__ void bdpt_wavefront_step_kernel(
             float t2[3];
             wf::local_frame(normal, tables.rough_axis_rad[material], t1, t2);
             const float wi_world[3] = {-in[0], -in[1], -in[2]};
-            const float wi_local[3] = {wf::dot3(wi_world, t1), wf::dot3(wi_world, t2), wf::dot3(wi_world, normal)};
+            const float wi_local[3] = {wf::dot_values(wi_world, t1), wf::dot_values(wi_world, t2), wf::dot_values(wi_world, normal)};
             float p_te;
             float p_tm;
             if (already_scattered) {
@@ -1015,21 +1015,21 @@ __global__ void bdpt_wavefront_step_kernel(
                 p_tm = 0.5f * carried;
             } else {
                 float s[3];
-                wf::cross3(in, normal, s);
-                if (wf::dot3(s, s) > 1.0e-12f) {
-                    wf::normalize3(s);
+                wf::cross_values(in, normal, s);
+                if (wf::dot_values(s, s) > 1.0e-12f) {
+                    wf::unit_values(s);
                 } else {
                     float substitute_t2[3];
                     wf::local_frame(in, 0.0f, s, substitute_t2);
                 }
                 float p[3];
-                wf::cross3(s, in, p);
+                wf::cross_values(s, in, p);
                 const float re[3] = {incoming.x.re, incoming.y.re, incoming.z.re};
                 const float im[3] = {incoming.x.im, incoming.y.im, incoming.z.im};
-                const float sr = wf::dot3(re, s);
-                const float si = wf::dot3(im, s);
-                const float pr = wf::dot3(re, p);
-                const float pi = wf::dot3(im, p);
+                const float sr = wf::dot_values(re, s);
+                const float si = wf::dot_values(im, s);
+                const float pr = wf::dot_values(re, p);
+                const float pi = wf::dot_values(im, p);
                 p_te = sr * sr + si * si;
                 p_tm = pr * pr + pi * pi;
             }

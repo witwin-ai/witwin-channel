@@ -8,6 +8,8 @@
 
 #if defined(__CUDACC__)
 #include <rayd/scattering_table.cuh>
+
+#include "math.cuh"
 #endif
 
 namespace channel::bdpt_wavefront {
@@ -95,21 +97,11 @@ __device__ __forceinline__ TableView table_view(const ScatterTables& tables, int
     };
 }
 
-__device__ __forceinline__ void normalize3(float* v) {
-    const float length = fmaxf(sqrtf(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]), 1.0e-12f);
-    v[0] /= length;
-    v[1] /= length;
-    v[2] /= length;
-}
+using channel::math::cross_values;
+using channel::math::dot_values;
 
-__device__ __forceinline__ void cross3(const float* a, const float* b, float* out) {
-    out[0] = a[1] * b[2] - a[2] * b[1];
-    out[1] = a[2] * b[0] - a[0] * b[2];
-    out[2] = a[0] * b[1] - a[1] * b[0];
-}
-
-__device__ __forceinline__ float dot3(const float* a, const float* b) {
-    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+__device__ __forceinline__ void unit_values(float* v) {
+    channel::math::normalize_values_div(v, 1.0e-12f);
 }
 
 // Tangent frame (t1, t2) of a unit normal: t1 is the stable perpendicular
@@ -119,10 +111,10 @@ __device__ __forceinline__ void local_frame(const float* normal, float axis_rad,
     const float reference[3] = {
         fabsf(normal[2]) < 0.9f ? 0.0f : 1.0f, 0.0f, fabsf(normal[2]) < 0.9f ? 1.0f : 0.0f};
     float a[3];
-    cross3(reference, normal, a);
-    normalize3(a);
+    cross_values(reference, normal, a);
+    unit_values(a);
     float b[3];
-    cross3(normal, a, b);
+    cross_values(normal, a, b);
     const float c = cosf(axis_rad);
     const float s = sinf(axis_rad);
     for (int axis = 0; axis < 3; ++axis) {

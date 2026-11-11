@@ -114,6 +114,19 @@ __device__ __forceinline__ Vec3 normalize_min_length(Vec3 value, float minimum_l
     return scale(value, inverse);
 }
 
+// In-place unit scaling by division: v / max(|v|, minimum_length) (the
+// per-component division, matching a Torch v / norm.clamp_min expression).
+__device__ __forceinline__ void normalize_values_div(float* values, float minimum_length) {
+    const float value_length = fmaxf(length_values(values[0], values[1], values[2]), minimum_length);
+    values[0] /= value_length;
+    values[1] /= value_length;
+    values[2] /= value_length;
+}
+
+__device__ __forceinline__ void cross_values(const float* a, const float* b, float* out) {
+    store_vec3(out, 0, cross(load_vec3(a, 0), load_vec3(b, 0)));
+}
+
 __device__ __forceinline__ Vec3 load_normalized_min_length(
     const float* values,
     int64_t index,
