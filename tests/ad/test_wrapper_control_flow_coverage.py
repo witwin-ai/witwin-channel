@@ -269,6 +269,7 @@ def test_field_jvp_callbacks_cover_declared_component_matrix(monkeypatch) -> Non
             module,
             "_ad_checked_tangent",
             lambda _label, tangent, _shape: tangent,
+            raising=False,
         )
     value = torch.ones(1)
 
@@ -345,7 +346,7 @@ def test_field_jvp_callbacks_cover_declared_component_matrix(monkeypatch) -> Non
     assert chain == (value, value, value, value, None)
 
     dd_ctx = SimpleNamespace(
-        saved_tensors=(value,) * 35,
+        saved_tensors=(value,) * 39,  # 35 primals and the four frozen edge bounds
         frequency_value=3.0e9,
     )
     dd_tangents = [None] * 41
@@ -471,7 +472,7 @@ def test_remaining_vjp_callbacks_pack_full_gradients(monkeypatch) -> None:
         dd_needed[index] = True
     dd_ctx = SimpleNamespace(
         needs_input_grad=tuple(dd_needed),
-        saved_tensors=(value,) * 35,
+        saved_tensors=(value,) * 39,  # 35 primals and the four frozen edge bounds
         frequency_value=3.0e9,
         frequency_meta=None,
     )

@@ -8,6 +8,7 @@ import inspect
 import pytest
 
 from witwin.channel.kernels import fields as field_kernels
+from witwin.channel.kernels import spec
 from witwin.channel.propagation import fields
 from witwin.channel import runtime
 
@@ -50,6 +51,7 @@ def test_fields_projection_autograd_is_the_single_object_owner(name: str):
 def test_fields_autograd_uses_canonical_runtime_dependencies():
     assert field_kernels._required_native_op is runtime.required_symbol
     assert field_kernels.disable_functorch is runtime.disable_functorch
+    # The AD plumbing is runtime's, used directly or through the declared AD inputs.
     for name in (
         "_ad_checked_tangent",
         "_ad_frequency_grad",
@@ -62,7 +64,9 @@ def test_fields_autograd_uses_canonical_runtime_dependencies():
         "_ad_reject_fixed_inputs",
         "_ad_reject_fixed_tangents",
     ):
-        assert getattr(field_kernels, name) is getattr(runtime, name)
+        owners = [module for module in (field_kernels, spec) if hasattr(module, name)]
+        assert owners
+        assert all(getattr(module, name) is getattr(runtime, name) for module in owners)
 
 
 def test_fields_autograd_uses_canonical_functional_companions():
