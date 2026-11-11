@@ -2097,7 +2097,7 @@ def solve_pipeline(  # type: ignore[no-untyped-def]
             name: value.view(value.shape[0], value.shape[2])
             for name, value in component_maps.items()
         }
-    else:
+    elif grid is not None:
         # The native maps are [T, cols, rows]; the grid result is [T, rows, cols] with
         # entry [t, row, col] at the grid sample (row, col), like every other solver.
         rows, cols = grid.shape
