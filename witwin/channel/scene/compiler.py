@@ -78,6 +78,13 @@ def require_tensor(
         raise ValueError(f"{name} must be contiguous")
 
 
+# MaterialStore fields a Kirchhoff table is built from.
+_KIRCHHOFF_SOURCE_FIELDS = (
+    "scatter_model_id", "layer_offset", "layer_count", "layer_thickness_m", "layer_eps_r",
+    "layer_sigma_e", "layer_mu_r", "rough_sigma_h_m", "rough_corr_x_m", "rough_corr_y_m",
+    "rough_axis_rad",
+)
+
 @dataclass(frozen=True, slots=True)
 class GeometryStore:
     vertices: torch.Tensor
@@ -368,6 +375,8 @@ class CompiledScene:
     _kirchhoff_resources_cache: KirchhoffRuntimeResources | None = field(
         default=None, repr=False, compare=False
     )
+    # Identity/autograd/mutation signature of the store tensors the cached tables were built from.
+    _kirchhoff_resources_state: tuple | None = field(default=None, repr=False, compare=False)
     _phase_screen_resources_cache: PhaseScreenRuntimeResources | None = field(
         default=None, repr=False, compare=False
     )
@@ -597,14 +606,45 @@ class CompiledScene:
         """
 
         key = self._scattering_resource_key()
+        state = self._kirchhoff_source_state()
+        cached = self._kirchhoff_resources_cache
         if (
-            self._kirchhoff_resources_cache is None
-            or self._kirchhoff_resources_cache.key != key
+            cached is not None
+            and cached.key == key
+            and self._kirchhoff_resources_state == state
         ):
-            self._kirchhoff_resources_cache = build_kirchhoff_resources(
-                self.materials, key
+            return cached
+        resources = build_kirchhoff_resources(self.materials, key)
+        # A table carrying a graph or a forward-AD tangent is never reused: the
+        # graph would be freed by the first backward, and a later solve with a
+        # different tangent or leaf would read the stale derivative.
+        graph_bearing = any(entry[1] or entry[2] or entry[3] for entry in state)
+        self._kirchhoff_resources_cache = None if graph_bearing else resources
+        self._kirchhoff_resources_state = None if graph_bearing else state
+        return resources
+
+    def _kirchhoff_source_state(self) -> tuple[tuple[int, bool, bool, bool, int], ...]:
+        """Host-only identity, autograd and mutation signature of the Kirchhoff table inputs.
+
+        Replacing a store tensor, writing it in place, marking it ``requires_grad`` or giving
+        it a forward-AD tangent changes the signature, so the tables are rebuilt with the
+        derivative attached. Reads tensor attributes only; no device work.
+        """
+
+        store = self.materials
+        state = []
+        for name in _KIRCHHOFF_SOURCE_FIELDS:
+            source = getattr(store, name)
+            state.append(
+                (
+                    id(source),
+                    bool(source.requires_grad),
+                    source.grad_fn is not None,
+                    torch.autograd.forward_ad.unpack_dual(source).tangent is not None,
+                    int(source._version),
+                )
             )
-        return self._kirchhoff_resources_cache
+        return tuple(state)
 
     @property
     def phase_screen_resources(self) -> PhaseScreenRuntimeResources:
