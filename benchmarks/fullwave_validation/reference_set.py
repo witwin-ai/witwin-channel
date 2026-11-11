@@ -291,8 +291,9 @@ def _silhouette(block: Block, a: np.ndarray, b: np.ndarray, tx: np.ndarray) -> b
     return lit.count(True) == 1
 
 
-def _vertex_visible(case: ReferenceCase, block: Block, vertex: np.ndarray,
-                    points: np.ndarray) -> np.ndarray:
+def _vertex_visible(
+    case: ReferenceCase, block: Block, vertex: np.ndarray, points: np.ndarray,
+) -> np.ndarray:
     lifted = vertex + 1.0e-3 * np.sign(vertex - np.asarray(block.center))
     return ~_segments_blocked(case, lifted[None, None], points)
 
@@ -381,8 +382,10 @@ def reference_path(case_id: str) -> Path:
     return DATA_DIR / f"{case_id}.npz"
 
 
-def save_reference(case: ReferenceCase, planes: list[dict[str, Any]], metadata: dict[str, Any],
-                   path: Path | None = None) -> Path:
+def save_reference(
+    case: ReferenceCase, planes: list[dict[str, Any]], metadata: dict[str, Any],
+    path: Path | None = None,
+) -> Path:
     output = path or reference_path(case.case_id)
     output.parent.mkdir(parents=True, exist_ok=True)
     arrays: dict[str, Any] = {

@@ -134,8 +134,9 @@ def deterministic_plane(case: rs.ReferenceCase, plane: dict) -> tuple[np.ndarray
     return field / scale, components, float(np.max(np.abs(ratio / scale - 1.0)))
 
 
-def boundary_excess(case: rs.ReferenceCase, plane: dict, field: np.ndarray,
-                    components: dict) -> dict[str, float]:
+def boundary_excess(
+    case: rs.ReferenceCase, plane: dict, field: np.ndarray, components: dict,
+) -> dict[str, float]:
     """p95 excess of adjacent-sample dB jumps across LoS (ISB) and reflection (RSB) support edges."""
 
     metadata = {"case_id": case.case_id, "case_fingerprint": case.fingerprint,
