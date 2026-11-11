@@ -23,18 +23,18 @@ def test_build_info_contract():
     assert len(info["channel_git_sha"]) == 40
     assert isinstance(info["channel_git_dirty"], bool)
     assert info["rayd_repository_url"] == "https://github.com/Asixa/RayD"
-    assert info["rayd_commit"] == "918528ebc81415ac9888b683a249db7dce72fc5b"
+    assert info["rayd_commit"] == "81725469360a0bd94852c1580e4809ee462f5902"
     assert isinstance(info["rayd_dirty"], bool)
     assert info["rayd_integration_abi_kind"] == "source-header-set-sha256"
     assert info["rayd_integration_abi_path"] == "include/rayd/integration.h"
     assert (
         info["rayd_integration_abi_sha256"]
-        == "e543a63e618dd74de8c5e178108cc46f3197c03b8306e37ed1bae5518050a788"
+        == "8aaffa5e32450aa5c61de9a2988779e358f2df116310249762304ba42dcb4588"
     )
     assert info["rayd_source_kind"] in {"git-checkout", "python-package"}
     assert (
         info["rayd_source_manifest_sha256"]
-        == "358e607c30dad4ed74a5209363daa45f53b052396bbcdde2c325cb3bad4632d5"
+        == "bd380d3d0cb70bbbdd56d338177cf1a8810b75df7f29c19c40ede67cc346044c"
     )
     assert isinstance(info["torch_version"], str) and info["torch_version"]
     assert isinstance(info["cuda_version"], str) and info["cuda_version"]

@@ -3209,13 +3209,13 @@ def _preflight_evaluate(
 def _require_fresh_source(compiled: CompiledScene) -> None:
     """Refuse a compiled scene whose source world was edited after compilation.
 
-    Four host integer comparisons between the version domains recorded at
-    compile time and the source scene's current ones; no device work. An edit
-    that bypasses the tensor version counter (``tensor.data = ...``) is not
-    visible here or to the solvers.
+    Compares the structure, material and assignment state recorded at compile
+    time with the source scene's current state on the host, with no device work.
+    The scene's own antennas are not compared: the consumer takes its endpoints
+    from the request's endpoint batches.
     """
 
-    moved = WorldProvenance.of(compiled).moved_domain(WorldProvenance.of(compiled.source))
+    moved = compiled.stale_domain()
     if moved is not None:
         raise ValueError(
             f"the compiled scene is stale: its source scene's {moved} changed after "
@@ -3634,13 +3634,15 @@ def rediscovery_required(
     like any other domain; a caller replaying under
     ``world_motion="fixed_winner_replay"`` deliberately ignores that one.
 
-    ``revalidate_source=True`` additionally recomputes the four domains from
-    the live ``witwin.core`` world the compiled scene was built from, which
-    catches a scene mutated in place after compilation - the one staleness
-    class the recorded versions cannot see, because a compiled scene and the
-    rows discovered on it always agree with each other. That recomputation
-    walks the world and hashes it, so it is O(scene) host work and belongs on
-    a motion-event cadence, never in a per-frame replay loop.
+    ``revalidate_source=True`` additionally compares the structure, material
+    and assignment state of the live ``witwin.core`` world the compiled scene
+    was built from with the state recorded at compilation, which catches a
+    scene mutated in place after compilation - the one staleness class the
+    recorded versions cannot see, because a compiled scene and the rows
+    discovered on it always agree with each other. The scene's own antennas
+    are not compared, since replay takes its endpoints from the request. That
+    walk reads host attributes of every structure, so it is O(scene) host work
+    and belongs on a motion-event cadence, never in a per-frame replay loop.
 
     Returns ``None`` when nothing moved.
     """
@@ -3661,7 +3663,7 @@ def rediscovery_required(
             return moved
     if not revalidate_source:
         return None
-    return current.moved_domain(WorldProvenance.of(compiled_scene.source))
+    return compiled_scene.stale_domain()
 
 
 def _require_wideband_dispersive_materials(compiled: CompiledScene) -> None:

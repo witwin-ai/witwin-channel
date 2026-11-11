@@ -60,6 +60,44 @@ module already cached. The float64 NumPy build sits behind an explicit banner
 inside the file: the CPU-compute policy line is drawn there, and nothing below
 it may grow into per-solve physics.
 
+## Compile cache
+
+`compile` keys a runtime on Channel's own state of the source world, not on the
+Core version domains, because those also count the scene's own antennas and no
+compiled resource depends on them (solvers read endpoints from the source when
+they bind it; the consumer takes them from its endpoint batches). The state is
+read from host attributes only: object identity, scalar fields, and per tensor
+its identity, `_version`, storage address and `requires_grad`, split into the
+same four domains as Core (topology, geometry, material, assignment) minus the
+endpoints. A warm hit therefore costs one walk of those attributes and never
+hashes the world. The Core versions are still read when a new runtime is built,
+for provenance.
+
+- The RayD scene, geometry tables, penetration diagonals and runtime structures
+  are shared by every runtime whose topology and geometry state are equal;
+  materials by material state and frequency; assignments by topology,
+  assignment and material IDs.
+- The registry holds one runtime per (source, frequency, device, trace
+  backend). A recompile of an edited source replaces all of its runtimes at
+  once. Least recently used runtimes are dropped above `_CACHE_BYTE_LIMIT`
+  (1 GiB of device memory, each shared resource counted once; the newest
+  runtime is always kept) or `_CACHE_ENTRY_LIMIT` (64) runtimes.
+- When only vertex values change on the same geometry objects with the same
+  faces and UVs, the first such compile rebuilds the RayD scene with the
+  changed meshes created refittable and later compiles refit them in place
+  through RayD's typed `update_mesh_vertices` + `sync_scene`. Building
+  refittable on the first change, not on the second, costs nothing extra (that
+  compile rebuilds anyway) and confines the uncompacted refittable GAS to the
+  meshes that actually moved. Every runtime on a refit scene came from the same,
+  now edited, objects and is dropped; `RayDSceneResource.generation` lets a held
+  one report itself stale. A refit scene traces bitwise like a fresh build
+  (RayD parity test); only the primitive reported for an exact tie between
+  coincident triangles may depend on the BVH. Snapshots with per-instant
+  motion or deformation objects rebuild instead of refitting.
+- `CompiledScene.stale_domain()` names the domain that changed since compile
+  (or `geometry_version` after a refit); the consumer's freshness check and
+  `rediscovery_required(revalidate_source=True)` use it.
+
 ## Numerical and AD contract
 
 Compilation and cache invalidation must preserve tensor storage, device,

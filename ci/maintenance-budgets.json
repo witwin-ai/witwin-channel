@@ -127,7 +127,7 @@
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
     "witwin/channel/scene/compiler.py::_runtime_structures": {
-      "ceiling": 25,
+      "ceiling": 16,
       "expires_on": "2027-01-31",
       "owner": "scene maintainers",
       "reason": "Core-world runtime structure projection is frozen at the Phase-2 compiler boundary pending focused decomposition."
@@ -139,7 +139,7 @@
       "reason": "Phase-3 explicit endpoint geometry added one typed field-dispatch branch while preserving the existing component owners; the measured dispatcher surface is frozen."
     },
     "witwin/channel/scene/compiler.py::compile": {
-      "ceiling": 30,
+      "ceiling": 27,
       "expires_on": "2027-01-31",
       "owner": "scene maintainers",
       "reason": "Single Core Scene compiler orchestration plus the Phase-3 product-identity material ABI guard is frozen at its measured surface pending focused decomposition."
