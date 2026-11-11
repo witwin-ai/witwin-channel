@@ -21,6 +21,8 @@ from witwin.channel.components import (
     validate_scatter_chain,
     validate_scattering_quadrature,
     validate_vocabulary,
+    DISCOVERY_MODES,
+    discovery_metadata,
     validated_components,
 )
 
@@ -171,6 +173,11 @@ class Config:
     # projection-validated optimum is 0.5 (artifacts/isb-taper/report.json).
     isb_boundary_taper: bool = False
     isb_boundary_taper_width: float = 0.5
+    # Reflection candidate source: "auto" (complete image tree, ray discovery only past its
+    # cost budget), "exhaustive" (every plane-group sequence) or "rays" (ray discovery). The
+    # result metadata's "complete" says whether the paths found are provably all of them.
+    discovery: str = "auto"
+
     def __post_init__(self) -> None:
         validate_config_fields(self)
         validate_max_depth(self.max_depth)
@@ -209,6 +216,7 @@ class Config:
         validate_vocabulary("max_paths_scope", self.max_paths_scope, _VALID_MAX_PATHS_SCOPES)
         validate_vocabulary("sort_key", self.sort_key, _VALID_SORT_KEYS)
         validate_vocabulary("deterministic ad_mode", self.ad_mode, _VALID_AD_MODES)
+        validate_vocabulary("discovery", self.discovery, DISCOVERY_MODES)
 
         object.__setattr__(self, "components", components)
 
@@ -679,6 +687,7 @@ def _metadata(
     component_counts: dict[str, int], launch_count: int, ad_companion_launches: int = 0,
     ad_tape_bytes: int = 0, forward_time_ms: float = 0.0, peak_memory_bytes: int = 0,
     scattering_info: dict[str, Any] | None = None, transmission_dropped_rows: int = 0,
+    reflection_discovery: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     capability = {
         "rayd_native": bool(native_info["uses_rayd_native"]),
@@ -765,7 +774,9 @@ def _metadata(
         # Coupled higher-order compensator family (coupled reflection and diffraction>D/D->R + coupled double diffraction
         # D->D); mirrors the path solver's coupled_paths metadata block.
         "coupled_paths": _coupled_paths_metadata(config, component_counts),
+        "discovery": discovery_metadata(config.discovery, reflection_discovery),
     }
+    metadata["complete"] = bool(metadata["discovery"]["complete"])
     if metadata_transmission is not None:
         metadata["transmission"] = metadata_transmission
     scattering_metadata = _scattering_metadata(scattering_info, config)
@@ -909,6 +920,7 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
         peak_memory_bytes=peak_memory_bytes,
         scattering_info=scattering_info,
         transmission_dropped_rows=transmission_dropped_rows(sidecars),
+        reflection_discovery=sidecars.execution.reflection_discovery,
     )
     diagnostics = None
     if config.diagnostics:
