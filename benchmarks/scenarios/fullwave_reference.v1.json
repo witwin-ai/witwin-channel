@@ -1,0 +1,70 @@
+{
+  "schema": {
+    "name": "witwin.channel.fullwave-reference-set",
+    "version": "1.0.0"
+  },
+  "note": "Synthetic PEC/dielectric blocks and plates in free space, solved once with Tidy3D. Lengths in metres. The stored references live in tests/data/fullwave/<case>.npz and record the sha256 fingerprint of their case entry.",
+  "frequency_hz": 5000000000.0,
+  "materials": {
+    "pec": {"kind": "pec"},
+    "dielectric": {"kind": "dielectric", "eps_r": 4.0, "sigma_e": 0.01}
+  },
+  "geometries": {
+    "beam": {
+      "description": "PEC beam along y: four 90-degree wedges with 0.5 m (8.3 wavelength) finite edges",
+      "blocks": [{"center": [0.0, 0.0, 0.09], "size": [0.18, 0.5, 0.18], "material": "pec"}],
+      "tx_position": [-0.4, 0.1, 0.35],
+      "analysis_bounds_xy": [[-0.5, 0.5], [-0.5, 0.5]],
+      "planes_z": [-0.1, 0.12],
+      "domain_bounds_xyz": [[-0.56, 0.56], [-0.56, 0.56], [-0.2, 0.44]]
+    },
+    "halfplane": {
+      "description": "Zero-thickness PEC plate in x = 0: a half-plane edge at z = 0.15 with ends at y = +-0.25",
+      "blocks": [{"center": [0.0, 0.0, -0.1], "size": [0.0, 0.5, 0.5], "material": "pec"}],
+      "tx_position": [-0.35, 0.1, 0.3],
+      "analysis_bounds_xy": [[-0.44, 0.44], [-0.44, 0.44]],
+      "planes_z": [-0.05, -0.2],
+      "domain_bounds_xyz": [[-0.5, 0.5], [-0.5, 0.5], [-0.42, 0.38]]
+    },
+    "cube": {
+      "description": "Manifest single_cube layout (fullwave_validation.v1.json)",
+      "blocks": [{"center": [0.0, 0.0, 0.15], "size": [0.2, 0.2, 0.2], "material": "$material"}],
+      "tx_position": [-0.2, -0.5, 0.42],
+      "analysis_bounds_xy": [[-0.8, 0.8], [-0.8, 0.8]],
+      "planes_z": [0.1, 0.3],
+      "domain_bounds_xyz": [[-0.86, 0.86], [-0.86, 0.86], [-0.1, 0.5]]
+    },
+    "three_cube": {
+      "description": "Manifest three_cube_320 layout (fullwave_validation.v1.json)",
+      "blocks": [
+        {"center": [-0.25, -0.3, 0.15], "size": [0.2, 0.2, 0.2], "material": "pec"},
+        {"center": [0.2, 0.05, 0.15], "size": [0.2, 0.2, 0.2], "material": "pec"},
+        {"center": [-0.05, 0.35, 0.15], "size": [0.2, 0.2, 0.2], "material": "pec"}
+      ],
+      "tx_position": [0.0, -0.5, 0.4],
+      "analysis_bounds_xy": [[-1.0, 1.0], [-1.0, 1.0]],
+      "planes_z": [0.1],
+      "domain_bounds_xyz": [[-1.06, 1.06], [-1.06, 1.06], [-0.1, 0.48]]
+    },
+    "empty": {
+      "description": "Free space: calibrates the Tidy3D source normalization and measures the FDTD phase error",
+      "blocks": [],
+      "tx_position": [-0.5, 0.0, 0.0],
+      "analysis_bounds_xy": [[-0.56, 0.56], [-0.26, 0.26]],
+      "planes_z": [-0.1],
+      "domain_bounds_xyz": [[-0.6, 0.6], [-0.3, 0.3], [-0.2, 0.2]]
+    }
+  },
+  "cases": {
+    "empty_z": {"geometry": "empty", "polarization": "z", "grid_m": 0.002, "material": "pec", "role": "calibration"},
+    "empty_x": {"geometry": "empty", "polarization": "x", "grid_m": 0.002, "material": "pec", "role": "calibration"},
+    "beam_z": {"geometry": "beam", "polarization": "z", "grid_m": 0.002, "material": "pec", "role": "fit"},
+    "beam_y": {"geometry": "beam", "polarization": "y", "grid_m": 0.002, "material": "pec", "role": "fit"},
+    "halfplane_z": {"geometry": "halfplane", "polarization": "z", "grid_m": 0.002, "material": "pec", "role": "fit"},
+    "halfplane_y": {"geometry": "halfplane", "polarization": "y", "grid_m": 0.002, "material": "pec", "role": "fit"},
+    "cube_z": {"geometry": "cube", "polarization": "z", "grid_m": 0.002, "material": "pec", "role": "fit"},
+    "cube_x": {"geometry": "cube", "polarization": "x", "grid_m": 0.002, "material": "pec", "role": "holdout"},
+    "three_cube_z": {"geometry": "three_cube", "polarization": "z", "grid_m": 0.0025, "material": "pec", "role": "holdout"},
+    "cube_dielectric_z": {"geometry": "cube", "polarization": "z", "grid_m": 0.002, "material": "dielectric", "role": "holdout"}
+  }
+}
