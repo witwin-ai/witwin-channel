@@ -449,6 +449,62 @@ def _candidate_requests(
         )
 
 
+class _DepthSources:
+    """Picks and produces each depth's candidate sequences, depth by depth from depth 1."""
+
+    def __init__(
+        self, plan: ReflectionDiscoveryPlan, tx_positions: torch.Tensor, rx_count: int,
+        trace_group_chains: TraceReflectionGroupChains,
+    ) -> None:
+        self._plan = plan
+        self._tx_positions = tx_positions
+        self._rx_count = rx_count
+        self._trace = trace_group_chains
+        self._rays: _RayChains | None = None
+        self._frontier = _image_tree_roots(tx_positions)
+        self.rays_from = 1 if plan.discovery == SOURCE_RAYS else None
+
+    def advance(self, depth: int, *, need_tree: bool) -> str:
+        """Grow the tree to ``depth`` (unless rays already own it) and name the depth's source."""
+
+        plan = self._plan
+        if self.rays_from is None and need_tree:
+            self._grow(depth)
+        if self.rays_from is not None:
+            return SOURCE_RAYS
+        return SOURCE_EXHAUSTIVE if plan.discovery == SOURCE_EXHAUSTIVE else SOURCE_IMAGE_TREE
+
+    def _grow(self, depth: int) -> None:
+        plan = self._plan
+        auto = plan.discovery == "auto"
+        expansion = self._frontier.size * plan.groups.group_count
+        limit = _frontier_node_limit(depth, self._tx_positions.device)
+        if auto and expansion > _COMPLETE_PAIR_BUDGET:
+            self.rays_from = depth
+            return
+        if plan.discovery == SOURCE_EXHAUSTIVE and expansion > limit:
+            raise ValueError(
+                f"discovery='exhaustive' needs {expansion} plane-group sequences at reflection "
+                f"depth {depth}, more than the {limit} that fit in device memory; "
+                "use discovery='auto'"
+            )
+        self._frontier = _expand_image_tree(
+            self._frontier, plan.groups, prune=plan.discovery != SOURCE_EXHAUSTIVE
+        )
+        size = self._frontier.size
+        if auto and (size * self._rx_count > _COMPLETE_PAIR_BUDGET or size > limit):
+            self.rays_from = depth
+
+    def sequences(self, depth: int) -> tuple[torch.Tensor, torch.Tensor]:
+        if self.rays_from is None:
+            return self._frontier.node_sequences, self._frontier.node_tx
+        if self._rays is None:
+            self._rays = _RayChains(
+                self._tx_positions, self._plan.groups, self._plan.max_depth, self._trace
+            )
+        return self._rays.sequences(depth)
+
+
 def iter_reflection_epc_requests(
     plan: ReflectionDiscoveryPlan, *, tx_positions: torch.Tensor, rx_positions: torch.Tensor,
     tri_a: torch.Tensor, normals: torch.Tensor, trace_group_chains: TraceReflectionGroupChains,
@@ -466,64 +522,33 @@ def iter_reflection_epc_requests(
     rx_count = int(rx_positions.shape[0])
     if groups.group_count <= 0 or rx_count <= 0 or tx_count <= 0 or plan.max_depth < plan.min_depth:
         return
-    device = tx_positions.device
-    auto = plan.discovery == "auto"
     # Depth 1 of a small product pairs every plane group with every endpoint pair directly.
+    shared_pairs = tx_count * groups.group_count * rx_count
     shared_first_depth = (
-        tx_count * groups.group_count * rx_count <= _RECEIVER_TEST_MIN_PAIRS
-        and groups.max_group_size <= _DIRECT_GROUP_SIZE
+        shared_pairs <= _RECEIVER_TEST_MIN_PAIRS and groups.max_group_size <= _DIRECT_GROUP_SIZE
     )
-    rays_from = 1 if plan.discovery == SOURCE_RAYS else None
-    rays: _RayChains | None = None
-    frontier = _image_tree_roots(tx_positions)
+    sources = _DepthSources(plan, tx_positions, rx_count, trace_group_chains)
     for depth in range(1, plan.max_depth + 1):
-        if rays_from is None and not (depth == 1 and shared_first_depth and plan.max_depth == 1):
-            expansion = frontier.size * groups.group_count
-            limit = _frontier_node_limit(depth, device)
-            if auto and expansion > _COMPLETE_PAIR_BUDGET:
-                rays_from = depth
-            else:
-                if plan.discovery == SOURCE_EXHAUSTIVE and expansion > limit:
-                    raise ValueError(
-                        f"discovery='exhaustive' needs {expansion} plane-group sequences at "
-                        f"reflection depth {depth}, more than the {limit} that fit in device "
-                        "memory; use discovery='auto'"
-                    )
-                frontier = _expand_image_tree(
-                    frontier, groups, prune=plan.discovery != SOURCE_EXHAUSTIVE
-                )
-                if auto and (
-                    frontier.size * rx_count > _COMPLETE_PAIR_BUDGET or frontier.size > limit
-                ):
-                    rays_from = depth
-        if rays_from is not None:
-            if rays is None:
-                rays = _RayChains(tx_positions, groups, plan.max_depth, trace_group_chains)
-            if record is not None:
-                record.sources[depth] = SOURCE_RAYS
-            if depth < plan.min_depth:
-                continue
-            sequences, sequence_tx = rays.sequences(depth)
-        else:
-            if record is not None:
-                record.sources[depth] = (
-                    SOURCE_EXHAUSTIVE if plan.discovery == SOURCE_EXHAUSTIVE else SOURCE_IMAGE_TREE
-                )
-            if depth < plan.min_depth:
-                continue
-            if depth == 1 and shared_first_depth:
-                if record_candidate_count is not None:
-                    record_candidate_count(tx_count * groups.group_count * rx_count)
-                yield from _epc_requests(
-                    1,
-                    tx_positions=tx_positions,
-                    rx_positions=rx_positions,
-                    sequences=groups.representative_faces.reshape(-1, 1),
-                    tri_a=tri_a,
-                    normals=normals,
-                )
-                continue
-            sequences, sequence_tx = frontier.node_sequences, frontier.node_tx
+        source = sources.advance(
+            depth, need_tree=not (depth == 1 and shared_first_depth and plan.max_depth == 1)
+        )
+        if record is not None:
+            record.sources[depth] = source
+        if depth < plan.min_depth:
+            continue
+        if depth == 1 and shared_first_depth and source != SOURCE_RAYS:
+            if record_candidate_count is not None:
+                record_candidate_count(shared_pairs)
+            yield from _epc_requests(
+                1,
+                tx_positions=tx_positions,
+                rx_positions=rx_positions,
+                sequences=groups.representative_faces.reshape(-1, 1),
+                tri_a=tri_a,
+                normals=normals,
+            )
+            continue
+        sequences, sequence_tx = sources.sequences(depth)
         yield from _candidate_requests(
             depth,
             sequences=sequences,

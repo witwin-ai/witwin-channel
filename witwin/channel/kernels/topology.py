@@ -1200,6 +1200,33 @@ def reflection_receiver_candidates(
     return exported["candidate_sequence"], exported["candidate_receiver"]
 
 
+def _epc_candidate_space(
+    tx_positions: torch.Tensor, rx_positions: torch.Tensor, sequences: torch.Tensor,
+    sequence_tx: torch.Tensor, candidate_sequence: torch.Tensor | None,
+    candidate_receiver: torch.Tensor | None,
+) -> tuple[torch.Tensor, torch.Tensor, int]:
+    """The native candidate lists (empty for implicit candidates) and the candidate count."""
+
+    if (candidate_sequence is None) != (candidate_receiver is None):
+        raise ValueError("candidate_sequence and candidate_receiver must be given together")
+    if candidate_sequence is None or candidate_receiver is None:
+        empty = torch.empty((0,), device=sequences.device, dtype=torch.int32)
+        total = reflection_epc_candidate_count(
+            tx_count=int(tx_positions.shape[0]),
+            rx_count=int(rx_positions.shape[0]),
+            sequence_count=int(sequences.shape[0]),
+            per_transmitter=int(sequence_tx.shape[0]) > 0,
+        )
+        return empty, empty, total
+    validate_cuda_tensor("candidate_sequence", candidate_sequence, dtype=torch.int32, ndim=1)
+    validate_cuda_tensor("candidate_receiver", candidate_receiver, dtype=torch.int32, ndim=1)
+    if candidate_receiver.shape != candidate_sequence.shape:
+        raise ValueError("candidate_receiver must match candidate_sequence")
+    if int(sequence_tx.shape[0]) == 0:
+        raise ValueError("explicit candidates require sequence_tx")
+    return candidate_sequence, candidate_receiver, int(candidate_sequence.shape[0])
+
+
 def deterministic_reflection_epc_input_batch(
     *, tx_positions: torch.Tensor, rx_positions: torch.Tensor, sequences: torch.Tensor,
     tri_a: torch.Tensor, normals: torch.Tensor, candidate_start: int, candidate_end: int,
@@ -1237,25 +1264,9 @@ def deterministic_reflection_epc_input_batch(
         validate_cuda_tensor("sequence_tx", sequence_tx, dtype=torch.int32, ndim=1)
         if sequence_tx.shape != (int(sequences.shape[0]),):
             raise ValueError("sequence_tx must match sequences")
-    if (candidate_sequence is None) != (candidate_receiver is None):
-        raise ValueError("candidate_sequence and candidate_receiver must be given together")
-    if candidate_sequence is None or candidate_receiver is None:
-        candidate_sequence = torch.empty((0,), device=sequences.device, dtype=torch.int32)
-        candidate_receiver = candidate_sequence
-        total = reflection_epc_candidate_count(
-            tx_count=int(tx_positions.shape[0]),
-            rx_count=int(rx_positions.shape[0]),
-            sequence_count=int(sequences.shape[0]),
-            per_transmitter=int(sequence_tx.shape[0]) > 0,
-        )
-    else:
-        validate_cuda_tensor("candidate_sequence", candidate_sequence, dtype=torch.int32, ndim=1)
-        validate_cuda_tensor("candidate_receiver", candidate_receiver, dtype=torch.int32, ndim=1)
-        if candidate_receiver.shape != candidate_sequence.shape:
-            raise ValueError("candidate_receiver must match candidate_sequence")
-        if int(sequence_tx.shape[0]) == 0:
-            raise ValueError("explicit candidates require sequence_tx")
-        total = int(candidate_sequence.shape[0])
+    candidate_sequence, candidate_receiver, total = _epc_candidate_space(
+        tx_positions, rx_positions, sequences, sequence_tx, candidate_sequence, candidate_receiver
+    )
     if not 0 <= candidate_start <= candidate_end <= total:
         raise ValueError("candidate range is out of bounds")
     exported = _required_native_op("deterministic_reflection_epc_input_batch")(
