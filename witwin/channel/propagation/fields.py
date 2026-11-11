@@ -72,6 +72,7 @@ from witwin.channel.materials import (
 from witwin.channel.scene.compiler import (
     _frequency_scalar,
 )
+from witwin.channel.scene.resources import diffraction_edge_vertex_ids
 from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel.propagation.geometry import (
     apply_los_taper,
@@ -661,14 +662,18 @@ def _evaluate_diffraction_fields(
                 # winner extraction below runs on detached tables; only the
                 # vertex gathers touch the live table.
                 records = compiled.rayd.edge_records()
-                edge_v0_ids = records.edge_v0.to(dtype=torch.int64)[edge_id]
-                edge_v1_ids = records.edge_v1.to(dtype=torch.int64)[edge_id]
+                record_v0 = records.edge_v0.to(dtype=torch.int64)[edge_id]
+                record_v1 = records.edge_v1.to(dtype=torch.int64)[edge_id]
+                first_ids, last_ids = diffraction_edge_vertex_ids(compiled.rayd, edge_geometry[2])
+                edge_v0_ids = first_ids.to(dtype=torch.int64)[edge_id]
+                edge_v1_ids = last_ids.to(dtype=torch.int64)[edge_id]
                 faces_table = records.faces.to(dtype=torch.int64)
                 tri0 = faces_table[face0.clamp(min=0)]
                 tri1 = faces_table[face1.clamp(min=0)]
-                opp0_ids = _opposite_vertex_ids(tri0, edge_v0_ids, edge_v1_ids)
-                opp1_ids = _opposite_vertex_ids(tri1, edge_v0_ids, edge_v1_ids)
-                edge_boundary = (face1 < 0).contiguous()
+                opp0_ids = _opposite_vertex_ids(tri0, record_v0, record_v1)
+                opp1_ids = _opposite_vertex_ids(tri1, record_v0, record_v1)
+                # A half-plane edge carries its one sheet face on both sides.
+                edge_boundary = ((face1 < 0) | (face1 == face0)).contiguous()
                 wedge_vertices = (
                     vertices[edge_v0_ids].contiguous(),
                     vertices[edge_v1_ids].contiguous(),

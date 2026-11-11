@@ -116,9 +116,16 @@ def _selected_diffraction_edges_reference(records) -> torch.Tensor:
         boundary, torch.full_like(exterior_angle, 2.0 * torch.pi), exterior_angle
     )
     wedge_n = exterior_angle / torch.pi
+    # Concave: each face lies in front of the other's outward normal.
+    concave = (
+        interior
+        & (((point_b - plane_point) * n0).sum(dim=1) > _REFERENCE_EDGE_INFO_PLANE_TOL)
+        & (((point_a - plane_point) * n1).sum(dim=1) > _REFERENCE_EDGE_INFO_PLANE_TOL)
+    )
     return (
         (interior | boundary)
         & ~coplanar
+        & ~concave
         & (lengths > 1.0e-6)
         & (wedge_n > 1.0 + 1.0e-6)
     )
@@ -152,10 +159,27 @@ def _torch_diffraction_edge_geometry(records) -> tuple[torch.Tensor, ...]:
     ordered_n1 = torch.where(choose_first[:, None], n1_cand, n0_cand)
 
     interior = (face0 >= 0) & (face1 >= 0)
-    boundary = face1 < 0
+    boundary = (face0 >= 0) & (face1 < 0)
     n0 = torch.where(interior[:, None], ordered_n0, n0_cand)
     n1 = torch.where(interior[:, None], ordered_n1, n1_cand)
     n1 = torch.where(boundary[:, None], -n0_cand, n1)
+    # Faces follow the exported normals; a half-plane's back face is the sheet itself.
+    face_zero = torch.where(interior & ~choose_first, safe1, safe0)
+    face_other = torch.where(interior & ~choose_first, safe0, safe1)
+    wedge_face0 = torch.where(face0 >= 0, face_zero, face0)
+    wedge_face1 = torch.where(interior, face_other, torch.where(boundary, face0, face1))
+    # Orient each edge so that n0 x dir points into face 0 (towards its opposite vertex).
+    faces = records.faces.to(dtype=torch.long)
+
+    def opposite(face: torch.Tensor) -> torch.Tensor:
+        tri = faces[face]
+        pick = torch.where((tri[:, 0] != edge_v0) & (tri[:, 0] != edge_v1), tri[:, 0],
+                           torch.where((tri[:, 1] != edge_v0) & (tri[:, 1] != edge_v1), tri[:, 1], tri[:, 2]))
+        return vertices[pick]
+
+    into_zero = opposite(face_zero) - start
+    flip = (face0 >= 0) & ((torch.cross(n0, edge_dir, dim=1) * into_zero).sum(dim=1) < 0.0)
+    edge_dir = torch.where(flip[:, None], -edge_dir, edge_dir)
     normal_dot = (n0 * n1).sum(dim=1)
     interior_angle = torch.acos(torch.clamp(-normal_dot, -1.0, 1.0))
     exterior_angle = torch.where(
@@ -172,8 +196,8 @@ def _torch_diffraction_edge_geometry(records) -> tuple[torch.Tensor, ...]:
         (0.5 * lengths).contiguous(),
         n0.contiguous(),
         n1.contiguous(),
-        records.face0.contiguous(),
-        records.face1.contiguous(),
+        wedge_face0.to(records.face0.dtype).contiguous(),
+        wedge_face1.to(records.face1.dtype).contiguous(),
         exterior_angle.contiguous(),
     )
 

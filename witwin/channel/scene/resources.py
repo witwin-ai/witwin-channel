@@ -59,6 +59,7 @@ __all__ = [
     "rayd_scene_update_vertices",
     "realization_phase_screens",
     "realization_seed",
+    "diffraction_edge_vertex_ids",
     "refine_edge_geometry",
     "resolve_scene_edge_policy",
     "sample_directions",
@@ -409,6 +410,9 @@ DEFAULT_EDGE_POLICY = EdgePolicy()
 # records that double count the diffracted field.
 
 _ENDPOINT_QUANTIZATION = 1.0e-4
+_NORMAL_QUANTIZATION = 1.0e-3
+# Runtime-cache key of the (first, last) end-point vertex ids of every refined diffraction edge.
+DIFFRACTION_EDGE_VERTEX_IDS = "diffraction_edge_vertex_ids"
 _NORMAL_COS_TOL = 1.0 - 1.0e-5
 _TWO_PI = 2.0 * math.pi
 
@@ -483,6 +487,7 @@ def refine_edge_geometry(
     exterior_angle = exterior_angle.clone()
 
     boundary = records.face1 < 0
+    shape1 = records.shape_id.clone()
     pair_first, pair_second, extras = _duplicate_boundary_pairs(records, selected & boundary)
     if int(pair_first.numel()) > 0:
         normal_a = n0[pair_first]
@@ -491,12 +496,17 @@ def refine_edge_geometry(
         interior_angle = torch.arccos((-normal_dot).clamp(-1.0, 1.0))
         merged_exterior = _TWO_PI - interior_angle
         coplanar = normal_dot.abs() >= _NORMAL_COS_TOL
-        keep = (merged_exterior > math.pi * (1.0 + 1.0e-6)) & ~coplanar
+        # Each boundary edge is oriented so that n0 x dir points into its face; the wedge is convex when
+        # face b leaves the edge behind face a's outward normal.
+        into_b = torch.cross(normal_b, edge_dir[pair_second], dim=1)
+        convex = (into_b * normal_a).sum(dim=1) < 0.0
+        keep = (merged_exterior > math.pi * (1.0 + 1.0e-6)) & ~coplanar & convex
         selected[pair_first] = keep
         selected[pair_second] = False
         n1[pair_first] = normal_b
         face1[pair_first] = face0[pair_second]
         exterior_angle[pair_first] = merged_exterior
+        shape1[pair_first] = records.shape_id[pair_second]
         boundary = boundary.clone()
         boundary[pair_first] = False
     if int(extras.numel()) > 0:
@@ -511,7 +521,129 @@ def refine_edge_geometry(
         length = delta.norm(dim=1).clamp_min(1.0e-6)
         selected &= (delta[:, 2].abs() / length) > float(policy.vertical_ratio)
 
+    edge_pos, lengths, line_min, line_max, first_vertex, last_vertex = _merge_collinear_wedges(
+        records, selected, edge_pos, edge_dir, line_max, n0, n1, shape1)
+    rayd.runtime_cache[DIFFRACTION_EDGE_VERTEX_IDS] = (first_vertex, last_vertex)
     return (selected, edge_pos, edge_dir, lengths, line_min, line_max, n0, n1, face0, face1, exterior_angle)
+
+
+def diffraction_edge_vertex_ids(
+    rayd: object, edge_dir: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Vertex ids of each diffraction edge's first and last end point along ``edge_dir``.
+
+    A merged edge spans its whole chain, so its ends are the chain's end vertices; any other edge
+    uses its own record vertices, ordered along its (possibly reversed) direction.
+    """
+
+    cached = rayd.runtime_cache.get(DIFFRACTION_EDGE_VERTEX_IDS)
+    if cached is not None:
+        return cached  # type: ignore[return-value]
+    records = rayd.edge_records()
+    along = ((records.vertices[records.edge_v1.long()] - records.vertices[records.edge_v0.long()])
+             * edge_dir).sum(dim=1) >= 0.0
+    return (torch.where(along, records.edge_v0, records.edge_v1),
+            torch.where(along, records.edge_v1, records.edge_v0))
+
+
+def _canonical_sign(direction: torch.Tensor) -> torch.Tensor:
+    """``+1`` or ``-1`` per row so that ``sign * direction`` has a positive leading component."""
+
+    tol = 1.0e-3
+    x, y, z = direction.unbind(dim=1)
+    lead = torch.where(x.abs() > tol, x, torch.where(y.abs() > tol, y, z))
+    return torch.where(lead < 0.0, -1.0, 1.0).to(direction.dtype)
+
+
+def _merge_collinear_wedges(
+    records: object, selected: torch.Tensor, edge_pos: torch.Tensor, edge_dir: torch.Tensor,
+    half_length: torch.Tensor, n0: torch.Tensor, n1: torch.Tensor, shape1: torch.Tensor,
+) -> tuple[torch.Tensor, ...]:
+    """Merge selected edge segments that form one physical wedge, updating ``selected`` in place.
+
+    A segment continues another when its start point is the other's end point, both are parallel,
+    both carry the same unordered pair of face normals (either face may be face 0), and both join
+    the same pair of shapes. Each chain keeps its first segment, with that segment's orientation
+    and faces, extended over the whole chain; the other segments are deselected. Returns the
+    updated ``edge_pos``, ``lengths``, ``line_min`` and ``line_max``, and the vertex ids of each
+    edge's first and last end point along its direction (the chain ends for a merged edge).
+    """
+
+    edge_pos = edge_pos.clone()
+    half_length = half_length.clone()
+    along = ((records.vertices[records.edge_v1.long()] - records.vertices[records.edge_v0.long()])
+             * edge_dir).sum(dim=1) >= 0.0
+    first_vertex = torch.where(along, records.edge_v0, records.edge_v1).clone()
+    last_vertex = torch.where(along, records.edge_v1, records.edge_v0).clone()
+    index = selected.nonzero(as_tuple=False).squeeze(1)
+    count = int(index.numel())
+    if count > 1:
+        device = index.device
+        v0 = records.edge_v0[index].long()
+        v1 = records.edge_v1[index].long()
+        point_a = records.vertices[v0].double()
+        point_b = records.vertices[v1].double()
+        sign = _canonical_sign(point_b - point_a).unsqueeze(1)
+        low = torch.where(sign > 0.0, point_a, point_b)
+        high = torch.where(sign > 0.0, point_b, point_a)
+        canonical = edge_dir[index].double() * _canonical_sign(edge_dir[index].double()).unsqueeze(1)
+        normal_a = n0[index].double()
+        normal_b = n1[index].double()
+        swap = (_canonical_sign(normal_a - normal_b) < 0.0).unsqueeze(1)
+        wedge_key = torch.cat([
+            torch.round(torch.where(swap, normal_b, normal_a) / _NORMAL_QUANTIZATION),
+            torch.round(torch.where(swap, normal_a, normal_b) / _NORMAL_QUANTIZATION),
+            torch.sort(torch.stack([records.shape_id[index], shape1[index]], dim=1).long(), dim=1).values.double(),
+        ], dim=1).long()
+        low_key = torch.cat([wedge_key, torch.round(low / _ENDPOINT_QUANTIZATION).long()], dim=1)
+        high_key = torch.cat([wedge_key, torch.round(high / _ENDPOINT_QUANTIZATION).long()], dim=1)
+        _, inverse = torch.unique(torch.cat([low_key, high_key]), dim=0, return_inverse=True)
+        low_slot, high_slot = inverse[:count], inverse[count:]
+        slots = 2 * count
+        low_count = torch.bincount(low_slot, minlength=slots)
+        high_count = torch.bincount(high_slot, minlength=slots)
+        local = torch.arange(count, device=device)
+        high_owner = torch.full((slots,), -1, dtype=torch.long, device=device)
+        high_owner.scatter_(0, high_slot, local)
+        previous = high_owner[low_slot]
+        unique_join = (low_count[low_slot] == 1) & (high_count[low_slot] == 1) & (previous >= 0)
+        safe_previous = previous.clamp_min(0)
+        parallel = (canonical * canonical[safe_previous]).sum(dim=1) > 1.0 - 1.0e-6
+        link = torch.where(unique_join & parallel & (safe_previous != local), safe_previous, local)
+        # Pointer jumping: after ceil(log2(count)) + 1 rounds every segment points at its chain head.
+        head = link
+        for _ in range(max(1, math.ceil(math.log2(count))) + 1):
+            head = head[head]
+        origin = low[head]
+        axis = canonical[head]
+        start = ((low - origin) * axis).sum(dim=1)
+        end = ((high - origin) * axis).sum(dim=1)
+        chain_start = torch.full((count,), math.inf, dtype=torch.float64, device=device)
+        chain_end = torch.full((count,), -math.inf, dtype=torch.float64, device=device)
+        chain_start.scatter_reduce_(0, head, start, reduce="amin")
+        chain_end.scatter_reduce_(0, head, end, reduce="amax")
+        is_head = head == local
+        merged = is_head & (torch.bincount(head, minlength=count) > 1)
+        centre = origin + 0.5 * (chain_start + chain_end).unsqueeze(1) * axis
+        new_half = 0.5 * (chain_end - chain_start)
+        target = index[merged]
+        edge_pos[target] = centre[merged].to(edge_pos.dtype)
+        half_length[target] = new_half[merged].to(half_length.dtype)
+        low_vertex = torch.where(sign.squeeze(1) > 0.0, v0, v1)
+        high_vertex = torch.where(sign.squeeze(1) > 0.0, v1, v0)
+        chain_low = torch.zeros(count, dtype=torch.long, device=device)
+        chain_high = torch.zeros(count, dtype=torch.long, device=device)
+        at_low = start == chain_start[head]
+        at_high = end == chain_end[head]
+        chain_low[head[at_low]] = low_vertex[at_low]
+        chain_high[head[at_high]] = high_vertex[at_high]
+        forward = (edge_dir[index].double() * axis).sum(dim=1) >= 0.0
+        first = torch.where(forward, chain_low, chain_high).to(first_vertex.dtype)
+        last = torch.where(forward, chain_high, chain_low).to(last_vertex.dtype)
+        first_vertex[target] = first[merged]
+        last_vertex[target] = last[merged]
+        selected[index[~is_head]] = False
+    return edge_pos, 2.0 * half_length, -half_length, half_length, first_vertex, last_vertex
 
 
 @dataclass(frozen=True, slots=True)
