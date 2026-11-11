@@ -1,7 +1,7 @@
 # Copyright Xingyu Chen.
-# Gate: incoherent deterministic radiomaps agree with Monte Carlo Basic within its confidence interval.
+# Gate: incoherent deterministic radiomaps agree with MC Basic within its confidence interval.
 
-"""Gate: incoherent deterministic radiomaps agree with Monte Carlo Basic within its confidence interval."""
+"""Gate: incoherent deterministic radiomaps agree with MC Basic within its confidence interval."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ SAMPLES = 1 << 20
 # A cell passes when |MC mean - deterministic cell average| <= Z_LIMIT standard errors. With
 # 7 degrees of freedom, 5 standard errors is a two-sided per-cell tail of about 0.16 %.
 Z_LIMIT = 5.0
-# Deterministic sub-samples per cell side used to form the deterministic cell average.
+# Deterministic sub-samples per cell side; their mean is the deterministic cell average.
 SUBSAMPLES = 8
 SHAPE, SPACING = (4, 4), 2.0
 
