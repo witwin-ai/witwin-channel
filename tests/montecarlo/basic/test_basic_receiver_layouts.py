@@ -173,3 +173,15 @@ def test_primal_face_material_tensors_are_reused_until_the_store_changes() -> No
     changed = mc_basic._face_material_tensors(scene, device=device, ad=False)
     assert changed[0] is not first[0]
     torch.testing.assert_close(changed[0], first[0] + 1.0)
+
+
+def test_point_diffraction_ad_forward_is_the_primal_and_carries_a_source_gradient() -> None:
+    base = torch.tensor([0.0, -1.0, 0.5])
+    config = dict(samples=1 << 16, seed=2, components={"diffraction"}, receiver_radius_m=0.1)
+    primal = _solve(wedge_diffraction_scene(tx=base.clone()), Config(**config)).path_gain
+    leaf = base.clone().cuda().requires_grad_(True)
+    result = _solve(wedge_diffraction_scene(tx=leaf), Config(**config, ad_mode="vjp"))
+    torch.testing.assert_close(result.path_gain.detach(), primal, rtol=1e-6, atol=0.0)
+    result.path_gain.sum().backward()
+    assert leaf.grad is not None
+    assert bool(torch.isfinite(leaf.grad).all()) and float(leaf.grad.abs().max()) > 0.0

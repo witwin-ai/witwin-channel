@@ -44,7 +44,11 @@ Finding P-12 measured three reductions:
 3. **MC reflection VJP.** The per-face material cotangents are combined within the
    warp (lanes with the same face add their values through shuffles, one atomic per
    distinct face) and the per-ray frequency cotangent goes through the same ordered
-   sum. Face cotangents stay atomic, so they remain order-dependent in the last bits.
+   sum. Face cotangents stay atomic, so they remain order-dependent in the last bits. The
+   four material tangents and the wavelength tangent come from one evaluation of RayD's
+   `legacy_slab_fresnel_dual_multi<5>` (RayD `7bbb44b`), which evaluates the frozen legacy slab
+   primal once and follows, per tangent, exactly the operation sequence of the single-tangent
+   `legacy_slab_fresnel_dual`.
 
 ## Evidence
 
