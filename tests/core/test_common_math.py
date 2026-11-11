@@ -52,7 +52,8 @@ def test_axis_aligned_grid_spec_preserves_native_layout_contract():
     assert spec.coord1_min == pytest.approx(2.875)
     assert spec.coord1_max == pytest.approx(4.125)
     assert spec.cell_area == pytest.approx(0.125)
-    assert component_grid_shape(grid) == (5, 3)
+    # Component maps are receiver row-major: (rows, cols) = grid.shape.
+    assert component_grid_shape(grid) == (3, 5)
 
 
 def test_first_receiver_grid_and_component_validation_are_shared():
