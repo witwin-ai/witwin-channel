@@ -200,8 +200,8 @@ def build_scene_from_structures(structures: tuple[object, ...]) -> RayDSceneReso
             reason="CUDA is unavailable", requested_trace_backend=trace_backend
         )
 
-    device = torch.device("cuda", torch.cuda.current_device())
-    require_device_supported(device.index)
+    require_device_supported(torch.cuda.current_device())
+    device = torch.device("cuda")
     vertices: list[torch.Tensor] = []
     faces: list[torch.Tensor] = []
     uv: list[torch.Tensor] = []

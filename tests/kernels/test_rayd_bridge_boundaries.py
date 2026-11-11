@@ -16,6 +16,7 @@ WRAPPERS_BY_SOURCE = {
     "scene.cpp": {
         "channel_rayd_scene_create",
         "channel_rayd_scene_edge_records",
+        "channel_runtime_probe",
     },
     "geometry.cpp": {
         "channel_rayd_intersect_forward",
@@ -93,7 +94,7 @@ def test_rayd_wrapper_definitions_are_unique_and_owned_by_responsibility():
         for definition in definitions:
             owners.setdefault(definition, []).append(source_name)
 
-    assert len(expected_wrappers) == 24
+    assert len(expected_wrappers) == 25
     assert set(owners) == expected_wrappers
     assert all(len(source_names) == 1 for source_names in owners.values())
 
