@@ -43,7 +43,7 @@ def test_every_entry_point_exists():
 
 
 def test_the_entry_points_are_the_public_surface():
-    """The root plus the four solver entries, and nothing else."""
+    """The root, the four solver entries and the preset module, and nothing else."""
 
     assert set(orphan.ENTRY_POINTS) == {
         "witwin.channel",
@@ -51,6 +51,7 @@ def test_the_entry_points_are_the_public_surface():
         "witwin.channel.deterministic",
         "witwin.channel.montecarlo.basic",
         "witwin.channel.montecarlo.bdpt",
+        "witwin.channel.presets",
     }
 
 
@@ -130,6 +131,7 @@ def test_a_stale_entry_point_is_refused(tmp_path: Path):
         "witwin.channel.montecarlo.basic",
         "witwin.channel.montecarlo.bdpt",
         "witwin.channel.path",
+        "witwin.channel.presets",
     ]
 
 

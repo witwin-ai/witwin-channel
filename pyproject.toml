@@ -39,6 +39,7 @@ files = [
     "witwin/channel/montecarlo/basic.py",
     "witwin/channel/montecarlo/bdpt.py",
     "witwin/channel/path.py",
+    "witwin/channel/presets.py",
 ]
 follow_imports = "skip"
 ignore_missing_imports = true

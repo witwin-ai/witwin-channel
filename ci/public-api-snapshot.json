@@ -406,6 +406,64 @@
           "signature": "(prepared: PreparedFixedTopology, slot_count: int, *, source_count: int, sink_count: int)"
         }
       ]
+    },
+    {
+      "module": "witwin.channel.presets",
+      "exports": [
+        {
+          "name": "ITU_MATERIALS",
+          "kind": "unresolved",
+          "target": "witwin.channel.presets.ITU_MATERIALS",
+          "contract_sha256": "51ab46c592026b55a34ef362f8115d6c78fe9b4291b6e87f59bf71ec913a7cd3"
+        },
+        {
+          "name": "ItuBand",
+          "kind": "class",
+          "target": "witwin.channel.presets.ItuBand",
+          "contract_sha256": "ee149f2339f82af589eacaa0ba875aa8d37cc9686b037813710c266757bd3f84"
+        },
+        {
+          "name": "ItuBandDispersion",
+          "kind": "class",
+          "target": "witwin.channel.presets.ItuBandDispersion",
+          "contract_sha256": "80327f2403e97245e17110d991cf3ba7b9a68f32a6a6e7e121a67db05319740a"
+        },
+        {
+          "name": "dipole_pattern",
+          "kind": "function",
+          "target": "witwin.channel.presets.dipole_pattern",
+          "contract_sha256": "4f6134cda7a37d8661b8779325e636ca15a40fb825a77c39650b6daf32b6c4ce",
+          "signature": "(kind: Literal['short', 'half_wave']='half_wave')"
+        },
+        {
+          "name": "itu_material",
+          "kind": "function",
+          "target": "witwin.channel.presets.itu_material",
+          "contract_sha256": "18c9185e36f641d2da1905dd2437690b4e6176dc87a1c2aa18c59dce3e9047e0",
+          "signature": "(name: str, frequency_hz: float | tuple[float, float], *, dispersive: bool=True, thickness_m: float=0.1, material_name: str | None=None, **material_kwargs: Any)"
+        },
+        {
+          "name": "itu_material_names",
+          "kind": "function",
+          "target": "witwin.channel.presets.itu_material_names",
+          "contract_sha256": "2ba77d0310d616779f93a28ea440033d2f2292eca33208d9080d73a0e4084deb",
+          "signature": "()"
+        },
+        {
+          "name": "itu_properties",
+          "kind": "function",
+          "target": "witwin.channel.presets.itu_properties",
+          "contract_sha256": "1b7b0f096d462b350fae70f76deb762eb193a65d3cf8ca42fc7c843e395e7cab",
+          "signature": "(name: str, frequency_hz: float)"
+        },
+        {
+          "name": "tr38901_pattern",
+          "kind": "function",
+          "target": "witwin.channel.presets.tr38901_pattern",
+          "contract_sha256": "889b3b967031dfd58a256786e42ced3c34e76881f6754401fbac06296436e23b",
+          "signature": "(*, max_gain_dbi: float=8.0, beamwidth_deg: float=65.0, side_lobe_db: float=30.0)"
+        }
+      ]
     }
   ]
 }
