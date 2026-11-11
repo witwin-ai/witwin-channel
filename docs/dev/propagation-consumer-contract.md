@@ -130,6 +130,11 @@ internal failure transaction before constructing the public result. No public
 contract contains a failure bit/state, observer, native handle, resource,
 cache, or tape.
 
+Endpoint separation is a caller precondition, not a refusal: requests never read
+endpoint coordinates on the host. `check_endpoint_separation` applies the
+solvers' coincidence tolerance to a pair of endpoint batches at the cost of one
+one-byte read.
+
 The frequency-offset entry in that list is now a supported capability with
 independent refusals rather than a blanket one (ADR-042).
 `FixedTopologyRequest.frequency_offsets_hz` is a host-declared grid of

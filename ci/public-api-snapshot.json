@@ -393,6 +393,13 @@
           "signature": "()"
         },
         {
+          "name": "check_endpoint_separation",
+          "kind": "function",
+          "target": "witwin.channel.propagation.consumer.check_endpoint_separation",
+          "contract_sha256": "07900250e1fc3af6da2fb6c2eefaa77effb9c5886e6a08d6ad64a280f74ee892",
+          "signature": "(sources: EndpointBatch, sinks: EndpointBatch, *, reference_frequency_hz: float | torch.Tensor)"
+        },
+        {
           "name": "evaluate",
           "kind": "function",
           "target": "witwin.channel.propagation.consumer.evaluate",
