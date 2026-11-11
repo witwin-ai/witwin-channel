@@ -68,3 +68,12 @@ def test_capability_manifest_is_versioned_serializable_and_defensive():
 
     manifest["components"].append("invalid")
     assert "invalid" not in capabilities()["components"]
+
+
+def test_solver_capabilities_is_a_fresh_copy_of_one_manifest_entry():
+    from witwin.channel.capabilities import capabilities as manifest, solver_capabilities
+
+    for solver in manifest()["solvers"]:
+        entry = solver_capabilities(solver)
+        assert entry == manifest()["solvers"][solver]
+        assert entry is not solver_capabilities(solver)
