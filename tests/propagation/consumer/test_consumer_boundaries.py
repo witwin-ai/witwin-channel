@@ -81,10 +81,13 @@ def test_compact_autograd_native_companions_have_one_topology_owner() -> None:
     for path in PACKAGE_ROOT.rglob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
+            # A symbol is dispatched by name or declared once as a native op of its facade.
             if (
                 isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Name)
-                and node.func.id == "_required_native_op"
+                and (
+                    (isinstance(node.func, ast.Name) and node.func.id == "_required_native_op")
+                    or (isinstance(node.func, ast.Attribute) and node.func.attr == "op")
+                )
                 and node.args
                 and isinstance(node.args[0], ast.Constant)
                 and node.args[0].value in symbols

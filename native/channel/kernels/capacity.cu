@@ -107,10 +107,6 @@ __global__ void enumerated_capacity_failure_sanitize_kernel(
     }
 }
 
-int launch_blocks(int64_t count) {
-    return static_cast<int>((count + kBlockSize - 1) / kBlockSize);
-}
-
 }  // namespace
 
 pybind11::dict channel_enumerated_capacity_failure_sanitize(
@@ -159,7 +155,7 @@ pybind11::dict channel_enumerated_capacity_failure_sanitize(
         const auto output_view = channel::evaluated_paths::output_view(output);
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
         enumerated_capacity_failure_sanitize_kernel<<<
-            launch_blocks(rows), kBlockSize, 0, stream>>>(
+            ::channel::launch_blocks(rows, kBlockSize), kBlockSize, 0, stream>>>(
             failure_state.data_ptr<int>(), valid.data_ptr<bool>(), input,
             selected_row_index.data_ptr<int64_t>(), output_valid.data_ptr<bool>(),
             output_view, rows, sequence_width);
@@ -187,11 +183,10 @@ pybind11::dict channel_enumerated_capacity_failure_sanitize(
 #include <cstdint>
 #include <optional>
 
-#define kBlockSize kMcSanitizeBlockSize
 
 namespace {
 
-constexpr int kBlockSize = 256;
+constexpr int kMcSanitizeBlockSize = 256;
 constexpr int kMapCount = 5;
 
 struct MapInputView {
@@ -301,11 +296,11 @@ pybind11::dict sanitize_maps(
     }
     const int64_t count = reference.numel();
     if (count > 0) {
-        const int blocks = static_cast<int>((count + kBlockSize - 1) / kBlockSize);
+        const int blocks = static_cast<int>((count + kMcSanitizeBlockSize - 1) / kMcSanitizeBlockSize);
         cudaStream_t stream =
             at::cuda::getCurrentCUDAStream(reference.get_device()).stream();
         capacity_failure_component_maps_sanitize_kernel<<<
-            blocks, kBlockSize, 0, stream>>>(
+            blocks, kMcSanitizeBlockSize, 0, stream>>>(
             failure_state.data_ptr<int>(), input, output,
             reference.size(1), reference.size(2), count);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
@@ -360,5 +355,4 @@ pybind11::dict channel_mc_capacity_failure_component_maps_sanitize_jvp(
     return sanitize_maps(failure_state, reference, values, false, false);
 }
 
-#undef kBlockSize
 

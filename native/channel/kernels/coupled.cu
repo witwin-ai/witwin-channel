@@ -7,6 +7,7 @@
 #include <c10/cuda/CUDAException.h>
 #include <c10/util/complex.h>
 #include "torch_cuda.h"
+#include "constants.cuh"
 
 #include <rayd/field_transport.cuh>
 #include <src/field_transport_ad.cuh>
@@ -41,10 +42,6 @@ __device__ __forceinline__ c10::complex<float> to_c10(field::Complex value) {
 
 __device__ __forceinline__ field::Complex from_c10(c10::complex<float> value) {
     return field::cplx(value.real(), value.imag());
-}
-
-int launch_blocks(int64_t count) {
-    return static_cast<int>((count + kBlockSize - 1) / kBlockSize);
 }
 
 at::Tensor zero_scalar(const at::TensorOptions& options) {
@@ -212,11 +209,11 @@ constexpr int kChainColumns = kChainMaxDepth + 2;
 
 // Diffraction slot of a chain row: component 3 diffracts last, 4 first, 8 + s at slot s.
 __device__ __forceinline__ int chain_diffraction_slot(int component, int depth) {
-    if (component == 3)
+    if (component == channel::kComponentReflectionDiffraction)
         return depth - 1;
-    if (component == 4)
+    if (component == channel::kComponentDiffractionReflection)
         return 0;
-    return component - 8;
+    return component - channel::kComponentChainInteriorBase;
 }
 
 struct ChainArgs {
@@ -1418,7 +1415,8 @@ pybind11::dict channel_field_coupled_chain(CHAIN_HOST_PARAMS) {
     auto direction = at::empty({count, 3}, source.options());
     if (count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
-        coupled_chain_field_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        coupled_chain_field_kernel<<<::channel::launch_blocks(count, kBlockSize),
+                                     kBlockSize, 0, stream>>>(
             count, args, field_vector.data_ptr<c10::complex<float>>(),
             coefficient.data_ptr<c10::complex<float>>(), path_field.data_ptr<c10::complex<float>>(),
             path_gain.data_ptr<float>(), direction.data_ptr<float>());
@@ -1484,7 +1482,8 @@ pybind11::dict channel_field_coupled_chain_backward(
         g_field != nullptr || g_coefficient != nullptr || g_path_field != nullptr || g_path_gain != nullptr;
     if (count > 0 && any_grad) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
-        coupled_chain_backward_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        coupled_chain_backward_kernel<<<::channel::launch_blocks(count, kBlockSize),
+                                        kBlockSize, 0, stream>>>(
             count, args, opt_ptr<c10::complex<float>>(g_field), opt_ptr<c10::complex<float>>(g_coefficient),
             opt_ptr<c10::complex<float>>(g_path_field), opt_ptr<float>(g_path_gain), opt_mut_ptr<float>(grad_ptrs[0]),
             opt_mut_ptr<float>(grad_ptrs[1]), opt_mut_ptr<float>(grad_ptrs[2]), opt_mut_ptr<float>(grad_ptrs[3]),
@@ -1545,7 +1544,8 @@ pybind11::dict channel_field_coupled_chain_jvp(
     auto tangent_path_gain = at::empty({count}, source.options());
     if (count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
-        coupled_chain_jvp_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        coupled_chain_jvp_kernel<<<::channel::launch_blocks(count, kBlockSize),
+                                   kBlockSize, 0, stream>>>(
             count, args, opt_ptr<float>(t_source), opt_ptr<float>(t_target), opt_ptr<float>(t_eps),
             opt_ptr<float>(t_sigma), opt_ptr<float>(t_gain), opt_ptr<float>(t_thickness),
             static_cast<float>(tangent_frequency), tangent_field_vector.data_ptr<c10::complex<float>>(),
@@ -1729,7 +1729,8 @@ pybind11::dict channel_field_coupled_dd_backward(
                           g_path_field != nullptr || g_path_gain != nullptr;
     if (count > 0 && any_grad) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
-        coupled_dd_backward_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        coupled_dd_backward_kernel<<<::channel::launch_blocks(count, kBlockSize),
+                                     kBlockSize, 0, stream>>>(
             count,
             COUPLED_DD_HOST_ARGS,
             opt_ptr<c10::complex<float>>(g_field),
@@ -1807,7 +1808,8 @@ pybind11::dict channel_field_coupled_dd_jvp(
     auto tangent_path_gain = at::empty({count}, source.options());
     if (count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
-        coupled_dd_jvp_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        coupled_dd_jvp_kernel<<<::channel::launch_blocks(count, kBlockSize),
+                                kBlockSize, 0, stream>>>(
             count,
             COUPLED_DD_HOST_ARGS,
             opt_ptr<float>(t_source),
@@ -1981,7 +1983,8 @@ pybind11::dict channel_field_project_complex3_backward(
     }
     if (count > 0 && (g_coefficient != nullptr || g_path_gain != nullptr)) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(direction.get_device()).stream();
-        project_complex3_backward_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        project_complex3_backward_kernel<<<::channel::launch_blocks(count, kBlockSize),
+                                           kBlockSize, 0, stream>>>(
             count,
             field_vector.data_ptr<c10::complex<float>>(),
             direction.data_ptr<float>(),
@@ -2033,7 +2036,8 @@ pybind11::dict channel_field_project_complex3_jvp(
     auto tangent_path_gain = at::empty({count}, direction.options());
     if (count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(direction.get_device()).stream();
-        project_complex3_jvp_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        project_complex3_jvp_kernel<<<::channel::launch_blocks(count, kBlockSize),
+                                      kBlockSize, 0, stream>>>(
             count,
             field_vector.data_ptr<c10::complex<float>>(),
             direction.data_ptr<float>(),
@@ -2065,14 +2069,12 @@ pybind11::dict channel_field_project_complex3_jvp(
 #include <cmath>
 #include <vector>
 
-#define launch_blocks coupled_topology_launch_blocks
-#define kBlockSize kCoupledTopologyBlockSize
 
 namespace {
 
-constexpr int kBlockSize = 256;
+constexpr int kCoupledTopologyBlockSize = 256;
 constexpr float kGeometryEpsilon = 1.0e-6f;
-constexpr float kSpeedOfLight = 299792458.0f;
+using channel::kSpeedOfLightF;
 namespace utd = rayd::shared::diffraction;
 
 
@@ -2146,7 +2148,7 @@ __global__ void coupled_chain_finalize_kernel(
         valid_out[index] = valid;
         const float total = valid ? prefix + suffix : NAN;
         path_length[index] = total;
-        delay[index] = valid ? total / kSpeedOfLight : NAN;
+        delay[index] = valid ? total / kSpeedOfLightF : NAN;
     }
 }
 
@@ -2484,12 +2486,8 @@ __global__ void coupled_dd_finalize_kernel(
         const float total = channel::math::length(channel::math::sub(q1, tx)) + channel::math::length(channel::math::sub(q2, q1)) +
                             channel::math::length(channel::math::sub(rx, q2));
         path_length[index] = valid ? total : NAN;
-        delay[index] = valid ? total / kSpeedOfLight : NAN;
+        delay[index] = valid ? total / kSpeedOfLightF : NAN;
     }
-}
-
-int launch_blocks(int64_t count) {
-    return static_cast<int>((count + kBlockSize - 1) / kBlockSize);
 }
 
 }  // namespace
@@ -2531,7 +2529,8 @@ pybind11::dict channel_coupled_chain_finalize_cuda(
     if (count > 0) {
         const at::Tensor prefix_valid_c = prefix_valid.contiguous();
         const at::Tensor suffix_valid_c = suffix_valid.contiguous();
-        coupled_chain_finalize_kernel<<<launch_blocks(count), kBlockSize, 0,
+        coupled_chain_finalize_kernel<<<::channel::launch_blocks(count, kCoupledTopologyBlockSize),
+                                        kCoupledTopologyBlockSize, 0,
                                         at::cuda::getCurrentCUDAStream(source.get_device()).stream()>>>(
             count, prefix_depth, suffix_depth, prefix_valid_c.data_ptr<bool>(), suffix_valid_c.data_ptr<bool>(),
             prefix_depth > 0 ? prefix_length.data_ptr<float>() : nullptr,
@@ -2600,7 +2599,8 @@ std::vector<at::Tensor> channel_coupled_dd_prepare_cuda(
     auto certificate_rejections = channel::empty_zero_cuda(
         {1}, source.options().dtype(at::kInt), stream);
     if (count > 0) {
-        coupled_dd_prepare_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        coupled_dd_prepare_kernel<<<::channel::launch_blocks(count, kCoupledTopologyBlockSize),
+                                    kCoupledTopologyBlockSize, 0, stream>>>(
             count,
             edge1_id.data_ptr<int>(),
             edge2_id.data_ptr<int>(),
@@ -2658,7 +2658,8 @@ pybind11::dict channel_coupled_dd_finalize_cuda(
     auto valid = at::empty_like(prefix_active);
     if (count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(prefix_active.get_device()).stream();
-        coupled_dd_finalize_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        coupled_dd_finalize_kernel<<<::channel::launch_blocks(count, kCoupledTopologyBlockSize),
+                                     kCoupledTopologyBlockSize, 0, stream>>>(
             count,
             prefix_active.data_ptr<bool>(),
             edge1_id.data_ptr<int>(),
@@ -2703,7 +2704,8 @@ at::Tensor channel_coupled_active_mask_cuda(at::Tensor lhs, at::Tensor rhs) {
     const int64_t count = lhs.size(0);
     if (count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(lhs.get_device()).stream();
-        coupled_active_mask_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        coupled_active_mask_kernel<<<::channel::launch_blocks(count, kCoupledTopologyBlockSize),
+                                     kCoupledTopologyBlockSize, 0, stream>>>(
             count,
             lhs.data_ptr<bool>(),
             rhs.data_ptr<bool>(),
@@ -2724,13 +2726,13 @@ at::Tensor channel_coupled_active_either_mask_cuda(at::Tensor lhs, at::Tensor rh
     const int64_t count = lhs.size(0);
     if (count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(lhs.get_device()).stream();
-        coupled_active_either_mask_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        coupled_active_either_mask_kernel<<<
+            ::channel::launch_blocks(count, kCoupledTopologyBlockSize),
+            kCoupledTopologyBlockSize, 0, stream>>>(
             count, lhs.data_ptr<bool>(), rhs.data_ptr<bool>(), other.data_ptr<bool>(), out.data_ptr<bool>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return out;
 }
 
-#undef launch_blocks
-#undef kBlockSize
 

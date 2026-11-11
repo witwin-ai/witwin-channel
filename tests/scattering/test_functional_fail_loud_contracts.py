@@ -9,6 +9,7 @@ import pytest
 import torch
 
 from witwin.channel.kernels import scattering as functional
+from witwin.channel.kernels import spec
 
 
 def _table_args(rows: int = 2) -> list[torch.Tensor]:
@@ -71,7 +72,8 @@ def _patch_args(rows: int = 2) -> list[torch.Tensor]:
 
 @pytest.fixture(autouse=True)
 def _isolate_thin_facade(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(functional, "validate_cuda_tensor", lambda *_args, **_kwargs: None)
+    # The declared tensor checks of the facade run through the spec module.
+    monkeypatch.setattr(spec, "validate_cuda_tensor", lambda *_args, **_kwargs: None)
     node = torch.zeros(1)
     monkeypatch.setattr(functional, "_duffy_nodes", lambda _device: (node, node, node))
 

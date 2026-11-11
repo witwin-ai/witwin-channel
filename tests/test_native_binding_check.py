@@ -132,6 +132,70 @@ def test_a_symbol_without_a_dispatch_site_is_reported(tmp_path: Path) -> None:
     assert check.check_invariants(repo) == ["native symbol has no Python dispatch site: beta"]
 
 
+_SPEC_KERNELS = """\
+from witwin.channel.kernels.spec import NativeOps, integer, tensor
+from witwin.channel.runtime import required_symbol as _required_native_op
+
+_native = NativeOps(lambda symbol: _required_native_op(symbol))
+_ALPHA = _native.op("alpha", tensor("values"), integer("count"))
+_BETA = _native.op("beta", tensor("values"))
+
+
+def alpha(values):
+    return _ALPHA(values, 1)
+
+
+def beta(values):
+    return _BETA(values)
+"""
+
+
+def test_declared_ops_are_owned_by_the_definitions_that_dispatch_them(tmp_path: Path) -> None:
+    repo = _repo(tmp_path, _SPEC_KERNELS, _SOLVER_USES_BOTH)
+
+    assert check.check_invariants(repo) == []
+    rows = {row["name"]: row for row in check.generate_manifest(repo)["symbols"]}
+    assert rows["alpha"]["python_owners"] == ["witwin.channel.kernels.alpha"]
+    assert rows["beta"]["python_owners"] == ["witwin.channel.kernels.beta"]
+
+
+def test_a_declared_op_reached_only_from_dead_code_is_reported(tmp_path: Path) -> None:
+    solver = "from witwin.channel import kernels\n\n\ndef solve(values):\n    return kernels.alpha(values)\n"
+    repo = _repo(tmp_path, _SPEC_KERNELS, solver)
+
+    assert check.check_invariants(repo) == ["native symbol has no production caller: beta"]
+
+
+def test_the_declaration_resolver_does_not_make_symbol_literals_dispatch_sites(
+    tmp_path: Path,
+) -> None:
+    kernels = _SPEC_KERNELS.replace(
+        '_BETA = _native.op("beta", tensor("values"))\n', ""
+    ).replace("    return _BETA(values)", '    return "beta"')
+    repo = _repo(tmp_path, kernels, _SOLVER_USES_BOTH)
+
+    assert check.check_invariants(repo) == ["native symbol has no Python dispatch site: beta"]
+
+
+@pytest.mark.parametrize(
+    ("declaration", "problem"),
+    [
+        ('tensor("count"), integer("values")', "arguments ['count', 'values'] differ"),
+        ('tensor("values")', "arguments ['values'] differ"),
+        ('tensor("values"), integer("count"), integer("extra")', "arguments ['values', 'count', 'extra'] differ"),
+    ],
+)
+def test_a_declaration_must_match_the_cpp_parameters(
+    tmp_path: Path, declaration: str, problem: str,
+) -> None:
+    kernels = _SPEC_KERNELS.replace('tensor("values"), integer("count")', declaration)
+    repo = _repo(tmp_path, kernels, _SOLVER_USES_BOTH)
+
+    problems = check.check_invariants(repo)
+    assert len(problems) == 1
+    assert problems[0].startswith("witwin.channel.kernels._ALPHA ") and problem in problems[0]
+
+
 def test_known_debt_entries_must_shrink(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo = _repo(tmp_path, _KERNELS, _SOLVER_USES_BOTH)
     monkeypatch.setattr(check, "KNOWN_SPLIT_OWNER_SYMBOLS", frozenset({"beta"}))

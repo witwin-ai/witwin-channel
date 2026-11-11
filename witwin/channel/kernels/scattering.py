@@ -5,25 +5,31 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import Any, Protocol, TypedDict, cast
 
 import numpy as np
 import torch
 
+from witwin.channel.kernels.spec import (
+    AdInputs,
+    Arg,
+    NativeOps,
+    flag,
+    frequency_meta,
+    real,
+    save,
+    tensor,
+    opaque,
+)
 from witwin.channel.runtime import (
     _ad_first_order_only,
     _ad_frequency_grad,
     _ad_frequency_tangent,
     _ad_frequency_value,
-    _ad_geometry_tangent,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
-    _ad_reject_fixed_inputs,
-    _ad_reject_fixed_tangents,
     disable_functorch,
     required_symbol as _required_native_op,
-    validate_cuda_tensor,
 )
 
 
@@ -82,8 +88,102 @@ def _duffy_nodes(device: torch.device) -> tuple[torch.Tensor, torch.Tensor, torc
     return entry
 
 
-_TABLE_EVAL_BACKWARD_FIELDS = ("grad_wi", "grad_wo", "grad_f_te", "grad_f_tm")
-_TABLE_EVAL_JVP_FIELDS = ("tangent_f_te", "tangent_f_tm")
+_native = NativeOps(lambda symbol: _required_native_op(symbol))
+_F32 = torch.float32
+
+_TABLE_PDF = _native.op(
+    "scattering_table_pdf", tensor("valid", torch.bool, 1), tensor("wi", _F32, 2),
+    tensor("wo", _F32, 2), tensor("sample_density", _F32, 4), flag("reverse"),
+)
+
+# Shared ensemble primal inputs in ABI order with their facade checks and AD roles.
+_ENSEMBLE_PRIMALS = (
+    tensor("valid", torch.bool, 1, grad="fixed"),
+    tensor("wo_rows", _F32, 2, grad="diff"),
+    tensor("r2_rows", _F32, 1, grad="diff"),
+    tensor("cos_o_rows", _F32, 1, grad="diff"),
+    tensor("n_o", grad="diff"),
+    tensor("t1r", grad="diff"),
+    tensor("t2r", grad="diff"),
+    tensor("wi_local", _F32, 2, grad="diff"),
+    tensor("cos_i", grad="diff"),
+    tensor("r1", grad="diff"),
+    tensor("a_te2", grad="diff"),
+    tensor("a_tm2", grad="diff"),
+    tensor("weights", grad="diff"),
+    tensor("material_id", torch.int32, 1, grad="fixed"),
+    tensor("backup_axis", grad="fixed"),
+    tensor("rx_pol", grad="fixed"),
+    tensor("rc_idx", torch.int64, 1, grad="fixed"),
+    tensor("sc_idx", torch.int64, 1, grad="fixed"),
+    tensor("f_te_flat", grad="diff", abi="fte_flat"),
+    tensor("f_tm_flat", grad="diff", abi="ftm_flat"),
+    tensor("table_offset", grad="fixed"),
+    tensor("table_dims", torch.int32, 2, grad="fixed"),
+    tensor("material_slot", torch.int32, 1, grad="fixed"),
+)
+_ENSEMBLE_SCALARS = (real("coef"), real("threshold"))
+# The order the ensemble facades check their inputs in (error precedence).
+_ENSEMBLE_CHECKS = (
+    "valid", "wo_rows", "r2_rows", "cos_o_rows", "wi_local", "rc_idx", "sc_idx", "material_id",
+    "material_slot", "table_dims",
+)
+_ENSEMBLE_EVAL = _native.op("scattering_ensemble_eval", _ENSEMBLE_PRIMALS, _ENSEMBLE_SCALARS)
+_ENSEMBLE_EVAL_BACKWARD = _native.op(
+    "scattering_ensemble_eval_backward", _ENSEMBLE_PRIMALS, _ENSEMBLE_SCALARS,
+    opaque("grad_gain"), opaque("grad_amplitude"), opaque("grad_length"), flag("need_grad_rows"),
+    flag("need_grad_samples"), flag("need_grad_tables"), flag("need_grad_coef"),
+)
+_ENSEMBLE_EVAL_JVP = _native.op(
+    "scattering_ensemble_eval_jvp", _ENSEMBLE_PRIMALS, _ENSEMBLE_SCALARS,
+    *(
+        opaque(f"t_{name}")
+        for name in (
+            "wo_rows", "r2_rows", "cos_o_rows", "n_o", "t1r", "t2r", "wi_local", "cos_i", "r1",
+            "a_te2", "a_tm2", "weights", "fte_flat", "ftm_flat",
+        )
+    ),
+    real("tangent_coef"),
+)
+
+# Shared patch-integral primal inputs in ABI order (the quadrature nodes follow ``heights``).
+_PATCH_PRIMALS = (
+    tensor("valid", torch.bool, 1, grad="fixed"),
+    tensor("patch_tris", _F32, 3, grad="fixed"),
+    tensor("patch_uvs", _F32, 3, grad="fixed"),
+    tensor("rows", torch.int64, 1, grad="fixed"),
+    tensor("d_i", _F32, 2, grad="diff"),
+    tensor("d_o", _F32, 2, grad="diff"),
+    tensor("n_rows", grad="fixed"),
+    tensor("r_te", torch.complex64, 1, grad="diff"),
+    tensor("r_tm", torch.complex64, 1, grad="diff"),
+    tensor("pol_t", grad="fixed"),
+    tensor("pol_r", grad="fixed"),
+    tensor("r1_rows", grad="diff"),
+    tensor("r2_rows", grad="diff"),
+    tensor("centroids", grad="diff"),
+    tensor("heights", _F32, 2, grad="diff"),
+    tensor("quad_a", grad="fixed"),
+    tensor("quad_b", grad="fixed"),
+    tensor("quad_w", grad="fixed"),
+)
+_PATCH_CHECKS = (
+    "valid", "patch_tris", "patch_uvs", "rows", "d_i", "d_o", "r_te", "r_tm", "heights",
+)
+_PATCH_EVAL = _native.op("scattering_patch_integral_eval", _PATCH_PRIMALS, real("k0"))
+_PATCH_EVAL_BACKWARD = _native.op(
+    "scattering_patch_integral_eval_backward", _PATCH_PRIMALS, real("k0"), tensor("grad_total"),
+    flag("need_grad_heights"), flag("need_grad_jones"), flag("need_grad_geometry"),
+    flag("need_grad_k0"),
+)
+_PATCH_EVAL_JVP = _native.op(
+    "scattering_patch_integral_eval_jvp", _PATCH_PRIMALS, real("k0"),
+    *(
+        opaque(f"t_{name}")
+        for name in ("heights", "r_te", "r_tm", "d_i", "d_o", "r1_rows", "r2_rows", "centroids")
+    ),
+    real("tangent_k0"),
+)
 
 
 def scattering_table_pdf(
@@ -92,32 +192,25 @@ def scattering_table_pdf(
 ) -> torch.Tensor:
     """Native CUDA piecewise-constant Kirchhoff PDF; required op."""
 
-    validate_cuda_tensor("valid", valid, dtype=torch.bool, ndim=1)
-    validate_cuda_tensor("wi", wi, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("wo", wo, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("sample_density", sample_density, dtype=torch.float32, ndim=4)
+    values = (valid, wi, wo, sample_density, reverse)
+    _TABLE_PDF.check(values, "valid", "wi", "wo", "sample_density")
     if valid.shape != wi.shape[:1] or wo.shape != wi.shape:
         raise ValueError("valid, wi, and wo rows must match")
-    return _required_native_op("scattering_table_pdf")(
-        valid, wi, wo, sample_density, bool(reverse)
-    )
+    return cast(torch.Tensor, _TABLE_PDF(*values))
 
 
-def _validate_ensemble_inputs(scope: Mapping[str, torch.Tensor]) -> None:
-    """Validate the shared ensemble primal inputs in ABI order."""
+def _validate_ensemble_inputs(primals: tuple[torch.Tensor, ...]) -> None:
+    """Validate the shared ensemble primal inputs."""
 
-    validate_cuda_tensor("valid", scope["valid"], dtype=torch.bool, ndim=1)
-    validate_cuda_tensor("wo_rows", scope["wo_rows"], dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("r2_rows", scope["r2_rows"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("cos_o_rows", scope["cos_o_rows"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("wi_local", scope["wi_local"], dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("rc_idx", scope["rc_idx"], dtype=torch.int64, ndim=1)
-    validate_cuda_tensor("sc_idx", scope["sc_idx"], dtype=torch.int64, ndim=1)
-    validate_cuda_tensor("material_id", scope["material_id"], dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("material_slot", scope["material_slot"], dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("table_dims", scope["table_dims"], dtype=torch.int32, ndim=2)
-    if scope["valid"].shape != scope["wo_rows"].shape[:1]:
+    _ENSEMBLE_EVAL.check(primals, *_ENSEMBLE_CHECKS)
+    if primals[0].shape != primals[1].shape[:1]:
         raise ValueError("valid must match ensemble rows")
+
+
+def _require_fields(out: object, expected: set[str] | tuple[str, ...], symbol: str) -> Any:
+    if not isinstance(out, dict) or set(out) != set(expected):
+        raise TypeError(f"_channel.{symbol} returned invalid fields")
+    return out
 
 
 def scattering_ensemble_eval(
@@ -138,55 +231,24 @@ def scattering_ensemble_eval(
     One launch per (tx, rx-chunk); required native op.
     """
 
-    _validate_ensemble_inputs(locals())
-    out = _required_native_op("scattering_ensemble_eval")(
-        valid,
-        wo_rows,
-        r2_rows,
-        cos_o_rows,
-        n_o,
-        t1r,
-        t2r,
-        wi_local,
-        cos_i,
-        r1,
-        a_te2,
-        a_tm2,
-        weights,
-        material_id,
-        backup_axis,
-        rx_pol,
-        rc_idx,
-        sc_idx,
-        f_te_flat,
-        f_tm_flat,
-        table_offset,
-        table_dims,
-        material_slot,
-        float(coef),
-        float(threshold),
+    primals = (
+        valid, wo_rows, r2_rows, cos_o_rows, n_o, t1r, t2r, wi_local, cos_i, r1, a_te2, a_tm2,
+        weights, material_id, backup_axis, rx_pol, rc_idx, sc_idx, f_te_flat, f_tm_flat,
+        table_offset, table_dims, material_slot,
     )
-    expected = {"gain", "amplitude", "length", "keep"}
-    if not isinstance(out, dict) or set(out) != expected:
-        raise TypeError(
-            "_channel.scattering_ensemble_eval returned invalid fields"
-        )
-    return out
+    _validate_ensemble_inputs(primals)
+    out = _ENSEMBLE_EVAL(*primals, coef, threshold)
+    return cast(
+        dict[str, torch.Tensor],
+        _require_fields(out, _ENSEMBLE_OUTPUT_FIELDS, _ENSEMBLE_EVAL.symbol),
+    )
 
 
-def _validate_patch_inputs(scope: Mapping[str, torch.Tensor]) -> None:
-    """Validate the shared patch-integral primal inputs in ABI order."""
+def _validate_patch_inputs(primals: tuple[torch.Tensor, ...]) -> None:
+    """Validate the shared patch-integral primal inputs (``primals`` stops at ``heights``)."""
 
-    validate_cuda_tensor("valid", scope["valid"], dtype=torch.bool, ndim=1)
-    validate_cuda_tensor("patch_tris", scope["patch_tris"], dtype=torch.float32, ndim=3)
-    validate_cuda_tensor("patch_uvs", scope["patch_uvs"], dtype=torch.float32, ndim=3)
-    validate_cuda_tensor("rows", scope["rows"], dtype=torch.int64, ndim=1)
-    validate_cuda_tensor("d_i", scope["d_i"], dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("d_o", scope["d_o"], dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("r_te", scope["r_te"], dtype=torch.complex64, ndim=1)
-    validate_cuda_tensor("r_tm", scope["r_tm"], dtype=torch.complex64, ndim=1)
-    validate_cuda_tensor("heights", scope["heights"], dtype=torch.float32, ndim=2)
-    if scope["valid"].shape != scope["rows"].shape:
+    _PATCH_EVAL.check(primals, *_PATCH_CHECKS)
+    if primals[0].shape != primals[3].shape:
         raise ValueError("valid must match patch rows")
 
 
@@ -216,35 +278,15 @@ def scattering_patch_integral_eval(
     buffers for tests. Required native op.
     """
 
-    _validate_patch_inputs(locals())
-    quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
-    out = _required_native_op("scattering_patch_integral_eval")(
-        valid,
-        patch_tris,
-        patch_uvs,
-        rows,
-        d_i,
-        d_o,
-        n_rows,
-        r_te,
-        r_tm,
-        pol_t,
-        pol_r,
-        r1_rows,
-        r2_rows,
-        centroids,
-        heights,
-        quad_a,
-        quad_b,
-        quad_w,
-        float(k0),
+    primals = (
+        valid, patch_tris, patch_uvs, rows, d_i, d_o, n_rows, r_te, r_tm, pol_t, pol_r, r1_rows,
+        r2_rows, centroids, heights,
     )
-    expected = {"total", "integral", "row_value"}
-    if not isinstance(out, dict) or set(out) != expected:
-        raise TypeError(
-            "_channel.scattering_patch_integral_eval returned invalid fields"
-        )
-    return cast(PatchIntegralOutputs, out)
+    _validate_patch_inputs(primals)
+    out = _PATCH_EVAL(*primals, *_duffy_nodes(patch_tris.device), k0)
+    return cast(
+        PatchIntegralOutputs, _require_fields(out, _PATCH_OUTPUT_FIELDS, _PATCH_EVAL.symbol)
+    )
 
 
 _ENSEMBLE_OUTPUT_FIELDS = ("gain", "amplitude", "length", "keep")
@@ -294,46 +336,20 @@ def scattering_ensemble_eval_backward(
 ) -> dict[str, torch.Tensor | None]:
     """VJP of :func:`scattering_ensemble_eval` (scattering AD)."""
 
-    _validate_ensemble_inputs(locals())
-    out = _required_native_op("scattering_ensemble_eval_backward")(
-        valid,
-        wo_rows,
-        r2_rows,
-        cos_o_rows,
-        n_o,
-        t1r,
-        t2r,
-        wi_local,
-        cos_i,
-        r1,
-        a_te2,
-        a_tm2,
-        weights,
-        material_id,
-        backup_axis,
-        rx_pol,
-        rc_idx,
-        sc_idx,
-        f_te_flat,
-        f_tm_flat,
-        table_offset,
-        table_dims,
-        material_slot,
-        float(coef),
-        float(threshold),
-        grad_gain,
-        grad_amplitude,
-        grad_length,
-        bool(need_grad_rows),
-        bool(need_grad_samples),
-        bool(need_grad_tables),
-        bool(need_grad_coef),
+    primals = (
+        valid, wo_rows, r2_rows, cos_o_rows, n_o, t1r, t2r, wi_local, cos_i, r1, a_te2, a_tm2,
+        weights, material_id, backup_axis, rx_pol, rc_idx, sc_idx, f_te_flat, f_tm_flat,
+        table_offset, table_dims, material_slot,
     )
-    if not isinstance(out, dict) or set(out) != set(_ENSEMBLE_BACKWARD_FIELDS):
-        raise TypeError(
-            "_channel.scattering_ensemble_eval_backward returned invalid fields"
-        )
-    return out
+    _validate_ensemble_inputs(primals)
+    out = _ENSEMBLE_EVAL_BACKWARD(
+        *primals, coef, threshold, grad_gain, grad_amplitude, grad_length, need_grad_rows,
+        need_grad_samples, need_grad_tables, need_grad_coef,
+    )
+    return cast(
+        dict[str, torch.Tensor | None],
+        _require_fields(out, _ENSEMBLE_BACKWARD_FIELDS, _ENSEMBLE_EVAL_BACKWARD.symbol),
+    )
 
 
 def scattering_ensemble_eval_jvp(
@@ -355,54 +371,22 @@ def scattering_ensemble_eval_jvp(
 ) -> dict[str, torch.Tensor]:
     """JVP of :func:`scattering_ensemble_eval` (scattering AD)."""
 
-    _validate_ensemble_inputs(locals())
-    out = _required_native_op("scattering_ensemble_eval_jvp")(
-        valid,
-        wo_rows,
-        r2_rows,
-        cos_o_rows,
-        n_o,
-        t1r,
-        t2r,
-        wi_local,
-        cos_i,
-        r1,
-        a_te2,
-        a_tm2,
-        weights,
-        material_id,
-        backup_axis,
-        rx_pol,
-        rc_idx,
-        sc_idx,
-        f_te_flat,
-        f_tm_flat,
-        table_offset,
-        table_dims,
-        material_slot,
-        float(coef),
-        float(threshold),
-        tangent_wo_rows,
-        tangent_r2_rows,
-        tangent_cos_o_rows,
-        tangent_n_o,
-        tangent_t1r,
-        tangent_t2r,
-        tangent_wi_local,
-        tangent_cos_i,
-        tangent_r1,
-        tangent_a_te2,
-        tangent_a_tm2,
-        tangent_weights,
-        tangent_f_te_flat,
-        tangent_f_tm_flat,
-        float(tangent_coef),
+    primals = (
+        valid, wo_rows, r2_rows, cos_o_rows, n_o, t1r, t2r, wi_local, cos_i, r1, a_te2, a_tm2,
+        weights, material_id, backup_axis, rx_pol, rc_idx, sc_idx, f_te_flat, f_tm_flat,
+        table_offset, table_dims, material_slot,
     )
-    if not isinstance(out, dict) or set(out) != set(_ENSEMBLE_TANGENT_FIELDS):
-        raise TypeError(
-            "_channel.scattering_ensemble_eval_jvp returned invalid fields"
-        )
-    return out
+    _validate_ensemble_inputs(primals)
+    out = _ENSEMBLE_EVAL_JVP(
+        *primals, coef, threshold, tangent_wo_rows, tangent_r2_rows, tangent_cos_o_rows,
+        tangent_n_o, tangent_t1r, tangent_t2r, tangent_wi_local, tangent_cos_i, tangent_r1,
+        tangent_a_te2, tangent_a_tm2, tangent_weights, tangent_f_te_flat, tangent_f_tm_flat,
+        tangent_coef,
+    )
+    return cast(
+        dict[str, torch.Tensor],
+        _require_fields(out, _ENSEMBLE_TANGENT_FIELDS, _ENSEMBLE_EVAL_JVP.symbol),
+    )
 
 
 def scattering_patch_integral_eval_backward(
@@ -415,40 +399,19 @@ def scattering_patch_integral_eval_backward(
 ) -> dict[str, torch.Tensor | None]:
     """VJP of :func:`scattering_patch_integral_eval` (scattering AD)."""
 
-    _validate_patch_inputs(locals())
-    quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
-    out = _required_native_op("scattering_patch_integral_eval_backward")(
-        valid,
-        patch_tris,
-        patch_uvs,
-        rows,
-        d_i,
-        d_o,
-        n_rows,
-        r_te,
-        r_tm,
-        pol_t,
-        pol_r,
-        r1_rows,
-        r2_rows,
-        centroids,
-        heights,
-        quad_a,
-        quad_b,
-        quad_w,
-        float(k0),
-        grad_total,
-        bool(need_grad_heights),
-        bool(need_grad_jones),
-        bool(need_grad_geometry),
-        bool(need_grad_k0),
+    primals = (
+        valid, patch_tris, patch_uvs, rows, d_i, d_o, n_rows, r_te, r_tm, pol_t, pol_r, r1_rows,
+        r2_rows, centroids, heights,
     )
-    if not isinstance(out, dict) or set(out) != set(_PATCH_BACKWARD_FIELDS):
-        raise TypeError(
-            "_channel.scattering_patch_integral_eval_backward returned"
-            " invalid fields"
-        )
-    return out
+    _validate_patch_inputs(primals)
+    out = _PATCH_EVAL_BACKWARD(
+        *primals, *_duffy_nodes(patch_tris.device), k0, grad_total, need_grad_heights,
+        need_grad_jones, need_grad_geometry, need_grad_k0,
+    )
+    return cast(
+        dict[str, torch.Tensor | None],
+        _require_fields(out, _PATCH_BACKWARD_FIELDS, _PATCH_EVAL_BACKWARD.symbol),
+    )
 
 
 def scattering_patch_integral_eval_jvp(
@@ -464,43 +427,19 @@ def scattering_patch_integral_eval_jvp(
 ) -> dict[str, torch.Tensor]:
     """JVP of :func:`scattering_patch_integral_eval` (scattering AD)."""
 
-    _validate_patch_inputs(locals())
-    quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
-    out = _required_native_op("scattering_patch_integral_eval_jvp")(
-        valid,
-        patch_tris,
-        patch_uvs,
-        rows,
-        d_i,
-        d_o,
-        n_rows,
-        r_te,
-        r_tm,
-        pol_t,
-        pol_r,
-        r1_rows,
-        r2_rows,
-        centroids,
-        heights,
-        quad_a,
-        quad_b,
-        quad_w,
-        float(k0),
-        tangent_heights,
-        tangent_r_te,
-        tangent_r_tm,
-        tangent_d_i,
-        tangent_d_o,
-        tangent_r1_rows,
-        tangent_r2_rows,
-        tangent_centroids,
-        float(tangent_k0),
+    primals = (
+        valid, patch_tris, patch_uvs, rows, d_i, d_o, n_rows, r_te, r_tm, pol_t, pol_r, r1_rows,
+        r2_rows, centroids, heights,
     )
-    if not isinstance(out, dict) or set(out) != {"tangent_total"}:
-        raise TypeError(
-            "_channel.scattering_patch_integral_eval_jvp returned invalid fields"
-        )
-    return out
+    _validate_patch_inputs(primals)
+    out = _PATCH_EVAL_JVP(
+        *primals, *_duffy_nodes(patch_tris.device), k0, tangent_heights, tangent_r_te,
+        tangent_r_tm, tangent_d_i, tangent_d_o, tangent_r1_rows, tangent_r2_rows,
+        tangent_centroids, tangent_k0,
+    )
+    return cast(
+        dict[str, torch.Tensor], _require_fields(out, ("tangent_total",), _PATCH_EVAL_JVP.symbol)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -519,99 +458,52 @@ def scattering_patch_integral_eval_jvp(
 _K_MAX_AD_DEPTH = 8
 
 _CHAIN_ENSEMBLE_OUTPUT_FIELDS = ("gain", "amplitude", "length", "keep")
-_CHAIN_ENSEMBLE_TANGENT_FIELDS = (
-    "tangent_gain",
-    "tangent_amplitude",
-    "tangent_length",
-)
-_CHAIN_ENSEMBLE_BACKWARD_FIELDS = (
-    "grad_c1_eps_r",
-    "grad_c1_sigma_e",
-    "grad_c1_gain",
-    "grad_c1_thickness",
-    "grad_c2_eps_r",
-    "grad_c2_sigma_e",
-    "grad_c2_gain",
-    "grad_c2_thickness",
-    "grad_f_te",
-    "grad_f_tm",
-    "grad_coef",
-    "grad_frequency",
-)
 
-_CHAIN_REALIZATION_OUTPUT_FIELDS = (
-    "total",
-    "path_field",
-    "path_gain",
-    "integral",
-    "row_value",
-)
-_CHAIN_REALIZATION_TANGENT_FIELDS = (
-    "tangent_total",
-    "tangent_path_field",
-    "tangent_path_gain",
-)
-_CHAIN_REALIZATION_BACKWARD_FIELDS = (
-    "grad_heights",
-    "grad_layer_thickness",
-    "grad_layer_eps_r",
-    "grad_layer_sigma_e",
-    "grad_c1_eps_r",
-    "grad_c1_sigma_e",
-    "grad_c1_gain",
-    "grad_c1_thickness",
-    "grad_c2_eps_r",
-    "grad_c2_sigma_e",
-    "grad_c2_gain",
-    "grad_c2_thickness",
-    "grad_d_i",
-    "grad_d_o",
-    "grad_c1_positions",
-    "grad_c1_normals",
-    "grad_c2_positions",
-    "grad_c2_normals",
-    "grad_L1",
-    "grad_L2",
-    "grad_sp1",
-    "grad_sp2",
-    "grad_centroids",
-    "grad_k0",
-    "grad_frequency",
-)
 
-_CHAIN_ENSEMBLE_PRIMAL_NAMES = (
-    "valid", "tx_pol", "rx_pol", "source", "vertex", "target",
-    "c1_positions", "c1_normals", "c1_eps_r", "c1_sigma_e", "c1_mu_r",
-    "c1_gain", "c1_thickness", "c1_depth",
-    "c2_positions", "c2_normals", "c2_eps_r", "c2_sigma_e", "c2_mu_r",
-    "c2_gain", "c2_thickness", "c2_depth",
-    "n_o", "t1r", "t2r", "backup_axis", "wi_local", "cos_i", "cos_o",
-    "d_i", "d_o", "l1", "l2", "weights", "material_id", "f_te_flat",
-    "f_tm_flat", "table_offset", "table_dims", "material_slot",
-)
-_CHAIN_REALIZATION_PRIMAL_NAMES = (
-    "valid", "patch_tris", "patch_uvs", "rows", "d_i", "d_o", "n_rows", "source",
-    "vertex", "target", "c1_positions", "c1_normals", "c1_eps_r",
-    "c1_sigma_e", "c1_mu_r", "c1_gain", "c1_thickness", "c1_depth",
-    "c2_positions", "c2_normals", "c2_eps_r", "c2_sigma_e", "c2_mu_r",
-    "c2_gain", "c2_thickness", "c2_depth", "tx_pol", "rx_pol", "L1", "L2",
-    "sp1", "sp2", "centroids", "heights", "cos_spec", "material_id",
-    "layer_offset", "layer_count", "layer_thickness_m", "layer_eps_r",
-    "layer_sigma_e", "layer_mu_r",
+def _vec3(name: str) -> Arg:
+    return tensor(name, _F32, 2, (3,))
+
+
+
+def _chain_leg(prefix: str) -> tuple[Arg, ...]:
+    """One padded specular leg block: ``[R, Dmax, 3]`` geometry, ``[R, Dmax]`` Fresnel inputs."""
+
+    return (
+        tensor(f"{prefix}_positions", _F32, 3, (3,)),
+        tensor(f"{prefix}_normals", _F32, 3, (3,)),
+        *(
+            tensor(f"{prefix}_{name}", _F32, 2)
+            for name in ("eps_r", "sigma_e", "mu_r", "gain", "thickness")
+        ),
+        tensor(f"{prefix}_depth", torch.int32, 1),
+    )
+
+
+_CHAIN_ENSEMBLE_EVAL = _native.op(
+    "scattering_chain_ensemble_eval",
+    tensor("valid", torch.bool, 1),
+    *(_vec3(name) for name in ("tx_pol", "rx_pol", "source", "vertex", "target")),
+    _chain_leg("c1"),
+    _chain_leg("c2"),
+    *(_vec3(name) for name in ("n_o", "t1r", "t2r", "backup_axis", "wi_local")),
+    tensor("cos_i", _F32, 1),
+    tensor("cos_o", _F32, 1),
+    _vec3("d_i"),
+    _vec3("d_o"),
+    *(tensor(name, _F32, 1) for name in ("l1", "l2", "weights")),
+    tensor("material_id", torch.int32, 1),
+    tensor("f_te_flat", _F32, 1, abi="fte_flat"),
+    tensor("f_tm_flat", _F32, 1, abi="ftm_flat"),
+    tensor("table_offset", torch.int64, 1),
+    tensor("table_dims", torch.int32, 2, (4,)),
+    tensor("material_slot", torch.int32, 1),
+    real("coef"),
+    real("threshold"),
+    real("frequency_hz"),
 )
 
 
-def _ordered_primal_args(scope: dict[str, object], names: tuple[str, ...]) -> tuple[object, ...]:
-    """Pack caller locals in the frozen typed native ABI order."""
-
-    return tuple(scope[name] for name in names)
-
-
-def _validate_chain_leg(
-    prefix: str, positions: torch.Tensor, normals: torch.Tensor, eps_r: torch.Tensor,
-    sigma_e: torch.Tensor, mu_r: torch.Tensor, gain: torch.Tensor, thickness: torch.Tensor,
-    depth: torch.Tensor, rows: int,
-) -> int:
+def _validate_chain_leg(prefix: str, named: dict[str, torch.Tensor], rows: int) -> int:
     """Validate one padded specular leg block and return its ``Dmax`` width.
 
     The padded block is ``[R, Dmax, 3]`` positions/normals and ``[R, Dmax]``
@@ -620,12 +512,8 @@ def _validate_chain_leg(
     are not read on the host (that would force a device sync).
     """
 
-    validate_cuda_tensor(
-        f"{prefix}_positions", positions, dtype=torch.float32, ndim=3, trailing_shape=(3,)
-    )
-    validate_cuda_tensor(
-        f"{prefix}_normals", normals, dtype=torch.float32, ndim=3, trailing_shape=(3,)
-    )
+    positions, normals = named[f"{prefix}_positions"], named[f"{prefix}_normals"]
+    _CHAIN_ENSEMBLE_EVAL.checks(named, f"{prefix}_positions", f"{prefix}_normals")
     dmax: int = positions.shape[1]
     if dmax > _K_MAX_AD_DEPTH:
         raise ValueError(
@@ -635,42 +523,27 @@ def _validate_chain_leg(
         raise ValueError(f"{prefix}_positions must have shape ({rows}, {dmax}, 3)")
     if tuple(normals.shape) != (rows, dmax, 3):
         raise ValueError(f"{prefix}_normals must have shape ({rows}, {dmax}, 3)")
-    for name, tensor in (
-        (f"{prefix}_eps_r", eps_r),
-        (f"{prefix}_sigma_e", sigma_e),
-        (f"{prefix}_mu_r", mu_r),
-        (f"{prefix}_gain", gain),
-        (f"{prefix}_thickness", thickness),
-    ):
-        validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=2)
-        if tuple(tensor.shape) != (rows, dmax):
+    fields = ("eps_r", "sigma_e", "mu_r", "gain", "thickness")
+    for name in (f"{prefix}_{field}" for field in fields):
+        _CHAIN_ENSEMBLE_EVAL.checks(named, name)
+        if tuple(named[name].shape) != (rows, dmax):
             raise ValueError(f"{name} must have shape ({rows}, {dmax})")
-    validate_cuda_tensor(f"{prefix}_depth", depth, dtype=torch.int32, ndim=1)
-    if depth.shape[0] != rows:
+    _CHAIN_ENSEMBLE_EVAL.checks(named, f"{prefix}_depth")
+    if named[f"{prefix}_depth"].shape[0] != rows:
         raise ValueError(f"{prefix}_depth must have {rows} rows")
     return dmax
-
-
-def _validate_chain_valid(valid: torch.Tensor, rows: int, reference: torch.Tensor) -> None:
-    """Validate the caller-owned device row mask without materializing one."""
-
-    validate_cuda_tensor("valid", valid, dtype=torch.bool, ndim=1)
-    if valid.shape != (rows,):
-        raise ValueError(f"valid must have shape ({rows},)")
-    if valid.device != reference.device:
-        raise ValueError("valid must share the chain row CUDA device")
 
 
 def _require_same_device(named: tuple[tuple[str, torch.Tensor], ...]) -> None:
     """Assert every named tensor shares one CUDA device."""
 
     device = None
-    for name, tensor in named:
-        if tensor is None:
+    for name, tensor_value in named:
+        if tensor_value is None:
             continue
         if device is None:
-            device = tensor.device
-        elif tensor.device != device:
+            device = tensor_value.device
+        elif tensor_value.device != device:
             raise ValueError(
                 f"{name} must share the CUDA device of the chain row block"
             )
@@ -703,108 +576,77 @@ def scattering_chain_ensemble_eval(
     (tx, rx-chunk); required native op.
     """
 
+    spec = _CHAIN_ENSEMBLE_EVAL
+    primals = (
+        valid, tx_pol, rx_pol, source, vertex, target, c1_positions, c1_normals, c1_eps_r,
+        c1_sigma_e, c1_mu_r, c1_gain, c1_thickness, c1_depth, c2_positions, c2_normals, c2_eps_r,
+        c2_sigma_e, c2_mu_r, c2_gain, c2_thickness, c2_depth, n_o, t1r, t2r, backup_axis,
+        wi_local, cos_i, cos_o, d_i, d_o, l1, l2, weights, material_id, f_te_flat, f_tm_flat,
+        table_offset, table_dims, material_slot,
+    )
+    named = dict(zip(spec.names, primals))
     rows = int(tx_pol.shape[0])
-    _validate_chain_valid(valid, rows, tx_pol)
-    validate_cuda_tensor("tx_pol", tx_pol, dtype=torch.float32, ndim=2, trailing_shape=(3,))
-    validate_cuda_tensor("rx_pol", rx_pol, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    spec.checks(named, "valid")
+    if valid.shape != (rows,):
+        raise ValueError(f"valid must have shape ({rows},)")
+    if valid.device != tx_pol.device:
+        raise ValueError("valid must share the chain row CUDA device")
+    spec.checks(named, "tx_pol", "rx_pol")
     if rx_pol.shape[0] != rows:
         raise ValueError("rx_pol must match tx_pol rows")
-    _validate_chain_leg(
-        "c1", c1_positions, c1_normals, c1_eps_r, c1_sigma_e, c1_mu_r, c1_gain,
-        c1_thickness, c1_depth, rows,
-    )
-    _validate_chain_leg(
-        "c2", c2_positions, c2_normals, c2_eps_r, c2_sigma_e, c2_mu_r, c2_gain,
-        c2_thickness, c2_depth, rows,
-    )
-    for name, tensor in (
-        ("source", source),
-        ("vertex", vertex),
-        ("target", target),
-        ("n_o", n_o),
-        ("t1r", t1r),
-        ("t2r", t2r),
-        ("backup_axis", backup_axis),
-        ("wi_local", wi_local),
-        ("d_i", d_i),
-        ("d_o", d_o),
+    _validate_chain_leg("c1", named, rows)
+    _validate_chain_leg("c2", named, rows)
+    for name in (
+        "source", "vertex", "target", "n_o", "t1r", "t2r", "backup_axis", "wi_local", "d_i",
+        "d_o", "cos_i", "cos_o", "l1", "l2", "weights",
     ):
-        validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=2, trailing_shape=(3,))
-        if tensor.shape[0] != rows:
+        spec.checks(named, name)
+        if named[name].shape[0] != rows:
             raise ValueError(f"{name} must have {rows} rows")
-    for name, tensor in (
-        ("cos_i", cos_i),
-        ("cos_o", cos_o),
-        ("l1", l1),
-        ("l2", l2),
-        ("weights", weights),
-    ):
-        validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=1)
-        if tensor.shape[0] != rows:
-            raise ValueError(f"{name} must have {rows} rows")
-    validate_cuda_tensor("material_id", material_id, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("f_te_flat", f_te_flat, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("f_tm_flat", f_tm_flat, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("table_offset", table_offset, dtype=torch.int64, ndim=1)
-    validate_cuda_tensor("table_dims", table_dims, dtype=torch.int32, ndim=2, trailing_shape=(4,))
-    validate_cuda_tensor("material_slot", material_slot, dtype=torch.int32, ndim=1)
+    spec.checks(
+        named, "material_id", "f_te_flat", "f_tm_flat", "table_offset", "table_dims",
+        "material_slot",
+    )
     _require_same_device(
-        (
-            ("tx_pol", tx_pol),
-            ("source", source),
-            ("c1_positions", c1_positions),
-            ("c2_positions", c2_positions),
-            ("d_i", d_i),
-            ("f_te_flat", f_te_flat),
-            ("material_slot", material_slot),
+        tuple(
+            (name, named[name])
+            for name in (
+                "tx_pol", "source", "c1_positions", "c2_positions", "d_i", "f_te_flat",
+                "material_slot",
+            )
         )
     )
-    primal_args = _ordered_primal_args(locals(), _CHAIN_ENSEMBLE_PRIMAL_NAMES)
-    out = _required_native_op("scattering_chain_ensemble_eval")(
-        *primal_args,
-        float(coef),
-        float(threshold),
-        float(frequency_hz),
+    out = spec(*primals, coef, threshold, frequency_hz)
+    return cast(
+        dict[str, torch.Tensor], _require_fields(out, _CHAIN_ENSEMBLE_OUTPUT_FIELDS, spec.symbol)
     )
-    if not isinstance(out, dict) or set(out) != set(_CHAIN_ENSEMBLE_OUTPUT_FIELDS):
-        raise TypeError(
-            "_channel.scattering_chain_ensemble_eval returned invalid fields"
-        )
-    return out
 
 
 # ---------------------------------------------------------------------------
 # autograd
 # ---------------------------------------------------------------------------
-def _grad_or_none(out: dict, key: str, needed: bool) -> torch.Tensor | None:
-    return out[key] if needed else None
-
-
-# Fixed inputs of the ensemble op: rejecting a gradient/tangent here fails
-# loudly instead of silently detaching (scattering AD).
-_ENSEMBLE_FIXED = (
-    (0, "valid"),
-    (13, "material_id"),
-    (14, "backup_axis"),
-    (15, "rx_pol"),
-    (16, "rc_idx"),
-    (17, "sc_idx"),
-    (20, "table_offset"),
-    (21, "table_dims"),
-    (22, "material_slot"),
+# Fixed inputs refuse a gradient or tangent instead of silently detaching (scattering AD).
+_ENSEMBLE_AD = AdInputs(
+    "scattering_ensemble_eval_ad", _ENSEMBLE_PRIMALS, opaque("coef", grad="diff"),
+    opaque("threshold"), opaque("coef_value"),
 )
-_PATCH_FIXED = (
-    (0, "valid"),
-    (1, "patch_tris"),
-    (2, "patch_uvs"),
-    (3, "rows"),
-    (6, "n_rows"),
-    (9, "pol_t"),
-    (10, "pol_r"),
-    (15, "quad_a"),
-    (16, "quad_b"),
-    (17, "quad_w"),
+_ENSEMBLE_ROW_INPUTS = ("wo_rows", "r2_rows", "cos_o_rows")
+_ENSEMBLE_SAMPLE_INPUTS = (
+    "n_o", "t1r", "t2r", "wi_local", "cos_i", "r1", "a_te2", "a_tm2", "weights",
 )
+_ENSEMBLE_TABLE_INPUTS = ("f_te_flat", "f_tm_flat")
+# Native gradient key of each differentiable ensemble tensor input.
+_ENSEMBLE_GRAD_KEYS = {
+    **{name: f"grad_{name}" for name in _ENSEMBLE_ROW_INPUTS + _ENSEMBLE_SAMPLE_INPUTS},
+    "f_te_flat": "grad_f_te",
+    "f_tm_flat": "grad_f_tm",
+}
+_PATCH_AD = AdInputs(
+    "scattering_patch_integral_eval_ad", _PATCH_PRIMALS, opaque("k0", grad="diff"),
+    opaque("k0_value"),
+)
+_PATCH_GEOMETRY_INPUTS = ("d_i", "d_o", "r1_rows", "r2_rows", "centroids")
+_PATCH_DIFF_INPUTS = ("heights", "r_te", "r_tm", "d_i", "d_o", "r1_rows", "r2_rows", "centroids")
 
 
 class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
@@ -830,30 +672,9 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
         coef_value: Any,
     ) -> Any:
         out = scattering_ensemble_eval(
-            valid,
-            wo_rows,
-            r2_rows,
-            cos_o_rows,
-            n_o,
-            t1r,
-            t2r,
-            wi_local,
-            cos_i,
-            r1,
-            a_te2,
-            a_tm2,
-            weights,
-            material_id,
-            backup_axis,
-            rx_pol,
-            rc_idx,
-            sc_idx,
-            f_te_flat,
-            f_tm_flat,
-            table_offset,
-            table_dims,
-            material_slot,
-            coef=coef_value,
+            valid, wo_rows, r2_rows, cos_o_rows, n_o, t1r, t2r, wi_local, cos_i, r1, a_te2,
+            a_tm2, weights, material_id, backup_axis, rx_pol, rc_idx, sc_idx, f_te_flat,
+            f_tm_flat, table_offset, table_dims, material_slot, coef=coef_value,
             threshold=threshold,
         )
         return tuple(out[name] for name in _ENSEMBLE_OUTPUT_FIELDS)
@@ -861,18 +682,11 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
     @staticmethod
     def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
-        coef = inputs[23]
-        primals = tuple(
-            torch.autograd.forward_ad.unpack_dual(value).primal
-            for value in inputs[:23]
-        )
-        ctx.threshold = inputs[24]
-        ctx.coef_value = inputs[25]
-        ctx.coef_meta = (
-            (coef.dtype, coef.device) if isinstance(coef, torch.Tensor) else None
-        )
-        ctx.save_for_backward(*primals)
-        ctx.save_for_forward(*primals)
+        primals = _ENSEMBLE_AD.primals(inputs, *_ENSEMBLE_EVAL.names[:23])
+        ctx.threshold = _ENSEMBLE_AD.get(inputs, "threshold")
+        ctx.coef_value = _ENSEMBLE_AD.get(inputs, "coef_value")
+        ctx.coef_meta = frequency_meta(_ENSEMBLE_AD.get(inputs, "coef"))
+        save(ctx, *primals)
         ctx.mark_non_differentiable(output[3])
 
     @staticmethod
@@ -880,20 +694,16 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
     def backward(
         ctx: Any, grad_gain: Any, grad_amplitude: Any, grad_length: Any, _grad_keep: Any,
     ) -> Any:
-        none_grads = (None,) * 26
-        _ad_reject_fixed_inputs(
-            "scattering_ensemble_eval_ad", ctx.needs_input_grad, _ENSEMBLE_FIXED
-        )
-        needed = tuple(bool(ctx.needs_input_grad[i]) for i in range(24))
-        need_rows = any(needed[1:4])
-        need_samples = any(needed[4:13])
-        need_tables = needed[18] or needed[19]
-        need_coef = needed[23]
+        _ENSEMBLE_AD.reject_fixed_grads(ctx)
+        need_rows = _ENSEMBLE_AD.needs(ctx, *_ENSEMBLE_ROW_INPUTS)
+        need_samples = _ENSEMBLE_AD.needs(ctx, *_ENSEMBLE_SAMPLE_INPUTS)
+        need_tables = _ENSEMBLE_AD.needs(ctx, *_ENSEMBLE_TABLE_INPUTS)
+        need_coef = _ENSEMBLE_AD.need(ctx, "coef")
         grads = (grad_gain, grad_amplitude, grad_length)
         if not (need_rows or need_samples or need_tables or need_coef) or all(
             value is None for value in grads
         ):
-            return none_grads
+            return _ENSEMBLE_AD.none
         out = scattering_ensemble_eval_backward(
             *ctx.saved_tensors,
             coef=ctx.coef_value,
@@ -909,106 +719,28 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
         grad_coef = (
             _ad_frequency_grad(out["grad_coef"], ctx.coef_meta) if need_coef else None
         )
-        return (
-            None,
-            _grad_or_none(out, "grad_wo_rows", needed[1]),
-            _grad_or_none(out, "grad_r2_rows", needed[2]),
-            _grad_or_none(out, "grad_cos_o_rows", needed[3]),
-            _grad_or_none(out, "grad_n_o", needed[4]),
-            _grad_or_none(out, "grad_t1r", needed[5]),
-            _grad_or_none(out, "grad_t2r", needed[6]),
-            _grad_or_none(out, "grad_wi_local", needed[7]),
-            _grad_or_none(out, "grad_cos_i", needed[8]),
-            _grad_or_none(out, "grad_r1", needed[9]),
-            _grad_or_none(out, "grad_a_te2", needed[10]),
-            _grad_or_none(out, "grad_a_tm2", needed[11]),
-            _grad_or_none(out, "grad_weights", needed[12]),
-            None,
-            None,
-            None,
-            None,
-            None,
-            _grad_or_none(out, "grad_f_te", needed[18]),
-            _grad_or_none(out, "grad_f_tm", needed[19]),
-            None,
-            None,
-            None,
-            grad_coef,
-            None,
-            None,
+        return _ENSEMBLE_AD.grads(
+            ctx,
+            **{
+                name: out[key]
+                for name, key in _ENSEMBLE_GRAD_KEYS.items()
+                if _ENSEMBLE_AD.need(ctx, name)
+            },
+            coef=grad_coef,
         )
 
     @staticmethod
-    def jvp(
-        ctx: Any, t_valid: Any, t_wo_rows: Any, t_r2_rows: Any, t_cos_o_rows: Any, t_n_o: Any,
-        t_t1r: Any, t_t2r: Any, t_wi_local: Any, t_cos_i: Any, t_r1: Any, t_a_te2: Any,
-        t_a_tm2: Any, t_weights: Any, t_material_id: Any, t_backup_axis: Any, t_rx_pol: Any,
-        t_rc_idx: Any, t_sc_idx: Any, t_f_te_flat: Any, t_f_tm_flat: Any, t_table_offset: Any,
-        t_table_dims: Any, t_material_slot: Any, t_coef: Any, _t_threshold: Any, _t_coef_value: Any,
-    ) -> Any:
-        _ad_reject_fixed_tangents(
-            "scattering_ensemble_eval_ad",
-            (
-                (t_valid, "valid"),
-                (t_material_id, "material_id"),
-                (t_backup_axis, "backup_axis"),
-                (t_rx_pol, "rx_pol"),
-                (t_rc_idx, "rc_idx"),
-                (t_sc_idx, "sc_idx"),
-                (t_table_offset, "table_offset"),
-                (t_table_dims, "table_dims"),
-                (t_material_slot, "material_slot"),
-            ),
-        )
+    def jvp(ctx: Any, *tangents: Any) -> Any:
+        _ENSEMBLE_AD.reject_fixed_tangents(tangents)
         saved = ctx.saved_tensors
-        tangents = {
-            "tangent_wo_rows": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_wo_rows", t_wo_rows, saved[1]
-            ),
-            "tangent_r2_rows": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_r2_rows", t_r2_rows, saved[2]
-            ),
-            "tangent_cos_o_rows": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_cos_o_rows",
-                t_cos_o_rows,
-                saved[3],
-            ),
-            "tangent_n_o": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_n_o", t_n_o, saved[4]
-            ),
-            "tangent_t1r": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_t1r", t_t1r, saved[5]
-            ),
-            "tangent_t2r": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_t2r", t_t2r, saved[6]
-            ),
-            "tangent_wi_local": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_wi_local", t_wi_local, saved[7]
-            ),
-            "tangent_cos_i": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_cos_i", t_cos_i, saved[8]
-            ),
-            "tangent_r1": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_r1", t_r1, saved[9]
-            ),
-            "tangent_a_te2": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_a_te2", t_a_te2, saved[10]
-            ),
-            "tangent_a_tm2": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_a_tm2", t_a_tm2, saved[11]
-            ),
-            "tangent_weights": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_weights", t_weights, saved[12]
-            ),
-            "tangent_f_te_flat": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_f_te_flat", t_f_te_flat, saved[18]
-            ),
-            "tangent_f_tm_flat": _ad_geometry_tangent(
-                "scattering_ensemble_eval_ad tangent_f_tm_flat", t_f_tm_flat, saved[19]
-            ),
+        native_tangents = {
+            f"tangent_{name}": _ENSEMBLE_AD.geometry_tangent(
+                tangents, name, saved[_ENSEMBLE_AD.index(name)]
+            )
+            for name in _ENSEMBLE_ROW_INPUTS + _ENSEMBLE_SAMPLE_INPUTS + _ENSEMBLE_TABLE_INPUTS
         }
-        tangent_coef = _ad_frequency_tangent(t_coef)
-        if tangent_coef == 0.0 and all(value is None for value in tangents.values()):
+        tangent_coef = _ad_frequency_tangent(_ENSEMBLE_AD.tangent(tangents, "coef"))
+        if tangent_coef == 0.0 and all(value is None for value in native_tangents.values()):
             return (None,) * len(_ENSEMBLE_OUTPUT_FIELDS)
         with disable_functorch():
             out = scattering_ensemble_eval_jvp(
@@ -1016,7 +748,7 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
                 coef=ctx.coef_value,
                 threshold=ctx.threshold,
                 tangent_coef=tangent_coef,
-                **tangents,
+                **native_tangents,
             )
         return (
             out["tangent_gain"],
@@ -1044,37 +776,11 @@ def scattering_ensemble_eval_ad(
 
     coef_value = _ad_frequency_value(coef)
     values = _ScatteringEnsembleEvalAdFunction.apply(
-        valid,
-        wo_rows,
-        r2_rows,
-        cos_o_rows,
-        n_o,
-        t1r,
-        t2r,
-        wi_local,
-        cos_i,
-        r1,
-        a_te2,
-        a_tm2,
-        weights,
-        material_id,
-        backup_axis,
-        rx_pol,
-        rc_idx,
-        sc_idx,
-        f_te_flat,
-        f_tm_flat,
-        table_offset,
-        table_dims,
-        material_slot,
-        coef,
-        float(threshold),
-        float(coef_value),
+        valid, wo_rows, r2_rows, cos_o_rows, n_o, t1r, t2r, wi_local, cos_i, r1, a_te2, a_tm2,
+        weights, material_id, backup_axis, rx_pol, rc_idx, sc_idx, f_te_flat, f_tm_flat,
+        table_offset, table_dims, material_slot, coef, float(threshold), float(coef_value),
     )
     return dict(zip(_ENSEMBLE_OUTPUT_FIELDS, values, strict=True))
-
-
-_TABLE_EVAL_OUTPUT_FIELDS = ("f_te", "f_tm")
 
 
 class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
@@ -1096,61 +802,34 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
         r_te: Any, r_tm: Any, pol_t: Any, pol_r: Any, r1_rows: Any, r2_rows: Any, centroids: Any,
         heights: Any, quad_a: Any, quad_b: Any, quad_w: Any, k0: Any, k0_value: Any,
     ) -> Any:
-        out = _required_patch_forward(
-            valid,
-            patch_tris,
-            patch_uvs,
-            rows,
-            d_i,
-            d_o,
-            n_rows,
-            r_te,
-            r_tm,
-            pol_t,
-            pol_r,
-            r1_rows,
-            r2_rows,
-            centroids,
-            heights,
-            quad_a,
-            quad_b,
-            quad_w,
-            k0_value,
+        out = _PATCH_EVAL(
+            valid, patch_tris, patch_uvs, rows, d_i, d_o, n_rows, r_te, r_tm, pol_t, pol_r,
+            r1_rows, r2_rows, centroids, heights, quad_a, quad_b, quad_w, k0_value,
         )
+        _require_fields(out, _PATCH_OUTPUT_FIELDS, _PATCH_EVAL.symbol)
         return tuple(out[name] for name in _PATCH_OUTPUT_FIELDS)
 
     @staticmethod
     def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
-        k0 = inputs[18]
-        primals = tuple(
-            torch.autograd.forward_ad.unpack_dual(value).primal
-            for value in inputs[:18]
-        )
-        ctx.k0_value = inputs[19]
-        ctx.k0_meta = (
-            (k0.dtype, k0.device) if isinstance(k0, torch.Tensor) else None
-        )
-        ctx.save_for_backward(*primals)
-        ctx.save_for_forward(*primals)
+        primals = _PATCH_AD.primals(inputs, *_PATCH_EVAL.names[:18])
+        ctx.k0_value = _PATCH_AD.get(inputs, "k0_value")
+        ctx.k0_meta = frequency_meta(_PATCH_AD.get(inputs, "k0"))
+        save(ctx, *primals)
         ctx.mark_non_differentiable(output[1], output[2])
 
     @staticmethod
     @_ad_first_order_only
     def backward(ctx: Any, grad_total: Any, _grad_integral: Any, _grad_row_value: Any) -> Any:
-        none_grads = (None,) * 20
-        _ad_reject_fixed_inputs(
-            "scattering_patch_integral_eval_ad", ctx.needs_input_grad, _PATCH_FIXED
-        )
-        needed = tuple(bool(ctx.needs_input_grad[i]) for i in range(19))
-        need_heights = needed[14]
-        need_jones = needed[7] or needed[8]
-        need_geometry = any(needed[i] for i in (4, 5, 11, 12, 13))
-        need_k0 = needed[18]
+        _PATCH_AD.reject_fixed_grads(ctx)
+        need_heights = _PATCH_AD.need(ctx, "heights")
+        need_jones = _PATCH_AD.needs(ctx, "r_te", "r_tm")
+        need_geometry = _PATCH_AD.needs(ctx, *_PATCH_GEOMETRY_INPUTS)
+        need_k0 = _PATCH_AD.need(ctx, "k0")
         if not (need_heights or need_jones or need_geometry or need_k0) or (
             grad_total is None
         ):
-            return none_grads
+            return _PATCH_AD.none
         out = scattering_patch_integral_eval_backward(
             *ctx.saved_tensors[:15],
             k0=ctx.k0_value,
@@ -1163,133 +842,37 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
         grad_k0 = (
             _ad_frequency_grad(out["grad_k0"], ctx.k0_meta) if need_k0 else None
         )
-        return (
-            None,
-            None,
-            None,
-            None,
-            _grad_or_none(out, "grad_d_i", needed[4]),
-            _grad_or_none(out, "grad_d_o", needed[5]),
-            None,
-            _grad_or_none(out, "grad_r_te", needed[7]),
-            _grad_or_none(out, "grad_r_tm", needed[8]),
-            None,
-            None,
-            _grad_or_none(out, "grad_r1_rows", needed[11]),
-            _grad_or_none(out, "grad_r2_rows", needed[12]),
-            _grad_or_none(out, "grad_centroids", needed[13]),
-            _grad_or_none(out, "grad_heights", needed[14]),
-            None,
-            None,
-            None,
-            grad_k0,
-            None,
+        return _PATCH_AD.grads(
+            ctx,
+            **{
+                name: out[f"grad_{name}"]
+                for name in _PATCH_DIFF_INPUTS
+                if _PATCH_AD.need(ctx, name)
+            },
+            k0=grad_k0,
         )
 
     @staticmethod
-    def jvp(
-        ctx: Any, t_valid: Any, t_patch_tris: Any, t_patch_uvs: Any, t_rows: Any, t_d_i: Any,
-        t_d_o: Any, t_n_rows: Any, t_r_te: Any, t_r_tm: Any, t_pol_t: Any, t_pol_r: Any,
-        t_r1_rows: Any, t_r2_rows: Any, t_centroids: Any, t_heights: Any, t_quad_a: Any,
-        t_quad_b: Any, t_quad_w: Any, t_k0: Any, _t_k0_value: Any,
-    ) -> Any:
-        _ad_reject_fixed_tangents(
-            "scattering_patch_integral_eval_ad",
-            (
-                (t_valid, "valid"),
-                (t_patch_tris, "patch_tris"),
-                (t_patch_uvs, "patch_uvs"),
-                (t_rows, "rows"),
-                (t_n_rows, "n_rows"),
-                (t_pol_t, "pol_t"),
-                (t_pol_r, "pol_r"),
-                (t_quad_a, "quad_a"),
-                (t_quad_b, "quad_b"),
-                (t_quad_w, "quad_w"),
-            ),
-        )
+    def jvp(ctx: Any, *tangents: Any) -> Any:
+        _PATCH_AD.reject_fixed_tangents(tangents)
         saved = ctx.saved_tensors
-        tangents = {
-            "tangent_heights": _ad_geometry_tangent(
-                "scattering_patch_integral_eval_ad tangent_heights",
-                t_heights,
-                saved[14],
-            ),
-            "tangent_r_te": _ad_geometry_tangent(
-                "scattering_patch_integral_eval_ad tangent_r_te", t_r_te, saved[7]
-            ),
-            "tangent_r_tm": _ad_geometry_tangent(
-                "scattering_patch_integral_eval_ad tangent_r_tm", t_r_tm, saved[8]
-            ),
-            "tangent_d_i": _ad_geometry_tangent(
-                "scattering_patch_integral_eval_ad tangent_d_i", t_d_i, saved[4]
-            ),
-            "tangent_d_o": _ad_geometry_tangent(
-                "scattering_patch_integral_eval_ad tangent_d_o", t_d_o, saved[5]
-            ),
-            "tangent_r1_rows": _ad_geometry_tangent(
-                "scattering_patch_integral_eval_ad tangent_r1_rows",
-                t_r1_rows,
-                saved[11],
-            ),
-            "tangent_r2_rows": _ad_geometry_tangent(
-                "scattering_patch_integral_eval_ad tangent_r2_rows",
-                t_r2_rows,
-                saved[12],
-            ),
-            "tangent_centroids": _ad_geometry_tangent(
-                "scattering_patch_integral_eval_ad tangent_centroids",
-                t_centroids,
-                saved[13],
-            ),
+        native_tangents = {
+            f"tangent_{name}": _PATCH_AD.geometry_tangent(
+                tangents, name, saved[_PATCH_AD.index(name)]
+            )
+            for name in _PATCH_DIFF_INPUTS
         }
-        tangent_k0 = _ad_frequency_tangent(t_k0)
-        if tangent_k0 == 0.0 and all(value is None for value in tangents.values()):
+        tangent_k0 = _ad_frequency_tangent(_PATCH_AD.tangent(tangents, "k0"))
+        if tangent_k0 == 0.0 and all(value is None for value in native_tangents.values()):
             return (None,) * len(_PATCH_OUTPUT_FIELDS)
         with disable_functorch():
             out = scattering_patch_integral_eval_jvp(
                 *(_ad_native_tensor(value) for value in saved[:15]),
                 k0=ctx.k0_value,
                 tangent_k0=tangent_k0,
-                **tangents,
+                **native_tangents,
             )
         return (out["tangent_total"], None, None)
-
-
-def _required_patch_forward(
-    valid: torch.Tensor, patch_tris: torch.Tensor, patch_uvs: torch.Tensor, rows: torch.Tensor,
-    d_i: torch.Tensor, d_o: torch.Tensor, n_rows: torch.Tensor, r_te: torch.Tensor,
-    r_tm: torch.Tensor, pol_t: torch.Tensor, pol_r: torch.Tensor, r1_rows: torch.Tensor,
-    r2_rows: torch.Tensor, centroids: torch.Tensor, heights: torch.Tensor, quad_a: torch.Tensor,
-    quad_b: torch.Tensor, quad_w: torch.Tensor, k0_value: float,
-) -> dict[str, torch.Tensor]:
-    out = _required_native_op("scattering_patch_integral_eval")(
-        valid,
-        patch_tris,
-        patch_uvs,
-        rows,
-        d_i,
-        d_o,
-        n_rows,
-        r_te,
-        r_tm,
-        pol_t,
-        pol_r,
-        r1_rows,
-        r2_rows,
-        centroids,
-        heights,
-        quad_a,
-        quad_b,
-        quad_w,
-        float(k0_value),
-    )
-    expected = {"total", "integral", "row_value"}
-    if not isinstance(out, dict) or set(out) != expected:
-        raise TypeError(
-            "_channel.scattering_patch_integral_eval returned invalid fields"
-        )
-    return out
 
 
 def scattering_patch_integral_eval_ad(
@@ -1309,118 +892,10 @@ def scattering_patch_integral_eval_ad(
     quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
     k0_value = _ad_frequency_value(k0)
     values = _ScatteringPatchIntegralEvalAdFunction.apply(
-        valid,
-        patch_tris,
-        patch_uvs,
-        rows,
-        d_i,
-        d_o,
-        n_rows,
-        r_te,
-        r_tm,
-        pol_t,
-        pol_r,
-        r1_rows,
-        r2_rows,
-        centroids,
-        heights,
-        quad_a,
-        quad_b,
-        quad_w,
-        k0,
-        float(k0_value),
+        valid, patch_tris, patch_uvs, rows, d_i, d_o, n_rows, r_te, r_tm, pol_t, pol_r, r1_rows,
+        r2_rows, centroids, heights, quad_a, quad_b, quad_w, k0, float(k0_value),
     )
     return cast(PatchIntegralOutputs, dict(zip(_PATCH_OUTPUT_FIELDS, values, strict=True)))
-
-
-# ---------------------------------------------------------------------------
-# autograd_chain
-#
-# The chain companions share the ``_grad_or_none`` helper defined above; the
-# two files this module merges carried byte-identical copies of it.
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# Op A: multi-bounce ensemble (power domain).
-# ---------------------------------------------------------------------------
-
-# Fixed inputs of Op A (index into the apply arg list). Requesting a gradient on
-# any of these in reverse mode fails loudly instead of silently detaching.
-# ``_CHAIN_ENSEMBLE_FIXED`` is the reverse-mode set: it adds the continuous chain
-# geometry (positions/normals/n_o/d_i/d_o/L1/L2/cos_i/cos_o) to the structurally
-# frozen inputs, because reverse-mode chain geometry is a staged follow-up wave
-# (the native backward rejects ``need_grad_geometry`` loudly). Forward-mode still
-# forwards those geometry tangents (native ``_jvp`` supports them), so the JVP
-# rejection set ``_CHAIN_ENSEMBLE_FIXED_TANGENTS`` excludes them.
-_CHAIN_ENSEMBLE_FIXED_TANGENTS = (
-    (0, "valid"),
-    (1, "tx_pol"),
-    (2, "rx_pol"),
-    (3, "source"),
-    (4, "vertex"),
-    (5, "target"),
-    (10, "c1_mu_r"),
-    (13, "c1_depth"),
-    (18, "c2_mu_r"),
-    (21, "c2_depth"),
-    (23, "t1r"),
-    (24, "t2r"),
-    (25, "backup_axis"),
-    (26, "wi_local"),
-    (33, "weights"),
-    (34, "material_id"),
-    (37, "table_offset"),
-    (38, "table_dims"),
-    (39, "material_slot"),
-)
-# Reverse-mode continuous geometry (fixed this wave; forward-mode tangent-able).
-_CHAIN_ENSEMBLE_FIXED_GEOMETRY = (
-    (6, "c1_positions"),
-    (7, "c1_normals"),
-    (14, "c2_positions"),
-    (15, "c2_normals"),
-    (22, "n_o"),
-    (27, "cos_i"),
-    (28, "cos_o"),
-    (29, "d_i"),
-    (30, "d_o"),
-    (31, "l1"),
-    (32, "l2"),
-)
-_CHAIN_ENSEMBLE_FIXED = _CHAIN_ENSEMBLE_FIXED_TANGENTS + _CHAIN_ENSEMBLE_FIXED_GEOMETRY
-
-
-# ---------------------------------------------------------------------------
-# Op B: coherent chain realization.
-# ---------------------------------------------------------------------------
-
-# Fixed inputs of Op B (index into the apply arg list, which appends the Duffy
-# quadrature nodes as fixed inputs 42/43/44). ``source``/``vertex``/``target``
-# are frozen structural endpoints (no tangent, no gradient in either mode).
-_CHAIN_REALIZATION_FIXED = (
-    (0, "valid"),
-    (1, "patch_tris"),
-    (2, "patch_uvs"),
-    (3, "rows"),
-    (6, "n_rows"),
-    (7, "source"),
-    (8, "vertex"),
-    (9, "target"),
-    (14, "c1_mu_r"),
-    (17, "c1_depth"),
-    (22, "c2_mu_r"),
-    (25, "c2_depth"),
-    (26, "tx_pol"),
-    (27, "rx_pol"),
-    (34, "cos_spec"),
-    (35, "material_id"),
-    (36, "layer_offset"),
-    (37, "layer_count"),
-    (41, "layer_mu_r"),
-    (42, "quad_a"),
-    (43, "quad_b"),
-    (44, "quad_w"),
-)
 
 
 # ---------------------------------------------------------------------------
@@ -1437,6 +912,26 @@ _BACKWARD_FIELDS = (
     "grad_frequency",
 )
 _JVP_FIELDS = ("tangent_f_te", "tangent_f_tm")
+
+# The table-build physics inputs both companions take, in ABI order.
+_TABLE_BUILD_TABLES = tuple(
+    tensor(name)
+    for name in (
+        "s_te", "s_tm", "a_te", "a_tm", "r_diff_te", "r_diff_tm", "cos_i", "phi_i", "cos_o",
+        "phi_o", "layer_thickness_m", "layer_eps_r", "layer_sigma_e", "layer_mu_r",
+    )
+)
+_TABLE_BUILD_SCALARS = (real("sigma_h"), real("corr_x"), real("corr_y"), real("frequency_hz"))
+_TABLE_BUILD_BACKWARD = _native.op(
+    "kirchhoff_table_build_backward", _TABLE_BUILD_TABLES, _TABLE_BUILD_SCALARS,
+    tensor("grad_f_te"), tensor("grad_f_tm"), flag("need_grad_rough"), flag("need_grad_layers"),
+    flag("need_grad_frequency"),
+)
+_TABLE_BUILD_JVP = _native.op(
+    "kirchhoff_table_build_jvp", _TABLE_BUILD_TABLES, _TABLE_BUILD_SCALARS,
+    opaque("t_layer_thickness_m"), opaque("t_layer_eps_r"), opaque("t_layer_sigma_e"),
+    real("t_sigma_h"), real("t_corr_x"), real("t_corr_y"), real("t_frequency"),
+)
 
 
 def _check_table_tensor(name: str, tensor: torch.Tensor, ndim: int) -> torch.Tensor:
@@ -1466,36 +961,19 @@ def kirchhoff_table_build_backward(
     s_tm = _check_table_tensor("s_tm", s_tm, 4)
     grad_f_te = _check_table_tensor("grad_f_te", grad_f_te, 4)
     grad_f_tm = _check_table_tensor("grad_f_tm", grad_f_tm, 4)
-    out = _required_native_op("kirchhoff_table_build_backward")(
-        s_te,
-        s_tm,
-        a_te.contiguous(),
-        a_tm.contiguous(),
-        r_diff_te.contiguous(),
-        r_diff_tm.contiguous(),
-        cos_i.contiguous(),
-        phi_i.contiguous(),
-        cos_o.contiguous(),
-        phi_o.contiguous(),
-        layer_thickness_m.contiguous(),
-        layer_eps_r.contiguous(),
-        layer_sigma_e.contiguous(),
-        layer_mu_r.contiguous(),
-        float(sigma_h),
-        float(corr_x),
-        float(corr_y),
-        float(frequency_hz),
-        grad_f_te,
-        grad_f_tm,
-        bool(need_grad_rough),
-        bool(need_grad_layers),
-        bool(need_grad_frequency),
+    tables = (
+        a_te, a_tm, r_diff_te, r_diff_tm, cos_i, phi_i, cos_o, phi_o, layer_thickness_m,
+        layer_eps_r, layer_sigma_e, layer_mu_r,
     )
-    if not isinstance(out, dict) or set(out) != set(_BACKWARD_FIELDS):
-        raise TypeError(
-            "_channel.kirchhoff_table_build_backward returned invalid fields"
-        )
-    return out
+    out = _TABLE_BUILD_BACKWARD(
+        s_te, s_tm, *(table.contiguous() for table in tables), sigma_h, corr_x, corr_y,
+        frequency_hz, grad_f_te, grad_f_tm, need_grad_rough, need_grad_layers,
+        need_grad_frequency,
+    )
+    return cast(
+        dict[str, torch.Tensor | None],
+        _require_fields(out, _BACKWARD_FIELDS, _TABLE_BUILD_BACKWARD.symbol),
+    )
 
 
 def kirchhoff_table_build_jvp(
@@ -1512,38 +990,17 @@ def kirchhoff_table_build_jvp(
 
     s_te = _check_table_tensor("s_te", s_te, 4)
     s_tm = _check_table_tensor("s_tm", s_tm, 4)
-    out = _required_native_op("kirchhoff_table_build_jvp")(
-        s_te,
-        s_tm,
-        a_te.contiguous(),
-        a_tm.contiguous(),
-        r_diff_te.contiguous(),
-        r_diff_tm.contiguous(),
-        cos_i.contiguous(),
-        phi_i.contiguous(),
-        cos_o.contiguous(),
-        phi_o.contiguous(),
-        layer_thickness_m.contiguous(),
-        layer_eps_r.contiguous(),
-        layer_sigma_e.contiguous(),
-        layer_mu_r.contiguous(),
-        float(sigma_h),
-        float(corr_x),
-        float(corr_y),
-        float(frequency_hz),
-        None if t_layer_thickness_m is None else t_layer_thickness_m.contiguous(),
-        None if t_layer_eps_r is None else t_layer_eps_r.contiguous(),
-        None if t_layer_sigma_e is None else t_layer_sigma_e.contiguous(),
-        float(t_sigma_h),
-        float(t_corr_x),
-        float(t_corr_y),
-        float(t_frequency),
+    tables = (
+        a_te, a_tm, r_diff_te, r_diff_tm, cos_i, phi_i, cos_o, phi_o, layer_thickness_m,
+        layer_eps_r, layer_sigma_e, layer_mu_r,
     )
-    if not isinstance(out, dict) or set(out) != set(_JVP_FIELDS):
-        raise TypeError(
-            "_channel.kirchhoff_table_build_jvp returned invalid fields"
-        )
-    return out
+    layer_tangents = (t_layer_thickness_m, t_layer_eps_r, t_layer_sigma_e)
+    out = _TABLE_BUILD_JVP(
+        s_te, s_tm, *(table.contiguous() for table in tables), sigma_h, corr_x, corr_y,
+        frequency_hz, *(None if t is None else t.contiguous() for t in layer_tangents),
+        t_sigma_h, t_corr_x, t_corr_y, t_frequency,
+    )
+    return cast(dict[str, torch.Tensor], _require_fields(out, _JVP_FIELDS, _TABLE_BUILD_JVP.symbol))
 
 
 def _scalar_value(tensor: torch.Tensor) -> float:
@@ -1557,82 +1014,29 @@ def _scalar_tangent(tensor: torch.Tensor | None) -> float:
     return float(value.reshape(()).detach())
 
 
-# Fixed inputs of the build op (scattering AD): grads/tangents here fail loudly
-# instead of silently detaching.
-_FIXED = (
-    (6, "layer_mu_r"),
-    (16, "cos_i"),
-    (17, "phi_i"),
-    (18, "cos_o"),
-    (19, "phi_o"),
+# The apply inputs of the build AD; fixed inputs fail loudly instead of silently detaching.
+_TABLE_BUILD_AD = AdInputs(
+    "kirchhoff_table_build_ad",
+    *(opaque(f"rough_{name}", grad="diff") for name in ("sigma_h", "corr_x", "corr_y")),
+    *(opaque(name, grad="diff") for name in ("layer_thickness_m", "layer_eps_r", "layer_sigma_e")),
+    opaque("layer_mu_r", grad="fixed"),
+    opaque("frequency", grad="diff"),
+    *(
+        opaque(name)
+        for name in (
+            "f_te_built", "f_tm_built", "s_te", "s_tm", "a_te", "a_tm", "r_diff_te", "r_diff_tm",
+        )
+    ),
+    *(opaque(name, grad="fixed") for name in ("cos_i", "phi_i", "cos_o", "phi_o")),
+    opaque("frequency_value"),
 )
-
-
-def _backward_need_flags(needed: tuple[bool, ...]) -> tuple[bool, bool, bool]:
-    """Resolve which native grad groups the VJP must compute."""
-
-    need_rough = bool(needed[0] or needed[1] or needed[2])
-    need_layers = bool(needed[3] or needed[4] or needed[5])
-    need_frequency = bool(needed[7])
-    return need_rough, need_layers, need_frequency
-
-
-def _backward_is_noop(
-    need_rough: bool, need_layers: bool, need_frequency: bool, grad_f_te: torch.Tensor | None,
-    grad_f_tm: torch.Tensor | None,
-) -> bool:
-    """True when no differentiable input is requested or no upstream grad flows."""
-
-    no_grad_requested = not (need_rough or need_layers or need_frequency)
-    no_upstream = grad_f_te is None and grad_f_tm is None
-    return no_grad_requested or no_upstream
-
-
-def _backward_grad_tuple(
-    out: dict[str, Any], ctx: Any, needed: tuple[bool, ...], *, need_frequency: bool,
-) -> tuple[torch.Tensor | None, ...]:
-    """Pack the 21-slot input-gradient tuple from the native VJP output."""
-
-    grad_sigma_h = (
-        out["grad_sigma_h"].reshape(ctx.rough_shapes[0]) if needed[0] else None
-    )
-    grad_corr_x = (
-        out["grad_corr_x"].reshape(ctx.rough_shapes[1]) if needed[1] else None
-    )
-    grad_corr_y = (
-        out["grad_corr_y"].reshape(ctx.rough_shapes[2]) if needed[2] else None
-    )
-    grad_thickness = out["grad_layer_thickness_m"] if needed[3] else None
-    grad_eps = out["grad_layer_eps_r"] if needed[4] else None
-    grad_sigma = out["grad_layer_sigma_e"] if needed[5] else None
-    grad_frequency = (
-        _ad_frequency_grad(out["grad_frequency"], ctx.frequency_meta)
-        if need_frequency
-        else None
-    )
-    return (
-        grad_sigma_h,
-        grad_corr_x,
-        grad_corr_y,
-        grad_thickness,
-        grad_eps,
-        grad_sigma,
-        None,  # layer_mu_r
-        grad_frequency,
-        None,  # f_te_built
-        None,  # f_tm_built
-        None,  # s_te
-        None,  # s_tm
-        None,  # a_te
-        None,  # a_tm
-        None,  # r_diff_te
-        None,  # r_diff_tm
-        None,  # cos_i
-        None,  # phi_i
-        None,  # cos_o
-        None,  # phi_o
-        None,  # frequency_value
-    )
+_TABLE_BUILD_ROUGH = ("rough_sigma_h", "rough_corr_x", "rough_corr_y")
+_TABLE_BUILD_LAYERS = ("layer_thickness_m", "layer_eps_r", "layer_sigma_e")
+# The saved primals, in the order of the companion facades' positional inputs.
+_TABLE_BUILD_SAVED = (
+    "s_te", "s_tm", "a_te", "a_tm", "r_diff_te", "r_diff_tm", "cos_i", "phi_i", "cos_o", "phi_o",
+    "layer_thickness_m", "layer_eps_r", "layer_sigma_e", "layer_mu_r",
+)
 
 
 class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
@@ -1661,50 +1065,33 @@ class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
     @staticmethod
     def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
-        frequency = inputs[7]
-        ctx.sigma_h = _scalar_value(inputs[0])
-        ctx.corr_x = _scalar_value(inputs[1])
-        ctx.corr_y = _scalar_value(inputs[2])
-        ctx.frequency_value = float(inputs[20])
-        ctx.rough_shapes = (
-            tuple(inputs[0].shape),
-            tuple(inputs[1].shape),
-            tuple(inputs[2].shape),
-        )
-        ctx.frequency_meta = (
-            (frequency.dtype, frequency.device)
-            if isinstance(frequency, torch.Tensor)
-            else None
-        )
-        # Physics tensors used by both backward and jvp (order matches the
-        # facade signatures). Grids (16..19) and CSR params (3..6) included.
-        saved = tuple(
-            torch.autograd.forward_ad.unpack_dual(inputs[i]).primal
-            for i in (10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 3, 4, 5, 6)
-        )
-        ctx.save_for_backward(*saved)
-        ctx.save_for_forward(*saved)
+        named = _TABLE_BUILD_AD.unpack(inputs)
+        ctx.sigma_h = _scalar_value(named["rough_sigma_h"])
+        ctx.corr_x = _scalar_value(named["rough_corr_x"])
+        ctx.corr_y = _scalar_value(named["rough_corr_y"])
+        ctx.frequency_value = float(named["frequency_value"])
+        ctx.rough_shapes = tuple(tuple(named[name].shape) for name in _TABLE_BUILD_ROUGH)
+        ctx.frequency_meta = frequency_meta(named["frequency"])
+        save(ctx, *_TABLE_BUILD_AD.primals(inputs, *_TABLE_BUILD_SAVED))
 
     @staticmethod
     @_ad_first_order_only
     def backward(ctx: Any, grad_f_te: Any, grad_f_tm: Any) -> Any:
-        none_grads = (None,) * 21
-        _ad_reject_fixed_inputs(
-            "kirchhoff_table_build_ad", ctx.needs_input_grad, _FIXED
-        )
-        needed = ctx.needs_input_grad
-        need_rough, need_layers, need_frequency = _backward_need_flags(needed)
-        if _backward_is_noop(
-            need_rough, need_layers, need_frequency, grad_f_te, grad_f_tm
+        _TABLE_BUILD_AD.reject_fixed_grads(ctx)
+        need_rough = _TABLE_BUILD_AD.needs(ctx, *_TABLE_BUILD_ROUGH)
+        need_layers = _TABLE_BUILD_AD.needs(ctx, *_TABLE_BUILD_LAYERS)
+        need_frequency = _TABLE_BUILD_AD.need(ctx, "frequency")
+        if not (need_rough or need_layers or need_frequency) or (
+            grad_f_te is None and grad_f_tm is None
         ):
-            return none_grads
+            return _TABLE_BUILD_AD.none
         saved = ctx.saved_tensors
         s_te = saved[0]
         if grad_f_te is None:
             grad_f_te = torch.zeros_like(s_te)
         if grad_f_tm is None:
             grad_f_tm = torch.zeros_like(s_te)
-        out = kirchhoff_table_build_backward(
+        out: dict[str, Any] = kirchhoff_table_build_backward(
             *saved,
             sigma_h=ctx.sigma_h,
             corr_x=ctx.corr_x,
@@ -1716,7 +1103,22 @@ class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
             need_grad_layers=need_layers,
             need_grad_frequency=need_frequency,
         )
-        return _backward_grad_tuple(out, ctx, needed, need_frequency=need_frequency)
+        rough = {
+            name: out[f"grad_{name.removeprefix('rough_')}"].reshape(shape)
+            for name, shape in zip(_TABLE_BUILD_ROUGH, ctx.rough_shapes)
+            if _TABLE_BUILD_AD.need(ctx, name)
+        }
+        layers = {
+            name: out[f"grad_{name}"]
+            for name in _TABLE_BUILD_LAYERS
+            if _TABLE_BUILD_AD.need(ctx, name)
+        }
+        grad_frequency = (
+            _ad_frequency_grad(out["grad_frequency"], ctx.frequency_meta)
+            if need_frequency
+            else None
+        )
+        return _TABLE_BUILD_AD.place(**rough, **layers, frequency=grad_frequency)
 
     @staticmethod
     def jvp(
@@ -1725,24 +1127,21 @@ class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
         _t_s_tm: Any, _t_a_te: Any, _t_a_tm: Any, _t_r_diff_te: Any, _t_r_diff_tm: Any,
         _t_cos_i: Any, _t_phi_i: Any, _t_cos_o: Any, _t_phi_o: Any, _t_frequency_value: Any,
     ) -> Any:
-        _ad_reject_fixed_tangents(
-            "kirchhoff_table_build_ad",
-            (
-                (t_mu_r, "layer_mu_r"),
-                (_t_cos_i, "cos_i"),
-                (_t_phi_i, "phi_i"),
-                (_t_cos_o, "cos_o"),
-                (_t_phi_o, "phi_o"),
-            ),
+        tangents = (
+            t_sigma_h, t_corr_x, t_corr_y, t_thickness, t_eps, t_sigma, t_mu_r, t_frequency,
+            _t_f_te, _t_f_tm, _t_s_te, _t_s_tm, _t_a_te, _t_a_tm, _t_r_diff_te, _t_r_diff_tm,
+            _t_cos_i, _t_phi_i, _t_cos_o, _t_phi_o, _t_frequency_value,
         )
+        _TABLE_BUILD_AD.reject_fixed_tangents(tangents)
         saved = ctx.saved_tensors
-        tangent_sigma_h = _scalar_tangent(t_sigma_h)
-        tangent_corr_x = _scalar_tangent(t_corr_x)
-        tangent_corr_y = _scalar_tangent(t_corr_y)
-        tangent_frequency = _scalar_tangent(t_frequency)
-        tangent_thickness = _ad_native_tangent_or_none(t_thickness)
-        tangent_eps = _ad_native_tangent_or_none(t_eps)
-        tangent_sigma = _ad_native_tangent_or_none(t_sigma)
+        tangent_sigma_h, tangent_corr_x, tangent_corr_y, tangent_frequency = (
+            _scalar_tangent(_TABLE_BUILD_AD.tangent(tangents, name))
+            for name in (*_TABLE_BUILD_ROUGH, "frequency")
+        )
+        tangent_thickness, tangent_eps, tangent_sigma = (
+            _ad_native_tangent_or_none(_TABLE_BUILD_AD.tangent(tangents, name))
+            for name in _TABLE_BUILD_LAYERS
+        )
         if (
             tangent_sigma_h == 0.0
             and tangent_corr_x == 0.0
@@ -1846,6 +1245,27 @@ def kirchhoff_table_build_ad(
     return f_te, f_tm
 
 
+# Kirchhoff samples and table views of the pair kernels, in ABI order.
+_PAIR_SAMPLES = tuple(
+    tensor(name)
+    for name in (
+        "points", "normals", "frame_t1", "frame_t2", "wi_local", "incident", "epsilon", "material",
+    )
+)
+_PAIR_TABLES = tuple(
+    tensor(name) for name in ("material_slot", "table_offset", "table_dims", "f_te", "f_tm")
+)
+_PAIR_LEGS = _native.op("mc_scattering_pair_legs", _PAIR_SAMPLES, _PAIR_TABLES, tensor("receivers"))
+_PAIR_SUM = _native.op(
+    "mc_scattering_pair_sum", _PAIR_SAMPLES, _PAIR_TABLES, tensor("receivers"), tensor("visible"),
+    tensor("value_te"), tensor("value_tm"), tensor("deposited"),
+)
+_PAIR_SUM_BACKWARD = _native.op(
+    "mc_scattering_pair_sum_backward", _PAIR_SAMPLES, _PAIR_TABLES, tensor("receivers"),
+    tensor("visible"), tensor("grad"),
+)
+
+
 def mc_scattering_pair_legs(
     samples: tuple[torch.Tensor, ...], tables: tuple[torch.Tensor, ...], receivers: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -1855,7 +1275,7 @@ def mc_scattering_pair_legs(
     ``tables`` = (material_slot, table_offset, table_dims, f_te_flat, f_tm_flat).
     """
 
-    out = _required_native_op("mc_scattering_pair_legs")(*samples, *tables, receivers)
+    out = _PAIR_LEGS(*samples, *tables, receivers)
     if not isinstance(out, tuple) or len(out) != 3:
         raise TypeError("_channel.mc_scattering_pair_legs must return 3 tensors")
     return out[0], out[1], out[2]
@@ -1865,9 +1285,7 @@ def _mc_scattering_pair_sum(
     samples: tuple[torch.Tensor, ...], tables: tuple[torch.Tensor, ...], receivers: torch.Tensor,
     visible: torch.Tensor, value_te: torch.Tensor, value_tm: torch.Tensor, deposited: torch.Tensor,
 ) -> torch.Tensor:
-    out = _required_native_op("mc_scattering_pair_sum")(
-        *samples, *tables, receivers, visible, value_te, value_tm, deposited
-    )
+    out = _PAIR_SUM(*samples, *tables, receivers, visible, value_te, value_tm, deposited)
     if not isinstance(out, torch.Tensor):
         raise TypeError("_channel.mc_scattering_pair_sum must return a tensor")
     return out
@@ -1908,7 +1326,7 @@ class _McScatteringPairSumFunction(torch.autograd.Function):
         if grad_out is None:
             return (None,) * 7
         f_te, f_tm = ctx.saved_tensors
-        out = _required_native_op("mc_scattering_pair_sum_backward")(
+        out = _PAIR_SUM_BACKWARD(
             *ctx.samples,
             *ctx.tables,
             _ad_native_tensor(f_te).detach(),

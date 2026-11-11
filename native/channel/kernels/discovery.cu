@@ -762,8 +762,8 @@ GroupTables group_tables(const at::Tensor& plane_point, const at::Tensor& plane_
                          const at::Tensor& occupancy) {
     check_vec3_table(plane_point, "plane_point");
     check_vec3_table(plane_normal, "plane_normal");
-    check_cuda_tensor(bounds, "bounds", at::kFloat, 2);
-    check_cuda_tensor(occupancy, "occupancy", at::kInt, 2);
+    check_tensor(bounds, "bounds", at::kFloat, 2);
+    check_tensor(occupancy, "occupancy", at::kInt, 2);
     TORCH_CHECK(bounds.size(1) == 6, "bounds must have shape (G, 6)");
     TORCH_CHECK(occupancy.size(1) == kOccupancyCells, "occupancy must have one bit row per cell row");
     TORCH_CHECK(plane_normal.size(0) == plane_point.size(0) && bounds.size(0) == plane_point.size(0) &&
@@ -781,10 +781,10 @@ pybind11::dict channel_reflection_group_tables(at::Tensor vertices, at::Tensor f
                                                double tolerance) {
     TORCH_CHECK(std::isfinite(tolerance) && tolerance >= 0.0, "tolerance must be finite and non-negative");
     check_vec3_table(vertices, "vertices");
-    check_cuda_tensor(faces, "faces", at::kInt, 2);
+    check_tensor(faces, "faces", at::kInt, 2);
     TORCH_CHECK(faces.size(1) == 3, "faces must have shape (F, 3)");
-    check_cuda_tensor(face_group_id, "face_group_id", at::kInt, 1);
-    check_cuda_tensor(representative_faces, "representative_faces", at::kLong, 1);
+    check_tensor(face_group_id, "face_group_id", at::kInt, 1);
+    check_tensor(representative_faces, "representative_faces", at::kLong, 1);
     check_vec3_table(tri_a, "tri_a");
     check_vec3_table(normals, "normals");
     TORCH_CHECK(face_group_id.size(0) == faces.size(0), "face_group_id must match faces");
@@ -807,23 +807,27 @@ pybind11::dict channel_reflection_group_tables(at::Tensor vertices, at::Tensor f
         return out;
     }
     auto ordered = at::empty({group_count, 6}, vertices.options().dtype(at::kInt));
-    group_bounds_init_kernel<<<static_cast<int>(launch_blocks(group_count * 6)), kPathBlockSize, 0, stream>>>(
+    group_bounds_init_kernel<<<::channel::launch_blocks(group_count * 6, kPathBlockSize),
+                               kPathBlockSize, 0, stream>>>(
         group_count, ordered.data_ptr<int>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     if (face_count > 0) {
-        group_bounds_accumulate_kernel<<<static_cast<int>(launch_blocks(face_count)), kPathBlockSize, 0, stream>>>(
+        group_bounds_accumulate_kernel<<<::channel::launch_blocks(face_count, kPathBlockSize),
+                                         kPathBlockSize, 0, stream>>>(
             face_count, vertices.data_ptr<float>(), faces.data_ptr<int>(), face_group_id.data_ptr<int>(), group_count,
             ordered.data_ptr<int>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
-    group_planes_kernel<<<static_cast<int>(launch_blocks(group_count)), kPathBlockSize, 0, stream>>>(
+    group_planes_kernel<<<::channel::launch_blocks(group_count, kPathBlockSize),
+                          kPathBlockSize, 0, stream>>>(
         group_count, ordered.data_ptr<int>(), representative_faces.data_ptr<int64_t>(), tri_a.data_ptr<float>(),
         normals.data_ptr<float>(), pybind11::cast<at::Tensor>(out["bounds"]).data_ptr<float>(),
         pybind11::cast<at::Tensor>(out["plane_point"]).data_ptr<float>(),
         pybind11::cast<at::Tensor>(out["plane_normal"]).data_ptr<float>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     if (face_count > 0) {
-        group_occupancy_kernel<<<static_cast<int>(launch_blocks(face_count)), kPathBlockSize, 0, stream>>>(
+        group_occupancy_kernel<<<::channel::launch_blocks(face_count, kPathBlockSize),
+                                 kPathBlockSize, 0, stream>>>(
             face_count, vertices.data_ptr<float>(), faces.data_ptr<int>(), face_group_id.data_ptr<int>(), group_count,
             pybind11::cast<at::Tensor>(out["bounds"]).data_ptr<float>(),
             pybind11::cast<at::Tensor>(out["plane_normal"]).data_ptr<float>(), static_cast<float>(tolerance),
@@ -838,8 +842,8 @@ pybind11::dict channel_reflection_image_tree_expand(at::Tensor node_tx, at::Tens
                                                     at::Tensor plane_normal, at::Tensor bounds,
                                                     at::Tensor occupancy, int64_t node_start,
                                                     int64_t node_end, double tolerance, bool prune) {
-    check_cuda_tensor(node_tx, "node_tx", at::kInt, 1);
-    check_cuda_tensor(node_sequences, "node_sequences", at::kInt, 2);
+    check_tensor(node_tx, "node_tx", at::kInt, 1);
+    check_tensor(node_sequences, "node_sequences", at::kInt, 2);
     check_vec3_table(node_images, "node_images");
     const GroupTables tables = group_tables(plane_point, plane_normal, bounds, occupancy);
     const int64_t node_count = node_tx.size(0);
@@ -899,8 +903,8 @@ pybind11::dict channel_reflection_receiver_candidates(at::Tensor tx_positions, a
                                                       double segment_tolerance, double min_segment_length) {
     check_vec3_table(tx_positions, "tx_positions");
     check_vec3_table(rx_positions, "rx_positions");
-    check_cuda_tensor(sequences, "sequences", at::kInt, 2);
-    check_cuda_tensor(sequence_tx, "sequence_tx", at::kInt, 1);
+    check_tensor(sequences, "sequences", at::kInt, 2);
+    check_tensor(sequence_tx, "sequence_tx", at::kInt, 1);
     const GroupTables tables = group_tables(plane_point, plane_normal, bounds, occupancy);
     const int64_t sequence_count = sequences.size(0);
     const int64_t depth = sequences.size(1);
@@ -961,8 +965,8 @@ ChainEdges chain_edges(const at::Tensor& position, const at::Tensor& direction, 
                        const at::Tensor& t_max) {
     check_vec3_table(position, "edge_position");
     check_vec3_table(direction, "edge_direction");
-    check_cuda_tensor(t_min, "edge_t_min", at::kFloat, 1);
-    check_cuda_tensor(t_max, "edge_t_max", at::kFloat, 1);
+    check_tensor(t_min, "edge_t_min", at::kFloat, 1);
+    check_tensor(t_max, "edge_t_max", at::kFloat, 1);
     TORCH_CHECK(direction.size(0) == position.size(0) && t_min.size(0) == position.size(0) &&
                     t_max.size(0) == position.size(0),
                 "edge tables must have one row per edge");
@@ -973,11 +977,11 @@ ChainEdges chain_edges(const at::Tensor& position, const at::Tensor& direction, 
 ChainHalf chain_half(const at::Tensor& edge_offsets, const at::Tensor& endpoint, const at::Tensor& node,
                      const at::Tensor& endpoints, const at::Tensor& node_sequences, const at::Tensor& node_images,
                      int64_t edge_count, const char* name) {
-    check_cuda_tensor(edge_offsets, "edge_offsets", at::kLong, 1);
-    check_cuda_tensor(endpoint, "endpoint", at::kInt, 1);
-    check_cuda_tensor(node, "node", at::kInt, 1);
+    check_tensor(edge_offsets, "edge_offsets", at::kLong, 1);
+    check_tensor(endpoint, "endpoint", at::kInt, 1);
+    check_tensor(node, "node", at::kInt, 1);
     check_vec3_table(endpoints, "endpoints");
-    check_cuda_tensor(node_sequences, "node_sequences", at::kInt, 2);
+    check_tensor(node_sequences, "node_sequences", at::kInt, 2);
     check_vec3_table(node_images, "node_images");
     TORCH_CHECK(edge_offsets.size(0) == edge_count + 1, name, " edge offsets must have one row per edge plus one");
     TORCH_CHECK(node.size(0) == endpoint.size(0), name, " node must match endpoint");
@@ -994,7 +998,7 @@ pybind11::dict channel_chain_node_edges(at::Tensor node_sequences, at::Tensor no
                                         at::Tensor plane_normal, at::Tensor bounds, at::Tensor occupancy,
                                         at::Tensor edge_position, at::Tensor edge_direction, at::Tensor edge_t_min, at::Tensor edge_t_max,
                                         int64_t node_start, int64_t node_end, double tolerance) {
-    check_cuda_tensor(node_sequences, "node_sequences", at::kInt, 2);
+    check_tensor(node_sequences, "node_sequences", at::kInt, 2);
     check_vec3_table(node_images, "node_images");
     const GroupTables tables = group_tables(plane_point, plane_normal, bounds, occupancy);
     const ChainEdges edges = chain_edges(edge_position, edge_direction, edge_t_min, edge_t_max);
@@ -1043,7 +1047,7 @@ pybind11::dict channel_chain_candidates(
     double box_tolerance, double segment_tolerance, double min_segment_length, double edge_epsilon) {
     const GroupTables tables = group_tables(plane_point, plane_normal, bounds, occupancy);
     const ChainEdges edges = chain_edges(edge_position, edge_direction, edge_t_min, edge_t_max);
-    check_cuda_tensor(lane_offsets, "lane_offsets", at::kLong, 1);
+    check_tensor(lane_offsets, "lane_offsets", at::kLong, 1);
     TORCH_CHECK(lane_offsets.size(0) == edges.edge_count + 1, "lane_offsets must have one row per edge plus one");
     TORCH_CHECK(edges.edge_count > 0, "chain candidates need at least one edge");
     const ChainHalf a = chain_half(a_edge_offsets, a_endpoint, a_node, a_endpoints, a_node_sequences, a_node_images,
@@ -1102,11 +1106,11 @@ pybind11::dict channel_chain_candidates(
 pybind11::dict channel_chain_double_candidates(at::Tensor pair_offsets, int64_t lane_start, int64_t lane_end,
                                                int64_t rx_count, at::Tensor tx_offsets, at::Tensor tx_edges,
                                                at::Tensor rx_offsets, at::Tensor rx_edges) {
-    check_cuda_tensor(pair_offsets, "pair_offsets", at::kLong, 1);
-    check_cuda_tensor(tx_offsets, "tx_offsets", at::kLong, 1);
-    check_cuda_tensor(rx_offsets, "rx_offsets", at::kLong, 1);
-    check_cuda_tensor(tx_edges, "tx_edges", at::kInt, 1);
-    check_cuda_tensor(rx_edges, "rx_edges", at::kInt, 1);
+    check_tensor(pair_offsets, "pair_offsets", at::kLong, 1);
+    check_tensor(tx_offsets, "tx_offsets", at::kLong, 1);
+    check_tensor(rx_offsets, "rx_offsets", at::kLong, 1);
+    check_tensor(tx_edges, "tx_edges", at::kInt, 1);
+    check_tensor(rx_edges, "rx_edges", at::kInt, 1);
     TORCH_CHECK(rx_count > 0 && rx_offsets.size(0) == rx_count + 1, "rx_offsets must have one row per receiver plus one");
     const int64_t tx_count = tx_offsets.size(0) - 1;
     TORCH_CHECK(tx_count > 0, "tx_offsets must have one row per transmitter plus one");

@@ -250,6 +250,13 @@
       "device_trap": false,
       "compile_options": []
     },
+    "native/channel/kernels/constants.cuh": {
+      "kernels": [],
+      "launches": [],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
     "native/channel/kernels/coupled.cu": {
       "kernels": [
         "coupled_active_either_mask_kernel",

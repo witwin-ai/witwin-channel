@@ -11,10 +11,13 @@
 #include <tuple>
 #include <vector>
 
+#include "../tensor_checks.h"
+#include "constants.cuh"
+
 #define CHANNEL_LOS_CHECK_VISIBILITY_APPLICATION()                                         \
-    check_cuda_tensor(maps, "maps", at::kFloat, 3);                                  \
-    check_cuda_tensor(los, "los", at::kFloat, 2);                                    \
-    check_cuda_tensor(visible, "visible", at::kBool, 1);                             \
+    check_tensor(maps, "maps", at::kFloat, 3);                                  \
+    check_tensor(los, "los", at::kFloat, 2);                                    \
+    check_tensor(visible, "visible", at::kBool, 1);                             \
     TORCH_CHECK(maps.size(0) == los.size(0), "maps and los must have the same tx dimension");\
     TORCH_CHECK(los.size(1) == maps.size(1) * maps.size(2), "los columns must match map cells");\
     TORCH_CHECK(tx_index >= 0 && tx_index < los.size(0), "tx_index is out of range"); \
@@ -31,19 +34,10 @@
 
 namespace {
 
-constexpr double kLightSpeedMetersPerSecond = 299792458.0;
+using channel::kSpeedOfLight;
 constexpr int kLosBlockSize = 256;
 
-void check_cuda_tensor(
-    const at::Tensor &tensor,
-    const char *name,
-    c10::ScalarType dtype,
-    int64_t dimensions) {
-    TORCH_CHECK(tensor.is_cuda(), name, " must be a CUDA tensor");
-    TORCH_CHECK(tensor.scalar_type() == dtype, name, " has the wrong dtype");
-    TORCH_CHECK(tensor.dim() == dimensions, name, " has the wrong rank");
-    TORCH_CHECK(tensor.is_contiguous(), name, " must be contiguous");
-}
+using channel::check_tensor;
 
 void check_cuda_tensor_rank(
     const at::Tensor &tensor,
@@ -57,7 +51,7 @@ void check_cuda_tensor_rank(
 
 float los_gain_scale(double frequency_hz) {
     TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
-    const double wavelength = kLightSpeedMetersPerSecond / frequency_hz;
+    const double wavelength = kSpeedOfLight / frequency_hz;
     const double scale = wavelength / 12.566370614359172;
     return static_cast<float>(scale * scale);
 }
@@ -66,7 +60,7 @@ float los_gain_scale(double frequency_hz) {
 // derivative is -2 * gain_scale / f (computed in double before narrowing).
 float los_gain_scale_dfreq(double frequency_hz) {
     TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
-    const double wavelength = kLightSpeedMetersPerSecond / frequency_hz;
+    const double wavelength = kSpeedOfLight / frequency_hz;
     const double scale = wavelength / 12.566370614359172;
     return static_cast<float>(-2.0 * scale * scale / frequency_hz);
 }
@@ -117,7 +111,7 @@ __global__ void path_los_export_kernel(
         tx_id[path] = tx;
         rx_id[path] = rx;
         path_length[path] = distance;
-        delay[path] = distance / static_cast<float>(kLightSpeedMetersPerSecond);
+        delay[path] = distance / static_cast<float>(kSpeedOfLight);
         const float gain = tx_power[tx] * gain_base * gain_base * pattern;
         path_gain[path] = gain;
         path_gain_matrix[static_cast<int64_t>(tx) * rx_count + rx] = gain;
@@ -407,10 +401,10 @@ LosExport los_export_cuda_impl(
     at::Tensor rx_positions,
     double frequency_hz,
     at::Tensor tx_pol) {
-    check_cuda_tensor(tx_positions, "tx_positions", at::kFloat, 2);
-    check_cuda_tensor(tx_power, "tx_power", at::kFloat, 1);
-    check_cuda_tensor(rx_positions, "rx_positions", at::kFloat, 2);
-    check_cuda_tensor(tx_pol, "tx_pol", at::kFloat, 2);
+    check_tensor(tx_positions, "tx_positions", at::kFloat, 2);
+    check_tensor(tx_power, "tx_power", at::kFloat, 1);
+    check_tensor(rx_positions, "rx_positions", at::kFloat, 2);
+    check_tensor(tx_pol, "tx_pol", at::kFloat, 2);
     TORCH_CHECK(tx_positions.size(1) == 3, "tx_positions must have shape (N, 3)");
     TORCH_CHECK(rx_positions.size(1) == 3, "rx_positions must have shape (M, 3)");
     TORCH_CHECK(tx_power.size(0) == tx_positions.size(0), "tx_power must match tx_positions");
@@ -434,7 +428,7 @@ LosExport los_export_cuda_impl(
     if (path_count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(tx_positions.get_device()).stream();
         const int block_count = static_cast<int>((path_count + kLosBlockSize - 1) / kLosBlockSize);
-        const float wavelength = static_cast<float>(kLightSpeedMetersPerSecond / frequency_hz);
+        const float wavelength = static_cast<float>(kSpeedOfLight / frequency_hz);
         path_los_export_kernel<<<block_count, kLosBlockSize, 0, stream>>>(
             tx_positions.data_ptr<float>(),
             tx_power.data_ptr<float>(),
@@ -479,7 +473,7 @@ at::Tensor los_component_maps_from_matrix_cuda_impl(
     at::Tensor los,
     int64_t rows,
     int64_t cols) {
-    check_cuda_tensor(los, "los", at::kFloat, 2);
+    check_tensor(los, "los", at::kFloat, 2);
     TORCH_CHECK(rows >= 0 && cols >= 0, "rows and cols must be non-negative");
     TORCH_CHECK(los.size(1) == rows * cols, "los columns must match rows * cols");
     return launch_los_component_maps(los, rows, cols);
@@ -489,7 +483,7 @@ std::tuple<at::Tensor, at::Tensor> los_visibility_inputs_cuda_impl(
     at::Tensor tx_positions,
     int64_t tx_index,
     int64_t rx_count) {
-    check_cuda_tensor(tx_positions, "tx_positions", at::kFloat, 2);
+    check_tensor(tx_positions, "tx_positions", at::kFloat, 2);
     TORCH_CHECK(tx_positions.size(1) == 3, "tx_positions must have shape (N, 3)");
     TORCH_CHECK(tx_index >= 0 && tx_index < tx_positions.size(0), "tx_index is out of range");
     TORCH_CHECK(rx_count >= 0, "rx_count must be non-negative");
@@ -525,7 +519,7 @@ at::Tensor receiver_grid_points_cuda_impl(
     double y_axis_z,
     double spacing0,
     double spacing1) {
-    check_cuda_tensor(reference, "reference", at::kFloat, 2);
+    check_tensor(reference, "reference", at::kFloat, 2);
     TORCH_CHECK(rows >= 0 && cols >= 0, "rows and cols must be non-negative");
     const int64_t count = rows * cols;
     auto points = at::empty({count, 3}, reference.options());
@@ -581,9 +575,9 @@ std::tuple<at::Tensor, at::Tensor> transmitter_tensors_cuda_impl(
 }
 
 at::Tensor pack_vec3_cuda_impl(at::Tensor x, at::Tensor y, at::Tensor z) {
-    check_cuda_tensor(x, "x", at::kFloat, 1);
-    check_cuda_tensor(y, "y", at::kFloat, 1);
-    check_cuda_tensor(z, "z", at::kFloat, 1);
+    check_tensor(x, "x", at::kFloat, 1);
+    check_tensor(y, "y", at::kFloat, 1);
+    check_tensor(z, "z", at::kFloat, 1);
     TORCH_CHECK(y.size(0) == x.size(0), "y must match x length");
     TORCH_CHECK(z.size(0) == x.size(0), "z must match x length");
     const int64_t count = x.size(0);
@@ -620,10 +614,10 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_mc_los_path_g
     at::Tensor grad_output,
     double frequency_hz,
     at::Tensor tx_pol) {
-    check_cuda_tensor(tx_positions, "tx_positions", at::kFloat, 2);
-    check_cuda_tensor(tx_power, "tx_power", at::kFloat, 1);
-    check_cuda_tensor(rx_positions, "rx_positions", at::kFloat, 2);
-    check_cuda_tensor(tx_pol, "tx_pol", at::kFloat, 2);
+    check_tensor(tx_positions, "tx_positions", at::kFloat, 2);
+    check_tensor(tx_power, "tx_power", at::kFloat, 1);
+    check_tensor(rx_positions, "rx_positions", at::kFloat, 2);
+    check_tensor(tx_pol, "tx_pol", at::kFloat, 2);
     check_cuda_tensor_rank(grad_output, "grad_output", at::kFloat, 2);
     TORCH_CHECK(tx_positions.size(1) == 3, "tx_positions must have shape (N, 3)");
     TORCH_CHECK(rx_positions.size(1) == 3, "rx_positions must have shape (M, 3)");
@@ -690,10 +684,10 @@ at::Tensor channel_mc_los_path_gain_jvp_cuda(
     double frequency_hz,
     double frequency_tangent,
     at::Tensor tx_pol) {
-    check_cuda_tensor(tx_positions, "tx_positions", at::kFloat, 2);
-    check_cuda_tensor(tx_power, "tx_power", at::kFloat, 1);
-    check_cuda_tensor(rx_positions, "rx_positions", at::kFloat, 2);
-    check_cuda_tensor(tx_pol, "tx_pol", at::kFloat, 2);
+    check_tensor(tx_positions, "tx_positions", at::kFloat, 2);
+    check_tensor(tx_power, "tx_power", at::kFloat, 1);
+    check_tensor(rx_positions, "rx_positions", at::kFloat, 2);
+    check_tensor(tx_pol, "tx_pol", at::kFloat, 2);
     TORCH_CHECK(tx_positions.size(1) == 3, "tx_positions must have shape (N, 3)");
     TORCH_CHECK(rx_positions.size(1) == 3, "rx_positions must have shape (M, 3)");
     TORCH_CHECK(tx_power.size(0) == tx_positions.size(0), "tx_power must match tx_positions");
@@ -701,17 +695,17 @@ at::Tensor channel_mc_los_path_gain_jvp_cuda(
     TORCH_CHECK(tx_power.get_device() == tx_positions.get_device(), "tx_power must be on tx_positions device");
     TORCH_CHECK(rx_positions.get_device() == tx_positions.get_device(), "rx_positions must be on tx_positions device");
     if (has_tx_tangent) {
-        check_cuda_tensor(tx_tangent, "tx_tangent", at::kFloat, 2);
+        check_tensor(tx_tangent, "tx_tangent", at::kFloat, 2);
         TORCH_CHECK(tx_tangent.sizes() == tx_positions.sizes(), "tx_tangent must match tx_positions");
         TORCH_CHECK(tx_tangent.get_device() == tx_positions.get_device(), "tx_tangent must be on tx_positions device");
     }
     if (has_power_tangent) {
-        check_cuda_tensor(power_tangent, "power_tangent", at::kFloat, 1);
+        check_tensor(power_tangent, "power_tangent", at::kFloat, 1);
         TORCH_CHECK(power_tangent.sizes() == tx_power.sizes(), "power_tangent must match tx_power");
         TORCH_CHECK(power_tangent.get_device() == tx_positions.get_device(), "power_tangent must be on tx_positions device");
     }
     if (has_rx_tangent) {
-        check_cuda_tensor(rx_tangent, "rx_tangent", at::kFloat, 2);
+        check_tensor(rx_tangent, "rx_tangent", at::kFloat, 2);
         TORCH_CHECK(rx_tangent.sizes() == rx_positions.sizes(), "rx_tangent must match rx_positions");
         TORCH_CHECK(rx_tangent.get_device() == tx_positions.get_device(), "rx_tangent must be on tx_positions device");
     }
@@ -759,7 +753,7 @@ at::Tensor channel_mc_los_component_maps_adjoint_cuda(
     const int64_t cols = grad_maps.size(2);
     const bool has_visible = visible.numel() > 0;
     if (has_visible) {
-        check_cuda_tensor(visible, "visible", at::kBool, 2);
+        check_tensor(visible, "visible", at::kBool, 2);
         TORCH_CHECK(
             visible.size(0) == tx_count && visible.size(1) == rows * cols,
             "visible must have shape (tx, rows * cols)");
@@ -1206,11 +1200,10 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_los_taper_app
 #include <limits>
 #include <optional>
 
-#define kBlockSize kFixedLosGatherBlockSize
 
 namespace {
 
-constexpr int kBlockSize = 256;
+constexpr int kFixedLosGatherBlockSize = 256;
 constexpr int kLoSComponentId = 0;
 
 enum ContractError : int {
@@ -1448,10 +1441,6 @@ __global__ void fixed_los_jvp_kernel(
     }
 }
 
-int launch_blocks(int64_t count) {
-    return static_cast<int>((count + kBlockSize - 1) / kBlockSize);
-}
-
 void check_row_tensor(
     const at::Tensor& tensor,
     const char* name,
@@ -1618,7 +1607,8 @@ pybind11::dict channel_consumer_fixed_los_gather(
         auto contract_error = channel::empty_zero_cuda(
             {1}, source_index.options().dtype(at::kInt), stream);
         validate_fixed_los_kernel<<<
-            launch_blocks(row_count), kBlockSize, 0, stream>>>(
+            ::channel::launch_blocks(row_count, kFixedLosGatherBlockSize),
+            kFixedLosGatherBlockSize, 0, stream>>>(
             source_index.data_ptr<int>(),
             sink_index.data_ptr<int>(),
             source_id.data_ptr<int64_t>(),
@@ -1648,7 +1638,8 @@ pybind11::dict channel_consumer_fixed_los_gather(
             ")");
 
         gather_fixed_los_kernel<<<
-            launch_blocks(row_count), kBlockSize, 0, stream>>>(
+            ::channel::launch_blocks(row_count, kFixedLosGatherBlockSize),
+            kFixedLosGatherBlockSize, 0, stream>>>(
             source_index.data_ptr<int>(),
             sink_index.data_ptr<int>(),
             pair_index.data_ptr<int64_t>(),
@@ -1725,7 +1716,8 @@ pybind11::dict channel_consumer_fixed_los_gather_backward(
         channel::empty_zero_cuda({sink_count, 3}, float_options, stream);
     if (row_count > 0) {
         fixed_los_backward_kernel<<<
-            launch_blocks(row_count), kBlockSize, 0, stream>>>(
+            ::channel::launch_blocks(row_count, kFixedLosGatherBlockSize),
+            kFixedLosGatherBlockSize, 0, stream>>>(
             source_index.data_ptr<int>(),
             sink_index.data_ptr<int>(),
             source_view,
@@ -1805,7 +1797,8 @@ pybind11::dict channel_consumer_fixed_los_gather_jvp(
         {row_count, 3}, float_options, stream);
     if (row_count > 0) {
         fixed_los_jvp_kernel<<<
-            launch_blocks(row_count), kBlockSize, 0, stream>>>(
+            ::channel::launch_blocks(row_count, kFixedLosGatherBlockSize),
+            kFixedLosGatherBlockSize, 0, stream>>>(
             source_index.data_ptr<int>(),
             sink_index.data_ptr<int>(),
             source_view,
@@ -1830,7 +1823,6 @@ pybind11::dict channel_consumer_fixed_los_gather_jvp(
     return result;
 }
 
-#undef kBlockSize
 
 // ==== Section: LoS Jones assembly ====
 #include <ATen/ATen.h>

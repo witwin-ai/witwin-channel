@@ -387,7 +387,7 @@ def test_fixed_input_rejection():
     # the four directional grids so requesting their gradient fails loudly.
     from witwin.channel.kernels import scattering as table_build_ad
 
-    names = {name for _, name in table_build_ad._FIXED}
+    names = {arg.name for arg in table_build_ad._TABLE_BUILD_AD.args if arg.grad == "fixed"}
     assert names == {"layer_mu_r", "cos_i", "phi_i", "cos_o", "phi_o"}
 
 

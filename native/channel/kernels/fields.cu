@@ -7,6 +7,7 @@
 #include <c10/cuda/CUDAException.h>
 #include <c10/util/complex.h>
 #include "torch_cuda.h"
+#include "constants.cuh"
 
 #include "math.cuh"
 #include "ordered_sum.cuh"
@@ -17,12 +18,10 @@
 #include <algorithm>
 #include <vector>
 
-#define launch_blocks field_transport_launch_blocks
-#define kBlockSize kFieldTransportBlockSize
 
 namespace {
 
-constexpr int kBlockSize = 256;
+constexpr int kFieldTransportBlockSize = 256;
 namespace field = rayd::shared::diffraction;
 namespace transport = rayd::shared::field_transport;
 namespace layered = channel::layered_reflection;
@@ -535,10 +534,6 @@ __global__ void coupled_dd_field_kernel(
     }
 }
 
-int launch_blocks(int64_t count) {
-    return static_cast<int>((count + kBlockSize - 1) / kBlockSize);
-}
-
 }  // namespace
 
 namespace {
@@ -590,7 +585,8 @@ void launch_free_space(
         return;
     }
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
-    free_space_kernel<<<launch_blocks(count * columns.count), kBlockSize, 0, stream>>>(
+    free_space_kernel<<<::channel::launch_blocks(count * columns.count, kFieldTransportBlockSize),
+                        kFieldTransportBlockSize, 0, stream>>>(
         count,
         source.data_ptr<float>(),
         target.data_ptr<float>(),
@@ -683,7 +679,8 @@ pybind11::dict channel_field_project_complex3(
     auto path_gain = at::empty({count}, direction.options());
     if (count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(direction.get_device()).stream();
-        project_complex3_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        project_complex3_kernel<<<::channel::launch_blocks(count, kFieldTransportBlockSize),
+                                  kFieldTransportBlockSize, 0, stream>>>(
             count,
             field_vector.data_ptr<c10::complex<float>>(),
             direction.data_ptr<float>(),
@@ -786,7 +783,9 @@ void launch_reflection_sequence(
         return;
     }
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
-    reflection_sequence_kernel<<<launch_blocks(count * columns.count), kBlockSize, 0, stream>>>(
+    reflection_sequence_kernel<<<
+        ::channel::launch_blocks(count * columns.count, kFieldTransportBlockSize),
+        kFieldTransportBlockSize, 0, stream>>>(
         count,
         interaction_positions.size(1),
         source.data_ptr<float>(),
@@ -1052,7 +1051,8 @@ pybind11::dict channel_field_coupled_dd(
     auto direction = at::empty_like(source);
     if (count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(source.get_device()).stream();
-        coupled_dd_field_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        coupled_dd_field_kernel<<<::channel::launch_blocks(count, kFieldTransportBlockSize),
+                                  kFieldTransportBlockSize, 0, stream>>>(
             count,
             source.data_ptr<float>(),
             target.data_ptr<float>(),
@@ -1110,8 +1110,6 @@ pybind11::dict channel_field_coupled_dd(
     return out;
 }
 
-#undef launch_blocks
-#undef kBlockSize
 
 // ==== Section: Free-space transport ====
 #include "field_ad.cuh"
@@ -1421,7 +1419,8 @@ pybind11::dict channel_field_free_space_fwd64(
     if (count > 0) {
         cudaStream_t stream =
             at::cuda::getCurrentCUDAStream(source.get_device()).stream();
-        free_space_fwd_kernel<double><<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        free_space_fwd_kernel<double><<<::channel::launch_blocks(count, kBlockSize),
+                                        kBlockSize, 0, stream>>>(
             count,
             source.data_ptr<double>(),
             target.data_ptr<double>(),
@@ -1532,7 +1531,7 @@ pybind11::dict channel_field_free_space_backward(
             at::cuda::getCurrentCUDAStream(source.get_device()).stream();
         if (real_dtype == at::kFloat) {
             free_space_backward_kernel<float>
-                <<<launch_blocks(count), kBlockSize, 0, stream>>>(
+                <<<::channel::launch_blocks(count, kBlockSize), kBlockSize, 0, stream>>>(
                     count,
                     source.data_ptr<float>(),
                     target.data_ptr<float>(),
@@ -1553,7 +1552,7 @@ pybind11::dict channel_field_free_space_backward(
                     need_grad_geometry ? grad_target.data_ptr<float>() : nullptr);
         } else {
             free_space_backward_kernel<double>
-                <<<launch_blocks(count), kBlockSize, 0, stream>>>(
+                <<<::channel::launch_blocks(count, kBlockSize), kBlockSize, 0, stream>>>(
                     count,
                     source.data_ptr<double>(),
                     target.data_ptr<double>(),
@@ -1639,7 +1638,7 @@ pybind11::dict channel_field_free_space_jvp(
             at::cuda::getCurrentCUDAStream(source.get_device()).stream();
         if (real_dtype == at::kFloat) {
             free_space_jvp_kernel<float>
-                <<<launch_blocks(count), kBlockSize, 0, stream>>>(
+                <<<::channel::launch_blocks(count, kBlockSize), kBlockSize, 0, stream>>>(
                     count,
                     source.data_ptr<float>(),
                     target.data_ptr<float>(),
@@ -1659,7 +1658,7 @@ pybind11::dict channel_field_free_space_jvp(
                     t_direction.data_ptr<float>());
         } else {
             free_space_jvp_kernel<double>
-                <<<launch_blocks(count), kBlockSize, 0, stream>>>(
+                <<<::channel::launch_blocks(count, kBlockSize), kBlockSize, 0, stream>>>(
                     count,
                     source.data_ptr<double>(),
                     target.data_ptr<double>(),
@@ -2462,7 +2461,7 @@ pybind11::dict channel_field_reflection_sequence_backward(
         cudaStream_t stream =
             at::cuda::getCurrentCUDAStream(source.get_device()).stream();
         reflection_sequence_backward_kernel
-            <<<launch_blocks(count), kBlockSize, 0, stream>>>(
+            <<<::channel::launch_blocks(count, kBlockSize), kBlockSize, 0, stream>>>(
                 count,
                 depth,
                 source.data_ptr<float>(),
@@ -2614,7 +2613,7 @@ pybind11::dict channel_field_reflection_sequence_jvp(
         cudaStream_t stream =
             at::cuda::getCurrentCUDAStream(source.get_device()).stream();
         reflection_sequence_jvp_kernel
-            <<<launch_blocks(count), kBlockSize, 0, stream>>>(
+            <<<::channel::launch_blocks(count, kBlockSize), kBlockSize, 0, stream>>>(
                 count,
                 depth,
                 source.data_ptr<float>(),
@@ -2687,20 +2686,14 @@ pybind11::dict channel_field_reflection_sequence_jvp(
 
 #include "../tensor_checks.h"
 
-#define launch_blocks rough_scale_launch_blocks
-#define kBlockSize kRoughScaleBlockSize
 #define zero_filled rough_scale_zero_filled
 
 namespace {
 
-constexpr int kBlockSize = 128;
+constexpr int kRoughScaleBlockSize = 128;
 constexpr int kMaxDepth = 5;
-constexpr double kPi = 3.14159265358979323846;
-constexpr double kC0 = 299792458.0;
-
-int launch_blocks(int64_t count) {
-    return static_cast<int>((count + kBlockSize - 1) / kBlockSize);
-}
+using channel::kPi;
+using channel::kSpeedOfLight;
 
 at::Tensor zero_filled(at::IntArrayRef sizes, const at::TensorOptions& options) {
     auto tensor = at::empty(sizes, options);
@@ -3192,7 +3185,7 @@ pybind11::dict channel_field_rough_reflection_scale(
     int depth = 0;
     check_inputs(field_vector, coefficient, path_field, path_gain, positions,
                  normals, source, sigma_b, rough_b, replaced, count, depth);
-    const float k0 = static_cast<float>(2.0 * kPi * frequency_hz / kC0);
+    const float k0 = static_cast<float>(2.0 * kPi * frequency_hz / kSpeedOfLight);
     auto out_field_vector = at::empty_like(field_vector);
     auto out_coefficient = at::empty_like(coefficient);
     auto out_path_field = at::empty_like(path_field);
@@ -3201,7 +3194,8 @@ pybind11::dict channel_field_rough_reflection_scale(
     if (count > 0) {
         cudaStream_t stream =
             at::cuda::getCurrentCUDAStream(field_vector.get_device()).stream();
-        rough_scale_forward_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        rough_scale_forward_kernel<<<::channel::launch_blocks(count, kRoughScaleBlockSize),
+                                     kRoughScaleBlockSize, 0, stream>>>(
             count, depth, k0,
             field_vector.data_ptr<cfloat>(), coefficient.data_ptr<cfloat>(),
             path_field.data_ptr<cfloat>(), path_gain.data_ptr<float>(),
@@ -3245,8 +3239,8 @@ pybind11::dict channel_field_rough_reflection_scale_backward(
     int depth = 0;
     check_inputs(field_vector, coefficient, path_field, path_gain, positions,
                  normals, source, sigma_b, rough_b, replaced, count, depth);
-    const float k0 = static_cast<float>(2.0 * kPi * frequency_hz / kC0);
-    const float dk0_df = static_cast<float>(2.0 * kPi / kC0);
+    const float k0 = static_cast<float>(2.0 * kPi * frequency_hz / kSpeedOfLight);
+    const float dk0_df = static_cast<float>(2.0 * kPi / kSpeedOfLight);
     at::Tensor storage[4];
     const at::Tensor* g_fv = optional_arg(
         std::move(grad_field_vector), storage[0], "grad_field_vector",
@@ -3286,7 +3280,8 @@ pybind11::dict channel_field_rough_reflection_scale_backward(
     if (count > 0 && any_grad) {
         cudaStream_t stream =
             at::cuda::getCurrentCUDAStream(field_vector.get_device()).stream();
-        rough_scale_backward_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        rough_scale_backward_kernel<<<::channel::launch_blocks(count, kRoughScaleBlockSize),
+                                      kRoughScaleBlockSize, 0, stream>>>(
             count, depth, k0, dk0_df,
             field_vector.data_ptr<cfloat>(), coefficient.data_ptr<cfloat>(),
             path_field.data_ptr<cfloat>(), path_gain.data_ptr<float>(),
@@ -3354,8 +3349,8 @@ pybind11::dict channel_field_rough_reflection_scale_jvp(
     int depth = 0;
     check_inputs(field_vector, coefficient, path_field, path_gain, positions,
                  normals, source, sigma_b, rough_b, replaced, count, depth);
-    const float k0 = static_cast<float>(2.0 * kPi * frequency_hz / kC0);
-    const float dk0_df = static_cast<float>(2.0 * kPi / kC0);
+    const float k0 = static_cast<float>(2.0 * kPi * frequency_hz / kSpeedOfLight);
+    const float dk0_df = static_cast<float>(2.0 * kPi / kSpeedOfLight);
     at::Tensor storage[7];
     const at::Tensor* t_fv = optional_arg(
         std::move(tangent_field_vector), storage[0], "tangent_field_vector",
@@ -3386,7 +3381,8 @@ pybind11::dict channel_field_rough_reflection_scale_jvp(
     if (count > 0) {
         cudaStream_t stream =
             at::cuda::getCurrentCUDAStream(field_vector.get_device()).stream();
-        rough_scale_jvp_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        rough_scale_jvp_kernel<<<::channel::launch_blocks(count, kRoughScaleBlockSize),
+                                 kRoughScaleBlockSize, 0, stream>>>(
             count, depth, k0, dk0_df,
             field_vector.data_ptr<cfloat>(), coefficient.data_ptr<cfloat>(),
             path_field.data_ptr<cfloat>(), path_gain.data_ptr<float>(),
@@ -3408,8 +3404,6 @@ pybind11::dict channel_field_rough_reflection_scale_jvp(
     return out;
 }
 
-#undef launch_blocks
-#undef kBlockSize
 #undef zero_filled
 
 // ==== Section: Source amplitude ====
@@ -3446,16 +3440,10 @@ pybind11::dict channel_field_rough_reflection_scale_jvp(
 
 #include "../tensor_checks.h"
 
-#define launch_blocks source_amplitude_launch_blocks
-#define kBlockSize kSourceAmplitudeBlockSize
 
 namespace {
 
-constexpr int kBlockSize = 128;
-
-int launch_blocks(int64_t count) {
-    return static_cast<int>((count + kBlockSize - 1) / kBlockSize);
-}
+constexpr int kSourceAmplitudeBlockSize = 128;
 
 using cfloat = c10::complex<float>;
 
@@ -3497,7 +3485,8 @@ at::Tensor scaled(const at::Tensor& field_vector, const at::Tensor& tx_power) {
     if (count > 0) {
         cudaStream_t stream =
             at::cuda::getCurrentCUDAStream(field_vector.get_device()).stream();
-        source_amplitude_scale_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        source_amplitude_scale_kernel<<<::channel::launch_blocks(count, kSourceAmplitudeBlockSize),
+                                        kSourceAmplitudeBlockSize, 0, stream>>>(
             count,
             field_vector.data_ptr<cfloat>(),
             tx_power.data_ptr<float>(),
@@ -3547,8 +3536,6 @@ pybind11::dict channel_field_source_amplitude_scale_jvp(
     return out;
 }
 
-#undef launch_blocks
-#undef kBlockSize
 
 // ==== Section: Canonical-row field stage ====
 // One launch evaluates every field-stage row whose operator lives in this translation unit:
@@ -3559,20 +3546,14 @@ pybind11::dict channel_field_source_amplitude_scale_jvp(
 // and writes the seven field-stage columns in place. Rows of any other kind keep their input
 // values for the operators that run after this launch.
 
-#define launch_blocks canonical_field_launch_blocks
-#define kBlockSize kCanonicalFieldBlockSize
 
 namespace {
 
-constexpr int kBlockSize = 256;
+constexpr int kCanonicalFieldBlockSize = 256;
 
-int launch_blocks(int64_t count) {
-    return static_cast<int>((count + kBlockSize - 1) / kBlockSize);
-}
-
-constexpr int kLineOfSightComponent = 0;
-constexpr int kReflectionComponent = 1;
-constexpr int kDiffractionComponent = 2;
+using channel::kComponentDiffraction;
+using channel::kComponentLineOfSight;
+using channel::kComponentReflection;
 
 struct CanonicalRows {
     int64_t count;
@@ -3750,10 +3731,10 @@ __global__ void canonical_field_kernel(CanonicalRows rows, FaceTables faces, Tra
         const int64_t row = rows.order == nullptr ? lane : rows.order[lane];
         const int component = rows.component_id[row];
         const int64_t depth = rows.depth[row];
-        const bool los = component == kLineOfSightComponent && rows.evaluate_los;
+        const bool los = component == kComponentLineOfSight && rows.evaluate_los;
         const bool reflection =
-            component == kReflectionComponent && depth >= 1 && depth <= rows.width;
-        const bool diffraction = component == kDiffractionComponent && rows.width >= 1;
+            component == kComponentReflection && depth >= 1 && depth <= rows.width;
+        const bool diffraction = component == kComponentDiffraction && rows.width >= 1;
         if (!los && !reflection && !diffraction) {
             store_input_row(rows, out, row);
             continue;
@@ -3919,7 +3900,7 @@ pybind11::dict channel_field_canonical_rows(
     }
     if (rough || replace_specular) {
         TORCH_CHECK(width <= kMaxDepth, "rough reflection supports at most ", kMaxDepth, " bounces");
-        faces.rough_k0 = static_cast<float>(2.0 * kPi * frequency_hz / kC0);
+        faces.rough_k0 = static_cast<float>(2.0 * kPi * frequency_hz / kSpeedOfLight);
     }
     if (rough) {
         check_flat_tensor(face_rough_sigma, "face_rough_sigma", at::kFloat);
@@ -3972,7 +3953,8 @@ pybind11::dict channel_field_canonical_rows(
     auto out_direction = at::empty_like(direction);
     if (count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(field_xyz.get_device()).stream();
-        canonical_field_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        canonical_field_kernel<<<::channel::launch_blocks(count, kCanonicalFieldBlockSize),
+                                 kCanonicalFieldBlockSize, 0, stream>>>(
             rows, faces,
             TransportOutputs{
                 out_field_xyz.data_ptr<cfloat>(), out_coefficient.data_ptr<cfloat>(),
@@ -3992,5 +3974,3 @@ pybind11::dict channel_field_canonical_rows(
     return result;
 }
 
-#undef launch_blocks
-#undef kBlockSize
