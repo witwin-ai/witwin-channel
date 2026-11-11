@@ -3126,8 +3126,8 @@ def prepared_bucket_inputs(
 
 
 def wideband_payload(
-    prepared: PreparedFixedTopology, rows: PreparedRows, bucket_inputs: tuple[BucketInputs, ...],
-    *, response: str, frequencies_hz: tuple[float, ...],
+    prepared: PreparedFixedTopology, rows: PreparedRows, bucket_inputs: tuple[BucketInputs, ...], *,
+    response: str, frequencies_hz: tuple[float, ...],
 ) -> torch.Tensor:
     """Primal ``[K, F]`` (scalar) or ``[K, F, 3]`` (complex3) payload, one native launch per bucket.
 
