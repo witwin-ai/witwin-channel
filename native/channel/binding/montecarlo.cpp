@@ -66,9 +66,6 @@ torch::Tensor channel_mc_diffraction_discover_edges_counted(
     torch::Tensor edge_line_min,
     torch::Tensor edge_line_max,
     torch::Tensor edge_adjacent_face1);
-pybind11::dict channel_mc_transmitter_tensors(
-    pybind11::sequence flat_positions,
-    pybind11::sequence powers);
 torch::Tensor channel_mc_pack_vec3(torch::Tensor x, torch::Tensor y, torch::Tensor z);
 torch::Tensor channel_mc_los_component_maps(torch::Tensor los);
 torch::Tensor channel_mc_los_component_maps_from_matrix(torch::Tensor los, int64_t rows, int64_t cols);
@@ -270,10 +267,6 @@ void register_montecarlo(pybind11::module_ &module) {
         "mc_diffraction_discover_edges_counted",
         &channel_mc_diffraction_discover_edges_counted,
         "Discover MC diffraction support edges from a counted RayD hit buffer.");
-    module.def(
-        "mc_transmitter_tensors",
-        &channel_mc_transmitter_tensors,
-        "Create transmitter position and power CUDA tensors through native code.");
     module.def(
         "mc_pack_vec3",
         &channel_mc_pack_vec3,

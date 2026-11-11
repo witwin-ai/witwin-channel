@@ -897,12 +897,6 @@ at::Tensor channel_mc_receiver_grid_points_cuda(
         spacing1);
 }
 
-std::tuple<at::Tensor, at::Tensor> channel_mc_transmitter_tensors_cuda(
-    const std::vector<float> &positions_host,
-    const std::vector<float> &power_host) {
-    return transmitter_tensors_cuda_impl(positions_host, power_host);
-}
-
 at::Tensor channel_mc_pack_vec3_cuda(at::Tensor x, at::Tensor y, at::Tensor z) {
     return pack_vec3_cuda_impl(x, y, z);
 }

@@ -39,13 +39,12 @@ from witwin.channel.kernels import topology as topology_kernels
 from witwin.channel.runtime import (
     bdpt_zero_matrix,
     mc_receiver_grid_points,
-    mc_transmitter_tensors,
     requested_trace_backend,
 )
 from witwin.channel.scene.endpoints import (
     ReceiverGrid,
-    ReceiverPoint,
     SolverScene,
+    endpoint_store,
     vector3_tuple,
 )
 from witwin.channel.scene.resources import (
@@ -375,6 +374,10 @@ class CompiledScene:
     # call so a scene leaf marked AFTER the cache was populated invalidates it
     # instead of being silently severed from the graph.
     _fixed_reevaluation_tables_cache: tuple[tuple, dict] | None = field(
+        default=None, repr=False, compare=False
+    )
+    # (endpoint token, EndpointStore) of the last non-differentiable binding.
+    _endpoint_store_cache: tuple[tuple, object] | None = field(
         default=None, repr=False, compare=False
     )
 
@@ -1768,72 +1771,27 @@ def receiver_grid_points(grid: ReceiverGrid, *, reference: torch.Tensor) -> torc
     )
 
 
-def host_vec3_tensor(flat_positions: tuple[float, ...]) -> torch.Tensor:
-    powers = tuple(1.0 for _ in range(len(flat_positions) // 3))
-    return mc_transmitter_tensors(flat_positions, powers)["positions"]
-
-
 def receiver_positions(
     scene: object, *, device: torch.device, reference: torch.Tensor | None = None,
 ) -> torch.Tensor:
-    if (
-        len(scene.receivers) == 1
-        and isinstance(scene.receivers[0], ReceiverGrid)
-        and reference is not None
-    ):
-        return receiver_grid_points(scene.receivers[0], reference=reference)
-    blocks: list[torch.Tensor] = []
-    grid_reference = reference
+    """Flattened receiver positions from the scene's endpoint store (grids generated natively)."""
 
-    for receiver in scene.receivers:
-        if isinstance(receiver, ReceiverPoint):
-            block = receiver.position.reshape(1, 3).to(device=device)
-            blocks.append(block)
-            if grid_reference is None:
-                grid_reference = block
-        elif isinstance(receiver, ReceiverGrid):
-            if grid_reference is None:
-                grid_reference = host_vec3_tensor(())
-            blocks.append(receiver_grid_points(receiver, reference=grid_reference))
-        else:
-            raise TypeError(f"receiver type is not accepted: {type(receiver)!r}")
-    if not blocks:
-        return host_vec3_tensor(())
-    if len(blocks) == 1:
-        return blocks[0]
-    return topology_kernels.path_concat_vec3(blocks)
+    return endpoint_store(scene, device=device).rx_positions
 
 
 def transmitter_positions(
     scene: object, *, device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    if not scene.transmitters:
-        exported = mc_transmitter_tensors((), ())
-        return exported["positions"], exported["power"]
-    positions = torch.stack(
-        tuple(transmitter.position for transmitter in scene.transmitters)
-    ).to(device=device, dtype=torch.float32)
-    powers = torch.stack(
-        tuple(
-            power.reshape(())
-            if isinstance((power := transmitter.power_w), torch.Tensor)
-            else positions.new_tensor(float(power))
-            for transmitter in scene.transmitters
-        )
-    ).to(device=device, dtype=torch.float32)
-    return positions, powers
+    """Transmitter positions and powers from the scene's endpoint store."""
+
+    store = endpoint_store(scene, device=device)
+    return store.tx_positions, store.tx_power
 
 
 def transmitter_polarizations_as_stored(scene: object, *, device: torch.device) -> torch.Tensor:
     """Return transmitter polarizations with the scene's stored dtype and layout."""
 
-    if not scene.transmitters:
-        return host_vec3_tensor(())
-    return torch.stack(
-        tuple(transmitter.polarization for transmitter in scene.transmitters)
-    ).to(
-        device=device
-    )
+    return endpoint_store(scene, device=device).tx_polarizations_stored
 
 
 __all__ = ["clear_compile_cache", "compile"]

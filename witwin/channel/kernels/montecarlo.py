@@ -35,7 +35,6 @@ from witwin.channel.runtime import (
     disable_functorch,
     mc_pack_vec3,  # noqa: F401
     mc_receiver_grid_points,  # noqa: F401
-    mc_transmitter_tensors,  # noqa: F401
     require_capacity_failure_state,
     required_symbol,
     required_symbol as _required_native_op,
