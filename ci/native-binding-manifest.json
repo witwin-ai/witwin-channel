@@ -580,6 +580,8 @@
         ["edge_direction", "torch::Tensor", null],
         ["edge_t_min", "torch::Tensor", null],
         ["edge_t_max", "torch::Tensor", null],
+        ["edge_n0", "torch::Tensor", null],
+        ["edge_n1", "torch::Tensor", null],
         ["a_edge_offsets", "torch::Tensor", null],
         ["a_endpoint", "torch::Tensor", null],
         ["a_node", "torch::Tensor", null],

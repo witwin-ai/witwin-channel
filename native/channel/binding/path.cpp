@@ -165,6 +165,8 @@ pybind11::dict channel_chain_candidates(
     torch::Tensor edge_direction,
     torch::Tensor edge_t_min,
     torch::Tensor edge_t_max,
+    torch::Tensor edge_n0,
+    torch::Tensor edge_n1,
     torch::Tensor a_edge_offsets,
     torch::Tensor a_endpoint,
     torch::Tensor a_node,

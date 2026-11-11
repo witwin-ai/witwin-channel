@@ -32,6 +32,7 @@ from witwin.channel.materials import (
     _require_frequency_ad_constant_materials,
 )
 from witwin.channel.interactions.coupled import (
+    chain_depth_limit,
     coupled_reflection_diffraction_topology,
 )
 from witwin.channel.interactions.diffraction import (
@@ -160,8 +161,8 @@ class EnumeratedOptions:
     max_paths: int | None = None
     max_paths_scope: str = "global"
     ad_mode: str = "none"
-    # Interaction chains (reflections with one diffraction anywhere, up to max_depth
-    # interactions) and double diffraction. Opt-in. coupled_candidate_limit bounds the
+    # Interaction chains (up to max_depth reflections with one diffraction anywhere) and
+    # double diffraction. Opt-in. coupled_candidate_limit bounds the
     # candidates of one validator launch; it never caps the result.
     coupled_paths: bool = False
     coupled_candidate_limit: int = 1_000_000
@@ -701,7 +702,7 @@ def evaluate_enumerated_paths(
         config
     )
     coupled_paths = bool(getattr(config, "coupled_paths", False))
-    sequence_width = max(int(config.max_depth), 2 if coupled_paths else 0)
+    sequence_width = max(int(config.max_depth), chain_depth_limit(config.max_depth) if coupled_paths else 0)
     blocks: list[dict[str, torch.Tensor]] = []
     launch_count = 0
     visibility_rejection_count = 0

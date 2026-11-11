@@ -64,8 +64,10 @@ def test_solve_exports_bounded_reflection_diffraction_sequences():
     assert result.metadata["coupled_paths"]["geometry"] == "native_interaction_chains"
     assert result.metadata["coupled_paths"]["coefficient"] == "unified_complex3_jones"
     active = result.interaction_type[result.valid]
-    assert bool((active == torch.tensor([1, 2], device=active.device)).all(dim=1).any())
-    assert bool((active == torch.tensor([2, 1], device=active.device)).all(dim=1).any())
+    # The path table is as wide as the deepest chain; shorter sequences are zero-padded.
+    padding = [0] * (int(active.shape[1]) - 2)
+    assert bool((active == torch.tensor([1, 2, *padding], device=active.device)).all(dim=1).any())
+    assert bool((active == torch.tensor([2, 1, *padding], device=active.device)).all(dim=1).any())
     coupled = (active[:, 0] != 0) & (active[:, 1] != 0) & (active[:, 0] != active[:, 1])
     coupled_types = active[coupled]
     coupled_objects = result.primitive_id[result.valid][coupled]
@@ -78,7 +80,7 @@ def test_solve_exports_bounded_reflection_diffraction_sequences():
     assert torch.count_nonzero(result.a[result.valid][coupled].abs() > 0.0) > 0
     assert torch.isfinite(coupled_positions).all()
     assert torch.isfinite(coupled_normals).all()
-    assert bool((coupled_objects >= 0).all())
+    assert bool((coupled_objects[coupled_types != 0] >= 0).all())
     reflection = coupled_types == 1
     diffraction = coupled_types == 2
     assert bool((coupled_materials[reflection] >= 0).all())

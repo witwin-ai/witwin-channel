@@ -932,13 +932,15 @@ def chain_candidates(
     *, lane_offsets: torch.Tensor, lane_start: int, lane_end: int, plane_point: torch.Tensor,
     plane_normal: torch.Tensor, bounds: torch.Tensor, occupancy: torch.Tensor,
     edge_position: torch.Tensor, edge_direction: torch.Tensor, edge_t_min: torch.Tensor,
-    edge_t_max: torch.Tensor, a: tuple[torch.Tensor, ...], b: tuple[torch.Tensor, ...],
-    box_tolerance: float, segment_tolerance: float, min_segment_length: float, edge_epsilon: float,
+    edge_t_max: torch.Tensor, edge_n0: torch.Tensor, edge_n1: torch.Tensor,
+    a: tuple[torch.Tensor, ...], b: tuple[torch.Tensor, ...], box_tolerance: float,
+    segment_tolerance: float, min_segment_length: float, edge_epsilon: float,
 ) -> dict[str, torch.Tensor]:
     """Interaction-chain candidates of one lane range that the image method cannot rule out.
 
     ``a`` and ``b`` are the transmitter and receiver halves as ``(edge_offsets, endpoint, node,
     endpoints, node_sequences, node_images)``; a lane joins one entry of each on a shared edge.
+    Both legs at the diffraction point must leave into the wedge exterior (``edge_n0``/``edge_n1``).
     """
 
     validate_cuda_tensor("lane_offsets", lane_offsets, dtype=torch.int64, ndim=1)
@@ -946,7 +948,8 @@ def chain_candidates(
         raise ValueError("chain halves must carry six tables")
     exported = _required_native_op("chain_candidates")(
         lane_offsets, int(lane_start), int(lane_end), plane_point, plane_normal, bounds, occupancy,
-        edge_position, edge_direction, edge_t_min, edge_t_max, *a, *b, float(box_tolerance),
+        edge_position, edge_direction, edge_t_min, edge_t_max, edge_n0, edge_n1, *a, *b,
+        float(box_tolerance),
         float(segment_tolerance), float(min_segment_length), float(edge_epsilon),
     )
     if not isinstance(exported, dict) or set(exported) != _CHAIN_CANDIDATE_FIELDS:

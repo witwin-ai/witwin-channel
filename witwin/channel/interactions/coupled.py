@@ -57,7 +57,7 @@ CHAIN_MAX_DEPTH = 8
 _CHAIN_LANES_PER_LAUNCH = 1 << 23
 _NODE_EDGE_TESTS_PER_LAUNCH = 1 << 24
 # Image-tree nodes of the receiver halves of one receiver chunk (bounds their edge lists).
-_RECEIVER_TREE_NODES = 1 << 20
+_RECEIVER_TREE_NODES = 1 << 22
 # Double-diffraction candidates per geometry launch.
 _DOUBLE_CANDIDATES_PER_LAUNCH = 1 << 20
 # Endpoint-edge visibility states per launch (the native state capacity).
@@ -67,6 +67,12 @@ _EDGE_EPSILON = 1.0e-6
 # Pruning tolerances, as the reflection candidate tests use them (relative to the scene diagonal).
 _BOUNDS_RELATIVE = 1.0e-4
 _SEGMENT_PARAMETER_SLACK = 1.0e-3
+
+
+def chain_depth_limit(max_depth: int) -> int:
+    """Deepest chain (interactions) of a solve: ``max_depth`` reflections and the diffraction."""
+
+    return min(int(max_depth) + 1, CHAIN_MAX_DEPTH)
 
 
 def chain_component_id(prefix_depth: int, suffix_depth: int) -> int:
@@ -172,6 +178,8 @@ class _ChainContext:
     edge_direction: torch.Tensor
     edge_t_min: torch.Tensor
     edge_t_max: torch.Tensor
+    edge_n0: torch.Tensor
+    edge_n1: torch.Tensor
     min_segment_length: float
 
     @property
@@ -240,6 +248,8 @@ def _prepare_chain_context(
         edge_direction=geometry.edge_direction[index].contiguous(),
         edge_t_min=geometry.line_min[index].contiguous(),
         edge_t_max=geometry.line_max[index].contiguous(),
+        edge_n0=geometry.n0[index].contiguous(),
+        edge_n1=geometry.n1[index].contiguous(),
         min_segment_length=reflection_min_segment_length(plane_groups),
     )
 
@@ -395,6 +405,8 @@ def _iter_chain_candidates(
             edge_direction=context.edge_direction,
             edge_t_min=context.edge_t_min,
             edge_t_max=context.edge_t_max,
+            edge_n0=context.edge_n0,
+            edge_n1=context.edge_n1,
             a=(a.edge_offsets, a.endpoint, a.node, a.endpoints, a.node_sequences, a.node_images),
             b=(b.edge_offsets, b.endpoint, b.node, b.endpoints, b.node_sequences, b.node_images),
             box_tolerance=_BOUNDS_RELATIVE * groups.scene_scale_m,
@@ -620,24 +632,27 @@ def coupled_reflection_diffraction_topology(
     scene: Scene, compiled: CompiledScene, tx_positions: torch.Tensor, rx_positions: torch.Tensor,
     *, max_depth: int, candidate_limit: int,
 ) -> tuple[dict[str, torch.Tensor], int, int]:
-    """Interaction-chain rows up to ``max_depth`` interactions, and double-diffraction rows.
+    """Interaction-chain rows with up to ``max_depth`` reflections, and double-diffraction rows.
 
     A chain is ``a`` reflections, one diffraction and ``b`` reflections (``1 <= a + b <=
-    max_depth - 1``). Its candidates join a transmitter-side half and a receiver-side half on a
-    shared edge: a half is the endpoint itself (any edge) or an image-tree node whose beam may
-    reach the edge (a conservative geometric test). Double diffraction takes its first edge from
-    the transmitter-visible and its second from the receiver-visible edge sets. The diffraction point is the Keller point
-    between the two half images, and the validator back-traces both halves with the reflection
-    EPC (a half without reflection is one visibility segment), the receiver half only where the
-    transmitter half is valid. ``candidate_limit`` bounds the candidates of one validator launch;
-    it never caps the result. Returns the rows, the launch count and the candidate count.
+    max_depth``, at most ``CHAIN_MAX_DEPTH`` interactions in all): the reflection paths go up to
+    ``max_depth`` reflections, and the chains with as many reflections carry the diffracted field
+    that keeps such a path continuous where another object blocks one of its legs. Its candidates
+    join a transmitter-side half and a receiver-side half on a shared edge: a half is the endpoint
+    itself (any edge) or an image-tree node whose beam may reach the edge (a conservative geometric
+    test). Double diffraction takes its first edge from the transmitter-visible and its second from
+    the receiver-visible edge sets. The diffraction point is the Keller point between the two half
+    images, and the validator back-traces both halves with the reflection EPC (a half without
+    reflection is one visibility segment), the receiver half only where the transmitter half is
+    valid. ``candidate_limit`` bounds the candidates of one validator launch; it never caps the
+    result. Returns the rows, the launch count and the candidate count.
     """
 
     device = tx_positions.device
     context = _prepare_chain_context(scene, compiled, tx_positions, rx_positions)
     if context is None:
         return _ensure_topology_fields(_empty_path_block(device)), 0, 0
-    max_chain_depth = min(int(max_depth), CHAIN_MAX_DEPTH)
+    max_chain_depth = chain_depth_limit(max_depth)
     tx_source = _HalfSource(context, tx_positions)
     blocks: list[dict[str, torch.Tensor]] = []
     launches = 0

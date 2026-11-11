@@ -544,8 +544,8 @@ def _coupled_paths_metadata(
     """Coupled-paths metadata block: interaction chains plus double diffraction.
 
     Mirrors the path solver's coupled_paths block. ``coupled_paths=True`` enables the
-    interaction chains (reflections with one diffraction anywhere, up to ``max_depth``
-    interactions) and double diffraction; the double-diffraction rows (component id 7) are
+    interaction chains (up to ``max_depth`` reflections with one diffraction anywhere) and
+    double diffraction; the double-diffraction rows (component id 7) are
     reported as their own row count while they aggregate into the single coherent coupled slot.
     """
 

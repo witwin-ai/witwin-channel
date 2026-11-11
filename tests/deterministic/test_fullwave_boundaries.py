@@ -9,10 +9,14 @@ import numpy as np
 import pytest
 import torch
 
+from benchmarks.fullwave_validation import reference_set as rs
 from witwin.channel.deployment import build_info
 from witwin.channel.deterministic import Config, solve
 from witwin.core import AntennaState, Mesh, PhysicalMaterial, Scene, Structure
 from witwin.core.identity import new_antenna_id
+
+_CHAIN_COMPONENTS = (3, 4)
+_CHAIN_INTERIOR_BASE = 8
 
 
 def _require_native() -> None:
@@ -53,3 +57,54 @@ def test_reflection_support_ends_at_the_edge_of_a_large_face():
                    reference_frequency_hz=5.0e9)
     reflected = result.component_fields["reflection"].reshape(-1).abs().cpu().numpy() > 0
     np.testing.assert_array_equal(reflected, offsets < 0.0)
+
+
+def _chain_rows(case_id: str, max_depth: int) -> tuple[object, np.ndarray]:
+    case = rs.load_reference_case(case_id)
+    planes, _ = rs.load_reference(case)
+    plane = dict(planes[0])
+    # Every fourth sample of the stored plane keeps the solve small.
+    plane["x"] = plane["x"][::4]
+    plane["y"] = plane["y"][::4]
+    plane["field"] = plane["field"][::4, ::4]
+    plane["regions"] = plane["regions"][::4, ::4]
+    result = solve(rs.build_channel_scene(case, plane), Config(
+        components=frozenset({"los", "reflection", "diffraction"}), max_depth=max_depth,
+        coupled_paths=True, export_paths=True, return_field=True), reference_frequency_hz=case.frequency_hz)
+    paths = result.paths
+    assert paths is not None
+    component = paths.component_id.cpu().numpy()
+    chain = paths.valid.cpu().numpy() & (np.isin(component, _CHAIN_COMPONENTS) |
+                                         (component >= _CHAIN_INTERIOR_BASE))
+    return paths, chain
+
+
+def test_chain_legs_leave_the_diffraction_edge_into_open_space():
+    """No chain leg crosses a closed cube behind its edge to reach a face from inside."""
+
+    _require_native()
+    paths, chain = _chain_rows("three_cube_z", 2)
+    assert chain.any()
+    case = rs.load_reference_case("three_cube_z")
+    boxes = [(np.asarray(b.center), 0.5 * np.asarray(b.size) - 1.0e-3) for b in case.blocks]
+    depth = paths.depth.cpu().numpy()
+    component = paths.component_id.cpu().numpy()
+    positions = paths.interaction_positions.cpu().numpy()
+    crossing = 0
+    for row in np.flatnonzero(chain):
+        d = int(depth[row])
+        slot = d - 1 if component[row] == 3 else (0 if component[row] == 4 else component[row] - 8)
+        for neighbour in (slot - 1, slot + 1):
+            if 0 <= neighbour < d:
+                midpoint = 0.5 * (positions[row, slot] + positions[row, neighbour])
+                crossing += any(bool(np.all(np.abs(midpoint - c) < h)) for c, h in boxes)
+    assert crossing == 0
+
+
+def test_chains_carry_as_many_reflections_as_the_reflection_paths():
+    """The chain that keeps a ``max_depth``-reflection path continuous where it is blocked is enumerated."""
+
+    _require_native()
+    paths, chain = _chain_rows("wall_column_z", 2)
+    depth = paths.depth.cpu().numpy()
+    assert int(depth[chain].max()) == 3

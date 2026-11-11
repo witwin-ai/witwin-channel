@@ -468,6 +468,8 @@ struct ChainEdges {
     const float* t_min;      // [E]
     const float* t_max;      // [E]
     int64_t edge_count;
+    const float* n0 = nullptr;  // [E, 3] outward face normals of the wedge; null when unused
+    const float* n1 = nullptr;  // [E, 3]
 };
 
 // Segment start, unit direction and length of one edge, as the coupled prepare kernels form them.
@@ -661,6 +663,23 @@ __device__ ChainCandidate chain_candidate(const GroupTables& tables, const Chain
         return out;
     }
     out.point = cmath::add(origin, cmath::scale(direction, parameter));
+    // Both legs leave the diffraction point into the open region around the wedge. The leg towards
+    // a half points at that half's image, so a chain whose leg would cross the solid behind the edge
+    // (a reflection reached from inside a closed body) is rejected here.
+    {
+        namespace utd = rayd::shared::diffraction;
+        const utd::float3a axis = utd::make_f3(direction.x, direction.y, direction.z);
+        const float3 n0 = cmath::load_vec3(edges.n0, lane.edge);
+        const float3 n1 = cmath::load_vec3(edges.n1, lane.edge);
+        const utd::float3a wn0 = utd::make_f3(n0.x, n0.y, n0.z);
+        const utd::float3a wn1 = utd::make_f3(n1.x, n1.y, n1.z);
+        const float3 to_a = cmath::sub(a_image, out.point);
+        const float3 to_b = cmath::sub(b_image, out.point);
+        if (!utd::wedge_exterior_mask(utd::make_f3(to_a.x, to_a.y, to_a.z), axis, wn0, wn1) ||
+            !utd::wedge_exterior_mask(utd::make_f3(to_b.x, to_b.y, to_b.z), axis, wn0, wn1)) {
+            return out;
+        }
+    }
     SequenceChain chain;
     if (a.depth > 0) {
         half_chain(tables, a, out.a_node, out.tx, chain);
@@ -1037,12 +1056,19 @@ pybind11::dict channel_chain_node_edges(at::Tensor node_sequences, at::Tensor no
 pybind11::dict channel_chain_candidates(
     at::Tensor lane_offsets, int64_t lane_start, int64_t lane_end, at::Tensor plane_point, at::Tensor plane_normal,
     at::Tensor bounds, at::Tensor occupancy, at::Tensor edge_position, at::Tensor edge_direction, at::Tensor edge_t_min, at::Tensor edge_t_max,
+    at::Tensor edge_n0, at::Tensor edge_n1,
     at::Tensor a_edge_offsets, at::Tensor a_endpoint, at::Tensor a_node, at::Tensor a_endpoints,
     at::Tensor a_node_sequences, at::Tensor a_node_images, at::Tensor b_edge_offsets, at::Tensor b_endpoint,
     at::Tensor b_node, at::Tensor b_endpoints, at::Tensor b_node_sequences, at::Tensor b_node_images,
     double box_tolerance, double segment_tolerance, double min_segment_length, double edge_epsilon) {
     const GroupTables tables = group_tables(plane_point, plane_normal, bounds, occupancy);
-    const ChainEdges edges = chain_edges(edge_position, edge_direction, edge_t_min, edge_t_max);
+    ChainEdges edges = chain_edges(edge_position, edge_direction, edge_t_min, edge_t_max);
+    check_vec3_table(edge_n0, "edge_n0");
+    check_vec3_table(edge_n1, "edge_n1");
+    TORCH_CHECK(edge_n0.size(0) == edges.edge_count && edge_n1.size(0) == edges.edge_count,
+                "edge normal tables must have one row per edge");
+    edges.n0 = edge_n0.data_ptr<float>();
+    edges.n1 = edge_n1.data_ptr<float>();
     check_cuda_tensor(lane_offsets, "lane_offsets", at::kLong, 1);
     TORCH_CHECK(lane_offsets.size(0) == edges.edge_count + 1, "lane_offsets must have one row per edge plus one");
     TORCH_CHECK(edges.edge_count > 0, "chain candidates need at least one edge");

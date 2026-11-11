@@ -27,6 +27,7 @@ from witwin.channel.propagation.enumerated import (
     EnumeratedOptions,
     evaluate_enumerated_paths,
 )
+from witwin.channel.interactions.coupled import chain_depth_limit
 from witwin.channel.interactions.scattering import (
     append_scattering_evaluated_paths,
 )
@@ -1090,9 +1091,9 @@ def _metadata(
         config.components, chain_depth=config.max_depth, single_bounce_depth=1
     )
     if config.coupled_paths:
-        # Interaction chains carry a diffraction up to max_depth interactions deep, and
+        # Interaction chains carry up to max_depth reflections and the diffraction, and
         # double diffraction reaches depth 2.
-        component_depths["diffraction"] = max(2, int(config.max_depth))
+        component_depths["diffraction"] = max(2, chain_depth_limit(config.max_depth))
     effective_max_depth = max(
         component_depths["los"],
         component_depths["reflection"],

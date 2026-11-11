@@ -136,8 +136,8 @@ _CAPABILITIES: dict[str, Any] = {
             "supports_reflection_diffraction_coupling": True,
             "supports_reflection_diffraction_coupling_geometry": True,
             "reflection_diffraction_coupling_topology": "one_diffraction_anywhere_in_a_reflection_chain",
-            # A chain has at most max_depth interactions, one of them the diffraction.
-            "max_reflections_in_coupled_path": 4,
+            # A chain carries up to max_depth reflections and the diffraction.
+            "max_reflections_in_coupled_path": 5,
             # coupled_paths=True also enables double diffraction (cid 7), which shares
             # the coupled gate, validator chunk and accumulator slot.
             "coupled_double_diffraction": True,
