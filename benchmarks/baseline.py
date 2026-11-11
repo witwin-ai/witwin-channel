@@ -24,6 +24,7 @@ BENCHMARKS = Path(__file__).resolve().parent
 REPO_ROOT = BENCHMARKS.parent
 SCHEMA = "channel-baseline.v1"
 RESULT_PREFIX = "BASELINE_RESULT "
+MEMORY_CAP_BYTES = 8 << 30
 SOLVER_MODULES = {
     "det": "witwin.channel.deterministic",
     "path": "witwin.channel.path",
@@ -83,10 +84,13 @@ def _cases() -> dict[str, Case]:
         rows.append(Case(f"det.los.d0.g{n}", "det", "los", 0, f"g{n}", tags=r21))
     rows.append(Case("det.lr.d1.g64", "det", "lr", 1, "g64", tags=r21))
     rows.append(Case("det.lr.d1.g512", "det", "lr", 1, "g512", tags=r21))
-    for d in (2, 3, 4, 5):
-        rows.append(Case(f"det.lr.d{d}.g64", "det", "lr", d, "g64", repeats=3,
-                         tags=r21 + (("C-1", "P-3") if d in (3, 4) else ()),
-                         note="C-1: d3 exhaustive vs d4 ray discovery" if d in (3, 4) else ""))
+    # Exhaustive depth-3 reflection on the 64x64 grid launches kernels of several hundred ms, too
+    # long for a shared GPU; the depth-3 / depth-4 pair (C-1, P-3) runs on a 16x16 grid instead.
+    for d in (2, 4, 5):
+        rows.append(Case(f"det.lr.d{d}.g64", "det", "lr", d, "g64", repeats=3, tags=r21))
+    for d in (3, 4):
+        rows.append(Case(f"det.lr.d{d}.g16", "det", "lr", d, "g16", repeats=3, tags=("C-1", "P-3"),
+                         note="C-1: d3 exhaustive vs d4 ray discovery"))
     rows.append(Case("det.lr.d1.g128", "det", "lr", 1, "g128", tags=r21 + ("P-9",)))
     rows.append(Case("det.lr.d1.g128.s4", "det", "lr", 1, "g128", subdiv=4, tags=r21 + ("P-9",),
                      note="same geometry subdivided 4 levels (41,472 triangles), welded"))
@@ -108,11 +112,12 @@ def _cases() -> dict[str, Case]:
                      note="report: 872 launches, 194 syncs, 41 D2H"))
     for s, label in ((4096, "4k"), (1 << 20, "1M"), (4194304, "4M")):
         rows.append(Case(f"mc.lr.d1.g256.s{label}", "mc", "lr", 1, "g256", samples=s, tags=r21))
+    # BDPT at depth 3 inherits the exhaustive depth-3 enumeration (P-3); the report's 64x64 and
+    # 256x256 depth-3 rows launch multi-second kernels and run here on a 16x16 grid only.
     for n, d, s, label, rep in ((64, 1, 4096, "4k", 5), (64, 1, 1 << 20, "1M", 5),
-                                (64, 3, 4096, "4k", 3), (64, 3, 1 << 20, "1M", 3),
-                                (256, 3, 4096, "4k", 2), (256, 3, 1 << 20, "1M", 2)):
+                                (16, 3, 4096, "4k", 3), (16, 3, 1 << 20, "1M", 3)):
         rows.append(Case(f"bdpt.lr.d{d}.g{n}.s{label}", "bdpt", "lr", d, f"g{n}", samples=s,
-                         repeats=rep, tags=r21 + (("slow",) if n == 256 else ())))
+                         repeats=rep, tags=r21))
     # Small / medium / large cities and their welded 4-way subdivisions, one case per solver.
     for n_side, size in ((4, "small"), (8, "medium"), (32, "large")):
         for sub in (0, 1):
@@ -174,11 +179,13 @@ def _count_trace(trace_path: str) -> dict[str, int]:
     with open(trace_path, encoding="utf-8") as handle:
         events = json.load(handle).get("traceEvents", [])
     counts: Counter[str] = Counter()
+    longest_us = 0.0
     for event in events:
         category = event.get("cat")
         name = str(event.get("name", ""))
         if category == "kernel":
             counts["kernels"] += 1
+            longest_us = max(longest_us, float(event.get("dur", 0.0)))
         elif category in ("cuda_runtime", "cuda_driver"):
             if name in _LAUNCH_API:
                 counts["launch_api"] += 1
@@ -202,10 +209,12 @@ def _count_trace(trace_path: str) -> dict[str, int]:
         elif category == "gpu_memset":
             counts["memset_count"] += 1
     counts["syncs"] = counts["stream_sync"] + counts["device_sync"] + counts["event_sync"]
-    return {key: int(counts[key]) for key in COUNT_KEYS}
+    out: dict[str, Any] = {key: int(counts[key]) for key in COUNT_KEYS}
+    out["longest_kernel_ms"] = round(longest_us / 1e3, 3)
+    return out
 
 
-def profile_counts(fn: Any) -> dict[str, int]:
+def profile_counts(fn: Any) -> dict[str, Any]:
     """Run ``fn`` once under the CUDA profiler and return launch, sync and copy counts.
 
     Counts come from CUPTI runtime-API and activity records, so they include native-extension
@@ -274,6 +283,9 @@ def _worker(args: argparse.Namespace) -> int:
     import torch
     import witwin.channel as channel
 
+    # Shared-GPU rule: at most 8 GiB per process.
+    total = torch.cuda.get_device_properties(0).total_memory
+    torch.cuda.set_per_process_memory_fraction(min(1.0, MEMORY_CAP_BYTES / total))
     case = CASES[args.case]
     info = {"channel_file": channel.__file__, "torch": torch.__version__,
             "gpu": torch.cuda.get_device_name(0)}
@@ -392,6 +404,7 @@ def _run(args: argparse.Namespace) -> int:
     document: dict[str, Any] = {"schema": SCHEMA, "meta": {
         "target": args.target, "processes": args.processes,
         "repeats_override": args.repeats, "counts_only": args.counts_only,
+        "timing": "exclusive GPU" if args.exclusive else "contended (shared GPU)",
         "git_head": _git_head() if args.target == "worktree" else None,
         "started": datetime.datetime.now().isoformat(timespec="seconds"),
         "python": sys.version.split()[0],
@@ -420,7 +433,8 @@ def _run(args: argparse.Namespace) -> int:
         print(f"{case.name:32s} " + (f"ERROR {entry['error']}" if "error" in entry else
               f"wall {entry['wall_ms_min']} ms  kern {counts.get('kernels')}  sync {counts.get('syncs')}  "
               f"h2d {counts.get('h2d_count')}  d2h {counts.get('d2h_count')}  "
-              f"peak {entry['peak_alloc_mib']} MiB  paths {entry['path_count']}"
+              f"peak {entry['peak_alloc_mib']} MiB  paths {entry['path_count']}  "
+              f"longest kernel {counts.get('longest_kernel_ms')} ms"
               + (f"  UNSTABLE {entry['unstable']}" if entry["unstable"] else "")), flush=True)
         if args.output:
             _write(args.output, document)
@@ -499,6 +513,61 @@ def table(document: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+BUDGET_METRICS = ("kernels", "syncs", "h2d_count", "h2d_bytes", "d2h_count", "d2h_bytes")
+
+
+def budgets(result: dict[str, Any], existing: dict[str, Any] | None, *, headroom: float,
+            allow_raise: bool) -> dict[str, Any]:
+    """Budget document from measured counts: ``ceil(measured * (1 + headroom))``, never above an existing bound."""
+    import math
+
+    cases: dict[str, Any] = dict(existing["cases"]) if existing else {}
+    raised = []
+    for name, entry in result["cases"].items():
+        if "error" in entry or not {"budget-small", "budget-medium", "budget-large"} & set(
+                entry["spec"]["tags"]):
+            continue
+        bounds = {m: int(math.ceil(entry["counts"][m] * (1.0 + headroom))) for m in BUDGET_METRICS}
+        old = cases.get(name)
+        if old is not None:
+            for metric in BUDGET_METRICS:
+                if entry["counts"][metric] > old[metric]:
+                    raised.append(f"{name}.{metric}: measured {entry['counts'][metric]} > bound {old[metric]}")
+                elif not allow_raise:
+                    bounds[metric] = min(bounds[metric], old[metric])
+        cases[name] = bounds
+    if raised and not allow_raise:
+        raise SystemExit("refusing to raise budgets:\n  " + "\n  ".join(raised))
+    return {"schema": "channel-launch-budgets.v1", "metrics": list(BUDGET_METRICS),
+            "headroom": headroom, "measured_on": {k: result["meta"].get(k) for k in (
+                "git_head", "gpu", "torch", "started")}, "cases": dict(sorted(cases.items()))}
+
+
+def merge(documents: list[dict[str, Any]]) -> dict[str, Any]:
+    """Combine runs of the same target: minimum wall times, maximum peaks, counts must agree."""
+    out = json.loads(json.dumps(documents[0]))
+    out["meta"]["merged_runs"] = [d["meta"].get("started") for d in documents]
+    for other in documents[1:]:
+        for name, entry in other["cases"].items():
+            base = out["cases"].get(name)
+            if base is None or "error" in base:
+                out["cases"][name] = entry
+                continue
+            if "error" in entry:
+                continue
+            base["wall_ms_per_process_min"] += entry["wall_ms_per_process_min"]
+            base["wall_ms_min"] = min(base["wall_ms_per_process_min"])
+            base["cold_ms_min"] = min(base["cold_ms_min"], entry["cold_ms_min"])
+            base["peak_alloc_mib"] = max(base["peak_alloc_mib"], entry["peak_alloc_mib"])
+            base["processes"] += entry["processes"]
+            differing = sorted(k for k in COUNT_KEYS if base["counts"].get(k) != entry["counts"].get(k))
+            if entry["path_count"] != base["path_count"]:
+                differing.append("path_count")
+            base["unstable"] = sorted(set(base["unstable"]) | set(entry["unstable"]) | set(differing))
+            base["gpu_before"] = f"{base.get('gpu_before')} | {entry.get('gpu_before')}"
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -515,12 +584,22 @@ def main(argv: list[str] | None = None) -> int:
                      help="worktree: this checkout plus the developer override; installed: the "
                      "site-packages witwin-channel, run from outside any checkout")
     run.add_argument("--timeout", type=float, default=900.0, help="seconds per process")
+    run.add_argument("--exclusive", action="store_true",
+                     help="label the timings as taken with the whole GPU to this run")
     run.add_argument("--output", help="JSON file to write (rewritten after every case)")
     cmp_ = sub.add_parser("compare", help="Markdown table of new/old ratios")
     cmp_.add_argument("old")
     cmp_.add_argument("new")
     show = sub.add_parser("table", help="Markdown table of one result file")
     show.add_argument("result")
+    bud = sub.add_parser("budgets", help="budget file from a result of the budget-* cases")
+    bud.add_argument("result")
+    bud.add_argument("--write", required=True, help="budget JSON to create or tighten")
+    bud.add_argument("--headroom", type=float, default=0.10, help="fraction above measured")
+    bud.add_argument("--allow-raise", action="store_true", help="permit raising existing bounds")
+    mer = sub.add_parser("merge", help="combine result files: min wall time, counts must agree")
+    mer.add_argument("results", nargs="+")
+    mer.add_argument("--output", required=True)
     worker = sub.add_parser("worker", help=argparse.SUPPRESS)
     worker.add_argument("case", choices=sorted(CASES))
     worker.add_argument("--target", choices=("worktree", "installed"), default="worktree")
@@ -538,6 +617,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "table":
         print(table(json.loads(Path(args.result).read_text())))
+        return 0
+    if args.command == "budgets":
+        target = Path(args.write)
+        existing = json.loads(target.read_text()) if target.is_file() else None
+        _write(args.write, budgets(json.loads(Path(args.result).read_text()), existing,
+                                   headroom=args.headroom, allow_raise=args.allow_raise))
+        return 0
+    if args.command == "merge":
+        _write(args.output, merge([json.loads(Path(r).read_text()) for r in args.results]))
         return 0
     return _worker(args)
 
