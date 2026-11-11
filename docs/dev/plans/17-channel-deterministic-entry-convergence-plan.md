@@ -74,7 +74,7 @@ between the two files. The copies have already drifted:
 | Capability | `path` | `deterministic` | `consumer` |
 |---|---|---|---|
 | `los`, `reflection`, `transmission` | yes | yes | yes |
-| `diffraction` | yes | yes | primal raises `IndexError` (pinned defect, see `propagation-ad-capability-matrix.md` section 4) |
+| `diffraction` | yes | yes | primal yes; AD refused (see `propagation-ad-capability-matrix.md` section 4) |
 | `scattering` (incoherent power rows) | yes | yes, plus `scattering_coherent` | refused before compute |
 | Coupled reflection-diffraction | yes | yes, with receiver-block streaming | no |
 | `ReceiverGrid` | no | yes | no |

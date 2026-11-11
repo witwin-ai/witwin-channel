@@ -5,8 +5,6 @@
 
 from __future__ import annotations
 
-import traceback
-from pathlib import Path
 
 import pytest
 import torch
@@ -423,25 +421,24 @@ def test_diffraction_ad_is_refused_before_any_native_work(ad_mode: str) -> None:
         evaluate(compiled, _wedge_request(ad_mode, sources, sinks))
 
 
-def test_the_diffraction_primal_defect_is_pinned_rather_than_fixed() -> None:
-    """A recorded upstream gap, not an AD cell.
+def test_diffraction_primal_evaluates_while_its_ad_column_stays_refused() -> None:
+    """The primal diffraction route runs; jvp/vjp stay refused by the narrowed record.
 
- ``_solver_scene`` builds ``SolverScene(transmitters=, receivers=)``
- because the consumer takes explicit endpoint batches, while the order-1
- diffraction topology owner indexes ``tx_polarizations[tx_index]``. That is a
- primal reachability defect: it fires at ``ad_mode='none'`` too. first-order differentiation not fix it, because fixing it would silently re-open an AD
- column nobody has validated. This test pins the failure by exception type
- and site so a future fix is a deliberate decision rather than a side effect.
- """
+    The order-1 diffraction topology takes the request's source polarizations,
+    so ``ad_mode='none'`` publishes finite diffraction rows. Fixing the primal
+    does not open the AD column: ``ad_modes_for_component('diffraction')`` is
+    still ``{'none'}`` and the refusal test above still holds.
+    """
 
+    assert capabilities().ad_modes_for_component("diffraction") == frozenset({"none"})
     compiled = compile_scene(wedge_diffraction_scene(), reference_frequency_hz=3.0e9)
     sources, sinks = _wedge_endpoints()
-    with pytest.raises(IndexError) as raised:
-        evaluate(compiled, _wedge_request("none", sources, sinks))
-    frames = traceback.extract_tb(raised.value.__traceback__)
-    sites = {(Path(frame.filename).name, frame.name) for frame in frames}
-    assert ("diffraction.py", "_diffraction_topology_order1") in sites
-    assert "index 0 is out of bounds" in str(raised.value)
+    paths = evaluate(compiled, _wedge_request("none", sources, sinks)).paths
+    assert paths.path_count > 0
+    assert bool((paths.topology.component_id == 2).all())
+    coefficient = paths.transport.coefficient
+    assert bool(torch.isfinite(coefficient.abs()).all())
+    assert float(coefficient.abs().sum()) > 0.0
 
 
 # ---------------------------------------------------------------------------
