@@ -317,6 +317,8 @@ def test_contract_fields_and_forbidden_imports():
         "witwin.channel.kernels.topology",
         "witwin.channel.propagation.geometry",
         "witwin.channel.propagation.topology",
+        "witwin.channel.scene.compiler",
         "witwin.channel.scene.endpoints",
+        "witwin.channel.scene.resources",
     }
     assert not any(module.startswith("witwin.channel.core") for module in imports)
