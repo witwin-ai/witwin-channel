@@ -28,14 +28,15 @@ else:
 
 
 _DISTRIBUTION = "witwin-channel"
-_DIST_INFO_LICENSE = "licenses/LICENSE"
-_DIST_INFO_FILES = frozenset({"METADATA", "RECORD", "WHEEL", _DIST_INFO_LICENSE})
-_NATIVE_MEMBER = "witwin/channel/_channel.cp311-win_amd64.pyd"
+_DIST_INFO_LICENSES = {"licenses/LICENSE": "LICENSE", "licenses/NOTICE": "NOTICE"}
+_DIST_INFO_FILES = frozenset(
+    {"METADATA", "RECORD", "WHEEL", "entry_points.txt", *_DIST_INFO_LICENSES}
+)
+_WINDOWS_WHEEL_TAG = re.compile(r"(cp3\d+)-\1-win_amd64")
 _REQUIRED_RUNTIME_MEMBERS = {
     "witwin/channel/_channel.build-fingerprint",
     "witwin/channel/rayd.lock.json",
 }
-_SPECIAL_PACKAGE_MEMBERS = frozenset({_NATIVE_MEMBER, *_REQUIRED_RUNTIME_MEMBERS})
 # The propagation consumer contract version has exactly one home, the checked-in
 # module below. The smoke reads it from there rather than restating the integer,
 # because a restated literal goes stale silently and only fails a release run.
@@ -423,6 +424,17 @@ def _audit_record(archive: zipfile.ZipFile, members: list[str], *, dist_info: st
             raise ValueError(f"wheel RECORD hash/size mismatch for {member!r}")
 
 
+def _native_member(archive: zipfile.ZipFile, dist_info: str) -> str:
+    """Return the extension path a Windows wheel must contain, from its single WHEEL tag."""
+
+    wheel = BytesParser(policy=policy.default).parsebytes(archive.read(f"{dist_info}/WHEEL"))
+    tags = wheel.get_all("Tag", [])
+    match = _WINDOWS_WHEEL_TAG.fullmatch(tags[0]) if len(tags) == 1 else None
+    if match is None:
+        raise ValueError(f"wheel must carry exactly one cpXY-cpXY-win_amd64 tag; found {tags}")
+    return f"witwin/channel/_channel.{match.group(1)}-win_amd64.pyd"
+
+
 def _wheel_identity(path: Path) -> tuple[str, str]:
     with zipfile.ZipFile(path) as archive:
         name, version, _ = _metadata_identity(archive, _canonical_members(archive))
@@ -433,13 +445,14 @@ def _audit_wheel_contents(path: Path) -> str:
     with zipfile.ZipFile(path) as archive:
         names = _canonical_members(archive)
         _, _, dist_info = _metadata_identity(archive, names)
-        native_extensions = [name for name in names if name == _NATIVE_MEMBER]
-        if native_extensions != [_NATIVE_MEMBER]:
+        native_extension = _native_member(archive, dist_info)
+        special_package_members = {native_extension, *_REQUIRED_RUNTIME_MEMBERS}
+        native_extensions = [name for name in names if name == native_extension]
+        if native_extensions != [native_extension]:
             raise ValueError(
                 "wheel must contain exactly one packaged _channel extension; "
                 f"found {native_extensions}"
             )
-        native_extension = _NATIVE_MEMBER
         shared_libraries = [
             name for name in names if Path(name).suffix.lower() in {".dll", ".dylib", ".pyd", ".so"}
         ]
@@ -454,7 +467,7 @@ def _audit_wheel_contents(path: Path) -> str:
 
         checked_in = _checked_in_package_members()
         package_members = {name for name in names if name.startswith("witwin/")}
-        expected_package_members = set(checked_in) | set(_SPECIAL_PACKAGE_MEMBERS)
+        expected_package_members = set(checked_in) | special_package_members
         if package_members != expected_package_members:
             missing_package = sorted(expected_package_members - package_members)
             extra_package = sorted(package_members - expected_package_members)
@@ -475,7 +488,7 @@ def _audit_wheel_contents(path: Path) -> str:
             name
             for name in names
             if name not in checked_in
-            and name not in _SPECIAL_PACKAGE_MEMBERS
+            and name not in special_package_members
             and name not in allowed_dist_info
         )
         if unexpected_members:
@@ -489,12 +502,13 @@ def _audit_wheel_contents(path: Path) -> str:
         dist_info_members = {name for name in names if name.startswith(f"{dist_info}/")}
         if dist_info_members != allowed_dist_info:
             raise ValueError(
-                "wheel dist-info must contain exactly METADATA, WHEEL, RECORD, and licenses/LICENSE"
+                "wheel dist-info must contain exactly METADATA, WHEEL, RECORD, entry_points.txt, "
+                "licenses/LICENSE and licenses/NOTICE"
             )
-        license_member = f"{dist_info}/{_DIST_INFO_LICENSE}"
-        repository_license = Path(__file__).resolve().parents[1] / "LICENSE"
-        if archive.read(license_member) != repository_license.read_bytes():
-            raise ValueError("wheel dist-info license bytes differ from the repository LICENSE")
+        repository_root = Path(__file__).resolve().parents[1]
+        for member, source in _DIST_INFO_LICENSES.items():
+            if archive.read(f"{dist_info}/{member}") != (repository_root / source).read_bytes():
+                raise ValueError(f"wheel dist-info {member} differs from the repository {source}")
         _audit_record(archive, names, dist_info=dist_info)
         _runtime_identity_from_archive(archive)
 

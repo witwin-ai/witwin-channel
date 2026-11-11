@@ -6,7 +6,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import re
-import tomllib
 
 from ci import run_ci_tier as tiers
 
@@ -196,23 +195,13 @@ def test_actual_execution_is_fail_fast(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
-    with (ROOT / "ci" / "support-matrix.toml").open("rb") as stream:
-        runtime = tomllib.load(stream)["runtime"][0]
-    assert runtime["python"] == "3.11"
-    assert runtime["cuda_runtime"] == "12.8"
-    assert runtime["cuda_toolkit"] == "12.8.1"
-    assert runtime["verified_sm"] == [120]
-    assert runtime["declared_unverified_sm"] == [
-        70,
-        75,
-        80,
-        86,
-        87,
-        89,
-        90,
-        100,
-        101,
-    ]
+    from ci import wheel_matrix
+
+    matrix = wheel_matrix.load()
+    assert matrix["cuda_runtime"] == "12.8"
+    assert matrix["cuda_toolkit"] == "12.8.1"
+    # x86_64 wheels carry no Jetson-only cubins; their exact-match SMs cannot run on x86_64.
+    assert not set(matrix["sass"]) & {72, 87, 101, 110}
 
     assert {path.name for path in WORKFLOWS.glob("*.yml")} == {
         "gpu-tier.yml",
@@ -227,17 +216,9 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "\n  workflow_dispatch:" in workflow
     assert "          - windows-smoke" in workflow
     assert "          - full" in workflow
-    assert "          - windows-release-recovery" in workflow
-    assert "          - publish-recovery-artifacts" in workflow
-    assert "      source_sha:" in workflow
-    assert "      release_tag:" in workflow
-    assert "      linux_artifact_run_id:" in workflow
-    assert "      windows_artifact_run_id:" in workflow
     assert "self-hosted" not in workflow
     assert "runs-on: windows-2022" in workflow
     assert "runs-on: ubuntu-22.04" in workflow
-    assert "channel-windows-8core" not in workflow
-    assert "channel-linux-8core" not in workflow
     assert "manylinux_2_28" in workflow
 
     locked_rayd = "e4a63d2a7630fcc5f69b2375b11b1ef9f7e2caec"
@@ -253,36 +234,44 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "RAYD_SOURCE_DIR=" in workflow
     assert "-DCHANNEL_RELEASE_BUILD=ON" in workflow
 
-    full_arches = (
-        "70-real;75-real;80-real;86-real;87-real;89-real;"
-        "90-real;100-real;101-real;120-real;120-virtual"
+    # Every architecture, flag, size limit and matrix row comes from ci/support-matrix.toml.
+    assert "python ci/wheel_matrix.py github-outputs" in workflow
+    assert workflow.count("include: ${{ fromJSON(needs.metadata.outputs.build) }}") == 2
+    assert (
+        workflow.count(
+            "-DCMAKE_CUDA_ARCHITECTURES=${{ needs.metadata.outputs.cuda_architectures }}"
+        )
+        == 2
     )
-    assert full_arches in workflow
-    assert "--expected-sass 70,75,80,86,87,89,90,100,101,120" in workflow
-    assert "--expected-ptx 120" in workflow
+    assert not re.search(r"\b\d+-real\b|sm_\d+|compute_\d+|--expected-sass \d", workflow)
+    assert workflow.count("--expected-sass ${{ needs.metadata.outputs.expected_sass }}") == 1
+    assert workflow.count("--expected-sass $env:EXPECTED_SASS") == 1
     assert workflow.count("rayd/drjit/scripts/verify_cuda_binary_arches.py") == 4
     assert "rayd/backends/drjit/scripts" not in workflow
-    assert "CHANNEL_CUDA_GENCODE_FLAGS=" in workflow
-    assert "RAYD_TORCH_CUDA_GENCODE_FLAGS=" in workflow
+    assert workflow.count("wheel_matrix.py check-size") == 2
+    assert "check-wheels dist/pypi --channel pypi" in workflow
+    assert "check-wheels dist/release-asset --channel release-asset" in workflow
+    assert workflow.count("wheel_matrix.py select-torch") == 2
+    assert "torch==${{ matrix.torch }} --index-url https://download.pytorch.org/whl/cu128" in workflow
+    assert "CIBW_BUILD: ${{ matrix.python_tag }}-manylinux_x86_64" in workflow
+    assert "python-version: ${{ matrix.python }}" in workflow
+    assert "CHANNEL_CUDA_GENCODE_FLAGS" in workflow
+    assert "RAYD_TORCH_CUDA_GENCODE_FLAGS" in workflow
     assert 'CMAKE_CUDA_COMPILER_LAUNCHER: ""' in workflow
     assert 'CMAKE_BUILD_PARALLEL_LEVEL: "3"' in workflow
     assert "CMAKE_BUILD_PARALLEL_LEVEL=2" in workflow
-    assert "Windows Channel wheel build: {0:N2} minutes" in workflow
-    assert "exceeded the previous 100-minute target; continuing" in workflow
-    assert 'throw "Windows Channel wheel build exceeded' not in workflow
     assert ".Path.Replace('\\', '/')" in workflow
     assert "actions/cache@v5" in workflow
     assert "sub-packages:" in workflow
     assert "safe.directory /project/channel" in workflow
     assert "safe.directory /host${{ github.workspace }}/rayd" in workflow
     assert "python channel/ci/wheel_smoke.py" in workflow
-    assert r"witwin_channel-0\.5\.0-" in workflow
-    assert r"witwin_channel-0\.4\.0-" not in workflow
     assert "import witwin.channel as channel" in workflow
     assert "from witwin.channel.propagation import consumer" in workflow
     assert '"enumerated_canonical_compact"' in workflow
     assert '"enumerated_exact_pair_metadata"' in workflow
     assert '"consumer_los_jones"' in workflow
+    assert '"runtime_probe"' in workflow
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
     assert "CHANNEL_CUDA_GENCODE_FLAGS" in cmake
     second_torch_find = cmake.index(
@@ -349,21 +338,17 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert ambiguous_ranges == []
 
     publish_guard = "github.event_name == 'release' && github.event.action == 'published'"
-    assert publish_guard in workflow
-    recovery_guard = (
-        "github.event_name == 'workflow_dispatch' && inputs.scope == 'windows-release-recovery'"
-    )
-    assert recovery_guard in workflow
-    assert "actions/runs/${LINUX_ARTIFACT_RUN_ID}/artifacts" in workflow
-    assert "actions/runs/${WINDOWS_ARTIFACT_RUN_ID}/artifacts" in workflow
-    assert "run-id: ${{ inputs.linux_artifact_run_id }}" in workflow
-    assert "run-id: ${{ inputs.windows_artifact_run_id }}" in workflow
-    assert workflow.count("Download recovered Linux wheel") == 2
-    assert workflow.count("Download recovered Windows wheel") == 2
-    assert "inputs.source_sha || github.sha" in workflow
-    assert "needs.validate-wheels.result == 'success'" in workflow
-    assert "pypa/gh-action-pypi-publish@release/v1" in workflow
-    assert "id-token: write" in workflow
+    assert workflow.count(publish_guard) == 2
+    assert workflow.count("needs.validate-wheels.result == 'success'") == 2
+    publish = workflow[workflow.index("\n  publish:") : workflow.index("\n  release-assets:")]
+    assert "pattern: channel-wheel-pypi-*" in publish
+    assert "release-asset" not in publish
+    assert "pypa/gh-action-pypi-publish@release/v1" in publish
+    assert "id-token: write" in publish
+    assets = workflow[workflow.index("\n  release-assets:") :]
+    assert "pattern: channel-wheel-release-asset-*" in assets
+    assert "contents: write" in assets
+    assert 'gh release upload "$RELEASE_TAG"' in assets
 
 
 def test_quick_tier_workflow_runs_on_every_push_and_pull_request() -> None:
