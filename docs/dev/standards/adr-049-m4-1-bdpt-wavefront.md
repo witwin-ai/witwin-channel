@@ -5,9 +5,11 @@
 - **Decision ID:** `bdpt-wavefront-sampler`.
 - **Scope:** `witwin.channel.montecarlo.bdpt` event-selected shooting sampler
   (mixed reflection+transmission chains), its random-number source, the
-  `staged` connection accumulation and the accumulate JVP. Supersedes the
-  sampler orchestration described in ADR-020 (polarization physics unchanged)
-  and the `staged` reduction recorded in ADR-019; ADR-022 AD scope unchanged.
+  `staged` connection accumulation, the accumulate JVP and the sampler's
+  fixed-topology AD. Supersedes the sampler orchestration described in ADR-020
+  (polarization physics unchanged), the `staged` reduction recorded in ADR-019
+  and the sampler's per-event subpath companions of ADR-022 (its AD scope is
+  unchanged).
 
 ## Context
 
@@ -60,9 +62,9 @@ accumulate JVP looped every row for every output cell (`O(cells x rows)`).
    - rows: a counting pass, the one sanctioned row-count copy, and a second
      pass that writes exactly those rows (sorted by sample, bounce, receiver)
      into the connection-sample schema for the compact export and the variance.
-   It also serves `jvp` / `vjp` (decision 7). The event-composed sampler and its
-   per-event AD companions remain in the tree but are no longer dispatched.
-   `Result.metadata["sampler"]` is `"wavefront"` whenever sampled chains run.
+   It also serves `jvp` / `vjp` (decision 7); the event-composed sampler and its
+   Torch scatter numerics are removed. `Result.metadata["sampler"]` is
+   `"wavefront"` whenever sampled chains run.
 3. **Random numbers.** Every sampler uniform is a pure function
    `u = h(seed, stream, g, depth)` of the global sample index
    `g = tx * samples + i` (splitmix64 mixing, 24 high bits, always in
@@ -101,7 +103,8 @@ accumulate JVP looped every row for every output cell (`O(cells x rows)`).
    same-seed agreement with the event-composed `vjp` (mixed chains identical
    directional sums; single-order scatter within 6e-6). The event-composed
    `jvp` returned zero tangents for sampled paths and its `vjp` NaN at
-   `max_scattering_order=3`.
+   `max_scattering_order=3`. The event-composed sampler, its per-event AD
+   companions and its Torch scatter numerics were then removed.
 
 ## Consequences
 
@@ -114,7 +117,12 @@ accumulate JVP looped every row for every output cell (`O(cells x rows)`).
 - `staged` sums change order (now deterministic); JVP tangents of the
   accumulate change order (now deterministic).
 - The mixed-chain sampler no longer scales its memory or launch count with
-  `samples x receivers`; the workspace estimate counts one chunk and one tile.
+  `samples x receivers`; the workspace estimate counts one chunk and one tile
+  (plus one chunk of replay tape under `vjp`).
+- AD results move: sampled paths now have a `jvp` (the event-composed `jvp`
+  returned zero tangents) and multi-order scatter a finite `vjp` (it returned
+  NaN). Single-order and mixed-chain `vjp` values agree with the removed
+  sampler to <= 6e-6 relative (evidence in the owner README).
 
 ## Estimator limitation (mixed chains)
 
@@ -135,8 +143,11 @@ with the deterministic solver by construction.
 Recorded in `docs/dev/montecarlo/README.md` ("BDPT wavefront evidence") and the
 tests `tests/montecarlo/bdpt/test_wavefront.py`:
 
-- wavefront and event-composed samplers agree per `(tx, rx)` and in every event
-  count for the same seed (same random numbers);
+- wavefront and event-composed samplers agreed per `(tx, rx)` and in every
+  event count for the same seed (same random numbers; checked while both
+  existed);
+- AD: primal bitwise equal to `ad_mode="none"`, same-seed FD, seed-mean FD and
+  jvp/vjp duality (`tests/ad/test_bdpt_wavefront_ad.py`);
 - chunk and receiver-tile invariance;
 - statistical equivalence against the previous `torch.Generator` sampler
   (means over seeds within confidence intervals) and, on a vacuum wall

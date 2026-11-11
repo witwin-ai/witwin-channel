@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 import torch
 
@@ -33,19 +34,20 @@ __all__ = [
     "_PATH_BLOCK_SCHEMA",
     "_validate_deterministic_topology_block",
     "_validate_path_block",
-    "_validate_path_reflection_candidates",
     "_validate_topology_extra_fields",
     "COMPACT_CONTINUOUS_FIELDS",
     "CanonicalCompactRows",
     "ExactPairMetadata",
     "TransmissionTopologyCapacity",
+    "chain_candidates",
+    "chain_double_candidates",
+    "chain_node_edges",
     "core_pack_int2",
     "deterministic_component_counts",
     "deterministic_concat_topology_blocks",
     "deterministic_diffraction_state_pack",
     "deterministic_diffraction_state_pack_selected",
     "deterministic_face_anchor_points",
-    "deterministic_gather_topology_block",
     "deterministic_los_topology_block",
     "deterministic_pad_topology_sequences",
     "deterministic_reflection_epc_input_batch",
@@ -56,9 +58,7 @@ __all__ = [
     "deterministic_reflection_sequence_compact",
     "deterministic_reflection_topology_compact",
     "deterministic_diffraction_topology_compact",
-    "deterministic_repeat_range",
     "deterministic_selected_edge_count",
-    "deterministic_sort_order",
     "deterministic_topology_default_fields",
     "enumerated_canonical_compact",
     "enumerated_exact_pair_metadata",
@@ -68,15 +68,9 @@ __all__ = [
     "mc_sample_directions",
     "mc_selected_edge_indices",
     "path_concat_vec3",
-    "path_diffraction_block",
-    "path_filter_block",
-    "path_filter_los",
-    "path_finalize_blocks",
     "path_los_export",
     "path_los_visibility_inputs",
-    "path_merge_blocks",
     "path_pack_padded",
-    "path_reflection_candidates",
 ]
 
 
@@ -188,7 +182,7 @@ def _validate_topology_extra_fields(
             validate_cuda_tensor(
                 f"{name}.{key}", tensor, dtype=dtype, ndim=2, trailing_shape=(3,)
             )
-            expected = (path_count, 3)
+            expected: tuple[int, ...] = (path_count, 3)
         elif key in {"primitive_sequence", "material_sequence"}:
             validate_cuda_tensor(f"{name}.{key}", tensor, dtype=dtype, ndim=2)
             expected = (path_count, sequence_width)
@@ -240,51 +234,6 @@ def deterministic_concat_topology_blocks(
     return exported
 
 
-def deterministic_gather_topology_block(
-    block: dict[str, torch.Tensor], order: torch.Tensor, *, max_count: int, sequence_width: int,
-) -> dict[str, torch.Tensor]:
-    if sequence_width < 0:
-        raise ValueError("sequence_width must be non-negative")
-    if max_count < -1:
-        raise ValueError("max_count must be -1 or non-negative")
-    _validate_path_block("block", block)
-    field_presence = {
-        key: key in block for key, _dtype in _DETERMINISTIC_TOPOLOGY_EXTRA_SCHEMA
-    }
-    _validate_topology_extra_fields("block", block, int(sequence_width), field_presence)
-    validate_cuda_tensor("order", order, dtype=torch.long, ndim=1)
-    if order.get_device() != block["valid"].get_device():
-        raise ValueError("order must share block device")
-
-    exported = _required_native_op("deterministic_gather_topology_block")(
-        block,
-        order,
-        int(max_count),
-        int(sequence_width),
-    )
-    if not isinstance(exported, dict):
-        raise TypeError(
-            "_channel.deterministic_gather_topology_block must return a dict"
-        )
-    _validate_path_block("deterministic_gather_topology_block", exported)
-    _validate_topology_extra_fields(
-        "deterministic_gather_topology_block",
-        exported,
-        int(sequence_width),
-        field_presence,
-    )
-    expected_count = (
-        int(order.shape[0])
-        if max_count < 0
-        else min(int(order.shape[0]), int(max_count))
-    )
-    if exported["valid"].shape != (expected_count,):
-        raise ValueError(
-            "_channel.deterministic_gather_topology_block returned bad path count"
-        )
-    return exported
-
-
 def path_los_visibility_inputs(
     tx_positions: torch.Tensor, rx_positions: torch.Tensor, tx_id: torch.Tensor,
     rx_id: torch.Tensor,
@@ -316,190 +265,6 @@ def path_los_visibility_inputs(
             "_channel.path_los_visibility_inputs returned bad active shape"
         )
     return exported
-
-
-def path_filter_los(
-    tx_id: torch.Tensor, rx_id: torch.Tensor, path_length_m: torch.Tensor, delay_s: torch.Tensor,
-    path_gain: torch.Tensor, visible: torch.Tensor,
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor("tx_id", tx_id, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("rx_id", rx_id, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("path_length_m", path_length_m, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("delay_s", delay_s, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("path_gain", path_gain, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("visible", visible, dtype=torch.bool, ndim=1)
-    for name, tensor in {
-        "rx_id": rx_id,
-        "path_length_m": path_length_m,
-        "delay_s": delay_s,
-        "path_gain": path_gain,
-        "visible": visible,
-    }.items():
-        if tensor.shape != tx_id.shape:
-            raise ValueError(f"{name} must match tx_id")
-    block = _required_native_op("path_filter_los")(
-        tx_id, rx_id, path_length_m, delay_s, path_gain, visible
-    )
-    _validate_path_block("path_filter_los", block)
-    return block
-
-
-def _validate_path_reflection_candidates(name: str, candidates: dict[str, torch.Tensor]) -> None:
-    _validate_path_block(name, candidates)
-    path_count = candidates["valid"].shape
-    for key in ("seg0_start", "seg0_end", "seg1_start", "seg1_end"):
-        tensor = candidates.get(key)
-        if not isinstance(tensor, torch.Tensor):
-            raise TypeError(f"{name}.{key} must be a torch.Tensor")
-        validate_cuda_tensor(
-            f"{name}.{key}", tensor, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-        )
-        if tensor.shape[0] != path_count[0]:
-            raise ValueError(f"{name}.{key} must share the path count")
-    active = candidates.get("active")
-    if not isinstance(active, torch.Tensor):
-        raise TypeError(f"{name}.active must be a torch.Tensor")
-    validate_cuda_tensor(f"{name}.active", active, dtype=torch.bool, ndim=1)
-    if tuple(active.shape) != path_count:
-        raise ValueError(f"{name}.active must share the path count")
-
-
-def path_filter_block(
-    block: dict[str, torch.Tensor], visible0: torch.Tensor, visible1: torch.Tensor,
-) -> dict[str, torch.Tensor]:
-    _validate_path_block("block", block)
-    validate_cuda_tensor("visible0", visible0, dtype=torch.bool, ndim=1)
-    validate_cuda_tensor("visible1", visible1, dtype=torch.bool, ndim=1)
-    if visible0.shape != block["valid"].shape or visible1.shape != block["valid"].shape:
-        raise ValueError("visible masks must share the path count")
-    out = _required_native_op("path_filter_block")(block, visible0, visible1)
-    if not isinstance(out, dict):
-        raise TypeError("_channel.path_filter_block must return a dict")
-    _validate_path_block("path_filter_block", out)
-    return out
-
-
-def path_diffraction_block(
-    rayd_output: tuple[torch.Tensor, ...], *, tx_index: int,
-) -> dict[str, torch.Tensor]:
-    if not isinstance(rayd_output, tuple) or len(rayd_output) != 18:
-        raise TypeError(
-            "rayd_output must be the 18-tensor RayD diffraction path tuple"
-        )
-    for index in (1, 3, 4, 5):
-        validate_cuda_tensor(
-            f"rayd_output[{index}]",
-            rayd_output[index],
-            dtype=torch.int32 if index != 1 else torch.bool,
-            ndim=1,
-        )
-    for index in (8, 9, 10, 11, 12, 13, 14):
-        validate_cuda_tensor(
-            f"rayd_output[{index}]", rayd_output[index], dtype=torch.float32, ndim=1
-        )
-    capacity = rayd_output[1].shape
-    for index in (3, 4, 5, 8, 9, 10, 11, 12, 13, 14):
-        if rayd_output[index].shape != capacity:
-            raise ValueError("RayD diffraction path tensors must share capacity")
-    if tx_index < 0:
-        raise ValueError("tx_index must be non-negative")
-    out = _required_native_op("path_diffraction_block")(rayd_output, int(tx_index))
-    if not isinstance(out, dict):
-        raise TypeError("_channel.path_diffraction_block must return a dict")
-    _validate_path_block("path_diffraction_block", out)
-    return out
-
-
-def path_merge_blocks(
-    blocks: tuple[dict[str, torch.Tensor], ...] | list[dict[str, torch.Tensor]], *, tx_count: int,
-    max_depth: int,
-) -> dict[str, torch.Tensor]:
-    if not blocks:
-        raise ValueError("blocks must not be empty")
-    for index, block in enumerate(blocks):
-        _validate_path_block(f"blocks[{index}]", block)
-    if tx_count < 0:
-        raise ValueError("tx_count must be non-negative")
-    if max_depth < 0:
-        raise ValueError("max_depth must be non-negative")
-    out = _required_native_op("path_merge_blocks")(
-        tuple(blocks), int(tx_count), int(max_depth)
-    )
-    if not isinstance(out, dict):
-        raise TypeError("_channel.path_merge_blocks must return a dict")
-    _validate_path_block("path_merge_blocks", out)
-    return out
-
-
-def path_finalize_blocks(
-    los: dict[str, torch.Tensor], reflection: dict[str, torch.Tensor],
-    diffraction: dict[str, torch.Tensor], *, max_paths: int | None, tx_count: int, max_depth: int,
-) -> dict[str, torch.Tensor]:
-    _validate_path_block("los", los)
-    _validate_path_block("reflection", reflection)
-    _validate_path_block("diffraction", diffraction)
-    if tx_count < 0:
-        raise ValueError("tx_count must be non-negative")
-    if max_depth < 0:
-        raise ValueError("max_depth must be non-negative")
-    max_paths_value = -1 if max_paths is None else int(max_paths)
-    if max_paths_value < -1:
-        raise ValueError("max_paths must be positive")
-    finalized = _required_native_op("path_finalize_blocks")(
-        los,
-        reflection,
-        diffraction,
-        max_paths_value,
-        int(tx_count),
-        int(max_depth),
-    )
-    _validate_path_block("path_finalize_blocks", finalized)
-    return finalized
-
-
-# -------------------------------------------------------------------------
-# candidates
-# -------------------------------------------------------------------------
-def path_reflection_candidates(
-    vertices: torch.Tensor, faces: torch.Tensor, face_normals: torch.Tensor,
-    face_gain: torch.Tensor, tx_positions: torch.Tensor, tx_power: torch.Tensor,
-    rx_positions: torch.Tensor, *, frequency_hz: float,
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor(
-        "vertices", vertices, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("faces", faces, dtype=torch.int32, ndim=2, trailing_shape=(3,))
-    validate_cuda_tensor(
-        "face_normals", face_normals, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("face_gain", face_gain, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor(
-        "tx_positions", tx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("tx_power", tx_power, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor(
-        "rx_positions", rx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    if face_normals.shape[0] != faces.shape[0] or face_gain.shape[0] != faces.shape[0]:
-        raise ValueError("face_normals and face_gain must match faces")
-    if tx_power.shape[0] != tx_positions.shape[0]:
-        raise ValueError("tx_power must match tx_positions")
-    if frequency_hz <= 0.0:
-        raise ValueError("frequency_hz must be positive")
-    candidates = _required_native_op("path_reflection_candidates")(
-        vertices,
-        faces,
-        face_normals,
-        face_gain,
-        tx_positions,
-        tx_power,
-        rx_positions,
-        float(frequency_hz),
-    )
-    if not isinstance(candidates, dict):
-        raise TypeError("_channel.path_reflection_candidates must return a dict")
-    _validate_path_reflection_candidates("path_reflection_candidates", candidates)
-    return candidates
 
 
 # -------------------------------------------------------------------------
@@ -826,46 +591,6 @@ def deterministic_reflection_sequence_compact(
     return exported
 
 
-def deterministic_sort_order(
-    valid: torch.Tensor, tx_id: torch.Tensor, rx_id: torch.Tensor, depth: torch.Tensor,
-    component_id: torch.Tensor, primitive_id: torch.Tensor, edge_id: torch.Tensor,
-    primitive_sequence: torch.Tensor,
-) -> torch.Tensor:
-    validate_cuda_tensor("valid", valid, dtype=torch.bool, ndim=1)
-    for name, tensor in (
-        ("tx_id", tx_id),
-        ("rx_id", rx_id),
-        ("depth", depth),
-        ("component_id", component_id),
-        ("primitive_id", primitive_id),
-        ("edge_id", edge_id),
-    ):
-        validate_cuda_tensor(name, tensor, dtype=torch.int32, ndim=1)
-        if tensor.shape != valid.shape:
-            raise ValueError(f"{name} must match valid")
-    validate_cuda_tensor(
-        "primitive_sequence", primitive_sequence, dtype=torch.int32, ndim=2
-    )
-    if primitive_sequence.shape[0] != valid.shape[0]:
-        raise ValueError("primitive_sequence must match valid rows")
-    out = _required_native_op("deterministic_sort_order")(
-        valid,
-        tx_id,
-        rx_id,
-        depth,
-        component_id,
-        primitive_id,
-        edge_id,
-        primitive_sequence,
-    )
-    if not isinstance(out, torch.Tensor):
-        raise TypeError("_channel.deterministic_sort_order must return a tensor")
-    validate_cuda_tensor("out", out, dtype=torch.long, ndim=1)
-    if out.shape != valid.shape:
-        raise ValueError("_channel.deterministic_sort_order returned bad shape")
-    return out
-
-
 # -------------------------------------------------------------------------
 # construction
 # -------------------------------------------------------------------------
@@ -1080,25 +805,6 @@ def deterministic_pad_topology_sequences(
     return exported
 
 
-def deterministic_repeat_range(
-    reference: torch.Tensor, *, start: int, end: int, repeats: int,
-) -> torch.Tensor:
-    validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=1)
-    if end < start:
-        raise ValueError("end must be greater than or equal to start")
-    if repeats <= 0:
-        raise ValueError("repeats must be positive")
-    out = _required_native_op("deterministic_repeat_range")(
-        reference, int(start), int(end), int(repeats)
-    )
-    validate_cuda_tensor("out", out, dtype=torch.int32, ndim=1)
-    if out.shape != ((int(end) - int(start)) * int(repeats),):
-        raise ValueError(
-            "_channel.deterministic_repeat_range returned bad shape"
-        )
-    return out
-
-
 def deterministic_face_anchor_points(vertices: torch.Tensor, faces: torch.Tensor) -> torch.Tensor:
     validate_cuda_tensor(
         "vertices", vertices, dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -1198,6 +904,76 @@ def reflection_receiver_candidates(
     if not isinstance(exported, dict) or set(exported) != {"candidate_sequence", "candidate_receiver"}:
         raise TypeError("_channel.reflection_receiver_candidates must return the candidate lists")
     return exported["candidate_sequence"], exported["candidate_receiver"]
+
+
+def chain_node_edges(
+    *, node_sequences: torch.Tensor, node_images: torch.Tensor, plane_point: torch.Tensor,
+    plane_normal: torch.Tensor, bounds: torch.Tensor, occupancy: torch.Tensor,
+    edge_position: torch.Tensor, edge_direction: torch.Tensor, edge_t_min: torch.Tensor,
+    edge_t_max: torch.Tensor, node_start: int, node_end: int, tolerance: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """``(node, edge)`` pairs whose edge may lie in the node's reflection beam, node-major."""
+
+    validate_cuda_tensor("node_sequences", node_sequences, dtype=torch.int32, ndim=2)
+    validate_cuda_tensor("node_images", node_images, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    exported = _required_native_op("chain_node_edges")(
+        node_sequences, node_images, plane_point, plane_normal, bounds, occupancy, edge_position,
+        edge_direction, edge_t_min, edge_t_max, int(node_start), int(node_end), float(tolerance),
+    )
+    if not isinstance(exported, dict) or set(exported) != {"node", "edge"}:
+        raise TypeError("_channel.chain_node_edges must return the node and edge lists")
+    return exported["node"], exported["edge"]
+
+
+_CHAIN_CANDIDATE_FIELDS = frozenset({"tx", "rx", "edge", "a_node", "b_node", "point"})
+
+
+def chain_candidates(
+    *, lane_offsets: torch.Tensor, lane_start: int, lane_end: int, plane_point: torch.Tensor,
+    plane_normal: torch.Tensor, bounds: torch.Tensor, occupancy: torch.Tensor,
+    edge_position: torch.Tensor, edge_direction: torch.Tensor, edge_t_min: torch.Tensor,
+    edge_t_max: torch.Tensor, a: tuple[torch.Tensor, ...], b: tuple[torch.Tensor, ...],
+    box_tolerance: float, segment_tolerance: float, min_segment_length: float, edge_epsilon: float,
+) -> dict[str, torch.Tensor]:
+    """Interaction-chain candidates of one lane range that the image method cannot rule out.
+
+    ``a`` and ``b`` are the transmitter and receiver halves as ``(edge_offsets, endpoint, node,
+    endpoints, node_sequences, node_images)``; a lane joins one entry of each on a shared edge.
+    """
+
+    validate_cuda_tensor("lane_offsets", lane_offsets, dtype=torch.int64, ndim=1)
+    if len(a) != 6 or len(b) != 6:
+        raise ValueError("chain halves must carry six tables")
+    exported = _required_native_op("chain_candidates")(
+        lane_offsets, int(lane_start), int(lane_end), plane_point, plane_normal, bounds, occupancy,
+        edge_position, edge_direction, edge_t_min, edge_t_max, *a, *b, float(box_tolerance),
+        float(segment_tolerance), float(min_segment_length), float(edge_epsilon),
+    )
+    if not isinstance(exported, dict) or set(exported) != _CHAIN_CANDIDATE_FIELDS:
+        raise TypeError("_channel.chain_candidates must return the chain candidate tables")
+    return exported
+
+
+def chain_double_candidates(
+    *, pair_offsets: torch.Tensor, lane_start: int, lane_end: int, rx_count: int,
+    tx_offsets: torch.Tensor, tx_edges: torch.Tensor, rx_offsets: torch.Tensor,
+    rx_edges: torch.Tensor,
+) -> dict[str, torch.Tensor]:
+    """Double-diffraction candidates of one lane range: transmitter-visible x receiver-visible edges."""
+
+    for name, value in (
+        ("pair_offsets", pair_offsets), ("tx_offsets", tx_offsets), ("rx_offsets", rx_offsets),
+    ):
+        validate_cuda_tensor(name, value, dtype=torch.int64, ndim=1)
+    for name, value in (("tx_edges", tx_edges), ("rx_edges", rx_edges)):
+        validate_cuda_tensor(name, value, dtype=torch.int32, ndim=1)
+    exported = _required_native_op("chain_double_candidates")(
+        pair_offsets, int(lane_start), int(lane_end), int(rx_count), tx_offsets, tx_edges, rx_offsets,
+        rx_edges,
+    )
+    if not isinstance(exported, dict) or set(exported) != {"tx", "rx", "edge1", "edge2"}:
+        raise TypeError("_channel.chain_double_candidates must return the candidate tables")
+    return exported
 
 
 def _epc_candidate_space(
@@ -1820,7 +1596,7 @@ _DISCRETE_OUTPUT_COUNT = len(_STRUCTURAL_OUTPUT_FIELDS) + len(
 
 class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
     @staticmethod
-    def forward(*inputs):
+    def forward(*inputs: Any) -> Any:
         block = {
             name: value
             for name, value in zip(
@@ -1874,7 +1650,7 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
         return tuple(raw[name] for name in _FUNCTION_OUTPUT_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         ctx.candidate_count = int(inputs[0].shape[0])
         ctx.sequence_width = int(inputs[27])
@@ -1888,7 +1664,7 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, *grad_outputs):
+    def backward(ctx: Any, *grad_outputs: Any) -> Any:
         input_grads: list[torch.Tensor | None] = [None] * 30
         continuous_grads = grad_outputs[_DISCRETE_OUTPUT_COUNT:]
         if all(value is None for value in continuous_grads):
@@ -1930,7 +1706,7 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
         return tuple(input_grads)
 
     @staticmethod
-    def jvp(ctx, *tangents):
+    def jvp(ctx: Any, *tangents: Any) -> Any:
         continuous_tangents = tuple(
             _ad_native_tangent_or_none(value) for value in tangents[10:20]
         )
@@ -2042,7 +1818,7 @@ def _validate_stable_ids(
 
 
 def _metadata_from_raw(
-    raw: dict[str, object], *, pair_count: int, stable_ids_requested: bool,
+    raw: dict[str, Any], *, pair_count: int, stable_ids_requested: bool,
 ) -> ExactPairMetadata:
     expected = {
         "pair_index",
@@ -2318,14 +2094,14 @@ class _EnumeratedTransmissionTopologyPackFunction(torch.autograd.Function):
     """Native fixed-valid topology copy with native VJP/JVP companions."""
 
     @staticmethod
-    def forward(*inputs):
+    def forward(*inputs: Any) -> Any:
         raw = _required_native_op("enumerated_transmission_topology_pack")(*inputs)
         if not isinstance(raw, dict) or set(raw) != set(_OUTPUT_FIELDS):
             raise TypeError("native transmission topology pack returned bad fields")
         return tuple(raw[name] for name in _OUTPUT_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         saved = tuple(
             torch.autograd.forward_ad.unpack_dual(value).primal
@@ -2344,7 +2120,7 @@ class _EnumeratedTransmissionTopologyPackFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, *grad_outputs):
+    def backward(ctx: Any, *grad_outputs: Any) -> Any:
         none_grads = (None,) * 13
         continuous_grads = tuple(
             grad_outputs[_OUTPUT_FIELDS.index(name)]
@@ -2384,7 +2160,7 @@ class _EnumeratedTransmissionTopologyPackFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def jvp(ctx, *tangents):
+    def jvp(ctx: Any, *tangents: Any) -> Any:
         native_tangents = tuple(
             _ad_native_tangent_or_none(tangents[index]) for index in (5, 6, 7)
         )

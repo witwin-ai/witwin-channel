@@ -106,107 +106,6 @@ def test_path_los_export_requires_native_cuda_kernel(monkeypatch):
         )
 
 
-def test_path_reflection_candidates_generate_native_segments():
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for path reflection candidates")
-
-    vertices = torch.tensor(
-        [[1.0, -1.0, -1.0], [1.0, 1.0, -1.0], [1.0, 0.0, 1.0]],
-        device="cuda",
-        dtype=torch.float32,
-    )
-    faces = torch.tensor([[0, 1, 2]], device="cuda", dtype=torch.int32)
-    face_normals = torch.tensor([[1.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
-    face_gain = torch.tensor([1.0], device="cuda", dtype=torch.float32)
-    tx_positions = torch.tensor([[0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
-    tx_power = torch.tensor([1.0], device="cuda", dtype=torch.float32)
-    rx_positions = torch.tensor([[0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
-
-    candidates = topology_kernels.path_reflection_candidates(
-        vertices,
-        faces,
-        face_normals,
-        face_gain,
-        tx_positions,
-        tx_power,
-        rx_positions,
-        frequency_hz=3.0e9,
-    )
-
-    assert candidates["valid"].is_cuda
-    assert bool(candidates["valid"].item())
-    assert int(candidates["component_id"].item()) == 1
-    assert int(candidates["primitive_id"].item()) == 0
-    assert candidates["seg0_start"].shape == (1, 3)
-    torch.testing.assert_close(
-        candidates["path_length_m"],
-        torch.tensor([2.0], device="cuda", dtype=torch.float32),
-        rtol=2.0e-6,
-        atol=1.0e-6,
-    )
-
-
-def test_path_diffraction_block_and_merge_use_native_compaction():
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for path diffraction block compaction")
-
-    capacity = 3
-    out = (
-        torch.tensor([capacity], device="cuda", dtype=torch.int32),
-        torch.tensor([True, False, True], device="cuda", dtype=torch.bool),
-        torch.zeros((capacity,), device="cuda", dtype=torch.int32),
-        torch.tensor([7, 8, 9], device="cuda", dtype=torch.int32),
-        torch.tensor([1, 1, 1], device="cuda", dtype=torch.int32),
-        torch.tensor([11, 12, 13], device="cuda", dtype=torch.int32),
-        torch.zeros((capacity,), device="cuda", dtype=torch.int32),
-        torch.zeros((capacity,), device="cuda", dtype=torch.int32),
-        torch.tensor([1.0e-9, 2.0e-9, 3.0e-9], device="cuda", dtype=torch.float32),
-        torch.tensor([1.0, 9.0, 2.0], device="cuda", dtype=torch.float32),
-        torch.tensor([2.0, 9.0, 3.0], device="cuda", dtype=torch.float32),
-        torch.tensor([0.5, 9.0, 1.0], device="cuda", dtype=torch.float32),
-        torch.tensor([0.25, 9.0, 4.0], device="cuda", dtype=torch.float32),
-        torch.tensor([0.0, 9.0, 5.0], device="cuda", dtype=torch.float32),
-        torch.tensor([0.75, 9.0, 6.0], device="cuda", dtype=torch.float32),
-        torch.empty((capacity, 3), device="cuda", dtype=torch.float32),
-        torch.empty((capacity, 3), device="cuda", dtype=torch.float32),
-        torch.empty((capacity, 3), device="cuda", dtype=torch.float32),
-    )
-
-    block = topology_kernels.path_diffraction_block(out, tx_index=2)
-    merged = topology_kernels.path_merge_blocks([block], tx_count=3, max_depth=1)
-
-    assert block["valid"].shape == (2,)
-    torch.testing.assert_close(block["tx_id"], torch.tensor([2, 2], device="cuda", dtype=torch.int32))
-    torch.testing.assert_close(block["rx_id"], torch.tensor([7, 9], device="cuda", dtype=torch.int32))
-    torch.testing.assert_close(block["edge_id"], torch.tensor([11, 13], device="cuda", dtype=torch.int32))
-    torch.testing.assert_close(
-        block["path_gain"],
-        torch.tensor([5.875, 91.0], device="cuda", dtype=torch.float32),
-    )
-    torch.testing.assert_close(merged["path_gain"], block["path_gain"])
-
-
-def test_deterministic_los_field_matches_python_reference():
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for deterministic LoS field")
-
-    path_gain = torch.tensor([1.0e-4, 2.5e-5, 0.0], device="cuda", dtype=torch.float32)
-    path_length = torch.tensor([1.0, 3.25, 9.5], device="cuda", dtype=torch.float32)
-
-    result = field_kernels.deterministic_los_field(
-        path_gain=path_gain,
-        path_length_m=path_length,
-        frequency_hz=3.0e9,
-    )
-
-    field = torch.complex(result["field_real"], result["field_imag"])
-    expected = field_kernels.deterministic_pack_complex(
-        result["field_real"], result["field_imag"]
-    )
-    torch.testing.assert_close(field, expected, rtol=2.0e-5, atol=1.0e-7)
-    torch.testing.assert_close(result["path_gain"], path_gain, rtol=0.0, atol=0.0)
-
-
 def test_deterministic_los_topology_block_compacts_and_fills_extended_fields():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic LoS topology block")
@@ -411,20 +310,6 @@ def test_deterministic_pad_topology_sequences_uses_native_defaults_and_copy():
         torch.tensor([[11, -1], [12, -1], [13, -1]], device="cuda", dtype=torch.int32),
     )
     torch.testing.assert_close(copied["interaction_positions"][:, 0, :], source_vec[:, 0, :])
-
-
-def test_deterministic_repeat_range_generates_native_repeated_indices():
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for deterministic repeated range generation")
-
-    reference = torch.empty((1,), device="cuda", dtype=torch.float32)
-
-    repeated = topology_kernels.deterministic_repeat_range(reference, start=4, end=7, repeats=2)
-
-    torch.testing.assert_close(
-        repeated,
-        torch.tensor([4, 4, 5, 5, 6, 6], device="cuda", dtype=torch.int32),
-    )
 
 
 def test_deterministic_reflection_epc_input_batch_generates_native_pairs():
@@ -752,20 +637,6 @@ def test_deterministic_normalize_vec3_normalizes_rows_with_native_kernel():
     torch.testing.assert_close(normalized, expected)
 
 
-def test_deterministic_reflect_points_reflects_about_planes_with_native_kernel():
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for deterministic point reflection")
-
-    points = torch.tensor([[1.0, 2.0, 3.0], [2.0, -1.0, 0.0]], device="cuda", dtype=torch.float32)
-    plane_points = torch.tensor([[0.0, 0.0, 0.0], [1.0, -1.0, 0.0]], device="cuda", dtype=torch.float32)
-    normals = torch.tensor([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], device="cuda", dtype=torch.float32)
-
-    reflected = geometry_kernels.deterministic_reflect_points(points, plane_points, normals)
-
-    expected = torch.tensor([[-1.0, 2.0, 3.0], [2.0, -1.0, 0.0]], device="cuda", dtype=torch.float32)
-    torch.testing.assert_close(reflected, expected)
-
-
 def test_deterministic_face_groups_matches_canonical_plane_keys():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic face grouping")
@@ -812,33 +683,6 @@ def test_deterministic_face_groups_matches_canonical_plane_keys():
     torch.testing.assert_close(
         groups["surface_group_members"],
         torch.tensor([0, 1, 2, -1, 4, -1, 3, -1], device="cuda", dtype=torch.int32),
-    )
-
-
-def test_deterministic_surface_face_groups_groups_by_surface_id_only():
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for deterministic surface grouping")
-
-    surface_ids = torch.tensor([3, 3, 2, 3, 2], device="cuda", dtype=torch.int64)
-
-    groups = geometry_kernels.deterministic_surface_face_groups(surface_ids)
-
-    assert groups["group_count"] == 2
-    torch.testing.assert_close(
-        groups["face_group_id"],
-        torch.tensor([1, 1, 0, 1, 0], device="cuda", dtype=torch.int32),
-    )
-    torch.testing.assert_close(
-        groups["representative_faces"],
-        torch.tensor([2, 0], device="cuda", dtype=torch.int64),
-    )
-    torch.testing.assert_close(
-        groups["surface_group_size"],
-        torch.tensor([2, 3], device="cuda", dtype=torch.int32),
-    )
-    torch.testing.assert_close(
-        groups["surface_group_members"],
-        torch.tensor([2, 4, -1, 0, 1, 3], device="cuda", dtype=torch.int32),
     )
 
 
@@ -928,85 +772,6 @@ def test_deterministic_concat_topology_blocks_concatenates_unpadded_schema():
     for key, tensor in block0.items():
         expected = torch.cat((tensor, block1[key]), dim=0).contiguous()
         torch.testing.assert_close(out[key], expected)
-
-
-def test_deterministic_gather_topology_block_orders_and_truncates_full_schema():
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for deterministic topology gather")
-
-    count = 4
-    i32 = torch.arange(count, device="cuda", dtype=torch.int32)
-    f32 = i32.to(dtype=torch.float32)
-    block = {
-        "valid": torch.ones((count,), device="cuda", dtype=torch.bool),
-        "tx_id": i32,
-        "rx_id": i32 + 10,
-        "depth": i32 + 20,
-        "component_id": i32 + 30,
-        "primitive_id": i32 + 40,
-        "edge_id": i32 + 50,
-        "path_length_m": f32 + 0.25,
-        "delay_s": f32 + 0.5,
-        "path_gain": f32 + 0.75,
-        "path_field": torch.complex(f32 + 1.0, f32 + 2.0),
-        "interaction_position": torch.stack((f32, f32 + 1.0, f32 + 2.0), dim=1),
-        "interaction_normal": torch.stack((f32 + 3.0, f32 + 4.0, f32 + 5.0), dim=1),
-        "material_id": i32 + 60,
-        "primitive_sequence": torch.stack((i32 + 70, i32 + 80), dim=1),
-        "material_sequence": torch.stack((i32 + 90, i32 + 100), dim=1),
-        "interaction_positions": torch.stack(
-            (
-                torch.stack((f32, f32 + 1.0, f32 + 2.0), dim=1),
-                torch.stack((f32 + 3.0, f32 + 4.0, f32 + 5.0), dim=1),
-            ),
-            dim=1,
-        ),
-        "interaction_normals": torch.stack(
-            (
-                torch.stack((f32 + 6.0, f32 + 7.0, f32 + 8.0), dim=1),
-                torch.stack((f32 + 9.0, f32 + 10.0, f32 + 11.0), dim=1),
-            ),
-            dim=1,
-        ),
-    }
-    order = torch.tensor([2, 0, 3], device="cuda", dtype=torch.long)
-
-    out = topology_kernels.deterministic_gather_topology_block(block, order, max_count=2, sequence_width=2)
-
-    expected_order = order[:2]
-    for key, tensor in block.items():
-        torch.testing.assert_close(out[key], tensor[expected_order].contiguous())
-
-
-def test_deterministic_sort_order_matches_topology_key_priority():
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for deterministic topology sorting")
-
-    valid = torch.ones(4, device="cuda", dtype=torch.bool)
-    tx_id = torch.tensor([0, 0, 0, 0], device="cuda", dtype=torch.int32)
-    rx_id = torch.tensor([1, 0, 0, 0], device="cuda", dtype=torch.int32)
-    depth = torch.tensor([1, 1, 1, 0], device="cuda", dtype=torch.int32)
-    component_id = torch.tensor([1, 1, 0, 1], device="cuda", dtype=torch.int32)
-    primitive_id = torch.tensor([2, 1, 3, 4], device="cuda", dtype=torch.int32)
-    edge_id = torch.tensor([-1, -1, -1, -1], device="cuda", dtype=torch.int32)
-    primitive_sequence = torch.tensor(
-        [[5, 2], [5, 1], [4, 9], [8, 8]],
-        device="cuda",
-        dtype=torch.int32,
-    )
-
-    order = topology_kernels.deterministic_sort_order(
-        valid,
-        tx_id,
-        rx_id,
-        depth,
-        component_id,
-        primitive_id,
-        edge_id,
-        primitive_sequence,
-    )
-
-    torch.testing.assert_close(order, torch.tensor([3, 2, 1, 0], device="cuda", dtype=torch.long))
 
 
 def test_mc_los_path_gain_backward_and_jvp_match_free_space_formula():
@@ -1274,25 +1039,6 @@ def test_mc_pack_vec3_requires_native_cuda_kernel(monkeypatch):
         runtime.mc_pack_vec3(x, x, x)
 
 
-def test_mc_los_component_maps_converts_to_public_grid_layout():
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for MC LoS component maps")
-
-    los = torch.tensor(
-        [
-            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
-            [[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]],
-        ],
-        device="cuda",
-        dtype=torch.float32,
-    )
-
-    maps = montecarlo_kernels.mc_los_component_maps(los)
-
-    # Grid maps are receiver row-major, like the [T, rows, cols] input.
-    torch.testing.assert_close(maps, los)
-
-
 def test_mc_los_component_maps_from_matrix_uses_native_grid_layout():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC LoS component maps")
@@ -1527,57 +1273,6 @@ def test_mc_selected_edge_indices_requires_native_cuda_kernel(monkeypatch):
         topology_kernels.mc_selected_edge_indices(selected)
 
 
-def test_mc_diffraction_state_pack_gathers_edge_state_tensors():
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for MC diffraction state packing")
-
-    edge_indices = torch.tensor([2, 0], device="cuda", dtype=torch.int32)
-    edge_pos = torch.tensor(
-        [[0.0, 1.0, 2.0], [3.0, 4.0, 5.0], [6.0, 7.0, 8.0]],
-        device="cuda",
-        dtype=torch.float32,
-    )
-    edge_dir = edge_pos + 10.0
-    line_min = torch.tensor([-1.0, -2.0, -3.0], device="cuda", dtype=torch.float32)
-    line_max = torch.tensor([1.0, 2.0, 3.0], device="cuda", dtype=torch.float32)
-    n0 = edge_pos + 20.0
-    n1 = edge_pos + 30.0
-    face0 = torch.tensor([10, 11, 12], device="cuda", dtype=torch.int32)
-    face1 = torch.tensor([20, 21, 22], device="cuda", dtype=torch.int32)
-    exterior_angle = torch.tensor([0.5, 1.5, 2.5], device="cuda", dtype=torch.float32)
-    tx = torch.tensor([9.0, 8.0, 7.0], device="cuda", dtype=torch.float32)
-    tx_power = torch.tensor(4.0, device="cuda", dtype=torch.float32)
-
-    states = montecarlo_kernels.mc_diffraction_state_pack(
-        edge_indices,
-        edge_pos,
-        edge_dir,
-        line_min,
-        line_max,
-        n0,
-        n1,
-        face0,
-        face1,
-        exterior_angle,
-        tx,
-        tx_power,
-    )
-
-    idx = edge_indices.to(dtype=torch.long)
-    torch.testing.assert_close(states[0], edge_indices)
-    torch.testing.assert_close(states[1], edge_pos[idx])
-    torch.testing.assert_close(states[2], edge_dir[idx])
-    torch.testing.assert_close(states[3], line_min[idx])
-    torch.testing.assert_close(states[4], line_max[idx])
-    torch.testing.assert_close(states[5], n0[idx])
-    torch.testing.assert_close(states[6], n1[idx])
-    torch.testing.assert_close(states[7], face0[idx])
-    torch.testing.assert_close(states[8], face1[idx])
-    torch.testing.assert_close(states[9], exterior_angle[idx])
-    torch.testing.assert_close(states[10], tx.expand(2, 3).contiguous())
-    torch.testing.assert_close(states[11], tx_power.expand(2).contiguous())
-
-
 def test_deterministic_diffraction_state_pack_reads_power_by_native_index():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for deterministic diffraction state packing")
@@ -1658,35 +1353,6 @@ def test_deterministic_diffraction_state_pack_selected_keeps_device_sized_capaci
     torch.testing.assert_close(states[1], edge_pos)
     torch.testing.assert_close(states[10], tx.expand(3, 3).contiguous())
     torch.testing.assert_close(states[11], torch.tensor([0.0, 6.0, 0.0], device="cuda", dtype=torch.float32))
-
-
-def test_mc_diffraction_state_pack_requires_native_cuda_kernel(monkeypatch):
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for MC diffraction state packing")
-
-    edge_indices = torch.zeros((1,), device="cuda", dtype=torch.int32)
-    edge_pos = torch.zeros((1, 3), device="cuda", dtype=torch.float32)
-    line = torch.zeros((1,), device="cuda", dtype=torch.float32)
-    face = torch.zeros((1,), device="cuda", dtype=torch.int32)
-    tx = torch.zeros((3,), device="cuda", dtype=torch.float32)
-    tx_power = torch.tensor(1.0, device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(runtime, "native_extension", lambda: None)
-
-    with pytest.raises(RuntimeError, match="mc_diffraction_state_pack CUDA kernel is required"):
-        montecarlo_kernels.mc_diffraction_state_pack(
-            edge_indices,
-            edge_pos,
-            edge_pos,
-            line,
-            line,
-            edge_pos,
-            edge_pos,
-            face,
-            face,
-            line,
-            tx,
-            tx_power,
-        )
 
 
 def test_mc_diffraction_discover_edges_counted_uses_gpu_hit_count():

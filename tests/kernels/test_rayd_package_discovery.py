@@ -48,7 +48,7 @@ class _FakeDistribution:
         return self.root / path
 
 
-def _package(tmp_path: Path) -> tuple[_FakeDistribution, Path]:
+def _package(tmp_path: Path, *, autocrlf: str = "false") -> tuple[_FakeDistribution, Path]:
     lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
     version = str(lock["source_bundle"]["distribution_version"])
     workspace = tmp_path / "rayd"
@@ -66,10 +66,10 @@ def _package(tmp_path: Path) -> tuple[_FakeDistribution, Path]:
         text=True,
     )
     assert cloned.returncode == 0, cloned.stderr
-    # The locked manifest digest is that of a CRLF (core.autocrlf=true) checkout, the
-    # line endings the published rayd-torch wheel was built from; see tools/relock_rayd.py.
+    # The locked manifest digest is line-ending independent; the bundle is built from an
+    # LF checkout by default and from a CRLF (core.autocrlf=true) checkout on request.
     configured = subprocess.run(
-        ("git", "config", "core.autocrlf", "true"), cwd=workspace, check=False
+        ("git", "config", "core.autocrlf", autocrlf), cwd=workspace, check=False
     )
     assert configured.returncode == 0
     checked_out = subprocess.run(
@@ -114,9 +114,10 @@ def _package(tmp_path: Path) -> tuple[_FakeDistribution, Path]:
     return distribution, resource
 
 
-def test_resolver_accepts_unique_lock_valid_package(tmp_path: Path):
+@pytest.mark.parametrize("autocrlf", ["false", "true"], ids=["lf-checkout", "crlf-checkout"])
+def test_resolver_accepts_unique_lock_valid_package(tmp_path: Path, autocrlf: str):
     resolver = _load_resolver()
-    distribution, resource = _package(tmp_path)
+    distribution, resource = _package(tmp_path, autocrlf=autocrlf)
     with patch.object(
         resolver.importlib.metadata,
         "distributions",
@@ -130,6 +131,54 @@ def test_resolver_accepts_unique_lock_valid_package(tmp_path: Path):
         result["source_manifest_sha256"]
         == json.loads(LOCK_PATH.read_text(encoding="utf-8"))["source_bundle"]["manifest_sha256"]
     )
+
+
+def test_crlf_and_lf_checkouts_give_the_locked_manifest_digest(tmp_path: Path):
+    resolver = _load_resolver()
+    locked = json.loads(LOCK_PATH.read_text(encoding="utf-8"))["source_bundle"]["manifest_sha256"]
+    digests = {}
+    shipped = {}
+    for autocrlf in ("false", "true"):
+        _, resource = _package(tmp_path / autocrlf, autocrlf=autocrlf)
+        metadata = json.loads((resource / "rayd-source.json").read_text(encoding="utf-8"))
+        manifest = json.loads((resource / "source-files.json").read_text(encoding="utf-8"))
+        shipped[autocrlf] = metadata["source_manifest"]["sha256"]
+        digests[autocrlf] = resolver.source_manifest_sha256(
+            resource / "source", [entry["path"] for entry in manifest["files"]]
+        )
+    # RayD pins `* text=auto eol=lf`, so a core.autocrlf=true checkout ships the same manifest as an
+    # LF checkout; both shipped manifests and Channel's LF-normalized digest equal the lock.
+    assert shipped == {"false": locked, "true": locked}
+    assert digests == {"false": locked, "true": locked}
+
+
+def test_a_consistently_rebundled_content_change_still_fails_the_lock(tmp_path: Path):
+    """A changed file with a matching shipped manifest is caught by the locked LF digest."""
+
+    import hashlib
+
+    resolver = _load_resolver()
+    distribution, resource = _package(tmp_path)
+    target = resource / "source" / "torch" / "CMakeLists.txt"
+    target.write_bytes(target.read_bytes() + b"# changed\n")
+    manifest_path = resource / "source-files.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    for entry in manifest["files"]:
+        if entry["path"] == "torch/CMakeLists.txt":
+            entry["sha256"] = hashlib.sha256(target.read_bytes()).hexdigest()
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    metadata_path = resource / "rayd-source.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata["source_manifest"]["sha256"] = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+    with patch.object(resolver.importlib.metadata, "distributions", return_value=[distribution]):
+        with pytest.raises(resolver.RayDDiscoveryError, match="does not match the lock"):
+            resolver.resolve(LOCK_PATH)
 
 
 @pytest.mark.parametrize(

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import Any, Protocol, TypedDict, cast
 
 import numpy as np
 import torch
@@ -30,37 +31,21 @@ __all__ = [
     "mc_scattering_pair_legs",
     "mc_scattering_pair_sum",
     "_KirchhoffTableBuildAdFunction",
-    "_ScatteringChainEnsembleEvalAdFunction",
-    "_ScatteringChainRealizationEvalAdFunction",
     "_ScatteringEnsembleEvalAdFunction",
     "_ScatteringPatchIntegralEvalAdFunction",
-    "_ScatteringTableEvalAdFunction",
     "kirchhoff_table_build_ad",
     "kirchhoff_table_build_backward",
     "kirchhoff_table_build_jvp",
     "scattering_chain_ensemble_eval",
-    "scattering_chain_ensemble_eval_ad",
-    "scattering_chain_ensemble_eval_backward",
-    "scattering_chain_ensemble_eval_jvp",
-    "scattering_chain_realization_eval",
-    "scattering_chain_realization_eval_ad",
-    "scattering_chain_realization_eval_backward",
-    "scattering_chain_realization_eval_jvp",
     "scattering_ensemble_eval",
     "scattering_ensemble_eval_ad",
     "scattering_ensemble_eval_backward",
     "scattering_ensemble_eval_jvp",
-    "scattering_event_probabilities",
     "scattering_patch_integral_eval",
     "scattering_patch_integral_eval_ad",
     "scattering_patch_integral_eval_backward",
     "scattering_patch_integral_eval_jvp",
-    "scattering_table_eval",
-    "scattering_table_eval_ad",
-    "scattering_table_eval_backward",
-    "scattering_table_eval_jvp",
     "scattering_table_pdf",
-    "scattering_table_sample",
 ]
 
 
@@ -97,98 +82,8 @@ def _duffy_nodes(device: torch.device) -> tuple[torch.Tensor, torch.Tensor, torc
     return entry
 
 
-def scattering_table_eval(
-    valid: torch.Tensor, wi: torch.Tensor, wo: torch.Tensor, f_te: torch.Tensor, f_tm: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Native CUDA multilinear Kirchhoff-table evaluation; required op."""
-
-    _validate_table_eval_inputs(valid, wi, wo, f_te, f_tm)
-    out = _required_native_op("scattering_table_eval")(valid, wi, wo, f_te, f_tm)
-    if not isinstance(out, dict) or set(out) != {"f_te", "f_tm"}:
-        raise TypeError("_channel.scattering_table_eval returned invalid fields")
-    return out["f_te"], out["f_tm"]
-
-
 _TABLE_EVAL_BACKWARD_FIELDS = ("grad_wi", "grad_wo", "grad_f_te", "grad_f_tm")
 _TABLE_EVAL_JVP_FIELDS = ("tangent_f_te", "tangent_f_tm")
-
-
-def _validate_table_eval_inputs(
-    valid: torch.Tensor, wi: torch.Tensor, wo: torch.Tensor, f_te: torch.Tensor, f_tm: torch.Tensor,
-) -> None:
-    """Validate the shared table-lookup primal inputs in ABI order."""
-
-    validate_cuda_tensor("valid", valid, dtype=torch.bool, ndim=1)
-    validate_cuda_tensor("wi", wi, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("wo", wo, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("f_te", f_te, dtype=torch.float32, ndim=4)
-    validate_cuda_tensor("f_tm", f_tm, dtype=torch.float32, ndim=4)
-    if wi.shape != wo.shape or wi.shape[1:] != (3,):
-        raise ValueError("wi and wo must have matching shape (N, 3)")
-    if valid.shape != wi.shape[:1]:
-        raise ValueError("valid must match wi rows")
-
-
-def scattering_table_eval_backward(
-    valid: torch.Tensor, wi: torch.Tensor, wo: torch.Tensor, f_te: torch.Tensor, f_tm: torch.Tensor,
-    *, grad_out_f_te: torch.Tensor | None = None, grad_out_f_tm: torch.Tensor | None = None,
-    need_grad_dirs: bool = False, need_grad_tables: bool = False,
-) -> dict[str, torch.Tensor | None]:
-    """VJP of :func:`scattering_table_eval` (scattering AD).
-
-    ``grad_wi``/``grad_wo`` are ``[N, 3]`` direct stores (``need_grad_dirs``);
-    ``grad_f_te``/``grad_f_tm`` are the table-shaped 16-corner atomicAdd scatter
-    (``need_grad_tables``). Entries are ``None`` when their owning flag is off.
-    """
-
-    _validate_table_eval_inputs(valid, wi, wo, f_te, f_tm)
-    out = _required_native_op("scattering_table_eval_backward")(
-        valid,
-        wi,
-        wo,
-        f_te,
-        f_tm,
-        grad_out_f_te,
-        grad_out_f_tm,
-        bool(need_grad_dirs),
-        bool(need_grad_tables),
-    )
-    if not isinstance(out, dict) or set(out) != set(_TABLE_EVAL_BACKWARD_FIELDS):
-        raise TypeError(
-            "_channel.scattering_table_eval_backward returned invalid fields"
-        )
-    return out
-
-
-def scattering_table_eval_jvp(
-    valid: torch.Tensor, wi: torch.Tensor, wo: torch.Tensor, f_te: torch.Tensor, f_tm: torch.Tensor,
-    *, tangent_wi: torch.Tensor | None = None, tangent_wo: torch.Tensor | None = None,
-    tangent_f_te: torch.Tensor | None = None, tangent_f_tm: torch.Tensor | None = None,
-) -> dict[str, torch.Tensor]:
-    """JVP of :func:`scattering_table_eval` (scattering AD).
-
-    Elementwise per-row tangents ``tangent_f_te``/``tangent_f_tm`` ``[N]`` from
-    the live tangents of ``wi``, ``wo`` and the two tables; a missing tangent is
-    a zero tangent.
-    """
-
-    _validate_table_eval_inputs(valid, wi, wo, f_te, f_tm)
-    out = _required_native_op("scattering_table_eval_jvp")(
-        valid,
-        wi,
-        wo,
-        f_te,
-        f_tm,
-        tangent_wi,
-        tangent_wo,
-        tangent_f_te,
-        tangent_f_tm,
-    )
-    if not isinstance(out, dict) or set(out) != set(_TABLE_EVAL_JVP_FIELDS):
-        raise TypeError(
-            "_channel.scattering_table_eval_jvp returned invalid fields"
-        )
-    return out
 
 
 def scattering_table_pdf(
@@ -206,57 +101,6 @@ def scattering_table_pdf(
     return _required_native_op("scattering_table_pdf")(
         valid, wi, wo, sample_density, bool(reverse)
     )
-
-
-def scattering_table_sample(
-    valid: torch.Tensor, wi: torch.Tensor, uniforms: torch.Tensor, marginal_cdf: torch.Tensor,
-    conditional_cdf: torch.Tensor, sample_density: torch.Tensor,
-) -> dict[str, torch.Tensor]:
-    """Native CUDA CDF inversion plus forward/reverse PDFs; required op."""
-
-    validate_cuda_tensor("valid", valid, dtype=torch.bool, ndim=1)
-    validate_cuda_tensor("wi", wi, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("uniforms", uniforms, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("marginal_cdf", marginal_cdf, dtype=torch.float32, ndim=3)
-    validate_cuda_tensor("conditional_cdf", conditional_cdf, dtype=torch.float32, ndim=4)
-    validate_cuda_tensor("sample_density", sample_density, dtype=torch.float32, ndim=4)
-    if valid.shape != wi.shape[:1] or uniforms.shape != (wi.shape[0], 2):
-        raise ValueError("valid and uniforms must match wi rows")
-    out = _required_native_op("scattering_table_sample")(
-        valid, wi, uniforms, marginal_cdf, conditional_cdf, sample_density
-    )
-    expected = {"wo", "pdf_forward", "pdf_reverse"}
-    if not isinstance(out, dict) or set(out) != expected:
-        raise TypeError("_channel.scattering_table_sample returned invalid fields")
-    return out
-
-
-def scattering_event_probabilities(
-    cos_theta: torch.Tensor, material_id: torch.Tensor, cap_r_te: torch.Tensor,
-    cap_r_tm: torch.Tensor, cap_t_te: torch.Tensor, cap_t_tm: torch.Tensor,
-    rough_sigma_h_m: torch.Tensor, scatter_model_id: torch.Tensor, *, frequency_hz: float,
-    probability_floor: float,
-) -> dict[str, torch.Tensor]:
-    """Fused native CUDA rough-event budgets and probabilities."""
-
-    validate_cuda_tensor("cos_theta", cos_theta, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("material_id", material_id, dtype=torch.int32, ndim=1)
-    out = _required_native_op("scattering_event_probabilities")(
-        cos_theta,
-        material_id,
-        cap_r_te,
-        cap_r_tm,
-        cap_t_te,
-        cap_t_tm,
-        rough_sigma_h_m,
-        scatter_model_id,
-        float(frequency_hz),
-        float(probability_floor),
-    )
-    expected = {"p_scatter", "p_transmit", "r_coh_amplitude", "rough"}
-    if not isinstance(out, dict) or set(out) != expected:
-        raise TypeError("_channel.scattering_event_probabilities returned invalid fields")
-    return out
 
 
 def _validate_ensemble_inputs(scope: Mapping[str, torch.Tensor]) -> None:
@@ -346,12 +190,20 @@ def _validate_patch_inputs(scope: Mapping[str, torch.Tensor]) -> None:
         raise ValueError("valid must match patch rows")
 
 
+class PatchIntegralOutputs(TypedDict):
+    """Phase-screen patch integral: per-row ``integral``/``row_value`` and their ``total``."""
+
+    total: torch.Tensor
+    integral: torch.Tensor
+    row_value: torch.Tensor
+
+
 def scattering_patch_integral_eval(
     valid: torch.Tensor, patch_tris: torch.Tensor, patch_uvs: torch.Tensor, rows: torch.Tensor,
     d_i: torch.Tensor, d_o: torch.Tensor, n_rows: torch.Tensor, r_te: torch.Tensor,
     r_tm: torch.Tensor, pol_t: torch.Tensor, pol_r: torch.Tensor, r1_rows: torch.Tensor,
     r2_rows: torch.Tensor, centroids: torch.Tensor, heights: torch.Tensor, *, k0: float,
-) -> dict[str, torch.Tensor]:
+) -> PatchIntegralOutputs:
     """Native realization-coherent phase-screen patch integral (rough-surface scattering).
 
     One fused launch per (tx, rx, structure) plus a fixed-order deterministic
@@ -392,7 +244,7 @@ def scattering_patch_integral_eval(
         raise TypeError(
             "_channel.scattering_patch_integral_eval returned invalid fields"
         )
-    return out
+    return cast(PatchIntegralOutputs, out)
 
 
 _ENSEMBLE_OUTPUT_FIELDS = ("gain", "amplitude", "length", "keep")
@@ -657,13 +509,11 @@ def scattering_patch_integral_eval_jvp(
 # ---------------------------------------------------------------------------
 # Coherent scattering-chain kernels.
 #
-# Op A (``scattering_chain_ensemble_eval``) generalizes op 1 to a specular
-# reflection chain C1 -> diffuse vertex v_s -> chain C2 in the power domain;
-# Op B (``scattering_chain_realization_eval``) generalizes op 2 to the coherent
-# 2x2 Jones sandwich with a phase-screen realization at the vertex. Both carry
-# two padded per-leg blocks ``[R, Dmax, ...]`` with ``Dmax = kMaxAdDepth = 8``
-#. The facades are thin: validate the spec tables, dispatch
-# the required native symbol, and assert the returned key-set exactly.
+# ``scattering_chain_ensemble_eval`` generalizes op 1 to a specular reflection
+# chain C1 -> diffuse vertex v_s -> chain C2 in the power domain. It carries two
+# padded per-leg blocks ``[R, Dmax, ...]`` with ``Dmax = kMaxAdDepth = 8``. The
+# facade is thin: validate the spec tables, dispatch the required native symbol,
+# and assert the returned key-set exactly.
 # ---------------------------------------------------------------------------
 
 _K_MAX_AD_DEPTH = 8
@@ -776,7 +626,7 @@ def _validate_chain_leg(
     validate_cuda_tensor(
         f"{prefix}_normals", normals, dtype=torch.float32, ndim=3, trailing_shape=(3,)
     )
-    dmax = positions.shape[1]
+    dmax: int = positions.shape[1]
     if dmax > _K_MAX_AD_DEPTH:
         raise ValueError(
             f"{prefix} leg depth {dmax} exceeds kMaxAdDepth={_K_MAX_AD_DEPTH}"
@@ -923,407 +773,6 @@ def scattering_chain_ensemble_eval(
     return out
 
 
-def scattering_chain_ensemble_eval_backward(
-    valid: torch.Tensor, tx_pol: torch.Tensor, rx_pol: torch.Tensor, source: torch.Tensor,
-    vertex: torch.Tensor, target: torch.Tensor, c1_positions: torch.Tensor,
-    c1_normals: torch.Tensor, c1_eps_r: torch.Tensor, c1_sigma_e: torch.Tensor,
-    c1_mu_r: torch.Tensor, c1_gain: torch.Tensor, c1_thickness: torch.Tensor,
-    c1_depth: torch.Tensor, c2_positions: torch.Tensor, c2_normals: torch.Tensor,
-    c2_eps_r: torch.Tensor, c2_sigma_e: torch.Tensor, c2_mu_r: torch.Tensor, c2_gain: torch.Tensor,
-    c2_thickness: torch.Tensor, c2_depth: torch.Tensor, n_o: torch.Tensor, t1r: torch.Tensor,
-    t2r: torch.Tensor, backup_axis: torch.Tensor, wi_local: torch.Tensor, cos_i: torch.Tensor,
-    cos_o: torch.Tensor, d_i: torch.Tensor, d_o: torch.Tensor, l1: torch.Tensor, l2: torch.Tensor,
-    weights: torch.Tensor, material_id: torch.Tensor, f_te_flat: torch.Tensor,
-    f_tm_flat: torch.Tensor, table_offset: torch.Tensor, table_dims: torch.Tensor,
-    material_slot: torch.Tensor, *, coef: float, threshold: float, frequency_hz: float,
-    grad_gain: torch.Tensor | None = None, grad_amplitude: torch.Tensor | None = None,
-    grad_length: torch.Tensor | None = None, need_grad_chain1: bool = False,
-    need_grad_chain2: bool = False, need_grad_tables: bool = False,
-    need_grad_geometry: bool = False, need_grad_coef: bool = False,
-    need_grad_frequency: bool = False,
-) -> dict[str, torch.Tensor | None]:
-    """VJP of :func:`scattering_chain_ensemble_eval`.
-
-    Per-bounce chain-Fresnel grads are direct stores; the table grads use the
-    16-corner atomicAdd scatter and ``grad_coef`` / ``grad_frequency`` are scalar
-    atomicAdd reductions. Reverse-mode continuous chain geometry
-    (``need_grad_geometry``) is a staged follow-up wave and is rejected loudly by
-    the native bridge; the ``_jvp`` companion covers geometry in forward mode. The
-    returned dict is exactly the twelve native VJP fields.
-    """
-
-    rows = int(tx_pol.shape[0])
-    _validate_chain_valid(valid, rows, tx_pol)
-    validate_cuda_tensor("tx_pol", tx_pol, dtype=torch.float32, ndim=2, trailing_shape=(3,))
-    _validate_chain_leg(
-        "c1", c1_positions, c1_normals, c1_eps_r, c1_sigma_e, c1_mu_r, c1_gain,
-        c1_thickness, c1_depth, rows,
-    )
-    _validate_chain_leg(
-        "c2", c2_positions, c2_normals, c2_eps_r, c2_sigma_e, c2_mu_r, c2_gain,
-        c2_thickness, c2_depth, rows,
-    )
-    validate_cuda_tensor("material_id", material_id, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("table_offset", table_offset, dtype=torch.int64, ndim=1)
-    validate_cuda_tensor("table_dims", table_dims, dtype=torch.int32, ndim=2, trailing_shape=(4,))
-    validate_cuda_tensor("material_slot", material_slot, dtype=torch.int32, ndim=1)
-    primal_args = _ordered_primal_args(locals(), _CHAIN_ENSEMBLE_PRIMAL_NAMES)
-    out = _required_native_op("scattering_chain_ensemble_eval_backward")(
-        *primal_args,
-        float(coef),
-        float(threshold),
-        float(frequency_hz),
-        grad_gain,
-        grad_amplitude,
-        grad_length,
-        bool(need_grad_chain1),
-        bool(need_grad_chain2),
-        bool(need_grad_tables),
-        bool(need_grad_geometry),
-        bool(need_grad_coef),
-        bool(need_grad_frequency),
-    )
-    if not isinstance(out, dict) or set(out) != set(_CHAIN_ENSEMBLE_BACKWARD_FIELDS):
-        raise TypeError(
-            "_channel.scattering_chain_ensemble_eval_backward returned"
-            " invalid fields"
-        )
-    return out
-
-
-def scattering_chain_ensemble_eval_jvp(
-    valid: torch.Tensor, tx_pol: torch.Tensor, rx_pol: torch.Tensor, source: torch.Tensor,
-    vertex: torch.Tensor, target: torch.Tensor, c1_positions: torch.Tensor,
-    c1_normals: torch.Tensor, c1_eps_r: torch.Tensor, c1_sigma_e: torch.Tensor,
-    c1_mu_r: torch.Tensor, c1_gain: torch.Tensor, c1_thickness: torch.Tensor,
-    c1_depth: torch.Tensor, c2_positions: torch.Tensor, c2_normals: torch.Tensor,
-    c2_eps_r: torch.Tensor, c2_sigma_e: torch.Tensor, c2_mu_r: torch.Tensor, c2_gain: torch.Tensor,
-    c2_thickness: torch.Tensor, c2_depth: torch.Tensor, n_o: torch.Tensor, t1r: torch.Tensor,
-    t2r: torch.Tensor, backup_axis: torch.Tensor, wi_local: torch.Tensor, cos_i: torch.Tensor,
-    cos_o: torch.Tensor, d_i: torch.Tensor, d_o: torch.Tensor, l1: torch.Tensor, l2: torch.Tensor,
-    weights: torch.Tensor, material_id: torch.Tensor, f_te_flat: torch.Tensor,
-    f_tm_flat: torch.Tensor, table_offset: torch.Tensor, table_dims: torch.Tensor,
-    material_slot: torch.Tensor, *, coef: float, threshold: float, frequency_hz: float,
-    tangent_c1_eps_r: torch.Tensor | None = None, tangent_c1_sigma_e: torch.Tensor | None = None,
-    tangent_c1_gain: torch.Tensor | None = None, tangent_c1_thickness: torch.Tensor | None = None,
-    tangent_c2_eps_r: torch.Tensor | None = None, tangent_c2_sigma_e: torch.Tensor | None = None,
-    tangent_c2_gain: torch.Tensor | None = None, tangent_c2_thickness: torch.Tensor | None = None,
-    tangent_f_te_flat: torch.Tensor | None = None, tangent_f_tm_flat: torch.Tensor | None = None,
-    tangent_c1_positions: torch.Tensor | None = None,
-    tangent_c1_normals: torch.Tensor | None = None,
-    tangent_c2_positions: torch.Tensor | None = None,
-    tangent_c2_normals: torch.Tensor | None = None, tangent_d_i: torch.Tensor | None = None,
-    tangent_d_o: torch.Tensor | None = None, tangent_v_normal: torch.Tensor | None = None,
-    tangent_l1: torch.Tensor | None = None, tangent_l2: torch.Tensor | None = None,
-    tangent_cos_i: torch.Tensor | None = None, tangent_cos_o: torch.Tensor | None = None,
-    tangent_coef: float = 0.0, tangent_frequency: float = 0.0,
-) -> dict[str, torch.Tensor]:
-    """JVP of :func:`scattering_chain_ensemble_eval`.
-
-    Deterministic forward-mode dual sweep (fixed-order, no atomics). Forward-mode
-    supports geometry tangents (positions/normals/d_i/d_o/n_o/L1/L2/cos_i/cos_o);
-    the endpoint positions, the vertex frame axes, ``weights``, ``wi_local`` and
-    the table metadata carry no tangent. A missing tangent is a zero tangent;
-    ``keep`` is non-differentiable so it has no tangent output.
-    """
-
-    rows = int(tx_pol.shape[0])
-    _validate_chain_valid(valid, rows, tx_pol)
-    validate_cuda_tensor("tx_pol", tx_pol, dtype=torch.float32, ndim=2, trailing_shape=(3,))
-    primal_args = _ordered_primal_args(locals(), _CHAIN_ENSEMBLE_PRIMAL_NAMES)
-    out = _required_native_op("scattering_chain_ensemble_eval_jvp")(
-        *primal_args,
-        float(coef),
-        float(threshold),
-        float(frequency_hz),
-        tangent_c1_eps_r,
-        tangent_c1_sigma_e,
-        tangent_c1_gain,
-        tangent_c1_thickness,
-        tangent_c2_eps_r,
-        tangent_c2_sigma_e,
-        tangent_c2_gain,
-        tangent_c2_thickness,
-        tangent_f_te_flat,
-        tangent_f_tm_flat,
-        tangent_c1_positions,
-        tangent_c1_normals,
-        tangent_c2_positions,
-        tangent_c2_normals,
-        tangent_d_i,
-        tangent_d_o,
-        tangent_v_normal,
-        tangent_l1,
-        tangent_l2,
-        tangent_cos_i,
-        tangent_cos_o,
-        float(tangent_coef),
-        float(tangent_frequency),
-    )
-    if not isinstance(out, dict) or set(out) != set(_CHAIN_ENSEMBLE_TANGENT_FIELDS):
-        raise TypeError(
-            "_channel.scattering_chain_ensemble_eval_jvp returned invalid fields"
-        )
-    return out
-
-
-def scattering_chain_realization_eval(
-    valid: torch.Tensor, patch_tris: torch.Tensor, patch_uvs: torch.Tensor, rows: torch.Tensor,
-    d_i: torch.Tensor, d_o: torch.Tensor, n_rows: torch.Tensor, source: torch.Tensor,
-    vertex: torch.Tensor, target: torch.Tensor, c1_positions: torch.Tensor,
-    c1_normals: torch.Tensor, c1_eps_r: torch.Tensor, c1_sigma_e: torch.Tensor,
-    c1_mu_r: torch.Tensor, c1_gain: torch.Tensor, c1_thickness: torch.Tensor,
-    c1_depth: torch.Tensor, c2_positions: torch.Tensor, c2_normals: torch.Tensor,
-    c2_eps_r: torch.Tensor, c2_sigma_e: torch.Tensor, c2_mu_r: torch.Tensor, c2_gain: torch.Tensor,
-    c2_thickness: torch.Tensor, c2_depth: torch.Tensor, tx_pol: torch.Tensor, rx_pol: torch.Tensor,
-    L1: torch.Tensor, L2: torch.Tensor, sp1: torch.Tensor, sp2: torch.Tensor,
-    centroids: torch.Tensor, heights: torch.Tensor, cos_spec: torch.Tensor,
-    material_id: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor, *, k0: float, frequency_hz: float,
-) -> dict[str, torch.Tensor]:
-    """Native coherent scattering-chain realization rows.
-
-    Coherent generalization of :func:`scattering_patch_integral_eval`: the full
-    2x2 Jones sandwich ``E_rx = A_2 . S_patch(d_i, d_o; h) . A_1 . e_tx`` with
-    the carrier over the image-unfolded lengths, the planar spreading, the
-    ``r_te/r_tm`` computed in-kernel from the resident CSR layer stack at
-    ``cos_spec``, and the same Duffy 16x16 GL quadrature and two-stage
-    fixed-order tree reduction as op 2. The Duffy nodes are appended by the
-    facade (op-2 parity); required native op.
-    """
-
-    n = int(d_i.shape[0])
-    _validate_chain_valid(valid, n, d_i)
-    validate_cuda_tensor("patch_tris", patch_tris, dtype=torch.float32, ndim=3, trailing_shape=(3, 3))
-    validate_cuda_tensor("patch_uvs", patch_uvs, dtype=torch.float32, ndim=3, trailing_shape=(3, 2))
-    validate_cuda_tensor("rows", rows, dtype=torch.int64, ndim=1)
-    if rows.shape[0] != n:
-        raise ValueError("rows must have one entry per chain row")
-    for name, tensor in (
-        ("d_i", d_i),
-        ("d_o", d_o),
-        ("n_rows", n_rows),
-        ("source", source),
-        ("vertex", vertex),
-        ("target", target),
-        ("tx_pol", tx_pol),
-        ("rx_pol", rx_pol),
-        ("centroids", centroids),
-    ):
-        validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=2, trailing_shape=(3,))
-        if tensor.shape[0] != n:
-            raise ValueError(f"{name} must have {n} rows")
-    _validate_chain_leg(
-        "c1", c1_positions, c1_normals, c1_eps_r, c1_sigma_e, c1_mu_r, c1_gain,
-        c1_thickness, c1_depth, n,
-    )
-    _validate_chain_leg(
-        "c2", c2_positions, c2_normals, c2_eps_r, c2_sigma_e, c2_mu_r, c2_gain,
-        c2_thickness, c2_depth, n,
-    )
-    for name, tensor in (
-        ("L1", L1),
-        ("L2", L2),
-        ("sp1", sp1),
-        ("sp2", sp2),
-        ("cos_spec", cos_spec),
-    ):
-        validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=1)
-        if tensor.shape[0] != n:
-            raise ValueError(f"{name} must have {n} rows")
-    validate_cuda_tensor("heights", heights, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("material_id", material_id, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("layer_offset", layer_offset, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("layer_count", layer_count, dtype=torch.int32, ndim=1)
-    for name, tensor in (
-        ("layer_thickness_m", layer_thickness_m),
-        ("layer_eps_r", layer_eps_r),
-        ("layer_sigma_e", layer_sigma_e),
-        ("layer_mu_r", layer_mu_r),
-    ):
-        validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=1)
-    _require_same_device(
-        (
-            ("patch_tris", patch_tris),
-            ("d_i", d_i),
-            ("c1_positions", c1_positions),
-            ("c2_positions", c2_positions),
-            ("heights", heights),
-            ("layer_thickness_m", layer_thickness_m),
-        )
-    )
-    quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
-    primal_args = _ordered_primal_args(locals(), _CHAIN_REALIZATION_PRIMAL_NAMES)
-    out = _required_native_op("scattering_chain_realization_eval")(
-        *primal_args,
-        quad_a,
-        quad_b,
-        quad_w,
-        float(k0),
-        float(frequency_hz),
-    )
-    if not isinstance(out, dict) or set(out) != set(_CHAIN_REALIZATION_OUTPUT_FIELDS):
-        raise TypeError(
-            "_channel.scattering_chain_realization_eval returned invalid fields"
-        )
-    return out
-
-
-def scattering_chain_realization_eval_backward(
-    valid: torch.Tensor, patch_tris: torch.Tensor, patch_uvs: torch.Tensor, rows: torch.Tensor,
-    d_i: torch.Tensor, d_o: torch.Tensor, n_rows: torch.Tensor, source: torch.Tensor,
-    vertex: torch.Tensor, target: torch.Tensor, c1_positions: torch.Tensor,
-    c1_normals: torch.Tensor, c1_eps_r: torch.Tensor, c1_sigma_e: torch.Tensor,
-    c1_mu_r: torch.Tensor, c1_gain: torch.Tensor, c1_thickness: torch.Tensor,
-    c1_depth: torch.Tensor, c2_positions: torch.Tensor, c2_normals: torch.Tensor,
-    c2_eps_r: torch.Tensor, c2_sigma_e: torch.Tensor, c2_mu_r: torch.Tensor, c2_gain: torch.Tensor,
-    c2_thickness: torch.Tensor, c2_depth: torch.Tensor, tx_pol: torch.Tensor, rx_pol: torch.Tensor,
-    L1: torch.Tensor, L2: torch.Tensor, sp1: torch.Tensor, sp2: torch.Tensor,
-    centroids: torch.Tensor, heights: torch.Tensor, cos_spec: torch.Tensor,
-    material_id: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor, *, k0: float, frequency_hz: float, grad_total: torch.Tensor,
-    grad_path_field: torch.Tensor | None = None, grad_path_gain: torch.Tensor | None = None,
-    need_grad_heights: bool = False, need_grad_layers: bool = False, need_grad_chain1: bool = False,
-    need_grad_chain2: bool = False, need_grad_geometry: bool = False, need_grad_k0: bool = False,
-    need_grad_frequency: bool = False,
-) -> dict[str, torch.Tensor | None]:
-    """VJP of :func:`scattering_chain_realization_eval`.
-
-    ``grad_total`` is the required 0-dim complex cotangent (op-2 parity);
-    ``grad_path_field`` / ``grad_path_gain`` are the optional per-row cotangents
-    the deterministic coherent combine backpropagates through. ``grad_heights``
-    and the CSR layer grads use atomicAdd scatter; per-row / per-bounce grads are
-    direct stores. Off-flag keys are ``None``.
-    """
-
-    n = int(d_i.shape[0])
-    _validate_chain_valid(valid, n, d_i)
-    validate_cuda_tensor("patch_tris", patch_tris, dtype=torch.float32, ndim=3, trailing_shape=(3, 3))
-    validate_cuda_tensor("rows", rows, dtype=torch.int64, ndim=1)
-    validate_cuda_tensor("heights", heights, dtype=torch.float32, ndim=2)
-    validate_cuda_tensor("grad_total", grad_total, dtype=torch.complex64, ndim=0)
-    _validate_chain_leg(
-        "c1", c1_positions, c1_normals, c1_eps_r, c1_sigma_e, c1_mu_r, c1_gain,
-        c1_thickness, c1_depth, n,
-    )
-    _validate_chain_leg(
-        "c2", c2_positions, c2_normals, c2_eps_r, c2_sigma_e, c2_mu_r, c2_gain,
-        c2_thickness, c2_depth, n,
-    )
-    validate_cuda_tensor("material_id", material_id, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("layer_offset", layer_offset, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("layer_count", layer_count, dtype=torch.int32, ndim=1)
-    quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
-    primal_args = _ordered_primal_args(locals(), _CHAIN_REALIZATION_PRIMAL_NAMES)
-    out = _required_native_op("scattering_chain_realization_eval_backward")(
-        *primal_args,
-        quad_a,
-        quad_b,
-        quad_w,
-        float(k0),
-        float(frequency_hz),
-        grad_total,
-        grad_path_field,
-        grad_path_gain,
-        bool(need_grad_heights),
-        bool(need_grad_layers),
-        bool(need_grad_chain1),
-        bool(need_grad_chain2),
-        bool(need_grad_geometry),
-        bool(need_grad_k0),
-        bool(need_grad_frequency),
-    )
-    if not isinstance(out, dict) or set(out) != set(_CHAIN_REALIZATION_BACKWARD_FIELDS):
-        raise TypeError(
-            "_channel.scattering_chain_realization_eval_backward returned"
-            " invalid fields"
-        )
-    return out
-
-
-def scattering_chain_realization_eval_jvp(
-    valid: torch.Tensor, patch_tris: torch.Tensor, patch_uvs: torch.Tensor, rows: torch.Tensor,
-    d_i: torch.Tensor, d_o: torch.Tensor, n_rows: torch.Tensor, source: torch.Tensor,
-    vertex: torch.Tensor, target: torch.Tensor, c1_positions: torch.Tensor,
-    c1_normals: torch.Tensor, c1_eps_r: torch.Tensor, c1_sigma_e: torch.Tensor,
-    c1_mu_r: torch.Tensor, c1_gain: torch.Tensor, c1_thickness: torch.Tensor,
-    c1_depth: torch.Tensor, c2_positions: torch.Tensor, c2_normals: torch.Tensor,
-    c2_eps_r: torch.Tensor, c2_sigma_e: torch.Tensor, c2_mu_r: torch.Tensor, c2_gain: torch.Tensor,
-    c2_thickness: torch.Tensor, c2_depth: torch.Tensor, tx_pol: torch.Tensor, rx_pol: torch.Tensor,
-    L1: torch.Tensor, L2: torch.Tensor, sp1: torch.Tensor, sp2: torch.Tensor,
-    centroids: torch.Tensor, heights: torch.Tensor, cos_spec: torch.Tensor,
-    material_id: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor, *, k0: float, frequency_hz: float,
-    tangent_heights: torch.Tensor | None = None,
-    tangent_layer_thickness: torch.Tensor | None = None,
-    tangent_layer_eps_r: torch.Tensor | None = None,
-    tangent_layer_sigma_e: torch.Tensor | None = None, tangent_c1_eps_r: torch.Tensor | None = None,
-    tangent_c1_sigma_e: torch.Tensor | None = None, tangent_c1_gain: torch.Tensor | None = None,
-    tangent_c1_thickness: torch.Tensor | None = None, tangent_c2_eps_r: torch.Tensor | None = None,
-    tangent_c2_sigma_e: torch.Tensor | None = None, tangent_c2_gain: torch.Tensor | None = None,
-    tangent_c2_thickness: torch.Tensor | None = None, tangent_d_i: torch.Tensor | None = None,
-    tangent_d_o: torch.Tensor | None = None, tangent_c1_positions: torch.Tensor | None = None,
-    tangent_c1_normals: torch.Tensor | None = None,
-    tangent_c2_positions: torch.Tensor | None = None,
-    tangent_c2_normals: torch.Tensor | None = None, tangent_L1: torch.Tensor | None = None,
-    tangent_L2: torch.Tensor | None = None, tangent_sp1: torch.Tensor | None = None,
-    tangent_sp2: torch.Tensor | None = None, tangent_centroids: torch.Tensor | None = None,
-    tangent_k0: float = 0.0, tangent_frequency: float = 0.0,
-) -> dict[str, torch.Tensor]:
-    """JVP of :func:`scattering_chain_realization_eval`.
-
-    Deterministic fixed-order dual sweep (no atomics). A missing tangent is a
-    zero tangent. Returns the per-row and total field tangents consumed by coherent combination.
-    """
-
-    n = int(d_i.shape[0])
-    _validate_chain_valid(valid, n, d_i)
-    validate_cuda_tensor("patch_tris", patch_tris, dtype=torch.float32, ndim=3, trailing_shape=(3, 3))
-    quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
-    primal_args = _ordered_primal_args(locals(), _CHAIN_REALIZATION_PRIMAL_NAMES)
-    out = _required_native_op("scattering_chain_realization_eval_jvp")(
-        *primal_args,
-        quad_a,
-        quad_b,
-        quad_w,
-        float(k0),
-        float(frequency_hz),
-        tangent_heights,
-        tangent_layer_thickness,
-        tangent_layer_eps_r,
-        tangent_layer_sigma_e,
-        tangent_c1_eps_r,
-        tangent_c1_sigma_e,
-        tangent_c1_gain,
-        tangent_c1_thickness,
-        tangent_c2_eps_r,
-        tangent_c2_sigma_e,
-        tangent_c2_gain,
-        tangent_c2_thickness,
-        tangent_d_i,
-        tangent_d_o,
-        tangent_c1_positions,
-        tangent_c1_normals,
-        tangent_c2_positions,
-        tangent_c2_normals,
-        tangent_L1,
-        tangent_L2,
-        tangent_sp1,
-        tangent_sp2,
-        tangent_centroids,
-        float(tangent_k0),
-        float(tangent_frequency),
-    )
-    if not isinstance(out, dict) or set(out) != set(_CHAIN_REALIZATION_TANGENT_FIELDS):
-        raise TypeError(
-            "_channel.scattering_chain_realization_eval_jvp returned invalid fields"
-        )
-    return out
-
-
 # ---------------------------------------------------------------------------
 # autograd
 # ---------------------------------------------------------------------------
@@ -1374,10 +823,12 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        valid, wo_rows, r2_rows, cos_o_rows, n_o, t1r, t2r, wi_local, cos_i, r1, a_te2, a_tm2,
-        weights, material_id, backup_axis, rx_pol, rc_idx, sc_idx, f_te_flat, f_tm_flat,
-        table_offset, table_dims, material_slot, coef, threshold, coef_value,
-    ):
+        valid: Any, wo_rows: Any, r2_rows: Any, cos_o_rows: Any, n_o: Any, t1r: Any, t2r: Any,
+        wi_local: Any, cos_i: Any, r1: Any, a_te2: Any, a_tm2: Any, weights: Any, material_id: Any,
+        backup_axis: Any, rx_pol: Any, rc_idx: Any, sc_idx: Any, f_te_flat: Any, f_tm_flat: Any,
+        table_offset: Any, table_dims: Any, material_slot: Any, coef: Any, threshold: Any,
+        coef_value: Any,
+    ) -> Any:
         out = scattering_ensemble_eval(
             valid,
             wo_rows,
@@ -1408,7 +859,7 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
         return tuple(out[name] for name in _ENSEMBLE_OUTPUT_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         coef = inputs[23]
         primals = tuple(
@@ -1426,7 +877,9 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, grad_gain, grad_amplitude, grad_length, _grad_keep):
+    def backward(
+        ctx: Any, grad_gain: Any, grad_amplitude: Any, grad_length: Any, _grad_keep: Any,
+    ) -> Any:
         none_grads = (None,) * 26
         _ad_reject_fixed_inputs(
             "scattering_ensemble_eval_ad", ctx.needs_input_grad, _ENSEMBLE_FIXED
@@ -1487,11 +940,12 @@ class _ScatteringEnsembleEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx, t_valid, t_wo_rows, t_r2_rows, t_cos_o_rows, t_n_o, t_t1r, t_t2r, t_wi_local, t_cos_i,
-        t_r1, t_a_te2, t_a_tm2, t_weights, t_material_id, t_backup_axis, t_rx_pol, t_rc_idx,
-        t_sc_idx, t_f_te_flat, t_f_tm_flat, t_table_offset, t_table_dims, t_material_slot, t_coef,
-        _t_threshold, _t_coef_value,
-    ):
+        ctx: Any, t_valid: Any, t_wo_rows: Any, t_r2_rows: Any, t_cos_o_rows: Any, t_n_o: Any,
+        t_t1r: Any, t_t2r: Any, t_wi_local: Any, t_cos_i: Any, t_r1: Any, t_a_te2: Any,
+        t_a_tm2: Any, t_weights: Any, t_material_id: Any, t_backup_axis: Any, t_rx_pol: Any,
+        t_rc_idx: Any, t_sc_idx: Any, t_f_te_flat: Any, t_f_tm_flat: Any, t_table_offset: Any,
+        t_table_dims: Any, t_material_slot: Any, t_coef: Any, _t_threshold: Any, _t_coef_value: Any,
+    ) -> Any:
         _ad_reject_fixed_tangents(
             "scattering_ensemble_eval_ad",
             (
@@ -1623,98 +1077,6 @@ def scattering_ensemble_eval_ad(
 _TABLE_EVAL_OUTPUT_FIELDS = ("f_te", "f_tm")
 
 
-class _ScatteringTableEvalAdFunction(torch.autograd.Function):
-    """Differentiable resident Kirchhoff BSDF table lookup (scattering AD).
-
-    Every input is live: the local-frame directions ``wi``/``wo`` and the two
-    4-D tables ``f_te``/``f_tm``. There is no fixed-input reject list. Both
-    ``f_te_row``/``f_tm_row`` outputs are differentiable; a below-horizon row
-    carries zero value and zero gradient (the shared quadrilinear helper gates
-    it). Used by the MC-basic scattering map so table values, and through the
-    surrounding Torch arithmetic frequency and tx power, keep their gradients.
-    """
-
-    @staticmethod
-    def forward(valid, wi, wo, f_te, f_tm):
-        return scattering_table_eval(valid, wi, wo, f_te, f_tm)
-
-    @staticmethod
-    def setup_context(ctx, inputs, output):
-        ctx.set_materialize_grads(False)
-        primals = tuple(
-            torch.autograd.forward_ad.unpack_dual(value).primal for value in inputs
-        )
-        ctx.save_for_backward(*primals)
-        ctx.save_for_forward(*primals)
-
-    @staticmethod
-    @_ad_first_order_only
-    def backward(ctx, grad_f_te, grad_f_tm):
-        _ad_reject_fixed_inputs(
-            "scattering_table_eval_ad", ctx.needs_input_grad, ((0, "valid"),)
-        )
-        need_dirs = bool(ctx.needs_input_grad[1]) or bool(ctx.needs_input_grad[2])
-        need_tables = bool(ctx.needs_input_grad[3]) or bool(ctx.needs_input_grad[4])
-        if (not (need_dirs or need_tables)) or (
-            grad_f_te is None and grad_f_tm is None
-        ):
-            return None, None, None, None, None
-        out = scattering_table_eval_backward(
-            *ctx.saved_tensors,
-            grad_out_f_te=grad_f_te,
-            grad_out_f_tm=grad_f_tm,
-            need_grad_dirs=need_dirs,
-            need_grad_tables=need_tables,
-        )
-        return (
-            None,
-            _grad_or_none(out, "grad_wi", bool(ctx.needs_input_grad[1])),
-            _grad_or_none(out, "grad_wo", bool(ctx.needs_input_grad[2])),
-            _grad_or_none(out, "grad_f_te", bool(ctx.needs_input_grad[3])),
-            _grad_or_none(out, "grad_f_tm", bool(ctx.needs_input_grad[4])),
-        )
-
-    @staticmethod
-    def jvp(ctx, t_valid, t_wi, t_wo, t_f_te, t_f_tm):
-        _ad_reject_fixed_tangents(
-            "scattering_table_eval_ad", ((t_valid, "valid"),)
-        )
-        saved = ctx.saved_tensors
-        tangents = {
-            "tangent_wi": _ad_geometry_tangent(
-                "scattering_table_eval_ad tangent_wi", t_wi, saved[1]
-            ),
-            "tangent_wo": _ad_geometry_tangent(
-                "scattering_table_eval_ad tangent_wo", t_wo, saved[2]
-            ),
-            "tangent_f_te": _ad_geometry_tangent(
-                "scattering_table_eval_ad tangent_f_te", t_f_te, saved[3]
-            ),
-            "tangent_f_tm": _ad_geometry_tangent(
-                "scattering_table_eval_ad tangent_f_tm", t_f_tm, saved[4]
-            ),
-        }
-        if all(value is None for value in tangents.values()):
-            return None, None
-        with disable_functorch():
-            out = scattering_table_eval_jvp(
-                *(_ad_native_tensor(value) for value in saved), **tangents
-            )
-        return out["tangent_f_te"], out["tangent_f_tm"]
-
-
-def scattering_table_eval_ad(
-    valid: torch.Tensor, wi: torch.Tensor, wo: torch.Tensor, f_te: torch.Tensor, f_tm: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Differentiable :func:`scattering_table_eval` (scattering AD).
-
-    Returns the ``(f_te_row, f_tm_row)`` pair like the plain forward, so the
-    MC-basic scattering map can drop it in behind ``ad``.
-    """
-
-    return _ScatteringTableEvalAdFunction.apply(valid, wi, wo, f_te, f_tm)
-
-
 class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
     """Fixed-topology differentiable phase-screen patch integral (scattering AD).
 
@@ -1730,9 +1092,10 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        valid, patch_tris, patch_uvs, rows, d_i, d_o, n_rows, r_te, r_tm, pol_t, pol_r, r1_rows,
-        r2_rows, centroids, heights, quad_a, quad_b, quad_w, k0, k0_value,
-    ):
+        valid: Any, patch_tris: Any, patch_uvs: Any, rows: Any, d_i: Any, d_o: Any, n_rows: Any,
+        r_te: Any, r_tm: Any, pol_t: Any, pol_r: Any, r1_rows: Any, r2_rows: Any, centroids: Any,
+        heights: Any, quad_a: Any, quad_b: Any, quad_w: Any, k0: Any, k0_value: Any,
+    ) -> Any:
         out = _required_patch_forward(
             valid,
             patch_tris,
@@ -1757,7 +1120,7 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
         return tuple(out[name] for name in _PATCH_OUTPUT_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         k0 = inputs[18]
         primals = tuple(
@@ -1774,7 +1137,7 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, grad_total, _grad_integral, _grad_row_value):
+    def backward(ctx: Any, grad_total: Any, _grad_integral: Any, _grad_row_value: Any) -> Any:
         none_grads = (None,) * 20
         _ad_reject_fixed_inputs(
             "scattering_patch_integral_eval_ad", ctx.needs_input_grad, _PATCH_FIXED
@@ -1825,10 +1188,11 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx, t_valid, t_patch_tris, t_patch_uvs, t_rows, t_d_i, t_d_o, t_n_rows, t_r_te, t_r_tm,
-        t_pol_t, t_pol_r, t_r1_rows, t_r2_rows, t_centroids, t_heights, t_quad_a, t_quad_b,
-        t_quad_w, t_k0, _t_k0_value,
-    ):
+        ctx: Any, t_valid: Any, t_patch_tris: Any, t_patch_uvs: Any, t_rows: Any, t_d_i: Any,
+        t_d_o: Any, t_n_rows: Any, t_r_te: Any, t_r_tm: Any, t_pol_t: Any, t_pol_r: Any,
+        t_r1_rows: Any, t_r2_rows: Any, t_centroids: Any, t_heights: Any, t_quad_a: Any,
+        t_quad_b: Any, t_quad_w: Any, t_k0: Any, _t_k0_value: Any,
+    ) -> Any:
         _ad_reject_fixed_tangents(
             "scattering_patch_integral_eval_ad",
             (
@@ -1893,9 +1257,12 @@ class _ScatteringPatchIntegralEvalAdFunction(torch.autograd.Function):
 
 
 def _required_patch_forward(
-    valid, patch_tris, patch_uvs, rows, d_i, d_o, n_rows, r_te, r_tm, pol_t, pol_r, r1_rows,
-    r2_rows, centroids, heights, quad_a, quad_b, quad_w, k0_value,
-):
+    valid: torch.Tensor, patch_tris: torch.Tensor, patch_uvs: torch.Tensor, rows: torch.Tensor,
+    d_i: torch.Tensor, d_o: torch.Tensor, n_rows: torch.Tensor, r_te: torch.Tensor,
+    r_tm: torch.Tensor, pol_t: torch.Tensor, pol_r: torch.Tensor, r1_rows: torch.Tensor,
+    r2_rows: torch.Tensor, centroids: torch.Tensor, heights: torch.Tensor, quad_a: torch.Tensor,
+    quad_b: torch.Tensor, quad_w: torch.Tensor, k0_value: float,
+) -> dict[str, torch.Tensor]:
     out = _required_native_op("scattering_patch_integral_eval")(
         valid,
         patch_tris,
@@ -1930,7 +1297,7 @@ def scattering_patch_integral_eval_ad(
     d_i: torch.Tensor, d_o: torch.Tensor, n_rows: torch.Tensor, r_te: torch.Tensor,
     r_tm: torch.Tensor, pol_t: torch.Tensor, pol_r: torch.Tensor, r1_rows: torch.Tensor,
     r2_rows: torch.Tensor, centroids: torch.Tensor, heights: torch.Tensor, *, k0: torch.Tensor,
-) -> dict[str, torch.Tensor]:
+) -> PatchIntegralOutputs:
     """Differentiable :func:`scattering_patch_integral_eval` (scattering AD).
 
     ``k0`` is the wavenumber as a 0-d scalar tensor so frequency gradients flow
@@ -1963,7 +1330,7 @@ def scattering_patch_integral_eval_ad(
         k0,
         float(k0_value),
     )
-    return dict(zip(_PATCH_OUTPUT_FIELDS, values, strict=True))
+    return cast(PatchIntegralOutputs, dict(zip(_PATCH_OUTPUT_FIELDS, values, strict=True)))
 
 
 # ---------------------------------------------------------------------------
@@ -2023,320 +1390,6 @@ _CHAIN_ENSEMBLE_FIXED_GEOMETRY = (
 _CHAIN_ENSEMBLE_FIXED = _CHAIN_ENSEMBLE_FIXED_TANGENTS + _CHAIN_ENSEMBLE_FIXED_GEOMETRY
 
 
-class _ScatteringChainEnsembleEvalAdFunction(torch.autograd.Function):
-    """Fixed-topology differentiable multi-bounce ensemble rows (coherent scattering).
-
-    Reverse-mode differentiable inputs: the two padded specular legs' Fresnel
-    parameters (``c1/c2 eps_r/sigma_e/gain/thickness``), the resident BSDF tables
-    (``f_te_flat``/``f_tm_flat``) and the two 0-dim AD scalars ``coef`` and
-    ``frequency``. The continuous chain geometry
-    (positions/normals/``n_o``/``d_i``/``d_o``/``l1``/``l2``/``cos_i``/``cos_o``)
-    is a staged follow-up in reverse mode and fails loudly if requested; the
-    forward-mode ``jvp`` still forwards its tangents. The endpoints
-    (``source``/``vertex``/``target``), ``tx_pol``/``rx_pol``, the depths,
-    ``mu_r``, the vertex frame axes ``t1r``/``t2r``/``backup_axis``,
-    ``wi_local``, ``weights``, the material ids and the table metadata stay fixed
-    in both modes. ``gain``/``amplitude``/``length`` are differentiable; ``keep``
-    is marked non-differentiable.
-    """
-
-    @staticmethod
-    def forward(
-        valid, tx_pol, rx_pol, source, vertex, target, c1_positions, c1_normals, c1_eps_r,
-        c1_sigma_e, c1_mu_r, c1_gain, c1_thickness, c1_depth, c2_positions, c2_normals, c2_eps_r,
-        c2_sigma_e, c2_mu_r, c2_gain, c2_thickness, c2_depth, n_o, t1r, t2r, backup_axis, wi_local,
-        cos_i, cos_o, d_i, d_o, l1, l2, weights, material_id, f_te_flat, f_tm_flat, table_offset,
-        table_dims, material_slot, coef, frequency, threshold, coef_value, frequency_value,
-    ):
-        out = scattering_chain_ensemble_eval(
-            valid,
-            tx_pol,
-            rx_pol,
-            source,
-            vertex,
-            target,
-            c1_positions,
-            c1_normals,
-            c1_eps_r,
-            c1_sigma_e,
-            c1_mu_r,
-            c1_gain,
-            c1_thickness,
-            c1_depth,
-            c2_positions,
-            c2_normals,
-            c2_eps_r,
-            c2_sigma_e,
-            c2_mu_r,
-            c2_gain,
-            c2_thickness,
-            c2_depth,
-            n_o,
-            t1r,
-            t2r,
-            backup_axis,
-            wi_local,
-            cos_i,
-            cos_o,
-            d_i,
-            d_o,
-            l1,
-            l2,
-            weights,
-            material_id,
-            f_te_flat,
-            f_tm_flat,
-            table_offset,
-            table_dims,
-            material_slot,
-            coef=coef_value,
-            threshold=threshold,
-            frequency_hz=frequency_value,
-        )
-        return tuple(out[name] for name in _CHAIN_ENSEMBLE_OUTPUT_FIELDS)
-
-    @staticmethod
-    def setup_context(ctx, inputs, output):
-        ctx.set_materialize_grads(False)
-        coef = inputs[40]
-        frequency = inputs[41]
-        primals = tuple(
-            torch.autograd.forward_ad.unpack_dual(value).primal for value in inputs[:40]
-        )
-        ctx.threshold = inputs[42]
-        ctx.coef_value = inputs[43]
-        ctx.frequency_value = inputs[44]
-        ctx.coef_meta = (
-            (coef.dtype, coef.device) if isinstance(coef, torch.Tensor) else None
-        )
-        ctx.frequency_meta = (
-            (frequency.dtype, frequency.device)
-            if isinstance(frequency, torch.Tensor)
-            else None
-        )
-        ctx.save_for_backward(*primals)
-        ctx.save_for_forward(*primals)
-        ctx.mark_non_differentiable(output[3])
-
-    @staticmethod
-    @_ad_first_order_only
-    def backward(ctx, grad_gain, grad_amplitude, grad_length, _grad_keep):
-        none_grads = (None,) * 45
-        # Rejects reverse-mode grads on both the structurally frozen inputs and
-        # the continuous chain geometry (staged follow-up wave).
-        _ad_reject_fixed_inputs(
-            "scattering_chain_ensemble_eval_ad",
-            ctx.needs_input_grad,
-            _CHAIN_ENSEMBLE_FIXED,
-        )
-        needed = tuple(bool(ctx.needs_input_grad[i]) for i in range(42))
-        need_chain1 = any(needed[i] for i in (8, 9, 11, 12))
-        need_chain2 = any(needed[i] for i in (16, 17, 19, 20))
-        need_tables = needed[35] or needed[36]
-        need_coef = needed[40]
-        need_frequency = needed[41]
-        grads = (grad_gain, grad_amplitude, grad_length)
-        if not (
-            need_chain1
-            or need_chain2
-            or need_tables
-            or need_coef
-            or need_frequency
-        ) or all(value is None for value in grads):
-            return none_grads
-        out = scattering_chain_ensemble_eval_backward(
-            *ctx.saved_tensors,
-            coef=ctx.coef_value,
-            threshold=ctx.threshold,
-            frequency_hz=ctx.frequency_value,
-            grad_gain=grad_gain,
-            grad_amplitude=grad_amplitude,
-            grad_length=grad_length,
-            need_grad_chain1=need_chain1,
-            need_grad_chain2=need_chain2,
-            need_grad_tables=need_tables,
-            need_grad_geometry=False,
-            need_grad_coef=need_coef,
-            need_grad_frequency=need_frequency,
-        )
-        grad_coef = (
-            _ad_frequency_grad(out["grad_coef"], ctx.coef_meta) if need_coef else None
-        )
-        grad_frequency = (
-            _ad_frequency_grad(out["grad_frequency"], ctx.frequency_meta)
-            if need_frequency
-            else None
-        )
-        return (
-            None,  # valid
-            None,  # tx_pol
-            None,  # rx_pol
-            None,  # source
-            None,  # vertex
-            None,  # target
-            None,  # c1_positions (geometry: reverse staged)
-            None,  # c1_normals
-            _grad_or_none(out, "grad_c1_eps_r", needed[8]),
-            _grad_or_none(out, "grad_c1_sigma_e", needed[9]),
-            None,  # c1_mu_r
-            _grad_or_none(out, "grad_c1_gain", needed[11]),
-            _grad_or_none(out, "grad_c1_thickness", needed[12]),
-            None,  # c1_depth
-            None,  # c2_positions (geometry: reverse staged)
-            None,  # c2_normals
-            _grad_or_none(out, "grad_c2_eps_r", needed[16]),
-            _grad_or_none(out, "grad_c2_sigma_e", needed[17]),
-            None,  # c2_mu_r
-            _grad_or_none(out, "grad_c2_gain", needed[19]),
-            _grad_or_none(out, "grad_c2_thickness", needed[20]),
-            None,  # c2_depth
-            None,  # n_o (geometry: reverse staged)
-            None,  # t1r
-            None,  # t2r
-            None,  # backup_axis
-            None,  # wi_local
-            None,  # cos_i (geometry: reverse staged)
-            None,  # cos_o (geometry: reverse staged)
-            None,  # d_i (geometry: reverse staged)
-            None,  # d_o (geometry: reverse staged)
-            None,  # l1 (geometry: reverse staged)
-            None,  # l2 (geometry: reverse staged)
-            None,  # weights
-            None,  # material_id
-            _grad_or_none(out, "grad_f_te", needed[35]),
-            _grad_or_none(out, "grad_f_tm", needed[36]),
-            None,  # table_offset
-            None,  # table_dims
-            None,  # material_slot
-            grad_coef,
-            grad_frequency,
-            None,  # threshold
-            None,  # coef_value
-            None,  # frequency_value
-        )
-
-    @staticmethod
-    def jvp(
-        ctx, t_valid, t_tx_pol, t_rx_pol, t_source, t_vertex, t_target, t_c1_positions,
-        t_c1_normals, t_c1_eps_r, t_c1_sigma_e, t_c1_mu_r, t_c1_gain, t_c1_thickness, t_c1_depth,
-        t_c2_positions, t_c2_normals, t_c2_eps_r, t_c2_sigma_e, t_c2_mu_r, t_c2_gain,
-        t_c2_thickness, t_c2_depth, t_n_o, t_t1r, t_t2r, t_backup_axis, t_wi_local, t_cos_i,
-        t_cos_o, t_d_i, t_d_o, t_l1, t_l2, t_weights, t_material_id, t_f_te_flat, t_f_tm_flat,
-        t_table_offset, t_table_dims, t_material_slot, t_coef, t_frequency, _t_threshold,
-        _t_coef_value, _t_frequency_value,
-    ):
-        # Forward mode forwards geometry tangents (native jvp supports them);
-        # only the structurally frozen inputs reject a tangent loudly.
-        _ad_reject_fixed_tangents(
-            "scattering_chain_ensemble_eval_ad",
-            (
-                (t_valid, "valid"),
-                (t_tx_pol, "tx_pol"),
-                (t_rx_pol, "rx_pol"),
-                (t_source, "source"),
-                (t_vertex, "vertex"),
-                (t_target, "target"),
-                (t_c1_mu_r, "c1_mu_r"),
-                (t_c1_depth, "c1_depth"),
-                (t_c2_mu_r, "c2_mu_r"),
-                (t_c2_depth, "c2_depth"),
-                (t_t1r, "t1r"),
-                (t_t2r, "t2r"),
-                (t_backup_axis, "backup_axis"),
-                (t_wi_local, "wi_local"),
-                (t_weights, "weights"),
-                (t_material_id, "material_id"),
-                (t_table_offset, "table_offset"),
-                (t_table_dims, "table_dims"),
-                (t_material_slot, "material_slot"),
-            ),
-        )
-        saved = ctx.saved_tensors
-        op = "scattering_chain_ensemble_eval_ad"
-        tangents = {
-            "tangent_c1_eps_r": _ad_geometry_tangent(f"{op} tangent_c1_eps_r", t_c1_eps_r, saved[8]),
-            "tangent_c1_sigma_e": _ad_geometry_tangent(f"{op} tangent_c1_sigma_e", t_c1_sigma_e, saved[9]),
-            "tangent_c1_gain": _ad_geometry_tangent(f"{op} tangent_c1_gain", t_c1_gain, saved[11]),
-            "tangent_c1_thickness": _ad_geometry_tangent(f"{op} tangent_c1_thickness", t_c1_thickness, saved[12]),
-            "tangent_c2_eps_r": _ad_geometry_tangent(f"{op} tangent_c2_eps_r", t_c2_eps_r, saved[16]),
-            "tangent_c2_sigma_e": _ad_geometry_tangent(f"{op} tangent_c2_sigma_e", t_c2_sigma_e, saved[17]),
-            "tangent_c2_gain": _ad_geometry_tangent(f"{op} tangent_c2_gain", t_c2_gain, saved[19]),
-            "tangent_c2_thickness": _ad_geometry_tangent(f"{op} tangent_c2_thickness", t_c2_thickness, saved[20]),
-            "tangent_f_te_flat": _ad_geometry_tangent(f"{op} tangent_f_te_flat", t_f_te_flat, saved[35]),
-            "tangent_f_tm_flat": _ad_geometry_tangent(f"{op} tangent_f_tm_flat", t_f_tm_flat, saved[36]),
-            "tangent_c1_positions": _ad_geometry_tangent(f"{op} tangent_c1_positions", t_c1_positions, saved[6]),
-            "tangent_c1_normals": _ad_geometry_tangent(f"{op} tangent_c1_normals", t_c1_normals, saved[7]),
-            "tangent_c2_positions": _ad_geometry_tangent(f"{op} tangent_c2_positions", t_c2_positions, saved[14]),
-            "tangent_c2_normals": _ad_geometry_tangent(f"{op} tangent_c2_normals", t_c2_normals, saved[15]),
-            "tangent_d_i": _ad_geometry_tangent(f"{op} tangent_d_i", t_d_i, saved[29]),
-            "tangent_d_o": _ad_geometry_tangent(f"{op} tangent_d_o", t_d_o, saved[30]),
-            "tangent_v_normal": _ad_geometry_tangent(f"{op} tangent_v_normal", t_n_o, saved[22]),
-            "tangent_l1": _ad_geometry_tangent(f"{op} tangent_l1", t_l1, saved[31]),
-            "tangent_l2": _ad_geometry_tangent(f"{op} tangent_l2", t_l2, saved[32]),
-            "tangent_cos_i": _ad_geometry_tangent(f"{op} tangent_cos_i", t_cos_i, saved[27]),
-            "tangent_cos_o": _ad_geometry_tangent(f"{op} tangent_cos_o", t_cos_o, saved[28]),
-        }
-        tangent_coef = _ad_frequency_tangent(t_coef)
-        tangent_frequency = _ad_frequency_tangent(t_frequency)
-        if (
-            tangent_coef == 0.0
-            and tangent_frequency == 0.0
-            and all(value is None for value in tangents.values())
-        ):
-            return (None,) * len(_CHAIN_ENSEMBLE_OUTPUT_FIELDS)
-        with disable_functorch():
-            out = scattering_chain_ensemble_eval_jvp(
-                *(_ad_native_tensor(value) for value in saved),
-                coef=ctx.coef_value,
-                threshold=ctx.threshold,
-                frequency_hz=ctx.frequency_value,
-                tangent_coef=tangent_coef,
-                tangent_frequency=tangent_frequency,
-                **tangents,
-            )
-        return (
-            out["tangent_gain"],
-            out["tangent_amplitude"],
-            out["tangent_length"],
-            None,
-        )
-
-
-def scattering_chain_ensemble_eval_ad(
-    valid: torch.Tensor, tx_pol: torch.Tensor, rx_pol: torch.Tensor, source: torch.Tensor,
-    vertex: torch.Tensor, target: torch.Tensor, c1_positions: torch.Tensor,
-    c1_normals: torch.Tensor, c1_eps_r: torch.Tensor, c1_sigma_e: torch.Tensor,
-    c1_mu_r: torch.Tensor, c1_gain: torch.Tensor, c1_thickness: torch.Tensor,
-    c1_depth: torch.Tensor, c2_positions: torch.Tensor, c2_normals: torch.Tensor,
-    c2_eps_r: torch.Tensor, c2_sigma_e: torch.Tensor, c2_mu_r: torch.Tensor, c2_gain: torch.Tensor,
-    c2_thickness: torch.Tensor, c2_depth: torch.Tensor, n_o: torch.Tensor, t1r: torch.Tensor,
-    t2r: torch.Tensor, backup_axis: torch.Tensor, wi_local: torch.Tensor, cos_i: torch.Tensor,
-    cos_o: torch.Tensor, d_i: torch.Tensor, d_o: torch.Tensor, l1: torch.Tensor, l2: torch.Tensor,
-    weights: torch.Tensor, material_id: torch.Tensor, f_te_flat: torch.Tensor,
-    f_tm_flat: torch.Tensor, table_offset: torch.Tensor, table_dims: torch.Tensor,
-    material_slot: torch.Tensor, *, coef: torch.Tensor, threshold: float, frequency: torch.Tensor,
-) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`scattering_chain_ensemble_eval` (coherent scattering).
-
-    ``coef`` and ``frequency`` are the two AD-live scalars as 0-dim tensors so
-    the radiometric-scale and frequency chains keep their gradients; their host
-    values are read once per apply at this seam, never per row.
-    """
-
-    primal_args = _ordered_primal_args(locals(), _CHAIN_ENSEMBLE_PRIMAL_NAMES)
-    coef_value = _ad_frequency_value(coef)
-    frequency_value = _ad_frequency_value(frequency)
-    values = _ScatteringChainEnsembleEvalAdFunction.apply(
-        *primal_args,
-        coef,
-        frequency,
-        float(threshold),
-        float(coef_value),
-        float(frequency_value),
-    )
-    return dict(zip(_CHAIN_ENSEMBLE_OUTPUT_FIELDS, values, strict=True))
-
-
 # ---------------------------------------------------------------------------
 # Op B: coherent chain realization.
 # ---------------------------------------------------------------------------
@@ -2368,408 +1421,6 @@ _CHAIN_REALIZATION_FIXED = (
     (43, "quad_b"),
     (44, "quad_w"),
 )
-
-
-def _required_chain_realization_forward(
-    valid, patch_tris, patch_uvs, rows, d_i, d_o, n_rows, source, vertex, target, c1_positions,
-    c1_normals, c1_eps_r, c1_sigma_e, c1_mu_r, c1_gain, c1_thickness, c1_depth, c2_positions,
-    c2_normals, c2_eps_r, c2_sigma_e, c2_mu_r, c2_gain, c2_thickness, c2_depth, tx_pol, rx_pol, L1,
-    L2, sp1, sp2, centroids, heights, cos_spec, material_id, layer_offset, layer_count,
-    layer_thickness_m, layer_eps_r, layer_sigma_e, layer_mu_r, quad_a, quad_b, quad_w, k0_value,
-    frequency_value,
-):
-    """Raw Op B forward dispatch with explicit quadrature nodes (autograd seam).
-
-    The Function holds the Duffy nodes as fixed inputs, so it dispatches the
-    native op directly (the public facade appends the cached nodes itself).
-    """
-
-    out = _required_native_op("scattering_chain_realization_eval")(
-        valid,
-        patch_tris,
-        patch_uvs,
-        rows,
-        d_i,
-        d_o,
-        n_rows,
-        source,
-        vertex,
-        target,
-        c1_positions,
-        c1_normals,
-        c1_eps_r,
-        c1_sigma_e,
-        c1_mu_r,
-        c1_gain,
-        c1_thickness,
-        c1_depth,
-        c2_positions,
-        c2_normals,
-        c2_eps_r,
-        c2_sigma_e,
-        c2_mu_r,
-        c2_gain,
-        c2_thickness,
-        c2_depth,
-        tx_pol,
-        rx_pol,
-        L1,
-        L2,
-        sp1,
-        sp2,
-        centroids,
-        heights,
-        cos_spec,
-        material_id,
-        layer_offset,
-        layer_count,
-        layer_thickness_m,
-        layer_eps_r,
-        layer_sigma_e,
-        layer_mu_r,
-        quad_a,
-        quad_b,
-        quad_w,
-        float(k0_value),
-        float(frequency_value),
-    )
-    expected = set(_CHAIN_REALIZATION_OUTPUT_FIELDS)
-    if not isinstance(out, dict) or set(out) != expected:
-        raise TypeError(
-            "_channel.scattering_chain_realization_eval returned invalid fields"
-        )
-    return out
-
-
-class _ScatteringChainRealizationEvalAdFunction(torch.autograd.Function):
-    """Fixed-topology differentiable coherent chain realization (coherent scattering).
-
-    Differentiable inputs: the phase-screen ``heights``, the CSR layer stack
-    (``layer_thickness_m``/``layer_eps_r``/``layer_sigma_e``), the two padded
-    specular legs' Fresnel parameters and geometry, the vertex directions
-    ``d_i``/``d_o``, the unfolded lengths/spreading, the ``centroids`` and the
-    two 0-dim AD scalars ``k0`` and ``frequency``. The patch mesh, ``rows``,
-    ``n_rows``, the depths, ``mu_r``, ``cos_spec`` (derived-frozen), the
-    material/CSR-index arrays, the endpoint polarizations and the quadrature
-    nodes stay fixed; requesting their gradient fails loudly. ``total`` /
-    ``path_field`` / ``path_gain`` are differentiable; ``integral`` and
-    ``row_value`` are marked non-differentiable test buffers.
-    """
-
-    @staticmethod
-    def forward(
-        valid, patch_tris, patch_uvs, rows, d_i, d_o, n_rows, source, vertex, target, c1_positions,
-        c1_normals, c1_eps_r, c1_sigma_e, c1_mu_r, c1_gain, c1_thickness, c1_depth, c2_positions,
-        c2_normals, c2_eps_r, c2_sigma_e, c2_mu_r, c2_gain, c2_thickness, c2_depth, tx_pol, rx_pol,
-        L1, L2, sp1, sp2, centroids, heights, cos_spec, material_id, layer_offset, layer_count,
-        layer_thickness_m, layer_eps_r, layer_sigma_e, layer_mu_r, quad_a, quad_b, quad_w, k0,
-        frequency, k0_value, frequency_value,
-    ):
-        out = _required_chain_realization_forward(
-            valid,
-            patch_tris,
-            patch_uvs,
-            rows,
-            d_i,
-            d_o,
-            n_rows,
-            source,
-            vertex,
-            target,
-            c1_positions,
-            c1_normals,
-            c1_eps_r,
-            c1_sigma_e,
-            c1_mu_r,
-            c1_gain,
-            c1_thickness,
-            c1_depth,
-            c2_positions,
-            c2_normals,
-            c2_eps_r,
-            c2_sigma_e,
-            c2_mu_r,
-            c2_gain,
-            c2_thickness,
-            c2_depth,
-            tx_pol,
-            rx_pol,
-            L1,
-            L2,
-            sp1,
-            sp2,
-            centroids,
-            heights,
-            cos_spec,
-            material_id,
-            layer_offset,
-            layer_count,
-            layer_thickness_m,
-            layer_eps_r,
-            layer_sigma_e,
-            layer_mu_r,
-            quad_a,
-            quad_b,
-            quad_w,
-            k0_value,
-            frequency_value,
-        )
-        return tuple(out[name] for name in _CHAIN_REALIZATION_OUTPUT_FIELDS)
-
-    @staticmethod
-    def setup_context(ctx, inputs, output):
-        ctx.set_materialize_grads(False)
-        k0 = inputs[45]
-        frequency = inputs[46]
-        primals = tuple(
-            torch.autograd.forward_ad.unpack_dual(value).primal for value in inputs[:45]
-        )
-        ctx.k0_value = inputs[47]
-        ctx.frequency_value = inputs[48]
-        ctx.k0_meta = (k0.dtype, k0.device) if isinstance(k0, torch.Tensor) else None
-        ctx.frequency_meta = (
-            (frequency.dtype, frequency.device)
-            if isinstance(frequency, torch.Tensor)
-            else None
-        )
-        ctx.save_for_backward(*primals)
-        ctx.save_for_forward(*primals)
-        ctx.mark_non_differentiable(output[3], output[4])
-
-    @staticmethod
-    @_ad_first_order_only
-    def backward(ctx, grad_total, grad_path_field, grad_path_gain, _grad_integral, _grad_row_value):
-        none_grads = (None,) * 49
-        _ad_reject_fixed_inputs(
-            "scattering_chain_realization_eval_ad",
-            ctx.needs_input_grad,
-            _CHAIN_REALIZATION_FIXED,
-        )
-        needed = tuple(bool(ctx.needs_input_grad[i]) for i in range(47))
-        need_heights = needed[33]
-        need_layers = any(needed[i] for i in (38, 39, 40))
-        need_chain1 = any(needed[i] for i in (12, 13, 15, 16))
-        need_chain2 = any(needed[i] for i in (20, 21, 23, 24))
-        need_geometry = any(
-            needed[i] for i in (4, 5, 10, 11, 18, 19, 28, 29, 30, 31, 32)
-        )
-        need_k0 = needed[45]
-        need_frequency = needed[46]
-        need_flags = (
-            need_heights, need_layers, need_chain1, need_chain2,
-            need_geometry, need_k0, need_frequency,
-        )
-        if not any(need_flags) or (
-            grad_total is None and grad_path_field is None and grad_path_gain is None
-        ):
-            return none_grads
-        saved = ctx.saved_tensors
-        if grad_total is None:
-            # path_field-only cotangents from coherent combination leave the scalar
-            # total ungraded; the required ABI slot takes a zero cotangent.
-            grad_total = torch.zeros((), dtype=torch.complex64, device=saved[1].device)
-        out = scattering_chain_realization_eval_backward(
-            *saved[:42],
-            k0=ctx.k0_value,
-            frequency_hz=ctx.frequency_value,
-            grad_total=grad_total,
-            grad_path_field=grad_path_field,
-            grad_path_gain=grad_path_gain,
-            need_grad_heights=need_heights,
-            need_grad_layers=need_layers,
-            need_grad_chain1=need_chain1,
-            need_grad_chain2=need_chain2,
-            need_grad_geometry=need_geometry,
-            need_grad_k0=need_k0,
-            need_grad_frequency=need_frequency,
-        )
-        grad_k0 = _ad_frequency_grad(out["grad_k0"], ctx.k0_meta) if need_k0 else None
-        grad_frequency = (
-            _ad_frequency_grad(out["grad_frequency"], ctx.frequency_meta)
-            if need_frequency
-            else None
-        )
-        return (
-            None,  # valid
-            None,  # patch_tris
-            None,  # patch_uvs
-            None,  # rows
-            _grad_or_none(out, "grad_d_i", needed[4]),
-            _grad_or_none(out, "grad_d_o", needed[5]),
-            None,  # n_rows
-            None,  # source
-            None,  # vertex
-            None,  # target
-            _grad_or_none(out, "grad_c1_positions", needed[10]),
-            _grad_or_none(out, "grad_c1_normals", needed[11]),
-            _grad_or_none(out, "grad_c1_eps_r", needed[12]),
-            _grad_or_none(out, "grad_c1_sigma_e", needed[13]),
-            None,  # c1_mu_r
-            _grad_or_none(out, "grad_c1_gain", needed[15]),
-            _grad_or_none(out, "grad_c1_thickness", needed[16]),
-            None,  # c1_depth
-            _grad_or_none(out, "grad_c2_positions", needed[18]),
-            _grad_or_none(out, "grad_c2_normals", needed[19]),
-            _grad_or_none(out, "grad_c2_eps_r", needed[20]),
-            _grad_or_none(out, "grad_c2_sigma_e", needed[21]),
-            None,  # c2_mu_r
-            _grad_or_none(out, "grad_c2_gain", needed[23]),
-            _grad_or_none(out, "grad_c2_thickness", needed[24]),
-            None,  # c2_depth
-            None,  # tx_pol
-            None,  # rx_pol
-            _grad_or_none(out, "grad_L1", needed[28]),
-            _grad_or_none(out, "grad_L2", needed[29]),
-            _grad_or_none(out, "grad_sp1", needed[30]),
-            _grad_or_none(out, "grad_sp2", needed[31]),
-            _grad_or_none(out, "grad_centroids", needed[32]),
-            _grad_or_none(out, "grad_heights", needed[33]),
-            None,  # cos_spec
-            None,  # material_id
-            None,  # layer_offset
-            None,  # layer_count
-            _grad_or_none(out, "grad_layer_thickness", needed[38]),
-            _grad_or_none(out, "grad_layer_eps_r", needed[39]),
-            _grad_or_none(out, "grad_layer_sigma_e", needed[40]),
-            None,  # layer_mu_r
-            None,  # quad_a
-            None,  # quad_b
-            None,  # quad_w
-            grad_k0,
-            grad_frequency,
-            None,  # k0_value
-            None,  # frequency_value
-        )
-
-    @staticmethod
-    def jvp(
-        ctx, t_valid, t_patch_tris, t_patch_uvs, t_rows, t_d_i, t_d_o, t_n_rows, t_source, t_vertex,
-        t_target, t_c1_positions, t_c1_normals, t_c1_eps_r, t_c1_sigma_e, t_c1_mu_r, t_c1_gain,
-        t_c1_thickness, t_c1_depth, t_c2_positions, t_c2_normals, t_c2_eps_r, t_c2_sigma_e,
-        t_c2_mu_r, t_c2_gain, t_c2_thickness, t_c2_depth, t_tx_pol, t_rx_pol, t_L1, t_L2, t_sp1,
-        t_sp2, t_centroids, t_heights, t_cos_spec, t_material_id, t_layer_offset, t_layer_count,
-        t_layer_thickness_m, t_layer_eps_r, t_layer_sigma_e, t_layer_mu_r, t_quad_a, t_quad_b,
-        t_quad_w, t_k0, t_frequency, _t_k0_value, _t_frequency_value,
-    ):
-        _ad_reject_fixed_tangents(
-            "scattering_chain_realization_eval_ad",
-            (
-                (t_valid, "valid"),
-                (t_patch_tris, "patch_tris"),
-                (t_patch_uvs, "patch_uvs"),
-                (t_rows, "rows"),
-                (t_n_rows, "n_rows"),
-                (t_source, "source"),
-                (t_vertex, "vertex"),
-                (t_target, "target"),
-                (t_c1_mu_r, "c1_mu_r"),
-                (t_c1_depth, "c1_depth"),
-                (t_c2_mu_r, "c2_mu_r"),
-                (t_c2_depth, "c2_depth"),
-                (t_tx_pol, "tx_pol"),
-                (t_rx_pol, "rx_pol"),
-                (t_cos_spec, "cos_spec"),
-                (t_material_id, "material_id"),
-                (t_layer_offset, "layer_offset"),
-                (t_layer_count, "layer_count"),
-                (t_layer_mu_r, "layer_mu_r"),
-                (t_quad_a, "quad_a"),
-                (t_quad_b, "quad_b"),
-                (t_quad_w, "quad_w"),
-            ),
-        )
-        saved = ctx.saved_tensors
-        op = "scattering_chain_realization_eval_ad"
-        tangents = {
-            "tangent_heights": _ad_geometry_tangent(f"{op} tangent_heights", t_heights, saved[33]),
-            "tangent_layer_thickness": _ad_geometry_tangent(f"{op} tangent_layer_thickness", t_layer_thickness_m, saved[38]),
-            "tangent_layer_eps_r": _ad_geometry_tangent(f"{op} tangent_layer_eps_r", t_layer_eps_r, saved[39]),
-            "tangent_layer_sigma_e": _ad_geometry_tangent(f"{op} tangent_layer_sigma_e", t_layer_sigma_e, saved[40]),
-            "tangent_c1_eps_r": _ad_geometry_tangent(f"{op} tangent_c1_eps_r", t_c1_eps_r, saved[12]),
-            "tangent_c1_sigma_e": _ad_geometry_tangent(f"{op} tangent_c1_sigma_e", t_c1_sigma_e, saved[13]),
-            "tangent_c1_gain": _ad_geometry_tangent(f"{op} tangent_c1_gain", t_c1_gain, saved[15]),
-            "tangent_c1_thickness": _ad_geometry_tangent(f"{op} tangent_c1_thickness", t_c1_thickness, saved[16]),
-            "tangent_c2_eps_r": _ad_geometry_tangent(f"{op} tangent_c2_eps_r", t_c2_eps_r, saved[20]),
-            "tangent_c2_sigma_e": _ad_geometry_tangent(f"{op} tangent_c2_sigma_e", t_c2_sigma_e, saved[21]),
-            "tangent_c2_gain": _ad_geometry_tangent(f"{op} tangent_c2_gain", t_c2_gain, saved[23]),
-            "tangent_c2_thickness": _ad_geometry_tangent(f"{op} tangent_c2_thickness", t_c2_thickness, saved[24]),
-            "tangent_d_i": _ad_geometry_tangent(f"{op} tangent_d_i", t_d_i, saved[4]),
-            "tangent_d_o": _ad_geometry_tangent(f"{op} tangent_d_o", t_d_o, saved[5]),
-            "tangent_c1_positions": _ad_geometry_tangent(f"{op} tangent_c1_positions", t_c1_positions, saved[10]),
-            "tangent_c1_normals": _ad_geometry_tangent(f"{op} tangent_c1_normals", t_c1_normals, saved[11]),
-            "tangent_c2_positions": _ad_geometry_tangent(f"{op} tangent_c2_positions", t_c2_positions, saved[18]),
-            "tangent_c2_normals": _ad_geometry_tangent(f"{op} tangent_c2_normals", t_c2_normals, saved[19]),
-            "tangent_L1": _ad_geometry_tangent(f"{op} tangent_L1", t_L1, saved[28]),
-            "tangent_L2": _ad_geometry_tangent(f"{op} tangent_L2", t_L2, saved[29]),
-            "tangent_sp1": _ad_geometry_tangent(f"{op} tangent_sp1", t_sp1, saved[30]),
-            "tangent_sp2": _ad_geometry_tangent(f"{op} tangent_sp2", t_sp2, saved[31]),
-            "tangent_centroids": _ad_geometry_tangent(f"{op} tangent_centroids", t_centroids, saved[32]),
-        }
-        tangent_k0 = _ad_frequency_tangent(t_k0)
-        tangent_frequency = _ad_frequency_tangent(t_frequency)
-        if (
-            tangent_k0 == 0.0
-            and tangent_frequency == 0.0
-            and all(value is None for value in tangents.values())
-        ):
-            return (None,) * len(_CHAIN_REALIZATION_OUTPUT_FIELDS)
-        with disable_functorch():
-            out = scattering_chain_realization_eval_jvp(
-                *(_ad_native_tensor(value) for value in saved[:42]),
-                k0=ctx.k0_value,
-                frequency_hz=ctx.frequency_value,
-                tangent_k0=tangent_k0,
-                tangent_frequency=tangent_frequency,
-                **tangents,
-            )
-        return (
-            out["tangent_total"],
-            out["tangent_path_field"],
-            out["tangent_path_gain"],
-            None,
-            None,
-        )
-
-
-def scattering_chain_realization_eval_ad(
-    valid: torch.Tensor, patch_tris: torch.Tensor, patch_uvs: torch.Tensor, rows: torch.Tensor,
-    d_i: torch.Tensor, d_o: torch.Tensor, n_rows: torch.Tensor, source: torch.Tensor,
-    vertex: torch.Tensor, target: torch.Tensor, c1_positions: torch.Tensor,
-    c1_normals: torch.Tensor, c1_eps_r: torch.Tensor, c1_sigma_e: torch.Tensor,
-    c1_mu_r: torch.Tensor, c1_gain: torch.Tensor, c1_thickness: torch.Tensor,
-    c1_depth: torch.Tensor, c2_positions: torch.Tensor, c2_normals: torch.Tensor,
-    c2_eps_r: torch.Tensor, c2_sigma_e: torch.Tensor, c2_mu_r: torch.Tensor, c2_gain: torch.Tensor,
-    c2_thickness: torch.Tensor, c2_depth: torch.Tensor, tx_pol: torch.Tensor, rx_pol: torch.Tensor,
-    L1: torch.Tensor, L2: torch.Tensor, sp1: torch.Tensor, sp2: torch.Tensor,
-    centroids: torch.Tensor, heights: torch.Tensor, cos_spec: torch.Tensor,
-    material_id: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor, *, k0: torch.Tensor, frequency: torch.Tensor,
-) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`scattering_chain_realization_eval` (coherent scattering).
-
-    ``k0`` and ``frequency`` are the two AD-live scalars as 0-dim tensors so the
-    carrier/prefactor and the in-kernel layer stack keep their gradients; their
-    host values are read once per apply at this seam. The Duffy
-    quadrature nodes are gathered from the shared cache and threaded to the
-    companions as fixed inputs.
-    """
-
-    primal_args = _ordered_primal_args(locals(), _CHAIN_REALIZATION_PRIMAL_NAMES)
-    quad_a, quad_b, quad_w = _duffy_nodes(patch_tris.device)
-    k0_value = _ad_frequency_value(k0)
-    frequency_value = _ad_frequency_value(frequency)
-    values = _ScatteringChainRealizationEvalAdFunction.apply(
-        *primal_args,
-        quad_a,
-        quad_b,
-        quad_w,
-        k0,
-        frequency,
-        float(k0_value),
-        float(frequency_value),
-    )
-    return dict(zip(_CHAIN_REALIZATION_OUTPUT_FIELDS, values, strict=True))
 
 
 # ---------------------------------------------------------------------------
@@ -2917,7 +1568,7 @@ _FIXED = (
 )
 
 
-def _backward_need_flags(needed) -> tuple[bool, bool, bool]:
+def _backward_need_flags(needed: tuple[bool, ...]) -> tuple[bool, bool, bool]:
     """Resolve which native grad groups the VJP must compute."""
 
     need_rough = bool(needed[0] or needed[1] or needed[2])
@@ -2937,7 +1588,9 @@ def _backward_is_noop(
     return no_grad_requested or no_upstream
 
 
-def _backward_grad_tuple(out, ctx, needed, *, need_frequency: bool) -> tuple:
+def _backward_grad_tuple(
+    out: dict[str, Any], ctx: Any, needed: tuple[bool, ...], *, need_frequency: bool,
+) -> tuple[torch.Tensor | None, ...]:
     """Pack the 21-slot input-gradient tuple from the native VJP output."""
 
     grad_sigma_h = (
@@ -2996,16 +1649,17 @@ class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        rough_sigma_h, rough_corr_x, rough_corr_y, layer_thickness_m, layer_eps_r, layer_sigma_e,
-        layer_mu_r, frequency, f_te_built, f_tm_built, s_te, s_tm, a_te, a_tm, r_diff_te, r_diff_tm,
-        cos_i, phi_i, cos_o, phi_o, frequency_value,
-    ):
+        rough_sigma_h: Any, rough_corr_x: Any, rough_corr_y: Any, layer_thickness_m: Any,
+        layer_eps_r: Any, layer_sigma_e: Any, layer_mu_r: Any, frequency: Any, f_te_built: Any,
+        f_tm_built: Any, s_te: Any, s_tm: Any, a_te: Any, a_tm: Any, r_diff_te: Any, r_diff_tm: Any,
+        cos_i: Any, phi_i: Any, cos_o: Any, phi_o: Any, frequency_value: Any,
+    ) -> Any:
         # The numpy build already produced f_te_built/f_tm_built; the forward is
         # a pure pass-through so the primal table stays bit-identical.
         return f_te_built, f_tm_built
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         frequency = inputs[7]
         ctx.sigma_h = _scalar_value(inputs[0])
@@ -3033,7 +1687,7 @@ class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, grad_f_te, grad_f_tm):
+    def backward(ctx: Any, grad_f_te: Any, grad_f_tm: Any) -> Any:
         none_grads = (None,) * 21
         _ad_reject_fixed_inputs(
             "kirchhoff_table_build_ad", ctx.needs_input_grad, _FIXED
@@ -3066,10 +1720,11 @@ class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx, t_sigma_h, t_corr_x, t_corr_y, t_thickness, t_eps, t_sigma, t_mu_r, t_frequency,
-        _t_f_te, _t_f_tm, _t_s_te, _t_s_tm, _t_a_te, _t_a_tm, _t_r_diff_te, _t_r_diff_tm, _t_cos_i,
-        _t_phi_i, _t_cos_o, _t_phi_o, _t_frequency_value,
-    ):
+        ctx: Any, t_sigma_h: Any, t_corr_x: Any, t_corr_y: Any, t_thickness: Any, t_eps: Any,
+        t_sigma: Any, t_mu_r: Any, t_frequency: Any, _t_f_te: Any, _t_f_tm: Any, _t_s_te: Any,
+        _t_s_tm: Any, _t_a_te: Any, _t_a_tm: Any, _t_r_diff_te: Any, _t_r_diff_tm: Any,
+        _t_cos_i: Any, _t_phi_i: Any, _t_cos_o: Any, _t_phi_o: Any, _t_frequency_value: Any,
+    ) -> Any:
         _ad_reject_fixed_tangents(
             "kirchhoff_table_build_ad",
             (
@@ -3116,10 +1771,37 @@ class _KirchhoffTableBuildAdFunction(torch.autograd.Function):
         return out["tangent_f_te"], out["tangent_f_tm"]
 
 
+class _KirchhoffTableBuild(Protocol):
+    """The parts of a built Kirchhoff table that its AD replay reads."""
+
+    @property
+    def cos_theta_i(self) -> torch.Tensor: ...
+    @property
+    def phi_i(self) -> torch.Tensor: ...
+    @property
+    def cos_theta_o(self) -> torch.Tensor: ...
+    @property
+    def phi_o(self) -> torch.Tensor: ...
+    @property
+    def f_te(self) -> torch.Tensor: ...
+    @property
+    def f_tm(self) -> torch.Tensor: ...
+    @property
+    def r_diff_te(self) -> torch.Tensor: ...
+    @property
+    def r_diff_tm(self) -> torch.Tensor: ...
+    @property
+    def normalization_applied(self) -> torch.Tensor: ...
+    @property
+    def pre_balance_lobe_te(self) -> torch.Tensor | None: ...
+    @property
+    def pre_balance_lobe_tm(self) -> torch.Tensor | None: ...
+
+
 def kirchhoff_table_build_ad(
     rough_sigma_h: torch.Tensor, rough_corr_x: torch.Tensor, rough_corr_y: torch.Tensor,
     layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor, frequency: torch.Tensor, *, table,
+    layer_mu_r: torch.Tensor, frequency: torch.Tensor, *, table: _KirchhoffTableBuild,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Attach the native build adjoint to a numpy-built ``KirchhoffTable``.
 
@@ -3200,14 +1882,17 @@ class _McScatteringPairSumFunction(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(f_te, f_tm, samples, tables, receivers, visible, deposited):
+    def forward(
+        f_te: Any, f_tm: Any, samples: Any, tables: Any, receivers: Any, visible: Any,
+        deposited: Any,
+    ) -> Any:
         native_tables = (*tables[:3], f_te, f_tm)
         return _mc_scattering_pair_sum(
             samples, native_tables, receivers, visible, f_te, f_tm, deposited
         )
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         f_te, f_tm, samples, tables, receivers, visible, _deposited = inputs
         ctx.samples = samples
@@ -3219,7 +1904,7 @@ class _McScatteringPairSumFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, grad_out):
+    def backward(ctx: Any, grad_out: Any) -> Any:
         if grad_out is None:
             return (None,) * 7
         f_te, f_tm = ctx.saved_tensors
@@ -3235,7 +1920,7 @@ class _McScatteringPairSumFunction(torch.autograd.Function):
         return out[0], out[1], None, None, None, None, None
 
     @staticmethod
-    def jvp(ctx, t_te, t_tm, *_rest):
+    def jvp(ctx: Any, t_te: Any, t_tm: Any, *_rest: Any) -> Any:
         tangent_te = _ad_native_tangent_or_none(t_te)
         tangent_tm = _ad_native_tangent_or_none(t_tm)
         if tangent_te is None and tangent_tm is None:
@@ -3265,7 +1950,7 @@ def mc_scattering_pair_sum(
     """
 
     if ad:
-        return _McScatteringPairSumFunction.apply(  # type: ignore[no-any-return]
+        return _McScatteringPairSumFunction.apply(
             tables[3], tables[4], samples, tables, receivers, visible, deposited
         )
     return _mc_scattering_pair_sum(

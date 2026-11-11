@@ -88,20 +88,6 @@
       "python_owners": ["witwin.channel.montecarlo.bdpt.bdpt_accumulate_connection_samples_jvp"]
     },
     {
-      "name": "bdpt_apply_los_visibility",
-      "target": "channel_bdpt_apply_los_visibility",
-      "return_type": "torch::Tensor",
-      "doc": "Apply RayD LoS visibility to one BDPT transmitter component map with a CUDA kernel.",
-      "parameters": [
-        ["maps", "torch::Tensor", null],
-        ["los", "torch::Tensor", null],
-        ["visible", "torch::Tensor", null],
-        ["tx_index", "int64_t", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_apply_los_visibility"]
-    },
-    {
       "name": "bdpt_compact_connection_samples",
       "target": "channel_bdpt_compact_connection_samples",
       "return_type": "pybind11::dict",
@@ -112,20 +98,6 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_compact_connection_samples"]
-    },
-    {
-      "name": "bdpt_component_map_buffer",
-      "target": "channel_bdpt_component_map_buffer",
-      "return_type": "torch::Tensor",
-      "doc": "Allocate a zero-filled BDPT component map buffer.",
-      "parameters": [
-        ["reference", "torch::Tensor", null],
-        ["tx_count", "int64_t", null],
-        ["dim0", "int64_t", null],
-        ["dim1", "int64_t", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_component_map_buffer"]
     },
     {
       "name": "bdpt_concat_connection_samples",
@@ -162,34 +134,6 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_count_valid_connection_samples"]
-    },
-    {
-      "name": "bdpt_counter_uniforms",
-      "target": "channel_bdpt_counter_uniforms_cuda",
-      "return_type": "at::Tensor",
-      "doc": "Generate counter-based BDPT event or scatter-direction uniforms with a CUDA kernel.",
-      "parameters": [
-        ["reference", "at::Tensor", null],
-        ["count", "int64_t", null],
-        ["lanes", "int64_t", null],
-        ["seed", "int64_t", null],
-        ["first", "int64_t", null],
-        ["depth", "int64_t", null],
-        ["stream", "int64_t", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_counter_uniforms"]
-    },
-    {
-      "name": "bdpt_empty_subpath_state",
-      "target": "channel_bdpt_empty_subpath_state",
-      "return_type": "pybind11::dict",
-      "doc": "Allocate the empty BDPT subpath-state tensor schema with native CUDA storage.",
-      "parameters": [
-        ["reference", "torch::Tensor", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_empty_subpath_state"]
     },
     {
       "name": "bdpt_endpoint_connection_samples",
@@ -284,34 +228,6 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_endpoint_subpath_state"]
-    },
-    {
-      "name": "bdpt_face_material_tensors",
-      "target": "channel_bdpt_face_material_tensors",
-      "return_type": "pybind11::dict",
-      "doc": "Expand BDPT material parameters to per-face tensors with a fused CUDA kernel.",
-      "parameters": [
-        ["material_eps_r", "torch::Tensor", null],
-        ["material_sigma_e", "torch::Tensor", null],
-        ["material_mu_r", "torch::Tensor", null],
-        ["face_material_id", "torch::Tensor", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.materials.bdpt_face_material_tensors"]
-    },
-    {
-      "name": "bdpt_face_material_tensors_from_host",
-      "target": "channel_bdpt_face_material_tensors_from_host",
-      "return_type": "pybind11::dict",
-      "doc": "Create and expand BDPT material parameters from host scalar inputs with native CUDA.",
-      "parameters": [
-        ["material_eps_r", "pybind11::sequence", null],
-        ["material_sigma_e", "pybind11::sequence", null],
-        ["material_mu_r", "pybind11::sequence", null],
-        ["face_material_id", "pybind11::sequence", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.materials.bdpt_face_material_tensors_from_host"]
     },
     {
       "name": "bdpt_filter_connection_samples",
@@ -455,17 +371,6 @@
       "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_launch_state"]
     },
     {
-      "name": "bdpt_los_component_maps",
-      "target": "channel_bdpt_los_component_maps",
-      "return_type": "torch::Tensor",
-      "doc": "Convert BDPT LoS gains to public component-map grid layout with a CUDA kernel.",
-      "parameters": [
-        ["los", "torch::Tensor", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_los_component_maps"]
-    },
-    {
       "name": "bdpt_los_component_maps_from_matrix",
       "target": "channel_bdpt_los_component_maps_from_matrix",
       "return_type": "torch::Tensor",
@@ -477,73 +382,6 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_los_component_maps_from_matrix"]
-    },
-    {
-      "name": "bdpt_los_export",
-      "target": "channel_bdpt_los_export",
-      "return_type": "pybind11::dict",
-      "doc": "Export BDPT direct LoS connections from CUDA tensors.",
-      "parameters": [
-        ["tx_positions", "torch::Tensor", null],
-        ["tx_power", "torch::Tensor", null],
-        ["rx_positions", "torch::Tensor", null],
-        ["frequency_hz", "double", null],
-        ["tx_pol", "torch::Tensor", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_los_export"]
-    },
-    {
-      "name": "bdpt_los_visibility_inputs",
-      "target": "channel_bdpt_los_visibility_inputs",
-      "return_type": "pybind11::dict",
-      "doc": "Prepare RayD LoS visibility start and active tensors for BDPT with a CUDA kernel.",
-      "parameters": [
-        ["tx_positions", "torch::Tensor", null],
-        ["tx_index", "int64_t", null],
-        ["rx_count", "int64_t", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_los_visibility_inputs"]
-    },
-    {
-      "name": "bdpt_mis_weights",
-      "target": "channel_bdpt_mis_weights",
-      "return_type": "torch::Tensor",
-      "doc": "Evaluate BDPT MIS weights with a CUDA kernel.",
-      "parameters": [
-        ["pdf", "torch::Tensor", null],
-        ["strategy_pdf_sum", "torch::Tensor", null],
-        ["mode_id", "int64_t", null],
-        ["beta", "double", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_mis_weights"]
-    },
-    {
-      "name": "bdpt_pack_vec3",
-      "target": "channel_bdpt_pack_vec3",
-      "return_type": "torch::Tensor",
-      "doc": "Pack three CUDA float vectors into an interleaved BDPT vec3 tensor.",
-      "parameters": [
-        ["x", "torch::Tensor", null],
-        ["y", "torch::Tensor", null],
-        ["z", "torch::Tensor", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_pack_vec3"]
-    },
-    {
-      "name": "bdpt_point_component_power",
-      "target": "channel_bdpt_point_component_power",
-      "return_type": "pybind11::dict",
-      "doc": "Reduce point-receiver BDPT component powers with CUDA kernels.",
-      "parameters": [
-        ["path_gain", "torch::Tensor", null],
-        ["include_los", "bool", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_point_component_power"]
     },
     {
       "name": "bdpt_receiver_grid_points",
@@ -568,232 +406,6 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_receiver_grid_points"]
-    },
-    {
-      "name": "bdpt_reflected_light_subpath_state",
-      "target": "channel_bdpt_reflected_light_subpath_state",
-      "return_type": "pybind11::dict",
-      "doc": "Propagate BDPT light subpaths through native RayD hit geometry with CUDA reflection.",
-      "parameters": [
-        ["light", "pybind11::dict", null],
-        ["intersection", "pybind11::dict", null],
-        ["material_gain", "torch::Tensor", null],
-        ["material_valid", "torch::Tensor", null],
-        ["material_eps_r", "torch::Tensor", null],
-        ["material_sigma_e", "torch::Tensor", null],
-        ["material_mu_r", "torch::Tensor", null],
-        ["material_thickness", "torch::Tensor", null],
-        ["frequency_hz", "double", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_reflected_light_subpath_state"]
-    },
-    {
-      "name": "bdpt_reflected_light_subpath_state_backward",
-      "target": "channel_bdpt_reflected_light_subpath_state_backward_dispatch",
-      "return_type": "pybind11::dict",
-      "doc": "ADR-022 VJP of BDPT reflected light subpath advance (native CUDA companion).",
-      "parameters": [
-        ["light", "pybind11::dict", null],
-        ["intersection", "pybind11::dict", null],
-        ["material_gain", "torch::Tensor", null],
-        ["material_valid", "torch::Tensor", null],
-        ["material_eps_r", "torch::Tensor", null],
-        ["material_sigma_e", "torch::Tensor", null],
-        ["material_mu_r", "torch::Tensor", null],
-        ["material_thickness", "torch::Tensor", null],
-        ["frequency_hz", "double", null],
-        ["grad_field_real", "pybind11::object", null],
-        ["grad_field_imag", "pybind11::object", null],
-        ["grad_throughput_real", "pybind11::object", null],
-        ["grad_throughput_imag", "pybind11::object", null],
-        ["need_grad_material", "bool", null],
-        ["need_grad_field_in", "bool", null],
-        ["need_grad_frequency", "bool", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.montecarlo.bdpt.bdpt_reflected_light_subpath_state_backward"]
-    },
-    {
-      "name": "bdpt_reflected_light_subpath_state_jvp",
-      "target": "channel_bdpt_reflected_light_subpath_state_jvp_dispatch",
-      "return_type": "pybind11::dict",
-      "doc": "ADR-022 JVP of BDPT reflected light subpath advance (native CUDA companion).",
-      "parameters": [
-        ["light", "pybind11::dict", null],
-        ["intersection", "pybind11::dict", null],
-        ["material_gain", "torch::Tensor", null],
-        ["material_valid", "torch::Tensor", null],
-        ["material_eps_r", "torch::Tensor", null],
-        ["material_sigma_e", "torch::Tensor", null],
-        ["material_mu_r", "torch::Tensor", null],
-        ["material_thickness", "torch::Tensor", null],
-        ["frequency_hz", "double", null],
-        ["tangent_eps_r", "pybind11::object", null],
-        ["tangent_sigma_e", "pybind11::object", null],
-        ["tangent_gain", "pybind11::object", null],
-        ["tangent_thickness", "pybind11::object", null],
-        ["tangent_frequency", "double", null],
-        ["tangent_light_field_real", "pybind11::object", null],
-        ["tangent_light_field_imag", "pybind11::object", null],
-        ["tangent_light_throughput_real", "pybind11::object", null],
-        ["tangent_light_throughput_imag", "pybind11::object", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.montecarlo.bdpt.bdpt_reflected_light_subpath_state_jvp"]
-    },
-    {
-      "name": "bdpt_reflection_launch_inputs",
-      "target": "channel_bdpt_reflection_launch_inputs",
-      "return_type": "pybind11::dict",
-      "doc": "Prepare RayD reflection launch tensors for BDPT with a CUDA kernel.",
-      "parameters": [
-        ["tx_positions", "torch::Tensor", null],
-        ["tx_index", "int64_t", null],
-        ["sample_count", "int64_t", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_reflection_launch_inputs"]
-    },
-    {
-      "name": "bdpt_sample_directions",
-      "target": "channel_bdpt_sample_directions",
-      "return_type": "torch::Tensor",
-      "doc": "Generate seeded BDPT sphere sample directions with a fused CUDA kernel.",
-      "parameters": [
-        ["count", "int64_t", null],
-        ["reference", "torch::Tensor", null],
-        ["seed", "int64_t", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_sample_directions"]
-    },
-    {
-      "name": "bdpt_store_component_map",
-      "target": "channel_bdpt_store_component_map",
-      "return_type": "torch::Tensor",
-      "doc": "Store one BDPT component map into a transmitter slot with a CUDA kernel.",
-      "parameters": [
-        ["maps", "torch::Tensor", null],
-        ["source", "torch::Tensor", null],
-        ["tx_index", "int64_t", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_store_component_map"]
-    },
-    {
-      "name": "bdpt_store_point_component_column",
-      "target": "channel_bdpt_store_point_component_column",
-      "return_type": "torch::Tensor",
-      "doc": "Store a one-cell BDPT component map into a point-receiver component matrix.",
-      "parameters": [
-        ["target", "torch::Tensor", null],
-        ["source", "torch::Tensor", null],
-        ["rx_index", "int64_t", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_store_point_component_column"]
-    },
-    {
-      "name": "bdpt_store_scaled_component_map",
-      "target": "channel_bdpt_store_scaled_component_map",
-      "return_type": "torch::Tensor",
-      "doc": "Store one scaled BDPT component map into a transmitter slot with a CUDA kernel.",
-      "parameters": [
-        ["maps", "torch::Tensor", null],
-        ["source", "torch::Tensor", null],
-        ["scale_values", "torch::Tensor", null],
-        ["tx_index", "int64_t", null],
-        ["scale_index", "int64_t", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_store_scaled_component_map"]
-    },
-    {
-      "name": "bdpt_subpath_intersection_inputs",
-      "target": "channel_bdpt_subpath_intersection_inputs",
-      "return_type": "pybind11::dict",
-      "doc": "Expose BDPT subpath state as RayD intersection ray inputs with native tensor storage.",
-      "parameters": [
-        ["subpath", "pybind11::dict", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_subpath_intersection_inputs"]
-    },
-    {
-      "name": "bdpt_transmitted_light_subpath_state",
-      "target": "channel_bdpt_transmitted_light_subpath_state",
-      "return_type": "pybind11::dict",
-      "doc": "Continue BDPT light subpaths through thin_sheet walls with CUDA layer-stack transmission.",
-      "parameters": [
-        ["light", "pybind11::dict", null],
-        ["intersection", "pybind11::dict", null],
-        ["face_material_id", "torch::Tensor", null],
-        ["layer_offset", "torch::Tensor", null],
-        ["layer_count", "torch::Tensor", null],
-        ["layer_thickness_m", "torch::Tensor", null],
-        ["layer_eps_r", "torch::Tensor", null],
-        ["layer_sigma_e", "torch::Tensor", null],
-        ["layer_mu_r", "torch::Tensor", null],
-        ["frequency_hz", "double", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_transmitted_light_subpath_state"]
-    },
-    {
-      "name": "bdpt_transmitted_light_subpath_state_backward",
-      "target": "channel_bdpt_transmitted_light_subpath_state_backward_dispatch",
-      "return_type": "pybind11::dict",
-      "doc": "ADR-022 VJP of BDPT transmitted light subpath advance (native CUDA companion).",
-      "parameters": [
-        ["light", "pybind11::dict", null],
-        ["intersection", "pybind11::dict", null],
-        ["face_material_id", "torch::Tensor", null],
-        ["layer_offset", "torch::Tensor", null],
-        ["layer_count", "torch::Tensor", null],
-        ["layer_thickness_m", "torch::Tensor", null],
-        ["layer_eps_r", "torch::Tensor", null],
-        ["layer_sigma_e", "torch::Tensor", null],
-        ["layer_mu_r", "torch::Tensor", null],
-        ["frequency_hz", "double", null],
-        ["grad_field_real", "pybind11::object", null],
-        ["grad_field_imag", "pybind11::object", null],
-        ["grad_throughput_real", "pybind11::object", null],
-        ["grad_throughput_imag", "pybind11::object", null],
-        ["need_grad_layers", "bool", null],
-        ["need_grad_field_in", "bool", null],
-        ["need_grad_frequency", "bool", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.montecarlo.bdpt.bdpt_transmitted_light_subpath_state_backward"]
-    },
-    {
-      "name": "bdpt_transmitted_light_subpath_state_jvp",
-      "target": "channel_bdpt_transmitted_light_subpath_state_jvp_dispatch",
-      "return_type": "pybind11::dict",
-      "doc": "ADR-022 JVP of BDPT transmitted light subpath advance (native CUDA companion).",
-      "parameters": [
-        ["light", "pybind11::dict", null],
-        ["intersection", "pybind11::dict", null],
-        ["face_material_id", "torch::Tensor", null],
-        ["layer_offset", "torch::Tensor", null],
-        ["layer_count", "torch::Tensor", null],
-        ["layer_thickness_m", "torch::Tensor", null],
-        ["layer_eps_r", "torch::Tensor", null],
-        ["layer_sigma_e", "torch::Tensor", null],
-        ["layer_mu_r", "torch::Tensor", null],
-        ["frequency_hz", "double", null],
-        ["tangent_layer_thickness", "pybind11::object", null],
-        ["tangent_layer_eps_r", "pybind11::object", null],
-        ["tangent_layer_sigma_e", "pybind11::object", null],
-        ["tangent_frequency", "double", null],
-        ["tangent_light_field_real", "pybind11::object", null],
-        ["tangent_light_field_imag", "pybind11::object", null],
-        ["tangent_light_throughput_real", "pybind11::object", null],
-        ["tangent_light_throughput_imag", "pybind11::object", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.montecarlo.bdpt.bdpt_transmitted_light_subpath_state_jvp"]
     },
     {
       "name": "bdpt_transmitter_tensors",
@@ -952,6 +564,84 @@
       "python_owners": ["witwin.channel.runtime.capacity_failure_state_read"]
     },
     {
+      "name": "chain_candidates",
+      "target": "channel_chain_candidates",
+      "return_type": "pybind11::dict",
+      "doc": "Join interaction-chain halves on shared edges and select candidates with native CUDA.",
+      "parameters": [
+        ["lane_offsets", "torch::Tensor", null],
+        ["lane_start", "int64_t", null],
+        ["lane_end", "int64_t", null],
+        ["plane_point", "torch::Tensor", null],
+        ["plane_normal", "torch::Tensor", null],
+        ["bounds", "torch::Tensor", null],
+        ["occupancy", "torch::Tensor", null],
+        ["edge_position", "torch::Tensor", null],
+        ["edge_direction", "torch::Tensor", null],
+        ["edge_t_min", "torch::Tensor", null],
+        ["edge_t_max", "torch::Tensor", null],
+        ["a_edge_offsets", "torch::Tensor", null],
+        ["a_endpoint", "torch::Tensor", null],
+        ["a_node", "torch::Tensor", null],
+        ["a_endpoints", "torch::Tensor", null],
+        ["a_node_sequences", "torch::Tensor", null],
+        ["a_node_images", "torch::Tensor", null],
+        ["b_edge_offsets", "torch::Tensor", null],
+        ["b_endpoint", "torch::Tensor", null],
+        ["b_node", "torch::Tensor", null],
+        ["b_endpoints", "torch::Tensor", null],
+        ["b_node_sequences", "torch::Tensor", null],
+        ["b_node_images", "torch::Tensor", null],
+        ["box_tolerance", "double", null],
+        ["segment_tolerance", "double", null],
+        ["min_segment_length", "double", null],
+        ["edge_epsilon", "double", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.topology.chain_candidates"]
+    },
+    {
+      "name": "chain_double_candidates",
+      "target": "channel_chain_double_candidates",
+      "return_type": "pybind11::dict",
+      "doc": "Expand double-diffraction candidates from endpoint-visible edges with native CUDA.",
+      "parameters": [
+        ["pair_offsets", "torch::Tensor", null],
+        ["lane_start", "int64_t", null],
+        ["lane_end", "int64_t", null],
+        ["rx_count", "int64_t", null],
+        ["tx_offsets", "torch::Tensor", null],
+        ["tx_edges", "torch::Tensor", null],
+        ["rx_offsets", "torch::Tensor", null],
+        ["rx_edges", "torch::Tensor", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.topology.chain_double_candidates"]
+    },
+    {
+      "name": "chain_node_edges",
+      "target": "channel_chain_node_edges",
+      "return_type": "pybind11::dict",
+      "doc": "Select image-tree node and diffraction edge pairs of interaction chains with native CUDA.",
+      "parameters": [
+        ["node_sequences", "torch::Tensor", null],
+        ["node_images", "torch::Tensor", null],
+        ["plane_point", "torch::Tensor", null],
+        ["plane_normal", "torch::Tensor", null],
+        ["bounds", "torch::Tensor", null],
+        ["occupancy", "torch::Tensor", null],
+        ["edge_position", "torch::Tensor", null],
+        ["edge_direction", "torch::Tensor", null],
+        ["edge_t_min", "torch::Tensor", null],
+        ["edge_t_max", "torch::Tensor", null],
+        ["node_start", "int64_t", null],
+        ["node_end", "int64_t", null],
+        ["tolerance", "double", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.topology.chain_node_edges"]
+    },
+    {
       "name": "consumer_fixed_los_gather",
       "target": "channel_consumer_fixed_los_gather",
       "return_type": "pybind11::dict",
@@ -1029,27 +719,6 @@
       "python_owners": ["witwin.channel.propagation.consumer.consumer_los_jones"]
     },
     {
-      "name": "core_diffraction_edge_count",
-      "target": "channel_core_diffraction_edge_count",
-      "return_type": "int64_t",
-      "doc": "Count selected diffraction edges with native CUDA policy logic.",
-      "parameters": [
-        ["vertices", "torch::Tensor", null],
-        ["faces", "torch::Tensor", null],
-        ["face_normals", "torch::Tensor", null],
-        ["edge_v0", "torch::Tensor", null],
-        ["edge_v1", "torch::Tensor", null],
-        ["face0", "torch::Tensor", null],
-        ["face1", "torch::Tensor", null],
-        ["vertical_only", "bool", null],
-        ["vertical_ratio", "double", null],
-        ["boundary_half_plane", "bool", null],
-        ["plane_tol", "double", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.geometry.core_diffraction_edge_count"]
-    },
-    {
       "name": "core_pack_int2",
       "target": "channel_core_pack_int2",
       "return_type": "torch::Tensor",
@@ -1060,6 +729,31 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.topology.core_pack_int2"]
+    },
+    {
+      "name": "coupled_chain_geometry_forward",
+      "target": "channel_coupled_chain_geometry_forward",
+      "return_type": "pybind11::dict",
+      "doc": "Validate interaction-chain candidates (reflections, one diffraction, reflections) with typed RayD EPC and visibility; no field coefficient is evaluated.",
+      "parameters": [
+        ["scene", "RayDSceneResource &", null],
+        ["source", "torch::Tensor", null],
+        ["receiver", "torch::Tensor", null],
+        ["edge_point", "torch::Tensor", null],
+        ["edge_id", "torch::Tensor", null],
+        ["prefix_faces", "torch::Tensor", null],
+        ["prefix_plane_points", "torch::Tensor", null],
+        ["prefix_plane_normals", "torch::Tensor", null],
+        ["suffix_faces", "torch::Tensor", null],
+        ["suffix_plane_points", "torch::Tensor", null],
+        ["suffix_plane_normals", "torch::Tensor", null],
+        ["surface_group_id", "torch::Tensor", null],
+        ["surface_group_size", "torch::Tensor", null],
+        ["surface_group_members", "torch::Tensor", null],
+        ["min_segment_length", "double", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.geometry.coupled_chain_geometry_forward"]
     },
     {
       "name": "coupled_dd_geometry_forward",
@@ -1083,89 +777,6 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.geometry.coupled_dd_geometry_forward"]
-    },
-    {
-      "name": "coupled_rd_geometry_forward",
-      "target": "channel_coupled_rd_geometry_forward",
-      "return_type": "pybind11::dict",
-      "doc": "Construct one-reflection/one-diffraction geometry with typed RayD EPC and visibility; no field coefficient is evaluated.",
-      "parameters": [
-        ["scene", "RayDSceneResource &", null],
-        ["source", "torch::Tensor", null],
-        ["receiver", "torch::Tensor", null],
-        ["face_id", "torch::Tensor", null],
-        ["plane_point", "torch::Tensor", null],
-        ["plane_normal", "torch::Tensor", null],
-        ["edge_id", "torch::Tensor", null],
-        ["edge_pos", "torch::Tensor", null],
-        ["edge_dir", "torch::Tensor", null],
-        ["edge_t_min", "torch::Tensor", null],
-        ["edge_t_max", "torch::Tensor", null],
-        ["surface_group_id", "torch::Tensor", null],
-        ["surface_group_size", "torch::Tensor", null],
-        ["surface_group_members", "torch::Tensor", null],
-        ["reverse", "bool", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.geometry.coupled_rd_geometry_forward"]
-    },
-    {
-      "name": "coupled_rd_prepare",
-      "target": "channel_coupled_rd_prepare_cuda",
-      "return_type": "std::vector<at::Tensor>",
-      "doc": "Fixed-winner coupled stationary geometry re-solve (image source, edge point, wall crossing).",
-      "parameters": [
-        ["source", "at::Tensor", null],
-        ["receiver", "at::Tensor", null],
-        ["plane_point", "at::Tensor", null],
-        ["plane_normal", "at::Tensor", null],
-        ["edge_pos", "at::Tensor", null],
-        ["edge_dir", "at::Tensor", null],
-        ["edge_t_min", "at::Tensor", null],
-        ["edge_t_max", "at::Tensor", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.fields._CoupledRdPrepareAdFunction"]
-    },
-    {
-      "name": "coupled_rd_prepare_backward",
-      "target": "channel_coupled_rd_prepare_backward",
-      "return_type": "pybind11::dict",
-      "doc": "VJP of the coupled stationary geometry re-solve (endpoints).",
-      "parameters": [
-        ["source", "at::Tensor", null],
-        ["receiver", "at::Tensor", null],
-        ["plane_point", "at::Tensor", null],
-        ["plane_normal", "at::Tensor", null],
-        ["edge_pos", "at::Tensor", null],
-        ["edge_dir", "at::Tensor", null],
-        ["edge_t_min", "at::Tensor", null],
-        ["grad_edge_point", "pybind11::object", null],
-        ["grad_reflection_point", "pybind11::object", null],
-        ["need_grad_source", "bool", null],
-        ["need_grad_receiver", "bool", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.fields._CoupledRdPrepareAdFunction"]
-    },
-    {
-      "name": "coupled_rd_prepare_jvp",
-      "target": "channel_coupled_rd_prepare_jvp",
-      "return_type": "pybind11::dict",
-      "doc": "JVP of the coupled stationary geometry re-solve (endpoints).",
-      "parameters": [
-        ["source", "at::Tensor", null],
-        ["receiver", "at::Tensor", null],
-        ["plane_point", "at::Tensor", null],
-        ["plane_normal", "at::Tensor", null],
-        ["edge_pos", "at::Tensor", null],
-        ["edge_dir", "at::Tensor", null],
-        ["edge_t_min", "at::Tensor", null],
-        ["tangent_source", "pybind11::object", null],
-        ["tangent_receiver", "pybind11::object", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.fields._CoupledRdPrepareAdFunction"]
     },
     {
       "name": "deterministic_accumulate_flat",
@@ -1441,45 +1052,6 @@
       "python_owners": ["witwin.channel.kernels.geometry.deterministic_face_groups"]
     },
     {
-      "name": "deterministic_field_from_power_phase",
-      "target": "channel_deterministic_field_from_power_phase",
-      "return_type": "pybind11::dict",
-      "doc": "Compute deterministic scalar complex field components from path power and phase with a CUDA kernel.",
-      "parameters": [
-        ["path_gain", "torch::Tensor", null],
-        ["phase_rad", "torch::Tensor", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.fields.deterministic_field_from_power_phase"]
-    },
-    {
-      "name": "deterministic_gather_topology_block",
-      "target": "channel_deterministic_gather_topology_block",
-      "return_type": "pybind11::dict",
-      "doc": "Gather and truncate deterministic topology rows with native CUDA.",
-      "parameters": [
-        ["block", "pybind11::dict", null],
-        ["order", "torch::Tensor", null],
-        ["max_count", "int64_t", null],
-        ["sequence_width", "int64_t", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.topology.deterministic_gather_topology_block"]
-    },
-    {
-      "name": "deterministic_los_field",
-      "target": "channel_deterministic_los_field",
-      "return_type": "pybind11::dict",
-      "doc": "Evaluate deterministic LoS/free-space scalar complex fields with a CUDA kernel.",
-      "parameters": [
-        ["path_gain", "torch::Tensor", null],
-        ["path_length_m", "torch::Tensor", null],
-        ["frequency_hz", "double", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.fields.deterministic_los_field"]
-    },
-    {
       "name": "deterministic_los_topology_block",
       "target": "channel_deterministic_los_topology_block",
       "return_type": "pybind11::dict",
@@ -1571,31 +1143,6 @@
       "python_owners": ["witwin.channel.kernels.fields.deterministic_phase_from_field"]
     },
     {
-      "name": "deterministic_phase_from_length",
-      "target": "channel_deterministic_phase_from_length",
-      "return_type": "torch::Tensor",
-      "doc": "Compute deterministic free-space phase from path length with a CUDA kernel.",
-      "parameters": [
-        ["path_length_m", "torch::Tensor", null],
-        ["frequency_hz", "double", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.fields.deterministic_phase_from_length"]
-    },
-    {
-      "name": "deterministic_reflect_points",
-      "target": "channel_deterministic_reflect_points",
-      "return_type": "torch::Tensor",
-      "doc": "Reflect deterministic points about planes with native CUDA.",
-      "parameters": [
-        ["points", "torch::Tensor", null],
-        ["plane_points", "torch::Tensor", null],
-        ["normals", "torch::Tensor", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.geometry.deterministic_reflect_points"]
-    },
-    {
       "name": "deterministic_reflection_epc_input_batch",
       "target": "channel_deterministic_reflection_epc_input_batch",
       "return_type": "pybind11::dict",
@@ -1685,20 +1232,6 @@
       "python_owners": ["witwin.channel.kernels.topology.deterministic_reflection_topology_compact"]
     },
     {
-      "name": "deterministic_repeat_range",
-      "target": "channel_deterministic_repeat_range",
-      "return_type": "torch::Tensor",
-      "doc": "Generate repeated deterministic int32 range indices with native CUDA.",
-      "parameters": [
-        ["reference", "torch::Tensor", null],
-        ["start", "int64_t", null],
-        ["end", "int64_t", null],
-        ["repeats", "int64_t", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.topology.deterministic_repeat_range"]
-    },
-    {
       "name": "deterministic_selected_edge_count",
       "target": "channel_deterministic_selected_edge_count",
       "return_type": "int64_t",
@@ -1708,35 +1241,6 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.topology.deterministic_selected_edge_count"]
-    },
-    {
-      "name": "deterministic_sort_order",
-      "target": "channel_deterministic_sort_order",
-      "return_type": "torch::Tensor",
-      "doc": "Stable-sort deterministic topology rows by native CUDA path keys.",
-      "parameters": [
-        ["valid", "torch::Tensor", null],
-        ["tx_id", "torch::Tensor", null],
-        ["rx_id", "torch::Tensor", null],
-        ["depth", "torch::Tensor", null],
-        ["component_id", "torch::Tensor", null],
-        ["primitive_id", "torch::Tensor", null],
-        ["edge_id", "torch::Tensor", null],
-        ["primitive_sequence", "torch::Tensor", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.topology.deterministic_sort_order"]
-    },
-    {
-      "name": "deterministic_surface_face_groups",
-      "target": "channel_deterministic_surface_face_groups",
-      "return_type": "pybind11::dict",
-      "doc": "Group deterministic faces by native CUDA surface ids.",
-      "parameters": [
-        ["surface_ids", "torch::Tensor", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.geometry.deterministic_surface_face_groups"]
     },
     {
       "name": "deterministic_topology_default_fields",
@@ -2227,6 +1731,137 @@
       "python_owners": ["witwin.channel.kernels.fields.field_canonical_rows"]
     },
     {
+      "name": "field_coupled_chain",
+      "target": "channel_field_coupled_chain",
+      "return_type": "pybind11::dict",
+      "doc": "Transport a canonical complex3 field through an interaction chain (reflections, one diffraction, reflections).",
+      "parameters": [
+        ["source", "at::Tensor", null],
+        ["target", "at::Tensor", null],
+        ["positions", "at::Tensor", null],
+        ["normals", "at::Tensor", null],
+        ["component_id", "at::Tensor", null],
+        ["depth", "at::Tensor", null],
+        ["edge_direction", "at::Tensor", null],
+        ["edge_n0", "at::Tensor", null],
+        ["edge_n1", "at::Tensor", null],
+        ["exterior_angle", "at::Tensor", null],
+        ["edge_line_min", "at::Tensor", null],
+        ["edge_line_max", "at::Tensor", null],
+        ["tx_power", "at::Tensor", null],
+        ["tx_polarization", "at::Tensor", null],
+        ["rx_polarization", "at::Tensor", null],
+        ["eps_r", "at::Tensor", null],
+        ["sigma_e", "at::Tensor", null],
+        ["mu_r", "at::Tensor", null],
+        ["gain", "at::Tensor", null],
+        ["thickness", "at::Tensor", null],
+        ["bounce_material", "at::Tensor", null],
+        ["layer_offset", "at::Tensor", null],
+        ["layer_count", "at::Tensor", null],
+        ["layer_thickness_m", "at::Tensor", null],
+        ["layer_eps_r", "at::Tensor", null],
+        ["layer_sigma_e", "at::Tensor", null],
+        ["layer_mu_r", "at::Tensor", null],
+        ["frequency_hz", "double", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.fields._FieldCoupledChainAdFunction", "witwin.channel.kernels.fields.field_coupled_chain"]
+    },
+    {
+      "name": "field_coupled_chain_backward",
+      "target": "channel_field_coupled_chain_backward",
+      "return_type": "pybind11::dict",
+      "doc": "Fixed-topology VJP of the interaction-chain field (slot materials, frequency, endpoints).",
+      "parameters": [
+        ["source", "at::Tensor", null],
+        ["target", "at::Tensor", null],
+        ["positions", "at::Tensor", null],
+        ["normals", "at::Tensor", null],
+        ["component_id", "at::Tensor", null],
+        ["depth", "at::Tensor", null],
+        ["edge_direction", "at::Tensor", null],
+        ["edge_n0", "at::Tensor", null],
+        ["edge_n1", "at::Tensor", null],
+        ["exterior_angle", "at::Tensor", null],
+        ["edge_line_min", "at::Tensor", null],
+        ["edge_line_max", "at::Tensor", null],
+        ["tx_power", "at::Tensor", null],
+        ["tx_polarization", "at::Tensor", null],
+        ["rx_polarization", "at::Tensor", null],
+        ["eps_r", "at::Tensor", null],
+        ["sigma_e", "at::Tensor", null],
+        ["mu_r", "at::Tensor", null],
+        ["gain", "at::Tensor", null],
+        ["thickness", "at::Tensor", null],
+        ["bounce_material", "at::Tensor", null],
+        ["layer_offset", "at::Tensor", null],
+        ["layer_count", "at::Tensor", null],
+        ["layer_thickness_m", "at::Tensor", null],
+        ["layer_eps_r", "at::Tensor", null],
+        ["layer_sigma_e", "at::Tensor", null],
+        ["layer_mu_r", "at::Tensor", null],
+        ["frequency_hz", "double", null],
+        ["grad_field_vector", "pybind11::object", null],
+        ["grad_coefficient", "pybind11::object", null],
+        ["grad_path_field", "pybind11::object", null],
+        ["grad_path_gain", "pybind11::object", null],
+        ["need_grad_eps_r", "bool", null],
+        ["need_grad_sigma_e", "bool", null],
+        ["need_grad_gain", "bool", null],
+        ["need_grad_thickness", "bool", null],
+        ["need_grad_frequency", "bool", null],
+        ["need_grad_geometry", "bool", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.fields._FieldCoupledChainAdFunction"]
+    },
+    {
+      "name": "field_coupled_chain_jvp",
+      "target": "channel_field_coupled_chain_jvp",
+      "return_type": "pybind11::dict",
+      "doc": "Fixed-topology JVP of the interaction-chain field (slot materials, frequency, endpoints).",
+      "parameters": [
+        ["source", "at::Tensor", null],
+        ["target", "at::Tensor", null],
+        ["positions", "at::Tensor", null],
+        ["normals", "at::Tensor", null],
+        ["component_id", "at::Tensor", null],
+        ["depth", "at::Tensor", null],
+        ["edge_direction", "at::Tensor", null],
+        ["edge_n0", "at::Tensor", null],
+        ["edge_n1", "at::Tensor", null],
+        ["exterior_angle", "at::Tensor", null],
+        ["edge_line_min", "at::Tensor", null],
+        ["edge_line_max", "at::Tensor", null],
+        ["tx_power", "at::Tensor", null],
+        ["tx_polarization", "at::Tensor", null],
+        ["rx_polarization", "at::Tensor", null],
+        ["eps_r", "at::Tensor", null],
+        ["sigma_e", "at::Tensor", null],
+        ["mu_r", "at::Tensor", null],
+        ["gain", "at::Tensor", null],
+        ["thickness", "at::Tensor", null],
+        ["bounce_material", "at::Tensor", null],
+        ["layer_offset", "at::Tensor", null],
+        ["layer_count", "at::Tensor", null],
+        ["layer_thickness_m", "at::Tensor", null],
+        ["layer_eps_r", "at::Tensor", null],
+        ["layer_sigma_e", "at::Tensor", null],
+        ["layer_mu_r", "at::Tensor", null],
+        ["frequency_hz", "double", null],
+        ["tangent_source", "pybind11::object", null],
+        ["tangent_target", "pybind11::object", null],
+        ["tangent_eps_r", "pybind11::object", null],
+        ["tangent_sigma_e", "pybind11::object", null],
+        ["tangent_gain", "pybind11::object", null],
+        ["tangent_thickness", "pybind11::object", null],
+        ["tangent_frequency", "double", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.fields._FieldCoupledChainAdFunction"]
+    },
+    {
       "name": "field_coupled_dd",
       "target": "channel_field_coupled_dd",
       "return_type": "pybind11::dict",
@@ -2392,155 +2027,6 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.fields._FieldCoupledDdAdFunction"]
-    },
-    {
-      "name": "field_coupled_rd",
-      "target": "channel_field_coupled_rd",
-      "return_type": "pybind11::dict",
-      "doc": "Transport a canonical complex3 field through coupled R-D or D-R events.",
-      "parameters": [
-        ["source", "torch::Tensor", null],
-        ["target", "torch::Tensor", null],
-        ["reflection_position", "torch::Tensor", null],
-        ["reflection_normal", "torch::Tensor", null],
-        ["edge_position", "torch::Tensor", null],
-        ["edge_direction", "torch::Tensor", null],
-        ["edge_n0", "torch::Tensor", null],
-        ["edge_n1", "torch::Tensor", null],
-        ["exterior_angle", "torch::Tensor", null],
-        ["tx_power", "torch::Tensor", null],
-        ["tx_polarization", "torch::Tensor", null],
-        ["rx_polarization", "torch::Tensor", null],
-        ["reflection_eps_r", "torch::Tensor", null],
-        ["reflection_sigma_e", "torch::Tensor", null],
-        ["reflection_mu_r", "torch::Tensor", null],
-        ["reflection_gain", "torch::Tensor", null],
-        ["reflection_thickness", "torch::Tensor", null],
-        ["reflection_material", "torch::Tensor", null],
-        ["layer_offset", "torch::Tensor", null],
-        ["layer_count", "torch::Tensor", null],
-        ["layer_thickness_m", "torch::Tensor", null],
-        ["layer_eps_r", "torch::Tensor", null],
-        ["layer_sigma_e", "torch::Tensor", null],
-        ["layer_mu_r", "torch::Tensor", null],
-        ["wedge_eps_r0", "torch::Tensor", null],
-        ["wedge_sigma_e0", "torch::Tensor", null],
-        ["wedge_mu_r0", "torch::Tensor", null],
-        ["wedge_gain0", "torch::Tensor", null],
-        ["wedge_thickness0", "torch::Tensor", null],
-        ["wedge_eps_r1", "torch::Tensor", null],
-        ["wedge_sigma_e1", "torch::Tensor", null],
-        ["wedge_mu_r1", "torch::Tensor", null],
-        ["wedge_gain1", "torch::Tensor", null],
-        ["wedge_thickness1", "torch::Tensor", null],
-        ["edge_line_min", "torch::Tensor", null],
-        ["edge_line_max", "torch::Tensor", null],
-        ["frequency_hz", "double", null],
-        ["reverse", "bool", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.fields._FieldCoupledRdAdFunction", "witwin.channel.kernels.fields.field_coupled_rd"]
-    },
-    {
-      "name": "field_coupled_rd_backward",
-      "target": "channel_field_coupled_rd_backward",
-      "return_type": "pybind11::dict",
-      "doc": "Fixed-topology VJP of the coupled R-D field (12 material scalars, frequency, geometry).",
-      "parameters": [
-        ["source", "at::Tensor", null],
-        ["target", "at::Tensor", null],
-        ["reflection_position", "at::Tensor", null],
-        ["reflection_normal", "at::Tensor", null],
-        ["edge_position", "at::Tensor", null],
-        ["edge_direction", "at::Tensor", null],
-        ["edge_n0", "at::Tensor", null],
-        ["edge_n1", "at::Tensor", null],
-        ["exterior_angle", "at::Tensor", null],
-        ["tx_power", "at::Tensor", null],
-        ["tx_polarization", "at::Tensor", null],
-        ["rx_polarization", "at::Tensor", null],
-        ["reflection_eps_r", "at::Tensor", null],
-        ["reflection_sigma_e", "at::Tensor", null],
-        ["reflection_mu_r", "at::Tensor", null],
-        ["reflection_gain", "at::Tensor", null],
-        ["reflection_thickness", "at::Tensor", null],
-        ["wedge_eps_r0", "at::Tensor", null],
-        ["wedge_sigma_e0", "at::Tensor", null],
-        ["wedge_mu_r0", "at::Tensor", null],
-        ["wedge_gain0", "at::Tensor", null],
-        ["wedge_thickness0", "at::Tensor", null],
-        ["wedge_eps_r1", "at::Tensor", null],
-        ["wedge_sigma_e1", "at::Tensor", null],
-        ["wedge_mu_r1", "at::Tensor", null],
-        ["wedge_gain1", "at::Tensor", null],
-        ["wedge_thickness1", "at::Tensor", null],
-        ["edge_line_min", "at::Tensor", null],
-        ["edge_line_max", "at::Tensor", null],
-        ["frequency_hz", "double", null],
-        ["reverse", "bool", null],
-        ["grad_field_vector", "pybind11::object", null],
-        ["grad_coefficient", "pybind11::object", null],
-        ["grad_path_field", "pybind11::object", null],
-        ["grad_path_gain", "pybind11::object", null],
-        ["need_grad_eps_r", "bool", null],
-        ["need_grad_sigma_e", "bool", null],
-        ["need_grad_gain", "bool", null],
-        ["need_grad_thickness", "bool", null],
-        ["need_grad_frequency", "bool", null],
-        ["need_grad_geometry", "bool", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.fields._FieldCoupledRdAdFunction"]
-    },
-    {
-      "name": "field_coupled_rd_jvp",
-      "target": "channel_field_coupled_rd_jvp",
-      "return_type": "pybind11::dict",
-      "doc": "Fixed-topology JVP of the coupled R-D field (12 material scalars, frequency, geometry).",
-      "parameters": [
-        ["source", "at::Tensor", null],
-        ["target", "at::Tensor", null],
-        ["reflection_position", "at::Tensor", null],
-        ["reflection_normal", "at::Tensor", null],
-        ["edge_position", "at::Tensor", null],
-        ["edge_direction", "at::Tensor", null],
-        ["edge_n0", "at::Tensor", null],
-        ["edge_n1", "at::Tensor", null],
-        ["exterior_angle", "at::Tensor", null],
-        ["tx_power", "at::Tensor", null],
-        ["tx_polarization", "at::Tensor", null],
-        ["rx_polarization", "at::Tensor", null],
-        ["reflection_eps_r", "at::Tensor", null],
-        ["reflection_sigma_e", "at::Tensor", null],
-        ["reflection_mu_r", "at::Tensor", null],
-        ["reflection_gain", "at::Tensor", null],
-        ["reflection_thickness", "at::Tensor", null],
-        ["wedge_eps_r0", "at::Tensor", null],
-        ["wedge_sigma_e0", "at::Tensor", null],
-        ["wedge_mu_r0", "at::Tensor", null],
-        ["wedge_gain0", "at::Tensor", null],
-        ["wedge_thickness0", "at::Tensor", null],
-        ["wedge_eps_r1", "at::Tensor", null],
-        ["wedge_sigma_e1", "at::Tensor", null],
-        ["wedge_mu_r1", "at::Tensor", null],
-        ["wedge_gain1", "at::Tensor", null],
-        ["wedge_thickness1", "at::Tensor", null],
-        ["edge_line_min", "at::Tensor", null],
-        ["edge_line_max", "at::Tensor", null],
-        ["frequency_hz", "double", null],
-        ["reverse", "bool", null],
-        ["tangent_source", "pybind11::object", null],
-        ["tangent_target", "pybind11::object", null],
-        ["tangent_reflection_position", "pybind11::object", null],
-        ["tangent_edge_position", "pybind11::object", null],
-        ["tangent_eps_r", "pybind11::object", null],
-        ["tangent_sigma_e", "pybind11::object", null],
-        ["tangent_gain", "pybind11::object", null],
-        ["tangent_thickness", "pybind11::object", null],
-        ["tangent_frequency", "double", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.fields._FieldCoupledRdAdFunction"]
     },
     {
       "name": "field_diffraction_wedge",
@@ -3415,28 +2901,6 @@
       "python_owners": ["witwin.channel.kernels.geometry.mc_diffraction_edge_geometry"]
     },
     {
-      "name": "mc_diffraction_state_pack",
-      "target": "channel_mc_diffraction_state_pack",
-      "return_type": "pybind11::tuple",
-      "doc": "Pack MC diffraction edge states with a fused CUDA kernel.",
-      "parameters": [
-        ["edge_indices", "torch::Tensor", null],
-        ["edge_pos", "torch::Tensor", null],
-        ["edge_dir", "torch::Tensor", null],
-        ["line_min", "torch::Tensor", null],
-        ["line_max", "torch::Tensor", null],
-        ["n0", "torch::Tensor", null],
-        ["n1", "torch::Tensor", null],
-        ["face0", "torch::Tensor", null],
-        ["face1", "torch::Tensor", null],
-        ["exterior_angle", "torch::Tensor", null],
-        ["tx", "torch::Tensor", null],
-        ["tx_power", "torch::Tensor", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.mc_diffraction_state_pack"]
-    },
-    {
       "name": "mc_diffraction_state_wi",
       "target": "channel_mc_diffraction_state_wi",
       "return_type": "torch::Tensor",
@@ -3476,17 +2940,6 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.montecarlo.mc_finalize_component_maps"]
-    },
-    {
-      "name": "mc_los_component_maps",
-      "target": "channel_mc_los_component_maps",
-      "return_type": "torch::Tensor",
-      "doc": "Convert MC LoS gains to public component-map grid layout with a CUDA kernel.",
-      "parameters": [
-        ["los", "torch::Tensor", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.montecarlo.mc_los_component_maps"]
     },
     {
       "name": "mc_los_component_maps_adjoint",
@@ -4255,63 +3708,6 @@
       "python_owners": ["witwin.channel.kernels.topology.path_concat_vec3"]
     },
     {
-      "name": "path_diffraction_block",
-      "target": "channel_path_diffraction_block",
-      "return_type": "pybind11::dict",
-      "doc": "Convert RayD order-1 diffraction outputs into a compact path block with native CUDA kernels.",
-      "parameters": [
-        ["rayd_output", "pybind11::sequence", null],
-        ["tx_index", "int64_t", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.topology.path_diffraction_block"]
-    },
-    {
-      "name": "path_filter_block",
-      "target": "channel_path_filter_block",
-      "return_type": "pybind11::dict",
-      "doc": "Compact path records by two visibility masks with native CUDA kernels.",
-      "parameters": [
-        ["block", "pybind11::dict", null],
-        ["visible0", "torch::Tensor", null],
-        ["visible1", "torch::Tensor", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.topology.path_filter_block"]
-    },
-    {
-      "name": "path_filter_los",
-      "target": "channel_path_filter_los",
-      "return_type": "pybind11::dict",
-      "doc": "Compact visible LoS path records with native CUDA kernels.",
-      "parameters": [
-        ["tx_id", "torch::Tensor", null],
-        ["rx_id", "torch::Tensor", null],
-        ["path_length", "torch::Tensor", null],
-        ["delay", "torch::Tensor", null],
-        ["path_gain", "torch::Tensor", null],
-        ["visible", "torch::Tensor", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.topology.path_filter_los"]
-    },
-    {
-      "name": "path_finalize_blocks",
-      "target": "channel_path_finalize_blocks",
-      "return_type": "pybind11::dict",
-      "doc": "Concatenate, stable-sort, cap, and gather path records with native CUDA kernels.",
-      "parameters": [
-        ["los", "pybind11::dict", null],
-        ["reflection", "pybind11::dict", null],
-        ["diffraction", "pybind11::dict", null],
-        ["max_paths", "int64_t", null],
-        ["tx_count", "int64_t", null],
-        ["max_depth", "int64_t", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.topology.path_finalize_blocks"]
-    },
-    {
       "name": "path_los_export",
       "target": "channel_path_los_export",
       "return_type": "pybind11::dict",
@@ -4341,19 +3737,6 @@
       "python_owners": ["witwin.channel.kernels.topology.path_los_visibility_inputs"]
     },
     {
-      "name": "path_merge_blocks",
-      "target": "channel_path_merge_blocks",
-      "return_type": "pybind11::dict",
-      "doc": "Merge and stable-sort path blocks with native CUDA kernels.",
-      "parameters": [
-        ["blocks", "pybind11::sequence", null],
-        ["tx_count", "int64_t", null],
-        ["max_depth", "int64_t", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.topology.path_merge_blocks"]
-    },
-    {
       "name": "path_pack_padded",
       "target": "channel_path_pack_padded",
       "return_type": "pybind11::dict",
@@ -4367,24 +3750,6 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.topology.path_pack_padded"]
-    },
-    {
-      "name": "path_reflection_candidates",
-      "target": "channel_path_reflection_candidates",
-      "return_type": "pybind11::dict",
-      "doc": "Generate first-order reflection path candidates and visibility segments with native CUDA kernels.",
-      "parameters": [
-        ["vertices", "torch::Tensor", null],
-        ["faces", "torch::Tensor", null],
-        ["face_normals", "torch::Tensor", null],
-        ["face_gain", "torch::Tensor", null],
-        ["tx_positions", "torch::Tensor", null],
-        ["tx_power", "torch::Tensor", null],
-        ["rx_positions", "torch::Tensor", null],
-        ["frequency_hz", "double", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.topology.path_reflection_candidates"]
     },
     {
       "name": "rayd_diffraction_paths_order1_forward",
@@ -4484,69 +3849,6 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.geometry.rayd_diffraction_sample_tape_forward"]
-    },
-    {
-      "name": "rayd_intersect_backward",
-      "target": "channel_rayd_intersect_backward",
-      "return_type": "pybind11::tuple",
-      "doc": "Call the typed RayD fixed-winner intersect VJP.",
-      "parameters": [
-        ["scene", "RayDSceneResource &", null],
-        ["ray_o", "torch::Tensor", null],
-        ["ray_d", "torch::Tensor", null],
-        ["ray_tmax", "torch::Tensor", null],
-        ["active", "pybind11::object", null],
-        ["tape_prim_id", "torch::Tensor", null],
-        ["tape_barycentric", "torch::Tensor", null],
-        ["grad_t", "pybind11::object", null],
-        ["grad_p", "pybind11::object", null],
-        ["grad_n", "pybind11::object", null],
-        ["grad_geo_n", "pybind11::object", null],
-        ["grad_uv", "pybind11::object", null],
-        ["grad_barycentric", "pybind11::object", null],
-        ["need_grad_vertices", "bool", null],
-        ["need_grad_ray_o", "bool", null],
-        ["need_grad_ray_d", "bool", null],
-        ["need_grad_ray_tmax", "bool", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.geometry.rayd_intersect_backward"]
-    },
-    {
-      "name": "rayd_intersect_forward",
-      "target": "channel_rayd_intersect_forward",
-      "return_type": "pybind11::tuple",
-      "doc": "Call typed RayD ray/scene intersection.",
-      "parameters": [
-        ["scene", "RayDSceneResource &", null],
-        ["ray_o", "torch::Tensor", null],
-        ["ray_d", "torch::Tensor", null],
-        ["ray_tmax", "torch::Tensor", null],
-        ["active", "pybind11::object", null],
-        ["flags", "int64_t", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.geometry._RaydIntersectAdFunction", "witwin.channel.kernels.geometry.rayd_intersect_forward"]
-    },
-    {
-      "name": "rayd_intersect_jvp",
-      "target": "channel_rayd_intersect_jvp",
-      "return_type": "pybind11::tuple",
-      "doc": "Call the typed RayD fixed-winner intersect JVP.",
-      "parameters": [
-        ["scene", "RayDSceneResource &", null],
-        ["ray_o", "torch::Tensor", null],
-        ["ray_d", "torch::Tensor", null],
-        ["active", "pybind11::object", null],
-        ["tape_prim_id", "torch::Tensor", null],
-        ["tape_barycentric", "torch::Tensor", null],
-        ["tangent_vertices", "pybind11::object", null],
-        ["tangent_ray_o", "pybind11::object", null],
-        ["tangent_ray_d", "pybind11::object", null],
-        ["flags", "int64_t", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.geometry.rayd_intersect_jvp"]
     },
     {
       "name": "rayd_reflection_epc_paths_backward",
@@ -4809,28 +4111,6 @@
       "python_owners": ["witwin.channel.kernels.geometry.rayd_segment_penetration_jvp"]
     },
     {
-      "name": "rayd_trace_reflections_backward",
-      "target": "channel_rayd_trace_reflections_backward",
-      "return_type": "pybind11::tuple",
-      "doc": "Call the typed RayD fixed-winner reflection chain VJP.",
-      "parameters": [
-        ["scene", "RayDSceneResource &", null],
-        ["ray_o", "torch::Tensor", null],
-        ["ray_d", "torch::Tensor", null],
-        ["ray_tmax", "torch::Tensor", null],
-        ["active", "pybind11::object", null],
-        ["tape_prim_id", "torch::Tensor", null],
-        ["tape_barycentric", "torch::Tensor", null],
-        ["tape_hit_points", "torch::Tensor", null],
-        ["tape_normals", "torch::Tensor", null],
-        ["image_sources", "torch::Tensor", null],
-        ["grad_t", "pybind11::object", null],
-        ["grad_image_sources", "pybind11::object", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.geometry.rayd_trace_reflections_backward"]
-    },
-    {
       "name": "rayd_trace_reflections_forward",
       "target": "channel_rayd_trace_reflections_forward",
       "return_type": "pybind11::tuple",
@@ -4845,44 +4125,6 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.geometry.rayd_trace_reflections_forward"]
-    },
-    {
-      "name": "rayd_trace_reflections_forward_tape",
-      "target": "channel_rayd_trace_reflections_forward_tape",
-      "return_type": "pybind11::tuple",
-      "doc": "Call typed RayD tape-emitting reflection chain tracing.",
-      "parameters": [
-        ["scene", "RayDSceneResource &", null],
-        ["ray_o", "torch::Tensor", null],
-        ["ray_d", "torch::Tensor", null],
-        ["ray_tmax", "torch::Tensor", null],
-        ["active", "pybind11::object", null],
-        ["max_bounces", "int64_t", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.geometry._RaydTraceReflectionsAdFunction", "witwin.channel.kernels.geometry.rayd_trace_reflections_forward_tape"]
-    },
-    {
-      "name": "rayd_trace_reflections_jvp",
-      "target": "channel_rayd_trace_reflections_jvp",
-      "return_type": "pybind11::tuple",
-      "doc": "Call the typed RayD fixed-winner reflection chain JVP.",
-      "parameters": [
-        ["scene", "RayDSceneResource &", null],
-        ["ray_o", "torch::Tensor", null],
-        ["ray_d", "torch::Tensor", null],
-        ["active", "pybind11::object", null],
-        ["tape_prim_id", "torch::Tensor", null],
-        ["tape_barycentric", "torch::Tensor", null],
-        ["tape_hit_points", "torch::Tensor", null],
-        ["tape_normals", "torch::Tensor", null],
-        ["tangent_vertices", "pybind11::object", null],
-        ["tangent_ray_o", "pybind11::object", null],
-        ["tangent_ray_d", "pybind11::object", null],
-        ["image_sources", "torch::Tensor", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.geometry.rayd_trace_reflections_jvp"]
     },
     {
       "name": "rayd_visibility_forward",
@@ -5025,350 +4267,6 @@
       "python_owners": ["witwin.channel.kernels.scattering.scattering_chain_ensemble_eval"]
     },
     {
-      "name": "scattering_chain_ensemble_eval_backward",
-      "target": "channel_scattering_chain_ensemble_eval_backward",
-      "return_type": "pybind11::dict",
-      "doc": "Fixed-topology VJP of the ADR-021 ensemble scattering chain (chain1/chain2 materials, tables, coef, frequency).",
-      "parameters": [
-        ["valid", "at::Tensor", null],
-        ["tx_pol", "at::Tensor", null],
-        ["rx_pol", "at::Tensor", null],
-        ["source", "at::Tensor", null],
-        ["vertex", "at::Tensor", null],
-        ["target", "at::Tensor", null],
-        ["c1_positions", "at::Tensor", null],
-        ["c1_normals", "at::Tensor", null],
-        ["c1_eps_r", "at::Tensor", null],
-        ["c1_sigma_e", "at::Tensor", null],
-        ["c1_mu_r", "at::Tensor", null],
-        ["c1_gain", "at::Tensor", null],
-        ["c1_thickness", "at::Tensor", null],
-        ["c1_depth", "at::Tensor", null],
-        ["c2_positions", "at::Tensor", null],
-        ["c2_normals", "at::Tensor", null],
-        ["c2_eps_r", "at::Tensor", null],
-        ["c2_sigma_e", "at::Tensor", null],
-        ["c2_mu_r", "at::Tensor", null],
-        ["c2_gain", "at::Tensor", null],
-        ["c2_thickness", "at::Tensor", null],
-        ["c2_depth", "at::Tensor", null],
-        ["n_o", "at::Tensor", null],
-        ["t1r", "at::Tensor", null],
-        ["t2r", "at::Tensor", null],
-        ["backup_axis", "at::Tensor", null],
-        ["wi_local", "at::Tensor", null],
-        ["cos_i", "at::Tensor", null],
-        ["cos_o", "at::Tensor", null],
-        ["d_i", "at::Tensor", null],
-        ["d_o", "at::Tensor", null],
-        ["l1", "at::Tensor", null],
-        ["l2", "at::Tensor", null],
-        ["weights", "at::Tensor", null],
-        ["material_id", "at::Tensor", null],
-        ["fte_flat", "at::Tensor", null],
-        ["ftm_flat", "at::Tensor", null],
-        ["table_offset", "at::Tensor", null],
-        ["table_dims", "at::Tensor", null],
-        ["material_slot", "at::Tensor", null],
-        ["coef", "double", null],
-        ["threshold", "double", null],
-        ["frequency_hz", "double", null],
-        ["grad_gain", "pybind11::object", null],
-        ["grad_amplitude", "pybind11::object", null],
-        ["grad_length", "pybind11::object", null],
-        ["need_grad_chain1", "bool", null],
-        ["need_grad_chain2", "bool", null],
-        ["need_grad_tables", "bool", null],
-        ["need_grad_geometry", "bool", null],
-        ["need_grad_coef", "bool", null],
-        ["need_grad_frequency", "bool", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.scattering.scattering_chain_ensemble_eval_backward"]
-    },
-    {
-      "name": "scattering_chain_ensemble_eval_jvp",
-      "target": "channel_scattering_chain_ensemble_eval_jvp",
-      "return_type": "pybind11::dict",
-      "doc": "Fixed-topology JVP of the ADR-021 ensemble scattering chain rows (Op A).",
-      "parameters": [
-        ["valid", "at::Tensor", null],
-        ["tx_pol", "at::Tensor", null],
-        ["rx_pol", "at::Tensor", null],
-        ["source", "at::Tensor", null],
-        ["vertex", "at::Tensor", null],
-        ["target", "at::Tensor", null],
-        ["c1_positions", "at::Tensor", null],
-        ["c1_normals", "at::Tensor", null],
-        ["c1_eps_r", "at::Tensor", null],
-        ["c1_sigma_e", "at::Tensor", null],
-        ["c1_mu_r", "at::Tensor", null],
-        ["c1_gain", "at::Tensor", null],
-        ["c1_thickness", "at::Tensor", null],
-        ["c1_depth", "at::Tensor", null],
-        ["c2_positions", "at::Tensor", null],
-        ["c2_normals", "at::Tensor", null],
-        ["c2_eps_r", "at::Tensor", null],
-        ["c2_sigma_e", "at::Tensor", null],
-        ["c2_mu_r", "at::Tensor", null],
-        ["c2_gain", "at::Tensor", null],
-        ["c2_thickness", "at::Tensor", null],
-        ["c2_depth", "at::Tensor", null],
-        ["n_o", "at::Tensor", null],
-        ["t1r", "at::Tensor", null],
-        ["t2r", "at::Tensor", null],
-        ["backup_axis", "at::Tensor", null],
-        ["wi_local", "at::Tensor", null],
-        ["cos_i", "at::Tensor", null],
-        ["cos_o", "at::Tensor", null],
-        ["d_i", "at::Tensor", null],
-        ["d_o", "at::Tensor", null],
-        ["l1", "at::Tensor", null],
-        ["l2", "at::Tensor", null],
-        ["weights", "at::Tensor", null],
-        ["material_id", "at::Tensor", null],
-        ["fte_flat", "at::Tensor", null],
-        ["ftm_flat", "at::Tensor", null],
-        ["table_offset", "at::Tensor", null],
-        ["table_dims", "at::Tensor", null],
-        ["material_slot", "at::Tensor", null],
-        ["coef", "double", null],
-        ["threshold", "double", null],
-        ["frequency_hz", "double", null],
-        ["tangent_c1_eps_r", "pybind11::object", null],
-        ["tangent_c1_sigma_e", "pybind11::object", null],
-        ["tangent_c1_gain", "pybind11::object", null],
-        ["tangent_c1_thickness", "pybind11::object", null],
-        ["tangent_c2_eps_r", "pybind11::object", null],
-        ["tangent_c2_sigma_e", "pybind11::object", null],
-        ["tangent_c2_gain", "pybind11::object", null],
-        ["tangent_c2_thickness", "pybind11::object", null],
-        ["tangent_f_te_flat", "pybind11::object", null],
-        ["tangent_f_tm_flat", "pybind11::object", null],
-        ["tangent_c1_positions", "pybind11::object", null],
-        ["tangent_c1_normals", "pybind11::object", null],
-        ["tangent_c2_positions", "pybind11::object", null],
-        ["tangent_c2_normals", "pybind11::object", null],
-        ["tangent_d_i", "pybind11::object", null],
-        ["tangent_d_o", "pybind11::object", null],
-        ["tangent_v_normal", "pybind11::object", null],
-        ["tangent_l1", "pybind11::object", null],
-        ["tangent_l2", "pybind11::object", null],
-        ["tangent_cos_i", "pybind11::object", null],
-        ["tangent_cos_o", "pybind11::object", null],
-        ["tangent_coef", "double", null],
-        ["tangent_frequency", "double", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.scattering.scattering_chain_ensemble_eval_jvp"]
-    },
-    {
-      "name": "scattering_chain_realization_eval",
-      "target": "channel_scattering_chain_realization_eval",
-      "return_type": "pybind11::dict",
-      "doc": "Evaluate the ADR-021 coherent phase-screen scattering chain rows with native CUDA (Op B).",
-      "parameters": [
-        ["valid", "at::Tensor", null],
-        ["patch_tris", "at::Tensor", null],
-        ["patch_uvs", "at::Tensor", null],
-        ["rows", "at::Tensor", null],
-        ["d_i", "at::Tensor", null],
-        ["d_o", "at::Tensor", null],
-        ["n_rows", "at::Tensor", null],
-        ["source", "at::Tensor", null],
-        ["vertex", "at::Tensor", null],
-        ["target", "at::Tensor", null],
-        ["c1_positions", "at::Tensor", null],
-        ["c1_normals", "at::Tensor", null],
-        ["c1_eps_r", "at::Tensor", null],
-        ["c1_sigma_e", "at::Tensor", null],
-        ["c1_mu_r", "at::Tensor", null],
-        ["c1_gain", "at::Tensor", null],
-        ["c1_thickness", "at::Tensor", null],
-        ["c1_depth", "at::Tensor", null],
-        ["c2_positions", "at::Tensor", null],
-        ["c2_normals", "at::Tensor", null],
-        ["c2_eps_r", "at::Tensor", null],
-        ["c2_sigma_e", "at::Tensor", null],
-        ["c2_mu_r", "at::Tensor", null],
-        ["c2_gain", "at::Tensor", null],
-        ["c2_thickness", "at::Tensor", null],
-        ["c2_depth", "at::Tensor", null],
-        ["tx_pol", "at::Tensor", null],
-        ["rx_pol", "at::Tensor", null],
-        ["l1", "at::Tensor", null],
-        ["l2", "at::Tensor", null],
-        ["sp1", "at::Tensor", null],
-        ["sp2", "at::Tensor", null],
-        ["centroids", "at::Tensor", null],
-        ["heights", "at::Tensor", null],
-        ["cos_spec", "at::Tensor", null],
-        ["material_id", "at::Tensor", null],
-        ["layer_offset", "at::Tensor", null],
-        ["layer_count", "at::Tensor", null],
-        ["layer_thickness_m", "at::Tensor", null],
-        ["layer_eps_r", "at::Tensor", null],
-        ["layer_sigma_e", "at::Tensor", null],
-        ["layer_mu_r", "at::Tensor", null],
-        ["quad_a", "at::Tensor", null],
-        ["quad_b", "at::Tensor", null],
-        ["quad_w", "at::Tensor", null],
-        ["k0", "double", null],
-        ["frequency_hz", "double", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.scattering._required_chain_realization_forward", "witwin.channel.kernels.scattering.scattering_chain_realization_eval"]
-    },
-    {
-      "name": "scattering_chain_realization_eval_backward",
-      "target": "channel_scattering_chain_realization_eval_backward",
-      "return_type": "pybind11::dict",
-      "doc": "Fixed-topology VJP of the ADR-021 coherent scattering chain (heights, layers, chains, geometry, k0, frequency).",
-      "parameters": [
-        ["valid", "at::Tensor", null],
-        ["patch_tris", "at::Tensor", null],
-        ["patch_uvs", "at::Tensor", null],
-        ["rows", "at::Tensor", null],
-        ["d_i", "at::Tensor", null],
-        ["d_o", "at::Tensor", null],
-        ["n_rows", "at::Tensor", null],
-        ["source", "at::Tensor", null],
-        ["vertex", "at::Tensor", null],
-        ["target", "at::Tensor", null],
-        ["c1_positions", "at::Tensor", null],
-        ["c1_normals", "at::Tensor", null],
-        ["c1_eps_r", "at::Tensor", null],
-        ["c1_sigma_e", "at::Tensor", null],
-        ["c1_mu_r", "at::Tensor", null],
-        ["c1_gain", "at::Tensor", null],
-        ["c1_thickness", "at::Tensor", null],
-        ["c1_depth", "at::Tensor", null],
-        ["c2_positions", "at::Tensor", null],
-        ["c2_normals", "at::Tensor", null],
-        ["c2_eps_r", "at::Tensor", null],
-        ["c2_sigma_e", "at::Tensor", null],
-        ["c2_mu_r", "at::Tensor", null],
-        ["c2_gain", "at::Tensor", null],
-        ["c2_thickness", "at::Tensor", null],
-        ["c2_depth", "at::Tensor", null],
-        ["tx_pol", "at::Tensor", null],
-        ["rx_pol", "at::Tensor", null],
-        ["l1", "at::Tensor", null],
-        ["l2", "at::Tensor", null],
-        ["sp1", "at::Tensor", null],
-        ["sp2", "at::Tensor", null],
-        ["centroids", "at::Tensor", null],
-        ["heights", "at::Tensor", null],
-        ["cos_spec", "at::Tensor", null],
-        ["material_id", "at::Tensor", null],
-        ["layer_offset", "at::Tensor", null],
-        ["layer_count", "at::Tensor", null],
-        ["layer_thickness_m", "at::Tensor", null],
-        ["layer_eps_r", "at::Tensor", null],
-        ["layer_sigma_e", "at::Tensor", null],
-        ["layer_mu_r", "at::Tensor", null],
-        ["quad_a", "at::Tensor", null],
-        ["quad_b", "at::Tensor", null],
-        ["quad_w", "at::Tensor", null],
-        ["k0", "double", null],
-        ["frequency_hz", "double", null],
-        ["grad_total", "at::Tensor", null],
-        ["grad_path_field", "pybind11::object", null],
-        ["grad_path_gain", "pybind11::object", null],
-        ["need_grad_heights", "bool", null],
-        ["need_grad_layers", "bool", null],
-        ["need_grad_chain1", "bool", null],
-        ["need_grad_chain2", "bool", null],
-        ["need_grad_geometry", "bool", null],
-        ["need_grad_k0", "bool", null],
-        ["need_grad_frequency", "bool", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.scattering.scattering_chain_realization_eval_backward"]
-    },
-    {
-      "name": "scattering_chain_realization_eval_jvp",
-      "target": "channel_scattering_chain_realization_eval_jvp",
-      "return_type": "pybind11::dict",
-      "doc": "Fixed-topology JVP of the ADR-021 coherent scattering chain rows (Op B).",
-      "parameters": [
-        ["valid", "at::Tensor", null],
-        ["patch_tris", "at::Tensor", null],
-        ["patch_uvs", "at::Tensor", null],
-        ["rows", "at::Tensor", null],
-        ["d_i", "at::Tensor", null],
-        ["d_o", "at::Tensor", null],
-        ["n_rows", "at::Tensor", null],
-        ["source", "at::Tensor", null],
-        ["vertex", "at::Tensor", null],
-        ["target", "at::Tensor", null],
-        ["c1_positions", "at::Tensor", null],
-        ["c1_normals", "at::Tensor", null],
-        ["c1_eps_r", "at::Tensor", null],
-        ["c1_sigma_e", "at::Tensor", null],
-        ["c1_mu_r", "at::Tensor", null],
-        ["c1_gain", "at::Tensor", null],
-        ["c1_thickness", "at::Tensor", null],
-        ["c1_depth", "at::Tensor", null],
-        ["c2_positions", "at::Tensor", null],
-        ["c2_normals", "at::Tensor", null],
-        ["c2_eps_r", "at::Tensor", null],
-        ["c2_sigma_e", "at::Tensor", null],
-        ["c2_mu_r", "at::Tensor", null],
-        ["c2_gain", "at::Tensor", null],
-        ["c2_thickness", "at::Tensor", null],
-        ["c2_depth", "at::Tensor", null],
-        ["tx_pol", "at::Tensor", null],
-        ["rx_pol", "at::Tensor", null],
-        ["l1", "at::Tensor", null],
-        ["l2", "at::Tensor", null],
-        ["sp1", "at::Tensor", null],
-        ["sp2", "at::Tensor", null],
-        ["centroids", "at::Tensor", null],
-        ["heights", "at::Tensor", null],
-        ["cos_spec", "at::Tensor", null],
-        ["material_id", "at::Tensor", null],
-        ["layer_offset", "at::Tensor", null],
-        ["layer_count", "at::Tensor", null],
-        ["layer_thickness_m", "at::Tensor", null],
-        ["layer_eps_r", "at::Tensor", null],
-        ["layer_sigma_e", "at::Tensor", null],
-        ["layer_mu_r", "at::Tensor", null],
-        ["quad_a", "at::Tensor", null],
-        ["quad_b", "at::Tensor", null],
-        ["quad_w", "at::Tensor", null],
-        ["k0", "double", null],
-        ["frequency_hz", "double", null],
-        ["tangent_heights", "pybind11::object", null],
-        ["tangent_layer_thickness", "pybind11::object", null],
-        ["tangent_layer_eps_r", "pybind11::object", null],
-        ["tangent_layer_sigma_e", "pybind11::object", null],
-        ["tangent_c1_eps_r", "pybind11::object", null],
-        ["tangent_c1_sigma_e", "pybind11::object", null],
-        ["tangent_c1_gain", "pybind11::object", null],
-        ["tangent_c1_thickness", "pybind11::object", null],
-        ["tangent_c2_eps_r", "pybind11::object", null],
-        ["tangent_c2_sigma_e", "pybind11::object", null],
-        ["tangent_c2_gain", "pybind11::object", null],
-        ["tangent_c2_thickness", "pybind11::object", null],
-        ["tangent_d_i", "pybind11::object", null],
-        ["tangent_d_o", "pybind11::object", null],
-        ["tangent_c1_positions", "pybind11::object", null],
-        ["tangent_c1_normals", "pybind11::object", null],
-        ["tangent_c2_positions", "pybind11::object", null],
-        ["tangent_c2_normals", "pybind11::object", null],
-        ["tangent_l1", "pybind11::object", null],
-        ["tangent_l2", "pybind11::object", null],
-        ["tangent_sp1", "pybind11::object", null],
-        ["tangent_sp2", "pybind11::object", null],
-        ["tangent_centroids", "pybind11::object", null],
-        ["tangent_k0", "double", null],
-        ["tangent_frequency", "double", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.scattering.scattering_chain_realization_eval_jvp"]
-    },
-    {
       "name": "scattering_ensemble_eval",
       "target": "channel_scattering_ensemble_eval",
       "return_type": "pybind11::dict",
@@ -5496,26 +4394,6 @@
       "python_owners": ["witwin.channel.kernels.scattering.scattering_ensemble_eval_jvp"]
     },
     {
-      "name": "scattering_event_probabilities",
-      "target": "channel_scattering_event_probabilities",
-      "return_type": "pybind11::dict",
-      "doc": "Evaluate fused rough-surface event budgets with native CUDA.",
-      "parameters": [
-        ["cos_theta", "torch::Tensor", null],
-        ["material_id", "torch::Tensor", null],
-        ["cap_r_te", "torch::Tensor", null],
-        ["cap_r_tm", "torch::Tensor", null],
-        ["cap_t_te", "torch::Tensor", null],
-        ["cap_t_tm", "torch::Tensor", null],
-        ["rough_sigma_h_m", "torch::Tensor", null],
-        ["scatter_model_id", "torch::Tensor", null],
-        ["frequency_hz", "double", null],
-        ["probability_floor", "double", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.scattering.scattering_event_probabilities"]
-    },
-    {
       "name": "scattering_patch_integral_eval",
       "target": "channel_scattering_patch_integral_eval",
       "return_type": "pybind11::dict",
@@ -5617,59 +4495,6 @@
       "python_owners": ["witwin.channel.kernels.scattering.scattering_patch_integral_eval_jvp"]
     },
     {
-      "name": "scattering_table_eval",
-      "target": "channel_scattering_table_eval",
-      "return_type": "pybind11::dict",
-      "doc": "Evaluate a resident Kirchhoff BSDF table with native CUDA.",
-      "parameters": [
-        ["valid", "torch::Tensor", null],
-        ["wi", "torch::Tensor", null],
-        ["wo", "torch::Tensor", null],
-        ["f_te", "torch::Tensor", null],
-        ["f_tm", "torch::Tensor", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.scattering.scattering_table_eval"]
-    },
-    {
-      "name": "scattering_table_eval_backward",
-      "target": "channel_scattering_table_eval_backward",
-      "return_type": "pybind11::dict",
-      "doc": "Fixed-topology VJP of the resident Kirchhoff BSDF table lookup (directions, tables) (ADR-015).",
-      "parameters": [
-        ["valid", "at::Tensor", null],
-        ["wi", "at::Tensor", null],
-        ["wo", "at::Tensor", null],
-        ["f_te", "at::Tensor", null],
-        ["f_tm", "at::Tensor", null],
-        ["grad_out_f_te", "pybind11::object", null],
-        ["grad_out_f_tm", "pybind11::object", null],
-        ["need_grad_dirs", "bool", null],
-        ["need_grad_tables", "bool", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.scattering.scattering_table_eval_backward"]
-    },
-    {
-      "name": "scattering_table_eval_jvp",
-      "target": "channel_scattering_table_eval_jvp",
-      "return_type": "pybind11::dict",
-      "doc": "Fixed-topology JVP of the resident Kirchhoff BSDF table lookup (directions, tables) (ADR-015).",
-      "parameters": [
-        ["valid", "at::Tensor", null],
-        ["wi", "at::Tensor", null],
-        ["wo", "at::Tensor", null],
-        ["f_te", "at::Tensor", null],
-        ["f_tm", "at::Tensor", null],
-        ["t_wi", "pybind11::object", null],
-        ["t_wo", "pybind11::object", null],
-        ["t_f_te", "pybind11::object", null],
-        ["t_f_tm", "pybind11::object", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.scattering.scattering_table_eval_jvp"]
-    },
-    {
       "name": "scattering_table_pdf",
       "target": "channel_scattering_table_pdf",
       "return_type": "torch::Tensor",
@@ -5683,22 +4508,6 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.scattering.scattering_table_pdf"]
-    },
-    {
-      "name": "scattering_table_sample",
-      "target": "channel_scattering_table_sample",
-      "return_type": "pybind11::dict",
-      "doc": "Sample a resident Kirchhoff CDF table with native CUDA.",
-      "parameters": [
-        ["valid", "torch::Tensor", null],
-        ["wi", "torch::Tensor", null],
-        ["uniforms", "torch::Tensor", null],
-        ["marginal_cdf", "torch::Tensor", null],
-        ["conditional_cdf", "torch::Tensor", null],
-        ["sample_density", "torch::Tensor", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.scattering.scattering_table_sample"]
     }
   ]
 }

@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import torch
 
 from witwin.channel.runtime import (
@@ -25,8 +27,6 @@ from witwin.channel.runtime import (
 __all__ = [
     "_EmLayerStackAdFunction",
     "_validate_layer_csr",
-    "bdpt_face_material_tensors",
-    "bdpt_face_material_tensors_from_host",
     "em_layer_stack_ad",
     "em_layer_stack_backward",
     "em_layer_stack_eval",
@@ -69,67 +69,6 @@ def _validate_layer_csr(
 
 
 validate_layer_csr = _validate_layer_csr
-
-
-# ---------------------------------------------------------------------------
-# functional
-# ---------------------------------------------------------------------------
-def bdpt_face_material_tensors(
-    material_eps_r: torch.Tensor, material_sigma_e: torch.Tensor, material_mu_r: torch.Tensor,
-    face_material_id: torch.Tensor,
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor("material_eps_r", material_eps_r, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor(
-        "material_sigma_e", material_sigma_e, dtype=torch.float32, ndim=1
-    )
-    validate_cuda_tensor("material_mu_r", material_mu_r, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor(
-        "face_material_id", face_material_id, dtype=torch.int32, ndim=1
-    )
-    exported = _required_native_op("bdpt_face_material_tensors")(
-        material_eps_r,
-        material_sigma_e,
-        material_mu_r,
-        face_material_id,
-    )
-    if not isinstance(exported, dict):
-        raise TypeError("_channel.bdpt_face_material_tensors must return a dict")
-    validate_cuda_tensor("eps_r", exported["eps_r"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("sigma_e", exported["sigma_e"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("mu_r", exported["mu_r"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("gain", exported["gain"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("valid", exported["valid"], dtype=torch.bool, ndim=1)
-    return exported
-
-
-def bdpt_face_material_tensors_from_host(
-    material_eps_r: tuple[float, ...], material_sigma_e: tuple[float, ...],
-    material_mu_r: tuple[float, ...], face_material_id: tuple[int, ...],
-) -> dict[str, torch.Tensor]:
-    if not material_eps_r:
-        raise ValueError("material_eps_r must not be empty")
-    if len(material_sigma_e) != len(material_eps_r):
-        raise ValueError("material_sigma_e must match material_eps_r")
-    if len(material_mu_r) != len(material_eps_r):
-        raise ValueError("material_mu_r must match material_eps_r")
-    if any(index < 0 or index >= len(material_eps_r) for index in face_material_id):
-        raise ValueError("face_material_id entries must reference a material")
-    exported = _required_native_op("bdpt_face_material_tensors_from_host")(
-        material_eps_r,
-        material_sigma_e,
-        material_mu_r,
-        face_material_id,
-    )
-    if not isinstance(exported, dict):
-        raise TypeError(
-            "_channel.bdpt_face_material_tensors_from_host must return a dict"
-        )
-    validate_cuda_tensor("eps_r", exported["eps_r"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("sigma_e", exported["sigma_e"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("mu_r", exported["mu_r"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("gain", exported["gain"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("valid", exported["valid"], dtype=torch.bool, ndim=1)
-    return exported
 
 
 _EM_LAYER_STACK_FIELDS = (
@@ -191,6 +130,12 @@ def em_layer_stack_eval(
         if out[name].shape != (count,):
             raise ValueError(f"em_layer_stack_eval returned bad {name} shape")
     return out
+
+# The eight primal tensors the layer-stack AD saves, in ``em_layer_stack_backward`` order.
+_LayerStackSaved = tuple[
+    torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
+    torch.Tensor, torch.Tensor,
+]
 
 
 def em_layer_stack_backward(
@@ -302,9 +247,10 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        cos_theta, material_id, layer_offset, layer_count, layer_thickness_m, layer_eps_r,
-        layer_sigma_e, layer_mu_r, frequency, frequency_value,
-    ):
+        cos_theta: Any, material_id: Any, layer_offset: Any, layer_count: Any,
+        layer_thickness_m: Any, layer_eps_r: Any, layer_sigma_e: Any, layer_mu_r: Any,
+        frequency: Any, frequency_value: Any,
+    ) -> Any:
         out = em_layer_stack_eval(
             cos_theta,
             material_id,
@@ -319,7 +265,7 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
         return tuple(out[name] for name in _EM_LAYER_STACK_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         frequency = inputs[8]
         primals = tuple(
@@ -337,7 +283,7 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, *grad_outputs):
+    def backward(ctx: Any, *grad_outputs: Any) -> Any:
         none_grads = (None,) * 10
         _ad_reject_fixed_inputs(
             "em_layer_stack_ad",
@@ -351,7 +297,7 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
             value is None for value in grad_outputs
         ):
             return none_grads
-        saved = ctx.saved_tensors
+        saved = cast(_LayerStackSaved, ctx.saved_tensors)
         out = em_layer_stack_backward(
             *saved,
             grad_outputs,
@@ -380,9 +326,10 @@ class _EmLayerStackAdFunction(torch.autograd.Function):
 
     @staticmethod
     def jvp(
-        ctx, t_cos_theta, _t_material_id, _t_layer_offset, _t_layer_count, t_layer_thickness,
-        t_layer_eps_r, t_layer_sigma_e, t_layer_mu_r, t_frequency, _t_frequency_value,
-    ):
+        ctx: Any, t_cos_theta: Any, _t_material_id: Any, _t_layer_offset: Any, _t_layer_count: Any,
+        t_layer_thickness: Any, t_layer_eps_r: Any, t_layer_sigma_e: Any, t_layer_mu_r: Any,
+        t_frequency: Any, _t_frequency_value: Any,
+    ) -> Any:
         _ad_reject_fixed_tangents(
             "em_layer_stack_ad", ((t_layer_mu_r, "layer_mu_r"),)
         )

@@ -32,14 +32,6 @@ using PathBlockTuple = std::tuple<
     X(8, delay, "delay_s")            \
     X(9, path_gain, "path_gain")
 
-inline pybind11::dict path_block_dict(const PathBlockTuple& block) {
-    pybind11::dict out;
-#define CHANNEL_PATH_BLOCK_TO_DICT(index, member, key) out[key] = std::get<index>(block);
-    CHANNEL_PATH_BLOCK_FIELDS(CHANNEL_PATH_BLOCK_TO_DICT)
-#undef CHANNEL_PATH_BLOCK_TO_DICT
-    return out;
-}
-
 struct PathBlockLists {
 #define CHANNEL_PATH_BLOCK_LIST(index, member, key) std::vector<at::Tensor> member;
     CHANNEL_PATH_BLOCK_FIELDS(CHANNEL_PATH_BLOCK_LIST)

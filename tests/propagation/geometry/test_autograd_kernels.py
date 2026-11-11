@@ -13,23 +13,14 @@ from witwin.channel import runtime
 
 _OWNER_NAMES = (
     "_RaydFaceNormalsAdFunction",
-    "_RaydIntersectAdFunction",
     "_RaydReflectionEpcPathsAdFunction",
-    "_RaydTraceReflectionsAdFunction",
     "_epc_paths_frozen_winner_checks",
     "rayd_face_normals_ad",
-    "rayd_intersect_ad",
-    "rayd_intersect_backward",
-    "rayd_intersect_jvp",
     "rayd_reflection_epc_paths_ad",
     "rayd_reflection_epc_paths_backward",
     "rayd_reflection_epc_paths_jvp",
     "rayd_scene_face_normals_backward",
     "rayd_scene_face_normals_jvp",
-    "rayd_trace_reflections_ad",
-    "rayd_trace_reflections_backward",
-    "rayd_trace_reflections_forward_tape",
-    "rayd_trace_reflections_jvp",
 )
 
 
@@ -51,7 +42,6 @@ def test_geometry_autograd_uses_canonical_runtime_and_scene_dependencies():
     )
     for name in (
         "_ad_active_ctx",
-        "_ad_check_active",
         "_ad_check_optional_grad",
         "_ad_check_rows",
         "_ad_check_tangent_vec3",
@@ -80,28 +70,6 @@ def test_autograd_methods_resolve_companions_in_the_canonical_owner():
             "rayd_scene_face_normals_jvp"
         ]
         is geometry.rayd_scene_face_normals_jvp
-    )
-    assert (
-        inspect.unwrap(geometry._RaydIntersectAdFunction.backward).__globals__[
-            "rayd_intersect_backward"
-        ]
-        is geometry.rayd_intersect_backward
-    )
-    assert (
-        geometry._RaydIntersectAdFunction.jvp.__globals__["rayd_intersect_jvp"]
-        is geometry.rayd_intersect_jvp
-    )
-    assert (
-        inspect.unwrap(geometry._RaydTraceReflectionsAdFunction.backward).__globals__[
-            "rayd_trace_reflections_backward"
-        ]
-        is geometry.rayd_trace_reflections_backward
-    )
-    assert (
-        geometry._RaydTraceReflectionsAdFunction.jvp.__globals__[
-            "rayd_trace_reflections_jvp"
-        ]
-        is geometry.rayd_trace_reflections_jvp
     )
     assert (
         inspect.unwrap(

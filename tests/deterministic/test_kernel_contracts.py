@@ -14,11 +14,8 @@ from witwin.channel import runtime
 
 
 _OWNER_NAMES = (
-    "deterministic_field_from_power_phase",
-    "deterministic_los_field",
     "deterministic_pack_complex",
     "deterministic_phase_from_field",
-    "deterministic_phase_from_length",
     "deterministic_zero_field_phase",
 )
 
@@ -36,7 +33,7 @@ def test_deterministic_fields_is_the_single_object_owner(name: str):
     owner = getattr(field_kernels, name)
 
     assert owner.__module__ == field_kernels.__name__
-    assert getattr(public_fields, name) is owner
+    assert name not in vars(public_fields)
 
 
 def test_deterministic_fields_uses_canonical_runtime_dependencies():

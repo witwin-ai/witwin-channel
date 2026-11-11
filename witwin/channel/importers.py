@@ -13,7 +13,7 @@ import math
 from os import PathLike
 from pathlib import Path
 import struct
-from typing import Any
+from typing import Any, cast
 import xml.etree.ElementTree as ElementTree
 import zlib
 
@@ -361,7 +361,7 @@ def _binary_fixed_lists(
         dtype_fields.append((f"{name}__count", endian + count_type))
         dtype_fields.append((name, endian + value_type, (length,)))
         cursor += np.dtype(count_type).itemsize + length * np.dtype(value_type).itemsize
-    dtype = np.dtype(dtype_fields)  # type: ignore[arg-type]
+    dtype = np.dtype(dtype_fields)
     if offset + dtype.itemsize * element.count > len(data):
         return None
     rows = np.frombuffer(data, dtype, element.count, offset)
@@ -907,7 +907,7 @@ def _legacy_itu_name(key: str) -> str | None:
 
 def _radio_material(key: str, element: ElementTree.Element, ctx: _MitsubaContext) -> MaterialSpec:
     while element.attrib.get("type") == "twosided" and element.find("bsdf") is not None:
-        element = element.find("bsdf")  # type: ignore[assignment]
+        element = cast(ElementTree.Element, element.find("bsdf"))
     kind = element.attrib.get("type", "")
     props = _properties(element)
     if kind == "itu-radio-material":

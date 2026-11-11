@@ -245,11 +245,55 @@ def test_frozen_baseline_universe_cannot_change():
     violations = graph.scan_package(PACKAGE_ROOT)
     allowlist = graph.load_allowlist(ALLOWLIST)
     changed = copy.deepcopy(allowlist)
-    changed["debts"]["solver_to_solver"]["baseline"][0]["line"] += 1
+    changed["debts"]["solver_to_solver"]["baseline"].append(
+        {
+            "id": "solver-new",
+            "path": "witwin/channel/path.py",
+            "rule": "solver_to_solver",
+            "source": "witwin.channel.path",
+            "target": "witwin.channel.deterministic",
+        }
+    )
 
     issues = graph.check_allowlist(violations, changed)
 
     assert any("frozen import debt universe changed" in issue for issue in issues)
+
+
+def test_allowlist_entries_name_no_line():
+    """An entry names a file and a module edge; a line or column pin is refused."""
+
+    violations = graph.scan_package(PACKAGE_ROOT)
+    allowlist = graph.load_allowlist(ALLOWLIST)
+    changed = copy.deepcopy(allowlist)
+    changed["debts"]["mc_enumerated_dependency"]["baseline"][0]["line"] = 99
+
+    issues = graph.check_allowlist(violations, changed)
+
+    assert any("pins a line or column" in issue for issue in issues)
+
+
+def test_allowance_survives_moving_the_import(tmp_path: Path):
+    """Imports added or removed above an allowlisted import do not break the allowance."""
+
+    def package(prefix: str) -> Path:
+        return _synthetic_package(
+            tmp_path / prefix,
+            {
+                "__init__.py": "",
+                "propagation/__init__.py": "from .enumerated import evaluate_enumerated_paths\n",
+                "propagation/enumerated.py": "",
+                "montecarlo/__init__.py": "",
+                "montecarlo/bdpt.py": (
+                    prefix + "from witwin.channel.propagation import evaluate_enumerated_paths\n"
+                ),
+            },
+        )
+
+    allowlist = graph.load_allowlist(ALLOWLIST)
+    for prefix in ("", "import os\nimport sys\n\n\n"):
+        violations = graph.scan_package(package(prefix))
+        assert graph.check_allowlist(violations, allowlist) == []
 
 
 def test_reexport_map_resolves_facade_symbols_to_defining_modules(tmp_path: Path):
@@ -383,11 +427,12 @@ def test_reexport_canonicalization_exposes_real_bdpt_enumerated_edge():
         for violation in violations
         if violation.rule == "mc_enumerated_dependency"
     ]
-    assert enumerated == [
-        graph.Violation(
+    assert [
+        (violation.path, violation.rule, violation.source, violation.target)
+        for violation in enumerated
+    ] == [
+        (
             "witwin/channel/montecarlo/bdpt.py",
-            99,
-            0,
             "mc_enumerated_dependency",
             f"{package}.montecarlo.bdpt",
             f"{package}.propagation.enumerated",

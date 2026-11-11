@@ -127,20 +127,6 @@ __device__ __forceinline__ void cross_values(const float* a, const float* b, flo
     store_vec3(out, 0, cross(load_vec3(a, 0), load_vec3(b, 0)));
 }
 
-__device__ __forceinline__ Vec3 load_normalized_min_length(
-    const float* values,
-    int64_t index,
-    float minimum_length) {
-    Vec3 value = load_vec3(values, index);
-    float value_length = sqrtf(
-        value.x * value.x + value.y * value.y + value.z * value.z);
-    value_length = fmaxf(value_length, minimum_length);
-    return vec3(
-        value.x / value_length,
-        value.y / value_length,
-        value.z / value_length);
-}
-
 __device__ __forceinline__ Vec3 normalize_rsqrt_min_squared(
     Vec3 value,
     float minimum_squared_length) {

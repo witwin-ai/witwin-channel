@@ -13,6 +13,11 @@
   audit: `docs/dev/audit/fullwave-deterministic-discontinuity-audit.md` and the
   three-cube multipath findings under `artifacts/fullwave-fix/threecube/`.
 
+> **Revised (0.6.0, M3-6):** `docs/dev/standards/adr-0xx-m3-6-interaction-chains.md` replaces the
+> coupled candidate enumerator and its 1,000,000-candidate cap with the interaction-chain
+> framework (one diffraction anywhere in a reflection chain) and changes double-diffraction
+> candidate selection and leg tracing. Where this record and that one disagree, that one holds.
+
 ## Context
 
 The single-cube UTD-continuity work (F1-F6, ADR-adjacent, RayD branch

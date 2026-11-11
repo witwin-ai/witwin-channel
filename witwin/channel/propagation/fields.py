@@ -11,22 +11,14 @@ from typing import TYPE_CHECKING
 import torch
 
 from witwin.channel.kernels.fields import (
-    _CoupledRdPrepareAdFunction,
-    _FieldCoupledRdAdFunction,
+    _FieldCoupledChainAdFunction,
     _FieldDiffractionWedgeAdFunction,
     _FieldFreeSpaceAdFunction,
     _FieldProjectComplex3AdFunction,
     _FieldReflectionSequenceAdFunction,
     _FieldTransmissionSequenceAdFunction,
-    coupled_rd_prepare_ad,
-    deterministic_field_from_power_phase as deterministic_field_from_power_phase,
-    deterministic_los_field as deterministic_los_field,
-    deterministic_pack_complex as deterministic_pack_complex,
-    deterministic_phase_from_field as deterministic_phase_from_field,
-    deterministic_phase_from_length as deterministic_phase_from_length,
-    deterministic_zero_field_phase as deterministic_zero_field_phase,
-    field_coupled_rd,
-    field_coupled_rd_ad,
+    field_coupled_chain,
+    field_coupled_chain_ad,
     field_diffraction_wedge,
     field_diffraction_wedge_ad,
     field_free_space,
@@ -89,16 +81,19 @@ from witwin.channel.propagation.geometry import (
 from witwin.channel.propagation.topology import (
     PathExecutionStats,
 )
-from witwin.channel.kernels import topology as topology_kernels
 
 if TYPE_CHECKING:
+    from witwin.channel.scene.compiler import CompiledScene
     from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
 _LOS_GROUP = 0
 _DIFFRACTION_GROUP = 2
-_RD_GROUP = 3
-_DR_GROUP = 4
+# Single-diffraction chains: the diffraction last (with the interior-diffraction chains, whose
+# component id is _CHAIN_INTERIOR_BASE + slot) and the diffraction first.
+_CHAIN_LAST_GROUP = 3
+_CHAIN_FIRST_GROUP = 4
+_CHAIN_INTERIOR_BASE = 8
 _TRANSMISSION_GROUP = 5
 _DD_GROUP = 7
 
@@ -142,57 +137,112 @@ class _FieldOutputs:
         self.write("direction", rows, evaluated["direction"])
 
 
-def _resolve_coupled_rd_stationary(
-    source: torch.Tensor, target: torch.Tensor, rows: torch.Tensor | None, reverse_order: bool,
-    tri_a: torch.Tensor, normals_table: torch.Tensor, reflection_face: torch.Tensor,
-    edge_geometry: tuple[torch.Tensor, ...], edge_id: torch.Tensor, edge_position: torch.Tensor,
-    reflection_position: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Differentiable fixed-winner coupled stationary re-solve (cid 3/4, AD).
+def _chain_rows(groups: PathRowGroups) -> torch.Tensor | None:
+    """Rows of every single-diffraction chain group, or None when they are every row."""
 
-    Pure lift of the cid-3/4 ``coupled_geometry_ad`` branch out of
-    ``_evaluate_coupled_fields``, with identical math and error behavior.
-    diffraction AD: the coupled interaction points move with the endpoints
-    (Fresnel angles are not stationary), so re-solve the frozen winner's
-    stationary geometry differentiably (the same image-source math as the
-    discovery prepare kernel) and feed the live points into the field kernel.
-    D->R is the reciprocal problem with the endpoints exchanged. Returns the
-    live (edge_point, reflection_point); the passed positions are the frozen
-    discovery references used only to guard that the winner did not move.
+    present = [group for group in (_CHAIN_LAST_GROUP, _CHAIN_FIRST_GROUP) if groups.count(group) > 0]
+    if len(present) == 1:
+        return groups.rows(present[0])
+    return torch.cat([groups.rows(group) for group in present])
+
+
+def _chain_diffraction_slot(component_id: torch.Tensor, depth: torch.Tensor) -> torch.Tensor:
+    """The diffraction slot of each chain row, as its component id encodes it."""
+
+    return torch.where(
+        component_id == _CHAIN_LAST_GROUP,
+        depth - 1,
+        torch.where(component_id == _CHAIN_FIRST_GROUP, torch.zeros_like(depth), component_id - _CHAIN_INTERIOR_BASE),
+    )
+
+
+def _evaluate_chain_rows(
+    compiled: CompiledScene, topology: PathTopology, geometry: PathGeometry, source: torch.Tensor,
+    target: torch.Tensor, source_power: torch.Tensor, tx_pol: torch.Tensor, rx_pol: torch.Tensor,
+    material: dict[str, torch.Tensor], edge_geometry: tuple[torch.Tensor, ...],
+    edge_n0: torch.Tensor, edge_n1: torch.Tensor, edge_exterior: torch.Tensor,
+    edge_face0: torch.Tensor, edge_face1: torch.Tensor, ad_enabled: bool,
+    frequency: float | torch.Tensor, frequency_value: float | None, ledger: AdLaunchLedger | None,
+    groups: PathRowGroups, outputs: _FieldOutputs, launch_count: int,
+) -> int:
+    """Evaluate the interaction-chain rows (reflections, one diffraction, reflections) in one launch.
+
+    Each row's slot materials are gathered per face: the reflection slots from the row's
+    sequence, the two wedge faces from its edge. The discovered interaction points are frozen;
+    under AD the endpoints move them through the native re-solve of the frozen winner.
     """
 
-    epc_source = _take(target, rows) if reverse_order else _take(source, rows)
-    epc_receiver = _take(source, rows) if reverse_order else _take(target, rows)
-    resolved = field_kernels.coupled_rd_prepare_ad(
-        epc_source.contiguous(),
-        epc_receiver.contiguous(),
-        tri_a[reflection_face].contiguous(),
-        normals_table[reflection_face].contiguous(),
-        edge_geometry[1][edge_id].contiguous(),
-        edge_geometry[2][edge_id].contiguous(),
-        edge_geometry[4][edge_id].contiguous(),
-        edge_geometry[5][edge_id].contiguous(),
+    if not groups.has_rows(_CHAIN_LAST_GROUP, _CHAIN_FIRST_GROUP):
+        return launch_count
+    rows = _chain_rows(groups)
+    component_id = _take(topology.component_id, rows).to(dtype=torch.int32)
+    depth = _take(topology.depth, rows).to(dtype=torch.int32)
+    sequence = _take(topology.primitive_sequence, rows).to(dtype=torch.int64)
+    positions = _take(geometry.interaction_positions, rows)
+    normals = _take(geometry.interaction_normals, rows)
+    width = int(sequence.shape[1])
+    edge_id = _take(topology.edge_id, rows).to(dtype=torch.int64)
+    slot = _chain_diffraction_slot(component_id, depth).to(dtype=torch.int64)
+    columns = torch.arange(width, device=sequence.device).reshape(1, -1)
+    reflection = (columns != slot.reshape(-1, 1)) & (columns < depth.reshape(-1, 1).to(dtype=torch.int64))
+    face0 = edge_face0[edge_id]
+    raw_face1 = edge_face1[edge_id]
+    # Boundary edges have no second face; reuse face0.
+    face1 = torch.where(raw_face1 >= 0, raw_face1, face0)
+    slot_faces = torch.where(reflection, sequence, face0.reshape(-1, 1))
+    face_table = torch.cat((slot_faces, face0.reshape(-1, 1), face1.reshape(-1, 1)), dim=1)
+    chain_material = tuple(
+        material[name][face_table].contiguous() for name in ("eps_r", "sigma_e", "mu_r", "gain", "thickness")
     )
-    if not bool(resolved["active"].all()):
-        raise RuntimeError(
-            "fixed-winner coupled stationary re-solve no longer "
-            "reproduces the discovered coupled paths; the winner "
-            "topology moved under the current scene tensors"
-        )
-    for name, reference in (
-        ("edge_point", edge_position),
-        ("reflection_point", reflection_position),
-    ):
-        if not bool(
-            torch.isclose(
-                resolved[name].detach(), reference, atol=1.0e-3
-            ).all()
-        ):
-            raise RuntimeError(
-                "fixed-winner coupled stationary re-solve moved the "
-                f"{name} away from the discovered topology"
+    # Edge-segment bounds relative to the discovered edge (Keller) point along the normalized
+    # edge axis, so the native stationary machinery can truncate and corner-mend the
+    # diffraction leg. Frozen: chain rows carry no edge-geometry gradient.
+    edge_point = positions.gather(1, slot.reshape(-1, 1, 1).expand(-1, 1, 3)).reshape(-1, 3)
+    edge_ref = edge_geometry[1][edge_id]
+    edge_axis = edge_geometry[2][edge_id]
+    edge_axis = edge_axis / edge_axis.norm(dim=-1, keepdim=True).clamp_min(1.0e-12)
+    t_keller = ((edge_point.detach() - edge_ref) * edge_axis).sum(dim=-1)
+    edge_line_min = (edge_geometry[4][edge_id] - t_keller).contiguous()
+    edge_line_max = (edge_geometry[5][edge_id] - t_keller).contiguous()
+    chain_args = (
+        _take(source, rows),
+        _take(target, rows),
+        positions.detach().contiguous(),
+        normals.detach().contiguous(),
+        component_id.contiguous(),
+        depth.contiguous(),
+        edge_geometry[2][edge_id].contiguous(),
+        edge_n0[edge_id].contiguous(),
+        edge_n1[edge_id].contiguous(),
+        edge_exterior[edge_id].contiguous(),
+        edge_line_min,
+        edge_line_max,
+        _take(source_power, rows),
+        _take(tx_pol, rows),
+        _take(rx_pol, rows),
+    )
+    if ledger is not None:
+        ledger.add(*chain_args, *chain_material)
+    if ad_enabled:
+        if has_multilayer_material(compiled):
+            raise NotImplementedError(
+                "coupled reflection-diffraction derivatives with a multilayer reflecting material are "
+                "not supported; disable coupled_paths or use ad_mode='none'"
             )
-    return resolved["edge_point"], resolved["reflection_point"]
+        evaluated = field_kernels.field_coupled_chain_ad(
+            *chain_args, chain_material, frequency=frequency, frequency_value=frequency_value
+        )
+    else:
+        layers = (
+            field_kernels.reflection_layers(material, slot_faces, multilayer=True)
+            if has_multilayer_material(compiled)
+            else None
+        )
+        evaluated = field_kernels.field_coupled_chain(
+            *chain_args, chain_material, frequency_hz=frequency, layers=layers
+        )
+    outputs.write_evaluated(rows, evaluated, with_length=False)
+    return launch_count + 1
 
 
 def _evaluate_coupled_dd_rows(
@@ -340,7 +390,7 @@ def _los_taper_frequency(
 
 
 def _rough_face_tables(
-    compiled: object, material: dict[str, torch.Tensor],
+    compiled: CompiledScene, material: dict[str, torch.Tensor],
 ) -> tuple[torch.Tensor, torch.Tensor] | None:
     """Per-face rough-surface sigma and Kirchhoff-rough flag, or None on a smooth scene.
 
@@ -355,7 +405,7 @@ def _rough_face_tables(
     return sigma_face, rough_face
 
 
-def _realization_structures(compiled: object, *, scattering_active: bool) -> list[int]:
+def _realization_structures(compiled: CompiledScene, *, scattering_active: bool) -> list[int]:
     """Structures whose realization_coherent phase screen replaces their specular reflection.
 
     When the scattering component is active, the coherent patch integral of such a surface
@@ -373,12 +423,10 @@ def _realization_structures(compiled: object, *, scattering_active: bool) -> lis
 
 
 def _realization_face_mask(
-    compiled: object, realization_ids: list[int], device: torch.device,
-) -> torch.Tensor | None:
-    """Per-face mask of the given realization structures, or None when there are none."""
+    compiled: CompiledScene, realization_ids: list[int], device: torch.device,
+) -> torch.Tensor:
+    """Per-face mask of the faces of the given realization structures."""
 
-    if not realization_ids:
-        return None
     face_structure = face_geometry_id_table(compiled, "face_structure_id", device=device)
     realization_face = torch.zeros(
         (int(face_structure.numel()),), device=device, dtype=torch.bool
@@ -390,8 +438,8 @@ def _realization_face_mask(
 
 
 def _rough_scale_inputs(
-    compiled: object, face_id: torch.Tensor, depth_value: int, material: dict[str, torch.Tensor], *,
-    scattering_active: bool,
+    compiled: CompiledScene, face_id: torch.Tensor, depth_value: int,
+    material: dict[str, torch.Tensor], *, scattering_active: bool,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | None:
     """Per-bounce inputs of the native rough-reflection C_r op for one reflection depth.
 
@@ -427,7 +475,7 @@ def _rough_scale_inputs(
 
 
 def _canonical_face_tables(
-    compiled: object, groups: PathRowGroups, components: frozenset[str] | set[str],
+    compiled: CompiledScene, groups: PathRowGroups, components: frozenset[str] | set[str],
     device: torch.device,
 ) -> field_kernels.CanonicalFaceTables:
     """Per-face material, layer and rough-surface tables of the fused canonical launch."""
@@ -436,6 +484,9 @@ def _canonical_face_tables(
         return field_kernels.CanonicalFaceTables.empty(device)
     material = face_material_field_bundle(compiled, device=device)
     rough_tables = _rough_face_tables(compiled, material)
+    realization_ids = _realization_structures(
+        compiled, scattering_active="scattering" in components
+    )
     return field_kernels.CanonicalFaceTables(
         eps_r=material["eps_r"],
         sigma_e=material["sigma_e"],
@@ -453,10 +504,8 @@ def _canonical_face_tables(
         multilayer=has_multilayer_material(compiled),
         rough_sigma=None if rough_tables is None else rough_tables[0],
         rough=None if rough_tables is None else rough_tables[1],
-        replaced=_realization_face_mask(
-            compiled,
-            _realization_structures(compiled, scattering_active="scattering" in components),
-            device,
+        replaced=(
+            _realization_face_mask(compiled, realization_ids, device) if realization_ids else None
         ),
     )
 
@@ -465,7 +514,7 @@ def _evaluate_los_fields(
     groups: PathRowGroups, source: torch.Tensor, target: torch.Tensor, source_power: torch.Tensor,
     tx_pol: torch.Tensor, rx_pol: torch.Tensor,
     los_field_op: Callable[..., dict[str, torch.Tensor]], ledger: AdLaunchLedger | None,
-    outputs: _FieldOutputs, launch_count: int, compiled: object, frequency_hz: float,
+    outputs: _FieldOutputs, launch_count: int, compiled: CompiledScene, frequency_hz: float,
     isb_boundary_taper_width: float,
 ) -> int:
     if groups.count(_LOS_GROUP) > 0:
@@ -512,7 +561,7 @@ def _evaluate_los_fields(
 
 
 def _evaluate_reflection_fields(
-    compiled: object, topology: PathTopology, geometry: PathGeometry, groups: PathRowGroups,
+    compiled: CompiledScene, topology: PathTopology, geometry: PathGeometry, groups: PathRowGroups,
     source: torch.Tensor, target: torch.Tensor, source_power: torch.Tensor, tx_pol: torch.Tensor,
     rx_pol: torch.Tensor, components: frozenset[str] | set[str], device: torch.device,
     frequency: float | torch.Tensor, geometry_ad: bool, vertices: torch.Tensor | None,
@@ -612,7 +661,7 @@ def _evaluate_reflection_fields(
 
 
 def _evaluate_transmission_fields(
-    compiled: object, topology: PathTopology, geometry: PathGeometry, source: torch.Tensor,
+    compiled: CompiledScene, topology: PathTopology, geometry: PathGeometry, source: torch.Tensor,
     target: torch.Tensor, source_power: torch.Tensor, tx_pol: torch.Tensor, rx_pol: torch.Tensor,
     device: torch.device, geometry_ad: bool, vertices: torch.Tensor | None,
     transmission_field_op: Callable[..., dict[str, torch.Tensor]], ledger: AdLaunchLedger | None,
@@ -678,7 +727,7 @@ def _evaluate_transmission_fields(
 
 
 def _evaluate_diffraction_fields(
-    scene: Scene, compiled: object, topology: PathTopology, source: torch.Tensor,
+    scene: Scene, compiled: CompiledScene, topology: PathTopology, source: torch.Tensor,
     target: torch.Tensor, source_power: torch.Tensor, rx_pol: torch.Tensor, device: torch.device,
     frequency: float | torch.Tensor, frequency_value: float | None, geometry_ad: bool,
     vertices: torch.Tensor | None, ledger: AdLaunchLedger | None,
@@ -737,10 +786,11 @@ def _evaluate_diffraction_fields(
             # A half-plane edge carries its one sheet face on both sides.
             edge_boundary = ((face1 < 0) | (face1 == face0)).contiguous()
             wedge_vertices = (
-                vertices[edge_v0_ids].contiguous(),
-                vertices[edge_v1_ids].contiguous(),
-                vertices[opp0_ids].contiguous(),
-                vertices[opp1_ids].contiguous(),
+                # The caller passes the vertex table whenever geometry AD is on.
+                vertices[edge_v0_ids].contiguous(),  # type: ignore[index]
+                vertices[edge_v1_ids].contiguous(),  # type: ignore[index]
+                vertices[opp0_ids].contiguous(),  # type: ignore[index]
+                vertices[opp1_ids].contiguous(),  # type: ignore[index]
                 edge_boundary,
             )
         wedge_args = (
@@ -796,32 +846,15 @@ def _evaluate_diffraction_fields(
     return material, launch_count
 
 
-def _layered_coupled_op(
-    op: Callable[..., dict[str, torch.Tensor]], compiled: object, material: dict[str, torch.Tensor],
-    reflection_face: torch.Tensor, ad_enabled: bool,
-) -> Callable[..., dict[str, torch.Tensor]]:
-    """Give the coupled reflection leg the layer store when the scene has a multilayer material."""
-
-    if not has_multilayer_material(compiled):
-        return op
-    if ad_enabled:
-        raise NotImplementedError(
-            "coupled reflection-diffraction derivatives with a multilayer reflecting material are "
-            "not supported; disable coupled_paths or use ad_mode='none'"
-        )
-    layers = field_kernels.reflection_layers(material, reflection_face.unsqueeze(1), multilayer=True)
-    return partial(op, layers=layers)
-
-
 def _evaluate_coupled_fields(
-    scene: Scene, compiled: object, topology: PathTopology, geometry: PathGeometry,
+    scene: Scene, compiled: CompiledScene, topology: PathTopology, geometry: PathGeometry,
     source: torch.Tensor, target: torch.Tensor, source_power: torch.Tensor, tx_pol: torch.Tensor,
     rx_pol: torch.Tensor, device: torch.device, frequency: float | torch.Tensor,
     frequency_value: float | None, ad_enabled: bool, geometry_ad: bool,
     ledger: AdLaunchLedger | None, material: dict[str, torch.Tensor] | None, groups: PathRowGroups,
     outputs: _FieldOutputs, launch_count: int,
 ) -> tuple[dict[str, torch.Tensor] | None, int]:
-    if groups.has_rows(_RD_GROUP, _DR_GROUP, _DD_GROUP):
+    if groups.has_rows(_CHAIN_LAST_GROUP, _CHAIN_FIRST_GROUP, _DD_GROUP):
         if material is None:
             material = face_material_field_bundle(compiled, device=device)
         rayd = compiled.rayd
@@ -840,14 +873,9 @@ def _evaluate_coupled_fields(
         edge_face0 = edge_geometry[8].to(dtype=torch.int64)
         edge_face1 = edge_geometry[9].to(dtype=torch.int64)
         edge_exterior = edge_geometry[10]
-        coupled_geometry_ad = ad_enabled and geometry_ad
-        if coupled_geometry_ad and _vertices_participate_in_ad(scene):
-            # The coupled chain (cid 3/4 reflection-diffraction and cid 7 double
-            # diffraction, coupled double diffraction) consumes the wall plane and the edge tables
-            # through the stationary re-solve and the coupled field kernels,
-            # whose adjoints take them as frozen winners; a vertex gradient
-            # through the coupled rows would therefore be silently
-            # incomplete. Fail loudly instead (the AD contract, coupled double diffraction).
+        if ad_enabled and geometry_ad and _vertices_participate_in_ad(scene):
+            # Chain and double-diffraction rows take the reflection planes and the edge tables as
+            # frozen winners, so a vertex gradient through them would be silently incomplete.
             raise NotImplementedError(
                 "coupled reflection-diffraction and double-diffraction paths do "
                 "not support mesh vertex gradients: the coupled stationary "
@@ -856,120 +884,30 @@ def _evaluate_coupled_fields(
                 " would be silently missing. Drop the vertices requires_grad/"
                 "tangent or disable coupled_paths."
             )
-        if coupled_geometry_ad:
-            tri_a = topology_kernels.deterministic_face_anchor_points(
-                records.vertices.contiguous(), records.faces.contiguous()
-            )
-            normals_table = geometry_kernels.deterministic_normalize_vec3(
-                records.face_normals.contiguous(), eps=1.0e-6
-            )
-        for component_id, reverse_order in ((_RD_GROUP, False), (_DR_GROUP, True)):
-            if groups.count(component_id) == 0:
-                continue
-            rows = groups.rows(component_id)
-            edge_id = _take(topology.edge_id, rows).to(dtype=torch.int64)
-            reflection_face = _take(topology.primitive_id, rows).to(dtype=torch.int64)
-            face0 = edge_face0[edge_id]
-            raw_face1 = edge_face1[edge_id]
-            face1 = torch.where(raw_face1 >= 0, raw_face1, face0)
-            reflection_slot = 1 if reverse_order else 0
-            edge_slot = 0 if reverse_order else 1
-            row_positions = _take(geometry.interaction_positions, rows)
-            reflection_position = row_positions[:, reflection_slot].contiguous()
-            edge_position = row_positions[:, edge_slot].contiguous()
-            if coupled_geometry_ad:
-                edge_position, reflection_position = (
-                    _resolve_coupled_rd_stationary(
-                        source,
-                        target,
-                        rows,
-                        reverse_order,
-                        tri_a,
-                        normals_table,
-                        reflection_face,
-                        edge_geometry,
-                        edge_id,
-                        edge_position,
-                        reflection_position,
-                    )
-                )
-
-            # edge-segment bounds relative to the passed edge (Keller) point,
-            # along the normalized edge axis, so the native stationary machinery
-            # can truncate and corner-mend the coupled diffraction leg. The edge
-            # tables carry line_min/line_max as arc-lengths from the segment
-            # reference origin (edge_geometry[1]); shift them by the Keller
-            # point's arc offset. Frozen (detached): coupled rows carry no
-            # edge-geometry gradient (coupled reflection and diffraction); the tx/rx gradient flows through
-            # source/target inside the native re-anchoring.
-            edge_ref = edge_geometry[1][edge_id]
-            edge_axis = edge_geometry[2][edge_id]
-            edge_axis = edge_axis / edge_axis.norm(dim=-1, keepdim=True).clamp_min(
-                1.0e-12
-            )
-            t_keller = ((edge_position.detach() - edge_ref) * edge_axis).sum(dim=-1)
-            edge_line_min = (edge_geometry[4][edge_id] - t_keller).contiguous()
-            edge_line_max = (edge_geometry[5][edge_id] - t_keller).contiguous()
-
-            def material_tuple(face: torch.Tensor) -> tuple[torch.Tensor, ...]:
-                return tuple(
-                    material[name][face].contiguous()
-                    for name in ("eps_r", "sigma_e", "mu_r", "gain", "thickness")
-                )
-
-            coupled_field_op = (
-                partial(
-                    field_kernels.field_coupled_rd_ad,
-                    frequency=frequency,
-                    frequency_value=frequency_value,
-                )
-                if ad_enabled
-                else partial(field_kernels.field_coupled_rd, frequency_hz=frequency)
-            )
-            reflection_materials = material_tuple(reflection_face)
-            wedge_materials0 = material_tuple(face0)
-            wedge_materials1 = material_tuple(face1)
-            coupled_args = (
-                _take(source, rows),
-                _take(target, rows),
-                reflection_position,
-                _take(geometry.interaction_normals, rows)[:, reflection_slot].contiguous(),
-                edge_position,
-                edge_geometry[2][edge_id].contiguous(),
-                edge_n0[edge_id].contiguous(),
-                edge_n1[edge_id].contiguous(),
-                edge_exterior[edge_id].contiguous(),
-                _take(source_power, rows),
-                _take(tx_pol, rows),
-                _take(rx_pol, rows),
-            )
-            if ledger is not None:
-                if coupled_geometry_ad:
-                    # Fixed-winner coupled stationary re-solve companion.
-                    ledger.add(_take(source, rows), _take(target, rows), reflection_position)
-                ledger.add(
-                    *coupled_args,
-                    *reflection_materials,
-                    *wedge_materials0,
-                    *wedge_materials1,
-                    edge_line_min,
-                    edge_line_max,
-                )
-            coupled_field_op = _layered_coupled_op(
-                coupled_field_op, compiled, material, reflection_face, ad_enabled
-            )
-            evaluated = coupled_field_op(
-                *coupled_args,
-                reflection_materials,
-                wedge_materials0,
-                wedge_materials1,
-                edge_line_min,
-                edge_line_max,
-                reverse=reverse_order,
-            )
-            outputs.write_evaluated(rows, evaluated, with_length=False)
-            launch_count += 1
-
+        launch_count = _evaluate_chain_rows(
+            compiled,
+            topology,
+            geometry,
+            source,
+            target,
+            source_power,
+            tx_pol,
+            rx_pol,
+            material,
+            edge_geometry,
+            edge_n0,
+            edge_n1,
+            edge_exterior,
+            edge_face0,
+            edge_face1,
+            ad_enabled,
+            frequency,
+            frequency_value,
+            ledger,
+            groups,
+            outputs,
+            launch_count,
+        )
         launch_count = _evaluate_coupled_dd_rows(
             topology,
             geometry,
@@ -1014,7 +952,7 @@ def _row_endpoints(
 
 
 def _evaluate_differentiable_rows(
-    scene: Scene, compiled: object, topology: PathTopology, geometry: PathGeometry,
+    scene: Scene, compiled: CompiledScene, topology: PathTopology, geometry: PathGeometry,
     input_fields: PathFields, row_groups: PathRowGroups, endpoint_rows: tuple[torch.Tensor, ...],
     components: frozenset[str] | set[str], device: torch.device, frequency: float | torch.Tensor,
     frequency_value: float | None, geometry_ad: bool, vertices: torch.Tensor | None,
@@ -1055,7 +993,7 @@ def _evaluate_differentiable_rows(
 
 
 def _evaluate_canonical_rows(
-    scene: Scene, compiled: object, topology: PathTopology, geometry: PathGeometry,
+    scene: Scene, compiled: CompiledScene, topology: PathTopology, geometry: PathGeometry,
     input_columns: dict[str, torch.Tensor], row_groups: PathRowGroups, tx_positions: torch.Tensor,
     tx_power: torch.Tensor, rx_positions: torch.Tensor, tx_pol_batch: torch.Tensor,
     rx_pol_batch: torch.Tensor, components: frozenset[str] | set[str], device: torch.device,
@@ -1095,7 +1033,9 @@ def _evaluate_canonical_rows(
     )
     launch_count += 1
     outputs = _FieldOutputs(canonical, owned=True)
-    if taper_los or row_groups.has_rows(_TRANSMISSION_GROUP, _RD_GROUP, _DR_GROUP, _DD_GROUP):
+    if taper_los or row_groups.has_rows(
+        _TRANSMISSION_GROUP, _CHAIN_LAST_GROUP, _CHAIN_FIRST_GROUP, _DD_GROUP
+    ):
         endpoint_rows = _row_endpoints(
             topology, tx_positions, tx_power, rx_positions, tx_pol_batch, rx_pol_batch
         )
@@ -1120,7 +1060,7 @@ def _evaluate_canonical_rows(
 
 
 def evaluate_path_fields(
-    scene: Scene, compiled: object, paths: EvaluatedPaths, execution: PathExecutionStats,
+    scene: Scene, compiled: CompiledScene, paths: EvaluatedPaths, execution: PathExecutionStats,
     tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor, *,
     row_groups: PathRowGroups, components: frozenset[str] | set[str] = frozenset(),
     ad_mode: str = "none", frequency_value: float | None = None,
@@ -1300,16 +1240,14 @@ def evaluate_path_fields(
 
 
 __all__ = [
-    "_CoupledRdPrepareAdFunction",
-    "_FieldCoupledRdAdFunction",
+    "_FieldCoupledChainAdFunction",
     "_FieldDiffractionWedgeAdFunction",
     "_FieldFreeSpaceAdFunction",
     "_FieldProjectComplex3AdFunction",
     "_FieldReflectionSequenceAdFunction",
     "_FieldTransmissionSequenceAdFunction",
-    "coupled_rd_prepare_ad",
-    "field_coupled_rd",
-    "field_coupled_rd_ad",
+    "field_coupled_chain",
+    "field_coupled_chain_ad",
     "field_diffraction_wedge",
     "field_diffraction_wedge_ad",
     "field_free_space",

@@ -14,7 +14,6 @@ from witwin.channel import runtime
 
 
 _SAMPLING_OWNER_NAMES = (
-    "mc_diffraction_state_pack",
     "mc_diffraction_state_wi",
     "mc_reflection_rays",
 )
@@ -46,7 +45,6 @@ _MAP_OWNER_NAMES = (
     "mc_component_map_buffer",
     "mc_finalize_component_maps",
     "mc_finalize_component_maps_ad",
-    "mc_los_component_maps",
     "mc_los_component_maps_adjoint",
     "mc_los_component_maps_from_matrix",
     "mc_los_grid_maps_ad",
@@ -101,7 +99,6 @@ _MAP_CONTRACT_IDS = (
     "mc_component_map_buffer",
     "mc_finalize_component_maps",
     "mc_finalize_component_maps_ad",
-    "mc_los_component_maps",
     "mc_los_component_maps_adjoint",
     "mc_los_component_maps_from_matrix",
     "mc_los_grid_maps_ad",
@@ -136,7 +133,8 @@ def test_runtime_native_buffers_is_the_neutral_single_object_owner(name: str):
     owner = getattr(runtime, name)
 
     assert owner.__module__ == runtime.__name__
-    assert getattr(montecarlo, name) is owner
+    # The Monte Carlo facades call the runtime owner and do not re-export it.
+    assert name not in vars(montecarlo)
 
 
 def test_mc_basic_sampling_uses_canonical_runtime_dependencies():
@@ -337,7 +335,6 @@ def test_mc_basic_maps_component_ad_methods_resolve_canonical_siblings(
     assert getattr(montecarlo, entry_name).__globals__[class_name] is function
 
 
-def test_mc_basic_maps_uses_package_level_los_export_same_object_alias():
-    assert topology.path_los_export is topology_kernels.path_los_export
-    assert montecarlo.path_los_export is topology.path_los_export
-    assert "path_los_export" not in topology.__all__
+def test_mc_basic_maps_use_the_canonical_los_export_owner():
+    assert montecarlo.path_los_export is topology_kernels.path_los_export
+    assert "path_los_export" not in vars(topology)

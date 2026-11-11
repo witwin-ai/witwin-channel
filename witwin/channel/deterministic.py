@@ -7,9 +7,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing import ClassVar
+from typing import ClassVar, cast
 
 from witwin.channel.components import (
+    DiscoveryMetadata,
     discovery_metadata,
     require_config_type,
     validate_vocabulary,
@@ -40,6 +41,8 @@ from time import perf_counter
 
 from witwin.channel.scene.endpoints import validate_scalar_endpoint_features
 from witwin.channel.capabilities import (
+    ConfigMetadata,
+    ResultSemantics,
     component_quantities,
     config_metadata,
     estimator_metadata,
@@ -47,7 +50,7 @@ from witwin.channel.capabilities import (
     solver_capabilities,
 )
 from witwin.channel import build_info
-from witwin.channel.runtime import make_metadata
+from witwin.channel.runtime import KernelMetadata, make_metadata
 from witwin.channel.constants import PHASE_CONVENTION
 from witwin.channel.kernels.topology import (
     deterministic_component_counts,
@@ -157,6 +160,38 @@ class PathTable:
     interaction_count: torch.Tensor
 
 
+class _MetadataKeys(ResultSemantics, ConfigMetadata):
+    max_depth: int
+    coherent: bool
+    return_field: bool
+    export_paths: bool
+    max_paths: int | None
+    max_paths_scope: str
+    sort_key: str
+    accumulation_strategy: str
+    components: dict[str, str]
+    counts: dict[str, Any]
+    capability: dict[str, bool]
+    kernel: KernelMetadata
+    field_abi: str
+    phase_convention: dict[str, Any]
+    coefficient_semantics: str
+    coupled_paths: dict[str, Any]
+    discovery: DiscoveryMetadata
+    semantic_capabilities: dict[str, Any]
+
+
+class Metadata(_MetadataKeys, total=False):
+    """The stable keys of ``Result.metadata``; a plain ``dict`` at run time."""
+
+    # Present when the transmission component was requested.
+    transmission: dict[str, Any]
+    # Present when the scattering component was requested.
+    scattering: dict[str, Any]
+    # Present when compilation removed degenerate or duplicate faces.
+    dropped_faces: dict[str, int]
+
+
 @dataclass(frozen=True, slots=True)
 class Result:
     path_gain: torch.Tensor
@@ -164,7 +199,7 @@ class Result:
     component_power: dict[str, torch.Tensor]
     component_fields: dict[str, torch.Tensor]
     paths: PathTable | None
-    metadata: dict[str, Any]
+    metadata: Metadata
     diagnostics: dict[str, Any] | None = None
 
 
@@ -172,9 +207,8 @@ class Result:
 
 # Component slots materialized by the native accumulator
 # (kAccumSlotCount=6 in kernels/deterministic_accum.cu); the path component
-# ids map to them as 0/1/2 -> 0/1/2, 5 -> 3, 6 -> 4, and 3/4 -> 5 (coupled reflection and diffraction:
-# reflection->diffraction and diffraction->reflection are the coupled classes,
-# both summed coherently into the single coupled field slot). Under
+# ids map to them as 0/1/2 -> 0/1/2, 5 -> 3, 6 -> 4, and the interaction chains and double
+# diffraction (3, 4, 7, 9..15) -> 5, summed coherently into the single coupled field slot. Under
 # ad_mode != "none" the same native forward runs inside a dispatch-only
 # autograd.Function whose backward/jvp are native CUDA companions
 # (accumulation_kernels.deterministic_accumulate_flat_ad), so the accumulated
@@ -507,12 +541,12 @@ def _scattering_metadata(
 def _coupled_paths_metadata(
     config: Config, component_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
-    """Coupled higher-order compensator metadata block (coupled reflection and diffraction + coupled double diffraction).
+    """Coupled-paths metadata block: interaction chains plus double diffraction.
 
-    Mirrors the path solver's coupled_paths block. ``coupled_paths=True`` now
-    enables the uniform order-2 compensator family {R->D, D->R, D->D}; the DD
-    (component id 7) member is reported as its own row count for audits while it
-    aggregates into the single coherent coupled slot.
+    Mirrors the path solver's coupled_paths block. ``coupled_paths=True`` enables the
+    interaction chains (reflections with one diffraction anywhere, up to ``max_depth``
+    interactions) and double diffraction; the double-diffraction rows (component id 7) are
+    reported as their own row count while they aggregate into the single coherent coupled slot.
     """
 
     if not config.coupled_paths:
@@ -524,7 +558,7 @@ def _coupled_paths_metadata(
     counts = component_counts or {}
     return {
         "requested": True,
-        "geometry": "native_1r1d_reciprocal_plus_dd",
+        "geometry": "native_interaction_chains_plus_dd",
         "coefficient": "unified_complex3_jones",
         "double_diffraction": {
             "geometry": "native_dd_cascade",
@@ -538,19 +572,23 @@ def _register_coupled_component(
     config: Config, topology: Any, component_counts: dict[str, int],
     extra_components: tuple[str, ...],
 ) -> tuple[str, ...]:
-    """Record the coupled component count and export name (coupled reflection and diffraction + coupled double diffraction).
+    """Record the coupled component count and export name.
 
-    Coupled rows carry component ids 3 (R->D), 4 (D->R) and 7 (D->D, coupled double diffraction);
-    all three accumulate into the single coupled slot. "coupled" is not a public
-    component name, so it is enabled by the coupled_paths gate rather than the
-    components set. The DD row count is recorded separately for audits.
+    Coupled rows carry component ids 3 (diffraction last), 4 (diffraction first), 9..15
+    (diffraction at an interior slot) and 7 (double diffraction); all accumulate into the single
+    coupled slot. "coupled" is not a public component name, so it is enabled by the
+    coupled_paths gate rather than the components set. The double-diffraction row count is
+    recorded separately for audits.
     """
 
     if not config.coupled_paths:
         return extra_components
     component_id = topology.component_id
     component_counts["coupled"] = int(
-        ((component_id == 3) | (component_id == 4) | (component_id == 7)).sum().item()
+        (
+            (component_id == 3) | (component_id == 4) | (component_id == 7)
+            | ((component_id > 8) & (component_id < 16))
+        ).sum().item()
     )
     component_counts["coupled_double_diffraction"] = int(
         (component_id == 7).sum().item()
@@ -588,7 +626,7 @@ def _metadata(
     ad_tape_bytes: int = 0, forward_time_ms: float = 0.0, peak_memory_bytes: int = 0,
     scattering_info: dict[str, Any] | None = None, transmission_dropped_rows: int = 0,
     reflection_discovery: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+) -> Metadata:
     capability = {
         "rayd_native": bool(native_info["uses_rayd_native"]),
         "path_native": bool(native_info.get("uses_path_native", False)),
@@ -632,7 +670,7 @@ def _metadata(
     requested_config = serialize_config(config)
     effective_config = dict(requested_config)
     discovery = discovery_metadata(config.discovery, reflection_discovery)
-    metadata = {
+    metadata: dict[str, Any] = {
         "max_depth": config.max_depth,
         "coherent": config.coherent,
         "return_field": config.return_field,
@@ -699,7 +737,7 @@ def _metadata(
         )
     )
     metadata["semantic_capabilities"] = solver_capabilities("deterministic")
-    return metadata
+    return cast(Metadata, metadata)
 
 
 def _terminal_check_capacity(sidecars: EvaluatedPathSidecars) -> None:
@@ -752,9 +790,6 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
         scene,
         config,
         frequency_value=frequency_hz,
-        # Stream coupled discovery over receiver blocks so a full grid solve
-        # stays under the per-block candidate budget (coupled reflection and diffraction).
-        coupled_rx_streaming=config.coupled_paths,
         defer_capacity_terminal=True,
     )
     evaluated, sidecars, scattering_info = _append_scattering(
@@ -868,11 +903,8 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
 # signature in ci/public-api-snapshot.json, so annotating it would break the
 # recorded contract hash. mypy only sees this function now that the solver is
 # one module, so the pre-existing shape is silenced here rather than changed.
-def solve(  # type: ignore[no-untyped-def]
-    scene: Scene | SceneSnapshot,
-    config: Config,
-    *,
-    reference_frequency_hz,
+def solve(
+    scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz: float | torch.Tensor,
 ) -> Result:
     """Run the deterministic propagation pipeline."""
 
@@ -884,4 +916,4 @@ def solve(  # type: ignore[no-untyped-def]
     record_dropped_faces(result, compiled)
     return result
 
-__all__ = ["Config", "PathTable", "Result", "solve"]
+__all__ = ["Config", "Metadata", "PathTable", "Result", "solve"]

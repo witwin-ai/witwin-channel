@@ -80,6 +80,12 @@ fails loudly (`_ad_reject_fixed_*`), and their values are bitwise identical to
 
 ### New native AD companions (owner: `montecarlo.bdpt.kernels`)
 
+Superseded in part by ADR-049 decision 7: the two per-event subpath
+companions below were removed with the event-composed sampler; the sampler's
+derivative is now `bdpt_wavefront_jvp` / `bdpt_wavefront_backward` with the
+same frozen-topology scope. The endpoint, accumulate and finalize companions
+remain.
+
 | Symbol | Kind |
 |---|---|
 | `bdpt_reflected_light_subpath_state_backward` / `_jvp` | per-event specular Jones advance |

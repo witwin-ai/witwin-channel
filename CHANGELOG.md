@@ -25,6 +25,21 @@ All notable changes to `witwin-channel` are documented in this file.
   `complete` (true only when every reflection depth came from a provably
   complete source) and `discovery` (requested source and source per depth).
   The public API snapshot records the two `Config` contracts changing.
+- Typed result metadata: `path.PathMetadata`, `deterministic.Metadata`,
+  `montecarlo.basic.Metadata` and `montecarlo.bdpt.Metadata` are `TypedDict`s
+  naming the stable keys of each solver's `Result.metadata` (including
+  `estimator`, `quantity`, `combine`, `complete`, `discovery` and the `kernel`
+  record). At run time the metadata is the same plain `dict` with the same keys
+  and values. Each `solve` now annotates `reference_frequency_hz: float |
+  torch.Tensor`, and `PathResult.from_ragged(metadata=...)` accepts any
+  `Mapping`. The public API snapshot records these annotation changes and the
+  four new exports; see the migration note.
+- Propagation consumer `CONTRACT_VERSION` 7: `PropagationRequest.discovery`
+  (same vocabulary, default `"auto"`), `PropagationEvaluation.complete` and
+  `PropagationCapabilities.discovery_modes`. Migration: a consumer that pins
+  the version (`CONTRACT_VERSION == 6`) or the exact capability field set
+  must accept 7 and the new field; requests that do not set `discovery` keep
+  today's rows. The public API snapshot records the three changed contracts.
 
 ### Changed
 
@@ -36,6 +51,18 @@ All notable changes to `witwin-channel` are documented in this file.
   reflection points on a shared edge, or repeated reflections on one plane)
   are no longer reported. Depth-3 reflection on a 64 x 64 grid of the 4x4
   synthetic city drops from 418 ms / 2.15 GB to about 14 ms / 0.1 GB.
+- `coupled_paths=True` now adds interaction chains: reflections with one
+  diffraction anywhere, up to `max_depth` interactions (at `max_depth=2` the
+  former reflection-diffraction and diffraction-reflection rows), plus double
+  diffraction. Candidates join transmitter and receiver image-tree halves on a
+  shared edge instead of enumerating every (group, edge) pair; the 1,000,000
+  candidate cap is gone and `coupled_candidate_limit` only sizes validator
+  launches. Double diffraction pairs transmitter-visible with
+  receiver-visible edges and gates each visibility leg on the previous one.
+  The 4x4 synthetic city with a 64 x 64 grid drops from about 910 ms to about
+  66 ms (shared GPU). Metadata geometry tags read
+  `native_interaction_chains` (Path) and `native_interaction_chains_plus_dd`
+  (Deterministic).
 
 ### Fixed
 
@@ -48,6 +75,18 @@ All notable changes to `witwin-channel` are documented in this file.
   Genuine device failures raise `CapacityError` naming the failure bits.
 - `coupled_paths=True` no longer device-asserts when the coupled D-D bisection
   cannot certify a stationary point; that candidate is dropped and counted.
+- Kirchhoff tables cached on a compiled scene are rebuilt when a roughness or
+  layer store tensor is replaced, written in place, marked `requires_grad` or
+  given a forward-AD tangent. Before, a JVP after a primal solve missed the
+  tables' dependence on the leaf and an in-place write was not seen.
+
+### Removed
+
+- Internal native bindings and facades with no production caller (57 of 245 bindings,
+  including the BDPT event-composed sampler that the wavefront replaced, the
+  scatter-chain realization op and the chain derivative companions), and the
+  internal re-export aliases. A chain-scattering solve (`scattering_chain_max_depth
+  >= 1`) with `ad_mode != "none"` is refused before native work, as before.
 
 ## [0.5.0] - 2026-07-30
 

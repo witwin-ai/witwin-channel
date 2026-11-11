@@ -5,10 +5,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Generator, Mapping, Sequence
 from dataclasses import dataclass
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import torch
 
@@ -26,7 +26,9 @@ from witwin.core import (
 from witwin.channel.runtime import is_transform_wrapped_tensor
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.compiler import CompiledScene
+    from witwin.core import RigidMotion
+
+    from witwin.channel.scene.compiler import CompiledScene, _RuntimeStructure
 
 
 _C0 = 299_792_458.0
@@ -98,7 +100,7 @@ def pattern_field_response(
 
 
 def steering_vector(
-    array: object, direction: torch.Tensor, *, frequency_hz: float,
+    array: _AntennaArrayView, direction: torch.Tensor, *, frequency_hz: float,
     orientation: torch.Tensor | None = None,
 ) -> torch.Tensor:
     """Return ``exp(+j k r·u)`` under the package's ``exp(-j k d)`` convention."""
@@ -180,7 +182,8 @@ def apply_endpoint_weights(
 
 
 def validate_scalar_endpoint_features(
-    transmitters: Sequence[object], receivers: Sequence[object], *, solver: str,
+    transmitters: Sequence[_TransmitterView | _ReceiverPointView | _ReceiverGridView],
+    receivers: Sequence[_TransmitterView | _ReceiverPointView | _ReceiverGridView], *, solver: str,
 ) -> None:
     """Reject endpoint features that a scalar/power solver cannot consume."""
 
@@ -263,7 +266,7 @@ class _EndpointView:
         return (rotation @ (polarization / norm)).contiguous()
 
     @property
-    def pattern(self):
+    def pattern(self) -> _CoreAntennaPattern:
         return self.source.pattern
 
     @property
@@ -282,13 +285,13 @@ class _EndpointView:
 
     @property
     def synthetic_array(self) -> bool:
-        return self.source.synthetic_array
+        return cast(bool, self.source.synthetic_array)
 
 
 @dataclass(frozen=True, slots=True)
 class _TransmitterView(_EndpointView):
     @property
-    def power_w(self):
+    def power_w(self) -> float | torch.Tensor:
         return 1.0 if self.source.power_w is None else self.source.power_w
 
     @property
@@ -331,7 +334,7 @@ class _ReceiverGridView(_EndpointView):
 
     @property
     def shape(self) -> tuple[int, int]:
-        return self.source.shape
+        return cast("tuple[int, int]", self.source.shape)
 
     @property
     def spacing(self) -> tuple[float, float]:
@@ -348,11 +351,11 @@ class SolverScene:
     """Internal solver binding over one immutable ``CompiledScene``."""
 
     compiled: CompiledScene
-    structures: tuple[object, ...]
+    structures: tuple[_RuntimeStructure, ...]
     transmitters: tuple[_TransmitterView, ...]
     receivers: tuple[_ReceiverPointView | _ReceiverGridView, ...]
     frequency: float | torch.Tensor
-    metadata: object
+    metadata: Mapping[str, Any]
     endpoint_store: EndpointStore | None = None
 
 
@@ -369,7 +372,10 @@ def _as_quaternion(orientation: torch.Tensor) -> torch.Tensor:
     )
 
 
-def _endpoint_views(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[_EndpointView, ...]:
+def _endpoint_views(
+    scene_or_snapshot: Scene | SceneSnapshot,
+) -> tuple[_TransmitterView | _ReceiverPointView | _ReceiverGridView, ...]:
+    states: tuple[tuple[AntennaState, RigidMotion | None], ...]
     if isinstance(scene_or_snapshot, Scene):
         states = tuple((endpoint, None) for endpoint in scene_or_snapshot.endpoints)
     else:
@@ -377,7 +383,7 @@ def _endpoint_views(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[_Endpoint
             (state.antenna, state.rigid_motion)
             for state in scene_or_snapshot.endpoints
         )
-    views: list[_EndpointView] = []
+    views: list[_TransmitterView | _ReceiverPointView | _ReceiverGridView] = []
     for endpoint, motion in states:
         position = endpoint.position
         orientation = endpoint.orientation
@@ -511,7 +517,9 @@ def _refuse_coincident_endpoints(views: tuple[_EndpointView, ...]) -> None:
     for receiver in views:
         at = _host_values(receiver.position) if isinstance(receiver, _ReceiverPointView) else None
         for transmitter, origin in transmitters if at is not None else ():
-            if origin is not None and bool(torch.equal(origin.to(at.dtype), at)):
+            if origin is not None and at is not None and bool(
+                torch.equal(origin.to(at.dtype), at)
+            ):
                 raise ValueError(
                     f"receiver {int(receiver.source.antenna_id)} is at the same position as "
                     f"transmitter {int(transmitter.source.antenna_id)} ({at.tolist()}); the "
@@ -599,6 +607,7 @@ def endpoint_token(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[object, ..
     grid_type = CoreReceiverGrid
     token: list[object] = []
     append = token.append
+    pairs: Generator[tuple[AntennaState, RigidMotion | None], None, None]
     if isinstance(scene_or_snapshot, Scene):
         pairs = ((endpoint, None) for endpoint in scene_or_snapshot.endpoints)
     else:
@@ -698,7 +707,7 @@ def _world_polarizations(views: Sequence[_EndpointView]) -> torch.Tensor:
         polarization = view.source.polarization
         if polarization is None:
             horizontal = view.source.pattern.kind == "horizontal"
-            key = ("polarization", horizontal, position.device, position.dtype)
+            key: tuple[object, ...] = ("polarization", horizontal, position.device, position.dtype)
             polarization = defaults.get(key)
             if polarization is None:
                 polarization = position.new_tensor(
@@ -845,7 +854,7 @@ class EndpointStore:
             )
             cached = (source.to(device=self.device), sink.to(device=self.device))
             self._lazy["stable_ids"] = cached
-        return cached  # type: ignore[return-value]
+        return cast("tuple[torch.Tensor, torch.Tensor]", cached)
 
 
 def _receiver_cells(receiver: object) -> int:
@@ -976,13 +985,13 @@ def build_endpoint_store(
     )
 
 
-def endpoint_store(scene: object, *, device: torch.device | None = None) -> EndpointStore:
+def endpoint_store(scene: SolverScene, *, device: torch.device | None = None) -> EndpointStore:
     """The scene's bound :class:`EndpointStore`, or a fresh one for re-bound endpoints."""
 
     target = torch.device("cuda") if device is None else torch.device(device)
     if target.type == "cuda" and target.index is None:
         target = torch.device("cuda", torch.cuda.current_device())
-    store = getattr(scene, "endpoint_store", None)
+    store: EndpointStore | None = getattr(scene, "endpoint_store", None)
     if (
         store is not None
         and store.device == target
@@ -1066,7 +1075,7 @@ def vector3_tuple(value: torch.Tensor) -> tuple[float, float, float]:
     return (float(value[0]), float(value[1]), float(value[2]))
 
 
-def first_receiver_grid(scene: object) -> ReceiverGrid | None:
+def first_receiver_grid(scene: SolverScene) -> ReceiverGrid | None:
     for receiver in scene.receivers:
         if isinstance(receiver, ReceiverGrid):
             return receiver
@@ -1134,7 +1143,7 @@ def axis_aligned_grid_spec(grid: ReceiverGrid) -> AxisAlignedGridSpec:
     )
 
 
-def scene_vertex_table(scene: object, compiled: object) -> torch.Tensor:
+def scene_vertex_table(scene: SolverScene | CompiledScene, compiled: CompiledScene) -> torch.Tensor:
     """Live global vertex table matching ``compiled.geometry.vertices``.
 
     RayD concatenates structure meshes in scene order, so the live table is
@@ -1162,7 +1171,7 @@ def scene_vertex_table(scene: object, compiled: object) -> torch.Tensor:
 
 
 def transmitter_positions_ad(
-    scene: object, native: torch.Tensor, *, device: torch.device,
+    scene: SolverScene, native: torch.Tensor, *, device: torch.device,
 ) -> torch.Tensor:
     """Live transmitter positions: one stack of the scene leaves, on the graph when they are."""
 
@@ -1172,7 +1181,7 @@ def transmitter_positions_ad(
 
 
 def receiver_positions_ad(
-    scene: object, native: torch.Tensor, *, device: torch.device,
+    scene: SolverScene, native: torch.Tensor, *, device: torch.device,
 ) -> torch.Tensor:
     """Live receiver positions for point receivers.
 
@@ -1215,12 +1224,12 @@ class _ZeroGradientLink(torch.autograd.Function):
     """Identity on ``output`` whose backward hands every linked leaf an exact zero gradient."""
 
     @staticmethod
-    def forward(ctx, output: torch.Tensor, *leaves: torch.Tensor) -> torch.Tensor:  # type: ignore[override]
+    def forward(ctx: Any, output: torch.Tensor, *leaves: torch.Tensor) -> torch.Tensor:
         ctx.leaf_meta = tuple((leaf.shape, leaf.dtype, leaf.device) for leaf in leaves)
         return output.clone()
 
     @staticmethod
-    def backward(ctx, grad_output: torch.Tensor):  # type: ignore[override]
+    def backward(ctx: Any, grad_output: torch.Tensor) -> tuple[torch.Tensor, ...]:
         return (
             grad_output,
             *(torch.zeros(shape, dtype=dtype, device=device) for shape, dtype, device in ctx.leaf_meta),
@@ -1245,7 +1254,7 @@ def link_zero_gradient(output: torch.Tensor, scene: SolverScene) -> torch.Tensor
     return _ZeroGradientLink.apply(output, *leaves)
 
 
-def transmitter_polarizations_f32(scene: object, *, device: torch.device) -> torch.Tensor:
+def transmitter_polarizations_f32(scene: SolverScene, *, device: torch.device) -> torch.Tensor:
     """Transmitter polarizations as a contiguous float32 ``(N, 3)`` tensor.
 
     Row order matches the transmitter order of the logical scene. The vectors
@@ -1262,7 +1271,7 @@ def transmitter_polarizations_f32(scene: object, *, device: torch.device) -> tor
 
 
 def receiver_polarizations_f32(
-    scene: object, *, device: torch.device, grid: ReceiverGrid | None = None,
+    scene: SolverScene, *, device: torch.device, grid: ReceiverGrid | None = None,
 ) -> torch.Tensor:
     """Receiver polarizations as a contiguous float32 ``(N, 3)`` tensor.
 
@@ -1286,7 +1295,7 @@ def receiver_polarizations_f32(
     return store.rx_polarizations.contiguous()
 
 
-def receiver_polarization_rows(scene: object, *, device: torch.device) -> torch.Tensor:
+def receiver_polarization_rows(scene: SolverScene, *, device: torch.device) -> torch.Tensor:
     """Float32 ``(N, 3)`` receiver polarizations per flattened row; a grid is a broadcast view."""
 
     return endpoint_store(scene, device=device).rx_polarizations

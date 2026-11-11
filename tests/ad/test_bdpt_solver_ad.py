@@ -372,7 +372,7 @@ def test_frequency_grad_matches_fd(builder, components, coherent):
 
 
 def _tx_power_scattering_scene(power: torch.Tensor) -> Scene:
-    # tx_power threads through the torch-side scattering NEE (source_power).
+    # tx_power threads through the wavefront scatter next-event rows.
     wall = rough_wall_structure(
         2.5, rms_height_m=0.015, corr_length_m=0.15, half_size=1.0,
         eps_r=4.0, sigma_e=0.05,
@@ -442,7 +442,7 @@ def _tx_power_endpoint_only_scene(power: torch.Tensor) -> Scene:
     (
         # LoS companion (native grad_tx_power) with structures and via the
         # endpoint-only fast path, enumerated reflection block (linear-coefficient
-        # reattach), and torch-side scattering NEE.
+        # reattach), and the wavefront scatter next-event rows.
         (_tx_power_same_side_scene, frozenset({"los"})),
         (_tx_power_endpoint_only_scene, frozenset({"los"})),
         (_tx_power_same_side_scene, frozenset({"reflection"})),

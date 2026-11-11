@@ -49,53 +49,8 @@ DISPATCH_CALLS = frozenset(
 )
 _FORBIDDEN_NAME = re.compile(r"(?:^|_)(?:v\d+|w[i]p)(?:_|$)", re.IGNORECASE)
 
-# Symbols whose Python facade has no production caller. They are kept until their facades and
-# bindings are deleted; the list may only shrink, and an entry that becomes live or disappears
-# fails the check so it is removed here in the same change.
-KNOWN_UNCALLED_SYMBOLS = frozenset(
-    {
-        "bdpt_apply_los_visibility",
-        "bdpt_component_map_buffer",
-        "bdpt_empty_subpath_state",
-        "bdpt_face_material_tensors",
-        "bdpt_face_material_tensors_from_host",
-        "bdpt_los_component_maps",
-        "bdpt_los_export",
-        "bdpt_los_visibility_inputs",
-        "bdpt_mis_weights",
-        "bdpt_pack_vec3",
-        "bdpt_point_component_power",
-        "bdpt_store_component_map",
-        "bdpt_store_point_component_column",
-        "bdpt_store_scaled_component_map",
-        "core_diffraction_edge_count",
-        "deterministic_field_from_power_phase",
-        "deterministic_gather_topology_block",
-        "deterministic_los_field",
-        "deterministic_phase_from_length",
-        "deterministic_reflect_points",
-        "deterministic_repeat_range",
-        "deterministic_sort_order",
-        "deterministic_surface_face_groups",
-        "mc_diffraction_state_pack",
-        "mc_los_component_maps",
-        "path_diffraction_block",
-        "path_filter_block",
-        "path_filter_los",
-        "path_finalize_blocks",
-        "path_merge_blocks",
-        "path_reflection_candidates",
-        "rayd_intersect_backward",
-        "rayd_intersect_jvp",
-        "rayd_trace_reflections_backward",
-        "rayd_trace_reflections_forward_tape",
-        "rayd_trace_reflections_jvp",
-        "scattering_chain_realization_eval",
-        "scattering_chain_realization_eval_backward",
-        "scattering_chain_realization_eval_jvp",
-    }
-)
-# Symbols dispatched from more than one module. Same shrink-only rule as above.
+# Symbols dispatched from more than one module. The list may only shrink, and an entry that
+# becomes single-owner or disappears fails the check so it is removed here in the same change.
 KNOWN_SPLIT_OWNER_SYMBOLS = frozenset({"bdpt_accumulate_connection_samples"})
 
 
@@ -359,11 +314,7 @@ def check_invariants(repo: Path) -> list[str]:
 
     problems.extend(
         f"native symbol has no production caller: {name}"
-        for name in sorted(uncalled - KNOWN_UNCALLED_SYMBOLS)
-    )
-    problems.extend(
-        f"KNOWN_UNCALLED_SYMBOLS entry is stale (now called or deleted): {name}"
-        for name in sorted(KNOWN_UNCALLED_SYMBOLS - uncalled)
+        for name in sorted(uncalled)
     )
     problems.extend(
         f"native symbol is dispatched from more than one module: {name}"

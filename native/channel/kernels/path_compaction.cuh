@@ -126,25 +126,6 @@ int64_t launch_blocks(int64_t count) {
     return (count + kPathBlockSize - 1) / kPathBlockSize;
 }
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
-empty_path_block_from(const at::Tensor& reference) {
-    auto bool_options = reference.options().dtype(at::kBool);
-    auto int_options = reference.options().dtype(at::kInt);
-    auto float_options = reference.options().dtype(at::kFloat);
-    return {
-        at::empty({0}, bool_options),
-        at::empty({0}, int_options),
-        at::empty({0}, int_options),
-        at::empty({0}, int_options),
-        at::empty({0}, int_options),
-        at::empty({0}, int_options),
-        at::empty({0}, int_options),
-        at::empty({0}, float_options),
-        at::empty({0}, float_options),
-        at::empty({0}, float_options),
-    };
-}
-
 pybind11::dict empty_deterministic_los_topology_block_from(const at::Tensor& reference, int64_t sequence_width) {
     auto bool_options = reference.options().dtype(at::kBool);
     auto int_options = reference.options().dtype(at::kInt);

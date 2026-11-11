@@ -8,7 +8,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from dataclasses import fields, is_dataclass
-from typing import Any
+from typing import Any, Literal, TypedDict, cast
 
 
 # BDPT AD scope: the parameters its jvp/vjp companions carry, and the leaves
@@ -135,11 +135,11 @@ _CAPABILITIES: dict[str, Any] = {
             "max_diffraction_order": 1,
             "supports_reflection_diffraction_coupling": True,
             "supports_reflection_diffraction_coupling_geometry": True,
-            "reflection_diffraction_coupling_topology": "one_reflection_one_diffraction_both_orders",
-            "max_reflections_in_coupled_path": 1,
-            # coupled double diffraction: coupled_paths=True is the uniform order-2 compensator
-            # family {R->D, D->R, D->D}; cid 7 double diffraction shares the
-            # coupled gate, budget, and accumulator slot (no new Config field).
+            "reflection_diffraction_coupling_topology": "one_diffraction_anywhere_in_a_reflection_chain",
+            # A chain has at most max_depth interactions, one of them the diffraction.
+            "max_reflections_in_coupled_path": 4,
+            # coupled_paths=True also enables double diffraction (cid 7), which shares
+            # the coupled gate, validator chunk and accumulator slot.
             "coupled_double_diffraction": True,
             "reflection_diffraction_coupling_candidate_limit": 1_000_000,
             "supports_complex_path_coefficients": True,
@@ -155,16 +155,13 @@ _CAPABILITIES: dict[str, Any] = {
         "deterministic": {
             "max_reflection_depth": 5,
             "max_diffraction_order": 1,
-            # Coupled reflection-diffraction on the grid solver (coupled reflection and diffraction). The
-            # coupling keys mirror the path solver; the deterministic engine
-            # streams coupled discovery over receiver blocks under the same
-            # per-block candidate limit.
+            # Interaction chains on the grid solver; the coupling keys mirror the path solver.
             "supports_reflection_diffraction_coupling": True,
             "supports_reflection_diffraction_coupling_geometry": True,
-            "reflection_diffraction_coupling_topology": "one_reflection_one_diffraction_both_orders",
-            "max_reflections_in_coupled_path": 1,
-            # coupled double diffraction: coupled_paths=True includes cid 7 double diffraction
-            # (D->D) on the grid solver, sharing the coupled gate and slot.
+            "reflection_diffraction_coupling_topology": "one_diffraction_anywhere_in_a_reflection_chain",
+            "max_reflections_in_coupled_path": 4,
+            # coupled_paths=True includes double diffraction (cid 7) on the grid solver,
+            # sharing the coupled gate and slot.
             "coupled_double_diffraction": True,
             "reflection_diffraction_coupling_candidate_limit": 1_000_000,
             "supports_complex_path_coefficients": True,
@@ -284,9 +281,19 @@ def solver_capabilities(solver: str) -> dict[str, Any]:
     return deepcopy(_CAPABILITIES["solvers"][solver])
 
 
+class ConfigMetadata(TypedDict):
+    """The requested/effective configuration keys every solver publishes in its metadata."""
+
+    requested_config: dict[str, Any]
+    effective_config: dict[str, Any]
+    requested_max_depth: int
+    effective_max_depth: int
+    component_max_depth: dict[str, int]
+
+
 def config_metadata(
     *, requested: dict[str, Any], effective: dict[str, Any], component_max_depth: dict[str, int],
-) -> dict[str, Any]:
+) -> ConfigMetadata:
     """Build the common requested/effective solver metadata contract."""
 
     return {
@@ -304,10 +311,23 @@ ESTIMATORS = frozenset({"enumerated", "sampled"})
 QUANTITIES = frozenset({"point_sample", "cell_average"})
 COMBINES = frozenset({"coherent", "incoherent", "none"})
 
+Estimator = Literal["enumerated", "sampled"]
+Quantity = Literal["point_sample", "cell_average"]
+Combine = Literal["coherent", "incoherent", "none"]
+
+
+class ResultSemantics(TypedDict):
+    """The result-semantics keys every solver publishes in its metadata."""
+
+    estimator: Estimator
+    quantity: dict[str, Quantity]
+    combine: Combine
+    complete: bool | None
+
 
 def estimator_metadata(
     *, estimator: str, quantity: Mapping[str, str], combine: str, complete: bool | None,
-) -> dict[str, Any]:
+) -> ResultSemantics:
     """The result-semantics keys every solver publishes in its metadata.
 
     ``estimator`` is ``enumerated`` or ``sampled``; ``quantity`` maps each requested
@@ -331,17 +351,18 @@ def estimator_metadata(
         raise ValueError(f"combine must be one of {sorted(COMBINES)}, got {combine!r}")
     if complete is not None and type(complete) is not bool:
         raise TypeError("complete must be a bool or None")
+    # The checks above narrow every value to its vocabulary.
     return {
-        "estimator": estimator,
-        "quantity": dict(sorted(quantity.items())),
-        "combine": combine,
+        "estimator": cast(Estimator, estimator),
+        "quantity": cast("dict[str, Quantity]", dict(sorted(quantity.items()))),
+        "combine": cast(Combine, combine),
         "complete": complete,
     }
 
 
 def component_quantities(
     components: Iterable[str], *, cell_average: Iterable[str] = (),
-) -> dict[str, str]:
+) -> dict[str, Quantity]:
     """``point_sample`` for every component except those listed in ``cell_average``."""
 
     averaged = frozenset(cell_average)
@@ -367,6 +388,11 @@ def serialize_config(config: object) -> dict[str, Any]:
 
 
 __all__ = [
+    "Combine",
+    "ConfigMetadata",
+    "Estimator",
+    "Quantity",
+    "ResultSemantics",
     "capabilities",
     "config_metadata",
     "component_quantities",

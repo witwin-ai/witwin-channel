@@ -110,11 +110,11 @@ priority `scattering > diffraction > transmission > reflection > los`.
 ## Native runtime boundary
 
 - `_channel` is the single production extension. It source-links RayD
-  `2a0cb0e85758e3cdeb2ebaae66dd5bd725ca0510` (`rayd-torch 0.9.0`) and calls the typed
+  `58f54f13bfdaefeb5e8d53c2c4c397f9c98884ec` (`rayd-torch 0.10.0`) and calls the typed
   `rayd::torch` C++ API directly; no RayD Python module, second dispatcher,
   copied C ABI, getter table, or dynamic symbol lookup participates.
 - Builds use an explicit validated `RAYD_SOURCE_DIR` first. Without one, they
-  may use the unique passive `rayd-torch` 0.9.0 source bundle only after lock,
+  may use the unique passive `rayd-torch` 0.10.0 source bundle only after lock,
   RECORD, full-manifest, complete header-set, and clean-state verification. No
   conda-prefix, site-packages, or global CMake scan is performed. `build_info`
   reports only the source kind and manifest SHA, never a machine-specific
@@ -432,6 +432,9 @@ priority `scattering > diffraction > transmission > reflection > los`.
   = 2.0`, `scattering_chain_max_rows: int = 256`. The `d1 = d2 = 0` degenerate
   row collapses symbol-for-symbol to op 1 / op 2 (lockstep-pinned, not
   production-dispatched).
+  In 0.6.0 Op B and both ops' derivative companions, which no solve ever
+  dispatched, were removed: chain rows are ensemble-only (Op A) and a chain
+  solve with `ad_mode != "none"` is refused before native work.
 - Coherent scattering combine (ADR-021 D3, default OFF): new Deterministic/Path
   config `scattering_coherent: bool = False`. OFF is bit-identical to today (the
   scattering slot stays the incoherent `SUM |field|^2` power term). ON (requires
@@ -514,6 +517,6 @@ priority `scattering > diffraction > transmission > reflection > los`.
 ## Distribution
 
 - GitHub Actions prebuilds Windows and manylinux_2_28 wheels from the locked,
-  clean RayD 0.9.0 source checkout. Release fatbins include native SM87 SASS
+  clean RayD 0.10.0 source checkout. Release fatbins include native SM87 SASS
   alongside the maintained CUDA 12.8 architecture set. Ordinary commits,
   pull requests, and schedules do not start paid native builds.

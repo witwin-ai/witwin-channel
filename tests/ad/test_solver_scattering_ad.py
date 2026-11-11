@@ -545,3 +545,59 @@ def test_ensemble_wrapper_rejects_fixed_receiver_polarization():
     )
     with pytest.raises(NotImplementedError):
         out["gain"].sum().backward()
+
+@pytest.mark.parametrize("param", ("layer_eps_r", "layer_sigma_e"))
+def test_ensemble_material_jvp_after_primal_warmup_matches_fd(param):
+    # A primal solve caches the Kirchhoff tables on the compiled scene. Swapping a
+    # dual layer leaf in afterwards must rebuild them with the forward-AD tangent,
+    # so the JVP carries the table's dependence on that leaf and matches FD.
+    _require_rayd()
+    scene = _ensemble_scene()
+    compiled = compile_scene(scene, reference_frequency_hz=_FREQUENCY_HZ)
+    leaf = getattr(compiled.materials, param)
+    base = leaf.detach().clone()
+    _loss(_solve(scene, "deterministic", "none"))
+    generator = torch.Generator(device="cpu").manual_seed(43)
+    tangent = torch.randn(leaf.shape, generator=generator).abs().to(leaf.device)
+
+    with torch.autograd.forward_ad.dual_level():
+        dual = torch.autograd.forward_ad.make_dual(base.clone(), tangent)
+        object.__setattr__(compiled.materials, param, dual)
+        try:
+            jvp = torch.autograd.forward_ad.unpack_dual(
+                _loss(_solve(scene, "deterministic", "jvp"))
+            ).tangent
+        finally:
+            object.__setattr__(compiled.materials, param, leaf)
+    assert jvp is not None
+
+    def evaluate(values: torch.Tensor) -> torch.Tensor:
+        # A fresh scene per evaluation: its compiled tables are built from ``values``.
+        fd_scene = _ensemble_scene()
+        fd_compiled = compile_scene(fd_scene, reference_frequency_hz=_FREQUENCY_HZ)
+        object.__setattr__(fd_compiled.materials, param, values.to(leaf.device, leaf.dtype))
+        return _loss(_solve(fd_scene, "deterministic", "none")).detach()
+
+    step = _MATERIAL_FD_STEPS[param]
+    fd = central_difference_directional(evaluate, base, tangent, step)
+    assert float(fd.abs()) > 0.0
+    assert relative_error(jvp, fd, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
+
+
+def test_ensemble_tables_follow_an_in_place_layer_write():
+    # Writing a cached table input in place must rebuild the tables, not serve stale ones.
+    _require_rayd()
+    scene = _ensemble_scene()
+    compiled = compile_scene(scene, reference_frequency_hz=_FREQUENCY_HZ)
+    leaf = compiled.materials.layer_eps_r
+    before = compiled.kirchhoff_resources.stack.f_te_flat.clone()
+    base = leaf.detach().clone()
+    try:
+        with torch.no_grad():
+            leaf.mul_(1.5)
+        after = compiled.kirchhoff_resources.stack.f_te_flat
+        assert not torch.equal(before, after)
+    finally:
+        with torch.no_grad():
+            leaf.copy_(base)
+    torch.testing.assert_close(compiled.kirchhoff_resources.stack.f_te_flat, before, rtol=0, atol=0)

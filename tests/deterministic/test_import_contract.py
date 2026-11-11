@@ -59,4 +59,4 @@ def test_solver_facade_delegates_to_pipeline_owner():
     assert deterministic.solve.__module__ == deterministic.__name__
     assert deterministic._solve_pipeline.__module__ == deterministic.__name__
     assert deterministic._metadata.__module__ == deterministic.__name__
-    assert deterministic.__all__ == ["Config", "PathTable", "Result", "solve"]
+    assert deterministic.__all__ == ["Config", "Metadata", "PathTable", "Result", "solve"]

@@ -1,7 +1,7 @@
 # Copyright Xingyu Chen.
-# The coupled reflection-diffraction interaction concept.
+# Interaction chains: reflections with one diffraction anywhere, and double diffraction.
 
-"""The coupled reflection-diffraction interaction concept."""
+"""Interaction chains: reflections with one diffraction anywhere, and double diffraction."""
 
 from __future__ import annotations
 
@@ -11,250 +11,77 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from witwin.channel.propagation.geometry import (
-    cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
-    diffraction_edge_geometry as _diffraction_edge_geometry,
+from witwin.channel.interactions.diffraction import (
+    _batched_diffraction_states,
+    plan_tx_visible_diffraction_states,
+    prepare_diffraction_order1_plan,
+    selected_diffraction_edges,
+)
+from witwin.channel.interactions.reflection import (
+    ReflectionPlaneGroups,
+    _expand_image_tree,
+    _image_tree_roots,
+    _reflection_geometry_tables,
+    reflection_min_segment_length,
+    reflection_plane_groups,
 )
 from witwin.channel.kernels import geometry as geometry_kernels
-from witwin.channel.propagation.geometry import (
-    _cached_coplanar_face_groups,
-)
+from witwin.channel.kernels import topology as topology_kernels
+from witwin.channel.materials import face_geometry_id_table, face_material_id_table
+from witwin.channel.propagation.geometry import _cached_coplanar_face_groups
 from witwin.channel.propagation.topology import (
     _empty_path_block,
+    _ensure_topology_fields,
     concatenate_path_blocks,
 )
-from witwin.channel.propagation.topology import _ensure_topology_fields
-from witwin.channel.kernels import topology as topology_kernels
 
 if TYPE_CHECKING:
+    from witwin.channel.interactions.diffraction import DiffractionEdgeGeometry
+    from witwin.channel.interactions.reflection import _ImageTreeFrontier
+    from witwin.channel.scene.compiler import CompiledScene
     from witwin.channel.scene.endpoints import SolverScene as Scene
+    from witwin.channel.scene.resources import RayDSceneResource
+
+
+# Component ids of single-diffraction chains: the diffraction last (reflections then the
+# diffraction), first (the diffraction then reflections), or at slot s >= 1 with reflections on
+# both sides (CHAIN_INTERIOR_COMPONENT_BASE + s). Double diffraction is its own component.
+CHAIN_DIFFRACTION_LAST_COMPONENT_ID = 3
+CHAIN_DIFFRACTION_FIRST_COMPONENT_ID = 4
+DOUBLE_DIFFRACTION_COMPONENT_ID = 7
+CHAIN_INTERIOR_COMPONENT_BASE = 8
+# Deepest chain the field kernels evaluate (the EPC bounce limit).
+CHAIN_MAX_DEPTH = 8
+
+# Join lanes (edge-sharing half pairs) and node-edge beam tests per native launch.
+_CHAIN_LANES_PER_LAUNCH = 1 << 23
+_NODE_EDGE_TESTS_PER_LAUNCH = 1 << 24
+# Image-tree nodes of the receiver halves of one receiver chunk (bounds their edge lists).
+_RECEIVER_TREE_NODES = 1 << 20
+# Double-diffraction candidates per geometry launch.
+_DOUBLE_CANDIDATES_PER_LAUNCH = 1 << 20
+# Endpoint-edge visibility states per launch (the native state capacity).
+_VISIBILITY_STATES_PER_LAUNCH = 1 << 22
+# The finite-edge interior tolerance of the coupled stationary points, metres.
+_EDGE_EPSILON = 1.0e-6
+# Pruning tolerances, as the reflection candidate tests use them (relative to the scene diagonal).
+_BOUNDS_RELATIVE = 1.0e-4
+_SEGMENT_PARAMETER_SLACK = 1.0e-3
+
+
+def chain_component_id(prefix_depth: int, suffix_depth: int) -> int:
+    """Component id of a chain with ``prefix_depth`` reflections before its diffraction."""
+
+    if prefix_depth == 0:
+        return CHAIN_DIFFRACTION_FIRST_COMPONENT_ID
+    if suffix_depth == 0:
+        return CHAIN_DIFFRACTION_LAST_COMPONENT_ID
+    return CHAIN_INTERIOR_COMPONENT_BASE + prefix_depth
 
 
 # --------------------------------------------------------------------------
-# Discovery: lazy coupled reflection-diffraction candidate planning.
+# Geometry: typed chain and double-diffraction geometry queries.
 # --------------------------------------------------------------------------
-
-_COUPLED_CANDIDATE_CHUNK_SIZE = 65_536
-# cid-7 (D->D) uses a larger chunk so the ~1260-ordered-pair stream collapses to
-# a single native launch per receiver block instead of ~8 (coupled double diffraction
-# gate). The R->D / D->R stream stays at 65_536 so its cid-3/4 row identity is
-# byte-identical to the frozen P1 baseline; only the cid-7 order (not yet frozen)
-# depends on this constant, and it is preserved because the linear candidate
-# order is chunk-size independent. Peak transient: one 1M-candidate DD chunk
-# materializes ~30 float32 fields/candidate (~100 MB), well within budget; the
-# streaming block budget (<=1M candidates/block) caps a block's DD stream below
-# this size, so a block never splits its DD stream.
-_COUPLED_DD_CANDIDATE_CHUNK_SIZE = 1_048_576
-_MAX_COUPLED_CANDIDATES = 1_000_000
-
-
-@dataclass(frozen=True, slots=True)
-class CoupledCandidatePlan:
-    tx_count: int
-    rx_count: int
-    representative_faces: torch.Tensor
-    selected_edges: torch.Tensor
-    edge_count: int
-    candidates_per_pair: int
-    dd_candidates_per_pair: int
-    base_candidate_count: int
-    dd_base_candidate_count: int
-    theoretical_candidate_count: int
-    chunk_size: int
-    dd_chunk_size: int
-
-
-@dataclass(frozen=True, slots=True)
-class CoupledCandidateRequest:
-    chunk_start: int
-    chunk_end: int
-    candidate_count: int
-    linear: torch.Tensor
-    tx_slot: torch.Tensor
-    rx_slot: torch.Tensor
-    face_id: torch.Tensor
-    edge_id: torch.Tensor
-    reverse: bool
-    component_id: int
-
-
-@dataclass(frozen=True, slots=True)
-class CoupledDdCandidateRequest:
-    chunk_start: int
-    chunk_end: int
-    candidate_count: int
-    linear: torch.Tensor
-    tx_slot: torch.Tensor
-    rx_slot: torch.Tensor
-    edge1_id: torch.Tensor
-    edge2_id: torch.Tensor
-    component_id: int
-
-
-def prepare_coupled_candidate_plan(
-    *, tx_count: int, rx_count: int, representative_faces: torch.Tensor,
-    selected_edges: torch.Tensor, candidate_limit: int,
-    chunk_size: int = _COUPLED_CANDIDATE_CHUNK_SIZE,
-    dd_chunk_size: int = _COUPLED_DD_CANDIDATE_CHUNK_SIZE,
-) -> CoupledCandidatePlan:
-    tx_count = int(tx_count)
-    rx_count = int(rx_count)
-    group_count = int(representative_faces.shape[0])
-    edge_count = int(selected_edges.shape[0])
-    candidates_per_pair = group_count * edge_count
-    # cid 7 (double diffraction) enumerates ordered edge pairs e1 != e2 by
-    # index; collinear geometric duplicates are the native kernel's job. One
-    # direction only: the ordered pair already covers both traversals.
-    dd_candidates_per_pair = edge_count * (edge_count - 1)
-    base_candidate_count = tx_count * rx_count * candidates_per_pair
-    dd_base_candidate_count = tx_count * rx_count * dd_candidates_per_pair
-    # The budget must count the whole coupled union that a block evaluates:
-    # both R->D / D->R directions (x2) plus the one-direction D->D stream
-    # (coupled double diffraction: per-receiver = tx*(2*groups*edges + edges*(edges-1))).
-    theoretical_candidate_count = base_candidate_count * 2 + dd_base_candidate_count
-    effective_candidate_limit = min(candidate_limit, _MAX_COUPLED_CANDIDATES)
-    if theoretical_candidate_count > effective_candidate_limit:
-        raise RuntimeError(
-            "coupled reflection-diffraction topology requires "
-            f"{theoretical_candidate_count} candidates, exceeding "
-            f"coupled_candidate_limit={effective_candidate_limit}"
-        )
-    return CoupledCandidatePlan(
-        tx_count=tx_count,
-        rx_count=rx_count,
-        representative_faces=representative_faces,
-        selected_edges=selected_edges,
-        edge_count=edge_count,
-        candidates_per_pair=candidates_per_pair,
-        dd_candidates_per_pair=dd_candidates_per_pair,
-        base_candidate_count=base_candidate_count,
-        dd_base_candidate_count=dd_base_candidate_count,
-        theoretical_candidate_count=theoretical_candidate_count,
-        chunk_size=int(chunk_size),
-        dd_chunk_size=int(dd_chunk_size),
-    )
-
-
-def iter_coupled_candidate_requests(
-    plan: CoupledCandidatePlan, *, device: torch.device,
-) -> Iterator[CoupledCandidateRequest]:
-    for start in range(0, plan.base_candidate_count, plan.chunk_size):
-        end = min(start + plan.chunk_size, plan.base_candidate_count)
-        linear = torch.arange(start, end, device=device, dtype=torch.int64)
-        pair_slot = torch.div(
-            linear,
-            plan.candidates_per_pair,
-            rounding_mode="floor",
-        )
-        local_slot = torch.remainder(linear, plan.candidates_per_pair)
-        tx_slot = torch.div(pair_slot, plan.rx_count, rounding_mode="floor")
-        rx_slot = torch.remainder(pair_slot, plan.rx_count)
-        face_slot = torch.div(local_slot, plan.edge_count, rounding_mode="floor")
-        edge_slot = torch.remainder(local_slot, plan.edge_count)
-        face_id = plan.representative_faces[face_slot]
-        edge_id = plan.selected_edges[edge_slot]
-        candidate_count = int(linear.shape[0])
-        for reverse, component_id in ((False, 3), (True, 4)):
-            yield CoupledCandidateRequest(
-                chunk_start=start,
-                chunk_end=end,
-                candidate_count=candidate_count,
-                linear=linear,
-                tx_slot=tx_slot,
-                rx_slot=rx_slot,
-                face_id=face_id,
-                edge_id=edge_id,
-                reverse=reverse,
-                component_id=component_id,
-            )
-
-
-def iter_coupled_dd_candidate_requests(
-    plan: CoupledCandidatePlan, *, device: torch.device,
-) -> Iterator[CoupledDdCandidateRequest]:
-    """Stream cid-7 ordered edge-pair candidates (e1 != e2 by index).
-
-    The candidate space is (tx, rx, e1, e2) with e1 != e2, giving
-    ``edge_count*(edge_count-1)`` ordered pairs per (tx, rx) pair and one
-    direction only. Geometric collinearity (edges on the same physical line) is
-    the native kernel's responsibility, not this index-level enumeration.
-    """
-
-    stride = plan.edge_count - 1
-    for start in range(0, plan.dd_base_candidate_count, plan.dd_chunk_size):
-        end = min(start + plan.dd_chunk_size, plan.dd_base_candidate_count)
-        linear = torch.arange(start, end, device=device, dtype=torch.int64)
-        pair_slot = torch.div(
-            linear,
-            plan.dd_candidates_per_pair,
-            rounding_mode="floor",
-        )
-        local_slot = torch.remainder(linear, plan.dd_candidates_per_pair)
-        tx_slot = torch.div(pair_slot, plan.rx_count, rounding_mode="floor")
-        rx_slot = torch.remainder(pair_slot, plan.rx_count)
-        first_slot = torch.div(local_slot, stride, rounding_mode="floor")
-        remainder_slot = torch.remainder(local_slot, stride)
-        # Skip the diagonal (e1 == e2): the second index steps over its own
-        # position so the pair is always ordered and distinct by index.
-        second_slot = torch.where(
-            remainder_slot < first_slot, remainder_slot, remainder_slot + 1
-        )
-        edge1_id = plan.selected_edges[first_slot]
-        edge2_id = plan.selected_edges[second_slot]
-        candidate_count = int(linear.shape[0])
-        yield CoupledDdCandidateRequest(
-            chunk_start=start,
-            chunk_end=end,
-            candidate_count=candidate_count,
-            linear=linear,
-            tx_slot=tx_slot,
-            rx_slot=rx_slot,
-            edge1_id=edge1_id,
-            edge2_id=edge2_id,
-            component_id=7,
-        )
-
-
-# --------------------------------------------------------------------------
-# Geometry: typed coupled reflection-diffraction geometry queries.
-# --------------------------------------------------------------------------
-
-
-@dataclass(frozen=True, slots=True)
-class CoupledGeometryQuery:
-    rayd_resource: object
-    source: torch.Tensor
-    receiver: torch.Tensor
-    face_id: torch.Tensor
-    face_anchor: torch.Tensor
-    face_normal: torch.Tensor
-    edge_id: torch.Tensor
-    edge_position: torch.Tensor
-    edge_direction: torch.Tensor
-    edge_t_min: torch.Tensor
-    edge_t_max: torch.Tensor
-    surface_group_id: torch.Tensor
-    surface_group_size: torch.Tensor
-    surface_group_members: torch.Tensor
-    reverse: bool
-
-
-@dataclass(frozen=True, slots=True)
-class CoupledGeometry:
-    valid: torch.Tensor
-    interaction_type_sequence: torch.Tensor
-    primitive_sequence: torch.Tensor
-    edge_sequence: torch.Tensor
-    face_id: torch.Tensor
-    edge_id: torch.Tensor
-    interaction_positions: torch.Tensor
-    interaction_normals: torch.Tensor
-    reflection_position: torch.Tensor
-    reflection_normal: torch.Tensor
-    edge_position: torch.Tensor
-    edge_direction: torch.Tensor
-    path_length_m: torch.Tensor
-    delay_s: torch.Tensor
 
 
 @dataclass(frozen=True, slots=True)
@@ -292,42 +119,6 @@ class CoupledDdGeometry:
     certificate_rejection_count: torch.Tensor
 
 
-def query_coupled_geometry(query: CoupledGeometryQuery) -> CoupledGeometry:
-    raw = geometry_kernels.coupled_rd_geometry_forward(
-        query.rayd_resource,
-        query.source,
-        query.receiver,
-        query.face_id,
-        query.face_anchor,
-        query.face_normal,
-        query.edge_id,
-        query.edge_position,
-        query.edge_direction,
-        query.edge_t_min,
-        query.edge_t_max,
-        query.surface_group_id,
-        query.surface_group_size,
-        query.surface_group_members,
-        query.reverse,
-    )
-    return CoupledGeometry(
-        valid=raw["valid"],
-        interaction_type_sequence=raw["interaction_type_sequence"],
-        primitive_sequence=raw["primitive_sequence"],
-        edge_sequence=raw["edge_sequence"],
-        face_id=raw["face_id"],
-        edge_id=raw["edge_id"],
-        interaction_positions=raw["interaction_positions"],
-        interaction_normals=raw["interaction_normals"],
-        reflection_position=raw["reflection_position"],
-        reflection_normal=raw["reflection_normal"],
-        edge_position=raw["edge_position"],
-        edge_direction=raw["edge_direction"],
-        path_length_m=raw["path_length_m"],
-        delay_s=raw["delay_s"],
-    )
-
-
 def query_coupled_dd_geometry(query: CoupledDdGeometryQuery) -> CoupledDdGeometry:
     raw = geometry_kernels.coupled_dd_geometry_forward(
         query.rayd_resource,
@@ -362,48 +153,59 @@ def query_coupled_dd_geometry(query: CoupledDdGeometryQuery) -> CoupledDdGeometr
 
 
 # --------------------------------------------------------------------------
-# Enumerated orchestration: coupled reflection-diffraction topology discovery.
+# Discovery: chain halves, the edge join, and the double-diffraction products.
 # --------------------------------------------------------------------------
 
 
 @dataclass(frozen=True, slots=True)
-class _CoupledTopologyContext:
-    """Receiver-independent coupled discovery inputs.
-
-    Every field is a function of the scene geometry and materials only, so a
-    single context is reused across all receiver blocks of a streamed
-    deterministic solve; ``candidates_per_pair`` (= coplanar groups x selected
-    edges) sizes the receiver blocks without re-running the geometry setup.
-    """
+class _ChainContext:
+    """Receiver-independent inputs of one chain discovery."""
 
     device: torch.device
-    rayd: object
-    representative_faces: torch.Tensor
-    tri_a: torch.Tensor
-    normals: torch.Tensor
+    rayd: RayDSceneResource
+    plane_groups: ReflectionPlaneGroups
+    coplanar_groups: dict[str, torch.Tensor]
+    face_material_id: torch.Tensor
+    edges: tuple[DiffractionEdgeGeometry, torch.Tensor]
     selected_edges: torch.Tensor
-    edge_pos: torch.Tensor
-    edge_dir: torch.Tensor
+    edge_position: torch.Tensor
+    edge_direction: torch.Tensor
     edge_t_min: torch.Tensor
     edge_t_max: torch.Tensor
-    face_material_id: torch.Tensor
-    surface_group_id: torch.Tensor
-    surface_group_size: torch.Tensor
-    surface_group_members: torch.Tensor
-    candidates_per_pair: int
+    min_segment_length: float
+
+    @property
+    def edge_count(self) -> int:
+        return int(self.selected_edges.shape[0])
 
 
-def _prepare_coupled_topology_context(
-    scene: Scene, compiled: object, tx_positions: torch.Tensor, rx_positions: torch.Tensor,
-) -> _CoupledTopologyContext | None:
-    """Build the receiver-independent coupled context, or ``None`` when empty.
+@dataclass(frozen=True, slots=True)
+class _ChainHalf:
+    """Per-edge lists (CSR over the selected edges) of one side of a chain.
 
-    Returns ``None`` for every case the single-shot discovery would resolve to
-    an empty block (no structures, no endpoints, no faces, or zero
-    candidates-per-pair) and raises loudly when RayD native capability is
-    missing. No candidate budget is evaluated here; the per-block plan owns the
-    total-cap guard.
+    An entry is an endpoint index and, for a half with reflections, its image-tree node; the
+    node tables hold the node's plane-group sequence from the endpoint and its image.
     """
+
+    edge_offsets: torch.Tensor
+    endpoint: torch.Tensor
+    node: torch.Tensor
+    endpoints: torch.Tensor
+    node_sequences: torch.Tensor
+    node_images: torch.Tensor
+
+    @property
+    def depth(self) -> int:
+        return int(self.node_sequences.shape[1])
+
+    def counts(self) -> torch.Tensor:
+        return self.edge_offsets[1:] - self.edge_offsets[:-1]
+
+
+def _prepare_chain_context(
+    scene: Scene, compiled: CompiledScene, tx_positions: torch.Tensor, rx_positions: torch.Tensor,
+) -> _ChainContext | None:
+    """The receiver-independent chain context, or ``None`` when no chain can exist."""
 
     device = tx_positions.device
     rayd = compiled.rayd
@@ -411,400 +213,469 @@ def _prepare_coupled_topology_context(
         return None
     if not rayd.available:
         raise RuntimeError("coupled topology requires RayD native scene capability")
-
-    records = rayd.edge_records()
-    faces = records.faces.contiguous()
+    faces, normals, tri_a = _reflection_geometry_tables(compiled, device)
     if int(faces.shape[0]) == 0:
         return None
-    vertices = records.vertices.contiguous()
-    normals = geometry_kernels.deterministic_normalize_vec3(
-        records.face_normals.contiguous(), eps=1.0e-6
+    coplanar_groups = _cached_coplanar_face_groups(
+        rayd, tri_a, normals, face_geometry_id_table(compiled, "face_surface_id", device=device)
     )
-    tri_a = topology_kernels.deterministic_face_anchor_points(vertices, faces)
-    groups = _cached_coplanar_face_groups(
-        rayd,
-        tri_a,
-        normals,
-        compiled.geometry.face_surface_id.to(
-            device=device, dtype=torch.long
-        ).contiguous(),
+    plane_groups = reflection_plane_groups(compiled, coplanar_groups, tri_a=tri_a, normals=normals)
+    plan = prepare_diffraction_order1_plan(
+        metadata=scene.metadata, tx_count=int(tx_positions.shape[0]), rx_count=int(rx_positions.shape[0])
     )
-    representative_faces = (
-        groups["representative_faces"].to(dtype=torch.int32).contiguous()
-    )
-    preserve_imported_edges = bool(
-        isinstance(scene.metadata.get("mitsuba", {}), dict)
-        and scene.metadata.get("mitsuba", {}).get("merge_shapes", False)
-    )
-    (
-        selected,
-        edge_pos,
-        edge_dir,
-        _edge_length,
-        edge_t_min,
-        edge_t_max,
-        _n0,
-        _n1,
-        _face0,
-        _face1,
-        _exterior_angle,
-    ) = (
-        _diffraction_edge_geometry(records)
-        if preserve_imported_edges
-        else _cached_diffraction_edge_geometry(rayd)
-    )
-    selected_edges = topology_kernels.mc_selected_edge_indices(selected)
-    candidates_per_pair = int(representative_faces.shape[0]) * int(
-        selected_edges.shape[0]
-    )
-    if candidates_per_pair == 0:
+    edges = selected_diffraction_edges(rayd, preserve_imported_edges=plan.preserve_imported_edges)
+    geometry, selected = edges
+    if plane_groups.group_count <= 0 or int(selected.shape[0]) == 0:
         return None
-
-    face_material_id = compiled.assignments.face_material_id.to(
-        device=device, dtype=torch.int32
-    ).contiguous()
-    surface_group_id = groups["surface_group_id"].to(dtype=torch.int32).contiguous()
-    surface_group_size = groups["surface_group_size"].to(dtype=torch.int32).contiguous()
-    surface_group_members = (
-        groups["surface_group_members"].to(dtype=torch.int32).contiguous()
-    )
-    return _CoupledTopologyContext(
+    index = selected.to(dtype=torch.int64)
+    return _ChainContext(
         device=device,
         rayd=rayd,
-        representative_faces=representative_faces,
-        tri_a=tri_a,
-        normals=normals,
-        selected_edges=selected_edges,
-        edge_pos=edge_pos,
-        edge_dir=edge_dir,
-        edge_t_min=edge_t_min,
-        edge_t_max=edge_t_max,
-        face_material_id=face_material_id,
-        surface_group_id=surface_group_id,
-        surface_group_size=surface_group_size,
-        surface_group_members=surface_group_members,
-        candidates_per_pair=candidates_per_pair,
+        plane_groups=plane_groups,
+        coplanar_groups=coplanar_groups,
+        face_material_id=face_material_id_table(compiled, device=device),
+        edges=edges,
+        selected_edges=selected.to(dtype=torch.int32).contiguous(),
+        edge_position=geometry.edge_position[index].contiguous(),
+        edge_direction=geometry.edge_direction[index].contiguous(),
+        edge_t_min=geometry.line_min[index].contiguous(),
+        edge_t_max=geometry.line_max[index].contiguous(),
+        min_segment_length=reflection_min_segment_length(plane_groups),
     )
 
 
-def _coupled_topology_rx_block(
-    context: _CoupledTopologyContext, tx_positions: torch.Tensor, rx_positions: torch.Tensor, *,
-    candidate_limit: int,
-) -> tuple[dict[str, torch.Tensor], int, int]:
-    """Discover coupled rows for one receiver slice against a prepared context.
+def _visible_edges(context: _ChainContext, endpoints: torch.Tensor) -> torch.Tensor:
+    """``[P, E]`` bool: each endpoint sees some of the four axial samples of each selected edge.
 
-    ``rx_id`` is local to ``rx_positions``; the streamed wrapper offsets it back
-    to the global receiver index. ``prepare_coupled_candidate_plan`` runs the
-    unchanged total-cap guard on this slice's candidate count, so a slice that
-    exceeds the budget fails loudly here.
+    The same visibility rule selects the order-1 diffraction states, and it is symmetric in the
+    two endpoints of a chain, so a chain and its reverse see the same edge sets.
     """
 
-    device = context.device
-    plan = prepare_coupled_candidate_plan(
-        tx_count=int(tx_positions.shape[0]),
-        rx_count=int(rx_positions.shape[0]),
-        representative_faces=context.representative_faces,
-        selected_edges=context.selected_edges,
-        candidate_limit=candidate_limit,
-    )
-    if plan.candidates_per_pair == 0:
-        return _ensure_topology_fields(_empty_path_block(device)), 0, 0
+    edge_count = context.edge_count
+    per_launch = max(1, _VISIBILITY_STATES_PER_LAUNCH // edge_count)
+    power = torch.ones((int(endpoints.shape[0]),), device=context.device, dtype=torch.float32)
+    parts: list[torch.Tensor] = []
+    for start in range(0, int(endpoints.shape[0]), per_launch):
+        chunk = endpoints[start : start + per_launch].contiguous()
+        states, _source = _batched_diffraction_states(context.edges, chunk, power[: chunk.shape[0]])
+        plan = plan_tx_visible_diffraction_states(context.rayd, states, chunk[0], per_state_source=True)
+        parts.append(plan.active.reshape(int(chunk.shape[0]), edge_count))
+    return parts[0] if len(parts) == 1 else torch.cat(parts)
 
-    tri_a = context.tri_a
-    normals = context.normals
-    edge_pos = context.edge_pos
-    edge_dir = context.edge_dir
-    edge_t_min = context.edge_t_min
-    edge_t_max = context.edge_t_max
-    face_material_id = context.face_material_id
-    surface_group_id = context.surface_group_id
-    surface_group_size = context.surface_group_size
-    surface_group_members = context.surface_group_members
-    blocks: list[dict[str, torch.Tensor]] = []
-    launch_count = 0
-    candidate_count = 0
-    current_chunk_start = -1
-    common_args: tuple[object, ...] = ()
-    for request in iter_coupled_candidate_requests(plan, device=device):
-        if request.chunk_start != current_chunk_start:
-            edge_index = request.edge_id.to(dtype=torch.int64)
-            common_args = (
-                context.rayd.require_resource(),
-                tx_positions[request.tx_slot].contiguous(),
-                rx_positions[request.rx_slot].contiguous(),
-                request.face_id,
-                tri_a[request.face_id.to(dtype=torch.int64)].contiguous(),
-                normals[request.face_id.to(dtype=torch.int64)].contiguous(),
-                request.edge_id,
-                edge_pos[edge_index].contiguous(),
-                edge_dir[edge_index].contiguous(),
-                edge_t_min[edge_index].contiguous(),
-                edge_t_max[edge_index].contiguous(),
-                surface_group_id,
-                surface_group_size,
-                surface_group_members,
-            )
-            current_chunk_start = request.chunk_start
-        exported = query_coupled_geometry(
-            CoupledGeometryQuery(*common_args, reverse=request.reverse)
+
+def _edge_offsets(edge: torch.Tensor, edge_count: int) -> torch.Tensor:
+    counts = torch.bincount(edge.to(dtype=torch.int64), minlength=edge_count)
+    offsets = torch.zeros((edge_count + 1,), device=edge.device, dtype=torch.int64)
+    torch.cumsum(counts, dim=0, out=offsets[1:])
+    return offsets
+
+
+def _direct_half(edges: torch.Tensor, endpoints: torch.Tensor) -> _ChainHalf:
+    """The half without reflections: every ``(edge, endpoint)`` pair marked in ``edges``, edge-major."""
+
+    pairs = torch.nonzero(edges.t(), as_tuple=False)
+    edge = pairs[:, 0]
+    device = endpoints.device
+    return _ChainHalf(
+        edge_offsets=_edge_offsets(edge, int(edges.shape[1])),
+        endpoint=pairs[:, 1].to(dtype=torch.int32).contiguous(),
+        node=torch.full((int(pairs.shape[0]),), -1, device=device, dtype=torch.int32),
+        endpoints=endpoints,
+        node_sequences=torch.empty((0, 0), device=device, dtype=torch.int32),
+        node_images=torch.empty((0, 3), device=device, dtype=torch.float32),
+    )
+
+
+def _reflected_half(
+    context: _ChainContext, frontier: _ImageTreeFrontier, endpoints: torch.Tensor,
+) -> _ChainHalf:
+    """The half whose last reflection is an image-tree node: every (node, edge in its beam)."""
+
+    groups = context.plane_groups
+    node_count = int(frontier.size)
+    edge_count = context.edge_count
+    nodes_per_launch = max(1, _NODE_EDGE_TESTS_PER_LAUNCH // edge_count)
+    node_parts: list[torch.Tensor] = []
+    edge_parts: list[torch.Tensor] = []
+    for start in range(0, node_count, nodes_per_launch):
+        node, edge = topology_kernels.chain_node_edges(
+            node_sequences=frontier.node_sequences,
+            node_images=frontier.node_images,
+            plane_point=groups.plane_point,
+            plane_normal=groups.plane_normal,
+            bounds=groups.bounds,
+            occupancy=groups.occupancy,
+            edge_position=context.edge_position,
+            edge_direction=context.edge_direction,
+            edge_t_min=context.edge_t_min,
+            edge_t_max=context.edge_t_max,
+            node_start=start,
+            node_end=min(start + nodes_per_launch, node_count),
+            tolerance=_BOUNDS_RELATIVE * groups.scene_scale_m,
         )
-        launch_count += 1
-        candidate_count += request.candidate_count
+        node_parts.append(node)
+        edge_parts.append(edge)
+    device = context.device
+    node = torch.cat(node_parts) if node_parts else torch.empty((0,), device=device, dtype=torch.int32)
+    edge = torch.cat(edge_parts) if edge_parts else torch.empty((0,), device=device, dtype=torch.int32)
+    order = torch.argsort(edge, stable=True)
+    node = node[order].contiguous()
+    return _ChainHalf(
+        edge_offsets=_edge_offsets(edge, edge_count),
+        endpoint=frontier.node_tx[node.to(dtype=torch.int64)].contiguous(),
+        node=node,
+        endpoints=endpoints,
+        node_sequences=frontier.node_sequences.contiguous(),
+        node_images=frontier.node_images.contiguous(),
+    )
+
+
+class _HalfSource:
+    """Chain halves of one endpoint set, by number of reflections, built on first use."""
+
+    def __init__(self, context: _ChainContext, endpoints: torch.Tensor) -> None:
+        self._context = context
+        self._endpoints = endpoints.to(dtype=torch.float32).contiguous()
+        self._halves: dict[int, _ChainHalf] = {}
+        self._frontier = _image_tree_roots(self._endpoints)
+        self._frontier_depth = 0
+        self.visible: torch.Tensor | None = None
+
+    def visible_edges(self) -> torch.Tensor:
+        if self.visible is None:
+            self.visible = _visible_edges(self._context, self._endpoints)
+        return self.visible
+
+    def half(self, depth: int) -> _ChainHalf:
+        if depth not in self._halves:
+            if depth == 0:
+                # Every edge: the validator's visibility segment decides, so a chain half never
+                # depends on a sampled visibility estimate.
+                every = torch.ones(
+                    (int(self._endpoints.shape[0]), self._context.edge_count),
+                    device=self._endpoints.device, dtype=torch.bool,
+                )
+                self._halves[0] = _direct_half(every, self._endpoints)
+            else:
+                while self._frontier_depth < depth:
+                    self._frontier = _expand_image_tree(
+                        self._frontier, self._context.plane_groups, prune=True
+                    )
+                    self._frontier_depth += 1
+                self._halves[depth] = _reflected_half(self._context, self._frontier, self._endpoints)
+        return self._halves[depth]
+
+
+def _lane_offsets(a: _ChainHalf, b: _ChainHalf) -> tuple[torch.Tensor, int]:
+    """Per-edge offsets of the joined (a entry, b entry) lanes and their total (one host read)."""
+
+    lanes = a.counts() * b.counts()
+    offsets = torch.zeros((int(lanes.shape[0]) + 1,), device=lanes.device, dtype=torch.int64)
+    torch.cumsum(lanes, dim=0, out=offsets[1:])
+    return offsets, int(offsets[-1].item())
+
+
+def _iter_chain_candidates(
+    context: _ChainContext, a: _ChainHalf, b: _ChainHalf,
+) -> Iterator[dict[str, torch.Tensor]]:
+    """Chain candidates (transmitter, receiver, edge, half nodes, diffraction point) of one class."""
+
+    offsets, total = _lane_offsets(a, b)
+    groups = context.plane_groups
+    for start in range(0, total, _CHAIN_LANES_PER_LAUNCH):
+        candidates = topology_kernels.chain_candidates(
+            lane_offsets=offsets,
+            lane_start=start,
+            lane_end=min(start + _CHAIN_LANES_PER_LAUNCH, total),
+            plane_point=groups.plane_point,
+            plane_normal=groups.plane_normal,
+            bounds=groups.bounds,
+            occupancy=groups.occupancy,
+            edge_position=context.edge_position,
+            edge_direction=context.edge_direction,
+            edge_t_min=context.edge_t_min,
+            edge_t_max=context.edge_t_max,
+            a=(a.edge_offsets, a.endpoint, a.node, a.endpoints, a.node_sequences, a.node_images),
+            b=(b.edge_offsets, b.endpoint, b.node, b.endpoints, b.node_sequences, b.node_images),
+            box_tolerance=_BOUNDS_RELATIVE * groups.scene_scale_m,
+            segment_tolerance=_SEGMENT_PARAMETER_SLACK,
+            min_segment_length=0.5 * context.min_segment_length,
+            edge_epsilon=_EDGE_EPSILON,
+        )
+        if int(candidates["tx"].shape[0]) > 0:
+            yield candidates
+
+
+def _half_planes(
+    context: _ChainContext, half: _ChainHalf, node: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Representative faces and plane tables of each candidate's half, in endpoint order."""
+
+    count = int(node.shape[0])
+    depth = half.depth
+    device = context.device
+    if depth == 0:
+        return (
+            torch.empty((count, 0), device=device, dtype=torch.int32),
+            torch.empty((count, 0, 3), device=device, dtype=torch.float32),
+            torch.empty((count, 0, 3), device=device, dtype=torch.float32),
+        )
+    groups = context.plane_groups
+    sequence = half.node_sequences[node.to(dtype=torch.int64)].to(dtype=torch.int64)
+    faces = groups.representative_faces[sequence].to(dtype=torch.int32).contiguous()
+    return faces, groups.plane_point[sequence].contiguous(), groups.plane_normal[sequence].contiguous()
+
+
+def _chain_block(
+    context: _ChainContext, exported: dict[str, torch.Tensor], tx: torch.Tensor, rx: torch.Tensor,
+    edge_id: torch.Tensor, prefix_depth: int, suffix_depth: int,
+) -> dict[str, torch.Tensor] | None:
+    kept = torch.nonzero(exported["valid"], as_tuple=False).reshape(-1)
+    count = int(kept.shape[0])
+    if count == 0:
+        return None
+    device = context.device
+    depth = prefix_depth + suffix_depth + 1
+    sequence = exported["primitive_sequence"][kept].contiguous()
+    positions = exported["interaction_positions"][kept].contiguous()
+    normals = exported["interaction_normals"][kept].contiguous()
+    reflection = torch.ones((depth,), device=device, dtype=torch.bool)
+    reflection[prefix_depth] = False
+    faces = torch.where(reflection, sequence, torch.zeros_like(sequence)).to(dtype=torch.int64)
+    material_sequence = torch.where(
+        reflection, context.face_material_id[faces], torch.full_like(sequence, -1)
+    ).to(dtype=torch.int32).contiguous()
+    first_reflection = 0 if prefix_depth > 0 else 1
+    primitive_id = sequence[:, first_reflection].contiguous()
+    nan = torch.full((count,), float("nan"), device=device, dtype=torch.float32)
+    return _ensure_topology_fields(
+        {
+            "valid": torch.ones((count,), device=device, dtype=torch.bool),
+            "tx_id": tx[kept].to(dtype=torch.int32).contiguous(),
+            "rx_id": rx[kept].to(dtype=torch.int32).contiguous(),
+            "depth": torch.full((count,), depth, device=device, dtype=torch.int32),
+            "component_id": torch.full(
+                (count,), chain_component_id(prefix_depth, suffix_depth), device=device,
+                dtype=torch.int32,
+            ),
+            "primitive_id": primitive_id,
+            "edge_id": edge_id[kept].to(dtype=torch.int32).contiguous(),
+            "path_length_m": exported["path_length_m"][kept],
+            "delay_s": exported["delay_s"][kept],
+            "path_gain": nan,
+        },
+        interaction_position=positions[:, 0].contiguous(),
+        interaction_normal=normals[:, 0].contiguous(),
+        material_id=material_sequence[:, first_reflection].contiguous(),
+        path_field=torch.complex(nan, nan),
+        primitive_sequence=sequence,
+        material_sequence=material_sequence,
+        interaction_positions=positions,
+        interaction_normals=normals,
+    )
+
+
+def _chain_class_blocks(
+    context: _ChainContext, a: _ChainHalf, b: _ChainHalf, tx_positions: torch.Tensor,
+    rx_positions: torch.Tensor, validator_chunk: int,
+) -> tuple[list[dict[str, torch.Tensor]], int, int]:
+    """Validated rows of one chain class (``a.depth`` reflections, the diffraction, ``b.depth``)."""
+
+    blocks: list[dict[str, torch.Tensor]] = []
+    launches = 0
+    candidate_count = 0
+    groups = context.coplanar_groups
+    resource = context.rayd.require_resource()
+    for candidates in _iter_chain_candidates(context, a, b):
+        launches += 1
+        total = int(candidates["tx"].shape[0])
+        candidate_count += total
+        for start in range(0, total, validator_chunk):
+            end = min(start + validator_chunk, total)
+            tx = candidates["tx"][start:end]
+            rx = candidates["rx"][start:end]
+            edge_id = context.selected_edges[candidates["edge"][start:end].to(dtype=torch.int64)]
+            prefix = _half_planes(context, a, candidates["a_node"][start:end])
+            suffix = _half_planes(context, b, candidates["b_node"][start:end])
+            exported = geometry_kernels.coupled_chain_geometry_forward(
+                resource,
+                tx_positions[tx.to(dtype=torch.int64)].contiguous(),
+                rx_positions[rx.to(dtype=torch.int64)].contiguous(),
+                candidates["point"][start:end].contiguous(),
+                edge_id.contiguous(),
+                *prefix,
+                *suffix,
+                groups["surface_group_id"].to(dtype=torch.int32).contiguous(),
+                groups["surface_group_size"].to(dtype=torch.int32).contiguous(),
+                groups["surface_group_members"].to(dtype=torch.int32).contiguous(),
+                context.min_segment_length,
+            )
+            launches += 1
+            block = _chain_block(context, exported, tx, rx, edge_id, a.depth, b.depth)
+            if block is not None:
+                blocks.append(block)
+    return blocks, launches, candidate_count
+
+
+def _endpoint_edge_lists(visible: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """CSR over endpoints of the edges each endpoint sees (ascending edge index)."""
+
+    pairs = torch.nonzero(visible, as_tuple=False)
+    counts = torch.bincount(pairs[:, 0], minlength=int(visible.shape[0]))
+    offsets = torch.zeros((int(visible.shape[0]) + 1,), device=visible.device, dtype=torch.int64)
+    torch.cumsum(counts, dim=0, out=offsets[1:])
+    return offsets, pairs[:, 1].to(dtype=torch.int32).contiguous()
+
+
+def _double_diffraction_blocks(
+    context: _ChainContext, tx_source: _HalfSource, rx_source: _HalfSource,
+    tx_positions: torch.Tensor, rx_positions: torch.Tensor,
+) -> tuple[list[dict[str, torch.Tensor]], int, int]:
+    """Double-diffraction rows: the first edge seen from the transmitter, the second from the receiver."""
+
+    tx_offsets, tx_edges = _endpoint_edge_lists(tx_source.visible_edges())
+    rx_offsets, rx_edges = _endpoint_edge_lists(rx_source.visible_edges())
+    tx_count = int(tx_positions.shape[0])
+    rx_count = int(rx_positions.shape[0])
+    pair_lanes = (
+        (tx_offsets[1:] - tx_offsets[:-1]).reshape(-1, 1) * (rx_offsets[1:] - rx_offsets[:-1]).reshape(1, -1)
+    ).reshape(-1)
+    pair_offsets = torch.zeros((tx_count * rx_count + 1,), device=context.device, dtype=torch.int64)
+    torch.cumsum(pair_lanes, dim=0, out=pair_offsets[1:])
+    total = int(pair_offsets[-1].item())
+    blocks: list[dict[str, torch.Tensor]] = []
+    launches = 0
+    resource = context.rayd.require_resource()
+    device = context.device
+    for start in range(0, total, _DOUBLE_CANDIDATES_PER_LAUNCH):
+        expanded = topology_kernels.chain_double_candidates(
+            pair_offsets=pair_offsets,
+            lane_start=start,
+            lane_end=min(start + _DOUBLE_CANDIDATES_PER_LAUNCH, total),
+            rx_count=rx_count,
+            tx_offsets=tx_offsets,
+            tx_edges=tx_edges,
+            rx_offsets=rx_offsets,
+            rx_edges=rx_edges,
+        )
+        tx = expanded["tx"].to(dtype=torch.int64)
+        rx = expanded["rx"].to(dtype=torch.int64)
+        first = expanded["edge1"].to(dtype=torch.int64)
+        second = expanded["edge2"].to(dtype=torch.int64)
+        exported = query_coupled_dd_geometry(
+            CoupledDdGeometryQuery(
+                rayd_resource=resource,
+                source=tx_positions[tx].contiguous(),
+                receiver=rx_positions[rx].contiguous(),
+                edge1_id=context.selected_edges[first].contiguous(),
+                edge1_position=context.edge_position[first].contiguous(),
+                edge1_direction=context.edge_direction[first].contiguous(),
+                edge1_t_min=context.edge_t_min[first].contiguous(),
+                edge1_t_max=context.edge_t_max[first].contiguous(),
+                edge2_id=context.selected_edges[second].contiguous(),
+                edge2_position=context.edge_position[second].contiguous(),
+                edge2_direction=context.edge_direction[second].contiguous(),
+                edge2_t_min=context.edge_t_min[second].contiguous(),
+                edge2_t_max=context.edge_t_max[second].contiguous(),
+            )
+        )
+        launches += 2
         kept = torch.nonzero(exported.valid, as_tuple=False).reshape(-1)
         kept_count = int(kept.shape[0])
         if kept_count == 0:
             continue
-        interaction_type = exported.interaction_type_sequence[kept]
-        primitive_sequence = exported.primitive_sequence[kept]
-        edge_sequence = exported.edge_sequence[kept]
-        object_sequence = (
-            torch.where(interaction_type == 2, edge_sequence, primitive_sequence)
-            .to(dtype=torch.int32)
-            .contiguous()
-        )
-        resolved_face = exported.face_id[kept]
-        resolved_edge = exported.edge_id[kept]
-        reflection_material = face_material_id[resolved_face.to(dtype=torch.int64)]
-        material_sequence = (
-            torch.where(
-                interaction_type == 1,
-                reflection_material.reshape(-1, 1),
-                torch.full_like(interaction_type, -1),
-            )
-            .to(dtype=torch.int32)
-            .contiguous()
-        )
-        nan = torch.full(
-            (kept_count,), float("nan"), device=device, dtype=torch.float32
-        )
+        # Both events are diffractions: the object sequence holds the two edge ids and no face
+        # is touched; the field stage resolves the wedge materials.
+        nan = torch.full((kept_count,), float("nan"), device=device, dtype=torch.float32)
         blocks.append(
             _ensure_topology_fields(
                 {
                     "valid": torch.ones((kept_count,), device=device, dtype=torch.bool),
-                    "tx_id": request.tx_slot[kept].to(dtype=torch.int32).contiguous(),
-                    "rx_id": request.rx_slot[kept].to(dtype=torch.int32).contiguous(),
-                    "depth": torch.full(
-                        (kept_count,), 2, device=device, dtype=torch.int32
-                    ),
+                    "tx_id": expanded["tx"][kept].contiguous(),
+                    "rx_id": expanded["rx"][kept].contiguous(),
+                    "depth": torch.full((kept_count,), 2, device=device, dtype=torch.int32),
                     "component_id": torch.full(
-                        (kept_count,),
-                        request.component_id,
-                        device=device,
-                        dtype=torch.int32,
+                        (kept_count,), DOUBLE_DIFFRACTION_COMPONENT_ID, device=device, dtype=torch.int32
                     ),
-                    "primitive_id": resolved_face.to(dtype=torch.int32),
-                    "edge_id": resolved_edge.to(dtype=torch.int32),
+                    "primitive_id": torch.full((kept_count,), -1, device=device, dtype=torch.int32),
+                    "edge_id": exported.edge1_id[kept].to(dtype=torch.int32),
                     "path_length_m": exported.path_length_m[kept],
                     "delay_s": exported.delay_s[kept],
                     "path_gain": nan,
                 },
                 interaction_position=exported.interaction_positions[kept, 0],
                 interaction_normal=exported.interaction_normals[kept, 0],
-                material_id=reflection_material,
+                material_id=torch.full((kept_count,), -1, device=device, dtype=torch.int32),
                 path_field=torch.complex(nan, nan),
-                primitive_sequence=object_sequence,
-                material_sequence=material_sequence,
+                primitive_sequence=exported.edge_sequence[kept].to(dtype=torch.int32).contiguous(),
+                material_sequence=torch.full((kept_count, 2), -1, device=device, dtype=torch.int32),
                 interaction_positions=exported.interaction_positions[kept],
                 interaction_normals=exported.interaction_normals[kept],
             )
         )
-    # cid 7 (double diffraction) shares the same plan and receiver block. Its
-    # ordered edge-pair stream is emitted after the R->D / D->R rows so the
-    # concatenated per-block row order is deterministic. Each row is a two-edge
-    # cascade: both edge ids live in the object sequence, no face is touched.
-    # Hoist the native handle out of the chunk loop (mirrors the R->D/D->R
-    # common_args hoist above): it is a per-solve constant, not per-chunk work.
-    dd_rayd_resource = context.rayd.require_resource()
-    for dd_request in iter_coupled_dd_candidate_requests(plan, device=device):
-        edge1_index = dd_request.edge1_id.to(dtype=torch.int64)
-        edge2_index = dd_request.edge2_id.to(dtype=torch.int64)
-        dd_exported = query_coupled_dd_geometry(
-            CoupledDdGeometryQuery(
-                rayd_resource=dd_rayd_resource,
-                source=tx_positions[dd_request.tx_slot].contiguous(),
-                receiver=rx_positions[dd_request.rx_slot].contiguous(),
-                edge1_id=dd_request.edge1_id,
-                edge1_position=edge_pos[edge1_index].contiguous(),
-                edge1_direction=edge_dir[edge1_index].contiguous(),
-                edge1_t_min=edge_t_min[edge1_index].contiguous(),
-                edge1_t_max=edge_t_max[edge1_index].contiguous(),
-                edge2_id=dd_request.edge2_id,
-                edge2_position=edge_pos[edge2_index].contiguous(),
-                edge2_direction=edge_dir[edge2_index].contiguous(),
-                edge2_t_min=edge_t_min[edge2_index].contiguous(),
-                edge2_t_max=edge_t_max[edge2_index].contiguous(),
-            )
-        )
-        launch_count += 1
-        candidate_count += dd_request.candidate_count
-        dd_kept = torch.nonzero(dd_exported.valid, as_tuple=False).reshape(-1)
-        dd_kept_count = int(dd_kept.shape[0])
-        if dd_kept_count == 0:
-            continue
-        # interaction_type is [2, 2], so the object sequence is exactly the two
-        # edge ids; the field stage recovers both edges from edge_sequence
-        # (slot 0 = e1, slot 1 = e2). material_sequence is fully -1: edges carry
-        # wedge materials resolved by the field stage.
-        dd_object_sequence = (
-            dd_exported.edge_sequence[dd_kept].to(dtype=torch.int32).contiguous()
-        )
-        dd_material_sequence = torch.full(
-            (dd_kept_count, 2), -1, device=device, dtype=torch.int32
-        )
-        dd_nan = torch.full(
-            (dd_kept_count,), float("nan"), device=device, dtype=torch.float32
-        )
-        blocks.append(
-            _ensure_topology_fields(
-                {
-                    "valid": torch.ones(
-                        (dd_kept_count,), device=device, dtype=torch.bool
-                    ),
-                    "tx_id": dd_request.tx_slot[dd_kept]
-                    .to(dtype=torch.int32)
-                    .contiguous(),
-                    "rx_id": dd_request.rx_slot[dd_kept]
-                    .to(dtype=torch.int32)
-                    .contiguous(),
-                    "depth": torch.full(
-                        (dd_kept_count,), 2, device=device, dtype=torch.int32
-                    ),
-                    "component_id": torch.full(
-                        (dd_kept_count,),
-                        dd_request.component_id,
-                        device=device,
-                        dtype=torch.int32,
-                    ),
-                    "primitive_id": torch.full(
-                        (dd_kept_count,), -1, device=device, dtype=torch.int32
-                    ),
-                    "edge_id": dd_exported.edge1_id[dd_kept].to(dtype=torch.int32),
-                    "path_length_m": dd_exported.path_length_m[dd_kept],
-                    "delay_s": dd_exported.delay_s[dd_kept],
-                    "path_gain": dd_nan,
-                },
-                interaction_position=dd_exported.interaction_positions[dd_kept, 0],
-                interaction_normal=dd_exported.interaction_normals[dd_kept, 0],
-                material_id=torch.full(
-                    (dd_kept_count,), -1, device=device, dtype=torch.int32
-                ),
-                path_field=torch.complex(dd_nan, dd_nan),
-                primitive_sequence=dd_object_sequence,
-                material_sequence=dd_material_sequence,
-                interaction_positions=dd_exported.interaction_positions[dd_kept],
-                interaction_normals=dd_exported.interaction_normals[dd_kept],
-            )
-        )
-    return (
-        _ensure_topology_fields(concatenate_path_blocks(blocks, device=device)),
-        launch_count,
-        candidate_count,
-    )
-
-
-def _coupled_reflection_diffraction_topology_order2(
-    scene: Scene, compiled: object, tx_positions: torch.Tensor, rx_positions: torch.Tensor, *,
-    candidate_limit: int,
-) -> tuple[dict[str, torch.Tensor], int, int]:
-    """Construct bounded 1R+1D and reciprocal 1D+1R geometry.
-
-    This deliberately exports no physical coefficient. the field evaluator applies
-    the shared complex/Jones transport to these canonical event sequences.
-
-    Single-shot discovery over the full receiver set: the whole receiver axis is
-    one candidate plan, so a scene whose total candidate count exceeds
-    ``candidate_limit`` fails loudly in ``prepare_coupled_candidate_plan``. The
-    path and Monte Carlo solvers keep this total-cap contract; the deterministic
-    grid solver streams over receiver blocks instead
-    (:func:`_coupled_reflection_diffraction_topology_rx_streamed`).
-    """
-
-    context = _prepare_coupled_topology_context(
-        scene, compiled, tx_positions, rx_positions
-    )
-    if context is None:
-        return _ensure_topology_fields(_empty_path_block(tx_positions.device)), 0, 0
-    return _coupled_topology_rx_block(
-        context, tx_positions, rx_positions, candidate_limit=candidate_limit
-    )
+    return blocks, launches, total
 
 
 def coupled_reflection_diffraction_topology(
-    scene: Scene, compiled: object, tx_positions: torch.Tensor, rx_positions: torch.Tensor, *,
-    candidate_limit: int, rx_streamed: bool,
+    scene: Scene, compiled: CompiledScene, tx_positions: torch.Tensor, rx_positions: torch.Tensor,
+    *, max_depth: int, candidate_limit: int,
 ) -> tuple[dict[str, torch.Tensor], int, int]:
-    """Dispatch coupled discovery: receiver-streamed grid vs single-shot.
+    """Interaction-chain rows up to ``max_depth`` interactions, and double-diffraction rows.
 
-    The deterministic grid solver streams over receiver blocks (coupled reflection and diffraction); the
-    path and Monte Carlo callers use the single-shot total-cap discovery.
-    """
-
-    topology = (
-        _coupled_reflection_diffraction_topology_rx_streamed
-        if rx_streamed
-        else _coupled_reflection_diffraction_topology_order2
-    )
-    return topology(
-        scene, compiled, tx_positions, rx_positions, candidate_limit=candidate_limit
-    )
-
-
-def _coupled_reflection_diffraction_topology_rx_streamed(
-    scene: Scene, compiled: object, tx_positions: torch.Tensor, rx_positions: torch.Tensor, *,
-    candidate_limit: int,
-) -> tuple[dict[str, torch.Tensor], int, int]:
-    """Stream coupled discovery over receiver blocks for the grid solver.
-
-    A full 65k-receiver grid needs far more than the 1M candidate budget in one
-    plan, so ``candidate_limit`` is treated as a per-block work/safety budget:
-    the receiver axis is split into blocks of ``block_rx`` receivers sized so
-    each block's candidate count stays under the (min-with-hard-cap) limit. Each
-    block runs the same order-2 discovery as the single-shot path, its local
-    ``rx_id`` is offset back to the global receiver index, and the compacted
-    blocks are concatenated in ascending receiver-block order. That
-    concatenation order IS the row identity and is deterministic across runs.
-
-    The shared ``_MAX_COUPLED_CANDIDATES`` guard and the discovery iterator are
-    untouched: a block that cannot fit even a single receiver under the budget
-    still fails loudly in ``prepare_coupled_candidate_plan``.
+    A chain is ``a`` reflections, one diffraction and ``b`` reflections (``1 <= a + b <=
+    max_depth - 1``). Its candidates join a transmitter-side half and a receiver-side half on a
+    shared edge: a half is the endpoint itself (any edge) or an image-tree node whose beam may
+    reach the edge (a conservative geometric test). Double diffraction takes its first edge from
+    the transmitter-visible and its second from the receiver-visible edge sets. The diffraction point is the Keller point
+    between the two half images, and the validator back-traces both halves with the reflection
+    EPC (a half without reflection is one visibility segment), the receiver half only where the
+    transmitter half is valid. ``candidate_limit`` bounds the candidates of one validator launch;
+    it never caps the result. Returns the rows, the launch count and the candidate count.
     """
 
     device = tx_positions.device
-    context = _prepare_coupled_topology_context(
-        scene, compiled, tx_positions, rx_positions
-    )
+    context = _prepare_chain_context(scene, compiled, tx_positions, rx_positions)
     if context is None:
         return _ensure_topology_fields(_empty_path_block(device)), 0, 0
-
-    tx_count = int(tx_positions.shape[0])
-    rx_count = int(rx_positions.shape[0])
-    effective_limit = min(int(candidate_limit), _MAX_COUPLED_CANDIDATES)
-    # The block budget counts the whole coupled union a receiver evaluates:
-    # both R->D / D->R directions (x2 over groups*edges) plus the one-direction
-    # D->D ordered edge-pair stream (edges*(edges-1)) (coupled double diffraction).
-    edge_count = int(context.selected_edges.shape[0])
-    per_receiver_candidates = tx_count * (
-        context.candidates_per_pair * 2 + edge_count * (edge_count - 1)
-    )
-    block_rx = max(1, effective_limit // max(per_receiver_candidates, 1))
+    max_chain_depth = min(int(max_depth), CHAIN_MAX_DEPTH)
+    tx_source = _HalfSource(context, tx_positions)
     blocks: list[dict[str, torch.Tensor]] = []
-    launch_count = 0
-    candidate_count = 0
-    for rx_start in range(0, rx_count, block_rx):
-        rx_end = min(rx_start + block_rx, rx_count)
-        rx_slice = rx_positions[rx_start:rx_end].contiguous()
-        block, block_launches, block_candidates = _coupled_topology_rx_block(
-            context, tx_positions, rx_slice, candidate_limit=candidate_limit
+    launches = 0
+    candidates = 0
+    # Receivers are taken in chunks whose image trees stay bounded: a receiver's tree holds up
+    # to group_count ** (max_chain_depth - 1) nodes at its deepest chain half.
+    tree_nodes = max(1, context.plane_groups.group_count) ** max(0, max_chain_depth - 1)
+    rx_count = int(rx_positions.shape[0])
+    rx_chunk = max(1, _RECEIVER_TREE_NODES // tree_nodes)
+    for rx_start in range(0, rx_count, rx_chunk):
+        chunk = rx_positions[rx_start : rx_start + rx_chunk].contiguous()
+        rx_source = _HalfSource(context, chunk)
+        chunk_blocks: list[dict[str, torch.Tensor]] = []
+        for reflections in range(1, max_chain_depth):
+            for prefix_depth in range(reflections, -1, -1):
+                class_blocks, class_launches, class_candidates = _chain_class_blocks(
+                    context,
+                    tx_source.half(prefix_depth),
+                    rx_source.half(reflections - prefix_depth),
+                    tx_positions,
+                    chunk,
+                    int(candidate_limit),
+                )
+                chunk_blocks.extend(class_blocks)
+                launches += class_launches
+                candidates += class_candidates
+        dd_blocks, dd_launches, dd_candidates = _double_diffraction_blocks(
+            context, tx_source, rx_source, tx_positions, chunk
         )
-        launch_count += block_launches
-        candidate_count += block_candidates
-        if int(block["valid"].numel()) == 0:
-            continue
-        if rx_start > 0:
-            block["rx_id"] = block["rx_id"] + rx_start
-        blocks.append(block)
+        chunk_blocks.extend(dd_blocks)
+        launches += dd_launches
+        candidates += dd_candidates
+        for block in chunk_blocks:
+            if rx_start > 0:
+                block["rx_id"] = block["rx_id"] + rx_start
+            blocks.append(block)
     return (
         _ensure_topology_fields(concatenate_path_blocks(blocks, device=device)),
-        launch_count,
-        candidate_count,
+        launches,
+        candidates,
     )

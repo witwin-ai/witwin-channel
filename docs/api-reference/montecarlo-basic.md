@@ -49,7 +49,7 @@ solve(
     scene: witwin.core.Scene | witwin.core.SceneSnapshot,
     config: Config,
     *,
-    reference_frequency_hz,
+    reference_frequency_hz: float | torch.Tensor,
 ) -> Result
 ```
 
@@ -79,7 +79,7 @@ print(result.component_maps["los"].shape) # same logical map shape
 Result(
     path_gain: torch.Tensor,
     component_power: dict[str, torch.Tensor],
-    metadata: dict[str, Any],
+    metadata: Metadata,
     diagnostics: dict[str, Any] | None = None,
     component_maps: dict[str, torch.Tensor] | None = None,
 )
@@ -89,9 +89,25 @@ Result(
 | --- | --- |
 | `path_gain` | `float32` total power gain; `[T, R]` for points or mixed receivers, `[T, rows, cols]` for exactly one grid (see the [receiver layout](index.md#receiver-layout-and-grid-axis-order)). |
 | `component_power` | Component-name to CUDA power tensor. |
-| `metadata` | Sample count, seed, components, build identity, execution counts, and phase convention. |
+| `metadata` | `Metadata`: sample count, seed, components, execution counts and policies (see [`Metadata`](#metadata)). |
 | `diagnostics` | Additional diagnostics when requested; otherwise `None`. |
 | `component_maps` | Component-name to spatial map when a map layout exists; otherwise `None`. |
 
 The result is all-or-nothing. Workspace overflow, capacity failure, or a
 native exception never returns a truncated estimate.
+
+## `Metadata`
+
+A `TypedDict` naming the stable keys; at run time it is a plain `dict`, so key access, `in`, `.get` and JSON serialization are unchanged. Every solver publishes the result-semantics keys `estimator`, `quantity`, `combine` and `complete` (see the [index](index.md)), the `kernel` execution record, and the requested/effective configuration keys `requested_config`, `effective_config`, `requested_max_depth`, `effective_max_depth` and `component_max_depth`.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `seed`, `samples`, `max_depth`, `ad_mode` | config values | The solve's options. |
+| `path_count`, `contribution_capacity` | `int` | Contribution counts of the solve. |
+| `components` | `dict[str, str]` | Status per component. |
+| `rayd` | `dict[str, bool]` | RayD reflection/diffraction availability. |
+| `kernel` | `KernelMetadata` | Launch, tape, memory and timing record. |
+| `semantic_capabilities` | `dict` | This solver's capability record. |
+| `edge_policy` | `dict` | Diffraction edge selection policy of the scene. |
+| `transmission`, `scattering` | `dict` | Only when that component was requested. |
+| `dropped_faces` | `dict[str, int]` | Only when compilation removed degenerate or duplicate faces. |

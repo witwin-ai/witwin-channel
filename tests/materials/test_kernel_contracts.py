@@ -12,8 +12,6 @@ from witwin.channel import runtime
 
 
 _FUNCTIONAL_OWNER_NAMES = (
-    "bdpt_face_material_tensors",
-    "bdpt_face_material_tensors_from_host",
     "em_layer_stack_backward",
     "em_layer_stack_eval",
     "em_layer_stack_jvp",
@@ -31,7 +29,7 @@ def test_material_kernel_contract_has_one_same_object_owner():
 
     assert owner.__module__ == kernels.__name__
     assert kernels.validate_layer_csr is owner
-    assert public_materials.validate_layer_csr is owner
+    assert "validate_layer_csr" not in vars(public_materials)
 
 
 def test_material_kernel_contract_uses_canonical_tensor_validation():
@@ -83,33 +81,6 @@ def test_material_autograd_uses_canonical_dependencies():
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")
-def test_bdpt_face_material_tensor_facade_dispatches_and_validates_schema():
-    exported = kernels.bdpt_face_material_tensors(
-        torch.tensor([2.5, 4.0], device="cuda", dtype=torch.float32),
-        torch.tensor([0.01, 0.02], device="cuda", dtype=torch.float32),
-        torch.tensor([1.0, 1.2], device="cuda", dtype=torch.float32),
-        torch.tensor([1, 0, 1], device="cuda", dtype=torch.int32),
-    )
-
-    assert set(exported) == {"eps_r", "sigma_e", "mu_r", "gain", "valid"}
-    assert all(value.shape == (3,) for value in exported.values())
-    assert exported["valid"].dtype == torch.bool
-
-
-def test_host_material_facade_rejects_inconsistent_contracts():
-    with pytest.raises(ValueError, match="must not be empty"):
-        kernels.bdpt_face_material_tensors_from_host((), (), (), ())
-    with pytest.raises(ValueError, match="sigma_e must match"):
-        kernels.bdpt_face_material_tensors_from_host((2.5,), (), (1.0,), (0,))
-    with pytest.raises(ValueError, match="mu_r must match"):
-        kernels.bdpt_face_material_tensors_from_host((2.5,), (0.01,), (), (0,))
-    with pytest.raises(ValueError, match="entries must reference"):
-        kernels.bdpt_face_material_tensors_from_host(
-            (2.5,), (0.01,), (1.0,), (1,)
-        )
-
-
-@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")
 def test_mc_face_material_facade_rejects_mismatched_sigma_shape():
     with pytest.raises(ValueError, match="sigma_e must match"):
         kernels.mc_face_material_tensors(
@@ -120,8 +91,9 @@ def test_mc_face_material_facade_rejects_mismatched_sigma_shape():
         )
 
 
-def test_materials_package_exports_only_the_channel_kernel_contract():
-    assert tuple(public_materials.__all__) == ("validate_layer_csr",)
+def test_materials_module_reexports_neither_kernels_nor_core_world_types():
+    assert not hasattr(public_materials, "__all__")
+    assert "validate_layer_csr" not in vars(public_materials)
     for name in (
         "Dielectric",
         "Layer",

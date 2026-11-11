@@ -15,7 +15,7 @@ from witwin.channel import runtime
 
 
 _OWNER_NAMES = (
-    "field_coupled_rd",
+    "field_coupled_chain",
     "field_diffraction_wedge",
     "field_free_space",
     "field_free_space_backward",
@@ -45,7 +45,7 @@ def test_fields_functional_uses_canonical_dependencies():
     assert field_kernels.validate_cuda_tensor is runtime.validate_cuda_tensor
     assert field_kernels._validate_layer_csr is owner
     assert material_contracts.validate_layer_csr is owner
-    assert materials.validate_layer_csr is owner
+    assert "validate_layer_csr" not in vars(materials)
 
 
 def test_transmission_family_requires_explicit_path_valid_first():

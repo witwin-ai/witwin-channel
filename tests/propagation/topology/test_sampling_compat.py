@@ -21,9 +21,9 @@ def test_topology_sampling_is_the_single_object_owner():
     owner = topology_kernels.mc_sample_directions
 
     assert owner.__module__ == topology_kernels.__name__
-    assert topology.mc_sample_directions is owner
-    assert mc_sampling.mc_sample_directions is owner
-    assert topology.__all__ == ["mc_sample_directions"]
+    # Neither the propagation topology owner nor the Monte Carlo facades re-export it.
+    assert "mc_sample_directions" not in vars(topology)
+    assert "mc_sample_directions" not in vars(mc_sampling)
 
 
 def test_topology_sampling_uses_canonical_runtime_dependencies():
@@ -43,16 +43,12 @@ def test_multibounce_discovery_uses_the_canonical_sampling_owner():
     )
 
 
-def test_sampling_dependency_uses_the_public_topology_seam():
+def test_monte_carlo_facades_do_not_import_the_propagation_layer():
     edges = check_import_graph.collect_import_edges(PACKAGE_ROOT)
     package = "witwin.channel"
     mc_source = f"{package}.kernels.montecarlo"
-    public_target = f"{package}.propagation.topology"
-    canonical_target = f"{package}.kernels.topology"
 
-    assert any(
-        edge.source == mc_source and edge.target == public_target for edge in edges
-    )
     assert not any(
-        edge.source == mc_source and edge.target == canonical_target for edge in edges
+        edge.source == mc_source and edge.target.startswith(f"{package}.propagation")
+        for edge in edges
     )

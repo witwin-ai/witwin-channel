@@ -11,7 +11,7 @@ from dataclasses import dataclass, field, fields, is_dataclass, replace
 import hashlib
 import math
 from threading import RLock
-from typing import TypeVar
+from typing import TYPE_CHECKING, NoReturn, TypeVar, cast
 import weakref
 
 import numpy as np
@@ -61,6 +61,11 @@ from witwin.channel.scene.resources import (
     build_scene_from_structures,
 )
 
+if TYPE_CHECKING:
+    from witwin.core import DeformationState, RigidMotion
+
+    from witwin.channel.scene.endpoints import EndpointStore
+
 
 def require_tensor(
     name: str, tensor: torch.Tensor, *, dtype: torch.dtype, ndim: int,
@@ -77,6 +82,13 @@ def require_tensor(
     if not tensor.is_contiguous():
         raise ValueError(f"{name} must be contiguous")
 
+
+# MaterialStore fields a Kirchhoff table is built from.
+_KIRCHHOFF_SOURCE_FIELDS = (
+    "scatter_model_id", "layer_offset", "layer_count", "layer_thickness_m", "layer_eps_r",
+    "layer_sigma_e", "layer_mu_r", "rough_sigma_h_m", "rough_corr_x_m", "rough_corr_y_m",
+    "rough_axis_rad",
+)
 
 @dataclass(frozen=True, slots=True)
 class GeometryStore:
@@ -343,7 +355,7 @@ def _validated_time(time_s: float | torch.Tensor | None) -> float | torch.Tensor
 @dataclass(slots=True)
 class CompiledScene:
     source: Scene | SceneSnapshot
-    structures: tuple[object, ...]
+    structures: tuple[_RuntimeStructure, ...]
     geometry: GeometryStore
     materials: MaterialStore
     assignments: AssignmentStore
@@ -368,6 +380,8 @@ class CompiledScene:
     _kirchhoff_resources_cache: KirchhoffRuntimeResources | None = field(
         default=None, repr=False, compare=False
     )
+    # Identity/autograd/mutation signature of the store tensors the cached tables were built from.
+    _kirchhoff_resources_state: tuple | None = field(default=None, repr=False, compare=False)
     _phase_screen_resources_cache: PhaseScreenRuntimeResources | None = field(
         default=None, repr=False, compare=False
     )
@@ -383,7 +397,7 @@ class CompiledScene:
     _world: _WorldState | None = field(default=None, repr=False, compare=False)
     _rayd_generation: int = field(default=0, repr=False, compare=False)
     # (endpoint token, EndpointStore) of the last non-differentiable binding.
-    _endpoint_store_cache: tuple[tuple, object] | None = field(
+    _endpoint_store_cache: tuple[tuple, EndpointStore] | None = field(
         default=None, repr=False, compare=False
     )
     # Device-resident per-face material tables (witwin.channel.materials), keyed
@@ -431,7 +445,7 @@ class CompiledScene:
         newer compile of the same, edited, structures.
         """
 
-        recorded = getattr(self, "_world", None)
+        recorded: _WorldState | None = getattr(self, "_world", None)
         if recorded is None:
             return None
         moved = recorded.moved_domain(world_state(self.source))
@@ -441,15 +455,14 @@ class CompiledScene:
             return "geometry_version"
         return None
 
-    def __reduce_ex__(self, protocol: object) -> object:
+    def __reduce_ex__(self, protocol: object) -> NoReturn:
         raise TypeError(
             "a CompiledScene owns a native RayD scene on one GPU and cannot be pickled or "
             "copied; pass the witwin.core Scene and call witwin.channel.scene.compile() again"
         )
 
-    def __deepcopy__(self, memo: object) -> CompiledScene:
+    def __deepcopy__(self, memo: object) -> NoReturn:
         self.__reduce_ex__(None)
-        raise AssertionError("unreachable")
 
     @property
     def dropped_faces(self) -> dict[str, int]:
@@ -476,7 +489,9 @@ class CompiledScene:
                     "reference_frequency_hz does not match the compiled tensor "
                     "identity"
                 )
-            if int(reference_frequency_hz._version) != self.reference_frequency_revision:
+            if int(cast(torch.Tensor, reference_frequency_hz)._version) != (
+                self.reference_frequency_revision
+            ):
                 raise ValueError(
                     "reference_frequency_hz changed after scene compilation"
                 )
@@ -580,7 +595,8 @@ class CompiledScene:
             )
 
         graph_bearing = _participates(tables["vertices"]) or any(
-            _participates(value) for value in tables["material"].values()
+            _participates(value)
+            for value in cast("dict[str, torch.Tensor]", tables["material"]).values()
         )
         self._fixed_reevaluation_tables_cache = (
             None if graph_bearing else (signature, tables)
@@ -597,14 +613,45 @@ class CompiledScene:
         """
 
         key = self._scattering_resource_key()
+        state = self._kirchhoff_source_state()
+        cached = self._kirchhoff_resources_cache
         if (
-            self._kirchhoff_resources_cache is None
-            or self._kirchhoff_resources_cache.key != key
+            cached is not None
+            and cached.key == key
+            and self._kirchhoff_resources_state == state
         ):
-            self._kirchhoff_resources_cache = build_kirchhoff_resources(
-                self.materials, key
+            return cached
+        resources = build_kirchhoff_resources(self.materials, key)
+        # A table carrying a graph or a forward-AD tangent is never reused: the
+        # graph would be freed by the first backward, and a later solve with a
+        # different tangent or leaf would read the stale derivative.
+        graph_bearing = any(entry[1] or entry[2] or entry[3] for entry in state)
+        self._kirchhoff_resources_cache = None if graph_bearing else resources
+        self._kirchhoff_resources_state = None if graph_bearing else state
+        return resources
+
+    def _kirchhoff_source_state(self) -> tuple[tuple[int, bool, bool, bool, int], ...]:
+        """Host-only identity, autograd and mutation signature of the Kirchhoff table inputs.
+
+        Replacing a store tensor, writing it in place, marking it ``requires_grad`` or giving
+        it a forward-AD tangent changes the signature, so the tables are rebuilt with the
+        derivative attached. Reads tensor attributes only; no device work.
+        """
+
+        store = self.materials
+        state = []
+        for name in _KIRCHHOFF_SOURCE_FIELDS:
+            source = getattr(store, name)
+            state.append(
+                (
+                    id(source),
+                    bool(source.requires_grad),
+                    source.grad_fn is not None,
+                    torch.autograd.forward_ad.unpack_dual(source).tangent is not None,
+                    int(source._version),
+                )
             )
-        return self._kirchhoff_resources_cache
+        return tuple(state)
 
     @property
     def phase_screen_resources(self) -> PhaseScreenRuntimeResources:
@@ -704,7 +751,7 @@ class _RuntimeStructure:
         return self.source.name or ""
 
     @property
-    def material(self):
+    def material(self) -> object:
         return self.source.material
 
     @property
@@ -767,6 +814,7 @@ def _field_names(kind: type) -> tuple[str, ...] | None:
 
 
 def _append_container_state(value: object, out: list[object], seen: set[int]) -> None:
+    # The caller passes only tuples, lists and mappings.
     out.append(len(value))  # type: ignore[arg-type]
     if isinstance(value, Mapping):
         for key, item in value.items():
@@ -855,7 +903,7 @@ class _SourcePlan:
     """The fixed shape of one frozen Core scene or snapshot, derived once per object."""
 
     # (structure, rigid_motion, deformation) of every enabled structure, in order.
-    rows: tuple[tuple[Structure, object | None, object | None], ...]
+    rows: tuple[tuple[Structure, RigidMotion | None, DeformationState | None], ...]
     # Per enabled structure: stable IDs, primitive IDs and geometry identity.
     topology_static: tuple[tuple[object, ...], ...]
     # Per enabled structure: the IDs and phase-screen identity of its assignment.
@@ -929,7 +977,13 @@ class _WorldState:
     # Per enabled structure: the face and face-UV table states.
     topology_rows: tuple[tuple[object, ...], ...]
     # Per enabled structure: geometry, UV, rigid motion and deformation states.
-    geometry_rows: tuple[tuple[object, ...], ...]
+    geometry_rows: tuple[
+        tuple[
+            tuple[object, ...], tuple[object, ...] | None, tuple[object, ...] | None,
+            tuple[object, ...] | None,
+        ],
+        ...,
+    ]
     # Snapshot instant, dynamic sources and the edge policy.
     geometry_extra: tuple[object, ...]
     material: tuple[object, ...]
@@ -1044,7 +1098,12 @@ _NO_TOPOLOGY_STATE: tuple[object, ...] = (None, None)
 def _world_state(scene_or_snapshot: Scene | SceneSnapshot) -> _WorldState:
     plan = _source_plan(scene_or_snapshot)
     topology_rows: list[tuple[object, ...]] = []
-    geometry_rows: list[tuple[object, ...]] = []
+    geometry_rows: list[
+        tuple[
+            tuple[object, ...], tuple[object, ...] | None, tuple[object, ...] | None,
+            tuple[object, ...] | None,
+        ]
+    ] = []
     assignment: list[object] = []
     for structure, motion, deformation in plan.rows:
         geometry = structure.geometry
@@ -1285,7 +1344,7 @@ def _readable_versions(scene_or_snapshot: Scene | SceneSnapshot) -> tuple[int, i
 
 def _source_structures(
     scene_or_snapshot: Scene | SceneSnapshot,
-) -> tuple[tuple[Structure, object | None, object | None], ...]:
+) -> tuple[tuple[Structure, RigidMotion | None, DeformationState | None], ...]:
     if isinstance(scene_or_snapshot, Scene):
         return tuple((structure, None, None) for structure in scene_or_snapshot.structures)
     return tuple(
@@ -1438,7 +1497,12 @@ def _validated_mesh(
 
 
 _TOPOLOGY_CHECK_LIMIT = 64
-_TOPOLOGY_CHECKS: OrderedDict[tuple[object, ...], tuple[object, ...]] = OrderedDict()
+_TOPOLOGY_CHECKS: OrderedDict[
+    tuple[object, ...],
+    tuple[
+        weakref.ref[torch.Tensor], weakref.ref[torch.Tensor], tuple[torch.Tensor | None, int, int]
+    ],
+] = OrderedDict()
 _TOPOLOGY_CHECK_LOCK = RLock()
 
 
@@ -1473,7 +1537,7 @@ def _checked_topology(
             hit = _TOPOLOGY_CHECKS.get(key)
             if hit is not None and hit[0]() is faces and hit[1]() is (face_uv if face_uv is not None else faces):
                 _TOPOLOGY_CHECKS.move_to_end(key)
-                return hit[2]  # type: ignore[return-value]
+                return hit[2]
     _require_index_table(label, "faces", faces, vertex_count, "vertices")
     if face_uv is not None and uv_count is not None:
         _require_index_table(label, "face_uv", face_uv, uv_count, "uv rows")
@@ -1506,8 +1570,8 @@ def _rebound_structures(
 
 
 def _snapshot_vertices(
-    geometry: object, vertices: torch.Tensor, rigid_motion: object | None,
-    deformation: object | None,
+    geometry: object, vertices: torch.Tensor, rigid_motion: RigidMotion | None,
+    deformation: DeformationState | None,
 ) -> torch.Tensor:
     """Apply a snapshot's deformation and rigid motion to a structure's world vertices."""
 
@@ -1717,7 +1781,7 @@ def _face_id_columns(
         if authored is None and kept is None:
             continue
         if authored is None:
-            values = (int(structure.structure_id) << 32) | kept
+            values = (int(structure.structure_id) << 32) | cast(torch.Tensor, kept)
         else:
             values = torch.tensor(authored, dtype=torch.int64)
             if kept is not None:
@@ -1770,7 +1834,7 @@ def _compile_geometry(
     )
 
 
-def _real(value):
+def _real(value: complex | float | torch.Tensor) -> float | torch.Tensor:
     if isinstance(value, complex):
         return value.real
     if isinstance(value, torch.Tensor) and value.is_complex():
@@ -1778,7 +1842,9 @@ def _real(value):
     return value
 
 
-def _sigma_from_eps(value, frequency_hz: float):
+def _sigma_from_eps(
+    value: complex | float | torch.Tensor, frequency_hz: float,
+) -> float | torch.Tensor:
     if isinstance(value, complex):
         imaginary = value.imag
     elif isinstance(value, torch.Tensor) and value.is_complex():
@@ -1915,12 +1981,16 @@ def _compile_materials(
     records = tuple(
         _material_record(material, frequency_hz) for material in material_specs
     )
-    layer_rows = [row for record in records for row in record["layers"]]
+    layer_rows = [
+        row
+        for record in records
+        for row in cast("tuple[tuple[object, ...], ...]", record["layers"])
+    ]
     offsets: list[int] = []
     counts: list[int] = []
     offset = 0
     for record in records:
-        rows = record["layers"]
+        rows = cast("tuple[tuple[object, ...], ...]", record["layers"])
         offsets.append(offset)
         counts.append(len(rows))
         offset += len(rows)
@@ -1933,7 +2003,7 @@ def _compile_materials(
 
     def rough_column(index: int) -> torch.Tensor:
         return _stack(
-            [record["roughness"][index] for record in records],
+            [cast("tuple[object, ...]", record["roughness"])[index] for record in records],
             dtype=torch.float32,
         )
 
@@ -2284,6 +2354,7 @@ def record_dropped_faces(result: _ResultT, compiled: CompiledScene) -> _ResultT:
 
     dropped = compiled.dropped_faces
     if any(dropped.values()):
+        # Every solver result has a metadata dict; the result type is generic here.
         result.metadata["dropped_faces"] = dict(dropped)  # type: ignore[attr-defined]
     return result
 
@@ -2319,7 +2390,7 @@ def receiver_grid_points(grid: ReceiverGrid, *, reference: torch.Tensor) -> torc
 
 
 def receiver_positions(
-    scene: object, *, device: torch.device, reference: torch.Tensor | None = None,
+    scene: SolverScene, *, device: torch.device, reference: torch.Tensor | None = None,
 ) -> torch.Tensor:
     """Flattened receiver positions from the scene's endpoint store (grids generated natively)."""
 
@@ -2327,7 +2398,7 @@ def receiver_positions(
 
 
 def transmitter_positions(
-    scene: object, *, device: torch.device,
+    scene: SolverScene, *, device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Transmitter positions and powers from the scene's endpoint store."""
 
@@ -2335,7 +2406,9 @@ def transmitter_positions(
     return store.tx_positions, store.tx_power
 
 
-def transmitter_polarizations_as_stored(scene: object, *, device: torch.device) -> torch.Tensor:
+def transmitter_polarizations_as_stored(
+    scene: SolverScene, *, device: torch.device,
+) -> torch.Tensor:
     """Return transmitter polarizations with the scene's stored dtype and layout."""
 
     return endpoint_store(scene, device=device).tx_polarizations_stored

@@ -119,23 +119,6 @@ def test_straight_transmission_chains_ad_requires_live_vertices() -> None:
         )
 
 
-def test_straight_transmission_chains_has_no_python_march_or_fallback() -> None:
-    source = inspect.getsource(transmission.straight_transmission_chains)
-    assert source.count("rayd_segment_penetration_forward(") == 1
-    assert source.count("rayd_segment_penetration_ad(") == 1
-    for forbidden in (
-        "for ",
-        "while ",
-        ".item(",
-        ".cpu(",
-        ".numpy(",
-        "torch.nonzero",
-        "rayd_intersect_forward",
-        "except ",
-    ):
-        assert forbidden not in source
-
-
 def test_transmission_component_map_flattens_pair_major_and_shares_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -252,3 +235,19 @@ def test_transmission_component_map_flattens_pair_major_and_shares_state(
     assert product[16] is state
     assert product[17]["frequency_hz"] == 3.5e9
     torch.testing.assert_close(result, scaled_power.reshape(2, 3), rtol=0.0, atol=0.0)
+
+
+def test_straight_transmission_chains_has_no_python_march_or_fallback() -> None:
+    source = inspect.getsource(transmission.straight_transmission_chains)
+    assert source.count("rayd_segment_penetration_forward(") == 1
+    assert source.count("rayd_segment_penetration_ad(") == 1
+    for forbidden in (
+        "for ",
+        "while ",
+        ".item(",
+        ".cpu(",
+        ".numpy(",
+        "torch.nonzero",
+        "except ",
+    ):
+        assert forbidden not in source

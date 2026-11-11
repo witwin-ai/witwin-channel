@@ -13,14 +13,15 @@ from dataclasses import (
 )
 from typing import (
     Any,
+    Protocol,
     TYPE_CHECKING,
     TypedDict,
+    cast,
 )
 
 import torch
 
 from witwin.core import PhaseScreen
-from witwin.core import SurfaceRoughness  # noqa: F401 - legacy reachable global
 from witwin.core import normalize_vec3
 
 from witwin.channel.constants import C0
@@ -37,7 +38,6 @@ from witwin.channel.interactions.reflection import (
     reflection_plane_groups,
 )
 from witwin.channel.interactions.transmission import (
-    _EVENT_PROBABILITY_FLOOR,
     scale_aware_epsilon,
     scene_diagonal_m,
 )
@@ -45,13 +45,9 @@ from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel.kernels import materials as material_kernels
 from witwin.channel.kernels import scattering as scattering_kernels
 from witwin.channel.kernels import topology as topology_kernels
-from witwin.channel.kernels.montecarlo import bdpt_counter_uniforms
 from witwin.channel.kernels.scattering import (
     mc_scattering_pair_legs,
     mc_scattering_pair_sum,
-    scattering_event_probabilities,
-    scattering_table_eval_ad,
-    scattering_table_sample,
 )
 from witwin.channel.materials import (
     face_material_field_bundle,
@@ -71,42 +67,38 @@ from witwin.channel.propagation.rows import (
     PathTopology,
 )
 from witwin.channel.propagation.topology import EvaluatedPathSidecars
-from witwin.channel.scene import resources as scene_resources
 from witwin.channel.scene.endpoints import require_compiled
 from witwin.channel.scene.resources import (
-    KirchhoffTable,  # noqa: F401 - legacy reachable global
     RoughMaterialRuntime,
     realization_phase_screens,
 )
 
 if TYPE_CHECKING:
+    from witwin.channel.scene.compiler import CompiledScene
     from witwin.channel.scene.endpoints import SolverScene as Scene
+    from witwin.channel.scene.resources import RayDSceneResource
+
+    class _EndpointTensors(Protocol):
+        """The explicit endpoint batch a propagation consumer passes in."""
+
+        tx_positions: torch.Tensor
+        tx_power: torch.Tensor
+        tx_polarizations: torch.Tensor
+        rx_positions: torch.Tensor
+        rx_polarizations: torch.Tensor
 
 __all__ = [
     "ChainSamples",
     "KMAX_AD_DEPTH",
-    "MASK_SCATTERING",
-    "SCATTERING_COMPONENT_ID",
-    "SCATTERING_EVENT_TYPE",
     "RoughMaterialRuntime",
     "ScatterChainDiscovery",
     "append_chain_scattering_paths",
     "append_scattering_evaluated_paths",
     "build_chain_samples",
     "discover_scatter_chains",
-    "eval_bsdf_rows",
     "local_frames",
-    "solid_angle_to_area_jacobian",
-    "local_to_world",
     "rough_material_runtimes",
-    "sample_scatter_directions",
-    "scatter_carried_incident_power",
-    "scatter_direction_uniforms",
-    "scattered_subpath_state",
     "scattering_map_matrix",
-    "scattering_nee_connection_samples",
-    "te_tm_incident_power",
-    "three_way_rough_probabilities",
     "world_to_local",
 ]
 
@@ -265,7 +257,9 @@ def _offset_eps(points: torch.Tensor, scene_diagonal: torch.Tensor) -> torch.Ten
     ).clamp_min(1.0e-6)
 
 
-def _visible(rayd: object, start: torch.Tensor, end: torch.Tensor) -> tuple[torch.Tensor, int]:
+def _visible(
+    rayd: RayDSceneResource, start: torch.Tensor, end: torch.Tensor,
+) -> tuple[torch.Tensor, int]:
     """Chunked segment visibility; returns (mask, launch_count)."""
 
     count = int(start.shape[0])
@@ -362,7 +356,7 @@ class _RowCollector:
 
 
 def _ensemble_rows(
-    scene: Scene, compiled: object, config: TopologyConfig, collector: _RowCollector, *,
+    scene: Scene, compiled: CompiledScene, config: TopologyConfig, collector: _RowCollector, *,
     tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor,
     tx_pol: torch.Tensor, rx_pol: torch.Tensor, ensemble_faces: torch.Tensor,
     scene_diagonal: torch.Tensor, info: dict[str, Any], ad_mode: str = "none",
@@ -520,7 +514,7 @@ def _ensemble_rows(
             if ad_enabled:
                 evaluated = scattering_kernels.scattering_ensemble_eval_ad(
                     *ensemble_args,
-                    coef=float(tx_power[tx_index]) * coef_scale_t,
+                    coef=float(tx_power[tx_index]) * cast(torch.Tensor, coef_scale_t),
                     threshold=max(threshold, 0.0),
                 )
             else:
@@ -597,7 +591,7 @@ def _subdivide_face(
 
 
 def _realization_rows(
-    scene: Scene, compiled: object, config: TopologyConfig, collector: _RowCollector, *,
+    scene: Scene, compiled: CompiledScene, config: TopologyConfig, collector: _RowCollector, *,
     tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor,
     tx_pol: torch.Tensor, rx_pol: torch.Tensor, screens: dict[int, PhaseScreen],
     scene_diagonal: torch.Tensor, info: dict[str, Any], ad_mode: str = "none",
@@ -1048,7 +1042,7 @@ def _scattering_info() -> dict[str, Any]:
 
 def _collect_scattering_rows(
     scene: Scene, config: TopologyConfig, *, device: torch.device, info: dict[str, Any],
-    ad_mode: str = "none", endpoint_tensors: object | None = None,
+    ad_mode: str = "none", endpoint_tensors: _EndpointTensors | None = None,
 ) -> tuple[dict[str, torch.Tensor] | None, int, int, int]:
     compiled = require_compiled(scene)
     screens = realization_phase_screens(compiled.materials, compiled.assignments)
@@ -1165,7 +1159,7 @@ def _collect_scattering_rows(
 
 def append_scattering_evaluated_paths(
     scene: Scene, config: TopologyConfig, evaluated: EvaluatedPaths,
-    sidecars: EvaluatedPathSidecars, *, endpoint_tensors: object | None = None,
+    sidecars: EvaluatedPathSidecars, *, endpoint_tensors: _EndpointTensors | None = None,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars, dict[str, Any]]:
     """Append scattering rows to canonical typed path contracts."""
 
@@ -1501,7 +1495,7 @@ def _budget_chain_rows(
 
 
 def build_chain_samples(
-    compiled: object, config: "TopologyConfig", ensemble_faces: torch.Tensor, *,
+    compiled: CompiledScene, config: "TopologyConfig", ensemble_faces: torch.Tensor, *,
     device: torch.device,
 ) -> ChainSamples | None:
     """Draw the chain-sample vertex set on the ensemble scatter faces.
@@ -1567,7 +1561,7 @@ class _ReflectionGeometry:
     face_group_id: torch.Tensor
 
 
-def _reflection_geometry(compiled: object, device: torch.device) -> _ReflectionGeometry:
+def _reflection_geometry(compiled: CompiledScene, device: torch.device) -> _ReflectionGeometry:
     records = compiled.rayd.edge_records()
     vertices = records.vertices
     faces = records.faces.contiguous()
@@ -1620,7 +1614,7 @@ def _polyline_length(
     return seg
 
 
-def _visibility(rayd: object, start: torch.Tensor, end: torch.Tensor) -> torch.Tensor:
+def _visibility(rayd: RayDSceneResource, start: torch.Tensor, end: torch.Tensor) -> torch.Tensor:
     count = int(start.shape[0])
     if count == 0:
         return torch.empty((0,), device=start.device, dtype=torch.bool)
@@ -1715,8 +1709,8 @@ def _leg_batch(
 
 
 def _gather_leg(
-    *, compiled: object, geom: _ReflectionGeometry, source: torch.Tensor, samples: ChainSamples,
-    scene_diagonal: torch.Tensor, max_leg_depth: int, reverse: bool,
+    *, compiled: CompiledScene, geom: _ReflectionGeometry, source: torch.Tensor,
+    samples: ChainSamples, scene_diagonal: torch.Tensor, max_leg_depth: int, reverse: bool,
 ) -> dict[str, torch.Tensor]:
     """Enumerate specular reflection chains ``source -> {samples}`` at every leg
     depth ``0..max_leg_depth`` and pack them into a concatenated padded leg table.
@@ -1794,8 +1788,9 @@ def _gather_leg(
 
 
 def _gather_leg_order1(
-    *, compiled: object, geom: _ReflectionGeometry, source: torch.Tensor, samples: ChainSamples,
-    tx_power_ref: torch.Tensor, reverse: bool, batches: list[dict[str, torch.Tensor]],
+    *, compiled: CompiledScene, geom: _ReflectionGeometry, source: torch.Tensor,
+    samples: ChainSamples, tx_power_ref: torch.Tensor, reverse: bool,
+    batches: list[dict[str, torch.Tensor]],
 ) -> None:
     groups = geom.groups
     group_count = int(groups["group_count"])
@@ -1872,8 +1867,8 @@ def _gather_leg_order1(
 
 
 def _gather_leg_multibounce(
-    *, compiled: object, geom: _ReflectionGeometry, source: torch.Tensor, samples: ChainSamples,
-    tx_power_ref: torch.Tensor, max_leg_depth: int, reverse: bool,
+    *, compiled: CompiledScene, geom: _ReflectionGeometry, source: torch.Tensor,
+    samples: ChainSamples, tx_power_ref: torch.Tensor, max_leg_depth: int, reverse: bool,
     batches: list[dict[str, torch.Tensor]],
 ) -> None:
     groups = geom.groups
@@ -1953,7 +1948,7 @@ def _gather_leg_multibounce(
 
 
 def _trace_group_chains(
-    rayd: object, tx: torch.Tensor, *, face_group_id: torch.Tensor, max_depth: int,
+    rayd: RayDSceneResource, tx: torch.Tensor, *, face_group_id: torch.Tensor, max_depth: int,
     ray_count: int = 262_144,
 ) -> torch.Tensor:
     """Trace specular chains from a source and map hits to plane-group ids.
@@ -1986,7 +1981,7 @@ def _trace_group_chains(
 
 
 def discover_scatter_chains(
-    compiled: object, config: "TopologyConfig", *, tx_positions: torch.Tensor,
+    compiled: CompiledScene, config: "TopologyConfig", *, tx_positions: torch.Tensor,
     rx_positions: torch.Tensor, samples: ChainSamples, scene_diagonal: torch.Tensor,
 ) -> ScatterChainDiscovery | None:
     """Enumerate and join C1/C2 specular chains around each chain vertex.
@@ -2036,7 +2031,7 @@ def discover_scatter_chains(
 
 
 def _enumerate_leg_tables(
-    *, compiled: object, geom: "_ReflectionGeometry", tx_positions: torch.Tensor,
+    *, compiled: CompiledScene, geom: "_ReflectionGeometry", tx_positions: torch.Tensor,
     rx_positions: torch.Tensor, samples: ChainSamples, scene_diagonal: torch.Tensor,
     max_leg_depth: int,
 ) -> tuple[list[dict[str, torch.Tensor]], list[dict[str, torch.Tensor]]]:
@@ -2227,19 +2222,10 @@ def _assemble_discovery(merged: dict[str, torch.Tensor]) -> ScatterChainDiscover
 # phase-screen assignment resolver so the two paths never diverge.
 
 
-# coherent scattering has never been reachable from this append path. Before the kernel
-# facades were lifted into ``witwin.channel.kernels``, the Op A ``_ad`` probe
-# below read the single-bounce ``scattering/kernels/autograd.py`` namespace,
-# which never carried a chain symbol, so ``ad_mode != "none"`` always refused
-# here and the AD dispatch a few lines further down was unreachable. The
-# facades are one module now, so that refusal is stated instead of implied.
-# Turning it on is an coherent scattering numerical decision with its own acceptance
-# evidence, not a layout move.
-_ADR021_D5_CHAIN_AD_WIRED = False
 
 
 def _ensemble_scatter_faces(
-    compiled: object, screens: dict[int, PhaseScreen], *, device: torch.device,
+    compiled: CompiledScene, screens: dict[int, PhaseScreen], *, device: torch.device,
 ) -> torch.Tensor:
     """Ensemble (non-realization) rough scatter faces (single-bounce parity)."""
 
@@ -2312,8 +2298,8 @@ def _chain_vertex_frame(
 
 
 def _chain_ensemble_evaluate(
-    scene: Scene, compiled: object, config: TopologyConfig, discovery: ScatterChainDiscovery, *,
-    tx_pol: torch.Tensor, rx_pol: torch.Tensor, tx_positions: torch.Tensor,
+    scene: Scene, compiled: CompiledScene, config: TopologyConfig, discovery: ScatterChainDiscovery,
+    *, tx_pol: torch.Tensor, rx_pol: torch.Tensor, tx_positions: torch.Tensor,
     rx_positions: torch.Tensor, tx_power: torch.Tensor, device: torch.device, ad_mode: str,
 ) -> dict[str, torch.Tensor]:
     """Dispatch the native coherent scattering chain-ensemble kernel per transmitter.
@@ -2328,21 +2314,14 @@ def _chain_ensemble_evaluate(
     convention (with the ``1/(L1^2 L2^2)`` spreading applied in-kernel).
     """
 
-    op_a = getattr(scattering_kernels, "scattering_chain_ensemble_eval", None)
-    op_a_ad = (
-        getattr(scattering_kernels, "scattering_chain_ensemble_eval_ad", None)
-        if _ADR021_D5_CHAIN_AD_WIRED
-        else None
-    )
-    if op_a is None or (ad_mode != "none" and op_a_ad is None):
+    if ad_mode != "none":
         raise RuntimeError(
-            "scattering_chain_max_depth >= 1 requires the native scatter-chain "
-            "operator 'scattering_chain_ensemble_eval', and under ad_mode != 'none' "
-            "also its derivative companion, which this build does not provide; use "
-            f"ad_mode='none' or scattering_chain_max_depth=0 (got ad_mode={ad_mode!r})"
+            "scattering_chain_max_depth >= 1 supports only ad_mode='none': the native "
+            "scatter-chain operator 'scattering_chain_ensemble_eval' has no derivative "
+            f"companion; use ad_mode='none' or scattering_chain_max_depth=0 (got ad_mode={ad_mode!r})"
         )
+    op_a = scattering_kernels.scattering_chain_ensemble_eval
 
-    ad_enabled = ad_mode != "none"
     face_eps, face_sigma, face_mu, face_gain, _valid = face_material_tensors(
         compiled, device=device
     )
@@ -2368,7 +2347,6 @@ def _chain_ensemble_evaluate(
     frequency = float(scene.frequency)
     wavelength = C0 / frequency
     power_scale = wavelength**2 / (4.0 * math.pi) ** 2
-    coef_scale_t = ensemble_coef_scale(scene, device, ad_enabled=ad_enabled)
     threshold = max(float(getattr(config, "scattering_power_threshold", 0.0)), 0.0)
     tx_id = discovery.tx_id.to(torch.int64)
 
@@ -2434,20 +2412,12 @@ def _chain_ensemble_evaluate(
             stack.table_dims,
             stack.material_slot,
         )
-        if ad_enabled:
-            evaluated = op_a_ad(
-                *args,
-                coef=float(tx_power[tx_index]) * coef_scale_t,
-                threshold=threshold,
-                frequency=frequency,
-            )
-        else:
-            evaluated = op_a(
-                *args,
-                coef=float(tx_power[tx_index]) * power_scale,
-                threshold=threshold,
-                frequency_hz=frequency,
-            )
+        evaluated = op_a(
+            *args,
+            coef=float(tx_power[tx_index]) * power_scale,
+            threshold=threshold,
+            frequency_hz=frequency,
+        )
         gain[idx] = evaluated["gain"].to(torch.float32)
         amplitude[idx] = evaluated["amplitude"].to(torch.float32)
         length[idx] = evaluated["length"].to(torch.float32)
@@ -2754,102 +2724,16 @@ def append_chain_scattering_paths(
 
 
 # -------------------------------------------------------------------------
-# Shared Monte Carlo Kirchhoff scattering events (was
-# montecarlo/events/scattering.py)
+# Kirchhoff table helpers shared with the Monte Carlo map
 # -------------------------------------------------------------------------
 #
-# Shared Kirchhoff rough-surface scattering helpers for the MC solvers.
-#
-# Extends the two-way {reflect, transmit} event machinery
-# (:mod:`witwin.channel.interactions.transmission`) to the three-way
-# {reflect, scatter, transmit} selection of surface-event selection at hits on rough
-# faces (``scatter_model_id == 1``), and hosts the pure-torch pieces both MC
-# solvers share: local roughness frames, TE/TM incident power decomposition,
-# per-material Kirchhoff table sampling/eval, and the BDPT scattering NEE
-# connection-row builder.
-#
-# Measure and normalization conventions (documented once, used everywhere):
-#
-# - Event probabilities are proportional to the native energy
-# budgets ``(R_coh, R_diff, T_bar)`` at the hit incidence with the same
-# minimum-probability floor pattern as the two-way split; the
-# selected branch's POWER is divided by its probability (fields by
-# ``sqrt(p)``), keeping the estimator unbiased. Smooth faces
-# (``scatter_model_id != 1``) keep the two-way logic bit-identically:
-# their scatter probability is exactly zero and their transmit probability
-# still comes from the native stack budgets, so the single selection
-# uniform partitions identically.
-# - Scattering contributions are POWER-ONLY (ensemble-average Kirchhoff
-# BSDF): the scattered field carries a unit amplitude as a placeholder that only
-# ever enters ``|field|^2``; no random phase is assigned by the power estimator.
-# - Specular reflection and delta transmission stay discrete events;
-# Kirchhoff scattering is a continuous solid-angle density. The scattered
-# subpath stores ``pdf_forward *= pdf(wo|wi)`` and ``pdf_reverse *=
-# pdf(wi|wo)`` from the SAME reciprocal table with swapped arguments.
-# - Depth rule (BDPT ``max_scattering_order``, coherent scattering):
-# * order 1 (default): scattering is single-bounce. A scattered subpath
-# connects to the receivers (NEE) and terminates; reflection/transmission
-# never follow a scattering event.
-# * order > 1: the terminal rule is lifted. A scattered subpath emits its
-# NEE row and then CONTINUES in its lobe-sampled direction (its power
-# already divided by ``p_scatter * pdf(wo)`` in
-# scattered_subpath_state, and may reflect, transmit, or scatter again
-# up to ``max_scattering_order`` scatter events, emitting an NEE row at
-# every scatter vertex. Because a scatter event clears the Complex3 Jones
-# carrier, a subsequent scatter vertex reads its incident power from the
-# scalar throughput (:func:`scatter_carried_incident_power`), split
-# unpolarized across the local TE/TM channels. Scattering stays power-only
-# and excluded from the coherent combination in both modes.
-#
-# NEE contribution derivation (the BDPT connection convention is
-# ``contribution = source_power * |field|^2 * (lambda/(4*pi*L))^2 / N`` with
-# no 1/r stored in the field, i.e. an isotropic-source picture where the
-# power flux density at unfolded distance ``r1`` is
-# ``source_power * |F|^2 / (4*pi*r1^2)``):
-#
-# g_scatter = Int_wall dA |F|^2 cos_i f_K(wi,wo) cos_o
-# * (lambda/(4*pi))^2 / (r1^2 * r2^2)
-#
-# Monte Carlo over the tx launch directions (uniform sphere, pdf 1/(4*pi))
-# converts solid angle to wall area over the UNFOLDED prefix distance,
-# ``dA = r1^2 dOmega / cos_i`` (specular prefixes preserve the image-source
-# solid-angle measure), so per hitting ray both ``r1^2`` and ``cos_i``
-# cancel:
-#
-# row = source_power * (P_te*f_te + P_tm*f_tm) * cos_o
-# * (lambda/(4*pi))^2 * 4*pi / (r2^2 * p_scatter * N)
-#
-# where ``P_te/P_tm`` are the incident Jones powers in the local s/p basis
-# (the same basis the table's co-pol kernels use) and the division by
-# ``p_scatter`` accounts for NEE being evaluated only on scatter-selected
-# rows. Cross-polarization is not tracked in v1: the
-# receiver is treated as polarization-matched to the scattered power, which
-# keeps BDPT consistent with the unpolarized MC basic map.
-#
-# MIS: the NEE connection is the ONLY strategy that produces a
-# tx->...->scatter->rx path in v1 (the directional continuation terminates
-# without a sensor-intersection strategy, and a point/cell-center sensor has
-# zero probability under the continuous direction density), so the balance
-# heuristic over {directional sample, connection} degenerates to weight 1
-# for the connection rows. The directional density converted to the
-# connection measure is still recorded in the row ``pdf`` for diagnostics
-# and future multi-bounce MIS.
+# Local roughness frames and per-material table lookups. The BDPT sampler's
+# scatter events (three-way selection, lobe sampling, next-event rows) run in
+# the native fused wavefront.
 LIGHT_SPEED_M_PER_S = 299_792_458.0
 
 
-# component classification: component_mask bit and exclusive path-class id.
-MASK_SCATTERING = 16
-SCATTERING_COMPONENT_ID = 6
-# Subpath event_type ids: 0=source, 1=specular reflection, 2=delta
-# transmission (native kernels), 3=continuous Kirchhoff scattering.
-SCATTERING_EVENT_TYPE = 3
-
-# Distinct seed stream for the two direction-sampling uniforms so the event
-# SELECTION uniforms stay bit-identical to the two-way event stream.
-_DEGENERATE_SIN_SQ = 1.0e-12
-
-
-def rough_material_runtimes(compiled: Any) -> dict[int, RoughMaterialRuntime]:
+def rough_material_runtimes(compiled: CompiledScene) -> dict[int, RoughMaterialRuntime]:
     """Kirchhoff runtimes per material index (``scatter_model_id == 1``).
 
     Reads the CSR layers and roughness fields from the compiled
@@ -2858,56 +2742,6 @@ def rough_material_runtimes(compiled: Any) -> dict[int, RoughMaterialRuntime]:
     """
 
     return compiled.rough_material_runtimes
-
-
-def scatter_direction_uniforms(
-    count: int, *, seed: int, tx_index: int, depth: int, device: torch.device,
-) -> torch.Tensor:
-    """Reproducible ``[count, 2]`` uniforms for Kirchhoff direction sampling.
-
-    Native counter-based draws of global samples ``tx_index * count + i`` in a
-    stream distinct from the event-selection uniforms of
-    :func:`witwin.channel.interactions.transmission.event_uniforms`.
-    """
-
-    reference = torch.empty((0,), device=device, dtype=torch.float32)
-    return bdpt_counter_uniforms(
-        reference, int(count), seed=int(seed), first=int(tx_index) * int(count),
-        depth=int(depth), stream="scatter_direction",
-    )
-
-
-def three_way_rough_probabilities(
-    cos_theta: torch.Tensor, material_id: torch.Tensor, material_bundle: dict[str, torch.Tensor],
-    stack: dict[str, torch.Tensor], *, frequency_hz: float, floor: float = _EVENT_PROBABILITY_FLOOR,
-) -> dict[str, torch.Tensor]:
-    """Rough-face three-way event probabilities (surface-event selection).
-
-    Returns row tensors ``p_scatter``, ``p_transmit``, ``r_coh_amplitude``
-    (the coherent attenuation ``C_r`` for the reflect branch field) and the
-    bool ``rough`` mask. Non-rough rows get zeros / False; the caller keeps
-    the two-way probabilities for them so smooth faces stay
-    bit-identical.
-
-    Probability construction per rough row: raw shares proportional to
-    ``(R_coh, R_diff, T_bar)``; every event with a strictly positive budget
-    is floored at ``floor`` and the triple renormalized. Events with a zero
-    budget keep probability zero (never selected, so no division by their
-    probability ever happens).
-    """
-
-    return scattering_event_probabilities(
-        cos_theta.contiguous(),
-        material_id.to(torch.int32).contiguous(),
-        stack["cap_R_te"],
-        stack["cap_R_tm"],
-        stack["cap_T_te"],
-        stack["cap_T_tm"],
-        material_bundle["rough_sigma_h_m"],
-        material_bundle["scatter_model_id"],
-        frequency_hz=float(frequency_hz),
-        probability_floor=float(floor),
-    )
 
 
 def local_frames(normal: torch.Tensor, axis_rad: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -2948,413 +2782,6 @@ def world_to_local(
         ),
         dim=-1,
     )
-
-
-def local_to_world(
-    w: torch.Tensor, t1: torch.Tensor, t2: torch.Tensor, normal: torch.Tensor,
-) -> torch.Tensor:
-    return w[:, 0:1] * t1 + w[:, 1:2] * t2 + w[:, 2:3] * normal
-
-
-def solid_angle_to_area_jacobian(cosine: torch.Tensor, distance: torch.Tensor) -> torch.Tensor:
-    """Return ``|cos(theta)|/r^2`` without folding it into a proposal PDF."""
-
-    return cosine.clamp_min(0.0) / distance.clamp_min(1.0e-6).square()
-
-
-def te_tm_incident_power(
-    field_real: torch.Tensor, field_imag: torch.Tensor, direction: torch.Tensor,
-    normal: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Incident Jones powers ``(P_te, P_tm)`` in the local s/p basis.
-
-    ``direction`` is the propagation direction into the surface, ``normal``
-    the mean-plane normal flipped toward the incident side. ``s =
-    normalize(direction x normal)`` with a
-    deterministic substitute basis at normal incidence,
-    ``p = s x direction``. Any
-    longitudinal residual of the field is dropped by the projection (the
-    Jones carriers are transverse by construction).
-    """
-
-    s = torch.linalg.cross(direction, normal)
-    s_norm_sq = (s * s).sum(dim=-1, keepdim=True)
-    substitute, _ = local_frames(
-        direction, torch.zeros(direction.shape[0], device=direction.device)
-    )
-    s = torch.where(
-        s_norm_sq > _DEGENERATE_SIN_SQ,
-        normalize_vec3(s),
-        substitute,
-    )
-    p = torch.linalg.cross(s, direction)
-    p_te = (field_real * s).sum(dim=-1) ** 2 + (field_imag * s).sum(dim=-1) ** 2
-    p_tm = (field_real * p).sum(dim=-1) ** 2 + (field_imag * p).sum(dim=-1) ** 2
-    return p_te, p_tm
-
-
-def scatter_carried_incident_power(
-    throughput_real: torch.Tensor, throughput_imag: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Unpolarized incident ``(P_te, P_tm)`` of an already-scattered subpath.
-
-    A scatter event clears the Complex3 Jones carrier (scattering is power-only
-    in v1) and moves the transported power into the scalar throughput, so a
-    FURTHER scatter vertex on the same multi-order subpath (coherent scattering) reads
-    its incident power from the throughput rather than the zeroed field. The
-    carried power is unpolarized, so it is split evenly across the local TE/TM
-    channels; both halves feed the same ``P_te*f_te + P_tm*f_tm`` NEE kernel and
-    the continuation's polarization-weighted BSDF as the single-bounce field
-    decomposition (:func:`te_tm_incident_power`) does at the first scatter."""
-
-    power = throughput_real**2 + throughput_imag**2
-    half = 0.5 * power
-    return half, half
-
-
-def _grouped_rows(
-    valid: torch.Tensor, material_id: torch.Tensor, runtimes: dict[int, RoughMaterialRuntime],
-) -> list[tuple[RoughMaterialRuntime, torch.Tensor, torch.Tensor]]:
-    groups = []
-    for index, runtime in runtimes.items():
-        material_valid = valid & (material_id == index)
-        rows = torch.nonzero(material_valid, as_tuple=False).flatten()
-        if int(rows.numel()):
-            groups.append(
-                (runtime, rows, material_valid.index_select(0, rows).contiguous())
-            )
-    return groups
-
-
-def sample_scatter_directions(
-    valid: torch.Tensor, material_id: torch.Tensor, wi_local: torch.Tensor, uniforms: torch.Tensor,
-    runtimes: dict[int, RoughMaterialRuntime],
-) -> dict[str, torch.Tensor]:
-    """Per-material Kirchhoff CDF sampling of local outgoing directions.
-
-    Returns ``wo_local`` plus the continuous forward density
-    ``pdf(wo|wi)`` and the swapped-argument reverse density ``pdf(wi|wo)``.
-    Rows without a rough material keep zeros.
-    """
-
-    count = int(material_id.shape[0])
-    device = wi_local.device
-    wo_local = torch.zeros((count, 3), device=device, dtype=torch.float32)
-    pdf_forward = torch.zeros((count,), device=device, dtype=torch.float32)
-    pdf_reverse = torch.zeros((count,), device=device, dtype=torch.float32)
-    for runtime, rows, valid_rows in _grouped_rows(valid, material_id, runtimes):
-        wi_rows = wi_local.index_select(0, rows).contiguous()
-        sampled = scattering_table_sample(
-            valid_rows,
-            wi_rows,
-            uniforms.index_select(0, rows).contiguous(),
-            runtime.table.marginal_cdf,
-            runtime.table.conditional_cdf,
-            runtime.table.sample_density,
-        )
-        wo_rows = sampled["wo"]
-        wo_local[rows] = wo_rows
-        pdf_forward[rows] = sampled["pdf_forward"]
-        pdf_reverse[rows] = sampled["pdf_reverse"]
-    return {
-        "wo_local": wo_local,
-        "pdf_forward": pdf_forward,
-        "pdf_reverse": pdf_reverse,
-    }
-
-
-def eval_bsdf_rows(
-    valid: torch.Tensor, material_id: torch.Tensor, wi_local: torch.Tensor, wo_local: torch.Tensor,
-    runtimes: dict[int, RoughMaterialRuntime], *, ad: bool = False, ledger: object | None = None,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Batched ``(f_te, f_tm)`` lookups grouped by rough material.
-
-    Under ``ad`` the native forward is dispatched behind :func:`scattering_table_eval_ad` so the resident table values keep their
-    gradient (scattering AD); the plain (``ad`` off) path is bitwise unchanged.
-    """
-
-    count = int(material_id.shape[0])
-    device = wi_local.device
-    f_te = torch.zeros((count,), device=device, dtype=torch.float32)
-    f_tm = torch.zeros((count,), device=device, dtype=torch.float32)
-    for runtime, rows, valid_rows in _grouped_rows(valid, material_id, runtimes):
-        wi_rows = wi_local.index_select(0, rows).contiguous()
-        wo_rows = wo_local.index_select(0, rows).contiguous()
-        if ad:
-            if ledger is not None:
-                ledger.add(
-                    runtime.table.f_te, runtime.table.f_tm, wi_rows, wo_rows
-                )
-            te_rows, tm_rows = scattering_table_eval_ad(
-                valid_rows,
-                wi_rows,
-                wo_rows,
-                runtime.table.f_te,
-                runtime.table.f_tm,
-            )
-        else:
-            te_rows, tm_rows = scene_resources.eval_bsdf(
-                runtime.table, valid_rows, wi_rows, wo_rows
-            )
-        f_te[rows] = te_rows
-        f_tm[rows] = tm_rows
-    return f_te, f_tm
-
-
-def scattering_nee_connection_samples(
-    rayd: Any, sensor: dict[str, torch.Tensor], runtimes: dict[int, Any], *, position: torch.Tensor,
-    normal: torch.Tensor, frame_t1: torch.Tensor, frame_t2: torch.Tensor, wi_local: torch.Tensor,
-    p_te: torch.Tensor, p_tm: torch.Tensor, p_scatter: torch.Tensor, material_id: torch.Tensor,
-    source_power: torch.Tensor, tx_id: torch.Tensor, light_depth: torch.Tensor,
-    path_length_at_vertex: torch.Tensor, frequency_hz: float | torch.Tensor, samples: int,
-    scene_diagonal: float, ad: bool = False, ledger: object | None = None,
-) -> dict[str, torch.Tensor] | None:
-    """NEE connection rows from scatter-selected vertices (component 6).
-
-    Assembled in torch instead of the native endpoint-connection kernel
-    because scattering needs a PER-SENSOR BSDF re-evaluation f_K(wi, w_rx)
-    and the 1/(r1^2*r2^2) double-spreading geometry, neither of which the
-    delta-event connection kernel (single per-vertex field, unfolded
-    1/(r1+r2)^2 spreading, sampled-direction hemisphere gate) can express.
-
-    Row value (derivation in the module docstring):
-    source_power * (P_te*f_te + P_tm*f_tm) * cos_o
-    * (lambda/(4*pi))^2 * 4*pi / (r2^2 * p_scatter * N)
-    The unfolded prefix distance r1 and cos_theta_i cancel against the
-    solid-angle-to-area Jacobian of the uniform-sphere launch density.
-    mis_weight is 1: the connection is the only strategy with nonzero
-    density for a scattered vertex in v1 (single-bounce termination, point
-    sensors); the directional density converted to the connection measure
-    is recorded in ``pdf`` for diagnostics.
-    """
-
-    vertex_count = int(position.shape[0])
-    sensor_count = int(sensor["origin"].shape[0])
-    if vertex_count == 0 or sensor_count == 0:
-        return None
-    # scattering AD: under ad the radiometric lambda factor is built from the
-    # live frequency tensor so its gradient flows through amplitude^2; the primal
-    # path reads the detached host scalar and is bitwise unchanged (mirrors
-    # scattering_map_matrix for MC-basic).
-    wavelength = LIGHT_SPEED_M_PER_S / (frequency_hz if ad else float(frequency_hz))
-    # Light-major layout (vertex * sensor_count + sensor), matching the
-    # native endpoint connection tables.
-    rx_origin = sensor["origin"]  # [R, 3]
-    delta = rx_origin[None, :, :] - position[:, None, :]  # [S, R, 3]
-    r2 = delta.norm(dim=-1).clamp_min(1.0e-6)
-    wo_world = delta / r2[..., None]
-    cos_o = (wo_world * normal[:, None, :]).sum(dim=-1)
-    front = cos_o > 0.0
-
-    def flat(t: torch.Tensor) -> torch.Tensor:
-        return t.reshape(vertex_count * sensor_count, *t.shape[2:])
-
-    def expand_rows(t: torch.Tensor) -> torch.Tensor:
-        return t[:, None].expand(vertex_count, sensor_count, *t.shape[1:])
-
-    wo_flat = flat(wo_world).contiguous()
-    wo_local = torch.stack(
-        (
-            (wo_flat * flat(expand_rows(frame_t1))).sum(dim=-1),
-            (wo_flat * flat(expand_rows(frame_t2))).sum(dim=-1),
-            (wo_flat * flat(expand_rows(normal))).sum(dim=-1),
-        ),
-        dim=-1,
-    )
-    wi_rows = flat(expand_rows(wi_local)).contiguous()
-    material_rows = flat(expand_rows(material_id)).contiguous()
-    rx_id_rows = sensor["rx_id"][None, :].expand(vertex_count, sensor_count)
-    bsdf_valid = (
-        flat(front)
-        & flat(expand_rows(tx_id >= 0))
-        & (flat(rx_id_rows) >= 0)
-        & flat(sensor["valid"][None, :].expand(vertex_count, sensor_count))
-    )
-    f_te, f_tm = eval_bsdf_rows(
-        bsdf_valid,
-        material_rows,
-        wi_rows,
-        wo_local.contiguous(),
-        runtimes,
-        ad=ad,
-        ledger=ledger,
-    )
-
-    p_te_rows = flat(expand_rows(p_te))
-    p_tm_rows = flat(expand_rows(p_tm))
-    power_kernel = p_te_rows * f_te + p_tm_rows * f_tm
-    amplitude = wavelength / (4.0 * math.pi)
-    geometry = (
-        flat(cos_o).clamp_min(0.0)
-        * (amplitude * amplitude)
-        * (4.0 * math.pi)
-        / (flat(r2) ** 2)
-    )
-    p_s_rows = flat(expand_rows(p_scatter)).clamp_min(1.0e-4)
-    contribution = (
-        flat(expand_rows(source_power))
-        * power_kernel
-        * geometry
-        / (p_s_rows * float(max(1, int(samples))))
-    )
-
-    valid = (
-        flat(front)
-        & flat(expand_rows(tx_id >= 0))
-        & (flat(rx_id_rows) >= 0)
-        & flat(sensor["valid"][None, :].expand(vertex_count, sensor_count))
-        & (contribution > 0.0)
-    )
-    if not bool(valid.any()):
-        return None
-
-    # Visibility: offset the surface start point along the connection
-    # direction with the contract scale-aware epsilon so the rough face
-    # never occludes its own connection.
-    epsilon = scale_aware_epsilon(
-        flat(expand_rows(position)), scene_diagonal=scene_diagonal
-    )
-    start = flat(expand_rows(position)) + wo_flat * epsilon[:, None]
-    end = flat(rx_origin[None, :, :].expand(vertex_count, sensor_count, 3)).contiguous()
-    visible = geometry_kernels.rayd_visibility_forward(
-        rayd.require_resource(),
-        start.contiguous(),
-        end,
-        valid.contiguous(),
-    )[0]
-    valid = valid & visible
-    contribution = torch.where(valid, contribution, torch.zeros_like(contribution))
-
-    # Store only the sampled proposal density. The solid-angle-to-area
-    # Jacobian is a geometry conversion and is deliberately kept out of the
-    # public ``pdf`` diagnostic.
-    pdf_omega = torch.zeros_like(contribution)
-    for index, runtime in runtimes.items():
-        rows = torch.nonzero(material_rows == index, as_tuple=False).flatten()
-        if int(rows.numel()) == 0:
-            continue
-        pdf_omega[rows] = scene_resources.pdf(
-            runtime.table,
-            valid.index_select(0, rows).contiguous(),
-            wi_rows.index_select(0, rows),
-            wo_local.index_select(0, rows).contiguous(),
-        )
-    pdf_dir = p_s_rows * pdf_omega
-    mis_weight = torch.where(
-        valid, torch.ones_like(contribution), torch.zeros_like(contribution)
-    )
-
-    tx_rows = flat(expand_rows(tx_id)).to(torch.int32)
-    rx_rows = flat(rx_id_rows).to(torch.int32)
-    grid_rows = flat(
-        sensor["grid_linear_id"][None, :].expand(vertex_count, sensor_count)
-    ).to(torch.int32)
-    depth_rows = flat(expand_rows(light_depth)).to(torch.int32)
-    zero_depth = torch.zeros_like(depth_rows)
-    component = torch.full_like(tx_rows, SCATTERING_COMPONENT_ID)
-    path_length = flat(expand_rows(path_length_at_vertex)) + flat(r2)
-    block = {
-        "topology": torch.stack((tx_rows, rx_rows, component, depth_rows), dim=1),
-        "contribution": contribution,
-        "pdf": torch.where(valid, pdf_dir, torch.zeros_like(pdf_dir)),
-        "mis_weight": mis_weight,
-        "component_id": component,
-        "valid": valid,
-        "tx_id": tx_rows,
-        "rx_id": rx_rows,
-        "grid_linear_id": grid_rows,
-        "light_depth": depth_rows,
-        "sensor_depth": zero_depth,
-        "path_length_m": path_length,
-    }
-    return {key: value.contiguous() for key, value in block.items()}
-
-
-def scattered_subpath_state(
-    state: dict[str, torch.Tensor], hit: dict[str, torch.Tensor], *, choose_scatter: torch.Tensor,
-    normal: torch.Tensor, frame_t1: torch.Tensor, frame_t2: torch.Tensor, wi_local: torch.Tensor,
-    p_te: torch.Tensor, p_tm: torch.Tensor, p_scatter: torch.Tensor, material_id: torch.Tensor,
-    runtimes: dict[int, Any], uniforms: torch.Tensor, scene_diagonal: float, ad: bool = False,
-    ledger: object | None = None,
-) -> dict[str, torch.Tensor]:
-    """Continued light subpath after a Kirchhoff scattering event.
-
-    Assembled directly in torch with the native subpath tensor layout (no
-    native kernel: the update is gather+FMA on the sampled table values).
-    Scattering contributions are POWER-ONLY ensemble estimates. No coherent
-    phase or cross-polarized Jones amplitude is available from the current
-    Kirchhoff table, so the Complex3 carrier is explicitly cleared instead of
-    manufacturing a zero-phase field.
-
-    Post-scatter carrier semantics (coherent scattering): the scattered subpath's
-    ``throughput_real`` is seeded from the FIELD-BASED incident power at this
-    vertex (``sqrt(p_te + p_tm)``, which excludes ``source_power`` - the
-    connection convention multiplies ``source_power`` separately), times the
-    unbiased continuation amplitude ``sqrt(f_weighted * cos_o / (pdf * p))``.
-    From this vertex on, ``|throughput|^2`` IS the authoritative unpolarized
-    power weight of the subpath: subsequent specular events scale it by
-    ``sqrt(gain * R_eff)`` at the actual incidence angle, which is the exact
-    unpolarized power transport. The PRE-scatter throughput remains the
-    sampling proxy of the sampling behavior and is deliberately not consumed
-    here.
-    """
-
-    scatter_valid = choose_scatter & state["valid"]
-    sampled = sample_scatter_directions(
-        scatter_valid, material_id, wi_local, uniforms, runtimes
-    )
-    wo_local = sampled["wo_local"]
-    pdf_forward = sampled["pdf_forward"]
-    wo_world = local_to_world(wo_local, frame_t1, frame_t2, normal)
-    f_te, f_tm = eval_bsdf_rows(
-        scatter_valid,
-        material_id,
-        wi_local,
-        wo_local,
-        runtimes,
-        ad=ad,
-        ledger=ledger,
-    )
-    incident_power = (p_te + p_tm).clamp_min(1.0e-20)
-    f_weighted = (p_te * f_te + p_tm * f_tm) / incident_power
-    cos_o = wo_local[:, 2].clamp_min(0.0)
-    power_scale = (
-        f_weighted
-        * cos_o
-        / (pdf_forward.clamp_min(1.0e-12) * p_scatter.clamp_min(1.0e-4))
-    )
-    valid = choose_scatter & (pdf_forward > 0.0) & (cos_o > 0.0) & state["valid"]
-    amplitude_scale = torch.where(
-        valid, power_scale.sqrt(), torch.zeros_like(power_scale)
-    )
-
-    epsilon = scale_aware_epsilon(hit["p"], scene_diagonal=scene_diagonal)
-    origin = hit["p"] + wo_world * epsilon[:, None]
-    scattered = dict(state)
-    scattered["origin"] = origin
-    scattered["direction"] = wo_world
-    scattered["field_real"] = torch.zeros_like(state["field_real"])
-    scattered["field_imag"] = torch.zeros_like(state["field_imag"])
-    # Seed the post-scatter carrier from the field-based incident power at
-    # this vertex, NOT from the pre-scatter proxy throughput: the proxy
-    # includes sqrt(tx_power) (double-counted by the connection convention's
-    # separate source_power factor) and approximates the polarized specular
-    # chain, while (p_te + p_tm) is exact for the first scatter and is the
-    # carried unpolarized power for later scatters on the same subpath.
-    incident_amp = incident_power.sqrt()
-    scattered["throughput_real"] = incident_amp * amplitude_scale
-    scattered["throughput_imag"] = torch.zeros_like(incident_amp)
-    scattered["pdf_forward"] = state["pdf_forward"] * p_scatter * pdf_forward
-    scattered["pdf_reverse"] = state["pdf_reverse"] * p_scatter * sampled["pdf_reverse"]
-    scattered["depth"] = state["depth"] + 1
-    scattered["component_mask"] = state["component_mask"] | MASK_SCATTERING
-    scattered["event_type"] = torch.full_like(
-        state["event_type"], SCATTERING_EVENT_TYPE
-    )
-    scattered["primitive_id"] = hit["global_prim_id"]
-    scattered["path_length"] = state["path_length"] + hit["t"].clamp_min(0.0)
-    scattered["valid"] = valid
-    return scattered
 
 
 # (receiver, sample) pairs per native scattering launch.
@@ -3497,7 +2924,7 @@ def scattering_map_matrix(
         active = candidates & visible_tx
         tx_visible.append(active.sum())
         incident = torch.where(active, cos_i / (r1 * r1), torch.zeros_like(cos_i))
-        samples = (
+        pair_samples = (
             points.contiguous(),
             normal_flipped.contiguous(),
             frame_t1.contiguous(),
@@ -3512,13 +2939,13 @@ def scattering_map_matrix(
         sums: list[torch.Tensor] = []
         for start in range(0, rx_count, rx_chunk):
             cells = receivers[start : start + rx_chunk]
-            leg_start, leg_end, pair_active = mc_scattering_pair_legs(samples, tables, cells)
+            leg_start, leg_end, pair_active = mc_scattering_pair_legs(pair_samples, tables, cells)
             visible_rx = geometry_kernels.rayd_visibility_forward(
                 handle, leg_start, leg_end, pair_active
             )[0]
             sums.append(
                 mc_scattering_pair_sum(
-                    samples,
+                    pair_samples,
                     tables,
                     cells,
                     (pair_active & visible_rx).contiguous(),

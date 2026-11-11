@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, ClassVar, Protocol
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol, cast
 
 import torch
 from witwin.channel.components import (
@@ -85,6 +85,7 @@ from witwin.channel.scene.compiler import (
 )
 
 if TYPE_CHECKING:
+    from witwin.channel.scene.compiler import CompiledScene
     from witwin.channel.scene.endpoints import SolverScene as Scene
 
 
@@ -102,33 +103,45 @@ __all__: list[str] = []
 
 
 class TopologyConfig(Protocol):
-    components: frozenset[str] | set[str] | tuple[str, ...] | list[str]
-    max_depth: int
-    scattering_samples_per_m2: float
-    scattering_power_threshold: float
-    scattering_max_paths_per_pair: int
+    @property
+    def components(self) -> frozenset[str] | set[str] | tuple[str, ...] | list[str]: ...
+    @property
+    def max_depth(self) -> int: ...
+    @property
+    def scattering_samples_per_m2(self) -> float: ...
+    @property
+    def scattering_power_threshold(self) -> float: ...
+    @property
+    def scattering_max_paths_per_pair(self) -> int: ...
     # coherent scattering enumerated scatter-chain path class. DEFAULT-OFF: 0 disables
     # chain discovery entirely (the pipeline stays byte-identical). When >= 1 it
     # is the cap on d1 + d2, the combined reflection depth of the two specular
     # legs around the single diffuse vertex; each leg is independently bounded by
     # the native kMaxAdDepth = 8, so the public cap is 2 * 8 = 16.
-    scattering_chain_max_depth: int
+    @property
+    def scattering_chain_max_depth(self) -> int: ...
     # Chain-sample vertex density (samples / m^2). Documented lower density than
     # the single-bounce scattering sampler (scattering_samples_per_m2) because a
     # chain vertex is joined against two specular legs (coherent scattering).
-    scattering_chain_samples_per_m2: float
+    @property
+    def scattering_chain_samples_per_m2(self) -> float: ...
     # Per-(tx, rx) keep-strongest cap on joined chain rows (coherent scattering budget).
-    scattering_chain_max_rows: int
+    @property
+    def scattering_chain_max_rows(self) -> int: ...
 
 
 # The structural view of a solver config this engine reads. It is declared here,
 # beside its only consumer, so a solver config satisfies it without importing a
 # solver.
 class EnumeratedPathConfig(Protocol):
-    max_depth: int
-    components: frozenset[str] | set[str] | tuple[str, ...] | list[str]
-    max_paths: int | None
-    max_paths_scope: str
+    @property
+    def max_depth(self) -> int: ...
+    @property
+    def components(self) -> frozenset[str] | set[str] | tuple[str, ...] | list[str]: ...
+    @property
+    def max_paths(self) -> int | None: ...
+    @property
+    def max_paths_scope(self) -> str: ...
 
 
 # --- Shared enumerated options --------------------------------------------
@@ -147,9 +160,9 @@ class EnumeratedOptions:
     max_paths: int | None = None
     max_paths_scope: str = "global"
     ad_mode: str = "none"
-    # Coupled reflection-diffraction rows (R->D, D->R and D->D). Opt-in.
-    # coupled_candidate_limit bounds the candidate work of one discovery call (one
-    # receiver block when the caller streams receivers).
+    # Interaction chains (reflections with one diffraction anywhere, up to max_depth
+    # interactions) and double diffraction. Opt-in. coupled_candidate_limit bounds the
+    # candidates of one validator launch; it never caps the result.
     coupled_paths: bool = False
     coupled_candidate_limit: int = 1_000_000
     # Rough-surface scattering quadrature: a fixed per-area sample density (per-face
@@ -300,7 +313,7 @@ class _EnumeratedCapacityFailureSanitizeFunction(torch.autograd.Function):
     """Shape-preserving final failure sanitizer with native AD companions."""
 
     @staticmethod
-    def forward(*inputs):
+    def forward(*inputs: Any) -> Any:
         raw = _required_native_op("enumerated_capacity_failure_sanitize")(
             inputs[22], *inputs[:22]
         )
@@ -309,7 +322,7 @@ class _EnumeratedCapacityFailureSanitizeFunction(torch.autograd.Function):
         return tuple(raw[name] for name in _SANITIZE_OUTPUT_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> None:
         ctx.set_materialize_grads(False)
         ctx.candidate_count = int(inputs[0].shape[0])
         ctx.sequence_width = int(inputs[8].shape[1])
@@ -323,7 +336,7 @@ class _EnumeratedCapacityFailureSanitizeFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, *grad_outputs):
+    def backward(ctx: Any, *grad_outputs: Any) -> Any:
         none_grads = (None,) * 23
         continuous_grads = grad_outputs[_SANITIZE_DISCRETE_OUTPUT_COUNT:]
         if all(value is None for value in continuous_grads):
@@ -352,7 +365,7 @@ class _EnumeratedCapacityFailureSanitizeFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def jvp(ctx, *tangents):
+    def jvp(ctx: Any, *tangents: Any) -> Any:
         continuous_tangents = tuple(
             _ad_native_tangent_or_none(value) for value in tangents[11:22]
         )
@@ -630,33 +643,27 @@ def bind_enumerated_endpoints(
     )
 
 
-def explicit_endpoint_scene(compiled: object) -> Scene:
+def explicit_endpoint_scene(compiled: CompiledScene) -> Scene:
     """A solver scene over ``compiled`` whose endpoints come only from an explicit batch."""
 
     from witwin.channel.scene.endpoints import SolverScene
 
     return SolverScene(
         compiled=compiled,
-        structures=compiled.structures,  # type: ignore[attr-defined]
+        structures=compiled.structures,
         transmitters=(),
         receivers=(),
-        frequency=compiled.reference_frequency_hz,  # type: ignore[attr-defined]
-        metadata=compiled.source.metadata,  # type: ignore[attr-defined]
+        frequency=compiled.reference_frequency_hz,
+        metadata=compiled.source.metadata,
     )
 
 
 def evaluate_enumerated_paths(
     scene: Scene, config: EnumeratedPathConfig, *, frequency_value: float | None = None,
-    coupled_rx_streaming: bool = False, defer_capacity_terminal: bool = False,
+    defer_capacity_terminal: bool = False,
     endpoint_tensors: EnumeratedEndpointTensors | None = None,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     """Discover, select, and evaluate canonical enumerated propagation rows.
-
-    ``coupled_rx_streaming`` streams coupled reflection-diffraction discovery
-    over receiver blocks so a full grid solve stays under the per-block
-    candidate budget (coupled reflection and diffraction). The deterministic grid solver sets it; the path
-    and Monte Carlo callers keep the single-shot total-cap discovery, so their
-    coupled behavior is unchanged.
 
     ``defer_capacity_terminal`` is reserved for Path and Deterministic outer
     solvers, which must sanitize scattering-appended rows and enqueue the one
@@ -788,10 +795,10 @@ def evaluate_enumerated_paths(
                 compiled,
                 tx_positions,
                 rx_positions,
+                max_depth=int(config.max_depth),
                 candidate_limit=int(
                     getattr(config, "coupled_candidate_limit", 1_000_000)
                 ),
-                rx_streamed=coupled_rx_streaming,
             )
         )
         launch_count += coupled_launches
@@ -893,7 +900,8 @@ def evaluate_enumerated_paths(
         tx_positions,
         field_tx_power,
         rx_positions,
-        row_groups=sidecars.row_groups,
+        # evaluated_paths_from_block always groups its rows.
+        row_groups=cast(PathRowGroups, sidecars.row_groups),
         components=components,
         ad_mode=ad_mode,
         frequency_value=frequency_hz,

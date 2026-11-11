@@ -262,3 +262,17 @@ def test_wavefront_vjp_with_exported_paths_keeps_primal_and_gradient():
         result.path_gain.detach(), exported_none.path_gain, rtol=0.0, atol=0.0
     )
     assert relative_error(exported, plain, abs_floor=ABS_TOL) <= 1.0e-5
+
+
+def test_wavefront_ad_refuses_permeability_gradients_loudly():
+    # mu_r is a constant of the fixed-topology derivative; a live mu_r leaf is
+    # refused instead of being silently detached.
+    _require_native()
+    scene = _mixed_scene()
+    materials = compile_scene(scene, reference_frequency_hz=_FREQ).materials
+    materials.layer_mu_r.requires_grad_(True)
+    try:
+        with pytest.raises(NotImplementedError, match="layer_mu_r"):
+            _solve(scene, "vjp", _MIXED)
+    finally:
+        materials.layer_mu_r.requires_grad_(False)

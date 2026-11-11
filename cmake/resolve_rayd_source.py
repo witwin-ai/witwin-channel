@@ -36,6 +36,25 @@ def _normalized_text_sha256(path: Path) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
+def source_manifest_sha256(source_root: Path, relative_paths: list[str]) -> str:
+    """SHA-256 of the source manifest RayD's bundle generator writes for an LF checkout.
+
+    Each file is hashed with CRLF/CR folded to LF, and the manifest is serialized
+    exactly as ``torch/scripts/generate_source_bundle.py`` does (sorted paths,
+    ``indent=2``, ``sort_keys``, LF newlines), so the digest is the same whether the
+    bundle was generated from an LF or a CRLF checkout.
+    """
+
+    files = [
+        {"path": relative, "sha256": _normalized_text_sha256(source_root / relative)}
+        for relative in sorted(relative_paths)
+    ]
+    text = json.dumps(
+        {"schema_version": 1, "files": files}, indent=2, sort_keys=True, ensure_ascii=False
+    )
+    return hashlib.sha256((text + "\n").encode("utf-8")).hexdigest()
+
+
 def _mapping(value: object, *, label: str, keys: set[str]) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != keys:
         actual = sorted(value) if isinstance(value, dict) else type(value).__name__
@@ -269,8 +288,6 @@ def resolve(lock_path: Path) -> dict[str, object]:
         label="RayD package source_manifest",
         keys={"path", "sha256"},
     )
-    if manifest_metadata["sha256"] != bundle_lock["manifest_sha256"]:
-        raise RayDDiscoveryError("RayD package source manifest SHA does not match the lock")
     source_relative = _safe_relative(metadata["source_root"], label="RayD package source_root")
     manifest_relative = _safe_relative(
         manifest_metadata["path"], label="RayD package manifest path"
@@ -286,7 +303,7 @@ def resolve(lock_path: Path) -> dict[str, object]:
         distribution_root,
         label="RayD package manifest",
     )
-    if _sha256(manifest_path) != bundle_lock["manifest_sha256"]:
+    if _sha256(manifest_path) != manifest_metadata["sha256"]:
         raise RayDDiscoveryError("RayD package source manifest bytes changed")
     for resource in (manifest_path, source_root):
         resource_record = resource.relative_to(distribution_root).as_posix()
@@ -336,6 +353,10 @@ def resolve(lock_path: Path) -> dict[str, object]:
     if actual != set(described):
         missing = sorted(set(described) - actual)
         raise RayDDiscoveryError(f"RayD package source files are missing: {missing}")
+    # The lock pins the line-ending-independent manifest; the shipped manifest above
+    # only proves that the installed files are the ones the bundle was built with.
+    if source_manifest_sha256(source_root, sorted(actual)) != bundle_lock["manifest_sha256"]:
+        raise RayDDiscoveryError("RayD package source manifest SHA does not match the lock")
 
     _validate_source_tree(source_root, integration)
 

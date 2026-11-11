@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, fields
-from typing import TYPE_CHECKING, Sequence, TypeVar
+from typing import TYPE_CHECKING, Sequence, TypeVar, cast
 
 import numpy as np
 import torch
@@ -15,16 +15,12 @@ import torch
 from witwin.channel.constants import C0, EPS0, MU0
 from witwin.channel.kernels.materials import (
     mc_face_material_tensors,
-    validate_layer_csr as validate_layer_csr,
 )
 from witwin.channel.runtime import _frequency_participates_in_ad
 
 if TYPE_CHECKING:
     from witwin.channel.scene.compiler import CompiledScene
     from witwin.channel.scene.endpoints import SolverScene as Scene
-
-__all__ = ["validate_layer_csr"]
-
 
 MATERIAL_ABI_VERSION = 3
 DIELECTRIC_MODEL_ID = 1
@@ -73,7 +69,7 @@ def _cached_material_table(
     key = (device, compiled.materials.version, compiled.assignments.version, state)
     cached = compiled._material_table_cache.get(kind)
     if cached is not None and cached[0] == key:
-        return cached[1]
+        return cast(_T, cached[1])
     value = build()
     compiled._material_table_cache[kind] = (key, value)
     return value
@@ -266,7 +262,7 @@ class _ProductionMedium:
 
     @property
     def omega(self) -> float:
-        return 2.0 * np.pi * self.frequency_hz
+        return cast(float, 2.0 * np.pi * self.frequency_hz)
 
 
 @dataclass(frozen=True)
@@ -285,12 +281,14 @@ class _ProductionRTCoefficients:
     A_tm: np.ndarray
 
 
-def _complex_sqrt_passive(z):
+def _complex_sqrt_passive(z: complex | np.ndarray) -> np.ndarray:
     w = np.sqrt(np.asarray(z, dtype=np.complex128))
     return np.where(w.imag > 0.0, -w, w)
 
 
-def _medium_params(eps_r, sigma_e, mu_r, frequency_hz) -> _ProductionMedium:
+def _medium_params(
+    eps_r: complex, sigma_e: float, mu_r: complex, frequency_hz: float,
+) -> _ProductionMedium:
     omega = 2.0 * np.pi * float(frequency_hz)
     eps_rel = complex(eps_r) - 1j * float(sigma_e) / (omega * EPS0)
     mu_rel = complex(mu_r)
@@ -304,21 +302,26 @@ def _medium_params(eps_r, sigma_e, mu_r, frequency_hz) -> _ProductionMedium:
     )
 
 
-def _vacuum_medium(frequency_hz) -> _ProductionMedium:
+def _vacuum_medium(frequency_hz: float) -> _ProductionMedium:
     return _medium_params(1.0, 0.0, 1.0, frequency_hz)
 
 
-def _admittances(medium: _ProductionMedium, k_z):
+def _admittances(medium: _ProductionMedium, k_z: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return k_z / (medium.omega * medium.mu), medium.omega * medium.eps / k_z
 
 
-def _power_coefficients(r, t, y1, y2):
+def _power_coefficients(
+    r: np.ndarray, t: np.ndarray, y1: np.ndarray, y2: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     big_r = np.abs(r) ** 2
     big_t = (np.real(y2) / np.real(y1)) * np.abs(t) ** 2
     return big_r, big_t, 1.0 - big_r - big_t
 
 
-def _stack_rt_one_pol(y_out, y_layers, deltas, y_back):
+def _stack_rt_one_pol(
+    y_out: np.ndarray, y_layers: Sequence[np.ndarray], deltas: Sequence[np.ndarray],
+    y_back: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
     m11 = np.ones_like(y_out)
     m12 = np.zeros_like(y_out)
     m21 = np.zeros_like(y_out)
@@ -350,8 +353,8 @@ def _stack_rt_one_pol(y_out, y_layers, deltas, y_back):
 
 
 def layer_stack_rt(
-    layers: Sequence[tuple], cos_theta_i, frequency_hz, outside: _ProductionMedium | None = None,
-    backing: _ProductionMedium | None = None,
+    layers: Sequence[tuple], cos_theta_i: float | np.ndarray, frequency_hz: float,
+    outside: _ProductionMedium | None = None, backing: _ProductionMedium | None = None,
 ) -> _ProductionRTCoefficients:
     """Production NumPy precompute for a planar material layer stack."""
 
@@ -366,7 +369,7 @@ def layer_stack_rt(
     sin2_i = 1.0 - cos_i * cos_i
     k_par2 = outside.k * outside.k * sin2_i
 
-    def kz(medium: _ProductionMedium):
+    def kz(medium: _ProductionMedium) -> np.ndarray:
         return _complex_sqrt_passive(medium.k * medium.k - k_par2)
 
     kz_out, kz_back = kz(outside), kz(backing)
@@ -400,7 +403,7 @@ def layer_stack_rt(
 
 
 def _require_frequency_ad_constant_materials(
-    scene: Scene, compiled: object, *, ad_mode: str,
+    scene: Scene, compiled: CompiledScene, *, ad_mode: str,
 ) -> None:
     """Explicit-failure contract for frequency AD over dispersive materials.
 

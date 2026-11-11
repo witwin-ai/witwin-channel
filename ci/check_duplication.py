@@ -20,7 +20,7 @@ if str(ROOT) not in sys.path:
 from tools import duplication_report  # noqa: E402
 
 # Combined Python + native duplicate-line coverage for regions of at least MIN_TOKENS tokens.
-COVERAGE_CEILING_PERCENT = 8.75
+COVERAGE_CEILING_PERCENT = 6.1
 
 
 def evaluate(report: dict[str, object], ceiling: float = COVERAGE_CEILING_PERCENT) -> list[str]:

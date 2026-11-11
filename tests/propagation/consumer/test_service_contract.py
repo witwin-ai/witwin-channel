@@ -190,6 +190,7 @@ def test_evaluate_consumes_request_batch_and_aliases_finalized_rows(monkeypatch)
                 visibility_rejection_count=0,
                 ad_companion_launches=0,
                 ad_tape_bytes=0,
+                reflection_discovery=None,
             ),
             capacity_transaction=None,
         )
@@ -221,6 +222,8 @@ def test_evaluate_consumes_request_batch_and_aliases_finalized_rows(monkeypatch)
     assert calls["scene"].transmitters == ()
     assert calls["scene"].receivers == ()
     assert calls["defer"] is True
+    assert calls["config"].discovery == "auto"
+    assert result.complete is True
     assert isinstance(result.paths.transport, ScalarTransport)
     assert result.paths.pair_index is compact.pair_index
     assert result.paths.pair_offsets is compact.pair_offsets

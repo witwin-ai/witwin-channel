@@ -106,7 +106,7 @@ def test_the_matrix_agrees_with_the_live_capability_record() -> None:
     """The anti-rot pin between the prose half and the queryable half."""
 
     record = capabilities()
-    assert record.contract_version == 6
+    assert record.contract_version == 7
     assert record.ad_modes_for_component("diffraction") == frozenset({"none"})
     assert record.direction_differentiable_components == frozenset(
         {"los", "reflection"}

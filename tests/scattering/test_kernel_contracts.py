@@ -13,18 +13,11 @@ from witwin.channel import runtime
 
 
 _OWNER_NAMES = (
-    "scattering_event_probabilities",
-    "scattering_table_eval",
     "scattering_table_pdf",
-    "scattering_table_sample",
 )
 
 _VALID_FIRST_NAMES = (
-    "scattering_table_eval",
-    "scattering_table_eval_backward",
-    "scattering_table_eval_jvp",
     "scattering_table_pdf",
-    "scattering_table_sample",
     "scattering_ensemble_eval",
     "scattering_ensemble_eval_backward",
     "scattering_ensemble_eval_jvp",

@@ -12,7 +12,7 @@ import math
 import os
 from pathlib import Path
 import re
-from typing import TYPE_CHECKING, Callable, Sequence
+from typing import TYPE_CHECKING, Callable, Sequence, cast
 
 import numpy as np
 import torch
@@ -30,7 +30,7 @@ from witwin.channel.runtime import (
 )
 
 if TYPE_CHECKING:
-    from witwin.channel.scene.compiler import AssignmentStore, MaterialStore
+    from witwin.channel.scene.compiler import AssignmentStore, MaterialStore, _RuntimeStructure
 
 __all__ = [
     "DEFAULT_EDGE_POLICY",
@@ -54,7 +54,6 @@ __all__ = [
     "build_phase_screen_resources",
     "build_scene_from_structures",
     "clear_kirchhoff_cache",
-    "eval_bsdf",
     "generate_gaussian_realization",
     "patch_phase_integral",
     "pdf",
@@ -67,7 +66,6 @@ __all__ = [
     "diffraction_edge_vertex_ids",
     "refine_edge_geometry",
     "resolve_scene_edge_policy",
-    "sample_directions",
 ]
 
 
@@ -164,7 +162,7 @@ class RayDSceneResource:
     def edge_records(self) -> RayDEdgeRecords:
         cached = self.runtime_cache.get("edge_records")
         if cached is not None:
-            return cached  # type: ignore[return-value]
+            return cast(RayDEdgeRecords, cached)
         try:
             values = rayd_scene_edge_records(self.require_resource())
         except RuntimeError as error:
@@ -257,7 +255,7 @@ def _allocated_device_bytes() -> int:
 
 
 def build_scene_from_structures(
-    structures: tuple[object, ...], *, dynamic: Sequence[bool] = (),
+    structures: tuple[_RuntimeStructure, ...], *, dynamic: Sequence[bool] = (),
 ) -> RayDSceneResource:
     """Build a typed RayD native scene from Channel structures.
 
@@ -439,7 +437,7 @@ def _lexicographic_min_first(
 
 
 def _duplicate_boundary_pairs(
-    records: object, candidate: torch.Tensor,
+    records: RayDEdgeRecords, candidate: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Group boundary edges by quantized endpoints.
 
@@ -473,7 +471,8 @@ def _duplicate_boundary_pairs(
 
 
 def refine_edge_geometry(
-    rayd: object, geometry: tuple[torch.Tensor, ...], *, policy: EdgePolicy | None = None,
+    rayd: RayDSceneResource, geometry: tuple[torch.Tensor, ...], *,
+    policy: EdgePolicy | None = None,
 ) -> tuple[torch.Tensor, ...]:
     """Return the geometry tuple with policy filtering and shared-edge merges."""
 
@@ -482,7 +481,7 @@ def refine_edge_geometry(
         return geometry
     records = rayd.edge_records()
     if policy is None:
-        policy = rayd.runtime_cache.get("edge_policy")
+        policy = cast("EdgePolicy | None", rayd.runtime_cache.get("edge_policy"))
     if not isinstance(policy, EdgePolicy):
         policy = DEFAULT_EDGE_POLICY
 
@@ -537,7 +536,7 @@ _CONTACT_PROBE_M = 1.0e-3
 
 
 def _drop_contact_edges(
-    rayd: object, selected: torch.Tensor, boundary: torch.Tensor, edge_pos: torch.Tensor,
+    rayd: RayDSceneResource, selected: torch.Tensor, boundary: torch.Tensor, edge_pos: torch.Tensor,
     edge_dir: torch.Tensor, n0: torch.Tensor,
 ) -> None:
     """Deselect half-plane edges that rest on another surface, in place.
@@ -567,7 +566,7 @@ def _drop_contact_edges(
 
 
 def diffraction_edge_vertex_ids(
-    rayd: object, edge_dir: torch.Tensor,
+    rayd: RayDSceneResource, edge_dir: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Vertex ids of each diffraction edge's first and last end point along ``edge_dir``.
 
@@ -577,7 +576,7 @@ def diffraction_edge_vertex_ids(
 
     cached = rayd.runtime_cache.get(DIFFRACTION_EDGE_VERTEX_IDS)
     if cached is not None:
-        return cached  # type: ignore[return-value]
+        return cast("tuple[torch.Tensor, torch.Tensor]", cached)
     records = rayd.edge_records()
     along = ((records.vertices[records.edge_v1.long()] - records.vertices[records.edge_v0.long()])
              * edge_dir).sum(dim=1) >= 0.0
@@ -595,8 +594,9 @@ def _canonical_sign(direction: torch.Tensor) -> torch.Tensor:
 
 
 def _merge_collinear_wedges(
-    records: object, selected: torch.Tensor, edge_pos: torch.Tensor, edge_dir: torch.Tensor,
-    half_length: torch.Tensor, n0: torch.Tensor, n1: torch.Tensor, shape1: torch.Tensor,
+    records: RayDEdgeRecords, selected: torch.Tensor, edge_pos: torch.Tensor,
+    edge_dir: torch.Tensor, half_length: torch.Tensor, n0: torch.Tensor, n1: torch.Tensor,
+    shape1: torch.Tensor,
 ) -> tuple[torch.Tensor, ...]:
     """Merge selected edge segments that form one physical wedge, updating ``selected`` in place.
 
@@ -1179,9 +1179,9 @@ def _phase_screen_rms_slope(
 # once, and are never re-entered per solve.
 #
 # The runtime side of the same subject stays on the production side of the
-# line: ``eval_bsdf``, ``sample_directions``, ``pdf`` and ``pdf_reverse`` are
-# thin facades over ``witwin.channel.kernels.scattering``, so every production
-# eval/sample/PDF/event-budget operation requires native CUDA. Nothing below
+# line: ``pdf`` and ``pdf_reverse`` are thin facades over
+# ``witwin.channel.kernels.scattering``, so every production PDF operation
+# requires native CUDA. Nothing below
 # this banner is a Torch or CPU production alternative, and nothing below it
 # may grow into per-solve physics.
 #
@@ -1301,7 +1301,10 @@ MAX_RMS_SLOPE = 0.5
 MAX_K0_RMS_HEIGHT = 32.0
 
 
-def _kirchhoff_diffuse_lobe_series(q_par_x, q_par_y, q_n, sigma_h, lx, ly, n_terms: int = 64):
+def _kirchhoff_diffuse_lobe_series(
+    q_par_x: np.ndarray | float, q_par_y: np.ndarray | float, q_n: np.ndarray | float,
+    sigma_h: float, lx: float, ly: float, n_terms: int = 64,
+) -> np.ndarray | float:
     """Production Beckmann series for the Gaussian-correlation lobe."""
 
     qx, qy, qn = np.broadcast_arrays(
@@ -1603,7 +1606,8 @@ def _cached_kirchhoff_arrays(
 
 
 def build_kirchhoff_table(
-    roughness, layers: Sequence[tuple], frequency_hz: float, device: torch.device | str = "cuda",
+    roughness: SurfaceRoughness, layers: Sequence[tuple], frequency_hz: float,
+    device: torch.device | str = "cuda",
 ) -> KirchhoffTable:
     """Precompute the Kirchhoff ensemble BSDF table for one material.
 
@@ -1825,57 +1829,10 @@ def _kirchhoff_table_arrays(
     return arrays
 
 
-def eval_bsdf(
-    table: KirchhoffTable, valid: torch.Tensor, wi: torch.Tensor, wo: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Bilinear (multilinear) lookup of ``(f_te, f_tm)`` for batched pairs.
-
-    ``wi``/``wo`` are [N, 3] local-frame unit vectors pointing away from the
-    surface. Directions below the horizon return 0.
-    """
-
-    from witwin.channel.kernels.scattering import (
-        scattering_table_eval,
-    )
-
-    return scattering_table_eval(
-        valid.contiguous(), wi.contiguous(), wo.contiguous(), table.f_te, table.f_tm
-    )
-
-
-def sample_directions(
-    table: KirchhoffTable, valid: torch.Tensor, wi: torch.Tensor, u1: torch.Tensor,
-    u2: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Sample outgoing directions by CDF inversion; returns ``(wo, pdf)``.
-
-    Uses the nearest incidence bin (the same convention :func:`pdf` uses, so
-    the sampler and its density are exactly consistent). ``u1`` inverts the
-    marginal CDF over ``cos_theta_o``; ``u2`` the conditional CDF over
-    ``phi_o``; both are linearly remapped inside the selected bin, i.e. the
-    sampled density is piecewise constant per outgoing bin.
-    """
-
-    from witwin.channel.kernels.scattering import (
-        scattering_table_sample,
-    )
-
-    uniforms = torch.stack((u1, u2), dim=1).contiguous()
-    out = scattering_table_sample(
-        valid.contiguous(),
-        wi.contiguous(),
-        uniforms,
-        table.marginal_cdf,
-        table.conditional_cdf,
-        table.sample_density,
-    )
-    return out["wo"], out["pdf_forward"]
-
-
 def pdf(
     table: KirchhoffTable, valid: torch.Tensor, wi: torch.Tensor, wo: torch.Tensor,
 ) -> torch.Tensor:
-    """Solid-angle sampling density of :func:`sample_directions`.
+    """Solid-angle sampling density of the table's CDF direction sampler.
 
     Piecewise constant per outgoing bin and exactly consistent with the
     sampler (same nearest incidence bin, same mass table); integrates to 1

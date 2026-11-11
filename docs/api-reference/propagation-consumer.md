@@ -12,19 +12,21 @@ from witwin.channel.propagation import consumer
 
 | Name | Value or type | Description |
 | --- | --- | --- |
-| `CONTRACT_VERSION` | `6` | Consumer semantic contract version. |
+| `CONTRACT_VERSION` | `7` | Consumer semantic contract version. |
 | `MAX_DEPTH` | `5` | Maximum requested interaction depth. |
 | `PropagationComponent` | `Literal["los", "reflection", "transmission", "diffraction"]` | Component vocabulary. |
 | `PropagationResponse` | `Literal["scalar_transport", "complex3_transport", "polarimetric_transport"]` | Response vocabulary. |
 | `PropagationTopologyMode` | `Literal["discover"]` | Discovery-mode vocabulary. |
 | `PropagationAdMode` | `Literal["none", "jvp", "vjp"]` | AD-mode vocabulary. |
+| `PropagationDiscovery` | `Literal["auto", "exhaustive", "rays"]` | Reflection candidate source vocabulary. |
 | `COMPONENTS` | `frozenset[str]` | Runtime values of `PropagationComponent`. |
 | `RESPONSES` | `frozenset[str]` | Runtime values of `PropagationResponse`. |
 | `TOPOLOGY_MODES` | `frozenset[str]` | Currently `{"discover"}`. |
 | `AD_MODES` | `frozenset[str]` | `{"none", "jvp", "vjp"}`. |
+| `DISCOVERY_MODES` | `frozenset[str]` | `{"auto", "exhaustive", "rays"}`. |
 
 ```python
-assert consumer.CONTRACT_VERSION == 6
+assert consumer.CONTRACT_VERSION == 7
 assert "scalar_transport" in consumer.RESPONSES
 ```
 
@@ -118,6 +120,7 @@ PropagationRequest(
     topology_mode: PropagationTopologyMode,
     ad_mode: PropagationAdMode,
     max_paths: int | None = None,
+    discovery: PropagationDiscovery = "auto",
 )
 ```
 
@@ -131,6 +134,7 @@ PropagationRequest(
 | `topology_mode` | Currently `"discover"`. |
 | `ad_mode` | `"none"`, `"jvp"`, or `"vjp"`. |
 | `max_paths` | Optional positive limit on actual compact rows; overflow fails rather than truncates. |
+| `discovery` | Reflection candidate source: `"auto"` (complete image tree; ray discovery only past its cost budget), `"exhaustive"` (every plane-group sequence) or `"rays"` (ray discovery, which can miss paths). The result reports `complete`. |
 
 The constructor validates structure and vocabulary. Scene-dependent
 component/response/AD capability checks occur in `evaluate` before native work.
@@ -426,6 +430,7 @@ Every evaluation returns this frozen convention record.
 | Fixed topology | `fixed_topology_components`, `fixed_topology_responses`, `supports_fixed_topology`, `supports_los_jones`, `fixed_topology_row_validity_components`, `polarimetric_frozen_ad_inputs` |
 | Slot/wideband | `supports_slot_batching`, `max_slot_count`, `supports_wideband_offsets`, `wideband_responses`, `wideband_components`, `wideband_dispersive_materials`, `wideband_rough_materials`, `max_frequency_offset_count`, `native_frequency_resolution_law` |
 | AD detail | `component_material_leaves`, `differentiable_geometry_outputs`, `direction_differentiable_components`, `primal_only_ad_inputs`, `supports_higher_order_ad`, `ad_accounting` |
+| Discovery | `discovery_modes` (the accepted `PropagationRequest.discovery` values) |
 
 Public lookup methods:
 
@@ -497,6 +502,7 @@ PropagationEvaluation(
     convention: PropagationConvention,
     capabilities: PropagationCapabilities,
     diagnostics: PropagationDiagnostics,
+    complete: bool,
 )
 ```
 
@@ -506,6 +512,7 @@ PropagationEvaluation(
 | `convention` | Units, phase, and layout contract. |
 | `capabilities` | Consumer capability record used by the result. |
 | `diagnostics` | Per-call audit counters. |
+| `complete` | `True` when the rows are provably every path the request admits; `False` when reflection candidates came from ray discovery. |
 
 ### `FixedTopologyEvaluation`
 

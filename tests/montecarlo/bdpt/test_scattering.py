@@ -7,7 +7,6 @@ import math
 
 import pytest
 import torch
-from scipy.stats import chi2
 
 from witwin.core import Scene, Structure
 from tests.support.core_world import (
@@ -19,12 +18,8 @@ from tests.support.core_world import (
 from witwin.channel.deployment import build_info
 from witwin.core import MaterialLayer, PhysicalMaterial, SurfaceRoughness
 from witwin.channel.montecarlo.bdpt import Config, solve
-from witwin.channel.interactions.scattering import (
-    sample_scatter_directions,
-    scatter_direction_uniforms,
-)
-from witwin.channel.scene.resources import build_kirchhoff_table, eval_bsdf
-from witwin.channel.scene.resources import pdf as table_pdf
+from tests.reference.kirchhoff_lookup import eval_table as eval_bsdf
+from witwin.channel.scene.resources import build_kirchhoff_table
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA torch is required"
@@ -365,69 +360,3 @@ def test_bdpt_grid_scattering_component_map_matches_power():
         atol=1.0e-12,
     )
 
-
-def test_scatter_direction_sampler_matches_table_pdf():
-    """Chi-square consistency of the seeded solver sampling path against the
- table pdf (coarser 8 x 16 binning than tests/scattering/test_sampling.py
- because the seeded stream draws fewer samples)."""
-
-    device = torch.device("cuda")
-    table = build_kirchhoff_table(
-        _roughness(), list(_LAYERS), _FREQUENCY, device=device
-    )
-    runtimes = {
-        0: type(
-            "Runtime",
-            (),
-            {
-                "material_index": 0,
-                "table": table,
-                "layers": _LAYERS,
-                "roughness": _roughness(),
-            },
-        )()
-    }
-    n = 60_000
-    cos_i = 0.7
-    sin_i = math.sqrt(1.0 - cos_i * cos_i)
-    wi = torch.tensor([[sin_i, 0.0, cos_i]], device=device).expand(n, 3).contiguous()
-    material_id = torch.zeros((n,), device=device, dtype=torch.int32)
-    uniforms = scatter_direction_uniforms(n, seed=3, tx_index=0, depth=0, device=device)
-    sampled = sample_scatter_directions(
-        torch.ones_like(material_id, dtype=torch.bool),
-        material_id,
-        wi,
-        uniforms,
-        runtimes,
-    )
-    wo = sampled["wo_local"]
-    assert bool((sampled["pdf_forward"] > 0.0).all())
-    # Sampler returns its own density.
-    lookup = table_pdf(
-        table,
-        torch.ones_like(material_id, dtype=torch.bool),
-        wi,
-        wo,
-    )
-    mismatch = (sampled["pdf_forward"] != lookup).float().mean().item()
-    assert mismatch < 1.0e-3
-
-    cos_o = wo[:, 2].clamp(0.0, 1.0 - 1.0e-7)
-    phi_o = torch.atan2(wo[:, 1], wo[:, 0])
-    phi_o = torch.where(phi_o < 0.0, phi_o + 2.0 * math.pi, phi_o)
-    bin_cos = (cos_o * 8).long().clamp(0, 7)
-    bin_phi = (phi_o / (2.0 * math.pi / 16)).long().clamp(0, 15)
-    counts = torch.zeros(8 * 16, device=device)
-    counts.scatter_add_(0, bin_cos * 16 + bin_phi, torch.ones(n, device=device))
-
-    # Expected masses from the sampling table at the nearest incidence bin
-    # (floor(cos_i * N) like tables._nearest_axis): aggregate the fine
-    # 32 x 64 grid into 8 x 16 coarse bins. The sampler rotates the relative
-    # azimuth by phi_i = 0 here, so the axes align.
-    ti = min(int(cos_i * 32), 31)
-    mass = table.sample_density[ti, 0] * table.bin_solid_angle  # [32, 64]
-    expected = mass.reshape(8, 4, 16, 4).sum(dim=(1, 3)).reshape(-1) * n
-    keep = expected >= 5.0
-    stat = float((((counts - expected) ** 2 / expected)[keep]).sum())
-    dof = int(keep.sum()) - 1
-    assert chi2.sf(stat, dof) > 1.0e-4

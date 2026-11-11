@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import math
+from typing import Any, TypedDict, cast
 
 import torch
 
@@ -20,7 +21,6 @@ from witwin.channel.runtime import (
     CapacityFailureBit,
     CapacityFailureState,
     _ad_active_ctx,
-    _ad_check_active,
     _ad_check_optional_grad,
     _ad_check_rows,
     _ad_check_tangent_vec3,
@@ -38,28 +38,19 @@ from witwin.channel.runtime import (
 __all__ = [
     "_BDPT_INTERSECTION_FIELDS",
     "_RaydFaceNormalsAdFunction",
-    "_RaydIntersectAdFunction",
     "_RaydReflectionEpcPathsAdFunction",
     "_RaydSegmentPenetrationAdFunction",
-    "_RaydTraceReflectionsAdFunction",
     "_epc_paths_frozen_winner_checks",
-    "core_diffraction_edge_count",
     "coupled_dd_geometry_forward",
-    "coupled_rd_geometry_forward",
+    "coupled_chain_geometry_forward",
     "deterministic_face_groups",
     "deterministic_normalize_vec3",
-    "deterministic_reflect_points",
-    "deterministic_surface_face_groups",
     "diffraction_tx_visible_state_plan",
     "mc_diffraction_edge_geometry",
     "mc_surface_group_edge_candidates",
     "rayd_diffraction_paths_order1_forward",
     "rayd_diffraction_sample_tape_forward",
     "rayd_face_normals_ad",
-    "rayd_intersect_ad",
-    "rayd_intersect_backward",
-    "rayd_intersect_forward",
-    "rayd_intersect_jvp",
     "rayd_reflection_epc_paths_ad",
     "rayd_reflection_epc_paths_backward",
     "rayd_reflection_epc_paths_forward",
@@ -71,11 +62,7 @@ __all__ = [
     "rayd_segment_penetration_forward",
     "rayd_segment_penetration_forward_tape",
     "rayd_segment_penetration_jvp",
-    "rayd_trace_reflections_ad",
-    "rayd_trace_reflections_backward",
     "rayd_trace_reflections_forward",
-    "rayd_trace_reflections_forward_tape",
-    "rayd_trace_reflections_jvp",
     "rayd_visibility_forward",
 ]
 
@@ -413,60 +400,6 @@ _BDPT_INTERSECTION_FIELDS = (
 )
 
 
-def rayd_intersect_forward(
-    scene_resource: object, ray_o: torch.Tensor, ray_d: torch.Tensor, ray_tmax: torch.Tensor,
-    active: torch.Tensor | None, *, flags: int = 7,
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor(
-        "ray_o", ray_o, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor(
-        "ray_d", ray_d, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("ray_tmax", ray_tmax, dtype=torch.float32, ndim=1)
-    if ray_d.shape != ray_o.shape:
-        raise ValueError("ray_d must match ray_o")
-    if ray_tmax.shape not in ((0,), (ray_o.shape[0],)):
-        raise ValueError("ray_tmax must be empty or match ray_o")
-    if active is not None:
-        validate_cuda_tensor("active", active, dtype=torch.bool, ndim=1)
-        if active.shape not in ((0,), (ray_o.shape[0],)):
-            raise ValueError("active must be empty or match ray_o")
-        if active.get_device() != ray_o.get_device():
-            raise ValueError("active must share ray_o device")
-    if (
-        ray_d.get_device() != ray_o.get_device()
-        or ray_tmax.get_device() != ray_o.get_device()
-    ):
-        raise ValueError("intersection tensors must share one CUDA device")
-    if flags < 0:
-        raise ValueError("flags must be non-negative")
-    out = _required_native_op("rayd_intersect_forward")(
-        _rayd_scene_resource(scene_resource),
-        ray_o,
-        ray_d,
-        ray_tmax,
-        active,
-        int(flags),
-    )
-    if not isinstance(out, (tuple, list)) or len(out) != len(_BDPT_INTERSECTION_FIELDS):
-        raise TypeError("_channel.rayd_intersect_forward must return 10 tensors")
-    exported = dict(zip(_BDPT_INTERSECTION_FIELDS, out, strict=True))
-    validate_cuda_tensor("t", exported["t"], dtype=torch.float32, ndim=1)
-    if exported["t"].shape != (ray_o.shape[0],):
-        raise ValueError("_channel.rayd_intersect_forward returned bad t shape")
-    for name in ("p", "n", "geo_n", "barycentric"):
-        validate_cuda_tensor(
-            name, exported[name], dtype=torch.float32, ndim=2, trailing_shape=(3,)
-        )
-    validate_cuda_tensor(
-        "uv", exported["uv"], dtype=torch.float32, ndim=2, trailing_shape=(2,)
-    )
-    for name in ("shape_id", "prim_id", "local_prim_id", "global_prim_id"):
-        validate_cuda_tensor(name, exported[name], dtype=torch.int32, ndim=1)
-    return exported
-
-
 def rayd_diffraction_sample_tape_forward(*args: object) -> tuple[torch.Tensor, ...]:
     if not args:
         raise TypeError(
@@ -515,69 +448,57 @@ def rayd_reflection_epc_paths_forward(*args: object) -> tuple[torch.Tensor, ...]
     return tuple(out)
 
 
-def coupled_rd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
-    """Construct reciprocal 1R+1D geometry without evaluating a coefficient.
+def coupled_chain_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
+    """Validate interaction-chain candidates without evaluating a coefficient.
 
-    The native operation uses image-source edge stationarity, RayD reflection
-    EPC, and RayD segment visibility. ``reverse=True`` constructs D->R by
-    exchanging endpoints and reversing the interaction sequence. The returned
-    dictionary intentionally has no ``path_gain`` or ``field`` entry; coupled
-    complex/Jones transport belongs to the unified field phase.
+    The transmitter half (to the diffraction point) is traced with the RayD reflection EPC or
+    one visibility segment, and the receiver half the same way only where the first is valid.
+    The rows carry the interaction sequence, the points and the path length; no field.
     """
 
     if not args:
-        raise TypeError(
-            "coupled_rd_geometry_forward requires a typed RayD scene resource"
-        )
+        raise TypeError("coupled_chain_geometry_forward requires a typed RayD scene resource")
     native_args = (_rayd_scene_resource(args[0]), *args[1:])
-    out = _required_native_op("coupled_rd_geometry_forward")(
-        *native_args,
-    )
+    out = _required_native_op("coupled_chain_geometry_forward")(*native_args)
     if not isinstance(out, dict):
-        raise TypeError(
-            "_channel.coupled_rd_geometry_forward must return a dict"
-        )
+        raise TypeError("_channel.coupled_chain_geometry_forward must return a dict")
     required = {
         "valid": (torch.bool, 1),
-        "interaction_type_sequence": (torch.int32, 2),
         "primitive_sequence": (torch.int32, 2),
-        "edge_sequence": (torch.int32, 2),
-        "face_id": (torch.int32, 1),
-        "edge_id": (torch.int32, 1),
         "interaction_positions": (torch.float32, 3),
         "interaction_normals": (torch.float32, 3),
-        "reflection_position": (torch.float32, 2),
-        "reflection_normal": (torch.float32, 2),
-        "edge_position": (torch.float32, 2),
-        "edge_direction": (torch.float32, 2),
         "path_length_m": (torch.float32, 1),
         "delay_s": (torch.float32, 1),
     }
+    if set(out) != set(required):
+        raise ValueError("coupled chain geometry returned unexpected fields")
     for name, (dtype, ndim) in required.items():
-        value = out.get(name)
-        if not isinstance(value, torch.Tensor):
-            raise TypeError(f"coupled geometry output {name!r} must be a tensor")
-        validate_cuda_tensor(name, value, dtype=dtype, ndim=ndim)
-    if "path_gain" in out or "field" in out or "path_field" in out:
-        raise ValueError(
-            "coupled geometry must not expose placeholder physical coefficients"
-        )
-    count = int(out["valid"].shape[0])
-    if out["interaction_type_sequence"].shape != (count, 2):
-        raise ValueError("interaction_type_sequence must have shape (N, 2)")
-    if out["primitive_sequence"].shape != (count, 2) or out["edge_sequence"].shape != (
-        count,
-        2,
-    ):
-        raise ValueError("coupled primitive/edge sequences must have shape (N, 2)")
-    if out["interaction_positions"].shape != (count, 2, 3):
-        raise ValueError("interaction_positions must have shape (N, 2, 3)")
-    if out["interaction_normals"].shape != (count, 2, 3):
-        raise ValueError("interaction_normals must have shape (N, 2, 3)")
+        validate_cuda_tensor(name, out[name], dtype=dtype, ndim=ndim)
+    count, width = (int(value) for value in out["primitive_sequence"].shape)
+    for name in ("interaction_positions", "interaction_normals"):
+        if tuple(out[name].shape) != (count, width, 3):
+            raise ValueError(f"{name} must have shape (N, depth, 3)")
     return out
 
+class CoupledDdGeometryOutputs(TypedDict):
+    """Two-edge diffraction geometry rows; no field or path gain."""
 
-def coupled_dd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
+    valid: torch.Tensor
+    interaction_type_sequence: torch.Tensor
+    primitive_sequence: torch.Tensor
+    edge_sequence: torch.Tensor
+    edge1_id: torch.Tensor
+    edge2_id: torch.Tensor
+    interaction_positions: torch.Tensor
+    interaction_normals: torch.Tensor
+    edge1_position: torch.Tensor
+    edge2_position: torch.Tensor
+    path_length_m: torch.Tensor
+    delay_s: torch.Tensor
+    certificate_rejection_count: torch.Tensor
+
+
+def coupled_dd_geometry_forward(*args: object) -> CoupledDdGeometryOutputs:
     """Construct two-edge (double) diffraction geometry without a coefficient.
 
     The native operation runs a convex bracketed Fermat solve for the two-edge
@@ -641,7 +562,7 @@ def coupled_dd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
         raise ValueError("interaction_normals must have shape (N, 2, 3)")
     if out["certificate_rejection_count"].shape != (1,):
         raise ValueError("certificate_rejection_count must have shape (1,)")
-    return out
+    return cast(CoupledDdGeometryOutputs, out)
 
 
 def rayd_diffraction_paths_order1_forward(*args: object) -> tuple[torch.Tensor, ...]:
@@ -780,50 +701,6 @@ def diffraction_tx_visible_state_plan(
     return active
 
 
-# ---------------------------------------------------------------------------
-# primitives
-# ---------------------------------------------------------------------------
-def core_diffraction_edge_count(
-    *, vertices: torch.Tensor, faces: torch.Tensor, face_normals: torch.Tensor,
-    edge_v0: torch.Tensor, edge_v1: torch.Tensor, face0: torch.Tensor, face1: torch.Tensor,
-    vertical_only: bool, vertical_ratio: float, boundary_half_plane: bool, plane_tol: float,
-) -> int:
-    validate_cuda_tensor(
-        "vertices", vertices, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("faces", faces, dtype=torch.int32, ndim=2, trailing_shape=(3,))
-    validate_cuda_tensor(
-        "face_normals", face_normals, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("edge_v0", edge_v0, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("edge_v1", edge_v1, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("face0", face0, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor("face1", face1, dtype=torch.int32, ndim=1)
-    if faces.shape[0] != face_normals.shape[0]:
-        raise ValueError("face_normals must match faces")
-    for name, tensor in {"edge_v1": edge_v1, "face0": face0, "face1": face1}.items():
-        if tensor.shape != edge_v0.shape:
-            raise ValueError(f"{name} must match edge_v0")
-    value = _required_native_op("core_diffraction_edge_count")(
-        vertices,
-        faces,
-        face_normals,
-        edge_v0,
-        edge_v1,
-        face0,
-        face1,
-        bool(vertical_only),
-        float(vertical_ratio),
-        bool(boundary_half_plane),
-        float(plane_tol),
-    )
-    if not isinstance(value, int):
-        raise TypeError(
-            "_channel.core_diffraction_edge_count must return an int"
-        )
-    return value
-
-
 def deterministic_normalize_vec3(values: torch.Tensor, *, eps: float = 1.0e-6) -> torch.Tensor:
     validate_cuda_tensor(
         "values", values, dtype=torch.float32, ndim=2, trailing_shape=(3,)
@@ -839,35 +716,6 @@ def deterministic_normalize_vec3(values: torch.Tensor, *, eps: float = 1.0e-6) -
     if out.shape != values.shape:
         raise ValueError(
             "_channel.deterministic_normalize_vec3 returned bad shape"
-        )
-    return out
-
-
-def deterministic_reflect_points(
-    points: torch.Tensor, plane_points: torch.Tensor, normals: torch.Tensor,
-) -> torch.Tensor:
-    validate_cuda_tensor(
-        "points", points, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor(
-        "plane_points", plane_points, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor(
-        "normals", normals, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    if plane_points.shape != points.shape or normals.shape != points.shape:
-        raise ValueError("points, plane_points, and normals must have matching shapes")
-    out = _required_native_op("deterministic_reflect_points")(
-        points, plane_points, normals
-    )
-    if not isinstance(out, torch.Tensor):
-        raise TypeError(
-            "_channel.deterministic_reflect_points must return a tensor"
-        )
-    validate_cuda_tensor("out", out, dtype=torch.float32, ndim=2, trailing_shape=(3,))
-    if out.shape != points.shape:
-        raise ValueError(
-            "_channel.deterministic_reflect_points returned bad shape"
         )
     return out
 
@@ -946,67 +794,6 @@ def deterministic_face_groups(
     ].shape != (group_count,):
         raise ValueError(
             "_channel.deterministic_face_groups returned bad group shape"
-        )
-    return exported
-
-
-def deterministic_surface_face_groups(surface_ids: torch.Tensor) -> dict[str, torch.Tensor | int]:
-    validate_cuda_tensor("surface_ids", surface_ids, dtype=torch.int64, ndim=1)
-    exported = _required_native_op("deterministic_surface_face_groups")(surface_ids)
-    if not isinstance(exported, dict):
-        raise TypeError(
-            "_channel.deterministic_surface_face_groups must return a dict"
-        )
-    expected_fields = {
-        "face_group_id",
-        "representative_faces",
-        "surface_group_id",
-        "surface_group_size",
-        "surface_group_members",
-        "group_count",
-    }
-    if set(exported) != expected_fields:
-        raise ValueError(
-            "_channel.deterministic_surface_face_groups returned unexpected fields"
-        )
-    face_count = int(surface_ids.shape[0])
-    validate_cuda_tensor(
-        "face_group_id", exported["face_group_id"], dtype=torch.int32, ndim=1
-    )
-    validate_cuda_tensor(
-        "representative_faces",
-        exported["representative_faces"],
-        dtype=torch.int64,
-        ndim=1,
-    )
-    validate_cuda_tensor(
-        "surface_group_id", exported["surface_group_id"], dtype=torch.int32, ndim=1
-    )
-    validate_cuda_tensor(
-        "surface_group_size", exported["surface_group_size"], dtype=torch.int32, ndim=1
-    )
-    validate_cuda_tensor(
-        "surface_group_members",
-        exported["surface_group_members"],
-        dtype=torch.int32,
-        ndim=1,
-    )
-    group_count = exported["group_count"]
-    if not isinstance(group_count, int):
-        raise TypeError(
-            "_channel.deterministic_surface_face_groups returned non-int group_count"
-        )
-    if exported["face_group_id"].shape != (face_count,) or exported[
-        "surface_group_id"
-    ].shape != (face_count,):
-        raise ValueError(
-            "_channel.deterministic_surface_face_groups returned bad face group shape"
-        )
-    if exported["representative_faces"].shape != (group_count,) or exported[
-        "surface_group_size"
-    ].shape != (group_count,):
-        raise ValueError(
-            "_channel.deterministic_surface_face_groups returned bad group shape"
         )
     return exported
 
@@ -1124,613 +911,6 @@ def mc_surface_group_edge_candidates(
 _RAYD_RAY_FLAGS_ALL = 0x01 | 0x02 | 0x04
 
 
-def rayd_intersect_backward(
-    scene_resource: object, ray_o: torch.Tensor, ray_d: torch.Tensor, ray_tmax: torch.Tensor,
-    active: torch.Tensor | None, tape_prim_id: torch.Tensor, tape_barycentric: torch.Tensor, *,
-    grad_t: torch.Tensor | None = None, grad_p: torch.Tensor | None = None,
-    grad_n: torch.Tensor | None = None, grad_geo_n: torch.Tensor | None = None,
-    grad_uv: torch.Tensor | None = None, grad_barycentric: torch.Tensor | None = None,
-    need_grad_vertices: bool = False, need_grad_ray_o: bool = False, need_grad_ray_d: bool = False,
-    need_grad_ray_tmax: bool = False,
-) -> tuple[torch.Tensor | None, ...]:
-    validate_cuda_tensor(
-        "ray_o", ray_o, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor(
-        "ray_d", ray_d, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("ray_tmax", ray_tmax, dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("tape_prim_id", tape_prim_id, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor(
-        "tape_barycentric", tape_barycentric, dtype=torch.float32, ndim=2
-    )
-    rows = int(ray_o.shape[0])
-    _ad_check_rows("ray_d", ray_d, rows)
-    if ray_tmax.shape[0] not in (0, rows):
-        raise ValueError("ray_tmax must be empty or match the ray batch size")
-    _ad_check_active(active, rows)
-    _ad_check_rows("tape_prim_id", tape_prim_id, rows)
-    # An empty barycentric tape selects the native width-0 recompute path.
-    if tape_barycentric.shape[0] not in (0, rows):
-        raise ValueError("tape_barycentric must be empty or match the ray batch size")
-    if tape_barycentric.shape[0] and tape_barycentric.shape[1] not in (2, 3):
-        raise ValueError("tape_barycentric last dimension must be 2 or 3")
-    _ad_check_optional_grad("grad_t", grad_t, ((rows,),))
-    _ad_check_optional_grad("grad_p", grad_p, ((rows, 3),))
-    _ad_check_optional_grad("grad_n", grad_n, ((rows, 3),))
-    _ad_check_optional_grad("grad_geo_n", grad_geo_n, ((rows, 3),))
-    _ad_check_optional_grad("grad_uv", grad_uv, ((rows, 2),))
-    _ad_check_optional_grad("grad_barycentric", grad_barycentric, ((rows, 3),))
-    out = _required_native_op("rayd_intersect_backward")(
-        _rayd_scene_resource(scene_resource),
-        ray_o,
-        ray_d,
-        ray_tmax,
-        active,
-        tape_prim_id,
-        tape_barycentric,
-        grad_t,
-        grad_p,
-        grad_n,
-        grad_geo_n,
-        grad_uv,
-        grad_barycentric,
-        bool(need_grad_vertices),
-        bool(need_grad_ray_o),
-        bool(need_grad_ray_d),
-        bool(need_grad_ray_tmax),
-    )
-    if not isinstance(out, (tuple, list)) or len(out) != 4:
-        raise TypeError(
-            "_channel.rayd_intersect_backward must return 4 gradients"
-        )
-    return tuple(out)
-
-
-def rayd_intersect_jvp(
-    scene_resource: object, ray_o: torch.Tensor, ray_d: torch.Tensor, active: torch.Tensor | None,
-    tape_prim_id: torch.Tensor, tape_barycentric: torch.Tensor, *,
-    tangent_vertices: torch.Tensor | None = None, tangent_ray_o: torch.Tensor | None = None,
-    tangent_ray_d: torch.Tensor | None = None, flags: int = _RAYD_RAY_FLAGS_ALL,
-) -> tuple[torch.Tensor, ...]:
-    validate_cuda_tensor(
-        "ray_o", ray_o, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor(
-        "ray_d", ray_d, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("tape_prim_id", tape_prim_id, dtype=torch.int32, ndim=1)
-    validate_cuda_tensor(
-        "tape_barycentric", tape_barycentric, dtype=torch.float32, ndim=2
-    )
-    rows = int(ray_o.shape[0])
-    _ad_check_rows("ray_d", ray_d, rows)
-    _ad_check_active(active, rows)
-    _ad_check_rows("tape_prim_id", tape_prim_id, rows)
-    # The native jvp kernel has no width-0 recompute path: the barycentric
-    # tape must cover the full ray batch (unlike backward, which accepts an
-    # empty tape).
-    _ad_check_rows("tape_barycentric", tape_barycentric, rows)
-    if rows and tape_barycentric.shape[1] not in (2, 3):
-        raise ValueError("tape_barycentric last dimension must be 2 or 3")
-    _ad_check_tangent_vec3("tangent_vertices", tangent_vertices, None)
-    _ad_check_tangent_vec3("tangent_ray_o", tangent_ray_o, rows)
-    _ad_check_tangent_vec3("tangent_ray_d", tangent_ray_d, rows)
-    out = _required_native_op("rayd_intersect_jvp")(
-        _rayd_scene_resource(scene_resource),
-        ray_o,
-        ray_d,
-        active,
-        tape_prim_id,
-        tape_barycentric,
-        tangent_vertices,
-        tangent_ray_o,
-        tangent_ray_d,
-        int(flags),
-    )
-    if not isinstance(out, (tuple, list)) or len(out) != 6:
-        raise TypeError("_channel.rayd_intersect_jvp must return 6 tangents")
-    return tuple(out)
-
-
-def rayd_trace_reflections_forward_tape(*args: object) -> tuple[torch.Tensor, ...]:
-    if not args:
-        raise TypeError(
-            "rayd_trace_reflections_forward_tape requires a typed RayD scene resource"
-        )
-    native_args = (_rayd_scene_resource(args[0]), *args[1:])
-    out = _required_native_op("rayd_trace_reflections_forward_tape")(
-        *native_args,
-    )
-    if not isinstance(out, (tuple, list)) or len(out) != 9:
-        raise TypeError(
-            "_channel.rayd_trace_reflections_forward_tape must return 9 tensors"
-        )
-    return tuple(out)
-
-
-def rayd_trace_reflections_backward(
-    scene_resource: object, ray_o: torch.Tensor, ray_d: torch.Tensor, ray_tmax: torch.Tensor,
-    active: torch.Tensor | None, tape_prim_id: torch.Tensor, tape_barycentric: torch.Tensor,
-    tape_hit_points: torch.Tensor, tape_normals: torch.Tensor, image_sources: torch.Tensor, *,
-    grad_t: torch.Tensor | None = None, grad_image_sources: torch.Tensor | None = None,
-) -> tuple[torch.Tensor | None, ...]:
-    validate_cuda_tensor(
-        "ray_o", ray_o, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor(
-        "ray_d", ray_d, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("tape_prim_id", tape_prim_id, dtype=torch.int32, ndim=2)
-    validate_cuda_tensor(
-        "tape_barycentric", tape_barycentric, dtype=torch.float32, ndim=3
-    )
-    validate_cuda_tensor(
-        "tape_hit_points",
-        tape_hit_points,
-        dtype=torch.float32,
-        ndim=3,
-        trailing_shape=(3,),
-    )
-    validate_cuda_tensor(
-        "tape_normals", tape_normals, dtype=torch.float32, ndim=3, trailing_shape=(3,)
-    )
-    validate_cuda_tensor(
-        "image_sources",
-        image_sources,
-        dtype=torch.float32,
-        ndim=3,
-        trailing_shape=(3,),
-    )
-    validate_cuda_tensor("ray_tmax", ray_tmax, dtype=torch.float32, ndim=1)
-    rows = int(ray_o.shape[0])
-    _ad_check_rows("ray_d", ray_d, rows)
-    if ray_tmax.shape[0] not in (0, rows):
-        raise ValueError("ray_tmax must be empty or match the ray batch size")
-    _ad_check_active(active, rows)
-    _ad_check_rows("tape_prim_id", tape_prim_id, rows)
-    bounces = int(tape_prim_id.shape[1])
-    if tuple(tape_barycentric.shape[:2]) != (rows, bounces) or tape_barycentric.shape[
-        2
-    ] not in (2, 3):
-        raise ValueError(f"tape_barycentric must have shape ({rows}, {bounces}, 2|3)")
-    for name, value in (
-        ("tape_hit_points", tape_hit_points),
-        ("tape_normals", tape_normals),
-        ("image_sources", image_sources),
-    ):
-        if tuple(value.shape) != (rows, bounces, 3):
-            raise ValueError(f"{name} must have shape ({rows}, {bounces}, 3)")
-    _ad_check_optional_grad("grad_t", grad_t, ((rows,), (rows, bounces)))
-    _ad_check_optional_grad(
-        "grad_image_sources", grad_image_sources, ((rows, bounces, 3),)
-    )
-    out = _required_native_op("rayd_trace_reflections_backward")(
-        _rayd_scene_resource(scene_resource),
-        ray_o,
-        ray_d,
-        ray_tmax,
-        active,
-        tape_prim_id,
-        tape_barycentric,
-        tape_hit_points,
-        tape_normals,
-        image_sources,
-        grad_t,
-        grad_image_sources,
-    )
-    if not isinstance(out, (tuple, list)) or len(out) != 4:
-        raise TypeError(
-            "_channel.rayd_trace_reflections_backward must return 4 gradients"
-        )
-    return tuple(out)
-
-
-def rayd_trace_reflections_jvp(
-    scene_resource: object, ray_o: torch.Tensor, ray_d: torch.Tensor, active: torch.Tensor | None,
-    tape_prim_id: torch.Tensor, tape_barycentric: torch.Tensor, tape_hit_points: torch.Tensor,
-    tape_normals: torch.Tensor, image_sources: torch.Tensor, *,
-    tangent_vertices: torch.Tensor | None = None, tangent_ray_o: torch.Tensor | None = None,
-    tangent_ray_d: torch.Tensor | None = None,
-) -> tuple[torch.Tensor, ...]:
-    validate_cuda_tensor(
-        "ray_o", ray_o, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor(
-        "ray_d", ray_d, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("tape_prim_id", tape_prim_id, dtype=torch.int32, ndim=2)
-    validate_cuda_tensor(
-        "tape_barycentric", tape_barycentric, dtype=torch.float32, ndim=3
-    )
-    validate_cuda_tensor(
-        "tape_hit_points",
-        tape_hit_points,
-        dtype=torch.float32,
-        ndim=3,
-        trailing_shape=(3,),
-    )
-    validate_cuda_tensor(
-        "tape_normals", tape_normals, dtype=torch.float32, ndim=3, trailing_shape=(3,)
-    )
-    validate_cuda_tensor(
-        "image_sources",
-        image_sources,
-        dtype=torch.float32,
-        ndim=3,
-        trailing_shape=(3,),
-    )
-    rows = int(ray_o.shape[0])
-    _ad_check_rows("ray_d", ray_d, rows)
-    _ad_check_active(active, rows)
-    _ad_check_rows("tape_prim_id", tape_prim_id, rows)
-    bounces = int(tape_prim_id.shape[1])
-    if tuple(tape_barycentric.shape[:2]) != (rows, bounces) or tape_barycentric.shape[
-        2
-    ] not in (2, 3):
-        raise ValueError(f"tape_barycentric must have shape ({rows}, {bounces}, 2|3)")
-    for name, value in (
-        ("tape_hit_points", tape_hit_points),
-        ("tape_normals", tape_normals),
-        ("image_sources", image_sources),
-    ):
-        if tuple(value.shape) != (rows, bounces, 3):
-            raise ValueError(f"{name} must have shape ({rows}, {bounces}, 3)")
-    _ad_check_tangent_vec3("tangent_vertices", tangent_vertices, None)
-    _ad_check_tangent_vec3("tangent_ray_o", tangent_ray_o, rows)
-    _ad_check_tangent_vec3("tangent_ray_d", tangent_ray_d, rows)
-    out = _required_native_op("rayd_trace_reflections_jvp")(
-        _rayd_scene_resource(scene_resource),
-        ray_o,
-        ray_d,
-        active,
-        tape_prim_id,
-        tape_barycentric,
-        tape_hit_points,
-        tape_normals,
-        tangent_vertices,
-        tangent_ray_o,
-        tangent_ray_d,
-        image_sources,
-    )
-    if not isinstance(out, (tuple, list)) or len(out) != 2:
-        raise TypeError(
-            "_channel.rayd_trace_reflections_jvp must return 2 tangents"
-        )
-    return tuple(out)
-
-
-class _RaydIntersectAdFunction(torch.autograd.Function):
-    """Fixed-winner differentiable RayD intersect through the direct typed C++ boundary.
-
-    Inputs: (scene_resource, vertices, ray_o, ray_d, ray_tmax, active).
-    ``vertices`` must be the scene's global vertex table (single-structure
-    scenes in AD-A0); the forward reads geometry from the native scene and
-    the tensor only routes vertex gradients/tangents.
-    """
-
-    @staticmethod
-    def forward(scene_resource, vertices, ray_o, ray_d, ray_tmax, active):
-        out = _required_native_op("rayd_intersect_forward")(
-            scene_resource,
-            ray_o,
-            ray_d,
-            ray_tmax,
-            active,
-            _RAYD_RAY_FLAGS_ALL,
-        )
-        return tuple(out)
-
-    @staticmethod
-    def setup_context(ctx, inputs, output):
-        ctx.set_materialize_grads(False)
-        scene_resource, vertices, ray_o, ray_d, ray_tmax, active = inputs
-        barycentric = output[5]
-        shape_id, prim_id, local_prim_id, global_prim_id = output[6:10]
-        vertices = torch.autograd.forward_ad.unpack_dual(vertices).primal
-        ray_o = torch.autograd.forward_ad.unpack_dual(ray_o).primal
-        ray_d = torch.autograd.forward_ad.unpack_dual(ray_d).primal
-        ray_tmax = torch.autograd.forward_ad.unpack_dual(ray_tmax).primal
-        active_ctx = _ad_active_ctx(active, ray_o)
-        ctx.scene_resource = scene_resource
-        ctx.vertices_shape = tuple(vertices.shape)
-        ctx.save_for_backward(
-            ray_o, ray_d, ray_tmax, active_ctx, global_prim_id, barycentric
-        )
-        ctx.save_for_forward(ray_o, ray_d, active_ctx, global_prim_id, barycentric)
-        ctx.mark_non_differentiable(shape_id, prim_id, local_prim_id, global_prim_id)
-
-    @staticmethod
-    @_ad_first_order_only
-    def backward(ctx, *grad_outputs):
-        none_grads = (None, None, None, None, None, None)
-        if all(value is None for value in grad_outputs[:6]):
-            return none_grads
-        (
-            ray_o,
-            ray_d,
-            ray_tmax,
-            active_ctx,
-            tape_prim_id,
-            tape_barycentric,
-        ) = ctx.saved_tensors
-        need_grad_vertices = bool(ctx.needs_input_grad[1])
-        need_grad_ray_o = bool(ctx.needs_input_grad[2])
-        need_grad_ray_d = bool(ctx.needs_input_grad[3])
-        need_grad_ray_tmax = bool(ctx.needs_input_grad[4])
-        if not (
-            need_grad_vertices
-            or need_grad_ray_o
-            or need_grad_ray_d
-            or need_grad_ray_tmax
-        ):
-            return none_grads
-        grad_vertices, grad_ray_o, grad_ray_d, grad_ray_tmax = rayd_intersect_backward(
-            ctx.scene_resource,
-            ray_o,
-            ray_d,
-            ray_tmax,
-            active_ctx,
-            tape_prim_id,
-            tape_barycentric,
-            grad_t=grad_outputs[0],
-            grad_p=grad_outputs[1],
-            grad_n=grad_outputs[2],
-            grad_geo_n=grad_outputs[3],
-            grad_uv=grad_outputs[4],
-            grad_barycentric=grad_outputs[5],
-            need_grad_vertices=need_grad_vertices,
-            need_grad_ray_o=need_grad_ray_o,
-            need_grad_ray_d=need_grad_ray_d,
-            need_grad_ray_tmax=need_grad_ray_tmax,
-        )
-        if need_grad_vertices and tuple(grad_vertices.shape) != ctx.vertices_shape:
-            raise RuntimeError(
-                "rayd_intersect_ad vertices must be the scene global vertex table"
-            )
-        return (
-            None,
-            grad_vertices if need_grad_vertices else None,
-            grad_ray_o if need_grad_ray_o else None,
-            grad_ray_d if need_grad_ray_d else None,
-            grad_ray_tmax if need_grad_ray_tmax else None,
-            None,
-        )
-
-    @staticmethod
-    def jvp(ctx, _grad_handle, grad_vertices, grad_ray_o, grad_ray_d, _grad_tmax, _grad_active):
-        ray_o, ray_d, active_ctx, tape_prim_id, tape_barycentric = ctx.saved_tensors
-        with disable_functorch():
-            values = rayd_intersect_jvp(
-                ctx.scene_resource,
-                _ad_native_tensor(ray_o),
-                _ad_native_tensor(ray_d),
-                _ad_native_tensor(active_ctx),
-                _ad_native_tensor(tape_prim_id),
-                _ad_native_tensor(tape_barycentric),
-                tangent_vertices=_ad_checked_tangent(
-                    "rayd_intersect_ad tangent_vertices",
-                    _ad_native_tangent_or_none(grad_vertices),
-                    ctx.vertices_shape,
-                ),
-                tangent_ray_o=_ad_checked_tangent(
-                    "rayd_intersect_ad tangent_ray_o",
-                    _ad_native_tangent_or_none(grad_ray_o),
-                    tuple(ray_o.shape),
-                ),
-                tangent_ray_d=_ad_checked_tangent(
-                    "rayd_intersect_ad tangent_ray_d",
-                    _ad_native_tangent_or_none(grad_ray_d),
-                    tuple(ray_d.shape),
-                ),
-                flags=_RAYD_RAY_FLAGS_ALL,
-            )
-        return (*values, None, None, None, None)
-
-
-def rayd_intersect_ad(
-    scene_resource: object, vertices: torch.Tensor, ray_o: torch.Tensor, ray_d: torch.Tensor,
-    ray_tmax: torch.Tensor, active: torch.Tensor | None = None,
-) -> dict[str, torch.Tensor]:
-    """Differentiable RayD intersect under the fixed-winner contract.
-
-    Returns the same fields as :func:`rayd_intersect_forward`; ``t``/``p``/
-    ``n``/``geo_n``/``uv``/``barycentric`` participate in reverse- and
-    forward-mode torch AD with respect to ``vertices``, ``ray_o`` and
-    ``ray_d``. Winner ids stay detached.
-    """
-
-    values = _RaydIntersectAdFunction.apply(
-        _rayd_scene_resource(scene_resource), vertices, ray_o, ray_d, ray_tmax, active
-    )
-    return dict(zip(_BDPT_INTERSECTION_FIELDS, values, strict=True))
-
-
-class _RaydTraceReflectionsAdFunction(torch.autograd.Function):
-    """Fixed-winner differentiable RayD reflection chain through the direct typed C++ boundary."""
-
-    @staticmethod
-    def forward(scene_resource, vertices, ray_o, ray_d, ray_tmax, active, max_bounces):
-        out = _required_native_op("rayd_trace_reflections_forward_tape")(
-            scene_resource,
-            ray_o,
-            ray_d,
-            ray_tmax,
-            active,
-            int(max_bounces),
-        )
-        (
-            valid,
-            t,
-            image_sources,
-            prim_ids,
-            _tape_prim_id,
-            tape_barycentric,
-            tape_hit_points,
-            tape_normals,
-            _active_ctx,
-        ) = out
-        return (
-            valid,
-            t,
-            image_sources,
-            prim_ids,
-            tape_barycentric,
-            tape_hit_points,
-            tape_normals,
-        )
-
-    @staticmethod
-    def setup_context(ctx, inputs, output):
-        ctx.set_materialize_grads(False)
-        scene_resource, vertices, ray_o, ray_d, ray_tmax, active, _max_bounces = inputs
-        (
-            valid,
-            _t,
-            image_sources,
-            prim_ids,
-            tape_barycentric,
-            tape_hit_points,
-            tape_normals,
-        ) = output
-        vertices = torch.autograd.forward_ad.unpack_dual(vertices).primal
-        ray_o = torch.autograd.forward_ad.unpack_dual(ray_o).primal
-        ray_d = torch.autograd.forward_ad.unpack_dual(ray_d).primal
-        ray_tmax = torch.autograd.forward_ad.unpack_dual(ray_tmax).primal
-        active_ctx = _ad_active_ctx(active, ray_o)
-        ctx.scene_resource = scene_resource
-        ctx.vertices_shape = tuple(vertices.shape)
-        ctx.save_for_backward(
-            ray_o,
-            ray_d,
-            ray_tmax,
-            active_ctx,
-            prim_ids,
-            tape_barycentric,
-            tape_hit_points,
-            tape_normals,
-            image_sources,
-        )
-        ctx.save_for_forward(
-            ray_o,
-            ray_d,
-            active_ctx,
-            prim_ids,
-            tape_barycentric,
-            tape_hit_points,
-            tape_normals,
-            image_sources,
-        )
-        ctx.mark_non_differentiable(
-            valid, prim_ids, tape_barycentric, tape_hit_points, tape_normals
-        )
-
-    @staticmethod
-    @_ad_first_order_only
-    def backward(ctx, *grad_outputs):
-        none_grads = (None, None, None, None, None, None, None)
-        grad_t = grad_outputs[1]
-        grad_image_sources = grad_outputs[2]
-        if grad_t is None and grad_image_sources is None:
-            return none_grads
-        (
-            ray_o,
-            ray_d,
-            ray_tmax,
-            active_ctx,
-            tape_prim_id,
-            tape_barycentric,
-            tape_hit_points,
-            tape_normals,
-            image_sources,
-        ) = ctx.saved_tensors
-        need_grad_vertices = bool(ctx.needs_input_grad[1])
-        need_grad_ray_o = bool(ctx.needs_input_grad[2])
-        need_grad_ray_d = bool(ctx.needs_input_grad[3])
-        need_grad_ray_tmax = bool(ctx.needs_input_grad[4])
-        if not (
-            need_grad_vertices
-            or need_grad_ray_o
-            or need_grad_ray_d
-            or need_grad_ray_tmax
-        ):
-            return none_grads
-        grad_vertices, grad_ray_o, grad_ray_d, grad_ray_tmax = (
-            rayd_trace_reflections_backward(
-                ctx.scene_resource,
-                ray_o,
-                ray_d,
-                ray_tmax,
-                active_ctx,
-                tape_prim_id,
-                tape_barycentric,
-                tape_hit_points,
-                tape_normals,
-                image_sources,
-                grad_t=grad_t,
-                grad_image_sources=grad_image_sources,
-            )
-        )
-        if need_grad_vertices and tuple(grad_vertices.shape) != ctx.vertices_shape:
-            raise RuntimeError(
-                "rayd_trace_reflections_ad vertices must be the scene global"
-                " vertex table"
-            )
-        return (
-            None,
-            grad_vertices if need_grad_vertices else None,
-            grad_ray_o if need_grad_ray_o else None,
-            grad_ray_d if need_grad_ray_d else None,
-            grad_ray_tmax if need_grad_ray_tmax else None,
-            None,
-            None,
-        )
-
-    @staticmethod
-    def jvp(
-        ctx, _grad_handle, grad_vertices, grad_ray_o, grad_ray_d, _grad_tmax, _grad_active,
-        _grad_max_bounces,
-    ):
-        (
-            ray_o,
-            ray_d,
-            active_ctx,
-            tape_prim_id,
-            tape_barycentric,
-            tape_hit_points,
-            tape_normals,
-            image_sources,
-        ) = ctx.saved_tensors
-        with disable_functorch():
-            tangent_t, tangent_image_sources = rayd_trace_reflections_jvp(
-                ctx.scene_resource,
-                _ad_native_tensor(ray_o),
-                _ad_native_tensor(ray_d),
-                _ad_native_tensor(active_ctx),
-                _ad_native_tensor(tape_prim_id),
-                _ad_native_tensor(tape_barycentric),
-                _ad_native_tensor(tape_hit_points),
-                _ad_native_tensor(tape_normals),
-                _ad_native_tensor(image_sources),
-                tangent_vertices=_ad_checked_tangent(
-                    "rayd_trace_reflections_ad tangent_vertices",
-                    _ad_native_tangent_or_none(grad_vertices),
-                    ctx.vertices_shape,
-                ),
-                tangent_ray_o=_ad_checked_tangent(
-                    "rayd_trace_reflections_ad tangent_ray_o",
-                    _ad_native_tangent_or_none(grad_ray_o),
-                    tuple(ray_o.shape),
-                ),
-                tangent_ray_d=_ad_checked_tangent(
-                    "rayd_trace_reflections_ad tangent_ray_d",
-                    _ad_native_tangent_or_none(grad_ray_d),
-                    tuple(ray_d.shape),
-                ),
-            )
-        return (None, tangent_t, tangent_image_sources, None, None, None, None)
-
-
 _RAYD_TRACE_REFLECTIONS_AD_FIELDS = (
     "valid",
     "t",
@@ -1740,29 +920,6 @@ _RAYD_TRACE_REFLECTIONS_AD_FIELDS = (
     "tape_hit_points",
     "tape_normals",
 )
-
-
-def rayd_trace_reflections_ad(
-    scene_resource: object, vertices: torch.Tensor, ray_o: torch.Tensor, ray_d: torch.Tensor,
-    ray_tmax: torch.Tensor, active: torch.Tensor | None, max_bounces: int,
-) -> dict[str, torch.Tensor]:
-    """Differentiable RayD reflection chain under the fixed-winner contract.
-
-    ``t`` and ``image_sources`` participate in reverse- and forward-mode
-    torch AD with respect to ``vertices``, ``ray_o`` and ``ray_d``; the
-    reflection chain (prim ids and tape tensors) stays detached.
-    """
-
-    values = _RaydTraceReflectionsAdFunction.apply(
-        _rayd_scene_resource(scene_resource),
-        vertices,
-        ray_o,
-        ray_d,
-        ray_tmax,
-        active,
-        int(max_bounces),
-    )
-    return dict(zip(_RAYD_TRACE_REFLECTIONS_AD_FIELDS, values, strict=True))
 
 
 def _epc_paths_frozen_winner_checks(
@@ -1886,10 +1043,10 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        scene_resource, vertices, source, receiver, sequence, plane_points, plane_normals,
-        surface_group_id, surface_group_size, surface_group_members, max_bounces,
-        visibility_ignore_mode,
-    ):
+        scene_resource: Any, vertices: Any, source: Any, receiver: Any, sequence: Any,
+        plane_points: Any, plane_normals: Any, surface_group_id: Any, surface_group_size: Any,
+        surface_group_members: Any, max_bounces: Any, visibility_ignore_mode: Any,
+    ) -> Any:
         out = _required_native_op("rayd_reflection_epc_paths_forward")(
             scene_resource,
             source,
@@ -1908,7 +1065,7 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
         return tuple(out)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         (
             scene_resource,
@@ -1961,7 +1118,7 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, *grad_outputs):
+    def backward(ctx: Any, *grad_outputs: Any) -> Any:
         none_grads = (None,) * 12
         grad_path_length = grad_outputs[1]
         grad_hits = grad_outputs[4]
@@ -1998,7 +1155,9 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
             need_grad_source=need_grad_source,
             need_grad_receiver=need_grad_receiver,
         )
-        if need_grad_vertices and tuple(grad_vertices.shape) != ctx.vertices_shape:
+        if need_grad_vertices and (
+            tuple(cast(torch.Tensor, grad_vertices).shape) != ctx.vertices_shape
+        ):
             raise RuntimeError(
                 "rayd_reflection_epc_paths_ad vertices must be the scene"
                 " global vertex table"
@@ -2019,7 +1178,10 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def jvp(ctx, _grad_handle, grad_vertices, grad_source, grad_receiver, *_frozen_tangents):
+    def jvp(
+        ctx: Any, _grad_handle: Any, grad_vertices: Any, grad_source: Any, grad_receiver: Any,
+        *_frozen_tangents: Any,
+    ) -> Any:
         (
             source,
             receiver,
@@ -2179,11 +1341,11 @@ class _RaydFaceNormalsAdFunction(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(scene_resource, vertices, raw_face_normals):
+    def forward(scene_resource: Any, vertices: Any, raw_face_normals: Any) -> Any:
         return deterministic_normalize_vec3(raw_face_normals, eps=1.0e-6)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         scene_resource, vertices, _raw_face_normals = inputs
         vertices = torch.autograd.forward_ad.unpack_dual(vertices).primal
@@ -2192,7 +1354,7 @@ class _RaydFaceNormalsAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, grad_face_normals):
+    def backward(ctx: Any, grad_face_normals: Any) -> Any:
         if ctx.needs_input_grad[2]:
             raise RuntimeError(
                 "rayd_face_normals_ad differentiates the vertex table only;"
@@ -2208,7 +1370,7 @@ class _RaydFaceNormalsAdFunction(torch.autograd.Function):
         return (None, grad_vertices, None)
 
     @staticmethod
-    def jvp(ctx, _grad_handle, grad_vertices, _grad_raw_face_normals):
+    def jvp(ctx: Any, _grad_handle: Any, grad_vertices: Any, _grad_raw_face_normals: Any) -> Any:
         tangent_vertices = _ad_native_tangent_or_none(grad_vertices)
         if tangent_vertices is None:
             return None
@@ -2250,7 +1412,7 @@ def rayd_face_normals_ad(
 # penetration_autograd
 # ---------------------------------------------------------------------------
 def _segment_penetration_tape_from_values(
-    values: tuple[torch.Tensor, ...], *, hit_capacity: int, failure_state: object,
+    values: tuple[torch.Tensor, ...], *, hit_capacity: int, failure_state: CapacityFailureState,
 ) -> SegmentPenetrationTapeResult:
     result = SegmentPenetrationResult(
         hit_capacity=hit_capacity,
@@ -2308,9 +1470,10 @@ class _RaydSegmentPenetrationAdFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        scene_resource, vertices, origins, targets, input_active, input_active_any, hit_capacity,
-        policy, scene_diagonal, failure_state,
-    ):
+        scene_resource: Any, vertices: Any, origins: Any, targets: Any, input_active: Any,
+        input_active_any: Any, hit_capacity: Any, policy: Any, scene_diagonal: Any,
+        failure_state: Any,
+    ) -> Any:
         tape = rayd_segment_penetration_forward_tape(
             scene_resource,
             origins,
@@ -2325,7 +1488,7 @@ class _RaydSegmentPenetrationAdFunction(torch.autograd.Function):
         return _segment_penetration_tape_values(tape)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         (
             scene_resource,
@@ -2364,7 +1527,9 @@ class _RaydSegmentPenetrationAdFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def _saved_request(ctx):
+    def _saved_request(
+        ctx: Any,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None, SegmentPenetrationTapeResult]:
         origins, targets, active_ctx, *values = ctx.saved_tensors
         input_active = None if ctx.input_active_absent else active_ctx
         tape = _segment_penetration_tape_from_values(
@@ -2376,7 +1541,7 @@ class _RaydSegmentPenetrationAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, *grad_outputs):
+    def backward(ctx: Any, *grad_outputs: Any) -> Any:
         none_grads = (None,) * 10
         continuous_grads = grad_outputs[4:10]
         if not any(value is not None for value in continuous_grads):
@@ -2433,7 +1598,10 @@ class _RaydSegmentPenetrationAdFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def jvp(ctx, _grad_handle, grad_vertices, grad_origins, grad_targets, *_frozen_tangents):
+    def jvp(
+        ctx: Any, _grad_handle: Any, grad_vertices: Any, grad_origins: Any, grad_targets: Any,
+        *_frozen_tangents: Any,
+    ) -> Any:
         origins, targets, input_active, tape = (
             _RaydSegmentPenetrationAdFunction._saved_request(ctx)
         )
@@ -2499,7 +1667,7 @@ class _RaydSegmentPenetrationAdFunction(torch.autograd.Function):
 def rayd_segment_penetration_ad(
     scene_resource: object, vertices: torch.Tensor, origins: torch.Tensor, targets: torch.Tensor,
     input_active: torch.Tensor | None, *, input_active_any: bool, hit_capacity: int,
-    policy: SegmentPenetrationPolicy, scene_diagonal: float, failure_state: object,
+    policy: SegmentPenetrationPolicy, scene_diagonal: float, failure_state: CapacityFailureState,
 ) -> SegmentPenetrationResult:
     """Differentiable live RayD segment-penetration entry."""
 

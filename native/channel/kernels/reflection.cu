@@ -785,44 +785,6 @@ __global__ void slab_reflection_accumulate_jvp_kernel(
 
 using channel::check_tensor;
 
-__global__ void reflection_launch_inputs_kernel(
-    const float *__restrict__ tx_positions,
-    float *__restrict__ ray_o,
-    bool *__restrict__ active,
-    float *__restrict__ tx_pol,
-    int *__restrict__ tx_id,
-    int64_t *__restrict__ light_seed,
-    int64_t tx_index,
-    int64_t sample_count) {
-    const float tx_x = tx_positions[tx_index * 3 + 0];
-    const float tx_y = tx_positions[tx_index * 3 + 1];
-    const float tx_z = tx_positions[tx_index * 3 + 2];
-    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
-    for (int64_t sample = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         sample < sample_count;
-         sample += stride) {
-        float *origin = ray_o + sample * 3;
-        origin[0] = tx_x;
-        origin[1] = tx_y;
-        origin[2] = tx_z;
-
-        float *pol = tx_pol + sample * 3;
-        pol[0] = 1.0f;
-        pol[1] = 0.0f;
-        pol[2] = 0.0f;
-
-        active[sample] = true;
-        if (tx_id != nullptr) {
-            tx_id[sample] = static_cast<int>(tx_index);
-        }
-        if (light_seed != nullptr) {
-            light_seed[sample] = static_cast<int64_t>(
-                (static_cast<unsigned long long>(tx_index) << 32) ^
-                static_cast<unsigned long long>(sample));
-        }
-    }
-}
-
 }  // namespace
 
 namespace {
@@ -1146,27 +1108,6 @@ at::Tensor channel_mc_slab_reflection_accumulate_jvp_cuda(
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     });
     return output_tangent;
-}
-
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_bdpt_reflection_launch_inputs_cuda(
-    at::Tensor tx_positions,
-    int64_t tx_index,
-    int64_t sample_count) {
-    CHANNEL_REFLECTION_PREPARE_LAUNCH_INPUTS();
-    auto tx_id = at::empty({sample_count}, tx_positions.options().dtype(at::kInt));
-    auto light_seed = at::empty({sample_count}, tx_positions.options().dtype(at::kLong));
-    if (sample_count > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(tx_positions.get_device()).stream();
-        const int block_count = static_cast<int>((sample_count + kReflectionBlockSize - 1) / kReflectionBlockSize);
-        reflection_launch_inputs_kernel<<<block_count, kReflectionBlockSize, 0, stream>>>(
-            CHANNEL_REFLECTION_LAUNCH_INPUT_PREFIX(),
-            tx_id.data_ptr<int>(),
-            light_seed.data_ptr<int64_t>(),
-            tx_index,
-            sample_count);
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-    return {ray_o, ray_tmax, active, tx_pol, tx_id, light_seed};
 }
 
 #undef CHANNEL_REFLECTION_LAUNCH_INPUT_PREFIX

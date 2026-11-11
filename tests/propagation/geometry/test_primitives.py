@@ -11,11 +11,8 @@ from witwin.channel import runtime
 
 
 _OWNER_NAMES = (
-    "core_diffraction_edge_count",
     "deterministic_face_groups",
     "deterministic_normalize_vec3",
-    "deterministic_reflect_points",
-    "deterministic_surface_face_groups",
     "mc_diffraction_edge_geometry",
     "mc_surface_group_edge_candidates",
 )

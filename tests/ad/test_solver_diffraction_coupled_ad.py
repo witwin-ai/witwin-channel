@@ -705,3 +705,85 @@ def test_coupled_dd_mesh_vertex_grad_raises_loudly():
     scene = _coupled_vertex_scene(vertices)
     with pytest.raises(NotImplementedError, match="double-diffraction"):
         _solve_coupled(scene, "vjp")
+
+# ---------------------------------------------------------------------------
+# Interaction chains with more than one reflection (max_depth=3): the diffraction may be
+# first, interior or last. The fixture's floor gives reflection-diffraction-reflection rows.
+# ---------------------------------------------------------------------------
+
+
+def _solve_chain(scene: Scene, ad_mode: str):
+    return path_solve(
+        scene,
+        PathConfig(max_depth=3, components=_COUPLED_COMPONENTS, coupled_paths=True, ad_mode=ad_mode),
+        reference_frequency_hz=_FREQUENCY_HZ,
+    )
+
+
+def _long_chain_mask(result) -> torch.Tensor:
+    types = result.interaction_type
+    return ((types == 2).sum(dim=-1) == 1) & ((types == 1).sum(dim=-1) == 2)
+
+
+def _chain_loss(result) -> torch.Tensor:
+    coefficient = result.a[..., 0][_long_chain_mask(result)]
+    return coefficient.real.sum() + 0.5 * coefficient.imag.sum()
+
+
+@pytest.mark.parametrize("endpoint", ("tx", "rx"))
+def test_long_chain_endpoint_position_grad_matches_fd(endpoint):
+    base = torch.tensor(_COUPLED_TX if endpoint == "tx" else _COUPLED_RX, dtype=torch.float32)
+    leaf = base.clone().cuda().requires_grad_(True)
+    result = _solve_chain(_coupled_scene(**{endpoint: leaf}), "vjp")
+    assert bool(_long_chain_mask(result).any()), "the fixture no longer produces 2R+1D chains"
+    _chain_loss(result).backward()
+    assert leaf.grad is not None and float(leaf.grad.abs().max()) > 0.0
+
+    def evaluate(values: torch.Tensor) -> torch.Tensor:
+        return _chain_loss(_solve_chain(_coupled_scene(**{endpoint: values.clone()}), "none")).detach()
+
+    expected = central_difference_gradient(evaluate, base, FD_STEP_POSITION_PHASE)
+    assert relative_error(leaf.grad, expected, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
+
+
+@pytest.mark.parametrize("param", ("eps_r", "sigma_e"))
+def test_long_chain_material_forward_mode_matches_reverse_and_fd(param):
+    scene = _coupled_scene()
+    compiled = compile_scene(scene, reference_frequency_hz=_FREQUENCY_HZ)
+    base = getattr(compiled.materials, param)
+    tangent = torch.ones_like(base)
+    with torch.autograd.forward_ad.dual_level():
+        dual = torch.autograd.forward_ad.make_dual(base.detach().clone(), tangent)
+        object.__setattr__(compiled.materials, param, dual)
+        try:
+            result = _solve_chain(scene, "jvp")
+            mask = _long_chain_mask(result)
+            assert bool(mask.any())
+            tangent_a = torch.autograd.forward_ad.unpack_dual(result.a[..., 0]).tangent
+        finally:
+            object.__setattr__(compiled.materials, param, base)
+    assert tangent_a is not None
+    jvp = tangent_a[mask].real.sum() + 0.5 * tangent_a[mask].imag.sum()
+    base.requires_grad_(True)
+    try:
+        _chain_loss(_solve_chain(scene, "vjp")).backward()
+        assert base.grad is not None
+        grad = base.grad.detach().clone()
+    finally:
+        base.requires_grad_(False)
+        base.grad = None
+    assert float(jvp.abs()) > 0.0
+    assert relative_error(jvp, (grad * tangent).sum(), abs_floor=ABS_TOL) <= REL_TOL_GENERAL
+
+    def evaluate(values: torch.Tensor) -> torch.Tensor:
+        with torch.no_grad():
+            base.copy_(values.to(device=base.device, dtype=base.dtype))
+        try:
+            return _chain_loss(_solve_chain(scene, "none")).detach()
+        finally:
+            with torch.no_grad():
+                base.copy_(saved)
+
+    saved = base.detach().clone()
+    expected = central_difference_gradient(evaluate, saved, _MATERIAL_STEPS[param])
+    assert relative_error(grad, expected, abs_floor=ABS_TOL) <= REL_TOL_GENERAL

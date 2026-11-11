@@ -436,6 +436,8 @@ def test_gradient_is_stable_across_seeds():
 # ---------------------------------------------------------------------------
 
 _DIFFRACTION_SAMPLES = 4096
+# Samples per seed of the cross-seed gradient spread test (see its docstring).
+_SEED_SPREAD_SAMPLES = 262144
 
 
 def _diffraction_scene(
@@ -464,11 +466,13 @@ def _diffraction_scene(
     )
 
 
-def _solve_diffraction(scene: Scene, ad_mode: str, seed: int = _SEED):
+def _solve_diffraction(
+    scene: Scene, ad_mode: str, seed: int = _SEED, samples: int = _DIFFRACTION_SAMPLES,
+):
     return solve(
         scene,
         Config(
-            samples=_DIFFRACTION_SAMPLES,
+            samples=samples,
             seed=seed,
             components={"diffraction"},
             max_depth=1,
@@ -768,6 +772,14 @@ def test_diffraction_gradient_is_stable_across_seeds():
  The diffraction map resamples its edge points and cone azimuths per
  seed, so this is the real Monte Carlo gradient-variance check; the bound
  reflects the sampling noise of the estimator at this sample count.
+
+ The face term depends on each cone lane's observation angle, so the eps_r
+ gradient has a heavier tail than the primal. Its relative standard
+ deviation across seeds is 0.32 at 4096 samples (200 seeds), 0.14 at 16384
+ (200 seeds), 0.088 at 65536 (50 seeds) and 0.035 at 262144 (20 seeds),
+ against 0.17, 0.08, 0.044 and 0.024 for the primal. The 0.15 bound on a
+ five-seed spread needs a deviation well below 0.15, so this test draws
+ 262144 samples per seed (a few short launches on a 4x4 grid per solve).
  """
 
     scene = _diffraction_scene()
@@ -776,7 +788,9 @@ def test_diffraction_gradient_is_stable_across_seeds():
     leaf.requires_grad_(True)
     try:
         for seed in (1, 2, 3, 4, 5):
-            _loss(_solve_diffraction(scene, "vjp", seed=seed)).backward()
+            _loss(
+                _solve_diffraction(scene, "vjp", seed=seed, samples=_SEED_SPREAD_SAMPLES)
+            ).backward()
             gradients.append(leaf.grad.detach().clone())
             leaf.grad = None
     finally:
@@ -833,3 +847,34 @@ def test_ad_mode_none_keeps_primal_contract():
     )
     assert primal.metadata["kernel"]["ad_status"] == "none"
     assert ad.metadata["kernel"]["ad_status"] == "vjp"
+
+def _seed_mean_and_error(scene: Scene, leaf: torch.Tensor, seeds) -> tuple[float, float]:
+    values = []
+    leaf.requires_grad_(True)
+    try:
+        for seed in seeds:
+            _loss(_solve_diffraction(scene, "vjp", seed=seed)).backward()
+            values.append(float(leaf.grad.abs().max() * leaf.grad.flatten()[leaf.grad.abs().argmax()].sign()))
+            leaf.grad = None
+    finally:
+        leaf.requires_grad_(False)
+        leaf.grad = None
+    stacked = torch.tensor(values, dtype=torch.float64)
+    return float(stacked.mean()), float(stacked.std() / len(values) ** 0.5)
+
+
+def test_diffraction_seeds_closer_than_the_sample_count_draw_independent_streams():
+    """Adjacent seeds (all below the 4096-lane sample count) estimate the same mean as seeds
+    spread over the high bits. When the samplers XORed the raw lane with the seed, adjacent
+    seeds only permuted one set of draws and their gradient mean sat 7 standard errors away
+    from the spread seeds' mean."""
+
+    scene = _diffraction_scene()
+    leaf = _material_leaf(scene, "eps_r")
+    count = 128
+    adjacent, adjacent_error = _seed_mean_and_error(scene, leaf, range(1, count + 1))
+    spread, spread_error = _seed_mean_and_error(
+        scene, leaf, [index * 65537 for index in range(1, count + 1)]
+    )
+    combined_error = (adjacent_error**2 + spread_error**2) ** 0.5
+    assert abs(adjacent - spread) <= 4.0 * combined_error

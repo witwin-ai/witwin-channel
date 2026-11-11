@@ -11,8 +11,6 @@ from tests.support.core_world import (
     make_transmitter,
 )
 from witwin.channel.deployment import build_info
-from witwin.channel.interactions.transmission import event_uniforms
-from witwin.channel.kernels.montecarlo import bdpt_counter_uniforms
 from witwin.core import MaterialLayer, PhysicalMaterial, Scene
 
 _FREQUENCY = 3.0e9
@@ -66,65 +64,8 @@ def _mixed_scene(transmitters=1) -> Scene:
     )
 
 
-def _solve(scene, config, monkeypatch=None, *, composed=False, frequency=_FREQUENCY):
-    if composed:
-        assert monkeypatch is not None
-        monkeypatch.setattr(bdpt, "_wavefront_eligible", lambda config, runtimes: False)
-    try:
-        return bdpt.solve(scene, config, reference_frequency_hz=frequency)
-    finally:
-        if composed:
-            monkeypatch.undo()
-
-
-@cuda
-def test_counter_uniforms_depend_only_on_the_global_sample():
-    reference = torch.empty((0,), device="cuda")
-    wide = bdpt_counter_uniforms(reference, 64, seed=9, first=0, depth=2, stream="event_selection")
-    window = bdpt_counter_uniforms(
-        reference, 16, seed=9, first=20, depth=2, stream="event_selection"
-    )
-    assert torch.equal(wide[20:36], window)
-    assert bool(((wide >= 0.0) & (wide < 1.0)).all())
-    # Sample i of transmitter t is global sample t * count + i.
-    assert torch.equal(
-        event_uniforms(32, seed=9, tx_index=1, depth=2, device=torch.device("cuda")), wide[32:]
-    )
-    other_depth = bdpt_counter_uniforms(
-        reference, 64, seed=9, first=0, depth=3, stream="event_selection"
-    )
-    other_seed = bdpt_counter_uniforms(
-        reference, 64, seed=10, first=0, depth=2, stream="event_selection"
-    )
-    assert not torch.equal(wide, other_depth)
-    assert not torch.equal(wide, other_seed)
-    directions = bdpt_counter_uniforms(
-        reference, 64, seed=9, first=0, depth=2, stream="scatter_direction"
-    )
-    assert directions.shape == (64, 2)
-    assert not torch.equal(directions[:, 0], wide)
-
-
-@cuda
-def test_wavefront_matches_event_composed_sampler(monkeypatch):
-    _require_native()
-    scene = _mixed_scene(transmitters=2)
-    config = bdpt.Config(samples=4096, seed=11, max_depth=3, components={"transmission"})
-    wavefront = _solve(scene, config)
-    composed = _solve(scene, config, monkeypatch, composed=True)
-
-    assert wavefront.metadata["sampler"] == "wavefront"
-    assert composed.metadata["sampler"] == "event_composed"
-    assert float(wavefront.component_power["transmission"]) > 0.0
-    torch.testing.assert_close(wavefront.path_gain, composed.path_gain, rtol=1.0e-6, atol=0.0)
-    assert (
-        wavefront.metadata["transmission"]["event_counts"]
-        == composed.metadata["transmission"]["event_counts"]
-    )
-    assert (
-        wavefront.metadata["valid_contribution_count"]
-        == composed.metadata["valid_contribution_count"]
-    )
+def _solve(scene, config, *, frequency=_FREQUENCY):
+    return bdpt.solve(scene, config, reference_frequency_hz=frequency)
 
 
 @cuda
@@ -209,40 +150,3 @@ def test_enumerated_oracle_is_called_once(monkeypatch):
         )
 
 
-
-@cuda
-@pytest.mark.parametrize("order", [1, 3])
-@pytest.mark.parametrize("components", [{"scattering"}, {"scattering", "transmission"}])
-def test_wavefront_scatter_branch_matches_event_composed_sampler(monkeypatch, order, components):
-    _require_native()
-    from tests.montecarlo.bdpt.test_scattering import (
-        _FREQUENCY as frequency,
-        _material,
-        _point_scene,
-        _roughness,
-    )
-
-    scene = _point_scene(_material(_roughness()))
-    config = bdpt.Config(
-        samples=16_384, seed=5, max_depth=3, components=components, max_scattering_order=order
-    )
-    wavefront = _solve(scene, config, frequency=frequency)
-    composed = _solve(scene, config, monkeypatch, composed=True, frequency=frequency)
-
-    assert wavefront.metadata["sampler"] == "wavefront"
-    assert float(wavefront.component_power["scattering"]) > 0.0
-    for component in sorted(components):
-        torch.testing.assert_close(
-            wavefront.component_power[component],
-            composed.component_power[component],
-            rtol=1.0e-4,
-            atol=0.0,
-        )
-    assert (
-        wavefront.metadata["scattering"]["event_counts"]
-        == composed.metadata["scattering"]["event_counts"]
-    )
-    assert (
-        wavefront.metadata["scattering"]["nee_connection_rows"]
-        == composed.metadata["scattering"]["nee_connection_rows"]
-    )

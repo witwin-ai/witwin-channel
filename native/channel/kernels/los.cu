@@ -475,11 +475,6 @@ at::Tensor launch_los_component_maps(
     return maps;
 }
 
-at::Tensor los_component_maps_cuda_impl(at::Tensor los) {
-    check_cuda_tensor(los, "los", at::kFloat, 3);
-    return launch_los_component_maps(los, los.size(1), los.size(2));
-}
-
 at::Tensor los_component_maps_from_matrix_cuda_impl(
     at::Tensor los,
     int64_t rows,
@@ -751,10 +746,6 @@ at::Tensor channel_mc_los_path_gain_jvp_cuda(
     return out;
 }
 
-at::Tensor channel_mc_los_component_maps_cuda(at::Tensor los) {
-    return los_component_maps_cuda_impl(los);
-}
-
 at::Tensor channel_mc_los_component_maps_from_matrix_cuda(at::Tensor los, int64_t rows, int64_t cols) {
     return los_component_maps_from_matrix_cuda_impl(los, rows, cols);
 }
@@ -862,53 +853,12 @@ at::Tensor channel_mc_pack_vec3_cuda(at::Tensor x, at::Tensor y, at::Tensor z) {
     return pack_vec3_cuda_impl(x, y, z);
 }
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_bdpt_los_export_cuda(
-    at::Tensor tx_positions,
-    at::Tensor tx_power,
-    at::Tensor rx_positions,
-    double frequency_hz,
-    at::Tensor tx_pol) {
-    return los_export_cuda_impl(tx_positions, tx_power, rx_positions, frequency_hz, tx_pol);
-}
-
-at::Tensor channel_bdpt_los_component_maps_cuda(at::Tensor los) {
-    return los_component_maps_cuda_impl(los);
-}
-
 at::Tensor channel_bdpt_los_component_maps_from_matrix_cuda(at::Tensor los, int64_t rows, int64_t cols) {
     return los_component_maps_from_matrix_cuda_impl(los, rows, cols);
 }
 
-at::Tensor channel_bdpt_apply_los_visibility_cuda(
-    at::Tensor maps,
-    at::Tensor los,
-    at::Tensor visible,
-    int64_t tx_index) {
-    CHANNEL_LOS_CHECK_VISIBILITY_APPLICATION();
-    const int64_t rows = maps.size(1);
-    const int64_t cols = maps.size(2);
-    const int64_t cell_count = rows * cols;
-    TORCH_CHECK(visible.size(0) == cell_count, "visible length must match one receiver grid");
-
-    if (cell_count > 0) {
-        cudaStream_t stream = at::cuda::getCurrentCUDAStream(los.get_device()).stream();
-        const int block_count = static_cast<int>((cell_count + kLosBlockSize - 1) / kLosBlockSize);
-        apply_los_visibility_public_layout_kernel<<<block_count, kLosBlockSize, 0, stream>>>(
-            CHANNEL_LOS_VISIBILITY_LAUNCH_ARGUMENTS());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    }
-    return maps;
-}
-
 #undef CHANNEL_LOS_VISIBILITY_LAUNCH_ARGUMENTS
 #undef CHANNEL_LOS_CHECK_VISIBILITY_APPLICATION
-
-std::tuple<at::Tensor, at::Tensor> channel_bdpt_los_visibility_inputs_cuda(
-    at::Tensor tx_positions,
-    int64_t tx_index,
-    int64_t rx_count) {
-    return los_visibility_inputs_cuda_impl(tx_positions, tx_index, rx_count);
-}
 
 at::Tensor channel_bdpt_receiver_grid_points_cuda(
     at::Tensor reference,
@@ -946,10 +896,6 @@ std::tuple<at::Tensor, at::Tensor> channel_bdpt_transmitter_tensors_cuda(
     const std::vector<float> &positions_host,
     const std::vector<float> &power_host) {
     return transmitter_tensors_cuda_impl(positions_host, power_host);
-}
-
-at::Tensor channel_bdpt_pack_vec3_cuda(at::Tensor x, at::Tensor y, at::Tensor z) {
-    return pack_vec3_cuda_impl(x, y, z);
 }
 
 // ==== Section: LoS silhouette clearance ====
@@ -1906,8 +1852,6 @@ namespace {
 constexpr int kJonesBlockSize = 256;
 namespace field = rayd::shared::diffraction;
 namespace transport = rayd::shared::field_transport;
-
-
 
 __device__ __forceinline__ field::Basis3 endpoint_basis(
     const float *values,

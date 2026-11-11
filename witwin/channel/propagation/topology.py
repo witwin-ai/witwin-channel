@@ -10,10 +10,6 @@ from types import SimpleNamespace
 
 import torch
 
-from witwin.channel.kernels.topology import (
-    mc_sample_directions as mc_sample_directions,
-    path_los_export as path_los_export,
-)
 from witwin.channel.kernels import topology as topology_kernels
 from witwin.channel.propagation.rows import (
     EvaluatedPaths,
@@ -68,25 +64,6 @@ def concatenate_path_blocks(
     )
 
 
-def _sort_order(paths: dict[str, torch.Tensor], *, tx_count: int, max_depth: int) -> torch.Tensor:
-    del tx_count, max_depth
-    sequence = paths.get("primitive_sequence")
-    if sequence is None or sequence.dim() != 2:
-        sequence = torch.empty(
-            (paths["valid"].numel(), 0), device=paths["valid"].device, dtype=torch.int32
-        )
-    return topology_kernels.deterministic_sort_order(
-        paths["valid"],
-        paths["tx_id"],
-        paths["rx_id"],
-        paths["depth"],
-        paths["component_id"],
-        paths["primitive_id"],
-        paths["edge_id"],
-        sequence.to(dtype=torch.int32).contiguous(),
-    )
-
-
 def _interaction_type_sequence(
     *, component_id: torch.Tensor, depth: torch.Tensor, width: int,
 ) -> torch.Tensor:
@@ -107,12 +84,25 @@ def _interaction_type_sequence(
     scattering = (component_id == 6) & (depth > 0)
     result[scattering, 0] = 8
     if width >= 2:
-        reflection_diffraction = (component_id == 3) & (depth >= 2)
-        result[reflection_diffraction, 0] = 1
-        result[reflection_diffraction, 1] = 2
-        diffraction_reflection = (component_id == 4) & (depth >= 2)
-        result[diffraction_reflection, 0] = 2
-        result[diffraction_reflection, 1] = 1
+        # Single-diffraction chains: reflections everywhere but the diffraction slot, which is
+        # last for component 3, first for 4 and slot s for 8 + s (s >= 1).
+        diffraction_slot = torch.where(
+            component_id == 3,
+            depth.to(dtype=torch.int64) - 1,
+            torch.where(
+                component_id == 4,
+                torch.zeros_like(depth, dtype=torch.int64),
+                torch.where(
+                    (component_id > 8) & (component_id < 16),
+                    component_id.to(dtype=torch.int64) - 8,
+                    torch.full_like(depth, -1, dtype=torch.int64),
+                ),
+            ),
+        )
+        chain = (diffraction_slot >= 0) & (depth >= 2)
+        chain_slots = active & chain.reshape(-1, 1)
+        result[chain_slots] = 1
+        result[chain_slots & (slots == diffraction_slot.reshape(-1, 1))] = 2
         # component_id 7 = double diffraction: two sequential edge (DIFFRACTION)
         # events. Both slots carry the edge object ids in primitive_sequence, so
         # the canonical dedup key keeps distinct edge pairs distinct.
@@ -143,51 +133,6 @@ def canonical_sequence_key(paths: dict[str, torch.Tensor]) -> torch.Tensor:
         object_id[diffraction, 0] = paths["edge_id"][diffraction]
         object_id[interaction_type == 0] = -1
     return torch.stack((interaction_type, object_id), dim=-1).contiguous()
-
-
-def _canonical_selection_order(
-    paths: dict[str, torch.Tensor], *, tx_count: int, max_depth: int, max_paths: int | None,
-    max_paths_scope: str,
-) -> torch.Tensor:
-    order = _sort_order(paths, tx_count=tx_count, max_depth=max_depth)
-    count = int(order.numel())
-    if count > 1:
-        key = canonical_sequence_key(paths)[order].reshape(count, -1)
-        tx_id = paths["tx_id"][order]
-        rx_id = paths["rx_id"][order]
-        same = (tx_id[1:] == tx_id[:-1]) & (rx_id[1:] == rx_id[:-1])
-        if int(key.shape[1]) > 0:
-            same &= (key[1:] == key[:-1]).all(dim=1)
-        group_start = torch.ones((count,), device=order.device, dtype=torch.bool)
-        group_start[1:] = ~same
-        group_id = group_start.cumsum(dim=0, dtype=torch.int64) - 1
-        length = paths["path_length_m"][order]
-        minimum = torch.full(
-            (count,), float("inf"), device=order.device, dtype=length.dtype
-        )
-        minimum.scatter_reduce_(0, group_id, length, reduce="amin", include_self=True)
-        shortest = length == minimum[group_id]
-        shortest_group = group_id[shortest]
-        unique_shortest = torch.ones_like(shortest_group, dtype=torch.bool)
-        unique_shortest[1:] = shortest_group[1:] != shortest_group[:-1]
-        unique = torch.zeros((count,), device=order.device, dtype=torch.bool)
-        unique[torch.nonzero(shortest, as_tuple=False).reshape(-1)[unique_shortest]] = (
-            True
-        )
-        order = order[unique]
-
-    if max_paths is not None and max_paths_scope == "global":
-        order = order[: int(max_paths)]
-    elif max_paths is not None and int(order.numel()) > 0:
-        tx_id = paths["tx_id"][order].to(dtype=torch.int64)
-        rx_id = paths["rx_id"][order].to(dtype=torch.int64)
-        pair = rx_id * max(int(tx_count), 1) + tx_id
-        row = torch.arange(int(order.numel()), device=order.device, dtype=torch.int64)
-        first = torch.ones_like(pair, dtype=torch.bool)
-        first[1:] = pair[1:] != pair[:-1]
-        starts = torch.where(first, row, torch.zeros_like(row)).cummax(dim=0).values
-        order = order[(row - starts) < int(max_paths)]
-    return order.contiguous()
 
 
 def _pad_topology_sequences(
@@ -269,7 +214,9 @@ class EvaluatedPathSidecars:
     row_groups: PathRowGroups | None = None
 
 
-def evaluated_paths_from_result(paths: object) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
+def evaluated_paths_from_result(
+    paths: SimpleNamespace,
+) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     """Normalize one canonical result directly into split typed contracts."""
 
     path_count = int(paths.valid.numel())
@@ -575,6 +522,3 @@ def _ensure_topology_fields(
             dtype=torch.float32
         ).contiguous()
     return extended
-
-
-__all__ = ["mc_sample_directions"]

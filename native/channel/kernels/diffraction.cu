@@ -116,8 +116,10 @@ namespace fad = rayd::torch::field_transport_ad;
 __device__ __forceinline__ unsigned int dfr_hash(unsigned int x) {
     x^=x>>16; x*=0x7feb352du; x^=x>>15; x*=0x846ca68bu; x^=x>>16; return x;
 }
+// The lane is hashed before it meets the stream and seed words (as in RayD's samplers), so
+// seeds closer together than the lane count draw unrelated values.
 __device__ __forceinline__ float dfr_uniform(unsigned int lane,unsigned int stream,unsigned int seed) {
-    const unsigned int h=dfr_hash(lane^(stream*0x9e3779b9u)^seed);
+    const unsigned int h=dfr_hash(dfr_hash(lane)^(stream*0x9e3779b9u)^seed);
     return static_cast<float>(h&0x00ffffffu)*(1.0f/16777216.0f);
 }
 
@@ -838,8 +840,6 @@ __global__ void diffraction_state_pack_selected_kernel(
     }
 }
 
-
-
 __device__ __forceinline__ float signf_like_torch(float value) {
     return (value > 0.0f) ? 1.0f : ((value < 0.0f) ? -1.0f : 0.0f);
 }
@@ -1503,35 +1503,6 @@ at::Tensor channel_mc_diffraction_state_wi_cuda(at::Tensor state_edge_pos, at::T
 
 at::Tensor channel_mc_selected_edge_indices_cuda(at::Tensor selected) {
     return selected_edge_indices_cuda_impl(selected);
-}
-
-std::vector<at::Tensor> channel_mc_diffraction_state_pack_cuda(
-    at::Tensor edge_indices,
-    at::Tensor edge_pos,
-    at::Tensor edge_dir,
-    at::Tensor line_min,
-    at::Tensor line_max,
-    at::Tensor n0,
-    at::Tensor n1,
-    at::Tensor face0,
-    at::Tensor face1,
-    at::Tensor exterior_angle,
-    at::Tensor tx,
-    at::Tensor tx_power) {
-    return diffraction_state_pack_cuda_impl(
-        edge_indices,
-        edge_pos,
-        edge_dir,
-        line_min,
-        line_max,
-        n0,
-        n1,
-        face0,
-        face1,
-        exterior_angle,
-        tx,
-        tx_power,
-        0);
 }
 
 std::vector<at::Tensor> channel_deterministic_diffraction_state_pack_cuda(

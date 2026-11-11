@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import torch
 
@@ -15,7 +15,7 @@ from witwin.core import Scene, SceneSnapshot
 
 from witwin.channel import build_info
 from witwin.channel.capabilities import (
-    _BDPT_AD_DIFFERENTIABLE_PARAMETERS, capabilities,
+    _BDPT_AD_DIFFERENTIABLE_PARAMETERS, ConfigMetadata, ResultSemantics, capabilities,
     config_metadata, component_quantities, estimator_metadata,
     serialize_config,
 )
@@ -36,7 +36,6 @@ from witwin.channel.scene.endpoints import (
     transmitter_polarizations_f32,
 )
 from witwin.channel.kernels import geometry as geometry_kernels
-from witwin.channel.kernels.materials import em_layer_stack_eval
 from witwin.channel.kernels.montecarlo import (
     _BDPT_COMPONENT_MATRIX_FIELDS,
     _BDPT_COMPONENT_MATRIX_ORDER,
@@ -49,7 +48,6 @@ from witwin.channel.kernels.montecarlo import (
     bdpt_compact_connection_samples,
     # Re-exported for the canonical-owner contract test; this module has no
     # other caller for the two component-map buffer facades.
-    bdpt_component_map_buffer as bdpt_component_map_buffer,
     bdpt_concat_connection_samples,
     bdpt_connection_variance,
     bdpt_count_valid_connection_samples,
@@ -67,38 +65,21 @@ from witwin.channel.kernels.montecarlo import (
     bdpt_launch_state,
     bdpt_los_component_maps_from_matrix,
     bdpt_receiver_grid_points,
-    bdpt_reflected_light_subpath_state,
-    bdpt_reflection_launch_inputs,
-    bdpt_sample_directions,
-    bdpt_store_component_map as bdpt_store_component_map,
-    bdpt_subpath_intersection_inputs,
-    bdpt_transmitted_light_subpath_state,
     bdpt_transmitter_tensors, bdpt_wavefront_transmission, bdpt_scatter_table_stack,
-    BDPT_WAVEFRONT_GRADIENTS, bdpt_wavefront_backward, bdpt_wavefront_jvp, bdpt_zero_matrix,
+    BDPT_WAVEFRONT_GRADIENTS, bdpt_wavefront_backward, bdpt_wavefront_jvp,
 )
 from witwin.channel.materials import face_material_field_bundle, has_multilayer_material
 from witwin.channel.interactions.scattering import (
-    MASK_SCATTERING,
-    local_frames,
     rough_material_runtimes,
-    scatter_carried_incident_power,
-    scatter_direction_uniforms,
-    scattered_subpath_state,
-    scattering_nee_connection_samples,
-    te_tm_incident_power,
-    three_way_rough_probabilities,
-    world_to_local,
 )
 from witwin.channel.interactions.transmission import (
-    event_uniforms,
-    layer_csr_view,
     scene_diagonal_m,
-    transmission_event_probability,
-    unpolarized_power_budgets,
 )
 from witwin.channel.propagation import EvaluatedPaths, evaluate_enumerated_paths
 from witwin.channel.runtime import (
     AdLaunchLedger,
+    bdpt_zero_matrix,
+    KernelMetadata,
     MemoryEstimate,
     _ad_first_order_only,
     _ad_frequency_grad,
@@ -107,8 +88,6 @@ from witwin.channel.runtime import (
     _ad_geometry_live,
     _ad_native_tangent_or_none,
     _ad_native_tensor,
-    _ad_reject_fixed_inputs,
-    _ad_reject_fixed_tangents,
     disable_functorch,
     enforce_memory_budget,
     make_metadata,
@@ -166,11 +145,11 @@ def _validate_ad_readiness(ad_mode: str, components: frozenset[str]) -> None:
 
     ``ad_mode='none'`` is the bitwise default and never builds a tape. Under
     ``jvp``/``vjp`` every BDPT estimator block is differentiable: the frozen
-    material/EM/table/frequency/tx_power parameters ride the differentiable fields and
-    scattering derivative companions plus the BDPT AD subpath / endpoint /
-    accumulate / finalize companions. ``max_scattering_order > 1`` is allowed:
-    its extra diffuse factors ride ``scattering_table_eval_ad`` and the subpath
-    ``_ad`` wrappers exactly as order 1 does. Any combination whose native
+    material/EM/table/frequency/tx_power parameters ride the differentiable fields
+    and scattering derivative companions, the fused wavefront's forward-mode and
+    replay-reverse passes, and the BDPT endpoint / accumulate / finalize
+    companions. ``max_scattering_order > 1`` is allowed: continued scatter
+    events are part of the same wavefront derivative. Any combination whose native
     companions are not registered fails loudly where they are dispatched (a
     missing-symbol error from ``runtime.required_symbol``); it is never silently
     detached. No component combination is refused here in v1 because every
@@ -320,11 +299,62 @@ class BDPTPathSamples:
     path_length_m: torch.Tensor
 
 
+class _MetadataKeys(ResultSemantics, ConfigMetadata):
+    samples: int
+    seed: int
+    stream_count: int
+    sample_streams: int
+    mis: str
+    power_heuristic_beta: float
+    combine_domain: str
+    coherent: bool
+    max_depth: int
+    max_light_depth: int | None
+    max_diffraction_order: int
+    path_counts_by_strategy: dict[str, int]
+    valid_contribution_count: int
+    components: dict[str, str]
+    native_capabilities: dict[str, bool]
+    rayd: dict[str, bool]
+    launch_count: int
+    accumulation_strategy: str
+    workspace_bytes: int
+    variance: bool
+    throughput_domain: str
+    max_scattering_order: int
+    scattering_depth_rule: str
+    field_transport: dict[str, str]
+    pdf_domain: str
+    event_classification: dict[str, int]
+    component_mask_bits: dict[str, int]
+    delta_strategy: str
+    sampled_delta_mass: str
+    mis_capabilities: dict[str, Any]
+    ad_status: str
+    ad_geometry: str
+    ad_differentiable_parameters: list[str]
+    kernel: KernelMetadata
+    semantic_capabilities: dict[str, Any]
+    sampler: str
+    edge_policy: dict[str, Any]
+
+
+class Metadata(_MetadataKeys, total=False):
+    """The stable keys of ``Result.metadata``; a plain ``dict`` at run time."""
+
+    # Present when the transmission component was requested.
+    transmission: dict[str, Any]
+    # Present when the scattering component was requested.
+    scattering: dict[str, Any]
+    # Present when compilation removed degenerate or duplicate faces.
+    dropped_faces: dict[str, int]
+
+
 @dataclass(frozen=True, slots=True)
 class Result:
     path_gain: torch.Tensor
     component_power: dict[str, torch.Tensor]
-    metadata: dict[str, Any]
+    metadata: Metadata
     diagnostics: dict[str, Any] | None = None
     component_maps: dict[str, torch.Tensor] | None = None
     variance: torch.Tensor | None = None
@@ -377,260 +407,6 @@ def _empty_path_samples(reference: torch.Tensor) -> BDPTPathSamples:
     )
 # --- BDPT native AD facades ------------------------------------
 
-# Differentiable subpath output fields (the four the companions carry cotangents
-# for). Every other subpath field is frozen structure.
-_BDPT_SUBPATH_TANGENT_FIELDS = (
-    "tangent_field_real",
-    "tangent_field_imag",
-    "tangent_throughput_real",
-    "tangent_throughput_imag",
-)
-
-
-def _validate_subpath_field_cotangents(
-    grad_field_real: torch.Tensor | None, grad_field_imag: torch.Tensor | None,
-    grad_throughput_real: torch.Tensor | None, grad_throughput_imag: torch.Tensor | None, *,
-    count: int,
-) -> None:
-    for name, tensor, trailing in (
-        ("grad_field_real", grad_field_real, (3,)),
-        ("grad_field_imag", grad_field_imag, (3,)),
-        ("grad_throughput_real", grad_throughput_real, None),
-        ("grad_throughput_imag", grad_throughput_imag, None),
-    ):
-        if tensor is None:
-            continue
-        ndim = 2 if trailing is not None else 1
-        validate_cuda_tensor(
-            name,
-            tensor,
-            dtype=torch.float32,
-            ndim=ndim,
-            trailing_shape=trailing,  # type: ignore[arg-type]
-            require_contiguous=False,
-        )
-        if int(tensor.shape[0]) != int(count):
-            raise ValueError(f"{name} must have {count} rows")
-
-
-def bdpt_reflected_light_subpath_state_backward(
-    light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor],
-    material_gain: torch.Tensor, material_valid: torch.Tensor, material_eps_r: torch.Tensor,
-    material_sigma_e: torch.Tensor, material_mu_r: torch.Tensor, material_thickness: torch.Tensor,
-    *, frequency_hz: float, grad_field_real: torch.Tensor | None = None,
-    grad_field_imag: torch.Tensor | None = None, grad_throughput_real: torch.Tensor | None = None,
-    grad_throughput_imag: torch.Tensor | None = None, need_grad_material: bool = False,
-    need_grad_field_in: bool = False, need_grad_frequency: bool = False,
-) -> dict[str, torch.Tensor | None]:
-    """VJP of :func:`bdpt_reflected_light_subpath_state` (reflected-subpath derivatives).
-
-    ``grad_field_in = O^H grad_field_out`` (``O`` = ReflectFrame rotation x
-    Fresnel diag); material partials via ``field_transport_ad.cuh::stack_rt_dual``
-    accumulate into the shared CSR/material grads by ``atomicAdd``; the frequency
-    grad by ``atomicAdd``. Off-flag groups are ``None``."""
-
-    _validate_bdpt_subpath_state("light", light, None)
-    count = int(light["origin"].shape[0])
-    _validate_subpath_field_cotangents(
-        grad_field_real,
-        grad_field_imag,
-        grad_throughput_real,
-        grad_throughput_imag,
-        count=count,
-    )
-    exported = _required_native_op("bdpt_reflected_light_subpath_state_backward")(  # type: ignore[operator]
-        light,
-        intersection,
-        material_gain,
-        material_valid,
-        material_eps_r,
-        material_sigma_e,
-        material_mu_r,
-        material_thickness,
-        float(frequency_hz),
-        grad_field_real,
-        grad_field_imag,
-        grad_throughput_real,
-        grad_throughput_imag,
-        bool(need_grad_material),
-        bool(need_grad_field_in),
-        bool(need_grad_frequency),
-    )
-    expected = {
-        "grad_eps_r",
-        "grad_sigma_e",
-        "grad_gain",
-        "grad_thickness",
-        "grad_light_field_real",
-        "grad_light_field_imag",
-        "grad_light_throughput_real",
-        "grad_light_throughput_imag",
-        "grad_frequency",
-    }
-    if not isinstance(exported, dict) or set(exported) != expected:
-        raise TypeError(
-            "_channel.bdpt_reflected_light_subpath_state_backward "
-            "returned unexpected fields"
-        )
-    return exported
-
-
-def bdpt_reflected_light_subpath_state_jvp(
-    light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor],
-    material_gain: torch.Tensor, material_valid: torch.Tensor, material_eps_r: torch.Tensor,
-    material_sigma_e: torch.Tensor, material_mu_r: torch.Tensor, material_thickness: torch.Tensor,
-    *, frequency_hz: float, tangent_eps_r: torch.Tensor | None = None,
-    tangent_sigma_e: torch.Tensor | None = None, tangent_gain: torch.Tensor | None = None,
-    tangent_thickness: torch.Tensor | None = None, tangent_frequency: float = 0.0,
-    tangent_light_field_real: torch.Tensor | None = None,
-    tangent_light_field_imag: torch.Tensor | None = None,
-    tangent_light_throughput_real: torch.Tensor | None = None,
-    tangent_light_throughput_imag: torch.Tensor | None = None,
-) -> dict[str, torch.Tensor]:
-    """JVP of :func:`bdpt_reflected_light_subpath_state` (reflected-subpath derivatives).
-
-    The differentiable reflected material set is ``{eps_r, sigma_e, gain,
-    thickness}`` (``mu_r`` is frozen); ``tangent_gain`` maps to the native
-    kernel's gain tangent slot."""
-
-    _validate_bdpt_subpath_state("light", light, None)
-    exported = _required_native_op("bdpt_reflected_light_subpath_state_jvp")(  # type: ignore[operator]
-        light,
-        intersection,
-        material_gain,
-        material_valid,
-        material_eps_r,
-        material_sigma_e,
-        material_mu_r,
-        material_thickness,
-        float(frequency_hz),
-        tangent_eps_r,
-        tangent_sigma_e,
-        tangent_gain,
-        tangent_thickness,
-        float(tangent_frequency),
-        tangent_light_field_real,
-        tangent_light_field_imag,
-        tangent_light_throughput_real,
-        tangent_light_throughput_imag,
-    )
-    if not isinstance(exported, dict) or set(exported) != set(
-        _BDPT_SUBPATH_TANGENT_FIELDS
-    ):
-        raise TypeError(
-            "_channel.bdpt_reflected_light_subpath_state_jvp "
-            "returned unexpected fields"
-        )
-    return exported
-
-
-def bdpt_transmitted_light_subpath_state_backward(
-    light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor],
-    face_material_id: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor, *, frequency_hz: float, grad_field_real: torch.Tensor | None = None,
-    grad_field_imag: torch.Tensor | None = None, grad_throughput_real: torch.Tensor | None = None,
-    grad_throughput_imag: torch.Tensor | None = None, need_grad_layers: bool = False,
-    need_grad_field_in: bool = False, need_grad_frequency: bool = False,
-) -> dict[str, torch.Tensor | None]:
-    """VJP of :func:`bdpt_transmitted_light_subpath_state` (transmitted-subpath derivatives).
-
-    Layer grads via ``stack_rt_dual`` folded onto the CSR by ``atomicAdd``
-    (identical to ``em_layer_stack_backward`` / the transmission-sequence
-    backward). Off-flag groups are ``None``."""
-
-    _validate_bdpt_subpath_state("light", light, None)
-    count = int(light["origin"].shape[0])
-    _validate_subpath_field_cotangents(
-        grad_field_real,
-        grad_field_imag,
-        grad_throughput_real,
-        grad_throughput_imag,
-        count=count,
-    )
-    exported = _required_native_op("bdpt_transmitted_light_subpath_state_backward")(  # type: ignore[operator]
-        light,
-        intersection,
-        face_material_id,
-        layer_offset,
-        layer_count,
-        layer_thickness_m,
-        layer_eps_r,
-        layer_sigma_e,
-        layer_mu_r,
-        float(frequency_hz),
-        grad_field_real,
-        grad_field_imag,
-        grad_throughput_real,
-        grad_throughput_imag,
-        bool(need_grad_layers),
-        bool(need_grad_field_in),
-        bool(need_grad_frequency),
-    )
-    expected = {
-        "grad_layer_thickness",
-        "grad_layer_eps_r",
-        "grad_layer_sigma_e",
-        "grad_light_field_real",
-        "grad_light_field_imag",
-        "grad_light_throughput_real",
-        "grad_light_throughput_imag",
-        "grad_frequency",
-    }
-    if not isinstance(exported, dict) or set(exported) != expected:
-        raise TypeError(
-            "_channel.bdpt_transmitted_light_subpath_state_backward "
-            "returned unexpected fields"
-        )
-    return exported
-
-
-def bdpt_transmitted_light_subpath_state_jvp(
-    light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor],
-    face_material_id: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor, *, frequency_hz: float,
-    tangent_layer_thickness: torch.Tensor | None = None,
-    tangent_layer_eps_r: torch.Tensor | None = None,
-    tangent_layer_sigma_e: torch.Tensor | None = None, tangent_frequency: float = 0.0,
-    tangent_light_field_real: torch.Tensor | None = None,
-    tangent_light_field_imag: torch.Tensor | None = None,
-    tangent_light_throughput_real: torch.Tensor | None = None,
-    tangent_light_throughput_imag: torch.Tensor | None = None,
-) -> dict[str, torch.Tensor]:
-    """JVP of :func:`bdpt_transmitted_light_subpath_state` (transmitted-subpath derivatives)."""
-
-    _validate_bdpt_subpath_state("light", light, None)
-    exported = _required_native_op("bdpt_transmitted_light_subpath_state_jvp")(  # type: ignore[operator]
-        light,
-        intersection,
-        face_material_id,
-        layer_offset,
-        layer_count,
-        layer_thickness_m,
-        layer_eps_r,
-        layer_sigma_e,
-        layer_mu_r,
-        float(frequency_hz),
-        tangent_layer_thickness,
-        tangent_layer_eps_r,
-        tangent_layer_sigma_e,
-        float(tangent_frequency),
-        tangent_light_field_real,
-        tangent_light_field_imag,
-        tangent_light_throughput_real,
-        tangent_light_throughput_imag,
-    )
-    if not isinstance(exported, dict) or set(exported) != set(
-        _BDPT_SUBPATH_TANGENT_FIELDS
-    ):
-        raise TypeError(
-            "_channel.bdpt_transmitted_light_subpath_state_jvp "
-            "returned unexpected fields"
-        )
-    return exported
-
-
 def bdpt_endpoint_connection_samples_backward(
     light: dict[str, torch.Tensor], sensor: dict[str, torch.Tensor], *, frequency_hz: float,
     samples_per_tx: int, mis: str, beta: float, strategy_count: int, max_paths: int | None,
@@ -656,7 +432,7 @@ def bdpt_endpoint_connection_samples_backward(
             require_contiguous=False,
         )
     max_paths_value = -1 if max_paths is None else int(max_paths)
-    exported = _required_native_op("bdpt_endpoint_connection_samples_backward")(  # type: ignore[operator]
+    exported = _required_native_op("bdpt_endpoint_connection_samples_backward")(
         light,
         sensor,
         float(frequency_hz),
@@ -700,7 +476,7 @@ def bdpt_endpoint_connection_samples_jvp(
     _validate_bdpt_subpath_state("light", light, None)
     _validate_bdpt_subpath_state("sensor", sensor, None)
     max_paths_value = -1 if max_paths is None else int(max_paths)
-    exported = _required_native_op("bdpt_endpoint_connection_samples_jvp")(  # type: ignore[operator]
+    exported = _required_native_op("bdpt_endpoint_connection_samples_jvp")(
         light,
         sensor,
         float(frequency_hz),
@@ -740,7 +516,7 @@ def bdpt_accumulate_connection_samples_forward_ad(
 
     strategy_ids = {"atomic": 0, "staged": 1, "compact": 2}
     combine_ids = {"power": 0, "coherent": 1}
-    exported = _required_native_op("bdpt_accumulate_connection_samples")(  # type: ignore[operator]
+    exported = _required_native_op("bdpt_accumulate_connection_samples")(
         samples,
         int(tx_count),
         int(rx_count),
@@ -787,7 +563,7 @@ def bdpt_accumulate_connection_samples_backward(
     if combine_domain not in combine_ids:
         raise ValueError("combine_domain must be 'power' or 'coherent'")
     bin_args = _bdpt_accumulate_bin_sum_args(combine_domain, bin_sums)
-    exported = _required_native_op("bdpt_accumulate_connection_samples_backward")(  # type: ignore[operator]
+    exported = _required_native_op("bdpt_accumulate_connection_samples_backward")(
         samples,
         int(tx_count),
         int(rx_count),
@@ -832,7 +608,7 @@ def bdpt_accumulate_connection_samples_jvp(
     if combine_domain not in combine_ids:
         raise ValueError("combine_domain must be 'power' or 'coherent'")
     bin_args = _bdpt_accumulate_bin_sum_args(combine_domain, bin_sums)
-    exported = _required_native_op("bdpt_accumulate_connection_samples_jvp")(  # type: ignore[operator]
+    exported = _required_native_op("bdpt_accumulate_connection_samples_jvp")(
         samples,
         int(tx_count),
         int(rx_count),
@@ -871,6 +647,18 @@ _SUBPATH_DIFF_INDEX = {
 }
 
 
+
+
+# ---------------------------------------------------------------------------
+# 6.2 transmitted light subpath advance
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# 6.3 endpoint connection samples
+# ---------------------------------------------------------------------------
+
+
 def _subpath_with_fields(
     base: dict[str, torch.Tensor], field_real: torch.Tensor, field_imag: torch.Tensor,
     throughput_real: torch.Tensor, throughput_imag: torch.Tensor,
@@ -883,598 +671,6 @@ def _subpath_with_fields(
     out["throughput_real"] = throughput_real
     out["throughput_imag"] = throughput_imag
     return out
-
-
-def _subpath_output_tuple(out: dict[str, torch.Tensor]) -> tuple[torch.Tensor, ...]:
-    return tuple(out[name] for name in _SUBPATH_FIELDS)
-
-
-def _mark_subpath_structural(ctx, output) -> None:  # type: ignore[no-untyped-def]
-    """Mark every subpath output field non-differentiable except the four
-    field/throughput slots that carry the advance's cotangents."""
-
-    structural = [
-        output[index]
-        for index, name in enumerate(_SUBPATH_FIELDS)
-        if name not in _SUBPATH_DIFF_FIELDS
-    ]
-    ctx.mark_non_differentiable(*structural)
-
-
-def _subpath_backward_needs(  # type: ignore[no-untyped-def]
-    needs_input_grad, material_indices: tuple[int, ...]
-) -> tuple[bool, bool, bool]:
-    """Derive the (field-in, material/layers, frequency) need flags for a subpath
-    advance backward from ``ctx.needs_input_grad``.
-
-    ``material_indices`` selects the differentiable material/layer slots (they
-    differ between the reflected and transmitted advances); slots 0-3 are the
-    upstream field/throughput inputs and slot 8 is the carrier frequency."""
-
-    need_field_in = any(bool(needs_input_grad[i]) for i in range(4))
-    need_material = any(bool(needs_input_grad[i]) for i in material_indices)
-    need_frequency = bool(needs_input_grad[8])
-    return need_field_in, need_material, need_frequency
-
-
-# ---------------------------------------------------------------------------
-# 6.1 reflected light subpath advance
-# ---------------------------------------------------------------------------
-
-
-class _BdptReflectedSubpathAdFunction(torch.autograd.Function):
-    """Differentiable specular-reflection subpath advance (reflected-subpath derivatives).
-
-    Differentiable inputs: the upstream light field/throughput (4 tensors) and
-    the per-face material eps_r / sigma_e / thickness plus the carrier
-    frequency. Frozen (reject loudly): hit-point geometry (the ``intersection``
-    dict), material_valid, material_gain, mu_r, and every structural subpath
-    field. Hit geometry stays frozen in v1 (stochastic-sampler stance,
-    ``ad_geometry='enumerated_blocks_only'``)."""
-
-    @staticmethod
-    def forward(  # type: ignore[no-untyped-def]
-        field_real,
-        field_imag,
-        throughput_real,
-        throughput_imag,
-        material_eps_r,
-        material_sigma_e,
-        material_mu_r,
-        material_thickness,
-        frequency,
-        frequency_value,
-        base_light,
-        intersection,
-        material_gain,
-        material_valid,
-    ):
-        light = _subpath_with_fields(
-            base_light, field_real, field_imag, throughput_real, throughput_imag
-        )
-        out = bdpt_reflected_light_subpath_state(
-            light,
-            intersection,
-            material_gain=material_gain,
-            material_valid=material_valid,
-            material_eps_r=material_eps_r,
-            material_sigma_e=material_sigma_e,
-            material_mu_r=material_mu_r,
-            material_thickness=material_thickness,
-            frequency_hz=frequency_value,
-        )
-        return _subpath_output_tuple(out)
-
-    @staticmethod
-    def setup_context(ctx, inputs, output):  # type: ignore[no-untyped-def]
-        ctx.set_materialize_grads(False)
-        (
-            field_real,
-            field_imag,
-            throughput_real,
-            throughput_imag,
-            material_eps_r,
-            material_sigma_e,
-            material_mu_r,
-            material_thickness,
-            frequency,
-            frequency_value,
-            base_light,
-            intersection,
-            material_gain,
-            material_valid,
-        ) = inputs
-        primals = tuple(
-            torch.autograd.forward_ad.unpack_dual(value).primal
-            for value in (
-                field_real,
-                field_imag,
-                throughput_real,
-                throughput_imag,
-                material_eps_r,
-                material_sigma_e,
-                material_mu_r,
-                material_thickness,
-            )
-        )
-        ctx.frequency_value = frequency_value
-        ctx.frequency_meta = (
-            (frequency.dtype, frequency.device)
-            if isinstance(frequency, torch.Tensor)
-            else None
-        )
-        ctx.base_light = {
-            name: torch.autograd.forward_ad.unpack_dual(value).primal
-            if isinstance(value, torch.Tensor)
-            else value
-            for name, value in base_light.items()
-        }
-        ctx.intersection = intersection
-        ctx.material_gain = material_gain
-        ctx.material_valid = material_valid
-        ctx.save_for_backward(*primals)
-        ctx.save_for_forward(*primals)
-        _mark_subpath_structural(ctx, output)
-
-    @staticmethod
-    @_ad_first_order_only
-    def backward(ctx, *grad_outputs):  # type: ignore[no-untyped-def]
-        none_grads = (None,) * 14
-        _ad_reject_fixed_inputs(
-            "bdpt_reflected_light_subpath_state_ad",
-            ctx.needs_input_grad,
-            ((6, "material_mu_r"),),
-        )
-        need_field_in, need_material, need_frequency = _subpath_backward_needs(
-            ctx.needs_input_grad, (4, 5, 7)
-        )
-        grad_field_real = grad_outputs[_SUBPATH_DIFF_INDEX["field_real"]]
-        grad_field_imag = grad_outputs[_SUBPATH_DIFF_INDEX["field_imag"]]
-        grad_throughput_real = grad_outputs[_SUBPATH_DIFF_INDEX["throughput_real"]]
-        grad_throughput_imag = grad_outputs[_SUBPATH_DIFF_INDEX["throughput_imag"]]
-        grads = (
-            grad_field_real,
-            grad_field_imag,
-            grad_throughput_real,
-            grad_throughput_imag,
-        )
-        if not (need_field_in or need_material or need_frequency) or all(
-            value is None for value in grads
-        ):
-            return none_grads
-        (
-            field_real,
-            field_imag,
-            throughput_real,
-            throughput_imag,
-            material_eps_r,
-            material_sigma_e,
-            material_mu_r,
-            material_thickness,
-        ) = ctx.saved_tensors
-        light = _subpath_with_fields(
-            ctx.base_light, field_real, field_imag, throughput_real, throughput_imag
-        )
-        out = bdpt_reflected_light_subpath_state_backward(
-            light,
-            ctx.intersection,
-            ctx.material_gain,
-            ctx.material_valid,
-            material_eps_r,
-            material_sigma_e,
-            material_mu_r,
-            material_thickness,
-            frequency_hz=ctx.frequency_value,
-            grad_field_real=grad_field_real,
-            grad_field_imag=grad_field_imag,
-            grad_throughput_real=grad_throughput_real,
-            grad_throughput_imag=grad_throughput_imag,
-            need_grad_material=need_material,
-            need_grad_field_in=need_field_in,
-            need_grad_frequency=need_frequency,
-        )
-        grad_frequency = (
-            _ad_frequency_grad(out["grad_frequency"], ctx.frequency_meta)
-            if need_frequency
-            else None
-        )
-        return (
-            out["grad_light_field_real"] if ctx.needs_input_grad[0] else None,
-            out["grad_light_field_imag"] if ctx.needs_input_grad[1] else None,
-            out["grad_light_throughput_real"] if ctx.needs_input_grad[2] else None,
-            out["grad_light_throughput_imag"] if ctx.needs_input_grad[3] else None,
-            out["grad_eps_r"] if ctx.needs_input_grad[4] else None,
-            out["grad_sigma_e"] if ctx.needs_input_grad[5] else None,
-            None,
-            out["grad_thickness"] if ctx.needs_input_grad[7] else None,
-            grad_frequency,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-
-    @staticmethod
-    def jvp(  # type: ignore[no-untyped-def]
-        ctx,
-        t_field_real,
-        t_field_imag,
-        t_throughput_real,
-        t_throughput_imag,
-        t_eps_r,
-        t_sigma_e,
-        t_mu_r,
-        t_thickness,
-        t_frequency,
-        _t_frequency_value,
-        _t_base_light,
-        _t_intersection,
-        _t_material_gain,
-        _t_material_valid,
-    ):
-        _ad_reject_fixed_tangents(
-            "bdpt_reflected_light_subpath_state_ad", ((t_mu_r, "material_mu_r"),)
-        )
-        saved = ctx.saved_tensors
-        light = _subpath_with_fields(ctx.base_light, saved[0], saved[1], saved[2], saved[3])
-        tangent_frequency = _ad_frequency_tangent(t_frequency)
-        tangents = {
-            "tangent_light_field_real": _ad_native_tangent_or_none(t_field_real),
-            "tangent_light_field_imag": _ad_native_tangent_or_none(t_field_imag),
-            "tangent_light_throughput_real": _ad_native_tangent_or_none(
-                t_throughput_real
-            ),
-            "tangent_light_throughput_imag": _ad_native_tangent_or_none(
-                t_throughput_imag
-            ),
-            "tangent_eps_r": _ad_native_tangent_or_none(t_eps_r),
-            "tangent_sigma_e": _ad_native_tangent_or_none(t_sigma_e),
-            "tangent_thickness": _ad_native_tangent_or_none(t_thickness),
-        }
-        if tangent_frequency == 0.0 and all(v is None for v in tangents.values()):
-            return (None,) * len(_SUBPATH_FIELDS)
-        with disable_functorch():
-            out = bdpt_reflected_light_subpath_state_jvp(
-                light,
-                ctx.intersection,
-                ctx.material_gain,
-                ctx.material_valid,
-                _ad_native_tensor(saved[4]),
-                _ad_native_tensor(saved[5]),
-                _ad_native_tensor(saved[6]),
-                _ad_native_tensor(saved[7]),
-                frequency_hz=ctx.frequency_value,
-                tangent_frequency=tangent_frequency,
-                **tangents,
-            )
-        return _subpath_tangent_outputs(out)
-
-
-def _subpath_tangent_outputs(out: dict[str, torch.Tensor]) -> tuple:
-    """Map the four native tangent fields onto the full subpath output slots."""
-
-    result: list[torch.Tensor | None] = [None] * len(_SUBPATH_FIELDS)
-    result[_SUBPATH_DIFF_INDEX["field_real"]] = out["tangent_field_real"]
-    result[_SUBPATH_DIFF_INDEX["field_imag"]] = out["tangent_field_imag"]
-    result[_SUBPATH_DIFF_INDEX["throughput_real"]] = out["tangent_throughput_real"]
-    result[_SUBPATH_DIFF_INDEX["throughput_imag"]] = out["tangent_throughput_imag"]
-    return tuple(result)
-
-
-def bdpt_reflected_light_subpath_state_ad(
-    light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor], *,
-    material_gain: torch.Tensor, material_valid: torch.Tensor, material_eps_r: torch.Tensor,
-    material_sigma_e: torch.Tensor, material_mu_r: torch.Tensor, material_thickness: torch.Tensor,
-    frequency: torch.Tensor | float, frequency_value: float | None = None,
-) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`bdpt_reflected_light_subpath_state` (reflected-subpath derivatives)."""
-
-    if frequency_value is None:
-        frequency_value = _ad_frequency_value(frequency)
-    base_light = {
-        name: value
-        for name, value in light.items()
-        if name not in _SUBPATH_DIFF_FIELDS
-    }
-    values = _BdptReflectedSubpathAdFunction.apply(
-        light["field_real"],
-        light["field_imag"],
-        light["throughput_real"],
-        light["throughput_imag"],
-        material_eps_r,
-        material_sigma_e,
-        material_mu_r,
-        material_thickness,
-        frequency,
-        float(frequency_value),
-        base_light,
-        intersection,
-        material_gain,
-        material_valid,
-    )
-    return dict(zip(_SUBPATH_FIELDS, values, strict=True))
-
-
-# ---------------------------------------------------------------------------
-# 6.2 transmitted light subpath advance
-# ---------------------------------------------------------------------------
-
-
-class _BdptTransmittedSubpathAdFunction(torch.autograd.Function):
-    """Differentiable slab-transmission subpath advance (transmitted-subpath derivatives).
-
-    Differentiable inputs: the upstream light field/throughput (4 tensors) and
-    the CSR layer thickness / eps_r / sigma_e plus the carrier frequency. Frozen
-    (reject loudly): hit-point geometry, face_material_id, the CSR index arrays
-    (layer_offset / layer_count), layer_mu_r, and every structural subpath
-    field."""
-
-    @staticmethod
-    def forward(  # type: ignore[no-untyped-def]
-        field_real,
-        field_imag,
-        throughput_real,
-        throughput_imag,
-        layer_thickness_m,
-        layer_eps_r,
-        layer_sigma_e,
-        layer_mu_r,
-        frequency,
-        frequency_value,
-        base_light,
-        intersection,
-        face_material_id,
-        layer_offset,
-        layer_count,
-    ):
-        light = _subpath_with_fields(
-            base_light, field_real, field_imag, throughput_real, throughput_imag
-        )
-        out = bdpt_transmitted_light_subpath_state(
-            light,
-            intersection,
-            face_material_id=face_material_id,
-            layer_offset=layer_offset,
-            layer_count=layer_count,
-            layer_thickness_m=layer_thickness_m,
-            layer_eps_r=layer_eps_r,
-            layer_sigma_e=layer_sigma_e,
-            layer_mu_r=layer_mu_r,
-            frequency_hz=frequency_value,
-        )
-        return _subpath_output_tuple(out)
-
-    @staticmethod
-    def setup_context(ctx, inputs, output):  # type: ignore[no-untyped-def]
-        ctx.set_materialize_grads(False)
-        (
-            field_real,
-            field_imag,
-            throughput_real,
-            throughput_imag,
-            layer_thickness_m,
-            layer_eps_r,
-            layer_sigma_e,
-            layer_mu_r,
-            frequency,
-            frequency_value,
-            base_light,
-            intersection,
-            face_material_id,
-            layer_offset,
-            layer_count,
-        ) = inputs
-        primals = tuple(
-            torch.autograd.forward_ad.unpack_dual(value).primal
-            for value in (
-                field_real,
-                field_imag,
-                throughput_real,
-                throughput_imag,
-                layer_thickness_m,
-                layer_eps_r,
-                layer_sigma_e,
-                layer_mu_r,
-            )
-        )
-        ctx.frequency_value = frequency_value
-        ctx.frequency_meta = (
-            (frequency.dtype, frequency.device)
-            if isinstance(frequency, torch.Tensor)
-            else None
-        )
-        ctx.base_light = {
-            name: torch.autograd.forward_ad.unpack_dual(value).primal
-            if isinstance(value, torch.Tensor)
-            else value
-            for name, value in base_light.items()
-        }
-        ctx.intersection = intersection
-        ctx.face_material_id = face_material_id
-        ctx.layer_offset = layer_offset
-        ctx.layer_count = layer_count
-        ctx.save_for_backward(*primals)
-        ctx.save_for_forward(*primals)
-        _mark_subpath_structural(ctx, output)
-
-    @staticmethod
-    @_ad_first_order_only
-    def backward(ctx, *grad_outputs):  # type: ignore[no-untyped-def]
-        none_grads = (None,) * 15
-        _ad_reject_fixed_inputs(
-            "bdpt_transmitted_light_subpath_state_ad",
-            ctx.needs_input_grad,
-            ((7, "layer_mu_r"),),
-        )
-        need_field_in, need_layers, need_frequency = _subpath_backward_needs(
-            ctx.needs_input_grad, (4, 5, 6)
-        )
-        grad_field_real = grad_outputs[_SUBPATH_DIFF_INDEX["field_real"]]
-        grad_field_imag = grad_outputs[_SUBPATH_DIFF_INDEX["field_imag"]]
-        grad_throughput_real = grad_outputs[_SUBPATH_DIFF_INDEX["throughput_real"]]
-        grad_throughput_imag = grad_outputs[_SUBPATH_DIFF_INDEX["throughput_imag"]]
-        grads = (
-            grad_field_real,
-            grad_field_imag,
-            grad_throughput_real,
-            grad_throughput_imag,
-        )
-        if not (need_field_in or need_layers or need_frequency) or all(
-            value is None for value in grads
-        ):
-            return none_grads
-        (
-            field_real,
-            field_imag,
-            throughput_real,
-            throughput_imag,
-            layer_thickness_m,
-            layer_eps_r,
-            layer_sigma_e,
-            layer_mu_r,
-        ) = ctx.saved_tensors
-        light = _subpath_with_fields(
-            ctx.base_light, field_real, field_imag, throughput_real, throughput_imag
-        )
-        out = bdpt_transmitted_light_subpath_state_backward(
-            light,
-            ctx.intersection,
-            ctx.face_material_id,
-            ctx.layer_offset,
-            ctx.layer_count,
-            layer_thickness_m,
-            layer_eps_r,
-            layer_sigma_e,
-            layer_mu_r,
-            frequency_hz=ctx.frequency_value,
-            grad_field_real=grad_field_real,
-            grad_field_imag=grad_field_imag,
-            grad_throughput_real=grad_throughput_real,
-            grad_throughput_imag=grad_throughput_imag,
-            need_grad_layers=need_layers,
-            need_grad_field_in=need_field_in,
-            need_grad_frequency=need_frequency,
-        )
-        grad_frequency = (
-            _ad_frequency_grad(out["grad_frequency"], ctx.frequency_meta)
-            if need_frequency
-            else None
-        )
-        return (
-            out["grad_light_field_real"] if ctx.needs_input_grad[0] else None,
-            out["grad_light_field_imag"] if ctx.needs_input_grad[1] else None,
-            out["grad_light_throughput_real"] if ctx.needs_input_grad[2] else None,
-            out["grad_light_throughput_imag"] if ctx.needs_input_grad[3] else None,
-            out["grad_layer_thickness"] if ctx.needs_input_grad[4] else None,
-            out["grad_layer_eps_r"] if ctx.needs_input_grad[5] else None,
-            out["grad_layer_sigma_e"] if ctx.needs_input_grad[6] else None,
-            None,
-            grad_frequency,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-
-    @staticmethod
-    def jvp(  # type: ignore[no-untyped-def]
-        ctx,
-        t_field_real,
-        t_field_imag,
-        t_throughput_real,
-        t_throughput_imag,
-        t_thickness,
-        t_eps_r,
-        t_sigma_e,
-        t_mu_r,
-        t_frequency,
-        _t_frequency_value,
-        _t_base_light,
-        _t_intersection,
-        _t_face_material_id,
-        _t_layer_offset,
-        _t_layer_count,
-    ):
-        _ad_reject_fixed_tangents(
-            "bdpt_transmitted_light_subpath_state_ad", ((t_mu_r, "layer_mu_r"),)
-        )
-        saved = ctx.saved_tensors
-        light = _subpath_with_fields(ctx.base_light, saved[0], saved[1], saved[2], saved[3])
-        tangent_frequency = _ad_frequency_tangent(t_frequency)
-        tangents = {
-            "tangent_light_field_real": _ad_native_tangent_or_none(t_field_real),
-            "tangent_light_field_imag": _ad_native_tangent_or_none(t_field_imag),
-            "tangent_light_throughput_real": _ad_native_tangent_or_none(
-                t_throughput_real
-            ),
-            "tangent_light_throughput_imag": _ad_native_tangent_or_none(
-                t_throughput_imag
-            ),
-            "tangent_layer_thickness": _ad_native_tangent_or_none(t_thickness),
-            "tangent_layer_eps_r": _ad_native_tangent_or_none(t_eps_r),
-            "tangent_layer_sigma_e": _ad_native_tangent_or_none(t_sigma_e),
-        }
-        if tangent_frequency == 0.0 and all(v is None for v in tangents.values()):
-            return (None,) * len(_SUBPATH_FIELDS)
-        with disable_functorch():
-            out = bdpt_transmitted_light_subpath_state_jvp(
-                light,
-                ctx.intersection,
-                ctx.face_material_id,
-                ctx.layer_offset,
-                ctx.layer_count,
-                _ad_native_tensor(saved[4]),
-                _ad_native_tensor(saved[5]),
-                _ad_native_tensor(saved[6]),
-                _ad_native_tensor(saved[7]),
-                frequency_hz=ctx.frequency_value,
-                tangent_frequency=tangent_frequency,
-                **tangents,
-            )
-        return _subpath_tangent_outputs(out)
-
-
-def bdpt_transmitted_light_subpath_state_ad(
-    light: dict[str, torch.Tensor], intersection: dict[str, torch.Tensor], *,
-    face_material_id: torch.Tensor, layer_offset: torch.Tensor, layer_count: torch.Tensor,
-    layer_thickness_m: torch.Tensor, layer_eps_r: torch.Tensor, layer_sigma_e: torch.Tensor,
-    layer_mu_r: torch.Tensor, frequency: torch.Tensor | float, frequency_value: float | None = None,
-) -> dict[str, torch.Tensor]:
-    """Differentiable :func:`bdpt_transmitted_light_subpath_state` (transmitted-subpath derivatives)."""
-
-    if frequency_value is None:
-        frequency_value = _ad_frequency_value(frequency)
-    base_light = {
-        name: value
-        for name, value in light.items()
-        if name not in _SUBPATH_DIFF_FIELDS
-    }
-    values = _BdptTransmittedSubpathAdFunction.apply(
-        light["field_real"],
-        light["field_imag"],
-        light["throughput_real"],
-        light["throughput_imag"],
-        layer_thickness_m,
-        layer_eps_r,
-        layer_sigma_e,
-        layer_mu_r,
-        frequency,
-        float(frequency_value),
-        base_light,
-        intersection,
-        face_material_id,
-        layer_offset,
-        layer_count,
-    )
-    return dict(zip(_SUBPATH_FIELDS, values, strict=True))
-
-
-# ---------------------------------------------------------------------------
-# 6.3 endpoint connection samples
-# ---------------------------------------------------------------------------
 
 
 _CONNECTION_FIELDS = (
@@ -1504,22 +700,12 @@ class _BdptEndpointConnectionAdFunction(torch.autograd.Function):
     differentiable output; the other 11 schema fields are frozen structure."""
 
     @staticmethod
-    def forward(  # type: ignore[no-untyped-def]
-        light_field_real,
-        light_field_imag,
-        light_throughput_real,
-        light_throughput_imag,
-        sensor_field_real,
-        sensor_field_imag,
-        sensor_throughput_real,
-        sensor_throughput_imag,
-        frequency,
-        frequency_value,
-        tx_power,
-        base_light,
-        base_sensor,
-        params,
-    ):
+    def forward(
+        light_field_real: Any, light_field_imag: Any, light_throughput_real: Any,
+        light_throughput_imag: Any, sensor_field_real: Any, sensor_field_imag: Any,
+        sensor_throughput_real: Any, sensor_throughput_imag: Any, frequency: Any,
+        frequency_value: Any, tx_power: Any, base_light: Any, base_sensor: Any, params: Any,
+    ) -> Any:
         light = _subpath_with_fields(
             base_light,
             light_field_real,
@@ -1547,7 +733,7 @@ class _BdptEndpointConnectionAdFunction(torch.autograd.Function):
         return tuple(out[name] for name in _CONNECTION_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):  # type: ignore[no-untyped-def]
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         (
             light_field_real,
@@ -1573,7 +759,7 @@ class _BdptEndpointConnectionAdFunction(torch.autograd.Function):
         )
         ctx.params = params
 
-        def _detach_dict(source):  # type: ignore[no-untyped-def]
+        def _detach_dict(source: Any) -> Any:
             return {
                 name: torch.autograd.forward_ad.unpack_dual(value).primal
                 if isinstance(value, torch.Tensor)
@@ -1607,7 +793,7 @@ class _BdptEndpointConnectionAdFunction(torch.autograd.Function):
         ctx.mark_non_differentiable(*structural)
 
     @staticmethod
-    def _light_sensor(ctx):  # type: ignore[no-untyped-def]
+    def _light_sensor(ctx: Any) -> Any:
         saved = ctx.saved_tensors
         light = _subpath_with_fields(
             ctx.base_light, saved[0], saved[1], saved[2], saved[3]
@@ -1619,7 +805,7 @@ class _BdptEndpointConnectionAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, *grad_outputs):  # type: ignore[no-untyped-def]
+    def backward(ctx: Any, *grad_outputs: Any) -> Any:
         none_grads = (None,) * 14
         need_field = any(bool(ctx.needs_input_grad[i]) for i in range(8))
         need_frequency = bool(ctx.needs_input_grad[8])
@@ -1668,7 +854,7 @@ class _BdptEndpointConnectionAdFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def jvp(ctx, *tangents):  # type: ignore[no-untyped-def]
+    def jvp(ctx: Any, *tangents: Any) -> Any:
         light, sensor = _BdptEndpointConnectionAdFunction._light_sensor(ctx)
         params = ctx.params
         tangent_frequency = _ad_frequency_tangent(tangents[8])
@@ -1770,7 +956,9 @@ class _BdptFinalizeAdFunction(torch.autograd.Function):
     both deterministic, no atomics."""
 
     @staticmethod
-    def forward(los, reflection, diffraction, transmission, scattering, kind):  # type: ignore[no-untyped-def]
+    def forward(
+        los: Any, reflection: Any, diffraction: Any, transmission: Any, scattering: Any, kind: Any,
+    ) -> Any:
         forward = (
             bdpt_finalize_point_components
             if kind == "point"
@@ -1780,7 +968,7 @@ class _BdptFinalizeAdFunction(torch.autograd.Function):
         return tuple(out[name] for name in _FINALIZE_FIELDS)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):  # type: ignore[no-untyped-def]
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         los, reflection, diffraction, transmission, scattering, kind = inputs
         ctx.kind = kind
@@ -1793,7 +981,7 @@ class _BdptFinalizeAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, grad_path_gain, *grad_powers):  # type: ignore[no-untyped-def]
+    def backward(ctx: Any, grad_path_gain: Any, *grad_powers: Any) -> Any:
         if not any(bool(flag) for flag in ctx.needs_input_grad[:5]):
             return (None,) * 6
         backward = (
@@ -1821,7 +1009,10 @@ class _BdptFinalizeAdFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def jvp(ctx, t_los, t_reflection, t_diffraction, t_transmission, t_scattering, _t_kind):  # type: ignore[no-untyped-def]
+    def jvp(
+        ctx: Any, t_los: Any, t_reflection: Any, t_diffraction: Any, t_transmission: Any,
+        t_scattering: Any, _t_kind: Any,
+    ) -> Any:
         tangents = {
             "tangent_los": _ad_native_tangent_or_none(t_los),
             "tangent_reflection": _ad_native_tangent_or_none(t_reflection),
@@ -1900,16 +1091,10 @@ class _BdptAccumulateAdFunction(torch.autograd.Function):
     ``S_b`` so the coherent backward needs no re-reduction (retained forward bin sums)."""
 
     @staticmethod
-    def forward(  # type: ignore[no-untyped-def]
-        contribution,
-        coeff_real,
-        coeff_imag,
-        base_samples,
-        tx_count,
-        rx_count,
-        accumulation_strategy,
-        combine_domain,
-    ):
+    def forward(
+        contribution: Any, coeff_real: Any, coeff_imag: Any, base_samples: Any, tx_count: Any,
+        rx_count: Any, accumulation_strategy: Any, combine_domain: Any,
+    ) -> Any:
         samples = dict(base_samples)
         samples["contribution"] = contribution
         matrices, bin_sums = bdpt_accumulate_connection_samples_forward_ad(
@@ -1929,7 +1114,7 @@ class _BdptAccumulateAdFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def setup_context(ctx, inputs, output):  # type: ignore[no-untyped-def]
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         (
             contribution,
@@ -1965,7 +1150,7 @@ class _BdptAccumulateAdFunction(torch.autograd.Function):
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, *grad_outputs):  # type: ignore[no-untyped-def]
+    def backward(ctx: Any, *grad_outputs: Any) -> Any:
         grad_matrices = grad_outputs[: len(_ACCUMULATE_MATRIX_FIELDS)]
         none_grads = (None,) * 8
         # The coherent VJP/JVP read the forward-retained bin sums (ctx.bin_sums),
@@ -2006,17 +1191,10 @@ class _BdptAccumulateAdFunction(torch.autograd.Function):
         )
 
     @staticmethod
-    def jvp(  # type: ignore[no-untyped-def]
-        ctx,
-        t_contribution,
-        t_coeff_real,
-        t_coeff_imag,
-        _t_base_samples,
-        _t_tx_count,
-        _t_rx_count,
-        _t_strategy,
-        _t_combine,
-    ):
+    def jvp(
+        ctx: Any, t_contribution: Any, t_coeff_real: Any, t_coeff_imag: Any, _t_base_samples: Any,
+        _t_tx_count: Any, _t_rx_count: Any, _t_strategy: Any, _t_combine: Any,
+    ) -> Any:
         # The coherent VJP/JVP read the forward-retained bin sums (ctx.bin_sums),
         # not the sample coefficients, so the saved coeff tensors are unused here.
         contribution, _coeff_real, _coeff_imag = ctx.saved_tensors
@@ -2096,7 +1274,7 @@ def _native_los_connection_samples(
     rayd: Any, light: dict[str, torch.Tensor], sensor: dict[str, torch.Tensor], *,
     scene_has_structures: bool, frequency_hz: float | torch.Tensor, mis: str, beta: float,
     strategy_count: int, ad: bool = False, tx_power: torch.Tensor | None = None,
-    frequency_value: float | None = None, ledger: object | None = None,
+    frequency_value: float | None = None, ledger: AdLaunchLedger | None = None,
 ) -> dict[str, torch.Tensor]:
     if ad:
         # BDPT AD: the LoS direct connection carries both a frequency gradient
@@ -2118,7 +1296,7 @@ def _native_los_connection_samples(
             strategy_count=strategy_count,
         )
         if ledger is not None:
-            ledger.add(  # type: ignore[attr-defined]
+            ledger.add(
                 light["field_real"],
                 light["field_imag"],
                 sensor["field_real"],
@@ -2148,665 +1326,9 @@ def _native_los_connection_samples(
         visibility_inputs["end"],
         visibility_inputs["active"],
     )[0]
-    return bdpt_filter_connection_samples(samples, visible)  # type: ignore[no-any-return]
+    return bdpt_filter_connection_samples(samples, visible)
 
 
-def _merge_event_states(
-    reflected: dict[str, torch.Tensor], transmitted: dict[str, torch.Tensor],
-    choose_transmit: torch.Tensor,
-) -> dict[str, torch.Tensor]:
-    """Row-wise merge of the two event kernels' outputs.
-
-    Both kernels are evaluated on the full batch and the per-row winner is
-    selected, which preserves the tensor layout exactly (equivalent to
-    partitioning the hit indices, running each kernel on its partition, and
-    scattering back by original index).
-    """
-
-    wide = choose_transmit[:, None]
-    merged: dict[str, torch.Tensor] = {}
-    for key, reflected_value in reflected.items():
-        condition = wide if reflected_value.dim() == 2 else choose_transmit
-        merged[key] = torch.where(condition, transmitted[key], reflected_value)
-    return merged
-
-
-def _merge_scattered_state(
-    merged: dict[str, torch.Tensor], scattered: dict[str, torch.Tensor],
-    choose_scatter: torch.Tensor,
-) -> dict[str, torch.Tensor]:
-    """Row-wise overlay of the scattered branch onto the reflect/transmit
-    merge (same evaluate-everywhere-select-per-row pattern as :func:`_merge_event_states`)."""
-
-    wide = choose_scatter[:, None]
-    out: dict[str, torch.Tensor] = {}
-    for key, merged_value in merged.items():
-        condition = wide if merged_value.dim() == 2 else choose_scatter
-        out[key] = torch.where(condition, scattered[key], merged_value)
-    return out
-
-
-def _select_surface_events(
-    *, cos_theta: torch.Tensor, material_id: torch.Tensor, hit_ok: torch.Tensor,
-    material_bundle: dict[str, torch.Tensor], layer_csr: dict[str, torch.Tensor],
-    runtimes: dict[int, Any], frequency_value: float, samples: int, seed: int, tx_index: int,
-    bounce: int, device: torch.device,
-) -> dict[str, torch.Tensor]:
-    """Three-way (scatter / transmit / reflect) event selection at a surface hit.
-
-    Pure lift of surface-event selection's frozen event-probability stack: the smooth
-    two-way split, the rough three-way budget overlay on rough rows, and the
-    single seeded uniform that partitions scatter/transmit/reflect. Returns the
-    per-row selection masks plus the probabilities the unbiased weighting reads.
-    """
-
-    stack = em_layer_stack_eval(
-        cos_theta,
-        material_id.clamp_min(0),
-        layer_csr["layer_offset"],
-        layer_csr["layer_count"],
-        layer_csr["layer_thickness_m"],
-        layer_csr["layer_eps_r"],
-        layer_csr["layer_sigma_e"],
-        layer_csr["layer_mu_r"],
-        frequency_hz=frequency_value,
-    )
-    r_eff, t_eff = unpolarized_power_budgets(stack)
-    p_transmit = transmission_event_probability(r_eff, t_eff)
-    uniforms = event_uniforms(
-        int(samples), seed=seed, tx_index=tx_index, depth=bounce, device=device
-    )
-    if runtimes:
-        rough_probs = three_way_rough_probabilities(
-            cos_theta,
-            material_id,
-            material_bundle,
-            stack,
-            frequency_hz=frequency_value,
-        )
-        rough = rough_probs["rough"] & hit_ok
-        p_scatter = torch.where(
-            rough, rough_probs["p_scatter"], torch.zeros_like(p_transmit)
-        )
-        # Smooth rows keep the exact two-way probability;
-        # rough rows switch to the three-way budget split.
-        p_transmit = torch.where(rough, rough_probs["p_transmit"], p_transmit)
-        coherent_amplitude = torch.where(
-            rough,
-            rough_probs["r_coh_amplitude"],
-            torch.ones_like(p_transmit),
-        )
-    else:
-        rough = torch.zeros_like(hit_ok)
-        p_scatter = torch.zeros_like(p_transmit)
-        coherent_amplitude = torch.ones_like(p_transmit)
-    # One uniform partitions the three events: [0, p_s) scatter,
-    # [p_s, p_s + p_t) transmit, else reflect. Smooth faces have
-    # p_s = 0 exactly, so their transmit test u < p_t is unchanged.
-    choose_scatter = hit_ok & (uniforms < p_scatter)
-    choose_transmit = (
-        hit_ok & ~choose_scatter & (uniforms < p_scatter + p_transmit)
-    )
-    return {
-        "choose_scatter": choose_scatter,
-        "choose_transmit": choose_transmit,
-        "rough": rough,
-        "p_scatter": p_scatter,
-        "p_transmit": p_transmit,
-        "coherent_amplitude": coherent_amplitude,
-    }
-
-
-def _emit_scatter_nee(
-    *, rayd: Any, sensor: dict[str, torch.Tensor], state: dict[str, torch.Tensor],
-    hit: dict[str, torch.Tensor], merged: dict[str, torch.Tensor], choose_scatter: torch.Tensor,
-    p_scatter: torch.Tensor, material_id: torch.Tensor, material_axis_rad: torch.Tensor,
-    runtimes: dict[int, Any], max_scattering_order: int, samples: int, seed: int, tx_index: int,
-    bounce: int, device: torch.device, scene_diagonal: float, frequency_hz: float | torch.Tensor,
-    frequency_value: float, tx_power: torch.Tensor, ad: bool, ledger: object | None,
-    sample_blocks: list[dict[str, torch.Tensor]],
-) -> tuple[dict[str, torch.Tensor], torch.Tensor, torch.Tensor]:
-    """Scatter branch: local frames, the scattered subpath overlay, and NEE rows.
-
-    Pure lift of the scatter-selected emission block (surface-event selection, coherent scattering). Appends the NEE connection block (when any) to ``sample_blocks`` and
-    returns the (possibly overlaid) merged state, the scattered-valid mask, and
-    the count of emitted NEE rows."""
-
-    scattered_valid = torch.zeros_like(choose_scatter)
-    nee_rows = torch.zeros((), device=device, dtype=torch.int64)
-    if runtimes and bool(choose_scatter.any()):
-        # Local roughness frames from the shading normal flipped
-        # toward the incident side (roughness applies to whichever
-        # side is illuminated in v1; the store carries front-surface
-        # statistics only).
-        direction = state["direction"]
-        hit_normal = hit["n"]
-        normal_flipped = torch.where(
-            ((direction * hit_normal).sum(dim=-1) > 0.0)[:, None],
-            -hit_normal,
-            hit_normal,
-        )
-        axis_rad = material_axis_rad.index_select(
-            0, material_id.clamp_min(0).to(torch.int64)
-        )
-        frame_t1, frame_t2 = local_frames(normal_flipped, axis_rad)
-        wi_world = -direction
-        wi_local = world_to_local(wi_world, frame_t1, frame_t2, normal_flipped)
-        p_te, p_tm = te_tm_incident_power(
-            state["field_real"],
-            state["field_imag"],
-            direction,
-            normal_flipped,
-        )
-        if int(max_scattering_order) > 1:
-            # A subpath that has ALREADY scattered carries no Complex3
-            # field (cleared at the previous scatter vertex); its
-            # incident power lives in the scalar throughput. Route that
-            # unpolarized power into the local TE/TM channels so both
-            # the NEE row and the continuation weight see the correct
-            # incident power at this vertex. Order 1 never reaches here
-            # (no subpath is ever a continued scatter), so the default
-            # stays bitwise the field-based decomposition above.
-            already_scattered = (
-                state["component_mask"] & MASK_SCATTERING
-            ) != 0
-            carried_te, carried_tm = scatter_carried_incident_power(
-                state["throughput_real"], state["throughput_imag"]
-            )
-            p_te = torch.where(already_scattered, carried_te, p_te)
-            p_tm = torch.where(already_scattered, carried_tm, p_tm)
-        direction_uniforms = scatter_direction_uniforms(
-            int(samples),
-            seed=seed,
-            tx_index=tx_index,
-            depth=bounce,
-            device=device,
-        )
-        scattered = scattered_subpath_state(
-            state,
-            hit,
-            choose_scatter=choose_scatter,
-            normal=normal_flipped,
-            frame_t1=frame_t1,
-            frame_t2=frame_t2,
-            wi_local=wi_local,
-            p_te=p_te,
-            p_tm=p_tm,
-            p_scatter=p_scatter,
-            material_id=material_id,
-            runtimes=runtimes,
-            uniforms=direction_uniforms,
-            scene_diagonal=scene_diagonal,
-            ad=ad,
-            ledger=ledger,
-        )
-        scattered_valid = scattered["valid"]
-        merged = _merge_scattered_state(merged, scattered, choose_scatter)
-        rows = torch.nonzero(scattered_valid, as_tuple=False).flatten()
-        if int(rows.numel()):
-            scatter_source_power = state["source_power"].index_select(0, rows)
-            if ad:
-                # BDPT transmitter-power gradients: reattach the live per-tx
-                # power's gradient onto the detached native source power
-                # for the scatter-selected rows (values bitwise-identical,
-                # so the scattering NEE primal is unchanged).
-                scatter_tx_id = (
-                    state["tx_id"].index_select(0, rows).to(torch.int64)
-                )
-                live_source_power = tx_power.index_select(0, scatter_tx_id)
-                scatter_source_power = scatter_source_power + (
-                    live_source_power - live_source_power.detach()
-                )
-            nee_block = scattering_nee_connection_samples(
-                rayd,
-                sensor,
-                runtimes,
-                position=hit["p"].index_select(0, rows),
-                normal=normal_flipped.index_select(0, rows),
-                frame_t1=frame_t1.index_select(0, rows),
-                frame_t2=frame_t2.index_select(0, rows),
-                wi_local=wi_local.index_select(0, rows),
-                p_te=p_te.index_select(0, rows),
-                p_tm=p_tm.index_select(0, rows),
-                p_scatter=p_scatter.index_select(0, rows),
-                material_id=material_id.index_select(0, rows),
-                source_power=scatter_source_power,
-                tx_id=state["tx_id"].index_select(0, rows),
-                light_depth=scattered["depth"].index_select(0, rows),
-                path_length_at_vertex=scattered["path_length"].index_select(
-                    0, rows
-                ),
-                # scattering AD: hand the live frequency tensor to the
-                # radiometric factor under ad; frequency_value stays the
-                # host scalar for the sampling/pdf paths.
-                frequency_hz=frequency_hz if ad else frequency_value,
-                samples=int(samples),
-                scene_diagonal=scene_diagonal,
-                ad=ad,
-                ledger=ledger,
-            )
-            if nee_block is not None:
-                sample_blocks.append(nee_block)
-                nee_rows = nee_rows + nee_block["valid"].sum()
-    return merged, scattered_valid, nee_rows
-
-
-def _emit_mixed_transmission(
-    *, rayd: Any, sensor: dict[str, torch.Tensor], merged: dict[str, torch.Tensor],
-    choose_scatter: torch.Tensor, emit_mixed_transmission: bool, sensor_count: int, samples: int,
-    tx_power: torch.Tensor, frequency_hz: float | torch.Tensor, frequency_value: float, mis: str,
-    beta: float, ad: bool, ledger: object | None, sample_blocks: list[dict[str, torch.Tensor]],
-) -> None:
-    """Emit the MIXED reflection+transmission endpoint connection (component 5).
-
-    Pure lift of the mixed-transmission emission block (transmission): connects only the
-    reflect-and-transmit subpaths through the native endpoint kernel, filters by
-    visibility, and appends the resulting block to ``sample_blocks``."""
-
-    mask = merged["component_mask"]
-    mixed = (
-        merged["valid"]
-        & ~choose_scatter
-        & ((mask & _MASK_REFLECTION) != 0)
-        & ((mask & _MASK_TRANSMISSION) != 0)
-        # Post-scatter subpaths carry no Complex3 field (cleared at
-        # the scatter vertex); their |F|^2 = 0 endpoint rows would
-        # contribute nothing while contaminating the component-5
-        # sample statistics. Their path class (S -> ... -> T) is
-        # explicitly not covered in v1 (coherent scattering). At order 1 no
-        # subpath survives with the scattering bit, so this term is
-        # structurally inert for the default.
-        & ((mask & MASK_SCATTERING) == 0)
-    )
-    if emit_mixed_transmission and bool(mixed.any()):
-        if ad:
-            samples_out = bdpt_endpoint_connection_samples_ad(
-                merged,
-                sensor,
-                tx_power,
-                frequency=frequency_hz,
-                frequency_value=frequency_value,
-                samples_per_tx=int(samples),
-                max_paths=None,
-                mis=mis,
-                beta=beta,
-                strategy_count=1,
-            )
-            if ledger is not None:
-                ledger.add(  # type: ignore[attr-defined]
-                    merged["field_real"],
-                    merged["field_imag"],
-                    sensor["field_real"],
-                    sensor["field_imag"],
-                )
-        else:
-            samples_out = bdpt_endpoint_connection_samples(
-                merged,
-                sensor,
-                frequency_hz=frequency_value,
-                samples_per_tx=int(samples),
-                max_paths=None,
-                mis=mis,
-                beta=beta,
-                strategy_count=1,
-            )
-        visibility_inputs = bdpt_endpoint_connection_visibility_inputs(
-            merged,
-            sensor,
-            sample_count=int(samples_out["valid"].shape[0]),
-        )
-        visible = geometry_kernels.rayd_visibility_forward(
-            rayd.require_resource(),
-            visibility_inputs["start"],
-            visibility_inputs["end"],
-            visibility_inputs["active"],
-        )[0]
-        keep = visible & mixed.repeat_interleave(sensor_count)
-        sample_blocks.append(bdpt_filter_connection_samples(samples_out, keep))
-
-
-def _apply_scatter_continuation(
-    *, merged: dict[str, torch.Tensor], scatter_count: torch.Tensor | None,
-    choose_scatter: torch.Tensor, scattered_valid: torch.Tensor, max_scattering_order: int,
-) -> torch.Tensor | None:
-    """Terminate (order 1) or continue (order > 1) scattered subpaths.
-
-    Pure lift of the continuation/kill logic (coherent scattering). Mutates
-    ``merged['valid']`` in place and returns the updated scatter-event tally."""
-
-    if scatter_count is None:
-        # order 1 (default): scattered subpaths connected above and
-        # terminate here; reflection/transmission never follow them.
-        merged["valid"] = merged["valid"] & ~choose_scatter
-        return None
-    # order > 1 (coherent scattering): a successfully scattered subpath
-    # CONTINUES (its new direction/origin/throughput are already
-    # overlaid in ``merged`` by _merge_scattered_state) until it
-    # reaches the scatter-event cap. NEE rows were emitted above at
-    # this vertex exactly as at order 1. Count only successful
-    # scatter events; a subpath that just hit the cap terminates
-    # (its NEE is already recorded), and a scatter selection whose
-    # direction sample failed is dropped.
-    scatter_count = scatter_count + scattered_valid.to(scatter_count.dtype)
-    reached_cap = scatter_count >= int(max_scattering_order)
-    merged["valid"] = (
-        merged["valid"]
-        & ~(choose_scatter & ~scattered_valid)
-        & ~reached_cap
-    )
-    return scatter_count
-
-
-def _transmission_sampled_connection_samples(
-    rayd: Any, tx_positions: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
-    rx_positions: torch.Tensor, rx_polarization: torch.Tensor, sensor: dict[str, torch.Tensor],
-    material_bundle: dict[str, torch.Tensor], *, frequency_hz: float, samples: int, max_depth: int,
-    seed: int, mis: str, beta: float, scattering_runtimes: dict[int, Any] | None = None,
-    emit_mixed_transmission: bool = True, scene_diagonal: float = 0.0,
-    max_scattering_order: int = 1, ad: bool = False, ledger: object | None = None,
-) -> tuple[list[dict[str, torch.Tensor]], dict[str, torch.Tensor]]:
-    """Shooting-context light subpaths with three-way event selection.
-
-    Implements surface-event selection. At every surface hit a seeded, reproducible
-    uniform selects among the delta specular reflection, the continuous
-    Kirchhoff scattering (rough faces only, when ``scattering_runtimes`` is
-    provided) and the delta transmission events; the selected branch's field
-    is divided by sqrt(p_event) so the power estimator stays unbiased (see
-    the inline algebra note).
-
-    Event probabilities: smooth faces keep the two-way split
-    p_t = T/(R+T) from the native stack budgets BIT-IDENTICALLY (their
-    scatter probability is exactly zero, so the same uniform partitions the
-    same way); rough faces use the native (R_coh, R_diff, T_bar) budgets
-    with the same floor pattern. The rough reflect branch
-    additionally multiplies the field by the coherent attenuation C_r so its
-    amplitude represents sqrt(R_coh), matching the budget that selected it.
-
-    Contribution routing (never double counts):
-    - MIXED reflection+transmission chains connect through the native
-    endpoint kernel (component 5), as in transmission; emitted only when
-    ``emit_mixed_transmission`` (the transmission component is requested).
-    - Scatter-selected vertices emit torch-side NEE rows (component 6).
-    Depth rule (coherent scattering, ``max_scattering_order``):
-    * order 1 (default, BIT-IDENTICAL): the scattered subpath emits its
-    NEE row and TERMINATES; reflection/transmission never follow.
-    * order > 1: the scattered subpath CONTINUES in its lobe-sampled
-    direction (power divided by ``p_scatter * pdf(wo)`` in :func:`scattered_subpath_state`) and may reflect/transmit/scatter
-    again, emitting an NEE row at every scatter vertex, until it has
-    undergone ``max_scattering_order`` scatter events. A post-scatter
-    subpath carries power in the scalar throughput (its Complex3 Jones
-    field is cleared at a scatter vertex), so its incident power at a
-    further scatter vertex is the unpolarized throughput power.
-    - Pure reflection stays with the discrete enumeration and pure
-    transmission with the straight endpoint chains.
-    """
-
-    device = tx_positions.device
-    # scattering AD: under AD the carrier crosses as a live 0-dim tensor
-    # (``frequency_hz``) while the host scalar (``frequency_value``) is read once
-    # and threaded to the frozen event-probability stack and every _ad facade.
-    # The primal path keeps ``frequency_hz`` a float, so ``frequency_value`` is
-    # exactly that float and every call is bitwise the pre-AD behaviour.
-    frequency_value = (
-        _ad_frequency_value(frequency_hz) if ad else float(frequency_hz)
-    )
-    layer_csr = layer_csr_view(material_bundle)
-    face_material_id = material_bundle["material_id"]
-    material_axis_rad = material_bundle["rough_axis_rad"]
-    runtimes = scattering_runtimes or {}
-    sensor_count = int(sensor["origin"].shape[0])
-    sample_blocks: list[dict[str, torch.Tensor]] = []
-    # Event tallies stay on the device; metadata reads them once per solve.
-    transmit_events = torch.zeros((), device=device, dtype=torch.int64)
-    reflect_events = torch.zeros((), device=device, dtype=torch.int64)
-    scatter_events = torch.zeros((), device=device, dtype=torch.int64)
-    nee_rows = torch.zeros((), device=device, dtype=torch.int64)
-    for tx_index in range(int(tx_positions.shape[0])):
-        launch_inputs = bdpt_reflection_launch_inputs(
-            tx_positions, tx_index=tx_index, sample_count=int(samples)
-        )
-        ray_d = bdpt_sample_directions(
-            int(samples), tx_positions, seed=int(seed) + tx_index * 65537
-        )
-        state = bdpt_endpoint_subpath_state(
-            tx_positions,
-            tx_power,
-            tx_polarization,
-            rx_positions,
-            rx_polarization,
-            launch_inputs["tx_id"],
-            launch_inputs["light_seed"],
-        )["light"]
-        state["direction"] = ray_d
-        ray_inputs = {
-            "ray_o": launch_inputs["ray_o"],
-            "ray_d": ray_d,
-            "ray_tmax": launch_inputs["ray_tmax"],
-            "active": launch_inputs["active"],
-        }
-        # Per-subpath diffuse-scatter event tally for the order cap. Only
-        # allocated when multi-order continuation is requested; order 1 keeps
-        # the single-bounce terminal rule and never reads it.
-        scatter_count = (
-            torch.zeros((int(samples),), device=device, dtype=torch.int32)
-            if int(max_scattering_order) > 1
-            else None
-        )
-        for bounce in range(max(1, int(max_depth))):
-            hit = geometry_kernels.rayd_intersect_forward(
-                rayd.require_resource(),
-                ray_inputs["ray_o"],
-                ray_inputs["ray_d"],
-                ray_inputs["ray_tmax"],
-                ray_inputs["active"],
-            )
-            prim = hit["global_prim_id"]
-            material_id = face_material_id.index_select(
-                0, prim.clamp_min(0).to(torch.int64)
-            )
-            hit_ok = (
-                state["valid"] & (prim >= 0) & (hit["t"] >= 0.0) & (material_id >= 0)
-            )
-            cos_theta = (
-                (state["direction"] * hit["n"]).sum(dim=-1).abs().clamp(1.0e-6, 1.0)
-            )
-            # The event-probability stack is FROZEN (it drives sampling and MIS,
-            # frozen under BDPT AD): always the non-AD primal evaluation with the
-            # host scalar. Material/layer gradients ride the subpath _ad kernels
-            # below, not this selection stack.
-            events = _select_surface_events(
-                cos_theta=cos_theta,
-                material_id=material_id,
-                hit_ok=hit_ok,
-                material_bundle=material_bundle,
-                layer_csr=layer_csr,
-                runtimes=runtimes,
-                frequency_value=frequency_value,
-                samples=samples,
-                seed=seed,
-                tx_index=tx_index,
-                bounce=bounce,
-                device=device,
-            )
-            choose_scatter = events["choose_scatter"]
-            choose_transmit = events["choose_transmit"]
-            rough = events["rough"]
-            p_scatter = events["p_scatter"]
-            p_transmit = events["p_transmit"]
-            coherent_amplitude = events["coherent_amplitude"]
-            if ad:
-                if ledger is not None:
-                    ledger.add(  # type: ignore[attr-defined]
-                        state["field_real"],
-                        state["field_imag"],
-                        material_bundle["eps_r"],
-                        material_bundle["sigma_e"],
-                        material_bundle["thickness"],
-                    )
-                reflected = bdpt_reflected_light_subpath_state_ad(
-                    state,
-                    hit,
-                    material_gain=material_bundle["gain"],
-                    material_valid=material_bundle["valid"],
-                    material_eps_r=material_bundle["eps_r"],
-                    material_sigma_e=material_bundle["sigma_e"],
-                    material_mu_r=material_bundle["mu_r"],
-                    material_thickness=material_bundle["thickness"],
-                    frequency=frequency_hz,
-                    frequency_value=frequency_value,
-                )
-                if ledger is not None:
-                    ledger.add(  # type: ignore[attr-defined]
-                        state["field_real"],
-                        state["field_imag"],
-                        layer_csr["layer_thickness_m"],
-                        layer_csr["layer_eps_r"],
-                        layer_csr["layer_sigma_e"],
-                    )
-                transmitted = bdpt_transmitted_light_subpath_state_ad(
-                    state,
-                    hit,
-                    face_material_id=face_material_id,
-                    layer_offset=layer_csr["layer_offset"],
-                    layer_count=layer_csr["layer_count"],
-                    layer_thickness_m=layer_csr["layer_thickness_m"],
-                    layer_eps_r=layer_csr["layer_eps_r"],
-                    layer_sigma_e=layer_csr["layer_sigma_e"],
-                    layer_mu_r=layer_csr["layer_mu_r"],
-                    frequency=frequency_hz,
-                    frequency_value=frequency_value,
-                )
-            else:
-                reflected = bdpt_reflected_light_subpath_state(
-                    state,
-                    hit,
-                    material_gain=material_bundle["gain"],
-                    material_valid=material_bundle["valid"],
-                    material_eps_r=material_bundle["eps_r"],
-                    material_sigma_e=material_bundle["sigma_e"],
-                    material_mu_r=material_bundle["mu_r"],
-                    material_thickness=material_bundle["thickness"],
-                    frequency_hz=frequency_value,
-                )
-                transmitted = bdpt_transmitted_light_subpath_state(
-                    state,
-                    hit,
-                    face_material_id=face_material_id,
-                    layer_offset=layer_csr["layer_offset"],
-                    layer_count=layer_csr["layer_count"],
-                    layer_thickness_m=layer_csr["layer_thickness_m"],
-                    layer_eps_r=layer_csr["layer_eps_r"],
-                    layer_sigma_e=layer_csr["layer_sigma_e"],
-                    layer_mu_r=layer_csr["layer_mu_r"],
-                    frequency_hz=frequency_value,
-                )
-            merged = _merge_event_states(reflected, transmitted, choose_transmit)
-            # Unbiased event split: every contribution downstream has the form
-            # source_power * |field|^2 * (geometry terms), and branch e was
-            # selected with probability p_e, so the POWER must be divided by
-            # p_e. Dividing the FIELD (and the real amplitude proxy) by
-            # sqrt(p_e) achieves exactly that:
-            # E[|field_e / sqrt(p_e)|^2] = sum_e p_e * |field_e|^2 / p_e
-            # = sum_e |field_e|^2.
-            # source_power is deliberately untouched; scaling it too would
-            # double count the correction. The reflect probability is
-            # 1 - p_s - p_t (p_s = 0 on smooth faces, reproducing transmission).
-            p_event = torch.where(
-                choose_transmit, p_transmit, 1.0 - p_scatter - p_transmit
-            )
-            inv_amplitude = torch.where(
-                merged["valid"],
-                torch.rsqrt(p_event.clamp_min(1.0e-4)),
-                torch.ones_like(p_event),
-            )
-            # Rough reflect branch: the native kernel applied the SMOOTH
-            # stack Jones (amplitude sqrt(R_bar)); multiplying by C_r turns
-            # it into the coherent amplitude sqrt(R_coh) that matches the
-            # budget driving its selection probability (contract 6.2).
-            reflect_scale = torch.where(
-                rough & ~choose_transmit & ~choose_scatter,
-                coherent_amplitude,
-                torch.ones_like(coherent_amplitude),
-            )
-            amplitude_scale = inv_amplitude * reflect_scale
-            for key in ("throughput_real", "throughput_imag"):
-                merged[key] = merged[key] * amplitude_scale
-            for key in ("field_real", "field_imag"):
-                merged[key] = merged[key] * amplitude_scale[:, None]
-            # Reflection/transmission directions are delta events, but the
-            # sampled event class still has a discrete probability mass. Keep
-            # that mass in the proposal density; canonical enumerated delta
-            # paths use a separate unit-mass block.
-            for key in ("pdf_forward", "pdf_reverse"):
-                merged[key] = torch.where(
-                    merged["valid"], merged[key] * p_event, torch.zeros_like(p_event)
-                )
-
-            merged, scattered_valid, scatter_nee_rows = _emit_scatter_nee(
-                rayd=rayd,
-                sensor=sensor,
-                state=state,
-                hit=hit,
-                merged=merged,
-                choose_scatter=choose_scatter,
-                p_scatter=p_scatter,
-                material_id=material_id,
-                material_axis_rad=material_axis_rad,
-                runtimes=runtimes,
-                max_scattering_order=max_scattering_order,
-                samples=samples,
-                seed=seed,
-                tx_index=tx_index,
-                bounce=bounce,
-                device=device,
-                scene_diagonal=scene_diagonal,
-                frequency_hz=frequency_hz,
-                frequency_value=frequency_value,
-                tx_power=tx_power,
-                ad=ad,
-                ledger=ledger,
-                sample_blocks=sample_blocks,
-            )
-            nee_rows = nee_rows + scatter_nee_rows
-            transmit_events = transmit_events + (choose_transmit & merged["valid"]).sum()
-            scatter_events = scatter_events + scattered_valid.sum()
-            reflect_events = reflect_events + (
-                ~choose_transmit & ~choose_scatter & merged["valid"]
-            ).sum()
-            _emit_mixed_transmission(
-                rayd=rayd,
-                sensor=sensor,
-                merged=merged,
-                choose_scatter=choose_scatter,
-                emit_mixed_transmission=emit_mixed_transmission,
-                sensor_count=sensor_count,
-                samples=samples,
-                tx_power=tx_power,
-                frequency_hz=frequency_hz,
-                frequency_value=frequency_value,
-                mis=mis,
-                beta=beta,
-                ad=ad,
-                ledger=ledger,
-                sample_blocks=sample_blocks,
-            )
-            scatter_count = _apply_scatter_continuation(
-                merged=merged,
-                scatter_count=scatter_count,
-                choose_scatter=choose_scatter,
-                scattered_valid=scattered_valid,
-                max_scattering_order=max_scattering_order,
-            )
-            if not bool(merged["valid"].any()):
-                break
-            state = merged
-            ray_inputs = bdpt_subpath_intersection_inputs(merged)
-    return sample_blocks, {
-        "transmit": transmit_events,
-        "reflect": reflect_events,
-        "scatter": scatter_events,
-        "scattering_nee_rows": nee_rows,
-    }
 # --- Transmitter/receiver endpoint tensor packing ---------------------------
 
 def transmitter_tensors(scene: SolverScene) -> tuple[torch.Tensor, torch.Tensor]:
@@ -2859,7 +1381,7 @@ def receiver_positions(
 def make_launch_state(
     reference: torch.Tensor, *, tx_count: int, config: Config,
 ) -> dict[str, torch.Tensor]:
-    return bdpt_launch_state(  # type: ignore[no-any-return]
+    return bdpt_launch_state(
         reference,
         tx_count=tx_count,
         samples=config.samples,
@@ -3127,7 +1649,7 @@ def _accumulate_connection_samples(
             coeff_real=coeff_real,
             coeff_imag=coeff_imag,
         )
-    return bdpt_accumulate_connection_samples(  # type: ignore[no-any-return]
+    return bdpt_accumulate_connection_samples(
         samples,
         tx_count=tx_count,
         rx_count=rx_count,
@@ -3154,7 +1676,7 @@ def _reduced_light_endpoint_state(
     tx_count = int(tx_reference.shape[0])
     tx_ids = torch.arange(tx_count, device=device, dtype=torch.int32)
     seeds = torch.zeros((tx_count,), device=device, dtype=torch.int64)
-    return bdpt_endpoint_subpath_state(  # type: ignore[no-any-return]
+    return bdpt_endpoint_subpath_state(
         tx_reference,
         tx_power,
         tx_polarization,
@@ -3393,17 +1915,19 @@ def _estimate_workspace_bytes(
     if "transmission" in config.components:
         # Straight endpoint chains: one deterministic row per (tx, rx) pair.
         dense_rows += max(0, int(tx_count)) * rx_rows
-        if _wavefront_eligible(config, {}):
-            # The fused wavefront holds one chunk and one pair tile, never rows.
-            chunk = min(launch_entries, _WAVEFRONT_CHUNK_SAMPLES)
-            tile_receivers = max(1, min(rx_rows, _WAVEFRONT_PAIR_TILE // max(1, chunk)))
-            bytes_estimate += chunk * _WAVEFRONT_BYTES_PER_SAMPLE
-            bytes_estimate += chunk * tile_receivers * _WAVEFRONT_BYTES_PER_PAIR
-            bytes_estimate += max(0, int(tx_count)) * rx_rows * 8
-        else:
-            # Sampled mixed reflection+transmission chains retain a connection
-            # block per light depth.
-            dense_rows += launch_entries * rx_rows * max(1, int(config.max_depth))
+        # The fused wavefront holds one chunk and one pair tile, never rows.
+        chunk = min(launch_entries, _WAVEFRONT_CHUNK_SAMPLES)
+        tile_receivers = max(1, min(rx_rows, _WAVEFRONT_PAIR_TILE // max(1, chunk)))
+        bytes_estimate += chunk * _WAVEFRONT_BYTES_PER_SAMPLE
+        bytes_estimate += chunk * tile_receivers * _WAVEFRONT_BYTES_PER_PAIR
+        bytes_estimate += max(0, int(tx_count)) * rx_rows * 8
+        if config.ad_mode == "vjp":
+            # The reverse pass keeps a per-bounce replay tape of one chunk.
+            bytes_estimate += (
+                min(launch_entries, _WAVEFRONT_AD_CHUNK_SAMPLES)
+                * max(1, int(config.max_depth))
+                * _WAVEFRONT_TAPE_BYTES_PER_SLOT
+            )
     if "scattering" in config.components:
         # NEE rows from scatter-selected vertices: bounded by one block of
         # (scatter events x receivers) per light depth.
@@ -3442,13 +1966,14 @@ def _effective_native_samples(config: Config) -> int:
 
 
 def _effective_native_depth(config: Config) -> int:
-    return min(int(config.max_depth), int(config.max_light_depth))  # type: ignore[arg-type]
+    # Config normalizes an unset max_light_depth to max_depth.
+    return min(int(config.max_depth), int(cast(int, config.max_light_depth)))
 
 
 # Enumerated component id -> BDPT accumulation bucket. LoS 0, reflection 1 and
-# diffraction 2 keep their id; coupled reflection-diffraction (3, 4) and double
+# diffraction 2 keep their id; the interaction chains (3, 4, 9..15) and double
 # diffraction (7) fold into diffraction; transmission keeps 5.
-_ENUMERATED_BUCKET = (0, 1, 2, 2, 2, 5, 6, 2)
+_ENUMERATED_BUCKET = (0, 1, 2, 2, 2, 5, 6, 2, 2, 2, 2, 2, 2, 2, 2, 2)
 
 
 def _evaluated_connection_samples(
@@ -3746,16 +2271,6 @@ class _CollectedSamples:
     sampler: str = "none"
 
 
-def _wavefront_eligible(config: Config, runtimes: dict[int, Any]) -> bool:
-    """The fused wavefront owns the sampler unless AD is requested.
-
-    AD needs the per-event subpath companions; those solves run the
-    event-composed sampler with the same native counter-based random numbers.
-    """
-
-    return True
-
-
 @dataclass
 class _Wavefront:
     """Arguments of one solve's fused wavefront calls."""
@@ -3812,7 +2327,7 @@ class _Wavefront:
     def run(
         self, base: dict[str, torch.Tensor], rows_capacity: int | None = None,
     ) -> dict[str, Any]:
-        return bdpt_wavefront_transmission(  # type: ignore[no-any-return]
+        return bdpt_wavefront_transmission(
             *self.positional(base["transmission"], base["scattering"]),
             rows_capacity=rows_capacity, **self.arguments(),
         )
@@ -3833,6 +2348,10 @@ _WAVEFRONT_MATERIAL_LEAVES = (
 # The reverse pass replays the wavefront in chunks of this many samples (its
 # per-bounce tape is held for one chunk at a time).
 _WAVEFRONT_AD_CHUNK_SAMPLES = 1 << 16
+# Replay tape bytes per (sample, bounce): event code, primitive, incident
+# direction, normal, incoming field, field cotangent, carrier, scale, scatter
+# powers cotangent and the scatter record.
+_WAVEFRONT_TAPE_BYTES_PER_SLOT = 1 + 4 + 18 * 4 + 4 * 4 + 14 * 4
 
 
 def _reject_frozen_wavefront_leaves(materials: dict[str, torch.Tensor]) -> None:
@@ -3857,17 +2376,17 @@ class _BdptWavefrontAdFunction(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(runner, base_transmission, base_scattering, *leaves):  # type: ignore[no-untyped-def]
+    def forward(runner: Any, base_transmission: Any, base_scattering: Any, *leaves: Any) -> Any:
         return runner.forward(base_transmission, base_scattering)
 
     @staticmethod
-    def setup_context(ctx, inputs, output):  # type: ignore[no-untyped-def]
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         ctx.runner = inputs[0]
 
     @staticmethod
     @_ad_first_order_only
-    def backward(ctx, grad_transmission, grad_scattering):  # type: ignore[no-untyped-def]
+    def backward(ctx: Any, grad_transmission: Any, grad_scattering: Any) -> Any:
         leaf_needs = ctx.needs_input_grad[3:]
         needs = tuple(
             name for name, need in zip(BDPT_WAVEFRONT_GRADIENTS, leaf_needs, strict=True) if need
@@ -3879,7 +2398,9 @@ class _BdptWavefrontAdFunction(torch.autograd.Function):
         return (None, grad_transmission, grad_scattering, *ctx.runner.cast_grads(leaf_grads))
 
     @staticmethod
-    def jvp(ctx, _t_runner, t_base_transmission, t_base_scattering, *_t_leaves):  # type: ignore[no-untyped-def]
+    def jvp(
+        ctx: Any, _t_runner: Any, t_base_transmission: Any, t_base_scattering: Any, *_t_leaves: Any,
+    ) -> Any:
         return ctx.runner.tangents(t_base_transmission, t_base_scattering)
 
 
@@ -3900,7 +2421,7 @@ class _WavefrontAdRunner:
     def _arguments(self) -> dict[str, Any]:
         return self.wavefront.arguments(self.leaves[7], self.leaves[8])
 
-    def forward(self, base_transmission: torch.Tensor, base_scattering: torch.Tensor):  # type: ignore[no-untyped-def]
+    def forward(self, base_transmission: torch.Tensor, base_scattering: torch.Tensor) -> Any:
         wavefront = self.wavefront
         if self.leaf_tangents is not None:
             tangents = dict(self.leaf_tangents)
@@ -3922,7 +2443,7 @@ class _WavefrontAdRunner:
             return base_transmission.clone(), base_scattering.clone()
         return out["transmission"], out["scattering"]
 
-    def tangents(self, t_base_transmission, t_base_scattering):  # type: ignore[no-untyped-def]
+    def tangents(self, t_base_transmission: Any, t_base_scattering: Any) -> Any:
         if self.tangent_out is None:
             raise RuntimeError("BDPT wavefront tangents need the forward-mode pass")
         sampled = self.tangent_out
@@ -3932,7 +2453,7 @@ class _WavefrontAdRunner:
             out.append(value if base is None else base + value)
         return tuple(out)
 
-    def backward(self, grad_transmission, grad_scattering, needs):  # type: ignore[no-untyped-def]
+    def backward(self, grad_transmission: Any, grad_scattering: Any, needs: Any) -> Any:
         wavefront = self.wavefront
         reference = wavefront.workspace.tx_reference
         shape = (wavefront.workspace.tx_count, wavefront.workspace.rx_count)
@@ -3947,7 +2468,7 @@ class _WavefrontAdRunner:
             needs=needs, **arguments,
         )
 
-    def cast_grads(self, grads):  # type: ignore[no-untyped-def]
+    def cast_grads(self, grads: Any) -> Any:
         out: list[torch.Tensor | None] = []
         for name, leaf, grad in zip(BDPT_WAVEFRONT_GRADIENTS, self.leaves, grads, strict=True):
             if grad is None or leaf is None:
@@ -4030,40 +2551,6 @@ def _wavefront_counts(counts: torch.Tensor, *, rows_counted: bool) -> dict[str, 
     return out
 
 
-def _composed_sampler(
-    scene: SolverScene, config: Config, *, prep: _SolvePrep, workspace: _EndpointWorkspace,
-    materials: dict[str, torch.Tensor], runtimes: dict[int, Any], emit_mixed: bool,
-    ledger: AdLaunchLedger | None,
-) -> tuple[list[dict[str, torch.Tensor]], dict[str, torch.Tensor]]:
-    """Event-composed sampler with AD companions (same random numbers as the wavefront)."""
-
-    ad = config.ad_mode != "none"
-    return _transmission_sampled_connection_samples(
-        prep.rayd,
-        workspace.tx_reference,
-        workspace.tx_power,
-        workspace.tx_polarization,
-        workspace.rx_positions,
-        workspace.rx_polarization,
-        workspace.endpoint_subpaths["sensor"],
-        materials,
-        # Under AD the carrier stays a live tensor so lambda/frequency chains carry
-        # a gradient; the primal reads the host scalar.
-        frequency_hz=scene.frequency if ad else _host_frequency(scene),
-        samples=prep.native_samples,
-        max_depth=prep.native_max_depth,
-        seed=int(config.seed),
-        mis=config.mis,
-        beta=config.power_heuristic_beta,
-        scattering_runtimes=runtimes,
-        emit_mixed_transmission=emit_mixed,
-        scene_diagonal=scene_diagonal_m(scene),
-        max_scattering_order=int(config.max_scattering_order),
-        ad=ad,
-        ledger=ledger,
-    )
-
-
 class _BdptConcatAdFunction(torch.autograd.Function):
     """Row concatenation of connection blocks that keeps the contribution graph.
 
@@ -4072,25 +2559,25 @@ class _BdptConcatAdFunction(torch.autograd.Function):
     only)."""
 
     @staticmethod
-    def forward(blocks, *contributions):  # type: ignore[no-untyped-def]
+    def forward(blocks: Any, *contributions: Any) -> Any:
         packed = dict(bdpt_concat_connection_samples(tuple(blocks)))
         return packed.pop("contribution"), packed
 
     @staticmethod
-    def setup_context(ctx, inputs, output):  # type: ignore[no-untyped-def]
+    def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
         ctx.sizes = [int(value.shape[0]) for value in inputs[1:]]
         ctx.device = inputs[1].device
         ctx.mark_non_differentiable(*(v for v in output[1].values() if isinstance(v, torch.Tensor)))
 
     @staticmethod
-    def backward(ctx, grad_contribution, _grad_packed):  # type: ignore[no-untyped-def]
+    def backward(ctx: Any, grad_contribution: Any, _grad_packed: Any) -> Any:
         if grad_contribution is None:
             return (None, *(None for _ in ctx.sizes))
         return (None, *torch.split(grad_contribution, ctx.sizes))
 
     @staticmethod
-    def jvp(ctx, _t_blocks, *t_contributions):  # type: ignore[no-untyped-def]
+    def jvp(ctx: Any, _t_blocks: Any, *t_contributions: Any) -> Any:
         parts = []
         for size, tangent in zip(ctx.sizes, t_contributions, strict=True):
             tangent = _ad_native_tangent_or_none(tangent)
@@ -4153,7 +2640,8 @@ def _endpoint_only_samples(workspace: _EndpointWorkspace) -> _CollectedSamples:
         )
         for component in _COMPONENT_ORDER
     }
-    matrices["los"] = workspace.endpoint_accumulation["los"]  # type: ignore[index]
+    # An endpoint-only workspace always carries the endpoint accumulation.
+    matrices["los"] = cast("dict[str, torch.Tensor]", workspace.endpoint_accumulation)["los"]
     return _CollectedSamples(
         matrices=matrices,
         estimate_samples=workspace.endpoint_connection_samples,
@@ -4267,18 +2755,8 @@ def _collect_connection_samples(
     wavefront_materials: dict[str, torch.Tensor] | None = None
     if transmission_requested or runtimes:
         material_bundle = face_material_field_bundle(scene, device=tx_reference.device)
-        if _wavefront_eligible(config, runtimes):
-            sampler = "wavefront"
-            wavefront_materials = material_bundle
-        else:
-            sampler = "event_composed"
-            mixed_blocks, event_counts = _composed_sampler(
-                scene, config, prep=prep, workspace=workspace, materials=material_bundle,
-                runtimes=runtimes, emit_mixed=transmission_requested, ledger=ledger,
-            )
-            sample_blocks.extend(mixed_blocks)
-            device_counts.update(event_counts)
-            launch_count += 3
+        sampler = "wavefront"
+        wavefront_materials = material_bundle
     wavefront = (
         None
         if wavefront_materials is None
@@ -4416,7 +2894,7 @@ def _accumulate_and_finalize(
 def _export_paths(
     scene: SolverScene, config: Config, *, workspace: _EndpointWorkspace,
     estimate_samples: dict[str, torch.Tensor] | None,
-) -> ReceiverGrid | None:
+) -> BDPTPathSamples | None:
     endpoint_only = workspace.endpoint_only
     los_light_state = workspace.los_light_state
     endpoint_subpaths = workspace.endpoint_subpaths
@@ -4424,8 +2902,10 @@ def _export_paths(
     path_samples = None
     if config.export_paths:
         if endpoint_only:
+            # An endpoint-only solve requests exactly the LoS component, so the LoS light
+            # endpoint state exists.
             exported_endpoint_samples = bdpt_endpoint_connection_samples(
-                los_light_state,
+                cast("dict[str, torch.Tensor]", los_light_state),
                 endpoint_subpaths["sensor"],
                 frequency_hz=_host_frequency(scene),
                 samples_per_tx=1,
@@ -4479,7 +2959,7 @@ def _build_metadata(
     scene: SolverScene, config: Config, *, prep: _SolvePrep, workspace: _EndpointWorkspace,
     collected: _CollectedSamples, path_gain: torch.Tensor, variance: torch.Tensor | None,
     component_maps: dict[str, torch.Tensor] | None, ledger: AdLaunchLedger | None = None,
-) -> tuple[dict[str, Any], dict[str, Any] | None]:
+) -> tuple[Metadata, dict[str, Any] | None]:
     launch_state = workspace.launch_state
     endpoint_subpaths = workspace.endpoint_subpaths
     selected_accumulation = prep.selected_accumulation
@@ -4552,7 +3032,7 @@ def _build_metadata(
                 else {key: tuple(value.shape) for key, value in component_maps.items()}
             ),
         }
-    return metadata, diagnostics
+    return cast(Metadata, metadata), diagnostics
 
 
 def _solve_pipeline(
@@ -4616,11 +3096,8 @@ def _solve_pipeline(
     )
 # --- Public entry point -----------------------------------------------------
 
-def solve(  # type: ignore[no-untyped-def]
-    scene: Scene | SceneSnapshot,
-    config: Config,
-    *,
-    reference_frequency_hz,
+def solve(
+    scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz: float | torch.Tensor,
 ) -> Result:
     """Run the native CUDA/OptiX BDPT pipeline."""
 
@@ -4660,4 +3137,4 @@ def solve(  # type: ignore[no-untyped-def]
     return result
 
 
-__all__ = ["BDPTPathSamples", "Config", "Result", "solve"]
+__all__ = ["BDPTPathSamples", "Config", "Metadata", "Result", "solve"]

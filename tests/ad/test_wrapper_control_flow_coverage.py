@@ -9,7 +9,6 @@ from contextlib import nullcontext
 import inspect
 from types import SimpleNamespace
 
-import pytest
 import torch
 
 from witwin.channel.kernels import fields
@@ -18,8 +17,8 @@ from witwin.channel.montecarlo import bdpt
 
 
 def _patch_ad_plumbing(monkeypatch, module) -> None:
-    monkeypatch.setattr(module, "_ad_reject_fixed_inputs", lambda *args: None)
-    monkeypatch.setattr(module, "_ad_reject_fixed_tangents", lambda *args: None)
+    monkeypatch.setattr(module, "_ad_reject_fixed_inputs", lambda *args: None, raising=False)
+    monkeypatch.setattr(module, "_ad_reject_fixed_tangents", lambda *args: None, raising=False)
     monkeypatch.setattr(module, "_ad_native_tensor", lambda value: value)
     monkeypatch.setattr(module, "_ad_native_tangent_or_none", lambda value: value)
     monkeypatch.setattr(
@@ -106,56 +105,6 @@ def test_field_backward_callbacks_pack_requested_gradients(monkeypatch) -> None:
     assert reflection_grads[12] is scalar
 
 
-def test_scattering_chain_jvp_callbacks_pack_native_tangents(monkeypatch) -> None:
-    _patch_ad_plumbing(monkeypatch, scattering)
-    scalar = torch.ones(())
-
-    monkeypatch.setattr(
-        scattering,
-        "scattering_chain_ensemble_eval_jvp",
-        lambda *a, **k: {
-            "tangent_gain": scalar,
-            "tangent_amplitude": scalar,
-            "tangent_length": scalar,
-        },
-    )
-    ensemble_ctx = SimpleNamespace(
-        saved_tensors=(scalar,) * 40,
-        coef_value=1.0,
-        threshold=-1.0,
-        frequency_value=3.0e9,
-    )
-    ensemble = _call_named_tangents(
-        scattering._ScatteringChainEnsembleEvalAdFunction.jvp,
-        ensemble_ctx,
-        t_c1_eps_r=scalar,
-        t_coef=scalar,
-    )
-    assert ensemble == (scalar, scalar, scalar, None)
-
-    monkeypatch.setattr(
-        scattering,
-        "scattering_chain_realization_eval_jvp",
-        lambda *a, **k: {
-            "tangent_total": scalar,
-            "tangent_path_field": scalar,
-            "tangent_path_gain": scalar,
-        },
-    )
-    realization_ctx = SimpleNamespace(
-        saved_tensors=(scalar,) * 45,
-        k0_value=1.0,
-        frequency_value=3.0e9,
-    )
-    realization = _call_named_tangents(
-        scattering._ScatteringChainRealizationEvalAdFunction.jvp,
-        realization_ctx,
-        t_heights=scalar,
-        t_k0=scalar,
-    )
-    assert realization == (scalar, scalar, scalar, None, None)
-
-
 def test_kirchhoff_build_callbacks_pack_all_gradient_groups(monkeypatch) -> None:
     _patch_ad_plumbing(monkeypatch, scattering)
     scalar = torch.ones(())
@@ -217,56 +166,27 @@ def test_kirchhoff_build_callbacks_pack_all_gradient_groups(monkeypatch) -> None
     assert gradients[7] is scalar
 
 
-def test_bdpt_subpath_jvp_callbacks_pack_tangent_fields(monkeypatch) -> None:
-    _patch_ad_plumbing(monkeypatch, bdpt)
-    scalar = torch.ones(())
-    tangent_output = {
-        "tangent_field_real": scalar,
-        "tangent_field_imag": scalar,
-        "tangent_throughput_real": scalar,
-        "tangent_throughput_imag": scalar,
-    }
+def test_bdpt_wavefront_ad_callbacks_route_through_the_runner() -> None:
+    value = torch.ones(())
+    leaves = tuple(value for _ in bdpt.BDPT_WAVEFRONT_GRADIENTS)
 
-    monkeypatch.setattr(
-        bdpt,
-        "bdpt_reflected_light_subpath_state_jvp",
-        lambda *a, **k: tangent_output,
-    )
-    reflected_ctx = SimpleNamespace(
-        saved_tensors=(scalar,) * 8,
-        base_light={},
-        intersection={},
-        material_gain=scalar,
-        material_valid=scalar,
-        frequency_value=3.0e9,
-    )
-    reflected = _call_named_tangents(
-        bdpt._BdptReflectedSubpathAdFunction.jvp,
-        reflected_ctx,
-        t_field_real=scalar,
-    )
-    assert reflected[bdpt._SUBPATH_DIFF_INDEX["field_real"]] is scalar
+    class Runner:
+        def tangents(self, t_transmission, t_scattering):
+            return t_transmission, t_scattering
 
-    monkeypatch.setattr(
-        bdpt,
-        "bdpt_transmitted_light_subpath_state_jvp",
-        lambda *a, **k: tangent_output,
-    )
-    transmitted_ctx = SimpleNamespace(
-        saved_tensors=(scalar,) * 8,
-        base_light={},
-        intersection={},
-        face_material_id=scalar,
-        layer_offset=scalar,
-        layer_count=scalar,
-        frequency_value=3.0e9,
-    )
-    transmitted = _call_named_tangents(
-        bdpt._BdptTransmittedSubpathAdFunction.jvp,
-        transmitted_ctx,
-        t_thickness=scalar,
-    )
-    assert transmitted[bdpt._SUBPATH_DIFF_INDEX["throughput_imag"]] is scalar
+        def backward(self, grad_transmission, grad_scattering, needs):
+            return {name: value for name in needs}
+
+        def cast_grads(self, grads):
+            return grads
+
+    ctx = SimpleNamespace(runner=Runner(), needs_input_grad=(False, True, True, *(True,) * len(leaves)))
+    assert bdpt._BdptWavefrontAdFunction.jvp(ctx, None, value, value, *leaves) == (value, value)
+    with torch.no_grad():
+        grads = bdpt._BdptWavefrontAdFunction.backward(ctx, value, None)
+    assert len(grads) == 3 + len(leaves)
+    assert grads[1] is value and grads[2] is None
+    assert all(grad is value for grad in grads[3:])
 
 
 def test_bdpt_endpoint_and_accumulate_jvp_callbacks_pack_schema(monkeypatch) -> None:
@@ -352,7 +272,7 @@ def test_field_jvp_callbacks_cover_declared_component_matrix(monkeypatch) -> Non
                 "tangent_field_vector": value,
                 "tangent_direction": value,
             },
-            "field_coupled_rd_jvp": {
+            "field_coupled_chain_jvp": {
                 "tangent_field_vector": value,
                 "tangent_coefficient": value,
                 "tangent_path_field": value,
@@ -408,16 +328,15 @@ def test_field_jvp_callbacks_cover_declared_component_matrix(monkeypatch) -> Non
     )
     assert diffraction == (value, value)
 
-    rd_ctx = SimpleNamespace(
-        saved_tensors=(value,) * 28,
+    chain_ctx = SimpleNamespace(
+        saved_tensors=(value,) * 20,
         frequency_value=3.0e9,
-        reverse=False,
     )
-    rd_tangents = [None] * 32
-    rd_tangents[0] = value
-    rd_tangents[12] = value
-    rd = fields._FieldCoupledRdAdFunction.jvp(rd_ctx, *rd_tangents)
-    assert rd == (value, value, value, value, None)
+    chain_tangents = [None] * 22
+    chain_tangents[0] = value
+    chain_tangents[15] = value
+    chain = fields._FieldCoupledChainAdFunction.jvp(chain_ctx, *chain_tangents)
+    assert chain == (value, value, value, value, None)
 
     dd_ctx = SimpleNamespace(
         saved_tensors=(value,) * 35,
@@ -461,7 +380,6 @@ def test_field_jvp_callbacks_cover_declared_component_matrix(monkeypatch) -> Non
 def test_remaining_vjp_callbacks_pack_full_gradients(monkeypatch) -> None:
     _patch_ad_plumbing(monkeypatch, fields)
     value = torch.ones(1)
-    material3 = torch.ones(1, 3)
     material4 = torch.ones(1, 4)
 
     def required_symbol(name):
@@ -481,15 +399,13 @@ def test_remaining_vjp_callbacks_pack_full_gradients(monkeypatch) -> None:
                 "grad_vertex_opp0": value,
                 "grad_vertex_opp1": value,
             },
-            "field_coupled_rd_backward": {
+            "field_coupled_chain_backward": {
                 "grad_source": value,
                 "grad_target": value,
-                "grad_reflection_position": value,
-                "grad_edge_position": value,
-                "grad_eps_r": material3,
-                "grad_sigma_e": material3,
-                "grad_gain": material3,
-                "grad_thickness": material3,
+                "grad_eps_r": material4,
+                "grad_sigma_e": material4,
+                "grad_gain": material4,
+                "grad_thickness": material4,
                 "grad_frequency": value,
             },
             "field_coupled_dd_backward": {
@@ -529,21 +445,20 @@ def test_remaining_vjp_callbacks_pack_full_gradients(monkeypatch) -> None:
         )
     assert len(diffraction) == 28 and diffraction[25] is value
 
-    rd_needed = [False] * 32
-    for index in (0, 1, 2, 4, 12, 13, 15, 16, 17, 18, 20, 21, 22, 23, 25, 26, 27):
-        rd_needed[index] = True
-    rd_ctx = SimpleNamespace(
-        needs_input_grad=tuple(rd_needed),
-        saved_tensors=(value,) * 28,
+    chain_needed = [False] * 22
+    for index in (0, 1, 15, 16, 18, 19, 20):
+        chain_needed[index] = True
+    chain_ctx = SimpleNamespace(
+        needs_input_grad=tuple(chain_needed),
+        saved_tensors=(value,) * 20,
         frequency_value=3.0e9,
         frequency_meta=None,
-        reverse=False,
     )
     with torch.no_grad():
-        rd = fields._FieldCoupledRdAdFunction.backward(
-            rd_ctx, value, value, value, value, None
+        chain = fields._FieldCoupledChainAdFunction.backward(
+            chain_ctx, value, value, value, value, None
         )
-    assert len(rd) == 32 and torch.equal(rd[26], value)
+    assert len(chain) == 22 and torch.equal(chain[19], material4) and chain[20] is not None
 
     dd_needed = [False] * 41
     for index in (0, 1, 15, 16, 18, 19, 20, 21, 23, 24, 25, 26, 28, 29, 30, 31, 33, 34, 35):
@@ -610,140 +525,8 @@ def test_remaining_vjp_callbacks_pack_full_gradients(monkeypatch) -> None:
     assert source == (value, None)
 
 
-def test_scattering_and_bdpt_vjp_callbacks_pack_full_gradients(monkeypatch) -> None:
-    _patch_ad_plumbing(monkeypatch, scattering)
+def test_transmission_vjp_covers_all_groups(monkeypatch) -> None:
     value = torch.ones(1)
-    chain_output = {
-        "grad_c1_eps_r": value,
-        "grad_c1_sigma_e": value,
-        "grad_c1_gain": value,
-        "grad_c1_thickness": value,
-        "grad_c2_eps_r": value,
-        "grad_c2_sigma_e": value,
-        "grad_c2_gain": value,
-        "grad_c2_thickness": value,
-        "grad_f_te": value,
-        "grad_f_tm": value,
-        "grad_coef": value,
-        "grad_frequency": value,
-    }
-    monkeypatch.setattr(
-        scattering,
-        "scattering_chain_ensemble_eval_backward",
-        lambda *a, **k: chain_output,
-    )
-    chain_needed = [False] * 45
-    for index in (8, 9, 11, 12, 16, 17, 19, 20, 35, 36, 40, 41):
-        chain_needed[index] = True
-    chain_ctx = SimpleNamespace(
-        needs_input_grad=tuple(chain_needed),
-        saved_tensors=(value,) * 40,
-        coef_value=1.0,
-        coef_meta=None,
-        threshold=-1.0,
-        frequency_value=3.0e9,
-        frequency_meta=None,
-    )
-    with torch.no_grad():
-        chain = scattering._ScatteringChainEnsembleEvalAdFunction.backward(
-            chain_ctx, value, value, value, None
-        )
-    assert len(chain) == 45 and chain[41] is value
-
-    _patch_ad_plumbing(monkeypatch, bdpt)
-    subpath_output = {
-        "grad_light_field_real": value,
-        "grad_light_field_imag": value,
-        "grad_light_throughput_real": value,
-        "grad_light_throughput_imag": value,
-        "grad_eps_r": value,
-        "grad_sigma_e": value,
-        "grad_thickness": value,
-        "grad_frequency": value,
-    }
-    monkeypatch.setattr(
-        bdpt,
-        "bdpt_reflected_light_subpath_state_backward",
-        lambda *a, **k: subpath_output,
-    )
-    subpath_needed = [False] * 14
-    for index in (0, 1, 2, 3, 4, 5, 7, 8):
-        subpath_needed[index] = True
-    subpath_ctx = SimpleNamespace(
-        needs_input_grad=tuple(subpath_needed),
-        saved_tensors=(value,) * 8,
-        base_light={},
-        intersection={},
-        material_gain=value,
-        material_valid=value,
-        frequency_value=3.0e9,
-        frequency_meta=None,
-    )
-    grad_outputs = [None] * len(bdpt._SUBPATH_FIELDS)
-    for name in bdpt._SUBPATH_DIFF_FIELDS:
-        grad_outputs[bdpt._SUBPATH_DIFF_INDEX[name]] = value
-    with torch.no_grad():
-        subpath = bdpt._BdptReflectedSubpathAdFunction.backward(
-            subpath_ctx, *grad_outputs
-        )
-    assert len(subpath) == 14 and subpath[8] is value
-
-def test_realization_and_transmission_vjp_cover_all_groups(monkeypatch) -> None:
-    _patch_ad_plumbing(monkeypatch, scattering)
-    value = torch.ones(1)
-    realization_names = (
-        "d_i",
-        "d_o",
-        "c1_positions",
-        "c1_normals",
-        "c1_eps_r",
-        "c1_sigma_e",
-        "c1_gain",
-        "c1_thickness",
-        "c2_positions",
-        "c2_normals",
-        "c2_eps_r",
-        "c2_sigma_e",
-        "c2_gain",
-        "c2_thickness",
-        "L1",
-        "L2",
-        "sp1",
-        "sp2",
-        "centroids",
-        "heights",
-        "layer_thickness",
-        "layer_eps_r",
-        "layer_sigma_e",
-        "k0",
-        "frequency",
-    )
-    realization_output = {f"grad_{name}": value for name in realization_names}
-    monkeypatch.setattr(
-        scattering,
-        "scattering_chain_realization_eval_backward",
-        lambda *a, **k: realization_output,
-    )
-    realization_needed = [False] * 49
-    for index in (
-        4, 5, 10, 11, 12, 13, 15, 16, 18, 19, 20, 21, 23, 24,
-        28, 29, 30, 31, 32, 33, 38, 39, 40, 45, 46,
-    ):
-        realization_needed[index] = True
-    realization_ctx = SimpleNamespace(
-        needs_input_grad=tuple(realization_needed),
-        saved_tensors=(value,) * 45,
-        k0_value=1.0,
-        k0_meta=None,
-        frequency_value=3.0e9,
-        frequency_meta=None,
-    )
-    with torch.no_grad():
-        realization = scattering._ScatteringChainRealizationEvalAdFunction.backward(
-            realization_ctx, None, value, value, None, None
-        )
-    assert len(realization) == 49
-    assert realization[33] is value and realization[46] is value
 
     _patch_ad_plumbing(monkeypatch, fields)
     transmission_output = {
@@ -775,6 +558,7 @@ def test_realization_and_transmission_vjp_cover_all_groups(monkeypatch) -> None:
         )
     assert len(transmission) == 18
     assert transmission[14] is value and transmission[16] is value
+
 
 def test_scattering_primitive_vjp_callbacks_cover_all_groups(monkeypatch) -> None:
     _patch_ad_plumbing(monkeypatch, scattering)
@@ -819,27 +603,6 @@ def test_scattering_primitive_vjp_callbacks_cover_all_groups(monkeypatch) -> Non
         )
     assert len(ensemble) == 26 and ensemble[23] is value
 
-    table_output = {
-        "grad_wi": value,
-        "grad_wo": value,
-        "grad_f_te": value,
-        "grad_f_tm": value,
-    }
-    monkeypatch.setattr(
-        scattering,
-        "scattering_table_eval_backward",
-        lambda *a, **k: table_output,
-    )
-    table_ctx = SimpleNamespace(
-        needs_input_grad=(False, True, True, True, True),
-        saved_tensors=(value,) * 5,
-    )
-    with torch.no_grad():
-        table = scattering._ScatteringTableEvalAdFunction.backward(
-            table_ctx, value, value
-        )
-    assert table == (None, value, value, value, value)
-
     patch_names = (
         "d_i",
         "d_o",
@@ -871,17 +634,3 @@ def test_scattering_primitive_vjp_callbacks_cover_all_groups(monkeypatch) -> Non
             patch_ctx, value, None, None
         )
     assert len(patch) == 20 and patch[18] is value
-
-@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
-def test_deterministic_field_helpers_dispatch_native() -> None:
-    path_length = torch.tensor([1.0, 2.0], device="cuda", dtype=torch.float32)
-    phase = fields.deterministic_phase_from_length(
-        path_length,
-        frequency_hz=3.0e9,
-    )
-    assert phase.shape == path_length.shape
-
-    path_gain = torch.tensor([0.25, 0.5], device="cuda", dtype=torch.float32)
-    exported = fields.deterministic_field_from_power_phase(path_gain, phase)
-    assert exported["field_real"].shape == path_gain.shape
-    assert exported["field_imag"].shape == path_gain.shape
