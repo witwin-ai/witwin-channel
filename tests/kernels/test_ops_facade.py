@@ -1667,9 +1667,9 @@ def test_mc_receiver_grid_points_requires_native_cuda_kernel(monkeypatch):
         )
 
 
-def test_mc_reflection_launch_inputs_fill_ray_origin_active_and_polarization():
+def test_mc_reflection_rays_fill_origins_unit_directions_and_seeded_rotation():
     if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for MC reflection launch inputs")
+        pytest.skip("CUDA is required for MC reflection launch rays")
 
     tx_positions = torch.tensor(
         [[0.0, 1.0, 2.0], [3.0, 4.0, 5.0]],
@@ -1677,26 +1677,54 @@ def test_mc_reflection_launch_inputs_fill_ray_origin_active_and_polarization():
         dtype=torch.float32,
     )
 
-    result = montecarlo_kernels.mc_reflection_launch_inputs(tx_positions, tx_index=1, sample_count=4)
+    result = montecarlo_kernels.mc_reflection_rays(
+        tx_positions, bounds=None, sample_count=4096, seed=3
+    )
 
-    torch.testing.assert_close(result["ray_o"], tx_positions[1].expand(4, 3).contiguous())
-    assert result["ray_tmax"].shape == (0,)
-    assert result["active"].dtype == torch.bool
-    assert result["active"].all()
-    expected_pol = torch.zeros((4, 3), device="cuda", dtype=torch.float32)
-    expected_pol[:, 0] = 1.0
-    torch.testing.assert_close(result["tx_pol"], expected_pol)
+    torch.testing.assert_close(result["ray_o"][4096:], tx_positions[1].expand(4096, 3))
+    assert result["active"].dtype == torch.bool and bool(result["active"].all())
+    norms = result["ray_d"].norm(dim=-1)
+    torch.testing.assert_close(norms, torch.ones_like(norms), rtol=0.0, atol=1e-5)
+    # Uniform on the sphere: the mean direction of each transmitter is near zero.
+    for block in result["ray_d"].view(2, 4096, 3):
+        assert float(block.mean(dim=0).norm()) < 1e-2
+    torch.testing.assert_close(
+        result["solid_angle"], torch.full((2,), 4.0 * math.pi / 4096, device="cuda")
+    )
+    again = montecarlo_kernels.mc_reflection_rays(
+        tx_positions, bounds=None, sample_count=4096, seed=3
+    )
+    other = montecarlo_kernels.mc_reflection_rays(
+        tx_positions, bounds=None, sample_count=4096, seed=4
+    )
+    assert torch.equal(result["ray_d"], again["ray_d"])
+    assert not torch.equal(result["ray_d"][:4096], other["ray_d"][:4096])
+    assert not torch.equal(result["ray_d"][:4096], result["ray_d"][4096:])
 
 
-def test_mc_reflection_launch_inputs_requires_native_cuda_kernel(monkeypatch):
+def test_mc_reflection_rays_fold_into_the_scene_bounds():
     if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for MC reflection launch inputs")
+        pytest.skip("CUDA is required for MC reflection launch rays")
 
-    tx_positions = torch.zeros((1, 3), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(runtime, "native_extension", lambda: None)
-
-    with pytest.raises(RuntimeError, match="mc_reflection_launch_inputs CUDA kernel is required"):
-        montecarlo_kernels.mc_reflection_launch_inputs(tx_positions, tx_index=0, sample_count=1)
+    vertices = torch.tensor(
+        [[-1.0, -1.0, 0.0], [1.0, 1.0, 2.0], [0.0, 0.5, 1.0]], device="cuda"
+    )
+    bounds = montecarlo_kernels.mc_scene_bounds(vertices)
+    torch.testing.assert_close(
+        bounds, torch.tensor([-1.0, -1.0, 0.0, 1.0, 1.0, 2.0], device="cuda")
+    )
+    tx_positions = torch.tensor(
+        [[0.0, 0.0, 5.0], [3.0, 0.0, 5.0], [0.0, 0.0, 1.0]], device="cuda"
+    )
+    result = montecarlo_kernels.mc_reflection_rays(
+        tx_positions, bounds=bounds, sample_count=2048, seed=0
+    )
+    directions = result["ray_d"].view(3, 2048, 3)
+    assert bool((directions[0, :, 2] <= 0.0).all())
+    assert bool((directions[1, :, 2] <= 0.0).all() and (directions[1, :, 0] <= 0.0).all())
+    assert float(directions[2, :, 2].min()) < 0.0 < float(directions[2, :, 2].max())
+    expected = 4.0 * math.pi / 2048 * torch.tensor([0.5, 0.25, 1.0], device="cuda")
+    torch.testing.assert_close(result["solid_angle"], expected)
 
 
 def test_mc_diffraction_state_wi_matches_normalized_edge_to_source_direction():

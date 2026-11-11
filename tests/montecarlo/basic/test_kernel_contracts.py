@@ -16,7 +16,7 @@ from witwin.channel import runtime
 _SAMPLING_OWNER_NAMES = (
     "mc_diffraction_state_pack",
     "mc_diffraction_state_wi",
-    "mc_reflection_launch_inputs",
+    "mc_reflection_rays",
 )
 
 _NATIVE_BUFFER_OWNER_NAMES = (
@@ -54,7 +54,6 @@ _MAP_OWNER_NAMES = (
     "mc_los_path_gain_backward",
     "mc_los_path_gain_jvp",
     "mc_los_visibility_inputs",
-    "mc_point_component_power",
     "mc_reflection_ad_max_depth",
     "mc_slab_reflection_accumulate",
     "mc_slab_reflection_accumulate_ad",
@@ -110,7 +109,6 @@ _MAP_CONTRACT_IDS = (
     "mc_los_path_gain_backward",
     "mc_los_path_gain_jvp",
     "mc_los_visibility_inputs",
-    "mc_point_component_power",
     "mc_reflection_ad_max_depth",
     "mc_slab_reflection_accumulate",
     "mc_slab_reflection_accumulate_ad",

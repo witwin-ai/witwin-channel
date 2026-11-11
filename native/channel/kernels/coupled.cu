@@ -11,6 +11,7 @@
 #include <rayd/field_transport.cuh>
 #include <src/field_transport_ad.cuh>
 #include "../tensor_checks.h"
+#include "ordered_sum.cuh"
 
 #include <array>
 #include <vector>
@@ -611,9 +612,9 @@ __global__ void coupled_rd_backward_kernel(
             seeds.frequency = 1.f;
             const CoupledRowTangents t = coupled_rd_row_dual(in, seeds);
             seeds.frequency = 0.f;
-            atomicAdd(grad_frequency, coupled_contract(
+            grad_frequency[index] = coupled_contract(
                 index, grad_field_vector, grad_coefficient, grad_path_field,
-                grad_path_gain, t));
+                grad_path_gain, t);
         }
     }
 }
@@ -1104,9 +1105,9 @@ __global__ void coupled_dd_backward_kernel(
             seeds.frequency = 1.f;
             const CoupledRowTangents t = coupled_dd_row_dual(in, seeds);
             seeds.frequency = 0.f;
-            atomicAdd(grad_frequency, coupled_contract(
+            grad_frequency[index] = coupled_contract(
                 index, grad_field_vector, grad_coefficient, grad_path_field,
-                grad_path_gain, t));
+                grad_path_gain, t);
         }
     }
 }
@@ -1334,9 +1335,15 @@ pybind11::dict channel_field_coupled_rd_backward(
         grad_thickness = at::empty({count, 3}, options);
         grad_thickness_ptr = &grad_thickness;
     }
+    // Per-row frequency cotangents (every row writes one), summed after the kernel in a
+    // fixed order.
+    at::Tensor row_frequency;
+    at::Tensor* row_frequency_ptr = nullptr;
     if (need_grad_frequency) {
         grad_frequency = zero_scalar(options);
         grad_frequency_ptr = &grad_frequency;
+        row_frequency = at::empty({count}, options);
+        row_frequency_ptr = &row_frequency;
     }
     const bool any_grad = g_field != nullptr || g_coefficient != nullptr ||
                           g_path_field != nullptr || g_path_gain != nullptr;
@@ -1357,8 +1364,12 @@ pybind11::dict channel_field_coupled_rd_backward(
             opt_mut_ptr<float>(grad_sigma_ptr),
             opt_mut_ptr<float>(grad_gain_ptr),
             opt_mut_ptr<float>(grad_thickness_ptr),
-            opt_mut_ptr<float>(grad_frequency_ptr));
+            opt_mut_ptr<float>(row_frequency_ptr));
         C10_CUDA_KERNEL_LAUNCH_CHECK();
+        if (row_frequency_ptr != nullptr)
+            channel::ordered_sum::add_sum<float>(
+                row_frequency.data_ptr<float>(), count, grad_frequency.data_ptr<float>(),
+                options, stream);
     } else {
         for (at::Tensor* tensor :
              {grad_source_ptr, grad_target_ptr, grad_hit_ptr, grad_edge_ptr,
@@ -1608,9 +1619,15 @@ pybind11::dict channel_field_coupled_dd_backward(
         grad_thickness = at::empty({count, 4}, options);
         grad_thickness_ptr = &grad_thickness;
     }
+    // Per-row frequency cotangents (every row writes one), summed after the kernel in a
+    // fixed order.
+    at::Tensor row_frequency;
+    at::Tensor* row_frequency_ptr = nullptr;
     if (need_grad_frequency) {
         grad_frequency = zero_scalar(options);
         grad_frequency_ptr = &grad_frequency;
+        row_frequency = at::empty({count}, options);
+        row_frequency_ptr = &row_frequency;
     }
     const bool any_grad = g_field != nullptr || g_coefficient != nullptr ||
                           g_path_field != nullptr || g_path_gain != nullptr;
@@ -1629,8 +1646,12 @@ pybind11::dict channel_field_coupled_dd_backward(
             opt_mut_ptr<float>(grad_sigma_ptr),
             opt_mut_ptr<float>(grad_gain_ptr),
             opt_mut_ptr<float>(grad_thickness_ptr),
-            opt_mut_ptr<float>(grad_frequency_ptr));
+            opt_mut_ptr<float>(row_frequency_ptr));
         C10_CUDA_KERNEL_LAUNCH_CHECK();
+        if (row_frequency_ptr != nullptr)
+            channel::ordered_sum::add_sum<float>(
+                row_frequency.data_ptr<float>(), count, grad_frequency.data_ptr<float>(),
+                options, stream);
     } else {
         for (at::Tensor* tensor :
              {grad_source_ptr, grad_target_ptr, grad_eps_ptr, grad_sigma_ptr,

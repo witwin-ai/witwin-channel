@@ -381,6 +381,51 @@ def mc_los_grid_maps_ad(
     return _McLosGridMapsAdFunction.apply(matrix, visible, int(rows), int(cols))
 
 
+class _McGridMapsToMatrixAdFunction(torch.autograd.Function):
+    """Native AD for the grid-map-to-matrix layout, the inverse of the matrix-to-map layout."""
+
+    @staticmethod
+    def forward(maps, rows, cols):
+        return mc_los_component_maps_adjoint(maps, None)
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.set_materialize_grads(False)
+        ctx.rows = int(inputs[1])
+        ctx.cols = int(inputs[2])
+
+    @staticmethod
+    @_ad_first_order_only
+    def backward(ctx, grad_matrix):
+        if grad_matrix is None or not ctx.needs_input_grad[0]:
+            return None, None, None
+        return (
+            mc_los_component_maps_from_matrix(
+                _ad_native_tensor(grad_matrix), rows=ctx.rows, cols=ctx.cols
+            ),
+            None,
+            None,
+        )
+
+    @staticmethod
+    def jvp(ctx, t_maps, _t_rows, _t_cols):
+        tangent = _ad_native_tangent_or_none(t_maps)
+        if tangent is None:
+            return None
+        with disable_functorch():
+            return mc_los_component_maps_adjoint(_ad_native_tensor(tangent), None)
+
+
+def mc_grid_maps_to_matrix(
+    maps: torch.Tensor, *, rows: int, cols: int, ad: bool = False,
+) -> torch.Tensor:
+    """``[T, rows * cols]`` receiver-order matrix of grid maps ``[T, cols, rows]``."""
+
+    if ad:
+        return _McGridMapsToMatrixAdFunction.apply(maps, int(rows), int(cols))
+    return mc_los_component_maps_adjoint(maps, None)
+
+
 def mc_zero_matrix(reference: torch.Tensor, *, rows: int, cols: int) -> torch.Tensor:
     validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=2)
     if rows < 0 or cols < 0:
@@ -392,20 +437,6 @@ def mc_zero_matrix(reference: torch.Tensor, *, rows: int, cols: int) -> torch.Te
     if out.shape != (int(rows), int(cols)):
         raise ValueError("_channel.mc_zero_matrix returned an unexpected shape")
     return out
-
-
-def mc_point_component_power(
-    path_gain: torch.Tensor, *, include_los: bool,
-) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor("path_gain", path_gain, dtype=torch.float32, ndim=2)
-    exported = _required_native_op("mc_point_component_power")(
-        path_gain, bool(include_los)
-    )
-    if not isinstance(exported, dict):
-        raise TypeError("_channel.mc_point_component_power must return a dict")
-    for name in ("los", "reflection", "diffraction"):
-        validate_cuda_tensor(name, exported[name], dtype=torch.float32, ndim=0)
-    return exported
 
 
 def mc_component_map_buffer(
@@ -803,6 +834,15 @@ def mc_los_path_gain_ad(
     )
 
 
+def _point_rows(points: torch.Tensor | None, reference: torch.Tensor) -> torch.Tensor:
+    """Point receiver rows for the reflection accumulate ops; grids pass an empty (0, 3) table."""
+
+    if points is None:
+        return reference.new_empty((0, 3))
+    validate_cuda_tensor("points", points, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    return points
+
+
 def mc_slab_reflection_accumulate(
     ray_o: torch.Tensor, ray_d: torch.Tensor, trace_valid: torch.Tensor, trace_t: torch.Tensor,
     trace_prim: torch.Tensor, face_normals: torch.Tensor, material_eta_r: torch.Tensor,
@@ -810,7 +850,8 @@ def mc_slab_reflection_accumulate(
     material_thickness: torch.Tensor, *, tx_pol: torch.Tensor, contribution_depth: int,
     grid_axis: int, grid_position: float, grid_coord0_min: float, grid_coord0_max: float,
     grid_coord1_min: float, grid_coord1_max: float, grid_resolution0: int, grid_resolution1: int,
-    wavelength: float, solid_angle_per_ray: float, grid_cell_area: float,
+    wavelength: float, solid_angle_per_ray: torch.Tensor, grid_cell_area: float,
+    points: torch.Tensor | None = None, point_radius: float = -0.01,
 ) -> torch.Tensor:
     """Accumulate finite-thickness slab specular reflections into a radiomap.
 
@@ -830,6 +871,12 @@ def mc_slab_reflection_accumulate(
     consistency with the LoS and diffraction maps). Level parity with a
     unit-magnitude-source radiomap is therefore knowingly abandoned; a
     near-axis level offset is the intended behaviour, not a defect.
+
+    With ``points`` of shape ``(P, 3)`` (P > 0) the deposits go to point receivers instead and
+    the result has shape ``(1, P)``: a segment passing within the capture radius of a point
+    deposits ``|E|^2 * solid_angle * (lambda / 4pi)^2 / (pi * radius^2)``. The radius is
+    ``point_radius`` when positive, else ``-point_radius`` times the straight transmitter
+    distance (at least 1 mm). ``solid_angle_per_ray`` is a one-element device tensor.
     """
 
     return _required_native_op("mc_slab_reflection_accumulate")(
@@ -854,9 +901,11 @@ def mc_slab_reflection_accumulate(
         int(grid_resolution0),
         int(grid_resolution1),
         float(wavelength),
-        float(solid_angle_per_ray),
+        solid_angle_per_ray,
         float(grid_cell_area),
         tx_pol,
+        _point_rows(points, ray_o),
+        float(point_radius),
     )
 
 
@@ -879,7 +928,8 @@ def mc_slab_reflection_accumulate_backward(
     need_materials: bool, need_frequency: bool, contribution_depth: int, grid_axis: int,
     grid_position: float, grid_coord0_min: float, grid_coord0_max: float, grid_coord1_min: float,
     grid_coord1_max: float, grid_resolution0: int, grid_resolution1: int, wavelength: float,
-    solid_angle_per_ray: float, grid_cell_area: float, wavelength_dfreq: float,
+    solid_angle_per_ray: torch.Tensor, grid_cell_area: float, wavelength_dfreq: float,
+    points: torch.Tensor | None = None, point_radius: float = -0.01,
 ) -> tuple[torch.Tensor, ...]:
     gradients = _required_native_op("mc_slab_reflection_accumulate_backward")(
         ray_o,
@@ -906,10 +956,12 @@ def mc_slab_reflection_accumulate_backward(
         int(grid_resolution0),
         int(grid_resolution1),
         float(wavelength),
-        float(solid_angle_per_ray),
+        solid_angle_per_ray,
         float(grid_cell_area),
         float(wavelength_dfreq),
         tx_pol,
+        _point_rows(points, ray_o),
+        float(point_radius),
     )
     if not isinstance(gradients, tuple) or len(gradients) != 5:
         raise TypeError(
@@ -928,7 +980,8 @@ def mc_slab_reflection_accumulate_jvp(
     tangent_thickness: torch.Tensor | None, *, tx_pol: torch.Tensor, contribution_depth: int,
     grid_axis: int, grid_position: float, grid_coord0_min: float, grid_coord0_max: float,
     grid_coord1_min: float, grid_coord1_max: float, grid_resolution0: int, grid_resolution1: int,
-    wavelength: float, solid_angle_per_ray: float, grid_cell_area: float, wavelength_tangent: float,
+    wavelength: float, solid_angle_per_ray: torch.Tensor, grid_cell_area: float,
+    wavelength_tangent: float, points: torch.Tensor | None = None, point_radius: float = -0.01,
 ) -> torch.Tensor:
     output = _required_native_op("mc_slab_reflection_accumulate_jvp")(
         ray_o,
@@ -960,10 +1013,12 @@ def mc_slab_reflection_accumulate_jvp(
         int(grid_resolution0),
         int(grid_resolution1),
         float(wavelength),
-        float(solid_angle_per_ray),
+        solid_angle_per_ray,
         float(grid_cell_area),
         float(wavelength_tangent),
         tx_pol,
+        _point_rows(points, ray_o),
+        float(point_radius),
     )
     if not isinstance(output, torch.Tensor):
         raise TypeError(
@@ -1013,6 +1068,8 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
             wavelength=params["wavelength"],
             solid_angle_per_ray=params["solid_angle_per_ray"],
             grid_cell_area=params["grid_cell_area"],
+            points=params["points"],
+            point_radius=params["point_radius"],
         )
 
     @staticmethod
@@ -1111,6 +1168,8 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
             wavelength=wavelength,
             solid_angle_per_ray=params["solid_angle_per_ray"],
             grid_cell_area=params["grid_cell_area"],
+            points=params["points"],
+            point_radius=params["point_radius"],
             wavelength_dfreq=-wavelength * wavelength / _LIGHT_SPEED_M_PER_S_AD,
         )
         grad_frequency = (
@@ -1239,6 +1298,8 @@ class _McReflectionMapAdFunction(torch.autograd.Function):
                 wavelength=wavelength,
                 solid_angle_per_ray=params["solid_angle_per_ray"],
                 grid_cell_area=params["grid_cell_area"],
+                points=params["points"],
+                point_radius=params["point_radius"],
                 wavelength_tangent=(-wavelength * wavelength / _LIGHT_SPEED_M_PER_S_AD)
                 * tangent_frequency,
             )
@@ -1251,8 +1312,9 @@ def mc_slab_reflection_accumulate_ad(
     trace_prim: torch.Tensor, face_normals: torch.Tensor, material_valid: torch.Tensor, *,
     tx_pol: torch.Tensor, contribution_depth: int, grid_axis: int, grid_position: float,
     grid_coord0_min: float, grid_coord0_max: float, grid_coord1_min: float, grid_coord1_max: float,
-    grid_resolution0: int, grid_resolution1: int, wavelength: float, solid_angle_per_ray: float,
-    grid_cell_area: float,
+    grid_resolution0: int, grid_resolution1: int, wavelength: float,
+    solid_angle_per_ray: torch.Tensor, grid_cell_area: float, points: torch.Tensor | None = None,
+    point_radius: float = -0.01,
 ) -> torch.Tensor:
     """Differentiable :func:`mc_slab_reflection_accumulate` (one tx)."""
 
@@ -1268,8 +1330,10 @@ def mc_slab_reflection_accumulate_ad(
         "grid_resolution0": int(grid_resolution0),
         "grid_resolution1": int(grid_resolution1),
         "wavelength": float(wavelength),
-        "solid_angle_per_ray": float(solid_angle_per_ray),
+        "solid_angle_per_ray": solid_angle_per_ray,
         "grid_cell_area": float(grid_cell_area),
+        "points": points,
+        "point_radius": float(point_radius),
     }
     return _McReflectionMapAdFunction.apply(
         tx_anchor,
@@ -1711,30 +1775,118 @@ def mc_utd_diffraction_tape_accumulate_ad(
 # -------------------------------------------------------------------------
 # basic sampling
 # -------------------------------------------------------------------------
-def mc_reflection_launch_inputs(
-    tx_positions: torch.Tensor, *, tx_index: int, sample_count: int,
+def mc_reflection_rays(
+    tx_positions: torch.Tensor, *, bounds: torch.Tensor | None, sample_count: int, seed: int,
 ) -> dict[str, torch.Tensor]:
+    """Seeded lattice launch rays for every transmitter, folded into the scene bounds.
+
+    Returns ``ray_o``/``ray_d`` of shape ``(T * N, 3)`` (transmitter-major), ``active`` and the
+    per-transmitter ``solid_angle`` each ray carries, shape ``(T,)``.
+    """
+
     validate_cuda_tensor(
         "tx_positions", tx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
     )
-    if sample_count < 0:
-        raise ValueError("sample_count must be non-negative")
-    exported = required_symbol("mc_reflection_launch_inputs")(
-        tx_positions, int(tx_index), int(sample_count)
+    if sample_count <= 0:
+        raise ValueError("sample_count must be positive")
+    if bounds is not None:
+        validate_cuda_tensor("bounds", bounds, dtype=torch.float32, ndim=1)
+    exported = required_symbol("mc_reflection_rays")(
+        tx_positions, bounds, int(sample_count), int(seed)
     )
     if not isinstance(exported, dict):
-        raise TypeError(
-            "_channel.mc_reflection_launch_inputs must return a dict"
-        )
-    validate_cuda_tensor(
-        "ray_o", exported["ray_o"], dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor("ray_tmax", exported["ray_tmax"], dtype=torch.float32, ndim=1)
-    validate_cuda_tensor("active", exported["active"], dtype=torch.bool, ndim=1)
-    validate_cuda_tensor(
-        "tx_pol", exported["tx_pol"], dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
+        raise TypeError("_channel.mc_reflection_rays must return a dict")
     return exported
+
+
+def mc_scene_bounds(vertices: torch.Tensor) -> torch.Tensor:
+    """Axis-aligned bounds ``[min_x, min_y, min_z, max_x, max_y, max_z]`` of scene vertices."""
+
+    validate_cuda_tensor("vertices", vertices, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    bounds = required_symbol("mc_scene_bounds")(vertices)
+    if not isinstance(bounds, torch.Tensor):
+        raise TypeError("_channel.mc_scene_bounds must return a tensor")
+    return bounds
+
+
+@dataclass(frozen=True, slots=True)
+class ReflectionFinalSegments:
+    """Spawn points, directions, distance bounds and activity of the final reflected segments."""
+
+    origin: torch.Tensor
+    direction: torch.Tensor
+    tmax: torch.Tensor
+    offset: torch.Tensor
+    active: torch.Tensor
+
+
+def mc_reflection_final_segment(
+    ray_o: torch.Tensor, ray_d: torch.Tensor, trace: tuple[torch.Tensor, ...],
+    face_normals: torch.Tensor, material_valid: torch.Tensor, *, receiver: dict[str, object],
+    wavelength: float, segments: ReflectionFinalSegments | None,
+) -> ReflectionFinalSegments:
+    """Fold one receiver block into the bounded final-segment request (``segments=None`` starts)."""
+
+    rays = int(ray_o.shape[0])
+    if segments is None:
+        segments = ReflectionFinalSegments(
+            origin=torch.empty_like(ray_o),
+            direction=torch.empty_like(ray_o),
+            tmax=ray_o.new_empty((rays,)),
+            offset=ray_o.new_empty((rays,)),
+            active=torch.empty((rays,), dtype=torch.bool, device=ray_o.device),
+        )
+        first_block = True
+    else:
+        first_block = False
+    required_symbol("mc_reflection_final_segment")(
+        ray_o,
+        ray_d,
+        trace[0],
+        trace[1],
+        trace[2],
+        face_normals,
+        material_valid,
+        int(receiver["grid_axis"]),
+        float(receiver["grid_position"]),
+        float(receiver["grid_coord0_min"]),
+        float(receiver["grid_coord0_max"]),
+        float(receiver["grid_coord1_min"]),
+        float(receiver["grid_coord1_max"]),
+        int(receiver["grid_resolution0"]),
+        int(receiver["grid_resolution1"]),
+        float(receiver["grid_cell_area"]),
+        _point_rows(receiver.get("points"), ray_o),  # type: ignore[arg-type]
+        float(receiver.get("point_radius", -0.01)),  # type: ignore[arg-type]
+        float(wavelength),
+        bool(first_block),
+        segments.origin,
+        segments.direction,
+        segments.tmax,
+        segments.offset,
+        segments.active,
+    )
+    return segments
+
+
+def mc_reflection_append_final(
+    trace: tuple[torch.Tensor, ...], final_trace: tuple[torch.Tensor, ...],
+    segments: ReflectionFinalSegments,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Trace table with the bounded final-segment hit appended as its last column."""
+
+    out = required_symbol("mc_reflection_append_final")(
+        trace[0],
+        trace[1],
+        trace[2],
+        final_trace[0],
+        final_trace[1],
+        final_trace[2],
+        segments.offset,
+    )
+    if not isinstance(out, tuple) or len(out) != 3:
+        raise TypeError("_channel.mc_reflection_append_final must return 3 tensors")
+    return out[0], out[1], out[2]
 
 
 def _validate_mc_diffraction_discovery_args(

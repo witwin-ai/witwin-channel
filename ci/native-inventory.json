@@ -596,7 +596,8 @@
         "wall_product_backward_kernel",
         "wall_product_jvp_kernel",
         "wall_product_kernel",
-        "wall_product_shared_backward_kernel"
+        "wall_product_shared_reduce_kernel",
+        "wall_product_shared_terms_kernel"
       ],
       "launches": [
         "sanitize_backward_kernel",
@@ -605,7 +606,8 @@
         "wall_product_backward_kernel",
         "wall_product_jvp_kernel",
         "wall_product_kernel",
-        "wall_product_shared_backward_kernel"
+        "wall_product_shared_reduce_kernel",
+        "wall_product_shared_terms_kernel"
       ],
       "host_synchronization": [],
       "device_trap": false,
@@ -642,6 +644,19 @@
         "cudaMemcpyAsync",
         "cudaStreamSynchronize"
       ],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/ordered_sum.cuh": {
+      "kernels": [
+        "finish_kernel",
+        "partial_kernel"
+      ],
+      "launches": [
+        "finish_kernel",
+        "partial_kernel"
+      ],
+      "host_synchronization": [],
       "device_trap": false,
       "compile_options": []
     },
@@ -754,17 +769,32 @@
     },
     "native/channel/kernels/reflection.cu": {
       "kernels": [
+        "reflection_append_final_kernel",
+        "reflection_final_segment_kernel",
         "reflection_launch_inputs_kernel",
+        "reflection_rays_kernel",
+        "scene_bounds_kernel",
         "slab_reflection_accumulate_backward_kernel",
         "slab_reflection_accumulate_jvp_kernel",
         "slab_reflection_accumulate_kernel"
       ],
       "launches": [
+        "reflection_append_final_kernel",
+        "reflection_final_segment_kernel",
         "reflection_launch_inputs_kernel",
+        "reflection_rays_kernel",
+        "scene_bounds_kernel",
         "slab_reflection_accumulate_backward_kernel",
         "slab_reflection_accumulate_jvp_kernel",
         "slab_reflection_accumulate_kernel"
       ],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/reflection_receivers.h": {
+      "kernels": [],
+      "launches": [],
       "host_synchronization": [],
       "device_trap": false,
       "compile_options": []

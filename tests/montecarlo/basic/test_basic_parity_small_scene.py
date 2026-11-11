@@ -28,15 +28,15 @@ def test_basic_solver_matches_empty_space_los_reference():
     torch.testing.assert_close(result.path_gain, expected, rtol=1e-5, atol=1e-8)
 
 
-def test_single_wall_reflection_on_point_receivers_is_refused():
-    # MC basic accumulates reflection on a ReceiverGrid only; with point
-    # receivers it refuses instead of reporting an "enabled" zero.
+def test_single_wall_reflection_on_point_receivers_is_estimated():
+    # Point receivers take reflection in a capture sphere instead of a refusal.
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for MC basic parity")
 
-    with pytest.raises(ValueError, match=r"computes \['reflection'\] only on a ReceiverGrid"):
-        solve(
-            single_wall_reflection_scene(),
-            Config(samples=256, seed=11, components={"reflection"}),
-            reference_frequency_hz=3.0e9,
-        )
+    result = solve(
+        single_wall_reflection_scene(),
+        Config(samples=256, seed=11, components={"reflection"}),
+        reference_frequency_hz=3.0e9,
+    )
+    assert result.path_gain.shape == (1, 1)
+    assert result.metadata["components"]["reflection"] == "enabled"

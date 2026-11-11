@@ -1,0 +1,60 @@
+# ADR-0xx: MC Basic point receivers and multiple or mixed receivers
+
+- **Status:** Accepted.
+- **Date:** 2026-11-10.
+- **Decision ID:** `mc-basic-receiver-layouts`.
+- **Scope:** receiver layouts of `witwin.channel.montecarlo.basic`; public
+  `Config.receiver_radius_m`; result layout for anything but exactly one grid.
+  Numerical change (new estimator for point receivers).
+
+## Context
+
+S-9 and S-10: MC Basic returned an "enabled" zero for every non-LoS component at a
+point receiver and silently dropped every receiver after the first grid. The 0.6.0
+refusals made both errors loud; this record implements the layouts.
+
+## Decision
+
+**Layouts.** A scene with exactly one `ReceiverGrid` keeps the grid result layout
+(`component_maps[name]` of shape `[T, cols, rows]`). Any other layout (points only,
+several grids, grids and points mixed) is split into receiver blocks (each grid, and
+each run of consecutive points) and every component is returned as a `[T, R]`
+matrix whose columns follow `scene.receivers` (a grid in row-major receiver order,
+like Deterministic); `path_gain` has the same columns and `component_power` is the
+total over all columns as before.
+
+**Estimators per component.**
+
+- LoS and transmission are evaluated per receiver position for every block (the
+  analytic LoS gain with RayD visibility; the straight-penetration wall product).
+- Scattering evaluates the existing Kirchhoff area estimator at every receiver
+  position.
+- Reflection traces the rays once per transmitter and deposits into every block.
+  Grids keep the cell flux estimator. A point receiver is a capture sphere: a
+  segment whose closest approach to the point lies within radius `rho` (and before
+  the segment's blocker) deposits `|E|^2 dOmega (lambda / 4 pi)^2 / (pi rho^2)`.
+  The expected number of rays through the sphere's cross-section is
+  `pi rho^2 / (r^2 dOmega)`, so the estimator converges to the sphere average of the
+  specular path gain; the bias is second order in `rho / r` for a smooth field.
+  `rho` is `Config.receiver_radius_m` when set, else 1% of the straight transmitter
+  distance (at least 1 mm). The AD companions use the same deposit visitor, so
+  `ad_mode` works for point receivers too.
+- Diffraction is sampled on grids only (the RayD Keller-cone sampler bins on a grid
+  plane). A scene with point receivers and the diffraction component is refused
+  before any native work with a message naming the alternatives; MC Basic stays at
+  zero enumerated-path dependency, so the deterministic oracle is not an option.
+
+## Evidence
+
+`tests/montecarlo/basic/test_basic_receiver_layouts.py`: point reflection vs.
+Deterministic within the seed spread; two grids equal the two single-grid solves
+column for column (same seed, same rays); a mixed grid-and-points layout has one
+column per receiver and `path_gain` is the sum of the component columns; the
+diffraction refusal; `receiver_radius_m` validation.
+
+## Consequences
+
+The S-9/S-10 refusals in `montecarlo.basic` are lifted (BDPT keeps its own).
+Point receivers are noisier than grids at the same sample count; the default radius
+keeps the bias below about 1e-4 relative, users trade bias for variance with
+`receiver_radius_m`.

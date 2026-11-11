@@ -85,9 +85,22 @@ used by focused contract tests, but are not compatibility promises. The parent
 - Both solvers require CUDA. `samples` is positive, `seed` is non-negative,
   and the selected components are drawn from `los`, `reflection`,
   `diffraction`, `transmission`, and `scattering`.
-- Basic returns incoherent real power in `path_gain`, `component_power`, and,
-  for receiver grids, `component_maps`. It does not claim complex path
+- Basic returns incoherent real power in `path_gain`, `component_power` and
+  `component_maps`. With exactly one `ReceiverGrid` each map is `[T, cols, rows]`;
+  any other layout (point receivers, several grids, grids and points mixed) gives
+  `[T, R]` matrices whose columns follow `scene.receivers` (grids in row-major
+  receiver order), aligned with `path_gain`. It does not claim complex path
   coefficients, polarization, or antenna-array synthesis.
+- Basic reflection launches a lattice rotated by a random rotation drawn from
+  `seed` (different seeds give independent estimates), folded into the half-spaces
+  that can reach the scene bounds, and bounds the final reflected segment by the
+  farthest deposit any receiver needs. Grids take the cell flux estimator; a point
+  receiver is a capture sphere of radius `Config.receiver_radius_m` (default 1% of
+  its straight transmitter distance). Diffraction is sampled on grids only and is
+  refused with point receivers. `Config.scattering_samples` sets the scattering
+  area-sample count independently of `samples` (default: `samples`). Migration:
+  scenes that previously raised for point, multiple or mixed receivers now solve;
+  the single-grid layout is unchanged.
 - BDPT carries complex3/Jones fields for coherent events, but scalar throughput
   is only a sampling-probability proxy. Its public result reports power;
   `BDPTPathSamples` exposes topology, contribution, proposal PDF, MIS weight,

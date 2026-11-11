@@ -711,7 +711,8 @@ def test_transmission_wall_product_source_freezes_residency_and_reduction() -> N
     live_route = (
         _ROOT / "witwin/channel/montecarlo/basic.py"
     ).read_text(encoding="utf-8")
-    assert "wall_product_shared_backward_kernel" in source
+    assert "wall_product_shared_terms_kernel" in source
+    assert "wall_product_shared_reduce_kernel" in source
     assert "frequency_owner" in source
     assert "atomicAdd" not in source
     assert "atomicOr" in source
