@@ -1304,6 +1304,25 @@ def _assignment_input_identity(
     )
 
 
+def _reusable_rayd(
+    reusable: tuple[CompiledScene, ...], rayd_input_identity: tuple[object, ...],
+    topology_version: int, geometry_version: int, trace_backend: str,
+) -> RayDSceneResource | None:
+    """Return a cached RayD scene built from the same geometry for the same trace backend."""
+
+    return next(
+        (
+            candidate.rayd
+            for candidate in reusable
+            if _rayd_input_identity(candidate.source) == rayd_input_identity
+            and candidate.rayd.requested_trace_backend == trace_backend
+            and candidate.topology_version == topology_version
+            and candidate.geometry_version == geometry_version
+        ),
+        None,
+    )
+
+
 def compile(
     scene_or_snapshot: Scene | SceneSnapshot, *, reference_frequency_hz: float | torch.Tensor,
 ) -> CompiledScene:
@@ -1330,16 +1349,8 @@ def compile(
     topology_version, geometry_version, material_version, assignment_version = versions
     reusable = _REGISTRY.candidates()
     rayd_input_identity = _rayd_input_identity(scene_or_snapshot)
-    rayd = next(
-        (
-            candidate.rayd
-            for candidate in reusable
-            if _rayd_input_identity(candidate.source) == rayd_input_identity
-            and candidate.rayd.requested_trace_backend == trace_backend
-            and candidate.topology_version == topology_version
-            and candidate.geometry_version == geometry_version
-        ),
-        None,
+    rayd = _reusable_rayd(
+        reusable, rayd_input_identity, topology_version, geometry_version, trace_backend
     )
     if rayd is None:
         rayd = build_scene_from_structures(structures)

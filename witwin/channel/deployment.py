@@ -215,91 +215,116 @@ def _cuda_version_text(version: object) -> str:
     return f"{version // 1000}.{(version % 1000) // 10}"
 
 
-def doctor_report(diagnostics: dict[str, Any], *, driver_release: str | None) -> tuple[str, int]:
-    """Format a doctor report; return the text and the exit status (0 ok, 1 failure)."""
-
-    lines = ["witwin-channel doctor", ""]
-    failures: list[str] = []
-    warnings: list[str] = []
-
-    def row(label: str, value: object) -> None:
-        lines.append(f"  {label:<22} {value}")
-
-    row("witwin-channel", diagnostics.get("package_version"))
-    row("Python", f"{diagnostics.get('python')} ({diagnostics.get('python_executable')})")
-    row("Platform", diagnostics.get("platform"))
-    torch_version = diagnostics.get("torch")
-    row("PyTorch", torch_version or "not importable")
-    row("PyTorch CUDA", diagnostics.get("cuda_runtime") or "none (CPU-only build)")
-    row("NVIDIA driver", driver_release or "unknown")
-    row("Driver CUDA version", _cuda_version_text(diagnostics.get("cuda_driver_version")))
+def _report_rows(diagnostics: dict[str, Any], driver_release: str | None) -> list[str]:
+    rows: list[tuple[str, object]] = [
+        ("witwin-channel", diagnostics.get("package_version")),
+        ("Python", f"{diagnostics.get('python')} ({diagnostics.get('python_executable')})"),
+        ("Platform", diagnostics.get("platform")),
+        ("PyTorch", diagnostics.get("torch") or "not importable"),
+        ("PyTorch CUDA", diagnostics.get("cuda_runtime") or "none (CPU-only build)"),
+        ("NVIDIA driver", driver_release or "unknown"),
+        ("Driver CUDA version", _cuda_version_text(diagnostics.get("cuda_driver_version"))),
+    ]
     device = diagnostics.get("device")
-    if isinstance(device, dict):
-        row("GPU", f"{device['index']}: {device['name']} (sm_{device['sm']})")
-    else:
-        row("GPU", "none visible")
-    native = diagnostics.get("native_build")
-    sm_targets = diagnostics.get("build_sm_architectures")
-    if isinstance(native, dict):
-        row("Build torch / CUDA", f"{native.get('torch_version')} / {native.get('cuda_version')}")
-        if isinstance(sm_targets, dict):
-            row("Build cubins", ", ".join(f"sm_{a}" for a in sm_targets["sass"]) or "none")
-            row("Build PTX", ", ".join(f"compute_{a}" for a in sm_targets["ptx"]) or "none")
-        row("Build fingerprint", native.get("build_fingerprint"))
-        row("RayD commit", native.get("rayd_commit"))
-    else:
-        row("Native extension", "not loaded")
-    trace = diagnostics.get("trace_backend")
-    if isinstance(trace, dict):
-        row("Trace backend request", trace.get("requested"))
-        optix = trace.get("optix")
-        if isinstance(optix, dict):
-            row("OptiX", "available" if optix["available"] else f"unavailable: {optix['reason']}")
-        scenes = trace.get("scenes") or []
-        if scenes:
-            row("Compiled scenes", ", ".join(
-                f"device {scene['device_index']}: {scene['trace_backend']}" for scene in scenes
-            ))
+    rows.append(("GPU", f"{device['index']}: {device['name']} (sm_{device['sm']})"
+                 if isinstance(device, dict) else "none visible"))
+    rows += _build_rows(diagnostics)
+    rows += _trace_rows(diagnostics.get("trace_backend"))
+    return [f"  {label:<22} {value}" for label, value in rows]
 
+
+def _build_rows(diagnostics: dict[str, Any]) -> list[tuple[str, object]]:
+    native = diagnostics.get("native_build")
+    if not isinstance(native, dict):
+        return [("Native extension", "not loaded")]
+    rows: list[tuple[str, object]] = [
+        ("Build torch / CUDA", f"{native.get('torch_version')} / {native.get('cuda_version')}")
+    ]
+    targets = diagnostics.get("build_sm_architectures")
+    if isinstance(targets, dict):
+        rows.append(("Build cubins", ", ".join(f"sm_{a}" for a in targets["sass"]) or "none"))
+        rows.append(("Build PTX", ", ".join(f"compute_{a}" for a in targets["ptx"]) or "none"))
+    rows.append(("Build fingerprint", native.get("build_fingerprint")))
+    rows.append(("RayD commit", native.get("rayd_commit")))
+    return rows
+
+
+def _trace_rows(trace: object) -> list[tuple[str, object]]:
+    if not isinstance(trace, dict):
+        return []
+    rows: list[tuple[str, object]] = [("Trace backend request", trace.get("requested"))]
+    optix = trace.get("optix")
+    if isinstance(optix, dict):
+        rows.append(
+            ("OptiX", "available" if optix["available"] else f"unavailable: {optix['reason']}")
+        )
+    scenes = trace.get("scenes") or []
+    if scenes:
+        rows.append(("Compiled scenes", ", ".join(
+            f"device {scene['device_index']}: {scene['trace_backend']}" for scene in scenes
+        )))
+    return rows
+
+
+def _torch_failures(diagnostics: dict[str, Any]) -> list[str]:
+    torch_version = diagnostics.get("torch")
     if torch_version is None:
-        failures.append(
+        return [
             f"PyTorch is not importable. Install the CUDA build: pip install {_required_torch()} "
             "--index-url https://download.pytorch.org/whl/cu128"
-        )
-    elif not diagnostics.get("torch_cuda_build", False):
-        failures.append(
+        ]
+    if not diagnostics.get("torch_cuda_build", False):
+        return [
             f"PyTorch {torch_version} is a CPU-only build. Install the CUDA build: pip install "
             f"torch=={str(torch_version).split('+')[0]} --index-url "
             "https://download.pytorch.org/whl/cu128"
-        )
-    elif not diagnostics.get("cuda_available", False):
-        failures.append(
+        ]
+    if not diagnostics.get("cuda_available", False):
+        return [
             "PyTorch sees no CUDA GPU. Check `nvidia-smi`, CUDA_VISIBLE_DEVICES, and in a "
             "container run with `--gpus all`."
-        )
-    failures.extend(str(error) for error in diagnostics.get("errors", []))
-    if isinstance(device, dict) and device.get("problems"):
-        failures.extend(str(problem) for problem in device["problems"])
-        failures.append(
-            "Update the NVIDIA driver, or build Channel from source for "
-            f"sm_{device['sm']} (see CONTRIBUTING.md)."
-        )
-    if isinstance(trace, dict) and isinstance(trace.get("optix"), dict):
-        optix = trace["optix"]
-        if not optix["available"]:
-            if trace.get("requested") == "optix":
-                failures.append(
-                    "WITWIN_CHANNEL_TRACE_BACKEND=optix but OptiX is unusable: "
-                    f"{optix['reason']}"
-                )
-            else:
-                warnings.append(
-                    "OptiX is unusable, so scenes trace on the slower pure-CUDA backend "
-                    f"({optix['reason']}). OptiX needs driver R555 or newer; in a container set "
-                    "NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics."
-                )
+        ]
+    return []
 
-    lines.append("")
+
+def _device_failures(device: object) -> list[str]:
+    if not isinstance(device, dict) or not device.get("problems"):
+        return []
+    return [
+        *(str(problem) for problem in device["problems"]),
+        f"Update the NVIDIA driver, or build Channel from source for sm_{device['sm']} "
+        "(see CONTRIBUTING.md).",
+    ]
+
+
+def _optix_findings(trace: object) -> tuple[list[str], list[str]]:
+    """Return the OptiX failures and warnings."""
+
+    if not isinstance(trace, dict) or not isinstance(trace.get("optix"), dict):
+        return [], []
+    optix = trace["optix"]
+    if optix["available"]:
+        return [], []
+    if trace.get("requested") == "optix":
+        return [f"WITWIN_CHANNEL_TRACE_BACKEND=optix but OptiX is unusable: {optix['reason']}"], []
+    return [], [
+        "OptiX is unusable, so scenes trace on the slower pure-CUDA backend "
+        f"({optix['reason']}). OptiX needs driver R555 or newer; in a container set "
+        "NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics."
+    ]
+
+
+def doctor_report(diagnostics: dict[str, Any], *, driver_release: str | None) -> tuple[str, int]:
+    """Format a doctor report; return the text and the exit status (0 ok, 1 failure)."""
+
+    optix_failures, warnings = _optix_findings(diagnostics.get("trace_backend"))
+    failures = [
+        *_torch_failures(diagnostics),
+        *(str(error) for error in diagnostics.get("errors", [])),
+        *_device_failures(diagnostics.get("device")),
+        *optix_failures,
+    ]
+    lines = ["witwin-channel doctor", "", *_report_rows(diagnostics, driver_release), ""]
     if failures:
         lines.append("Verdict: FAIL - Channel cannot run here.")
         lines += [f"  - {item}" for item in failures]
