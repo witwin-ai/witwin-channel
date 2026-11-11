@@ -17,6 +17,7 @@ from witwin.channel import build_info
 from witwin.channel.capabilities import (
     capabilities,
     config_metadata,
+    estimator_metadata,
     serialize_config,
 )
 from witwin.channel.components import (
@@ -247,6 +248,9 @@ def make_solver_metadata(
             "diffraction": diffraction_available,
         },
         "kernel": kernel_metadata,
+        **estimator_metadata(
+            estimator="sampled", quantity="cell_average", combine="incoherent", complete=False
+        ),
     }
     metadata.update(
         config_metadata(

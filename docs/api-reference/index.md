@@ -86,6 +86,13 @@ and MC Basic `path_gain` are contiguous; MC Basic `component_maps` and the BDPT
 grid outputs are transposed views of the native `[T, cols, rows]` maps (call
 `.contiguous()` before `.view()`).
 
+Result metadata of every solver carries `estimator` (`enumerated` or
+`sampled`), `quantity` (`point_sample` at the receiver position or
+`cell_average` over the cell or capture region), `combine` (`coherent`,
+`incoherent`, or `none` for uncombined rows) and `complete` (whether every path
+within the requested bounds was found; `None` when the solve does not report
+it).
+
 ## Minimal solver example
 
 ```python

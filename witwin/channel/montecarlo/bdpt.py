@@ -17,6 +17,7 @@ from witwin.channel import build_info
 from witwin.channel.capabilities import (
     _BDPT_AD_DIFFERENTIABLE_PARAMETERS, capabilities,
     config_metadata,
+    estimator_metadata,
     serialize_config,
 )
 from witwin.channel.components import (
@@ -2978,6 +2979,12 @@ def make_solver_metadata(
         # is the default incoherent per-path accumulation; "coherent" sums the
         # enumerated delta/UTD complex field per (tx, rx, component).
         "combine_domain": "coherent" if config.coherent else "power",
+        **estimator_metadata(
+            estimator="sampled",
+            quantity="point_sample",
+            combine="coherent" if config.coherent else "incoherent",
+            complete=False,
+        ),
         "coherent": bool(config.coherent),
         "max_depth": config.max_depth,
         "max_light_depth": config.max_light_depth,

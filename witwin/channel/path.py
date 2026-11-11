@@ -28,6 +28,7 @@ from witwin.channel.propagation.enumerated import (
 from witwin.channel.interactions.scattering import (
     append_scattering_evaluated_paths,
 )
+from witwin.channel.capabilities import estimator_metadata
 from witwin.channel.constants import UNIT_EXCITATION_PHASE_CONVENTION
 from witwin.channel.runtime import SolveCapacityTransaction, make_metadata
 from witwin.channel import build_info
@@ -1072,6 +1073,9 @@ def _metadata(
         "field_abi": "complex3_v1",
         "phase_convention": dict(UNIT_EXCITATION_PHASE_CONVENTION),
         "coefficient_semantics": "unit_excitation_dimensionless_receiver_projection",
+        **estimator_metadata(
+            estimator="enumerated", quantity="point_sample", combine="none", complete=None
+        ),
         "coupled_paths": {
             "requested": config.coupled_paths,
             "geometry": "native_1r1d_reciprocal"

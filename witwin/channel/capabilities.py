@@ -299,6 +299,34 @@ def config_metadata(
     }
 
 
+ESTIMATORS = frozenset({"enumerated", "sampled"})
+QUANTITIES = frozenset({"point_sample", "cell_average"})
+COMBINES = frozenset({"coherent", "incoherent", "none"})
+
+
+def estimator_metadata(
+    *, estimator: str, quantity: str, combine: str, complete: bool | None,
+) -> dict[str, Any]:
+    """The result-semantics keys every solver publishes in its metadata.
+
+    ``estimator`` is ``enumerated`` or ``sampled``; ``quantity`` says whether a receiver
+    value is a ``point_sample`` at the receiver position or a ``cell_average`` over the
+    receiver's cell or capture region; ``combine`` is how rows reach a receiver value
+    (``none`` when rows are returned uncombined); ``complete`` is whether every path
+    within the requested bounds was found, or ``None`` when the solve does not report it.
+    """
+
+    if estimator not in ESTIMATORS:
+        raise ValueError(f"estimator must be one of {sorted(ESTIMATORS)}, got {estimator!r}")
+    if quantity not in QUANTITIES:
+        raise ValueError(f"quantity must be one of {sorted(QUANTITIES)}, got {quantity!r}")
+    if combine not in COMBINES:
+        raise ValueError(f"combine must be one of {sorted(COMBINES)}, got {combine!r}")
+    if complete is not None and type(complete) is not bool:
+        raise TypeError("complete must be a bool or None")
+    return {"estimator": estimator, "quantity": quantity, "combine": combine, "complete": complete}
+
+
 def serialize_config(config: object) -> dict[str, Any]:
     """Serialize every dataclass config field to JSON-compatible values."""
 
@@ -315,4 +343,10 @@ def serialize_config(config: object) -> dict[str, Any]:
     return serialized
 
 
-__all__ = ["capabilities", "config_metadata", "serialize_config", "solver_capabilities"]
+__all__ = [
+    "capabilities",
+    "config_metadata",
+    "estimator_metadata",
+    "serialize_config",
+    "solver_capabilities",
+]

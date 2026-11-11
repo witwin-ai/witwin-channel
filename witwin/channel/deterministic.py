@@ -37,6 +37,7 @@ from time import perf_counter
 from witwin.channel.scene.endpoints import validate_scalar_endpoint_features
 from witwin.channel.capabilities import (
     config_metadata,
+    estimator_metadata,
     serialize_config,
     solver_capabilities,
 )
@@ -633,6 +634,12 @@ def _metadata(
         "max_paths_scope": config.max_paths_scope,
         "sort_key": config.sort_key,
         "accumulation_strategy": "coherent" if config.coherent else "incoherent",
+        **estimator_metadata(
+            estimator="enumerated",
+            quantity="point_sample",
+            combine="coherent" if config.coherent else "incoherent",
+            complete=None,
+        ),
         "components": components,
         "counts": {
             "path_count": path_count,
