@@ -151,6 +151,11 @@ used by focused contract tests, but are not compatibility promises. The parent
   (a pure function of seed, stream, global sample index and depth), so they
   give the same estimate. `metadata["sampler"]` names the one used.
 - Metadata counts stay on the device and are read in one copy per solve.
+- With only enumerated components (the default `los`, `reflection`,
+  `diffraction`, and coupled paths) every row is a unit-mass discrete
+  connection: the estimate does not depend on `samples` or `seed`, and `mis` /
+  `power_heuristic_beta` do not change it (each connection has one strategy, so
+  every MIS weight is 1). Only sampled transmission and scattering use samples.
 - `accumulation_strategy="auto"` picks `atomic` (or `compact` for sparse grid
   estimates), never `staged`. `staged` and the accumulate JVP are a stable key
   sort plus a fixed-order reduce-by-key per `(tx, rx, component)`: bitwise
