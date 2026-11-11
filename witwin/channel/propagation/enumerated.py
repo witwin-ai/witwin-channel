@@ -147,9 +147,9 @@ class EnumeratedOptions:
     max_paths: int | None = None
     max_paths_scope: str = "global"
     ad_mode: str = "none"
-    # Coupled reflection-diffraction rows (R->D, D->R and D->D). Opt-in.
-    # coupled_candidate_limit bounds the candidate work of one discovery call (one
-    # receiver block when the caller streams receivers).
+    # Interaction chains (reflections with one diffraction anywhere, up to max_depth
+    # interactions) and double diffraction. Opt-in. coupled_candidate_limit bounds the
+    # candidates of one validator launch; it never caps the result.
     coupled_paths: bool = False
     coupled_candidate_limit: int = 1_000_000
     # Rough-surface scattering quadrature: a fixed per-area sample density (per-face
@@ -722,16 +722,10 @@ def explicit_endpoint_scene(compiled: object) -> Scene:
 
 def evaluate_enumerated_paths(
     scene: Scene, config: EnumeratedPathConfig, *, frequency_value: float | None = None,
-    coupled_rx_streaming: bool = False, defer_capacity_terminal: bool = False,
+    defer_capacity_terminal: bool = False,
     endpoint_tensors: EnumeratedEndpointTensors | None = None,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     """Discover, select, and evaluate canonical enumerated propagation rows.
-
-    ``coupled_rx_streaming`` streams coupled reflection-diffraction discovery
-    over receiver blocks so a full grid solve stays under the per-block
-    candidate budget (coupled reflection and diffraction). The deterministic grid solver sets it; the path
-    and Monte Carlo callers keep the single-shot total-cap discovery, so their
-    coupled behavior is unchanged.
 
     ``defer_capacity_terminal`` is reserved for Path and Deterministic outer
     solvers, which must sanitize scattering-appended rows and enqueue the one
@@ -866,10 +860,10 @@ def evaluate_enumerated_paths(
                 compiled,
                 tx_positions,
                 rx_positions,
+                max_depth=int(config.max_depth),
                 candidate_limit=int(
                     getattr(config, "coupled_candidate_limit", 1_000_000)
                 ),
-                rx_streamed=coupled_rx_streaming,
             )
         )
         launch_count += coupled_launches

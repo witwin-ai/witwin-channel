@@ -1037,9 +1037,9 @@ def _metadata(
         config.components, chain_depth=config.max_depth, single_bounce_depth=1
     )
     if config.coupled_paths:
-        # The coupled 1R1D/1D1R family reaches depth 2 whenever it is requested,
-        # including when plain diffraction is not in the component set.
-        component_depths["diffraction"] = 2
+        # Interaction chains carry a diffraction up to max_depth interactions deep, and
+        # double diffraction reaches depth 2.
+        component_depths["diffraction"] = max(2, int(config.max_depth))
     effective_max_depth = max(
         component_depths["los"],
         component_depths["reflection"],
@@ -1083,7 +1083,7 @@ def _metadata(
         ),
         "coupled_paths": {
             "requested": config.coupled_paths,
-            "geometry": "native_1r1d_reciprocal"
+            "geometry": "native_interaction_chains"
             if config.coupled_paths
             else "not_requested",
             "coefficient": "unified_complex3_jones"

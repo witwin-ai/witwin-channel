@@ -352,7 +352,7 @@ def test_field_jvp_callbacks_cover_declared_component_matrix(monkeypatch) -> Non
                 "tangent_field_vector": value,
                 "tangent_direction": value,
             },
-            "field_coupled_rd_jvp": {
+            "field_coupled_chain_jvp": {
                 "tangent_field_vector": value,
                 "tangent_coefficient": value,
                 "tangent_path_field": value,
@@ -408,16 +408,15 @@ def test_field_jvp_callbacks_cover_declared_component_matrix(monkeypatch) -> Non
     )
     assert diffraction == (value, value)
 
-    rd_ctx = SimpleNamespace(
-        saved_tensors=(value,) * 28,
+    chain_ctx = SimpleNamespace(
+        saved_tensors=(value,) * 20,
         frequency_value=3.0e9,
-        reverse=False,
     )
-    rd_tangents = [None] * 32
-    rd_tangents[0] = value
-    rd_tangents[12] = value
-    rd = fields._FieldCoupledRdAdFunction.jvp(rd_ctx, *rd_tangents)
-    assert rd == (value, value, value, value, None)
+    chain_tangents = [None] * 22
+    chain_tangents[0] = value
+    chain_tangents[15] = value
+    chain = fields._FieldCoupledChainAdFunction.jvp(chain_ctx, *chain_tangents)
+    assert chain == (value, value, value, value, None)
 
     dd_ctx = SimpleNamespace(
         saved_tensors=(value,) * 35,
@@ -461,7 +460,6 @@ def test_field_jvp_callbacks_cover_declared_component_matrix(monkeypatch) -> Non
 def test_remaining_vjp_callbacks_pack_full_gradients(monkeypatch) -> None:
     _patch_ad_plumbing(monkeypatch, fields)
     value = torch.ones(1)
-    material3 = torch.ones(1, 3)
     material4 = torch.ones(1, 4)
 
     def required_symbol(name):
@@ -481,15 +479,13 @@ def test_remaining_vjp_callbacks_pack_full_gradients(monkeypatch) -> None:
                 "grad_vertex_opp0": value,
                 "grad_vertex_opp1": value,
             },
-            "field_coupled_rd_backward": {
+            "field_coupled_chain_backward": {
                 "grad_source": value,
                 "grad_target": value,
-                "grad_reflection_position": value,
-                "grad_edge_position": value,
-                "grad_eps_r": material3,
-                "grad_sigma_e": material3,
-                "grad_gain": material3,
-                "grad_thickness": material3,
+                "grad_eps_r": material4,
+                "grad_sigma_e": material4,
+                "grad_gain": material4,
+                "grad_thickness": material4,
                 "grad_frequency": value,
             },
             "field_coupled_dd_backward": {
@@ -529,21 +525,20 @@ def test_remaining_vjp_callbacks_pack_full_gradients(monkeypatch) -> None:
         )
     assert len(diffraction) == 28 and diffraction[25] is value
 
-    rd_needed = [False] * 32
-    for index in (0, 1, 2, 4, 12, 13, 15, 16, 17, 18, 20, 21, 22, 23, 25, 26, 27):
-        rd_needed[index] = True
-    rd_ctx = SimpleNamespace(
-        needs_input_grad=tuple(rd_needed),
-        saved_tensors=(value,) * 28,
+    chain_needed = [False] * 22
+    for index in (0, 1, 15, 16, 18, 19, 20):
+        chain_needed[index] = True
+    chain_ctx = SimpleNamespace(
+        needs_input_grad=tuple(chain_needed),
+        saved_tensors=(value,) * 20,
         frequency_value=3.0e9,
         frequency_meta=None,
-        reverse=False,
     )
     with torch.no_grad():
-        rd = fields._FieldCoupledRdAdFunction.backward(
-            rd_ctx, value, value, value, value, None
+        chain = fields._FieldCoupledChainAdFunction.backward(
+            chain_ctx, value, value, value, value, None
         )
-    assert len(rd) == 32 and torch.equal(rd[26], value)
+    assert len(chain) == 22 and torch.equal(chain[19], material4) and chain[20] is not None
 
     dd_needed = [False] * 41
     for index in (0, 1, 15, 16, 18, 19, 20, 21, 23, 24, 25, 26, 28, 29, 30, 31, 33, 34, 35):

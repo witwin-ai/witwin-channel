@@ -11,7 +11,7 @@ from witwin.channel import runtime
 
 
 _CANONICAL_FUNCTION_NAMES = (
-    "coupled_rd_geometry_forward",
+    "coupled_chain_geometry_forward",
     "diffraction_tx_visible_state_plan",
     "rayd_diffraction_paths_order1_forward",
     "rayd_diffraction_sample_tape_forward",

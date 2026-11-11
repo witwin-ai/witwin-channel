@@ -1,5 +1,5 @@
 // Copyright Xingyu Chen.
-// Generates reflection candidates: plane-group tables, image-tree expansion, receiver tests.
+// Generates reflection and interaction-chain candidates: plane groups, image trees, tests.
 
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
@@ -10,6 +10,8 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+
+#include <rayd/utd.h>
 
 #include "math.cuh"
 #include "path_compaction.cuh"
@@ -448,6 +450,309 @@ __global__ void receiver_candidate_write_kernel(int64_t tile_total, int64_t tile
     }
 }
 
+// ---------------------------------------------------------------------------
+// Interaction chains (reflections, one diffraction, reflections). A chain is
+// the join of a transmitter-side half (an image-tree node or the transmitter,
+// with an edge in its beam) and a receiver-side half (the same from the
+// receiver) on a shared edge. The diffraction point is the Keller point
+// between the two half images; both halves are then back-traced through their
+// planes exactly as the reflection receiver test does.
+// ---------------------------------------------------------------------------
+
+// Edge pieces tested against a beam; a long edge is split so each piece's bounding sphere stays tight.
+constexpr int kChainEdgePieces = 8;
+
+struct ChainEdges {
+    const float* position;   // [E, 3]
+    const float* direction;  // [E, 3]
+    const float* t_min;      // [E]
+    const float* t_max;      // [E]
+    int64_t edge_count;
+};
+
+// Segment start, unit direction and length of one edge, as the coupled prepare kernels form them.
+struct EdgeFrame {
+    float3 origin;
+    float3 direction;
+    float length;
+};
+
+__device__ __forceinline__ EdgeFrame edge_frame(const ChainEdges& edges, int edge) {
+    EdgeFrame frame;
+    frame.direction = cmath::normalize_or_zero(cmath::load_vec3(edges.direction, edge), 1.0e-6f);
+    frame.origin = cmath::add(cmath::load_vec3(edges.position, edge), cmath::scale(frame.direction, edges.t_min[edge]));
+    frame.length = edges.t_max[edge] - edges.t_min[edge];
+    return frame;
+}
+
+__device__ __forceinline__ float3 frame_point(const EdgeFrame& frame, float t) {
+    return cmath::add(frame.origin, cmath::scale(frame.direction, t));
+}
+
+// True unless no point of the edge can lie in the beam of the node (image `image`, last plane
+// group `last`): the beam lies beyond the last plane and inside the cones from the image around
+// the bounding spheres of the last group's occupied macro cells. Conservative, like image_tree_keep.
+__device__ bool chain_edge_keep(const GroupTables& tables, int last, float3 image, const ChainEdges& edges, int edge,
+                                float tolerance) {
+    const EdgeFrame frame = edge_frame(edges, edge);
+    const float length = frame.length;
+    if (!(isfinite(length) && length > 0.0f)) {
+        return false;
+    }
+    const float3 a = frame_point(frame, 0.0f);
+    const float3 b = frame_point(frame, length);
+    const float3 last_point = cmath::load_vec3(tables.plane_point, last);
+    const float3 last_normal = cmath::load_vec3(tables.plane_normal, last);
+    const float image_side = cmath::dot(cmath::sub(image, last_point), last_normal);
+    if (fabsf(image_side) <= tolerance) {
+        return true;
+    }
+    const float sign = image_side > 0.0f ? 1.0f : -1.0f;
+    const bool beyond = sign * cmath::dot(cmath::sub(a, last_point), last_normal) < tolerance ||
+                        sign * cmath::dot(cmath::sub(b, last_point), last_normal) < tolerance;
+    if (!beyond) {
+        return false;
+    }
+    const float piece = length / kChainEdgePieces;
+    for (int c = 0; c < kMacroCells * kMacroCells; ++c) {
+        float3 alo, ahi;
+        if (!macro_box(tables, last, c, alo, ahi)) {
+            continue;
+        }
+        const float3 axis = cmath::sub(cmath::scale(cmath::add(alo, ahi), 0.5f), image);
+        const float axis_length = cmath::length(axis);
+        const float cone_radius = 0.5f * cmath::length(cmath::sub(ahi, alo)) + tolerance;
+        if (axis_length <= cone_radius) {
+            return true;
+        }
+        const float cone = asinf(fminf(1.0f, cone_radius / axis_length));
+        for (int p = 0; p < kChainEdgePieces; ++p) {
+            const float3 center = frame_point(frame, piece * (p + 0.5f));
+            const float3 offset = cmath::sub(center, image);
+            const float offset_length = cmath::length(offset);
+            const float radius = 0.5f * piece + tolerance;
+            if (offset_length <= radius) {
+                return true;
+            }
+            const float spread = asinf(fminf(1.0f, radius / offset_length));
+            const float cosine =
+                fmaxf(-1.0f, fminf(1.0f, cmath::dot(axis, offset) / (axis_length * offset_length)));
+            if (acosf(cosine) <= cone + spread + 1.0e-3f) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+__global__ void chain_node_edge_flags_kernel(int64_t pair_count, int64_t node_start, int64_t width,
+                                             const int* __restrict__ node_sequences,
+                                             const float* __restrict__ node_images, GroupTables tables,
+                                             ChainEdges edges, float tolerance, int* __restrict__ flags) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t pair = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x; pair < pair_count;
+         pair += stride) {
+        const int64_t node = node_start + pair / edges.edge_count;
+        const int edge = static_cast<int>(pair % edges.edge_count);
+        const int last = node_sequences[node * width + width - 1];
+        flags[pair] = chain_edge_keep(tables, last, cmath::load_vec3(node_images, node), edges, edge, tolerance) ? 1 : 0;
+    }
+}
+
+__global__ void chain_node_edge_write_kernel(int64_t pair_count, int64_t node_start, int64_t edge_count,
+                                             const int* __restrict__ flags, const int* __restrict__ offsets,
+                                             int* __restrict__ out_node, int* __restrict__ out_edge) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t pair = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x; pair < pair_count;
+         pair += stride) {
+        if (flags[pair] == 0) {
+            continue;
+        }
+        const int64_t dst = offsets[pair];
+        out_node[dst] = static_cast<int>(node_start + pair / edge_count);
+        out_edge[dst] = static_cast<int>(pair % edge_count);
+    }
+}
+
+// One half of a chain: per-edge lists (CSR over edges) of entries. An entry is an endpoint
+// (transmitter or receiver index) and, for a half with reflections, its image-tree node.
+struct ChainHalf {
+    const int64_t* edge_offsets;  // [E + 1]
+    const int* endpoint;          // [K]
+    const int* node;              // [K]; null when the half has no reflection
+    const float* endpoints;       // [endpoint count, 3]
+    const int* node_sequences;    // [nodes, depth]
+    const float* node_images;     // [nodes, 3]
+    int depth;
+};
+
+__device__ __forceinline__ void half_entry(const ChainHalf& half, int64_t entry, int& endpoint, int& node,
+                                           float3& image) {
+    endpoint = half.endpoint[entry];
+    node = half.node != nullptr ? half.node[entry] : -1;
+    image = node >= 0 ? cmath::load_vec3(half.node_images, node) : cmath::load_vec3(half.endpoints, endpoint);
+}
+
+// Per-thread mirrored chain of one half (the shared-memory loader serves whole blocks only).
+__device__ void half_chain(const GroupTables& tables, const ChainHalf& half, int node, int endpoint,
+                           SequenceChain& chain) {
+    chain.images[0] = cmath::load_vec3(half.endpoints, endpoint);
+    for (int bounce = 0; bounce < half.depth; ++bounce) {
+        const int group = half.node_sequences[static_cast<int64_t>(node) * half.depth + bounce];
+        chain.groups[bounce] = group;
+        chain.plane_point[bounce] = cmath::load_vec3(tables.plane_point, group);
+        chain.plane_normal[bounce] = cmath::load_vec3(tables.plane_normal, group);
+        chain.images[bounce + 1] = mirror(chain.images[bounce], chain.plane_point[bounce], chain.plane_normal[bounce]);
+    }
+}
+
+struct ChainLane {
+    int edge;
+    int64_t a_entry;
+    int64_t b_entry;
+};
+
+// Lane -> (edge, transmitter-side entry, receiver-side entry) over the per-edge products.
+__device__ __forceinline__ ChainLane chain_lane(const int64_t* lane_offsets, int64_t edge_count, const ChainHalf& b,
+                                                const ChainHalf& a, int64_t lane) {
+    int64_t lo = 0;
+    int64_t hi = edge_count;
+    while (hi - lo > 1) {
+        const int64_t mid = (lo + hi) / 2;
+        if (lane_offsets[mid] <= lane) {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    const int edge = static_cast<int>(lo);
+    const int64_t local = lane - lane_offsets[edge];
+    const int64_t b_count = b.edge_offsets[edge + 1] - b.edge_offsets[edge];
+    return {edge, a.edge_offsets[edge] + local / b_count, b.edge_offsets[edge] + local % b_count};
+}
+
+struct ChainCandidate {
+    bool keep;
+    int tx;
+    int rx;
+    int a_node;
+    int b_node;
+    float3 point;
+};
+
+__device__ ChainCandidate chain_candidate(const GroupTables& tables, const ChainEdges& edges, const ChainHalf& a,
+                                          const ChainHalf& b, const ChainLane& lane, const PairTolerances& tol,
+                                          float edge_epsilon) {
+    ChainCandidate out{};
+    float3 a_image, b_image;
+    half_entry(a, lane.a_entry, out.tx, out.a_node, a_image);
+    half_entry(b, lane.b_entry, out.rx, out.b_node, b_image);
+    const EdgeFrame frame = edge_frame(edges, lane.edge);
+    const float3 origin = frame.origin;
+    const float3 direction = frame.direction;
+    const float length = frame.length;
+    const float parameter = rayd::shared::diffraction::first_order_diffraction_parameter(
+        rayd::shared::diffraction::make_f3(a_image.x, a_image.y, a_image.z),
+        rayd::shared::diffraction::make_f3(b_image.x, b_image.y, b_image.z),
+        rayd::shared::diffraction::make_f3(origin.x, origin.y, origin.z),
+        rayd::shared::diffraction::make_f3(direction.x, direction.y, direction.z));
+    if (!(isfinite(length) && length > edge_epsilon && isfinite(parameter) && parameter > edge_epsilon &&
+          parameter < length - edge_epsilon)) {
+        return out;
+    }
+    out.point = cmath::add(origin, cmath::scale(direction, parameter));
+    SequenceChain chain;
+    if (a.depth > 0) {
+        half_chain(tables, a, out.a_node, out.tx, chain);
+        if (!receiver_candidate(tables, chain, a.depth, out.point, tol)) {
+            return out;
+        }
+    } else if (cmath::length(cmath::sub(out.point, a_image)) < tol.min_segment) {
+        return out;
+    }
+    if (b.depth > 0) {
+        half_chain(tables, b, out.b_node, out.rx, chain);
+        if (!receiver_candidate(tables, chain, b.depth, out.point, tol)) {
+            return out;
+        }
+    } else if (cmath::length(cmath::sub(out.point, b_image)) < tol.min_segment) {
+        return out;
+    }
+    out.keep = true;
+    return out;
+}
+
+__global__ void chain_candidate_flags_kernel(int64_t lane_start, int64_t lane_count, const int64_t* lane_offsets,
+                                             GroupTables tables, ChainEdges edges, ChainHalf a, ChainHalf b,
+                                             PairTolerances tol, float edge_epsilon, int* __restrict__ flags) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x; index < lane_count;
+         index += stride) {
+        const ChainLane lane = chain_lane(lane_offsets, edges.edge_count, b, a, lane_start + index);
+        flags[index] = chain_candidate(tables, edges, a, b, lane, tol, edge_epsilon).keep ? 1 : 0;
+    }
+}
+
+__global__ void chain_candidate_write_kernel(int64_t lane_start, int64_t lane_count, const int64_t* lane_offsets,
+                                             GroupTables tables, ChainEdges edges, ChainHalf a, ChainHalf b,
+                                             PairTolerances tol, float edge_epsilon, const int* __restrict__ flags,
+                                             const int* __restrict__ offsets, int* __restrict__ out_tx,
+                                             int* __restrict__ out_rx, int* __restrict__ out_edge,
+                                             int* __restrict__ out_a_node, int* __restrict__ out_b_node,
+                                             float* __restrict__ out_point) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x; index < lane_count;
+         index += stride) {
+        if (flags[index] == 0) {
+            continue;
+        }
+        const ChainLane lane = chain_lane(lane_offsets, edges.edge_count, b, a, lane_start + index);
+        const ChainCandidate candidate = chain_candidate(tables, edges, a, b, lane, tol, edge_epsilon);
+        const int64_t dst = offsets[index];
+        out_tx[dst] = candidate.tx;
+        out_rx[dst] = candidate.rx;
+        out_edge[dst] = lane.edge;
+        out_a_node[dst] = candidate.a_node;
+        out_b_node[dst] = candidate.b_node;
+        out_point[dst * 3] = candidate.point.x;
+        out_point[dst * 3 + 1] = candidate.point.y;
+        out_point[dst * 3 + 2] = candidate.point.z;
+    }
+}
+
+// Double diffraction: lane -> (transmitter, receiver, first edge, second edge) over the products
+// of each transmitter's visible edges with each receiver's visible edges.
+__global__ void chain_double_expand_kernel(int64_t lane_start, int64_t lane_count, int64_t rx_count,
+                                           const int64_t* __restrict__ pair_offsets,
+                                           const int64_t* __restrict__ tx_offsets, const int* __restrict__ tx_edges,
+                                           const int64_t* __restrict__ rx_offsets, const int* __restrict__ rx_edges,
+                                           int64_t pair_count, int* __restrict__ out_tx, int* __restrict__ out_rx,
+                                           int* __restrict__ out_edge1, int* __restrict__ out_edge2) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x; index < lane_count;
+         index += stride) {
+        const int64_t lane = lane_start + index;
+        int64_t lo = 0;
+        int64_t hi = pair_count;
+        while (hi - lo > 1) {
+            const int64_t mid = (lo + hi) / 2;
+            if (pair_offsets[mid] <= lane) {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        const int64_t tx = lo / rx_count;
+        const int64_t rx = lo % rx_count;
+        const int64_t local = lane - pair_offsets[lo];
+        const int64_t rx_visible = rx_offsets[rx + 1] - rx_offsets[rx];
+        out_tx[index] = static_cast<int>(tx);
+        out_rx[index] = static_cast<int>(rx);
+        out_edge1[index] = tx_edges[tx_offsets[tx] + local / rx_visible];
+        out_edge2[index] = rx_edges[rx_offsets[rx] + local % rx_visible];
+    }
+}
+
 int discovery_grid(int64_t work) {
     const int64_t blocks = (work + kDiscoveryBlock - 1) / kDiscoveryBlock;
     return static_cast<int>(std::max<int64_t>(1, std::min<int64_t>(blocks, 65535)));
@@ -646,6 +951,186 @@ pybind11::dict channel_reflection_receiver_candidates(at::Tensor tx_positions, a
         tx_positions.data_ptr<float>(), rx_positions.data_ptr<float>(), tables, tol, tile_offsets.data_ptr<int>(),
         pybind11::cast<at::Tensor>(out["candidate_sequence"]).data_ptr<int>(),
         pybind11::cast<at::Tensor>(out["candidate_receiver"]).data_ptr<int>());
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    return out;
+}
+
+namespace {
+
+ChainEdges chain_edges(const at::Tensor& position, const at::Tensor& direction, const at::Tensor& t_min,
+                       const at::Tensor& t_max) {
+    check_vec3_table(position, "edge_position");
+    check_vec3_table(direction, "edge_direction");
+    check_cuda_tensor(t_min, "edge_t_min", at::kFloat, 1);
+    check_cuda_tensor(t_max, "edge_t_max", at::kFloat, 1);
+    TORCH_CHECK(direction.size(0) == position.size(0) && t_min.size(0) == position.size(0) &&
+                    t_max.size(0) == position.size(0),
+                "edge tables must have one row per edge");
+    return ChainEdges{position.data_ptr<float>(), direction.data_ptr<float>(), t_min.data_ptr<float>(),
+                      t_max.data_ptr<float>(), position.size(0)};
+}
+
+ChainHalf chain_half(const at::Tensor& edge_offsets, const at::Tensor& endpoint, const at::Tensor& node,
+                     const at::Tensor& endpoints, const at::Tensor& node_sequences, const at::Tensor& node_images,
+                     int64_t edge_count, const char* name) {
+    check_cuda_tensor(edge_offsets, "edge_offsets", at::kLong, 1);
+    check_cuda_tensor(endpoint, "endpoint", at::kInt, 1);
+    check_cuda_tensor(node, "node", at::kInt, 1);
+    check_vec3_table(endpoints, "endpoints");
+    check_cuda_tensor(node_sequences, "node_sequences", at::kInt, 2);
+    check_vec3_table(node_images, "node_images");
+    TORCH_CHECK(edge_offsets.size(0) == edge_count + 1, name, " edge offsets must have one row per edge plus one");
+    TORCH_CHECK(node.size(0) == endpoint.size(0), name, " node must match endpoint");
+    TORCH_CHECK(node_sequences.size(0) == node_images.size(0), name, " node tables must have one row per node");
+    TORCH_CHECK(node_sequences.size(1) < kDiscoveryMaxDepth, name, " depth exceeds the specular chain limit");
+    return ChainHalf{edge_offsets.data_ptr<int64_t>(), endpoint.data_ptr<int>(), node.data_ptr<int>(),
+                     endpoints.data_ptr<float>(), node_sequences.data_ptr<int>(), node_images.data_ptr<float>(),
+                     static_cast<int>(node_sequences.size(1))};
+}
+
+}  // namespace
+
+pybind11::dict channel_chain_node_edges(at::Tensor node_sequences, at::Tensor node_images, at::Tensor plane_point,
+                                        at::Tensor plane_normal, at::Tensor bounds, at::Tensor occupancy,
+                                        at::Tensor edge_position, at::Tensor edge_direction, at::Tensor edge_t_min, at::Tensor edge_t_max,
+                                        int64_t node_start, int64_t node_end, double tolerance) {
+    check_cuda_tensor(node_sequences, "node_sequences", at::kInt, 2);
+    check_vec3_table(node_images, "node_images");
+    const GroupTables tables = group_tables(plane_point, plane_normal, bounds, occupancy);
+    const ChainEdges edges = chain_edges(edge_position, edge_direction, edge_t_min, edge_t_max);
+    const int64_t node_count = node_sequences.size(0);
+    const int64_t width = node_sequences.size(1);
+    TORCH_CHECK(width >= 1 && width < kDiscoveryMaxDepth, "chain node depth must be in [1, 7]");
+    TORCH_CHECK(node_images.size(0) == node_count, "node tables must have one row per node");
+    TORCH_CHECK(0 <= node_start && node_start <= node_end && node_end <= node_count, "node range is out of range");
+    TORCH_CHECK(std::isfinite(tolerance) && tolerance >= 0.0, "tolerance must be finite and non-negative");
+    const int64_t pair_count = (node_end - node_start) * edges.edge_count;
+    TORCH_CHECK(pair_count < std::numeric_limits<int>::max(), "chain node-edge chunk exceeds the int32 range");
+    auto int_options = node_sequences.options();
+    pybind11::dict out;
+    if (pair_count == 0) {
+        out["node"] = at::empty({0}, int_options);
+        out["edge"] = at::empty({0}, int_options);
+        return out;
+    }
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(node_sequences.get_device()).stream();
+    auto flags = at::empty({pair_count}, int_options);
+    auto offsets = at::empty({pair_count + 1}, int_options);
+    chain_node_edge_flags_kernel<<<discovery_grid(pair_count), kDiscoveryBlock, 0, stream>>>(
+        pair_count, node_start, width, node_sequences.data_ptr<int>(), node_images.data_ptr<float>(), tables, edges,
+        static_cast<float>(tolerance), flags.data_ptr<int>());
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    channel::scan::exclusive_flag_offsets(flags, offsets, pair_count, stream);
+    const int64_t count = observe_compact_count(offsets, pair_count, stream).count;
+    out["node"] = at::empty({count}, int_options);
+    out["edge"] = at::empty({count}, int_options);
+    if (count == 0) {
+        return out;
+    }
+    chain_node_edge_write_kernel<<<discovery_grid(pair_count), kDiscoveryBlock, 0, stream>>>(
+        pair_count, node_start, edges.edge_count, flags.data_ptr<int>(), offsets.data_ptr<int>(),
+        pybind11::cast<at::Tensor>(out["node"]).data_ptr<int>(), pybind11::cast<at::Tensor>(out["edge"]).data_ptr<int>());
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    return out;
+}
+
+pybind11::dict channel_chain_candidates(
+    at::Tensor lane_offsets, int64_t lane_start, int64_t lane_end, at::Tensor plane_point, at::Tensor plane_normal,
+    at::Tensor bounds, at::Tensor occupancy, at::Tensor edge_position, at::Tensor edge_direction, at::Tensor edge_t_min, at::Tensor edge_t_max,
+    at::Tensor a_edge_offsets, at::Tensor a_endpoint, at::Tensor a_node, at::Tensor a_endpoints,
+    at::Tensor a_node_sequences, at::Tensor a_node_images, at::Tensor b_edge_offsets, at::Tensor b_endpoint,
+    at::Tensor b_node, at::Tensor b_endpoints, at::Tensor b_node_sequences, at::Tensor b_node_images,
+    double box_tolerance, double segment_tolerance, double min_segment_length, double edge_epsilon) {
+    const GroupTables tables = group_tables(plane_point, plane_normal, bounds, occupancy);
+    const ChainEdges edges = chain_edges(edge_position, edge_direction, edge_t_min, edge_t_max);
+    check_cuda_tensor(lane_offsets, "lane_offsets", at::kLong, 1);
+    TORCH_CHECK(lane_offsets.size(0) == edges.edge_count + 1, "lane_offsets must have one row per edge plus one");
+    TORCH_CHECK(edges.edge_count > 0, "chain candidates need at least one edge");
+    const ChainHalf a = chain_half(a_edge_offsets, a_endpoint, a_node, a_endpoints, a_node_sequences, a_node_images,
+                                   edges.edge_count, "transmitter half");
+    const ChainHalf b = chain_half(b_edge_offsets, b_endpoint, b_node, b_endpoints, b_node_sequences, b_node_images,
+                                   edges.edge_count, "receiver half");
+    TORCH_CHECK(a.depth + b.depth + 1 <= kDiscoveryMaxDepth, "chain depth exceeds the specular chain limit");
+    TORCH_CHECK(0 <= lane_start && lane_start <= lane_end, "lane range is out of range");
+    const int64_t lane_count = lane_end - lane_start;
+    TORCH_CHECK(lane_count < std::numeric_limits<int>::max(), "chain candidate chunk exceeds the int32 range");
+    TORCH_CHECK(std::isfinite(box_tolerance) && box_tolerance >= 0.0 && std::isfinite(segment_tolerance) &&
+                    segment_tolerance >= 0.0 && std::isfinite(min_segment_length) && min_segment_length >= 0.0 &&
+                    std::isfinite(edge_epsilon) && edge_epsilon >= 0.0,
+                "chain candidate tolerances must be finite and non-negative");
+    auto int_options = a_endpoint.options();
+    auto allocate = [&](int64_t rows) {
+        pybind11::dict out;
+        out["tx"] = at::empty({rows}, int_options);
+        out["rx"] = at::empty({rows}, int_options);
+        out["edge"] = at::empty({rows}, int_options);
+        out["a_node"] = at::empty({rows}, int_options);
+        out["b_node"] = at::empty({rows}, int_options);
+        out["point"] = at::empty({rows, 3}, edge_position.options());
+        return out;
+    };
+    if (lane_count == 0) {
+        return allocate(0);
+    }
+    const PairTolerances tol{static_cast<float>(box_tolerance), static_cast<float>(segment_tolerance),
+                             static_cast<float>(min_segment_length)};
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(a_endpoint.get_device()).stream();
+    auto flags = at::empty({lane_count}, int_options);
+    auto offsets = at::empty({lane_count + 1}, int_options);
+    chain_candidate_flags_kernel<<<discovery_grid(lane_count), kDiscoveryBlock, 0, stream>>>(
+        lane_start, lane_count, lane_offsets.data_ptr<int64_t>(), tables, edges, a, b, tol,
+        static_cast<float>(edge_epsilon), flags.data_ptr<int>());
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    channel::scan::exclusive_flag_offsets(flags, offsets, lane_count, stream);
+    const int64_t count = observe_compact_count(offsets, lane_count, stream).count;
+    pybind11::dict out = allocate(count);
+    if (count == 0) {
+        return out;
+    }
+    chain_candidate_write_kernel<<<discovery_grid(lane_count), kDiscoveryBlock, 0, stream>>>(
+        lane_start, lane_count, lane_offsets.data_ptr<int64_t>(), tables, edges, a, b, tol,
+        static_cast<float>(edge_epsilon), flags.data_ptr<int>(), offsets.data_ptr<int>(),
+        pybind11::cast<at::Tensor>(out["tx"]).data_ptr<int>(), pybind11::cast<at::Tensor>(out["rx"]).data_ptr<int>(),
+        pybind11::cast<at::Tensor>(out["edge"]).data_ptr<int>(),
+        pybind11::cast<at::Tensor>(out["a_node"]).data_ptr<int>(),
+        pybind11::cast<at::Tensor>(out["b_node"]).data_ptr<int>(),
+        pybind11::cast<at::Tensor>(out["point"]).data_ptr<float>());
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    return out;
+}
+
+pybind11::dict channel_chain_double_candidates(at::Tensor pair_offsets, int64_t lane_start, int64_t lane_end,
+                                               int64_t rx_count, at::Tensor tx_offsets, at::Tensor tx_edges,
+                                               at::Tensor rx_offsets, at::Tensor rx_edges) {
+    check_cuda_tensor(pair_offsets, "pair_offsets", at::kLong, 1);
+    check_cuda_tensor(tx_offsets, "tx_offsets", at::kLong, 1);
+    check_cuda_tensor(rx_offsets, "rx_offsets", at::kLong, 1);
+    check_cuda_tensor(tx_edges, "tx_edges", at::kInt, 1);
+    check_cuda_tensor(rx_edges, "rx_edges", at::kInt, 1);
+    TORCH_CHECK(rx_count > 0 && rx_offsets.size(0) == rx_count + 1, "rx_offsets must have one row per receiver plus one");
+    const int64_t tx_count = tx_offsets.size(0) - 1;
+    TORCH_CHECK(tx_count > 0, "tx_offsets must have one row per transmitter plus one");
+    const int64_t pair_count = tx_count * rx_count;
+    TORCH_CHECK(pair_offsets.size(0) == pair_count + 1, "pair_offsets must have one row per endpoint pair plus one");
+    TORCH_CHECK(0 <= lane_start && lane_start <= lane_end, "lane range is out of range");
+    const int64_t lane_count = lane_end - lane_start;
+    TORCH_CHECK(lane_count < std::numeric_limits<int>::max(), "double-diffraction chunk exceeds the int32 range");
+    auto int_options = tx_edges.options();
+    pybind11::dict out;
+    out["tx"] = at::empty({lane_count}, int_options);
+    out["rx"] = at::empty({lane_count}, int_options);
+    out["edge1"] = at::empty({lane_count}, int_options);
+    out["edge2"] = at::empty({lane_count}, int_options);
+    if (lane_count == 0) {
+        return out;
+    }
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(tx_edges.get_device()).stream();
+    chain_double_expand_kernel<<<discovery_grid(lane_count), kDiscoveryBlock, 0, stream>>>(
+        lane_start, lane_count, rx_count, pair_offsets.data_ptr<int64_t>(), tx_offsets.data_ptr<int64_t>(),
+        tx_edges.data_ptr<int>(), rx_offsets.data_ptr<int64_t>(), rx_edges.data_ptr<int>(), pair_count,
+        pybind11::cast<at::Tensor>(out["tx"]).data_ptr<int>(), pybind11::cast<at::Tensor>(out["rx"]).data_ptr<int>(),
+        pybind11::cast<at::Tensor>(out["edge1"]).data_ptr<int>(),
+        pybind11::cast<at::Tensor>(out["edge2"]).data_ptr<int>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     return out;
 }

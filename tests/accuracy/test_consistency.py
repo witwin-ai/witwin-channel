@@ -59,12 +59,13 @@ def test_reciprocity_swap_tx_rx(accuracy, components):
     accuracy.check(f"{sorted(components)}", error, coefficient_tolerance(4 * sc.PITCH_M * 3))
 
 
-def test_coupled_reflection_diffraction_is_reciprocal(accuracy):
-    """The coupled R-D / D-R rows (one reflection and one diffraction) are reciprocal under a swap.
+@pytest.mark.parametrize("max_depth", [2, 3])
+def test_coupled_reflection_diffraction_is_reciprocal(accuracy, max_depth):
+    """The coupled rows (interaction chains and double diffraction) are reciprocal under a swap.
 
-    Each direction's coupled rows are summed per pair; an R-D row of one direction is the D-R row of
-    the other. Double-diffraction rows are excluded: their discovery prunes the two edges
-    asymmetrically, which is a candidate-set question, not the coupled field.
+    Each direction's coupled rows are summed per pair; a chain of one direction is the reversed
+    chain of the other. Both chain halves and both double-diffraction edges are selected by
+    endpoint-symmetric rules, so the two directions find the same paths.
     """
     from witwin.channel.path import Config, solve
 
@@ -75,19 +76,21 @@ def test_coupled_reflection_diffraction_is_reciprocal(accuracy):
     def coupled_pairs(tx_points, rx_points):
         scene = Scene(structures=city.structures,
                       endpoints=[*(antenna("tx", p) for p in tx_points), *(antenna("rx", p) for p in rx_points)])
-        config = Config(components={"los", "reflection", "diffraction"}, max_depth=2, coupled_paths=True)
+        config = Config(components={"los", "reflection", "diffraction"}, max_depth=max_depth, coupled_paths=True)
         result = solve(scene, config, reference_frequency_hz=FREQ)
         types = result.types[:, 0, :, 0, :]
-        mixed = result.valid[:, 0, :, 0, :] & (types == 1).any(-1) & (types == 2).any(-1)
-        a = torch.where(mixed, result.a[:, 0, :, 0, :, 0], torch.zeros_like(result.a[:, 0, :, 0, :, 0]))
-        return torch.stack([a.sum(-1), a.abs().sum(-1).to(a.dtype)])
+        events = (types != 0).sum(-1)
+        coupled = result.valid[:, 0, :, 0, :] & (types == 2).any(-1) & (events >= 2)
+        a = torch.where(coupled, result.a[:, 0, :, 0, :, 0], torch.zeros_like(result.a[:, 0, :, 0, :, 0]))
+        return torch.stack([a.sum(-1), a.abs().sum(-1).to(a.dtype)]), coupled.sum(-1)
 
-    forward = coupled_pairs(a_side, b_side)
-    backward = coupled_pairs(b_side, a_side)
+    forward, forward_rows = coupled_pairs(a_side, b_side)
+    backward, backward_rows = coupled_pairs(b_side, a_side)
     scale = forward[1].real.clamp_min(1e-30)
     assert float(forward[1].real.min()) > 0.0
+    assert torch.equal(forward_rows, backward_rows.transpose(0, 1))
     error = ((forward[0] - backward[0].transpose(0, 1)).abs() / scale).max().item()
-    accuracy.check("coupled R-D/D-R rows", error, coefficient_tolerance(2 * sc.PITCH_M * 3))
+    accuracy.check(f"coupled rows, max_depth={max_depth}", error, coefficient_tolerance(2 * sc.PITCH_M * 3))
 
 
 def _radiomap(subdiv: int, welded: bool, components: set[str], depth: int = 1) -> torch.Tensor:

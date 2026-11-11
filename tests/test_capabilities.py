@@ -40,12 +40,11 @@ def test_capability_manifest_is_versioned_serializable_and_defensive():
     assert path["supports_reflection_diffraction_coupling_geometry"] is True
     assert (
         path["reflection_diffraction_coupling_topology"]
-        == "one_reflection_one_diffraction_both_orders"
+        == "one_diffraction_anywhere_in_a_reflection_chain"
     )
-    assert path["max_reflections_in_coupled_path"] == 1
+    assert path["max_reflections_in_coupled_path"] == 4
     assert path["reflection_diffraction_coupling_candidate_limit"] == 1_000_000
-    # coupled double diffraction: coupled_paths=True now enables the uniform order-2
-    # compensator family including cid 7 double diffraction (D->D). The key is
+    # coupled_paths=True also enables double diffraction (cid 7). The key is
     # exposed on every solver block that declares coupling support.
     assert path["coupled_double_diffraction"] is True
     assert manifest["solvers"]["deterministic"]["coupled_double_diffraction"] is True
