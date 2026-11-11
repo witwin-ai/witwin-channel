@@ -4420,7 +4420,7 @@
         ["k0", "double", null]
       ],
       "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.scattering._required_patch_forward", "witwin.channel.kernels.scattering.scattering_patch_integral_eval"]
+      "python_owners": ["witwin.channel.kernels.scattering._ScatteringPatchIntegralEvalAdFunction", "witwin.channel.kernels.scattering.scattering_patch_integral_eval"]
     },
     {
       "name": "scattering_patch_integral_eval_backward",
