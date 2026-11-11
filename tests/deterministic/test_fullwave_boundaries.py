@@ -108,3 +108,25 @@ def test_chains_carry_as_many_reflections_as_the_reflection_paths():
     paths, chain = _chain_rows("wall_column_z", 2)
     depth = paths.depth.cpu().numpy()
     assert int(depth[chain].max()) == 3
+
+
+@pytest.mark.parametrize("material", ["pec", "concrete"])
+def test_receiver_on_a_reflection_boundary_keeps_the_lit_total(material):
+    """On the boundary the reflection is kept and the diffraction takes its lit side: no half-R error."""
+
+    from witwin.core import MaterialLayer
+
+    _require_native()
+    face = (PhysicalMaterial.perfect_conductor(name="pec") if material == "pec" else
+            PhysicalMaterial(layers=(MaterialLayer(thickness_m=0.1, eps_r=5.24, sigma_e=0.1627),), name="c"))
+    # Transmitter (-1, 0, 0.5): the face's reflection boundary crosses x = -1 at z = -0.5 exactly.
+    offsets = (-1.0e-4, -1.0e-6, 0.0, 1.0e-6)
+    receivers = [(-1.0, 0.0, -0.5 + dz) for dz in offsets]
+    scene = _plate_scene(5.0, face, (-1.0, 0.0, 0.5), receivers)
+    result = solve(scene, Config(components=frozenset({"los", "reflection", "diffraction"}), max_depth=1,
+                                 return_field=True), reference_frequency_hz=5.0e9)
+    total = result.field.reshape(-1).cpu().numpy()
+    reflected = result.component_fields["reflection"].reshape(-1).cpu().numpy()
+    assert np.all(np.abs(reflected) > 0)
+    scale = np.abs(reflected).max()
+    np.testing.assert_array_less(np.abs(total[1:] - total[0]), 0.05 * scale)
