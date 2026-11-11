@@ -8,7 +8,9 @@ from types import SimpleNamespace
 import pytest
 import torch
 
+from tests.support.core_world import make_transmitter
 from witwin.channel.interactions import diffraction
+from witwin.channel.scene.endpoints import _TransmitterView
 from witwin.channel.kernels import fields as field_kernels
 # The discovery, geometry and enumerated halves of diffraction are one module
 # now; the alias is kept so the geometry-facing assertions still read as such.
@@ -64,7 +66,12 @@ def _minimal_scene_and_compiled() -> tuple[object, object]:
     scene = SimpleNamespace(
         structures=[object()],
         metadata={"mitsuba": {"merge_shapes": True}},
-        transmitters=[SimpleNamespace(polarization=torch.tensor([0.0, 0.0, 1.0]))],
+        transmitters=(
+            _TransmitterView(
+                make_transmitter(torch.zeros(3), polarization=torch.tensor([0.0, 0.0, 1.0]))
+            ),
+        ),
+        receivers=(),
     )
     return scene, SimpleNamespace(rayd=rayd)
 
@@ -209,7 +216,12 @@ def test_diffraction_lazy_event_field_and_export_order(monkeypatch):
         metadata={"mitsuba": {"merge_shapes": True}},
         # order-1 diffraction now threads the real transmitter
         # polarization (transmitter_polarizations reads scene.transmitters).
-        transmitters=[SimpleNamespace(polarization=torch.tensor([0.0, 0.0, 1.0]))],
+        transmitters=(
+            _TransmitterView(
+                make_transmitter(torch.zeros(3), polarization=torch.tensor([0.0, 0.0, 1.0]))
+            ),
+        ),
+        receivers=(),
     )
     compiled = SimpleNamespace(rayd=rayd)
 

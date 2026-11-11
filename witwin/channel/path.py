@@ -1220,9 +1220,9 @@ class _AntennaEndpoint(Protocol):
     def pattern(self) -> Any: ...
 
 
-def _value_key(value: torch.Tensor | None, fallback: object) -> object:
+def _value_key(value: torch.Tensor | None, default: object) -> object:
     if value is None:
-        return fallback
+        return default
     if value.device.type == "cpu":
         detached = value.detach()
         return ("value", detached.dtype, tuple(detached.shape), detached.numpy().tobytes())
