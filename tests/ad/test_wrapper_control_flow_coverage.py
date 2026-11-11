@@ -13,13 +13,17 @@ import torch
 
 from witwin.channel.kernels import fields
 from witwin.channel.kernels import scattering
+from witwin.channel.kernels import spec
 from witwin.channel.montecarlo import bdpt
 
 
 def _patch_ad_plumbing(monkeypatch, module) -> None:
+    # The declarative AD scaffolding of the facade modules calls the same plumbing.
+    if module is not spec:
+        _patch_ad_plumbing(monkeypatch, spec)
     monkeypatch.setattr(module, "_ad_reject_fixed_inputs", lambda *args: None, raising=False)
     monkeypatch.setattr(module, "_ad_reject_fixed_tangents", lambda *args: None, raising=False)
-    monkeypatch.setattr(module, "_ad_native_tensor", lambda value: value)
+    monkeypatch.setattr(module, "_ad_native_tensor", lambda value: value, raising=False)
     monkeypatch.setattr(module, "_ad_native_tangent_or_none", lambda value: value)
     monkeypatch.setattr(
         module,
@@ -31,9 +35,10 @@ def _patch_ad_plumbing(monkeypatch, module) -> None:
         module,
         "_ad_frequency_tangent",
         lambda value: 0.0 if value is None else 1.0,
+        raising=False,
     )
-    monkeypatch.setattr(module, "_ad_frequency_grad", lambda value, _meta: value)
-    monkeypatch.setattr(module, "disable_functorch", nullcontext)
+    monkeypatch.setattr(module, "_ad_frequency_grad", lambda value, _meta: value, raising=False)
+    monkeypatch.setattr(module, "disable_functorch", nullcontext, raising=False)
 
 
 def _call_named_tangents(function, ctx, **active):
@@ -259,11 +264,13 @@ def test_bdpt_endpoint_and_accumulate_jvp_callbacks_pack_schema(monkeypatch) -> 
 
 def test_field_jvp_callbacks_cover_declared_component_matrix(monkeypatch) -> None:
     _patch_ad_plumbing(monkeypatch, fields)
-    monkeypatch.setattr(
-        fields,
-        "_ad_checked_tangent",
-        lambda _label, tangent, _shape: tangent,
-    )
+    for module in (fields, spec):
+        monkeypatch.setattr(
+            module,
+            "_ad_checked_tangent",
+            lambda _label, tangent, _shape: tangent,
+            raising=False,
+        )
     value = torch.ones(1)
 
     def required_symbol(name):
@@ -340,7 +347,7 @@ def test_field_jvp_callbacks_cover_declared_component_matrix(monkeypatch) -> Non
     assert chain == (value, value, value, value, None)
 
     dd_ctx = SimpleNamespace(
-        saved_tensors=(value,) * 35,
+        saved_tensors=(value,) * 39,  # 35 primals and the four frozen edge bounds
         frequency_value=3.0e9,
     )
     dd_tangents = [None] * 41
@@ -467,7 +474,7 @@ def test_remaining_vjp_callbacks_pack_full_gradients(monkeypatch) -> None:
         dd_needed[index] = True
     dd_ctx = SimpleNamespace(
         needs_input_grad=tuple(dd_needed),
-        saved_tensors=(value,) * 35,
+        saved_tensors=(value,) * 39,  # 35 primals and the four frozen edge bounds
         frequency_value=3.0e9,
         frequency_meta=None,
     )

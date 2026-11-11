@@ -1186,7 +1186,7 @@ pybind11::dict channel_mc_transmission_wall_product(
     zero_tensor(wall_count, stream);
     zero_tensor(penetrated, stream);
     if (shape.rows > 0) {
-        const int blocks = launch_blocks(shape.rows);
+        const int blocks = ::channel::launch_blocks(shape.rows, kBlockSize);
         wall_product_kernel<<<blocks, kBlockSize, 0, stream>>>(
             shape.rows, shape.hit_capacity, valid.data_ptr<bool>(), num_hits.data_ptr<int>(),
             reached_target.data_ptr<bool>(), direction.data_ptr<float>(), normal.data_ptr<float>(),
@@ -1260,7 +1260,7 @@ pybind11::tuple channel_mc_transmission_wall_product_backward(
                                grad_frequency})
         zero_tensor(tensor, stream);
     if (shape.rows > 0) {
-        const int blocks = launch_blocks(shape.rows);
+        const int blocks = ::channel::launch_blocks(shape.rows, kBlockSize);
         wall_product_backward_kernel<<<blocks, kBlockSize, 0, stream>>>(
             shape.rows, shape.hit_capacity, valid.data_ptr<bool>(), num_hits.data_ptr<int>(),
             reached_target.data_ptr<bool>(), direction.data_ptr<float>(), normal.data_ptr<float>(),
@@ -1291,7 +1291,8 @@ pybind11::tuple channel_mc_transmission_wall_product_backward(
             (shared_outputs + kReduceWarpsPerBlock - 1) / kReduceWarpsPerBlock);
         for (int64_t row_begin = 0; row_begin < shape.rows; row_begin += chunk_rows) {
             const int64_t row_end = std::min(shape.rows, row_begin + chunk_rows);
-            wall_product_shared_terms_kernel<<<launch_blocks(row_end - row_begin), kBlockSize, 0, stream>>>(
+            wall_product_shared_terms_kernel<<<
+                ::channel::launch_blocks(row_end - row_begin, kBlockSize), kBlockSize, 0, stream>>>(
                 shape.rows, shape.hit_capacity, valid.data_ptr<bool>(), num_hits.data_ptr<int>(),
                 reached_target.data_ptr<bool>(), direction.data_ptr<float>(), normal.data_ptr<float>(),
                 global_primitive_id.data_ptr<int>(), face_material_id.data_ptr<int>(), face_material_id.numel(),
@@ -1314,7 +1315,9 @@ pybind11::tuple channel_mc_transmission_wall_product_backward(
         const int64_t total = std::max(
             std::max(shape.rows * 3, shape.rows * shape.hit_capacity * 3),
             std::max(shape.layers, shape.rows));
-        sanitize_backward_kernel<<<launch_blocks(std::max<int64_t>(total, 1)), kBlockSize, 0, stream>>>(
+        sanitize_backward_kernel<<<
+            ::channel::launch_blocks(std::max<int64_t>(total, 1), kBlockSize),
+            kBlockSize, 0, stream>>>(
             capacity_failure_state.data_ptr<int>(), shape.rows, shape.hit_capacity, shape.layers,
             grad_direction.data_ptr<float>(), grad_normal.data_ptr<float>(),
             grad_layer_thickness.data_ptr<float>(), grad_layer_eps.data_ptr<float>(),
@@ -1388,7 +1391,7 @@ pybind11::dict channel_mc_transmission_wall_product_jvp(
     zero_tensor(tangent_scaled_power, stream);
     zero_tensor(tangent_transmittance, stream);
     if (shape.rows > 0) {
-        const int blocks = launch_blocks(shape.rows);
+        const int blocks = ::channel::launch_blocks(shape.rows, kBlockSize);
         wall_product_jvp_kernel<<<blocks, kBlockSize, 0, stream>>>(
             shape.rows, shape.hit_capacity, valid.data_ptr<bool>(), num_hits.data_ptr<int>(),
             reached_target.data_ptr<bool>(), direction.data_ptr<float>(), normal.data_ptr<float>(),

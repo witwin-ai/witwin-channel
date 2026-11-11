@@ -6,6 +6,7 @@
 #include <c10/cuda/CUDAException.h>
 #include <cuda_runtime_api.h>
 #include "torch_cuda.h"
+#include "constants.cuh"
 
 #include <rayd/field_transport.cuh>
 
@@ -25,8 +26,8 @@ namespace {
 namespace utd = rayd::shared::diffraction;
 namespace transport = rayd::shared::field_transport;
 
-constexpr float kLightSpeedMPerS = 299792458.0f;
-constexpr float kPi = 3.14159265358979323846f;
+using channel::kPiF;
+using channel::kSpeedOfLightF;
 
 // BDPT component_mask bits (component classification): 1=los, 2=reflection,
 // 4=diffraction, 8=transmission, 16=scattering.
@@ -34,13 +35,12 @@ constexpr int kMaskReflection = 2;
 constexpr int kMaskDiffraction = 4;
 constexpr int kMaskTransmission = 8;
 constexpr int kMaskScattering = 16;
-// Connection-sample component ids follow core/path_topology.py:
-// 0=los, 1=reflection, 2=diffraction, 5=transmission, 6=scattering.
-constexpr int kComponentLos = 0;
-constexpr int kComponentReflection = 1;
-constexpr int kComponentDiffraction = 2;
-constexpr int kComponentTransmission = 5;
-constexpr int kComponentScattering = 6;
+// Connection samples carry the enumerated path component ids.
+using channel::kComponentDiffraction;
+using channel::kComponentLineOfSight;
+using channel::kComponentReflection;
+using channel::kComponentScattering;
+using channel::kComponentTransmission;
 
 // Collapse a per-path component mask to the EXCLUSIVE path_class with the
 // contract priority scattering > diffraction > transmission > reflection >
@@ -58,11 +58,11 @@ __device__ int bdpt_component_from_mask(int mask) {
     if (mask & kMaskReflection) {
         return kComponentReflection;
     }
-    return kComponentLos;
+    return kComponentLineOfSight;
 }
 
 __device__ bool bdpt_component_accumulable(int component) {
-    return component == kComponentLos || component == kComponentReflection ||
+    return component == kComponentLineOfSight || component == kComponentReflection ||
         component == kComponentDiffraction || component == kComponentTransmission ||
         component == kComponentScattering;
 }
@@ -254,7 +254,7 @@ __device__ BdptConnectionRow bdpt_connection_row(
     // The free-space spreading acts over the unfolded path (light-subpath
     // prefix + connection segment), not the last segment alone.
     const float total_distance = distance + fmaxf(light_path_length, 0.0f);
-    const float wave_number = 2.0f * kPi * frequency_hz / kLightSpeedMPerS;
+    const float wave_number = 2.0f * kPiF * frequency_hz / kSpeedOfLightF;
     const float amplitude = 1.0f /
         (2.0f * fmaxf(wave_number, 1.0e-12f) * fmaxf(total_distance, 1.0e-6f));
     const utd::Complex propagation = utd::cplx_mul_real(
@@ -1135,7 +1135,7 @@ __global__ void bdpt_accumulate_connection_samples_double_kernel(
     const int64_t out_index = static_cast<int64_t>(tx) * rx_count + rx;
     const double value = static_cast<double>(contribution[index]) * static_cast<double>(mis_weight[index]);
     atomicAdd(path_gain + out_index, value);
-    if (component == kComponentLos) {
+    if (component == kComponentLineOfSight) {
         atomicAdd(los + out_index, value);
     } else if (component == kComponentReflection) {
         atomicAdd(reflection + out_index, value);
@@ -1191,7 +1191,7 @@ __global__ void bdpt_accumulate_connection_samples_coherent_kernel(
     const int64_t out_index = static_cast<int64_t>(tx) * rx_count + rx;
     const double re = static_cast<double>(coeff_real[index]);
     const double im = static_cast<double>(coeff_imag[index]);
-    if (component == kComponentLos) {
+    if (component == kComponentLineOfSight) {
         atomicAdd(los_real + out_index, re);
         atomicAdd(los_imag + out_index, im);
     } else if (component == kComponentReflection) {
@@ -1309,7 +1309,7 @@ __global__ void bdpt_accumulate_connection_samples_compacted_kernel(
     const int64_t out_index = static_cast<int64_t>(tx) * rx_count + rx;
     const float value = contribution[index] * mis_weight[index];
     atomicAdd(path_gain + out_index, value);
-    if (component == kComponentLos) {
+    if (component == kComponentLineOfSight) {
         atomicAdd(los + out_index, value);
     } else if (component == kComponentReflection) {
         atomicAdd(reflection + out_index, value);
@@ -1415,7 +1415,7 @@ namespace {
 constexpr int kSortedSlots = 5;
 
 __device__ __forceinline__ int bdpt_component_slot(int component) {
-    if (component == kComponentLos) return 0;
+    if (component == kComponentLineOfSight) return 0;
     if (component == kComponentReflection) return 1;
     if (component == kComponentDiffraction) return 2;
     if (component == kComponentTransmission) return 3;
@@ -2031,7 +2031,7 @@ __device__ __forceinline__ const float* bdpt_component_matrix(
     const float* diffraction,
     const float* transmission,
     const float* scattering) {
-    if (component == kComponentLos) return los;
+    if (component == kComponentLineOfSight) return los;
     if (component == kComponentReflection) return reflection;
     if (component == kComponentDiffraction) return diffraction;
     if (component == kComponentTransmission) return transmission;
@@ -2128,7 +2128,7 @@ __global__ void bdpt_accumulate_coherent_backward_kernel(
             const float g_power = grad_pg + grad_comp;
             const double* bin_re = nullptr;
             const double* bin_im = nullptr;
-            if (component == kComponentLos) {
+            if (component == kComponentLineOfSight) {
                 bin_re = los_re;
                 bin_im = los_im;
             } else if (component == kComponentReflection) {
@@ -2578,7 +2578,7 @@ __device__ ConnectionCarrier bdpt_connection_carrier(
     out.source_power = light_source_power[light_index];
 
     const float total_distance = distance + fmaxf(light_path_length[light_index], 0.0f);
-    const float wave_number = 2.0f * kPi * frequency_hz / kLightSpeedMPerS;
+    const float wave_number = 2.0f * kPiF * frequency_hz / kSpeedOfLightF;
     const float k_clamped = fmaxf(wave_number, 1.0e-12f);
     const float l_clamped = fmaxf(total_distance, 1.0e-6f);
     const float amplitude = 1.0f / (2.0f * k_clamped * l_clamped);
@@ -2589,7 +2589,7 @@ __device__ ConnectionCarrier bdpt_connection_carrier(
     // d propagation / d frequency (amplitude and phase chain, matching the
     // free-space carrier convention). dk/df = 2*pi/c; the fmod phase reduction
     // has unit slope so d(phase_angle)/dk = -total_distance.
-    const float dk_df = 2.0f * kPi / kLightSpeedMPerS;
+    const float dk_df = 2.0f * kPiF / kSpeedOfLightF;
     const float d_amp_df =
         wave_number > 1.0e-12f ? (-amplitude / k_clamped) * dk_df : 0.0f;
     const float d_phase_df = -total_distance * dk_df;
@@ -3178,12 +3178,12 @@ __device__ WavefrontMixedCarrier wavefront_mixed_carrier(
     const float dz = rx_position[2] - origin[2];
     const float distance = fmaxf(sqrtf(dx * dx + dy * dy + dz * dz), 1.0e-6f);
     const float total_distance = distance + fmaxf(path_length, 0.0f);
-    const float wave_number = 2.0f * kPi * frequency_hz / kLightSpeedMPerS;
+    const float wave_number = 2.0f * kPiF * frequency_hz / kSpeedOfLightF;
     const float k_clamped = fmaxf(wave_number, 1.0e-12f);
     const float amplitude = 1.0f / (2.0f * k_clamped * fmaxf(total_distance, 1.0e-6f));
     const utd::Complex carrier_phase = utd::cplx_exp_phase(transport::precise_neg_kd(wave_number, total_distance));
     out.propagation = utd::cplx_mul_real(carrier_phase, amplitude);
-    const float dk_df = 2.0f * kPi / kLightSpeedMPerS;
+    const float dk_df = 2.0f * kPiF / kSpeedOfLightF;
     const float d_amp_df = wave_number > 1.0e-12f ? (-amplitude / k_clamped) * dk_df : 0.0f;
     const float d_phase_df = -total_distance * dk_df;
     out.d_propagation_df = utd::cplx(
@@ -3598,7 +3598,7 @@ void channel_bdpt_wavefront_visibility_inputs_cuda(
     const int blocks = static_cast<int>((pairs + threads - 1) / threads);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(rx_positions.get_device()).stream();
     const BdptNeeConstants constants{
-        static_cast<float>(amplitude_sq), static_cast<float>(4.0 * 3.14159265358979323846),
+        static_cast<float>(amplitude_sq), static_cast<float>(4.0 * channel::kPi),
         static_cast<float>(samples)};
     bdpt_wavefront_visibility_inputs_kernel<<<blocks, threads, 0, stream>>>(
         pairs,
@@ -3669,7 +3669,7 @@ void channel_bdpt_wavefront_connect_accumulate_cuda(
     const int blocks = static_cast<int>((pairs + threads - 1) / threads);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(rx_positions.get_device()).stream();
     const BdptNeeConstants constants{
-        static_cast<float>(amplitude_sq), static_cast<float>(4.0 * 3.14159265358979323846),
+        static_cast<float>(amplitude_sq), static_cast<float>(4.0 * channel::kPi),
         static_cast<float>(samples)};
     const wf::Tangent no_tangent{};
     auto kernel = tangent != nullptr ? bdpt_wavefront_connect_accumulate_kernel<true>
@@ -3732,7 +3732,7 @@ void channel_bdpt_wavefront_connect_backward_cuda(
     const int blocks = static_cast<int>((count + threads - 1) / threads);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(rx_positions.get_device()).stream();
     const BdptNeeConstants constants{
-        static_cast<float>(amplitude_sq), static_cast<float>(4.0 * 3.14159265358979323846),
+        static_cast<float>(amplitude_sq), static_cast<float>(4.0 * channel::kPi),
         static_cast<float>(samples)};
     bdpt_wavefront_connect_backward_kernel<<<blocks, threads, 0, stream>>>(
         count,

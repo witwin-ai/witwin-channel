@@ -24,11 +24,12 @@
 #include <vector>
 
 #include "path_compaction.cuh"
+#include "constants.cuh"
 
 namespace {
 
-constexpr double kLightSpeedMetersPerSecond = 299792458.0;
-constexpr float kPi = 3.14159265358979323846f;
+using channel::kPiF;
+using channel::kSpeedOfLight;
 // In-face slack of a reflection point, relative to the coordinate magnitude of the triangle and
 // the point (RayD's reflection containment rule): a distance outside each edge line, so the
 // reflection support ends at a face's boundary edge whatever the face size.
@@ -38,7 +39,7 @@ constexpr float kReflectionVisEps = 1.0e-4f;
 __device__ float channel_neg_kd_phase(float k, float d) {
     // Reduce k*d mod 2*pi in double: the f32 product loses ~k*d*2^-24 of
     // phase, which shifts coherent nulls at mmWave ranges.
-    const double kd = fmod(static_cast<double>(k) * static_cast<double>(d), 6.283185307179586476925287);
+    const double kd = fmod(static_cast<double>(k) * static_cast<double>(d), channel::kTwoPi);
     return -static_cast<float>(kd);
 }
 
@@ -122,8 +123,8 @@ __global__ void deterministic_los_topology_all_kernel(
         const float length = path_length[index];
         const float gain = path_gain[index];
         const float amplitude = sqrtf(fmaxf(gain, 0.0f));
-        const float wavelength = static_cast<float>(kLightSpeedMetersPerSecond) / frequency_hz;
-        const float phase = channel_neg_kd_phase(2.0f * kPi / wavelength, length);
+        const float wavelength = static_cast<float>(kSpeedOfLight) / frequency_hz;
+        const float phase = channel_neg_kd_phase(2.0f * kPiF / wavelength, length);
 
         out_valid[index] = true;
         out_tx_id[index] = tx_id[index];
@@ -512,7 +513,7 @@ __global__ void path_reflection_candidates_kernel(
         valid[index] = true;
         active[index] = true;
         path_length[index] = total_length;
-        delay[index] = total_length / static_cast<float>(kLightSpeedMetersPerSecond);
+        delay[index] = total_length / static_cast<float>(kSpeedOfLight);
         path_gain[index] = tx_power[tx] * gain * scale * scale;
     }
 }
@@ -537,7 +538,8 @@ at::Tensor channel_path_concat_vec3_cuda(std::vector<at::Tensor> blocks) {
     for (const auto& block : blocks) {
         const int64_t count = block.size(0);
         if (count > 0) {
-            path_concat_vec3_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
+            path_concat_vec3_kernel<<<::channel::launch_blocks(count, kPathBlockSize),
+                                      kPathBlockSize, 0, stream>>>(
                 count,
                 block.data_ptr<float>(),
                 out.data_ptr<float>(),
@@ -556,8 +558,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> channel_path_los_visibility_input
     at::Tensor rx_id) {
     check_vec3_table(tx_positions, "tx_positions");
     check_vec3_table(rx_positions, "rx_positions");
-    check_cuda_tensor(tx_id, "tx_id", at::kInt, 1);
-    check_cuda_tensor(rx_id, "rx_id", at::kInt, 1);
+    check_tensor(tx_id, "tx_id", at::kInt, 1);
+    check_tensor(rx_id, "rx_id", at::kInt, 1);
     TORCH_CHECK(tx_positions.get_device() == rx_positions.get_device(), "tx_positions and rx_positions must share a device");
     TORCH_CHECK(tx_id.get_device() == tx_positions.get_device(), "tx_id must share tx_positions device");
     TORCH_CHECK(rx_id.get_device() == tx_positions.get_device(), "rx_id must share tx_positions device");
@@ -569,7 +571,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> channel_path_los_visibility_input
     auto active = at::empty({count}, tx_positions.options().dtype(at::kBool));
     if (count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(tx_positions.get_device()).stream();
-        path_los_visibility_inputs_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
+        path_los_visibility_inputs_kernel<<<::channel::launch_blocks(count, kPathBlockSize),
+                                            kPathBlockSize, 0, stream>>>(
             count,
             tx_positions.data_ptr<float>(),
             rx_positions.data_ptr<float>(),
@@ -591,11 +594,11 @@ pybind11::dict channel_deterministic_los_topology_block_all_visible(
     at::Tensor path_gain,
     double frequency_hz,
     int64_t sequence_width) {
-    check_cuda_tensor(tx_id, "tx_id", at::kInt, 1);
-    check_cuda_tensor(rx_id, "rx_id", at::kInt, 1);
-    check_cuda_tensor(path_length, "path_length_m", at::kFloat, 1);
-    check_cuda_tensor(delay, "delay_s", at::kFloat, 1);
-    check_cuda_tensor(path_gain, "path_gain", at::kFloat, 1);
+    check_tensor(tx_id, "tx_id", at::kInt, 1);
+    check_tensor(rx_id, "rx_id", at::kInt, 1);
+    check_tensor(path_length, "path_length_m", at::kFloat, 1);
+    check_tensor(delay, "delay_s", at::kFloat, 1);
+    check_tensor(path_gain, "path_gain", at::kFloat, 1);
     TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
     TORCH_CHECK(sequence_width >= 0, "sequence_width must be non-negative");
     const int64_t count = tx_id.size(0);
@@ -635,7 +638,8 @@ pybind11::dict channel_deterministic_los_topology_block_all_visible(
     auto out_interaction_positions = at::empty({count, sequence_width, 3}, float_options);
     auto out_interaction_normals = at::empty({count, sequence_width, 3}, float_options);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
-    deterministic_los_topology_all_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
+    deterministic_los_topology_all_kernel<<<::channel::launch_blocks(count, kPathBlockSize),
+                                            kPathBlockSize, 0, stream>>>(
         count,
         tx_id.data_ptr<int>(),
         rx_id.data_ptr<int>(),
@@ -687,7 +691,7 @@ pybind11::dict channel_deterministic_los_topology_block_all_visible(
 }
 
 pybind11::dict channel_deterministic_topology_default_fields(at::Tensor reference) {
-    check_cuda_tensor(reference, "reference", at::kFloat, 1);
+    check_tensor(reference, "reference", at::kFloat, 1);
     const int64_t count = reference.size(0);
     auto float_options = reference.options().dtype(at::kFloat);
     auto int_options = reference.options().dtype(at::kInt);
@@ -698,7 +702,8 @@ pybind11::dict channel_deterministic_topology_default_fields(at::Tensor referenc
     auto path_field = at::empty({count}, complex_options);
     if (count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(reference.get_device()).stream();
-        deterministic_topology_default_fields_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
+        deterministic_topology_default_fields_kernel<<<
+            ::channel::launch_blocks(count, kPathBlockSize), kPathBlockSize, 0, stream>>>(
             count,
             interaction_position.data_ptr<float>(),
             interaction_normal.data_ptr<float>(),
@@ -725,15 +730,15 @@ pybind11::dict channel_deterministic_pad_topology_sequences(
     at::Tensor interaction_positions,
     at::Tensor interaction_normals,
     int64_t width) {
-    check_cuda_tensor(depth, "depth", at::kInt, 1);
-    check_cuda_tensor(primitive_id, "primitive_id", at::kInt, 1);
-    check_cuda_tensor(material_id, "material_id", at::kInt, 1);
+    check_tensor(depth, "depth", at::kInt, 1);
+    check_tensor(primitive_id, "primitive_id", at::kInt, 1);
+    check_tensor(material_id, "material_id", at::kInt, 1);
     check_vec3_table(interaction_position, "interaction_position");
     check_vec3_table(interaction_normal, "interaction_normal");
-    check_cuda_tensor(primitive_sequence, "primitive_sequence", at::kInt, 2);
-    check_cuda_tensor(material_sequence, "material_sequence", at::kInt, 2);
-    check_cuda_tensor(interaction_positions, "interaction_positions", at::kFloat, 3);
-    check_cuda_tensor(interaction_normals, "interaction_normals", at::kFloat, 3);
+    check_tensor(primitive_sequence, "primitive_sequence", at::kInt, 2);
+    check_tensor(material_sequence, "material_sequence", at::kInt, 2);
+    check_tensor(interaction_positions, "interaction_positions", at::kFloat, 3);
+    check_tensor(interaction_normals, "interaction_normals", at::kFloat, 3);
     TORCH_CHECK(width >= 0, "width must be non-negative");
     const int64_t count = depth.size(0);
     const int device = depth.get_device();
@@ -765,7 +770,8 @@ pybind11::dict channel_deterministic_pad_topology_sequences(
     const int64_t total = count * width;
     if (total > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
-        deterministic_pad_topology_sequences_kernel<<<static_cast<int>(launch_blocks(total)), kPathBlockSize, 0, stream>>>(
+        deterministic_pad_topology_sequences_kernel<<<
+            ::channel::launch_blocks(total, kPathBlockSize), kPathBlockSize, 0, stream>>>(
             count,
             width,
             primitive_sequence.size(1),
@@ -798,14 +804,15 @@ pybind11::dict channel_deterministic_pad_topology_sequences(
 
 at::Tensor channel_deterministic_face_anchor_points(at::Tensor vertices, at::Tensor faces) {
     check_vec3_table(vertices, "vertices");
-    check_cuda_tensor(faces, "faces", at::kInt, 2);
+    check_tensor(faces, "faces", at::kInt, 2);
     TORCH_CHECK(faces.size(1) == 3, "faces must have shape (F, 3)");
     TORCH_CHECK(faces.get_device() == vertices.get_device(), "faces must share vertices device");
     const int64_t face_count = faces.size(0);
     auto out = at::empty({face_count, 3}, vertices.options().dtype(at::kFloat));
     if (face_count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(vertices.get_device()).stream();
-        deterministic_face_anchor_points_kernel<<<static_cast<int>(launch_blocks(face_count)), kPathBlockSize, 0, stream>>>(
+        deterministic_face_anchor_points_kernel<<<
+            ::channel::launch_blocks(face_count, kPathBlockSize), kPathBlockSize, 0, stream>>>(
             face_count,
             vertices.data_ptr<float>(),
             faces.data_ptr<int>(),
@@ -837,13 +844,13 @@ pybind11::dict channel_deterministic_reflection_epc_input_batch(
     TORCH_CHECK(
         sequences.scalar_type() == at::kLong || sequences.scalar_type() == at::kInt,
         "sequences must be int64 or int32");
-    check_cuda_tensor(sequence_tx, "sequence_tx", at::kInt, 1);
+    check_tensor(sequence_tx, "sequence_tx", at::kInt, 1);
     const bool shared = sequence_tx.size(0) == 0;
     TORCH_CHECK(
         shared || sequence_tx.size(0) == sequences.size(0),
         "sequence_tx must be empty or match sequences");
-    check_cuda_tensor(candidate_sequence, "candidate_sequence", at::kInt, 1);
-    check_cuda_tensor(candidate_receiver, "candidate_receiver", at::kInt, 1);
+    check_tensor(candidate_sequence, "candidate_sequence", at::kInt, 1);
+    check_tensor(candidate_receiver, "candidate_receiver", at::kInt, 1);
     const bool listed = candidate_sequence.size(0) > 0;
     TORCH_CHECK(
         candidate_receiver.size(0) == candidate_sequence.size(0),
@@ -884,7 +891,7 @@ pybind11::dict channel_deterministic_reflection_epc_input_batch(
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
         auto launch = [&](auto* sequence_data) {
             deterministic_reflection_epc_input_batch_kernel<<<
-                static_cast<int>(launch_blocks(pair_count)),
+                ::channel::launch_blocks(pair_count, kPathBlockSize),
                 kPathBlockSize,
                 0,
                 stream>>>(
@@ -926,7 +933,8 @@ at::Tensor channel_deterministic_normalize_vec3(at::Tensor values, double eps) {
     auto out = at::empty_like(values);
     if (count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(values.get_device()).stream();
-        deterministic_normalize_vec3_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
+        deterministic_normalize_vec3_kernel<<<::channel::launch_blocks(count, kPathBlockSize),
+                                              kPathBlockSize, 0, stream>>>(
             count,
             values.data_ptr<float>(),
             static_cast<float>(eps),
@@ -962,11 +970,11 @@ channel_path_reflection_candidates_cuda(
     at::Tensor rx_positions,
     double frequency_hz) {
     check_vec3_table(vertices, "vertices");
-    check_cuda_tensor(faces, "faces", at::kInt, 2);
+    check_tensor(faces, "faces", at::kInt, 2);
     check_vec3_table(face_normals, "face_normals");
-    check_cuda_tensor(face_gain, "face_gain", at::kFloat, 1);
+    check_tensor(face_gain, "face_gain", at::kFloat, 1);
     check_vec3_table(tx_positions, "tx_positions");
-    check_cuda_tensor(tx_power, "tx_power", at::kFloat, 1);
+    check_tensor(tx_power, "tx_power", at::kFloat, 1);
     check_vec3_table(rx_positions, "rx_positions");
     TORCH_CHECK(faces.size(1) == 3, "faces must have shape (F, 3)");
     TORCH_CHECK(face_normals.size(0) == faces.size(0), "face_normals must match faces");
@@ -998,7 +1006,8 @@ channel_path_reflection_candidates_cuda(
     auto active = at::empty({count}, bool_options);
     if (count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(tx_positions.get_device()).stream();
-        path_reflection_candidates_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
+        path_reflection_candidates_kernel<<<::channel::launch_blocks(count, kPathBlockSize),
+                                            kPathBlockSize, 0, stream>>>(
             count,
             face_count,
             rx_count,
@@ -1009,7 +1018,7 @@ channel_path_reflection_candidates_cuda(
             tx_positions.data_ptr<float>(),
             tx_power.data_ptr<float>(),
             rx_positions.data_ptr<float>(),
-            static_cast<float>(kLightSpeedMetersPerSecond / frequency_hz),
+            static_cast<float>(kSpeedOfLight / frequency_hz),
             valid.data_ptr<bool>(),
             tx_id.data_ptr<int>(),
             rx_id.data_ptr<int>(),
@@ -1064,18 +1073,16 @@ channel_path_reflection_candidates_cuda(
 #include "path_compaction.cuh"
 
 #define channel_neg_kd_phase channel_neg_kd_phase_compaction
-#define kLightSpeedMetersPerSecond kCompactionLightSpeedMetersPerSecond
-#define kPi kCompactionPi
 
 namespace {
 
-constexpr double kLightSpeedMetersPerSecond = 299792458.0;
-constexpr float kPi = 3.14159265358979323846f;
+using channel::kPiF;
+using channel::kSpeedOfLight;
 
 __device__ float channel_neg_kd_phase(float k, float d) {
     // Reduce k*d mod 2*pi in double: the f32 product loses ~k*d*2^-24 of
     // phase, which shifts coherent nulls at mmWave ranges.
-    const double kd = fmod(static_cast<double>(k) * static_cast<double>(d), 6.283185307179586476925287);
+    const double kd = fmod(static_cast<double>(k) * static_cast<double>(d), channel::kTwoPi);
     return -static_cast<float>(kd);
 }
 
@@ -1131,8 +1138,8 @@ __global__ void deterministic_los_topology_compact_kernel(
         const float length = path_length[index];
         const float gain = path_gain[index];
         const float amplitude = sqrtf(fmaxf(gain, 0.0f));
-        const float wavelength = static_cast<float>(kLightSpeedMetersPerSecond) / frequency_hz;
-        const float phase = channel_neg_kd_phase(2.0f * kPi / wavelength, length);
+        const float wavelength = static_cast<float>(kSpeedOfLight) / frequency_hz;
+        const float phase = channel_neg_kd_phase(2.0f * kPiF / wavelength, length);
 
         out_valid[dst] = true;
         out_tx_id[dst] = tx_id[index];
@@ -1215,7 +1222,7 @@ __global__ void deterministic_reflection_topology_compact_kernel(
         out_component_id[dst] = 1;
         out_edge_id[dst] = -1;
         out_path_length[dst] = length;
-        out_delay[dst] = length / 299792458.0f;
+        out_delay[dst] = length / channel::kSpeedOfLightF;
         out_path_gain[dst] = 0.0f;
         out_path_field[dst] = c10::complex<float>(0.0f, 0.0f);
         for (int axis = 0; axis < 3; ++axis) {
@@ -1444,7 +1451,7 @@ __global__ void deterministic_diffraction_topology_compact_kernel(
         out_component_id[dst] = 2;
         out_primitive_id[dst] = -1;
         out_edge_id[dst] = edge_id[index];
-        out_path_length[dst] = row_delay * 299792458.0f;
+        out_path_length[dst] = row_delay * channel::kSpeedOfLightF;
         out_delay[dst] = row_delay;
         out_path_gain[dst] = 0.0f;
         out_path_field[dst] = c10::complex<float>(0.0f, 0.0f);
@@ -1470,12 +1477,12 @@ pybind11::dict channel_deterministic_los_topology_block(
     at::Tensor visible,
     double frequency_hz,
     int64_t sequence_width) {
-    check_cuda_tensor(tx_id, "tx_id", at::kInt, 1);
-    check_cuda_tensor(rx_id, "rx_id", at::kInt, 1);
-    check_cuda_tensor(path_length, "path_length_m", at::kFloat, 1);
-    check_cuda_tensor(delay, "delay_s", at::kFloat, 1);
-    check_cuda_tensor(path_gain, "path_gain", at::kFloat, 1);
-    check_cuda_tensor(visible, "visible", at::kBool, 1);
+    check_tensor(tx_id, "tx_id", at::kInt, 1);
+    check_tensor(rx_id, "rx_id", at::kInt, 1);
+    check_tensor(path_length, "path_length_m", at::kFloat, 1);
+    check_tensor(delay, "delay_s", at::kFloat, 1);
+    check_tensor(path_gain, "path_gain", at::kFloat, 1);
+    check_tensor(visible, "visible", at::kBool, 1);
     TORCH_CHECK(frequency_hz > 0.0, "frequency_hz must be positive");
     TORCH_CHECK(sequence_width >= 0, "sequence_width must be non-negative");
     const int64_t count = tx_id.size(0);
@@ -1498,7 +1505,8 @@ pybind11::dict channel_deterministic_los_topology_block(
     auto flags = at::empty({count}, int_options);
     auto offsets = at::empty({count + 1}, int_options);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
-    path_visibility_flags_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
+    path_visibility_flags_kernel<<<::channel::launch_blocks(count, kPathBlockSize),
+                                   kPathBlockSize, 0, stream>>>(
         count,
         visible.data_ptr<bool>(),
         flags.data_ptr<int>());
@@ -1533,7 +1541,8 @@ pybind11::dict channel_deterministic_los_topology_block(
     auto out_material_sequence = at::empty({out_count, sequence_width}, int_options);
     auto out_interaction_positions = at::empty({out_count, sequence_width, 3}, float_options);
     auto out_interaction_normals = at::empty({out_count, sequence_width, 3}, float_options);
-    deterministic_los_topology_compact_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
+    deterministic_los_topology_compact_kernel<<<::channel::launch_blocks(count, kPathBlockSize),
+                                                kPathBlockSize, 0, stream>>>(
         count,
         flags.data_ptr<int>(),
         offsets.data_ptr<int>(),
@@ -1590,16 +1599,16 @@ static void check_reflection_compact_tensors(
     const at::Tensor& rx_indices, const at::Tensor& tx, const at::Tensor& rx_positions,
     const at::Tensor& tx_power, const at::Tensor& face_eps_r, const at::Tensor& face_sigma_e,
     const at::Tensor& face_mu_r, const at::Tensor& face_gain, const at::Tensor& face_material_id) {
-    check_cuda_tensor(rx_indices, "rx_indices", at::kInt, 1);
-    check_cuda_tensor(tx, "tx", at::kFloat, 1);
+    check_tensor(rx_indices, "rx_indices", at::kInt, 1);
+    check_tensor(tx, "tx", at::kFloat, 1);
     TORCH_CHECK(tx.size(0) == 3, "tx must have shape (3,)");
     check_vec3_table(rx_positions, "rx_positions");
-    check_cuda_tensor(tx_power, "tx_power", at::kFloat, 1);
-    check_cuda_tensor(face_eps_r, "face_eps_r", at::kFloat, 1);
-    check_cuda_tensor(face_sigma_e, "face_sigma_e", at::kFloat, 1);
-    check_cuda_tensor(face_mu_r, "face_mu_r", at::kFloat, 1);
-    check_cuda_tensor(face_gain, "face_gain", at::kFloat, 1);
-    check_cuda_tensor(face_material_id, "face_material_id", at::kInt, 1);
+    check_tensor(tx_power, "tx_power", at::kFloat, 1);
+    check_tensor(face_eps_r, "face_eps_r", at::kFloat, 1);
+    check_tensor(face_sigma_e, "face_sigma_e", at::kFloat, 1);
+    check_tensor(face_mu_r, "face_mu_r", at::kFloat, 1);
+    check_tensor(face_gain, "face_gain", at::kFloat, 1);
+    check_tensor(face_material_id, "face_material_id", at::kInt, 1);
 }
 
 static void check_reflection_compact_shapes(
@@ -1637,18 +1646,18 @@ pybind11::dict channel_deterministic_reflection_topology_compact(
     at::Tensor visible, at::Tensor epc_sequences, at::Tensor epc_hits, at::Tensor epc_normals,
     at::Tensor epc_path_length, at::Tensor tx_indices, at::Tensor rx_indices,
     at::Tensor face_material_id) {
-    check_cuda_tensor(visible, "visible", at::kBool, 1);
+    check_tensor(visible, "visible", at::kBool, 1);
     TORCH_CHECK(epc_sequences.is_cuda(), "epc_sequences must be a CUDA tensor");
     TORCH_CHECK(epc_sequences.is_contiguous(), "epc_sequences must be contiguous");
     TORCH_CHECK(epc_sequences.dim() == 2, "epc_sequences must have shape (N, depth)");
     TORCH_CHECK(epc_sequences.scalar_type() == at::kInt || epc_sequences.scalar_type() == at::kLong,
                 "epc_sequences must be int32 or int64");
-    check_cuda_tensor(epc_hits, "epc_hits", at::kFloat, 3);
-    check_cuda_tensor(epc_normals, "epc_normals", at::kFloat, 3);
-    check_cuda_tensor(epc_path_length, "epc_path_length", at::kFloat, 1);
-    check_cuda_tensor(tx_indices, "tx_indices", at::kInt, 1);
-    check_cuda_tensor(rx_indices, "rx_indices", at::kInt, 1);
-    check_cuda_tensor(face_material_id, "face_material_id", at::kInt, 1);
+    check_tensor(epc_hits, "epc_hits", at::kFloat, 3);
+    check_tensor(epc_normals, "epc_normals", at::kFloat, 3);
+    check_tensor(epc_path_length, "epc_path_length", at::kFloat, 1);
+    check_tensor(tx_indices, "tx_indices", at::kInt, 1);
+    check_tensor(rx_indices, "rx_indices", at::kInt, 1);
+    check_tensor(face_material_id, "face_material_id", at::kInt, 1);
     const int64_t count = visible.size(0);
     const int64_t depth = epc_sequences.size(1);
     TORCH_CHECK(depth > 0, "epc_sequences must have positive depth");
@@ -1699,7 +1708,8 @@ pybind11::dict channel_deterministic_reflection_topology_compact(
     auto flags = at::empty({count}, int_options);
     auto offsets = at::empty({count + 1}, int_options);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
-    path_visibility_flags_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
+    path_visibility_flags_kernel<<<::channel::launch_blocks(count, kPathBlockSize),
+                                   kPathBlockSize, 0, stream>>>(
         count,
         visible.data_ptr<bool>(),
         flags.data_ptr<int>());
@@ -1713,7 +1723,7 @@ pybind11::dict channel_deterministic_reflection_topology_compact(
     auto tensor = [&](const char* name) { return pybind11::cast<at::Tensor>(out[name]); };
     auto launch = [&](auto* sequence_data) {
         deterministic_reflection_topology_compact_kernel<<<
-            static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
+            ::channel::launch_blocks(count, kPathBlockSize), kPathBlockSize, 0, stream>>>(
             count,
             depth,
             flags.data_ptr<int>(),
@@ -1759,15 +1769,15 @@ pybind11::dict channel_deterministic_reflection_order1_compact(
     at::Tensor sequence_batch, at::Tensor rx_indices, at::Tensor tx, at::Tensor rx_positions,
     at::Tensor tx_power, int64_t tx_index, at::Tensor face_eps_r, at::Tensor face_sigma_e,
     at::Tensor face_mu_r, at::Tensor face_gain, at::Tensor face_material_id, bool grouped_export) {
-    check_cuda_tensor(visible, "visible", at::kBool, 1);
+    check_tensor(visible, "visible", at::kBool, 1);
     TORCH_CHECK(epc_faces.is_cuda(), "epc_faces must be a CUDA tensor");
     TORCH_CHECK(epc_faces.is_contiguous(), "epc_faces must be contiguous");
     TORCH_CHECK(epc_faces.dim() == 2, "epc_faces must have shape (N, depth)");
     TORCH_CHECK(epc_faces.scalar_type() == at::kInt || epc_faces.scalar_type() == at::kLong,
                 "epc_faces must be int32 or int64");
-    check_cuda_tensor(epc_hits, "epc_hits", at::kFloat, 3);
-    check_cuda_tensor(epc_normals, "epc_normals", at::kFloat, 3);
-    check_cuda_tensor(sequence_batch, "sequence_batch", at::kInt, 2);
+    check_tensor(epc_hits, "epc_hits", at::kFloat, 3);
+    check_tensor(epc_normals, "epc_normals", at::kFloat, 3);
+    check_tensor(sequence_batch, "sequence_batch", at::kInt, 2);
     check_reflection_compact_tensors(rx_indices, tx, rx_positions, tx_power, face_eps_r,
                                      face_sigma_e, face_mu_r, face_gain, face_material_id);
     const int64_t count = visible.size(0);
@@ -1814,7 +1824,8 @@ pybind11::dict channel_deterministic_reflection_order1_compact(
     auto flags = at::empty({count}, int_options);
     auto offsets = at::empty({count + 1}, int_options);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
-    path_visibility_flags_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
+    path_visibility_flags_kernel<<<::channel::launch_blocks(count, kPathBlockSize),
+                                   kPathBlockSize, 0, stream>>>(
         count,
         visible.data_ptr<bool>(),
         flags.data_ptr<int>());
@@ -1842,7 +1853,7 @@ pybind11::dict channel_deterministic_reflection_order1_compact(
 
     if (epc_faces.scalar_type() == at::kLong) {
         deterministic_reflection_order1_compact_kernel<int64_t><<<
-            static_cast<int>(launch_blocks(count)),
+            ::channel::launch_blocks(count, kPathBlockSize),
             kPathBlockSize,
             0,
             stream>>>(
@@ -1881,7 +1892,7 @@ pybind11::dict channel_deterministic_reflection_order1_compact(
             pybind11::cast<at::Tensor>(out["material_id"]).data_ptr<int>());
     } else {
         deterministic_reflection_order1_compact_kernel<int><<<
-            static_cast<int>(launch_blocks(count)),
+            ::channel::launch_blocks(count, kPathBlockSize),
             kPathBlockSize,
             0,
             stream>>>(
@@ -1928,14 +1939,14 @@ pybind11::dict channel_deterministic_reflection_sequence_compact(
     at::Tensor rx_indices, at::Tensor tx, at::Tensor rx_positions, at::Tensor tx_power,
     int64_t tx_index, at::Tensor face_eps_r, at::Tensor face_sigma_e, at::Tensor face_mu_r,
     at::Tensor face_gain, at::Tensor face_material_id, int64_t max_count) {
-    check_cuda_tensor(visible, "visible", at::kBool, 1);
+    check_tensor(visible, "visible", at::kBool, 1);
     TORCH_CHECK(epc_sequences.is_cuda(), "epc_sequences must be a CUDA tensor");
     TORCH_CHECK(epc_sequences.is_contiguous(), "epc_sequences must be contiguous");
     TORCH_CHECK(epc_sequences.dim() == 2, "epc_sequences must have shape (N, depth)");
     TORCH_CHECK(epc_sequences.scalar_type() == at::kInt || epc_sequences.scalar_type() == at::kLong,
                 "epc_sequences must be int32 or int64");
-    check_cuda_tensor(epc_hits, "epc_hits", at::kFloat, 3);
-    check_cuda_tensor(epc_normals, "epc_normals", at::kFloat, 3);
+    check_tensor(epc_hits, "epc_hits", at::kFloat, 3);
+    check_tensor(epc_normals, "epc_normals", at::kFloat, 3);
     check_reflection_compact_tensors(rx_indices, tx, rx_positions, tx_power, face_eps_r,
                                      face_sigma_e, face_mu_r, face_gain, face_material_id);
     TORCH_CHECK(max_count >= -1, "max_count must be -1 or non-negative");
@@ -1985,7 +1996,8 @@ pybind11::dict channel_deterministic_reflection_sequence_compact(
     auto flags = at::empty({count}, int_options);
     auto offsets = at::empty({count + 1}, int_options);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
-    path_visibility_flags_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
+    path_visibility_flags_kernel<<<::channel::launch_blocks(count, kPathBlockSize),
+                                   kPathBlockSize, 0, stream>>>(
         count,
         visible.data_ptr<bool>(),
         flags.data_ptr<int>());
@@ -2018,7 +2030,7 @@ pybind11::dict channel_deterministic_reflection_sequence_compact(
 
     if (epc_sequences.scalar_type() == at::kLong) {
         deterministic_reflection_sequence_compact_kernel<int64_t><<<
-            static_cast<int>(launch_blocks(count)),
+            ::channel::launch_blocks(count, kPathBlockSize),
             kPathBlockSize,
             0,
             stream>>>(
@@ -2058,7 +2070,7 @@ pybind11::dict channel_deterministic_reflection_sequence_compact(
             pybind11::cast<at::Tensor>(out["first_normal"]).data_ptr<float>());
     } else {
         deterministic_reflection_sequence_compact_kernel<int><<<
-            static_cast<int>(launch_blocks(count)),
+            ::channel::launch_blocks(count, kPathBlockSize),
             kPathBlockSize,
             0,
             stream>>>(
@@ -2105,19 +2117,19 @@ pybind11::dict channel_deterministic_diffraction_topology_compact(
     at::Tensor valid, at::Tensor tx_id, at::Tensor rx_id, int64_t rx_offset, at::Tensor depth,
     at::Tensor edge_id, at::Tensor delay, at::Tensor x_re, at::Tensor x_im, at::Tensor y_re,
     at::Tensor y_im, at::Tensor z_re, at::Tensor z_im, at::Tensor interaction_position) {
-    check_cuda_tensor(valid, "valid", at::kBool, 1);
+    check_tensor(valid, "valid", at::kBool, 1);
     const int64_t count = valid.size(0);
     const std::pair<const char*, const at::Tensor*> int_inputs[] = {
         {"tx_id", &tx_id}, {"rx_id", &rx_id}, {"depth", &depth}, {"edge_id", &edge_id}};
     for (const auto& item : int_inputs) {
-        check_cuda_tensor(*item.second, item.first, at::kInt, 1);
+        check_tensor(*item.second, item.first, at::kInt, 1);
         TORCH_CHECK(item.second->size(0) == count, item.first, " must match valid");
     }
     const std::pair<const char*, const at::Tensor*> float_inputs[] = {
         {"delay_s", &delay}, {"x_re", &x_re}, {"x_im", &x_im}, {"y_re", &y_re},
         {"y_im", &y_im}, {"z_re", &z_re}, {"z_im", &z_im}};
     for (const auto& item : float_inputs) {
-        check_cuda_tensor(*item.second, item.first, at::kFloat, 1);
+        check_tensor(*item.second, item.first, at::kFloat, 1);
         TORCH_CHECK(item.second->size(0) == count, item.first, " must match valid");
     }
     check_vec3_table(interaction_position, "interaction_position");
@@ -2157,7 +2169,8 @@ pybind11::dict channel_deterministic_diffraction_topology_compact(
     auto flags = at::empty({count}, int_options);
     auto offsets = at::empty({count + 1}, int_options);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
-    path_visibility_flags_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
+    path_visibility_flags_kernel<<<::channel::launch_blocks(count, kPathBlockSize),
+                                   kPathBlockSize, 0, stream>>>(
         count,
         valid.data_ptr<bool>(),
         flags.data_ptr<int>());
@@ -2170,7 +2183,7 @@ pybind11::dict channel_deterministic_diffraction_topology_compact(
     }
     auto tensor = [&](const char* name) { return pybind11::cast<at::Tensor>(out[name]); };
     deterministic_diffraction_topology_compact_kernel<<<
-        static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
+        ::channel::launch_blocks(count, kPathBlockSize), kPathBlockSize, 0, stream>>>(
         count,
         static_cast<int>(rx_offset),
         flags.data_ptr<int>(),
@@ -2207,8 +2220,6 @@ pybind11::dict channel_deterministic_diffraction_topology_compact(
 }
 
 #undef channel_neg_kd_phase
-#undef kLightSpeedMetersPerSecond
-#undef kPi
 
 // ==== Section: Deterministic topology ====
 #include <ATen/cuda/CUDAContext.h>
@@ -2426,7 +2437,7 @@ void check_topology_concat_schema(
     check_optional_field_presence(block, "path_field", has_path_field);
     if (has_path_field) {
         at::Tensor path_field = block_tensor(block, "path_field");
-        check_cuda_tensor(path_field, "path_field", at::kComplexFloat, 1);
+        check_tensor(path_field, "path_field", at::kComplexFloat, 1);
         TORCH_CHECK(path_field.size(0) == count, "path_field must match valid");
         TORCH_CHECK(path_field.get_device() == device, "path_field must share valid device");
     }
@@ -2434,7 +2445,7 @@ void check_topology_concat_schema(
     check_optional_field_presence(block, "field_xyz", has_field_xyz);
     if (has_field_xyz) {
         at::Tensor field_xyz = block_tensor(block, "field_xyz");
-        check_cuda_tensor(field_xyz, "field_xyz", at::kComplexFloat, 2);
+        check_tensor(field_xyz, "field_xyz", at::kComplexFloat, 2);
         TORCH_CHECK(field_xyz.size(0) == count && field_xyz.size(1) == 3,
                     "field_xyz must have shape (N, 3)");
         TORCH_CHECK(field_xyz.get_device() == device, "field_xyz must share valid device");
@@ -2443,7 +2454,7 @@ void check_topology_concat_schema(
     check_optional_field_presence(block, "coefficient", has_coefficient);
     if (has_coefficient) {
         at::Tensor coefficient = block_tensor(block, "coefficient");
-        check_cuda_tensor(coefficient, "coefficient", at::kComplexFloat, 1);
+        check_tensor(coefficient, "coefficient", at::kComplexFloat, 1);
         TORCH_CHECK(coefficient.size(0) == count, "coefficient must match valid");
         TORCH_CHECK(coefficient.get_device() == device, "coefficient must share valid device");
     }
@@ -2467,7 +2478,7 @@ void check_topology_concat_schema(
     check_optional_field_presence(block, "material_id", has_material_id);
     if (has_material_id) {
         at::Tensor material_id = block_tensor(block, "material_id");
-        check_cuda_tensor(material_id, "material_id", at::kInt, 1);
+        check_tensor(material_id, "material_id", at::kInt, 1);
         TORCH_CHECK(material_id.size(0) == count, "material_id must match valid");
         TORCH_CHECK(material_id.get_device() == device, "material_id must share valid device");
     }
@@ -2475,7 +2486,7 @@ void check_topology_concat_schema(
     check_optional_field_presence(block, "primitive_sequence", has_primitive_sequence);
     if (has_primitive_sequence) {
         at::Tensor primitive_sequence = block_tensor(block, "primitive_sequence");
-        check_cuda_tensor(primitive_sequence, "primitive_sequence", at::kInt, 2);
+        check_tensor(primitive_sequence, "primitive_sequence", at::kInt, 2);
         TORCH_CHECK(primitive_sequence.size(0) == count, "primitive_sequence must match valid");
         TORCH_CHECK(primitive_sequence.size(1) == sequence_width, "primitive_sequence has wrong width");
         TORCH_CHECK(primitive_sequence.get_device() == device, "primitive_sequence must share valid device");
@@ -2484,7 +2495,7 @@ void check_topology_concat_schema(
     check_optional_field_presence(block, "material_sequence", has_material_sequence);
     if (has_material_sequence) {
         at::Tensor material_sequence = block_tensor(block, "material_sequence");
-        check_cuda_tensor(material_sequence, "material_sequence", at::kInt, 2);
+        check_tensor(material_sequence, "material_sequence", at::kInt, 2);
         TORCH_CHECK(material_sequence.size(0) == count, "material_sequence must match valid");
         TORCH_CHECK(material_sequence.size(1) == sequence_width, "material_sequence has wrong width");
         TORCH_CHECK(material_sequence.get_device() == device, "material_sequence must share valid device");
@@ -2493,7 +2504,7 @@ void check_topology_concat_schema(
     check_optional_field_presence(block, "interaction_positions", has_interaction_positions);
     if (has_interaction_positions) {
         at::Tensor interaction_positions = block_tensor(block, "interaction_positions");
-        check_cuda_tensor(interaction_positions, "interaction_positions", at::kFloat, 3);
+        check_tensor(interaction_positions, "interaction_positions", at::kFloat, 3);
         TORCH_CHECK(interaction_positions.size(0) == count, "interaction_positions must match valid");
         TORCH_CHECK(interaction_positions.size(1) == sequence_width, "interaction_positions has wrong width");
         TORCH_CHECK(interaction_positions.size(2) == 3, "interaction_positions must have vec3 rows");
@@ -2503,7 +2514,7 @@ void check_topology_concat_schema(
     check_optional_field_presence(block, "interaction_normals", has_interaction_normals);
     if (has_interaction_normals) {
         at::Tensor interaction_normals = block_tensor(block, "interaction_normals");
-        check_cuda_tensor(interaction_normals, "interaction_normals", at::kFloat, 3);
+        check_tensor(interaction_normals, "interaction_normals", at::kFloat, 3);
         TORCH_CHECK(interaction_normals.size(0) == count, "interaction_normals must match valid");
         TORCH_CHECK(interaction_normals.size(1) == sequence_width, "interaction_normals has wrong width");
         TORCH_CHECK(interaction_normals.size(2) == 3, "interaction_normals must have vec3 rows");
@@ -2560,7 +2571,9 @@ void gather_tensor_rows(
     if (out_count == 0 || row_stride == 0) {
         return;
     }
-    deterministic_gather_rows_kernel<scalar_t><<<static_cast<int>(launch_blocks(out_count * row_stride)), kPathBlockSize, 0, stream>>>(
+    deterministic_gather_rows_kernel<scalar_t><<<
+        ::channel::launch_blocks(out_count * row_stride, kPathBlockSize),
+        kPathBlockSize, 0, stream>>>(
         out_count,
         row_stride,
         order.data_ptr<int64_t>(),
@@ -2759,7 +2772,7 @@ pybind11::dict channel_deterministic_gather_topology_block(
         has_material_sequence,
         has_interaction_positions,
         has_interaction_normals);
-    check_cuda_tensor(order, "order", at::kLong, 1);
+    check_tensor(order, "order", at::kLong, 1);
 
     at::Tensor valid = block_tensor(block, "valid");
     TORCH_CHECK(order.get_device() == valid.get_device(), "order must share topology block device");
@@ -2864,7 +2877,7 @@ pybind11::dict channel_deterministic_face_groups(
     double quantization) {
     check_vec3_table(tri_a, "tri_a");
     check_vec3_table(normals, "normals");
-    check_cuda_tensor(surface_ids, "surface_ids", at::kLong, 1);
+    check_tensor(surface_ids, "surface_ids", at::kLong, 1);
     TORCH_CHECK(normals.sizes() == tri_a.sizes(), "normals must match tri_a");
     TORCH_CHECK(surface_ids.size(0) == tri_a.size(0), "surface_ids must match tri_a");
     TORCH_CHECK(normals.get_device() == tri_a.get_device(), "normals must share tri_a device");
@@ -2890,7 +2903,8 @@ pybind11::dict channel_deterministic_face_groups(
     auto key_matrix = at::empty({face_count, kFaceGroupKeyWidth}, long_options);
     auto order = at::empty({face_count}, long_options);
     auto sort_keys = at::empty({face_count}, long_options);
-    deterministic_face_group_keys_kernel<<<static_cast<int>(launch_blocks(face_count)), kPathBlockSize, 0, stream>>>(
+    deterministic_face_group_keys_kernel<<<::channel::launch_blocks(face_count, kPathBlockSize),
+                                           kPathBlockSize, 0, stream>>>(
         face_count,
         tri_a.data_ptr<float>(),
         normals.data_ptr<float>(),
@@ -2898,13 +2912,15 @@ pybind11::dict channel_deterministic_face_groups(
         static_cast<float>(1.0 / quantization),
         key_matrix.data_ptr<int64_t>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
-    deterministic_order_init_kernel<<<static_cast<int>(launch_blocks(face_count)), kPathBlockSize, 0, stream>>>(
+    deterministic_order_init_kernel<<<::channel::launch_blocks(face_count, kPathBlockSize),
+                                      kPathBlockSize, 0, stream>>>(
         face_count,
         order.data_ptr<int64_t>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     for (int64_t column = kFaceGroupKeyWidth - 1; column >= 0; --column) {
-        deterministic_face_group_sort_key_kernel<<<static_cast<int>(launch_blocks(face_count)), kPathBlockSize, 0, stream>>>(
+        deterministic_face_group_sort_key_kernel<<<
+            ::channel::launch_blocks(face_count, kPathBlockSize), kPathBlockSize, 0, stream>>>(
             face_count,
             column,
             key_matrix.data_ptr<int64_t>(),
@@ -2920,7 +2936,8 @@ pybind11::dict channel_deterministic_face_groups(
 
     auto flags = at::empty({face_count}, int_options);
     auto group_offsets = at::empty({face_count + 1}, int_options);
-    deterministic_face_group_flags_kernel<<<static_cast<int>(launch_blocks(face_count)), kPathBlockSize, 0, stream>>>(
+    deterministic_face_group_flags_kernel<<<::channel::launch_blocks(face_count, kPathBlockSize),
+                                            kPathBlockSize, 0, stream>>>(
         face_count,
         key_matrix.data_ptr<int64_t>(),
         order.data_ptr<int64_t>(),
@@ -2949,7 +2966,8 @@ pybind11::dict channel_deterministic_face_groups(
     auto representative_faces = at::empty({group_count}, long_options);
     auto surface_group_size = at::empty({group_count}, int_options);
     C10_CUDA_CHECK(cudaMemsetAsync(surface_group_size.data_ptr<int>(), 0, group_count * sizeof(int), stream));
-    deterministic_face_group_assign_kernel<<<static_cast<int>(launch_blocks(face_count)), kPathBlockSize, 0, stream>>>(
+    deterministic_face_group_assign_kernel<<<::channel::launch_blocks(face_count, kPathBlockSize),
+                                             kPathBlockSize, 0, stream>>>(
         face_count,
         order.data_ptr<int64_t>(),
         flags.data_ptr<int>(),
@@ -2980,7 +2998,8 @@ pybind11::dict channel_deterministic_face_groups(
         0xff,
         surface_group_members.numel() * sizeof(int),
         stream));
-    deterministic_face_group_members_kernel<<<static_cast<int>(launch_blocks(face_count)), kPathBlockSize, 0, stream>>>(
+    deterministic_face_group_members_kernel<<<::channel::launch_blocks(face_count, kPathBlockSize),
+                                              kPathBlockSize, 0, stream>>>(
         face_count,
         max_group_size,
         order.data_ptr<int64_t>(),
@@ -3114,7 +3133,8 @@ __global__ void path_pack_padded_kernel(
         out_a[slot] = coefficient[row];
         out_tau[slot] = delay[row];
         out_valid[slot] = true;
-        const bool diffraction_row = component_id[row] == 2 && row_depth > 0;
+        const bool diffraction_row =
+            component_id[row] == channel::kComponentDiffraction && row_depth > 0;
         for (int64_t k = 0; k < depth_width; ++k) {
             const int64_t at = slot * depth_width + k;
             const int64_t source = row * depth_width + k;
@@ -3157,29 +3177,29 @@ std::vector<at::Tensor> channel_path_pack_padded_cuda(
                                                                    {&depth, "depth"},
                                                                    {&component_id, "component_id"},
                                                                    {&edge_id, "edge_id"}}}) {
-        check_cuda_tensor(*value, name, at::kInt, 1);
+        check_tensor(*value, name, at::kInt, 1);
         TORCH_CHECK(value->size(0) == row_count, name, " must have one entry per row");
     }
     for (const auto& [value, name] : std::array<std::pair<const at::Tensor*, const char*>, 3>{
              {{&interaction_type, "interaction_type"},
               {&primitive_sequence, "primitive_sequence"},
               {&material_sequence, "material_sequence"}}}) {
-        check_cuda_tensor(*value, name, at::kInt, 2);
+        check_tensor(*value, name, at::kInt, 2);
         TORCH_CHECK(value->size(0) == row_count && value->size(1) == depth_width, name,
                     " must have shape (row, depth)");
     }
     for (const auto& [value, name] : std::array<std::pair<const at::Tensor*, const char*>, 2>{
              {{&positions, "interaction_positions"}, {&normals, "interaction_normals"}}}) {
-        check_cuda_tensor(*value, name, at::kFloat, 3);
+        check_tensor(*value, name, at::kFloat, 3);
         TORCH_CHECK(value->size(0) == row_count && value->size(1) == depth_width &&
                         value->size(2) == 3,
                     name, " must have shape (row, depth, 3)");
     }
-    check_cuda_tensor(coefficient, "coefficient", at::kComplexFloat, 1);
-    check_cuda_tensor(delay, "delay_s", at::kFloat, 1);
-    check_cuda_tensor(field_xyz, "field_xyz", at::kComplexFloat, 2);
-    check_cuda_tensor(field_direction, "field_direction", at::kFloat, 2);
-    check_cuda_tensor(pair_offsets, "pair_offsets", at::kLong, 1);
+    check_tensor(coefficient, "coefficient", at::kComplexFloat, 1);
+    check_tensor(delay, "delay_s", at::kFloat, 1);
+    check_tensor(field_xyz, "field_xyz", at::kComplexFloat, 2);
+    check_tensor(field_direction, "field_direction", at::kFloat, 2);
+    check_tensor(pair_offsets, "pair_offsets", at::kLong, 1);
     TORCH_CHECK(coefficient.size(0) == row_count && delay.size(0) == row_count,
                 "row fields must match row count");
     TORCH_CHECK(field_xyz.size(0) == row_count && field_xyz.size(1) == 3 &&
@@ -3197,7 +3217,8 @@ std::vector<at::Tensor> channel_path_pack_padded_cuda(
                                    first_row.numel() * sizeof(int64_t), stream));
     C10_CUDA_CHECK(cudaMemsetAsync(max_count.data_ptr<int64_t>(), 0, sizeof(int64_t), stream));
     if (row_count > 0) {
-        path_pack_first_row_kernel<<<static_cast<int>(launch_blocks(row_count)), kPathBlockSize, 0,
+        path_pack_first_row_kernel<<<::channel::launch_blocks(row_count, kPathBlockSize),
+                                     kPathBlockSize, 0,
                                      stream>>>(
             row_count, num_tx, tx_id.data_ptr<int>(), rx_id.data_ptr<int>(),
             pair_offsets.data_ptr<int64_t>(),
@@ -3235,7 +3256,8 @@ std::vector<at::Tensor> channel_path_pack_padded_cuda(
     auto out_field_direction = at::empty({slot_count, 3}, float_options);
     auto out_num_paths = channel::empty_zero_cuda({pair_count}, int_options, stream);
     if (slot_count > 0) {
-        path_pack_padded_kernel<<<static_cast<int>(launch_blocks(slot_count)), kPathBlockSize, 0,
+        path_pack_padded_kernel<<<::channel::launch_blocks(slot_count, kPathBlockSize),
+                                  kPathBlockSize, 0,
                                   stream>>>(
             slot_count, width, depth_width, num_tx,
             reinterpret_cast<const unsigned long long*>(first_row.data_ptr<int64_t>()),

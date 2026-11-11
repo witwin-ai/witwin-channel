@@ -24,10 +24,13 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 import difflib
 import functools
+import importlib
+import importlib.util
 import json
 from pathlib import Path
 import re
 import sys
+from types import ModuleType
 from typing import Any
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -52,6 +55,9 @@ _FORBIDDEN_NAME = re.compile(r"(?:^|_)(?:v\d+|w[i]p)(?:_|$)", re.IGNORECASE)
 # Symbols dispatched from more than one module. The list may only shrink, and an entry that
 # becomes single-owner or disappears fails the check so it is removed here in the same change.
 KNOWN_SPLIT_OWNER_SYMBOLS = frozenset({"bdpt_accumulate_connection_samples"})
+# ``NativeOps.op`` declares one native operation's ABI argument list (witwin/channel/kernels/spec.py).
+SPEC_DECLARATION = "op"
+SPEC_RESOLVER = "NativeOps"
 
 
 def _module_name(path: Path, package_root: Path) -> str:
@@ -86,11 +92,42 @@ class PackageIndex:
         return context
 
 
+def _spec_symbol(node: ast.AST, symbols: frozenset[str]) -> str | None:
+    """The symbol of a native-op declaration ``<ops>.op("symbol", ...)``, else None."""
+
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == SPEC_DECLARATION
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and node.args[0].value in symbols
+    ):
+        return str(node.args[0].value)
+    return None
+
+
+def spec_declarations(tree: ast.Module, symbols: frozenset[str]) -> dict[str, str]:
+    """Module-level ``NAME = <ops>.op("symbol", ...)`` declarations, as name -> symbol."""
+
+    declared: dict[str, str] = {}
+    for statement in tree.body:
+        if isinstance(statement, ast.Assign) and len(statement.targets) == 1:
+            target = statement.targets[0]
+            symbol = _spec_symbol(statement.value, symbols)
+            if symbol is not None and isinstance(target, ast.Name):
+                declared[target.id] = symbol
+    return declared
+
+
 class _Indexer(ast.NodeVisitor):
-    def __init__(self, index: PackageIndex, module: str, dynamic_dispatch: bool) -> None:
+    def __init__(
+        self, index: PackageIndex, module: str, dynamic_dispatch: bool, specs: dict[str, str],
+    ) -> None:
         self.index = index
         self.module = module
         self.dynamic_dispatch = dynamic_dispatch
+        self.specs = specs
         self.stack: list[str] = []
         self.aliases: dict[str, str] = {}
 
@@ -131,6 +168,12 @@ class _Indexer(ast.NodeVisitor):
                 self.aliases[alias.asname] = alias.name
 
     def visit_Call(self, node: ast.Call) -> None:  # noqa: N802
+        if _spec_symbol(node, self.index.symbols) is not None:
+            # A declaration names its symbol and composes other declarations' argument lists;
+            # neither dispatches. The definitions that reference the declaration dispatch.
+            for argument in node.args[1:]:
+                self._visit_declaration_argument(argument)
+            return
         name = _call_name(node.func)
         if name in DISPATCH_CALLS:
             for argument in node.args:
@@ -152,15 +195,34 @@ class _Indexer(ast.NodeVisitor):
 
     def visit_Attribute(self, node: ast.Attribute) -> None:  # noqa: N802
         self.index.loads[node.attr].add(self._context())
+        if isinstance(node.value, ast.Name) and node.value.id in self.specs:
+            # Reading a declaration's names or checks does not dispatch it.
+            self.index.loads[node.value.id].add(self._context())
+            return
         self.generic_visit(node)
 
     def visit_Name(self, node: ast.Name) -> None:  # noqa: N802
         self.index.loads[self.aliases.get(node.id, node.id)].add(self._context())
+        if node.id in self.specs and isinstance(node.ctx, ast.Load):
+            self.index.sites[self.specs[node.id]].add(self._context())
+
+    def _visit_declaration_argument(self, node: ast.AST) -> None:
+        for child in ast.walk(node):
+            if isinstance(child, ast.Name) and child.id not in self.specs:
+                self.index.loads[self.aliases.get(child.id, child.id)].add(self._context())
 
 
 def _has_dynamic_dispatch(tree: ast.AST) -> bool:
+    # The resolver handed to ``NativeOps`` looks a declared symbol up; it is not a dynamic site.
+    resolvers = {
+        id(inner)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and _call_name(node.func) == SPEC_RESOLVER
+        for inner in ast.walk(node)
+    }
     return any(
         isinstance(node, ast.Call)
+        and id(node) not in resolvers
         and _call_name(node.func) in DISPATCH_CALLS
         and bool(node.args)
         and not isinstance(node.args[0], ast.Constant)
@@ -173,7 +235,10 @@ def index_package(repo: Path, symbols: frozenset[str]) -> PackageIndex:
     package_root = repo / PACKAGE_PATH
     for path in sorted(package_root.rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
-        _Indexer(index, _module_name(path, package_root), _has_dynamic_dispatch(tree)).visit(tree)
+        _Indexer(
+            index, _module_name(path, package_root), _has_dynamic_dispatch(tree),
+            spec_declarations(tree, symbols),
+        ).visit(tree)
     return index
 
 
@@ -290,6 +355,54 @@ def render_manifest(manifest: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _load_module(repo: Path, path: Path, module_name: str) -> ModuleType:
+    """Import a repository module; a module of another tree is executed from its file."""
+
+    if repo == REPOSITORY_ROOT:
+        return importlib.import_module(module_name)
+    loader_spec = importlib.util.spec_from_file_location(f"_binding_check.{module_name}", path)
+    if loader_spec is None or loader_spec.loader is None:
+        raise ImportError(f"cannot load {path}")
+    module = importlib.util.module_from_spec(loader_spec)
+    loader_spec.loader.exec_module(module)
+    return module
+
+
+def spec_problems(repo: Path) -> list[str]:
+    """Check every native-op declaration against the C++ entry point it dispatches to.
+
+    The declared argument names and their order must equal the C++ parameter names, so a facade
+    that forwards in declaration order cannot swap two same-typed arguments unnoticed.
+    """
+
+    raw, _index = _parsed(repo)
+    symbols = frozenset(str(entry["name"]) for entry in raw["symbols"])
+    parameters = {
+        str(entry["name"]): [str(parameter["name"]) for parameter in entry["parameters"]]
+        for entry in raw["symbols"]
+    }
+    package_root = repo / PACKAGE_PATH
+    problems: list[str] = []
+    for path in sorted(package_root.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
+        declared = spec_declarations(tree, symbols)
+        if not declared:
+            continue
+        module_name = _module_name(path, package_root)
+        module = _load_module(repo, path, module_name)
+        for name, symbol in sorted(declared.items()):
+            spec = getattr(module, name)
+            names = list(getattr(spec, "abi_names", ()))
+            if getattr(spec, "symbol", None) != symbol:
+                problems.append(f"{module_name}.{name} does not declare {symbol}")
+            elif names != parameters[symbol]:
+                problems.append(
+                    f"{module_name}.{name} arguments {names} differ from the C++ parameters of "
+                    f"{symbol} {parameters[symbol]}"
+                )
+    return problems
+
+
 def check_invariants(repo: Path) -> list[str]:
     raw, index = _parsed(repo)
     problems = [f"pybind symbol registered more than once: {name}" for name in raw["duplicate_symbols"]]
@@ -324,6 +437,7 @@ def check_invariants(repo: Path) -> list[str]:
         f"KNOWN_SPLIT_OWNER_SYMBOLS entry is stale (now single-owner or deleted): {name}"
         for name in sorted(KNOWN_SPLIT_OWNER_SYMBOLS - split)
     )
+    problems.extend(spec_problems(repo))
     return problems
 
 

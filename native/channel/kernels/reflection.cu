@@ -7,6 +7,7 @@
 #include <cuda_runtime_api.h>
 
 #include "../tensor_checks.h"
+#include "constants.cuh"
 #include "math.cuh"
 #include "ordered_sum.cuh"
 #include "reflection_receivers.h"
@@ -38,7 +39,7 @@ namespace {
 
 constexpr int kReflectionBlockSize = 256;
 constexpr int kReflectionAdMaxDepth = 8;
-constexpr float kPi = 3.14159265358979323846f;
+using channel::kPiF;
 constexpr float kReflectionEpsilon = 1.0e-6f;
 namespace transport = rayd::shared::field_transport;
 namespace ad = rayd::torch::field_transport_ad;
@@ -179,7 +180,7 @@ template <class Visit>
 __device__ __forceinline__ void visit_deposits(
     const ReceiverTargets& rx, float3 tx, float3 origin, float3 direction, float blocker_t,
     float solid_angle, float wavelength, Visit&& visit) {
-    const float aperture = (wavelength / (4.0f * kPi)) * (wavelength / (4.0f * kPi));
+    const float aperture = (wavelength / (4.0f * kPiF)) * (wavelength / (4.0f * kPiF));
     if (rx.kind == 0) {
         const float axis_direction = component3(direction, rx.axis);
         if (fabsf(axis_direction) <= kReflectionEpsilon) return;
@@ -208,7 +209,7 @@ __device__ __forceinline__ void visit_deposits(
         const float distance_sq = fmaxf(cmath::dot(offset, offset) - t * t, 0.0f);
         const float radius = point_radius(rx, point, tx);
         if (!(distance_sq < radius * radius)) continue;
-        visit(index - rx.point_begin, t, solid_angle * aperture / (kPi * radius * radius));
+        visit(index - rx.point_begin, t, solid_angle * aperture / (kPiF * radius * radius));
     }
 }
 
@@ -429,7 +430,7 @@ __global__ void reflection_rays_kernel(
         // Lattice point: z uniform in cell centers, azimuth by the golden ratio in 32-bit fixed point.
         const float z = 1.0f - (2.0f * static_cast<float>(sample) + 1.0f) / static_cast<float>(count);
         const uint32_t phase = static_cast<uint32_t>(static_cast<uint64_t>(sample) * 2654435769ull);
-        const float phi = 2.0f * kPi * (static_cast<float>(phase) * (1.0f / 4294967296.0f));
+        const float phi = 2.0f * kPiF * (static_cast<float>(phase) * (1.0f / 4294967296.0f));
         const float radial = sqrtf(fmaxf(1.0f - z * z, 0.0f));
         float sin_phi, cos_phi;
         sincosf(phi, &sin_phi, &cos_phi);
@@ -442,8 +443,8 @@ __global__ void reflection_rays_kernel(
         const float a = sqrtf(1.0f - u1);
         const float b = sqrtf(u1);
         float s2, c2, s3, c3;
-        sincosf(2.0f * kPi * u2, &s2, &c2);
-        sincosf(2.0f * kPi * u3, &s3, &c3);
+        sincosf(2.0f * kPiF * u2, &s2, &c2);
+        sincosf(2.0f * kPiF * u3, &s3, &c3);
         const float qx = a * s2, qy = a * c2, qz = b * s3, qw = b * c3;
         const float3 qv = cmath::vec3(qx, qy, qz);
         const float3 uv = cmath::cross(qv, lattice);
@@ -472,7 +473,7 @@ __global__ void reflection_rays_kernel(
         ray_d[3 * index + 2] = direction.z;
         active[index] = true;
         if (sample == 0)
-            solid_angle[tx_index] = 4.0f * kPi / (static_cast<float>(1 << folds) * static_cast<float>(count));
+            solid_angle[tx_index] = 4.0f * kPiF / (static_cast<float>(1 << folds) * static_cast<float>(count));
     }
 }
 

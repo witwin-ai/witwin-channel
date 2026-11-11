@@ -190,10 +190,16 @@ pybind11::tuple channel_mc_point_diffraction_tape(
     torch::Tensor source, torch::Tensor points, int64_t point_begin, int64_t point_count,
     int64_t seed, double point_radius);
 torch::Tensor channel_mc_utd_diffraction_tape_accumulate(
-    torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,
-    torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,
-    torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,torch::Tensor,int64_t,double,double,double,double,double,
-    int64_t,int64_t,double,double,int64_t,double,torch::Tensor,
+    torch::Tensor tape_active, torch::Tensor tape_state, torch::Tensor tape_cell,
+    torch::Tensor tape_u, torch::Tensor edge_pos, torch::Tensor edge_dir,
+    torch::Tensor t_min, torch::Tensor t_max, torch::Tensor n0, torch::Tensor nn,
+    torch::Tensor prim0, torch::Tensor prim1, torch::Tensor exterior_angle,
+    torch::Tensor source, torch::Tensor source_power, torch::Tensor eta_r,
+    torch::Tensor sigma, torch::Tensor mu_r, torch::Tensor gain,
+    torch::Tensor material_valid, torch::Tensor thickness, int64_t axis, double plane,
+    double c0min, double c0max, double c1min, double c1max, int64_t r0, int64_t r1,
+    double wavelength, double cell_area, int64_t seed, double total_edge_length,
+    torch::Tensor tx_pol,
     torch::Tensor tape_lane, torch::Tensor points, double point_radius, int64_t edge_samples);
 pybind11::tuple channel_mc_utd_diffraction_tape_accumulate_backward(
     torch::Tensor tape_active, torch::Tensor tape_state, torch::Tensor tape_cell,

@@ -7,6 +7,7 @@
 
 #include "bdpt_dict_helpers.h"
 #include "kernels/bdpt_wavefront.cuh"
+#include "kernels/constants.cuh"
 
 #include <algorithm>
 #include <cmath>
@@ -309,8 +310,8 @@ WavefrontSetup make_setup(
         tables.marginal_offset = marginal_offset.data_ptr<int64_t>();
         tables.dims = dims.data_ptr<int>();
     }
-    const double wavelength = 299792458.0 / frequency_hz;
-    const double amplitude = wavelength / (4.0 * 3.14159265358979323846);
+    const double wavelength = channel::kSpeedOfLight / frequency_hz;
+    const double amplitude = wavelength / (4.0 * channel::kPi);
     setup.amplitude_sq = amplitude * amplitude;
     setup.frequency_hz = frequency_hz;
     setup.samples = samples;

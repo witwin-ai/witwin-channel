@@ -9,6 +9,7 @@ import inspect
 import pytest
 
 from witwin.channel.kernels import scattering as kernels
+from witwin.channel.kernels import spec
 from witwin.channel import runtime
 
 
@@ -44,4 +45,8 @@ def test_non_chain_row_operations_require_explicit_valid_first(name: str):
 
 def test_scattering_functional_uses_canonical_runtime_dependencies():
     assert kernels._required_native_op is runtime.required_symbol
-    assert kernels.validate_cuda_tensor is runtime.validate_cuda_tensor
+    # The declared tensor checks run runtime's validator.
+    assert spec.validate_cuda_tensor is runtime.validate_cuda_tensor
+    assert getattr(kernels, "validate_cuda_tensor", runtime.validate_cuda_tensor) is (
+        runtime.validate_cuda_tensor
+    )

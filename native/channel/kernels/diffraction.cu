@@ -3,6 +3,7 @@
 
 // ==== Section: Diffraction kernels ====
 #include "reflection_receivers.h"
+#include "constants.cuh"
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
@@ -376,7 +377,7 @@ __device__ bool tape_row_value(
     mat.muR = T(1.f);
     mat.sigma = T(0.f);
     mat.gain = T(1.f);
-    mat.omega = 2.0f * utd::UTD_PI * 299792458.0f / wavelength;
+    mat.omega = 2.0f * utd::UTD_PI * channel::kSpeedOfLightF / wavelength;
     mat.txPolX = T(c.tx_pol.x);
     mat.txPolY = T(c.tx_pol.y);
     mat.txPolZ = T(c.tx_pol.z);
@@ -804,7 +805,7 @@ __device__ __forceinline__ float unsigned_angle(float3 a, float3 b, float3 axis)
     const float3 cross = channel::math::cross(a, b);
     const float signed_norm = signf_like_torch(channel::math::dot_rn_xzy(cross, axis)) * channel::math::length_rn_xzy(cross);
     float angle = atan2f(signed_norm, channel::math::dot_rn_xzy(a, b));
-    return angle < 0.0f ? angle + 6.28318530717958647692f : angle;
+    return angle < 0.0f ? angle + channel::kTwoPiF : angle;
 }
 
 __device__ __forceinline__ int opposite_vertex(const int *faces, int face, int shared0, int shared1) {
@@ -844,7 +845,7 @@ __global__ void diffraction_edge_geometry_kernel(
     float plane_tol) {
     constexpr float edge_epsilon = 1.0e-6f;
     constexpr float normal_cos_tol = 1.0f - 1.0e-5f;
-    constexpr float two_pi = 6.28318530717958647692f;
+    constexpr float two_pi = channel::kTwoPiF;
 
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t edge = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;

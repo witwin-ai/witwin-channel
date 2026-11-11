@@ -7,6 +7,7 @@
 #include <c10/cuda/CUDAException.h>
 #include <c10/util/complex.h>
 #include "torch_cuda.h"
+#include "constants.cuh"
 
 #include "../tensor_checks.h"
 #include "math.cuh"
@@ -17,7 +18,7 @@
 namespace {
 
 constexpr int kBlockSize = 256;
-constexpr float kPi = 3.14159265358979323846f;
+using channel::kPiF;
 
 using channel::check_tensor;
 namespace transport = rayd::shared::field_transport;
@@ -51,9 +52,9 @@ __global__ void deterministic_phase_from_field_kernel(
          index < count;
          index += stride) {
         float phase = -atan2f(field_imag[index], field_real[index]);
-        phase = fmodf(phase, 2.0f * kPi);
+        phase = fmodf(phase, 2.0f * kPiF);
         if (phase < 0.0f) {
-            phase += 2.0f * kPi;
+            phase += 2.0f * kPiF;
         }
         phase_rad[index] = phase;
     }
@@ -139,11 +140,10 @@ pybind11::dict channel_deterministic_zero_field_phase(at::Tensor reference) {
 #include <array>
 #include <utility>
 
-#define kBlockSize kAccumBlockSize
 
 namespace {
 
-constexpr int kBlockSize = 256;
+constexpr int kAccumBlockSize = 256;
 // Named component counts exported by channel_deterministic_component_counts
 // (los / reflection / diffraction only).
 constexpr int kComponentCount = 3;
@@ -167,13 +167,16 @@ __device__ __forceinline__ int accum_slot(int component_id) {
     if (component_id >= 0 && component_id < kComponentCount) {
         return component_id;
     }
-    if (component_id == 3 || component_id == 4 || component_id == 7 || (component_id > 8 && component_id < 16)) {
+    if (component_id == channel::kComponentReflectionDiffraction ||
+        component_id == channel::kComponentDiffractionReflection ||
+        component_id == channel::kComponentDoubleDiffraction ||
+        (component_id > channel::kComponentChainInteriorBase && component_id < 16)) {
         return kCoupledSlot;
     }
-    if (component_id == 5) {
+    if (component_id == channel::kComponentTransmission) {
         return 3;
     }
-    if (component_id == 6) {
+    if (component_id == channel::kComponentScattering) {
         return kScatteringSlot;
     }
     return -1;
@@ -642,10 +645,6 @@ __global__ void deterministic_compact_edges_kernel(
     }
 }
 
-int launch_blocks(int64_t count) {
-    return static_cast<int>((count + kBlockSize - 1) / kBlockSize);
-}
-
 // Tangent accumulators must start at zero; allocate raw and memset on the
 // current stream (same pattern as field_transport_ad.cu) instead of ATen
 // zero-fill.
@@ -768,7 +767,7 @@ pybind11::dict accumulate_flat_launch(
     }
     if (path_count > 0) {
         deterministic_accumulate_paths_kernel<T>
-            <<<launch_blocks(path_count), kBlockSize, 0, stream>>>(
+            <<<::channel::launch_blocks(path_count, kAccumBlockSize), kAccumBlockSize, 0, stream>>>(
                 valid.data_ptr<bool>(),
                 tx_id.data_ptr<int>(),
                 rx_id.data_ptr<int>(),
@@ -786,7 +785,7 @@ pybind11::dict accumulate_flat_launch(
     }
     if (cell_count > 0) {
         deterministic_finalize_accumulation_kernel<T>
-            <<<launch_blocks(cell_count), kBlockSize, 0, stream>>>(
+            <<<::channel::launch_blocks(cell_count, kAccumBlockSize), kAccumBlockSize, 0, stream>>>(
                 component_power.data_ptr<T>(),
                 component_field_real.data_ptr<T>(),
                 component_field_imag.data_ptr<T>(),
@@ -956,7 +955,8 @@ pybind11::dict channel_deterministic_accumulate_flat_backward(
             at::cuda::getCurrentCUDAStream(tx_id.get_device()).stream();
         if (real_dtype == at::kFloat) {
             deterministic_accumulate_backward_kernel<float>
-                <<<launch_blocks(path_count), kBlockSize, 0, stream>>>(
+                <<<::channel::launch_blocks(path_count, kAccumBlockSize),
+                   kAccumBlockSize, 0, stream>>>(
                     valid.data_ptr<bool>(),
                     tx_id.data_ptr<int>(),
                     rx_id.data_ptr<int>(),
@@ -982,7 +982,8 @@ pybind11::dict channel_deterministic_accumulate_flat_backward(
                     scattering_coherent);
         } else {
             deterministic_accumulate_backward_kernel<double>
-                <<<launch_blocks(path_count), kBlockSize, 0, stream>>>(
+                <<<::channel::launch_blocks(path_count, kAccumBlockSize),
+                   kAccumBlockSize, 0, stream>>>(
                     valid.data_ptr<bool>(),
                     tx_id.data_ptr<int>(),
                     rx_id.data_ptr<int>(),
@@ -1079,7 +1080,8 @@ pybind11::dict channel_deterministic_accumulate_flat_jvp(
     if (path_count > 0 && any_tangent) {
         if (real_dtype == at::kFloat) {
             deterministic_accumulate_tangent_scatter_kernel<float>
-                <<<launch_blocks(path_count), kBlockSize, 0, stream>>>(
+                <<<::channel::launch_blocks(path_count, kAccumBlockSize),
+                   kAccumBlockSize, 0, stream>>>(
                     valid.data_ptr<bool>(),
                     tx_id.data_ptr<int>(),
                     rx_id.data_ptr<int>(),
@@ -1097,7 +1099,8 @@ pybind11::dict channel_deterministic_accumulate_flat_jvp(
                     scattering_coherent);
         } else {
             deterministic_accumulate_tangent_scatter_kernel<double>
-                <<<launch_blocks(path_count), kBlockSize, 0, stream>>>(
+                <<<::channel::launch_blocks(path_count, kAccumBlockSize),
+                   kAccumBlockSize, 0, stream>>>(
                     valid.data_ptr<bool>(),
                     tx_id.data_ptr<int>(),
                     rx_id.data_ptr<int>(),
@@ -1119,7 +1122,8 @@ pybind11::dict channel_deterministic_accumulate_flat_jvp(
     if (cell_count > 0) {
         if (real_dtype == at::kFloat) {
             deterministic_accumulate_jvp_finalize_kernel<float>
-                <<<launch_blocks(cell_count), kBlockSize, 0, stream>>>(
+                <<<::channel::launch_blocks(cell_count, kAccumBlockSize),
+                   kAccumBlockSize, 0, stream>>>(
                     component_field_real.data_ptr<float>(),
                     component_field_imag.data_ptr<float>(),
                     power_total.data_ptr<float>(),
@@ -1134,7 +1138,8 @@ pybind11::dict channel_deterministic_accumulate_flat_jvp(
                     scattering_coherent);
         } else {
             deterministic_accumulate_jvp_finalize_kernel<double>
-                <<<launch_blocks(cell_count), kBlockSize, 0, stream>>>(
+                <<<::channel::launch_blocks(cell_count, kAccumBlockSize),
+                   kAccumBlockSize, 0, stream>>>(
                     component_field_real.data_ptr<double>(),
                     component_field_imag.data_ptr<double>(),
                     power_total.data_ptr<double>(),
@@ -1168,8 +1173,8 @@ pybind11::dict channel_deterministic_component_counts(at::Tensor component_id) {
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(component_id.get_device()).stream();
     C10_CUDA_CHECK(cudaMemsetAsync(counts.data_ptr<int64_t>(), 0, kComponentCount * sizeof(int64_t), stream));
     if (path_count > 0) {
-        const int block_count = static_cast<int>((path_count + kBlockSize - 1) / kBlockSize);
-        deterministic_component_counts_kernel<<<block_count, kBlockSize, 0, stream>>>(
+        const int block_count = static_cast<int>((path_count + kAccumBlockSize - 1) / kAccumBlockSize);
+        deterministic_component_counts_kernel<<<block_count, kAccumBlockSize, 0, stream>>>(
             component_id.data_ptr<int>(),
             path_count,
             reinterpret_cast<unsigned long long *>(counts.data_ptr<int64_t>()));
@@ -1202,8 +1207,8 @@ int64_t channel_deterministic_selected_edge_count(at::Tensor edge_id) {
     auto flags = at::empty({path_count}, int_options);
     auto offsets = at::empty({path_count + 1}, int_options);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(edge_id.get_device()).stream();
-    const int block_count = static_cast<int>((path_count + kBlockSize - 1) / kBlockSize);
-    deterministic_edge_flags_kernel<<<block_count, kBlockSize, 0, stream>>>(
+    const int block_count = static_cast<int>((path_count + kAccumBlockSize - 1) / kAccumBlockSize);
+    deterministic_edge_flags_kernel<<<block_count, kAccumBlockSize, 0, stream>>>(
         edge_id.data_ptr<int>(),
         path_count,
         flags.data_ptr<int>());
@@ -1225,7 +1230,7 @@ int total = 0;
     }
 
     auto compacted = at::empty({selected_count}, int_options);
-    deterministic_compact_edges_kernel<<<block_count, kBlockSize, 0, stream>>>(
+    deterministic_compact_edges_kernel<<<block_count, kAccumBlockSize, 0, stream>>>(
         edge_id.data_ptr<int>(),
         flags.data_ptr<int>(),
         offsets.data_ptr<int>(),
@@ -1240,5 +1245,4 @@ int total = 0;
     return static_cast<int64_t>(unique_end - begin);
 }
 
-#undef kBlockSize
 

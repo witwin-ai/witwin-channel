@@ -14,6 +14,7 @@ import torch
 from witwin.channel.propagation.penetration import (
     SegmentPenetrationResult,
 )
+from witwin.channel.kernels.spec import AdInputs, NativeOps, opaque, tensor as tensor_arg
 from witwin.channel.runtime import (
     CapacityExecutionCounts,
     CapacityFailureState,
@@ -73,6 +74,208 @@ __all__ = [
     "path_pack_padded",
 ]
 
+_native = NativeOps(lambda symbol: _required_native_op(symbol))
+_CHAIN_CANDIDATES = _native.op(
+    "chain_candidates",
+    tensor_arg("lane_offsets"), opaque("lane_start"), opaque("lane_end"), tensor_arg("plane_point"),
+    tensor_arg("plane_normal"), tensor_arg("bounds"), tensor_arg("occupancy"),
+    tensor_arg("edge_position"), tensor_arg("edge_direction"), tensor_arg("edge_t_min"),
+    tensor_arg("edge_t_max"), tensor_arg("edge_n0"), tensor_arg("edge_n1"),
+    tensor_arg("a_edge_offsets"), tensor_arg("a_endpoint"),
+    tensor_arg("a_node"), tensor_arg("a_endpoints"), tensor_arg("a_node_sequences"),
+    tensor_arg("a_node_images"), tensor_arg("b_edge_offsets"), tensor_arg("b_endpoint"),
+    tensor_arg("b_node"), tensor_arg("b_endpoints"), tensor_arg("b_node_sequences"),
+    tensor_arg("b_node_images"), opaque("box_tolerance"), opaque("segment_tolerance"),
+    opaque("min_segment_length"), opaque("edge_epsilon"),
+)
+_CHAIN_DOUBLE_CANDIDATES = _native.op(
+    "chain_double_candidates",
+    tensor_arg("pair_offsets"), opaque("lane_start"), opaque("lane_end"), opaque("rx_count"),
+    tensor_arg("tx_offsets"), tensor_arg("tx_edges"), tensor_arg("rx_offsets"),
+    tensor_arg("rx_edges"),
+)
+_CHAIN_NODE_EDGES = _native.op(
+    "chain_node_edges",
+    tensor_arg("node_sequences"), tensor_arg("node_images"), tensor_arg("plane_point"),
+    tensor_arg("plane_normal"), tensor_arg("bounds"), tensor_arg("occupancy"),
+    tensor_arg("edge_position"), tensor_arg("edge_direction"), tensor_arg("edge_t_min"),
+    tensor_arg("edge_t_max"), opaque("node_start"), opaque("node_end"), opaque("tolerance"),
+)
+_CORE_PACK_INT2 = _native.op("core_pack_int2", tensor_arg("x"), tensor_arg("y"))
+_DETERMINISTIC_COMPONENT_COUNTS = _native.op(
+    "deterministic_component_counts",
+    tensor_arg("component_id"),
+)
+_DETERMINISTIC_CONCAT_TOPOLOGY_BLOCKS = _native.op(
+    "deterministic_concat_topology_blocks",
+    opaque("blocks"), opaque("sequence_width"),
+)
+_DETERMINISTIC_DIFFRACTION_STATE_PACK = _native.op(
+    "deterministic_diffraction_state_pack",
+    tensor_arg("edge_indices"), tensor_arg("edge_pos"), tensor_arg("edge_dir"),
+    tensor_arg("line_min"), tensor_arg("line_max"), tensor_arg("n0"), tensor_arg("n1"),
+    tensor_arg("face0"), tensor_arg("face1"), tensor_arg("exterior_angle"), tensor_arg("tx"),
+    tensor_arg("tx_power"), opaque("tx_power_index"),
+)
+_DETERMINISTIC_DIFFRACTION_STATE_PACK_SELECTED = _native.op(
+    "deterministic_diffraction_state_pack_selected",
+    tensor_arg("selected"), tensor_arg("edge_pos"), tensor_arg("edge_dir"), tensor_arg("line_min"),
+    tensor_arg("line_max"), tensor_arg("n0"), tensor_arg("n1"), tensor_arg("face0"),
+    tensor_arg("face1"), tensor_arg("exterior_angle"), tensor_arg("tx"), tensor_arg("tx_power"),
+    opaque("tx_power_index"),
+)
+_DETERMINISTIC_DIFFRACTION_TOPOLOGY_COMPACT = _native.op(
+    "deterministic_diffraction_topology_compact",
+    tensor_arg("valid"), tensor_arg("tx_id"), tensor_arg("rx_id"), opaque("rx_offset"),
+    tensor_arg("depth"), tensor_arg("edge_id"), tensor_arg("delay"), tensor_arg("x_re"),
+    tensor_arg("x_im"), tensor_arg("y_re"), tensor_arg("y_im"), tensor_arg("z_re"),
+    tensor_arg("z_im"), tensor_arg("interaction_position"),
+)
+_DETERMINISTIC_FACE_ANCHOR_POINTS = _native.op(
+    "deterministic_face_anchor_points",
+    tensor_arg("vertices"), tensor_arg("faces"),
+)
+_DETERMINISTIC_LOS_TOPOLOGY_BLOCK = _native.op(
+    "deterministic_los_topology_block",
+    tensor_arg("tx_id"), tensor_arg("rx_id"), tensor_arg("path_length_m"), tensor_arg("delay_s"),
+    tensor_arg("path_gain"), tensor_arg("visible"), opaque("frequency_hz"),
+    opaque("sequence_width"),
+)
+_DETERMINISTIC_LOS_TOPOLOGY_BLOCK_ALL_VISIBLE = _native.op(
+    "deterministic_los_topology_block_all_visible",
+    tensor_arg("tx_id"), tensor_arg("rx_id"), tensor_arg("path_length_m"), tensor_arg("delay_s"),
+    tensor_arg("path_gain"), opaque("frequency_hz"), opaque("sequence_width"),
+)
+_DETERMINISTIC_PAD_TOPOLOGY_SEQUENCES = _native.op(
+    "deterministic_pad_topology_sequences",
+    tensor_arg("depth"), tensor_arg("primitive_id"), tensor_arg("material_id"),
+    tensor_arg("interaction_position"), tensor_arg("interaction_normal"),
+    tensor_arg("primitive_sequence"), tensor_arg("material_sequence"),
+    tensor_arg("interaction_positions"), tensor_arg("interaction_normals"), opaque("width"),
+)
+_DETERMINISTIC_REFLECTION_EPC_INPUT_BATCH = _native.op(
+    "deterministic_reflection_epc_input_batch",
+    tensor_arg("tx_positions"), tensor_arg("rx_positions"), tensor_arg("sequences"),
+    tensor_arg("sequence_tx"), tensor_arg("candidate_sequence"), tensor_arg("candidate_receiver"),
+    tensor_arg("tri_a"), tensor_arg("normals"), opaque("candidate_start"), opaque("candidate_end"),
+)
+_DETERMINISTIC_REFLECTION_ORDER1_COMPACT = _native.op(
+    "deterministic_reflection_order1_compact",
+    tensor_arg("visible"), tensor_arg("epc_faces"), tensor_arg("epc_hits"),
+    tensor_arg("epc_normals"), tensor_arg("sequence_batch"), tensor_arg("rx_indices"),
+    tensor_arg("tx"), tensor_arg("rx_positions"), tensor_arg("tx_power"), opaque("tx_index"),
+    tensor_arg("face_eps_r"), tensor_arg("face_sigma_e"), tensor_arg("face_mu_r"),
+    tensor_arg("face_gain"), tensor_arg("face_material_id"), opaque("grouped_export"),
+)
+_DETERMINISTIC_REFLECTION_SEQUENCE_COMPACT = _native.op(
+    "deterministic_reflection_sequence_compact",
+    tensor_arg("visible"), tensor_arg("epc_sequences"), tensor_arg("epc_hits"),
+    tensor_arg("epc_normals"), tensor_arg("rx_indices"), tensor_arg("tx"),
+    tensor_arg("rx_positions"), tensor_arg("tx_power"), opaque("tx_index"),
+    tensor_arg("face_eps_r"), tensor_arg("face_sigma_e"), tensor_arg("face_mu_r"),
+    tensor_arg("face_gain"), tensor_arg("face_material_id"), opaque("max_count"),
+)
+_DETERMINISTIC_REFLECTION_TOPOLOGY_COMPACT = _native.op(
+    "deterministic_reflection_topology_compact",
+    tensor_arg("visible"), tensor_arg("epc_sequences"), tensor_arg("epc_hits"),
+    tensor_arg("epc_normals"), tensor_arg("epc_path_length"), tensor_arg("tx_indices"),
+    tensor_arg("rx_indices"), tensor_arg("face_material_id"),
+)
+_DETERMINISTIC_SELECTED_EDGE_COUNT = _native.op(
+    "deterministic_selected_edge_count",
+    tensor_arg("edge_id"),
+)
+_DETERMINISTIC_TOPOLOGY_DEFAULT_FIELDS = _native.op(
+    "deterministic_topology_default_fields",
+    tensor_arg("reference"),
+)
+_ENUMERATED_CANONICAL_COMPACT = _native.op(
+    "enumerated_canonical_compact",
+    opaque("block"), opaque("pair_count"), opaque("num_tx"), opaque("num_rx"), opaque("max_paths"),
+    opaque("max_paths_scope"), opaque("sequence_width"), opaque("source_stable_ids"),
+    opaque("sink_stable_ids"), opaque("capacity_failure_record"),
+)
+_ENUMERATED_EXACT_PAIR_METADATA = _native.op(
+    "enumerated_exact_pair_metadata",
+    tensor_arg("tx_id"), tensor_arg("rx_id"), opaque("pair_count"), opaque("num_tx"),
+    opaque("num_rx"), opaque("source_stable_ids"), opaque("sink_stable_ids"),
+)
+_ENUMERATED_TRANSMISSION_TOPOLOGY_PACK = _native.op(
+    "enumerated_transmission_topology_pack",
+    tensor_arg("failure_state"), tensor_arg("valid"), tensor_arg("num_hits"),
+    tensor_arg("reached_target"), tensor_arg("overflow"), tensor_arg("distance"),
+    tensor_arg("position"), tensor_arg("normal"), tensor_arg("global_primitive_id"),
+    tensor_arg("face_material_id"), tensor_arg("geometry_mode_id"), opaque("tx_count"),
+    opaque("rx_count"),
+)
+_ENUMERATED_TRANSMISSION_TOPOLOGY_PACK_BACKWARD = _native.op(
+    "enumerated_transmission_topology_pack_backward",
+    tensor_arg("topology_valid"), tensor_arg("hit_valid"), opaque("grad_path_length_m"),
+    opaque("grad_delay_s"), opaque("grad_interaction_position"), opaque("grad_interaction_normal"),
+    opaque("grad_interaction_positions"), opaque("grad_interaction_normals"),
+)
+_ENUMERATED_TRANSMISSION_TOPOLOGY_PACK_JVP = _native.op(
+    "enumerated_transmission_topology_pack_jvp",
+    tensor_arg("topology_valid"), tensor_arg("hit_valid"), opaque("tangent_distance"),
+    opaque("tangent_position"), opaque("tangent_normal"),
+)
+_EVALUATED_PATHS_COMPACT_FINALIZE_BACKWARD = _native.op(
+    "evaluated_paths_compact_finalize_backward",
+    tensor_arg("valid"), tensor_arg("selected_row_index"), opaque("grad_path_length_m"),
+    opaque("grad_delay_s"), opaque("grad_field_direction"), opaque("grad_interaction_position"),
+    opaque("grad_interaction_normal"), opaque("grad_interaction_positions"),
+    opaque("grad_interaction_normals"), opaque("grad_path_gain"), opaque("grad_path_field"),
+    opaque("grad_field_xyz"), opaque("grad_coefficient"), opaque("candidate_count"),
+    opaque("sequence_width"),
+)
+_EVALUATED_PATHS_COMPACT_FINALIZE_JVP = _native.op(
+    "evaluated_paths_compact_finalize_jvp",
+    tensor_arg("valid"), tensor_arg("selected_row_index"), opaque("tangent_path_length_m"),
+    opaque("tangent_delay_s"), opaque("tangent_field_direction"),
+    opaque("tangent_interaction_position"), opaque("tangent_interaction_normal"),
+    opaque("tangent_interaction_positions"), opaque("tangent_interaction_normals"),
+    opaque("tangent_path_gain"), opaque("tangent_path_field"), opaque("tangent_field_xyz"),
+    opaque("tangent_coefficient"), opaque("candidate_count"), opaque("sequence_width"),
+)
+_MC_SAMPLE_DIRECTIONS = _native.op("mc_sample_directions", opaque("count"), tensor_arg("reference"))
+_MC_SELECTED_EDGE_INDICES = _native.op("mc_selected_edge_indices", tensor_arg("selected"))
+_PATH_CONCAT_VEC3 = _native.op("path_concat_vec3", opaque("blocks"))
+_PATH_LOS_EXPORT = _native.op(
+    "path_los_export",
+    tensor_arg("tx_positions"), tensor_arg("tx_power"), tensor_arg("rx_positions"),
+    opaque("frequency_hz"), tensor_arg("tx_pol"),
+)
+_PATH_LOS_VISIBILITY_INPUTS = _native.op(
+    "path_los_visibility_inputs",
+    tensor_arg("tx_positions"), tensor_arg("rx_positions"), tensor_arg("tx_id"),
+    tensor_arg("rx_id"),
+)
+_PATH_PACK_PADDED = _native.op(
+    "path_pack_padded",
+    opaque("rows"), tensor_arg("tx_positions"), tensor_arg("rx_positions"),
+    tensor_arg("pair_offsets"), opaque("width"),
+)
+_REFLECTION_GROUP_TABLES = _native.op(
+    "reflection_group_tables",
+    tensor_arg("vertices"), tensor_arg("faces"), tensor_arg("face_group_id"),
+    tensor_arg("representative_faces"), tensor_arg("tri_a"), tensor_arg("normals"),
+    opaque("tolerance"),
+)
+_REFLECTION_IMAGE_TREE_EXPAND = _native.op(
+    "reflection_image_tree_expand",
+    tensor_arg("node_tx"), tensor_arg("node_sequences"), tensor_arg("node_images"),
+    tensor_arg("plane_point"), tensor_arg("plane_normal"), tensor_arg("bounds"),
+    tensor_arg("occupancy"), opaque("node_start"), opaque("node_end"), opaque("tolerance"),
+    opaque("prune"),
+)
+_REFLECTION_RECEIVER_CANDIDATES = _native.op(
+    "reflection_receiver_candidates",
+    tensor_arg("tx_positions"), tensor_arg("rx_positions"), tensor_arg("sequences"),
+    tensor_arg("sequence_tx"), tensor_arg("plane_point"), tensor_arg("plane_normal"),
+    tensor_arg("bounds"), tensor_arg("occupancy"), opaque("sequence_start"), opaque("sequence_end"),
+    opaque("box_tolerance"), opaque("segment_tolerance"), opaque("min_segment_length"),
+)
+
 
 # -------------------------------------------------------------------------
 # blocks
@@ -102,7 +305,7 @@ def path_los_export(
     if frequency_hz <= 0.0:
         raise ValueError("frequency_hz must be positive")
 
-    exported = _required_native_op("path_los_export")(
+    exported = _PATH_LOS_EXPORT(
         tx_positions, tx_power, rx_positions, float(frequency_hz), tx_polarizations
     )
     if not isinstance(exported, dict):
@@ -212,7 +415,7 @@ def deterministic_concat_topology_blocks(
         _validate_topology_extra_fields(
             f"blocks[{index}]", block, int(sequence_width), concat_presence
         )
-    exported = _required_native_op("deterministic_concat_topology_blocks")(
+    exported = _DETERMINISTIC_CONCAT_TOPOLOGY_BLOCKS(
         tuple(blocks), int(sequence_width)
     )
     if not isinstance(exported, dict):
@@ -248,7 +451,7 @@ def path_los_visibility_inputs(
     validate_cuda_tensor("rx_id", rx_id, dtype=torch.int32, ndim=1)
     if rx_id.shape != tx_id.shape:
         raise ValueError("rx_id must match tx_id")
-    exported = _required_native_op("path_los_visibility_inputs")(
+    exported = _PATH_LOS_VISIBILITY_INPUTS(
         tx_positions, rx_positions, tx_id, rx_id
     )
     if not isinstance(exported, dict):
@@ -346,7 +549,7 @@ def deterministic_reflection_order1_compact(
         rx_indices, tx_power, tx_index, face_eps_r, face_sigma_e, face_mu_r,
         face_gain, face_material_id, count,
     )
-    exported = _required_native_op("deterministic_reflection_order1_compact")(
+    exported = _DETERMINISTIC_REFLECTION_ORDER1_COMPACT(
         visible,
         epc_faces,
         epc_hits,
@@ -467,7 +670,7 @@ def deterministic_reflection_sequence_compact(
         rx_indices, tx_power, tx_index, face_eps_r, face_sigma_e, face_mu_r,
         face_gain, face_material_id, count,
     )
-    exported = _required_native_op("deterministic_reflection_sequence_compact")(
+    exported = _DETERMINISTIC_REFLECTION_SEQUENCE_COMPACT(
         visible,
         epc_sequences,
         epc_hits,
@@ -617,7 +820,7 @@ def deterministic_los_topology_block(
         if tensor.shape != tx_id.shape:
             raise ValueError(f"{name} must match tx_id")
     if visible is None:
-        block = _required_native_op("deterministic_los_topology_block_all_visible")(
+        block = _DETERMINISTIC_LOS_TOPOLOGY_BLOCK_ALL_VISIBLE(
             tx_id,
             rx_id,
             path_length_m,
@@ -630,7 +833,7 @@ def deterministic_los_topology_block(
         validate_cuda_tensor("visible", visible, dtype=torch.bool, ndim=1)
         if visible.shape != tx_id.shape:
             raise ValueError("visible must match tx_id")
-        block = _required_native_op("deterministic_los_topology_block")(
+        block = _DETERMINISTIC_LOS_TOPOLOGY_BLOCK(
             tx_id,
             rx_id,
             path_length_m,
@@ -652,7 +855,7 @@ def deterministic_los_topology_block(
 
 def deterministic_topology_default_fields(reference: torch.Tensor) -> dict[str, torch.Tensor]:
     validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=1)
-    exported = _required_native_op("deterministic_topology_default_fields")(reference)
+    exported = _DETERMINISTIC_TOPOLOGY_DEFAULT_FIELDS(reference)
     if not isinstance(exported, dict):
         raise TypeError(
             "_channel.deterministic_topology_default_fields must return a dict"
@@ -752,7 +955,7 @@ def deterministic_pad_topology_sequences(
     }.items():
         if tensor.shape[0] != count or tensor.shape[2] != 3:
             raise ValueError(f"{name} must have shape (N, D, 3)")
-    exported = _required_native_op("deterministic_pad_topology_sequences")(
+    exported = _DETERMINISTIC_PAD_TOPOLOGY_SEQUENCES(
         depth,
         primitive_id,
         material_id,
@@ -812,7 +1015,7 @@ def deterministic_face_anchor_points(vertices: torch.Tensor, faces: torch.Tensor
     validate_cuda_tensor("faces", faces, dtype=torch.int32, ndim=2, trailing_shape=(3,))
     if vertices.get_device() != faces.get_device():
         raise ValueError("vertices and faces must share a CUDA device")
-    out = _required_native_op("deterministic_face_anchor_points")(vertices, faces)
+    out = _DETERMINISTIC_FACE_ANCHOR_POINTS(vertices, faces)
     if not isinstance(out, torch.Tensor):
         raise TypeError(
             "_channel.deterministic_face_anchor_points must return a tensor"
@@ -852,7 +1055,7 @@ def reflection_group_tables(
     validate_cuda_tensor("representative_faces", representative_faces, dtype=torch.int64, ndim=1)
     validate_cuda_tensor("tri_a", tri_a, dtype=torch.float32, ndim=2, trailing_shape=(3,))
     validate_cuda_tensor("normals", normals, dtype=torch.float32, ndim=2, trailing_shape=(3,))
-    exported = _required_native_op("reflection_group_tables")(
+    exported = _REFLECTION_GROUP_TABLES(
         vertices, faces, face_group_id, representative_faces, tri_a, normals, float(tolerance)
     )
     if not isinstance(exported, dict) or set(exported) != {
@@ -875,7 +1078,7 @@ def reflection_image_tree_expand(
     validate_cuda_tensor("node_tx", node_tx, dtype=torch.int32, ndim=1)
     validate_cuda_tensor("node_sequences", node_sequences, dtype=torch.int32, ndim=2)
     validate_cuda_tensor("node_images", node_images, dtype=torch.float32, ndim=2, trailing_shape=(3,))
-    exported = _required_native_op("reflection_image_tree_expand")(
+    exported = _REFLECTION_IMAGE_TREE_EXPAND(
         node_tx, node_sequences, node_images, plane_point, plane_normal, bounds, occupancy,
         int(node_start), int(node_end), float(tolerance), bool(prune),
     )
@@ -896,7 +1099,7 @@ def reflection_receiver_candidates(
     validate_cuda_tensor("rx_positions", rx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,))
     validate_cuda_tensor("sequences", sequences, dtype=torch.int32, ndim=2)
     validate_cuda_tensor("sequence_tx", sequence_tx, dtype=torch.int32, ndim=1)
-    exported = _required_native_op("reflection_receiver_candidates")(
+    exported = _REFLECTION_RECEIVER_CANDIDATES(
         tx_positions, rx_positions, sequences, sequence_tx, plane_point, plane_normal, bounds,
         occupancy, int(sequence_start), int(sequence_end), float(box_tolerance), float(segment_tolerance),
         float(min_segment_length),
@@ -916,7 +1119,7 @@ def chain_node_edges(
 
     validate_cuda_tensor("node_sequences", node_sequences, dtype=torch.int32, ndim=2)
     validate_cuda_tensor("node_images", node_images, dtype=torch.float32, ndim=2, trailing_shape=(3,))
-    exported = _required_native_op("chain_node_edges")(
+    exported = _CHAIN_NODE_EDGES(
         node_sequences, node_images, plane_point, plane_normal, bounds, occupancy, edge_position,
         edge_direction, edge_t_min, edge_t_max, int(node_start), int(node_end), float(tolerance),
     )
@@ -946,7 +1149,7 @@ def chain_candidates(
     validate_cuda_tensor("lane_offsets", lane_offsets, dtype=torch.int64, ndim=1)
     if len(a) != 6 or len(b) != 6:
         raise ValueError("chain halves must carry six tables")
-    exported = _required_native_op("chain_candidates")(
+    exported = _CHAIN_CANDIDATES(
         lane_offsets, int(lane_start), int(lane_end), plane_point, plane_normal, bounds, occupancy,
         edge_position, edge_direction, edge_t_min, edge_t_max, edge_n0, edge_n1, *a, *b,
         float(box_tolerance),
@@ -970,7 +1173,7 @@ def chain_double_candidates(
         validate_cuda_tensor(name, value, dtype=torch.int64, ndim=1)
     for name, value in (("tx_edges", tx_edges), ("rx_edges", rx_edges)):
         validate_cuda_tensor(name, value, dtype=torch.int32, ndim=1)
-    exported = _required_native_op("chain_double_candidates")(
+    exported = _CHAIN_DOUBLE_CANDIDATES(
         pair_offsets, int(lane_start), int(lane_end), int(rx_count), tx_offsets, tx_edges, rx_offsets,
         rx_edges,
     )
@@ -1048,7 +1251,7 @@ def deterministic_reflection_epc_input_batch(
     )
     if not 0 <= candidate_start <= candidate_end <= total:
         raise ValueError("candidate range is out of bounds")
-    exported = _required_native_op("deterministic_reflection_epc_input_batch")(
+    exported = _DETERMINISTIC_REFLECTION_EPC_INPUT_BATCH(
         tx_positions,
         rx_positions,
         sequences,
@@ -1123,7 +1326,7 @@ def deterministic_diffraction_topology_compact(
     )
     if int(rx_offset) < 0:
         raise ValueError("rx_offset must be non-negative")
-    block = _required_native_op("deterministic_diffraction_topology_compact")(
+    block = _DETERMINISTIC_DIFFRACTION_TOPOLOGY_COMPACT(
         valid, tx_id, rx_id, int(rx_offset), depth, edge_id, delay_s, x_re, x_im, y_re, y_im,
         z_re, z_im, interaction_position,
     )
@@ -1166,7 +1369,7 @@ def deterministic_reflection_topology_compact(
     depth = int(epc_sequences.shape[1])
     if epc_sequences.shape[0] != count or epc_hits.shape != (count, depth, 3):
         raise ValueError("reflection EPC outputs must share the candidate count and depth")
-    block = _required_native_op("deterministic_reflection_topology_compact")(
+    block = _DETERMINISTIC_REFLECTION_TOPOLOGY_COMPACT(
         visible,
         epc_sequences.contiguous(),
         epc_hits,
@@ -1201,7 +1404,7 @@ def deterministic_reflection_topology_compact(
 
 def deterministic_component_counts(component_id: torch.Tensor) -> dict[str, int]:
     validate_cuda_tensor("component_id", component_id, dtype=torch.int32, ndim=1)
-    exported = _required_native_op("deterministic_component_counts")(component_id)
+    exported = _DETERMINISTIC_COMPONENT_COUNTS(component_id)
     if not isinstance(exported, dict):
         raise TypeError(
             "_channel.deterministic_component_counts must return a dict"
@@ -1219,7 +1422,7 @@ def deterministic_component_counts(component_id: torch.Tensor) -> dict[str, int]
 
 def deterministic_selected_edge_count(edge_id: torch.Tensor) -> int:
     validate_cuda_tensor("edge_id", edge_id, dtype=torch.int32, ndim=1)
-    value = _required_native_op("deterministic_selected_edge_count")(edge_id)
+    value = _DETERMINISTIC_SELECTED_EDGE_COUNT(edge_id)
     if not isinstance(value, int):
         raise TypeError(
             "_channel.deterministic_selected_edge_count must return an int"
@@ -1232,7 +1435,7 @@ def core_pack_int2(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     validate_cuda_tensor("y", y, dtype=torch.int32, ndim=1)
     if y.shape != x.shape:
         raise ValueError("x and y must have the same shape")
-    out = _required_native_op("core_pack_int2")(x, y)
+    out = _CORE_PACK_INT2(x, y)
     if not isinstance(out, torch.Tensor):
         raise TypeError("_channel.core_pack_int2 must return a tensor")
     validate_cuda_tensor("out", out, dtype=torch.int32, ndim=2, trailing_shape=(2,))
@@ -1265,7 +1468,7 @@ def deterministic_diffraction_state_pack(
     validate_cuda_tensor("tx_power", tx_power, dtype=torch.float32, ndim=1)
     if not 0 <= int(tx_power_index) < int(tx_power.shape[0]):
         raise ValueError("tx_power_index is out of range")
-    states = _required_native_op("deterministic_diffraction_state_pack")(
+    states = _DETERMINISTIC_DIFFRACTION_STATE_PACK(
         edge_indices,
         edge_pos,
         edge_dir,
@@ -1333,7 +1536,7 @@ def deterministic_diffraction_state_pack_selected(
     validate_cuda_tensor("tx_power", tx_power, dtype=torch.float32, ndim=1)
     if not 0 <= int(tx_power_index) < int(tx_power.shape[0]):
         raise ValueError("tx_power_index is out of range")
-    states = _required_native_op("deterministic_diffraction_state_pack_selected")(
+    states = _DETERMINISTIC_DIFFRACTION_STATE_PACK_SELECTED(
         selected,
         edge_pos,
         edge_dir,
@@ -1379,7 +1582,7 @@ def deterministic_diffraction_state_pack_selected(
 
 def mc_selected_edge_indices(selected: torch.Tensor) -> torch.Tensor:
     validate_cuda_tensor("selected", selected, dtype=torch.bool, ndim=1)
-    indices = _required_native_op("mc_selected_edge_indices")(selected)
+    indices = _MC_SELECTED_EDGE_INDICES(selected)
     if not isinstance(indices, torch.Tensor):
         raise TypeError("_channel.mc_selected_edge_indices must return a tensor")
     validate_cuda_tensor("indices", indices, dtype=torch.int32, ndim=1)
@@ -1393,7 +1596,7 @@ def path_concat_vec3(blocks: tuple[torch.Tensor, ...] | list[torch.Tensor]) -> t
         validate_cuda_tensor(
             f"blocks[{index}]", block, dtype=torch.float32, ndim=2, trailing_shape=(3,)
         )
-    out = _required_native_op("path_concat_vec3")(tuple(blocks))
+    out = _PATH_CONCAT_VEC3(tuple(blocks))
     validate_cuda_tensor("out", out, dtype=torch.float32, ndim=2, trailing_shape=(3,))
     return out
 
@@ -1444,7 +1647,7 @@ def path_pack_padded(
     validate_cuda_tensor("pair_offsets", pair_offsets, dtype=torch.int64, ndim=1)
     if width is not None and width < 0:
         raise ValueError("width must be non-negative")
-    packed = _required_native_op("path_pack_padded")(
+    packed = _PATH_PACK_PADDED(
         {name: rows[name] for name, _, _ in PATH_PACK_ROW_FIELDS},
         tx_positions,
         rx_positions,
@@ -1464,7 +1667,7 @@ def mc_sample_directions(count: int, reference: torch.Tensor) -> torch.Tensor:
         raise ValueError("count must be non-negative")
     validate_cuda_tensor("reference", reference, dtype=torch.float32, ndim=2)
 
-    directions = _required_native_op("mc_sample_directions")(int(count), reference)
+    directions = _MC_SAMPLE_DIRECTIONS(int(count), reference)
     if not isinstance(directions, torch.Tensor):
         raise TypeError("_channel.mc_sample_directions must return a tensor")
     validate_cuda_tensor(
@@ -1517,7 +1720,7 @@ def evaluated_paths_compact_finalize_backward(
     """Scatter compact continuous cotangents to candidate rows."""
 
     return _compact_autograd_companion(
-        _required_native_op("evaluated_paths_compact_finalize_backward"),
+        _EVALUATED_PATHS_COMPACT_FINALIZE_BACKWARD,
         "backward",
         valid,
         selected_row_index,
@@ -1534,7 +1737,7 @@ def evaluated_paths_compact_finalize_jvp(
     """Gather candidate continuous tangents into exact compact rows."""
 
     return _compact_autograd_companion(
-        _required_native_op("evaluated_paths_compact_finalize_jvp"),
+        _EVALUATED_PATHS_COMPACT_FINALIZE_JVP,
         "JVP",
         valid,
         selected_row_index,
@@ -1597,17 +1800,25 @@ _DISCRETE_OUTPUT_COUNT = len(_STRUCTURAL_OUTPUT_FIELDS) + len(
 )
 
 
+# The apply inputs of the compact owner: the row block (only its continuous columns carry a
+# derivative), then the host configuration and the capacity observation.
+_COMPACT_CONFIG = (
+    "source_stable_ids", "sink_stable_ids", "pair_count", "num_tx", "num_rx", "max_paths",
+    "scope", "sequence_width", "capacity_failure_record", "observation",
+)
+_CANONICAL_COMPACT_AD = AdInputs(
+    "enumerated_canonical_compact",
+    *(opaque(name) for name in _DISCRETE_INPUT_FIELDS),
+    *(opaque(name, grad="diff") for name in _CONTINUOUS_INPUT_FIELDS),
+    *(opaque(name) for name in _COMPACT_CONFIG),
+)
+
+
 class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
     @staticmethod
     def forward(*inputs: Any) -> Any:
-        block = {
-            name: value
-            for name, value in zip(
-                (*_DISCRETE_INPUT_FIELDS, *_CONTINUOUS_INPUT_FIELDS),
-                inputs[:20],
-                strict=True,
-            )
-        }
+        named = _CANONICAL_COMPACT_AD.unpack(inputs)
+        block = {name: named[name] for name in (*_DISCRETE_INPUT_FIELDS, *_CONTINUOUS_INPUT_FIELDS)}
         (
             source_stable_ids,
             sink_stable_ids,
@@ -1619,8 +1830,8 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
             sequence_width,
             capacity_failure_record,
             observation,
-        ) = inputs[20:]
-        raw = _required_native_op("enumerated_canonical_compact")(
+        ) = (named[name] for name in _COMPACT_CONFIG)
+        raw = _ENUMERATED_CANONICAL_COMPACT(
             block,
             int(pair_count),
             int(num_tx),
@@ -1655,8 +1866,8 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
     @staticmethod
     def setup_context(ctx: Any, inputs: Any, output: Any) -> Any:
         ctx.set_materialize_grads(False)
-        ctx.candidate_count = int(inputs[0].shape[0])
-        ctx.sequence_width = int(inputs[27])
+        ctx.candidate_count = int(_CANONICAL_COMPACT_AD.get(inputs, "valid").shape[0])
+        ctx.sequence_width = int(_CANONICAL_COMPACT_AD.get(inputs, "sequence_width"))
         saved = tuple(
             torch.autograd.forward_ad.unpack_dual(value).primal
             for value in (output[5], output[0])
@@ -1668,12 +1879,11 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
     @staticmethod
     @_ad_first_order_only
     def backward(ctx: Any, *grad_outputs: Any) -> Any:
-        input_grads: list[torch.Tensor | None] = [None] * 30
         continuous_grads = grad_outputs[_DISCRETE_OUTPUT_COUNT:]
         if all(value is None for value in continuous_grads):
-            return tuple(input_grads)
-        if not any(ctx.needs_input_grad[10:20]):
-            return tuple(input_grads)
+            return _CANONICAL_COMPACT_AD.none
+        if not _CANONICAL_COMPACT_AD.needs(ctx, *_CONTINUOUS_INPUT_FIELDS):
+            return _CANONICAL_COMPACT_AD.none
         valid, selected_row_index = ctx.saved_tensors
         native_grads = (
             continuous_grads[0],
@@ -1703,15 +1913,15 @@ class _EnumeratedCanonicalCompactFunction(torch.autograd.Function):
         }
         if not isinstance(raw, dict) or set(raw) != expected:
             raise TypeError("native canonical compact backward returned bad fields")
-        for index, name in enumerate(_CONTINUOUS_INPUT_FIELDS, start=10):
-            if ctx.needs_input_grad[index]:
-                input_grads[index] = raw[name]
-        return tuple(input_grads)
+        return _CANONICAL_COMPACT_AD.output_grads(
+            ctx, raw, {name: name for name in _CONTINUOUS_INPUT_FIELDS}
+        )
 
     @staticmethod
     def jvp(ctx: Any, *tangents: Any) -> Any:
         continuous_tangents = tuple(
-            _ad_native_tangent_or_none(value) for value in tangents[10:20]
+            _ad_native_tangent_or_none(_CANONICAL_COMPACT_AD.tangent(tangents, name))
+            for name in _CONTINUOUS_INPUT_FIELDS
         )
         if all(value is None for value in continuous_tangents):
             return (None,) * len(_FUNCTION_OUTPUT_FIELDS)
@@ -2040,7 +2250,7 @@ def enumerated_exact_pair_metadata(
         num_tx=num_tx,
         num_rx=num_rx,
     )
-    raw = _required_native_op("enumerated_exact_pair_metadata")(
+    raw = _ENUMERATED_EXACT_PAIR_METADATA(
         tx_id,
         rx_id,
         int(pair_count),
@@ -2093,12 +2303,22 @@ _CONTINUOUS_OUTPUT_FIELDS = (
 )
 
 
+_TRANSMISSION_TOPOLOGY_DIFF = ("distance", "position", "normal")
+_TRANSMISSION_TOPOLOGY_PACK_AD = AdInputs(
+    "enumerated_transmission_topology_pack",
+    *(
+        opaque(name, grad="diff" if name in _TRANSMISSION_TOPOLOGY_DIFF else "none")
+        for name in _ENUMERATED_TRANSMISSION_TOPOLOGY_PACK.names
+    ),
+)
+
+
 class _EnumeratedTransmissionTopologyPackFunction(torch.autograd.Function):
     """Native fixed-valid topology copy with native VJP/JVP companions."""
 
     @staticmethod
     def forward(*inputs: Any) -> Any:
-        raw = _required_native_op("enumerated_transmission_topology_pack")(*inputs)
+        raw = _ENUMERATED_TRANSMISSION_TOPOLOGY_PACK(*inputs)
         if not isinstance(raw, dict) or set(raw) != set(_OUTPUT_FIELDS):
             raise TypeError("native transmission topology pack returned bad fields")
         return tuple(raw[name] for name in _OUTPUT_FIELDS)
@@ -2108,7 +2328,7 @@ class _EnumeratedTransmissionTopologyPackFunction(torch.autograd.Function):
         ctx.set_materialize_grads(False)
         saved = tuple(
             torch.autograd.forward_ad.unpack_dual(value).primal
-            for value in (output[0], inputs[1])
+            for value in (output[0], _TRANSMISSION_TOPOLOGY_PACK_AD.get(inputs, "valid"))
         )
         ctx.save_for_backward(*saved)
         ctx.save_for_forward(*saved)
@@ -2124,14 +2344,14 @@ class _EnumeratedTransmissionTopologyPackFunction(torch.autograd.Function):
     @staticmethod
     @_ad_first_order_only
     def backward(ctx: Any, *grad_outputs: Any) -> Any:
-        none_grads = (None,) * 13
+        none_grads = _TRANSMISSION_TOPOLOGY_PACK_AD.none
         continuous_grads = tuple(
             grad_outputs[_OUTPUT_FIELDS.index(name)]
             for name in _CONTINUOUS_OUTPUT_FIELDS
         )
         if all(value is None for value in continuous_grads):
             return none_grads
-        if not any(ctx.needs_input_grad[index] for index in (5, 6, 7)):
+        if not _TRANSMISSION_TOPOLOGY_PACK_AD.needs(ctx, *_TRANSMISSION_TOPOLOGY_DIFF):
             return none_grads
         topology_valid, hit_valid = ctx.saved_tensors
         # Reductions commonly supply expanded stride-zero cotangents. The
@@ -2140,32 +2360,21 @@ class _EnumeratedTransmissionTopologyPackFunction(torch.autograd.Function):
         continuous_grads = tuple(
             None if value is None else value.contiguous() for value in continuous_grads
         )
-        raw = _required_native_op("enumerated_transmission_topology_pack_backward")(
+        raw = _ENUMERATED_TRANSMISSION_TOPOLOGY_PACK_BACKWARD(
             topology_valid, hit_valid, *continuous_grads
         )
         expected = {"grad_distance", "grad_position", "grad_normal"}
         if not isinstance(raw, dict) or set(raw) != expected:
             raise TypeError("native transmission topology backward returned bad fields")
-        return (
-            None,
-            None,
-            None,
-            None,
-            None,
-            raw["grad_distance"] if ctx.needs_input_grad[5] else None,
-            raw["grad_position"] if ctx.needs_input_grad[6] else None,
-            raw["grad_normal"] if ctx.needs_input_grad[7] else None,
-            None,
-            None,
-            None,
-            None,
-            None,
+        return _TRANSMISSION_TOPOLOGY_PACK_AD.output_grads(
+            ctx, raw, {name: f"grad_{name}" for name in _TRANSMISSION_TOPOLOGY_DIFF}
         )
 
     @staticmethod
     def jvp(ctx: Any, *tangents: Any) -> Any:
         native_tangents = tuple(
-            _ad_native_tangent_or_none(tangents[index]) for index in (5, 6, 7)
+            _ad_native_tangent_or_none(_TRANSMISSION_TOPOLOGY_PACK_AD.tangent(tangents, name))
+            for name in _TRANSMISSION_TOPOLOGY_DIFF
         )
         if all(value is None for value in native_tangents):
             return (None,) * len(_OUTPUT_FIELDS)
@@ -2173,7 +2382,7 @@ class _EnumeratedTransmissionTopologyPackFunction(torch.autograd.Function):
             _ad_native_tensor(value) for value in ctx.saved_tensors
         )
         with disable_functorch():
-            raw = _required_native_op("enumerated_transmission_topology_pack_jvp")(
+            raw = _ENUMERATED_TRANSMISSION_TOPOLOGY_PACK_JVP(
                 topology_valid, hit_valid, *native_tangents
             )
         if not isinstance(raw, dict) or set(raw) != set(_CONTINUOUS_OUTPUT_FIELDS):

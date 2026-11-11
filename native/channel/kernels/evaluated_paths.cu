@@ -10,6 +10,7 @@
 #include <cub/device/device_select.cuh>
 #include <cuda_runtime_api.h>
 #include "torch_cuda.h"
+#include "constants.cuh"
 
 #include "../tensor_checks.h"
 #include "capacity.h"
@@ -21,7 +22,6 @@
 #include <utility>
 #include <vector>
 
-#define launch_blocks canonical_select_launch_blocks
 
 namespace {
 
@@ -37,9 +37,9 @@ constexpr int kDepthKeyLimit = 1 << kDepthKeyBits;
 // and one trailing group for rows outside both. Interaction chains whose diffraction is
 // interior (component 8 + slot) share group 3 with the chains whose diffraction is last.
 constexpr int kComponentRowGroups = 8;
-constexpr int kChainLastComponent = 3;
-constexpr int kChainFirstComponent = 4;
-constexpr int kChainInteriorComponentBase = 8;
+constexpr int kChainLastComponent = channel::kComponentReflectionDiffraction;
+constexpr int kChainFirstComponent = channel::kComponentDiffractionReflection;
+constexpr int kChainInteriorComponentBase = channel::kComponentChainInteriorBase;
 using channel::check_tensor;
 
 int index_bits(int64_t count) {
@@ -56,7 +56,7 @@ int64_t row_group_count(int64_t width) {
 
 __device__ __forceinline__ int row_group(int component, int depth, int64_t width) {
     const int overflow = static_cast<int>(kComponentRowGroups + width + 1);
-    if (component == 1) {
+    if (component == channel::kComponentReflection) {
         return depth >= 0 && depth <= width ? kComponentRowGroups + depth : overflow;
     }
     if (component > kChainInteriorComponentBase && component < kComponentKeyLimit) {
@@ -81,10 +81,6 @@ __device__ __forceinline__ int chain_diffraction_slot(int component, int depth) 
 
 __device__ __forceinline__ uint64_t biased_key(int value) {
     return static_cast<uint64_t>(static_cast<uint32_t>(value) ^ 0x80000000u);
-}
-
-int launch_blocks(int64_t count) {
-    return static_cast<int>((count + kBlockSize - 1) / kBlockSize);
 }
 
 __global__ void validate_rows_kernel(
@@ -218,16 +214,16 @@ __global__ void row_group_histogram_kernel(
 }
 
 __device__ int event_type(int component, int depth, int64_t slot, int64_t width) {
-    if (component == 1 && slot < depth) {
+    if (component == channel::kComponentReflection && slot < depth) {
         return 1;
     }
-    if (component == 2 && depth > 0 && slot == 0) {
+    if (component == channel::kComponentDiffraction && depth > 0 && slot == 0) {
         return 2;
     }
-    if (component == 5 && slot < depth) {
+    if (component == channel::kComponentTransmission && slot < depth) {
         return 4;
     }
-    if (component == 6 && depth > 0 && slot == 0) {
+    if (component == channel::kComponentScattering && depth > 0 && slot == 0) {
         return 8;
     }
     if (width >= 2 && depth >= 2 && slot < depth) {
@@ -235,7 +231,7 @@ __device__ int event_type(int component, int depth, int64_t slot, int64_t width)
         if (diffraction >= 0) {
             return slot == diffraction ? 2 : 1;
         }
-        if (component == 7 && slot < 2) {
+        if (component == channel::kComponentDoubleDiffraction && slot < 2) {
             return 2;
         }
     }
@@ -253,7 +249,7 @@ __device__ int object_id(
     if (type == 0) {
         return -1;
     }
-    if (component == 2 && slot == 0) {
+    if (component == channel::kComponentDiffraction && slot == 0) {
         return edge;
     }
     return sequence[row * width + slot];
@@ -597,7 +593,8 @@ at::Tensor row_group_order(
     auto keys = at::empty({row_count}, long_options.dtype(at::kInt));
     auto sorted_keys = at::empty({row_count}, long_options.dtype(at::kInt));
     auto positions = at::empty({row_count}, long_options);
-    row_group_key_kernel<<<launch_blocks(row_count), kBlockSize, 0, stream>>>(
+    row_group_key_kernel<<<::channel::launch_blocks(row_count, kBlockSize),
+                           kBlockSize, 0, stream>>>(
         exact_index.data_ptr<int64_t>(), component_id.data_ptr<int>(), depth.data_ptr<int>(),
         reinterpret_cast<unsigned int*>(keys.data_ptr<int>()), positions.data_ptr<int64_t>(),
         row_count, width);
@@ -810,12 +807,14 @@ static pybind11::dict canonical_capacity_select_impl(
     C10_CUDA_CHECK(cudaMemsetAsync(private_selected_count.data_ptr<int>(), 0, sizeof(int), stream));
 
     if (count > 0) {
-        validate_rows_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        validate_rows_kernel<<<::channel::launch_blocks(count, kBlockSize),
+                               kBlockSize, 0, stream>>>(
             failure_state.data_ptr<int>(), valid.data_ptr<bool>(), tx_id.data_ptr<int>(),
             rx_id.data_ptr<int>(), depth.data_ptr<int>(), component_id.data_ptr<int>(),
             valid_count.data_ptr<int>(), count, num_tx, num_rx);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
-        init_order_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(count, order.data_ptr<int64_t>());
+        init_order_kernel<<<::channel::launch_blocks(count, kBlockSize),
+                            kBlockSize, 0, stream>>>(count, order.data_ptr<int64_t>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
         // Least-significant-first stable radix passes over packed keys give the
         // lexicographic order (invalid, rx, tx, depth, component, sequence
@@ -837,7 +836,8 @@ static pybind11::dict canonical_capacity_select_impl(
         };
         auto sort_pair = [&](const int* hi, int64_t hi_stride, int64_t hi_column,
                              const int* lo, int64_t lo_stride, int64_t lo_column) {
-            sort_key_pair_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+            sort_key_pair_kernel<<<::channel::launch_blocks(count, kBlockSize),
+                                   kBlockSize, 0, stream>>>(
                 failure_state.data_ptr<int>(), valid.data_ptr<bool>(), hi, hi_stride, hi_column,
                 lo, lo_stride, lo_column, order.data_ptr<int64_t>(),
                 reinterpret_cast<uint64_t*>(keys.data_ptr<int64_t>()), count);
@@ -851,20 +851,22 @@ static pybind11::dict canonical_capacity_select_impl(
         }
         const int tx_bits = index_bits(num_tx);
         const int rx_bits = index_bits(num_rx);
-        sort_key_outer_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        sort_key_outer_kernel<<<::channel::launch_blocks(count, kBlockSize),
+                                kBlockSize, 0, stream>>>(
             failure_state.data_ptr<int>(), valid.data_ptr<bool>(), component_id.data_ptr<int>(),
             depth.data_ptr<int>(), tx_id.data_ptr<int>(), rx_id.data_ptr<int>(),
             order.data_ptr<int64_t>(), reinterpret_cast<uint64_t*>(keys.data_ptr<int64_t>()),
             count, tx_bits, rx_bits);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
         stable_sort(kComponentKeyBits + kDepthKeyBits + tx_bits + rx_bits + 1);
-        group_start_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        group_start_kernel<<<::channel::launch_blocks(count, kBlockSize), kBlockSize, 0, stream>>>(
             failure_state.data_ptr<int>(), valid.data_ptr<bool>(), order.data_ptr<int64_t>(),
             tx_id.data_ptr<int>(), rx_id.data_ptr<int>(), depth.data_ptr<int>(),
             component_id.data_ptr<int>(), edge_id.data_ptr<int>(), primitive_sequence.data_ptr<int>(),
             group_start.data_ptr<bool>(), count, width);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
-        shortest_winner_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        shortest_winner_kernel<<<::channel::launch_blocks(count, kBlockSize),
+                                 kBlockSize, 0, stream>>>(
             failure_state.data_ptr<int>(), valid_count.data_ptr<int>(), valid.data_ptr<bool>(),
             order.data_ptr<int64_t>(), group_start.data_ptr<bool>(), path_length_m.data_ptr<float>(),
             winner.data_ptr<bool>(), count);
@@ -880,17 +882,20 @@ static pybind11::dict canonical_capacity_select_impl(
     }
 
     if (pair_count > 0) {
-        pair_state_init_kernel<<<launch_blocks(pair_count), kBlockSize, 0, stream>>>(
+        pair_state_init_kernel<<<::channel::launch_blocks(pair_count, kBlockSize),
+                                 kBlockSize, 0, stream>>>(
             pair_counts.data_ptr<int>(), pair_starts.data_ptr<int>(), pair_count);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     if (count > 0) {
-        dedup_pair_state_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        dedup_pair_state_kernel<<<::channel::launch_blocks(count, kBlockSize),
+                                  kBlockSize, 0, stream>>>(
             failure_state.data_ptr<int>(), dedup_index.data_ptr<int64_t>(), dedup_count.data_ptr<int>(),
             tx_id.data_ptr<int>(), rx_id.data_ptr<int>(), pair_counts.data_ptr<int>(),
             pair_starts.data_ptr<int>(), count, num_tx);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
-        max_paths_flags_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        max_paths_flags_kernel<<<::channel::launch_blocks(count, kBlockSize),
+                                 kBlockSize, 0, stream>>>(
             failure_state.data_ptr<int>(), dedup_index.data_ptr<int64_t>(), dedup_count.data_ptr<int>(),
             tx_id.data_ptr<int>(), rx_id.data_ptr<int>(), pair_starts.data_ptr<int>(), keep.data_ptr<bool>(),
             count, num_tx, max_paths, static_cast<int>(max_paths_scope));
@@ -908,12 +913,14 @@ static pybind11::dict canonical_capacity_select_impl(
         C10_CUDA_CHECK(cudaMemsetAsync(pair_counts.data_ptr<int>(), 0, pair_count * sizeof(int), stream));
     }
     if (count > 0) {
-        row_group_histogram_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        row_group_histogram_kernel<<<::channel::launch_blocks(count, kBlockSize),
+                                     kBlockSize, 0, stream>>>(
             failure_state.data_ptr<int>(), private_selected_index.data_ptr<int64_t>(),
             private_selected_count.data_ptr<int>(), component_id.data_ptr<int>(),
             depth.data_ptr<int>(), group_counts.data_ptr<int>(), count, width);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
-        final_pair_count_kernel<<<launch_blocks(count), kBlockSize, 0, stream>>>(
+        final_pair_count_kernel<<<::channel::launch_blocks(count, kBlockSize),
+                                  kBlockSize, 0, stream>>>(
             failure_state.data_ptr<int>(), private_selected_index.data_ptr<int64_t>(),
             private_selected_count.data_ptr<int>(), tx_id.data_ptr<int>(), rx_id.data_ptr<int>(),
             pair_counts.data_ptr<int>(), count, num_tx);
@@ -921,7 +928,8 @@ static pybind11::dict canonical_capacity_select_impl(
     }
     const int64_t publish_count = count > pair_count ? count : pair_count;
     if (publish_count > 0) {
-        publish_kernel<<<launch_blocks(publish_count), kBlockSize, 0, stream>>>(
+        publish_kernel<<<::channel::launch_blocks(publish_count, kBlockSize),
+                         kBlockSize, 0, stream>>>(
             failure_state.data_ptr<int>(), private_selected_index.data_ptr<int64_t>(),
             private_selected_count.data_ptr<int>(), pair_counts.data_ptr<int>(),
             selected_row_index.data_ptr<int64_t>(), selected_valid.data_ptr<bool>(),
@@ -1031,7 +1039,7 @@ pybind11::dict exact_pair_metadata(
         {has_stable_ids ? row_count : 0}, long_options);
     if (row_count > 0) {
         exact_pair_metadata_kernel<<<
-            launch_blocks(row_count), kBlockSize, 0, stream>>>(
+            ::channel::launch_blocks(row_count, kBlockSize), kBlockSize, 0, stream>>>(
             selected_row_index.defined()
                 ? selected_row_index.data_ptr<int64_t>()
                 : nullptr,
@@ -1253,7 +1261,6 @@ pybind11::dict channel_enumerated_exact_pair_metadata(
     return result;
 }
 
-#undef launch_blocks
 
 // ==== Section: Transmission topology packing ====
 #include <ATen/ATen.h>
@@ -1276,13 +1283,11 @@ pybind11::dict channel_enumerated_exact_pair_metadata(
 #include <limits>
 #include <optional>
 
-#define launch_blocks transmission_pack_launch_blocks
-#define kBlockSize kTransmissionPackBlockSize
 
 namespace {
 
-constexpr int kBlockSize = 256;
-constexpr float kLightSpeedMetersPerSecond = 299792458.0f;
+constexpr int kTransmissionPackBlockSize = 256;
+using channel::kSpeedOfLightF;
 
 __device__ __forceinline__ float canonical_quiet_nan() {
     return __uint_as_float(0x7fc00000u);
@@ -1308,10 +1313,6 @@ struct TopologyOutput {
     float *interaction_positions;
     float *interaction_normals;
 };
-
-int launch_blocks(int64_t count) {
-    return static_cast<int>((count + kBlockSize - 1) / kBlockSize);
-}
 
 __global__ void transmission_topology_init_kernel(
     TopologyOutput output,
@@ -1456,7 +1457,7 @@ __global__ void transmission_topology_pack_kernel(
         output.component_id[row] = 5;
         output.edge_id[row] = -1;
         output.path_length_m[row] = distance[row];
-        output.delay_s[row] = distance[row] / kLightSpeedMetersPerSecond;
+        output.delay_s[row] = distance[row] / kSpeedOfLightF;
         const float nan = canonical_quiet_nan();
         output.path_gain[row] = nan;
         output.path_field[row] = c10::complex<float>(nan, nan);
@@ -1586,7 +1587,7 @@ __global__ void transmission_topology_pack_backward_kernel(
         distance_grad += grad_path_length_m[row];
     }
     if (grad_delay_s != nullptr) {
-        distance_grad += grad_delay_s[row] / kLightSpeedMetersPerSecond;
+        distance_grad += grad_delay_s[row] / kSpeedOfLightF;
     }
     grad_distance[row] = distance_grad;
     for (int64_t slot = 0; slot < hit_capacity; ++slot) {
@@ -1654,7 +1655,7 @@ __global__ void transmission_topology_pack_jvp_kernel(
     }
     if (tangent_distance != nullptr) {
         tangent_path_length_m[row] = tangent_distance[row];
-        tangent_delay_s[row] = tangent_distance[row] / kLightSpeedMetersPerSecond;
+        tangent_delay_s[row] = tangent_distance[row] / kSpeedOfLightF;
     }
     for (int64_t slot = 0; slot < hit_capacity; ++slot) {
         const int64_t sequence = row * hit_capacity + slot;
@@ -1774,20 +1775,23 @@ pybind11::dict channel_enumerated_transmission_topology_pack(
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
     const int64_t init_count = pair_count > 0 ? pair_count : 1;
     transmission_topology_init_kernel<<<
-        launch_blocks(init_count), kBlockSize, 0, stream>>>(
+        ::channel::launch_blocks(init_count, kTransmissionPackBlockSize),
+        kTransmissionPackBlockSize, 0, stream>>>(
         output, candidate_count.data_ptr<int>(), guardrail_count.data_ptr<int>(),
         pair_count, hit_capacity);
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     if (pair_count > 0) {
         transmission_topology_preflight_kernel<<<
-            launch_blocks(pair_count), kBlockSize, 0, stream>>>(
+            ::channel::launch_blocks(pair_count, kTransmissionPackBlockSize),
+            kTransmissionPackBlockSize, 0, stream>>>(
             failure_state.data_ptr<int>(), valid.data_ptr<bool>(), num_hits.data_ptr<int>(),
             reached_target.data_ptr<bool>(), overflow.data_ptr<bool>(),
             global_primitive_id.data_ptr<int>(), pair_count, hit_capacity,
             face_material_id.numel());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
         transmission_topology_pack_kernel<<<
-            launch_blocks(pair_count), kBlockSize, 0, stream>>>(
+            ::channel::launch_blocks(pair_count, kTransmissionPackBlockSize),
+            kTransmissionPackBlockSize, 0, stream>>>(
             failure_state.data_ptr<int>(), reached_target.data_ptr<bool>(),
             num_hits.data_ptr<int>(),
             distance.data_ptr<float>(), position.data_ptr<float>(),
@@ -1797,7 +1801,8 @@ pybind11::dict channel_enumerated_transmission_topology_pack(
             hit_capacity, geometry_mode_id.numel(), rx_count);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
         transmission_topology_sanitize_kernel<<<
-            launch_blocks(pair_count), kBlockSize, 0, stream>>>(
+            ::channel::launch_blocks(pair_count, kTransmissionPackBlockSize),
+            kTransmissionPackBlockSize, 0, stream>>>(
             failure_state.data_ptr<int>(), output, candidate_count.data_ptr<int>(),
             guardrail_count.data_ptr<int>(), pair_count, hit_capacity);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
@@ -1874,7 +1879,8 @@ pybind11::dict channel_enumerated_transmission_topology_pack_backward(
     if (pair_count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
         transmission_topology_pack_backward_kernel<<<
-            launch_blocks(pair_count), kBlockSize, 0, stream>>>(
+            ::channel::launch_blocks(pair_count, kTransmissionPackBlockSize),
+            kTransmissionPackBlockSize, 0, stream>>>(
             topology_valid.data_ptr<bool>(),
             hit_valid.data_ptr<bool>(),
             grad_path_length_m.has_value() ? grad_path_length_m->data_ptr<float>() : nullptr,
@@ -1937,7 +1943,8 @@ pybind11::dict channel_enumerated_transmission_topology_pack_jvp(
     if (pair_count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
         transmission_topology_pack_jvp_kernel<<<
-            launch_blocks(pair_count), kBlockSize, 0, stream>>>(
+            ::channel::launch_blocks(pair_count, kTransmissionPackBlockSize),
+            kTransmissionPackBlockSize, 0, stream>>>(
             topology_valid.data_ptr<bool>(),
             hit_valid.data_ptr<bool>(),
             tangent_distance.has_value() ? tangent_distance->data_ptr<float>() : nullptr,
@@ -1963,8 +1970,6 @@ pybind11::dict channel_enumerated_transmission_topology_pack_jvp(
     return result;
 }
 
-#undef launch_blocks
-#undef kBlockSize
 
 // ==== Section: Compact path finalization ====
 #include <ATen/ATen.h>
@@ -2137,11 +2142,6 @@ __global__ void compact_pair_histogram_kernel(
     }
 }
 
-int finalize_launch_blocks(int64_t count) {
-    return static_cast<int>(
-        (count + kFinalizeBlockSize - 1) / kFinalizeBlockSize);
-}
-
 void check_stable_lookup(
     const at::Tensor& lookup,
     const char *name,
@@ -2288,7 +2288,7 @@ pybind11::dict channel_evaluated_paths_compact_finalize(
         selected_row_index = at::empty({compact_count}, long_options);
         pair_index = at::empty({compact_count}, long_options);
         exact_row_metadata_kernel<<<
-            finalize_launch_blocks(compact_count),
+            ::channel::launch_blocks(compact_count, kFinalizeBlockSize),
             kFinalizeBlockSize,
             0,
             stream>>>(
@@ -2314,7 +2314,7 @@ pybind11::dict channel_evaluated_paths_compact_finalize(
         auto contract_error = channel::empty_zero_cuda(
             {1}, int_options, stream);
         compact_contract_flags_kernel<<<
-            finalize_launch_blocks(candidate_count),
+            ::channel::launch_blocks(candidate_count, kFinalizeBlockSize),
             kFinalizeBlockSize,
             0,
             stream>>>(
@@ -2340,7 +2340,7 @@ pybind11::dict channel_evaluated_paths_compact_finalize(
         sink_id = at::empty({compact_count}, long_options);
         if (compact_count > 0) {
             compact_selection_kernel<<<
-                finalize_launch_blocks(candidate_count),
+                ::channel::launch_blocks(candidate_count, kFinalizeBlockSize),
                 kFinalizeBlockSize,
                 0,
                 stream>>>(
@@ -2365,7 +2365,7 @@ pybind11::dict channel_evaluated_paths_compact_finalize(
         {pair_count + 1}, long_options, stream);
     if (compact_count > 0 && pair_count > 0) {
         compact_pair_histogram_kernel<<<
-            finalize_launch_blocks(compact_count),
+            ::channel::launch_blocks(compact_count, kFinalizeBlockSize),
             kFinalizeBlockSize,
             0,
             stream>>>(
@@ -2383,7 +2383,7 @@ pybind11::dict channel_evaluated_paths_compact_finalize(
     }
     if (!rows_are_compact && compact_count > 0) {
         compact_payload_gather_kernel<<<
-            finalize_launch_blocks(compact_count),
+            ::channel::launch_blocks(compact_count, kFinalizeBlockSize),
             kFinalizeBlockSize,
             0,
             stream>>>(
@@ -2572,7 +2572,6 @@ inline AllocatedContinuous allocate_continuous(
 #include <cstdint>
 #include <optional>
 
-#define launch_blocks evaluated_paths_ad_launch_blocks
 
 namespace {
 
@@ -2763,10 +2762,6 @@ __global__ void evaluated_paths_capacity_jvp_gather_kernel(
     }
 }
 
-int launch_blocks(int64_t count) {
-    return static_cast<int>((count + kPackAdBlockSize - 1) / kPackAdBlockSize);
-}
-
 void check_selection(
     const at::Tensor& valid,
     const at::Tensor& selected_row_index) {
@@ -2824,13 +2819,15 @@ pybind11::dict channel_evaluated_paths_compact_finalize_backward(
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
     if (candidate_count > 0) {
         evaluated_paths_capacity_continuous_init_kernel<<<
-            launch_blocks(candidate_count), kPackAdBlockSize, 0, stream>>>(
+            ::channel::launch_blocks(candidate_count, kPackAdBlockSize),
+            kPackAdBlockSize, 0, stream>>>(
             outputs.view(), candidate_count, sequence_width);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     if (row_capacity > 0) {
         evaluated_paths_capacity_backward_scatter_kernel<<<
-            launch_blocks(row_capacity), kPackAdBlockSize, 0, stream>>>(
+            ::channel::launch_blocks(row_capacity, kPackAdBlockSize),
+            kPackAdBlockSize, 0, stream>>>(
             valid.data_ptr<bool>(),
             selected_row_index.data_ptr<int64_t>(),
             views,
@@ -2884,11 +2881,13 @@ pybind11::dict channel_evaluated_paths_compact_finalize_jvp(
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
     if (row_capacity > 0) {
         evaluated_paths_capacity_continuous_init_kernel<<<
-            launch_blocks(row_capacity), kPackAdBlockSize, 0, stream>>>(
+            ::channel::launch_blocks(row_capacity, kPackAdBlockSize),
+            kPackAdBlockSize, 0, stream>>>(
             outputs.view(), row_capacity, sequence_width);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
         evaluated_paths_capacity_jvp_gather_kernel<<<
-            launch_blocks(row_capacity), kPackAdBlockSize, 0, stream>>>(
+            ::channel::launch_blocks(row_capacity, kPackAdBlockSize),
+            kPackAdBlockSize, 0, stream>>>(
             valid.data_ptr<bool>(),
             selected_row_index.data_ptr<int64_t>(),
             views,
@@ -2968,5 +2967,4 @@ pybind11::dict channel_evaluated_paths_capacity_pack_jvp(
         sequence_width);
 }
 
-#undef launch_blocks
 

@@ -8,6 +8,7 @@ import inspect
 import pytest
 
 from witwin.channel.kernels import montecarlo
+from witwin.channel.kernels import spec
 from witwin.channel.propagation import topology
 from witwin.channel.kernels import topology as topology_kernels
 from witwin.channel import runtime
@@ -142,7 +143,7 @@ def test_mc_basic_sampling_uses_canonical_runtime_dependencies():
     # runtime.required_symbol, and ci/check_import_graph.py rejects a solver
     # that imports ``native_extension`` at all.
     assert not hasattr(montecarlo, "native_extension")
-    assert montecarlo.required_symbol is runtime.required_symbol
+    assert montecarlo._required_native_op is runtime.required_symbol
     assert montecarlo.validate_cuda_tensor is runtime.validate_cuda_tensor
 
 
@@ -181,18 +182,20 @@ def test_mc_basic_maps_uses_canonical_runtime_dependencies():
     assert montecarlo._required_native_op is runtime.required_symbol
     assert montecarlo.validate_cuda_tensor is runtime.validate_cuda_tensor
     assert montecarlo.disable_functorch is runtime.disable_functorch
-    assert montecarlo._ad_frequency_grad is runtime._ad_frequency_grad
-    assert montecarlo._ad_frequency_tangent is runtime._ad_frequency_tangent
-    assert montecarlo._ad_frequency_value is runtime._ad_frequency_value
-    assert montecarlo._ad_geometry_tangent is runtime._ad_geometry_tangent
-    assert (
-        montecarlo._ad_native_tangent_or_none is runtime._ad_native_tangent_or_none
-    )
-    assert montecarlo._ad_native_tensor is runtime._ad_native_tensor
-    assert montecarlo._ad_reject_fixed_inputs is runtime._ad_reject_fixed_inputs
-    assert (
-        montecarlo._ad_reject_fixed_tangents is runtime._ad_reject_fixed_tangents
-    )
+    # The AD plumbing is runtime's, used directly or through the declared AD inputs.
+    for name in (
+        "_ad_frequency_grad",
+        "_ad_frequency_tangent",
+        "_ad_frequency_value",
+        "_ad_geometry_tangent",
+        "_ad_native_tangent_or_none",
+        "_ad_native_tensor",
+        "_ad_reject_fixed_inputs",
+        "_ad_reject_fixed_tangents",
+    ):
+        owners = [module for module in (montecarlo, spec) if hasattr(module, name)]
+        assert owners
+        assert all(getattr(module, name) is getattr(runtime, name) for module in owners)
     assert montecarlo._LIGHT_SPEED_M_PER_S_AD == 299_792_458.0
     assert montecarlo._MC_FINALIZE_FIELDS
 

@@ -44,6 +44,7 @@
 #include <c10/cuda/CUDAGuard.h>
 #include <cusolverDn.h>
 #include "torch_cuda.h"
+#include "constants.cuh"
 
 #include <src/transmission_device.cuh>
 #include <src/field_transport_ad.cuh>
@@ -56,12 +57,8 @@ namespace em = rayd::shared::transmission;
 namespace ad = rayd::torch::field_transport_ad;
 namespace utd = rayd::shared::diffraction;
 
-constexpr float kTwoPi = 6.283185307179586f;
-constexpr float kDkDf = kTwoPi / em::kSpeedOfLight;  // dk0/df
-
-int launch_blocks(int64_t count) {
-    return static_cast<int>((count + kBlockSize - 1) / kBlockSize);
-}
+using channel::kTwoPiF;
+constexpr float kDkDf = kTwoPiF / em::kSpeedOfLight;  // dk0/df
 
 at::Tensor zero_filled(at::IntArrayRef sizes, const at::TensorOptions& options) {
     auto tensor = at::empty(sizes, options);
@@ -848,11 +845,11 @@ void solve_dense(at::Tensor& A_colmajor, at::Tensor& b, int n) {
     TORCH_CHECK(status == CUSOLVER_STATUS_SUCCESS, "cusolverDnDgesvd failed");
 
     auto c = at::empty({n}, opts);
-    pinv_project_kernel<<<launch_blocks(n), kBlockSize, 0, stream>>>(
+    pinv_project_kernel<<<::channel::launch_blocks(n, kBlockSize), kBlockSize, 0, stream>>>(
         n, U.data_ptr<double>(), b.data_ptr<double>(), S.data_ptr<double>(),
         kPinvRelCutoff, c.data_ptr<double>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
-    pinv_reconstruct_kernel<<<launch_blocks(n), kBlockSize, 0, stream>>>(
+    pinv_reconstruct_kernel<<<::channel::launch_blocks(n, kBlockSize), kBlockSize, 0, stream>>>(
         n, VT.data_ptr<double>(), c.data_ptr<double>(), b.data_ptr<double>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
@@ -918,9 +915,9 @@ TableDims check_inputs(
     }
     d.iso = d.npi == 1;
     d.n_states = d.nti * d.npi;
-    d.d_omega = (1.0f / d.nto) * (kTwoPi / d.npo);
+    d.d_omega = (1.0f / d.nto) * (kTwoPiF / d.npo);
     d.k0 = static_cast<float>(
-        2.0 * 3.14159265358979323846 * frequency_hz / em::kSpeedOfLight);
+        2.0 * channel::kPi * frequency_hz / em::kSpeedOfLight);
     const float g_max =
         (2.0f * d.k0 * static_cast<float>(sigma_h)) *
         (2.0f * d.k0 * static_cast<float>(sigma_h));
@@ -956,20 +953,21 @@ ChannelAdjoint channel_backward_adjoint(
     auto stream = at::cuda::getCurrentCUDAStream().stream();
 
     auto sbar = at::empty(s.sizes(), d_opts);
-    sbar_direct_kernel<<<launch_blocks(elems), kBlockSize, 0, stream>>>(
+    sbar_direct_kernel<<<::channel::launch_blocks(elems, kBlockSize), kBlockSize, 0, stream>>>(
         elems, d.nti, d.npi, d.nto, d.npo, grad_f.data_ptr<float>(),
         a.data_ptr<float>(), sbar.data_ptr<double>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     auto abar = at::empty({n}, d_opts);
-    abar_kernel<<<launch_blocks(n), kBlockSize, 0, stream>>>(
+    abar_kernel<<<::channel::launch_blocks(n, kBlockSize), kBlockSize, 0, stream>>>(
         n, d.nti, d.npi, d.nto, d.npo, d.iso, grad_f.data_ptr<float>(),
         s.data_ptr<float>(), a.data_ptr<float>(), r_diff.data_ptr<float>(),
         abar.data_ptr<double>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     auto smat = at::empty({static_cast<int64_t>(n) * n}, d_opts);
-    smat_kernel<float><<<launch_blocks(static_cast<int64_t>(n) * n), kBlockSize, 0,
+    smat_kernel<float><<<::channel::launch_blocks(static_cast<int64_t>(n) * n, kBlockSize),
+                         kBlockSize, 0,
                          stream>>>(
         n, d.nti, d.npi, d.nto, d.npo, d.iso, s.data_ptr<float>(),
         smat.data_ptr<double>());
@@ -978,7 +976,7 @@ ChannelAdjoint channel_backward_adjoint(
     auto w_state = at::empty({n}, d_opts);
     auto a_state = at::empty({n}, d_opts);
     auto active = at::empty({n}, s.options().dtype(at::kInt));
-    state_weight_kernel<<<launch_blocks(n), kBlockSize, 0, stream>>>(
+    state_weight_kernel<<<::channel::launch_blocks(n, kBlockSize), kBlockSize, 0, stream>>>(
         n, d.nti, d.npi, d.nto, d.npo, d.iso, static_cast<double>(d.d_omega),
         cos_o.data_ptr<float>(), a.data_ptr<float>(), r_diff.data_ptr<float>(),
         w_state.data_ptr<double>(), a_state.data_ptr<double>(),
@@ -986,14 +984,15 @@ ChannelAdjoint channel_backward_adjoint(
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     auto diag = at::empty({n}, d_opts);
-    diag_kernel<<<launch_blocks(n), kBlockSize, 0, stream>>>(
+    diag_kernel<<<::channel::launch_blocks(n, kBlockSize), kBlockSize, 0, stream>>>(
         n, smat.data_ptr<double>(), w_state.data_ptr<double>(),
         a_state.data_ptr<double>(), diag.data_ptr<double>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     // A = J^T (column-major); solve A lambda = abar (min-norm least squares).
     auto A = at::empty({static_cast<int64_t>(n) * n}, d_opts);
-    assemble_matrix_kernel<<<launch_blocks(static_cast<int64_t>(n) * n), kBlockSize,
+    assemble_matrix_kernel<<<::channel::launch_blocks(static_cast<int64_t>(n) * n, kBlockSize),
+                             kBlockSize,
                              0, stream>>>(
         n, /*transpose=*/true, smat.data_ptr<double>(), diag.data_ptr<double>(),
         w_state.data_ptr<double>(), a_state.data_ptr<double>(),
@@ -1003,14 +1002,14 @@ ChannelAdjoint channel_backward_adjoint(
     auto lambda = abar.clone();  // solve overwrites in place.
     solve_dense(A, lambda, n);
 
-    sbar_implicit_kernel<<<launch_blocks(elems), kBlockSize, 0, stream>>>(
+    sbar_implicit_kernel<<<::channel::launch_blocks(elems, kBlockSize), kBlockSize, 0, stream>>>(
         elems, d.nti, d.npi, d.nto, d.npo, static_cast<double>(d.d_omega),
         cos_o.data_ptr<float>(), a.data_ptr<float>(), lambda.data_ptr<double>(),
         sbar.data_ptr<double>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     auto budget_adjoint = at::empty({d.nti}, d_opts);
-    budget_adjoint_kernel<<<launch_blocks(d.nti), kBlockSize, 0, stream>>>(
+    budget_adjoint_kernel<<<::channel::launch_blocks(d.nti, kBlockSize), kBlockSize, 0, stream>>>(
         d.nti, d.npi, lambda.data_ptr<double>(), budget_adjoint.data_ptr<double>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 
@@ -1075,7 +1074,8 @@ pybind11::dict channel_kirchhoff_table_build_backward(
             d, *s_ch[c], *a_ch[c], *r_ch[c], cos_o, *gf_ch[c]);
         // Step 3: budget chain.
         if (need_grad_rough || need_grad_layers || need_grad_frequency) {
-            budget_chain_backward_kernel<<<launch_blocks(d.nti), kBlockSize, 0,
+            budget_chain_backward_kernel<<<::channel::launch_blocks(d.nti, kBlockSize),
+                                           kBlockSize, 0,
                                            at::cuda::getCurrentCUDAStream().stream()>>>(
                 d.nti, channels[c], static_cast<float>(sigma_h), d.k0,
                 static_cast<float>(frequency_hz), cos_i.data_ptr<float>(),
@@ -1092,7 +1092,7 @@ pybind11::dict channel_kirchhoff_table_build_backward(
         }
         // Step 4: raw-lobe adjoint over both node sets.
         for (int swapped = 0; swapped < 2; ++swapped) {
-            raw_lobe_backward_kernel<<<launch_blocks(elems), kBlockSize, 0,
+            raw_lobe_backward_kernel<<<::channel::launch_blocks(elems, kBlockSize), kBlockSize, 0,
                                        at::cuda::getCurrentCUDAStream().stream()>>>(
                 elems, d.nti, d.npi, d.nto, d.npo, swapped == 1, channels[c],
                 static_cast<float>(sigma_h), static_cast<float>(corr_x),
@@ -1159,7 +1159,7 @@ void channel_jvp(
     // dS over both node sets (double: dS feeds the a_i*a_j-scaled forcing).
     auto dsbar = zero_filled(s.sizes(), d_opts);
     for (int swapped = 0; swapped < 2; ++swapped) {
-        raw_lobe_jvp_kernel<<<launch_blocks(elems), kBlockSize, 0, stream>>>(
+        raw_lobe_jvp_kernel<<<::channel::launch_blocks(elems, kBlockSize), kBlockSize, 0, stream>>>(
             elems, d.nti, d.npi, d.nto, d.npo, swapped == 1, pol,
             static_cast<float>(sigma_h), static_cast<float>(corr_x),
             static_cast<float>(corr_y), d.k0, static_cast<float>(frequency_hz),
@@ -1176,7 +1176,7 @@ void channel_jvp(
 
     // drhs per incidence cos.
     auto drhs = at::empty({d.nti}, d_opts);
-    budget_chain_jvp_kernel<<<launch_blocks(d.nti), kBlockSize, 0, stream>>>(
+    budget_chain_jvp_kernel<<<::channel::launch_blocks(d.nti, kBlockSize), kBlockSize, 0, stream>>>(
         d.nti, pol, static_cast<float>(sigma_h), d.k0,
         static_cast<float>(frequency_hz), static_cast<float>(t_sigma_h),
         static_cast<float>(t_frequency), cos_i.data_ptr<float>(),
@@ -1188,13 +1188,15 @@ void channel_jvp(
 
     // State-space Smat / dSmat / weights (all float64).
     auto smat = at::empty({static_cast<int64_t>(n) * n}, d_opts);
-    smat_kernel<float><<<launch_blocks(static_cast<int64_t>(n) * n), kBlockSize, 0,
+    smat_kernel<float><<<::channel::launch_blocks(static_cast<int64_t>(n) * n, kBlockSize),
+                         kBlockSize, 0,
                          stream>>>(
         n, d.nti, d.npi, d.nto, d.npo, d.iso, s.data_ptr<float>(),
         smat.data_ptr<double>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     auto dsmat = at::empty({static_cast<int64_t>(n) * n}, d_opts);
-    smat_kernel<double><<<launch_blocks(static_cast<int64_t>(n) * n), kBlockSize, 0,
+    smat_kernel<double><<<::channel::launch_blocks(static_cast<int64_t>(n) * n, kBlockSize),
+                          kBlockSize, 0,
                           stream>>>(
         n, d.nti, d.npi, d.nto, d.npo, d.iso, dsbar.data_ptr<double>(),
         dsmat.data_ptr<double>());
@@ -1203,7 +1205,7 @@ void channel_jvp(
     auto w_state = at::empty({n}, d_opts);
     auto a_state = at::empty({n}, d_opts);
     auto active = at::empty({n}, options.dtype(at::kInt));
-    state_weight_kernel<<<launch_blocks(n), kBlockSize, 0, stream>>>(
+    state_weight_kernel<<<::channel::launch_blocks(n, kBlockSize), kBlockSize, 0, stream>>>(
         n, d.nti, d.npi, d.nto, d.npo, d.iso, static_cast<double>(d.d_omega),
         cos_o.data_ptr<float>(), a.data_ptr<float>(), r_diff.data_ptr<float>(),
         w_state.data_ptr<double>(), a_state.data_ptr<double>(),
@@ -1211,14 +1213,15 @@ void channel_jvp(
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     auto diag = at::empty({n}, d_opts);
-    diag_kernel<<<launch_blocks(n), kBlockSize, 0, stream>>>(
+    diag_kernel<<<::channel::launch_blocks(n, kBlockSize), kBlockSize, 0, stream>>>(
         n, smat.data_ptr<double>(), w_state.data_ptr<double>(),
         a_state.data_ptr<double>(), diag.data_ptr<double>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     // J (column-major, not transposed) and forcing e; solve J da = e.
     auto J = at::empty({static_cast<int64_t>(n) * n}, d_opts);
-    assemble_matrix_kernel<<<launch_blocks(static_cast<int64_t>(n) * n), kBlockSize,
+    assemble_matrix_kernel<<<::channel::launch_blocks(static_cast<int64_t>(n) * n, kBlockSize),
+                             kBlockSize,
                              0, stream>>>(
         n, /*transpose=*/false, smat.data_ptr<double>(), diag.data_ptr<double>(),
         w_state.data_ptr<double>(), a_state.data_ptr<double>(),
@@ -1226,7 +1229,7 @@ void channel_jvp(
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     auto e = at::empty({n}, d_opts);
-    jvp_forcing_kernel<<<launch_blocks(n), kBlockSize, 0, stream>>>(
+    jvp_forcing_kernel<<<::channel::launch_blocks(n, kBlockSize), kBlockSize, 0, stream>>>(
         n, d.nti, d.npi, d.nto, d.npo, d.iso, dsmat.data_ptr<double>(),
         w_state.data_ptr<double>(), a_state.data_ptr<double>(), a.data_ptr<float>(),
         drhs.data_ptr<double>(), active.data_ptr<int>(), e.data_ptr<double>());
@@ -1235,7 +1238,7 @@ void channel_jvp(
     auto da = e.clone();
     solve_dense(J, da, n);
 
-    tangent_f_kernel<<<launch_blocks(elems), kBlockSize, 0, stream>>>(
+    tangent_f_kernel<<<::channel::launch_blocks(elems, kBlockSize), kBlockSize, 0, stream>>>(
         elems, d.nti, d.npi, d.nto, d.npo, s.data_ptr<float>(),
         dsbar.data_ptr<double>(), a.data_ptr<float>(), da.data_ptr<double>(),
         tangent_f.data_ptr<float>());
