@@ -1,5 +1,5 @@
 # Copyright Xingyu Chen.
-# Enforce per-solve kernel launch, host sync and host/device copy budgets on fixed small/medium/large scenes.
+# Enforce per-solve kernel launch, host sync and copy budgets on small, medium and large scenes.
 
 from __future__ import annotations
 
