@@ -7,13 +7,13 @@
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
     "witwin/channel/deterministic.py::_solve_pipeline": {
-      "ceiling": 25,
+      "ceiling": 20,
       "expires_on": "2027-01-31",
       "owner": "deterministic maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
     "witwin/channel/montecarlo/basic.py::solve_pipeline": {
-      "ceiling": 51,
+      "ceiling": 49,
       "expires_on": "2027-01-31",
       "owner": "montecarlo/basic maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
@@ -43,7 +43,7 @@
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
     "witwin/channel/propagation/enumerated.py::evaluate_enumerated_paths": {
-      "ceiling": 31,
+      "ceiling": 24,
       "expires_on": "2027-01-31",
       "owner": "propagation maintainers",
       "reason": "Phase-3 exact-row ownership and explicit endpoint batches extended the existing enumerated orchestration; the measured control-flow surface is frozen pending focused decomposition."
