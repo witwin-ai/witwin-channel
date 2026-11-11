@@ -126,7 +126,7 @@ def test_coherent_refuses_scattering_regardless_of_order():
     # The coherent combination (coherent combine supports only los/reflection/
     # diffraction) stays intact and applies whatever the scattering order is.
     for order in (1, 2, 3):
-        with pytest.raises(RuntimeError, match="coherent"):
+        with pytest.raises(ValueError, match="coherent"):
             Config(
                 coherent=True,
                 components={"reflection", "scattering"},

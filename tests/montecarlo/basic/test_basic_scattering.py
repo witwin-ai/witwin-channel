@@ -294,15 +294,13 @@ def test_basic_scattering_requires_unobstructed_incident_segment():
     assert result.metadata["contribution_capacity"] == 1
 
 
-def test_basic_point_receivers_report_zero_scattering_power():
+def test_basic_point_receivers_refuse_scattering():
     _require_native()
     scene = Scene(
         structures=[_wall(_material(_roughness()))],
         endpoints=[make_transmitter(_TX), make_receiver(_RX)],
     )
-    result = _solve(
-        scene, Config(samples=1024, seed=5, components={"los", "scattering"})
-    )
-    # MC basic carries scattering on grid maps only; point receivers report
-    # a truthful zero (mirrors the transmission point-receiver contract).
-    assert float(result.component_power["scattering"]) == 0.0
+    # MC basic carries scattering on grid maps only; with point receivers it
+    # refuses instead of reporting an "enabled" zero.
+    with pytest.raises(ValueError, match=r"computes \['scattering'\] only on a ReceiverGrid"):
+        _solve(scene, Config(samples=1024, seed=5, components={"los", "scattering"}))

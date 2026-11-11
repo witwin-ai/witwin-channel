@@ -405,6 +405,16 @@ class CompiledScene:
             if not math.isfinite(value) or value < 0.0:
                 raise ValueError(f"{name} must be finite and non-negative")
 
+    def __reduce_ex__(self, protocol: object) -> object:
+        raise TypeError(
+            "a CompiledScene owns a native RayD scene on one GPU and cannot be pickled or "
+            "copied; pass the witwin.core Scene and call witwin.channel.scene.compile() again"
+        )
+
+    def __deepcopy__(self, memo: object) -> CompiledScene:
+        self.__reduce_ex__(None)
+        raise AssertionError("unreachable")
+
     @property
     def dropped_faces(self) -> dict[str, int]:
         """Faces removed at compile: ``degenerate`` (repeated vertex index) and ``duplicate``."""
@@ -701,9 +711,15 @@ class _CompileRegistry:
                 self._compiled.move_to_end(key)
             return value
 
-    def candidates(self) -> tuple[CompiledScene, ...]:
+    def candidates(self, runtime_device: object) -> tuple[CompiledScene, ...]:
+        """Cached runtimes built on ``runtime_device``, most recent first."""
+
         with self._lock:
-            return tuple(reversed(self._compiled.values()))
+            return tuple(
+                compiled
+                for key, compiled in reversed(self._compiled.items())
+                if key[-2] == runtime_device
+            )
 
     def put(self, key: tuple[object, ...], compiled: CompiledScene) -> None:
         with self._lock:
@@ -1529,7 +1545,20 @@ def compile(
     if not isinstance(scene_or_snapshot, (Scene, SceneSnapshot)):
         raise TypeError("scene_or_snapshot must be a witwin.core Scene or SceneSnapshot")
     frequency_value = _frequency_value(reference_frequency_hz)
-    versions = _versions(scene_or_snapshot)
+    try:
+        versions = _versions(scene_or_snapshot)
+    except RuntimeError as error:
+        if "doesn't have storage" in str(error):
+            from witwin.channel.scene.endpoints import FUNCTORCH_MESSAGE
+
+            raise NotImplementedError(FUNCTORCH_MESSAGE) from error
+        if "Inference tensors" not in str(error):
+            raise
+        raise ValueError(
+            "the scene holds tensors created under torch.inference_mode(); Channel tracks "
+            "scene edits through tensor version counters, which inference tensors do not "
+            "have. Build the scene outside torch.inference_mode() (solving inside it is fine)"
+        ) from error
     key = _cache_key(
         scene_or_snapshot,
         versions,
@@ -1541,7 +1570,7 @@ def compile(
 
     structures = _runtime_structures(scene_or_snapshot)
     topology_version, geometry_version, material_version, assignment_version = versions
-    reusable = _REGISTRY.candidates()
+    reusable = _REGISTRY.candidates(key[-2])
     rayd_input_identity = _rayd_input_identity(scene_or_snapshot)
     rayd = next(
         (

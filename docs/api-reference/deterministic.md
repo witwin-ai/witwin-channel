@@ -147,7 +147,7 @@ use interaction width `D`.
 | Field | Shape and dtype | Description |
 | --- | --- | --- |
 | `valid` | `(K,) bool` | Row validity. Published rows in a complete success are valid. |
-| `tx_id`, `rx_id` | `(K,) int32` | Stable endpoint IDs. |
+| `tx_id`, `rx_id` | `(K,) int32` | 0-based transmitter and receiver indices in scene endpoint order (a grid contributes one receiver per cell), not antenna IDs. |
 | `depth` | `(K,) int32` | Interaction depth. |
 | `component_id` | `(K,) int32` | Component code. |
 | `primitive_id`, `edge_id`, `material_id` | `(K,) int32` | First-interaction convenience columns. |

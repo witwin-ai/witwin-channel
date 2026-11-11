@@ -105,9 +105,9 @@ def test_bdpt_config_accepts_supported_variants_and_normalizes_components():
 
 
 def test_bdpt_coupled_paths_require_mixed_components_and_depth_two():
-    with pytest.raises(RuntimeError, match="max_depth"):
+    with pytest.raises(ValueError, match="max_depth"):
         Config(max_depth=1, coupled_paths=True)
-    with pytest.raises(RuntimeError, match="reflection and diffraction"):
+    with pytest.raises(ValueError, match="'reflection' and 'diffraction'"):
         Config(max_depth=2, components={"reflection"}, coupled_paths=True)
     assert Config(max_depth=2, coupled_paths=True).coupled_paths
 

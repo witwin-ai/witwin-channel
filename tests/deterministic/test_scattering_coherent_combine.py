@@ -88,14 +88,14 @@ def _config(**overrides) -> Config:
 
 
 def test_config_refuses_coherent_without_scattering_component():
-    with pytest.raises(RuntimeError, match="requires the 'scattering' component"):
+    with pytest.raises(ValueError, match="requires the 'scattering' component"):
         Config(scattering_coherent=True, components={"reflection"})
 
 
 def test_config_default_components_refuse_coherent():
     # The default component set has no scattering; opting into the combine
     # without requesting scattering is a config-level error.
-    with pytest.raises(RuntimeError, match="requires the 'scattering' component"):
+    with pytest.raises(ValueError, match="requires the 'scattering' component"):
         Config(scattering_coherent=True)
 
 

@@ -10,12 +10,17 @@ from dataclasses import dataclass
 from witwin.channel.components import (
     AD_MODES as _VALID_AD_MODES,
     DEFAULT_COMPONENTS as _DEFAULT_COMPONENTS,
-    DEPTH_CAPPED_COMPONENTS,
+    require_config_type,
+    validate_chain_depth_cap,
+    validate_config_fields,
     validate_coupled_candidate_limit,
     validate_coupled_gate,
     validate_isb_boundary_taper,
     validate_max_depth,
+    validate_max_paths,
     validate_scatter_chain,
+    validate_scattering_quadrature,
+    validate_vocabulary,
     validated_components,
 )
 
@@ -24,8 +29,8 @@ from typing import Any
 import torch
 
 from typing import TYPE_CHECKING
-from witwin.channel.scene.compiler import compile as compile_scene
-from witwin.channel.scene.endpoints import bind_solver_scene
+from witwin.channel.scene.compiler import compile as compile_scene, record_dropped_faces
+from witwin.channel.scene.endpoints import bind_solver_scene, link_zero_gradient
 
 from witwin.channel.propagation.enumerated import (
     evaluate_enumerated_paths,
@@ -95,10 +100,10 @@ def _validate_scattering_coherent(*, scattering_coherent: bool, components: froz
         # The scene-level requirement (realization-coherent phase screens,
         # not ensemble surfaces) is enforced at solve time where the scene
         # is known; here we reject the config-level precondition loudly.
-        raise RuntimeError(
-            "scattering_coherent=True requires the 'scattering' component "
-            "(ADR-021 D3 combines scattering rows coherently and has no "
-            "effect on any other component)"
+        raise ValueError(
+            "scattering_coherent=True requires the 'scattering' component (it "
+            "combines scattering rows coherently and affects no other component), "
+            f"got components {sorted(components)}"
         )
 
 
@@ -166,18 +171,18 @@ class Config:
     isb_boundary_taper: bool = False
     isb_boundary_taper_width: float = 0.5
     def __post_init__(self) -> None:
+        validate_config_fields(self)
         validate_max_depth(self.max_depth)
         validate_isb_boundary_taper(self.isb_boundary_taper_width)
-        if self.scattering_samples_per_m2 <= 0.0:
-            raise ValueError("scattering_samples_per_m2 must be positive")
-        if self.scattering_max_paths_per_pair <= 0:
-            raise ValueError("scattering_max_paths_per_pair must be positive")
-        if self.scattering_power_threshold < 0.0:
-            raise ValueError("scattering_power_threshold must be non-negative")
-        if self.max_diffraction_order < 0:
-            raise ValueError("max_diffraction_order must be 0 or 1")
-        if self.max_diffraction_order > 1:
-            raise RuntimeError("max_diffraction_order above 1 is not supported yet")
+        validate_scattering_quadrature(
+            samples_per_m2=self.scattering_samples_per_m2,
+            max_paths_per_pair=self.scattering_max_paths_per_pair,
+            power_threshold=self.scattering_power_threshold,
+        )
+        if self.max_diffraction_order not in (0, 1):
+            raise ValueError(
+                f"max_diffraction_order must be 0 or 1, got {self.max_diffraction_order}"
+            )
 
         components = validated_components(
             self.components,
@@ -192,26 +197,17 @@ class Config:
             max_rows=self.scattering_chain_max_rows,
             components=components,
         )
-        if self.max_depth > 5 and components & DEPTH_CAPPED_COMPONENTS:
-            raise RuntimeError(
-                "deterministic reflection/transmission currently support max_depth <= 5"
-            )
+        validate_chain_depth_cap("deterministic", self.max_depth, components)
         validate_coupled_gate(
             coupled_paths=self.coupled_paths,
             max_depth=self.max_depth,
             components=components,
         )
         validate_coupled_candidate_limit(self.coupled_candidate_limit)
-        if self.max_paths is not None and self.max_paths <= 0:
-            raise ValueError("max_paths must be positive when set")
-        if self.max_paths_scope not in _VALID_MAX_PATHS_SCOPES:
-            raise ValueError("max_paths_scope must be 'global' or 'per_pair'")
-        if self.sort_key not in _VALID_SORT_KEYS:
-            raise ValueError(f"sort_key must be one of {sorted(_VALID_SORT_KEYS)}")
-        if self.ad_mode not in _VALID_AD_MODES:
-            raise RuntimeError(
-                f"deterministic ad_mode must be one of {sorted(_VALID_AD_MODES)}"
-            )
+        validate_max_paths(self.max_paths)
+        validate_vocabulary("max_paths_scope", self.max_paths_scope, _VALID_MAX_PATHS_SCOPES)
+        validate_vocabulary("sort_key", self.sort_key, _VALID_SORT_KEYS)
+        validate_vocabulary("deterministic ad_mode", self.ad_mode, _VALID_AD_MODES)
 
         object.__setattr__(self, "components", components)
 
@@ -524,8 +520,8 @@ def _validate_requested_components(config: Config) -> None:
         # lands, taper + AD is rejected loudly rather than returning a silently
         # incomplete gradient. OFF-path AD stays bit-identical.
         raise RuntimeError(
-            "isb_boundary_taper does not support ad_mode != 'none' yet "
-            "(ADR-017 gate 3 C1 clearance companion is a follow-up)"
+            "isb_boundary_taper=True supports only ad_mode='none' (the taper has no "
+            f"derivative companion), got ad_mode={config.ad_mode!r}"
         )
     if "reflection" in config.components and config.max_depth < 1:
         raise RuntimeError("deterministic reflection requires max_depth >= 1")
@@ -558,14 +554,14 @@ def _validate_scattering_coherent_mode(scattering_info: dict[str, Any] | None) -
             "ensemble samples). Ensemble rows are zero-phase power rows and "
             "cannot combine coherently; assign a realization_coherent "
             "PhaseScreen to every scattering surface or disable "
-            "scattering_coherent (ADR-021 D3, contract 6.7.3)"
+            "scattering_coherent"
         )
     if realization == 0:
         raise RuntimeError(
             "scattering_coherent=True requires at least one "
             "realization_coherent phase-screen scattering surface, but the "
             "scene has none; the coherent combine has no physical complex "
-            "field to interfere (ADR-021 D3)"
+            "field to interfere"
         )
 
 
@@ -880,6 +876,9 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
         component_power["diffraction"] = exact_diffraction
         if not config.coherent:
             path_gain = path_gain - previous_diffraction + exact_diffraction
+    if config.ad_mode == "vjp":
+        path_gain = link_zero_gradient(path_gain, scene)
+        field = link_zero_gradient(field, scene)
     if ad_instrumented:
         torch.cuda.synchronize()
         forward_time_ms = (perf_counter() - solve_start) * 1.0e3
@@ -965,9 +964,12 @@ def solve(  # type: ignore[no-untyped-def]
 ) -> Result:
     """Run the deterministic propagation pipeline."""
 
+    require_config_type(config, Config, "witwin.channel.deterministic")
     compiled = compile_scene(
         scene, reference_frequency_hz=reference_frequency_hz
     )
-    return _solve_pipeline(bind_solver_scene(compiled), config)
+    result = _solve_pipeline(bind_solver_scene(compiled), config)
+    record_dropped_faces(result, compiled)
+    return result
 
 __all__ = ["Config", "PathTable", "Result", "solve"]

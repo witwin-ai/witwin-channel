@@ -433,9 +433,127 @@ def _validate_scalar_endpoint_boundary(views: tuple[_EndpointView, ...]) -> None
             _require_host_constant(f"{prefix}.spacing", view.source.spacing)
 
 
+def _host_values(value: object) -> torch.Tensor | None:
+    """Host view of an endpoint scalar or tensor, or None when reading it would sync a device."""
+
+    if isinstance(value, torch.Tensor):
+        return value.detach() if value.device.type == "cpu" else None
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return torch.tensor(float(value), dtype=torch.float64)
+    if isinstance(value, (tuple, list)):
+        return torch.tensor([float(item) for item in value], dtype=torch.float64)
+    return None
+
+
+def _validate_endpoint_values(views: tuple[_EndpointView, ...]) -> None:
+    """Refuse non-finite endpoint data before any native work.
+
+    Host-resident values are checked here; reading a CUDA-resident value would
+    synchronize the device on every solve, so those are left to the caller.
+    """
+
+    for view in views:
+        source = view.source
+        kind = "transmitter" if source.role == "tx" else (
+            "ReceiverGrid" if isinstance(view, _ReceiverGridView) else "receiver"
+        )
+        label = f"{kind} {int(source.antenna_id)}"
+        checks: list[tuple[str, object]] = [
+            ("origin" if isinstance(view, _ReceiverGridView) else "position", view.position),
+            ("orientation", view.orientation),
+        ]
+        if isinstance(view, _ReceiverGridView):
+            checks += [("x_axis", view.x_axis), ("y_axis", view.y_axis)]
+        for name, value in checks:
+            host = _host_values(value)
+            if host is not None and not bool(torch.isfinite(host).all()):
+                raise ValueError(
+                    f"{label} {name} must be finite, got {host.tolist()}"
+                )
+        if isinstance(view, _ReceiverGridView):
+            host = _host_values(source.spacing)
+            if host is not None and not bool(((host > 0.0) & torch.isfinite(host)).all()):
+                raise ValueError(
+                    f"{label} spacing entries must be finite and positive, got {host.tolist()}"
+                )
+        if isinstance(view, _TransmitterView):
+            host = _host_values(view.power_w)
+            if host is not None and not bool(((host >= 0.0) & torch.isfinite(host)).all()):
+                raise ValueError(
+                    f"{label} power_w must be finite and non-negative, got {host.tolist()}"
+                )
+    transmitters = [
+        (view, _host_values(view.position)) for view in views if isinstance(view, _TransmitterView)
+    ]
+    for receiver in views:
+        if not isinstance(receiver, _ReceiverPointView):
+            continue
+        at = _host_values(receiver.position)
+        if at is None:
+            continue
+        for transmitter, origin in transmitters:
+            if origin is not None and bool(torch.equal(origin.to(at.dtype), at)):
+                raise ValueError(
+                    f"receiver {int(receiver.source.antenna_id)} is at the same position as "
+                    f"transmitter {int(transmitter.source.antenna_id)} ({at.tolist()}); the "
+                    "free-space field is singular at zero distance"
+                )
+
+
+def require_single_receiver_layout(
+    views: Sequence[_EndpointView], *, solver: str,
+    grid_only_components: frozenset[str] = frozenset(),
+) -> None:
+    """Refuse receiver layouts a Monte Carlo solver does not accumulate, before native work.
+
+    The Monte Carlo solvers accumulate either one ``ReceiverGrid`` or point receivers.
+    ``grid_only_components`` names requested components the solver computes only
+    on a grid; with point receivers they would silently read zero.
+    """
+
+    receivers = [view for view in views if view.source.role != "tx"]
+    grids = sum(isinstance(view, _ReceiverGridView) for view in receivers)
+    points = len(receivers) - grids
+    if grids > 1 or (grids and points):
+        raise ValueError(
+            f"{solver} accepts either exactly one ReceiverGrid or only point receivers; "
+            f"the scene has {grids} ReceiverGrid(s) and {points} point receiver(s). "
+            "Solve each grid separately, or use witwin.channel.deterministic"
+        )
+    if points and grid_only_components:
+        raise ValueError(
+            f"{solver} computes {sorted(grid_only_components)} only on a ReceiverGrid; "
+            f"with point receivers request components={{'los'}} or use "
+            "witwin.channel.deterministic, witwin.channel.path or "
+            "witwin.channel.montecarlo.bdpt"
+        )
+
+
+FUNCTORCH_MESSAGE = (
+    "witwin.channel does not run under torch.func transforms (grad, jvp, vjp, vmap): "
+    "native kernels need real tensor storage. Use ad_mode='vjp' with torch.autograd, or "
+    "ad_mode='jvp' with torch.autograd.forward_ad, and loop or batch the endpoints "
+    "instead of vmap"
+)
+
+
+def require_no_functorch_transform(values: Sequence[object]) -> None:
+    """Refuse tensors wrapped by ``torch.func`` (``grad``/``jvp``/``vmap``) before native work."""
+
+    for value in values:
+        if isinstance(value, torch.Tensor) and torch._C._functorch.is_functorch_wrapped_tensor(value):
+            raise NotImplementedError(FUNCTORCH_MESSAGE)
+
+
 def bind_solver_scene(compiled: CompiledScene) -> SolverScene:
     views = _endpoint_views(compiled.source)
+    require_no_functorch_transform(
+        [view.position for view in views]
+        + [getattr(structure, "vertices", None) for structure in compiled.structures]
+        + [compiled.reference_frequency_hz]
+    )
     _validate_scalar_endpoint_boundary(views)
+    _validate_endpoint_values(views)
     return SolverScene(
         compiled=compiled,
         structures=compiled.structures,
@@ -620,6 +738,64 @@ def receiver_positions_ad(
         ],
         dim=0,
     )
+
+
+_MATERIAL_AD_FIELDS = (
+    "eps_r", "sigma_e", "thickness_m", "gain", "layer_eps_r", "layer_sigma_e", "layer_thickness_m",
+)
+
+
+def reverse_mode_scene_leaves(scene: SolverScene) -> tuple[torch.Tensor, ...]:
+    """Every scene tensor a caller can mark ``requires_grad`` for a solve, if it does."""
+
+    candidates: list[object] = [scene.frequency]
+    for transmitter in scene.transmitters:
+        candidates += [transmitter.position, transmitter.power_w]
+    candidates += [
+        receiver.position for receiver in scene.receivers if isinstance(receiver, _ReceiverPointView)
+    ]
+    candidates += [getattr(structure, "vertices", None) for structure in scene.structures]
+    materials = scene.compiled.materials
+    candidates += [getattr(materials, name, None) for name in _MATERIAL_AD_FIELDS]
+    return tuple(
+        value
+        for value in candidates
+        if isinstance(value, torch.Tensor) and value.requires_grad
+    )
+
+
+class _ZeroGradientLink(torch.autograd.Function):
+    """Identity on ``output`` whose backward hands every linked leaf an exact zero gradient."""
+
+    @staticmethod
+    def forward(ctx, output: torch.Tensor, *leaves: torch.Tensor) -> torch.Tensor:  # type: ignore[override]
+        ctx.leaf_meta = tuple((leaf.shape, leaf.dtype, leaf.device) for leaf in leaves)
+        return output.clone()
+
+    @staticmethod
+    def backward(ctx, grad_output: torch.Tensor):  # type: ignore[override]
+        return (
+            grad_output,
+            *(torch.zeros(shape, dtype=dtype, device=device) for shape, dtype, device in ctx.leaf_meta),
+        )
+
+
+def link_zero_gradient(output: torch.Tensor, scene: SolverScene) -> torch.Tensor:
+    """Keep a reverse-mode result on the graph when no path depends on the live leaves.
+
+    Under ``ad_mode="vjp"`` a solve whose surviving paths do not depend on any
+    marked leaf (for example a receiver with no valid path) has an exactly zero
+    derivative. Without this the output carries no graph and ``backward()``
+    fails with an unrelated autograd error; with it every live leaf receives a
+    zero gradient, as the other solvers return.
+    """
+
+    if output.requires_grad:
+        return output
+    leaves = reverse_mode_scene_leaves(scene)
+    if not leaves:
+        return output
+    return _ZeroGradientLink.apply(output, *leaves)
 
 
 def transmitter_polarizations_f32(scene: object, *, device: torch.device) -> torch.Tensor:
