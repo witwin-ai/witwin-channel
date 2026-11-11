@@ -16,13 +16,13 @@
   "started": "2026-11-10T16:49:27"
  },
  "cases": {
-  "bdpt.lr.d1.g64.s4k.c32": {
-   "kernels": 68,
-   "syncs": 24,
-   "h2d_count": 25,
-   "h2d_bytes": 182051,
-   "d2h_count": 7,
-   "d2h_bytes": 27
+  "bdpt.lr.d1.g128.s4k.c32": {
+   "kernels": 332,
+   "syncs": 68,
+   "h2d_count": 56,
+   "h2d_bytes": 490288,
+   "d2h_count": 27,
+   "d2h_bytes": 111
   },
   "bdpt.lr.d1.g64.s4k.c4": {
    "kernels": 332,
@@ -40,13 +40,13 @@
    "d2h_count": 18,
    "d2h_bytes": 75
   },
-  "det.lrd.d1.g64.c32": {
-   "kernels": 460,
-   "syncs": 82,
-   "h2d_count": 62,
-   "h2d_bytes": 293819,
-   "d2h_count": 52,
-   "d2h_bytes": 234
+  "det.lrd.d1.g128.c32": {
+   "kernels": 1648,
+   "syncs": 189,
+   "h2d_count": 170,
+   "h2d_bytes": 581240,
+   "d2h_count": 138,
+   "d2h_bytes": 577
   },
   "det.lrd.d1.g64.c4": {
    "kernels": 408,
@@ -64,7 +64,7 @@
    "d2h_count": 24,
    "d2h_bytes": 119
   },
-  "mc.lr.d1.g64.s64k.c32": {
+  "mc.lr.d1.g128.s64k.c32": {
    "kernels": 25,
    "syncs": 32,
    "h2d_count": 36,

@@ -118,20 +118,23 @@ def _cases() -> dict[str, Case]:
                                 (16, 3, 4096, "4k", 3), (16, 3, 1 << 20, "1M", 3)):
         rows.append(Case(f"bdpt.lr.d{d}.g{n}.s{label}", "bdpt", "lr", d, f"g{n}", samples=s,
                          repeats=rep, tags=r21))
-    # Small / medium / large cities and their welded 4-way subdivisions, one case per solver.
+    # Small / medium / large cities and their welded 4-way subdivisions, one case per solver. The
+    # grid spacing must not be a divisor of the 40 m pitch that lands every cell centre inside a
+    # building: 64 cells over 4x4 and 8x8 cities (2.5 m, 5 m), 128 over the 32x32 city (10 m).
     for n_side, size in ((4, "small"), (8, "medium"), (32, "large")):
+        g = "g128" if n_side == 32 else "g64"
         for sub in (0, 1):
             suffix = f"c{n_side}" + (f"s{sub}" if sub else "")
             tags = ("city", f"budget-{size}") if sub == 0 else ("city",)
             rep = 3 if n_side == 32 else 5
-            rows.append(Case(f"det.lrd.d1.g64.{suffix}", "det", "lrd", 1, "g64", city=n_side,
+            rows.append(Case(f"det.lrd.d1.{g}.{suffix}", "det", "lrd", 1, g, city=n_side,
                              subdiv=sub, repeats=rep, tags=tags))
             rows.append(Case(f"path.lrd.d1.p16.{suffix}", "path", "lrd", 1, "p16", city=n_side,
                              subdiv=sub, repeats=rep, tags=tags))
-            rows.append(Case(f"mc.lr.d1.g64.s64k.{suffix}", "mc", "lr", 1, "g64", city=n_side,
+            rows.append(Case(f"mc.lr.d1.{g}.s64k.{suffix}", "mc", "lr", 1, g, city=n_side,
                              subdiv=sub, samples=65536, repeats=rep, tags=tags))
-            rows.append(Case(f"bdpt.lr.d1.g64.s4k.{suffix}", "bdpt", "lr", 1, "g64",
-                             city=n_side, subdiv=sub, samples=4096, repeats=rep, tags=tags))
+            rows.append(Case(f"bdpt.lr.d1.{g}.s4k.{suffix}", "bdpt", "lr", 1, g, city=n_side,
+                             subdiv=sub, samples=4096, repeats=rep, tags=tags))
     return {case.name: case for case in rows}
 
 
@@ -316,8 +319,10 @@ def _worker_env(target: str) -> tuple[dict[str, str], str]:
     return env, str(REPO_ROOT)
 
 
-def run_worker(case: Case, *, target: str = "worktree", repeats: int | None = None,
-               counts_only: bool = False, timeout_s: float = 900.0) -> dict[str, Any]:
+def run_worker(
+    case: Case, *, target: str = "worktree", repeats: int | None = None, counts_only: bool = False,
+    timeout_s: float = 900.0,
+) -> dict[str, Any]:
     """Run one case in a fresh process and return its record (``error`` on crash or timeout)."""
     env, cwd = _worker_env(target)
     command = [sys.executable, str(Path(__file__).resolve()), "worker", case.name, "--target", target]
@@ -516,8 +521,9 @@ def table(document: dict[str, Any]) -> str:
 BUDGET_METRICS = ("kernels", "syncs", "h2d_count", "h2d_bytes", "d2h_count", "d2h_bytes")
 
 
-def budgets(result: dict[str, Any], existing: dict[str, Any] | None, *, headroom: float,
-            allow_raise: bool) -> dict[str, Any]:
+def budgets(
+    result: dict[str, Any], existing: dict[str, Any] | None, *, headroom: float, allow_raise: bool,
+) -> dict[str, Any]:
     """Budget document from measured counts: ``ceil(measured * (1 + headroom))``, never above an existing bound."""
     import math
 

@@ -1,0 +1,2837 @@
+{
+ "schema": "channel-baseline.v1",
+ "meta": {
+  "target": "installed",
+  "processes": 2,
+  "repeats_override": null,
+  "counts_only": false,
+  "timing": "contended (shared GPU)",
+  "git_head": null,
+  "started": "2026-11-10T18:11:39",
+  "python": "3.11.16",
+  "cuda_visible_devices": "1",
+  "installed_version": "0.5.0",
+  "channel_file": "/home/xingyu/miniconda3/envs/solvers/lib/python3.11/site-packages/witwin/channel/__init__.py",
+  "torch": "2.10.0+cu128",
+  "gpu": "NVIDIA RTX A6000",
+  "finished": "2026-11-10T18:31:47",
+  "note": "witwin-channel 0.5.0 from site-packages of the solvers env, run from outside any checkout, 2 processes per case"
+ },
+ "cases": {
+  "det.los.d0.g32": {
+   "spec": {
+    "solver": "det",
+    "comps": "los",
+    "depth": 0,
+    "receivers": "g32",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "report-2.1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 8.831,
+   "wall_ms_per_process_min": [
+    8.831,
+    11.677
+   ],
+   "cold_ms_min": 348.6,
+   "peak_alloc_mib": 0.2,
+   "path_count": 248,
+   "meta_launch_count": 3,
+   "counts": {
+    "kernels": 98,
+    "launch_api": 98,
+    "stream_sync": 21,
+    "device_sync": 1,
+    "event_sync": 1,
+    "syncs": 23,
+    "memcpy_api": 32,
+    "h2d_count": 10,
+    "h2d_bytes": 12696,
+    "d2h_count": 12,
+    "d2h_bytes": 68,
+    "d2d_count": 11,
+    "d2d_bytes": 16220,
+    "memset_count": 6,
+    "malloc_count": 1,
+    "free_count": 1,
+    "longest_kernel_ms": 0.004
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 34355 MiB; 1, 98 %, 6529 MiB"
+  },
+  "det.los.d0.g256": {
+   "spec": {
+    "solver": "det",
+    "comps": "los",
+    "depth": 0,
+    "receivers": "g256",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "report-2.1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 22.491,
+   "wall_ms_per_process_min": [
+    22.491,
+    22.951
+   ],
+   "cold_ms_min": 346.8,
+   "peak_alloc_mib": 11.8,
+   "path_count": 14744,
+   "meta_launch_count": 3,
+   "counts": {
+    "kernels": 107,
+    "launch_api": 107,
+    "stream_sync": 21,
+    "device_sync": 1,
+    "event_sync": 1,
+    "syncs": 23,
+    "memcpy_api": 32,
+    "h2d_count": 10,
+    "h2d_bytes": 786840,
+    "d2h_count": 12,
+    "d2h_bytes": 68,
+    "d2d_count": 11,
+    "d2d_bytes": 943964,
+    "memset_count": 6,
+    "malloc_count": 1,
+    "free_count": 1,
+    "longest_kernel_ms": 0.01
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 34449 MiB; 1, 98 %, 4598 MiB"
+  },
+  "det.los.d0.g1024": {
+   "spec": {
+    "solver": "det",
+    "comps": "los",
+    "depth": 0,
+    "receivers": "g1024",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "report-2.1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 220.642,
+   "wall_ms_per_process_min": [
+    222.57,
+    220.642
+   ],
+   "cold_ms_min": 569.7,
+   "peak_alloc_mib": 191.9,
+   "path_count": 240792,
+   "meta_launch_count": 3,
+   "counts": {
+    "kernels": 107,
+    "launch_api": 107,
+    "stream_sync": 21,
+    "device_sync": 1,
+    "event_sync": 1,
+    "syncs": 23,
+    "memcpy_api": 32,
+    "h2d_count": 10,
+    "h2d_bytes": 12583320,
+    "d2h_count": 12,
+    "d2h_bytes": 68,
+    "d2d_count": 11,
+    "d2d_bytes": 15411036,
+    "memset_count": 6,
+    "malloc_count": 1,
+    "free_count": 1,
+    "longest_kernel_ms": 0.149
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 34599 MiB; 1, 98 %, 5733 MiB"
+  },
+  "det.lr.d1.g64": {
+   "spec": {
+    "solver": "det",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g64",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "report-2.1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 23.241,
+   "wall_ms_per_process_min": [
+    23.241,
+    25.298
+   ],
+   "cold_ms_min": 520.7,
+   "peak_alloc_mib": 27.7,
+   "path_count": 3544,
+   "meta_launch_count": 5,
+   "counts": {
+    "kernels": 300,
+    "launch_api": 300,
+    "stream_sync": 53,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 56,
+    "memcpy_api": 122,
+    "h2d_count": 38,
+    "h2d_bytes": 54036,
+    "d2h_count": 17,
+    "d2h_bytes": 92,
+    "d2d_count": 69,
+    "d2d_bytes": 1007820,
+    "memset_count": 95,
+    "malloc_count": 3,
+    "free_count": 3,
+    "longest_kernel_ms": 0.027
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 34147 MiB; 1, 98 %, 5128 MiB"
+  },
+  "det.lr.d1.g512": {
+   "spec": {
+    "solver": "det",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g512",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "report-2.1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 87.442,
+   "wall_ms_per_process_min": [
+    141.654,
+    87.442
+   ],
+   "cold_ms_min": 508.8,
+   "peak_alloc_mib": 1025.0,
+   "path_count": 212528,
+   "meta_launch_count": 7,
+   "counts": {
+    "kernels": 345,
+    "launch_api": 345,
+    "stream_sync": 57,
+    "device_sync": 1,
+    "event_sync": 4,
+    "syncs": 62,
+    "memcpy_api": 160,
+    "h2d_count": 40,
+    "h2d_bytes": 3151604,
+    "d2h_count": 21,
+    "d2h_bytes": 108,
+    "d2d_count": 103,
+    "d2d_bytes": 60415888,
+    "memset_count": 95,
+    "malloc_count": 5,
+    "free_count": 5,
+    "longest_kernel_ms": 0.831
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 36237 MiB; 1, 98 %, 5241 MiB"
+  },
+  "det.lr.d2.g64": {
+   "spec": {
+    "solver": "det",
+    "comps": "lr",
+    "depth": 2,
+    "receivers": "g64",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 3,
+    "tags": [
+     "report-2.1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 38.313,
+   "wall_ms_per_process_min": [
+    38.313,
+    47.819
+   ],
+   "cold_ms_min": 454.2,
+   "peak_alloc_mib": 1300.5,
+   "path_count": 6497,
+   "meta_launch_count": 8,
+   "counts": {
+    "kernels": 400,
+    "launch_api": 400,
+    "stream_sync": 64,
+    "device_sync": 1,
+    "event_sync": 4,
+    "syncs": 69,
+    "memcpy_api": 195,
+    "h2d_count": 47,
+    "h2d_bytes": 57636,
+    "d2h_count": 21,
+    "d2h_bytes": 108,
+    "d2d_count": 131,
+    "d2d_bytes": 2332950,
+    "memset_count": 105,
+    "malloc_count": 5,
+    "free_count": 5,
+    "longest_kernel_ms": 2.195
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 36353 MiB; 1, 99 %, 6813 MiB"
+  },
+  "det.lr.d4.g64": {
+   "spec": {
+    "solver": "det",
+    "comps": "lr",
+    "depth": 4,
+    "receivers": "g64",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 3,
+    "tags": [
+     "report-2.1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 45.964,
+   "wall_ms_per_process_min": [
+    45.964,
+    47.528
+   ],
+   "cold_ms_min": 542.6,
+   "peak_alloc_mib": 443.4,
+   "path_count": 13105,
+   "meta_launch_count": 12,
+   "counts": {
+    "kernels": 575,
+    "launch_api": 575,
+    "stream_sync": 83,
+    "device_sync": 1,
+    "event_sync": 6,
+    "syncs": 90,
+    "memcpy_api": 230,
+    "h2d_count": 49,
+    "h2d_bytes": 58636,
+    "d2h_count": 34,
+    "d2h_bytes": 151,
+    "d2d_count": 153,
+    "d2d_bytes": 6493854,
+    "memset_count": 128,
+    "malloc_count": 6,
+    "free_count": 6,
+    "longest_kernel_ms": 0.39
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 36237 MiB; 1, 98 %, 6017 MiB"
+  },
+  "det.lr.d5.g64": {
+   "spec": {
+    "solver": "det",
+    "comps": "lr",
+    "depth": 5,
+    "receivers": "g64",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 3,
+    "tags": [
+     "report-2.1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 42.663,
+   "wall_ms_per_process_min": [
+    78.094,
+    42.663
+   ],
+   "cold_ms_min": 507.3,
+   "peak_alloc_mib": 658.0,
+   "path_count": 15770,
+   "meta_launch_count": 14,
+   "counts": {
+    "kernels": 647,
+    "launch_api": 647,
+    "stream_sync": 90,
+    "device_sync": 1,
+    "event_sync": 7,
+    "syncs": 98,
+    "memcpy_api": 256,
+    "h2d_count": 50,
+    "h2d_bytes": 59132,
+    "d2h_count": 39,
+    "d2h_bytes": 168,
+    "d2d_count": 174,
+    "d2d_bytes": 8823992,
+    "memset_count": 139,
+    "malloc_count": 7,
+    "free_count": 7,
+    "longest_kernel_ms": 0.615
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 36353 MiB; 1, 98 %, 4598 MiB"
+  },
+  "det.lr.d3.g16": {
+   "spec": {
+    "solver": "det",
+    "comps": "lr",
+    "depth": 3,
+    "receivers": "g16",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 3,
+    "tags": [
+     "C-1",
+     "P-3"
+    ],
+    "note": "C-1: d3 exhaustive vs d4 ray discovery",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 55.755,
+   "wall_ms_per_process_min": [
+    55.755,
+    67.288
+   ],
+   "cold_ms_min": 482.9,
+   "peak_alloc_mib": 2153.0,
+   "path_count": 648,
+   "meta_launch_count": 11,
+   "counts": {
+    "kernels": 372,
+    "launch_api": 372,
+    "stream_sync": 68,
+    "device_sync": 1,
+    "event_sync": 6,
+    "syncs": 75,
+    "memcpy_api": 241,
+    "h2d_count": 49,
+    "h2d_bytes": 12548,
+    "d2h_count": 25,
+    "d2h_bytes": 124,
+    "d2d_count": 173,
+    "d2d_bytes": 282176,
+    "memset_count": 15,
+    "malloc_count": 7,
+    "free_count": 7,
+    "longest_kernel_ms": 2.484
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 36237 MiB; 1, 99 %, 5046 MiB"
+  },
+  "det.lr.d4.g16": {
+   "spec": {
+    "solver": "det",
+    "comps": "lr",
+    "depth": 4,
+    "receivers": "g16",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 3,
+    "tags": [
+     "C-1",
+     "P-3"
+    ],
+    "note": "C-1: d3 exhaustive vs d4 ray discovery",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 27.185,
+   "wall_ms_per_process_min": [
+    28.283,
+    27.185
+   ],
+   "cold_ms_min": 466.6,
+   "peak_alloc_mib": 38.5,
+   "path_count": 883,
+   "meta_launch_count": 12,
+   "counts": {
+    "kernels": 467,
+    "launch_api": 467,
+    "stream_sync": 83,
+    "device_sync": 1,
+    "event_sync": 6,
+    "syncs": 90,
+    "memcpy_api": 230,
+    "h2d_count": 49,
+    "h2d_bytes": 12556,
+    "d2h_count": 34,
+    "d2h_bytes": 151,
+    "d2d_count": 153,
+    "d2d_bytes": 442918,
+    "memset_count": 18,
+    "malloc_count": 6,
+    "free_count": 6,
+    "longest_kernel_ms": 0.136
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 34261 MiB; 1, 50 %, 4598 MiB"
+  },
+  "det.lr.d1.g128": {
+   "spec": {
+    "solver": "det",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g128",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "report-2.1",
+     "P-9"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 27.652,
+   "wall_ms_per_process_min": [
+    27.652,
+    27.795
+   ],
+   "cold_ms_min": 446.6,
+   "peak_alloc_mib": 110.7,
+   "path_count": 12952,
+   "meta_launch_count": 5,
+   "counts": {
+    "kernels": 309,
+    "launch_api": 309,
+    "stream_sync": 53,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 56,
+    "memcpy_api": 122,
+    "h2d_count": 38,
+    "h2d_bytes": 201492,
+    "d2h_count": 17,
+    "d2h_bytes": 92,
+    "d2d_count": 69,
+    "d2d_bytes": 3680952,
+    "memset_count": 95,
+    "malloc_count": 3,
+    "free_count": 3,
+    "longest_kernel_ms": 0.107
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 34381 MiB; 1, 26 %, 4598 MiB"
+  },
+  "det.lr.d1.g128.s4": {
+   "spec": {
+    "solver": "det",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g128",
+    "city": 4,
+    "subdiv": 4,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "report-2.1",
+     "P-9"
+    ],
+    "note": "same geometry subdivided 4 levels (41,472 triangles), welded",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 62.186,
+   "wall_ms_per_process_min": [
+    62.186,
+    62.253
+   ],
+   "cold_ms_min": 499.6,
+   "peak_alloc_mib": 112.4,
+   "path_count": 12952,
+   "meta_launch_count": 5,
+   "counts": {
+    "kernels": 309,
+    "launch_api": 309,
+    "stream_sync": 53,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 56,
+    "memcpy_api": 122,
+    "h2d_count": 38,
+    "h2d_bytes": 1192932,
+    "d2h_count": 17,
+    "d2h_bytes": 92,
+    "d2d_count": 69,
+    "d2d_bytes": 3680952,
+    "memset_count": 95,
+    "malloc_count": 3,
+    "free_count": 3,
+    "longest_kernel_ms": 0.107
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 34285 MiB; 1, 38 %, 5523 MiB"
+  },
+  "det.lrd.d1.g128": {
+   "spec": {
+    "solver": "det",
+    "comps": "lrd",
+    "depth": 1,
+    "receivers": "g128",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 3,
+    "tags": [
+     "report-2.1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 28.452,
+   "wall_ms_per_process_min": [
+    29.189,
+    28.452
+   ],
+   "cold_ms_min": 580.8,
+   "peak_alloc_mib": 274.7,
+   "path_count": 174248,
+   "meta_launch_count": 7,
+   "counts": {
+    "kernels": 370,
+    "launch_api": 370,
+    "stream_sync": 66,
+    "device_sync": 1,
+    "event_sync": 4,
+    "syncs": 71,
+    "memcpy_api": 170,
+    "h2d_count": 46,
+    "h2d_bytes": 203392,
+    "d2h_count": 21,
+    "d2h_bytes": 108,
+    "d2d_count": 107,
+    "d2d_bytes": 54329120,
+    "memset_count": 101,
+    "malloc_count": 6,
+    "free_count": 6,
+    "longest_kernel_ms": 0.4
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 34287 MiB; 1, 33 %, 4598 MiB"
+  },
+  "det.diff.d1.g128": {
+   "spec": {
+    "solver": "det",
+    "comps": "diff",
+    "depth": 1,
+    "receivers": "g128",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 3,
+    "tags": [
+     "report-2.1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 19.677,
+   "wall_ms_per_process_min": [
+    20.178,
+    19.677
+   ],
+   "cold_ms_min": 533.6,
+   "peak_alloc_mib": 273.3,
+   "path_count": 161296,
+   "meta_launch_count": 2,
+   "counts": {
+    "kernels": 291,
+    "launch_api": 291,
+    "stream_sync": 35,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 38,
+    "memcpy_api": 81,
+    "h2d_count": 17,
+    "h2d_bytes": 198580,
+    "d2h_count": 17,
+    "d2h_bytes": 92,
+    "d2d_count": 49,
+    "d2d_bytes": 50648180,
+    "memset_count": 101,
+    "malloc_count": 4,
+    "free_count": 4,
+    "longest_kernel_ms": 0.401
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 36565 MiB; 1, 34 %, 5060 MiB"
+  },
+  "det.diff.d1.g32.s0": {
+   "spec": {
+    "solver": "det",
+    "comps": "diff",
+    "depth": 1,
+    "receivers": "g32",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "C-6"
+    ],
+    "note": "C-6 subdivision invariance (welded)",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 12.894,
+   "wall_ms_per_process_min": [
+    12.894,
+    16.993
+   ],
+   "cold_ms_min": 527.0,
+   "peak_alloc_mib": 17.1,
+   "path_count": 11151,
+   "meta_launch_count": 2,
+   "counts": {
+    "kernels": 291,
+    "launch_api": 291,
+    "stream_sync": 35,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 38,
+    "memcpy_api": 81,
+    "h2d_count": 17,
+    "h2d_bytes": 14260,
+    "d2h_count": 17,
+    "d2h_bytes": 92,
+    "d2d_count": 49,
+    "d2d_bytes": 3502650,
+    "memset_count": 101,
+    "malloc_count": 4,
+    "free_count": 4,
+    "longest_kernel_ms": 0.026
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 36461 MiB; 1, 33 %, 5040 MiB"
+  },
+  "det.diff.d1.g32.s1": {
+   "spec": {
+    "solver": "det",
+    "comps": "diff",
+    "depth": 1,
+    "receivers": "g32",
+    "city": 4,
+    "subdiv": 1,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "C-6"
+    ],
+    "note": "C-6 subdivision invariance (welded)",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 14.361,
+   "wall_ms_per_process_min": [
+    14.361,
+    17.86
+   ],
+   "cold_ms_min": 603.8,
+   "peak_alloc_mib": 34.3,
+   "path_count": 14244,
+   "meta_launch_count": 2,
+   "counts": {
+    "kernels": 291,
+    "launch_api": 291,
+    "stream_sync": 35,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 38,
+    "memcpy_api": 81,
+    "h2d_count": 17,
+    "h2d_bytes": 16204,
+    "d2h_count": 17,
+    "d2h_bytes": 92,
+    "d2d_count": 49,
+    "d2d_bytes": 4473852,
+    "memset_count": 101,
+    "malloc_count": 4,
+    "free_count": 4,
+    "longest_kernel_ms": 0.05
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 36461 MiB; 1, 45 %, 4972 MiB"
+  },
+  "det.diff.d1.g32.s3": {
+   "spec": {
+    "solver": "det",
+    "comps": "diff",
+    "depth": 1,
+    "receivers": "g32",
+    "city": 4,
+    "subdiv": 3,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "C-6"
+    ],
+    "note": "C-6 subdivision invariance (welded)",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 17.984,
+   "wall_ms_per_process_min": [
+    18.496,
+    17.984
+   ],
+   "cold_ms_min": 742.1,
+   "peak_alloc_mib": 136.6,
+   "path_count": 23810,
+   "meta_launch_count": 2,
+   "counts": {
+    "kernels": 291,
+    "launch_api": 291,
+    "stream_sync": 35,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 38,
+    "memcpy_api": 81,
+    "h2d_count": 17,
+    "h2d_bytes": 55084,
+    "d2h_count": 17,
+    "d2h_bytes": 92,
+    "d2d_count": 49,
+    "d2d_bytes": 7477576,
+    "memset_count": 101,
+    "malloc_count": 4,
+    "free_count": 4,
+    "longest_kernel_ms": 0.408
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 36565 MiB; 1, 22 %, 5455 MiB"
+  },
+  "det.diff.d1.g32.s1u": {
+   "spec": {
+    "solver": "det",
+    "comps": "diff",
+    "depth": 1,
+    "receivers": "g32",
+    "city": 4,
+    "subdiv": 1,
+    "welded": false,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "C-6"
+    ],
+    "note": "C-6 unwelded subdivision",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 16.516,
+   "wall_ms_per_process_min": [
+    19.659,
+    16.516
+   ],
+   "cold_ms_min": 593.2,
+   "peak_alloc_mib": 34.3,
+   "path_count": 14245,
+   "meta_launch_count": 2,
+   "counts": {
+    "kernels": 291,
+    "launch_api": 291,
+    "stream_sync": 35,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 38,
+    "memcpy_api": 81,
+    "h2d_count": 17,
+    "h2d_bytes": 16204,
+    "d2h_count": 17,
+    "d2h_bytes": 92,
+    "d2d_count": 49,
+    "d2d_bytes": 4474166,
+    "memset_count": 101,
+    "malloc_count": 4,
+    "free_count": 4,
+    "longest_kernel_ms": 0.05
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 36597 MiB; 1, 27 %, 4964 MiB"
+  },
+  "det.los.d0.p1": {
+   "spec": {
+    "solver": "det",
+    "comps": "los",
+    "depth": 0,
+    "receivers": "p1",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "report-2.1"
+    ],
+    "note": "1 Tx x 1 Rx fixed cost",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 9.346,
+   "wall_ms_per_process_min": [
+    10.815,
+    9.346
+   ],
+   "cold_ms_min": 357.6,
+   "peak_alloc_mib": 0.0,
+   "path_count": 1,
+   "meta_launch_count": 3,
+   "counts": {
+    "kernels": 86,
+    "launch_api": 86,
+    "stream_sync": 23,
+    "device_sync": 1,
+    "event_sync": 1,
+    "syncs": 25,
+    "memcpy_api": 34,
+    "h2d_count": 12,
+    "h2d_bytes": 444,
+    "d2h_count": 12,
+    "d2h_bytes": 68,
+    "d2d_count": 11,
+    "d2d_bytes": 412,
+    "memset_count": 6,
+    "malloc_count": 1,
+    "free_count": 1,
+    "longest_kernel_ms": 0.004
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 31051 MiB; 1, 97 %, 5044 MiB"
+  },
+  "path.los.d0.p1": {
+   "spec": {
+    "solver": "path",
+    "comps": "los",
+    "depth": 0,
+    "receivers": "p1",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "report-2.1",
+     "P-1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 18.287,
+   "wall_ms_per_process_min": [
+    25.685,
+    18.287
+   ],
+   "cold_ms_min": 570.0,
+   "peak_alloc_mib": 0.0,
+   "path_count": 1,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 269,
+    "launch_api": 269,
+    "stream_sync": 46,
+    "device_sync": 1,
+    "event_sync": 1,
+    "syncs": 48,
+    "memcpy_api": 69,
+    "h2d_count": 19,
+    "h2d_bytes": 613,
+    "d2h_count": 28,
+    "d2h_bytes": 143,
+    "d2d_count": 23,
+    "d2d_bytes": 452,
+    "memset_count": 2,
+    "malloc_count": 1,
+    "free_count": 1,
+    "longest_kernel_ms": 0.004
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 37583 MiB; 1, 99 %, 4968 MiB"
+  },
+  "path.los.d0.p16": {
+   "spec": {
+    "solver": "path",
+    "comps": "los",
+    "depth": 0,
+    "receivers": "p16",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "report-2.1",
+     "P-1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 53.466,
+   "wall_ms_per_process_min": [
+    56.238,
+    53.466
+   ],
+   "cold_ms_min": 807.3,
+   "peak_alloc_mib": 0.0,
+   "path_count": 5,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 582,
+    "launch_api": 582,
+    "stream_sync": 137,
+    "device_sync": 1,
+    "event_sync": 1,
+    "syncs": 139,
+    "memcpy_api": 152,
+    "h2d_count": 110,
+    "h2d_bytes": 2541,
+    "d2h_count": 28,
+    "d2h_bytes": 143,
+    "d2d_count": 15,
+    "d2d_bytes": 916,
+    "memset_count": 2,
+    "malloc_count": 1,
+    "free_count": 1,
+    "longest_kernel_ms": 0.008
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 37583 MiB; 1, 97 %, 4598 MiB"
+  },
+  "path.los.d0.p256": {
+   "spec": {
+    "solver": "path",
+    "comps": "los",
+    "depth": 0,
+    "receivers": "p256",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 3,
+    "tags": [
+     "report-2.1",
+     "P-1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 871.684,
+   "wall_ms_per_process_min": [
+    871.684,
+    2647.608
+   ],
+   "cold_ms_min": 1795.7,
+   "peak_alloc_mib": 0.1,
+   "path_count": 63,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 5382,
+    "launch_api": 5382,
+    "stream_sync": 1577,
+    "device_sync": 1,
+    "event_sync": 1,
+    "syncs": 1579,
+    "memcpy_api": 1592,
+    "h2d_count": 1550,
+    "h2d_bytes": 33261,
+    "d2h_count": 28,
+    "d2h_bytes": 143,
+    "d2d_count": 15,
+    "d2d_bytes": 7940,
+    "memset_count": 2,
+    "malloc_count": 1,
+    "free_count": 1,
+    "longest_kernel_ms": 0.01
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 37687 MiB; 1, 22 %, 5036 MiB"
+  },
+  "path.los.d0.p1024": {
+   "spec": {
+    "solver": "path",
+    "comps": "los",
+    "depth": 0,
+    "receivers": "p1024",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 3,
+    "tags": [
+     "report-2.1",
+     "P-1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 2977.558,
+   "wall_ms_per_process_min": [
+    10492.931,
+    2977.558
+   ],
+   "cold_ms_min": 7538.4,
+   "peak_alloc_mib": 0.6,
+   "path_count": 292,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 20742,
+    "launch_api": 20742,
+    "stream_sync": 6185,
+    "device_sync": 1,
+    "event_sync": 1,
+    "syncs": 6187,
+    "memcpy_api": 6200,
+    "h2d_count": 6158,
+    "h2d_bytes": 131565,
+    "d2h_count": 28,
+    "d2h_bytes": 143,
+    "d2d_count": 15,
+    "d2d_bytes": 34236,
+    "memset_count": 2,
+    "malloc_count": 1,
+    "free_count": 1,
+    "longest_kernel_ms": 0.027
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 34359 MiB; 1, 91 %, 4598 MiB"
+  },
+  "path.lrd.d1.p1": {
+   "spec": {
+    "solver": "path",
+    "comps": "lrd",
+    "depth": 1,
+    "receivers": "p1",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "report-2.1",
+     "P-1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 29.289,
+   "wall_ms_per_process_min": [
+    29.289,
+    39.307
+   ],
+   "cold_ms_min": 849.3,
+   "peak_alloc_mib": 0.1,
+   "path_count": 31,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 500,
+    "launch_api": 500,
+    "stream_sync": 94,
+    "device_sync": 1,
+    "event_sync": 4,
+    "syncs": 99,
+    "memcpy_api": 207,
+    "h2d_count": 55,
+    "h2d_bytes": 6989,
+    "d2h_count": 39,
+    "d2h_bytes": 191,
+    "d2d_count": 117,
+    "d2d_bytes": 12925,
+    "memset_count": 11,
+    "malloc_count": 6,
+    "free_count": 6,
+    "longest_kernel_ms": 0.021
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 30871 MiB; 1, 30 %, 10224 MiB"
+  },
+  "path.lrd.d1.p1024": {
+   "spec": {
+    "solver": "path",
+    "comps": "lrd",
+    "depth": 1,
+    "receivers": "p1024",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 3,
+    "tags": [
+     "report-2.1",
+     "P-1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 1898.283,
+   "wall_ms_per_process_min": [
+    2283.424,
+    1898.283
+   ],
+   "cold_ms_min": 3245.0,
+   "peak_alloc_mib": 17.2,
+   "path_count": 13891,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 21069,
+    "launch_api": 21069,
+    "stream_sync": 6232,
+    "device_sync": 1,
+    "event_sync": 4,
+    "syncs": 6237,
+    "memcpy_api": 6339,
+    "h2d_count": 6194,
+    "h2d_bytes": 137941,
+    "d2h_count": 39,
+    "d2h_bytes": 191,
+    "d2d_count": 110,
+    "d2d_bytes": 4901282,
+    "memset_count": 107,
+    "malloc_count": 6,
+    "free_count": 6,
+    "longest_kernel_ms": 0.026
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 27627 MiB; 1, 98 %, 9890 MiB"
+  },
+  "path.lrd.d2.p16": {
+   "spec": {
+    "solver": "path",
+    "comps": "lrd",
+    "depth": 2,
+    "receivers": "p16",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "report-2.1"
+    ],
+    "note": "report: 872 launches, 194 syncs, 41 D2H",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 79.403,
+   "wall_ms_per_process_min": [
+    79.403,
+    517.159
+   ],
+   "cold_ms_min": 1416.9,
+   "peak_alloc_mib": 5.3,
+   "path_count": 266,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 872,
+    "launch_api": 872,
+    "stream_sync": 194,
+    "device_sync": 1,
+    "event_sync": 5,
+    "syncs": 200,
+    "memcpy_api": 344,
+    "h2d_count": 154,
+    "h2d_bytes": 12021,
+    "d2h_count": 41,
+    "d2h_bytes": 199,
+    "d2d_count": 154,
+    "d2d_bytes": 109807,
+    "memset_count": 11,
+    "malloc_count": 7,
+    "free_count": 7,
+    "longest_kernel_ms": 0.027
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 31317 MiB; 1, 6 %, 11107 MiB"
+  },
+  "mc.lr.d1.g256.s4k": {
+   "spec": {
+    "solver": "mc",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g256",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": 4096,
+    "repeats": 5,
+    "tags": [
+     "report-2.1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 76.974,
+   "wall_ms_per_process_min": [
+    82.795,
+    76.974
+   ],
+   "cold_ms_min": 564.7,
+   "peak_alloc_mib": 2.6,
+   "path_count": 8192,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 22,
+    "launch_api": 22,
+    "stream_sync": 28,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 31,
+    "memcpy_api": 33,
+    "h2d_count": 30,
+    "h2d_bytes": 2284,
+    "d2h_count": 0,
+    "d2h_bytes": 0,
+    "d2d_count": 5,
+    "d2d_bytes": 852,
+    "memset_count": 10,
+    "malloc_count": 0,
+    "free_count": 0,
+    "longest_kernel_ms": 0.008
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 33077 MiB; 1, 100 %, 14722 MiB"
+  },
+  "mc.lr.d1.g256.s1M": {
+   "spec": {
+    "solver": "mc",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g256",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": 1048576,
+    "repeats": 5,
+    "tags": [
+     "report-2.1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 75.158,
+   "wall_ms_per_process_min": [
+    77.916,
+    75.158
+   ],
+   "cold_ms_min": 638.1,
+   "peak_alloc_mib": 56.0,
+   "path_count": 2097152,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 22,
+    "launch_api": 22,
+    "stream_sync": 28,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 31,
+    "memcpy_api": 33,
+    "h2d_count": 30,
+    "h2d_bytes": 2284,
+    "d2h_count": 0,
+    "d2h_bytes": 0,
+    "d2d_count": 5,
+    "d2d_bytes": 852,
+    "memset_count": 10,
+    "malloc_count": 0,
+    "free_count": 0,
+    "longest_kernel_ms": 0.277
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 33077 MiB; 1, 100 %, 14854 MiB"
+  },
+  "mc.lr.d1.g256.s4M": {
+   "spec": {
+    "solver": "mc",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g256",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": 4194304,
+    "repeats": 5,
+    "tags": [
+     "report-2.1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 76.769,
+   "wall_ms_per_process_min": [
+    76.769,
+    77.001
+   ],
+   "cold_ms_min": 571.6,
+   "peak_alloc_mib": 221.0,
+   "path_count": 8388608,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 22,
+    "launch_api": 22,
+    "stream_sync": 28,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 31,
+    "memcpy_api": 33,
+    "h2d_count": 30,
+    "h2d_bytes": 2284,
+    "d2h_count": 0,
+    "d2h_bytes": 0,
+    "d2d_count": 5,
+    "d2d_bytes": 852,
+    "memset_count": 10,
+    "malloc_count": 0,
+    "free_count": 0,
+    "longest_kernel_ms": 1.103
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 32545 MiB; 1, 100 %, 13988 MiB"
+  },
+  "bdpt.lr.d1.g64.s4k": {
+   "spec": {
+    "solver": "bdpt",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g64",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": 4096,
+    "repeats": 5,
+    "tags": [
+     "report-2.1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 129.026,
+   "wall_ms_per_process_min": [
+    129.238,
+    129.026
+   ],
+   "cold_ms_min": 785.8,
+   "peak_alloc_mib": 28.7,
+   "path_count": 3544,
+   "meta_launch_count": 4,
+   "counts": {
+    "kernels": 301,
+    "launch_api": 301,
+    "stream_sync": 52,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 55,
+    "memcpy_api": 103,
+    "h2d_count": 40,
+    "h2d_bytes": 54060,
+    "d2h_count": 16,
+    "d2h_bytes": 68,
+    "d2d_count": 49,
+    "d2d_bytes": 807288,
+    "memset_count": 103,
+    "malloc_count": 2,
+    "free_count": 2,
+    "longest_kernel_ms": 0.027
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 31929 MiB; 1, 100 %, 14311 MiB"
+  },
+  "bdpt.lr.d1.g64.s1M": {
+   "spec": {
+    "solver": "bdpt",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g64",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": 1048576,
+    "repeats": 5,
+    "tags": [
+     "report-2.1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 134.352,
+   "wall_ms_per_process_min": [
+    134.352,
+    144.465
+   ],
+   "cold_ms_min": 797.6,
+   "peak_alloc_mib": 154.4,
+   "path_count": 3544,
+   "meta_launch_count": 4,
+   "counts": {
+    "kernels": 300,
+    "launch_api": 300,
+    "stream_sync": 52,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 55,
+    "memcpy_api": 103,
+    "h2d_count": 40,
+    "h2d_bytes": 54060,
+    "d2h_count": 16,
+    "d2h_bytes": 68,
+    "d2d_count": 49,
+    "d2d_bytes": 807288,
+    "memset_count": 97,
+    "malloc_count": 2,
+    "free_count": 2,
+    "longest_kernel_ms": 0.665
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 32051 MiB; 1, 100 %, 14057 MiB"
+  },
+  "bdpt.lr.d3.g16.s4k": {
+   "spec": {
+    "solver": "bdpt",
+    "comps": "lr",
+    "depth": 3,
+    "receivers": "g16",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": 4096,
+    "repeats": 3,
+    "tags": [
+     "report-2.1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 216.158,
+   "wall_ms_per_process_min": [
+    216.396,
+    216.158
+   ],
+   "cold_ms_min": 847.4,
+   "peak_alloc_mib": 2153.6,
+   "path_count": 648,
+   "meta_launch_count": 4,
+   "counts": {
+    "kernels": 373,
+    "launch_api": 373,
+    "stream_sync": 67,
+    "device_sync": 1,
+    "event_sync": 6,
+    "syncs": 74,
+    "memcpy_api": 222,
+    "h2d_count": 51,
+    "h2d_bytes": 12572,
+    "d2h_count": 24,
+    "d2h_bytes": 100,
+    "d2d_count": 153,
+    "d2d_bytes": 268144,
+    "memset_count": 23,
+    "malloc_count": 6,
+    "free_count": 6,
+    "longest_kernel_ms": 4.153
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 32179 MiB; 1, 100 %, 13203 MiB"
+  },
+  "bdpt.lr.d3.g16.s1M": {
+   "spec": {
+    "solver": "bdpt",
+    "comps": "lr",
+    "depth": 3,
+    "receivers": "g16",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": 1048576,
+    "repeats": 3,
+    "tags": [
+     "report-2.1"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 224.18,
+   "wall_ms_per_process_min": [
+    224.18,
+    380.263
+   ],
+   "cold_ms_min": 851.2,
+   "peak_alloc_mib": 2277.3,
+   "path_count": 648,
+   "meta_launch_count": 4,
+   "counts": {
+    "kernels": 372,
+    "launch_api": 372,
+    "stream_sync": 67,
+    "device_sync": 1,
+    "event_sync": 6,
+    "syncs": 74,
+    "memcpy_api": 222,
+    "h2d_count": 51,
+    "h2d_bytes": 12572,
+    "d2h_count": 24,
+    "d2h_bytes": 100,
+    "d2d_count": 153,
+    "d2d_bytes": 268144,
+    "memset_count": 17,
+    "malloc_count": 6,
+    "free_count": 6,
+    "longest_kernel_ms": 6.389
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 32179 MiB; 1, 100 %, 14928 MiB"
+  },
+  "det.lrd.d1.g64.c4": {
+   "spec": {
+    "solver": "det",
+    "comps": "lrd",
+    "depth": 1,
+    "receivers": "g64",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "city",
+     "budget-small"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 166.48,
+   "wall_ms_per_process_min": [
+    166.48,
+    168.107
+   ],
+   "cold_ms_min": 1000.0,
+   "peak_alloc_mib": 68.7,
+   "path_count": 48125,
+   "meta_launch_count": 7,
+   "counts": {
+    "kernels": 370,
+    "launch_api": 370,
+    "stream_sync": 66,
+    "device_sync": 1,
+    "event_sync": 4,
+    "syncs": 71,
+    "memcpy_api": 170,
+    "h2d_count": 46,
+    "h2d_bytes": 55936,
+    "d2h_count": 21,
+    "d2h_bytes": 108,
+    "d2d_count": 107,
+    "d2d_bytes": 15007478,
+    "memset_count": 101,
+    "malloc_count": 6,
+    "free_count": 6,
+    "longest_kernel_ms": 0.1
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 31777 MiB; 1, 100 %, 14721 MiB"
+  },
+  "path.lrd.d1.p16.c4": {
+   "spec": {
+    "solver": "path",
+    "comps": "lrd",
+    "depth": 1,
+    "receivers": "p16",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "city",
+     "budget-small"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 461.796,
+   "wall_ms_per_process_min": [
+    483.503,
+    461.796
+   ],
+   "cold_ms_min": 1420.8,
+   "peak_alloc_mib": 0.3,
+   "path_count": 243,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 808,
+    "launch_api": 808,
+    "stream_sync": 185,
+    "device_sync": 1,
+    "event_sync": 4,
+    "syncs": 190,
+    "memcpy_api": 294,
+    "h2d_count": 146,
+    "h2d_bytes": 8917,
+    "d2h_count": 39,
+    "d2h_bytes": 191,
+    "d2d_count": 113,
+    "d2d_bytes": 90141,
+    "memset_count": 11,
+    "malloc_count": 6,
+    "free_count": 6,
+    "longest_kernel_ms": 0.028
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 31921 MiB; 1, 100 %, 14871 MiB"
+  },
+  "mc.lr.d1.g64.s64k.c4": {
+   "spec": {
+    "solver": "mc",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g64",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": 65536,
+    "repeats": 5,
+    "tags": [
+     "city",
+     "budget-small"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 71.132,
+   "wall_ms_per_process_min": [
+    71.132,
+    78.814
+   ],
+   "cold_ms_min": 559.8,
+   "peak_alloc_mib": 3.5,
+   "path_count": 131072,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 22,
+    "launch_api": 22,
+    "stream_sync": 28,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 31,
+    "memcpy_api": 33,
+    "h2d_count": 30,
+    "h2d_bytes": 2284,
+    "d2h_count": 0,
+    "d2h_bytes": 0,
+    "d2d_count": 5,
+    "d2d_bytes": 852,
+    "memset_count": 10,
+    "malloc_count": 0,
+    "free_count": 0,
+    "longest_kernel_ms": 0.024
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 34903 MiB; 1, 100 %, 15001 MiB"
+  },
+  "bdpt.lr.d1.g64.s4k.c4": {
+   "spec": {
+    "solver": "bdpt",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g64",
+    "city": 4,
+    "subdiv": 0,
+    "welded": true,
+    "samples": 4096,
+    "repeats": 5,
+    "tags": [
+     "city",
+     "budget-small"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 127.804,
+   "wall_ms_per_process_min": [
+    131.479,
+    127.804
+   ],
+   "cold_ms_min": 784.1,
+   "peak_alloc_mib": 28.7,
+   "path_count": 3544,
+   "meta_launch_count": 4,
+   "counts": {
+    "kernels": 301,
+    "launch_api": 301,
+    "stream_sync": 52,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 55,
+    "memcpy_api": 103,
+    "h2d_count": 40,
+    "h2d_bytes": 54060,
+    "d2h_count": 16,
+    "d2h_bytes": 68,
+    "d2d_count": 49,
+    "d2d_bytes": 807288,
+    "memset_count": 103,
+    "malloc_count": 2,
+    "free_count": 2,
+    "longest_kernel_ms": 0.027
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 34903 MiB; 1, 100 %, 15401 MiB"
+  },
+  "det.lrd.d1.g64.c4s1": {
+   "spec": {
+    "solver": "det",
+    "comps": "lrd",
+    "depth": 1,
+    "receivers": "g64",
+    "city": 4,
+    "subdiv": 1,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "city"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 163.625,
+   "wall_ms_per_process_min": [
+    163.625,
+    295.344
+   ],
+   "cold_ms_min": 1049.8,
+   "peak_alloc_mib": 137.0,
+   "path_count": 60835,
+   "meta_launch_count": 7,
+   "counts": {
+    "kernels": 370,
+    "launch_api": 370,
+    "stream_sync": 66,
+    "device_sync": 1,
+    "event_sync": 4,
+    "syncs": 71,
+    "memcpy_api": 170,
+    "h2d_count": 46,
+    "h2d_bytes": 69544,
+    "d2h_count": 21,
+    "d2h_bytes": 108,
+    "d2d_count": 107,
+    "d2d_bytes": 18998418,
+    "memset_count": 101,
+    "malloc_count": 6,
+    "free_count": 6,
+    "longest_kernel_ms": 0.201
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 34903 MiB; 1, 100 %, 15905 MiB"
+  },
+  "path.lrd.d1.p16.c4s1": {
+   "spec": {
+    "solver": "path",
+    "comps": "lrd",
+    "depth": 1,
+    "receivers": "p16",
+    "city": 4,
+    "subdiv": 1,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "city"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 433.058,
+   "wall_ms_per_process_min": [
+    455.995,
+    433.058
+   ],
+   "cold_ms_min": 1462.5,
+   "peak_alloc_mib": 0.6,
+   "path_count": 299,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 808,
+    "launch_api": 808,
+    "stream_sync": 185,
+    "device_sync": 1,
+    "event_sync": 4,
+    "syncs": 190,
+    "memcpy_api": 294,
+    "h2d_count": 146,
+    "h2d_bytes": 22525,
+    "d2h_count": 39,
+    "d2h_bytes": 191,
+    "d2d_count": 113,
+    "d2d_bytes": 110285,
+    "memset_count": 11,
+    "malloc_count": 6,
+    "free_count": 6,
+    "longest_kernel_ms": 0.031
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 37231 MiB; 1, 100 %, 16155 MiB"
+  },
+  "mc.lr.d1.g64.s64k.c4s1": {
+   "spec": {
+    "solver": "mc",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g64",
+    "city": 4,
+    "subdiv": 1,
+    "welded": true,
+    "samples": 65536,
+    "repeats": 5,
+    "tags": [
+     "city"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 74.709,
+   "wall_ms_per_process_min": [
+    74.709,
+    74.879
+   ],
+   "cold_ms_min": 590.3,
+   "peak_alloc_mib": 3.5,
+   "path_count": 131072,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 22,
+    "launch_api": 22,
+    "stream_sync": 28,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 31,
+    "memcpy_api": 33,
+    "h2d_count": 30,
+    "h2d_bytes": 6172,
+    "d2h_count": 0,
+    "d2h_bytes": 0,
+    "d2d_count": 5,
+    "d2d_bytes": 852,
+    "memset_count": 10,
+    "malloc_count": 0,
+    "free_count": 0,
+    "longest_kernel_ms": 0.024
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 37233 MiB; 1, 100 %, 15683 MiB"
+  },
+  "bdpt.lr.d1.g64.s4k.c4s1": {
+   "spec": {
+    "solver": "bdpt",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g64",
+    "city": 4,
+    "subdiv": 1,
+    "welded": true,
+    "samples": 4096,
+    "repeats": 5,
+    "tags": [
+     "city"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 129.019,
+   "wall_ms_per_process_min": [
+    253.137,
+    129.019
+   ],
+   "cold_ms_min": 753.6,
+   "peak_alloc_mib": 28.8,
+   "path_count": 3544,
+   "meta_launch_count": 4,
+   "counts": {
+    "kernels": 301,
+    "launch_api": 301,
+    "stream_sync": 52,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 55,
+    "memcpy_api": 103,
+    "h2d_count": 40,
+    "h2d_bytes": 65724,
+    "d2h_count": 16,
+    "d2h_bytes": 68,
+    "d2d_count": 49,
+    "d2d_bytes": 807288,
+    "memset_count": 103,
+    "malloc_count": 2,
+    "free_count": 2,
+    "longest_kernel_ms": 0.027
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 37233 MiB; 1, 100 %, 15253 MiB"
+  },
+  "det.lrd.d1.g64.c8": {
+   "spec": {
+    "solver": "det",
+    "comps": "lrd",
+    "depth": 1,
+    "receivers": "g64",
+    "city": 8,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "city",
+     "budget-medium"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 303.955,
+   "wall_ms_per_process_min": [
+    303.955,
+    444.631
+   ],
+   "cold_ms_min": 1451.9,
+   "peak_alloc_mib": 268.9,
+   "path_count": 65419,
+   "meta_launch_count": 7,
+   "counts": {
+    "kernels": 370,
+    "launch_api": 370,
+    "stream_sync": 66,
+    "device_sync": 1,
+    "event_sync": 4,
+    "syncs": 71,
+    "memcpy_api": 170,
+    "h2d_count": 46,
+    "h2d_bytes": 69376,
+    "d2h_count": 21,
+    "d2h_bytes": 108,
+    "d2d_count": 107,
+    "d2d_bytes": 20483784,
+    "memset_count": 101,
+    "malloc_count": 6,
+    "free_count": 6,
+    "longest_kernel_ms": 0.397
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 37233 MiB; 1, 100 %, 16382 MiB"
+  },
+  "path.lrd.d1.p16.c8": {
+   "spec": {
+    "solver": "path",
+    "comps": "lrd",
+    "depth": 1,
+    "receivers": "p16",
+    "city": 8,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "city",
+     "budget-medium"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 787.345,
+   "wall_ms_per_process_min": [
+    795.731,
+    787.345
+   ],
+   "cold_ms_min": 2169.5,
+   "peak_alloc_mib": 1.2,
+   "path_count": 331,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 808,
+    "launch_api": 808,
+    "stream_sync": 185,
+    "device_sync": 1,
+    "event_sync": 4,
+    "syncs": 190,
+    "memcpy_api": 294,
+    "h2d_count": 146,
+    "h2d_bytes": 22357,
+    "d2h_count": 39,
+    "d2h_bytes": 191,
+    "d2d_count": 113,
+    "d2d_bytes": 126328,
+    "memset_count": 11,
+    "malloc_count": 6,
+    "free_count": 6,
+    "longest_kernel_ms": 0.031
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 34973 MiB; 1, 100 %, 19264 MiB"
+  },
+  "mc.lr.d1.g64.s64k.c8": {
+   "spec": {
+    "solver": "mc",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g64",
+    "city": 8,
+    "subdiv": 0,
+    "welded": true,
+    "samples": 65536,
+    "repeats": 5,
+    "tags": [
+     "city",
+     "budget-medium"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 144.827,
+   "wall_ms_per_process_min": [
+    144.827,
+    145.137
+   ],
+   "cold_ms_min": 805.6,
+   "peak_alloc_mib": 3.5,
+   "path_count": 131072,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 22,
+    "launch_api": 22,
+    "stream_sync": 28,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 31,
+    "memcpy_api": 33,
+    "h2d_count": 30,
+    "h2d_bytes": 6124,
+    "d2h_count": 0,
+    "d2h_bytes": 0,
+    "d2d_count": 5,
+    "d2d_bytes": 852,
+    "memset_count": 10,
+    "malloc_count": 0,
+    "free_count": 0,
+    "longest_kernel_ms": 0.024
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 34973 MiB; 1, 100 %, 18845 MiB"
+  },
+  "bdpt.lr.d1.g64.s4k.c8": {
+   "spec": {
+    "solver": "bdpt",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g64",
+    "city": 8,
+    "subdiv": 0,
+    "welded": true,
+    "samples": 4096,
+    "repeats": 5,
+    "tags": [
+     "city",
+     "budget-medium"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 234.643,
+   "wall_ms_per_process_min": [
+    250.208,
+    234.643
+   ],
+   "cold_ms_min": 1344.1,
+   "peak_alloc_mib": 82.9,
+   "path_count": 1962,
+   "meta_launch_count": 4,
+   "counts": {
+    "kernels": 229,
+    "launch_api": 229,
+    "stream_sync": 52,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 55,
+    "memcpy_api": 103,
+    "h2d_count": 40,
+    "h2d_bytes": 65580,
+    "d2h_count": 16,
+    "d2h_bytes": 68,
+    "d2d_count": 49,
+    "d2d_bytes": 443496,
+    "memset_count": 23,
+    "malloc_count": 2,
+    "free_count": 2,
+    "longest_kernel_ms": 0.078
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 35997 MiB; 1, 100 %, 19271 MiB"
+  },
+  "det.lrd.d1.g64.c8s1": {
+   "spec": {
+    "solver": "det",
+    "comps": "lrd",
+    "depth": 1,
+    "receivers": "g64",
+    "city": 8,
+    "subdiv": 1,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "city"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 311.83,
+   "wall_ms_per_process_min": [
+    311.83,
+    390.009
+   ],
+   "cold_ms_min": 1508.1,
+   "peak_alloc_mib": 403.1,
+   "path_count": 82061,
+   "meta_launch_count": 8,
+   "counts": {
+    "kernels": 392,
+    "launch_api": 392,
+    "stream_sync": 68,
+    "device_sync": 1,
+    "event_sync": 5,
+    "syncs": 74,
+    "memcpy_api": 189,
+    "h2d_count": 47,
+    "h2d_bytes": 124112,
+    "d2h_count": 23,
+    "d2h_bytes": 116,
+    "d2d_count": 124,
+    "d2d_bytes": 25710180,
+    "memset_count": 101,
+    "malloc_count": 7,
+    "free_count": 7,
+    "longest_kernel_ms": 0.527
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 35997 MiB; 1, 100 %, 17931 MiB"
+  },
+  "path.lrd.d1.p16.c8s1": {
+   "spec": {
+    "solver": "path",
+    "comps": "lrd",
+    "depth": 1,
+    "receivers": "p16",
+    "city": 8,
+    "subdiv": 1,
+    "welded": true,
+    "samples": null,
+    "repeats": 5,
+    "tags": [
+     "city"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 845.236,
+   "wall_ms_per_process_min": [
+    845.236,
+    904.158
+   ],
+   "cold_ms_min": 2278.1,
+   "peak_alloc_mib": 2.3,
+   "path_count": 400,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 808,
+    "launch_api": 808,
+    "stream_sync": 185,
+    "device_sync": 1,
+    "event_sync": 4,
+    "syncs": 190,
+    "memcpy_api": 294,
+    "h2d_count": 146,
+    "h2d_bytes": 76285,
+    "d2h_count": 39,
+    "d2h_bytes": 191,
+    "d2d_count": 113,
+    "d2d_bytes": 150842,
+    "memset_count": 11,
+    "malloc_count": 6,
+    "free_count": 6,
+    "longest_kernel_ms": 0.115
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 36783 MiB; 1, 100 %, 20528 MiB"
+  },
+  "mc.lr.d1.g64.s64k.c8s1": {
+   "spec": {
+    "solver": "mc",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g64",
+    "city": 8,
+    "subdiv": 1,
+    "welded": true,
+    "samples": 65536,
+    "repeats": 5,
+    "tags": [
+     "city"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 119.228,
+   "wall_ms_per_process_min": [
+    153.035,
+    119.228
+   ],
+   "cold_ms_min": 883.9,
+   "peak_alloc_mib": 3.6,
+   "path_count": 131072,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 22,
+    "launch_api": 22,
+    "stream_sync": 28,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 31,
+    "memcpy_api": 33,
+    "h2d_count": 30,
+    "h2d_bytes": 21532,
+    "d2h_count": 0,
+    "d2h_bytes": 0,
+    "d2d_count": 5,
+    "d2d_bytes": 852,
+    "memset_count": 10,
+    "malloc_count": 0,
+    "free_count": 0,
+    "longest_kernel_ms": 0.024
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 36783 MiB; 1, 100 %, 23956 MiB"
+  },
+  "bdpt.lr.d1.g64.s4k.c8s1": {
+   "spec": {
+    "solver": "bdpt",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g64",
+    "city": 8,
+    "subdiv": 1,
+    "welded": true,
+    "samples": 4096,
+    "repeats": 5,
+    "tags": [
+     "city"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 250.116,
+   "wall_ms_per_process_min": [
+    263.872,
+    250.116
+   ],
+   "cold_ms_min": 1248.1,
+   "peak_alloc_mib": 83.0,
+   "path_count": 1962,
+   "meta_launch_count": 4,
+   "counts": {
+    "kernels": 229,
+    "launch_api": 229,
+    "stream_sync": 52,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 55,
+    "memcpy_api": 103,
+    "h2d_count": 40,
+    "h2d_bytes": 111804,
+    "d2h_count": 16,
+    "d2h_bytes": 68,
+    "d2d_count": 49,
+    "d2d_bytes": 443496,
+    "memset_count": 23,
+    "malloc_count": 2,
+    "free_count": 2,
+    "longest_kernel_ms": 0.078
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 36783 MiB; 1, 100 %, 23267 MiB"
+  },
+  "det.lrd.d1.g128.c32": {
+   "spec": {
+    "solver": "det",
+    "comps": "lrd",
+    "depth": 1,
+    "receivers": "g128",
+    "city": 32,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 3,
+    "tags": [
+     "city",
+     "budget-large"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 226.159,
+   "wall_ms_per_process_min": [
+    226.159,
+    539.254
+   ],
+   "cold_ms_min": 1434.4,
+   "peak_alloc_mib": 1001.0,
+   "path_count": 159442,
+   "meta_launch_count": 59,
+   "counts": {
+    "kernels": 1498,
+    "launch_api": 1498,
+    "stream_sync": 170,
+    "device_sync": 1,
+    "event_sync": 56,
+    "syncs": 227,
+    "memcpy_api": 1158,
+    "h2d_count": 98,
+    "h2d_bytes": 526400,
+    "d2h_count": 125,
+    "d2h_bytes": 524,
+    "d2d_count": 991,
+    "d2d_bytes": 50053864,
+    "memset_count": 101,
+    "malloc_count": 58,
+    "free_count": 58,
+    "longest_kernel_ms": 0.832
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 38807 MiB; 1, 36 %, 16456 MiB"
+  },
+  "path.lrd.d1.p16.c32": {
+   "spec": {
+    "solver": "path",
+    "comps": "lrd",
+    "depth": 1,
+    "receivers": "p16",
+    "city": 32,
+    "subdiv": 0,
+    "welded": true,
+    "samples": null,
+    "repeats": 3,
+    "tags": [
+     "city",
+     "budget-large"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 777.739,
+   "wall_ms_per_process_min": [
+    777.739,
+    797.329
+   ],
+   "cold_ms_min": 2227.0,
+   "peak_alloc_mib": 17.9,
+   "path_count": 279,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 808,
+    "launch_api": 808,
+    "stream_sync": 185,
+    "device_sync": 1,
+    "event_sync": 4,
+    "syncs": 190,
+    "memcpy_api": 294,
+    "h2d_count": 146,
+    "h2d_bytes": 291157,
+    "d2h_count": 39,
+    "d2h_bytes": 191,
+    "d2d_count": 113,
+    "d2d_bytes": 118961,
+    "memset_count": 12,
+    "malloc_count": 6,
+    "free_count": 6,
+    "longest_kernel_ms": 0.479
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 32571 MiB; 1, 100 %, 24217 MiB"
+  },
+  "mc.lr.d1.g128.s64k.c32": {
+   "spec": {
+    "solver": "mc",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g128",
+    "city": 32,
+    "subdiv": 0,
+    "welded": true,
+    "samples": 65536,
+    "repeats": 3,
+    "tags": [
+     "city",
+     "budget-large"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 140.898,
+   "wall_ms_per_process_min": [
+    149.967,
+    140.898
+   ],
+   "cold_ms_min": 996.7,
+   "peak_alloc_mib": 3.9,
+   "path_count": 131072,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 22,
+    "launch_api": 22,
+    "stream_sync": 28,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 31,
+    "memcpy_api": 33,
+    "h2d_count": 30,
+    "h2d_bytes": 82924,
+    "d2h_count": 0,
+    "d2h_bytes": 0,
+    "d2d_count": 5,
+    "d2d_bytes": 852,
+    "memset_count": 10,
+    "malloc_count": 0,
+    "free_count": 0,
+    "longest_kernel_ms": 0.024
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 38807 MiB; 1, 100 %, 15213 MiB"
+  },
+  "bdpt.lr.d1.g128.s4k.c32": {
+   "spec": {
+    "solver": "bdpt",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g128",
+    "city": 32,
+    "subdiv": 0,
+    "welded": true,
+    "samples": 4096,
+    "repeats": 3,
+    "tags": [
+     "city",
+     "budget-large"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 249.461,
+   "wall_ms_per_process_min": [
+    345.646,
+    249.461
+   ],
+   "cold_ms_min": 1555.5,
+   "peak_alloc_mib": 1004.2,
+   "path_count": 1542,
+   "meta_launch_count": 4,
+   "counts": {
+    "kernels": 301,
+    "launch_api": 301,
+    "stream_sync": 60,
+    "device_sync": 1,
+    "event_sync": 6,
+    "syncs": 67,
+    "memcpy_api": 179,
+    "h2d_count": 44,
+    "h2d_bytes": 445420,
+    "d2h_count": 24,
+    "d2h_bytes": 100,
+    "d2d_count": 117,
+    "d2d_bytes": 330364,
+    "memset_count": 23,
+    "malloc_count": 6,
+    "free_count": 6,
+    "longest_kernel_ms": 0.835
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 38821 MiB; 1, 100 %, 14867 MiB"
+  },
+  "det.lrd.d1.g128.c32s1": {
+   "spec": {
+    "solver": "det",
+    "comps": "lrd",
+    "depth": 1,
+    "receivers": "g128",
+    "city": 32,
+    "subdiv": 1,
+    "welded": true,
+    "samples": null,
+    "repeats": 3,
+    "tags": [
+     "city"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 950.91,
+   "wall_ms_per_process_min": [
+    1024.083,
+    950.91
+   ],
+   "cold_ms_min": 2635.2,
+   "peak_alloc_mib": 1002.3,
+   "path_count": 197039,
+   "meta_launch_count": 107,
+   "counts": {
+    "kernels": 2554,
+    "launch_api": 2554,
+    "stream_sync": 266,
+    "device_sync": 1,
+    "event_sync": 104,
+    "syncs": 371,
+    "memcpy_api": 2070,
+    "h2d_count": 146,
+    "h2d_bytes": 1425512,
+    "d2h_count": 221,
+    "d2h_bytes": 908,
+    "d2d_count": 1807,
+    "d2d_bytes": 61898106,
+    "memset_count": 101,
+    "malloc_count": 106,
+    "free_count": 106,
+    "longest_kernel_ms": 1.749
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 38835 MiB; 1, 100 %, 15417 MiB"
+  },
+  "path.lrd.d1.p16.c32s1": {
+   "spec": {
+    "solver": "path",
+    "comps": "lrd",
+    "depth": 1,
+    "receivers": "p16",
+    "city": 32,
+    "subdiv": 1,
+    "welded": true,
+    "samples": null,
+    "repeats": 3,
+    "tags": [
+     "city"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 794.474,
+   "wall_ms_per_process_min": [
+    809.48,
+    794.474
+   ],
+   "cold_ms_min": 2049.7,
+   "peak_alloc_mib": 36.5,
+   "path_count": 337,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 808,
+    "launch_api": 808,
+    "stream_sync": 185,
+    "device_sync": 1,
+    "event_sync": 4,
+    "syncs": 190,
+    "memcpy_api": 294,
+    "h2d_count": 146,
+    "h2d_bytes": 1151485,
+    "d2h_count": 39,
+    "d2h_bytes": 191,
+    "d2d_count": 113,
+    "d2d_bytes": 144149,
+    "memset_count": 12,
+    "malloc_count": 6,
+    "free_count": 6,
+    "longest_kernel_ms": 1.75
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 34441 MiB; 1, 100 %, 24930 MiB"
+  },
+  "mc.lr.d1.g128.s64k.c32s1": {
+   "spec": {
+    "solver": "mc",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g128",
+    "city": 32,
+    "subdiv": 1,
+    "welded": true,
+    "samples": 65536,
+    "repeats": 3,
+    "tags": [
+     "city"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 77.372,
+   "wall_ms_per_process_min": [
+    84.098,
+    77.372
+   ],
+   "cold_ms_min": 737.3,
+   "peak_alloc_mib": 4.5,
+   "path_count": 131072,
+   "meta_launch_count": 1,
+   "counts": {
+    "kernels": 22,
+    "launch_api": 22,
+    "stream_sync": 28,
+    "device_sync": 1,
+    "event_sync": 2,
+    "syncs": 31,
+    "memcpy_api": 33,
+    "h2d_count": 30,
+    "h2d_bytes": 328732,
+    "d2h_count": 0,
+    "d2h_bytes": 0,
+    "d2d_count": 5,
+    "d2d_bytes": 852,
+    "memset_count": 10,
+    "malloc_count": 0,
+    "free_count": 0,
+    "longest_kernel_ms": 0.024
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 38827 MiB; 1, 100 %, 14977 MiB"
+  },
+  "bdpt.lr.d1.g128.s4k.c32s1": {
+   "spec": {
+    "solver": "bdpt",
+    "comps": "lr",
+    "depth": 1,
+    "receivers": "g128",
+    "city": 32,
+    "subdiv": 1,
+    "welded": true,
+    "samples": 4096,
+    "repeats": 3,
+    "tags": [
+     "city"
+    ],
+    "note": "",
+    "extra": {}
+   },
+   "processes": 2,
+   "wall_ms_min": 269.277,
+   "wall_ms_per_process_min": [
+    269.277,
+    281.176
+   ],
+   "cold_ms_min": 1148.8,
+   "peak_alloc_mib": 1005.5,
+   "path_count": 1542,
+   "meta_launch_count": 4,
+   "counts": {
+    "kernels": 301,
+    "launch_api": 301,
+    "stream_sync": 60,
+    "device_sync": 1,
+    "event_sync": 6,
+    "syncs": 67,
+    "memcpy_api": 179,
+    "h2d_count": 44,
+    "h2d_bytes": 1182844,
+    "d2h_count": 24,
+    "d2h_bytes": 100,
+    "d2d_count": 117,
+    "d2d_bytes": 330364,
+    "memset_count": 23,
+    "malloc_count": 6,
+    "free_count": 6,
+    "longest_kernel_ms": 0.833
+   },
+   "unstable": [],
+   "gpu_before": "0, 100 %, 38855 MiB; 1, 100 %, 14979 MiB"
+  }
+ }
+}

@@ -39,7 +39,9 @@ def _box(x0: float, y0: float, x1: float, y1: float, h: float) -> tuple[torch.Te
     return vertices, faces
 
 
-def _subdivide(vertices: torch.Tensor, faces: torch.Tensor, levels: int) -> tuple[torch.Tensor, torch.Tensor]:
+def _subdivide(
+    vertices: torch.Tensor, faces: torch.Tensor, levels: int,
+) -> tuple[torch.Tensor, torch.Tensor]:
     """Split every triangle into four at its edge midpoints, ``levels`` times (midpoints not shared)."""
     for _ in range(levels):
         a, b, c = vertices[faces[:, 0]], vertices[faces[:, 1]], vertices[faces[:, 2]]
