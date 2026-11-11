@@ -4,7 +4,7 @@ This reference documents the complete supported Python interface of
 `witwin-channel` 0.4.x.
 
 The stable API baseline is [`ci/public-api-snapshot.json`](../../ci/public-api-snapshot.json):
-six modules and 60 frozen exports. The scene lifecycle page additionally
+eight modules and 78 frozen exports. The scene lifecycle page additionally
 documents the three supporting exports required to compile a `witwin.core`
 world for direct consumer use. Implementation modules such as `runtime`,
 `kernels`, `interactions`, and the remaining `propagation` modules are
@@ -26,6 +26,13 @@ intentionally excluded: they are internal contracts, not supported user APIs.
 | `witwin.channel.montecarlo.basic` | Basic Monte Carlo power estimation | [Monte Carlo Basic](montecarlo-basic.md) |
 | `witwin.channel.montecarlo.bdpt` | Bidirectional path tracing with MIS | [Monte Carlo BDPT](montecarlo-bdpt.md) |
 | `witwin.channel.propagation.consumer` | Solver-neutral compact propagation contract | [Propagation consumer](propagation-consumer.md) |
+| `witwin.channel.importers` | Mitsuba/Sionna XML, PLY, OBJ and glTF import into Core structures | [Importers](importers.md) |
+| `witwin.channel.presets` | ITU-R P.2040 materials, TR 38.901 and dipole patterns | [Presets](presets.md) |
+
+User guides: [Quickstart](../user/quickstart.md), [Scene import](../user/scene-import.md),
+[Materials and antennas](../user/materials-and-antennas.md),
+[Troubleshooting](../user/troubleshooting.md). Runnable scripts are in
+[`examples/`](../../examples).
 
 ## Shared conventions
 
@@ -96,7 +103,8 @@ print(result.field.device)     # cuda:0 (device index is environment-specific)
 ## Stability boundary
 
 The frozen stable surface consists of the package root, the four solver entry
-modules, and `witwin.channel.propagation.consumer`. The scene lifecycle is a
+modules, `witwin.channel.propagation.consumer`, and the `importers` and
+`presets` helper modules. The scene lifecycle is a
 small supporting surface used to obtain `CompiledScene` for the consumer.
 
 An importable name is not automatically public. In particular, `__all__`
