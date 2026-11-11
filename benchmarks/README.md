@@ -1,5 +1,48 @@
 # Benchmark evidence
 
+## Baseline tool (`baseline.py`)
+
+`baseline.py` measures fixed solves on the synthetic cities of `synthetic_city.py` (an N x N grid
+of concrete boxes on a ground plane, merged into one mesh, optionally 4-way subdivided and
+welded). Every case runs in `--processes` fresh processes (default 4). Each process records the
+cold first solve (it includes compilation), the minimum of the timed warm solves, the peak Torch
+allocation of one solve, the path count, and the CUPTI counts of one profiled solve: kernels,
+stream/device/event synchronizations, H2D/D2H/D2D copy counts and bytes, memsets, and
+`cudaMalloc`/`cudaFree` calls. The record keeps the minimum wall time over all processes and
+lists every count that differed between processes under `unstable` (it should be empty).
+
+```bash
+source scripts/dev_env.sh
+python benchmarks/baseline.py list                               # cases and tags
+python benchmarks/baseline.py run --output now.json              # every case, 4 processes each
+python benchmarks/baseline.py run --cases 'det.lr.*' --tags C-1 --processes 2 --output part.json
+python benchmarks/baseline.py run --target installed --output installed.json  # site-packages build
+python benchmarks/baseline.py table now.json                     # Markdown table of one file
+python benchmarks/baseline.py compare benchmarks/baselines/m0-release-0.6.0.sm86.json now.json
+python benchmarks/baseline.py merge a.json b.json --output ab.json  # min over two passes
+```
+
+Tags: `report-2.1` (one case per row of the analysis report's table 2.1), `C-1`, `C-6`, `P-1`,
+`P-3`, `P-9`, `city` (4x4, 8x8, 32x32 cities and welded subdivisions, one case per solver) and
+`budget-small|medium|large` (the cases `tests/budgets` enforces). Three rows of table 2.1 are
+measured smaller than in the report because they launch kernels of several hundred milliseconds
+to seconds, which time out other tenants of a shared GPU: Deterministic depth-3 reflection and
+BDPT depth 3 run on a 16x16 grid (`det.lr.d3.g16`, `bdpt.lr.d3.g16.*`), and BDPT 256x256 depth 3
+is not a case. Each record carries `longest_kernel_ms`, the longest single CUDA-runtime kernel.
+`--target installed` strips the developer-override variables and `PYTHONPATH` and runs from the
+temporary directory, so it measures the installed `witwin-channel`; it works only while that
+version accepts the same configuration fields.
+
+On a shared GPU run the whole command under the machine's GPU slot lock (for example
+`flock <slot.lock> python benchmarks/baseline.py run ...`); workers run one at a time inside it
+and cap themselves at 8 GiB. Records are labelled `"timing": "contended (shared GPU)"` unless
+`--exclusive` says the run had the GPU to itself.
+
+Wall times move with GPU contention (a contended run is 5-10x slower and looks stable); check the
+`gpu_before` snapshot, compare counts first, and repeat timings back to back. The profiler does not
+see OptiX launches made through the driver API, so `kernels` counts CUDA-runtime kernels only.
+Recorded baselines live in `baselines/m0-*.json`.
+
 ## Plan 13 Phase 12 three-group A/B evidence
 
 Formal Phase 12 evidence contains three independent five-pair AB/BA groups:
