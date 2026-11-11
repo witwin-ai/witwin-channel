@@ -110,11 +110,11 @@ priority `scattering > diffraction > transmission > reflection > los`.
 ## Native runtime boundary
 
 - `_channel` is the single production extension. It source-links RayD
-  `70b0d4c50b587a9f2f375ae79a8bc1ecd1353229` (`rayd-torch 0.8.0`) and calls the typed
+  `2a0cb0e85758e3cdeb2ebaae66dd5bd725ca0510` (`rayd-torch 0.9.0`) and calls the typed
   `rayd::torch` C++ API directly; no RayD Python module, second dispatcher,
   copied C ABI, getter table, or dynamic symbol lookup participates.
 - Builds use an explicit validated `RAYD_SOURCE_DIR` first. Without one, they
-  may use the unique passive `rayd-torch` 0.8.0 source bundle only after lock,
+  may use the unique passive `rayd-torch` 0.9.0 source bundle only after lock,
   RECORD, full-manifest, complete header-set, and clean-state verification. No
   conda-prefix, site-packages, or global CMake scan is performed. `build_info`
   reports only the source kind and manifest SHA, never a machine-specific
@@ -514,6 +514,6 @@ priority `scattering > diffraction > transmission > reflection > los`.
 ## Distribution
 
 - GitHub Actions prebuilds Windows and manylinux_2_28 wheels from the locked,
-  clean RayD 0.8.0 source checkout. Release fatbins include native SM87 SASS
+  clean RayD 0.9.0 source checkout. Release fatbins include native SM87 SASS
   alongside the maintained CUDA 12.8 architecture set. Ordinary commits,
   pull requests, and schedules do not start paid native builds.
