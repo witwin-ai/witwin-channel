@@ -2634,6 +2634,22 @@
       "python_owners": ["witwin.channel.kernels.fields.field_free_space_backward"]
     },
     {
+      "name": "field_free_space_columns",
+      "target": "channel_field_free_space_columns",
+      "return_type": "pybind11::dict",
+      "doc": "Evaluate the field at several carrier frequencies in one native launch per 64 frequencies.",
+      "parameters": [
+        ["source", "torch::Tensor", null],
+        ["target", "torch::Tensor", null],
+        ["tx_power", "torch::Tensor", null],
+        ["tx_polarization", "torch::Tensor", null],
+        ["rx_polarization", "torch::Tensor", null],
+        ["frequencies_hz", "std::vector<double>", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.fields.field_transport_columns"]
+    },
+    {
       "name": "field_free_space_fwd64",
       "target": "channel_field_free_space_fwd64",
       "return_type": "pybind11::dict",
@@ -2771,6 +2787,29 @@
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.fields.field_reflection_sequence_backward"]
+    },
+    {
+      "name": "field_reflection_sequence_columns",
+      "target": "channel_field_reflection_sequence_columns",
+      "return_type": "pybind11::dict",
+      "doc": "Evaluate the field at several carrier frequencies in one native launch per 64 frequencies.",
+      "parameters": [
+        ["source", "torch::Tensor", null],
+        ["target", "torch::Tensor", null],
+        ["interaction_positions", "torch::Tensor", null],
+        ["interaction_normals", "torch::Tensor", null],
+        ["tx_power", "torch::Tensor", null],
+        ["tx_polarization", "torch::Tensor", null],
+        ["rx_polarization", "torch::Tensor", null],
+        ["eps_r", "torch::Tensor", null],
+        ["sigma_e", "torch::Tensor", null],
+        ["mu_r", "torch::Tensor", null],
+        ["gain", "torch::Tensor", null],
+        ["thickness", "torch::Tensor", null],
+        ["frequencies_hz", "std::vector<double>", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.kernels.fields.field_transport_columns"]
     },
     {
       "name": "field_reflection_sequence_jvp",

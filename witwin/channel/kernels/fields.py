@@ -71,6 +71,7 @@ __all__ = [
     "field_source_amplitude_scale_backward",
     "field_source_amplitude_scale_jvp",
     "field_transmission_sequence",
+    "field_transport_columns",
     "field_transmission_sequence_ad",
     "field_transmission_sequence_backward",
     "field_transmission_sequence_jvp",
@@ -236,6 +237,42 @@ def field_reflection_sequence(
         field_error="field_reflection_sequence returned unexpected fields",
         shape_error_prefix="field_reflection_sequence",
     )
+
+
+def field_transport_columns(
+    *arguments: torch.Tensor, depth: int, frequencies_hz: tuple[float, ...],
+) -> dict[str, torch.Tensor]:
+    """Free-space (``depth == 0``) or reflection field at several carrier frequencies.
+
+    ``arguments`` are the positional tensors of :func:`field_free_space` or
+    :func:`field_reflection_sequence`. Each (row, frequency) lane runs that op's
+    single-frequency arithmetic, so column ``f`` is bitwise the single op at
+    ``frequencies_hz[f]``. Returns ``field_vector`` ``[N, F, 3]`` and ``path_field`` ``[N, F]``.
+    """
+
+    frequencies = tuple(float(value) for value in frequencies_hz)
+    if not frequencies or any(not value > 0.0 for value in frequencies):
+        raise ValueError("frequencies_hz must be a non-empty tuple of positive values")
+    name, expected = (
+        ("field_free_space_columns", 5) if depth == 0 else ("field_reflection_sequence_columns", 12)
+    )
+    if len(arguments) != expected:
+        raise TypeError(f"{name} takes {expected} tensors")
+    for value in arguments:
+        validate_cuda_tensor("field input", value, dtype=torch.float32, ndim=value.ndim)
+    count = int(arguments[0].shape[0])
+    out = _required_native_op(name)(*arguments, list(frequencies))
+    if not isinstance(out, dict) or set(out) != {"field_vector", "path_field"}:
+        raise TypeError(f"_channel.{name} returned invalid fields")
+    columns = len(frequencies)
+    validate_cuda_tensor("field_vector", out["field_vector"], dtype=torch.complex64, ndim=3)
+    validate_cuda_tensor("path_field", out["path_field"], dtype=torch.complex64, ndim=2)
+    if out["field_vector"].shape != (count, columns, 3) or out["path_field"].shape != (
+        count,
+        columns,
+    ):
+        raise ValueError(f"_channel.{name} returned bad shapes")
+    return out
 
 
 def field_transmission_sequence(
