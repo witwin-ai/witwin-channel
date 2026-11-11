@@ -3,6 +3,7 @@
 
 #include <torch/extension.h>
 
+#include "../rayd/resource.h"
 #include "registry.h"
 
 #include <cstdint>
@@ -68,7 +69,7 @@ pybind11::dict channel_bdpt_accumulate_connection_samples(
     torch::Tensor coeff_real,
     torch::Tensor coeff_imag);
 pybind11::dict channel_bdpt_filter_connection_samples(pybind11::dict samples, torch::Tensor visible);
-int64_t channel_bdpt_count_valid_connection_samples(pybind11::dict samples);
+torch::Tensor channel_bdpt_count_valid_connection_samples(pybind11::dict samples);
 pybind11::dict channel_bdpt_compact_connection_samples(pybind11::dict samples, int64_t max_paths);
 pybind11::dict channel_bdpt_concat_connection_samples(pybind11::sequence samples);
 torch::Tensor channel_bdpt_connection_variance(
@@ -77,6 +78,31 @@ torch::Tensor channel_bdpt_connection_variance(
     int64_t rx_count,
     int64_t samples_per_tx);
 torch::Tensor channel_bdpt_sample_directions(int64_t count, torch::Tensor reference, int64_t seed);
+at::Tensor channel_bdpt_counter_uniforms_cuda(
+    at::Tensor reference,
+    int64_t count,
+    int64_t lanes,
+    int64_t seed,
+    int64_t first,
+    int64_t depth,
+    int64_t stream);
+pybind11::dict channel_bdpt_wavefront_transmission(
+    RayDSceneResource& scene,
+    torch::Tensor tx_positions,
+    torch::Tensor tx_power,
+    torch::Tensor tx_polarization,
+    torch::Tensor rx_positions,
+    torch::Tensor rx_polarization,
+    pybind11::dict materials,
+    torch::Tensor base_transmission,
+    double frequency_hz,
+    int64_t samples,
+    int64_t max_depth,
+    int64_t seed,
+    int64_t mode_id,
+    double beta,
+    int64_t chunk_samples,
+    int64_t pair_tile);
 torch::Tensor channel_bdpt_mis_weights(
     torch::Tensor pdf,
     torch::Tensor strategy_pdf_sum,
@@ -522,6 +548,14 @@ void register_bdpt_components(pybind11::module_ &module) {
         "bdpt_sample_directions",
         &channel_bdpt_sample_directions,
         "Generate seeded BDPT sphere sample directions with a fused CUDA kernel.");
+    module.def(
+        "bdpt_counter_uniforms",
+        &channel_bdpt_counter_uniforms_cuda,
+        "Generate counter-based BDPT event or scatter-direction uniforms with a CUDA kernel.");
+    module.def(
+        "bdpt_wavefront_transmission",
+        &channel_bdpt_wavefront_transmission,
+        "Run the fused all-transmitter BDPT mixed reflection+transmission wavefront.");
     module.def(
         "bdpt_transmitter_tensors",
         &channel_bdpt_transmitter_tensors,

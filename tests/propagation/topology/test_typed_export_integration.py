@@ -158,19 +158,17 @@ def test_bdpt_consumes_the_typed_engine_without_a_mixed_export():
 
 def test_bdpt_connection_samples_read_typed_domains_exactly():
     paths, _ = _evaluated_paths_fixture()
-    selected = torch.tensor([1, 4], dtype=torch.int64)
 
-    samples = bdpt_pipeline._evaluated_connection_samples(
-        paths, selected, component_out=2
-    )
+    samples = bdpt_pipeline._evaluated_connection_samples(paths)
 
     assert samples is not None
-    torch.testing.assert_close(samples["tx_id"], paths.topology.tx_id[selected])
-    torch.testing.assert_close(samples["rx_id"], paths.topology.rx_id[selected])
-    torch.testing.assert_close(
-        samples["contribution"], paths.fields.path_gain[selected]
-    )
-    torch.testing.assert_close(
-        samples["path_length_m"], paths.geometry.path_length_m[selected]
-    )
-    assert samples["component_id"].tolist() == [2, 2]
+    torch.testing.assert_close(samples["tx_id"], paths.topology.tx_id.to(torch.int32))
+    torch.testing.assert_close(samples["rx_id"], paths.topology.rx_id.to(torch.int32))
+    torch.testing.assert_close(samples["contribution"], paths.fields.path_gain)
+    torch.testing.assert_close(samples["path_length_m"], paths.geometry.path_length_m)
+    # Every row keeps its enumerated class as its accumulation bucket; coupled
+    # reflection-diffraction (3, 4) and double diffraction (7) fold into 2.
+    buckets = {0: 0, 1: 1, 2: 2, 3: 2, 4: 2, 5: 5, 6: 6, 7: 2}
+    assert samples["component_id"].tolist() == [
+        buckets[int(value)] for value in paths.topology.component_id.tolist()
+    ]

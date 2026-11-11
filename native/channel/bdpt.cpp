@@ -228,7 +228,7 @@ void channel_bdpt_filter_connection_samples_cuda(
     at::Tensor mis_weight,
     at::Tensor valid,
     at::Tensor visible);
-int64_t channel_bdpt_count_valid_connection_samples_cuda(at::Tensor valid);
+at::Tensor channel_bdpt_count_valid_connection_samples_cuda(at::Tensor valid);
 std::tuple<
     at::Tensor,
     at::Tensor,
@@ -677,7 +677,7 @@ pybind11::dict channel_bdpt_filter_connection_samples(pybind11::dict samples, to
     return samples;
 }
 
-int64_t channel_bdpt_count_valid_connection_samples(pybind11::dict samples) {
+torch::Tensor channel_bdpt_count_valid_connection_samples(pybind11::dict samples) {
     return channel_bdpt_count_valid_connection_samples_cuda(tensor_from_dict(samples, "valid"));
 }
 

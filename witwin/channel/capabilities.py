@@ -10,6 +10,22 @@ from dataclasses import fields, is_dataclass
 from typing import Any
 
 
+# BDPT AD scope: the parameters its jvp/vjp companions carry, and the leaves
+# it refuses before launch (endpoint positions and mesh vertices).
+_BDPT_AD_DIFFERENTIABLE_PARAMETERS = (
+    "layer_eps_r",
+    "layer_sigma_e",
+    "layer_thickness",
+    "roughness_sigma_h",
+    "roughness_corr_x",
+    "roughness_corr_y",
+    "bsdf_table_values",
+    "phase_screen_heights",
+    "frequency",
+    "tx_power",
+)
+_BDPT_AD_EXCLUDED = ("tx_position", "rx_position", "mesh_vertices")
+
 _CAPABILITIES: dict[str, Any] = {
     "schema_version": 1,
     "components": ["los", "reflection", "diffraction", "transmission", "scattering"],
@@ -54,7 +70,7 @@ _CAPABILITIES: dict[str, Any] = {
         "fixed_topology_jvp": True,
         "fixed_topology_vjp": True,
         "visibility_discontinuity_estimator": False,
-        "differentiable_solvers": ["path", "deterministic", "montecarlo_basic"],
+        "differentiable_solvers": ["path", "deterministic", "montecarlo_basic", "montecarlo_bdpt"],
         "differentiable_inputs": [
             "material_eps_r",
             "material_sigma_e",
@@ -70,7 +86,10 @@ _CAPABILITIES: dict[str, Any] = {
             "path": ["scattering", "coupled_paths_mesh_vertex"],
             "deterministic": ["scattering", "coupled_paths_mesh_vertex"],
             "montecarlo_basic": ["scattering"],
-            "montecarlo_bdpt": ["all"],
+            # The sampled estimator carries material, frequency and transmitter
+            # power derivatives; endpoint-position and mesh-vertex leaves are
+            # refused before any launch.
+            "montecarlo_bdpt": list(_BDPT_AD_EXCLUDED),
         },
         # Wired into the montecarlo.basic LoS Function since AD; the
         # standalone facades remain available.
@@ -189,16 +208,19 @@ _CAPABILITIES: dict[str, Any] = {
             # the coupled compensator folded into diffraction) is summed as a
             # complex phasor per (tx, rx, component) and finalized |sum|^2; the
             # stochastic transmission/scattering samplers have no coherent field
-            # and are refused. AD is refused in the coherent path.
+            # and are refused. The coherent path carries the same AD as the power path.
             "coherent_combine": {
                 "default": False,
                 "combine_domains": ["power", "coherent"],
                 "coherent_components": ["los", "reflection", "diffraction"],
                 "coherent_excluded": ["transmission", "scattering"],
-                "supports_ad": False,
+                "supports_ad": True,
             },
-            "supports_ad": False,
-            "ad_modes": ["none"],
+            "supports_ad": True,
+            "ad_modes": ["none", "jvp", "vjp"],
+            "ad_differentiable_inputs": list(_BDPT_AD_DIFFERENTIABLE_PARAMETERS),
+            "ad_geometry": "refused",
+            "ad_excluded": list(_BDPT_AD_EXCLUDED),
         },
     },
 }

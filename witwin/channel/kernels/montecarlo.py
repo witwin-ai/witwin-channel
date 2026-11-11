@@ -31,6 +31,7 @@ from witwin.channel.runtime import (
     _ad_native_tensor,
     _ad_reject_fixed_inputs,
     _ad_reject_fixed_tangents,
+    _rayd_scene_resource,
     bdpt_zero_matrix,  # noqa: F401
     disable_functorch,
     mc_pack_vec3,  # noqa: F401
@@ -3595,17 +3596,16 @@ def bdpt_filter_connection_samples(
     return exported
 
 
-def bdpt_count_valid_connection_samples(samples: dict[str, torch.Tensor]) -> int:
+def bdpt_count_valid_connection_samples(samples: dict[str, torch.Tensor]) -> torch.Tensor:
+    """Return the number of valid rows as a 0-dim int64 CUDA tensor (no host copy)."""
+
     _validate_bdpt_connection_samples("samples", samples, None)
     count = _required_native_op("bdpt_count_valid_connection_samples")(samples)
-    if not isinstance(count, int):
+    if not isinstance(count, torch.Tensor):
         raise TypeError(
-            "_channel.bdpt_count_valid_connection_samples must return an int"
+            "_channel.bdpt_count_valid_connection_samples must return a tensor"
         )
-    if count < 0 or count > int(samples["valid"].shape[0]):
-        raise ValueError(
-            "_channel.bdpt_count_valid_connection_samples returned bad count"
-        )
+    validate_cuda_tensor("count", count, dtype=torch.int64, ndim=0)
     return count
 
 
@@ -3752,3 +3752,105 @@ def bdpt_pack_vec3(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.T
         "packed", packed, dtype=torch.float32, ndim=2, trailing_shape=(3,)
     )
     return packed
+
+
+# -------------------------------------------------------------------------
+# BDPT counter-based sampling and the fused wavefront
+# -------------------------------------------------------------------------
+_BDPT_UNIFORM_STREAMS = {"event_selection": 0, "scatter_direction": 1}
+
+
+def bdpt_counter_uniforms(
+    reference: torch.Tensor, count: int, *, seed: int, first: int, depth: int, stream: str,
+) -> torch.Tensor:
+    """Counter-based uniforms of global samples ``[first, first + count)`` at ``depth``.
+
+    ``event_selection`` returns ``[count]``; ``scatter_direction`` returns
+    ``[count, 2]``. The wavefront step draws the identical event uniforms in-kernel.
+    """
+
+    if not isinstance(reference, torch.Tensor) or not reference.is_cuda:
+        raise ValueError("reference must be a CUDA tensor")
+    if stream not in _BDPT_UNIFORM_STREAMS:
+        raise ValueError(f"stream must be one of {sorted(_BDPT_UNIFORM_STREAMS)}")
+    if count < 0 or seed < 0 or first < 0 or depth < 0:
+        raise ValueError("count, seed, first and depth must be non-negative")
+    lanes = 1 if stream == "event_selection" else 2
+    out = _required_native_op("bdpt_counter_uniforms")(
+        reference, int(count), lanes, int(seed), int(first), int(depth),
+        _BDPT_UNIFORM_STREAMS[stream],
+    )
+    if not isinstance(out, torch.Tensor):
+        raise TypeError("_channel.bdpt_counter_uniforms must return a tensor")
+    expected = (int(count),) if lanes == 1 else (int(count), 2)
+    if tuple(out.shape) != expected:
+        raise ValueError("_channel.bdpt_counter_uniforms returned a bad shape")
+    return out
+
+
+_BDPT_WAVEFRONT_MATERIAL_FIELDS = (
+    "material_id",
+    "valid",
+    "gain",
+    "eps_r",
+    "sigma_e",
+    "mu_r",
+    "thickness",
+    "layer_offset",
+    "layer_count",
+    "layer_thickness_m",
+    "layer_eps_r",
+    "layer_sigma_e",
+    "layer_mu_r",
+)
+
+
+def bdpt_wavefront_transmission(
+    rayd: object, tx_positions: torch.Tensor, tx_power: torch.Tensor, tx_polarization: torch.Tensor,
+    rx_positions: torch.Tensor, rx_polarization: torch.Tensor,
+    material_bundle: dict[str, torch.Tensor], base_transmission: torch.Tensor, *,
+    frequency_hz: float, samples: int, max_depth: int, seed: int, mis_mode: int, beta: float,
+    chunk_samples: int = 1 << 18, pair_tile: int = 1 << 20,
+) -> dict[str, torch.Tensor]:
+    """Run the fused mixed reflection+transmission wavefront of every transmitter.
+
+    Returns ``transmission`` (``base_transmission`` plus the sampled estimate,
+    float ``[T, R]``) and ``counts`` (int64 ``[3]``: transmit events, reflect
+    events, accumulated connection rows), both still on the device.
+    """
+
+    for name, tensor in (
+        ("tx_positions", tx_positions),
+        ("tx_polarization", tx_polarization),
+        ("rx_positions", rx_positions),
+        ("rx_polarization", rx_polarization),
+    ):
+        validate_cuda_tensor(name, tensor, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    validate_cuda_tensor("tx_power", tx_power, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("base_transmission", base_transmission, dtype=torch.float32, ndim=2)
+    if samples <= 0 or max_depth < 1 or seed < 0 or chunk_samples <= 0 or pair_tile <= 0:
+        raise ValueError("samples, max_depth, chunk_samples and pair_tile must be positive")
+    materials = {name: material_bundle[name] for name in _BDPT_WAVEFRONT_MATERIAL_FIELDS}
+    out = _required_native_op("bdpt_wavefront_transmission")(
+        _rayd_scene_resource(rayd),
+        tx_positions,
+        tx_power.detach().contiguous(),
+        tx_polarization.contiguous(),
+        rx_positions.contiguous(),
+        rx_polarization.contiguous(),
+        materials,
+        base_transmission.contiguous(),
+        float(frequency_hz),
+        int(samples),
+        int(max_depth),
+        int(seed),
+        int(mis_mode),
+        float(beta),
+        int(chunk_samples),
+        int(pair_tile),
+    )
+    if not isinstance(out, dict) or set(out) != {"transmission", "counts"}:
+        raise TypeError("_channel.bdpt_wavefront_transmission must return transmission and counts")
+    validate_cuda_tensor("transmission", out["transmission"], dtype=torch.float32, ndim=2)
+    validate_cuda_tensor("counts", out["counts"], dtype=torch.int64, ndim=1)
+    return out
