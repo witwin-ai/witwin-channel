@@ -84,9 +84,9 @@ def test_mc_frequency_material_guard_runs_before_build_info_and_native(monkeypat
     compiled = object()
     bound = SimpleNamespace(transmitters=(), receivers=(), frequency=3.0e9)
 
-    config = SimpleNamespace(
+    config = mc_basic.Config(
         workspace_limit_bytes=None,
-        components=frozenset(),
+        components={"los"},
         max_depth=1,
         ad_mode="vjp",
     )

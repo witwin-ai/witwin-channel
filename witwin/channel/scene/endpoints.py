@@ -23,6 +23,8 @@ from witwin.core import (
     quat_multiply,
 )
 
+from witwin.channel.runtime import is_transform_wrapped_tensor
+
 if TYPE_CHECKING:
     from witwin.channel.scene.compiler import CompiledScene
 
@@ -553,7 +555,7 @@ def require_no_functorch_transform(values: Sequence[object]) -> None:
     """Refuse tensors wrapped by ``torch.func`` (``grad``/``jvp``/``vmap``) before native work."""
 
     for value in values:
-        if isinstance(value, torch.Tensor) and torch._C._functorch.is_functorch_wrapped_tensor(value):
+        if isinstance(value, torch.Tensor) and is_transform_wrapped_tensor(value):
             raise NotImplementedError(FUNCTORCH_MESSAGE)
 
 

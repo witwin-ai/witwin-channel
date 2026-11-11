@@ -92,7 +92,7 @@ outside the hot path (result assembly, refusal checks); it is never physics.
 |---|---|---|---|---|---|---|---|
 | discovery/diffraction | every leaf | jvp | REF | host-declaration | witwin/channel/propagation/consumer.py | tests/propagation/consumer/test_phase9_ad_matrix.py::test_diffraction_ad_is_refused_before_any_native_work | refusal |
 | discovery/diffraction | every leaf | vjp | REF | host-declaration | witwin/channel/propagation/consumer.py | tests/propagation/consumer/test_phase9_ad_matrix.py::test_diffraction_ad_is_refused_before_any_native_work | refusal |
-| discovery/diffraction | primal reachability | none | REF | host-declaration | witwin/channel/interactions/diffraction.py | tests/propagation/consumer/test_phase9_ad_matrix.py::test_the_diffraction_primal_defect_is_pinned_rather_than_fixed | refusal |
+| discovery/diffraction | primal reachability | none | YES | host-declaration | witwin/channel/interactions/diffraction.py | tests/propagation/consumer/test_phase9_ad_matrix.py::test_diffraction_primal_evaluates_while_its_ad_column_stays_refused | primal |
 
 ### 2.6 Higher order
 
@@ -160,14 +160,12 @@ Each entry is a `DECL` or a recorded gap, with the reason and the follow-up.
   `evaluated_paths_compact_finalize_backward` with direction and interaction
   cotangents. No consumer asks for it: the supported differentiable geometry
   route is `prepare_fixed_topology` + `reevaluate`.
-- **Diffraction through `consumer.evaluate` (primal).**
-  `service._solver_scene` builds `SolverScene(transmitters=(), receivers=())`
-  because the consumer takes explicit endpoint batches, while
-  `interactions/diffraction.py:469` indexes `tx_polarizations[tx_index]`. The
-  result is an `IndexError` at every AD mode including `none`. ADR-043
-  deliberately does not fix it: it is a primal reachability defect, and fixing
-  it would silently re-open an AD column nobody has validated. The failure is
-  pinned by exception type and site so a future fix is a deliberate decision.
+- **Diffraction AD through `consumer.evaluate`.** The primal route works: the
+  order-1 diffraction topology takes the request's source polarizations
+  instead of the bound scene's (empty) transmitters, so `ad_mode='none'`
+  publishes diffraction rows that match the deterministic path table. The AD
+  column stays refused (`ad_modes_for_component('diffraction') == {'none'}`)
+  until its derivatives are validated.
 - **Second-order AD anywhere.** `supports_higher_order_ad` is `False` and every
   composition is refused. A reparameterised second-order contract would be its
   own ADR.
