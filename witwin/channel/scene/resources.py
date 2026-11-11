@@ -244,6 +244,12 @@ def _mesh_flags(*, use_face_normals: bool, edges_enabled: bool, dynamic: bool) -
     return flags
 
 
+def _allocated_device_bytes() -> int:
+    """Bytes the caching allocator holds for tensors on the current device (a host counter)."""
+
+    return int(torch.cuda.memory_allocated())
+
+
 def build_scene_from_structures(
     structures: tuple[object, ...], *, dynamic: Sequence[bool] = (),
 ) -> RayDSceneResource:
@@ -269,7 +275,7 @@ def build_scene_from_structures(
     dynamic_flags = tuple(bool(flag) for flag in dynamic) or (False,) * len(structures)
     if len(dynamic_flags) != len(structures):
         raise ValueError("dynamic must hold one flag per structure")
-    allocated_before = torch.cuda.memory_allocated()
+    allocated_before = _allocated_device_bytes()
     vertices: list[torch.Tensor] = []
     faces: list[torch.Tensor] = []
     uv: list[torch.Tensor] = []
@@ -339,7 +345,7 @@ def build_scene_from_structures(
         dynamic_meshes=dynamic_flags,
     )
     object.__setattr__(
-        scene, "native_bytes", max(0, torch.cuda.memory_allocated() - allocated_before)
+        scene, "native_bytes", max(0, _allocated_device_bytes() - allocated_before)
     )
     return scene
 

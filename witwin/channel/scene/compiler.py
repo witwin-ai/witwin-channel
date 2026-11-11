@@ -758,6 +758,17 @@ def _field_names(kind: type) -> tuple[str, ...] | None:
     return resolved
 
 
+def _append_container_state(value: object, out: list[object], seen: set[int]) -> None:
+    out.append(len(value))  # type: ignore[arg-type]
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            out.append(key if type(key) in _ATOMIC_STATE_TYPES else id(key))
+            _append_state(item, out, seen)
+        return
+    for item in value:  # type: ignore[attr-defined]
+        _append_state(item, out, seen)
+
+
 def _append_state(value: object, out: list[object], seen: set[int]) -> None:
     """Append the host-visible mutation state of ``value`` to ``out``."""
 
@@ -773,16 +784,8 @@ def _append_state(value: object, out: list[object], seen: set[int]) -> None:
         out.append(("seen", marker))
         return
     seen.add(marker)
-    if kind is tuple or kind is list:
-        out.append(len(value))  # type: ignore[arg-type]
-        for item in value:  # type: ignore[attr-defined]
-            _append_state(item, out, seen)
-        return
-    if isinstance(value, Mapping):
-        out.append(len(value))
-        for key, item in value.items():
-            out.append(key if type(key) in _ATOMIC_STATE_TYPES else id(key))
-            _append_state(item, out, seen)
+    if kind is tuple or kind is list or isinstance(value, Mapping):
+        _append_container_state(value, out, seen)
         return
     out.append((kind, marker))
     instance_dict = getattr(value, "__dict__", None)
@@ -1477,6 +1480,82 @@ def _rebound_structures(
     )
 
 
+def _snapshot_vertices(
+    geometry: object, vertices: torch.Tensor, rigid_motion: object | None,
+    deformation: object | None,
+) -> torch.Tensor:
+    """Apply a snapshot's deformation and rigid motion to a structure's world vertices."""
+
+    if deformation is not None:
+        if not isinstance(geometry, Mesh):
+            raise TypeError(
+                "Channel snapshot deformation currently requires "
+                "witwin.core.Mesh geometry"
+            )
+        local_vertices = (
+            deformation.vertices
+            if deformation.vertices is not None
+            else geometry.vertices + deformation.offsets
+        )
+        if local_vertices.shape != geometry.vertices.shape:
+            raise ValueError(
+                "snapshot deformation must match the authored local mesh"
+            )
+        if geometry.recenter:
+            bounds_min = local_vertices.amin(dim=0)
+            bounds_max = local_vertices.amax(dim=0)
+            local_vertices = local_vertices - 0.5 * (bounds_min + bounds_max)
+        local_vertices = local_vertices * geometry.scale.to(
+            device=local_vertices.device, dtype=local_vertices.dtype
+        )
+        authored_rotation_value = geometry.rotation.to(
+            device=local_vertices.device,
+            dtype=local_vertices.dtype,
+        )
+        authored_rotation = quat_to_rotation_matrix(
+            authored_rotation_value
+            if authored_rotation_value.shape == (4,)
+            else quat_from_euler(
+                authored_rotation_value[0],
+                authored_rotation_value[1],
+                authored_rotation_value[2],
+                device=authored_rotation_value.device,
+                dtype=authored_rotation_value.dtype,
+            )
+        )
+        vertices = (
+            local_vertices @ authored_rotation.T
+            + geometry.position.to(
+                device=local_vertices.device,
+                dtype=local_vertices.dtype,
+            )
+        )
+    if rigid_motion is not None:
+        if rigid_motion.rotation is not None:
+            rigid_rotation_value = rigid_motion.rotation
+            if not isinstance(rigid_rotation_value, torch.Tensor):
+                rigid_rotation_value = torch.as_tensor(
+                    rigid_rotation_value,
+                    device=vertices.device,
+                    dtype=vertices.dtype,
+                )
+            rotation = quat_to_rotation_matrix(
+                rigid_rotation_value
+                if rigid_rotation_value.shape == (4,)
+                else quat_from_euler(
+                    rigid_rotation_value[2],
+                    rigid_rotation_value[1],
+                    rigid_rotation_value[0],
+                    device=rigid_rotation_value.device,
+                    dtype=rigid_rotation_value.dtype,
+                )
+            )
+            vertices = vertices @ rotation.T
+        if rigid_motion.translation is not None:
+            vertices = vertices + rigid_motion.translation
+    return vertices
+
+
 def _runtime_structures(
     scene_or_snapshot: Scene | SceneSnapshot, state: _WorldState,
     donors: dict[tuple[object, ...], _RuntimeStructure],
@@ -1517,73 +1596,7 @@ def _runtime_structures(
             raise ValueError("Core mesh vertices must have shape (V, 3)")
         if faces.ndim != 2 or faces.shape[1] != 3:
             raise ValueError("Core mesh faces must have shape (F, 3)")
-        if deformation is not None:
-            if not isinstance(geometry, Mesh):
-                raise TypeError(
-                    "Channel snapshot deformation currently requires "
-                    "witwin.core.Mesh geometry"
-                )
-            local_vertices = (
-                deformation.vertices
-                if deformation.vertices is not None
-                else geometry.vertices + deformation.offsets
-            )
-            if local_vertices.shape != geometry.vertices.shape:
-                raise ValueError(
-                    "snapshot deformation must match the authored local mesh"
-                )
-            if geometry.recenter:
-                bounds_min = local_vertices.amin(dim=0)
-                bounds_max = local_vertices.amax(dim=0)
-                local_vertices = local_vertices - 0.5 * (bounds_min + bounds_max)
-            local_vertices = local_vertices * geometry.scale.to(
-                device=local_vertices.device, dtype=local_vertices.dtype
-            )
-            authored_rotation_value = geometry.rotation.to(
-                device=local_vertices.device,
-                dtype=local_vertices.dtype,
-            )
-            authored_rotation = quat_to_rotation_matrix(
-                authored_rotation_value
-                if authored_rotation_value.shape == (4,)
-                else quat_from_euler(
-                    authored_rotation_value[0],
-                    authored_rotation_value[1],
-                    authored_rotation_value[2],
-                    device=authored_rotation_value.device,
-                    dtype=authored_rotation_value.dtype,
-                )
-            )
-            vertices = (
-                local_vertices @ authored_rotation.T
-                + geometry.position.to(
-                    device=local_vertices.device,
-                    dtype=local_vertices.dtype,
-                )
-            )
-        if rigid_motion is not None:
-            if rigid_motion.rotation is not None:
-                rigid_rotation_value = rigid_motion.rotation
-                if not isinstance(rigid_rotation_value, torch.Tensor):
-                    rigid_rotation_value = torch.as_tensor(
-                        rigid_rotation_value,
-                        device=vertices.device,
-                        dtype=vertices.dtype,
-                    )
-                rotation = quat_to_rotation_matrix(
-                    rigid_rotation_value
-                    if rigid_rotation_value.shape == (4,)
-                    else quat_from_euler(
-                        rigid_rotation_value[2],
-                        rigid_rotation_value[1],
-                        rigid_rotation_value[0],
-                        device=rigid_rotation_value.device,
-                        dtype=rigid_rotation_value.dtype,
-                    )
-                )
-                vertices = vertices @ rotation.T
-            if rigid_motion.translation is not None:
-                vertices = vertices + rigid_motion.translation
+        vertices = _snapshot_vertices(geometry, vertices, rigid_motion, deformation)
         if (
             structure.primitive_ids is not None
             and len(structure.primitive_ids) != int(faces.shape[0])
