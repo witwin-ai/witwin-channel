@@ -3949,12 +3949,38 @@ class _WavefrontAdRunner:
             elif name == "frequency":
                 out.append(_ad_frequency_grad(grad, (leaf.dtype, leaf.device)))
             else:
-                out.append(grad.to(dtype=leaf.dtype).reshape(leaf.shape))
+                out.append(grad.to(dtype=leaf.dtype))
         return tuple(out)
+
+
+def _wavefront_leaf_tangents(leaves: tuple[torch.Tensor | None, ...]) -> dict[str, object]:
+    """Forward-mode tangents of the wavefront leaves (absent tangents are omitted)."""
+
+    leaf_tangents: dict[str, object] = {}
+    for name, leaf in zip(BDPT_WAVEFRONT_GRADIENTS, leaves, strict=True):
+        if leaf is None:
+            continue
+        tangent = _ad_native_tangent_or_none(torch.autograd.forward_ad.unpack_dual(leaf).tangent)
+        if tangent is None:
+            continue
+        if name == "frequency":
+            leaf_tangents[name] = _ad_frequency_tangent(tangent)
+        else:
+            leaf_tangents[name] = tangent.to(torch.float32)
+    # The native pass takes both table tangents or neither.
+    for name, other in (("f_te", 8), ("f_tm", 7)):
+        partner = leaves[other]
+        if name in leaf_tangents and BDPT_WAVEFRONT_GRADIENTS[other] not in leaf_tangents:
+            assert partner is not None
+            leaf_tangents[BDPT_WAVEFRONT_GRADIENTS[other]] = torch.zeros(
+                partner.shape, device=partner.device, dtype=torch.float32
+            )
+    return leaf_tangents
 
 
 def _wavefront_ad_estimate(
     wavefront: _Wavefront, base: dict[str, torch.Tensor], *, include_estimate: bool,
+    ledger: AdLaunchLedger | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Differentiable wavefront estimate of the transmission and scattering matrices."""
 
@@ -3969,27 +3995,11 @@ def _wavefront_ad_estimate(
         wavefront.workspace.tx_power,
         frequency if isinstance(frequency, torch.Tensor) else None,
     )
-    leaf_tangents: dict[str, object] | None = None
-    if wavefront.config.ad_mode == "jvp":
-        leaf_tangents = {}
-        for name, leaf in zip(BDPT_WAVEFRONT_GRADIENTS, leaves, strict=True):
-            if leaf is None:
-                continue
-            tangent = _ad_native_tangent_or_none(torch.autograd.forward_ad.unpack_dual(leaf).tangent)
-            if tangent is None:
-                continue
-            if name == "frequency":
-                leaf_tangents[name] = _ad_frequency_tangent(tangent)
-            else:
-                leaf_tangents[name] = tangent.to(torch.float32).contiguous()
-        # The native pass takes both table tangents or neither.
-        for name, other in (("f_te", 8), ("f_tm", 7)):
-            partner = leaves[other]
-            if name in leaf_tangents and BDPT_WAVEFRONT_GRADIENTS[other] not in leaf_tangents:
-                assert partner is not None
-                leaf_tangents[BDPT_WAVEFRONT_GRADIENTS[other]] = torch.zeros(
-                    partner.shape, device=partner.device, dtype=torch.float32
-                )
+    leaf_tangents = (
+        _wavefront_leaf_tangents(leaves) if wavefront.config.ad_mode == "jvp" else None
+    )
+    if ledger is not None:
+        ledger.add(*(leaf for leaf in leaves if leaf is not None))
     runner = _WavefrontAdRunner(
         wavefront=wavefront, leaves=leaves, include_estimate=include_estimate,
         leaf_tangents=leaf_tangents,
@@ -4160,7 +4170,7 @@ def _enumerated_components(config: Config, prep: _SolvePrep) -> frozenset[str]:
 
 def _apply_wavefront_estimate(
     wavefront: _Wavefront, matrices: dict[str, torch.Tensor], rows_pass: dict[str, Any] | None, *,
-    ad: bool,
+    ad: bool, ledger: AdLaunchLedger | None = None,
 ) -> dict[str, Any]:
     """Add the wavefront estimate to the accumulated matrices (in place).
 
@@ -4174,7 +4184,7 @@ def _apply_wavefront_estimate(
         return rows_pass
     if ad:
         matrices["transmission"], matrices["scattering"] = _wavefront_ad_estimate(
-            wavefront, matrices, include_estimate=rows_pass is None
+            wavefront, matrices, include_estimate=rows_pass is None, ledger=ledger
         )
         return rows_pass if rows_pass is not None else {"counts": wavefront.counts}
     sampled = wavefront.run(matrices)
@@ -4289,7 +4299,7 @@ def _collect_connection_samples(
     )
     if wavefront is not None:
         launch_count += 3 if sampled is None else 0
-        sampled = _apply_wavefront_estimate(wavefront, matrices, sampled, ad=ad)
+        sampled = _apply_wavefront_estimate(wavefront, matrices, sampled, ad=ad, ledger=ledger)
     if sampled is not None:
         device_counts.update(
             _wavefront_counts(sampled["counts"], rows_counted=estimate_samples is not None and rows_needed)
