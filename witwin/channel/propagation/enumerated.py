@@ -23,8 +23,8 @@ from witwin.channel.interactions.diffraction import (
 )
 from witwin.channel.interactions.los import _los_topology
 from witwin.channel.interactions.reflection import (
-    _reflection_topology_multibounce,
-    _reflection_topology_order1,
+    ReflectionDiscoveryRecord,
+    _reflection_topology,
 )
 from witwin.channel.interactions.transmission import (
     _transmission_topology,
@@ -645,31 +645,19 @@ def evaluate_enumerated_paths(
         candidate_count += los_candidates
         visibility_rejection_count += los_visibility_rejections
         blocks.append(los_block)
+    discovery = str(getattr(config, "discovery", "auto"))
+    discovery_record: ReflectionDiscoveryRecord | None = None
     if "reflection" in components and config.max_depth >= 1:
-        block, reflection_launches = _reflection_topology_order1(
+        discovery_record = ReflectionDiscoveryRecord()
+        block, reflection_launches, reflection_candidates = _reflection_topology(
             scene,
             compiled,
             tx_positions,
-            tx_power,
             rx_positions,
-            frequency_hz=frequency_hz,
-        )
-        launch_count += reflection_launches
-        candidate_count += int(block["valid"].numel())
-        blocks.append(block)
-    if "reflection" in components and config.max_depth >= 2:
-        block, reflection_launches, reflection_candidates = (
-            _reflection_topology_multibounce(
-                scene,
-                compiled,
-                tx_positions,
-                tx_power,
-                rx_positions,
-                frequency_hz=frequency_hz,
-                min_depth=2,
-                max_depth=int(config.max_depth),
-                max_paths=config.max_paths,
-            )
+            min_depth=1,
+            max_depth=int(config.max_depth),
+            discovery=discovery,
+            record=discovery_record,
         )
         launch_count += reflection_launches
         candidate_count += int(reflection_candidates)
@@ -822,7 +810,13 @@ def evaluate_enumerated_paths(
     )
     sidecars = replace(
         sidecars,
-        execution=replace(sidecars.execution, selected_edge_ids=paths["edge_id"]),
+        execution=replace(
+            sidecars.execution,
+            selected_edge_ids=paths["edge_id"],
+            reflection_discovery=(
+                discovery_record.metadata(discovery) if discovery_record is not None else None
+            ),
+        ),
         diffraction_vector_field=diffraction_vector_field,
         capacity_execution=capacity_execution,
         capacity_transaction=capacity_transaction,

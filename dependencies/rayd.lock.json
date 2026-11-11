@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "repository_url": "https://github.com/Asixa/RayD",
-  "commit": "c486d630a60088843b238c1377469d3b6041e8e8",
+  "commit": "2a0cb0e85758e3cdeb2ebaae66dd5bd725ca0510",
   "integration_abi": {
     "kind": "source-header-set-sha256",
     "entrypoint": "include/rayd/integration.h",
@@ -9,20 +9,20 @@
       {"path": "include/rayd/diffraction.h", "sha256": "3b2aeda2d4889659e98833c576b28952c674b40252f44db37e6961a4f1d363d5"},
       {"path": "include/rayd/integration.h", "sha256": "57a48596403ecb81a6064f908bd945637a00d353f292acb904c851af389e3a67"},
       {"path": "include/rayd/penetration.h", "sha256": "53a54479cdb1dfd944168560536df605bae0cf584334272f7ee4769ad1eb0465"},
-      {"path": "include/rayd/reflection.h", "sha256": "e7decb547d45cbf03fe810785aabc059f6ed43eda1a48165aa18297bf0746d73"},
+      {"path": "include/rayd/reflection.h", "sha256": "64f28d02f6656f2c0f47344d8b6d9d1aaea2b13bcab6151faa8afd9a5cdac6d6"},
       {"path": "include/rayd/scattering.h", "sha256": "67bfa850df5f4ef95f24f4456124c9b5d4bdc9d97b4292f419b078ee8e63e20b"},
       {"path": "include/rayd/scene.h", "sha256": "d2c62d78fe755f276496437321973005792b864d725995071744766b2d060a03"},
       {"path": "include/rayd/transmission.h", "sha256": "2ee0a6b5170f371a74e2ed69cde429b43ec8cee5f31f5f0366fa8337168372e1"},
       {"path": "include/rayd/visibility.h", "sha256": "80d4ab7c4f3648a87b59315f1e9db4536d69c01f1d2f968d81dcd5ce08a33b31"}
     ],
-    "sha256": "4c7d196dfa424cde701f065a6433a785937fb61f81febfe7ef363258cfce13bd",
+    "sha256": "8f344528ac3f4855bd1fc3d8007c60a23dcb816ef2853b65bfaecd286e575d2c",
     "api_version": 8,
     "identity": "rayd.torch.integration"
   },
   "source_bundle": {
     "distribution": "rayd-torch",
-    "distribution_version": "0.8.0",
+    "distribution_version": "0.9.0",
     "metadata_path": "rayd/torch/_source/rayd-source.json",
-    "manifest_sha256": "49546824befd7aa28d78498b817650a982567c87686eaab025805abfe59c8ab5"
+    "manifest_sha256": "e33ce1cc90f889c4e18ef0937507532cfa2edc0e76a6e33a5bddfb3a90727aa6"
   }
 }

@@ -33,7 +33,6 @@ def _fixture(monkeypatch, events: list[str], *, selected: bool = True):
     compiled = SimpleNamespace(rayd=rayd)
     scene = SimpleNamespace(structures=[object()])
     tx_positions = torch.arange(6, dtype=torch.float32).reshape(2, 3)
-    tx_power = torch.tensor([2.0, 3.0], dtype=torch.float64)
     rx_positions = torch.arange(6, dtype=torch.float32).reshape(2, 3)
     face_material_id = torch.tensor([7], dtype=torch.int32)
 
@@ -59,8 +58,9 @@ def _fixture(monkeypatch, events: list[str], *, selected: bool = True):
             "surface_group_members": torch.tensor([[0]]),
         },
     )
-    monkeypatch.setattr(reflection, "prepare_reflection_order1_plan", lambda **k: object())
-    monkeypatch.setattr(reflection, "prepare_reflection_multibounce_plan", lambda **k: object())
+    plane_groups = SimpleNamespace(group_count=1, scene_scale_m=10.0)
+    monkeypatch.setattr(reflection, "reflection_plane_groups", lambda *a, **k: plane_groups)
+    monkeypatch.setattr(reflection, "prepare_reflection_discovery_plan", lambda *a, **k: object())
     # The discovery stage evaluates no fields: the field stage owns every reflection row.
     for name in ("deterministic_pack_complex", "field_reflection_sequence"):
         monkeypatch.setattr(field_kernels, name, _forbidden(name))
@@ -82,7 +82,7 @@ def _fixture(monkeypatch, events: list[str], *, selected: bool = True):
         "concatenate_path_blocks",
         lambda blocks, **k: events.append("concat") or {"blocks": tuple(blocks)},
     )
-    return scene, compiled, tx_positions, tx_power, rx_positions
+    return scene, compiled, tx_positions, rx_positions
 
 
 def _request(depth: int = 1) -> tuple[ReflectionEpcRequest, dict[str, object]]:
@@ -113,7 +113,13 @@ def _epc_geometry(events):
     return fake_query
 
 
-def test_order1_maps_batched_request_to_query_and_topology_compact(monkeypatch):
+def _topology(args, *, min_depth=1, max_depth=1, record=None):
+    return reflection._reflection_topology(
+        *args, min_depth=min_depth, max_depth=max_depth, discovery="auto", record=record
+    )
+
+
+def test_maps_batched_request_to_query_and_topology_compact(monkeypatch):
     events: list[str] = []
     args = _fixture(monkeypatch, events)
     request, epc_inputs = _request()
@@ -124,34 +130,37 @@ def test_order1_maps_batched_request_to_query_and_topology_compact(monkeypatch):
         return _epc_geometry(events)(query)
 
     monkeypatch.setattr(reflection, "query_reflection_epc", fake_query)
-    monkeypatch.setattr(
-        reflection, "iter_reflection_order1_epc_requests", lambda *a, **k: iter([request])
-    )
-    result, launches = reflection._reflection_topology_order1(*args, frequency_hz=3.0e9)
+    monkeypatch.setattr(reflection, "iter_reflection_epc_requests", lambda *a, **k: iter([request]))
+    result, launches, _candidates = _topology(args)
     assert launches == 1
     query = queries[0]
     assert query.source is epc_inputs["tx_batch"]
     assert query.receiver is epc_inputs["rx_batch"]
     assert query.expected_prim_ids is epc_inputs["sequence_batch"]
     assert query.max_bounces == 1 and query.visibility_ignore_mode == 1
+    # The validator rejects paths with a segment shorter than a fixed fraction of the scene.
+    assert query.min_segment_length == pytest.approx(10.0 * 1.0e-5)
     (block,) = result["blocks"]
     assert block["kwargs"]["tx_indices"] is epc_inputs["tx_indices"]
     assert block["kwargs"]["rx_indices"] is epc_inputs["rx_indices"]
     assert events == ["epc1", "compact", "ensure", "concat", "ensure"]
 
 
-def test_order1_passes_every_transmitter_to_one_iterator(monkeypatch):
+def test_passes_every_transmitter_and_the_record_to_one_iterator(monkeypatch):
     events: list[str] = []
     args = _fixture(monkeypatch, events)
     seen = {}
+    record = reflection.ReflectionDiscoveryRecord()
 
-    def iterator(plan, *, tx_positions, **kwargs):
+    def iterator(plan, *, tx_positions, record, **kwargs):
         seen["tx"] = tx_positions
+        seen["record"] = record
         return iter(())
 
-    monkeypatch.setattr(reflection, "iter_reflection_order1_epc_requests", iterator)
-    reflection._reflection_topology_order1(*args, frequency_hz=1.0)
+    monkeypatch.setattr(reflection, "iter_reflection_epc_requests", iterator)
+    _topology(args, record=record)
     assert seen["tx"] is args[2]
+    assert seen["record"] is record
 
 
 def test_empty_compact_appends_no_block(monkeypatch):
@@ -159,14 +168,14 @@ def test_empty_compact_appends_no_block(monkeypatch):
     args = _fixture(monkeypatch, events, selected=False)
     monkeypatch.setattr(reflection, "query_reflection_epc", _epc_geometry(events))
     monkeypatch.setattr(
-        reflection, "iter_reflection_order1_epc_requests", lambda *a, **k: iter([_request()[0]])
+        reflection, "iter_reflection_epc_requests", lambda *a, **k: iter([_request()[0]])
     )
-    result, launches = reflection._reflection_topology_order1(*args, frequency_hz=1.0)
+    result, launches, _candidates = _topology(args)
     assert launches == 1
     assert result["blocks"] == ()
 
 
-def test_multibounce_counts_trace_and_epc_launches_and_candidates(monkeypatch):
+def test_counts_trace_and_epc_launches_and_candidates(monkeypatch):
     events: list[str] = []
     args = _fixture(monkeypatch, events)
     monkeypatch.setattr(reflection, "query_reflection_epc", _epc_geometry(events))
@@ -183,17 +192,15 @@ def test_multibounce_counts_trace_and_epc_launches_and_candidates(monkeypatch):
         record_candidate_count(7)
         yield _request(3)[0]
 
-    monkeypatch.setattr(reflection, "iter_reflection_multibounce_epc_requests", iterator)
-    result, launches, candidates = reflection._reflection_topology_multibounce(
-        *args, frequency_hz=1.0, min_depth=2, max_depth=3, max_paths=None
-    )
+    monkeypatch.setattr(reflection, "iter_reflection_epc_requests", iterator)
+    result, launches, candidates = _topology(args, min_depth=2, max_depth=3)
     assert launches == 3
     assert candidates == 12
     assert len(result["blocks"]) == 2
     assert events[:3] == ["trace", "epc2", "compact"]
 
 
-def test_multibounce_trace_error_propagates(monkeypatch):
+def test_trace_error_propagates(monkeypatch):
     events: list[str] = []
     args = _fixture(monkeypatch, events)
     monkeypatch.setattr(
@@ -206,8 +213,6 @@ def test_multibounce_trace_error_propagates(monkeypatch):
         trace_group_chains(kwargs["tx_positions"], face_group_id=torch.tensor([0]), max_depth=2)
         yield _request(2)[0]
 
-    monkeypatch.setattr(reflection, "iter_reflection_multibounce_epc_requests", iterator)
+    monkeypatch.setattr(reflection, "iter_reflection_epc_requests", iterator)
     with pytest.raises(RuntimeError, match="trace"):
-        reflection._reflection_topology_multibounce(
-            *args, frequency_hz=1.0, min_depth=2, max_depth=2, max_paths=None
-        )
+        _topology(args, min_depth=2, max_depth=2)

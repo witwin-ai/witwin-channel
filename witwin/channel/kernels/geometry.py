@@ -1903,6 +1903,7 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
             surface_group_members,
             int(max_bounces),
             int(visibility_ignore_mode),
+            0.0,
         )
         return tuple(out)
 
