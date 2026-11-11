@@ -19,7 +19,6 @@ from typing import Any, cast
 
 DEPLOYMENT_ABI = "witwin.channel.deployment.v2"
 PIPELINE_CACHE_ABI = "witwin.channel.pipeline-cache.v1"
-SUPPORTED_TORCH_CUDA = "12.8"
 
 
 def _package_version() -> str:
@@ -27,6 +26,20 @@ def _package_version() -> str:
         return importlib.metadata.version("witwin-channel")
     except importlib.metadata.PackageNotFoundError:
         return "source-tree"
+
+
+def _required_torch() -> str:
+    """Return the ``torch==X`` requirement of the installed wheel, or plain ``torch``."""
+
+    try:
+        requirements = importlib.metadata.requires("witwin-channel") or []
+    except importlib.metadata.PackageNotFoundError:
+        requirements = []
+    for requirement in requirements:
+        match = re.fullmatch(r"torch\s*==\s*([0-9][0-9A-Za-z.]*)", requirement.strip())
+        if match is not None:
+            return f"torch=={match.group(1)}"
+    return "torch"
 
 
 def _import_torch() -> ModuleType:
@@ -250,8 +263,8 @@ def doctor_report(diagnostics: dict[str, Any], *, driver_release: str | None) ->
 
     if torch_version is None:
         failures.append(
-            "PyTorch is not importable. Install the CUDA build: "
-            "pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cu128"
+            f"PyTorch is not importable. Install the CUDA build: pip install {_required_torch()} "
+            "--index-url https://download.pytorch.org/whl/cu128"
         )
     elif not diagnostics.get("torch_cuda_build", False):
         failures.append(
