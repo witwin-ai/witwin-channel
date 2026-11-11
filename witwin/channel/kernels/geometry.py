@@ -586,7 +586,9 @@ def coupled_dd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
     from ``edge_sequence`` (slot 0 = e1, slot 1 = e2); ``primitive_sequence`` is
     fully ``-1`` because a double-diffraction row touches no face. The returned
     dictionary intentionally carries no ``path_gain``/``field`` entry; complex
-    transport belongs to the unified field phase.
+    transport belongs to the unified field phase. ``certificate_rejection_count``
+    is a device ``int32[1]`` count of candidates dropped because the float32
+    bisection could not certify their stationary point.
     """
 
     if not args:
@@ -614,6 +616,7 @@ def coupled_dd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
         "edge2_position": (torch.float32, 2),
         "path_length_m": (torch.float32, 1),
         "delay_s": (torch.float32, 1),
+        "certificate_rejection_count": (torch.int32, 1),
     }
     for name, (dtype, ndim) in required.items():
         value = out.get(name)
@@ -636,6 +639,8 @@ def coupled_dd_geometry_forward(*args: object) -> dict[str, torch.Tensor]:
         raise ValueError("interaction_positions must have shape (N, 2, 3)")
     if out["interaction_normals"].shape != (count, 2, 3):
         raise ValueError("interaction_normals must have shape (N, 2, 3)")
+    if out["certificate_rejection_count"].shape != (1,):
+        raise ValueError("certificate_rejection_count must have shape (1,)")
     return out
 
 

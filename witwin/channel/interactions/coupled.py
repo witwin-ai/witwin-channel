@@ -288,6 +288,8 @@ class CoupledDdGeometry:
     edge2_position: torch.Tensor
     path_length_m: torch.Tensor
     delay_s: torch.Tensor
+    # Device int32[1]: candidates dropped for an uncertified stationary point.
+    certificate_rejection_count: torch.Tensor
 
 
 def query_coupled_geometry(query: CoupledGeometryQuery) -> CoupledGeometry:
@@ -355,6 +357,7 @@ def query_coupled_dd_geometry(query: CoupledDdGeometryQuery) -> CoupledDdGeometr
         edge2_position=raw["edge2_position"],
         path_length_m=raw["path_length_m"],
         delay_s=raw["delay_s"],
+        certificate_rejection_count=raw["certificate_rejection_count"],
     )
 
 

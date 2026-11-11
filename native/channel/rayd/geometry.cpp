@@ -662,7 +662,7 @@ pybind11::dict channel_coupled_dd_geometry_forward(
         edge2_dir,
         edge2_t_min,
         edge2_t_max);
-    TORCH_CHECK(prepared.size() == 3,
+    TORCH_CHECK(prepared.size() == 4,
                 "coupled D-D prepare returned an unexpected tensor count");
     at::Tensor candidate_active = prepared[0];
     at::Tensor q1 = prepared[1];
@@ -690,5 +690,6 @@ pybind11::dict channel_coupled_dd_geometry_forward(
         source,
         receiver);
     out["candidate_active"] = candidate_active;
+    out["certificate_rejection_count"] = prepared[3];
     return out;
 }
