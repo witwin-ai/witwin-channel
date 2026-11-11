@@ -32,6 +32,16 @@ imaginary part, folded into non-negative equivalent conductivity. Layer records
 use ABI v3 CSR and SI units. Layer order, roughness axes, frequency, dtype, and
 device are contractual; tabulated data never extrapolates.
 
+### Device residency
+
+`face_material_tensors`, `face_material_field_bundle`,
+`face_material_thickness`, `face_material_id_table` and
+`face_geometry_id_table` build their device tables once per `CompiledScene`
+and serve them from a cache keyed by device, material/assignment (or geometry)
+version and the source tensors' identity and mutation version, so a warm solve
+uploads no material or per-face id table. A store tensor that takes part in
+autograd bypasses the cache and the table is rebuilt on the graph each call.
+
 ### AD contract
 
 Layer-stack evaluation has native backward and JVP companions for supported

@@ -128,9 +128,8 @@ def epc_candidate_chunk(depth: int, device: torch.device) -> int:
 
 
 def _epc_requests(
-    depth: int, *, tx_positions: torch.Tensor, rx_positions: torch.Tensor,
-    sequences: torch.Tensor, tri_a: torch.Tensor, normals: torch.Tensor,
-    sequence_tx: torch.Tensor | None = None,
+    depth: int, *, tx_positions: torch.Tensor, rx_positions: torch.Tensor, sequences: torch.Tensor,
+    tri_a: torch.Tensor, normals: torch.Tensor, sequence_tx: torch.Tensor | None = None,
 ) -> Iterator[ReflectionEpcRequest]:
     total = topology_kernels.reflection_epc_candidate_count(
         tx_count=int(tx_positions.shape[0]),
@@ -157,9 +156,7 @@ def _epc_requests(
         )
 
 
-def _unique_tx_chains(
-    chains: torch.Tensor, *, depth: int, group_count: int,
-) -> torch.Tensor:
+def _unique_tx_chains(chains: torch.Tensor, *, depth: int, group_count: int) -> torch.Tensor:
     """Distinct ``(tx, group_1..group_depth)`` rows of chains reaching ``depth``, sorted.
 
     ``chains`` is ``(T, N, max_depth)`` plane-group ids with -1 past each ray's last hit.

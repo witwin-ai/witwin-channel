@@ -340,8 +340,8 @@ def _los_taper_frequency(
 
 
 def _rough_scale_inputs(
-    compiled: object, face_id: torch.Tensor, depth_value: int, material: dict[str, torch.Tensor],
-    *, scattering_active: bool,
+    compiled: object, face_id: torch.Tensor, depth_value: int, material: dict[str, torch.Tensor], *,
+    scattering_active: bool,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | None:
     """Host-side per-bounce inputs for the native rough-reflection C_r op.
 
@@ -754,8 +754,8 @@ def _evaluate_coupled_fields(
     source: torch.Tensor, target: torch.Tensor, source_power: torch.Tensor, tx_pol: torch.Tensor,
     rx_pol: torch.Tensor, device: torch.device, frequency: float | torch.Tensor,
     frequency_value: float | None, ad_enabled: bool, geometry_ad: bool,
-    ledger: AdLaunchLedger | None, material: dict[str, torch.Tensor] | None,
-    groups: PathRowGroups, outputs: _FieldOutputs, launch_count: int,
+    ledger: AdLaunchLedger | None, material: dict[str, torch.Tensor] | None, groups: PathRowGroups,
+    outputs: _FieldOutputs, launch_count: int,
 ) -> tuple[dict[str, torch.Tensor] | None, int]:
     if any(groups.count(group) > 0 for group in (_RD_GROUP, _DR_GROUP, _DD_GROUP)):
         if material is None:
@@ -933,9 +933,8 @@ def evaluate_path_fields(
     scene: Scene, compiled: object, paths: EvaluatedPaths, execution: PathExecutionStats,
     tx_positions: torch.Tensor, tx_power: torch.Tensor, rx_positions: torch.Tensor, *,
     row_groups: PathRowGroups, components: frozenset[str] | set[str] = frozenset(),
-    ad_mode: str = "none",
-    frequency_value: float | None = None, isb_boundary_taper_width: float = 0.0,
-    endpoint_tx_polarizations: torch.Tensor | None = None,
+    ad_mode: str = "none", frequency_value: float | None = None,
+    isb_boundary_taper_width: float = 0.0, endpoint_tx_polarizations: torch.Tensor | None = None,
     endpoint_rx_polarizations: torch.Tensor | None = None, explicit_endpoint_geometry: bool = False,
 ) -> tuple[EvaluatedPaths, PathExecutionStats]:
     """Evaluate selected canonical rows with the shared complex3 ABI.
