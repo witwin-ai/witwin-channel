@@ -151,4 +151,62 @@ __device__ __forceinline__ utd::Complex3 reflect_layered(utd::Complex3 value, ut
                        utd::cplx_scale_real(frame.p_out, utd::cplx_mul(r_tm, e_p)));
 }
 
+// Reflection coefficients of the two faces of a diffraction wedge, for the pair evaluation
+// (utd::compute_pair_vector_contribution_faces): each face reflects in the diffraction face term with the
+// coefficient its specular reflection uses, a finite slab or the layer stack of a multilayer material
+// (`material` < 0 or a null layer store: the slab). Faces whose FaceMaterialParams are absent keep the stored
+// operator. The float form is the primal; the Dual form carries the incidence-angle, slab-parameter, gain and
+// frequency tangents.
+template <typename T> struct WedgeFaceFresnel;
+
+template <> struct WedgeFaceFresnel<float> {
+    float eps[2];
+    float sigma[2];
+    float mu[2];
+    float gain[2];
+    float thickness[2];
+    int material[2] = {-1, -1};
+    LayerTables tables;
+    float frequency_hz;
+
+    __device__ __forceinline__ bool evaluates(int, const utd::FaceMaterialParams& face) const {
+        return face.present > 0.5f;
+    }
+    __device__ __forceinline__ utd::FaceFresnelT<float> operator()(int face, const utd::FaceMaterialParams&,
+                                                                   float cos_theta) const {
+        utd::FaceFresnelT<float> out;
+        face_fresnel(cos_theta, eps[face], sigma[face], mu[face], gain[face], thickness[face], frequency_hz,
+                     material[face], tables, out.rTE, out.rTM);
+        return out;
+    }
+};
+
+__device__ __forceinline__ utd::ComplexT<utd::Dual> dual_complex(const ad::DualC& value) {
+    return {utd::Dual(value.v.re, value.d.re), utd::Dual(value.v.im, value.d.im)};
+}
+
+template <> struct WedgeFaceFresnel<utd::Dual> {
+    utd::Dual eps[2];
+    utd::Dual sigma[2];
+    float mu[2];
+    utd::Dual gain[2];
+    utd::Dual thickness[2];
+    int material[2] = {-1, -1};
+    LayerTables tables;
+    utd::Dual frequency_hz;
+
+    __device__ __forceinline__ bool evaluates(int, const utd::FaceMaterialParamsT<utd::Dual>& face) const {
+        return face.present > 0.5f;
+    }
+    __device__ __forceinline__ utd::FaceFresnelT<utd::Dual> operator()(int face,
+                                                                       const utd::FaceMaterialParamsT<utd::Dual>&,
+                                                                       utd::Dual cos_theta) const {
+        ad::DualC r_te, r_tm;
+        face_fresnel_dual(cos_theta.v, eps[face].v, sigma[face].v, mu[face], gain[face].v, thickness[face].v,
+                          frequency_hz.v, material[face], tables, cos_theta.d, eps[face].d, sigma[face].d,
+                          gain[face].d, thickness[face].d, frequency_hz.d, r_te, r_tm);
+        return {dual_complex(r_te), dual_complex(r_tm)};
+    }
+};
+
 } // namespace channel::layered_reflection

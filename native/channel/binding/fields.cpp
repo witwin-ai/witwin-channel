@@ -130,7 +130,8 @@ rayd::torch::DiffractionWedgeRequest diffraction_wedge_request(
     pybind11::object vertex_opp0,
     pybind11::object vertex_opp1,
     pybind11::object edge_boundary,
-    double isb_boundary_taper_width) {
+    double isb_boundary_taper_width,
+    pybind11::object face_layers) {
     rayd::torch::DiffractionWedgeRequest request;
     request.valid = std::move(valid);
     request.source = std::move(source);
@@ -160,6 +161,15 @@ rayd::torch::DiffractionWedgeRequest diffraction_wedge_request(
     request.vertex_opp1 = optional_tensor(vertex_opp1);
     request.edge_boundary = optional_tensor(edge_boundary);
     request.isb_boundary_taper_width = isb_boundary_taper_width;
+    if (!face_layers.is_none()) {
+        // (face0 thickness, face1 thickness, face0 layer row, face1 layer row, then the layer store).
+        const auto tables = pybind11::cast<std::vector<at::Tensor>>(face_layers);
+        TORCH_CHECK(tables.size() == 10, "face_layers must hold ten tensors");
+        request.face0_layers = rayd::torch::DiffractionFaceLayers{
+            tables[0], tables[2], tables[4], tables[5], tables[6], tables[7], tables[8], tables[9]};
+        request.face1_layers = rayd::torch::DiffractionFaceLayers{
+            tables[1], tables[3], tables[4], tables[5], tables[6], tables[7], tables[8], tables[9]};
+    }
     return request;
 }
 
@@ -247,11 +257,12 @@ pybind11::dict channel_field_diffraction_wedge(
     pybind11::object vertex_opp0,
     pybind11::object vertex_opp1,
     pybind11::object edge_boundary,
-    double isb_boundary_taper_width) {
+    double isb_boundary_taper_width,
+    pybind11::object face_layers) {
     return diffraction_wedge_result_dict(
         rayd::torch::field_diffraction_wedge(diffraction_wedge_request(
             CHANNEL_DIFFRACTION_WEDGE_COMMON_ARGUMENTS,
-            isb_boundary_taper_width)));
+            isb_boundary_taper_width, face_layers)));
 }
 pybind11::dict channel_field_diffraction_wedge_backward(
     at::Tensor valid,
@@ -287,11 +298,12 @@ pybind11::dict channel_field_diffraction_wedge_backward(
     bool need_grad_frequency,
     bool need_grad_geometry,
     bool need_grad_vertices,
-    double isb_boundary_taper_width) {
+    double isb_boundary_taper_width,
+    pybind11::object face_layers) {
     rayd::torch::DiffractionWedgeBackwardRequest request;
     request.primal = diffraction_wedge_request(
         CHANNEL_DIFFRACTION_WEDGE_COMMON_ARGUMENTS,
-        isb_boundary_taper_width);
+        isb_boundary_taper_width, face_layers);
     request.grad_field_vector = optional_tensor(grad_field_vector);
     request.grad_direction = optional_tensor(grad_direction);
     request.need_grad_material = need_grad_material;
@@ -363,11 +375,12 @@ pybind11::dict channel_field_diffraction_wedge_jvp(
     pybind11::object tangent_vertex_v1,
     pybind11::object tangent_vertex_opp0,
     pybind11::object tangent_vertex_opp1,
-    double isb_boundary_taper_width) {
+    double isb_boundary_taper_width,
+    pybind11::object face_layers) {
     rayd::torch::DiffractionWedgeJvpRequest request;
     request.primal = diffraction_wedge_request(
         CHANNEL_DIFFRACTION_WEDGE_COMMON_ARGUMENTS,
-        isb_boundary_taper_width);
+        isb_boundary_taper_width, face_layers);
     request.tangent_source = optional_tensor(tangent_source);
     request.tangent_target = optional_tensor(tangent_target);
     request.tangent_face0_eps_r = optional_tensor(tangent_face0_eps_r);

@@ -80,6 +80,12 @@ def _fixture(monkeypatch, events, *, states_per_tx: int, tx_count: int = 2):
     monkeypatch.setattr(
         diffraction, "face_material_tensors", lambda *a, **k: tuple(torch.ones(1) for _ in range(5))
     )
+    monkeypatch.setattr(
+        diffraction, "face_material_field_bundle",
+        lambda *a, **k: {name: torch.ones(1) for name in (
+            "thickness", "material_id", "layer_offset", "layer_count", "layer_thickness_m",
+            "layer_eps_r", "layer_sigma_e", "layer_mu_r")},
+    )
     monkeypatch.setattr(diffraction, "selected_diffraction_edges", lambda *a, **k: (None, None))
     monkeypatch.setattr(
         diffraction,

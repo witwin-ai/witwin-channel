@@ -591,7 +591,7 @@ def field_coupled_chain(
     ``positions`` and ``normals`` are ``(N, W, 3)`` interaction points and reflection normals;
     the component id and depth place the diffraction. ``material`` holds ``(N, W + 2)``
     eps/sigma/mu/gain/thickness tables: the reflection slots, then both wedge faces.
-    ``layers.bounce_material`` has shape ``(N, W)``.
+    ``layers.bounce_material`` has shape ``(N, W + 2)``: the layer-store rows of the same columns.
     """
 
     _validate_chain_inputs(
@@ -605,7 +605,7 @@ def field_coupled_chain(
     out = _required_native_op("field_coupled_chain")(
         source, target, positions, normals, component_id, depth, edge_direction, edge_n0,
         edge_n1, exterior_angle, edge_line_min, edge_line_max, tx_power, tx_polarization,
-        rx_polarization, *material, *_native_layers(layers, positions[:, :, 0]),
+        rx_polarization, *material, *_native_layers(layers, material[0]),
         float(frequency_hz),
     )
     if not isinstance(out, dict):
@@ -1062,6 +1062,23 @@ def _validate_wedge_valid(valid: torch.Tensor, source: torch.Tensor) -> None:
         raise ValueError("valid must have shape (N,) matching source rows")
 
 
+def wedge_face_layers(
+    material: dict[str, torch.Tensor], face0: torch.Tensor, face1: torch.Tensor,
+) -> tuple[torch.Tensor, ...]:
+    """Slab / layer-stack tables of wedge rows with faces ``face0``/``face1``, from the material bundle.
+
+    The tuple is (face0 thickness, face1 thickness, face0 layer-store row, face1 layer-store row,
+    layer offset, count, thickness, eps_r, sigma_e, mu_r), the native ``face_layers`` argument.
+    """
+
+    return (
+        material["thickness"][face0].contiguous(), material["thickness"][face1].contiguous(),
+        material["material_id"][face0].contiguous(), material["material_id"][face1].contiguous(),
+        material["layer_offset"], material["layer_count"], material["layer_thickness_m"],
+        material["layer_eps_r"], material["layer_sigma_e"], material["layer_mu_r"],
+    )
+
+
 def field_diffraction_wedge(
     valid: torch.Tensor, source: torch.Tensor, target: torch.Tensor, edge_position: torch.Tensor,
     edge_direction: torch.Tensor, edge_t_min: torch.Tensor, edge_t_max: torch.Tensor,
@@ -1070,8 +1087,13 @@ def field_diffraction_wedge(
     face0_mu_r: torch.Tensor, face0_gain: torch.Tensor, face1_valid: torch.Tensor,
     face1_eps_r: torch.Tensor, face1_sigma_e: torch.Tensor, face1_mu_r: torch.Tensor,
     face1_gain: torch.Tensor, tx_power: torch.Tensor, *, frequency_hz: float,
+    face_layers: tuple[torch.Tensor, ...] | None = None,
 ) -> dict[str, torch.Tensor]:
-    """Re-evaluate RayD's order-1 UTD wedge export from the frozen topology."""
+    """Re-evaluate RayD's order-1 UTD wedge export from the frozen topology.
+
+    ``face_layers`` optionally gives the faces their slab / layer-stack reflection: per row the two
+    faces' thickness and layer-store row, then the layer store (see :func:`wedge_face_layers`).
+    """
 
     _validate_wedge_valid(valid, source)
     out = _required_native_op("field_diffraction_wedge")(
@@ -1102,6 +1124,8 @@ def field_diffraction_wedge(
         None,
         None,
         None,
+        0.0,
+        face_layers,
     )
     if not isinstance(out, dict) or set(out) != set(_WEDGE_OUTPUT_FIELDS):
         raise TypeError(
@@ -2082,7 +2106,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
         face0_valid: Any, face0_eps_r: Any, face0_sigma_e: Any, face0_mu_r: Any, face0_gain: Any,
         face1_valid: Any, face1_eps_r: Any, face1_sigma_e: Any, face1_mu_r: Any, face1_gain: Any,
         tx_power: Any, frequency: Any, vertex_v0: Any, vertex_v1: Any, vertex_opp0: Any,
-        vertex_opp1: Any, edge_boundary: Any, frequency_value: Any,
+        vertex_opp1: Any, edge_boundary: Any, frequency_value: Any, face_layers: Any,
     ) -> Any:
         out = _required_native_op("field_diffraction_wedge")(
             valid,
@@ -2117,6 +2141,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
             # companion pending), so the differentiable twin never tapers. The
             # argument is threaded for lockstep completeness of the guarded path.
             0.0,
+            face_layers,
         )
         return tuple(out[name] for name in _WEDGE_OUTPUT_FIELDS)
 
@@ -2136,6 +2161,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
         )
         ctx.has_vertices = vertex_primals[0] is not None
         ctx.frequency_value = inputs[27]
+        ctx.face_layers = inputs[28]
         ctx.frequency_meta = (
             (frequency.dtype, frequency.device)
             if isinstance(frequency, torch.Tensor)
@@ -2158,7 +2184,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
     @staticmethod
     @_ad_first_order_only
     def backward(ctx: Any, grad_field_vector: Any, grad_direction: Any) -> Any:
-        none_grads = (None,) * 28
+        none_grads = (None,) * 29
         _ad_reject_fixed_inputs(
             "field_diffraction_wedge_ad",
             ctx.needs_input_grad,
@@ -2202,6 +2228,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
             need_vertices,
             # the boundary taper width; always 0.0 (taper + AD is guarded off).
             0.0,
+            ctx.face_layers,
         )
         grad_frequency = (
             _ad_frequency_grad(out["grad_frequency"], ctx.frequency_meta)
@@ -2235,6 +2262,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
             out["grad_vertex_v1"] if ctx.needs_input_grad[23] else None,
             out["grad_vertex_opp0"] if ctx.needs_input_grad[24] else None,
             out["grad_vertex_opp1"] if ctx.needs_input_grad[25] else None,
+            None,
             None,
             None,
         )
@@ -2320,6 +2348,7 @@ class _FieldDiffractionWedgeAdFunction(torch.autograd.Function):
                 *vertex_tangents,
                 # the boundary taper width; always 0.0 (taper + AD is guarded off).
                 0.0,
+                ctx.face_layers,
             )
         return (out["tangent_field_vector"], out["tangent_direction"])
 
@@ -2333,6 +2362,7 @@ def field_diffraction_wedge_ad(
     face1_eps_r: torch.Tensor, face1_sigma_e: torch.Tensor, face1_mu_r: torch.Tensor,
     face1_gain: torch.Tensor, tx_power: torch.Tensor, *, frequency: torch.Tensor | float,
     frequency_value: float | None = None, vertices: tuple[torch.Tensor, ...] | None = None,
+    face_layers: tuple[torch.Tensor, ...] | None = None,
 ) -> dict[str, torch.Tensor]:
     """Differentiable :func:`field_diffraction_wedge`.
 
@@ -2377,6 +2407,7 @@ def field_diffraction_wedge_ad(
         frequency,
         *vertex_args,
         float(frequency_value),
+        face_layers,
     )
     return dict(zip(_WEDGE_OUTPUT_FIELDS, values, strict=True))
 
@@ -2401,7 +2432,7 @@ class _FieldCoupledChainAdFunction(torch.autograd.Function):
             source, target, positions, normals, component_id, depth, edge_direction, edge_n0,
             edge_n1, exterior_angle, edge_line_min, edge_line_max, tx_power, tx_polarization,
             rx_polarization, eps_r, sigma_e, mu_r, gain, thickness,
-            *_native_layers(None, positions[..., 0]), frequency_value,
+            *_native_layers(None, eps_r), frequency_value,
         )
         return tuple(out[name] for name in _COUPLED_OUTPUT_FIELDS)
 
@@ -2421,7 +2452,7 @@ class _FieldCoupledChainAdFunction(torch.autograd.Function):
     @staticmethod
     def _native_primals(ctx: Any) -> tuple[torch.Tensor, ...]:
         saved = tuple(_ad_native_tensor(value) for value in ctx.saved_tensors)
-        return (*saved, *_native_layers(None, saved[2][..., 0]), ctx.frequency_value)
+        return (*saved, *_native_layers(None, saved[15]), ctx.frequency_value)
 
     @staticmethod
     @_ad_first_order_only

@@ -388,14 +388,8 @@ __global__ void coupled_dd_field_kernel(
             2.0f * field::UTD_PI * frequency_hz / transport::kSpeedOfLight;
 
         // --- Leg 1: direct-source diffraction at e1, observed at frozen Q2 ---
-        const field::float3a incident_direction1 = field::safe_normalize(
-            field::f3_sub(q1, src), field::make_f3(1.0f, 0.0f, 0.0f));
-        const field::float3a outgoing_direction1 = field::safe_normalize(
-            field::f3_sub(q2, q1), field::make_f3(1.0f, 0.0f, 0.0f));
         const field::Basis3 input_edge_basis1 = field::diffraction_edge_basis(
             field::f3_sub(q1, src), e1_axis, false);
-        const field::Basis3 output_edge_basis1 = field::diffraction_edge_basis(
-            field::f3_sub(q2, q1), e1_axis, true);
 
         field::PairInputs pair1{};
         pair1.edgePos = q1;
@@ -412,56 +406,38 @@ __global__ void coupled_dd_field_kernel(
         pair1.incidentDerivativeJones = field::jones_zero();
         pair1.face0Material.present = 1.0f;
         pair1.face1Material.present = 1.0f;
-        float pair1_face0_cos, pair1_face1_cos;
-        field::pair_face_cosines(pair1, q2, pair1_face0_cos, pair1_face1_cos);
-        pair1.face0Operator = transport::slab_face_operator(
-            pair1_face0_cos,
-            wedge1_eps_r0[index],
-            wedge1_sigma_e0[index],
-            wedge1_mu_r0[index],
-            wedge1_gain0[index],
-            wedge1_thickness0[index],
-            frequency_hz,
-            pair1.n0,
-            incident_direction1,
-            outgoing_direction1,
-            input_edge_basis1,
-            output_edge_basis1);
-        pair1.face1Operator = transport::slab_face_operator(
-            pair1_face1_cos,
-            wedge1_eps_r1[index],
-            wedge1_sigma_e1[index],
-            wedge1_mu_r1[index],
-            wedge1_gain1[index],
-            wedge1_thickness1[index],
-            frequency_hz,
-            pair1.nn,
-            incident_direction1,
-            outgoing_direction1,
-            input_edge_basis1,
-            output_edge_basis1);
+        pair1.face0Material.useFresnel = 1.0f;
+        pair1.face1Material.useFresnel = 1.0f;
+        layered::WedgeFaceFresnel<float> faces1;
+        faces1.eps[0] = wedge1_eps_r0[index];
+        faces1.sigma[0] = wedge1_sigma_e0[index];
+        faces1.mu[0] = wedge1_mu_r0[index];
+        faces1.gain[0] = wedge1_gain0[index];
+        faces1.thickness[0] = wedge1_thickness0[index];
+        faces1.eps[1] = wedge1_eps_r1[index];
+        faces1.sigma[1] = wedge1_sigma_e1[index];
+        faces1.mu[1] = wedge1_mu_r1[index];
+        faces1.gain[1] = wedge1_gain1[index];
+        faces1.thickness[1] = wedge1_thickness1[index];
+        faces1.frequency_hz = frequency_hz;
         pair1.selectStationaryPoint = 1.0f;
         pair1.stationaryExternalIncident = 0.0f;
         const field::float3a tx_pol = channel::math::load_field_vec3(tx_polarization, index);
         field::MaterialParams material1{};
-        // omega < 0 keeps the stored (frozen-at-Keller) slab face operators; the
-        // direct incident spherical wave still uses the transmitter polarization.
+        // The face terms reflect with the wedge faces' slab coefficients; the direct incident
+        // spherical wave uses the transmitter polarization.
         material1.omega = -1.0f;
         material1.txPolX = tx_pol.x;
         material1.txPolY = tx_pol.y;
         material1.txPolZ = tx_pol.z;
-        const field::Complex3 leg1_field = field::compute_pair_contribution(
-            pair1, q2, wave_number, material1).vectorField;
+        const field::Complex3 leg1_field = field::compute_pair_contribution_faces(
+            pair1, q2, wave_number, material1, faces1).vectorField;
 
         // --- Leg 2: external-incident diffraction at e2, observed at rx ---
-        const field::float3a incident_direction2 = field::safe_normalize(
-            field::f3_sub(q2, q1), field::make_f3(1.0f, 0.0f, 0.0f));
         const field::float3a outgoing_direction2 = field::safe_normalize(
             field::f3_sub(dst, q2), field::make_f3(1.0f, 0.0f, 0.0f));
         const field::Basis3 input_edge_basis2 = field::diffraction_edge_basis(
             field::f3_sub(q2, q1), e2_axis, false);
-        const field::Basis3 output_edge_basis2 = field::diffraction_edge_basis(
-            field::f3_sub(dst, q2), e2_axis, true);
 
         field::PairInputs pair2{};
         pair2.edgePos = q2;
@@ -479,34 +455,20 @@ __global__ void coupled_dd_field_kernel(
         pair2.incidentDerivativeJones = field::jones_zero();
         pair2.face0Material.present = 1.0f;
         pair2.face1Material.present = 1.0f;
-        float pair2_face0_cos, pair2_face1_cos;
-        field::pair_face_cosines(pair2, dst, pair2_face0_cos, pair2_face1_cos);
-        pair2.face0Operator = transport::slab_face_operator(
-            pair2_face0_cos,
-            wedge2_eps_r0[index],
-            wedge2_sigma_e0[index],
-            wedge2_mu_r0[index],
-            wedge2_gain0[index],
-            wedge2_thickness0[index],
-            frequency_hz,
-            pair2.n0,
-            incident_direction2,
-            outgoing_direction2,
-            input_edge_basis2,
-            output_edge_basis2);
-        pair2.face1Operator = transport::slab_face_operator(
-            pair2_face1_cos,
-            wedge2_eps_r1[index],
-            wedge2_sigma_e1[index],
-            wedge2_mu_r1[index],
-            wedge2_gain1[index],
-            wedge2_thickness1[index],
-            frequency_hz,
-            pair2.nn,
-            incident_direction2,
-            outgoing_direction2,
-            input_edge_basis2,
-            output_edge_basis2);
+        pair2.face0Material.useFresnel = 1.0f;
+        pair2.face1Material.useFresnel = 1.0f;
+        layered::WedgeFaceFresnel<float> faces2;
+        faces2.eps[0] = wedge2_eps_r0[index];
+        faces2.sigma[0] = wedge2_sigma_e0[index];
+        faces2.mu[0] = wedge2_mu_r0[index];
+        faces2.gain[0] = wedge2_gain0[index];
+        faces2.thickness[0] = wedge2_thickness0[index];
+        faces2.eps[1] = wedge2_eps_r1[index];
+        faces2.sigma[1] = wedge2_sigma_e1[index];
+        faces2.mu[1] = wedge2_mu_r1[index];
+        faces2.gain[1] = wedge2_gain1[index];
+        faces2.thickness[1] = wedge2_thickness1[index];
+        faces2.frequency_hz = frequency_hz;
         pair2.selectStationaryPoint = 1.0f;
         pair2.stationaryExternalIncident = 1.0f;
         field::MaterialParams material2{};
@@ -514,8 +476,8 @@ __global__ void coupled_dd_field_kernel(
         // Single leg-2 coefficient call site (the transition-coefficient isolation swaps this for the
         // two-variable transition function). sPrimeFrozen = |Q1 - Q2| is
         // recaptured inside compute_pair_vector_contribution before the re-anchor.
-        const field::Complex3 value = field::compute_pair_contribution(
-            pair2, dst, wave_number, material2).vectorField;
+        const field::Complex3 value = field::compute_pair_contribution_faces(
+            pair2, dst, wave_number, material2, faces2).vectorField;
 
         const field::float3a final_direction = outgoing_direction2;
         const int64_t base = index * 3;

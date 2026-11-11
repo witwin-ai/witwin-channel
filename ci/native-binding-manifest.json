@@ -2063,7 +2063,8 @@
         ["vertex_opp0", "pybind11::object", null],
         ["vertex_opp1", "pybind11::object", null],
         ["edge_boundary", "pybind11::object", null],
-        ["isb_boundary_taper_width", "double", null]
+        ["isb_boundary_taper_width", "double", null],
+        ["face_layers", "pybind11::object", null]
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.fields._FieldDiffractionWedgeAdFunction", "witwin.channel.kernels.fields.field_diffraction_wedge"]
@@ -2107,7 +2108,8 @@
         ["need_grad_frequency", "bool", null],
         ["need_grad_geometry", "bool", null],
         ["need_grad_vertices", "bool", null],
-        ["isb_boundary_taper_width", "double", null]
+        ["isb_boundary_taper_width", "double", null],
+        ["face_layers", "pybind11::object", null]
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.fields._FieldDiffractionWedgeAdFunction"]
@@ -2158,7 +2160,8 @@
         ["tangent_vertex_v1", "pybind11::object", null],
         ["tangent_vertex_opp0", "pybind11::object", null],
         ["tangent_vertex_opp1", "pybind11::object", null],
-        ["isb_boundary_taper_width", "double", null]
+        ["isb_boundary_taper_width", "double", null],
+        ["face_layers", "pybind11::object", null]
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.fields._FieldDiffractionWedgeAdFunction"]
@@ -3785,7 +3788,8 @@
         ["capacity", "int64_t", null],
         ["wavelength", "double", null],
         ["isb_taper_width_scale", "double", null],
-        ["state_source_index", "std::optional<torch::Tensor>", null]
+        ["state_source_index", "std::optional<torch::Tensor>", null],
+        ["face_layers", "std::optional<std::vector<torch::Tensor>>", null]
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.geometry.rayd_diffraction_paths_order1_forward"]

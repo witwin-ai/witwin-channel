@@ -319,8 +319,9 @@ def test_field_jvp_callbacks_cover_declared_component_matrix(monkeypatch) -> Non
         saved_tensors=(value,) * 26,
         has_vertices=True,
         frequency_value=3.0e9,
+        face_layers=None,
     )
-    diffraction_tangents = [None] * 26
+    diffraction_tangents = [None] * 27
     diffraction_tangents[1] = value
     diffraction_tangents[11] = value
     diffraction = fields._FieldDiffractionWedgeAdFunction.jvp(
@@ -429,7 +430,7 @@ def test_remaining_vjp_callbacks_pack_full_gradients(monkeypatch) -> None:
 
     monkeypatch.setattr(fields, "_required_native_op", required_symbol)
 
-    diffraction_needed = [False] * 28
+    diffraction_needed = [False] * 29
     for index in (1, 2, 11, 12, 14, 16, 17, 19, 21, 22, 23, 24, 25):
         diffraction_needed[index] = True
     diffraction_ctx = SimpleNamespace(
@@ -438,12 +439,13 @@ def test_remaining_vjp_callbacks_pack_full_gradients(monkeypatch) -> None:
         has_vertices=True,
         frequency_value=3.0e9,
         frequency_meta=None,
+        face_layers=None,
     )
     with torch.no_grad():
         diffraction = fields._FieldDiffractionWedgeAdFunction.backward(
             diffraction_ctx, value, value
         )
-    assert len(diffraction) == 28 and diffraction[25] is value
+    assert len(diffraction) == 29 and diffraction[25] is value
 
     chain_needed = [False] * 22
     for index in (0, 1, 15, 16, 18, 19, 20):

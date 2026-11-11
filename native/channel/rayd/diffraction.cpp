@@ -86,7 +86,8 @@ pybind11::tuple channel_rayd_diffraction_paths_order1_forward(
     int64_t capacity,
     double wavelength,
     double isb_taper_width_scale,
-    std::optional<torch::Tensor> state_source_index) {
+    std::optional<torch::Tensor> state_source_index,
+    std::optional<std::vector<torch::Tensor>> face_layers) {
     // tx_pol is the scene transmitter polarization threaded from the caller
     // . The RayD UTD op consumes it as the incident field basis.
     TORCH_CHECK(
@@ -109,6 +110,13 @@ pybind11::tuple channel_rayd_diffraction_paths_order1_forward(
         isb_taper_width_scale,
         rayd::torch::DiffractionPathLayout::Compact,
         state_source_index};
+    if (face_layers.has_value()) {
+        // Per face: slab thickness and layer-store row; then the layer store.
+        const std::vector<torch::Tensor> &tables = *face_layers;
+        TORCH_CHECK(tables.size() == 8, "face_layers must hold eight tensors");
+        config.face_layers = rayd::torch::DiffractionFaceLayers{
+            tables[0], tables[1], tables[2], tables[3], tables[4], tables[5], tables[6], tables[7]};
+    }
     return diffraction_path_tuple(
         rayd::torch::diffraction_paths_order1_forward(scene.resource(), config));
 }

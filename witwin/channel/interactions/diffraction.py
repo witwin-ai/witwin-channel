@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import torch
 
 from witwin.channel.scene.endpoints import transmitter_polarizations_f32
-from witwin.channel.materials import face_material_tensors
+from witwin.channel.materials import face_material_field_bundle, face_material_tensors
 from witwin.channel.scene.compiler import (
     LIGHT_SPEED_M_PER_S as _LIGHT_SPEED_M_PER_S,
 )
@@ -250,6 +250,9 @@ class DiffractionOrder1Query:
     # Per-state transmitter index (int32): every state then carries its own transmitter, the
     # launch has one transmitter lane, and the exported tx_id is that index.
     state_source_index: torch.Tensor | None = None
+    # Slab / layer-stack reflection of the face terms (per face: thickness, layer-store row; then
+    # the layer store), so a face diffracts with the coefficient its specular reflection uses.
+    face_layers: tuple[torch.Tensor, ...] | None = None
 
     def __post_init__(self) -> None:
         if self.active is not self.states.active:
@@ -307,6 +310,7 @@ def query_diffraction_order1(query: DiffractionOrder1Query) -> DiffractionOrder1
         query.wavelength,
         query.isb_taper_width_scale,
         query.state_source_index,
+        list(query.face_layers) if query.face_layers is not None else None,
     )
     return DiffractionOrder1Geometry(
         valid=raw[1],
@@ -455,6 +459,12 @@ def _diffraction_topology_order1(
     face_eps_r, face_sigma_e, face_mu_r, material_gain, material_valid = (
         face_material_tensors(compiled, device=device)
     )
+    bundle = face_material_field_bundle(compiled, device=device)
+    face_layers = (
+        bundle["thickness"], bundle["material_id"], bundle["layer_offset"], bundle["layer_count"],
+        bundle["layer_thickness_m"], bundle["layer_eps_r"], bundle["layer_sigma_e"],
+        bundle["layer_mu_r"],
+    )
     # Per-transmitter polarization threaded into the RayD UTD op: the
     # incident field basis must use the real scene polarization, not a
     # fabricated z-axis vector.
@@ -509,6 +519,7 @@ def _diffraction_topology_order1(
                         # width notches the incident-boundary odd part in the header.
                         isb_taper_width_scale=float(isb_boundary_taper_width),
                         state_source_index=source_index,
+                        face_layers=face_layers,
                     )
                 )
             launch_count += 1

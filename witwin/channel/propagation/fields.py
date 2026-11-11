@@ -234,7 +234,7 @@ def _evaluate_chain_rows(
         )
     else:
         layers = (
-            field_kernels.reflection_layers(material, slot_faces, multilayer=True)
+            field_kernels.reflection_layers(material, face_table, multilayer=True)
             if has_multilayer_material(compiled)
             else None
         )
@@ -826,6 +826,7 @@ def _evaluate_diffraction_fields(
             frequency=frequency,
             frequency_value=frequency_value,
             vertices=wedge_vertices,
+            face_layers=field_kernels.wedge_face_layers(material, face0_c, face1_c),
         )
         powered_xyz = evaluated["field_vector"]
         arrival = evaluated["direction"]

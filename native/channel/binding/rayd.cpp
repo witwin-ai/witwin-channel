@@ -231,7 +231,8 @@ pybind11::tuple channel_rayd_diffraction_paths_order1_forward(
     int64_t capacity,
     double wavelength,
     double isb_taper_width_scale,
-    std::optional<torch::Tensor> state_source_index);
+    std::optional<torch::Tensor> state_source_index,
+    std::optional<std::vector<torch::Tensor>> face_layers);
 pybind11::tuple channel_rayd_diffraction_sample_tape_forward(
     RayDSceneResource &scene,
     pybind11::object active,

@@ -13,6 +13,7 @@
 #include "math.cuh"
 #include <rayd/field_transport.cuh>
 #include <src/field_transport_ad.cuh>
+#include "layered_reflection.cuh"
 #include <algorithm>
 #include <cstdint>
 #include <vector>
@@ -112,6 +113,7 @@ constexpr int kDiffractionBlockSize = 256;
 namespace utd = rayd::shared::diffraction;
 namespace transport = rayd::shared::field_transport;
 namespace fad = rayd::torch::field_transport_ad;
+namespace layered = channel::layered_reflection;
 
 __device__ __forceinline__ unsigned int dfr_hash(unsigned int x) {
     x^=x>>16; x*=0x7feb352du; x^=x>>15; x*=0x846ca68bu; x^=x>>16; return x;
@@ -121,45 +123,6 @@ __device__ __forceinline__ unsigned int dfr_hash(unsigned int x) {
 __device__ __forceinline__ float dfr_uniform(unsigned int lane,unsigned int stream,unsigned int seed) {
     const unsigned int h=dfr_hash(dfr_hash(lane)^(stream*0x9e3779b9u)^seed);
     return static_cast<float>(h&0x00ffffffu)*(1.0f/16777216.0f);
-}
-
-__device__ __forceinline__ utd::JonesOperator slab_face_operator(
-    float ct,float er,float sg,float gain,float thickness,float wavelength,
-    utd::float3a normal,utd::float3a in_hat,utd::float3a out_hat,
-    utd::Basis3 in_edge,utd::Basis3 out_edge) {
-    return transport::slab_face_operator(
-        ct, er, sg, 1.0f, gain, thickness,
-        transport::kSpeedOfLight / wavelength,
-        normal, in_hat, out_hat, in_edge, out_edge);
-}
-
-// Templated twin of the local slab_face_operator: the float instantiation IS
-// the primal operator; the Dual instantiation is the validated AD slab
-// response on RayD duals (field_transport_ad.cuh).
-template <typename T>
-__device__ __forceinline__ utd::JonesOperatorT<T> slab_face_operator_t(
-    T ct, T er, T sg, T gain, T thickness, T wavelength,
-    utd::Vec3T<T> normal, utd::Vec3T<T> in_hat, utd::Vec3T<T> out_hat,
-    utd::Basis3T<T> in_edge, utd::Basis3T<T> out_edge);
-template <>
-__device__ __forceinline__ utd::JonesOperatorT<float> slab_face_operator_t<float>(
-    float ct, float er, float sg, float gain, float thickness, float wavelength,
-    utd::Vec3T<float> normal, utd::Vec3T<float> in_hat, utd::Vec3T<float> out_hat,
-    utd::Basis3T<float> in_edge, utd::Basis3T<float> out_edge) {
-    return slab_face_operator(
-        ct, er, sg, gain, thickness, wavelength, normal, in_hat, out_hat,
-        in_edge, out_edge);
-}
-template <>
-__device__ __forceinline__ utd::JonesOperatorT<utd::Dual> slab_face_operator_t<utd::Dual>(
-    utd::Dual ct, utd::Dual er, utd::Dual sg, utd::Dual gain, utd::Dual thickness,
-    utd::Dual wavelength, utd::Vec3T<utd::Dual> normal,
-    utd::Vec3T<utd::Dual> in_hat, utd::Vec3T<utd::Dual> out_hat,
-    utd::Basis3T<utd::Dual> in_edge, utd::Basis3T<utd::Dual> out_edge) {
-    const utd::Dual frequency = transport::kSpeedOfLight / wavelength;
-    return fad::slab_face_operator_dual(
-        ct, er, sg, 1.0f, gain, thickness, frequency, normal, in_hat, out_hat,
-        in_edge, out_edge);
 }
 
 __device__ __forceinline__ utd::float3a load_utd3(const float *p, int i) {
@@ -446,26 +409,19 @@ __device__ bool tape_row_value(
         utd::f3_sub(edge_point, src), eh, false);
     const utd::Basis3T<T> out_edge = utd::diffraction_edge_basis(
         utd::f3_sub(target, edge_point), eh, true);
-    T face0_cos, face1_cos;
-    utd::reciprocal_face_cosines(gphi, gphi_p, p.wedgeN, face0_cos, face1_cos);
-    if (c.valid0) {
-        p.face0Operator = slab_face_operator_t<T>(
-            face0_cos,
-            fad::seeded<T>(c.eps0, seeds.eps0),
-            fad::seeded<T>(c.sigma0, seeds.sigma0),
-            fad::seeded<T>(c.gain0, seeds.gain0),
-            fad::seeded<T>(c.thick0, seeds.thick0), wavelength, p.n0,
-            in_edge.k, out_edge.k, in_edge, out_edge);
-    }
-    if (c.valid1) {
-        p.face1Operator = slab_face_operator_t<T>(
-            face1_cos,
-            fad::seeded<T>(c.eps1, seeds.eps1),
-            fad::seeded<T>(c.sigma1, seeds.sigma1),
-            fad::seeded<T>(c.gain1, seeds.gain1),
-            fad::seeded<T>(c.thick1, seeds.thick1), wavelength, p.nn,
-            in_edge.k, out_edge.k, in_edge, out_edge);
-    }
+    // The face terms reflect with the faces' slab coefficients (absent faces stay zero).
+    layered::WedgeFaceFresnel<T> faces;
+    faces.eps[0] = fad::seeded<T>(c.eps0, seeds.eps0);
+    faces.sigma[0] = fad::seeded<T>(c.sigma0, seeds.sigma0);
+    faces.mu[0] = 1.0f;
+    faces.gain[0] = fad::seeded<T>(c.gain0, seeds.gain0);
+    faces.thickness[0] = fad::seeded<T>(c.thick0, seeds.thick0);
+    faces.eps[1] = fad::seeded<T>(c.eps1, seeds.eps1);
+    faces.sigma[1] = fad::seeded<T>(c.sigma1, seeds.sigma1);
+    faces.mu[1] = 1.0f;
+    faces.gain[1] = fad::seeded<T>(c.gain1, seeds.gain1);
+    faces.thickness[1] = fad::seeded<T>(c.thick1, seeds.thick1);
+    faces.frequency_hz = transport::kSpeedOfLight / wavelength;
     mat.omega = T(0.0f);
     // compute_pair_vector_contribution with selectStationaryPoint = 0,
     // transcribed so the pseudo-infinite truncation factor can be frozen at
@@ -482,9 +438,9 @@ __device__ bool tape_row_value(
     utd::ComplexT<T> finite_factor =
         utd::finite_wedge_truncation_factor(p, target, k);
     freeze_complex_tangent<T>(finite_factor);
-    const utd::Complex3T<T> vector_field = utd::compute_pair_vector_at_angles(
+    const utd::Complex3T<T> vector_field = utd::compute_pair_vector_at_angles_faces(
         p, target, k, mat, gphi, gphi_p, gs, gs_p, gsb, in_edge, out_edge,
-        finite_factor);
+        finite_factor, T(1.f), utd::c_const<T>(1, 0), T(-1.f), faces);
     const T field_power = utd::cplx_abs_sqr(vector_field.x) +
                           utd::cplx_abs_sqr(vector_field.y) +
                           utd::cplx_abs_sqr(vector_field.z);

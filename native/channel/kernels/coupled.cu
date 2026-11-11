@@ -15,6 +15,7 @@
 #include "layered_reflection.cuh"
 
 #include <array>
+#include <type_traits>
 #include <vector>
 
 namespace {
@@ -120,7 +121,6 @@ using ad::seeded3;
 
 // Slab Fresnel / slab face operator on RayD duals: shared with the
 // diffraction-map companions in field_transport_ad.cuh (single copy).
-using ad::slab_face_operator_dual;
 using ad::slab_fresnel_dual_rd;
 
 // Dual of transport::precise_neg_kd (fmod has unit slope).
@@ -242,7 +242,7 @@ struct ChainArgs {
     const float* mu_r;
     const float* gain;
     const float* thickness;
-    const int* bounce_material;  // (N, W)
+    const int* bounce_material;  // (N, W + 2): layer-store row of each reflection slot, then both wedge faces
     layered::LayerTables layers;
     float frequency;
 };
@@ -269,7 +269,7 @@ struct ChainRow {
     float mu[kChainColumns];
     float gain[kChainColumns];
     float thickness[kChainColumns];
-    int material[kChainMaxDepth];
+    int material[kChainColumns];
     float frequency;
 };
 
@@ -290,7 +290,6 @@ __device__ ChainRow load_chain_row(const ChainArgs& a, int64_t index) {
     for (int i = 0; i < depth; ++i) {
         row.position[i] = load3f(a.positions, index * a.width + i);
         row.normal[i] = load3f(a.normals, index * a.width + i);
-        row.material[i] = a.bounce_material[index * a.width + i];
     }
     row.edge_dir_raw = load3f(a.edge_direction, index);
     row.n0 = load3f(a.edge_n0, index);
@@ -311,6 +310,7 @@ __device__ ChainRow load_chain_row(const ChainArgs& a, int64_t index) {
         row.mu[column] = a.mu_r[at];
         row.gain[column] = a.gain[at];
         row.thickness[column] = a.thickness[at];
+        row.material[column] = a.bounce_material[at];
     }
     row.frequency = a.frequency;
     return row;
@@ -386,19 +386,25 @@ __device__ __forceinline__ DualC3 chain_reflect(
         v.thickness[column], v.frequency, reflected_direction);
 }
 
-__device__ __forceinline__ field::JonesOperator chain_face_operator(
-    float cos_theta, const ChainRow& row, const ChainValues<float>& v, int column, field::float3a normal,
-    field::float3a in_direction, field::float3a out_direction, field::Basis3 in_basis, field::Basis3 out_basis) {
-    return transport::slab_face_operator(
-        cos_theta, v.eps[column], v.sigma[column], row.mu[column], v.gain[column], v.thickness[column],
-        v.frequency, normal, in_direction, out_direction, in_basis, out_basis);
-}
-__device__ __forceinline__ field::JonesOperatorT<Dual> chain_face_operator(
-    Dual cos_theta, const ChainRow& row, const ChainValues<Dual>& v, int column, DualV3 normal,
-    DualV3 in_direction, DualV3 out_direction, field::Basis3T<Dual> in_basis, field::Basis3T<Dual> out_basis) {
-    return slab_face_operator_dual(
-        cos_theta, v.eps[column], v.sigma[column], row.mu[column], v.gain[column], v.thickness[column],
-        v.frequency, normal, in_direction, out_direction, in_basis, out_basis);
+// Reflection coefficients of the two wedge faces of a chain row: the layer store in the primal, the slab duals
+// in the AD passes (as the chain's reflections).
+template <typename T>
+__device__ __forceinline__ layered::WedgeFaceFresnel<T> chain_face_fresnel(
+    const ChainRow& row, const ChainValues<T>& v, const layered::LayerTables& layers, bool layered_store) {
+    layered::WedgeFaceFresnel<T> faces;
+    for (int face = 0; face < 2; ++face) {
+        const int column = kChainWedge0 + face;
+        faces.eps[face] = v.eps[column];
+        faces.sigma[face] = v.sigma[column];
+        faces.mu[face] = row.mu[column];
+        faces.gain[face] = v.gain[column];
+        faces.thickness[face] = v.thickness[column];
+        faces.material[face] = layered_store ? row.material[column] : -1;
+    }
+    if (layered_store)
+        faces.tables = layers;
+    faces.frequency_hz = v.frequency;
+    return faces;
 }
 
 template <typename T>
@@ -434,8 +440,6 @@ __device__ ChainOutput<T> chain_row_body(
         field::safe_normalize(field::f3_sub(diffraction_target, edge), field::v3_const<T>(1.f, 0.f, 0.f));
     const field::Basis3T<T> input_edge_basis =
         field::diffraction_edge_basis(field::f3_sub(edge, diffraction_source), edge_axis, false);
-    const field::Basis3T<T> output_edge_basis =
-        field::diffraction_edge_basis(field::f3_sub(diffraction_target, edge), edge_axis, true);
 
     field::Complex3T<T> incident_field;
     if (slot == 0) {
@@ -475,23 +479,19 @@ __device__ ChainOutput<T> chain_row_body(
     pair.incidentDerivativeJones = field::jones_zero<T>();
     pair.face0Material.present = 1.0f;
     pair.face1Material.present = 1.0f;
-    T pair_face0_cos, pair_face1_cos;
-    field::pair_face_cosines(pair, diffraction_target, pair_face0_cos, pair_face1_cos);
-    pair.face0Operator = chain_face_operator(
-        pair_face0_cos, row, v, kChainWedge0, pair.n0, incident_direction, outgoing_direction, input_edge_basis,
-        output_edge_basis);
-    pair.face1Operator = chain_face_operator(
-        pair_face1_cos, row, v, kChainWedge1, pair.nn, incident_direction, outgoing_direction, input_edge_basis,
-        output_edge_basis);
+    pair.face0Material.useFresnel = 1.0f;
+    pair.face1Material.useFresnel = 1.0f;
     // The stationary-path machinery (edge re-anchoring, monotone even truncation, corner
     // correction, boundary blend) runs on the diffraction leg; stationaryExternalIncident
     // re-extrapolates the image-source incident field stored in incidentJones to the re-anchored
-    // point, and omega < 0 keeps the stored face operators.
+    // point. The face terms reflect with the faces' own slab or layer-stack coefficients.
     pair.selectStationaryPoint = 1.0f;
     pair.stationaryExternalIncident = 1.0f;
     field::MaterialParamsT<T> material{};
     material.omega = T(-1.0f);
-    field::Complex3T<T> value = field::compute_pair_vector_contribution(pair, diffraction_target, wave_number, material);
+    const bool layered_store = std::is_same<T, float>::value;
+    field::Complex3T<T> value = field::compute_pair_vector_contribution_faces(
+        pair, diffraction_target, wave_number, material, chain_face_fresnel(row, v, layers, layered_store));
 
     V3 final_direction = outgoing_direction;
     V3 previous = edge;
@@ -853,14 +853,8 @@ __device__ CoupledRowTangents coupled_dd_row_dual(
         field::dual_const3(in.e2_dir_raw), field::v3_const<Dual>(0.f, 0.f, 1.f));
 
     // --- Leg 1: direct-source diffraction at e1, observed at frozen Q2 ---
-    const DualV3 incident_direction1 = field::safe_normalize(
-        field::f3_sub(q1, src), field::v3_const<Dual>(1.f, 0.f, 0.f));
-    const DualV3 outgoing_direction1 = field::safe_normalize(
-        field::f3_sub(q2, q1), field::v3_const<Dual>(1.f, 0.f, 0.f));
     const field::Basis3T<Dual> input_edge_basis1 = field::diffraction_edge_basis(
         field::f3_sub(q1, src), e1_axis, false);
-    const field::Basis3T<Dual> output_edge_basis1 = field::diffraction_edge_basis(
-        field::f3_sub(q2, q1), e1_axis, true);
 
     field::PairInputsT<Dual> pair1{};
     pair1.edgePos = q1;
@@ -877,56 +871,37 @@ __device__ CoupledRowTangents coupled_dd_row_dual(
     pair1.incidentDerivativeJones = field::jones_zero<Dual>();
     pair1.face0Material.present = 1.0f;
     pair1.face1Material.present = 1.0f;
-    Dual pair1_face0_cos, pair1_face1_cos;
-    field::pair_face_cosines(pair1, q2, pair1_face0_cos, pair1_face1_cos);
-    pair1.face0Operator = slab_face_operator_dual(
-        pair1_face0_cos,
-        {in.w1a_eps, seeds.w1a_eps},
-        {in.w1a_sigma, seeds.w1a_sigma},
-        in.w1a_mu,
-        {in.w1a_gain, seeds.w1a_gain},
-        {in.w1a_thickness, seeds.w1a_thickness},
-        frequency,
-        pair1.n0,
-        incident_direction1,
-        outgoing_direction1,
-        input_edge_basis1,
-        output_edge_basis1);
-    pair1.face1Operator = slab_face_operator_dual(
-        pair1_face1_cos,
-        {in.w1b_eps, seeds.w1b_eps},
-        {in.w1b_sigma, seeds.w1b_sigma},
-        in.w1b_mu,
-        {in.w1b_gain, seeds.w1b_gain},
-        {in.w1b_thickness, seeds.w1b_thickness},
-        frequency,
-        pair1.nn,
-        incident_direction1,
-        outgoing_direction1,
-        input_edge_basis1,
-        output_edge_basis1);
+    pair1.face0Material.useFresnel = 1.0f;
+    pair1.face1Material.useFresnel = 1.0f;
+    layered::WedgeFaceFresnel<Dual> faces1;
+    faces1.eps[0] = {in.w1a_eps, seeds.w1a_eps};
+    faces1.sigma[0] = {in.w1a_sigma, seeds.w1a_sigma};
+    faces1.mu[0] = in.w1a_mu;
+    faces1.gain[0] = {in.w1a_gain, seeds.w1a_gain};
+    faces1.thickness[0] = {in.w1a_thickness, seeds.w1a_thickness};
+    faces1.eps[1] = {in.w1b_eps, seeds.w1b_eps};
+    faces1.sigma[1] = {in.w1b_sigma, seeds.w1b_sigma};
+    faces1.mu[1] = in.w1b_mu;
+    faces1.gain[1] = {in.w1b_gain, seeds.w1b_gain};
+    faces1.thickness[1] = {in.w1b_thickness, seeds.w1b_thickness};
+    faces1.frequency_hz = frequency;
     pair1.selectStationaryPoint = 1.0f;
     pair1.stationaryExternalIncident = 0.0f;
     field::MaterialParamsT<Dual> material1{};
-    // omega < 0 keeps the stored (frozen-at-Keller) slab face operators; the
-    // direct incident spherical wave uses the (frozen) transmitter
-    // polarization, exactly like coupled_dd_field_kernel.
+    // The face terms reflect with the wedge faces' slab coefficients; the direct incident
+    // spherical wave uses the (frozen) transmitter polarization, exactly like coupled_dd_field_kernel.
     material1.omega = Dual(-1.0f);
     material1.txPolX = Dual(in.tx_pol.x);
     material1.txPolY = Dual(in.tx_pol.y);
     material1.txPolZ = Dual(in.tx_pol.z);
-    const DualC3 leg1_field = field::compute_pair_vector_contribution(
-        pair1, q2, wave_number, material1);
+    const DualC3 leg1_field = field::compute_pair_vector_contribution_faces(
+        pair1, q2, wave_number, material1, faces1);
 
     // --- Leg 2: external-incident diffraction at e2, observed at rx ---
-    const DualV3 incident_direction2 = field::safe_normalize(
-        field::f3_sub(q2, q1), field::v3_const<Dual>(1.f, 0.f, 0.f));
     const DualV3 outgoing_direction2 = field::safe_normalize(
         field::f3_sub(dst, q2), field::v3_const<Dual>(1.f, 0.f, 0.f));
     const field::Basis3T<Dual> input_edge_basis2 = field::diffraction_edge_basis(
         field::f3_sub(q2, q1), e2_axis, false);
-    const field::Basis3T<Dual> output_edge_basis2 = field::diffraction_edge_basis(
-        field::f3_sub(dst, q2), e2_axis, true);
 
     field::PairInputsT<Dual> pair2{};
     pair2.edgePos = q2;
@@ -943,40 +918,26 @@ __device__ CoupledRowTangents coupled_dd_row_dual(
     pair2.incidentDerivativeJones = field::jones_zero<Dual>();
     pair2.face0Material.present = 1.0f;
     pair2.face1Material.present = 1.0f;
-    Dual pair2_face0_cos, pair2_face1_cos;
-    field::pair_face_cosines(pair2, dst, pair2_face0_cos, pair2_face1_cos);
-    pair2.face0Operator = slab_face_operator_dual(
-        pair2_face0_cos,
-        {in.w2a_eps, seeds.w2a_eps},
-        {in.w2a_sigma, seeds.w2a_sigma},
-        in.w2a_mu,
-        {in.w2a_gain, seeds.w2a_gain},
-        {in.w2a_thickness, seeds.w2a_thickness},
-        frequency,
-        pair2.n0,
-        incident_direction2,
-        outgoing_direction2,
-        input_edge_basis2,
-        output_edge_basis2);
-    pair2.face1Operator = slab_face_operator_dual(
-        pair2_face1_cos,
-        {in.w2b_eps, seeds.w2b_eps},
-        {in.w2b_sigma, seeds.w2b_sigma},
-        in.w2b_mu,
-        {in.w2b_gain, seeds.w2b_gain},
-        {in.w2b_thickness, seeds.w2b_thickness},
-        frequency,
-        pair2.nn,
-        incident_direction2,
-        outgoing_direction2,
-        input_edge_basis2,
-        output_edge_basis2);
+    pair2.face0Material.useFresnel = 1.0f;
+    pair2.face1Material.useFresnel = 1.0f;
+    layered::WedgeFaceFresnel<Dual> faces2;
+    faces2.eps[0] = {in.w2a_eps, seeds.w2a_eps};
+    faces2.sigma[0] = {in.w2a_sigma, seeds.w2a_sigma};
+    faces2.mu[0] = in.w2a_mu;
+    faces2.gain[0] = {in.w2a_gain, seeds.w2a_gain};
+    faces2.thickness[0] = {in.w2a_thickness, seeds.w2a_thickness};
+    faces2.eps[1] = {in.w2b_eps, seeds.w2b_eps};
+    faces2.sigma[1] = {in.w2b_sigma, seeds.w2b_sigma};
+    faces2.mu[1] = in.w2b_mu;
+    faces2.gain[1] = {in.w2b_gain, seeds.w2b_gain};
+    faces2.thickness[1] = {in.w2b_thickness, seeds.w2b_thickness};
+    faces2.frequency_hz = frequency;
     pair2.selectStationaryPoint = 1.0f;
     pair2.stationaryExternalIncident = 1.0f;
     field::MaterialParamsT<Dual> material2{};
     material2.omega = Dual(-1.0f);
-    const DualC3 value = field::compute_pair_vector_contribution(
-        pair2, dst, wave_number, material2);
+    const DualC3 value = field::compute_pair_vector_contribution_faces(
+        pair2, dst, wave_number, material2, faces2);
 
     const DualV3 final_direction = outgoing_direction2;
     const DualV3 rx_axis = field::project_to_wedge_plane(
@@ -1361,8 +1322,8 @@ ChainArgs chain_args(CHAIN_HOST_PARAMS) {
                     named.second, " must have shape (N, W + 2)");
     }
     check_tensor(bounce_material, "bounce_material", at::kInt, 2);
-    TORCH_CHECK(bounce_material.size(0) == count && bounce_material.size(1) == width,
-                "bounce_material must have shape (N, W)");
+    TORCH_CHECK(bounce_material.size(0) == count && bounce_material.size(1) == width + 2,
+                "bounce_material must have shape (N, W + 2)");
     check_tensor(layer_offset, "layer_offset", at::kInt, 1);
     check_tensor(layer_count, "layer_count", at::kInt, 1);
     TORCH_CHECK(layer_count.size(0) == layer_offset.size(0), "layer_count must match layer_offset");
