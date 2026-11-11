@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 import math
+import re
 from typing import TYPE_CHECKING, Sequence
 
 import numpy as np
@@ -127,7 +128,10 @@ class RayDSceneResource:
         cached = self.runtime_cache.get("edge_records")
         if cached is not None:
             return cached  # type: ignore[return-value]
-        values = rayd_scene_edge_records(self.require_resource())
+        try:
+            values = rayd_scene_edge_records(self.require_resource())
+        except RuntimeError as error:
+            raise _channel_edge_error(error) from error
         if len(values) != 12:
             raise RuntimeError(
                 f"RayD edge_records returned {len(values)} tensors, expected 12"
@@ -147,6 +151,21 @@ class RayDSceneResource:
         )
         self.runtime_cache["edge_records"] = records
         return records
+
+
+def _channel_edge_error(error: RuntimeError) -> Exception:
+    """Restate a RayD edge-topology refusal in Channel terms; other errors pass through."""
+
+    message = str(error)
+    if "edges_enabled" not in message:
+        return error
+    mesh = re.search(r"mesh (\d+)", message)
+    which = f"enabled structure {mesh.group(1)}" if mesh else "a structure"
+    return ValueError(
+        f"{which} has no diffraction edge topology: an edge is shared by more faces "
+        "than supported, or its edge records exceed the 32-bit index range. Remove "
+        "coincident faces or split the mesh into several structures"
+    )
 
 
 def _empty_tensor(
@@ -228,15 +247,18 @@ def build_scene_from_structures(structures: tuple[object, ...]) -> RayDSceneReso
             )
         )
 
-    resource = rayd_scene_create(
-        vertices,
-        faces,
-        uv,
-        face_uv,
-        to_world_left,
-        to_world_right,
-        mesh_flags,
-    )
+    try:
+        resource = rayd_scene_create(
+            vertices,
+            faces,
+            uv,
+            face_uv,
+            to_world_left,
+            to_world_right,
+            mesh_flags,
+        )
+    except RuntimeError as error:
+        raise _channel_edge_error(error) from error
     return RayDSceneResource(resource=resource, mesh_tensors=tuple(keepalive))
 
 
