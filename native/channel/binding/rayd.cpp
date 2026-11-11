@@ -21,6 +21,10 @@ std::shared_ptr<RayDSceneResource> channel_rayd_scene_create(
     const std::string &trace_backend);
 pybind11::dict channel_runtime_probe(int64_t device_index, bool probe_optix);
 pybind11::tuple channel_rayd_scene_edge_records(RayDSceneResource &scene);
+void channel_rayd_scene_update_vertices(
+    RayDSceneResource &scene,
+    std::vector<int64_t> mesh_indices,
+    std::vector<torch::Tensor> vertices);
 pybind11::tuple channel_rayd_intersect_forward(
     RayDSceneResource &scene,
     torch::Tensor ray_o,
@@ -378,6 +382,10 @@ void register_rayd_geometry(pybind11::module_ &module) {
         "rayd_scene_edge_records",
         &channel_rayd_scene_edge_records,
         "Read edge records from a typed RayD scene resource.");
+    module.def(
+        "rayd_scene_update_vertices",
+        &channel_rayd_scene_update_vertices,
+        "Refit listed refittable meshes of a typed RayD scene to new vertices.");
     module.def(
         "rayd_intersect_forward",
         &channel_rayd_intersect_forward,

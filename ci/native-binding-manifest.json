@@ -4365,6 +4365,19 @@
       "python_owners": ["witwin.channel.kernels.geometry.rayd_scene_face_normals_jvp"]
     },
     {
+      "name": "rayd_scene_update_vertices",
+      "target": "channel_rayd_scene_update_vertices",
+      "return_type": "void",
+      "doc": "Refit listed refittable meshes of a typed RayD scene to new vertices.",
+      "parameters": [
+        ["scene", "RayDSceneResource &", null],
+        ["mesh_indices", "std::vector<int64_t>", null],
+        ["vertices", "std::vector<torch::Tensor>", null]
+      ],
+      "pybind_arguments": [],
+      "python_owners": ["witwin.channel.scene.resources.rayd_scene_update_vertices"]
+    },
+    {
       "name": "rayd_segment_penetration_backward",
       "target": "channel_rayd_segment_penetration_backward",
       "return_type": "pybind11::tuple",

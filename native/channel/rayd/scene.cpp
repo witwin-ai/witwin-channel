@@ -46,6 +46,24 @@ const rayd::torch::SceneEdgeRecordsResult &RayDSceneResource::edge_records() {
     return *edge_records_;
 }
 
+void RayDSceneResource::update_vertices(
+    const std::vector<int64_t> &mesh_indices,
+    const std::vector<at::Tensor> &vertices) {
+    if (mesh_indices.size() != vertices.size())
+        throw std::runtime_error("rayd_scene_update_vertices needs one vertex tensor per mesh index");
+    edge_records_.reset();
+    for (size_t index = 0; index < mesh_indices.size(); ++index)
+        rayd::torch::update_mesh_vertices(resource_, mesh_indices[index], vertices[index]);
+    rayd::torch::sync_scene(resource_);
+}
+
+void channel_rayd_scene_update_vertices(
+    RayDSceneResource &scene,
+    std::vector<int64_t> mesh_indices,
+    std::vector<torch::Tensor> vertices) {
+    scene.update_vertices(mesh_indices, vertices);
+}
+
 std::shared_ptr<RayDSceneResource> channel_rayd_scene_create(
     std::vector<torch::Tensor> vertices,
     std::vector<torch::Tensor> faces,
