@@ -110,13 +110,10 @@
     "native/channel/kernels/bdpt_connect.cu": {
       "kernels": [
         "bdpt_accumulate_coherent_backward_kernel",
-        "bdpt_accumulate_coherent_jvp_kernel",
         "bdpt_accumulate_connection_samples_coherent_kernel",
         "bdpt_accumulate_connection_samples_compacted_kernel",
         "bdpt_accumulate_connection_samples_double_kernel",
-        "bdpt_accumulate_connection_samples_staged_kernel",
         "bdpt_accumulate_power_backward_kernel",
-        "bdpt_accumulate_power_jvp_kernel",
         "bdpt_cast_connection_accumulation_kernel",
         "bdpt_compact_connection_samples_kernel",
         "bdpt_compact_valid_connection_indices_kernel",
@@ -130,17 +127,19 @@
         "bdpt_endpoint_connection_visibility_inputs_kernel",
         "bdpt_filter_connection_samples_kernel",
         "bdpt_finalize_coherent_accumulation_kernel",
-        "bdpt_mis_weights_kernel"
+        "bdpt_mis_weights_kernel",
+        "bdpt_sorted_coherent_jvp_finalize_kernel",
+        "bdpt_sorted_gather_kernel",
+        "bdpt_sorted_keys_kernel",
+        "bdpt_sorted_power_finalize_kernel",
+        "bdpt_sorted_scatter_kernel"
       ],
       "launches": [
         "bdpt_accumulate_coherent_backward_kernel",
-        "bdpt_accumulate_coherent_jvp_kernel",
         "bdpt_accumulate_connection_samples_coherent_kernel",
         "bdpt_accumulate_connection_samples_compacted_kernel",
         "bdpt_accumulate_connection_samples_double_kernel",
-        "bdpt_accumulate_connection_samples_staged_kernel",
         "bdpt_accumulate_power_backward_kernel",
-        "bdpt_accumulate_power_jvp_kernel",
         "bdpt_cast_connection_accumulation_kernel",
         "bdpt_compact_connection_samples_kernel",
         "bdpt_compact_valid_connection_indices_kernel",
@@ -154,7 +153,12 @@
         "bdpt_endpoint_connection_visibility_inputs_kernel",
         "bdpt_filter_connection_samples_kernel",
         "bdpt_finalize_coherent_accumulation_kernel",
-        "bdpt_mis_weights_kernel"
+        "bdpt_mis_weights_kernel",
+        "bdpt_sorted_coherent_jvp_finalize_kernel",
+        "bdpt_sorted_gather_kernel",
+        "bdpt_sorted_keys_kernel",
+        "bdpt_sorted_power_finalize_kernel",
+        "bdpt_sorted_scatter_kernel"
       ],
       "host_synchronization": [
         "cudaMemcpyAsync",

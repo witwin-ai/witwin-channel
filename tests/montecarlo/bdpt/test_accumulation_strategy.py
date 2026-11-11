@@ -67,7 +67,7 @@ def test_bdpt_accumulation_strategy_metadata_reports_native_kernel_variant():
     scene = empty_space_los_scene()
     expected = {
         "atomic": "atomic_add",
-        "staged": "cell_reduce",
+        "staged": "sorted_segment_reduce",
         "compact": "compact_atomic_add",
     }
 

@@ -2885,7 +2885,7 @@ _AD_GEOMETRY_SCOPE = "enumerated_blocks_only"
 
 _KERNEL_ACCUMULATION = {
     "atomic": "atomic_add",
-    "staged": "cell_reduce",
+    "staged": "sorted_segment_reduce",
     "compact": "compact_atomic_add",
 }
 
@@ -2909,15 +2909,18 @@ _COMPONENT_MASK_BITS = {
 def select_accumulation_strategy(
     config: Config, *, grid_cells: int, estimated_valid_ratio: float,
 ) -> str:
+    """Resolve ``accumulation_strategy='auto'``.
+
+    ``auto`` picks the row-parallel atomic reduction, or the compacted atomic
+    reduction for sparse grid estimates. It never picks ``staged``: the sorted
+    segmented reduction costs a sort of the rows and is the explicit choice for a
+    run-to-run reproducible sum.
+    """
+
     if config.accumulation_strategy != "auto":
         return config.accumulation_strategy
-    if grid_cells <= 0:
-        return "atomic"
-    samples_per_cell = config.samples / float(grid_cells)
-    if estimated_valid_ratio < 0.1:
+    if grid_cells > 0 and estimated_valid_ratio < 0.1:
         return "compact"
-    if samples_per_cell >= 64:
-        return "staged"
     return "atomic"
 
 

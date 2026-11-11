@@ -9,8 +9,11 @@
 
 #include <rayd/field_transport.cuh>
 
+#include <cub/cub.cuh>
+
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -1332,64 +1335,6 @@ __global__ void bdpt_accumulate_connection_samples_compacted_kernel(
     }
 }
 
-__global__ void bdpt_accumulate_connection_samples_staged_kernel(
-    int64_t out_count,
-    int64_t sample_count,
-    const float* contribution,
-    const float* mis_weight,
-    const int* tx_id,
-    const int* rx_id,
-    const int* component_id,
-    const bool* valid,
-    int64_t rx_count,
-    float* path_gain,
-    float* los,
-    float* reflection,
-    float* diffraction,
-    float* transmission,
-    float* scattering) {
-    int64_t out_index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    if (out_index >= out_count) {
-        return;
-    }
-    const int out_tx = static_cast<int>(out_index / rx_count);
-    const int out_rx = static_cast<int>(out_index - static_cast<int64_t>(out_tx) * rx_count);
-    double path_sum = 0.0;
-    double los_sum = 0.0;
-    double reflection_sum = 0.0;
-    double diffraction_sum = 0.0;
-    double transmission_sum = 0.0;
-    double scattering_sum = 0.0;
-    for (int64_t index = 0; index < sample_count; ++index) {
-        if (!valid[index] || tx_id[index] != out_tx || rx_id[index] != out_rx) {
-            continue;
-        }
-        const int component = component_id[index];
-        if (!bdpt_component_accumulable(component)) {
-            continue;
-        }
-        const double value = static_cast<double>(contribution[index]) * static_cast<double>(mis_weight[index]);
-        path_sum += value;
-        if (component == kComponentLos) {
-            los_sum += value;
-        } else if (component == kComponentReflection) {
-            reflection_sum += value;
-        } else if (component == kComponentDiffraction) {
-            diffraction_sum += value;
-        } else if (component == kComponentTransmission) {
-            transmission_sum += value;
-        } else if (component == kComponentScattering) {
-            scattering_sum += value;
-        }
-    }
-    path_gain[out_index] = static_cast<float>(path_sum);
-    los[out_index] = static_cast<float>(los_sum);
-    reflection[out_index] = static_cast<float>(reflection_sum);
-    diffraction[out_index] = static_cast<float>(diffraction_sum);
-    transmission[out_index] = static_cast<float>(transmission_sum);
-    scattering[out_index] = static_cast<float>(scattering_sum);
-}
-
 __global__ void bdpt_cast_connection_accumulation_kernel(
     int64_t count,
     const double* path_gain_sum,
@@ -1465,6 +1410,268 @@ __global__ void bdpt_connection_variance_finalize_double_kernel(
     const double ex2 = sum_square_unweighted[index] / samples_per_tx;
     const double variance_value = fmax(ex2 - mean * mean, 0.0) / samples_per_tx;
     variance[index] = variance_value <= 1.0e-30 ? 0.0f : static_cast<float>(variance_value);
+}
+
+}  // namespace
+
+// ==== Section: BDPT sorted segmented reduction ====
+//
+// Deterministic per-(tx, rx, component) sums. Every accumulable row gets the
+// key (tx * rx_count + rx) * 5 + slot (slot = los, reflection, diffraction,
+// transmission, scattering); other rows get the sentinel 5 * cells. A stable
+// radix sort orders rows by key (rows of one key keep their input order) and
+// a reduce-by-key sums each key's run, so every bin is the same fixed-order
+// sum on every run, in O(rows log rows) instead of O(cells x rows).
+
+namespace {
+
+constexpr int kSortedSlots = 5;
+
+__device__ __forceinline__ int bdpt_component_slot(int component) {
+    if (component == kComponentLos) return 0;
+    if (component == kComponentReflection) return 1;
+    if (component == kComponentDiffraction) return 2;
+    if (component == kComponentTransmission) return 3;
+    if (component == kComponentScattering) return 4;
+    return -1;
+}
+
+__global__ void bdpt_sorted_keys_kernel(
+    int64_t count,
+    const int* tx_id,
+    const int* rx_id,
+    const int* component_id,
+    const bool* valid,
+    int64_t tx_count,
+    int64_t rx_count,
+    unsigned long long* keys,
+    int* rows) {
+    const int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (index >= count) {
+        return;
+    }
+    const unsigned long long sentinel =
+        static_cast<unsigned long long>(tx_count * rx_count * kSortedSlots);
+    unsigned long long key = sentinel;
+    const int tx = tx_id[index];
+    const int rx = rx_id[index];
+    const int slot = bdpt_component_slot(component_id[index]);
+    if (valid[index] && tx >= 0 && tx < tx_count && rx >= 0 && rx < rx_count && slot >= 0) {
+        key = static_cast<unsigned long long>((static_cast<int64_t>(tx) * rx_count + rx) * kSortedSlots + slot);
+    }
+    keys[index] = key;
+    rows[index] = static_cast<int>(index);
+}
+
+// sorted_values[i] = first[row] * second[row] (second may be null) in sorted order.
+__global__ void bdpt_sorted_gather_kernel(
+    int64_t count, const int* rows, const float* first, const float* second, double* sorted_values) {
+    const int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (index >= count) {
+        return;
+    }
+    const int row = rows[index];
+    const double value = static_cast<double>(first[row]);
+    sorted_values[index] = second == nullptr ? value : value * static_cast<double>(second[row]);
+}
+
+__global__ void bdpt_sorted_scatter_kernel(
+    int64_t capacity,
+    const int* run_count,
+    const unsigned long long* unique_keys,
+    const double* run_sums,
+    unsigned long long bins_count,
+    double* bins) {
+    const int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (index >= capacity || index >= static_cast<int64_t>(run_count[0])) {
+        return;
+    }
+    const unsigned long long key = unique_keys[index];
+    if (key < bins_count) {
+        bins[key] = run_sums[index];
+    }
+}
+
+__global__ void bdpt_sorted_power_finalize_kernel(
+    int64_t cells,
+    const double* bins,
+    float* path_gain,
+    float* los,
+    float* reflection,
+    float* diffraction,
+    float* transmission,
+    float* scattering) {
+    const int64_t cell = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (cell >= cells) {
+        return;
+    }
+    const double* bin = bins + cell * kSortedSlots;
+    los[cell] = static_cast<float>(bin[0]);
+    reflection[cell] = static_cast<float>(bin[1]);
+    diffraction[cell] = static_cast<float>(bin[2]);
+    transmission[cell] = static_cast<float>(bin[3]);
+    scattering[cell] = static_cast<float>(bin[4]);
+    path_gain[cell] = static_cast<float>(bin[0] + bin[1] + bin[2] + bin[3] + bin[4]);
+}
+
+// Coherent tangent power t_P_c = 2 Re(conj(S_c) t_S_c) per component.
+__global__ void bdpt_sorted_coherent_jvp_finalize_kernel(
+    int64_t cells,
+    const double* bins_re,
+    const double* bins_im,
+    const double* los_re,
+    const double* los_im,
+    const double* reflection_re,
+    const double* reflection_im,
+    const double* diffraction_re,
+    const double* diffraction_im,
+    const double* transmission_re,
+    const double* transmission_im,
+    const double* scattering_re,
+    const double* scattering_im,
+    float* t_path_gain,
+    float* t_los,
+    float* t_reflection,
+    float* t_diffraction,
+    float* t_transmission,
+    float* t_scattering) {
+    const int64_t cell = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (cell >= cells) {
+        return;
+    }
+    const double* re = bins_re + cell * kSortedSlots;
+    const double* im = bins_im + cell * kSortedSlots;
+    const double tp_los = 2.0 * (los_re[cell] * re[0] + los_im[cell] * im[0]);
+    const double tp_reflection = 2.0 * (reflection_re[cell] * re[1] + reflection_im[cell] * im[1]);
+    const double tp_diffraction = 2.0 * (diffraction_re[cell] * re[2] + diffraction_im[cell] * im[2]);
+    const double tp_transmission = 2.0 * (transmission_re[cell] * re[3] + transmission_im[cell] * im[3]);
+    const double tp_scattering = 2.0 * (scattering_re[cell] * re[4] + scattering_im[cell] * im[4]);
+    t_los[cell] = static_cast<float>(tp_los);
+    t_reflection[cell] = static_cast<float>(tp_reflection);
+    t_diffraction[cell] = static_cast<float>(tp_diffraction);
+    t_transmission[cell] = static_cast<float>(tp_transmission);
+    t_scattering[cell] = static_cast<float>(tp_scattering);
+    t_path_gain[cell] = static_cast<float>(
+        tp_los + tp_reflection + tp_diffraction + tp_transmission + tp_scattering);
+}
+
+int sorted_key_bits(unsigned long long sentinel) {
+    int bits = 1;
+    while (bits < 64 && (sentinel >> bits) != 0ULL) {
+        ++bits;
+    }
+    return bits;
+}
+
+// Rows stably sorted by bin key, ready for one or more value reductions.
+struct SortedBins {
+    at::Tensor keys;
+    at::Tensor rows;
+    int64_t count = 0;
+    unsigned long long bins_count = 0;
+};
+
+SortedBins sorted_bins(
+    const at::Tensor& tx_id,
+    const at::Tensor& rx_id,
+    const at::Tensor& component_id,
+    const at::Tensor& valid,
+    int64_t tx_count,
+    int64_t rx_count) {
+    SortedBins out;
+    out.count = valid.numel();
+    out.bins_count = static_cast<unsigned long long>(tx_count * rx_count * kSortedSlots);
+    const auto long_options = valid.options().dtype(at::kLong);
+    const auto int_options = valid.options().dtype(at::kInt);
+    out.keys = at::empty({out.count}, long_options);
+    out.rows = at::empty({out.count}, int_options);
+    if (out.count == 0) {
+        return out;
+    }
+    TORCH_CHECK(out.count <= std::numeric_limits<int>::max(), "sorted accumulation supports at most 2^31-1 rows");
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(valid.get_device()).stream();
+    constexpr int threads = 256;
+    const int blocks = static_cast<int>((out.count + threads - 1) / threads);
+    auto keys_in = at::empty({out.count}, long_options);
+    auto rows_in = at::empty({out.count}, int_options);
+    bdpt_sorted_keys_kernel<<<blocks, threads, 0, stream>>>(
+        out.count,
+        tx_id.data_ptr<int>(),
+        rx_id.data_ptr<int>(),
+        component_id.data_ptr<int>(),
+        valid.data_ptr<bool>(),
+        tx_count,
+        rx_count,
+        reinterpret_cast<unsigned long long*>(keys_in.data_ptr<int64_t>()),
+        rows_in.data_ptr<int>());
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    const int end_bit = sorted_key_bits(out.bins_count);
+    size_t temp_bytes = 0;
+    C10_CUDA_CHECK(cub::DeviceRadixSort::SortPairs(
+        nullptr, temp_bytes,
+        reinterpret_cast<const unsigned long long*>(keys_in.data_ptr<int64_t>()),
+        reinterpret_cast<unsigned long long*>(out.keys.data_ptr<int64_t>()),
+        rows_in.data_ptr<int>(), out.rows.data_ptr<int>(),
+        static_cast<int>(out.count), 0, end_bit, stream));
+    auto temp = at::empty({static_cast<int64_t>(std::max<size_t>(temp_bytes, 1))}, valid.options().dtype(at::kByte));
+    C10_CUDA_CHECK(cub::DeviceRadixSort::SortPairs(
+        temp.data_ptr(), temp_bytes,
+        reinterpret_cast<const unsigned long long*>(keys_in.data_ptr<int64_t>()),
+        reinterpret_cast<unsigned long long*>(out.keys.data_ptr<int64_t>()),
+        rows_in.data_ptr<int>(), out.rows.data_ptr<int>(),
+        static_cast<int>(out.count), 0, end_bit, stream));
+    return out;
+}
+
+// bins[key] = fixed-order sum of first[row] * second[row] over the key's rows.
+at::Tensor sorted_bin_sums(const SortedBins& sorted, const float* first, const float* second,
+                           const at::Tensor& reference) {
+    auto bins = at::zeros({static_cast<int64_t>(sorted.bins_count)}, reference.options().dtype(at::kDouble));
+    if (sorted.count == 0) {
+        return bins;
+    }
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(reference.get_device()).stream();
+    constexpr int threads = 256;
+    const int blocks = static_cast<int>((sorted.count + threads - 1) / threads);
+    const auto double_options = reference.options().dtype(at::kDouble);
+    auto sorted_values = at::empty({sorted.count}, double_options);
+    bdpt_sorted_gather_kernel<<<blocks, threads, 0, stream>>>(
+        sorted.count, sorted.rows.data_ptr<int>(), first, second, sorted_values.data_ptr<double>());
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    auto unique_keys = at::empty({sorted.count}, reference.options().dtype(at::kLong));
+    auto run_sums = at::empty({sorted.count}, double_options);
+    auto run_count = at::empty({1}, reference.options().dtype(at::kInt));
+    size_t temp_bytes = 0;
+    const auto* keys = reinterpret_cast<const unsigned long long*>(sorted.keys.data_ptr<int64_t>());
+    auto* unique = reinterpret_cast<unsigned long long*>(unique_keys.data_ptr<int64_t>());
+    C10_CUDA_CHECK(cub::DeviceReduce::ReduceByKey(
+        nullptr, temp_bytes, keys, unique, sorted_values.data_ptr<double>(), run_sums.data_ptr<double>(),
+        run_count.data_ptr<int>(), cub::Sum(), static_cast<int>(sorted.count), stream));
+    auto temp = at::empty({static_cast<int64_t>(std::max<size_t>(temp_bytes, 1))}, reference.options().dtype(at::kByte));
+    C10_CUDA_CHECK(cub::DeviceReduce::ReduceByKey(
+        temp.data_ptr(), temp_bytes, keys, unique, sorted_values.data_ptr<double>(), run_sums.data_ptr<double>(),
+        run_count.data_ptr<int>(), cub::Sum(), static_cast<int>(sorted.count), stream));
+    bdpt_sorted_scatter_kernel<<<blocks, threads, 0, stream>>>(
+        sorted.count, run_count.data_ptr<int>(), unique, run_sums.data_ptr<double>(), sorted.bins_count,
+        bins.data_ptr<double>());
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    return bins;
+}
+
+void sorted_power_finalize(
+    const at::Tensor& bins, int64_t cells, at::Tensor& path_gain, at::Tensor& los, at::Tensor& reflection,
+    at::Tensor& diffraction, at::Tensor& transmission, at::Tensor& scattering) {
+    if (cells == 0) {
+        return;
+    }
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(bins.get_device()).stream();
+    constexpr int threads = 256;
+    const int blocks = static_cast<int>((cells + threads - 1) / threads);
+    bdpt_sorted_power_finalize_kernel<<<blocks, threads, 0, stream>>>(
+        cells, bins.data_ptr<double>(), path_gain.data_ptr<float>(), los.data_ptr<float>(),
+        reflection.data_ptr<float>(), diffraction.data_ptr<float>(), transmission.data_ptr<float>(),
+        scattering.data_ptr<float>());
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 
 }  // namespace
@@ -1622,28 +1829,10 @@ channel_bdpt_accumulate_connection_samples_cuda(
                 bin_transmission_im, bin_scattering_re, bin_scattering_im};
     }
     if (accumulation_strategy == 1) {
-        if (out_count > 0) {
-            constexpr int threads = 256;
-            int blocks = static_cast<int>((out_count + threads - 1) / threads);
-            cudaStream_t stream = at::cuda::getCurrentCUDAStream(contribution.get_device()).stream();
-            bdpt_accumulate_connection_samples_staged_kernel<<<blocks, threads, 0, stream>>>(
-                out_count,
-                count,
-                contribution.data_ptr<float>(),
-                mis_weight.data_ptr<float>(),
-                tx_id.data_ptr<int>(),
-                rx_id.data_ptr<int>(),
-                component_id.data_ptr<int>(),
-                valid.data_ptr<bool>(),
-                rx_count,
-                path_gain.data_ptr<float>(),
-                los.data_ptr<float>(),
-                reflection.data_ptr<float>(),
-                diffraction.data_ptr<float>(),
-                transmission.data_ptr<float>(),
-                scattering.data_ptr<float>());
-            C10_CUDA_KERNEL_LAUNCH_CHECK();
-        }
+        const SortedBins sorted = sorted_bins(tx_id, rx_id, component_id, valid, tx_count, rx_count);
+        const at::Tensor bins = sorted_bin_sums(
+            sorted, contribution.data_ptr<float>(), mis_weight.data_ptr<float>(), contribution);
+        sorted_power_finalize(bins, out_count, path_gain, los, reflection, diffraction, transmission, scattering);
         return {path_gain, los, reflection, diffraction, transmission, scattering,
                 bin_los_re, bin_los_im, bin_reflection_re, bin_reflection_im,
                 bin_diffraction_re, bin_diffraction_im, bin_transmission_re,
@@ -1979,154 +2168,6 @@ __global__ void bdpt_accumulate_coherent_backward_kernel(
     grad_coeff_imag[index] = gi;
 }
 
-__global__ void bdpt_accumulate_power_jvp_kernel(
-    int64_t out_count,
-    int64_t sample_count,
-    const float* mis_weight,
-    const float* tangent_contribution,
-    const int* tx_id,
-    const int* rx_id,
-    const int* component_id,
-    const bool* valid,
-    int64_t rx_count,
-    float* t_path_gain,
-    float* t_los,
-    float* t_reflection,
-    float* t_diffraction,
-    float* t_transmission,
-    float* t_scattering) {
-    int64_t out_index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    if (out_index >= out_count) {
-        return;
-    }
-    const int out_tx = static_cast<int>(out_index / rx_count);
-    const int out_rx = static_cast<int>(out_index - static_cast<int64_t>(out_tx) * rx_count);
-    double path_sum = 0.0;
-    double los_sum = 0.0;
-    double reflection_sum = 0.0;
-    double diffraction_sum = 0.0;
-    double transmission_sum = 0.0;
-    double scattering_sum = 0.0;
-    for (int64_t index = 0; index < sample_count; ++index) {
-        if (!valid[index] || tx_id[index] != out_tx || rx_id[index] != out_rx) {
-            continue;
-        }
-        const int component = component_id[index];
-        if (!bdpt_component_accumulable(component)) {
-            continue;
-        }
-        const double value = static_cast<double>(mis_weight[index]) *
-            static_cast<double>(tangent_contribution[index]);
-        path_sum += value;
-        if (component == kComponentLos) {
-            los_sum += value;
-        } else if (component == kComponentReflection) {
-            reflection_sum += value;
-        } else if (component == kComponentDiffraction) {
-            diffraction_sum += value;
-        } else if (component == kComponentTransmission) {
-            transmission_sum += value;
-        } else if (component == kComponentScattering) {
-            scattering_sum += value;
-        }
-    }
-    t_path_gain[out_index] = static_cast<float>(path_sum);
-    t_los[out_index] = static_cast<float>(los_sum);
-    t_reflection[out_index] = static_cast<float>(reflection_sum);
-    t_diffraction[out_index] = static_cast<float>(diffraction_sum);
-    t_transmission[out_index] = static_cast<float>(transmission_sum);
-    t_scattering[out_index] = static_cast<float>(scattering_sum);
-}
-
-__global__ void bdpt_accumulate_coherent_jvp_kernel(
-    int64_t out_count,
-    int64_t sample_count,
-    const float* tangent_coeff_real,
-    const float* tangent_coeff_imag,
-    const int* tx_id,
-    const int* rx_id,
-    const int* component_id,
-    const bool* valid,
-    int64_t rx_count,
-    const double* los_re,
-    const double* los_im,
-    const double* reflection_re,
-    const double* reflection_im,
-    const double* diffraction_re,
-    const double* diffraction_im,
-    const double* transmission_re,
-    const double* transmission_im,
-    const double* scattering_re,
-    const double* scattering_im,
-    float* t_path_gain,
-    float* t_los,
-    float* t_reflection,
-    float* t_diffraction,
-    float* t_transmission,
-    float* t_scattering) {
-    int64_t out_index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    if (out_index >= out_count) {
-        return;
-    }
-    const int out_tx = static_cast<int>(out_index / rx_count);
-    const int out_rx = static_cast<int>(out_index - static_cast<int64_t>(out_tx) * rx_count);
-    // Fixed-order tangent bin sums t_S_c per component (deterministic, no atomics).
-    double t_los_re = 0.0, t_los_im = 0.0;
-    double t_reflection_re = 0.0, t_reflection_im = 0.0;
-    double t_diffraction_re = 0.0, t_diffraction_im = 0.0;
-    double t_transmission_re = 0.0, t_transmission_im = 0.0;
-    double t_scattering_re = 0.0, t_scattering_im = 0.0;
-    for (int64_t index = 0; index < sample_count; ++index) {
-        if (!valid[index] || tx_id[index] != out_tx || rx_id[index] != out_rx) {
-            continue;
-        }
-        const int component = component_id[index];
-        if (!bdpt_component_accumulable(component)) {
-            continue;
-        }
-        const double tr = static_cast<double>(tangent_coeff_real[index]);
-        const double ti = static_cast<double>(tangent_coeff_imag[index]);
-        if (component == kComponentLos) {
-            t_los_re += tr;
-            t_los_im += ti;
-        } else if (component == kComponentReflection) {
-            t_reflection_re += tr;
-            t_reflection_im += ti;
-        } else if (component == kComponentDiffraction) {
-            t_diffraction_re += tr;
-            t_diffraction_im += ti;
-        } else if (component == kComponentTransmission) {
-            t_transmission_re += tr;
-            t_transmission_im += ti;
-        } else if (component == kComponentScattering) {
-            t_scattering_re += tr;
-            t_scattering_im += ti;
-        }
-    }
-    // t_P_c = 2 Re(conj(S_c) t_S_c); path_gain tangent sums the component powers.
-    const double tp_los =
-        2.0 * (los_re[out_index] * t_los_re + los_im[out_index] * t_los_im);
-    const double tp_reflection = 2.0 *
-        (reflection_re[out_index] * t_reflection_re +
-         reflection_im[out_index] * t_reflection_im);
-    const double tp_diffraction = 2.0 *
-        (diffraction_re[out_index] * t_diffraction_re +
-         diffraction_im[out_index] * t_diffraction_im);
-    const double tp_transmission = 2.0 *
-        (transmission_re[out_index] * t_transmission_re +
-         transmission_im[out_index] * t_transmission_im);
-    const double tp_scattering = 2.0 *
-        (scattering_re[out_index] * t_scattering_re +
-         scattering_im[out_index] * t_scattering_im);
-    t_los[out_index] = static_cast<float>(tp_los);
-    t_reflection[out_index] = static_cast<float>(tp_reflection);
-    t_diffraction[out_index] = static_cast<float>(tp_diffraction);
-    t_transmission[out_index] = static_cast<float>(tp_transmission);
-    t_scattering[out_index] = static_cast<float>(tp_scattering);
-    t_path_gain[out_index] = static_cast<float>(
-        tp_los + tp_reflection + tp_diffraction + tp_transmission + tp_scattering);
-}
-
 // Optional-tensor helper: None -> nullptr, else validate and expose contiguous
 // storage. Shape/dtype/device are enforced against the reference structure.
 const at::Tensor* accumulate_optional(
@@ -2379,27 +2420,13 @@ pybind11::dict channel_bdpt_accumulate_connection_samples_jvp_cuda(
             std::move(tangent_contribution), tc_s, "tangent_contribution",
             at::kFloat, sample_shape, mis_weight);
         TORCH_CHECK(tc != nullptr, "power-domain accumulate jvp requires tangent_contribution");
-        if (out_count > 0) {
-            constexpr int threads = 256;
-            int blocks = static_cast<int>((out_count + threads - 1) / threads);
-            bdpt_accumulate_power_jvp_kernel<<<blocks, threads, 0, stream>>>(
-                out_count,
-                count,
-                mis_weight.data_ptr<float>(),
-                tc->data_ptr<float>(),
-                tx_id.data_ptr<int>(),
-                rx_id.data_ptr<int>(),
-                component_id.data_ptr<int>(),
-                valid.data_ptr<bool>(),
-                rx_count,
-                t_path_gain.data_ptr<float>(),
-                t_los.data_ptr<float>(),
-                t_reflection.data_ptr<float>(),
-                t_diffraction.data_ptr<float>(),
-                t_transmission.data_ptr<float>(),
-                t_scattering.data_ptr<float>());
-            C10_CUDA_KERNEL_LAUNCH_CHECK();
-        }
+        // Row-parallel: one stable key sort of the rows, then a fixed-order
+        // reduce-by-key of mis_weight * tangent per (tx, rx, component).
+        const SortedBins sorted = sorted_bins(tx_id, rx_id, component_id, valid, tx_count, rx_count);
+        const at::Tensor bins = sorted_bin_sums(
+            sorted, mis_weight.data_ptr<float>(), tc->data_ptr<float>(), mis_weight);
+        sorted_power_finalize(
+            bins, out_count, t_path_gain, t_los, t_reflection, t_diffraction, t_transmission, t_scattering);
     } else {
         at::Tensor tcr_s, tci_s;
         const at::Tensor* tcr = accumulate_optional(
@@ -2433,19 +2460,16 @@ pybind11::dict channel_bdpt_accumulate_connection_samples_jvp_cuda(
         TORCH_CHECK(
             lre && lim && rre && rim && dre && dim && tre && tim && sre && sim,
             "coherent accumulate jvp requires all ten bin-sum buffers");
+        const SortedBins sorted = sorted_bins(tx_id, rx_id, component_id, valid, tx_count, rx_count);
+        const at::Tensor bins_re = sorted_bin_sums(sorted, tcr->data_ptr<float>(), nullptr, mis_weight);
+        const at::Tensor bins_im = sorted_bin_sums(sorted, tci->data_ptr<float>(), nullptr, mis_weight);
         if (out_count > 0) {
             constexpr int threads = 256;
             int blocks = static_cast<int>((out_count + threads - 1) / threads);
-            bdpt_accumulate_coherent_jvp_kernel<<<blocks, threads, 0, stream>>>(
+            bdpt_sorted_coherent_jvp_finalize_kernel<<<blocks, threads, 0, stream>>>(
                 out_count,
-                count,
-                tcr->data_ptr<float>(),
-                tci->data_ptr<float>(),
-                tx_id.data_ptr<int>(),
-                rx_id.data_ptr<int>(),
-                component_id.data_ptr<int>(),
-                valid.data_ptr<bool>(),
-                rx_count,
+                bins_re.data_ptr<double>(),
+                bins_im.data_ptr<double>(),
                 lre->data_ptr<double>(),
                 lim->data_ptr<double>(),
                 rre->data_ptr<double>(),
