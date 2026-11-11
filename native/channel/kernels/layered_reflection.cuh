@@ -1,5 +1,5 @@
 // Copyright Xingyu Chen.
-// Face reflection coefficients of single-slab and multilayer materials shared by the reflection kernels.
+// Face reflection coefficients of single-slab and multilayer materials for the reflection kernels.
 #pragma once
 
 #include <rayd/field_transport.cuh>
