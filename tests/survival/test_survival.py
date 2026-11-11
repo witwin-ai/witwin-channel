@@ -22,27 +22,7 @@ LONG_WORK_ENV = "CHANNEL_SURVIVAL_LONG_GPU_WORK"
 # Cases that crash, hang or accept invalid input today, keyed by case name, with the finding ID.
 # They are strict expected failures: a fix makes them pass, which fails the suite until the
 # entry is removed here.
-EXPECTED_FAILURES = {
-    "s1.box_transmission_depth1.det": "S-1 device trap when hits exceed max_depth",
-    "s1.box_transmission_depth1.path": "S-1 device trap when hits exceed max_depth",
-    "s1.box_transmission_depth1.bdpt": "S-1 device trap when hits exceed max_depth",
-    "s1.city4_transmission_depth2.mc": "S-1 device trap when hits exceed max_depth",
-    "s1.city4_transmission_depth2.det": "S-1 device trap when hits exceed max_depth",
-    "s1.city8_transmission_depth5.det": "S-1 device trap at the maximum depth",
-    "s1.consumer_two_walls_transmission_depth1": "S-1 device trap through the consumer",
-    "s2.path_one_building_4rx_coupled": "S-2 coupled D-D stationary-root device assert",
-    "s2.det_city4_grid16_coupled": "S-2 coupled D-D stationary-root device assert",
-    "s3.nan_rx_transmission.det": "S-3 non-finite endpoint reaches the transmission trap",
-    "s3.inf_tx_transmission.det": "S-3 non-finite endpoint reaches the transmission trap",
-    "s3.far_rx_1e30_transmission.det": "S-3 far endpoint reaches the transmission trap",
-    "s3.consumer_nan_source_transmission": "S-3 non-finite consumer endpoint",
-    "s4.face_index_int64_wraps_to_valid": "S-4 int64 face index silently truncated to int32",
-    "s5.consumer_endpoints_on_other_gpu": "S-5 consumer preflight does not compare devices",
-    "s6.reevaluate_primitive_sequence_oob": "S-6 tampered topology index out of bounds",
-    "s6.reevaluate_provenance_none_other_scene": "S-6 hand-built topology on another scene",
-    "s8.kirchhoff_300ghz": "S-8 Kirchhoff series unbounded in k0*sigma_h (hang)",
-    "s8.kirchhoff_1thz": "S-8 Kirchhoff series unbounded in k0*sigma_h (hang)",
-}
+EXPECTED_FAILURES: dict[str, str] = {}
 
 
 def _environment(gpus: int) -> dict[str, str] | None:

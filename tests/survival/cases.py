@@ -20,7 +20,10 @@ OUTCOME = "SURVIVAL_OUTCOME"
 
 @dataclass(frozen=True, slots=True)
 class SurvivalCase:
-    """``expect`` is ``survive`` (complete or raise a Python exception) or ``reject`` (must raise)."""
+    """``expect`` is ``survive`` (complete or raise a Python exception) or ``reject`` (must raise).
+
+    ``errors`` names the exception classes a rejection must be one of; empty accepts any.
+    """
 
     name: str
     run: Callable[[], Any]
@@ -29,6 +32,7 @@ class SurvivalCase:
     timeout_s: float = 300.0
     gpus: int = 1
     long_gpu_work: bool = False
+    errors: tuple[str, ...] = ()
 
 
 CASES: dict[str, SurvivalCase] = {}
@@ -36,10 +40,11 @@ CASES: dict[str, SurvivalCase] = {}
 
 def case(
     name: str, finding: str, *, expect: str = "survive", timeout_s: float = 300.0, gpus: int = 1,
-    long_gpu_work: bool = False,
+    long_gpu_work: bool = False, errors: tuple[str, ...] = (),
 ) -> Callable[[Callable[[], Any]], Callable[[], Any]]:
     def register(fn: Callable[[], Any]) -> Callable[[], Any]:
-        CASES[name] = SurvivalCase(name, fn, finding, expect, timeout_s, gpus, long_gpu_work)
+        CASES[name] = SurvivalCase(name, fn, finding, "reject" if errors else expect, timeout_s,
+                                   gpus, long_gpu_work, errors)
         return fn
 
     return register
@@ -287,16 +292,19 @@ def _() -> None:
 # --------------------------------------------------------------------------- S-3
 
 _NAN, _INF = float("nan"), float("inf")
-for _label, _tx, _rx in (("nan_rx", (0.0, 0.0, 1.5), (_NAN, 0.3, 1.2)),
-                         ("inf_tx", (_INF, 0.0, 1.5), (6.0, 0.3, 1.2)),
-                         ("far_rx_1e30", (0.0, 0.0, 1.5), (1e30, 0.3, 1.2))):
-    @case(f"s3.{_label}_transmission.det", "S-3")
+# Non-finite endpoints are refused on the host; a finite but unreachably far one fails in the
+# penetration trace and is reported as a named capacity failure.
+for _label, _tx, _rx, _errors in (
+        ("nan_rx", (0.0, 0.0, 1.5), (_NAN, 0.3, 1.2), ("ValueError",)),
+        ("inf_tx", (_INF, 0.0, 1.5), (6.0, 0.3, 1.2), ("ValueError",)),
+        ("far_rx_1e30", (0.0, 0.0, 1.5), (1e30, 0.3, 1.2), ("ValueError", "CapacityError"))):
+    @case(f"s3.{_label}_transmission.det", "S-3", errors=_errors)
     def _(tx_pos: Any = _tx, rx_pos: Any = _rx) -> None:
         _solve("det", _box_between_scene(tx_pos=tx_pos, rx_pos=rx_pos),
                components={"los", "transmission"}, max_depth=2)
 
 
-@case("s3.consumer_nan_source_transmission", "S-3")
+@case("s3.consumer_nan_source_transmission", "S-3", errors=("ValueError", "CapacityError"))
 def _() -> None:
     compiled = _compiled([_floor(), _wall()])
     _evaluate(compiled, _request(_batch([[_NAN, 0.0, 1.5]], power=True),
@@ -321,17 +329,17 @@ def _face_case(faces: Any, *, device: str = "cpu") -> None:
 
 for _label, _faces in (("negative", [[0, 1, -1]]), ("equals_vertex_count", [[0, 1, 3]]),
                        ("int32_max", [[0, 1, 2**31 - 1]]), ("int64_wraps_to_valid", [[0, 1, 2**32 + 2]])):
-    @case(f"s4.face_index_{_label}", "S-4", expect="reject")
+    @case(f"s4.face_index_{_label}", "S-4", errors=("ValueError",))
     def _(faces: Any = _faces) -> None:
         _face_case(torch.tensor(faces, dtype=torch.int64))
 
 
-@case("s4.face_index_oob_cuda_tensor", "S-4", expect="reject")
+@case("s4.face_index_oob_cuda_tensor", "S-4", errors=("ValueError",))
 def _() -> None:
     _face_case(torch.tensor([[0, 1, 7]]), device="cuda")
 
 
-@case("s4.face_uv_index_oob", "S-4", expect="reject")
+@case("s4.face_uv_index_oob", "S-4", errors=("ValueError",))
 def _() -> None:
     from witwin.core import Scene
 
@@ -343,7 +351,7 @@ def _() -> None:
     _solve("bdpt", scene, components={"los", "reflection"})
 
 
-@case("s4.face_tensor_mutated_after_compile", "S-4", expect="reject")
+@case("s4.face_tensor_mutated_after_compile", "S-4", errors=("ValueError",))
 def _() -> None:
     from witwin.core import Scene
 
@@ -359,7 +367,7 @@ def _() -> None:
 # --------------------------------------------------------------------------- S-5
 
 
-@case("s5.consumer_endpoints_on_other_gpu", "S-5", gpus=2)
+@case("s5.consumer_endpoints_on_other_gpu", "S-5", gpus=2, errors=("ValueError",))
 def _() -> None:
     compiled = _compiled([_floor(), _wall()])
     _evaluate(compiled, _request(_batch([[0.0, 0.0, 1.5]], power=True, device="cuda:1"),
@@ -394,7 +402,7 @@ def _big(x: torch.Tensor) -> torch.Tensor:
     return torch.where(x >= 0, torch.full_like(x, 10**6), x)
 
 
-@case("s6.reevaluate_primitive_sequence_oob", "S-6")
+@case("s6.reevaluate_primitive_sequence_oob", "S-6", errors=("ValueError",))
 def _() -> None:
     _reevaluate_tampered(primitive_sequence=_big, primitive_id=_big)
 
@@ -404,12 +412,12 @@ def _() -> None:
     _reevaluate_tampered(material_sequence=_big, material_id=_big)
 
 
-@case("s6.reevaluate_source_index_oob", "S-6")
+@case("s6.reevaluate_source_index_oob", "S-6", errors=("ValueError",))
 def _() -> None:
     _reevaluate_tampered(source_index=lambda x: x + 10**6)
 
 
-@case("s6.reevaluate_provenance_none_other_scene", "S-6")
+@case("s6.reevaluate_provenance_none_other_scene", "S-6", errors=("ValueError",))
 def _() -> None:
     c = _consumer()
     compiled = _compiled([_floor(), _wall()])
@@ -476,12 +484,12 @@ def _rough_scene(frequency_hz: float) -> None:
                         reference_frequency_hz=frequency_hz))
 
 
-@case("s8.kirchhoff_300ghz", "S-8", timeout_s=30.0, long_gpu_work=True)
+@case("s8.kirchhoff_300ghz", "S-8", timeout_s=30.0, errors=("ValueError",))
 def _() -> None:
     _rough_scene(300e9)
 
 
-@case("s8.kirchhoff_1thz", "S-8", timeout_s=30.0, long_gpu_work=True)
+@case("s8.kirchhoff_1thz", "S-8", timeout_s=30.0, errors=("ValueError",))
 def _() -> None:
     _rough_scene(1e12)
 
@@ -531,6 +539,10 @@ def main(argv: list[str] | None = None) -> int:
     if item.expect == "reject" and raised is None:
         print("SURVIVAL_EXPECTATION input was accepted but must be rejected", flush=True)
         return 4
+    if item.errors and type(raised).__name__ not in item.errors:
+        print(f"SURVIVAL_EXPECTATION raised {type(raised).__name__}, expected one of {item.errors}",
+              flush=True)
+        return 5
     return 0
 
 

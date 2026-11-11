@@ -19,7 +19,9 @@ time and cap each at 8 GiB.
 `python -m tests.survival.cases --list` and `python -m tests.survival.cases <case>`.
 The test runs every case in a fresh process with a timeout and requires exit code 0 and a working
 `torch.zeros(1, device="cuda")` afterwards. A case passes when the solve completes or raises a
-Python exception; `expect="reject"` cases must raise. A timeout is a hang.
+Python exception; `expect="reject"` cases must raise, and cases with `errors=(...)` must raise one
+of the named exception classes (the contract the fix established, for example `ValueError` for
+host-side validation or `CapacityError` for a named native capacity failure). A timeout is a hang.
 
 Cases that fail today are strict expected failures in `EXPECTED_FAILURES` in `test_survival.py`,
 each with its finding ID from the analysis report (S-1 ... S-8). A fix turns its case into an
@@ -27,9 +29,9 @@ unexpected pass, which fails the suite until the entry is deleted: that is the f
 
 The cross-device case (S-5) needs two GPUs. It is skipped unless `CHANNEL_SURVIVAL_SECOND_GPU`
 names the physical index of a second GPU, which the case then appends to `CUDA_VISIBLE_DEVICES`.
-It only builds a two-triangle scene there. The two S-8 Kirchhoff cases reproduce a hang that keeps
-the GPU busy for tens of seconds; they are skipped unless `CHANNEL_SURVIVAL_LONG_GPU_WORK=1`, which
-only belongs on a GPU nobody else uses.
+It only builds a two-triangle scene there. A case marked `long_gpu_work=True` (none today) keeps
+the GPU busy for tens of seconds and runs only with `CHANNEL_SURVIVAL_LONG_GPU_WORK=1`, on a GPU
+nobody else uses.
 
 ## Reference accuracy (`tests/accuracy`)
 
