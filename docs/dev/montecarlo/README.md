@@ -96,9 +96,10 @@ used by focused contract tests, but are not compatibility promises. The parent
   that can reach the scene bounds, and bounds the final reflected segment by the
   farthest deposit any receiver needs. Grids take the cell flux estimator; a point
   receiver is a capture sphere of radius `Config.receiver_radius_m` (default 1% of
-  its straight transmitter distance). Diffraction is sampled on grids only and is
-  refused with point receivers. `Config.scattering_samples` sets the scattering
-  area-sample count independently of `samples` (default: `samples`). Migration:
+  its straight transmitter distance); diffraction at a point receiver uses the same
+  capture sphere on the Keller-cone samples. `Config.scattering_samples` sets the scattering
+  area-sample count independently of `samples` (default: `samples`); the receiver pairs run
+  natively with fixed-order per-receiver sums. Migration:
   scenes that previously raised for point, multiple or mixed receivers now solve;
   the single-grid layout is unchanged.
 - BDPT carries complex3/Jones fields for coherent events, but scalar throughput
