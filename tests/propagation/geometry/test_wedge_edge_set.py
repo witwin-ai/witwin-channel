@@ -1,5 +1,5 @@
 # Copyright Xingyu Chen.
-# The diffraction edge set is the set of geometric wedges, independent of how the mesh is triangulated.
+# The diffraction edge set is the set of geometric wedges, whatever the triangulation.
 
 from __future__ import annotations
 
