@@ -3766,7 +3766,7 @@ class _Wavefront:
         self, base: dict[str, torch.Tensor], rows_capacity: int | None = None,
     ) -> dict[str, Any]:
         workspace = self.workspace
-        return bdpt_wavefront_transmission(
+        return bdpt_wavefront_transmission(  # type: ignore[no-any-return]
             self.prep.rayd,
             workspace.tx_reference,
             workspace.tx_power,
