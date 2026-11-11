@@ -974,6 +974,7 @@ pybind11::dict channel_scattering_event_probabilities(at::Tensor cos_theta,at::T
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAException.h>
 #include <rayd/scattering_table.cuh>
+#include "math.cuh"
 
 #include "../tensor_checks.h"
 
@@ -1017,13 +1018,8 @@ struct PairGeometry {
     int slot;
 };
 
-__device__ __forceinline__ float3 load_vec3(const float* values, int64_t index) {
-    return make_float3(values[3 * index], values[3 * index + 1], values[3 * index + 2]);
-}
-
-__device__ __forceinline__ float dot3(float3 a, float3 b) {
-    return a.x * b.x + a.y * b.y + a.z * b.z;
-}
+using channel::math::load_vec3;
+using channel::math::dot;
 
 // Outgoing geometry of sample n towards receiver rx: active when the sample is lit, carries a
 // table, and the receiver lies on the lit side; weight = cos_o * incident / r2^2.
@@ -1037,17 +1033,17 @@ __device__ __forceinline__ PairGeometry pair_geometry(
     if (pair.slot < 0 || !(incident > 0.0f)) return pair;
     const float3 p = load_vec3(samples.points, n);
     const float3 delta = make_float3(rx.x - p.x, rx.y - p.y, rx.z - p.z);
-    const float r2 = fmaxf(sqrtf(dot3(delta, delta)), 1.0e-6f);
+    const float r2 = fmaxf(sqrtf(dot(delta, delta)), 1.0e-6f);
     const float3 wo = make_float3(delta.x / r2, delta.y / r2, delta.z / r2);
     const float3 normal = load_vec3(samples.normals, n);
-    const float cos_o = dot3(wo, normal);
+    const float cos_o = dot(wo, normal);
     if (!(cos_o > 0.0f)) return pair;
     pair.active = true;
     pair.wo_world[0] = wo.x;
     pair.wo_world[1] = wo.y;
     pair.wo_world[2] = wo.z;
-    pair.wo_local[0] = dot3(wo, load_vec3(samples.frame_t1, n));
-    pair.wo_local[1] = dot3(wo, load_vec3(samples.frame_t2, n));
+    pair.wo_local[0] = dot(wo, load_vec3(samples.frame_t1, n));
+    pair.wo_local[1] = dot(wo, load_vec3(samples.frame_t2, n));
     pair.wo_local[2] = cos_o;
     pair.weight = incident * cos_o / (r2 * r2);
     return pair;
