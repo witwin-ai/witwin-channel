@@ -1544,36 +1544,17 @@
       "return_type": "pybind11::dict",
       "doc": "Build deterministic reflection EPC input batches with native CUDA.",
       "parameters": [
-        ["tx", "torch::Tensor", null],
+        ["tx_positions", "torch::Tensor", null],
         ["rx_positions", "torch::Tensor", null],
         ["sequences", "torch::Tensor", null],
+        ["sequence_tx", "torch::Tensor", null],
         ["tri_a", "torch::Tensor", null],
         ["normals", "torch::Tensor", null],
-        ["rx_start", "int64_t", null],
-        ["rx_end", "int64_t", null]
+        ["candidate_start", "int64_t", null],
+        ["candidate_end", "int64_t", null]
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.topology.deterministic_reflection_epc_input_batch"]
-    },
-    {
-      "name": "deterministic_reflection_field",
-      "target": "channel_deterministic_reflection_field",
-      "return_type": "pybind11::dict",
-      "doc": "Evaluate deterministic scalar reflection complex fields with a CUDA kernel.",
-      "parameters": [
-        ["tx_position", "torch::Tensor", null],
-        ["rx_position", "torch::Tensor", null],
-        ["hit_position", "torch::Tensor", null],
-        ["normal", "torch::Tensor", null],
-        ["tx_power", "torch::Tensor", null],
-        ["eps_r", "torch::Tensor", null],
-        ["sigma_e", "torch::Tensor", null],
-        ["mu_r", "torch::Tensor", null],
-        ["gain", "torch::Tensor", null],
-        ["frequency_hz", "double", null]
-      ],
-      "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.fields.deterministic_reflection_field"]
     },
     {
       "name": "deterministic_reflection_order1_compact",
@@ -1627,24 +1608,22 @@
       "python_owners": ["witwin.channel.kernels.topology.deterministic_reflection_sequence_compact"]
     },
     {
-      "name": "deterministic_reflection_sequence_field",
-      "target": "channel_deterministic_reflection_sequence_field",
+      "name": "deterministic_reflection_topology_compact",
+      "target": "channel_deterministic_reflection_topology_compact",
       "return_type": "pybind11::dict",
-      "doc": "Evaluate deterministic multi-bounce scalar reflection complex fields with a CUDA kernel.",
+      "doc": "Compact batched reflection EPC outputs into topology rows with native CUDA.",
       "parameters": [
-        ["tx_position", "torch::Tensor", null],
-        ["rx_position", "torch::Tensor", null],
-        ["hit_positions", "torch::Tensor", null],
-        ["normals", "torch::Tensor", null],
-        ["tx_power", "torch::Tensor", null],
-        ["eps_r", "torch::Tensor", null],
-        ["sigma_e", "torch::Tensor", null],
-        ["mu_r", "torch::Tensor", null],
-        ["gain", "torch::Tensor", null],
-        ["frequency_hz", "double", null]
+        ["visible", "torch::Tensor", null],
+        ["epc_sequences", "torch::Tensor", null],
+        ["epc_hits", "torch::Tensor", null],
+        ["epc_normals", "torch::Tensor", null],
+        ["epc_path_length", "torch::Tensor", null],
+        ["tx_indices", "torch::Tensor", null],
+        ["rx_indices", "torch::Tensor", null],
+        ["face_material_id", "torch::Tensor", null]
       ],
       "pybind_arguments": [],
-      "python_owners": ["witwin.channel.kernels.fields.deterministic_reflection_sequence_field"]
+      "python_owners": ["witwin.channel.kernels.topology.deterministic_reflection_topology_compact"]
     },
     {
       "name": "deterministic_repeat_range",

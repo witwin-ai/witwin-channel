@@ -14,6 +14,7 @@ _OWNER_NAMES = (
     "deterministic_diffraction_order1_compact",
     "deterministic_reflection_order1_compact",
     "deterministic_reflection_sequence_compact",
+    "deterministic_reflection_topology_compact",
     "deterministic_sort_order",
 )
 

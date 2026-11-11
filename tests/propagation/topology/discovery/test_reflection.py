@@ -41,7 +41,7 @@ def test_plan_limit_boundary(monkeypatch, count, exhaustive):
     assert (plan.face_group_id is None) is exhaustive
 
 
-def test_large_trace_unique_minus_one_tx_major_tail_and_identity(monkeypatch):
+def test_large_trace_batches_every_transmitter_into_one_trace_and_candidate_space(monkeypatch):
     representative = torch.tensor([10, 11, 12])
     plan = reflection.ReflectionOrder1Plan(
         exhaustive=False,
@@ -67,21 +67,48 @@ def test_large_trace_unique_minus_one_tx_major_tail_and_identity(monkeypatch):
 
     def trace(tx, **kwargs):
         traced.append(tx)
-        return torch.tensor([[-1], [2], [1], [2]])
+        # Transmitter-major chains: tx 0 reaches groups {1, 2}, tx 1 reaches {0, 1}.
+        return torch.tensor([[-1], [2], [1], [2], [1], [1], [-1], [0]])
 
     requests = list(
         reflection.iter_reflection_order1_epc_requests(
             plan, trace_group_chains=trace, **_inputs()
         )
     )
-    assert [request.tx_index for request in requests] == [0, 0, 0, 1, 1, 1]
+    assert len(traced) == 1 and traced[0].shape == (2, 3)
+    assert [request.depth for request in requests] == [1] * 5
     assert all(request.epc_inputs is sentinel for request in requests)
-    assert [call["rx_start"] for call in calls] == [0, 2, 4, 0, 2, 4]
-    assert [call["rx_end"] for call in calls] == [2, 4, 5, 2, 4, 5]
-    assert all(
-        torch.equal(call["sequences"], torch.tensor([[11], [12]])) for call in calls
+    # Four (tx, group) sequences times five receivers, four candidates per launch.
+    assert [(call["candidate_start"], call["candidate_end"]) for call in calls] == [
+        (0, 4),
+        (4, 8),
+        (8, 12),
+        (12, 16),
+        (16, 20),
+    ]
+    for call in calls:
+        assert torch.equal(call["sequences"], torch.tensor([[11], [12], [10], [11]]))
+        assert call["sequence_tx"].tolist() == [0, 0, 1, 1]
+        assert call["tx_positions"].shape == (2, 3)
+
+
+def test_unique_tx_chains_matches_per_transmitter_unique():
+    chains = torch.tensor(
+        [
+            [[2, 0], [1, 2], [1, 2], [-1, -1], [0, -1]],
+            [[1, 1], [2, -1], [1, 1], [0, 2], [-1, -1]],
+        ]
     )
-    assert len(traced) == 2
+    for depth in (1, 2):
+        rows = reflection._unique_tx_chains(chains, depth=depth, group_count=3)
+        expected = []
+        for tx in range(2):
+            reached = chains[tx][chains[tx][:, depth - 1] >= 0][:, :depth]
+            for row in torch.unique(reached, dim=0).tolist():
+                expected.append([tx, *row])
+        assert rows.tolist() == expected
+    wide = reflection._unique_tx_chains(chains, depth=2, group_count=2**40)
+    assert wide.tolist() == reflection._unique_tx_chains(chains, depth=2, group_count=3).tolist()
 
 
 def test_generator_is_lazy_and_callback_errors_propagate():
@@ -127,9 +154,8 @@ def test_contract_fields_and_forbidden_imports():
         "base_sequences",
         "face_group_id",
     ]
-    assert [field.name for field in fields(reflection.ReflectionOrder1EpcRequest)] == [
-        "tx_index",
-        "tx",
+    assert [field.name for field in fields(reflection.ReflectionEpcRequest)] == [
+        "depth",
         "epc_inputs",
     ]
     assert [field.name for field in fields(reflection.ReflectionMultibouncePlan)] == [
@@ -140,9 +166,6 @@ def test_contract_fields_and_forbidden_imports():
         "min_depth",
         "max_depth",
     ]
-    assert [
-        field.name for field in fields(reflection.ReflectionMultibounceEpcRequest)
-    ] == ["depth", "tx_index", "tx", "epc_inputs"]
     assert reflection.ReflectionMultibouncePlan.__dataclass_params__.frozen
     assert not hasattr(
         reflection.ReflectionMultibouncePlan(True, 0, torch.empty(0), None, 1, 0),
@@ -209,13 +232,13 @@ def _multibounce_inputs():
     }
 
 
-def test_exhaustive_order_is_depth_candidate_chunk_rx_tx_and_lazy(monkeypatch):
+def test_exhaustive_order_is_depth_sequence_chunk_candidate_chunk_and_lazy(monkeypatch):
     events = []
     sentinel = {"sentinel": torch.ones(())}
     plan = reflection.ReflectionMultibouncePlan(
         True, 2, torch.tensor([4, 5]), None, 1, 2
     )
-    monkeypatch.setattr(reflection, "_MULTIBOUNCE_PAIR_CHUNK_SIZE", 2)
+    monkeypatch.setattr(reflection, "_MULTIBOUNCE_PAIR_CHUNK_SIZE", 4)
     monkeypatch.setattr(
         reflection,
         "_face_sequence_count",
@@ -232,7 +255,8 @@ def test_exhaustive_order_is_depth_candidate_chunk_rx_tx_and_lazy(monkeypatch):
         "deterministic_reflection_epc_input_batch",
         lambda **k: (
             events.append(
-                f"build{k['sequences'].shape[0]}:{k['rx_start']}:{int(k['tx'][0])}"
+                f"build{k['sequences'].shape[0]}:{k['candidate_start']}:{k['candidate_end']}"
+                f":{k['sequence_tx'] is None}:{k['tx_positions'].shape[0]}"
             )
             or sentinel
         ),
@@ -246,26 +270,42 @@ def test_exhaustive_order_is_depth_candidate_chunk_rx_tx_and_lazy(monkeypatch):
     assert events == []
     requests = list(iterator)
     assert all(request.epc_inputs is sentinel for request in requests)
-    assert events[:4] == ["count1", "record1", "chunk1", "build1:0:0"]
-    assert events.index("count2") > events.index("build1:2:3")
+    # Depth 1: one sequence x 2 tx x 3 rx = 6 candidates in launches of 4.
+    assert events[:5] == [
+        "count1",
+        "record1",
+        "chunk1",
+        "build1:0:4:True:2",
+        "build1:4:6:True:2",
+    ]
+    # Depth 2: two sequences x 6 endpoint pairs = 12 candidates.
+    assert events[5:] == [
+        "count2",
+        "record2",
+        "chunk2",
+        "build2:0:4:True:2",
+        "build2:4:8:True:2",
+        "build2:8:12:True:2",
+    ]
+    assert [request.depth for request in requests] == [1, 1, 2, 2, 2]
 
 
-def test_traced_order_unique_minus_one_and_no_reached_depth(monkeypatch):
+def test_traced_order_is_one_trace_then_depth_with_per_transmitter_sequences(monkeypatch):
     events = []
     plan = reflection.ReflectionMultibouncePlan(
         False, 3, torch.tensor([10, 11, 12]), torch.arange(3), 1, 2
     )
-    chains = torch.tensor([[2, -1], [1, 2], [1, 2], [-1, -1]])
+    per_tx = torch.tensor([[2, -1], [1, 2], [1, 2], [-1, -1]])
 
     def trace(tx, **kwargs):
-        events.append(f"trace{int(tx[0])}")
-        return chains
+        events.append(f"trace{tx.shape[0]}")
+        return torch.cat((per_tx, per_tx))
 
     monkeypatch.setattr(
         reflection.topology_kernels,
         "deterministic_reflection_epc_input_batch",
         lambda **k: (
-            events.append(f"build{int(k['tx'][0])}:{k['sequences'].tolist()}")
+            events.append(f"build{k['sequences'].tolist()}:{k['sequence_tx'].tolist()}")
             or {"sentinel": torch.ones(())}
         ),
     )
@@ -277,10 +317,14 @@ def test_traced_order_unique_minus_one_and_no_reached_depth(monkeypatch):
             **_multibounce_inputs(),
         )
     )
-    assert [request.tx_index for request in requests] == [0, 0, 1, 1]
-    assert events[:3] == ["trace0", "record2", "build0:[[11], [12]]"]
-    assert "record1" in events
-    assert events.index("trace3") > events.index("record1")
+    assert [request.depth for request in requests] == [1, 2]
+    assert events == [
+        "trace2",
+        "record4",
+        "build[[11], [12], [11], [12]]:[0, 0, 1, 1]",
+        "record2",
+        "build[[11, 12], [11, 12]]:[0, 1]",
+    ]
 
 
 def test_traced_no_chain_records_no_candidate_or_request(monkeypatch):

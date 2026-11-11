@@ -63,10 +63,7 @@ def test_live_reflection_and_diffraction_producers_remain_compact() -> None:
         "witwin/channel/interactions/diffraction.py"
     )
 
-    assert {
-        "deterministic_reflection_order1_compact",
-        "deterministic_reflection_sequence_compact",
-    } <= reflection_calls
+    assert "deterministic_reflection_topology_compact" in reflection_calls
     assert "deterministic_diffraction_order1_compact" in diffraction_calls
 
 

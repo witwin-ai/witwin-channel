@@ -281,9 +281,7 @@
         "deterministic_los_field_kernel",
         "deterministic_pack_complex_kernel",
         "deterministic_phase_from_field_kernel",
-        "deterministic_phase_from_length_kernel",
-        "deterministic_reflection_field_kernel",
-        "deterministic_reflection_sequence_field_kernel"
+        "deterministic_phase_from_length_kernel"
       ],
       "launches": [
         "deterministic_accumulate_backward_kernel",
@@ -300,9 +298,7 @@
         "deterministic_los_field_kernel",
         "deterministic_pack_complex_kernel",
         "deterministic_phase_from_field_kernel",
-        "deterministic_phase_from_length_kernel",
-        "deterministic_reflection_field_kernel",
-        "deterministic_reflection_sequence_field_kernel"
+        "deterministic_phase_from_length_kernel"
       ],
       "host_synchronization": [
         "cudaMemcpyAsync",
@@ -663,6 +659,7 @@
         "deterministic_reflection_epc_input_batch_kernel",
         "deterministic_reflection_order1_compact_kernel",
         "deterministic_reflection_sequence_compact_kernel",
+        "deterministic_reflection_topology_compact_kernel",
         "deterministic_repeat_range_kernel",
         "deterministic_sort_key_1d_kernel",
         "deterministic_sort_key_sequence_kernel",
@@ -700,6 +697,7 @@
         "deterministic_reflection_epc_input_batch_kernel",
         "deterministic_reflection_order1_compact_kernel",
         "deterministic_reflection_sequence_compact_kernel",
+        "deterministic_reflection_topology_compact_kernel",
         "deterministic_repeat_range_kernel",
         "deterministic_sort_key_1d_kernel",
         "deterministic_sort_key_sequence_kernel",

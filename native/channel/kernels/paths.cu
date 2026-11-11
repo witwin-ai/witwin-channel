@@ -313,37 +313,55 @@ __global__ void deterministic_face_anchor_points_kernel(
     }
 }
 
+// Candidate c of [candidate_start, candidate_start + candidate_count) maps to
+// (transmitter, receiver, sequence). With shared sequences (sequence_tx null)
+// c = (tx * rx_count + rx) * sequence_count + sequence; with per-transmitter
+// sequences c = sequence * rx_count + rx and sequence_tx names the transmitter.
 template <typename index_t>
 __global__ void deterministic_reflection_epc_input_batch_kernel(
-    int64_t pair_count,
+    int64_t candidate_count,
+    int64_t candidate_start,
     int64_t sequence_count,
     int64_t depth,
-    int rx_start,
-    const float* __restrict__ tx,
+    int64_t rx_count,
+    const int* __restrict__ sequence_tx,
+    const float* __restrict__ tx_positions,
     const float* __restrict__ rx_positions,
     const index_t* __restrict__ sequences,
     const float* __restrict__ tri_a,
     const float* __restrict__ normals,
     float* __restrict__ tx_batch,
     float* __restrict__ rx_batch,
+    int* __restrict__ tx_indices,
     int* __restrict__ rx_indices,
     int* __restrict__ sequence_batch,
     float* __restrict__ direct_plane_points,
     float* __restrict__ direct_plane_normals) {
     const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
     for (int64_t pair = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-         pair < pair_count;
+         pair < candidate_count;
          pair += stride) {
-        const int64_t rx_local = pair / sequence_count;
-        const int64_t sequence_index = pair - rx_local * sequence_count;
-        const int rx_id = rx_start + static_cast<int>(rx_local);
-        rx_indices[pair] = rx_id;
+        const int64_t candidate = candidate_start + pair;
+        int64_t sequence_index = 0;
+        int64_t rx_id = 0;
+        int64_t tx_id = 0;
+        if (sequence_tx == nullptr) {
+            const int64_t endpoint_pair = candidate / sequence_count;
+            sequence_index = candidate - endpoint_pair * sequence_count;
+            tx_id = endpoint_pair / rx_count;
+            rx_id = endpoint_pair - tx_id * rx_count;
+        } else {
+            sequence_index = candidate / rx_count;
+            rx_id = candidate - sequence_index * rx_count;
+            tx_id = sequence_tx[sequence_index];
+        }
+        rx_indices[pair] = static_cast<int>(rx_id);
+        tx_indices[pair] = static_cast<int>(tx_id);
 
         const int64_t vec_base = pair * 3;
-        const int64_t rx_base = static_cast<int64_t>(rx_id) * 3;
         for (int axis = 0; axis < 3; ++axis) {
-            tx_batch[vec_base + axis] = tx[axis];
-            rx_batch[vec_base + axis] = rx_positions[rx_base + axis];
+            tx_batch[vec_base + axis] = tx_positions[tx_id * 3 + axis];
+            rx_batch[vec_base + axis] = rx_positions[rx_id * 3 + axis];
         }
 
         for (int64_t column = 0; column < depth; ++column) {
@@ -1126,15 +1144,15 @@ at::Tensor channel_deterministic_face_anchor_points(at::Tensor vertices, at::Ten
 }
 
 pybind11::dict channel_deterministic_reflection_epc_input_batch(
-    at::Tensor tx,
+    at::Tensor tx_positions,
     at::Tensor rx_positions,
     at::Tensor sequences,
+    at::Tensor sequence_tx,
     at::Tensor tri_a,
     at::Tensor normals,
-    int64_t rx_start,
-    int64_t rx_end) {
-    check_cuda_tensor(tx, "tx", at::kFloat, 1);
-    TORCH_CHECK(tx.size(0) == 3, "tx must have shape (3,)");
+    int64_t candidate_start,
+    int64_t candidate_end) {
+    check_vec3_table(tx_positions, "tx_positions");
     check_vec3_table(rx_positions, "rx_positions");
     check_vec3_table(tri_a, "tri_a");
     check_vec3_table(normals, "normals");
@@ -1145,25 +1163,33 @@ pybind11::dict channel_deterministic_reflection_epc_input_batch(
     TORCH_CHECK(
         sequences.scalar_type() == at::kLong || sequences.scalar_type() == at::kInt,
         "sequences must be int64 or int32");
-    const int device = tx.get_device();
+    check_cuda_tensor(sequence_tx, "sequence_tx", at::kInt, 1);
+    const bool shared = sequence_tx.size(0) == 0;
+    TORCH_CHECK(
+        shared || sequence_tx.size(0) == sequences.size(0),
+        "sequence_tx must be empty or match sequences");
+    const int device = tx_positions.get_device();
     TORCH_CHECK(rx_positions.get_device() == device, "rx_positions must share tx device");
     TORCH_CHECK(sequences.get_device() == device, "sequences must share tx device");
+    TORCH_CHECK(sequence_tx.get_device() == device, "sequence_tx must share tx device");
     TORCH_CHECK(tri_a.get_device() == device, "tri_a must share tx device");
     TORCH_CHECK(normals.get_device() == device, "normals must share tx device");
-    TORCH_CHECK(rx_start >= 0, "rx_start must be non-negative");
-    TORCH_CHECK(rx_end >= rx_start, "rx_end must be greater than or equal to rx_start");
-    TORCH_CHECK(rx_end <= rx_positions.size(0), "rx_end is out of range");
-
-    const int64_t rx_count = rx_end - rx_start;
+    const int64_t tx_count = tx_positions.size(0);
+    const int64_t rx_count = rx_positions.size(0);
     const int64_t sequence_count = sequences.size(0);
     const int64_t depth = sequences.size(1);
-    const int64_t pair_count = rx_count * sequence_count;
-    auto float_options = tx.options().dtype(at::kFloat);
-    auto int_options = tx.options().dtype(at::kInt);
+    const int64_t total = shared ? tx_count * rx_count * sequence_count : sequence_count * rx_count;
+    TORCH_CHECK(candidate_start >= 0, "candidate_start must be non-negative");
+    TORCH_CHECK(candidate_end >= candidate_start, "candidate_end must not precede candidate_start");
+    TORCH_CHECK(candidate_end <= total, "candidate_end is out of range");
+    const int64_t pair_count = candidate_end - candidate_start;
+    auto float_options = tx_positions.options().dtype(at::kFloat);
+    auto int_options = tx_positions.options().dtype(at::kInt);
 
     pybind11::dict out;
     out["tx_batch"] = at::empty({pair_count, 3}, float_options);
     out["rx_batch"] = at::empty({pair_count, 3}, float_options);
+    out["tx_indices"] = at::empty({pair_count}, int_options);
     out["rx_indices"] = at::empty({pair_count}, int_options);
     out["sequence_batch"] = at::empty({pair_count, depth}, int_options);
     out["direct_plane_points"] = at::empty({pair_count, depth, 3}, float_options);
@@ -1171,48 +1197,35 @@ pybind11::dict channel_deterministic_reflection_epc_input_batch(
 
     if (pair_count > 0) {
         cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
+        auto launch = [&](auto* sequence_data) {
+            deterministic_reflection_epc_input_batch_kernel<<<
+                static_cast<int>(launch_blocks(pair_count)),
+                kPathBlockSize,
+                0,
+                stream>>>(
+                pair_count,
+                candidate_start,
+                sequence_count,
+                depth,
+                rx_count,
+                shared ? nullptr : sequence_tx.data_ptr<int>(),
+                tx_positions.data_ptr<float>(),
+                rx_positions.data_ptr<float>(),
+                sequence_data,
+                tri_a.data_ptr<float>(),
+                normals.data_ptr<float>(),
+                pybind11::cast<at::Tensor>(out["tx_batch"]).data_ptr<float>(),
+                pybind11::cast<at::Tensor>(out["rx_batch"]).data_ptr<float>(),
+                pybind11::cast<at::Tensor>(out["tx_indices"]).data_ptr<int>(),
+                pybind11::cast<at::Tensor>(out["rx_indices"]).data_ptr<int>(),
+                pybind11::cast<at::Tensor>(out["sequence_batch"]).data_ptr<int>(),
+                pybind11::cast<at::Tensor>(out["direct_plane_points"]).data_ptr<float>(),
+                pybind11::cast<at::Tensor>(out["direct_plane_normals"]).data_ptr<float>());
+        };
         if (sequences.scalar_type() == at::kLong) {
-            deterministic_reflection_epc_input_batch_kernel<int64_t><<<
-                static_cast<int>(launch_blocks(pair_count)),
-                kPathBlockSize,
-                0,
-                stream>>>(
-                pair_count,
-                sequence_count,
-                depth,
-                static_cast<int>(rx_start),
-                tx.data_ptr<float>(),
-                rx_positions.data_ptr<float>(),
-                sequences.data_ptr<int64_t>(),
-                tri_a.data_ptr<float>(),
-                normals.data_ptr<float>(),
-                pybind11::cast<at::Tensor>(out["tx_batch"]).data_ptr<float>(),
-                pybind11::cast<at::Tensor>(out["rx_batch"]).data_ptr<float>(),
-                pybind11::cast<at::Tensor>(out["rx_indices"]).data_ptr<int>(),
-                pybind11::cast<at::Tensor>(out["sequence_batch"]).data_ptr<int>(),
-                pybind11::cast<at::Tensor>(out["direct_plane_points"]).data_ptr<float>(),
-                pybind11::cast<at::Tensor>(out["direct_plane_normals"]).data_ptr<float>());
+            launch(sequences.data_ptr<int64_t>());
         } else {
-            deterministic_reflection_epc_input_batch_kernel<int><<<
-                static_cast<int>(launch_blocks(pair_count)),
-                kPathBlockSize,
-                0,
-                stream>>>(
-                pair_count,
-                sequence_count,
-                depth,
-                static_cast<int>(rx_start),
-                tx.data_ptr<float>(),
-                rx_positions.data_ptr<float>(),
-                sequences.data_ptr<int>(),
-                tri_a.data_ptr<float>(),
-                normals.data_ptr<float>(),
-                pybind11::cast<at::Tensor>(out["tx_batch"]).data_ptr<float>(),
-                pybind11::cast<at::Tensor>(out["rx_batch"]).data_ptr<float>(),
-                pybind11::cast<at::Tensor>(out["rx_indices"]).data_ptr<int>(),
-                pybind11::cast<at::Tensor>(out["sequence_batch"]).data_ptr<int>(),
-                pybind11::cast<at::Tensor>(out["direct_plane_points"]).data_ptr<float>(),
-                pybind11::cast<at::Tensor>(out["direct_plane_normals"]).data_ptr<float>());
+            launch(sequences.data_ptr<int>());
         }
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
@@ -1805,6 +1818,87 @@ __global__ void deterministic_los_topology_compact_kernel(
     }
 }
 
+// Writes one visible reflection EPC candidate as a complete topology row. The
+// field columns stay zero: the field stage evaluates every reflection row.
+template <typename sequence_t>
+__global__ void deterministic_reflection_topology_compact_kernel(
+    int64_t count,
+    int64_t depth,
+    const int* __restrict__ flags,
+    const int* __restrict__ offsets,
+    const sequence_t* __restrict__ epc_sequences,
+    const float* __restrict__ epc_hits,
+    const float* __restrict__ epc_normals,
+    const float* __restrict__ epc_path_length,
+    const int* __restrict__ tx_indices,
+    const int* __restrict__ rx_indices,
+    const int* __restrict__ face_material_id,
+    bool* __restrict__ out_valid,
+    int* __restrict__ out_tx_id,
+    int* __restrict__ out_rx_id,
+    int* __restrict__ out_depth,
+    int* __restrict__ out_component_id,
+    int* __restrict__ out_primitive_id,
+    int* __restrict__ out_edge_id,
+    float* __restrict__ out_path_length,
+    float* __restrict__ out_delay,
+    float* __restrict__ out_path_gain,
+    c10::complex<float>* __restrict__ out_path_field,
+    c10::complex<float>* __restrict__ out_field_xyz,
+    float* __restrict__ out_interaction_position,
+    float* __restrict__ out_interaction_normal,
+    int* __restrict__ out_material_id,
+    int* __restrict__ out_primitive_sequence,
+    int* __restrict__ out_material_sequence,
+    float* __restrict__ out_interaction_positions,
+    float* __restrict__ out_interaction_normals) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < count;
+         index += stride) {
+        if (flags[index] == 0) {
+            continue;
+        }
+        const int64_t dst = offsets[index];
+        const float length = epc_path_length[index];
+        out_valid[dst] = true;
+        out_tx_id[dst] = tx_indices[index];
+        out_rx_id[dst] = rx_indices[index];
+        out_depth[dst] = static_cast<int>(depth);
+        out_component_id[dst] = 1;
+        out_edge_id[dst] = -1;
+        out_path_length[dst] = length;
+        out_delay[dst] = length / 299792458.0f;
+        out_path_gain[dst] = 0.0f;
+        out_path_field[dst] = c10::complex<float>(0.0f, 0.0f);
+        for (int axis = 0; axis < 3; ++axis) {
+            out_field_xyz[dst * 3 + axis] = c10::complex<float>(0.0f, 0.0f);
+        }
+        for (int64_t column = 0; column < depth; ++column) {
+            const int64_t src_slot = index * depth + column;
+            const int64_t dst_slot = dst * depth + column;
+            const int face = static_cast<int>(epc_sequences[src_slot]);
+            const int material = face_material_id[face];
+            out_primitive_sequence[dst_slot] = face;
+            out_material_sequence[dst_slot] = material;
+            for (int axis = 0; axis < 3; ++axis) {
+                const float hit = epc_hits[src_slot * 3 + axis];
+                const float normal = epc_normals[src_slot * 3 + axis];
+                out_interaction_positions[dst_slot * 3 + axis] = hit;
+                out_interaction_normals[dst_slot * 3 + axis] = normal;
+                if (column == 0) {
+                    out_interaction_position[dst * 3 + axis] = hit;
+                    out_interaction_normal[dst * 3 + axis] = normal;
+                }
+            }
+            if (column == 0) {
+                out_primitive_id[dst] = face;
+                out_material_id[dst] = material;
+            }
+        }
+    }
+}
+
 template <typename face_id_t>
 __global__ void deterministic_reflection_order1_compact_kernel(
     int64_t count,
@@ -2380,6 +2474,127 @@ check_reflection_compact_device(const at::Tensor& rx_indices, const at::Tensor& 
     TORCH_CHECK(face_gain.get_device() == device, "face_gain must share visible device");
     TORCH_CHECK(face_material_id.get_device() == device,
                 "face_material_id must share visible device");
+}
+
+pybind11::dict channel_deterministic_reflection_topology_compact(
+    at::Tensor visible, at::Tensor epc_sequences, at::Tensor epc_hits, at::Tensor epc_normals,
+    at::Tensor epc_path_length, at::Tensor tx_indices, at::Tensor rx_indices,
+    at::Tensor face_material_id) {
+    check_cuda_tensor(visible, "visible", at::kBool, 1);
+    TORCH_CHECK(epc_sequences.is_cuda(), "epc_sequences must be a CUDA tensor");
+    TORCH_CHECK(epc_sequences.is_contiguous(), "epc_sequences must be contiguous");
+    TORCH_CHECK(epc_sequences.dim() == 2, "epc_sequences must have shape (N, depth)");
+    TORCH_CHECK(epc_sequences.scalar_type() == at::kInt || epc_sequences.scalar_type() == at::kLong,
+                "epc_sequences must be int32 or int64");
+    check_cuda_tensor(epc_hits, "epc_hits", at::kFloat, 3);
+    check_cuda_tensor(epc_normals, "epc_normals", at::kFloat, 3);
+    check_cuda_tensor(epc_path_length, "epc_path_length", at::kFloat, 1);
+    check_cuda_tensor(tx_indices, "tx_indices", at::kInt, 1);
+    check_cuda_tensor(rx_indices, "rx_indices", at::kInt, 1);
+    check_cuda_tensor(face_material_id, "face_material_id", at::kInt, 1);
+    const int64_t count = visible.size(0);
+    const int64_t depth = epc_sequences.size(1);
+    TORCH_CHECK(depth > 0, "epc_sequences must have positive depth");
+    TORCH_CHECK(epc_sequences.size(0) == count, "epc_sequences must match visible");
+    TORCH_CHECK(epc_hits.size(0) == count && epc_hits.size(1) == depth && epc_hits.size(2) == 3,
+                "epc_hits must have shape (N, depth, 3)");
+    TORCH_CHECK(epc_normals.sizes() == epc_hits.sizes(), "epc_normals must match epc_hits");
+    TORCH_CHECK(epc_path_length.size(0) == count, "epc_path_length must match visible");
+    TORCH_CHECK(tx_indices.size(0) == count, "tx_indices must match visible");
+    TORCH_CHECK(rx_indices.size(0) == count, "rx_indices must match visible");
+    const int device = visible.get_device();
+    for (const at::Tensor* tensor : {&epc_sequences, &epc_hits, &epc_normals, &epc_path_length,
+                                     &tx_indices, &rx_indices, &face_material_id}) {
+        TORCH_CHECK(tensor->get_device() == device, "reflection compact inputs must share one device");
+    }
+
+    auto bool_options = visible.options().dtype(at::kBool);
+    auto int_options = visible.options().dtype(at::kInt);
+    auto float_options = visible.options().dtype(at::kFloat);
+    auto complex_options = visible.options().dtype(at::kComplexFloat);
+    auto allocate = [&](int64_t rows) {
+        pybind11::dict out;
+        out["valid"] = at::empty({rows}, bool_options);
+        out["tx_id"] = at::empty({rows}, int_options);
+        out["rx_id"] = at::empty({rows}, int_options);
+        out["depth"] = at::empty({rows}, int_options);
+        out["component_id"] = at::empty({rows}, int_options);
+        out["primitive_id"] = at::empty({rows}, int_options);
+        out["edge_id"] = at::empty({rows}, int_options);
+        out["path_length_m"] = at::empty({rows}, float_options);
+        out["delay_s"] = at::empty({rows}, float_options);
+        out["path_gain"] = at::empty({rows}, float_options);
+        out["path_field"] = at::empty({rows}, complex_options);
+        out["field_xyz"] = at::empty({rows, 3}, complex_options);
+        out["interaction_position"] = at::empty({rows, 3}, float_options);
+        out["interaction_normal"] = at::empty({rows, 3}, float_options);
+        out["material_id"] = at::empty({rows}, int_options);
+        out["primitive_sequence"] = at::empty({rows, depth}, int_options);
+        out["material_sequence"] = at::empty({rows, depth}, int_options);
+        out["interaction_positions"] = at::empty({rows, depth, 3}, float_options);
+        out["interaction_normals"] = at::empty({rows, depth, 3}, float_options);
+        return out;
+    };
+    if (count == 0) {
+        return allocate(0);
+    }
+
+    auto flags = at::empty({count}, int_options);
+    auto offsets = at::empty({count + 1}, int_options);
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
+    path_visibility_flags_kernel<<<static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
+        count,
+        visible.data_ptr<bool>(),
+        flags.data_ptr<int>());
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    channel::scan::exclusive_flag_offsets(flags, offsets, count, stream);
+    const int64_t out_count = observe_compact_count(offsets, count, stream).count;
+    pybind11::dict out = allocate(out_count);
+    if (out_count == 0) {
+        return out;
+    }
+    auto tensor = [&](const char* name) { return pybind11::cast<at::Tensor>(out[name]); };
+    auto launch = [&](auto* sequence_data) {
+        deterministic_reflection_topology_compact_kernel<<<
+            static_cast<int>(launch_blocks(count)), kPathBlockSize, 0, stream>>>(
+            count,
+            depth,
+            flags.data_ptr<int>(),
+            offsets.data_ptr<int>(),
+            sequence_data,
+            epc_hits.data_ptr<float>(),
+            epc_normals.data_ptr<float>(),
+            epc_path_length.data_ptr<float>(),
+            tx_indices.data_ptr<int>(),
+            rx_indices.data_ptr<int>(),
+            face_material_id.data_ptr<int>(),
+            tensor("valid").data_ptr<bool>(),
+            tensor("tx_id").data_ptr<int>(),
+            tensor("rx_id").data_ptr<int>(),
+            tensor("depth").data_ptr<int>(),
+            tensor("component_id").data_ptr<int>(),
+            tensor("primitive_id").data_ptr<int>(),
+            tensor("edge_id").data_ptr<int>(),
+            tensor("path_length_m").data_ptr<float>(),
+            tensor("delay_s").data_ptr<float>(),
+            tensor("path_gain").data_ptr<float>(),
+            tensor("path_field").data_ptr<c10::complex<float>>(),
+            tensor("field_xyz").data_ptr<c10::complex<float>>(),
+            tensor("interaction_position").data_ptr<float>(),
+            tensor("interaction_normal").data_ptr<float>(),
+            tensor("material_id").data_ptr<int>(),
+            tensor("primitive_sequence").data_ptr<int>(),
+            tensor("material_sequence").data_ptr<int>(),
+            tensor("interaction_positions").data_ptr<float>(),
+            tensor("interaction_normals").data_ptr<float>());
+    };
+    if (epc_sequences.scalar_type() == at::kLong) {
+        launch(epc_sequences.data_ptr<int64_t>());
+    } else {
+        launch(epc_sequences.data_ptr<int>());
+    }
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    return out;
 }
 
 pybind11::dict channel_deterministic_reflection_order1_compact(

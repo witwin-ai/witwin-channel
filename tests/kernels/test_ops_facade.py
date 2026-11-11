@@ -1,7 +1,6 @@
 # Copyright Xingyu Chen.
 # Tests ops facade.
 
-import math
 
 import pytest
 import torch
@@ -495,23 +494,106 @@ def test_deterministic_reflection_epc_input_batch_generates_native_pairs():
         dtype=torch.float32,
     )
 
+    # Receivers 4 and 5 of the shared (tx, rx, sequence) space: candidates 8..12.
     batch = topology_kernels.deterministic_reflection_epc_input_batch(
-        tx=tx,
+        tx_positions=tx.reshape(1, 3),
         rx_positions=rx_positions,
         sequences=sequences,
         tri_a=tri_a,
         normals=normals,
-        rx_start=4,
-        rx_end=6,
+        candidate_start=8,
+        candidate_end=12,
     )
 
     expected_sequence_batch = sequences.repeat(2, 1).to(dtype=torch.int32)
     torch.testing.assert_close(batch["tx_batch"], tx.expand(4, 3).contiguous())
     torch.testing.assert_close(batch["rx_batch"], rx_positions[4:6].repeat_interleave(2, dim=0).contiguous())
     torch.testing.assert_close(batch["rx_indices"], torch.tensor([4, 4, 5, 5], device="cuda", dtype=torch.int32))
+    torch.testing.assert_close(batch["tx_indices"], torch.zeros(4, device="cuda", dtype=torch.int32))
     torch.testing.assert_close(batch["sequence_batch"], expected_sequence_batch)
     torch.testing.assert_close(batch["direct_plane_points"], tri_a[expected_sequence_batch.to(dtype=torch.long)])
     torch.testing.assert_close(batch["direct_plane_normals"], normals[expected_sequence_batch.to(dtype=torch.long)])
+
+
+def test_deterministic_reflection_epc_input_batch_folds_transmitters_into_candidates():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for deterministic reflection EPC batch generation")
+
+    tx_positions = torch.tensor([[9.0, 8.0, 7.0], [1.0, 2.0, 3.0]], device="cuda")
+    rx_positions = torch.tensor([[0.0, 1.0, 2.0], [3.0, 4.0, 5.0], [6.0, 7.0, 8.0]], device="cuda")
+    sequences = torch.tensor([[2], [1], [0]], device="cuda", dtype=torch.int32)
+    tri_a = torch.arange(9, device="cuda", dtype=torch.float32).reshape(3, 3)
+    normals = -tri_a
+
+    shared = topology_kernels.deterministic_reflection_epc_input_batch(
+        tx_positions=tx_positions,
+        rx_positions=rx_positions,
+        sequences=sequences,
+        tri_a=tri_a,
+        normals=normals,
+        candidate_start=0,
+        candidate_end=18,
+    )
+    tx = torch.arange(2).repeat_interleave(9)
+    rx = torch.arange(3).repeat_interleave(3).repeat(2)
+    sequence = torch.arange(3).repeat(6)
+    assert shared["tx_indices"].cpu().tolist() == tx.tolist()
+    assert shared["rx_indices"].cpu().tolist() == rx.tolist()
+    assert shared["sequence_batch"][:, 0].cpu().tolist() == sequences[sequence, 0].cpu().tolist()
+    torch.testing.assert_close(shared["tx_batch"], tx_positions[tx.cuda()])
+    torch.testing.assert_close(shared["rx_batch"], rx_positions[rx.cuda()])
+
+    # Per-transmitter sequences enumerate (sequence, rx) with the receiver fastest.
+    owner = torch.tensor([1, 0, 1], device="cuda", dtype=torch.int32)
+    owned = topology_kernels.deterministic_reflection_epc_input_batch(
+        tx_positions=tx_positions,
+        rx_positions=rx_positions,
+        sequences=sequences,
+        tri_a=tri_a,
+        normals=normals,
+        candidate_start=2,
+        candidate_end=7,
+        sequence_tx=owner,
+    )
+    assert owned["rx_indices"].cpu().tolist() == [2, 0, 1, 2, 0]
+    assert owned["tx_indices"].cpu().tolist() == [1, 0, 0, 0, 1]
+    assert owned["sequence_batch"][:, 0].cpu().tolist() == [2, 1, 1, 1, 0]
+
+
+def test_deterministic_reflection_topology_compact_writes_visible_rows_in_order():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required for reflection topology compaction")
+
+    visible = torch.tensor([False, True, True, False], device="cuda")
+    sequences = torch.tensor([[0, 1], [1, 0], [2, 1], [0, 2]], device="cuda", dtype=torch.int32)
+    hits = torch.arange(24, device="cuda", dtype=torch.float32).reshape(4, 2, 3)
+    normals = -hits
+    length = torch.tensor([1.0, 2.0, 3.0, 4.0], device="cuda")
+    block = topology_kernels.deterministic_reflection_topology_compact(
+        visible=visible,
+        epc_sequences=sequences,
+        epc_hits=hits,
+        epc_normals=normals,
+        epc_path_length=length,
+        tx_indices=torch.tensor([0, 1, 0, 1], device="cuda", dtype=torch.int32),
+        rx_indices=torch.tensor([3, 2, 1, 0], device="cuda", dtype=torch.int32),
+        face_material_id=torch.tensor([5, 6, 7], device="cuda", dtype=torch.int32),
+    )
+    assert block["tx_id"].cpu().tolist() == [1, 0]
+    assert block["rx_id"].cpu().tolist() == [2, 1]
+    assert block["depth"].cpu().tolist() == [2, 2]
+    assert block["component_id"].cpu().tolist() == [1, 1]
+    assert block["primitive_id"].cpu().tolist() == [1, 2]
+    assert block["edge_id"].cpu().tolist() == [-1, -1]
+    assert block["material_id"].cpu().tolist() == [6, 7]
+    assert block["material_sequence"].cpu().tolist() == [[6, 5], [7, 6]]
+    assert block["primitive_sequence"].cpu().tolist() == [[1, 0], [2, 1]]
+    torch.testing.assert_close(block["path_length_m"], length[1:3])
+    torch.testing.assert_close(block["interaction_positions"], hits[1:3])
+    torch.testing.assert_close(block["interaction_normal"], normals[1:3, 0])
+    assert bool(block["valid"].all())
+    assert not bool(block["path_gain"].any())
+    assert not bool(block["field_xyz"].abs().any())
 
 
 def test_deterministic_face_anchor_points_gathers_first_vertices_native():
@@ -1118,140 +1200,6 @@ def test_deterministic_diffraction_vector_field_matches_python_reference():
     )
     torch.testing.assert_close(result["path_gain"], reference["path_gain"], rtol=2.0e-6, atol=1.0e-7)
     torch.testing.assert_close(field, expected_field, rtol=2.0e-6, atol=1.0e-7)
-
-
-def test_deterministic_reflection_field_returns_native_complex_field():
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for deterministic reflection field")
-    native = runtime.native_extension()
-    if native is None or not hasattr(native, "deterministic_reflection_field"):
-        pytest.skip("native deterministic reflection field kernel is not built")
-
-    tx_position = torch.tensor([[0.0, 0.0, 1.0]], device="cuda", dtype=torch.float32)
-    hit_position = torch.tensor([[0.0, 0.0, 0.0]], device="cuda", dtype=torch.float32)
-    rx_position = torch.tensor([[1.0, 0.0, 1.0]], device="cuda", dtype=torch.float32)
-    normal = torch.tensor([[0.0, 0.0, 1.0]], device="cuda", dtype=torch.float32)
-    one = torch.ones((1,), device="cuda", dtype=torch.float32)
-    eps_r = torch.full((1,), 4.0, device="cuda", dtype=torch.float32)
-    sigma_e = torch.zeros((1,), device="cuda", dtype=torch.float32)
-
-    result = field_kernels.deterministic_reflection_field(
-        tx_position=tx_position,
-        rx_position=rx_position,
-        hit_position=hit_position,
-        normal=normal,
-        tx_power=one,
-        eps_r=eps_r,
-        sigma_e=sigma_e,
-        mu_r=one,
-        gain=one,
-        frequency_hz=3.0e9,
-    )
-
-    assert result["path_gain"].is_cuda
-    assert result["field_real"].is_cuda
-    assert result["field_imag"].is_cuda
-    assert result["path_length_m"].is_cuda
-    assert result["delay_s"].is_cuda
-    assert result["path_gain"].item() > 0.0
-    expected_length = torch.tensor([1.0 + math.sqrt(2.0)], device="cuda", dtype=torch.float32)
-    torch.testing.assert_close(result["path_length_m"], expected_length, rtol=2.0e-6, atol=1.0e-6)
-    torch.testing.assert_close(result["delay_s"], expected_length / 299_792_458.0, rtol=2.0e-6, atol=1.0e-12)
-    field = torch.complex(result["field_real"], result["field_imag"])
-    torch.testing.assert_close(result["path_gain"], field.abs().square(), rtol=2.0e-4, atol=1.0e-10)
-
-
-def test_deterministic_reflection_field_requires_native_cuda_kernel(monkeypatch):
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for deterministic reflection field")
-
-    tensor = torch.zeros((1, 3), device="cuda", dtype=torch.float32)
-    one = torch.ones((1,), device="cuda", dtype=torch.float32)
-    monkeypatch.setattr(runtime, "native_extension", lambda: None)
-
-    with pytest.raises(RuntimeError, match="deterministic_reflection_field CUDA kernel is required"):
-        field_kernels.deterministic_reflection_field(
-            tx_position=tensor,
-            rx_position=tensor,
-            hit_position=tensor,
-            normal=tensor,
-            tx_power=one,
-            eps_r=one,
-            sigma_e=one,
-            mu_r=one,
-            gain=one,
-            frequency_hz=3.0e9,
-        )
-
-
-def test_deterministic_reflection_sequence_field_matches_python_reference():
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA is required for deterministic reflection sequence field")
-
-    tx_position = torch.tensor([[0.0, 0.0, 1.0], [0.2, 0.0, 1.0]], device="cuda", dtype=torch.float32)
-    hit_positions = torch.tensor(
-        [
-            [[2.0, 0.0, 1.0], [2.0, 2.0, 1.0]],
-            [[2.0, 0.1, 1.0], [2.0, 2.0, 1.0]],
-        ],
-        device="cuda",
-        dtype=torch.float32,
-    )
-    rx_position = torch.tensor([[0.0, 2.0, 1.0], [0.1, 2.0, 1.0]], device="cuda", dtype=torch.float32)
-    normals = torch.tensor(
-        [
-            [[-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]],
-            [[-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]],
-        ],
-        device="cuda",
-        dtype=torch.float32,
-    )
-    tx_power = torch.tensor([1.0, 0.5], device="cuda", dtype=torch.float32)
-    eps_r = torch.tensor([[3.0, 4.0], [3.5, 4.5]], device="cuda", dtype=torch.float32)
-    sigma_e = torch.tensor([[0.005, 0.01], [0.004, 0.009]], device="cuda", dtype=torch.float32)
-    mu_r = torch.ones((2, 2), device="cuda", dtype=torch.float32)
-    gain = torch.ones((2, 2), device="cuda", dtype=torch.float32)
-
-    result = field_kernels.deterministic_reflection_sequence_field(
-        tx_position=tx_position,
-        rx_position=rx_position,
-        hit_positions=hit_positions,
-        normals=normals,
-        tx_power=tx_power,
-        eps_r=eps_r,
-        sigma_e=sigma_e,
-        mu_r=mu_r,
-        gain=gain,
-        frequency_hz=3.0e9,
-    )
-    reference = field_kernels.deterministic_reflection_sequence_field(
-        tx_position=tx_position,
-        rx_position=rx_position,
-        hit_positions=hit_positions,
-        normals=normals,
-        tx_power=tx_power,
-        eps_r=eps_r,
-        sigma_e=sigma_e,
-        mu_r=mu_r,
-        gain=gain,
-        frequency_hz=3.0e9,
-    )
-    expected_gain = reference["path_gain"]
-    expected_length = reference["path_length_m"]
-    expected_field = field_kernels.deterministic_pack_complex(
-        reference["field_real"], reference["field_imag"]
-    )
-
-    field = torch.complex(result["field_real"], result["field_imag"])
-    torch.testing.assert_close(result["path_length_m"], expected_length, rtol=2.0e-5, atol=1.0e-6)
-    torch.testing.assert_close(
-        result["delay_s"],
-        expected_length / 299_792_458.0,
-        rtol=2.0e-5,
-        atol=1.0e-12,
-    )
-    torch.testing.assert_close(result["path_gain"], expected_gain, rtol=5.0e-4, atol=1.0e-10)
-    torch.testing.assert_close(field, expected_field, rtol=5.0e-4, atol=1.0e-7)
 
 
 def test_deterministic_delay_to_path_length_uses_native_kernel():

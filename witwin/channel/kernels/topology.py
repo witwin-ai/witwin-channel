@@ -54,6 +54,7 @@ __all__ = [
     "deterministic_reflection_epc_input_batch",
     "deterministic_reflection_order1_compact",
     "deterministic_reflection_sequence_compact",
+    "deterministic_reflection_topology_compact",
     "deterministic_repeat_range",
     "deterministic_selected_edge_count",
     "deterministic_sort_order",
@@ -1275,22 +1276,35 @@ def deterministic_face_anchor_points(vertices: torch.Tensor, faces: torch.Tensor
     return out
 
 
+def reflection_epc_candidate_count(
+    *, tx_count: int, rx_count: int, sequence_count: int, per_transmitter: bool,
+) -> int:
+    """Candidate count of one EPC input space: shared sequences pair with every endpoint pair."""
+
+    if per_transmitter:
+        return int(sequence_count) * int(rx_count)
+    return int(tx_count) * int(rx_count) * int(sequence_count)
+
+
 def deterministic_reflection_epc_input_batch(
-    *, tx: torch.Tensor, rx_positions: torch.Tensor, sequences: torch.Tensor, tri_a: torch.Tensor,
-    normals: torch.Tensor, rx_start: int, rx_end: int,
+    *, tx_positions: torch.Tensor, rx_positions: torch.Tensor, sequences: torch.Tensor,
+    tri_a: torch.Tensor, normals: torch.Tensor, candidate_start: int, candidate_end: int,
+    sequence_tx: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
-    validate_cuda_tensor("tx", tx, dtype=torch.float32, ndim=1)
-    if tx.shape != (3,):
-        raise ValueError("tx must have shape (3,)")
-    validate_cuda_tensor(
-        "rx_positions", rx_positions, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor(
-        "tri_a", tri_a, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
-    validate_cuda_tensor(
-        "normals", normals, dtype=torch.float32, ndim=2, trailing_shape=(3,)
-    )
+    """EPC inputs for candidates ``[candidate_start, candidate_end)`` over every transmitter.
+
+    Shared sequences enumerate ``(tx, rx, sequence)`` with the sequence fastest; with
+    ``sequence_tx`` each sequence belongs to one transmitter and enumerates
+    ``(sequence, rx)`` with the receiver fastest.
+    """
+
+    for name, value in (
+        ("tx_positions", tx_positions),
+        ("rx_positions", rx_positions),
+        ("tri_a", tri_a),
+        ("normals", normals),
+    ):
+        validate_cuda_tensor(name, value, dtype=torch.float32, ndim=2, trailing_shape=(3,))
     if normals.shape != tri_a.shape:
         raise ValueError("normals must match tri_a")
     if sequences.dtype not in {torch.int32, torch.int64}:
@@ -1301,96 +1315,109 @@ def deterministic_reflection_epc_input_batch(
         raise ValueError("sequences must have shape (S, depth)")
     if not sequences.is_contiguous():
         raise ValueError("sequences must be contiguous")
-    if rx_start < 0:
-        raise ValueError("rx_start must be non-negative")
-    if rx_end < rx_start:
-        raise ValueError("rx_end must be greater than or equal to rx_start")
-    if rx_end > int(rx_positions.shape[0]):
-        raise ValueError("rx_end is out of range")
+    if sequence_tx is None:
+        sequence_tx = torch.empty((0,), device=sequences.device, dtype=torch.int32)
+    else:
+        validate_cuda_tensor("sequence_tx", sequence_tx, dtype=torch.int32, ndim=1)
+        if sequence_tx.shape != (int(sequences.shape[0]),):
+            raise ValueError("sequence_tx must match sequences")
+    total = reflection_epc_candidate_count(
+        tx_count=int(tx_positions.shape[0]),
+        rx_count=int(rx_positions.shape[0]),
+        sequence_count=int(sequences.shape[0]),
+        per_transmitter=int(sequence_tx.shape[0]) > 0,
+    )
+    if not 0 <= candidate_start <= candidate_end <= total:
+        raise ValueError("candidate range is out of bounds")
     exported = _required_native_op("deterministic_reflection_epc_input_batch")(
-        tx,
+        tx_positions,
         rx_positions,
         sequences,
+        sequence_tx,
         tri_a,
         normals,
-        int(rx_start),
-        int(rx_end),
+        int(candidate_start),
+        int(candidate_end),
     )
     if not isinstance(exported, dict):
         raise TypeError(
             "_channel.deterministic_reflection_epc_input_batch must return a dict"
         )
-    expected_fields = {
-        "tx_batch",
-        "rx_batch",
-        "rx_indices",
-        "sequence_batch",
-        "direct_plane_points",
-        "direct_plane_normals",
+    pair_count = int(candidate_end) - int(candidate_start)
+    depth = int(sequences.shape[1])
+    expected = {
+        "tx_batch": (torch.float32, (pair_count, 3)),
+        "rx_batch": (torch.float32, (pair_count, 3)),
+        "tx_indices": (torch.int32, (pair_count,)),
+        "rx_indices": (torch.int32, (pair_count,)),
+        "sequence_batch": (torch.int32, (pair_count, depth)),
+        "direct_plane_points": (torch.float32, (pair_count, depth, 3)),
+        "direct_plane_normals": (torch.float32, (pair_count, depth, 3)),
     }
-    if set(exported) != expected_fields:
+    if set(exported) != set(expected):
         raise ValueError(
             "_channel.deterministic_reflection_epc_input_batch returned unexpected fields"
         )
-    pair_count = (int(rx_end) - int(rx_start)) * int(sequences.shape[0])
-    depth = int(sequences.shape[1])
-    validate_cuda_tensor(
-        "tx_batch",
-        exported["tx_batch"],
-        dtype=torch.float32,
-        ndim=2,
-        trailing_shape=(3,),
-    )
-    validate_cuda_tensor(
-        "rx_batch",
-        exported["rx_batch"],
-        dtype=torch.float32,
-        ndim=2,
-        trailing_shape=(3,),
-    )
-    validate_cuda_tensor(
-        "rx_indices", exported["rx_indices"], dtype=torch.int32, ndim=1
-    )
-    validate_cuda_tensor(
-        "sequence_batch", exported["sequence_batch"], dtype=torch.int32, ndim=2
-    )
-    validate_cuda_tensor(
-        "direct_plane_points",
-        exported["direct_plane_points"],
-        dtype=torch.float32,
-        ndim=3,
-    )
-    validate_cuda_tensor(
-        "direct_plane_normals",
-        exported["direct_plane_normals"],
-        dtype=torch.float32,
-        ndim=3,
-    )
-    if exported["tx_batch"].shape != (pair_count, 3):
-        raise ValueError(
-            "_channel.deterministic_reflection_epc_input_batch returned bad tx_batch shape"
-        )
-    if exported["rx_batch"].shape != (pair_count, 3):
-        raise ValueError(
-            "_channel.deterministic_reflection_epc_input_batch returned bad rx_batch shape"
-        )
-    if exported["rx_indices"].shape != (pair_count,):
-        raise ValueError(
-            "_channel.deterministic_reflection_epc_input_batch returned bad rx_indices shape"
-        )
-    if exported["sequence_batch"].shape != (pair_count, depth):
-        raise ValueError(
-            "_channel.deterministic_reflection_epc_input_batch returned bad sequence_batch shape"
-        )
-    if exported["direct_plane_points"].shape != (pair_count, depth, 3):
-        raise ValueError(
-            "_channel.deterministic_reflection_epc_input_batch returned bad direct_plane_points shape"
-        )
-    if exported["direct_plane_normals"].shape != (pair_count, depth, 3):
-        raise ValueError(
-            "_channel.deterministic_reflection_epc_input_batch returned bad direct_plane_normals shape"
-        )
+    for key, (dtype, shape) in expected.items():
+        validate_cuda_tensor(key, exported[key], dtype=dtype, ndim=len(shape))
+        if tuple(exported[key].shape) != shape:
+            raise ValueError(
+                f"_channel.deterministic_reflection_epc_input_batch returned bad {key} shape"
+            )
     return exported
+
+
+def deterministic_reflection_topology_compact(
+    *, visible: torch.Tensor, epc_sequences: torch.Tensor, epc_hits: torch.Tensor,
+    epc_normals: torch.Tensor, epc_path_length: torch.Tensor, tx_indices: torch.Tensor,
+    rx_indices: torch.Tensor, face_material_id: torch.Tensor,
+) -> dict[str, torch.Tensor]:
+    """Compact visible reflection EPC candidates into one topology block (one count copy)."""
+
+    validate_cuda_tensor("visible", visible, dtype=torch.bool, ndim=1)
+    if epc_sequences.dtype not in {torch.int32, torch.int64} or epc_sequences.ndim != 2:
+        raise TypeError("epc_sequences must be an int32 or int64 (N, depth) tensor")
+    validate_cuda_tensor("epc_hits", epc_hits, dtype=torch.float32, ndim=3)
+    validate_cuda_tensor("epc_normals", epc_normals, dtype=torch.float32, ndim=3)
+    validate_cuda_tensor("epc_path_length", epc_path_length, dtype=torch.float32, ndim=1)
+    validate_cuda_tensor("tx_indices", tx_indices, dtype=torch.int32, ndim=1)
+    validate_cuda_tensor("rx_indices", rx_indices, dtype=torch.int32, ndim=1)
+    validate_cuda_tensor("face_material_id", face_material_id, dtype=torch.int32, ndim=1)
+    count = int(visible.shape[0])
+    depth = int(epc_sequences.shape[1])
+    if epc_sequences.shape[0] != count or epc_hits.shape != (count, depth, 3):
+        raise ValueError("reflection EPC outputs must share the candidate count and depth")
+    block = _required_native_op("deterministic_reflection_topology_compact")(
+        visible,
+        epc_sequences.contiguous(),
+        epc_hits,
+        epc_normals,
+        epc_path_length,
+        tx_indices,
+        rx_indices,
+        face_material_id,
+    )
+    if not isinstance(block, dict):
+        raise TypeError("_channel.deterministic_reflection_topology_compact must return a dict")
+    _validate_path_block("deterministic_reflection_topology_compact", block)
+    rows = int(block["valid"].shape[0])
+    for key, dtype, shape in (
+        ("path_field", torch.complex64, (rows,)),
+        ("field_xyz", torch.complex64, (rows, 3)),
+        ("interaction_position", torch.float32, (rows, 3)),
+        ("interaction_normal", torch.float32, (rows, 3)),
+        ("material_id", torch.int32, (rows,)),
+        ("primitive_sequence", torch.int32, (rows, depth)),
+        ("material_sequence", torch.int32, (rows, depth)),
+        ("interaction_positions", torch.float32, (rows, depth, 3)),
+        ("interaction_normals", torch.float32, (rows, depth, 3)),
+    ):
+        validate_cuda_tensor(key, block[key], dtype=dtype, ndim=len(shape))
+        if tuple(block[key].shape) != shape:
+            raise ValueError(
+                f"_channel.deterministic_reflection_topology_compact returned bad {key} shape"
+            )
+    return block
 
 
 def deterministic_face_sequence_chunk(

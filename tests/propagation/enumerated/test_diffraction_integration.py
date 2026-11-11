@@ -17,6 +17,12 @@ from witwin.channel.interactions import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _selected_edges(monkeypatch):
+    # The selected edge table is queried once per solve, before the transmitter loop.
+    monkeypatch.setattr(diffraction, "selected_diffraction_edges", lambda *a, **k: (None, None))
+
+
 def _states() -> tuple[torch.Tensor, ...]:
     return (
         torch.tensor([7], dtype=torch.int32),
@@ -239,7 +245,7 @@ def test_diffraction_lazy_event_field_and_export_order(monkeypatch):
         fake_tx_requests,
     )
 
-    def fake_states(rayd_arg, tx, power, tx_index, *, preserve_imported_edges):
+    def fake_states(rayd_arg, tx, power, tx_index, *, preserve_imported_edges, edges=None):
         events.append("states")
         assert rayd_arg is rayd
         assert tx.data_ptr() == tx_positions[0].data_ptr()
@@ -347,7 +353,8 @@ def test_diffraction_lazy_event_field_and_export_order(monkeypatch):
     def fake_compact(**kwargs):
         events.append("compact")
         assert kwargs["valid"] is raw_geometry.valid
-        assert kwargs["rx_id"] is raw_geometry.rx_id
+        # Receiver ids arrive as global (tx, rx) pair codes: tx 0 keeps rx unchanged.
+        assert torch.equal(kwargs["rx_id"], raw_geometry.rx_id)
         assert kwargs["interaction_position"] is raw_geometry.interaction_position
         return compacted
 
@@ -384,7 +391,7 @@ def test_diffraction_lazy_event_field_and_export_order(monkeypatch):
 
     def fake_base(**kwargs):
         events.append("base")
-        assert kwargs["rx_id"] is compacted["rx_id"]
+        assert torch.equal(kwargs["rx_id"], compacted["rx_id"])
         assert kwargs["path_gain"].item() == 14.0
         return {"valid": torch.ones(1, dtype=torch.bool)}
 
@@ -432,14 +439,85 @@ def test_diffraction_lazy_event_field_and_export_order(monkeypatch):
         "visibility",
         "yield rx",
         "geometry",
+        "resume rx",
+        "resume tx",
         "compact",
         "field",
         "pack",
         "delay",
         "base",
         "ensure/block",
-        "resume rx",
-        "resume tx",
         "concat",
         "final ensure",
     ]
+
+def test_every_transmitter_export_is_compacted_once_with_global_pair_codes(monkeypatch):
+    scene, compiled = _minimal_scene_and_compiled()
+    scene.transmitters = scene.transmitters * 2
+    states = _states_with_rows(1)
+    monkeypatch.setattr(
+        diffraction,
+        "face_material_tensors",
+        lambda *_args, **_kwargs: tuple(torch.ones(1) for _ in range(5)),
+    )
+    monkeypatch.setattr(
+        diffraction, "_deterministic_diffraction_states", lambda *_args, **_kwargs: states
+    )
+    monkeypatch.setattr(
+        diffraction,
+        "plan_tx_visible_diffraction_states",
+        lambda *_args: _visible_plan(states, torch.ones(1, dtype=torch.bool)),
+    )
+
+    def export(query):
+        rows = int(query.rx_positions.shape[0])
+        return geometry_diffraction.DiffractionOrder1Geometry(
+            valid=torch.ones(rows, dtype=torch.bool),
+            rx_id=torch.arange(rows, dtype=torch.int32),
+            depth=torch.ones(rows, dtype=torch.int32),
+            edge_id=torch.full((rows,), 7, dtype=torch.int32),
+            delay_s=torch.ones(rows),
+            x_re=torch.ones(rows),
+            x_im=torch.zeros(rows),
+            y_re=torch.zeros(rows),
+            y_im=torch.zeros(rows),
+            z_re=torch.zeros(rows),
+            z_im=torch.zeros(rows),
+            interaction_position=torch.zeros((rows, 3)),
+        )
+
+    monkeypatch.setattr(diffraction, "query_diffraction_order1", export)
+    compacts = []
+
+    def compact(**kwargs):
+        compacts.append(kwargs["rx_id"].tolist())
+        return {name: value for name, value in kwargs.items() if name != "valid"}
+
+    monkeypatch.setattr(diffraction.topology_kernels, "deterministic_diffraction_order1_compact", compact)
+    monkeypatch.setattr(
+        field_kernels,
+        "deterministic_diffraction_vector_field",
+        lambda **k: {"path_gain": k["x_re"], "field_real": k["x_re"], "field_imag": k["x_im"]},
+    )
+    monkeypatch.setattr(field_kernels, "deterministic_pack_complex", lambda a, b: torch.complex(a, b))
+    monkeypatch.setattr(field_kernels, "deterministic_delay_to_path_length", lambda delay: delay)
+    monkeypatch.setattr(
+        diffraction.topology_kernels,
+        "deterministic_topology_base_fields",
+        lambda **k: {"rx_id": k["rx_id"]},
+    )
+    _patch_empty_result_assembly(monkeypatch)
+    block, launch_count, vector_field = diffraction._diffraction_topology_order1(
+        scene,
+        compiled,
+        torch.zeros((2, 3)),
+        torch.ones(2),
+        torch.ones((3, 3)),
+        frequency_hz=3.0e9,
+    )
+    assert launch_count == 2
+    assert compacts == [[0, 1, 2, 3, 4, 5]]
+    (rows,) = block["blocks"]
+    assert rows["tx_id"].tolist() == [0, 0, 0, 1, 1, 1]
+    assert rows["rx_id"].tolist() == [0, 1, 2, 0, 1, 2]
+    torch.testing.assert_close(vector_field[:, :, 0], torch.ones((2, 3), dtype=torch.complex64))

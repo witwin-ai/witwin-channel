@@ -326,17 +326,17 @@ def test_two_bounce_reflection_uses_native_sequence_field(monkeypatch):
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native reflection is not built")
 
-    original = field_kernels.deterministic_reflection_sequence_field
+    original = field_kernels.field_reflection_sequence
     calls = 0
 
-    def count_native_sequence_field(**kwargs):
+    def count_native_sequence_field(*args, **kwargs):
         nonlocal calls
         calls += 1
-        return original(**kwargs)
+        return original(*args, **kwargs)
 
     monkeypatch.setattr(
         field_kernels,
-        "deterministic_reflection_sequence_field",
+        "field_reflection_sequence",
         count_native_sequence_field,
     )
     result = solve(

@@ -21,8 +21,6 @@ _OWNER_NAMES = (
     "deterministic_pack_complex",
     "deterministic_phase_from_field",
     "deterministic_phase_from_length",
-    "deterministic_reflection_field",
-    "deterministic_reflection_sequence_field",
     "deterministic_zero_field_phase",
 )
 
