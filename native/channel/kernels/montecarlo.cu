@@ -8,6 +8,7 @@
 #include <cuda_runtime_api.h>
 #include "math.cuh"
 #include "constants.cuh"
+#include "fixed_sum.cuh"
 
 #include <tuple>
 
@@ -16,6 +17,7 @@
 namespace {
 
 constexpr int kFinalizeBlockSize = 256;
+constexpr int kFinalizeComponentCount = 5;
 constexpr int kComponentMapBlockSize = 256;
 
 void check_component_map(const at::Tensor &tensor, const char *name) {
@@ -57,6 +59,8 @@ __global__ void finalize_component_maps_kernel(
     const float *__restrict__ transmission,
     const float *__restrict__ scattering,
     float *__restrict__ path_gain,
+    float *__restrict__ block_totals,
+    unsigned int *__restrict__ finished_blocks,
     float *__restrict__ los_power,
     float *__restrict__ reflection_power,
     float *__restrict__ diffraction_power,
@@ -112,13 +116,30 @@ __global__ void finalize_component_maps_kernel(
         __syncthreads();
     }
 
+    // Block totals per component; the last block to finish adds them in block order (one warp
+    // per component: strided lane sums, then a fixed shuffle tree), so the scalar powers are the
+    // same bits on every run.
     if (tid == 0) {
-        atomicAdd(los_power, los_sum[0]);
-        atomicAdd(reflection_power, reflection_sum[0]);
-        atomicAdd(diffraction_power, diffraction_sum[0]);
-        atomicAdd(transmission_power, transmission_sum[0]);
-        atomicAdd(scattering_power, scattering_sum[0]);
+        block_totals[0 * gridDim.x + blockIdx.x] = los_sum[0];
+        block_totals[1 * gridDim.x + blockIdx.x] = reflection_sum[0];
+        block_totals[2 * gridDim.x + blockIdx.x] = diffraction_sum[0];
+        block_totals[3 * gridDim.x + blockIdx.x] = transmission_sum[0];
+        block_totals[4 * gridDim.x + blockIdx.x] = scattering_sum[0];
     }
+    if (!channel::fixed_sum::last_block(finished_blocks)) return;
+    const int component = tid / 32;
+    const int lane = tid % 32;
+    if (component >= kFinalizeComponentCount) return;
+    float sum = 0.0f;
+    for (int64_t block = lane; block < gridDim.x; block += 32)
+        sum += __ldcg(block_totals + component * gridDim.x + block);
+    for (int offset = 16; offset > 0; offset /= 2)
+        sum += __shfl_down_sync(0xffffffffu, sum, offset);
+    if (lane != 0) return;
+    float *const destinations[kFinalizeComponentCount] = {
+        los_power, reflection_power, diffraction_power, transmission_power, scattering_power};
+    *destinations[component] = sum;
+    if (component == 0) *finished_blocks = 0;
 }
 
 }  // namespace
@@ -228,31 +249,36 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
     auto scattering_power = at::empty({}, los.options());
 
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(los.get_device()).stream();
-    C10_CUDA_CHECK(cudaMemsetAsync(los_power.data_ptr<float>(), 0, sizeof(float), stream));
-    C10_CUDA_CHECK(cudaMemsetAsync(reflection_power.data_ptr<float>(), 0, sizeof(float), stream));
-    C10_CUDA_CHECK(cudaMemsetAsync(diffraction_power.data_ptr<float>(), 0, sizeof(float), stream));
-    C10_CUDA_CHECK(cudaMemsetAsync(transmission_power.data_ptr<float>(), 0, sizeof(float), stream));
-    C10_CUDA_CHECK(cudaMemsetAsync(scattering_power.data_ptr<float>(), 0, sizeof(float), stream));
-
     const int64_t element_count = los.numel();
-    if (element_count > 0) {
-        const int block_count = static_cast<int>(
-            (element_count + kFinalizeBlockSize - 1) / kFinalizeBlockSize);
-        finalize_component_maps_kernel<<<block_count, kFinalizeBlockSize, 0, stream>>>(
-            los.data_ptr<float>(),
-            reflection.data_ptr<float>(),
-            diffraction.data_ptr<float>(),
-            transmission.data_ptr<float>(),
-            scattering.data_ptr<float>(),
-            path_gain.data_ptr<float>(),
-            los_power.data_ptr<float>(),
-            reflection_power.data_ptr<float>(),
-            diffraction_power.data_ptr<float>(),
-            transmission_power.data_ptr<float>(),
-            scattering_power.data_ptr<float>(),
-            element_count);
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    const int64_t block_count = (element_count + kFinalizeBlockSize - 1) / kFinalizeBlockSize;
+    if (element_count == 0) {
+        for (auto *power : {&los_power, &reflection_power, &diffraction_power, &transmission_power,
+                            &scattering_power})
+            C10_CUDA_CHECK(cudaMemsetAsync(power->data_ptr<float>(), 0, sizeof(float), stream));
+        return {path_gain, los_power, reflection_power, diffraction_power, transmission_power, scattering_power};
     }
+    // Block totals followed by the finished-block counter, which alone needs zeroing.
+    auto scratch = at::empty({kFinalizeComponentCount * block_count + 1}, los.options());
+    float *block_totals = scratch.data_ptr<float>();
+    unsigned int *finished_blocks =
+        reinterpret_cast<unsigned int *>(block_totals + kFinalizeComponentCount * block_count);
+    C10_CUDA_CHECK(cudaMemsetAsync(finished_blocks, 0, sizeof(unsigned int), stream));
+    finalize_component_maps_kernel<<<static_cast<int>(block_count), kFinalizeBlockSize, 0, stream>>>(
+        los.data_ptr<float>(),
+        reflection.data_ptr<float>(),
+        diffraction.data_ptr<float>(),
+        transmission.data_ptr<float>(),
+        scattering.data_ptr<float>(),
+        path_gain.data_ptr<float>(),
+        block_totals,
+        finished_blocks,
+        los_power.data_ptr<float>(),
+        reflection_power.data_ptr<float>(),
+        diffraction_power.data_ptr<float>(),
+        transmission_power.data_ptr<float>(),
+        scattering_power.data_ptr<float>(),
+        element_count);
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     return {path_gain, los_power, reflection_power, diffraction_power, transmission_power, scattering_power};
 }

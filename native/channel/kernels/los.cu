@@ -13,6 +13,7 @@
 
 #include "../tensor_checks.h"
 #include "constants.cuh"
+#include "fixed_sum.cuh"
 
 #define CHANNEL_LOS_CHECK_VISIBILITY_APPLICATION()                                         \
     check_tensor(maps, "maps", at::kFloat, 3);                                  \
@@ -126,7 +127,7 @@ __global__ void los_path_gain_backward_kernel(
     float *__restrict__ grad_tx,
     float *__restrict__ grad_power,
     float *__restrict__ grad_rx,
-    float *__restrict__ grad_frequency,
+    float *__restrict__ frequency_terms,
     int64_t tx_count,
     int64_t rx_count,
     int64_t grad_stride0,
@@ -161,11 +162,10 @@ __global__ void los_path_gain_backward_kernel(
                                tx_pol_p[1] * tx_pol_p[1] + tx_pol_p[2] * tx_pol_p[2];
         const float pattern = fmaxf(pol_mag2 - pol_dot * pol_dot, 0.0f);
         atomicAdd(grad_power + tx, go * gain_scale * inv_d2 * pattern);
-        if (grad_frequency != nullptr) {
-            // gain = P * gain_scale(f) / d^2 * sin2; only gain_scale carries f.
-            atomicAdd(
-                grad_frequency,
-                go * tx_power[tx] * gain_scale_dfreq * inv_d2 * pattern);
+        if (frequency_terms != nullptr) {
+            // gain = P * gain_scale(f) / d^2 * sin2; only gain_scale carries f. One term per
+            // pair; the host adds them in an order-independent sum.
+            frequency_terms[pair] = go * tx_power[tx] * gain_scale_dfreq * inv_d2 * pattern;
         }
         // Position gradients follow the clamp_min pass-through convention
         // (>= keeps the boundary subgradient, matching the tests/ad oracle).
@@ -643,11 +643,11 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_mc_los_path_g
     if (grad_rx.numel() > 0) {
         C10_CUDA_CHECK(cudaMemsetAsync(grad_rx.data_ptr<float>(), 0, grad_rx.numel() * sizeof(float), stream));
     }
-    C10_CUDA_CHECK(cudaMemsetAsync(grad_frequency.data_ptr<float>(), 0, sizeof(float), stream));
 
     const int64_t tx_count = tx_positions.size(0);
     const int64_t rx_count = rx_positions.size(0);
     const int64_t pair_count = tx_count * rx_count;
+    auto frequency_terms = at::empty({pair_count}, tx_positions.options());
     if (pair_count > 0) {
         const int block_count = static_cast<int>((pair_count + kLosBlockSize - 1) / kLosBlockSize);
         los_path_gain_backward_kernel<<<block_count, kLosBlockSize, 0, stream>>>(
@@ -658,7 +658,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_mc_los_path_g
             grad_tx.data_ptr<float>(),
             grad_power.data_ptr<float>(),
             grad_rx.data_ptr<float>(),
-            grad_frequency.data_ptr<float>(),
+            frequency_terms.data_ptr<float>(),
             tx_count,
             rx_count,
             grad_output.stride(0),
@@ -668,6 +668,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> channel_mc_los_path_g
             tx_pol.data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
+    channel::fixed_sum::scatter_sum<float>(
+        frequency_terms.data_ptr<float>(), nullptr, pair_count, grad_frequency.data_ptr<float>(), 1,
+        tx_positions.options(), stream);
     return {grad_tx, grad_power, grad_rx, grad_frequency};
 }
 

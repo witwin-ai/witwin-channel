@@ -15,6 +15,7 @@
 #include <rayd/field_transport.cuh>
 #include <src/field_transport_ad.cuh>
 #include "layered_reflection.cuh"
+#include "fixed_sum.cuh"
 #include <algorithm>
 #include <cstdint>
 #include <vector>
@@ -493,7 +494,7 @@ __global__ void utd_diffraction_tape_accumulate_kernel(
     const float *n0, const float *nn, const int *prim0, const int *prim1,
     const float *exterior_angle, const float *source, const float *source_power,
     const float *eta_r, const float *sigma, const float *mu_r, const float *gain, const float *thickness,
-    const bool *material_valid, float *output, int64_t sample_count, int state_count,
+    const bool *material_valid, float *values, int *targets, int64_t sample_count, int state_count,
     int axis, float plane, float c0min, float c0max, float c1min, float c1max,
     int r0, int r1, float wavelength, float cell_area, int seed, float total_edge_length,
     const float *tx_pol, PointTapeArgs points) {
@@ -501,6 +502,9 @@ __global__ void utd_diffraction_tape_accumulate_kernel(
     const int64_t stride = static_cast<int64_t>(blockDim.x)*gridDim.x;
     for (int64_t lane=static_cast<int64_t>(blockIdx.x)*blockDim.x+threadIdx.x;
          lane<sample_count; lane+=stride) {
+        // Every lane publishes its value and output element; the map is their fixed-point sum.
+        values[lane] = 0.0f;
+        targets[lane] = -1;
         if (!tape_active[lane]) continue;
         const int sidx=tape_state[lane], cell=tape_cell[lane];
         if (sidx<0 || sidx>=state_count || cell<0 || cell>=r0*r1) continue;
@@ -509,7 +513,8 @@ __global__ void utd_diffraction_tape_accumulate_kernel(
             wavelength, cell_area, seed, total_edge_length, tx_pol, points, cell);
         float value = 0.0f;
         if (tape_row_value<float>(row, tape_seeds_zero(), value)) {
-            atomicAdd(output + tape_output_index(cell, r0, r1), value);
+            values[lane] = value;
+            targets[lane] = static_cast<int>(tape_output_index(cell, r0, r1));
         }
     }
 }
@@ -531,6 +536,8 @@ __global__ void utd_diffraction_tape_accumulate_backward_kernel(
     const int64_t stride = static_cast<int64_t>(blockDim.x)*gridDim.x;
     for (int64_t lane=static_cast<int64_t>(blockIdx.x)*blockDim.x+threadIdx.x;
          lane<sample_count; lane+=stride) {
+        // grad_frequency holds one term per lane; the host sums them in a fixed-point sum.
+        if (grad_frequency != nullptr) grad_frequency[lane] = 0.0f;
         if (!tape_active[lane]) continue;
         const int sidx=tape_state[lane], cell=tape_cell[lane];
         if (sidx<0 || sidx>=state_count || cell<0 || cell>=r0*r1) continue;
@@ -587,7 +594,7 @@ __global__ void utd_diffraction_tape_accumulate_backward_kernel(
             seeds.wavelength = wavelength_dfreq;
             const bool accepted = tape_row_value<utd::Dual>(row, seeds, value);
             seeds.wavelength = 0.f;
-            if (accepted) atomicAdd(grad_frequency, cotangent * value.d);
+            if (accepted) grad_frequency[lane] = cotangent * value.d;
         }
     }
 }
@@ -602,7 +609,7 @@ __global__ void utd_diffraction_tape_accumulate_jvp_kernel(
     const float *tangent_eta_r, const float *tangent_sigma,
     const float *tangent_gain, const float *tangent_thickness,
     const float *tangent_source, float wavelength_tangent,
-    float *output_tangent,
+    float *values, int *targets,
     int64_t sample_count, int state_count,
     int axis, float plane, int r0, int r1, float wavelength, float cell_area,
     int seed, float total_edge_length,
@@ -610,6 +617,8 @@ __global__ void utd_diffraction_tape_accumulate_jvp_kernel(
     const int64_t stride = static_cast<int64_t>(blockDim.x)*gridDim.x;
     for (int64_t lane=static_cast<int64_t>(blockIdx.x)*blockDim.x+threadIdx.x;
          lane<sample_count; lane+=stride) {
+        values[lane] = 0.0f;
+        targets[lane] = -1;
         if (!tape_active[lane]) continue;
         const int sidx=tape_state[lane], cell=tape_cell[lane];
         if (sidx<0 || sidx>=state_count || cell<0 || cell>=r0*r1) continue;
@@ -638,7 +647,8 @@ __global__ void utd_diffraction_tape_accumulate_jvp_kernel(
         seeds.wavelength = wavelength_tangent;
         utd::Dual value;
         if (tape_row_value<utd::Dual>(row, seeds, value)) {
-            atomicAdd(output_tangent + tape_output_index(cell, r0, r1), value.d);
+            values[lane] = value.d;
+            targets[lane] = static_cast<int>(tape_output_index(cell, r0, r1));
         }
     }
 }
@@ -1707,23 +1717,27 @@ at::Tensor channel_mc_utd_diffraction_tape_accumulate_cuda(
     const PointTapeArgs point_tape = point_tape_args(point_tensors);
     auto output=at::empty(tape_output_shape(point_tape,r0,r1),source.options());
     const auto stream=at::cuda::getCurrentCUDAStream();
-    C10_CUDA_CHECK(cudaMemsetAsync(
-        output.data_ptr<float>(),0,static_cast<size_t>(output.numel())*sizeof(float),stream));
     const int64_t samples=tape_active.numel();
-    if(samples==0) return output;
-    const int blocks=static_cast<int>(std::min<int64_t>((samples+kDiffractionBlockSize-1)/kDiffractionBlockSize,65535));
-    utd_diffraction_tape_accumulate_kernel<<<blocks,kDiffractionBlockSize,0,stream>>>(
-        tape_active.data_ptr<bool>(),tape_state.data_ptr<int>(),tape_cell.data_ptr<int>(),tape_u.data_ptr<float>(),
-        edge_pos.data_ptr<float>(),edge_dir.data_ptr<float>(),t_min.data_ptr<float>(),t_max.data_ptr<float>(),
-        n0.data_ptr<float>(),nn.data_ptr<float>(),prim0.data_ptr<int>(),prim1.data_ptr<int>(),
-        exterior_angle.data_ptr<float>(),source.data_ptr<float>(),source_power.data_ptr<float>(),
-        eta_r.data_ptr<float>(),sigma.data_ptr<float>(),mu_r.data_ptr<float>(),gain.data_ptr<float>(),thickness.data_ptr<float>(),
-        material_valid.data_ptr<bool>(),output.data_ptr<float>(),samples,static_cast<int>(edge_pos.size(0)),
-        static_cast<int>(axis),static_cast<float>(plane),static_cast<float>(c0min),static_cast<float>(c0max),
-        static_cast<float>(c1min),static_cast<float>(c1max),static_cast<int>(r0),static_cast<int>(r1),
-        static_cast<float>(wavelength),static_cast<float>(cell_area),static_cast<int>(seed),static_cast<float>(total_edge_length),
-        tx_pol.data_ptr<float>(),point_tape);
-    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    auto values=at::empty({samples},source.options());
+    auto targets=at::empty({samples},source.options().dtype(at::kInt));
+    if(samples>0){
+        const int blocks=static_cast<int>(std::min<int64_t>((samples+kDiffractionBlockSize-1)/kDiffractionBlockSize,65535));
+        utd_diffraction_tape_accumulate_kernel<<<blocks,kDiffractionBlockSize,0,stream>>>(
+            tape_active.data_ptr<bool>(),tape_state.data_ptr<int>(),tape_cell.data_ptr<int>(),tape_u.data_ptr<float>(),
+            edge_pos.data_ptr<float>(),edge_dir.data_ptr<float>(),t_min.data_ptr<float>(),t_max.data_ptr<float>(),
+            n0.data_ptr<float>(),nn.data_ptr<float>(),prim0.data_ptr<int>(),prim1.data_ptr<int>(),
+            exterior_angle.data_ptr<float>(),source.data_ptr<float>(),source_power.data_ptr<float>(),
+            eta_r.data_ptr<float>(),sigma.data_ptr<float>(),mu_r.data_ptr<float>(),gain.data_ptr<float>(),thickness.data_ptr<float>(),
+            material_valid.data_ptr<bool>(),values.data_ptr<float>(),targets.data_ptr<int>(),samples,static_cast<int>(edge_pos.size(0)),
+            static_cast<int>(axis),static_cast<float>(plane),static_cast<float>(c0min),static_cast<float>(c0max),
+            static_cast<float>(c1min),static_cast<float>(c1max),static_cast<int>(r0),static_cast<int>(r1),
+            static_cast<float>(wavelength),static_cast<float>(cell_area),static_cast<int>(seed),static_cast<float>(total_edge_length),
+            tx_pol.data_ptr<float>(),point_tape);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    channel::fixed_sum::scatter_sum<float>(
+        values.data_ptr<float>(), targets.data_ptr<int>(), samples, output.data_ptr<float>(),
+        output.numel(), source.options(), stream);
     return output;
 }
 
@@ -1777,6 +1791,7 @@ channel_mc_utd_diffraction_tape_accumulate_backward_cuda(
     auto grad_source = diffraction_zero_filled({3}, source.options());
     auto grad_frequency = diffraction_zero_filled({1}, source.options());
     const int64_t samples = tape_active.numel();
+    auto frequency_terms = at::empty({need_frequency ? samples : 0}, source.options());
     if (samples == 0 || !(need_materials || need_source || need_frequency)) {
         return {grad_eta_r, grad_sigma, grad_gain, grad_thickness, grad_source,
                 grad_frequency};
@@ -1801,7 +1816,7 @@ channel_mc_utd_diffraction_tape_accumulate_backward_cuda(
         need_materials ? grad_gain.data_ptr<float>() : nullptr,
         need_materials ? grad_thickness.data_ptr<float>() : nullptr,
         need_source ? grad_source.data_ptr<float>() : nullptr,
-        need_frequency ? grad_frequency.data_ptr<float>() : nullptr,
+        need_frequency ? frequency_terms.data_ptr<float>() : nullptr,
         samples, static_cast<int>(edge_pos.size(0)),
         static_cast<int>(axis), static_cast<float>(plane),
         static_cast<int>(r0), static_cast<int>(r1),
@@ -1811,6 +1826,11 @@ channel_mc_utd_diffraction_tape_accumulate_backward_cuda(
         grad_output.stride(0), grad_output.stride(1),
         tx_pol.data_ptr<float>(), point_tape);
     C10_CUDA_KERNEL_LAUNCH_CHECK();
+    if (need_frequency) {
+        channel::fixed_sum::scatter_sum<float>(
+            frequency_terms.data_ptr<float>(), nullptr, samples, grad_frequency.data_ptr<float>(), 1,
+            source.options(), stream);
+    }
     return {grad_eta_r, grad_sigma, grad_gain, grad_thickness, grad_source,
             grad_frequency};
 }
@@ -1831,11 +1851,17 @@ at::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp_cuda(
     double total_edge_length, double wavelength_tangent, at::Tensor tx_pol,
     const PointTapeTensors& point_tensors) {
     const PointTapeArgs point_tape = point_tape_args(point_tensors);
-    auto output_tangent =
-        diffraction_zero_filled(tape_output_shape(point_tape, r0, r1), source.options());
+    auto output_tangent = at::empty(tape_output_shape(point_tape, r0, r1), source.options());
     const int64_t samples = tape_active.numel();
-    if (samples == 0) return output_tangent;
     const auto stream = at::cuda::getCurrentCUDAStream();
+    auto values = at::empty({samples}, source.options());
+    auto targets = at::empty({samples}, source.options().dtype(at::kInt));
+    if (samples == 0) {
+        channel::fixed_sum::scatter_sum<float>(
+            values.data_ptr<float>(), targets.data_ptr<int>(), 0, output_tangent.data_ptr<float>(),
+            output_tangent.numel(), source.options(), stream);
+        return output_tangent;
+    }
     const int blocks = static_cast<int>(std::min<int64_t>(
         (samples + kDiffractionBlockSize - 1) / kDiffractionBlockSize, 65535));
     utd_diffraction_tape_accumulate_jvp_kernel<<<blocks, kDiffractionBlockSize, 0, stream>>>(
@@ -1855,7 +1881,7 @@ at::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp_cuda(
         has_tangent_thickness ? tangent_thickness.data_ptr<float>() : nullptr,
         has_tangent_source ? tangent_source.data_ptr<float>() : nullptr,
         static_cast<float>(wavelength_tangent),
-        output_tangent.data_ptr<float>(),
+        values.data_ptr<float>(), targets.data_ptr<int>(),
         samples, static_cast<int>(edge_pos.size(0)),
         static_cast<int>(axis), static_cast<float>(plane),
         static_cast<int>(r0), static_cast<int>(r1),
@@ -1863,6 +1889,9 @@ at::Tensor channel_mc_utd_diffraction_tape_accumulate_jvp_cuda(
         static_cast<int>(seed), static_cast<float>(total_edge_length),
         tx_pol.data_ptr<float>(), point_tape);
     C10_CUDA_KERNEL_LAUNCH_CHECK();
+    channel::fixed_sum::scatter_sum<float>(
+        values.data_ptr<float>(), targets.data_ptr<int>(), samples, output_tangent.data_ptr<float>(),
+        output_tangent.numel(), source.options(), stream);
     return output_tangent;
 }
 

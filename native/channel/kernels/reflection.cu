@@ -10,6 +10,7 @@
 #include "constants.cuh"
 #include "math.cuh"
 #include "ordered_sum.cuh"
+#include "fixed_sum.cuh"
 #include "reflection_receivers.h"
 #include <rayd/field_transport.cuh>
 #include <src/field_transport_ad.cuh>
@@ -228,6 +229,7 @@ __device__ __forceinline__ Complex3 initial_reflection_field(float3 tx_polarizat
     return {cmath::complex(initial.x, 0.0f), cmath::complex(initial.y, 0.0f), cmath::complex(initial.z, 0.0f)};
 }
 
+// Deposits go to exact binned receiver sums; the last block writes the float map.
 __global__ void slab_reflection_accumulate_kernel(
     const float *__restrict__ ray_o,
     const float *__restrict__ ray_d,
@@ -242,7 +244,7 @@ __global__ void slab_reflection_accumulate_kernel(
     const float *__restrict__ thickness,
     const int *__restrict__ face_material,
     layered::LayerTables layers,
-    float *__restrict__ output,
+    channel::fixed_sum::BinnedOutput output,
     int64_t ray_count,
     int trace_depth,
     int contribution_depth,
@@ -294,10 +296,11 @@ __global__ void slab_reflection_accumulate_kernel(
             visit_deposits(rx, tx, origin, direction, blocker_t, solid_angle, wavelength,
                            [&](int64_t target, float, float coeff) {
                                const float power = field_power * coeff;
-                               if (power > 0.0f && isfinite(power)) atomicAdd(output + target, power);
+                               if (power > 0.0f && isfinite(power)) output.add(target, power);
                            });
         }
     }
+    output.finish();
 }
 
 // Final reflected segment of every ray that completed all trace_depth bounces: its spawn point
@@ -707,7 +710,7 @@ __global__ void slab_reflection_accumulate_jvp_kernel(
     const float *__restrict__ tangent_sigma,
     const float *__restrict__ tangent_gain,
     const float *__restrict__ tangent_thickness,
-    float *__restrict__ output_tangent,
+    channel::fixed_sum::BinnedOutput output_tangent,
     int64_t ray_count,
     int trace_depth,
     int contribution_depth,
@@ -778,10 +781,11 @@ __global__ void slab_reflection_accumulate_jvp_kernel(
                                // Aperture factor tangent: coeff carries (lambda / 4 pi)^2.
                                const float d_power = d_field_power * coeff +
                                                      power * 2.0f / wavelength * wavelength_tangent;
-                               atomicAdd(output_tangent + target, d_power);
+                               output_tangent.add(target, d_power);
                            });
         }
     }
+    output_tangent.finish();
 }
 
 using channel::check_tensor;
@@ -981,17 +985,21 @@ at::Tensor channel_mc_slab_reflection_accumulate_cuda(
     const int64_t ray_count = ray_o.size(0);
     const int trace_depth = static_cast<int>(trace_valid.size(1));
     const layered::LayerTables tables = mc_layer_tables(layers, eta_r.numel());
-    auto output = reflection_zero_filled(receiver_output_shape(receivers), ray_o.options());
-    if (ray_count == 0 || contribution_depth <= 0) return output;
+    if (ray_count == 0 || contribution_depth <= 0)
+        return reflection_zero_filled(receiver_output_shape(receivers), ray_o.options());
+    auto output = at::empty(receiver_output_shape(receivers), ray_o.options());
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(ray_o.get_device()).stream();
+    channel::fixed_sum::BinnedStorage sums(output.numel(), ray_o.options(), stream);
     for_each_target_chunk(receivers, ray_count, contribution_depth, [&](ReceiverTargets rx, int64_t offset) {
+        const int64_t targets = point_mode(receivers) ? rx.point_end - rx.point_begin
+                                                      : static_cast<int64_t>(rx.resolution0) * rx.resolution1;
         slab_reflection_accumulate_kernel<<<reflection_blocks(ray_count), kReflectionBlockSize, 0, stream>>>(
             ray_o.data_ptr<float>(), ray_d.data_ptr<float>(), trace_valid.data_ptr<bool>(),
             trace_t.data_ptr<float>(), trace_prim.data_ptr<int>(), face_normals.data_ptr<float>(),
             eta_r.data_ptr<float>(), sigma.data_ptr<float>(), gain.data_ptr<float>(),
             material_valid.data_ptr<bool>(), thickness.data_ptr<float>(),
             layers[0].data_ptr<int>(), tables,
-            output.data_ptr<float>() + offset, ray_count, trace_depth,
+            sums.output(offset, targets, output.data_ptr<float>()), ray_count, trace_depth,
             static_cast<int>(contribution_depth), rx, static_cast<float>(wavelength),
             solid_angle.data_ptr<float>(), tx_pol.data_ptr<float>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
@@ -1088,10 +1096,14 @@ at::Tensor channel_mc_slab_reflection_accumulate_jvp_cuda(
     const int64_t ray_count = ray_o.size(0);
     const int trace_depth = static_cast<int>(trace_valid.size(1));
     const layered::LayerTables tables = mc_layer_tables(layers, eta_r.numel());
-    auto output_tangent = reflection_zero_filled(receiver_output_shape(receivers), ray_o.options());
-    if (ray_count == 0 || contribution_depth <= 0) return output_tangent;
+    if (ray_count == 0 || contribution_depth <= 0)
+        return reflection_zero_filled(receiver_output_shape(receivers), ray_o.options());
+    auto output_tangent = at::empty(receiver_output_shape(receivers), ray_o.options());
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(ray_o.get_device()).stream();
+    channel::fixed_sum::BinnedStorage sums(output_tangent.numel(), ray_o.options(), stream);
     for_each_target_chunk(receivers, ray_count, contribution_depth, [&](ReceiverTargets rx, int64_t offset) {
+        const int64_t targets = point_mode(receivers) ? rx.point_end - rx.point_begin
+                                                      : static_cast<int64_t>(rx.resolution0) * rx.resolution1;
         slab_reflection_accumulate_jvp_kernel<<<reflection_blocks(ray_count), kReflectionBlockSize, 0, stream>>>(
             ray_o.data_ptr<float>(), ray_d.data_ptr<float>(), trace_valid.data_ptr<bool>(),
             trace_t.data_ptr<float>(), trace_prim.data_ptr<int>(), face_normals.data_ptr<float>(),
@@ -1102,7 +1114,7 @@ at::Tensor channel_mc_slab_reflection_accumulate_jvp_cuda(
             has_tangent_sigma ? tangent_sigma.data_ptr<float>() : nullptr,
             has_tangent_gain ? tangent_gain.data_ptr<float>() : nullptr,
             has_tangent_thickness ? tangent_thickness.data_ptr<float>() : nullptr,
-            output_tangent.data_ptr<float>() + offset,
+            sums.output(offset, targets, output_tangent.data_ptr<float>()),
             ray_count, trace_depth, static_cast<int>(contribution_depth), rx,
             static_cast<float>(wavelength), solid_angle.data_ptr<float>(),
             static_cast<float>(wavelength_tangent), tx_pol.data_ptr<float>());

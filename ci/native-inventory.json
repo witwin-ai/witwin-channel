@@ -307,7 +307,6 @@
         "deterministic_accumulate_backward_kernel",
         "deterministic_accumulate_jvp_finalize_kernel",
         "deterministic_accumulate_paths_kernel",
-        "deterministic_accumulate_tangent_scatter_kernel",
         "deterministic_compact_edges_kernel",
         "deterministic_component_counts_kernel",
         "deterministic_edge_flags_kernel",
@@ -514,6 +513,19 @@
         "rough_scale_forward_kernel",
         "rough_scale_jvp_kernel",
         "source_amplitude_scale_kernel"
+      ],
+      "host_synchronization": [],
+      "device_trap": false,
+      "compile_options": []
+    },
+    "native/channel/kernels/fixed_sum.cuh": {
+      "kernels": [
+        "resolve_kernel",
+        "scatter_pass_kernel"
+      ],
+      "launches": [
+        "resolve_kernel",
+        "scatter_pass_kernel"
       ],
       "host_synchronization": [],
       "device_trap": false,
