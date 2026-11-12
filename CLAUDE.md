@@ -105,7 +105,7 @@ and that path is the contract; whether it is one module or a package is internal
   `runtime_diagnostics`, `Complex3State`, `JonesState`), `path`, `radiomap`,
   `propagation.consumer`, `importers` and `presets`, exactly as frozen in
   `ci/public-api-snapshot.json`. `experimental.*` is importable and tested but outside the
-  snapshot (experimental tier ADR). Everything else is internal: no compatibility shims, aliases
+  snapshot (ADR-074). Everything else is internal: no compatibility shims, aliases
   or re-exports for moved internals; a removed public path only raises `ImportError`.
 - Owner documents live at `docs/dev/<domain>/README.md`.
 
@@ -207,13 +207,23 @@ Plans are in `docs/dev/plans/` (the modular architecture is plan `08-*`); the st
   0.8 source boundary, 048 scene import and presets.
 - Ownership: 007 propagation data, 008 enumerated oracle, 009 native fusion, 023 direct RayD
   integration, 024 shared RF/transmission, 025 diffraction family, 026 RayD scattering runtime,
-  027 segment penetration, 044 native translation units.
+  027 segment penetration, 044 native translation units, 065 fused field launch.
 - Device residency: 028 diffraction state selection, 032 compact cardinality (029, 030, 031 are
   Removed and superseded by 032), 035 trace backend selection.
 - Physics and AD: 004 numerical duplication, 010 scattering kernels, 011/012/013 coupled and
   double diffraction, 014/015 scattering AD, 016 transition integral, 017 ISB taper, 018/019 BDPT
   diffraction and coherent combine, 020 MC transmission polarization, 021 multibounce
-  scattering, 022 BDPT AD, 045 stationary diffraction amplitude, 046 coupled D-D domain.
+  scattering, 022 BDPT AD, 045 stationary diffraction amplitude, 046 coupled D-D domain,
+  049 BDPT wavefront, 050 UTD coefficient, 051 multilayer reflection, 053 AD reduction order,
+  057 diffraction edge set, 058 layout-independent diffraction, 059/060 reflection validity and
+  candidates, 064 interaction chains, 066 MC diffraction seed streams.
+- Monte Carlo (`radiomap.Stochastic`): 052 Kirchhoff table cache, 054 launch rays, 055 receiver
+  layouts, 056 scattering pairs, 063 estimator consistency gate.
+- Full-wave fixes: 068 reflection in-face test, 069 chain completeness, 070 GO-boundary sample,
+  071 layered face term, 072 oblique face dyadic, 073 coincident edges, 075 D-D sheet side, 076
+  penetrable-wedge incident terms.
+- Results and API: 061 grid axis order, 062 result-semantics metadata, 067 coincident endpoints,
+  074 experimental tier.
 - Consumer: 037 fixed topology and Jones, 038 forward-AD liveness, 039 source amplitude, 040
   world provenance, 041 slot batching and time-varying CIR, 042 wideband offsets, 043 AD
   capability matrix.
