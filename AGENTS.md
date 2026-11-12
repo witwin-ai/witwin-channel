@@ -91,19 +91,22 @@ and that path is the contract; whether it is one module or a package is internal
   engine), `rows` and `penetration` (typed internal contracts), and `consumer` (the stable
   solver-neutral public contract; ADR-037 to ADR-043). The consumer owns no physics, adds no
   second compaction, and never imports a solver.
-- `path`, `deterministic`, `montecarlo.basic`, `montecarlo.bdpt`: thin solver configuration,
-  orchestration, accumulation and results. A solver never imports another solver. BDPT may call
-  the public `evaluate_enumerated_paths` read-only as an opaque oracle (ADR-008).
+- `path`, `radiomap._coherent`, `radiomap._stochastic`, `experimental.bdpt`: thin solver
+  configuration, orchestration, accumulation and results. A solver never imports another solver;
+  the two radiomap estimators never import each other, and only the `radiomap` facade (which
+  dispatches `solve` on the config type) names both. BDPT may call the public
+  `evaluate_enumerated_paths` read-only as an opaque oracle (ADR-008).
 - Root modules: `constants`, `abi` (`Complex3State`, `JonesState`), `components`,
   `capabilities`, `deployment`.
 - `importers` and `presets`: file import (Mitsuba/Sionna XML, PLY, OBJ, glTF) and ITU-R P.2040
   material / antenna-pattern factories (ADR-048). Import-time NumPy/stdlib code that builds
   `witwin.core` values; they define no world types, never import a solver, and launch nothing.
 - Public API: the package root (`build_info`, `capabilities`, `pipeline_cache_key`,
-  `runtime_diagnostics`, `Complex3State`, `JonesState`), the four solver modules,
+  `runtime_diagnostics`, `Complex3State`, `JonesState`), `path`, `radiomap`,
   `propagation.consumer`, `importers` and `presets`, exactly as frozen in
-  `ci/public-api-snapshot.json`. Everything else is internal: no compatibility shims, aliases
-  or re-exports for moved internals.
+  `ci/public-api-snapshot.json`. `experimental.*` is importable and tested but outside the
+  snapshot (experimental tier ADR). Everything else is internal: no compatibility shims, aliases
+  or re-exports for moved internals; a removed public path only raises `ImportError`.
 - Owner documents live at `docs/dev/<domain>/README.md`.
 
 ## 5. Native boundary

@@ -1,12 +1,14 @@
-# Monte Carlo domain
+# Monte Carlo solvers
 
-This package contains the two Monte Carlo solver families. It is not itself a
-solver API: callers select either `witwin.channel.montecarlo.basic` or
-`witwin.channel.montecarlo.bdpt`.
+The two Monte Carlo solver families. Since 0.6.0 they live in different places:
+MC Basic is the Stochastic radiomap estimator, `witwin/channel/radiomap/_stochastic.py`,
+selected through `witwin.channel.radiomap` with a `Stochastic` config; BDPT is
+`witwin.channel.experimental.bdpt`, in the experimental tier. The former
+`witwin.channel.montecarlo` package only raises `ImportError` naming those paths.
 
 ## Ownership
 
-- `basic.py` owns the incoherent Monte Carlo power-map solver, including its
+- `radiomap/_stochastic.py` owns the incoherent Monte Carlo power-map solver, including its
   configuration, result type, orchestration, sampling, and metadata. It is one
   module: the former package's `__init__` re-export facade is gone with the
   package that held it, and its native facades live in
@@ -25,7 +27,7 @@ solver API: callers select either `witwin.channel.montecarlo.basic` or
   scalar reads, is measurement-required optimization debt: compare E2E
   latency, peak memory, steady throughput, synchronization cost, and result
   exactness before changing production semantics.
-- `bdpt.py` owns bidirectional path tracing, including subpaths, connections,
+- `experimental/bdpt.py` owns bidirectional path tracing, including subpaths, connections,
   MIS, optional path-sample export, accumulation, and the per-solve workspace.
   It is one module: the former package's lazy `solve` re-export is gone with
   the `__init__` that held it, and its native facades live in
@@ -45,28 +47,31 @@ solver API: callers select either `witwin.channel.montecarlo.basic` or
 
 The stable, snapshotted entry points are:
 
-- `witwin.channel.montecarlo.basic.Config`
-- `witwin.channel.montecarlo.basic.Result`
-- `witwin.channel.montecarlo.basic.solve(scene, config)`
-- `witwin.channel.montecarlo.bdpt.BDPTPathSamples`
-- `witwin.channel.montecarlo.bdpt.Config`
-- `witwin.channel.montecarlo.bdpt.Result`
-- `witwin.channel.montecarlo.bdpt.solve(scene, config)`
+- `witwin.channel.radiomap.Stochastic`
+- `witwin.channel.radiomap.RadioMap`, `witwin.channel.radiomap.RadioMapMetadata`
+- `witwin.channel.radiomap.solve(scene, config)` with a `Stochastic` config
 
-Everything else each solver defines is internal. `basic.py` and `bdpt.py` are
+The experimental BDPT entry points (not snapshotted):
+
+- `witwin.channel.experimental.bdpt.BDPTPathSamples`
+- `witwin.channel.experimental.bdpt.Config`
+- `witwin.channel.experimental.bdpt.Result`
+- `witwin.channel.experimental.bdpt.solve(scene, config)`
+
+Everything else each solver defines is internal. `_stochastic.py` and `bdpt.py` are
 each one module now, so the former `pipeline.py`, `backend.py`, `endpoints.py`,
 `connections.py`, `accumulation.py`, `subpaths.py`, `mis.py`, `sampling.py` and
 per-solver `kernels/` packages no longer exist as import paths; the names they
 defined are still there, as members of the collapsed module. Those names may be
-used by focused contract tests, but are not compatibility promises. The parent
-`montecarlo` package exports no solver symbols.
+used by focused contract tests, but are not compatibility promises.
 
 ## Dependency rules
 
 - Basic and BDPT are sibling owners. Neither solver may import the other or
-  any other solver package.
+  any other solver package; `radiomap._stochastic` also never imports
+  `radiomap._coherent` or the `radiomap` facade.
 - Basic must not call `witwin.channel.propagation.enumerated`. Under the
-  narrow ADR-008 exception, `montecarlo.bdpt` may call only the public
+  narrow ADR-008 exception, `experimental.bdpt` may call only the public
   `evaluate_enumerated_paths` entry read-only as an opaque discrete-path oracle;
   it must not import enumerated internals or add BDPT policy to that engine.
 - Orchestration may use public scene, material, geometry, topology, and field

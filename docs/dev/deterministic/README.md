@@ -1,17 +1,20 @@
-# Deterministic solver owner
+# Coherent radiomap estimator owner
 
 ## Ownership
 
-`deterministic` owns deterministic solver configuration, orchestration,
-coherent accumulation, result assembly, and deterministic scattering-path
-integration. Shared topology, geometry, and fields remain in `propagation`;
+`witwin/channel/radiomap/_coherent.py` (the 0.5 `deterministic` solver) owns the Coherent
+estimator's configuration, orchestration, field or power accumulation, result assembly,
+and its scattering-path integration. Shared topology, geometry, and fields remain in `propagation`;
 scene compilation and material encoding remain outside this package.
 
 ## Public entry points
 
-`witwin.channel.deterministic` exports exactly `Config`, `PathTable`,
-`Result`, and `solve`. Kernel, pipeline, accumulation, field, and scattering
-modules are internal.
+`witwin.channel.radiomap` exports `Coherent`, `CoherentRadioMap`,
+`CoherentRadioMapMetadata` and `PathTable` from this module, and `radiomap.solve`
+dispatches a `Coherent` config to its `solve`. `radiomap._coherent` itself is private;
+kernel, pipeline, accumulation, field, and scattering modules are internal. It never
+imports `radiomap._stochastic` or the `radiomap` facade (`ci/check_import_graph.py`,
+rule `radiomap_estimator_cross_import`).
 
 ## Dependency rules
 

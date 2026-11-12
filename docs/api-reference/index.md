@@ -1,10 +1,10 @@
 # Witwin Channel API Reference
 
 This reference documents the complete supported Python interface of
-`witwin-channel` 0.4.x.
+`witwin-channel` 0.6.x.
 
 The stable API baseline is [`ci/public-api-snapshot.json`](../../ci/public-api-snapshot.json):
-eight modules and 78 frozen exports. The scene lifecycle page additionally
+six modules and 79 frozen exports. The scene lifecycle page additionally
 documents the three supporting exports required to compile a `witwin.core`
 world for direct consumer use. Implementation modules such as `runtime`,
 `kernels`, `interactions`, and the remaining `propagation` modules are
@@ -22,9 +22,8 @@ intentionally excluded: they are internal contracts, not supported user APIs.
 | `witwin.channel` | ABI state types, capabilities, and deployment reporting | [Package root](root.md) |
 | `witwin.channel.scene` | Compile and cache lifecycle for direct consumer use | [Scene lifecycle](scene.md) |
 | `witwin.channel.path` | Explicit paths, CIR/CFR, taps, and beamforming | [Path solver](path.md) |
-| `witwin.channel.deterministic` | Deterministic coherent fields and radiomaps | [Deterministic solver](deterministic.md) |
-| `witwin.channel.montecarlo.basic` | Basic Monte Carlo power estimation | [Monte Carlo Basic](montecarlo-basic.md) |
-| `witwin.channel.montecarlo.bdpt` | Bidirectional path tracing with MIS | [Monte Carlo BDPT](montecarlo-bdpt.md) |
+| `witwin.channel.radiomap` | Radiomaps: `solve` dispatches on `Coherent` or `Stochastic` | [Radiomap](radiomap.md) ([Coherent](radiomap-coherent.md), [Stochastic](radiomap-stochastic.md)) |
+| `witwin.channel.experimental.bdpt` | Bidirectional path tracing with MIS (experimental tier, not in the snapshot) | [Experimental BDPT](experimental-bdpt.md) |
 | `witwin.channel.propagation.consumer` | Solver-neutral compact propagation contract | [Propagation consumer](propagation-consumer.md) |
 | `witwin.channel.importers` | Mitsuba/Sionna XML, PLY, OBJ and glTF import into Core structures | [Importers](importers.md) |
 | `witwin.channel.presets` | ITU-R P.2040 materials, TR 38.901 and dipole patterns | [Presets](presets.md) |
@@ -39,7 +38,7 @@ User guides: [Quickstart](../user/quickstart.md), [Scene import](../user/scene-i
 - Logical worlds are owned by `witwin.core`. Import `Scene`, `SceneSnapshot`,
   `Structure`, `AntennaState`, materials, and receiver grids from
   `witwin.core`.
-- All four solvers use
+- Every solver (`path.solve`, `radiomap.solve`, `experimental.bdpt.solve`) uses
   `solve(scene, config, *, reference_frequency_hz=...)`.
 - Frequency is in hertz, position and distance are in metres, delay is in
   seconds, angles are in radians, and power is in watts.
@@ -66,8 +65,8 @@ Dimension symbols used throughout this reference:
 
 ### Receiver layout and grid axis order
 
-Every solver uses the same receiver layout for `path_gain`, deterministic
-`field`/`component_power`/`component_fields`, Monte Carlo `component_maps` and
+Every solver uses the same receiver layout for `path_gain`, Coherent
+`field`/`component_power`/`component_fields`, Stochastic `component_maps` and
 BDPT `variance`:
 
 - **Exactly one `ReceiverGrid`** of `shape=(rows, cols)`: `[T, rows, cols]`,
@@ -85,16 +84,19 @@ every solver and equals the point-receiver result at that sample. All grid
 outputs are contiguous: every solver accumulates or deposits in receiver
 row-major order natively.
 
-Result metadata of every solver carries `estimator` (`enumerated` or
-`sampled`), `quantity` (a dict from each requested component to
-`point_sample`, the value at the receiver position, or `cell_average`, the
-average over the cell or capture region), `combine` (`coherent`,
-`incoherent`, or `none` for uncombined rows) and `complete` (whether every path
-within the requested bounds was found; for `path` and `deterministic` it is
-`metadata["discovery"]["complete"]`, and the sampled solvers report `False`).
+### Result semantics
+
+Result metadata of every solver carries `estimator` (`coherent` for enumerated
+paths, `stochastic` for sampled ones), `quantity` (a dict from each requested
+component to `point_sample`, the value at the receiver position, or
+`cell_average`, the average over the cell or capture region), `combine`
+(`field`: complex sum then squared, `power`: sum of row powers, or `none` for
+uncombined rows) and `complete` (whether every path within the requested bounds
+was found; for `path` and `radiomap.Coherent` it is
+`metadata["discovery"]["complete"]`, and the stochastic solvers report `False`).
 The metadata of each solver is typed as a `TypedDict` (`path.PathMetadata`,
-`deterministic.Metadata`, `montecarlo.basic.Metadata`, `montecarlo.bdpt.Metadata`)
-naming its stable keys; at run time it is a plain `dict`.
+`radiomap.CoherentRadioMapMetadata`, `radiomap.RadioMapMetadata`,
+`experimental.bdpt.Metadata`) naming its stable keys; at run time it is a plain `dict`.
 
 ## Minimal solver example
 
@@ -102,7 +104,7 @@ naming its stable keys; at run time it is a plain `dict`.
 import torch
 
 from witwin.core import AntennaState, Scene
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 
 scene = Scene(
     structures=[],
@@ -123,7 +125,7 @@ scene = Scene(
 
 result = solve(
     scene,
-    Config(max_depth=0, components={"los"}),
+    Coherent(max_depth=0, components={"los"}),
     reference_frequency_hz=3.5e9,
 )
 
@@ -134,9 +136,11 @@ print(result.field.device)     # cuda:0 (device index is environment-specific)
 
 ## Stability boundary
 
-The frozen stable surface consists of the package root, the four solver entry
-modules, `witwin.channel.propagation.consumer`, and the `importers` and
-`presets` helper modules. The scene lifecycle is a
+The frozen stable surface consists of the package root, the `path` and
+`radiomap` solver modules, `witwin.channel.propagation.consumer`, and the
+`importers` and `presets` helper modules. `witwin.channel.experimental.*` is
+importable and tested but outside the frozen surface; see
+[`docs/migration-0.6.md`](../migration-0.6.md) for the 0.6.0 renames. The scene lifecycle is a
 small supporting surface used to obtain `CompiledScene` for the consumer.
 
 An importable name is not automatically public. In particular, `__all__`

@@ -72,14 +72,16 @@ for the versioning, convention, zero-copy, and failure contracts.
 
 | Package | Use case | Primary result |
 | --- | --- | --- |
-| `witwin.channel.deterministic` | Repeatable coherent fields and radiomaps | Field, path gain, component maps, optional path table |
+| `witwin.channel.radiomap` with `Coherent` | Repeatable enumerated fields and radiomaps | `CoherentRadioMap`: field, path gain, component maps, optional path table |
+| `witwin.channel.radiomap` with `Stochastic` | Monte Carlo power and radiomaps | `RadioMap`: path gain and component power/maps |
 | `witwin.channel.path` | Explicit channel paths for point-to-point links | Complex coefficients, delays, angles, interactions, CIR/CFR |
-| `witwin.channel.montecarlo.basic` | Incoherent sampled power and radiomaps | Path gain and component power/maps |
-| `witwin.channel.montecarlo.bdpt` | Bidirectional Monte Carlo propagation | Path gain, component power, optional BDPT samples |
+| `witwin.channel.experimental.bdpt` | Bidirectional Monte Carlo propagation (experimental tier) | Path gain, component power, optional BDPT samples |
 
-Each solver owns its own `Config`, `Result`, and `solve(scene, config)` public
-contract. The exact stable exports are recorded in
-[`ci/public-api-snapshot.json`](ci/public-api-snapshot.json).
+`radiomap.solve(scene, config)` picks the estimator from the configuration type;
+`path` and `experimental.bdpt` own their own `Config`, `Result` and `solve`. The exact
+stable exports are recorded in The exact stable exports are recorded in
+[`ci/public-api-snapshot.json`](ci/public-api-snapshot.json); `experimental` modules are
+outside it. Upgrading from 0.5: [`docs/migration-0.6.md`](docs/migration-0.6.md).
 
 Complete signatures, parameter tables, tensor layouts, methods, exceptions,
 and usage patterns are collected in the
@@ -151,13 +153,13 @@ OptiX 8.1 headers) and the build commands for Linux and Windows.
 ## Quick start
 
 The following CUDA example evaluates a 10-metre free-space link with the
-deterministic solver:
+Coherent radiomap estimator:
 
 ```python
 import torch
 
 from witwin.core import AntennaState, Scene
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 
 scene = Scene(
     structures=[],
@@ -178,7 +180,7 @@ scene = Scene(
 
 result = solve(
     scene,
-    Config(max_depth=0, components={"los"}),
+    Coherent(max_depth=0, components={"los"}),
     reference_frequency_hz=3.5e9,
 )
 
@@ -188,8 +190,8 @@ print(result.field)      # complex64 coherent field
 
 Logical scenes, structures, materials, stable IDs, endpoints, and snapshots are
 owned by `witwin.core`. Channel compiles them with
-`witwin.channel.scene.compile(scene, reference_frequency_hz=...)`; the four
-solver entry points perform that same explicit compilation boundary. Use Core
+`witwin.channel.scene.compile(scene, reference_frequency_hz=...)`; every
+solver entry point performs that same explicit compilation boundary. Use Core
 `Mesh`, `PhysicalMaterial`, `MaterialLayer`, and
 `PhysicalMaterial.perfect_conductor()`. Use Core `ReceiverGrid` for radiomap
 solves, or select `witwin.channel.path` when individual path coefficients,
@@ -197,7 +199,7 @@ delays, angles, and interactions are required.
 
 ## Differentiation contract
 
-`path`, `deterministic`, and `montecarlo.basic` accept
+`path`, `radiomap.Coherent`, and `radiomap.Stochastic` accept
 `ad_mode="none"`, `"jvp"`, or `"vjp"`. Derivatives are evaluated through the
 fixed topology selected by the primal solve. Visibility changes, path
 birth/death, and other discrete topology discontinuities are outside this

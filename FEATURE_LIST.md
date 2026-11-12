@@ -314,8 +314,8 @@ priority `scattering > diffraction > transmission > reflection > los`.
 
 ## Differentiable solving (fixed topology, plan 07 AD-1 through AD-4)
 
-- `deterministic`, `path` and `montecarlo.basic` accept
-  `ad_mode="jvp" | "vjp"` (default `"none"`); `montecarlo.bdpt` still
+- `radiomap.Coherent`, `path` and `radiomap.Stochastic` accept
+  `ad_mode="jvp" | "vjp"` (default `"none"`); `experimental.bdpt` still
   rejects any non-`"none"` mode. The capability manifest advertises this:
   `supports_ad=True` with `ad_modes=["none", "jvp", "vjp"]` for the three
   fixed-topology solvers, and the global `ad_contract` states what is and
@@ -444,7 +444,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
   `scattering_combine_domain` argument on the existing `deterministic_accumulate_flat`
   op (no new primal ABI symbol); `combine == 0` never enters the branch and the
   kernels stay byte-identical.
-- BDPT multi-order scattering (ADR-021 D4, default OFF): `montecarlo.bdpt.Config`
+- BDPT multi-order scattering (ADR-021 D4, default OFF): `experimental.bdpt.Config`
   gains `max_scattering_order: int = 1` (default 1 keeps today's terminal
   single-scatter behaviour, bitwise: seed consumption, event partition and NEE
   rows untouched). For `> 1` a scatter-selected hit emits NEE rows as today and
@@ -452,7 +452,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
   domain (documented v1 carrier contract). MC-basic keeps its single-scatter
   analytic deposit (`scattering max_depth = 1` metadata). Native binding count
   re-frozen 193 -> 199 (the 6 ADR-021 chain symbols).
-- Explicit-failure policy: a montecarlo.basic reflection solve whose
+- Explicit-failure policy: a radiomap.Stochastic reflection solve whose
   `max_depth` exceeds the native reflection AD depth cap
   (`ops.mc_reflection_ad_max_depth()`, mirrored from the kernel constant) is
   rejected at `solve()` instead of failing mid-backward.
@@ -460,7 +460,7 @@ priority `scattering > diffraction > transmission > reflection > los`.
   `ad_status`, `tape_bytes` (bytes retained via `save_for_backward`; zero
   for `none`/`jvp`), `backward_launch_count` / `jvp_launch_count`
   (registered companion launches, one `AdLaunchLedger` shape across
-  montecarlo.basic / deterministic / path), plus `forward_time_ms`
+  radiomap.Stochastic / radiomap.Coherent / path), plus `forward_time_ms`
   (CUDA-synchronized solve wall time; a jvp solve carries its dual pass
   here) and `peak_memory_bytes` (how far the solve raised the process CUDA
   high-water mark). A vjp solve cannot observe its future backward, so

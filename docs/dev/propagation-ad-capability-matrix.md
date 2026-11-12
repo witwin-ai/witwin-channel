@@ -129,7 +129,7 @@ of what those `Function`s retained for backward.
 | source amplitude | `witwin/channel/propagation/fields.py` | field_vector, tx_power | `4*(2*K*3 + K)` | 1 per bucket, complex3 response only | released with the published field |
 
 `ad_tape_bytes` is gated to reverse mode by the consumer tape gate, which
-reproduces the gate `witwin/channel/deterministic.py` applies: forward mode retains
+reproduces the gate `witwin/channel/radiomap/_coherent.py` applies: forward mode retains
 nothing past the solve, so a `jvp` call reports zero tape however many
 companions it launched. A wideband sweep of `F` offsets drives `1 + F` columns,
 so its launch count is `(1 + F)` times the single-column count; that is the

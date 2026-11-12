@@ -1,18 +1,21 @@
-# `witwin.channel.montecarlo.basic`
+# `witwin.channel.radiomap.Stochastic`
 
-The Basic Monte Carlo solver produces incoherent sampled power estimates for
-links and receiver-grid radiomaps. It does not export individual paths.
+The Stochastic radiomap estimator produces Monte Carlo power estimates for
+links and receiver-grid radiomaps, combined in the power domain. It does not
+export individual paths. It is selected by passing a `Stochastic`
+configuration to [`radiomap.solve`](radiomap.md); the enumerated counterpart is
+[`Coherent`](radiomap-coherent.md).
 
 ```python
-from witwin.channel.montecarlo.basic import Config, Result, solve
+from witwin.channel.radiomap import RadioMap, Stochastic, solve
 ```
 
-## `Config`
+## `Stochastic`
 
 Frozen dataclass.
 
 ```text
-Config(
+Stochastic(
     samples: int = 4096,
     max_depth: int = 1,
     seed: int = 0,
@@ -20,6 +23,8 @@ Config(
     diagnostics: bool = False,
     ad_mode: str = "none",
     workspace_limit_bytes: int | None = 1 << 30,
+    receiver_radius_m: float | None = None,
+    scattering_samples: int | None = None,
 )
 ```
 
@@ -32,9 +37,11 @@ Config(
 | `diagnostics` | Return additional counters and performance diagnostics. |
 | `ad_mode` | `"none"`, `"jvp"`, or `"vjp"`; unsupported component combinations fail before launch. |
 | `workspace_limit_bytes` | Positive native workspace budget or `None`; insufficient budget fails rather than truncating samples. |
+| `receiver_radius_m` | Capture-sphere radius of point receivers, or `None` to derive it from the transmitter distance. |
+| `scattering_samples` | Area samples of the scattering estimator; `None` uses `samples`. |
 
 ```python
-config = Config(
+config = Stochastic(
     samples=16_384,
     max_depth=2,
     seed=2026,
@@ -47,10 +54,10 @@ config = Config(
 ```text
 solve(
     scene: witwin.core.Scene | witwin.core.SceneSnapshot,
-    config: Config,
+    config: Stochastic,
     *,
     reference_frequency_hz: float | torch.Tensor,
-) -> Result
+) -> RadioMap
 ```
 
 ### Parameters
@@ -58,12 +65,12 @@ solve(
 | Parameter | Description |
 | --- | --- |
 | `scene` | Core logical world or snapshot. |
-| `config` | Basic Monte Carlo configuration. |
+| `config` | A `witwin.channel.radiomap.Stochastic`; `radiomap.solve` dispatches on it. |
 | `reference_frequency_hz` | Positive reference frequency in hertz. |
 
 ### Returns
 
-A `Result` containing total gain, component power, optional component maps,
+A `RadioMap` containing total gain, component power, optional component maps,
 metadata, and optional diagnostics.
 
 ```python
@@ -73,13 +80,13 @@ print(result.component_power.keys())      # requested supported components
 print(result.component_maps["los"].shape) # same logical map shape
 ```
 
-## `Result`
+## `RadioMap`
 
 ```text
-Result(
+RadioMap(
     path_gain: torch.Tensor,
     component_power: dict[str, torch.Tensor],
-    metadata: Metadata,
+    metadata: RadioMapMetadata,
     diagnostics: dict[str, Any] | None = None,
     component_maps: dict[str, torch.Tensor] | None = None,
 )
@@ -89,16 +96,16 @@ Result(
 | --- | --- |
 | `path_gain` | `float32` total power gain; `[T, R]` for points or mixed receivers, `[T, rows, cols]` for exactly one grid (see the [receiver layout](index.md#receiver-layout-and-grid-axis-order)). |
 | `component_power` | Component-name to CUDA power tensor. |
-| `metadata` | `Metadata`: sample count, seed, components, execution counts and policies (see [`Metadata`](#metadata)). |
+| `metadata` | `RadioMapMetadata`: sample count, seed, components, execution counts and policies (see [`RadioMapMetadata`](#radiomapmetadata)). |
 | `diagnostics` | Additional diagnostics when requested; otherwise `None`. |
 | `component_maps` | Component-name to spatial map when a map layout exists; otherwise `None`. |
 
 The result is all-or-nothing. Workspace overflow, capacity failure, or a
 native exception never returns a truncated estimate.
 
-## `Metadata`
+## `RadioMapMetadata`
 
-A `TypedDict` naming the stable keys; at run time it is a plain `dict`, so key access, `in`, `.get` and JSON serialization are unchanged. Every solver publishes the result-semantics keys `estimator`, `quantity`, `combine` and `complete` (see the [index](index.md)), the `kernel` execution record, and the requested/effective configuration keys `requested_config`, `effective_config`, `requested_max_depth`, `effective_max_depth` and `component_max_depth`.
+A `TypedDict` naming the stable keys; at run time it is a plain `dict`, so key access, `in`, `.get` and JSON serialization are unchanged. Every solver publishes the result-semantics keys `estimator`, `quantity`, `combine` and `complete` (see the [index](index.md)); here `estimator` is `stochastic`, `combine` is `power` and `complete` is `False`, the `kernel` execution record, and the requested/effective configuration keys `requested_config`, `effective_config`, `requested_max_depth`, `effective_max_depth` and `component_max_depth`.
 
 | Key | Type | Meaning |
 | --- | --- | --- |

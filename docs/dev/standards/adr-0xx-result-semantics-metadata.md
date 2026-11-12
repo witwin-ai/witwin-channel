@@ -3,8 +3,12 @@
 - **Status:** Accepted (owner decision for the 0.6.0 radiomap estimators).
 - **Date:** 2026-11-10.
 - **Decision ID:** `result-semantics-metadata`.
-- **Scope:** `metadata` of `path`, `deterministic`, `montecarlo.basic` and
-  `montecarlo.bdpt` results. Additive; no numerical change.
+- **Scope:** `metadata` of `path`, `radiomap.Coherent`, `radiomap.Stochastic` and
+  `experimental.bdpt` results (the 0.5 `deterministic`, `montecarlo.basic` and
+  `montecarlo.bdpt`). Additive; no numerical change.
+- **Amended:** 2026-11-11, with the 0.6.0 rename: the `estimator` values became
+  `coherent` / `stochastic` (were `enumerated` / `sampled`) and the `combine` values
+  `field` / `power` (were `coherent` / `incoherent`), matching `radiomap.Coherent(combine=...)`.
 
 ## Decision
 
@@ -13,21 +17,21 @@ Every solver's result metadata carries four keys, built by one helper,
 
 | Key | Values | Meaning |
 | --- | --- | --- |
-| `estimator` | `enumerated`, `sampled` | Path enumeration or a Monte Carlo estimate. |
+| `estimator` | `coherent`, `stochastic` | Path enumeration or a Monte Carlo estimate. |
 | `quantity` | `{component: point_sample \| cell_average}` | Per requested component: value at the receiver position, or averaged over its cell / capture region. |
-| `combine` | `coherent`, `incoherent`, `none` | How rows reach a receiver value; `none` when rows are returned uncombined. |
+| `combine` | `field`, `power`, `none` | How rows reach a receiver value: complex field sum then squared, sum of row powers, or `none` when rows are returned uncombined. |
 | `complete` | `True`, `False`, `None` | Whether every path within the requested bounds was found; `None` when the solve does not report it. |
 
 Values in 0.6.0:
 
 | Solver | estimator | quantity | combine | complete |
 | --- | --- | --- | --- | --- |
-| `path` | enumerated | point_sample (every component) | none | from discovery |
-| `deterministic` | enumerated | point_sample (every component) | coherent / incoherent (`Config.coherent`) | from discovery |
-| `montecarlo.basic` | sampled | LoS, transmission: point_sample; reflection, diffraction, scattering: cell_average | incoherent | `False` |
-| `montecarlo.bdpt` | sampled | point_sample (every component) | coherent / incoherent (`Config.coherent`) | `False` |
+| `path` | coherent | point_sample (every component) | none | from discovery |
+| `radiomap.Coherent` | coherent | point_sample (every component) | field / power (`Coherent.combine`) | from discovery |
+| `radiomap.Stochastic` | stochastic | LoS, transmission: point_sample; reflection, diffraction, scattering: cell_average | power | `False` |
+| `experimental.bdpt` | stochastic | point_sample (every component) | field / power (`Config.coherent`) | `False` |
 
-For `path` and `deterministic`, `complete` is the discovery stage's per-depth
+For `path` and `radiomap.Coherent`, `complete` is the discovery stage's per-depth
 result (`metadata["discovery"]["complete"]`: true only when every reflection depth
 came from a complete source, so `discovery="rays"` gives `False`); the solver
 publishes it once, through the helper, next to the `discovery` block. The
