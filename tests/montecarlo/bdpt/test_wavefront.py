@@ -144,9 +144,9 @@ def test_enumerated_oracle_is_called_once(monkeypatch):
         ).component_power[component]
 
     for component in sorted(components):
-        # With the transmission paths in the solve the diffraction's incident terms compensate only the
-        # step those paths leave (design record adr-0xx-fw-penetrable-wedge), so the diffraction of the
-        # joint solve equals the diffraction of a solve that also carries transmission.
+        # With transmission paths in the solve the diffraction's incident terms compensate only the
+        # step those paths leave, so the joint solve's diffraction equals that of a solve that also
+        # carries transmission.
         subset = {"diffraction", "transmission"} if component == "diffraction" else {component}
         torch.testing.assert_close(
             together.component_power[component], power(subset, component), rtol=1.0e-6, atol=0.0
