@@ -99,3 +99,47 @@ def test_sheet_edge_resting_on_a_surface_is_not_a_half_plane():
     along_x = (rows["edge_dir"][:, 0].abs() > 0.99) & (rows["edge_pos"][:, 1].abs() < 1e-3)
     heights = sorted(round(float(z), 3) for z in rows["edge_pos"][along_x][:, 2])
     assert heights == [3.0]
+
+
+def _box(lo, hi) -> tuple[list, list]:
+    """A closed box with outward-wound triangles."""
+    (x0, y0, z0), (x1, y1, z1) = lo, hi
+    vertices = [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0],
+                [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]]
+    faces = [[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 1, 5], [0, 5, 4],
+             [1, 2, 6], [1, 6, 5], [2, 3, 7], [2, 7, 6], [3, 0, 4], [3, 4, 7]]
+    return vertices, faces
+
+
+def test_block_base_on_the_ground_is_not_a_wedge():
+    """A block standing on a ground block meets it in concave corners: its base edges do not diffract."""
+    block = _structure(*_box((0.0, 0.0, 0.0), (2.0, 2.0, 3.0)))
+    ground = _structure(*_box((-10.0, -10.0, -5.0), (10.0, 10.0, 0.0)))
+    rows = _edges([block, ground])
+    on_block = (rows["edge_pos"][:, :2] >= -1e-3).all(dim=1) & (rows["edge_pos"][:, :2] <= 2.001).all(dim=1)
+    heights = sorted({round(float(z), 3) for z in rows["edge_pos"][on_block][:, 2]})
+    # Four vertical corners (z = 1.5) and four roof edges (z = 3); no base edge at z = 0.
+    assert heights == [1.5, 3.0]
+    assert int(on_block.sum()) == 8
+
+
+def test_sheets_meeting_at_their_edges_form_one_wedge():
+    """A ground plate and a wall plate joined along their edges are one 270 degree wedge, faces turned out."""
+    ground = [[-1.0, -1.0, 0.0], [0.0, -1.0, 0.0], [0.0, 1.0, 0.0], [-1.0, 1.0, 0.0]]
+    wall = [[0.0, -1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 1.0], [0.0, -1.0, 1.0]]
+    for winding in ([[0, 1, 2], [0, 2, 3]], [[0, 2, 1], [0, 3, 2]]):
+        rows = _edges([_structure(ground, winding), _structure(wall, winding)])
+        junction = (rows["edge_pos"][:, 0].abs() < 1e-3) & (rows["edge_pos"][:, 2].abs() < 1e-3)
+        assert int(junction.sum()) == 1
+        angle = float(rows["exterior_angle"][junction][0])
+        assert math.isclose(angle, 1.5 * math.pi, rel_tol=1e-5)
+        normals = {tuple(round(float(v), 3) for v in rows[name][junction][0]) for name in ("n0", "n1")}
+        # The free sector is below the ground plate and in front of (+x) the wall.
+        assert normals == {(0.0, 0.0, -1.0), (1.0, 0.0, 0.0)}
+        face_a, face_b = int(rows["face0"][junction][0]), int(rows["face1"][junction][0])
+        # One face of each structure (ground triangles 0-1, wall triangles 2-3).
+        assert {face_a // 2, face_b // 2} == {0, 1}
+        # n0 x dir runs along face 0, away from the edge.
+        into = torch.linalg.cross(rows["n0"][junction], rows["edge_dir"][junction])[0]
+        centroid = rows["vertices"][rows["faces"][face_a].long()].mean(dim=0)
+        assert float((into * (centroid - rows["edge_pos"][junction][0])).sum()) > 0.0

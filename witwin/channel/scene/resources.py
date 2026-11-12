@@ -406,17 +406,16 @@ DEFAULT_EDGE_POLICY = EdgePolicy()
 # that:
 #
 # - the scene's ``EdgePolicy`` (``vertical_only`` filter,
-# ``boundary_edge_policy``) is actually enforced for path generation (audit
-# DF-4), and
-# - boundary edges shared between two structures are merged into a single wedge
-# record with the correct exterior angle instead of two duplicate half-plane
-# records that double count the diffracted field.
+# ``boundary_edge_policy``) is actually enforced for path generation, and
+# - each edge's wedge is built from every face that meets the edge line, across
+# structures: coincident edges become one wedge with the true exterior angle and
+# each face's own material, and an edge whose free space is a concave corner (a
+# block base on the ground) is dropped.
 
 _ENDPOINT_QUANTIZATION = 1.0e-4
 _NORMAL_QUANTIZATION = 1.0e-3
 # Runtime-cache key of the (first, last) end-point vertex ids of every refined diffraction edge.
 DIFFRACTION_EDGE_VERTEX_IDS = "diffraction_edge_vertex_ids"
-_NORMAL_COS_TOL = 1.0 - 1.0e-5
 _TWO_PI = 2.0 * math.pi
 
 
@@ -436,40 +435,6 @@ def _lexicographic_min_first(
     return torch.where(le, p0, p1), torch.where(le, p1, p0)
 
 
-def _duplicate_boundary_pairs(
-    records: RayDEdgeRecords, candidate: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Group boundary edges by quantized endpoints.
-
-    Returns (first_of_pair, second_of_pair, extra_duplicates); the extras are
-    third-or-later records of a group and are simply deselected.
-    """
-
-    device = candidate.device
-    empty = torch.empty((0,), device=device, dtype=torch.long)
-    index = candidate.nonzero(as_tuple=False).squeeze(1)
-    if int(index.numel()) < 2:
-        return empty, empty, empty
-    v0 = records.edge_v0[index].to(dtype=torch.long)
-    v1 = records.edge_v1[index].to(dtype=torch.long)
-    p0 = torch.round(records.vertices[v0] / _ENDPOINT_QUANTIZATION).to(dtype=torch.long)
-    p1 = torch.round(records.vertices[v1] / _ENDPOINT_QUANTIZATION).to(dtype=torch.long)
-    first, second = _lexicographic_min_first(p0, p1)
-    key = torch.cat([first, second], dim=1)
-    _, inverse, counts = torch.unique(key, dim=0, return_inverse=True, return_counts=True)
-    order = torch.argsort(inverse, stable=True)
-    sorted_inverse = inverse[order]
-    is_first = torch.ones_like(sorted_inverse, dtype=torch.bool)
-    is_first[1:] = sorted_inverse[1:] != sorted_inverse[:-1]
-    is_second = torch.zeros_like(is_first)
-    is_second[1:] = is_first[:-1] & (sorted_inverse[1:] == sorted_inverse[:-1])
-    in_pair = counts[sorted_inverse] >= 2
-    pair_first = index[order[is_first & in_pair]]
-    pair_second = index[order[is_second]]
-    extras = index[order[~is_first & ~is_second]]
-    return pair_first, pair_second, extras
-
-
 def refine_edge_geometry(
     rayd: RayDSceneResource, geometry: tuple[torch.Tensor, ...], *,
     policy: EdgePolicy | None = None,
@@ -486,36 +451,16 @@ def refine_edge_geometry(
         policy = DEFAULT_EDGE_POLICY
 
     selected = selected.clone()
+    n0 = n0.clone()
     n1 = n1.clone()
+    face0 = face0.clone()
     face1 = face1.clone()
     exterior_angle = exterior_angle.clone()
 
-    boundary = records.face1 < 0
     shape1 = records.shape_id.clone()
-    pair_first, pair_second, extras = _duplicate_boundary_pairs(records, selected & boundary)
-    if int(pair_first.numel()) > 0:
-        normal_a = n0[pair_first]
-        normal_b = n0[pair_second]
-        normal_dot = (normal_a * normal_b).sum(dim=1).clamp(-1.0, 1.0)
-        interior_angle = torch.arccos((-normal_dot).clamp(-1.0, 1.0))
-        merged_exterior = _TWO_PI - interior_angle
-        coplanar = normal_dot.abs() >= _NORMAL_COS_TOL
-        # Each boundary edge is oriented so that n0 x dir points into its face; the wedge is convex when
-        # face b leaves the edge behind face a's outward normal.
-        into_b = torch.cross(normal_b, edge_dir[pair_second], dim=1)
-        convex = (into_b * normal_a).sum(dim=1) < 0.0
-        keep = (merged_exterior > math.pi * (1.0 + 1.0e-6)) & ~coplanar & convex
-        selected[pair_first] = keep
-        selected[pair_second] = False
-        n1[pair_first] = normal_b
-        face1[pair_first] = face0[pair_second]
-        exterior_angle[pair_first] = merged_exterior
-        shape1[pair_first] = records.shape_id[pair_second]
-        boundary = boundary.clone()
-        boundary[pair_first] = False
-    if int(extras.numel()) > 0:
-        selected[extras] = False
-    _drop_contact_edges(rayd, selected, boundary, edge_pos, edge_dir, n0)
+    boundary = _wedges_from_every_face(
+        rayd, records, selected, edge_pos, edge_dir, lengths, n0, n1, face0, face1, exterior_angle,
+        shape1)
 
     if policy.boundary_edge_policy != "half_plane":
         selected &= ~boundary
@@ -532,37 +477,230 @@ def refine_edge_geometry(
     return (selected, edge_pos, edge_dir, lengths, line_min, line_max, n0, n1, face0, face1, exterior_angle)
 
 
-_CONTACT_PROBE_M = 1.0e-3
+# Probe of the faces that meet an edge line: a polygon of chords on a small circle around the
+# edge midpoint, in the plane normal to the edge. Every face through the line crosses it once
+# per side it extends to.
+_FACE_PROBE_RADIUS_M = 1.0e-3
+_FACE_PROBE_CHORDS = 32
+_FACE_PROBE_HITS = 4
+_FACE_PROBE_PHASE = 0.0137
+_RAY_ANGLE_TOL = 1.0e-4
 
 
-def _drop_contact_edges(
-    rayd: RayDSceneResource, selected: torch.Tensor, boundary: torch.Tensor, edge_pos: torch.Tensor,
-    edge_dir: torch.Tensor, n0: torch.Tensor,
-) -> None:
-    """Deselect half-plane edges that rest on another surface, in place.
+def _closed_faces(records: RayDEdgeRecords) -> torch.Tensor:
+    """Per face, whether its edge-connected surface is closed (so the face has an inside)."""
 
-    A sheet whose free edge lies on another surface (an open box wall standing on the ground) forms
-    a closed junction there, not a diffracting free edge. Just past the edge, on either side of the
-    sheet, a short probe crossing the edge line then hits that surface: the probe starts
-    ``_CONTACT_PROBE_M`` off the sheet and inside its face and ends as far beyond the edge.
+    face_count = int(records.faces.shape[0])
+    device = records.faces.device
+    label = torch.arange(face_count, device=device)
+    interior = records.face1 >= 0
+    a = records.face0[interior].long()
+    b = records.face1[interior].long()
+    if int(a.numel()) > 0:
+        while True:
+            lowest = label.clone()
+            lowest.scatter_reduce_(0, a, label[b], reduce="amin")
+            lowest.scatter_reduce_(0, b, label[a], reduce="amin")
+            for _ in range(4):
+                lowest = lowest[lowest]
+            if bool(torch.equal(lowest, label)):
+                break
+            label = lowest
+    open_label = torch.zeros(face_count, dtype=torch.bool, device=device)
+    open_label[label[records.face0[~interior & (records.face0 >= 0)].long()]] = True
+    return ~open_label[label]
+
+
+def _wedges_from_every_face(
+    rayd: RayDSceneResource, records: RayDEdgeRecords, selected: torch.Tensor,
+    edge_pos: torch.Tensor, edge_dir: torch.Tensor, lengths: torch.Tensor, n0: torch.Tensor,
+    n1: torch.Tensor, face0: torch.Tensor, face1: torch.Tensor, exterior_angle: torch.Tensor,
+    shape1: torch.Tensor,
+) -> torch.Tensor:
+    """Rebuild each selected edge's wedge from every face that meets its line, in place.
+
+    Faces of other structures (or other parts of the same mesh) through an edge line change the
+    free space around it: a block base on a ground face is a concave corner, two sheets meeting
+    at their edges a 270 degree wedge. Around each selected edge the faces through its line are
+    rays in the plane normal to the edge; a face of a closed surface occupies the side opposite
+    its normal (the edge's own faces use the wedge's outward normals). The free sector wider than
+    pi becomes the wedge, with its bounding faces as face 0 and face n and their normals turned
+    into it; an edge with none is deselected. Edges no other face meets are unchanged. Edges that
+    resolve to the same wedge keep one record. Returns the half-plane (boundary) mask.
     """
 
     from witwin.channel.kernels import geometry as geometry_kernels
+    from witwin.channel.propagation.penetration import SegmentPenetrationPolicy
+    from witwin.channel.runtime import create_capacity_failure_state
 
-    index = (selected & boundary).nonzero(as_tuple=False).squeeze(1)
-    if int(index.numel()) == 0:
-        return
-    point = edge_pos[index]
-    into = torch.cross(n0[index], edge_dir[index], dim=1)
-    into = into / into.norm(dim=1, keepdim=True).clamp_min(1.0e-12)
-    off = n0[index] * _CONTACT_PROBE_M
-    step = into * _CONTACT_PROBE_M
-    start = torch.cat([point + off + step, point - off + step]).contiguous()
-    end = torch.cat([point + off - step, point - off - step]).contiguous()
-    visible = geometry_kernels.rayd_visibility_forward(rayd.require_resource(), start, end, None)[0]
+    boundary = records.face1 < 0
+    index = selected.nonzero(as_tuple=False).squeeze(1)
     count = int(index.numel())
-    contact = ~(visible[:count] & visible[count:])
-    selected[index[contact]] = False
+    if count == 0:
+        return boundary
+    device = edge_pos.device
+    point = edge_pos[index]
+    axis = edge_dir[index]
+    frame_y = n0[index]
+    frame_x = torch.nn.functional.normalize(torch.cross(frame_y, axis, dim=1), dim=1)
+    chords = _FACE_PROBE_CHORDS
+    angle = (torch.arange(chords + 1, device=device, dtype=torch.float32) + 0.5) * (
+        _TWO_PI / chords) + _FACE_PROBE_PHASE
+    circle = point[:, None, :] + _FACE_PROBE_RADIUS_M * (
+        torch.cos(angle)[None, :, None] * frame_x[:, None, :]
+        + torch.sin(angle)[None, :, None] * frame_y[:, None, :])
+    origins = circle[:, :-1].reshape(-1, 3).contiguous()
+    targets = circle[:, 1:].reshape(-1, 3).contiguous()
+    vertices = records.vertices
+    diagonal = float((vertices.amax(dim=0) - vertices.amin(dim=0)).norm())
+    hits = geometry_kernels.rayd_segment_penetration_forward(
+        rayd, origins, targets, None, input_active_any=True, hit_capacity=_FACE_PROBE_HITS,
+        policy=SegmentPenetrationPolicy.EnumeratedFullDistance, scene_diagonal=diagonal,
+        failure_state=create_capacity_failure_state(origins))
+    slot = torch.arange(_FACE_PROBE_HITS, device=device)[None, :]
+    found = hits.valid.bool() & (slot < hits.num_hits.long()[:, None])
+    unresolved = torch.zeros(count, dtype=torch.bool, device=device)
+    unresolved.index_fill_(0, torch.div(hits.overflow.bool().nonzero().squeeze(1), chords,
+                                        rounding_mode="floor"), True)
+    row = torch.div(torch.arange(count * chords, device=device), chords,
+                    rounding_mode="floor")[:, None].expand_as(found)[found]
+    face = hits.global_primitive_id.long()[found]
+    position = hits.position[found]
+
+    # Keep the faces whose plane holds the whole edge line.
+    face_normal = torch.nn.functional.normalize(records.face_normals[face], dim=1)
+    anchor = vertices[records.faces[face, 0].long()]
+    half = 0.5 * lengths[index][row]
+    tolerance = 1.0e-5 + 4.0e-7 * point[row].abs().amax(dim=1)
+    on_plane = (
+        ((point[row] - half[:, None] * axis[row] - anchor) * face_normal).sum(dim=1).abs()
+        <= tolerance) & (
+        ((point[row] + half[:, None] * axis[row] - anchor) * face_normal).sum(dim=1).abs()
+        <= tolerance)
+    row, face, position, face_normal = row[on_plane], face[on_plane], position[on_plane], face_normal[on_plane]
+    in_face = torch.nn.functional.normalize(torch.cross(face_normal, axis[row], dim=1), dim=1)
+    side = torch.where(((position - point[row]) * in_face).sum(dim=1) >= 0.0, 1.0, -1.0)
+    ray = in_face * side[:, None]
+    theta = torch.remainder(torch.atan2((ray * frame_y[row]).sum(dim=1),
+                                        (ray * frame_x[row]).sum(dim=1)), _TWO_PI)
+    # One ray per (edge, face, side).
+    key = torch.stack([row, face, side.long()], dim=1)
+    key, first = _first_of_unique(key)
+    row, face, theta, ray, face_normal = row[first], face[first], theta[first], ray[first], face_normal[first]
+
+    own0 = face0[index][row].long()
+    own1 = torch.where(boundary[index][row], -1, face1[index][row].long())
+    own = (face == own0) | (face == own1)
+    other = torch.zeros(count, dtype=torch.bool, device=device)
+    other.index_fill_(0, row[~own], True)
+    other &= ~unresolved
+    keep_row = other[row]
+    if not bool(keep_row.any()):
+        return boundary
+    row, face, theta, ray, face_normal, own = (
+        row[keep_row], face[keep_row], theta[keep_row], ray[keep_row], face_normal[keep_row],
+        own[keep_row])
+    own0 = face0[index][row].long()
+    # A wedge face's outward normal from the edge table (n0 for face 0, n1 for face n).
+    own_normal = torch.where((face == own0)[:, None], n0[index][row], n1[index][row])
+    interior_record = ~boundary[index][row]
+    solid = _closed_faces(records)[face] | (own & interior_record)
+    normal = torch.where((own & interior_record)[:, None], own_normal, face_normal)
+    ccw = torch.cross(axis[row], ray, dim=1)
+    facing = (normal * ccw).sum(dim=1)
+    inside_ccw = solid & (facing < 0.0)
+    inside_cw = solid & (facing > 0.0)
+
+    # Sort each edge's rays by angle and merge rays at one angle.
+    order = torch.argsort(row.double() * 16.0 + theta.double())
+    row, face, theta, ccw, facing, inside_ccw, inside_cw, solid = (
+        row[order], face[order], theta[order], ccw[order], facing[order], inside_ccw[order],
+        inside_cw[order], solid[order])
+    new_group = torch.ones_like(row, dtype=torch.bool)
+    new_group[1:] = (row[1:] != row[:-1]) | ((theta[1:] - theta[:-1]) > _RAY_ANGLE_TOL)
+    group = torch.cumsum(new_group.long(), 0) - 1
+    group_count = int(group[-1]) + 1
+    group_row = torch.zeros(group_count, dtype=torch.long, device=device).scatter_(0, group, row)
+    group_theta = torch.zeros(group_count, dtype=theta.dtype, device=device).scatter_(0, group, theta)
+    group_ccw = torch.zeros(group_count, dtype=torch.int32, device=device).scatter_reduce_(
+        0, group, inside_ccw.int(), reduce="amax").bool()
+    group_cw = torch.zeros(group_count, dtype=torch.int32, device=device).scatter_reduce_(
+        0, group, inside_cw.int(), reduce="amax").bool()
+    # The face a free sector sees: one whose free side faces it (any sheet otherwise).
+    member = torch.arange(int(row.numel()), device=device)
+    big = int(row.numel())
+    sees_ccw = torch.where(~(solid & (facing < 0.0)), member, big)
+    sees_cw = torch.where(~(solid & (facing > 0.0)), member, big)
+    ccw_member = torch.full((group_count,), big, dtype=torch.long, device=device).scatter_reduce_(
+        0, group, sees_ccw, reduce="amin")
+    cw_member = torch.full((group_count,), big, dtype=torch.long, device=device).scatter_reduce_(
+        0, group, sees_cw, reduce="amin")
+    # The next group around the same edge (cyclic).
+    first_group = torch.full((count,), group_count, dtype=torch.long, device=device).scatter_reduce_(
+        0, group_row, torch.arange(group_count, device=device), reduce="amin")
+    following = torch.arange(1, group_count + 1, device=device)
+    last = torch.ones(group_count, dtype=torch.bool, device=device)
+    last[:-1] = group_row[1:] != group_row[:-1]
+    following = torch.where(last, first_group[group_row], following)
+    width = group_theta[following] - group_theta
+    width = torch.where(last, width + _TWO_PI, width)
+    occupied = group_ccw | group_cw[following]
+    wedge = ~occupied & (width > math.pi * (1.0 + 1.0e-6))
+    valid_ends = wedge & (ccw_member < big) & (cw_member[following] < big)
+    has_wedge = torch.zeros(count, dtype=torch.bool, device=device)
+    has_wedge.index_fill_(0, group_row[valid_ends], True)
+
+    touched = other.nonzero(as_tuple=False).squeeze(1)
+    drop = touched[~has_wedge[touched]]
+    selected[index[drop]] = False
+
+    start = valid_ends.nonzero(as_tuple=False).squeeze(1)
+    local = group_row[start]
+    start_member = ccw_member[start]
+    end_member = cw_member[following[start]]
+    target = index[local]
+    start_face = face[start_member]
+    end_face = face[end_member]
+    start_normal = torch.nn.functional.normalize(records.face_normals[start_face], dim=1)
+    end_normal = torch.nn.functional.normalize(records.face_normals[end_face], dim=1)
+    start_normal = start_normal * torch.where(
+        (start_normal * ccw[start_member]).sum(dim=1) >= 0.0, 1.0, -1.0)[:, None]
+    end_normal = end_normal * torch.where(
+        (end_normal * ccw[end_member]).sum(dim=1) <= 0.0, 1.0, -1.0)[:, None]
+    half_plane = following[start] == start
+    n0[target] = start_normal.to(n0.dtype)
+    n1[target] = torch.where(half_plane[:, None], -start_normal, end_normal).to(n1.dtype)
+    face0[target] = start_face.to(face0.dtype)
+    face1[target] = torch.where(half_plane, start_face, end_face).to(face1.dtype)
+    exterior_angle[target] = width[start].to(exterior_angle.dtype)
+    face_shape = torch.zeros(int(records.faces.shape[0]), dtype=records.shape_id.dtype, device=device)
+    face_shape[records.face0[records.face0 >= 0].long()] = records.shape_id[records.face0 >= 0]
+    shape1[target] = face_shape[torch.where(half_plane, start_face, end_face)]
+    boundary = boundary.clone()
+    boundary[target] = half_plane
+
+    # Records that resolve to one wedge (coincident edges of several structures) keep the first.
+    v0 = records.edge_v0[target].long()
+    v1 = records.edge_v1[target].long()
+    low, high = _lexicographic_min_first(
+        torch.round(vertices[v0] / _ENDPOINT_QUANTIZATION).long(),
+        torch.round(vertices[v1] / _ENDPOINT_QUANTIZATION).long())
+    faces_sorted = torch.sort(torch.stack([face0[target].long(), face1[target].long()], dim=1), dim=1).values
+    _, keep = _first_of_unique(torch.cat([low, high, faces_sorted], dim=1))
+    duplicate = torch.ones(int(target.numel()), dtype=torch.bool, device=device)
+    duplicate[keep] = False
+    selected[target[duplicate]] = False
+    return boundary
+
+
+def _first_of_unique(key: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """Unique rows of ``key`` and the index of each one's first occurrence."""
+
+    unique, inverse = torch.unique(key, dim=0, return_inverse=True)
+    position = torch.arange(int(key.shape[0]), device=key.device)
+    first = torch.full((int(unique.shape[0]),), int(key.shape[0]), dtype=torch.long,
+                       device=key.device).scatter_reduce_(0, inverse, position, reduce="amin")
+    return unique, first
 
 
 def diffraction_edge_vertex_ids(

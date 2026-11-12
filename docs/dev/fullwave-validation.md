@@ -630,10 +630,9 @@ cases, 2 otherwise; coupled paths on). Entries are RMS dB error / complex NMSE.
 
 ### Fixes and their full-wave effect
 
-D1-D4 and D6 are fixed; D5 is designed but not implemented (awaiting the owner's decision). Each has its own
-design record: `docs/dev/standards/adr-0xx-fw-d1-reflection-face-containment.md`, `-fw-d2-oblique-face-dyadic`,
-`-fw-d3-layered-face-term`, `-fw-d4-chain-completeness`, `-fw-d5-coincident-edges` (proposed) and
-`-fw-d6-boundary-sample`; the RayD side is in RayD ADR-0047 and ADR-0048 amendments.
+D1-D6 are fixed. Each has its own design record: `docs/dev/standards/adr-0xx-fw-d1-reflection-face-containment.md`,
+`-fw-d2-oblique-face-dyadic`, `-fw-d3-layered-face-term`, `-fw-d4-chain-completeness`, `-fw-d5-coincident-edges`
+and `-fw-d6-boundary-sample`; the RayD side is in RayD ADR-0047 and ADR-0048 amendments.
 
 | Defect | Fix | Gate metric (before -> after; target) |
 | --- | --- | --- |
@@ -641,12 +640,16 @@ design record: `docs/dev/standards/adr-0xx-fw-d1-reflection-face-containment.md`
 | D2 | face coefficients at the 3D incidence cosine; reciprocal specular dyadic in the edge-fixed bases | `cube_concrete_z` RSB 3.80 -> 0.47 dB (1.8); `cube_concrete_x` RSB 2.13 -> 0.05 dB (1.05) |
 | D3 | face terms reflect with the face's slab or layer stack (the specular kernels' coefficient) | RSB residual at normal incidence 0.05 / 0.38-0.42 / 0.54-0.60 -> 0.002 (slab / glass / layered) |
 | D4 | chains carry `max_depth` reflections; chain legs must leave the wedge into free space | `wall_column_z` RSB 5.35 -> 0.70 dB, `wall_column_y` 2.37 -> 0.98 dB (1.5); `canyon_x` plane 0 RSB 4.52 -> 1.14 dB |
+| D5 | each edge's wedge from every face that meets its line, across structures (compile time) | `trihedral_x` p0 shadow 3.04 / 0.908 -> 1.67 / 0.115; `canyon_z` p0 shadow 3.87 / 1.246 -> 2.65 / 0.697; regresses `trihedral_z` p0 shadow NMSE 0.161 -> 0.462 and `canyon_x` RSB (see the record) |
 | D6 | the pole term alone takes the one-sided limit, on the side the geometric tests choose; near-pole quantities from one small angle | on-boundary receiver: \|T\| 3.7e-5 -> 8.2e-4 (lit 8.2e-4) |
 
-Remaining strict xfails (measured / target): `double_edge_y` plane 1 RSB 2.84 / 1.5 dB (the RSB is continuous;
-an interference null next to the transmitter sits 2-3 mm off its full-wave position on the four worst edges);
-`trihedral_x` shadow and corner (D5); canyon shadow (D5), RSB (5.55 / 4.65 dB on `canyon_z`, 1.96 on `canyon_x`
-plane 1; second-order chain boundaries) and ISB (2.25-3.44 dB). The **unexplained canyon ISB** is resolved as a
+Remaining strict xfails (measured / target): `double_edge_y` plane 1 RSB 2.82 / 1.5 dB (the RSB is
+continuous; an interference null next to the transmitter sits 2-3 mm off its full-wave position on the four
+worst edges); `trihedral_x` plane 1 corner NMSE 0.633 / 0.60; canyon RSB (3.84 / 4.93 dB on `canyon_z`,
+2.76 on `canyon_x` plane 1; second-order chain boundaries) and ISB (2.46 / 3.68 dB). Two entries became strict
+xfails with D5: `trihedral_z` plane 0 shadow NMSE 0.462 / 0.195 (double diffraction along the plates into
+the new junction wedges) and `canyon_x` plane 0 RSB 3.27 / 1.5 dB (steps the spurious base wedges' chains
+had filled). The **unexplained canyon ISB** is resolved as a
 measurement effect: the probe that reported 25 % counted support edges at block faces (receivers inside the
 blocks); excluding the block interiors, the LoS steps are compensated to 1.4 % (y steps) and 2.3 % (x steps) of
 the LoS, and the ground-reflection steps that coincide with them to 0.0-0.5 %. The remaining ISB excess is at

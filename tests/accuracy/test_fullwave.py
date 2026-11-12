@@ -115,18 +115,18 @@ TOLERANCES: dict[tuple[str, int, str], tuple[float | None, float | None]] = {
     ("cube_concrete_z", 1, "transition"): (1.15, 0.025),
     ("cube_concrete_z", 1, "corner"): (0.85, 0.020),
     ("trihedral_z", 0, "lit"): (0.95, 0.015),
-    ("trihedral_z", 0, "shadow"): (0.60, 0.195),
+    ("trihedral_z", 0, "shadow"): (0.60, None),
     ("trihedral_z", 0, "transition"): (0.70, 0.015),
     ("trihedral_z", 0, "corner"): (1.05, 0.020),
     ("trihedral_z", 1, "lit"): (1.00, 0.020),
     ("trihedral_z", 1, "shadow"): (1.35, 0.040),
     ("trihedral_z", 1, "transition"): (0.85, 0.015),
-    ("trihedral_z", 1, "corner"): (1.05, 0.040),
-    ("trihedral_x", 0, "lit"): (1.05, 0.020),
-    ("trihedral_x", 0, "transition"): (1.70, 0.045),
+    ("trihedral_z", 1, "corner"): (1.05, 0.035),
+    ("trihedral_x", 0, "lit"): (1.00, 0.020),
+    ("trihedral_x", 0, "transition"): (1.65, 0.045),
     ("trihedral_x", 0, "corner"): (1.05, 0.025),
     ("trihedral_x", 1, "lit"): (1.20, 0.020),
-    ("trihedral_x", 1, "transition"): (1.85, 0.040),
+    ("trihedral_x", 1, "transition"): (1.75, 0.040),
     ("double_edge_y", 0, "lit"): (1.00, 0.015),
     ("double_edge_y", 0, "shadow"): (1.90, 0.165),
     ("double_edge_y", 1, "lit"): (0.55, 0.015),
@@ -143,12 +143,12 @@ TOLERANCES: dict[tuple[str, int, str], tuple[float | None, float | None]] = {
     ("wall_column_y", 0, "shadow"): (1.85, 0.080),
     ("wall_column_y", 0, "transition"): (1.65, 0.030),
     ("canyon_z_3g5", 0, "lit"): (2.05, 0.050),
-    ("canyon_z_3g5", 0, "transition"): (2.90, 0.025),
+    ("canyon_z_3g5", 0, "transition"): (2.40, 0.025),
     ("canyon_z_3g5", 0, "corner"): (2.50, 0.025),
     ("canyon_z_3g5", 1, "lit"): (1.80, 0.075),
-    ("canyon_z_3g5", 1, "shadow"): (2.80, 0.625),
-    ("canyon_z_3g5", 1, "transition"): (2.55, 0.025),
-    ("canyon_z_3g5", 1, "corner"): (2.50, 0.025),
+    ("canyon_z_3g5", 1, "shadow"): (2.70, 0.585),
+    ("canyon_z_3g5", 1, "transition"): (2.25, 0.020),
+    ("canyon_z_3g5", 1, "corner"): (2.50, 0.020),
     ("cube_concrete_x", 0, "lit"): (0.65, 0.015),
     ("cube_concrete_x", 0, "shadow"): (3.80, 0.205),
     ("cube_concrete_x", 0, "transition"): (1.15, 0.035),
@@ -160,23 +160,23 @@ TOLERANCES: dict[tuple[str, int, str], tuple[float | None, float | None]] = {
     ("canyon_x_3g5", 0, "transition"): (3.25, 0.045),
     ("canyon_x_3g5", 0, "corner"): (3.55, 0.035),
     ("canyon_x_3g5", 1, "lit"): (3.40, 0.060),
-    ("canyon_x_3g5", 1, "shadow"): (2.00, 0.520),
+    ("canyon_x_3g5", 1, "shadow"): (2.00, 0.515),
     ("canyon_x_3g5", 1, "transition"): (2.90, 0.060),
-    ("canyon_x_3g5", 1, "corner"): (2.55, 0.050),
+    ("canyon_x_3g5", 1, "corner"): (2.50, 0.050),
     ("double_edge_y", 1, "transition"): (1.30, 0.020),
-    ("trihedral_x", 0, "shadow"): (None, None),
-    ("trihedral_x", 1, "shadow"): (None, None),
-    ("trihedral_x", 1, "corner"): (None, None),
-    ("canyon_z_3g5", 0, "shadow"): (None, None),
-    ("canyon_x_3g5", 0, "shadow"): (1.65, None),
+    ("trihedral_x", 0, "shadow"): (1.95, 0.140),
+    ("trihedral_x", 1, "shadow"): (2.15, 0.170),
+    ("trihedral_x", 1, "corner"): (2.40, None),
+    ("canyon_z_3g5", 0, "shadow"): (2.95, 0.840),
+    ("canyon_x_3g5", 0, "shadow"): (1.65, 1.030),
 }
 JUMP_TOLERANCES: dict[tuple[str, int, str], float] = {
+    ("canyon_z_3g5", 1, "ISB"): 2.45,
     ("wall_column_z", 0, "RSB"): 1.75,
     ("wall_column_y", 0, "RSB"): 2.00,
     ("double_edge_z", 1, "RSB"): 1.00,
     ("cube_concrete_z", 1, "RSB"): 1.50,
     ("cube_concrete_x", 1, "RSB"): 1.05,
-    ("canyon_x_3g5", 0, "RSB"): 2.15,
     ("beam_z", 0, "ISB"): 0.90,
     ("beam_z", 0, "RSB"): 0.45,
     ("beam_z", 1, "ISB"): 1.50,
@@ -227,34 +227,32 @@ JUMP_TOLERANCES: dict[tuple[str, int, str], float] = {
 # metric) -> (target, measured, diagnosis). Each runs as a strict xfail against its target, the error
 # the model class reaches once the named defect is removed (measured with that defect worked around,
 # or the matching single-object ceiling), so a fix shows up as an unexpected pass.
-_D5 = ("coincident boundary edges of separate structures are diffracted as independent half-planes "
-       "or convex wedges")
+_TRIHEDRAL_CORNER = ("the three plates' junctions are wedges built from both plates; the corner "
+                     "region left is near the triple junction, where the junction wedges end")
 _CANYON_RSB = ("not isolated: the worst edges are depth-2 and depth-3 reflection paths that another "
                "block's corner blocks; their reflection-diffraction chain is enumerated on both sides "
                "but steps by less than the reflection (second-order chain boundaries)")
+_SHEET_DD = ("double diffraction along a sheet into the junction wedges of joined sheets: the "
+             "grazing D-D rows on the plates' planes add the error (dropping them gives 0.161, "
+             "the value before the junctions were wedges)")
+_BASE_CHAINS = ("the spurious block-base wedges' chains had filled the transmission and reflection "
+                "steps at the block bases; without them those steps are uncompensated")
 _CANYON_ISB = ("the LoS steps are compensated to 1.4-2.3 % of the LoS (Channel-only probe, block "
                "interiors excluded); the excess comes from samples where the total is 15-20 dB below "
                "the LoS, which the dB jump magnifies")
 KNOWN_GAPS: dict[tuple[str, int, str, str], tuple[float, float, str]] = {
-    ("double_edge_y", 1, "RSB", "jump"): (1.50, 2.84, "the RSB is continuous; an interference null "
+    ("trihedral_z", 0, "shadow", "nmse"): (0.195, 0.462, _SHEET_DD),
+    ("canyon_x_3g5", 0, "RSB", "jump"): (1.50, 3.27, _BASE_CHAINS),
+    ("double_edge_y", 1, "RSB", "jump"): (1.50, 2.82, "the RSB is continuous; an interference null "
                                           "next to the transmitter lies 2-3 mm from its full-wave "
                                           "position on the four worst edges"),
-    ("trihedral_x", 0, "shadow", "rmse_db"): (2.00, 3.04, _D5 + "; one welded mesh: 1.61 dB"),
-    ("trihedral_x", 0, "shadow", "nmse"): (0.15, 0.908, _D5 + "; one welded mesh: 0.103"),
-    ("trihedral_x", 1, "shadow", "rmse_db"): (2.10, 2.77, _D5 + "; one welded mesh: 1.84 dB"),
-    ("trihedral_x", 1, "shadow", "nmse"): (0.17, 0.336, _D5 + "; one welded mesh: 0.136"),
-    ("trihedral_x", 1, "corner", "rmse_db"): (2.45, 4.33, _D5 + "; one welded mesh: 2.15 dB"),
-    ("trihedral_x", 1, "corner", "nmse"): (0.60, 1.344, _D5 + "; one welded mesh: 0.485"),
-    ("canyon_z_3g5", 0, "shadow", "rmse_db"): (3.25, 3.87, _D5 + " (block bases on the ground); "
-                                               "bases hidden below the ground: 2.92 dB"),
-    ("canyon_z_3g5", 0, "shadow", "nmse"): (1.00, 1.246, _D5 + " (block bases); hidden bases: 0.845"),
-    ("canyon_x_3g5", 0, "shadow", "nmse"): (0.90, 0.962, _D5 + " (block bases); hidden bases: 0.745"),
-    ("canyon_z_3g5", 0, "RSB", "jump"): (1.50, 5.55, _CANYON_RSB),
-    ("canyon_z_3g5", 1, "RSB", "jump"): (1.50, 4.65, _CANYON_RSB),
-    ("canyon_x_3g5", 1, "RSB", "jump"): (1.50, 1.96, _CANYON_RSB),
-    ("canyon_z_3g5", 0, "ISB", "jump"): (1.50, 2.25, _CANYON_ISB),
-    ("canyon_z_3g5", 1, "ISB", "jump"): (1.50, 2.86, _CANYON_ISB),
-    ("canyon_x_3g5", 0, "ISB", "jump"): (1.50, 3.44, _CANYON_ISB),
+    ("trihedral_x", 1, "corner", "nmse"): (0.60, 0.633, _TRIHEDRAL_CORNER + "; one welded mesh: "
+                                            "0.485"),
+    ("canyon_z_3g5", 0, "RSB", "jump"): (1.50, 3.84, _CANYON_RSB),
+    ("canyon_z_3g5", 1, "RSB", "jump"): (1.50, 4.93, _CANYON_RSB),
+    ("canyon_x_3g5", 1, "RSB", "jump"): (1.50, 2.76, _CANYON_RSB + "; plus " + _BASE_CHAINS),
+    ("canyon_z_3g5", 0, "ISB", "jump"): (1.50, 2.46, _CANYON_ISB),
+    ("canyon_x_3g5", 0, "ISB", "jump"): (1.50, 3.68, _CANYON_ISB),
 }
 
 
