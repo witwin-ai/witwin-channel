@@ -2153,7 +2153,7 @@ def _validate(scene: SolverScene, config: Config) -> ReceiverGrid | None:
     if first_receiver_grid(scene) is not None and config.receiver_strategy != "grid_area":
         raise RuntimeError("receiver_strategy='point_sphere' requires point receivers")
     validate_scalar_endpoint_features(
-        scene.transmitters, scene.receivers, solver="BDPT"
+        scene.transmitters, scene.receivers, solver="experimental.bdpt"
     )
     _reject_live_geometry_through_sampler(scene, config)
     return grid
@@ -3115,7 +3115,7 @@ def solve(
     validate_scalar_endpoint_features(
         tuple(view for view in endpoint_views if view.source.role == "tx"),
         tuple(view for view in endpoint_views if view.source.role == "rx"),
-        solver="BDPT",
+        solver="experimental.bdpt",
     )
     compiled = compile_scene(
         scene, reference_frequency_hz=reference_frequency_hz
@@ -3125,7 +3125,7 @@ def solve(
         # mix it with the layered law of the enumerated paths.
         raise NotImplementedError(
             "BDPT does not yet evaluate reflection off multilayer materials; use the "
-            "deterministic, path or Monte Carlo basic solver, or a single-layer material"
+            "radiomap.Coherent, path or radiomap.Stochastic, or a single-layer material"
         )
     result = _solve_pipeline(
         bind_solver_scene(compiled),

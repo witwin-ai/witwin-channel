@@ -758,7 +758,7 @@ def _reflection_topology(
     if not scene.structures or tx_positions.numel() == 0 or rx_positions.numel() == 0:
         return _empty_reflection_block(device), 0, 0
     if not rayd.available:
-        raise RuntimeError("deterministic reflection requires RayD native scene capability")
+        raise RuntimeError("reflection discovery requires RayD native scene capability")
     faces, normals, tri_a = _reflection_geometry_tables(compiled, device)
     if int(faces.shape[0]) == 0 or max_depth < min_depth:
         return _empty_reflection_block(device), 0, 0

@@ -79,7 +79,7 @@ def _transmission_topology(
     rayd = compiled.rayd
     if not rayd.available:
         raise RuntimeError(
-            "deterministic transmission requires RayD native scene capability"
+            "transmission discovery requires RayD native scene capability"
         )
 
     if ad_mode == "none":

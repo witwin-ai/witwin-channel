@@ -477,9 +477,9 @@ def _validate_requested_components(config: Coherent) -> None:
             f"derivative companion), got ad_mode={config.ad_mode!r}"
         )
     if "reflection" in config.components and config.max_depth < 1:
-        raise RuntimeError("deterministic reflection requires max_depth >= 1")
+        raise RuntimeError("radiomap.Coherent reflection requires max_depth >= 1")
     if "diffraction" in config.components and config.max_depth < 1:
-        raise RuntimeError("deterministic diffraction requires max_depth >= 1")
+        raise RuntimeError("radiomap.Coherent diffraction requires max_depth >= 1")
 
 
 def _validate_scattering_coherent_mode(scattering_info: dict[str, Any] | None) -> None:
@@ -632,8 +632,8 @@ def _metadata(
         config.components,
         reflection_available=capability["rayd_native"],
         diffraction_available=capability["rayd_native"],
-        reflection_error="deterministic reflection requires RayD native capability",
-        diffraction_error="deterministic diffraction requires RayD native capability",
+        reflection_error="radiomap.Coherent reflection requires RayD native capability",
+        diffraction_error="radiomap.Coherent diffraction requires RayD native capability",
     )
     # transmission carries specular wall-penetration paths since transmission and
     # scattering carries Kirchhoff rough-surface patch paths since rough scattering.
@@ -648,7 +648,7 @@ def _metadata(
     if "transmission" in config.components:
         if not capability["rayd_native"]:
             raise RuntimeError(
-                "deterministic transmission requires RayD native capability"
+                "radiomap.Coherent transmission requires RayD native capability"
             )
         # Endpoint-connection thin_sheet contract.
         metadata_transmission = {
@@ -845,7 +845,7 @@ def _solve_receiver_windows(
         start = stop
         size = max(1, min(2 * done, (_WINDOW_ROWS * done) // max(rows, 1)))
     if totals is None or first_execution is None:
-        raise RuntimeError("a windowed deterministic solve needs at least one receiver")
+        raise RuntimeError("a windowed radiomap.Coherent solve needs at least one receiver")
     path_gain, field, component_power, component_fields = apply_layout_to_accumulation(
         path_gain=totals[0], field=totals[1], component_power=totals[2],
         component_fields=totals[3], layout=layout, return_field=config.return_field,
@@ -893,9 +893,9 @@ def _validate_solve_request(
 
     _validate_requested_components(config)
     if "reflection" in config.components and not native_info["uses_rayd_native"]:
-        raise RuntimeError("deterministic reflection requires RayD native capability")
+        raise RuntimeError("radiomap.Coherent reflection requires RayD native capability")
     if "diffraction" in config.components and not native_info["uses_rayd_native"]:
-        raise RuntimeError("deterministic diffraction requires RayD native capability")
+        raise RuntimeError("radiomap.Coherent diffraction requires RayD native capability")
     has_grid = any(
         receiver.__class__.__name__ == "ReceiverGrid" for receiver in scene.receivers
     )
@@ -905,7 +905,7 @@ def _validate_solve_request(
 
 def _solve_pipeline(scene: SolverScene, config: Coherent) -> CoherentRadioMap:
     validate_scalar_endpoint_features(
-        scene.transmitters, scene.receivers, solver="deterministic"
+        scene.transmitters, scene.receivers, solver="radiomap.Coherent"
     )
     if not torch.cuda.is_available():
         raise RuntimeError("witwin.channel.radiomap requires CUDA")

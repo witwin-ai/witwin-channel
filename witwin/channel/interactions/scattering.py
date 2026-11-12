@@ -1067,7 +1067,7 @@ def _collect_scattering_rows(
         return None, 0, 0, 0
     if not compiled.rayd.available:
         raise RuntimeError(
-            "deterministic scattering requires RayD native scene capability"
+            "scattering discovery requires RayD native scene capability"
         )
 
     if endpoint_tensors is None:
@@ -2666,7 +2666,7 @@ def append_chain_scattering_paths(
     compiled = require_compiled(scene)
     if not compiled.rayd.available:
         raise RuntimeError(
-            "deterministic scatter-chain discovery requires RayD native capability"
+            "scatter-chain discovery requires RayD native capability"
         )
     screens = realization_phase_screens(compiled.materials, compiled.assignments)
     ensemble_faces = _ensemble_scatter_faces(compiled, screens, device=device)
