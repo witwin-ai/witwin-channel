@@ -441,11 +441,14 @@ def preflight_rows(
                     _estimate_workspace_bytes,
                 )
 
+                # The default sampler streams its samples in fixed chunks, so its workspace
+                # does not grow with the sample count; exporting every sample's path does.
                 components = {"los"} if depth == 0 else {"los", "reflection"}
                 config = Config(
                     samples=PREFLIGHT_MC_SAMPLES,
                     max_depth=depth,
                     components=components,
+                    export_paths=True,
                 )
                 estimate = MemoryEstimate(
                     temporary_bytes=_estimate_workspace_bytes(
