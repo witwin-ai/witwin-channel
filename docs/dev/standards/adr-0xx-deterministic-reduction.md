@@ -7,7 +7,7 @@
   diffraction tape map, its JVP and its frequency cotangent (`diffraction.cu`), the MC
   reflection map and its JVP (`reflection.cu`), the MC component power totals
   (`montecarlo.cu`), and the frequency cotangent of the MC LoS matrix (`los.cu`). Extends the
-  frequency-cotangent part of the AD reduction-order ADR.
+  frequency-cotangent part of ADR-053 (AD reduction order).
 
 ## Context
 
@@ -86,9 +86,23 @@ component, a fixed shuffle tree).
 
 ## Evidence
 
-Filled from the task report (`reports/determ.md`): repeat spread per output before and
-after, the numeric shift against the mean of the old runs, the full-wave gate, the AD suite,
-and launch/peak-memory counts.
+- Repro harness (task report `reports/determ.md`): 11 cases (Coherent `lrd` depth 1, coupled
+  depth 2, rough scattering; Stochastic `lrd` and rough; VJP frequency gradients and JVP
+  frequency tangents), 5 runs in each of 2 processes. Base tree: every aggregated map and
+  every frequency gradient varied (up to 1.1e-6 of the map maximum for the coupled slot,
+  9.3e-7 for the Coherent frequency gradient). Branch: 0 varying outputs except the Coherent
+  and Path frequency gradients, whose remaining noise comes from RayD's VJP kernels.
+- Shift against the mean of 5 base runs: at most 6.4e-7 of the map maximum for primal maps
+  (coupled slot; base spread 1.1e-6), and at most 3.0e-6 for JVP tangent maps, where
+  per-row tangents of opposite sign cancel. Per-path columns are bitwise unchanged.
+- `tests/kernels/test_order_independent_sums.py`: identical bits for any row permutation,
+  and every cell within one float32 rounding plus `n` half-quanta of the float64 exact sum.
+- `tests/deterministic/test_reproducible_aggregates.py` and the receiver-window test: three
+  repeated solves, and a windowed against a whole solve, are byte-identical.
+- `tests/accuracy` (full-wave included) and `tests/ad` pass with no tolerance changed.
+- Launch counts (profiler, same scenes): Coherent `lrd` solves +1 kernel, -1 memset; MC
+  `lr` solves unchanged at 11 kernels, -4 memsets; peak allocation unchanged at the reported
+  resolution.
 
 ## Consequences
 
