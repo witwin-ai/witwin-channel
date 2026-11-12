@@ -83,16 +83,40 @@ def _bind(scene: Scene):
     return compiled, scene_endpoints.bind_solver_scene(compiled)
 
 
+def test_binding_is_host_only_and_builds_no_store(monkeypatch: pytest.MonkeyPatch) -> None:
+    from witwin.channel.scene.compiler import compile as compile_scene
+
+    scene = Scene(
+        endpoints=[
+            make_transmitter(torch.tensor([0.0, 0.0, 10.0])),
+            make_receiver(torch.tensor([3.0, 4.0, 1.5])),
+        ]
+    )
+    compiled = compile_scene(scene, reference_frequency_hz=3.5e9)
+
+    def unexpected(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("binding started CUDA or tensor work")
+
+    monkeypatch.setattr(scene_endpoints.torch.cuda, "is_available", unexpected)
+    monkeypatch.setattr(scene_endpoints.torch.cuda, "current_device", unexpected)
+    monkeypatch.setattr(scene_endpoints, "build_endpoint_store", unexpected)
+    solver_scene = scene_endpoints.bind_solver_scene(compiled)
+    assert solver_scene.endpoint_store is None
+    assert compiled._endpoint_store_cache is None
+
+
 @requires_cuda
 def test_store_is_built_once_per_endpoint_token() -> None:
     receivers = [make_receiver(torch.tensor([10.0 + i, 5.0, 1.5])) for i in range(6)]
     scene = Scene(endpoints=[make_transmitter(torch.tensor([0.0, 0.0, 10.0])), *receivers])
     compiled, first = _bind(scene)
+    device = torch.device("cuda")
+    store = scene_endpoints.endpoint_store(first, device=device)
+    assert scene_endpoints.endpoint_store(first, device=device) is store
     second = scene_endpoints.bind_solver_scene(compiled)
-    assert first.endpoint_store is not None
-    assert second.endpoint_store is first.endpoint_store
+    assert second.endpoint_store is store
+    assert scene_endpoints.endpoint_store(second, device=device) is store
     assert second.receivers is first.receivers
-    store = first.endpoint_store
     assert store.rx_positions.shape == (6, 3)
     assert torch.equal(
         store.rx_positions.cpu(), torch.stack([receiver.position for receiver in receivers])
@@ -128,9 +152,11 @@ def test_differentiable_endpoint_leaves_stay_on_the_graph_and_are_not_cached() -
         endpoints=[make_transmitter(position), make_receiver(torch.tensor([3.0, 4.0, 1.5]))]
     )
     compiled, solver_scene = _bind(scene)
-    store = solver_scene.endpoint_store
+    store = scene_endpoints.endpoint_store(solver_scene, device=torch.device("cuda"))
     assert store.differentiable
+    assert scene_endpoints.endpoint_store(solver_scene, device=torch.device("cuda")) is store
     assert compiled._endpoint_store_cache is None
+    assert scene_endpoints.bind_solver_scene(compiled).endpoint_store is None
     store.tx_positions.sum().backward()
     assert torch.equal(position.grad, torch.ones(3))
     assert not math.isnan(float(store.tx_power.sum()))

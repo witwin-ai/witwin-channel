@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
 from typing import TYPE_CHECKING, Any, cast
 
@@ -357,6 +357,9 @@ class SolverScene:
     frequency: float | torch.Tensor
     metadata: Mapping[str, Any]
     endpoint_store: EndpointStore | None = None
+    # The store built on first use and the endpoint token it is cached under. Not an
+    # init field, so ``dataclasses.replace`` gives a re-bound scene a fresh slot.
+    _bound: dict[str, Any] = field(default_factory=dict, init=False, repr=False, compare=False)
 
 
 def _as_quaternion(orientation: torch.Tensor) -> torch.Tensor:
@@ -1154,32 +1157,52 @@ def build_endpoint_store(
     )
 
 
+def _store_matches(store: EndpointStore | None, scene: SolverScene, target: torch.device) -> bool:
+    return (
+        store is not None
+        and store.device == target
+        and store.transmitters is scene.transmitters
+        and store.receivers is scene.receivers
+    )
+
+
 def endpoint_store(scene: SolverScene, *, device: torch.device | None = None) -> EndpointStore:
-    """The scene's bound :class:`EndpointStore`, or a fresh one for re-bound endpoints."""
+    """The scene's :class:`EndpointStore`, built on first use and cached per endpoint token.
+
+    A scene from :func:`bind_solver_scene` builds its store here, inside the solve, so
+    binding performs no CUDA or tensor work and a solve can refuse its budget first.
+    """
 
     target = torch.device("cuda") if device is None else torch.device(device)
     if target.type == "cuda" and target.index is None:
         target = torch.device("cuda", torch.cuda.current_device())
     store: EndpointStore | None = getattr(scene, "endpoint_store", None)
-    if (
-        store is not None
-        and store.device == target
-        and store.transmitters is scene.transmitters
-        and store.receivers is scene.receivers
-    ):
-        return store
-    return build_endpoint_store(scene.transmitters, scene.receivers, device=target)
+    if _store_matches(store, scene, target):
+        return cast(EndpointStore, store)
+    bound: dict[str, Any] | None = getattr(scene, "_bound", None)
+    if bound is not None and _store_matches(bound.get("store"), scene, target):
+        return cast(EndpointStore, bound["store"])
+    store = build_endpoint_store(scene.transmitters, scene.receivers, device=target)
+    if bound is not None:
+        bound["store"] = store
+        token = bound.get("token")
+        if token is not None:
+            compiled = scene.compiled
+            compiled._endpoint_store_cache = None if store.differentiable else (token, store)
+    return store
 
 
 def bind_solver_scene(compiled: CompiledScene) -> SolverScene:
+    """Bind ``compiled`` for one solve; host-only, the endpoint store is built on first use."""
+
     require_no_functorch_transform(
         [getattr(structure, "vertices", None) for structure in compiled.structures]
         + [compiled.reference_frequency_hz]
     )
     token = endpoint_token(compiled.source)
-    device = torch.device("cuda", torch.cuda.current_device()) if torch.cuda.is_available() else None
     cached = compiled._endpoint_store_cache
-    if cached is not None and cached[0] == token and cached[1].device == device:
+    store: EndpointStore | None
+    if cached is not None and cached[0] == token:
         store = cached[1]
         transmitters, receivers = store.transmitters, store.receivers
     else:
@@ -1190,10 +1213,7 @@ def bind_solver_scene(compiled: CompiledScene) -> SolverScene:
         transmitters = tuple(view for view in views if isinstance(view, _TransmitterView))
         receivers = tuple(view for view in views if not isinstance(view, _TransmitterView))
         store = None
-        if device is not None:
-            store = build_endpoint_store(transmitters, receivers, device=device)
-            compiled._endpoint_store_cache = None if store.differentiable else (token, store)
-    return SolverScene(
+    scene = SolverScene(
         compiled=compiled,
         structures=compiled.structures,
         transmitters=transmitters,
@@ -1202,6 +1222,8 @@ def bind_solver_scene(compiled: CompiledScene) -> SolverScene:
         metadata=compiled.source.metadata,
         endpoint_store=store,
     )
+    scene._bound["token"] = token
+    return scene
 
 
 def require_compiled(scene: SolverScene | CompiledScene) -> CompiledScene:

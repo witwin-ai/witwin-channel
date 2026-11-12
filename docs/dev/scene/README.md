@@ -45,7 +45,9 @@ solver-neutral propagation consumer among them. `require_compiled` resolves
 
 ## Endpoint store
 
-`bind_solver_scene` attaches one `EndpointStore` to the `SolverScene`. It holds
+`bind_solver_scene` is host-only: it validates the endpoints and returns a `SolverScene`
+whose one `EndpointStore` is built by `endpoint_store(scene)` on first use inside the
+solve, so a solve refuses its memory budget before any CUDA or tensor work. The store holds
 every endpoint tensor a solve reads, on the CUDA device: transmitter positions,
 powers and world-frame polarizations, flattened receiver positions (a
 `ReceiverGrid` through the native grid generator), per-receiver polarizations
@@ -73,8 +75,8 @@ product bit for bit: the 3x3 matrix-vector product sums `(r1*u1 + r2*u2) + r0*u0
 on the host BLAS and `(r0*u0 + r2*u2) + r1*u1` on CUDA, and the batched code
 uses that per-device order.
 
-`endpoint_store(scene)` returns the bound store, or builds an uncached one when
-a caller rebinds endpoints (explicit-array expansion binds its own; a BDPT
+`endpoint_store(scene)` returns the bound store (building it once per `SolverScene`), or
+builds an uncached one when a caller rebinds endpoints (explicit-array expansion binds its own; a BDPT
 sub-scene over one grid builds one per call). The module-level helpers
 (`transmitter_positions`, `receiver_positions`,
 `transmitter_polarizations_as_stored` in `compiler`;
