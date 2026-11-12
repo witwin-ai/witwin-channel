@@ -705,8 +705,12 @@ print(prepared.row_count)
 print([(b.component, b.depth) for b in prepared.buckets])
 ```
 
-Unsupported components, invalid padding, or a malformed topology raise before
-a usable handle is returned.
+Only the components in `capabilities().fixed_topology_components` (`los` and
+`reflection`) can be frozen: a topology with transmission or diffraction rows
+raises `NotImplementedError`, so discover with
+`components=frozenset({"los", "reflection"})` when the rows will be replayed.
+Invalid padding or a malformed topology raises `ValueError`. Both happen before a
+usable handle is returned.
 
 ### `reevaluate`
 

@@ -58,7 +58,10 @@ ADR-032 compact boundary; no adapter performs a second count observation or
 Torch/Python compaction. Unsupported component, response, frequency-offset, or
 AD combinations fail before a partial result is returned.
 
-The consumer supports LoS, reflection, transmission, and diffraction.
+The consumer discovers LoS, reflection, transmission, and diffraction rows
+(diffraction at `ad_mode="none"` only). Fixed-topology replay (`reevaluate`,
+`evaluate_time_varying`) covers LoS and reflection rows; a frozen topology that
+holds transmission or diffraction rows is refused by `prepare_fixed_topology`.
 Scattering is not advertised or accepted: its current enumerated rows are
 incoherent power-domain output and do not satisfy the consumer's coherent
 transport or canonical pair-major row contracts.

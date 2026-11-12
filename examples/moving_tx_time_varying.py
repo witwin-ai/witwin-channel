@@ -70,9 +70,9 @@ def main() -> None:
                 sources=_batch(tx_positions[:1], TX_ID, source=True),
                 sinks=_batch(rx, RX_ID, source=False),
                 reference_frequency_hz=args.frequency,
-                # Consumer discovery of diffraction currently raises (a known, pinned
-                # defect in the consumer's order-1 diffraction route), so this
-                # example replays LoS and reflection rows only.
+                # Discovery also returns transmission and diffraction rows, but a frozen
+                # topology can hold only capabilities().fixed_topology_components (LoS
+                # and reflection), so this example discovers and replays those two.
                 components=frozenset({"los", "reflection"}),
                 max_depth=2,
                 response="scalar_transport",

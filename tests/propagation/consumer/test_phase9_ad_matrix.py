@@ -441,6 +441,18 @@ def test_diffraction_primal_evaluates_while_its_ad_column_stays_refused() -> Non
     assert float(coefficient.abs().sum()) > 0.0
 
 
+def test_discovered_diffraction_rows_cannot_be_frozen_for_replay() -> None:
+    """Discovery publishes diffraction rows; the fixed-topology route refuses them."""
+
+    assert "diffraction" not in capabilities().fixed_topology_components
+    compiled = compile_scene(wedge_diffraction_scene(), reference_frequency_hz=3.0e9)
+    sources, sinks = _wedge_endpoints()
+    topology = evaluate(compiled, _wedge_request("none", sources, sinks)).paths.topology
+    assert topology.row_count > 0
+    with pytest.raises(NotImplementedError, match="fixed-topology reevaluation does not support"):
+        prepare_fixed_topology(topology)
+
+
 # ---------------------------------------------------------------------------
 # Higher order: refused everywhere, loudly, before any partial result.
 # ---------------------------------------------------------------------------
