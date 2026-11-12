@@ -23,12 +23,15 @@ SCHEMA = {
 
 
 def _driver_version() -> str:
-    raw = torch.cuda.cudart().cudaDriverGetVersion()
-    if isinstance(raw, tuple):
-        if len(raw) != 2 or int(raw[0]) != 0:
-            raise RuntimeError(f"cudaDriverGetVersion failed: {raw!r}")
-        raw = raw[1]
-    value = int(raw)
+    # Torch's cudart bindings do not expose the driver version, so ask the driver library.
+    import ctypes
+
+    library = ctypes.WinDLL("nvcuda.dll") if os.name == "nt" else ctypes.CDLL("libcuda.so.1")
+    raw = ctypes.c_int(0)
+    status = int(library.cuDriverGetVersion(ctypes.byref(raw)))
+    if status != 0:
+        raise RuntimeError(f"cuDriverGetVersion failed with CUresult {status}")
+    value = int(raw.value)
     major = value // 1000
     minor = (value % 1000) // 10
     return f"{major}.{minor}"

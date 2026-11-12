@@ -16,16 +16,8 @@ from typing import Callable
 import numpy as np
 import torch
 
-from witwin.channel import (
-    Dielectric,
-    PerfectConductor,
-    ReceiverGrid,
-    ReceiverPoint,
-    Scene,
-    Structure,
-    Transmitter,
-    build_info,
-)
+from witwin.channel import build_info
+from witwin.channel.importers import load_mitsuba
 from witwin.channel.radiomap import Coherent as DeterministicConfig
 from witwin.channel.radiomap import solve as solve_deterministic
 from witwin.channel.radiomap import Stochastic as BasicConfig
@@ -34,6 +26,8 @@ from witwin.channel.experimental.bdpt import Config as BDPTConfig
 from witwin.channel.experimental.bdpt import solve as solve_bdpt
 from witwin.channel.path import Config as PathConfig
 from witwin.channel.path import solve as solve_path
+from witwin.core import AntennaState, Mesh, PhysicalMaterial, ReceiverGrid, Scene, Structure
+from witwin.core.identity import new_antenna_id
 
 
 SCHEMA = {"name": "witwin.channel.phase13-phase12-worker", "version": 2}
@@ -66,6 +60,8 @@ NON_TARGET_NAMES = (
 )
 HASH_FORMAT = "semantic-dtype-shape-little-endian-contiguous"
 HASH_SCHEMA_VERSION = 1
+FIXTURE_FREQUENCY_HZ = 3.5e9
+MUNICH_FREQUENCY_HZ = 2.4e9
 
 
 def _tensor_bytes(tensor: torch.Tensor) -> tuple[bytes, list[int], str]:
@@ -101,6 +97,7 @@ def _hash_json(value: object) -> str:
 
 def _grid(size: int = 32) -> ReceiverGrid:
     return ReceiverGrid(
+        new_antenna_id(),
         origin=torch.tensor([-12.0, -12.0, 1.5]),
         x_axis=torch.tensor([1.0, 0.0, 0.0]),
         y_axis=torch.tensor([0.0, 1.0, 0.0]),
@@ -108,74 +105,79 @@ def _grid(size: int = 32) -> ReceiverGrid:
     )
 
 
+def _structure(
+    vertices: list[list[float]], faces: list[list[int]], material: PhysicalMaterial, *, name: str,
+    surface_id: int,
+) -> Structure:
+    mesh = Mesh(
+        torch.tensor(vertices, dtype=torch.float32), torch.tensor(faces, dtype=torch.int32),
+        recenter=False, fill_mode="surface", topology_diagnostics=False,
+    )
+    return Structure(mesh, material, name=name, surface_id=surface_id)
+
+
+def _transmitter(position: list[float]) -> AntennaState:
+    return AntennaState(new_antenna_id(), "tx", torch.tensor(position))
+
+
 def _wall_scene(*, point_receiver: bool = False) -> Scene:
-    wall = Structure(
-        vertices=torch.tensor(
-            [[0.0, -20.0, 0.0], [0.0, 20.0, 0.0],
-             [0.0, -20.0, 20.0], [0.0, 20.0, 20.0]],
-            dtype=torch.float32,
-        ),
-        faces=torch.tensor([[0, 1, 2], [1, 3, 2]], dtype=torch.int32),
-        material=Dielectric(eps_r=4.8, sigma_e=0.015),
+    wall = _structure(
+        [[0.0, -20.0, 0.0], [0.0, 20.0, 0.0], [0.0, -20.0, 20.0], [0.0, 20.0, 20.0]],
+        [[0, 1, 2], [1, 3, 2]],
+        PhysicalMaterial(eps_r=4.8, sigma_e=0.015),
         name="fixed-wall", surface_id=1,
     )
-    receiver: ReceiverPoint | ReceiverGrid
+    receiver: AntennaState | ReceiverGrid
     receiver = (
-        ReceiverPoint(position=torch.tensor([8.0, 0.0, 1.5]))
+        AntennaState(new_antenna_id(), "rx", torch.tensor([8.0, 0.0, 1.5]))
         if point_receiver else _grid()
     )
     return Scene(
         structures=[wall],
-        transmitters=[Transmitter(position=torch.tensor([-8.0, 0.0, 2.0]))],
-        receivers=[receiver], frequency=3.5e9,
+        endpoints=[_transmitter([-8.0, 0.0, 2.0]), receiver],
         metadata={"fixture": "phase13-phase12-fixed-wall"},
     )
 
 
 def _wedge_scene() -> Scene:
-    metal = PerfectConductor()
+    metal = PhysicalMaterial.perfect_conductor()
     structures = [
-        Structure(
-            vertices=torch.tensor(
-                [[0.0, 0.0, 0.0], [0.0, 0.0, 8.0], [0.0, 12.0, 0.0]],
-                dtype=torch.float32,
-            ),
-            faces=torch.tensor([[0, 1, 2]], dtype=torch.int32),
-            material=metal, name="wedge-a", surface_id=11,
+        _structure(
+            [[0.0, 0.0, 0.0], [0.0, 0.0, 8.0], [0.0, 12.0, 0.0]], [[0, 1, 2]], metal,
+            name="wedge-a", surface_id=11,
         ),
-        Structure(
-            vertices=torch.tensor(
-                [[0.0, 0.0, 0.0], [12.0, 0.0, 0.0], [0.0, 0.0, 8.0]],
-                dtype=torch.float32,
-            ),
-            faces=torch.tensor([[0, 1, 2]], dtype=torch.int32),
-            material=metal, name="wedge-b", surface_id=12,
+        _structure(
+            [[0.0, 0.0, 0.0], [12.0, 0.0, 0.0], [0.0, 0.0, 8.0]], [[0, 1, 2]], metal,
+            name="wedge-b", surface_id=12,
         ),
     ]
     return Scene(
         structures=structures,
-        transmitters=[Transmitter(position=torch.tensor([-4.0, -4.0, 3.0]))],
-        receivers=[_grid()], frequency=3.5e9,
+        endpoints=[_transmitter([-4.0, -4.0, 3.0]), _grid()],
         metadata={"fixture": "phase13-phase12-fixed-wedge"},
     )
 
 
 def _munich_scene(scene_xml: Path, sionna_root: Path) -> Scene:
-    base = Scene.load_mitsuba(
-        scene_xml, source_root=sionna_root, merge_shapes=True,
-        frequency=2.4e9, edge_selection_mode="all_edges",
-        boundary_edge_policy="half_plane",
-    )
+    # The importer resolves shape files relative to the XML; the canonical argv still names the
+    # Sionna source root, which must exist.
+    if not Path(sionna_root).is_dir():
+        raise RuntimeError(f"Sionna source root is not a directory: {sionna_root}")
+    imported = load_mitsuba(scene_xml, frequency_hz=MUNICH_FREQUENCY_HZ, merge_shapes=True)
     return Scene(
-        structures=base.structures,
-        transmitters=[Transmitter(position=torch.tensor([8.5, 21.0, 27.0]))],
-        receivers=[ReceiverGrid(
-            origin=torch.tensor([-116.25, -115.9375, 1.5]),
-            x_axis=torch.tensor([1.0, 0.0, 0.0]),
-            y_axis=torch.tensor([0.0, 1.0, 0.0]),
-            shape=(32, 32), spacing=(7.5, 8.125),
-        )],
-        frequency=base.frequency, metadata=base.metadata,
+        structures=list(imported.structures),
+        endpoints=[
+            _transmitter([8.5, 21.0, 27.0]),
+            ReceiverGrid(
+                new_antenna_id(),
+                origin=torch.tensor([-116.25, -115.9375, 1.5]),
+                x_axis=torch.tensor([1.0, 0.0, 0.0]),
+                y_axis=torch.tensor([0.0, 1.0, 0.0]),
+                shape=(32, 32), spacing=(7.5, 8.125),
+            ),
+        ],
+        # The solvers keep a merged Mitsuba import's edge table as imported.
+        metadata={"mitsuba": {"merge_shapes": True, "source": str(scene_xml)}},
     )
 
 
@@ -186,26 +188,56 @@ def _target(group: str, munich_xml: Path, sionna_root: Path) -> Callable[[], obj
             max_depth=2, components={"transmission"},
             export_paths=True,
         )
-        return lambda: solve_deterministic(scene, config)
+        return lambda: solve_deterministic(
+            scene, config, reference_frequency_hz=FIXTURE_FREQUENCY_HZ
+        )
     if group == "montecarlo_penetration":
         scene = _wall_scene()
         config = BasicConfig(
             samples=4096, max_depth=2, seed=13027,
             components={"transmission"},
         )
-        return lambda: solve_basic(scene, config)
+        return lambda: solve_basic(scene, config, reference_frequency_hz=FIXTURE_FREQUENCY_HZ)
     scene = _munich_scene(munich_xml, sionna_root)
     config = DeterministicConfig(
         max_depth=1, components={"diffraction"},
         combine="field", return_field=True, export_paths=True,
     )
-    return lambda: solve_deterministic(scene, config)
+    return lambda: solve_deterministic(scene, config, reference_frequency_hz=MUNICH_FREQUENCY_HZ)
+
+
+def pair_field_sum(
+    tx_id: torch.Tensor, rx_id: torch.Tensor, field_xyz: torch.Tensor, *, tx_count: int,
+    rx_count: int,
+) -> torch.Tensor:
+    """Per (transmitter, receiver) sum of row fields in row order, bitwise repeatable."""
+
+    field = torch.zeros((tx_count * rx_count, 3), device=field_xyz.device, dtype=torch.complex64)
+    pair = tx_id.to(dtype=torch.long) * rx_count + rx_id.to(dtype=torch.long)
+    previous = torch.are_deterministic_algorithms_enabled()
+    torch.use_deterministic_algorithms(True)
+    try:
+        field.index_add_(0, pair, field_xyz)
+    finally:
+        torch.use_deterministic_algorithms(previous)
+    return field
+
+
+def _pair_vector_field(result: object) -> torch.Tensor:
+    """Per (transmitter, receiver) sum of the exported world-Cartesian path fields."""
+
+    tx_count = int(result.path_gain.shape[0])
+    paths = result.paths
+    return pair_field_sum(
+        paths.tx_id, paths.rx_id, paths.field_xyz, tx_count=tx_count,
+        rx_count=int(result.path_gain.numel()) // tx_count,
+    )
 
 
 def _target_tensor(group: str, result: object) -> torch.Tensor:
     if group == "diffraction":
-        field = result.component_fields["diffraction"]
-        return torch.view_as_real(field).reshape(-1, 6).contiguous()
+        # The diffraction target is the per-pair vector field (six float32 components).
+        return torch.view_as_real(_pair_vector_field(result)).reshape(-1, 6).contiguous()
     return result.path_gain.detach().contiguous()
 
 
@@ -274,13 +306,18 @@ def _non_target_workloads() -> dict[str, Callable[[], object]]:
     bdpt_config = BDPTConfig(
         samples=1024, seed=13027, max_depth=1, components={"los", "reflection"}
     )
+    frequency = FIXTURE_FREQUENCY_HZ
     return {
-        "receiver_point_end_to_end": lambda: solve_deterministic(point, point_config),
-        "path_non_diffraction_end_to_end": lambda: solve_path(wedge, path_config),
-        "deterministic_non_diffraction_end_to_end": lambda: solve_deterministic(
-            wedge, deterministic_config
+        "receiver_point_end_to_end": lambda: solve_deterministic(
+            point, point_config, reference_frequency_hz=frequency
         ),
-        "bdpt_end_to_end": lambda: solve_bdpt(wedge, bdpt_config),
+        "path_non_diffraction_end_to_end": lambda: solve_path(
+            wedge, path_config, reference_frequency_hz=frequency
+        ),
+        "deterministic_non_diffraction_end_to_end": lambda: solve_deterministic(
+            wedge, deterministic_config, reference_frequency_hz=frequency
+        ),
+        "bdpt_end_to_end": lambda: solve_bdpt(wedge, bdpt_config, reference_frequency_hz=frequency),
     }
 
 

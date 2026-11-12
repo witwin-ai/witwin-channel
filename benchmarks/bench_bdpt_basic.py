@@ -5,14 +5,20 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
+import sys
 import time
 
 import torch
 
-from witwin.channel import radiomap
-from witwin.channel.experimental import bdpt
-from witwin.core import AntennaState, ReceiverGrid, Scene
-from witwin.core.identity import new_antenna_id
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+
+# Local source must resolve from this checkout before importing the benchmark target.
+from witwin.channel import radiomap  # noqa: E402
+from witwin.channel.experimental import bdpt  # noqa: E402
+from witwin.core import AntennaState, ReceiverGrid, Scene  # noqa: E402
+from witwin.core.identity import new_antenna_id  # noqa: E402
 
 
 REFERENCE_FREQUENCY_HZ = 3.0e9

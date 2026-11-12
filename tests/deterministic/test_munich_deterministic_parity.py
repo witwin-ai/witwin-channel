@@ -23,8 +23,10 @@ from witwin.channel.radiomap import Coherent, solve
 def test_reduced_munich_deterministic_parity_emits_artifacts():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for Munich deterministic parity")
-    if not DEFAULT_MUNICH_XML.exists():
+    if DEFAULT_MUNICH_XML is None:
         pytest.skip("Munich reference scene is not available")
+    if munich_bench.DEFAULT_CHANNEL_ROOT is None:
+        pytest.skip("the original archived Channel checkout is not available")
 
     artifact_dir = (
         Path(__file__).resolve().parents[2]
@@ -141,7 +143,7 @@ def test_reduced_munich_native_depth_one_through_three_exports_reflection_paths(
         pytest.skip(
             "CUDA is required for Munich deterministic native depth-two coverage"
         )
-    if not DEFAULT_MUNICH_XML.exists():
+    if DEFAULT_MUNICH_XML is None:
         pytest.skip("Munich reference scene is not available")
 
     args = _parser().parse_args(["--grid-size", "32", "--max-depth", str(max_depth)])
@@ -291,7 +293,7 @@ def test_run_executes_original_before_native(monkeypatch):
             },
         )
 
-    def fake_solve(scene, config):
+    def fake_solve(scene, config, *, reference_frequency_hz):
         order.append("native")
         return FakeResult()
 

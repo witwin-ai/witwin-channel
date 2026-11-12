@@ -5,13 +5,18 @@ from __future__ import annotations
 
 import argparse
 import json
-import time
 from pathlib import Path
+import sys
+import time
 
 import torch
 
-from witwin.channel.experimental.bdpt import Config, solve
-from witwin.core import (
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+
+# Local source must resolve from this checkout before importing the benchmark target.
+from witwin.channel.experimental.bdpt import Config, solve  # noqa: E402
+from witwin.core import (  # noqa: E402
     AntennaState,
     Mesh,
     PhysicalMaterial,
@@ -19,7 +24,7 @@ from witwin.core import (
     Scene,
     Structure,
 )
-from witwin.core.identity import (
+from witwin.core.identity import (  # noqa: E402
     new_antenna_id,
     new_assignment_id,
     new_material_id,

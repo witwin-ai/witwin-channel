@@ -11,7 +11,7 @@
   },
   "groups": {
     "enumerated_penetration": {
-      "callable": "witwin.channel.propagation.enumerated.transmission._transmission_topology",
+      "callable": "witwin.channel.interactions.transmission._transmission_topology",
       "variants": {
         "baseline": {"mode": "high_level_owner", "source_lane_available": false},
         "candidate": {"mode": "high_level_owner", "source_lane_available": false}
@@ -24,12 +24,14 @@
       ]
     },
     "montecarlo_penetration": {
-      "callable": "witwin.channel.montecarlo.events.transmission.straight_transmission_chains",
+      "callable": "witwin.channel.interactions.transmission.straight_transmission_chains",
       "variants": {
         "baseline": {"mode": "high_level_owner", "source_lane_available": false},
         "candidate": {"mode": "high_level_owner", "source_lane_available": false}
       },
-      "arrays": ["distance", "penetrated", "transmittance", "wall_count"]
+      "arrays": [
+        "distance", "global_primitive_id", "num_hits", "overflow", "reached_target", "t", "valid"
+      ]
     },
     "diffraction": {
       "callable": "witwin.channel.interactions.diffraction._diffraction_topology_order1",

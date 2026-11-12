@@ -16,7 +16,10 @@ _REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT))
 
 # Local source and test helpers must resolve from this checkout before importing them.
-from tests.deterministic.test_component_layout import _grid_scene  # noqa: E402
+from tests.deterministic.test_component_layout import (  # noqa: E402
+    _REFERENCE_FREQUENCY_HZ,
+    _grid_scene,
+)
 from witwin.channel.radiomap import Coherent, solve  # noqa: E402
 
 
@@ -33,7 +36,11 @@ def run_benchmark() -> dict[str, Any]:
     scene = _grid_scene()
     torch.cuda.synchronize()
     started = time.perf_counter()
-    result = solve(scene, Coherent(max_depth=0, components={"los"}))
+    result = solve(
+        scene,
+        Coherent(max_depth=0, components={"los"}),
+        reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
+    )
     torch.cuda.synchronize()
     elapsed_ms = (time.perf_counter() - started) * 1000.0
     return {
@@ -43,7 +50,7 @@ def run_benchmark() -> dict[str, Any]:
         "launch_count": result.metadata["kernel"]["launch_count"],
         "path_count": result.metadata["counts"]["path_count"],
         "output_bytes": _output_bytes(result),
-        "raydn_native": result.metadata["kernel"]["raydn_native"],
+        "rayd_native": result.metadata["kernel"]["rayd_native"],
         "accumulation_strategy": result.metadata["accumulation_strategy"],
     }
 
