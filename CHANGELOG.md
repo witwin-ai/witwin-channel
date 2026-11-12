@@ -4,7 +4,7 @@ All notable changes to `witwin-channel` are documented in this file.
 
 ## [Unreleased]
 
-## [0.6.0] - Unreleased
+## [0.6.0] - 2026-11-12
 
 Channel 0.6.0 is one breaking release. The radiomap solvers move into one
 package, BDPT moves to an experimental tier, and the coherent solvers
