@@ -38,6 +38,8 @@ def test_munich_native_vs_original_benchmark_runs_original_channel_subprocess():
 def test_reduced_munich_native_vs_original_strict_parity_gate():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required for reduced Munich native/original BDPT parity")
+    if not munich_parity.DEFAULT_CHANNEL_ROOT.exists():
+        pytest.skip("the original archived Channel checkout is not available")
 
     args = munich_parity._parser().parse_args(
         [
