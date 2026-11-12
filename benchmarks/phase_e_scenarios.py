@@ -7,7 +7,6 @@ from dataclasses import asdict, dataclass
 import hashlib
 import json
 import math
-import os
 from pathlib import Path
 from typing import Any
 import xml.etree.ElementTree as ET
@@ -23,6 +22,12 @@ from witwin.core import (
     Structure,
 )
 from witwin.channel.importers import load_mitsuba
+from benchmarks.reference_inputs import (
+    SCENE_ROOT_ENV,
+    FullScenarioAssetError,
+    city_xml_under,
+    scene_asset_root,
+)
 from witwin.core.identity import (
     new_antenna_id,
     new_assignment_id,
@@ -34,11 +39,6 @@ from witwin.core.identity import (
 SCENARIO_MANIFEST_PATH = (
     Path(__file__).resolve().parent / "scenarios" / "phase_e_scenarios.v1.json"
 )
-SCENE_ROOT_ENV = "WITWIN_CHANNEL_SCENE_ROOT"
-
-
-class FullScenarioAssetError(RuntimeError):
-    """Raised when a required full city asset cannot be resolved."""
 
 
 def _transmitter(position: torch.Tensor) -> AntennaState:
@@ -282,35 +282,6 @@ def _terrain_scene(*, tx_count: int, grid_shape: tuple[int, int]) -> Scene:
     )
 
 
-def _asset_root(explicit: str | Path | None) -> Path:
-    value = explicit if explicit is not None else os.environ.get(SCENE_ROOT_ENV)
-    if value is None or not str(value).strip():
-        raise FullScenarioAssetError(
-            "full Munich/SF scenarios require an explicit asset_root or "
-            f"the {SCENE_ROOT_ENV} environment variable; no reduced fallback is used"
-        )
-    root = Path(value).expanduser().resolve()
-    if not root.is_dir():
-        raise FullScenarioAssetError(f"Phase E scene asset root is not a directory: {root}")
-    return root
-
-
-def _resolve_city_xml(root: Path, city: str) -> Path:
-    candidates = (
-        root / "sionna" / "rt" / "scenes" / city / f"{city}.xml",
-        root / city / f"{city}.xml",
-        root / f"{city}.xml",
-    )
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate.resolve()
-    searched = ", ".join(str(path) for path in candidates)
-    raise FullScenarioAssetError(
-        f"full {city} scene is unavailable under {root}; searched: {searched}. "
-        "No reduced or synthetic city scene is substituted."
-    )
-
-
 def _referenced_asset_files(scene_xml: Path) -> tuple[Path, ...]:
     pending = [scene_xml.resolve()]
     visited: set[Path] = set()
@@ -360,8 +331,8 @@ def _city_scene(
     name: str, *, asset_root: str | Path | None, tx_count: int, grid_shape: tuple[int, int],
 ) -> tuple[Scene, str, Path]:
     spec = _scenario_spec(name)
-    root = _asset_root(asset_root)
-    scene_xml = _resolve_city_xml(root, str(spec["asset_name"]))
+    root = scene_asset_root(asset_root)
+    scene_xml = city_xml_under(root, str(spec["asset_name"]))
     imported = load_mitsuba(scene_xml, frequency_hz=float(spec["frequency_hz"]))
     tx_origin = tuple(float(value) for value in spec["transmitter"])
     transmitters = [
