@@ -45,7 +45,12 @@ def test_windowed_coupled_solve_equals_the_whole_solve(monkeypatch):
     assert windowed.metadata["counts"]["path_count"] == whole.metadata["counts"]["path_count"]
     assert windowed.metadata["counts"] == whole.metadata["counts"]
     assert windowed.metadata["kernel"]["launch_count"] > whole.metadata["kernel"]["launch_count"]
-    # Each receiver's rows are the whole solve's, summed in one window: float atomics only.
+    # Each receiver's rows are the whole solve's, summed in one window by an order-independent
+    # cell sum, so the maps are the same bits.
+    assert torch.equal(windowed.path_gain, whole.path_gain)
+    assert torch.equal(windowed.field, whole.field)
+    for name, value in whole.component_power.items():
+        assert torch.equal(windowed.component_power[name], value), name
     torch.testing.assert_close(windowed.path_gain, whole.path_gain, rtol=1e-5, atol=0.0)
     torch.testing.assert_close(windowed.field, whole.field, rtol=1e-5, atol=1e-12)
     assert set(windowed.component_fields) == set(whole.component_fields)
