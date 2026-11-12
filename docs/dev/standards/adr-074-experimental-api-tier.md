@@ -1,4 +1,4 @@
-# ADR-0xx: The experimental API tier
+# ADR-074: The experimental API tier
 
 - **Status:** Accepted (owner decision D2/D3 for Channel 0.6.0, report section 10.13).
 - **Date:** 2026-11-11.

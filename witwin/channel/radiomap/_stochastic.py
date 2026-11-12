@@ -160,7 +160,7 @@ class Stochastic:
             self.max_depth,
             components,
             error_message=(
-                "Monte Carlo basic requires max_depth >= 1 for components "
+                "radiomap.Stochastic requires max_depth >= 1 for components "
                 f"{sorted(components - {'los'})}, got max_depth={self.max_depth}"
             ),
         )
@@ -1549,7 +1549,7 @@ def _validate_ad_config(config: Stochastic) -> None:
         depth_cap = mc_reflection_ad_max_depth()
         if config.max_depth > depth_cap:
             raise RuntimeError(
-                f"MC basic ad_mode='{config.ad_mode}' supports the reflection "
+                f"radiomap.Stochastic ad_mode='{config.ad_mode}' supports the reflection "
                 f"component only up to max_depth={depth_cap} (native "
                 f"reflection AD depth cap); got max_depth={config.max_depth}"
             )
@@ -1603,7 +1603,7 @@ def _enforce_workspace_budget(scene: SolverScene, config: Stochastic) -> None:
     enforce_memory_budget(
         estimate,
         budget_bytes=config.workspace_limit_bytes,
-        workload="workspace for Monte Carlo basic",
+        workload="workspace for radiomap.Stochastic",
     )
 
 
@@ -1897,7 +1897,7 @@ def solve_pipeline(
     require_frequency_ad_constant_materials_fn: Any=_require_frequency_ad_constant_materials,
 ) -> RadioMap:
     validate_scalar_endpoint_features_fn(
-        scene.transmitters, scene.receivers, solver="Monte Carlo basic"
+        scene.transmitters, scene.receivers, solver="radiomap.Stochastic"
     )
     _enforce_workspace_budget(scene, config)
     if not torch.cuda.is_available():
@@ -2211,7 +2211,7 @@ def solve(
     validate_scalar_endpoint_features(
         tuple(view for view in endpoint_views if view.source.role == "tx"),
         tuple(view for view in endpoint_views if view.source.role == "rx"),
-        solver="Monte Carlo basic",
+        solver="radiomap.Stochastic",
     )
     compiled = compile_scene(
         scene, reference_frequency_hz=reference_frequency_hz

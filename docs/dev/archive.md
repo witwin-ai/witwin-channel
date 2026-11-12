@@ -25,7 +25,7 @@ worth keeping are now checked directly from the source, without a ledger:
 | `phase13-current-native-owner-inventory.json`, `phase9-native-owner-inventory.json`, `phase13-symbol-delta-ledger.json`, `phase13-migration-delta.json`, `phase10-legacy-dead-binding.json`, `phase12-ops-migration-ledger.json` | `ci/check_native_bindings.py` derives each pybind symbol's Python owner and production callers from the AST |
 | `adr-044-native-tu-consolidation.json` (translation-unit set, launch/sync/trap counts) | `ci/check_native_inventory.py` generates `ci/native-inventory.json` (kernel, launch and host-sync names per file) and checks the translation-unit layout |
 | `duplication-classification.json` | `ci/check_duplication.py` gates total duplicate coverage against a tighten-only ceiling |
-| everything else (`phase*`, `stage1-*`, `adr-0xx-*` evidence and resource ledgers) | historical only; the behaviour they describe is covered by the test suite |
+| everything else (`phase*`, `stage1-*`, `adr-NNN-*` evidence and resource ledgers) | historical only; the behaviour they describe is covered by the test suite |
 
 ## Refactor baselines (`docs/dev/baselines/<sha>/`)
 

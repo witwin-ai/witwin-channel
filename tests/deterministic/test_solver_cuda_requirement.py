@@ -13,6 +13,6 @@ def test_solve_requires_cuda_before_native_solver_work():
         pytest.skip("CUDA requirement is only observable on non-CUDA hosts")
 
     with pytest.raises(
-        RuntimeError, match="witwin.channel.deterministic requires CUDA"
+        RuntimeError, match="witwin.channel.radiomap requires CUDA"
     ):
         solve(empty_space_los_scene(), Coherent(), reference_frequency_hz=3.0e9)

@@ -456,7 +456,7 @@ def _diffraction_topology_order1(
         )
     if not rayd.available:
         raise RuntimeError(
-            "deterministic diffraction requires RayD native scene capability"
+            "diffraction discovery requires RayD native scene capability"
         )
 
     face_eps_r, face_sigma_e, face_mu_r, material_gain, material_valid = (

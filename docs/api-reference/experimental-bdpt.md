@@ -2,7 +2,7 @@
 
 > **Experimental tier.** This module is importable and tested but is not part of
 > the stable API snapshot: its names, options and results may change in any
-> release (see `docs/dev/standards/adr-0xx-experimental-api-tier.md`). It was
+> release (see `docs/dev/standards/adr-074-experimental-api-tier.md`). It was
 > `witwin.channel.montecarlo.bdpt` before 0.6.0; its behaviour is unchanged.
 
 The bidirectional path tracing (BDPT) solver estimates received power with

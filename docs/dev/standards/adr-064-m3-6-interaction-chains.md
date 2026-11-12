@@ -1,4 +1,4 @@
-# ADR-0xx: Interaction chains: one diffraction anywhere in a reflection chain
+# ADR-064: Interaction chains: one diffraction anywhere in a reflection chain
 
 - **Status:** Accepted.
 - **Date:** 2026-11-11.
@@ -33,7 +33,7 @@ same construction seen from the other side), and both halves are then back-trace
 reflection validator:
 
 - **Halves.** The transmitter half of depth `a >= 1` is a node of the transmitter's image tree
-  (the reflection candidate tree of the M3-3 record), kept for an edge only when the edge may lie
+  (the reflection candidate tree of ADR-060), kept for an edge only when the edge may lie
   in the node's beam: some edge point beyond the node's last plane, and an edge piece (the edge
   split in eight, bounding spheres) meeting a cone from the node image around one of the last
   group's occupied macro cells. This is the image-tree child test with the child group replaced by

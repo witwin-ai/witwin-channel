@@ -1,4 +1,4 @@
-# ADR-0xx: MC Basic launch rays, seeded lattice, bounds fold and bounded final segment
+# ADR-054: MC Basic launch rays, seeded lattice, bounds fold and bounded final segment
 
 - **Status:** Accepted.
 - **Date:** 2026-11-10.

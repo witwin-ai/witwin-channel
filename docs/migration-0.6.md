@@ -72,7 +72,7 @@ re-export nothing.
 
 `witwin.channel.experimental.*` is importable and fully tested but is not part of the stable
 API snapshot: its names, options and results may change in any release
-(`docs/dev/standards/adr-0xx-experimental-api-tier.md`). BDPT is its first member; its
+(`docs/dev/standards/adr-074-experimental-api-tier.md`). BDPT is its first member; its
 behaviour is unchanged by the move.
 
 ## Example

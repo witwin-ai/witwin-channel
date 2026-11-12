@@ -1,4 +1,4 @@
-# ADR-0xx: One fused field launch over the canonical rows
+# ADR-065: One fused field launch over the canonical rows
 
 - **Status:** Accepted.
 - **Date:** 2026-11-11.

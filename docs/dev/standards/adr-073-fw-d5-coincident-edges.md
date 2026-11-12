@@ -1,4 +1,4 @@
-# ADR-0xx (fw-d5): Wedges from every face that meets an edge, across structures
+# ADR-073: Wedges from every face that meets an edge, across structures
 
 - **Status:** Accepted by the owner (relayed by the coordinator, 2026-11-11): build each edge's wedge from
   the union of all faces meeting at the edge across structures, with the true exterior angle and per-face
@@ -24,7 +24,7 @@ show it, and both occur in every imported city (building meshes standing on a gr
 | `canyon_x_3g5` plane 0 shadow | NMSE 1.04 | NMSE 0.75 (bases hidden) |
 
 (Numbers from the `fullwave2` report, before the D1-D4 and D6 fixes; the D1/D4 fixes since moved
-`trihedral_x` plane 0 shadow to 3.04 dB / 0.91 and the canyon RSB metrics, see the fw-d4 record.)
+`trihedral_x` plane 0 shadow to 3.04 dB / 0.91 and the canyon RSB metrics, see ADR-069 (fw-d4).)
 
 Channel-only diagnosis of the edge set (`selected_diffraction_edges`, this worktree):
 

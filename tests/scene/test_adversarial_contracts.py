@@ -246,7 +246,7 @@ def test_mc_basic_rejects_endpoint_array_before_scene_compile(monkeypatch):
         unexpected_compile,
     )
 
-    with pytest.raises(ValueError, match="does not support antenna arrays"):
+    with pytest.raises(ValueError, match=r"radiomap\.Stochastic does not support antenna arrays"):
         radiomap.solve(
             scene,
             MonteCarloBasicConfig(samples=1, components={"los"}),

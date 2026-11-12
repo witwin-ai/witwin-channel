@@ -1,4 +1,4 @@
-# ADR-0xx (fw-d3): The diffraction face term reflects like the face
+# ADR-071: The diffraction face term reflects like the face
 
 - **Status:** Accepted on the full-wave principle; the coordinator is confirming it with the owner. Kept as a
   separate commit so it can be dropped (dropping it also drops fw-d2, which builds on it).

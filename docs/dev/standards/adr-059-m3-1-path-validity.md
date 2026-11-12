@@ -1,4 +1,4 @@
-# ADR-0xx: One definition of a valid specular reflection path
+# ADR-059: One definition of a valid specular reflection path
 
 - **Status:** Accepted.
 - **Date:** 2026-11-10.

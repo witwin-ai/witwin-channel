@@ -1,4 +1,4 @@
-# ADR-0xx: Diffraction accumulation is independent of the receiver layout
+# ADR-058: Diffraction accumulation is independent of the receiver layout
 
 - **Status:** Accepted (owner decision D4, analysis report 10.13).
 - **Date:** 2026-11-10.

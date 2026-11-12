@@ -1,4 +1,4 @@
-# ADR-049: The diffraction edge set is the set of geometric wedges
+# ADR-057: The diffraction edge set is the set of geometric wedges
 
 - **Status:** Accepted.
 - **Date:** 2026-11-10.

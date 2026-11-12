@@ -1,4 +1,4 @@
-# ADR-0xx: AD reduction order for shared leaves and frequency
+# ADR-053: AD reduction order for shared leaves and frequency
 
 - **Status:** Accepted.
 - **Date:** 2026-11-10.
