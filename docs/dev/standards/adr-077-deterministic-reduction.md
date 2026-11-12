@@ -1,4 +1,4 @@
-# ADR-0xx: Order-independent reduction of aggregated outputs
+# ADR-077: Order-independent reduction of aggregated outputs
 
 - **Status:** Accepted.
 - **Date:** 2026-11-11.

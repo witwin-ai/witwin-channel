@@ -209,7 +209,7 @@ Plans are in `docs/dev/plans/` (the modular architecture is plan `08-*`); the st
   integration, 024 shared RF/transmission, 025 diffraction family, 026 RayD scattering runtime,
   027 segment penetration, 044 native translation units, 065 fused field launch.
 - Device residency: 028 diffraction state selection, 032 compact cardinality (029, 030, 031 are
-  Removed and superseded by 032), 035 trace backend selection.
+  Removed and superseded by 032), 035 trace backend selection, 077 order-independent reduction.
 - Physics and AD: 004 numerical duplication, 010 scattering kernels, 011/012/013 coupled and
   double diffraction, 014/015 scattering AD, 016 transition integral, 017 ISB taper, 018/019 BDPT
   diffraction and coherent combine, 020 MC transmission polarization, 021 multibounce
