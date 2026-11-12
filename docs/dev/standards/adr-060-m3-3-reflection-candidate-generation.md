@@ -1,4 +1,4 @@
-# ADR-0xx: Reflection candidate generation v2: image tree, receiver test, one validator
+# ADR-060: Reflection candidate generation v2: image tree, receiver test, one validator
 
 - **Status:** Accepted.
 - **Date:** 2026-11-11.

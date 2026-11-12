@@ -1,4 +1,4 @@
-# ADR-0xx: Kirchhoff table cache keyed on roughness, layers and frequency
+# ADR-052: Kirchhoff table cache keyed on roughness, layers and frequency
 
 - **Status:** Accepted.
 - **Date:** 2026-11-10.

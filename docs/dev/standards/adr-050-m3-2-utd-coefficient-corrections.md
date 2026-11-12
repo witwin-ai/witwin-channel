@@ -6,7 +6,7 @@
 - **Scope:** every diffraction family that evaluates RayD's shared UTD coefficient: deterministic
   order-1 diffraction (cid 2), the Path solver's diffraction rows, the D leg of D-D (cid 7), Monte
   Carlo Sionna-style diffraction, and their native AD. Findings A-2, A-4 and the per-path part of C-6;
-  RayD side recorded in RayD ADR-0047. The edge set is ADR-049.
+  RayD side recorded in RayD ADR-0047. The edge set is ADR-057.
 
 ## Context
 
@@ -18,7 +18,7 @@ The reference-accuracy suite (M0-3) compares Channel's diffraction with float64 
 - A-3 (shadow part): the half-plane shadow region was 23-106 % off and D_soft = D_hard at phi = 270.
 - A-4: swapping transmitter and receiver changed the pair field by up to 139 % of the incoherent
   amplitude sum (Path solver, 4x4 city), while LoS + reflection was bit-identical under the swap.
-- C-6 after the edge-set fix (ADR-049): merged edges still moved individual path gains by up to 1.7x.
+- C-6 after the edge-set fix (ADR-057): merged edges still moved individual path gains by up to 1.7x.
 
 Root causes, each reproduced on a host-compiled copy of RayD's `utd.h` (RayD
 `tests/diffraction/test_utd_reference.py`) and in Channel:
@@ -29,12 +29,12 @@ Root causes, each reproduced on a host-compiled copy of RayD's `utd.h` (RayD
 2. The face s/p axes came from rounding noise when a ray left along a face normal: the half-plane
    phi = 270 case of A-3 and the wedge phi = 180 case.
 3. Luebbers' face angles (face 0 at phi', face n at n pi - phi) are not reciprocal and change when the
-   faces are relabelled; a re-triangulated mesh relabels them (ADR-049). On concrete faces relabelling
+   faces are relabelled; a re-triangulated mesh relabels them (ADR-057). On concrete faces relabelling
    changed a field by up to 14.7x and a source/observer swap by 9.1x: A-4 and the C-6 residual.
 4. The direct source normalised the dipole's transverse projection, removing `sin(theta)`; the receiver
    side kept its projection, so the swap was not symmetric: A-4. ADR-045 had accepted this fix, but the
    RayD commit carrying it never reached RayD's history.
-5. A boundary half-plane had no back-face material and was oriented by vertex order: ADR-049.
+5. A boundary half-plane had no back-face material and was oriented by vertex order: ADR-057.
 
 ## Decision
 

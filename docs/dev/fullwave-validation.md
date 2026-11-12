@@ -630,9 +630,10 @@ cases, 2 otherwise; coupled paths on). Entries are RMS dB error / complex NMSE.
 
 ### Fixes and their full-wave effect
 
-D1-D6 are fixed. Each has its own design record: `docs/dev/standards/adr-0xx-fw-d1-reflection-face-containment.md`,
-`-fw-d2-oblique-face-dyadic`, `-fw-d3-layered-face-term`, `-fw-d4-chain-completeness`, `-fw-d5-coincident-edges`
-and `-fw-d6-boundary-sample`; the RayD side is in RayD ADR-0047 and ADR-0048 amendments.
+D1-D6 are fixed. Each has its own design record under `docs/dev/standards/`: ADR-068 (D1,
+`adr-068-fw-d1-reflection-face-containment.md`), ADR-072 (D2, `adr-072-fw-d2-oblique-face-dyadic.md`), ADR-071 (D3,
+`adr-071-fw-d3-layered-face-term.md`), ADR-069 (D4, `adr-069-fw-d4-chain-completeness.md`), ADR-073 (D5,
+`adr-073-fw-d5-coincident-edges.md`) and ADR-070 (D6, `adr-070-fw-d6-boundary-sample.md`); the RayD side is in RayD ADR-0047 and ADR-0048 amendments.
 
 | Defect | Fix | Gate metric (before -> after; target) |
 | --- | --- | --- |
@@ -644,9 +645,9 @@ and `-fw-d6-boundary-sample`; the RayD side is in RayD ADR-0047 and ADR-0048 ame
 | D6 | the pole term alone takes the one-sided limit, on the side the geometric tests choose; near-pole quantities from one small angle | on-boundary receiver: \|T\| 3.7e-5 -> 8.2e-4 (lit 8.2e-4) |
 
 A double-diffraction leg that runs along a sheet to a junction wedge is evaluated on the junction's side
-(`adr-0xx-fw-dd-sheet-side`): `trihedral_z` plane 0 shadow NMSE 0.462 -> 0.107 and `trihedral_x` plane 1 corner
+(ADR-075, `adr-075-fw-dd-sheet-side.md`): `trihedral_z` plane 0 shadow NMSE 0.462 -> 0.107 and `trihedral_x` plane 1 corner
 NMSE 0.633 -> 0.587, both now ordinary ceilings. A penetrable wedge's incident-boundary terms compensate only the
-step the transmission paths leave, `(I - T)` times the incident field (`adr-0xx-fw-penetrable-wedge`):
+step the transmission paths leave, `(I - T)` times the incident field (ADR-076, `adr-076-fw-penetrable-wedge.md`):
 `cube_dielectric_z` plane 0 ISB 4.45 -> -0.38 dB, canyon ISB 2.46 / 3.68 -> 2.25 / 3.24 dB (plane 0), `canyon_x` RSB
 3.27 / 2.76 -> 2.98 / 2.32 dB; no PEC case moves. Remaining strict xfails (measured / target): `double_edge_y`
 plane 1 RSB 2.82 / 1.5 dB (the RSB is continuous; an interference null next to the transmitter sits 2-3 mm off its

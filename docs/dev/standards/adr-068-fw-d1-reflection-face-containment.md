@@ -1,4 +1,4 @@
-# ADR-0xx (fw-d1): The reflection in-face test is a distance
+# ADR-068: The reflection in-face test is a distance
 
 - **Status:** Accepted (full-wave principle set by the owner; coordinator task `fwfix`).
 - **Date:** 2026-11-11.
@@ -39,8 +39,8 @@ the two screens have no chain whose legs that test removes, so the change is thi
 | `double_edge_y` plane 1 transition RMS | 2.26 dB | 1.03 dB | 1.50 |
 | `double_edge_z` plane 1 transition RMS / NMSE | 1.49 / 0.083 | 1.65 / 0.029 | 1.75 / 0.10 |
 
-The `double_edge_y` RSB excess left after this change is not a containment effect (see the fw-d4 and
-fw-d2 records for its final value).
+The `double_edge_y` RSB excess left after this change is not a containment effect (see ADR-069 (fw-d4) and
+ADR-072 (fw-d2) for its final value).
 
 Tests: `tests/deterministic/test_fullwave_boundaries.py::test_reflection_support_ends_at_the_edge_of_a_large_face`
 (40 m plate; receivers whose reflection point is 0.25-1.5 mm past the edge get no reflection; fails before);

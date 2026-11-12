@@ -1,4 +1,4 @@
-# ADR-0xx: Consistency gate between the enumerated and sampled estimators
+# ADR-063: Consistency gate between the enumerated and sampled estimators
 
 - **Status:** Accepted (owner decision D5, analysis report 10.13).
 - **Date:** 2026-11-10.

@@ -68,7 +68,7 @@ larger of wavelength/(4*pi) at the compile frequency and `2^-20` times the
 coordinate magnitude), named by receiver, grid cell and transmitter. The grid
 test is analytic (an index box around the transmitter's in-plane grid
 coordinates) and never materializes the grid. CUDA-resident coordinates are
-not read. See `docs/dev/standards/adr-0xx-coincident-endpoints.md`.
+not read. See `docs/dev/standards/adr-067-coincident-endpoints.md`.
 
 The batched polarization reproduces the per-endpoint `rotation @ unit`
 product bit for bit: the 3x3 matrix-vector product sums `(r1*u1 + r2*u2) + r0*u0`

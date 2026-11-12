@@ -1,4 +1,4 @@
-# ADR-0xx: Independent MC diffraction sample streams for nearby seeds
+# ADR-066: Independent MC diffraction sample streams for nearby seeds
 
 - **Status:** Accepted.
 - **Date:** 2026-11-11.

@@ -426,7 +426,7 @@ coefficient and a near-coincident pair an unbounded far-field value.
 the precondition with a few device reductions and one one-byte read, and raises
 `ValueError` naming the first coincident pair. Call it when the endpoint
 batches change, not inside a replay loop
-(`docs/dev/standards/adr-0xx-coincident-endpoints.md`).
+(`docs/dev/standards/adr-067-coincident-endpoints.md`).
 
 ## Result shape
 

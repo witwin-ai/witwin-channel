@@ -1,4 +1,4 @@
-# ADR-0xx (fw-penetrable-wedge): The incident terms of a penetrable wedge compensate only the blocked field
+# ADR-076: The incident terms of a penetrable wedge compensate only the blocked field
 
 - **Status:** Accepted (owner-approved item, coordinator task `chainperf2`; full-wave principle).
 - **Date:** 2026-11-11.

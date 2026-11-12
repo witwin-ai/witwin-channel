@@ -1,4 +1,4 @@
-# ADR-0xx (fw-d4): Interaction chains that keep every reflection path continuous
+# ADR-069: Interaction chains that keep every reflection path continuous
 
 - **Status:** Accepted (full-wave principle set by the owner; coordinator task `fwfix`).
 - **Date:** 2026-11-11.

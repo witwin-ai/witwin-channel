@@ -1,4 +1,4 @@
-# ADR-0xx (fw-d2): The face term under oblique incidence
+# ADR-072: The face term under oblique incidence
 
 - **Status:** Accepted on the full-wave principle; the coordinator is confirming it with the owner. Kept as a
   separate commit on top of fw-d3 so it can be dropped alone (RayD commit `a21450c`; dropping it means reverting that commit on the RayD branch and re-locking; the later RayD commits do not depend on it).

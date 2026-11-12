@@ -1,4 +1,4 @@
-# ADR-0xx (fw-dd-sheet-side): A double-diffraction leg along a sheet runs on the side the other edge sees
+# ADR-075: A double-diffraction leg along a sheet runs on the side the other edge sees
 
 - **Status:** Accepted for review (coordinator task `chainperf`; requested physics fix, full-wave principle).
 - **Date:** 2026-11-11.

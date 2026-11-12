@@ -1,4 +1,4 @@
-# ADR-0xx: MC Basic scattering sample count and native receiver pairs
+# ADR-056: MC Basic scattering sample count and native receiver pairs
 
 - **Status:** Accepted.
 - **Date:** 2026-11-10.

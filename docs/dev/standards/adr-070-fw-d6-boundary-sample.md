@@ -1,4 +1,4 @@
-# ADR-0xx (fw-d6): A receiver exactly on a GO boundary
+# ADR-070: A receiver exactly on a GO boundary
 
 - **Status:** Accepted (full-wave principle set by the owner; coordinator task `fwfix`).
 - **Date:** 2026-11-11.

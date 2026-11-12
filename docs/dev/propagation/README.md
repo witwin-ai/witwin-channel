@@ -193,7 +193,7 @@ row through. Transmission (a RayD operation), the coupled chains (`coupled.cu`)
 and the LoS boundary taper then run on their own groups and write those rows in
 place. The AD route keeps one differentiable Function per group, slicing each
 group's rows from the order; an output column is cloned only when a group writes
-part of it. See `standards/adr-0xx-m3-7-fused-field-kernel.md`.
+part of it. See `standards/adr-065-m3-7-fused-field-kernel.md`.
 
 Reflection discovery (`interactions.reflection`) emits topology rows with EPC
 geometry and path length but no fields; the field stage owns every reflection

@@ -1,4 +1,4 @@
-# ADR-0xx: One grid axis order for every solver (Core row-major)
+# ADR-061: One grid axis order for every solver (Core row-major)
 
 - **Status:** Accepted (owner decision for 0.6.0; MC budget change accepted).
 - **Date:** 2026-11-10.

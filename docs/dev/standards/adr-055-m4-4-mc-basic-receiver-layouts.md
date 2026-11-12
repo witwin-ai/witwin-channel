@@ -1,4 +1,4 @@
-# ADR-0xx: MC Basic point receivers and multiple or mixed receivers
+# ADR-055: MC Basic point receivers and multiple or mixed receivers
 
 - **Status:** Accepted.
 - **Date:** 2026-11-10.

@@ -1,4 +1,4 @@
-# ADR-0xx: Coincident transmitter and receiver endpoints are refused
+# ADR-067: Coincident transmitter and receiver endpoints are refused
 
 - **Status:** Accepted (0.6.0).
 - **Date:** 2026-11-11.

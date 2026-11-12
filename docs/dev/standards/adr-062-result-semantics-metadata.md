@@ -1,4 +1,4 @@
-# ADR-0xx: Result-semantics keys in every solver's metadata
+# ADR-062: Result-semantics keys in every solver's metadata
 
 - **Status:** Accepted (owner decision for the 0.6.0 radiomap estimators).
 - **Date:** 2026-11-10.
