@@ -109,12 +109,9 @@ def _box_between_scene(*, rx_pos: Any = (6.0, 0.3, 1.2), tx_pos: Any = (0.0, 0.0
 
 
 def _solver(name: str) -> Any:
-    import importlib
+    from tests.support.solvers import solver
 
-    return importlib.import_module({
-        "det": "witwin.channel.deterministic", "path": "witwin.channel.path",
-        "mc": "witwin.channel.montecarlo.basic", "bdpt": "witwin.channel.experimental.bdpt",
-    }[name])
+    return solver(name)
 
 
 def _solve(solver: str, scene: Any, **config: Any) -> Any:
