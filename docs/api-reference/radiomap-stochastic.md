@@ -76,7 +76,7 @@ metadata, and optional diagnostics.
 ```python
 result = solve(scene, config, reference_frequency_hz=28e9)
 print(result.path_gain.shape)             # for example torch.Size([1, 4, 4])
-print(result.component_power.keys())      # requested supported components
+print(result.component_power.keys())      # los, reflection, diffraction; plus transmission/scattering when requested
 print(result.component_maps["los"].shape) # same logical map shape
 ```
 

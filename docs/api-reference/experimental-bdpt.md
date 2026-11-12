@@ -94,7 +94,8 @@ result = solve(
     reference_frequency_hz=28e9,
 )
 print(result.path_gain.shape)  # for example torch.Size([1, 4, 4])
-print(result.variance.shape)   # same shape when variance is published
+if result.metadata["variance"]:  # Result.variance is None when it is not published
+    print(result.variance.shape)  # same shape as path_gain
 ```
 
 The parameters have the same scene and frequency meaning as the shared solver

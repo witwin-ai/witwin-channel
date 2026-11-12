@@ -99,6 +99,6 @@ by the peak gain in the boresight direction. They return a scalar field
 amplitude; the polarization of the endpoint still comes from
 `AntennaState.polarization`.
 
-Directional patterns are honoured by the Path solver. The Deterministic and
-Monte Carlo solvers accept only isotropic endpoints and raise a `ValueError`
-for a directional pattern.
+Directional patterns are honoured by `witwin.channel.path`. The `radiomap`
+estimators (`Coherent`, `Stochastic`) and `experimental.bdpt` accept only
+isotropic endpoints and raise a `ValueError` for a directional pattern.
