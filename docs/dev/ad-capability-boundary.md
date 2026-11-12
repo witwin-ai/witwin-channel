@@ -155,9 +155,12 @@ nobody assumes the reverse pass is as cheap as the forward:
   path/ray count, but the per-row cost is tens of times the forward. This is the
   documented AD-4a choice (one forward implementation, exact derivative) and is
   the main remaining optimization headroom.
-- **Scalar-gradient atomics.** `grad_frequency` (1 address) and the MC
-  `grad_source` (3 addresses) accumulate with `atomicAdd` from every row/lane; a
-  block reduction would cut the serialization on large radiomaps.
+- **Scalar-gradient atomics.** The MC diffraction tape and MC LoS frequency
+  cotangents write one term per lane or pair and reduce through the order-independent
+  fixed-point sum (`fixed_sum.cuh`), so they repeat bit for bit. The MC `grad_source`
+  (3 addresses) and the frequency cotangents inside RayD's wedge, transmission and
+  rough-scattering VJPs still accumulate with `atomicAdd` from every row or lane and
+  vary in the last bits from run to run.
 
 Measured on small analytic scenes (frequency gradient, tensor-frequency): the AD
 forward is within ~1.0-1.15x of the none-mode forward and the reverse pass is a
