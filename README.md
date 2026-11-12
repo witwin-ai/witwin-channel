@@ -48,7 +48,7 @@ from witwin.channel.propagation.consumer import (
     evaluate,
 )
 
-assert CONTRACT_VERSION == 4
+assert CONTRACT_VERSION == 7
 ```
 
 The consumer publishes exact compact `K` rows with native-produced stable pair
@@ -58,7 +58,7 @@ ADR-032 compact boundary; no adapter performs a second count observation or
 Torch/Python compaction. Unsupported component, response, frequency-offset, or
 AD combinations fail before a partial result is returned.
 
-Contract version 1 supports LoS, reflection, transmission, and diffraction.
+The consumer supports LoS, reflection, transmission, and diffraction.
 Scattering is not advertised or accepted: its current enumerated rows are
 incoherent power-domain output and do not satisfy the consumer's coherent
 transport or canonical pair-major row contracts.
@@ -79,7 +79,7 @@ for the versioning, convention, zero-copy, and failure contracts.
 
 `radiomap.solve(scene, config)` picks the estimator from the configuration type;
 `path` and `experimental.bdpt` own their own `Config`, `Result` and `solve`. The exact
-stable exports are recorded in The exact stable exports are recorded in
+stable exports are recorded in
 [`ci/public-api-snapshot.json`](ci/public-api-snapshot.json); `experimental` modules are
 outside it. Upgrading from 0.5: [`docs/migration-0.6.md`](docs/migration-0.6.md).
 
