@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -11,6 +12,7 @@ from benchmarks.phase_e_scenarios import (
     FullScenarioAssetError,
     SCENARIO_MANIFEST_PATH,
     SCENE_ROOT_ENV,
+    _files_sha256,
     build_scenario,
     load_manifest,
     scenario_names,
@@ -34,6 +36,7 @@ def test_committed_manifest_has_five_truthful_scenario_identities():
     )
     assert manifest["asset_policy"] == {
         "external_root_env": SCENE_ROOT_ENV,
+        "external_source": "sionna-rt 2.2.0 wheel (Apache-2.0): the extracted sionna/rt/scenes tree",
         "full_asset_missing": "fail",
         "reduced_fallback": False,
     }
@@ -101,6 +104,27 @@ def test_full_city_bad_asset_root_reports_searched_paths():
         build_scenario(
             "sf_full", asset_root=SCENARIO_MANIFEST_PATH.parent, grid_shape=(2, 2)
         )
+
+
+def test_city_source_digest_ignores_xml_line_endings(tmp_path: Path):
+    xml = (
+        '<scene version="2.1.0">\n'
+        '  <shape type="ply">\n'
+        '    <string name="filename" value="meshes/wall.ply"/>\n'
+        "  </shape>\n"
+        "</scene>\n"
+    )
+    digests = []
+    for name, text in (("lf", xml), ("crlf", xml.replace("\n", "\r\n"))):
+        root = tmp_path / name
+        (root / "meshes").mkdir(parents=True)
+        (root / "meshes" / "wall.ply").write_bytes(b"ply\r\nbinary payload\n")
+        (root / "city.xml").write_bytes(text.encode("utf-8"))
+        digests.append(_files_sha256(root / "city.xml"))
+    assert digests[0] == digests[1]
+
+    (tmp_path / "lf" / "meshes" / "wall.ply").write_bytes(b"ply\nbinary payload\n")
+    assert _files_sha256(tmp_path / "lf" / "city.xml") != digests[1]
 
 
 def test_generated_scenario_rejects_external_asset_root():

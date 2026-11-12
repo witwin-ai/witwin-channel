@@ -22,6 +22,7 @@ from witwin.core import (
     Scene,
     Structure,
 )
+from witwin.channel.importers import load_mitsuba
 from witwin.core.identity import (
     new_antenna_id,
     new_assignment_id,
@@ -344,9 +345,13 @@ def _files_sha256(scene_xml: Path) -> str:
             label = path.relative_to(scene_xml.parent).as_posix()
         except ValueError:
             label = path.name
+        data = path.read_bytes()
+        if path.suffix.lower() == ".xml":
+            # A Windows checkout stores the XML with CRLF; the digest names the content.
+            data = data.replace(b"\r\n", b"\n")
         digest.update(label.encode("utf-8"))
         digest.update(b"\0")
-        digest.update(path.read_bytes())
+        digest.update(data)
         digest.update(b"\0")
     return digest.hexdigest()
 
@@ -356,11 +361,33 @@ def _city_scene(
 ) -> tuple[Scene, str, Path]:
     spec = _scenario_spec(name)
     root = _asset_root(asset_root)
-    _resolve_city_xml(root, str(spec["asset_name"]))
-    raise FullScenarioAssetError(
-        "full city XML assets require a Core-owned scene importer; "
-        "Channel no longer owns Scene.load_mitsuba"
+    scene_xml = _resolve_city_xml(root, str(spec["asset_name"]))
+    imported = load_mitsuba(scene_xml, frequency_hz=float(spec["frequency_hz"]))
+    tx_origin = tuple(float(value) for value in spec["transmitter"])
+    transmitters = [
+        _transmitter(
+            torch.tensor(
+                [tx_origin[0], tx_origin[1] + 0.5 * index, tx_origin[2]], dtype=torch.float32
+            )
+        )
+        for index in range(tx_count)
+    ]
+    grid = _receiver_grid(
+        grid_shape,
+        bounds_x=tuple(float(value) for value in spec["bounds_x"]),
+        bounds_y=tuple(float(value) for value in spec["bounds_y"]),
+        z=float(spec["plane_z"]),
     )
+    scene = Scene(
+        structures=list(imported.structures),
+        endpoints=[*transmitters, grid],
+        metadata={
+            "phase_e_scenario": name,
+            "scenario_mode": "full",
+            "reference_frequency_hz": float(spec["frequency_hz"]),
+        },
+    )
+    return scene, _files_sha256(scene_xml), scene_xml
 
 
 def _update_tensor(digest: Any, tensor: torch.Tensor) -> None:

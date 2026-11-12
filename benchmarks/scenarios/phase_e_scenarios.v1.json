@@ -5,6 +5,7 @@
   },
   "asset_policy": {
     "external_root_env": "WITWIN_CHANNEL_SCENE_ROOT",
+    "external_source": "sionna-rt 2.2.0 wheel (Apache-2.0): the extracted sionna/rt/scenes tree",
     "full_asset_missing": "fail",
     "reduced_fallback": false
   },
@@ -49,7 +50,7 @@
       "name": "munich_full",
       "mode": "full_external",
       "asset_name": "munich",
-      "source_sha256": "976b137d833bd5fb886533bfca6ba49763384f1457539612a0817a06060f507d",
+      "source_sha256": "8d1b7e3931bcc7da202b76b5e92b5364f9ebc22f3c00094de96a44b52268b106",
       "expected_triangle_count": 38936,
       "frequency_hz": 2400000000.0,
       "default_tx_count": 1,
@@ -63,7 +64,7 @@
       "name": "sf_full",
       "mode": "full_external",
       "asset_name": "san_francisco",
-      "source_sha256": "64f2e2a0119a00b11d83d051f8a9687d187c722514c0f4fe3d7beb8cfb813ec1",
+      "source_sha256": "c625a9a5a04d491b0f310f1b338683addfd525fff190a3807adf85a2528a771a",
       "expected_triangle_count": 268041,
       "frequency_hz": 3500000000.0,
       "default_tx_count": 1,
