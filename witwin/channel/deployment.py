@@ -336,6 +336,21 @@ def doctor_report(diagnostics: dict[str, Any], *, driver_release: str | None) ->
     return "\n".join(lines), 1 if failures else 0
 
 
+def _torch_identity() -> dict[str, Any]:
+    """PyTorch version fields that need no CUDA context, so a failed probe is not misreported."""
+
+    try:
+        torch = _import_torch()
+    except (ImportError, OSError):
+        return {}
+    return {
+        "torch": torch.__version__,
+        "cuda_runtime": torch.version.cuda,
+        "torch_cuda_build": torch.version.cuda is not None,
+        "cuda_available": bool(torch.cuda.is_available()),
+    }
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run ``python -m witwin.channel doctor``."""
 
@@ -356,6 +371,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "platform": platform.platform(),
             "errors": [f"runtime diagnostics failed ({type(exc).__name__}): {exc}"],
         }
+        diagnostics.update(_torch_identity())
     if arguments.json:
         print(json.dumps(diagnostics, indent=2, sort_keys=True, default=str))
         return 1 if diagnostics.get("errors") else 0

@@ -420,3 +420,21 @@ def test_doctor_main_prints_report_and_exit_status(monkeypatch, capsys):
     monkeypatch.setattr(deployment, "_nvidia_driver_release", lambda: "570.86")
     assert deployment.main(["doctor"]) == 0
     assert "Verdict: OK" in capsys.readouterr().out
+
+
+def test_doctor_main_reports_a_failed_probe_without_blaming_pytorch(monkeypatch, capsys):
+    def fail() -> dict:
+        raise RuntimeError("CUDA error in cudaFree(nullptr): out of memory")
+
+    monkeypatch.setattr(deployment, "runtime_diagnostics", fail)
+    monkeypatch.setattr(deployment, "_nvidia_driver_release", lambda: "570.86")
+    monkeypatch.setattr(deployment, "_import_torch", lambda: SimpleNamespace(
+        __version__="2.10.0+cu128", version=SimpleNamespace(cuda="12.8"),
+        cuda=SimpleNamespace(is_available=lambda: True),
+    ))
+    assert deployment.main(["doctor"]) == 1
+    out = capsys.readouterr().out
+    assert "runtime diagnostics failed (RuntimeError): CUDA error in cudaFree" in out
+    assert "2.10.0+cu128" in out
+    assert "not importable" not in out
+    assert "CPU-only" not in out
