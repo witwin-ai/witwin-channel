@@ -709,7 +709,7 @@ def test_transmission_wall_product_source_freezes_residency_and_reduction() -> N
         _ROOT / "native/channel/kernels/mc_transmission.cu"
     ).read_text(encoding="utf-8")
     live_route = (
-        _ROOT / "witwin/channel/montecarlo/basic.py"
+        _ROOT / "witwin/channel/radiomap/_stochastic.py"
     ).read_text(encoding="utf-8")
     assert "wall_product_shared_terms_kernel" in source
     assert "wall_product_shared_reduce_kernel" in source

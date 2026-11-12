@@ -6,7 +6,7 @@ import torch
 
 from tests.support.scenes import same_side_wall_reflection_scene
 from witwin.channel.deployment import build_info
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent as Config, solve
 from witwin.channel.kernels import fields as field_kernels
 from witwin.channel.interactions import reflection as topology
 from witwin.channel.path import Config as PathConfig
@@ -24,7 +24,7 @@ def test_single_plane_reflection_matches_path_reference():
         scene,
         Config(
             components={"reflection"},
-            coherent=False,
+            combine="power",
             export_paths=True,
             return_field=False,
         ),
@@ -66,7 +66,7 @@ def test_reflection_path_field_export_uses_native_complex_fields():
 
     result = solve(
         same_side_wall_reflection_scene(),
-        Config(components={"reflection"}, coherent=True, export_paths=True),
+        Config(components={"reflection"}, combine="field", export_paths=True),
         reference_frequency_hz=3.0e9,
     )
 
@@ -112,7 +112,7 @@ def test_reflection_solver_uses_native_field_kernel_when_available(monkeypatch):
     )
     result = solve(
         same_side_wall_reflection_scene(),
-        Config(components={"reflection"}, coherent=True, export_paths=True),
+        Config(components={"reflection"}, combine="field", export_paths=True),
         reference_frequency_hz=3.0e9,
     )
 
@@ -134,7 +134,7 @@ def test_single_plane_reflection_does_not_use_python_triangle_fallback():
 
     result = solve(
         same_side_wall_reflection_scene(),
-        Config(components={"reflection"}, coherent=True, export_paths=True),
+        Config(components={"reflection"}, combine="field", export_paths=True),
         reference_frequency_hz=3.0e9,
     )
 
@@ -161,6 +161,6 @@ def test_reflection_solver_requires_native_field_kernel(monkeypatch):
     ):
         solve(
             same_side_wall_reflection_scene(),
-            Config(components={"reflection"}, coherent=True, export_paths=True),
+            Config(components={"reflection"}, combine="field", export_paths=True),
             reference_frequency_hz=3.0e9,
         )

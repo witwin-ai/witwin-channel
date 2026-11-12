@@ -9,7 +9,8 @@ import pytest
 import torch
 
 from witwin.channel import materials as materials_package
-from witwin.channel.montecarlo import basic as mc_basic
+from witwin.channel import radiomap
+from witwin.channel.radiomap import _stochastic as mc_basic
 from witwin.channel import runtime
 
 
@@ -17,7 +18,7 @@ def test_frequency_and_material_guards_have_canonical_owners():
     frequency_guard = runtime._frequency_participates_in_ad
     material_guard = materials_package._require_frequency_ad_constant_materials
 
-    assert mc_basic._require_frequency_ad_constant_materials is material_guard
+    assert radiomap._stochastic._require_frequency_ad_constant_materials is material_guard
     assert frequency_guard.__module__ == runtime.__name__
     assert material_guard.__module__ == materials_package.__name__
     assert (
@@ -84,7 +85,7 @@ def test_mc_frequency_material_guard_runs_before_build_info_and_native(monkeypat
     compiled = object()
     bound = SimpleNamespace(transmitters=(), receivers=(), frequency=3.0e9)
 
-    config = mc_basic.Config(
+    config = radiomap.Stochastic(
         workspace_limit_bytes=None,
         components={"los"},
         max_depth=1,
@@ -125,6 +126,6 @@ def test_mc_frequency_material_guard_runs_before_build_info_and_native(monkeypat
     monkeypatch.setattr(mc_basic, "make_cuda_generator", forbidden("native"))
 
     with pytest.raises(NotImplementedError, match="frequency material guard"):
-        mc_basic.solve(Scene(), config, reference_frequency_hz=3.0e9)
+        radiomap.solve(Scene(), config, reference_frequency_hz=3.0e9)
 
     assert events == ["compile", "guard"]

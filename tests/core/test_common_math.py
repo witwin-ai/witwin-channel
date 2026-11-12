@@ -100,7 +100,7 @@ def test_core_modules_do_not_depend_on_solver_packages():
             if isinstance(node, ast.ImportFrom) and node.module is not None
         ]
         assert not any(
-            module.startswith("witwin.channel.montecarlo")
-            or module.startswith("witwin.channel.deterministic")
+            module.startswith("witwin.channel.radiomap")
+            or module.startswith("witwin.channel.experimental")
             for module in imported
         ), path.name

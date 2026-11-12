@@ -53,7 +53,7 @@ def _batch(endpoints, first_id, *, with_power):
 
 
 def _solve_all(name, *, max_paths=None):
-    from witwin.channel import deterministic, path
+    from witwin.channel import radiomap, path
     from witwin.channel.propagation import consumer
     from witwin.channel.scene import compile as compile_scene
 
@@ -63,9 +63,9 @@ def _solve_all(name, *, max_paths=None):
         scene, path.Config(components=components, max_depth=depth, max_paths=max_paths),
         reference_frequency_hz=FREQUENCY_HZ,
     )
-    table = deterministic.solve(
+    table = radiomap.solve(
         scene,
-        deterministic.Config(components=components, max_depth=depth, export_paths=True),
+        radiomap.Coherent(components=components, max_depth=depth, export_paths=True),
         reference_frequency_hz=FREQUENCY_HZ,
     ).paths
     sources = _endpoints(scene, "tx")
@@ -124,7 +124,7 @@ def test_max_paths_scope_is_an_intended_selection_difference():
     With ``max_paths_scope="per_pair"`` the deterministic export selects exactly the path rows.
     """
 
-    from witwin.channel import deterministic, path
+    from witwin.channel import radiomap, path
 
     build, components, depth = _scenes()["two_tx_two_rx_free_space"]
     scene = build()
@@ -137,9 +137,9 @@ def test_max_paths_scope_is_an_intended_selection_difference():
         path.Config(max_paths=1, max_paths_scope="global")
 
     def export(scope):
-        return deterministic.solve(
+        return radiomap.solve(
             scene,
-            deterministic.Config(
+            radiomap.Coherent(
                 components=components, max_depth=depth, export_paths=True, max_paths=1,
                 max_paths_scope=scope,
             ),
@@ -160,14 +160,14 @@ def test_deterministic_accumulation_combines_the_exported_rows(coherent):
     Coherent mode squares the summed complex field; incoherent mode sums row powers.
     """
 
-    from witwin.channel import deterministic
+    from witwin.channel import radiomap
 
     build, components, depth = _scenes()["wall_and_edge"]
-    result = deterministic.solve(
+    result = radiomap.solve(
         build(),
-        deterministic.Config(
+        radiomap.Coherent(
             components={"los", "reflection"}, max_depth=depth, export_paths=True,
-            coherent=coherent,
+            combine=("field" if coherent else "power"),
         ),
         reference_frequency_hz=FREQUENCY_HZ,
     )
@@ -188,7 +188,7 @@ def _layout_pair(coherent):
 
     from witwin.core import Scene
 
-    from witwin.channel import deterministic
+    from witwin.channel import radiomap
     from tests.support import scenes
     from tests.support.core_world import make_receiver, make_receiver_grid
 
@@ -205,10 +205,10 @@ def _layout_pair(coherent):
         ))
         for row in range(shape[0]) for col in range(shape[1])
     ]
-    config = deterministic.Config(components={"los", "reflection", "diffraction"}, coherent=coherent)
+    config = radiomap.Coherent(components={"los", "reflection", "diffraction"}, combine=("field" if coherent else "power"))
 
     def solve(receivers):
-        return deterministic.solve(
+        return radiomap.solve(
             Scene(structures=base.structures, endpoints=[*tx, *receivers]), config,
             reference_frequency_hz=FREQUENCY_HZ,
         )

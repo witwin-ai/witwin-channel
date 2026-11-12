@@ -7,8 +7,8 @@ import ast
 import inspect
 from pathlib import Path
 
-from witwin.channel import deterministic as deterministic_module
-from witwin.channel.montecarlo import bdpt as bdpt_pipeline
+from witwin.channel import radiomap
+from witwin.channel.experimental import bdpt as bdpt_pipeline
 from witwin.channel import path as path_module
 from witwin.channel.interactions import transmission
 from witwin.channel.propagation import enumerated as engine
@@ -123,7 +123,7 @@ def test_enumerated_engine_owns_one_transaction_and_terminal_observer() -> None:
 def test_path_deterministic_and_adr008_oracle_share_the_engine_entry() -> None:
     assert path_module.evaluate_enumerated_paths is engine.evaluate_enumerated_paths
     assert (
-        deterministic_module.evaluate_enumerated_paths
+        radiomap._coherent.evaluate_enumerated_paths
         is engine.evaluate_enumerated_paths
     )
     assert bdpt_pipeline.evaluate_enumerated_paths is engine.evaluate_enumerated_paths

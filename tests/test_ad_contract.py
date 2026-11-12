@@ -7,14 +7,12 @@ import pytest
 import torch
 
 from witwin.channel import capabilities
-from witwin.channel.deterministic import Config as DeterministicConfig
-from witwin.channel.deterministic import _metadata as deterministic_metadata
-from witwin.channel.montecarlo.basic import Config as BasicConfig
-from witwin.channel.montecarlo.basic import (
-    make_solver_metadata as basic_metadata,
-)
-from witwin.channel.montecarlo.bdpt import Config as BdptConfig
-from witwin.channel.montecarlo.bdpt import (
+from witwin.channel.radiomap import Coherent as DeterministicConfig
+from witwin.channel.radiomap._coherent import _metadata as deterministic_metadata
+from witwin.channel.radiomap import Stochastic as BasicConfig
+from witwin.channel.radiomap._stochastic import make_solver_metadata as basic_metadata
+from witwin.channel.experimental.bdpt import Config as BdptConfig
+from witwin.channel.experimental.bdpt import (
     make_solver_metadata as bdpt_metadata,
 )
 from witwin.channel.path import Config as PathConfig

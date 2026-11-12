@@ -9,8 +9,8 @@ import time
 
 import torch
 
-from witwin.channel.montecarlo import basic
-from witwin.channel.montecarlo import bdpt
+from witwin.channel import radiomap
+from witwin.channel.experimental import bdpt
 from witwin.core import AntennaState, ReceiverGrid, Scene
 from witwin.core.identity import new_antenna_id
 
@@ -55,9 +55,9 @@ def run_benchmark(*, samples: int = 4096, grid_size: int = 32) -> dict[str, floa
         raise RuntimeError("bench_bdpt_basic requires CUDA")
 
     scene = _grid_scene(grid_size)
-    basic_config = basic.Config(samples=samples, seed=11, components={"los"})
+    basic_config = radiomap.Stochastic(samples=samples, seed=11, components={"los"})
     bdpt_config = bdpt.Config(samples=samples, seed=11, components={"los"})
-    basic.solve(
+    radiomap.solve(
         scene,
         basic_config,
         reference_frequency_hz=REFERENCE_FREQUENCY_HZ,
@@ -69,7 +69,7 @@ def run_benchmark(*, samples: int = 4096, grid_size: int = 32) -> dict[str, floa
     )
 
     basic_seconds = _elapsed_seconds(
-        lambda: basic.solve(
+        lambda: radiomap.solve(
             scene,
             basic_config,
             reference_frequency_hz=REFERENCE_FREQUENCY_HZ,

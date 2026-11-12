@@ -8,7 +8,7 @@ import torch
 
 from tests.support.scenes import wedge_diffraction_scene
 from witwin.channel.deployment import build_info
-from witwin.channel.montecarlo.bdpt import Config, solve
+from witwin.channel.experimental.bdpt import Config, solve
 
 
 def _estimates(*, samples: int, mis: str) -> list[float]:

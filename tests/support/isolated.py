@@ -48,13 +48,12 @@ def scene(structures=None, endpoints=None):
                  endpoints=[tx(), rx()] if endpoints is None else endpoints)
 
 def solve(name, scene_value, **config):
-    import importlib
-    module = importlib.import_module({"det": "witwin.channel.deterministic", "path": "witwin.channel.path",
-        "basic": "witwin.channel.montecarlo.basic", "bdpt": "witwin.channel.montecarlo.bdpt"}[name])
+    from tests.support.solvers import solver
+    entry = solver(name)
     config.setdefault("components", {"los", "reflection"})
     if name in ("basic", "bdpt"):
         config.setdefault("samples", 256)
-    return module.solve(scene_value, module.Config(**config), reference_frequency_hz=3.5e9)
+    return entry.solve(scene_value, entry.Config(**config), reference_frequency_hz=3.5e9)
 
 def case(name, thunk):
     try:

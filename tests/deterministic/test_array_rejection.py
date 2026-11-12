@@ -7,8 +7,8 @@ import pytest
 import torch
 
 from tests.support.core_world import make_receiver, make_transmitter
-from witwin.channel.deterministic import Config
-from witwin.channel import deterministic
+from witwin.channel.radiomap import Coherent
+from witwin.channel import radiomap
 from witwin.core import Scene
 
 
@@ -25,8 +25,8 @@ def test_array_fails_before_cuda() -> None:
     )
 
     with pytest.raises(ValueError, match="does not support antenna arrays"):
-        deterministic.solve(
+        radiomap.solve(
             scene,
-            Config(components={"los"}),
+            Coherent(components={"los"}),
             reference_frequency_hz=1.0e9,
         )

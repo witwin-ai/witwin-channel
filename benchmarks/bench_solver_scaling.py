@@ -78,7 +78,7 @@ def _operation(solver: str, scene: Scene, *, depth: int, samples: int, workspace
             reference_frequency_hz=REFERENCE_FREQUENCY_HZ,
         )
     if solver == "deterministic":
-        from witwin.channel.deterministic import Config, solve
+        from witwin.channel.radiomap import Coherent as Config, solve
 
         config = Config(max_depth=depth, components=components)
         return lambda: solve(
@@ -87,7 +87,7 @@ def _operation(solver: str, scene: Scene, *, depth: int, samples: int, workspace
             reference_frequency_hz=REFERENCE_FREQUENCY_HZ,
         )
     if solver == "basic":
-        from witwin.channel.montecarlo.basic import Config, solve
+        from witwin.channel.radiomap import Stochastic as Config, solve
 
         config = Config(
             samples=samples,
@@ -101,7 +101,7 @@ def _operation(solver: str, scene: Scene, *, depth: int, samples: int, workspace
             reference_frequency_hz=REFERENCE_FREQUENCY_HZ,
         )
     if solver == "bdpt":
-        from witwin.channel.montecarlo.bdpt import Config, solve
+        from witwin.channel.experimental.bdpt import Config, solve
 
         config = Config(
             samples=samples,

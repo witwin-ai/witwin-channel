@@ -25,11 +25,12 @@ REPO_ROOT = BENCHMARKS.parent
 SCHEMA = "channel-baseline.v1"
 RESULT_PREFIX = "BASELINE_RESULT "
 MEMORY_CAP_BYTES = 8 << 30
+# Each solver label: the module whose ``solve`` runs it and the name of its config type.
 SOLVER_MODULES = {
-    "det": "witwin.channel.deterministic",
-    "path": "witwin.channel.path",
-    "mc": "witwin.channel.montecarlo.basic",
-    "bdpt": "witwin.channel.montecarlo.bdpt",
+    "det": ("witwin.channel.radiomap", "Coherent"),
+    "path": ("witwin.channel.path", "Config"),
+    "mc": ("witwin.channel.radiomap", "Stochastic"),
+    "bdpt": ("witwin.channel.experimental.bdpt", "Config"),
 }
 COMPONENTS = {
     "los": ("los",),
@@ -161,8 +162,9 @@ def build(case: Case) -> tuple[Any, Any, Any]:
     city = sc.city(case.city, subdiv=case.subdiv, welded=case.welded)
     scene = Scene(structures=city.structures,
                   endpoints=[sc.transmitter(city.extent_m), *_receivers(case.receivers, city.extent_m)])
-    module = importlib.import_module(SOLVER_MODULES[case.solver])
-    return module, scene, module.Config(**case.config_kwargs())
+    module_name, config_name = SOLVER_MODULES[case.solver]
+    module = importlib.import_module(module_name)
+    return module, scene, getattr(module, config_name)(**case.config_kwargs())
 
 
 def path_count(solver: str, result: Any) -> int | None:

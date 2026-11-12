@@ -12,7 +12,7 @@ from tests.support.scenes import (
     wedge_diffraction_scene,
 )
 from tests.support.core_world import make_receiver_grid
-from witwin.channel.montecarlo.bdpt import BDPTPathSamples, Config, solve
+from witwin.channel.experimental.bdpt import BDPTPathSamples, Config, solve
 
 
 def _with_grid(scene: Scene, grid: ReceiverGrid) -> Scene:

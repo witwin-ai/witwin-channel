@@ -164,7 +164,7 @@ def test_channel_scene_matches_case_geometry_and_material(scenario, cube_count, 
 
 
 def test_deterministic_backend_passes_explicit_reference_frequency(monkeypatch):
-    import witwin.channel.deterministic as deterministic_module
+    from witwin.channel import radiomap
 
     spec = replace(load_case("single_cube", "metal"), receiver_shape=(3, 2))
     sentinel_scene = object()
@@ -185,7 +185,7 @@ def test_deterministic_backend_passes_explicit_reference_frequency(monkeypatch):
         "benchmarks.fullwave_validation.backends.build_channel_scene",
         lambda _spec: sentinel_scene,
     )
-    monkeypatch.setattr(deterministic_module, "solve", fake_solve)
+    monkeypatch.setattr(radiomap, "solve", fake_solve)
 
     result = solve_deterministic(spec)
 

@@ -38,7 +38,7 @@ from benchmarks.fullwave_validation.scenarios import (  # noqa: E402
     load_case,
 )
 from witwin.core import Scene  # noqa: E402
-from witwin.channel.deterministic import Config, solve  # noqa: E402
+from witwin.channel.radiomap import Coherent, solve  # noqa: E402
 
 
 spec = load_case("three_cube_320", "metal")
@@ -52,10 +52,10 @@ empty_channel_scene = Scene(
 )
 deterministic_result = solve(
     empty_channel_scene,
-    Config(
+    Coherent(
         components=frozenset({"los"}),
         max_depth=0,
-        coherent=True,
+        combine="field",
         return_field=True,
         export_paths=False,
         diagnostics=True,

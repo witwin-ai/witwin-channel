@@ -25,7 +25,7 @@ from tests.support.core_world import (  # noqa: E402
     make_receiver_grid,
     make_transmitter,
 )
-from witwin.channel.deterministic import Config, solve  # noqa: E402
+from witwin.channel.radiomap import Coherent, solve  # noqa: E402
 
 
 DEFAULT_SIONNA_ROOT = pathlib.Path(
@@ -138,7 +138,8 @@ def main() -> None:
     import drjit as dr
     from witwin.channel.core.scene import ReceiverGrid, Scene, Transmitter
     from witwin.channel.core.scene.edge_policy import EdgePolicy
-    from witwin.channel.deterministic import Config, Tuning, solve
+    from witwin.channel.radiomap import Coherent, solve
+    from witwin.channel.radiomap._coherent import Tuning
 
     scene = Scene.load_mitsuba(
         pathlib.Path(args.scene_xml),
@@ -158,7 +159,7 @@ def main() -> None:
         )
     )
     max_bounces = max(0, int(args.max_depth))
-    config = Config(
+    config = Coherent(
         num_samples=1,
         max_bounces=max_bounces,
         max_diffraction_order=1,
@@ -347,10 +348,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         raise RuntimeError(f"Original Munich deterministic solver is unavailable: {original}")
 
     scene = _load_scene(args)
-    config = Config(
+    config = Coherent(
         max_depth=int(args.max_depth),
         components=set(COMPONENTS),
-        coherent=False,
+        combine="power",
         return_field=False,
         export_paths=True,
         diagnostics=True,

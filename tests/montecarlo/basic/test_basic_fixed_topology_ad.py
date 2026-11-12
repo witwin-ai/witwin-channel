@@ -3,7 +3,7 @@
 
 import pytest
 
-from witwin.channel.montecarlo.basic import Config
+from witwin.channel.radiomap import Stochastic
 
 
 @pytest.mark.parametrize("ad_mode", ["jvp", "vjp"])
@@ -12,4 +12,4 @@ def test_basic_fixed_topology_ad_modes_are_accepted(ad_mode):
     # (materials from the compiled store, frequency, LoS endpoints).
     # Solve-time rejection of pending components is covered by
     # tests/montecarlo/basic/test_basic_ad_errors.py.
-    assert Config(samples=128, components={"los"}, ad_mode=ad_mode).ad_mode == ad_mode
+    assert Stochastic(samples=128, components={"los"}, ad_mode=ad_mode).ad_mode == ad_mode

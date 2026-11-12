@@ -6,7 +6,7 @@ import torch
 
 from tests.support.scenes import empty_space_los_scene
 from witwin.channel.runtime import validate_metadata
-from witwin.channel.montecarlo.basic import Config, solve
+from witwin.channel.radiomap import Stochastic, solve
 
 
 def test_basic_primal_metadata_reports_no_ad_by_default():
@@ -15,7 +15,7 @@ def test_basic_primal_metadata_reports_no_ad_by_default():
 
     result = solve(
         empty_space_los_scene(),
-        Config(samples=64, components={"los"}),
+        Stochastic(samples=64, components={"los"}),
         reference_frequency_hz=3.0e9,
     )
 
@@ -41,7 +41,7 @@ def test_basic_metadata_reports_registered_ad_companions(ad_mode):
 
     result = solve(
         empty_space_los_scene(),
-        Config(samples=64, components={"los"}, ad_mode=ad_mode),
+        Stochastic(samples=64, components={"los"}, ad_mode=ad_mode),
         reference_frequency_hz=3.0e9,
     )
 

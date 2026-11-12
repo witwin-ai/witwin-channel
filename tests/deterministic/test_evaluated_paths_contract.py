@@ -6,7 +6,8 @@ from __future__ import annotations
 import torch
 
 from witwin.channel.propagation.geometry import ReceiverLayout
-from witwin.channel import deterministic
+from witwin.channel import radiomap
+from witwin.channel.radiomap import _coherent as deterministic
 from witwin.channel.propagation.rows import (
     EvaluatedPaths,
     PathFields,
@@ -69,7 +70,7 @@ def test_accumulation_consumes_split_evaluated_path_contract(monkeypatch):
         lambda **_kwargs: sentinel,
     )
 
-    result = deterministic.accumulate_path_result(
+    result = radiomap._coherent.accumulate_path_result(
         paths,
         frequency_hz=1.0,
         num_tx=1,

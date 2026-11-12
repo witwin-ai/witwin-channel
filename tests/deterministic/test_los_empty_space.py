@@ -6,7 +6,7 @@ import torch
 
 from tests.support.reference_channel import los_path_gain_reference
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 
 
 def test_empty_space_los_matches_analytic_reference():
@@ -16,7 +16,7 @@ def test_empty_space_los_matches_analytic_reference():
     scene = empty_space_los_scene()
     result = solve(
         scene,
-        Config(max_depth=0, components={"los"}),
+        Coherent(max_depth=0, components={"los"}),
         reference_frequency_hz=3.0e9,
     )
     expected = los_path_gain_reference(

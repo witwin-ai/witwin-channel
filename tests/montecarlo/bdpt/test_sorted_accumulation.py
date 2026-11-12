@@ -4,7 +4,7 @@
 import pytest
 import torch
 
-import witwin.channel.montecarlo.bdpt as bdpt
+import witwin.channel.experimental.bdpt as bdpt
 
 cuda = pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA torch is required")
 

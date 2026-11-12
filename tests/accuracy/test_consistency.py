@@ -94,12 +94,12 @@ def test_coupled_reflection_diffraction_is_reciprocal(accuracy, max_depth):
 
 
 def _radiomap(subdiv: int, welded: bool, components: set[str], depth: int = 1) -> torch.Tensor:
-    from witwin.channel.deterministic import Config, solve
+    from witwin.channel.radiomap import Coherent as Config, solve
 
     city = sc.city(4, subdiv=subdiv, welded=welded)
     scene = Scene(structures=city.structures,
                   endpoints=[sc.transmitter(city.extent_m), sc.receiver_grid(city.extent_m, 32)])
-    result = solve(scene, Config(components=components, max_depth=depth, coherent=False),
+    result = solve(scene, Config(components=components, max_depth=depth, combine="power"),
                    reference_frequency_hz=FREQ)
     return result.path_gain.reshape(-1).double()
 
@@ -127,7 +127,7 @@ def test_subdivision_invariance(accuracy, components, subdiv, welded):
 
 
 def _per_depth(max_depth: int) -> dict[int, tuple[int, float]]:
-    from witwin.channel.deterministic import Config, solve
+    from witwin.channel.radiomap import Coherent as Config, solve
 
     city = sc.city(4)
     scene = Scene(structures=city.structures,
@@ -156,13 +156,13 @@ def test_scheme_equivalence_on_overlapping_depths(accuracy, scheme_depths, depth
 
 def _reflection_rows(max_depth: int, discovery: str, n_side: int = 2, grid_n: int = 8):
     """Sorted ``(rx, depth, primitive sequence, length, gain)`` reflection rows of a small city."""
-    from witwin.channel.deterministic import Config, solve
+    from witwin.channel.radiomap import Coherent as Config, solve
 
     city = sc.city(n_side)
     scene = Scene(structures=city.structures,
                   endpoints=[sc.transmitter(city.extent_m), sc.receiver_grid(city.extent_m, grid_n)])
     result = solve(scene, Config(components={"reflection"}, max_depth=max_depth, export_paths=True,
-                                 coherent=False, discovery=discovery), reference_frequency_hz=FREQ)
+                                 combine="power", discovery=discovery), reference_frequency_hz=FREQ)
     p = result.paths
     rows = sorted(
         (int(rx), int(d), tuple(seq[:int(d)]), float(length), float(gain))
@@ -243,14 +243,16 @@ def _solve_grid(
 ) -> torch.Tensor:
     import importlib
 
-    module = importlib.import_module({
-        "deterministic": "witwin.channel.deterministic", "mc": "witwin.channel.montecarlo.basic",
-        "bdpt": "witwin.channel.montecarlo.bdpt"}[solver])
-    extra = {"coherent": False} if solver == "deterministic" else {
+    module_name, config_name = {
+        "deterministic": ("witwin.channel.radiomap", "Coherent"),
+        "mc": ("witwin.channel.radiomap", "Stochastic"),
+        "bdpt": ("witwin.channel.experimental.bdpt", "Config")}[solver]
+    module = importlib.import_module(module_name)
+    extra = {"combine": "power"} if solver == "deterministic" else {
         "samples": 1 << 23, "workspace_limit_bytes": 2 << 30} if solver == "mc" else {"samples": 4096}
     scene = Scene(structures=structures, endpoints=[antenna("tx", tx), grid(GRID_ORIGIN, GRID_SHAPE, GRID_SPACING)])
-    result = module.solve(scene, module.Config(components=components, max_depth=1, **extra),
-                          reference_frequency_hz=FREQ)
+    config = getattr(module, config_name)(components=components, max_depth=1, **extra)
+    result = module.solve(scene, config, reference_frequency_hz=FREQ)
     return result.path_gain.reshape(-1).double().cpu()
 
 
@@ -373,7 +375,7 @@ def test_multilayer_wall_reflection_across_solvers(accuracy, solver):
 
 
 def test_bdpt_refuses_multilayer_reflection():
-    from witwin.channel.montecarlo import bdpt
+    from witwin.channel.experimental import bdpt
 
     scene = Scene(structures=_multilayer_wall(),
                   endpoints=[antenna("tx", TX_REFLECTION), grid(GRID_ORIGIN, GRID_SHAPE, GRID_SPACING)])

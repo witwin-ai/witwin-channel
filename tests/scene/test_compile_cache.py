@@ -66,10 +66,10 @@ def _compile(scene, frequency=_FREQUENCY):
 
 
 def _deterministic(scene):
-    from witwin.channel import deterministic
+    from witwin.channel import radiomap
 
-    config = deterministic.Config(max_depth=1, components=("los", "reflection"))
-    return deterministic.solve(scene, config, reference_frequency_hz=_FREQUENCY)
+    config = radiomap.Coherent(max_depth=1, components=("los", "reflection"))
+    return radiomap.solve(scene, config, reference_frequency_hz=_FREQUENCY)
 
 
 def _assert_identical(left, right) -> None:

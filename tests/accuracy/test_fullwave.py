@@ -259,11 +259,11 @@ KNOWN_GAPS: dict[tuple[str, int, str, str], tuple[float, float, str]] = {
 def deterministic_plane(case: rs.ReferenceCase, plane: dict) -> tuple[np.ndarray, dict, float]:
     """Calibrated deterministic field and component maps on the reference samples, LoS spread."""
 
-    from witwin.channel.deterministic import Config, solve
+    from witwin.channel.radiomap import Coherent, solve
 
-    result = solve(rs.build_channel_scene(case, plane), Config(
+    result = solve(rs.build_channel_scene(case, plane), Coherent(
         components=frozenset({"los", "reflection", "diffraction", "transmission"}),
-        max_depth=_DEPTH.get(case.case_id, 2), coherent=True,
+        max_depth=_DEPTH.get(case.case_id, 2), combine="field",
         return_field=True, coupled_paths=True, coupled_candidate_limit=1_000_000,
         isb_boundary_taper=False), reference_frequency_hz=case.frequency_hz)
     # The grid is shape (x.size, y.size), so solver maps are [1, x, y]; the planes are (y, x).

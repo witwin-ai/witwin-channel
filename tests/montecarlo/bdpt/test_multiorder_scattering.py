@@ -14,7 +14,7 @@ from tests.support.core_world import (
 )
 from witwin.channel.deployment import build_info
 from witwin.core import MaterialLayer, PhysicalMaterial, SurfaceRoughness
-from witwin.channel.montecarlo.bdpt import Config, solve
+from witwin.channel.experimental.bdpt import Config, solve
 
 
 _FREQUENCY = 60.0e9

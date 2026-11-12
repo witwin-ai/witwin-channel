@@ -9,7 +9,7 @@ from tests.support.scenes import (
     same_side_wall_reflection_scene,
 )
 from witwin.channel.deployment import build_info
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 
 
 def test_transmission_and_scattering_are_zero_contribution_plumbing():
@@ -18,12 +18,12 @@ def test_transmission_and_scattering_are_zero_contribution_plumbing():
 
     baseline = solve(
         empty_space_los_scene(),
-        Config(components={"los"}),
+        Coherent(components={"los"}),
         reference_frequency_hz=3.0e9,
     )
     result = solve(
         empty_space_los_scene(),
-        Config(components={"los", "transmission", "scattering"}),
+        Coherent(components={"los", "transmission", "scattering"}),
         reference_frequency_hz=3.0e9,
     )
 
@@ -41,7 +41,7 @@ def test_transmission_and_scattering_are_zero_contribution_plumbing():
 
 def test_deterministic_config_rejects_unknown_component():
     with pytest.raises(ValueError, match="components"):
-        Config(components={"los", "teleportation"})
+        Coherent(components={"los", "teleportation"})
 
 
 def test_single_component_power_matches_total_for_reflection_only():
@@ -52,7 +52,7 @@ def test_single_component_power_matches_total_for_reflection_only():
 
     result = solve(
         same_side_wall_reflection_scene(),
-        Config(components={"reflection"}, coherent=False),
+        Coherent(components={"reflection"}, combine="power"),
         reference_frequency_hz=3.0e9,
     )
 

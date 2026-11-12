@@ -9,7 +9,7 @@ import torch
 from tests.deterministic.test_reflection_multibounce import two_wall_multibounce_scene
 from tests.support.scenes import empty_space_los_scene
 from witwin.channel.deployment import build_info
-from witwin.channel.deterministic import Config
+from witwin.channel.radiomap import Coherent
 from witwin.channel.propagation import fields as field_stage
 from witwin.channel.propagation.enumerated import evaluate_enumerated_paths
 from witwin.channel.propagation.rows import COMPONENT_ROW_GROUPS
@@ -33,7 +33,7 @@ def test_compact_row_groups_list_each_component_and_reflection_depth_in_row_orde
     _require_native()
     evaluated, sidecars = _solve(
         two_wall_multibounce_scene(),
-        Config(components={"los", "reflection"}, max_depth=3),
+        Coherent(components={"los", "reflection"}, max_depth=3),
     )
     groups = sidecars.row_groups
     assert groups is not None
@@ -59,7 +59,7 @@ def test_compact_row_groups_list_each_component_and_reflection_depth_in_row_orde
 
 def test_los_only_rows_form_one_identity_group():
     _require_native()
-    evaluated, sidecars = _solve(empty_space_los_scene(), Config(max_depth=0, components={"los"}))
+    evaluated, sidecars = _solve(empty_space_los_scene(), Coherent(max_depth=0, components={"los"}))
     assert sidecars.compact_metadata.count_d2h_copies == 0
     assert evaluated.row_count > 0
     assert bool((evaluated.topology.component_id == 0).all())
@@ -68,7 +68,7 @@ def test_los_only_rows_form_one_identity_group():
 def test_field_stage_component_passes_issue_no_torch_synchronization(monkeypatch):
     _require_native()
     scene = two_wall_multibounce_scene()
-    config = Config(components={"los", "reflection"}, max_depth=3)
+    config = Coherent(components={"los", "reflection"}, max_depth=3)
     reference, _ = _solve(scene, config)
 
     def strict(function):
@@ -121,7 +121,7 @@ def test_primal_field_stage_runs_no_per_component_field_operator(monkeypatch):
         )
     evaluated, _ = _solve(
         two_wall_multibounce_scene(),
-        Config(components={"los", "reflection", "diffraction"}, max_depth=3),
+        Coherent(components={"los", "reflection", "diffraction"}, max_depth=3),
     )
     assert evaluated.row_count > 0
     assert bool(torch.isfinite(evaluated.fields.path_gain).all())

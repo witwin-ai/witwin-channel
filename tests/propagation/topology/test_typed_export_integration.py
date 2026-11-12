@@ -9,8 +9,8 @@ from pathlib import Path
 import torch
 
 from tests.path.test_path_evaluated_paths import _evaluated_paths_fixture
-from witwin.channel import deterministic as deterministic_module
-from witwin.channel.montecarlo import bdpt as bdpt_pipeline
+from witwin.channel.radiomap import _coherent as deterministic_module
+from witwin.channel.experimental import bdpt as bdpt_pipeline
 from witwin.channel import path as path_module
 from witwin.channel.interactions import scattering
 from witwin.channel.propagation import enumerated as engine
@@ -136,7 +136,7 @@ def test_capacity_sanitize_and_terminal_boundaries_follow_outer_result_work():
     assert _call_line(
         deterministic, "sanitize_enumerated_capacity_transaction"
     ) < _call_line(deterministic, "accumulate_path_result")
-    assert _call_line(deterministic, "Result") < _call_line(
+    assert _call_line(deterministic, "CoherentRadioMap") < _call_line(
         deterministic, "_terminal_check_capacity"
     )
     assert _call_line(deterministic_terminal, "terminal_check") > 0

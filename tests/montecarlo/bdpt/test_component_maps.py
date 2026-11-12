@@ -8,7 +8,7 @@ from witwin.core import ReceiverGrid, Scene
 from tests.support.scenes import single_wall_reflection_scene
 from tests.support.core_world import make_receiver_grid
 from witwin.channel.deployment import build_info
-from witwin.channel.montecarlo.bdpt import Config, solve
+from witwin.channel.experimental.bdpt import Config, solve
 
 
 def _grid() -> ReceiverGrid:

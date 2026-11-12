@@ -5,17 +5,17 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel.montecarlo.basic import Config, solve
+from witwin.channel.radiomap import Stochastic, solve
 
 
 def test_basic_ad_config_rejects_unknown_mode():
     with pytest.raises(ValueError, match="ad_mode"):
-        Config(ad_mode="reverse")
+        Stochastic(ad_mode="reverse")
 
 
 @pytest.mark.parametrize("ad_mode", ["jvp", "vjp"])
 def test_basic_ad_config_accepts_fixed_topology_modes(ad_mode):
-    assert Config(ad_mode=ad_mode).ad_mode == ad_mode
+    assert Stochastic(ad_mode=ad_mode).ad_mode == ad_mode
 
 
 # Every MC-basic component has native AD companions. Scattering-path coverage
@@ -46,7 +46,7 @@ def test_basic_ad_solve_rejects_reflection_depth_over_ad_cap(ad_mode, monkeypatc
         geometry_kernels, "rayd_trace_reflections_forward", _forbidden_forward
     )
     scene = empty_space_los_scene()
-    config = Config(
+    config = Stochastic(
         samples=64,
         components={"reflection"},
         max_depth=depth_cap + 1,

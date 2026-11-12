@@ -10,7 +10,8 @@ import pytest
 import torch
 
 from witwin.channel.interactions import transmission
-from witwin.channel.montecarlo import basic as mc_basic
+from witwin.channel import radiomap
+from witwin.channel.radiomap import _stochastic as mc_basic
 from witwin.channel.propagation.penetration import (
     SegmentPenetrationPolicy,
 )
@@ -202,7 +203,7 @@ def test_transmission_component_map_flattens_pair_major_and_shares_state(
         lambda matrix, **kwargs: matrix,
     )
 
-    result = mc_basic.transmission_component_map(
+    result = radiomap._stochastic.transmission_component_map(
         scene,
         rayd,
         grid,

@@ -10,10 +10,10 @@ from tests.support.scenes import wedge_diffraction_scene
 from witwin.core import ReceiverGrid, Scene
 from tests.support.core_world import make_receiver_grid
 from witwin.channel.deployment import build_info
-from witwin.channel.deterministic import Config as DeterministicConfig
-from witwin.channel.deterministic import solve as deterministic_solve
-from witwin.channel.montecarlo.bdpt import Config as BDPTConfig
-from witwin.channel.montecarlo.bdpt import solve as bdpt_solve
+from witwin.channel.radiomap import Coherent as DeterministicConfig
+from witwin.channel.radiomap import solve as deterministic_solve
+from witwin.channel.experimental.bdpt import Config as BDPTConfig
+from witwin.channel.experimental.bdpt import solve as bdpt_solve
 
 
 _GATE_LOW = 0.5
@@ -101,7 +101,7 @@ def test_default_off_is_bit_identical_to_incoherent():
     deterministic = deterministic_solve(
         scene,
         DeterministicConfig(
-            components={"diffraction"}, max_depth=1, coherent=False, export_paths=True
+            components={"diffraction"}, max_depth=1, combine="power", export_paths=True
         ),
         reference_frequency_hz=3.0e9,
     )
@@ -154,7 +154,7 @@ def test_coherent_converges_to_deterministic_coherent():
             deterministic_solve(
                 scene,
                 DeterministicConfig(
-                    components={"diffraction"}, max_depth=1, coherent=True
+                    components={"diffraction"}, max_depth=1, combine="field"
                 ),
                 reference_frequency_hz=3.0e9,
             )
@@ -223,7 +223,7 @@ def test_coherent_differs_from_incoherent_like_the_deterministic_phasor_sum():
             _diffraction(
                 deterministic_solve(
                     scene,
-                    DeterministicConfig(components={"diffraction"}, max_depth=1, coherent=mode),
+                    DeterministicConfig(components={"diffraction"}, max_depth=1, combine=("field" if mode else "power")),
                     reference_frequency_hz=3.0e9,
                 )
             ).sum()

@@ -8,7 +8,7 @@ import torch
 
 from tests.support.scenes import wedge_diffraction_scene
 from witwin.channel.deployment import build_info
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 from witwin.channel.kernels import topology as topology_kernels
 
 
@@ -26,10 +26,10 @@ def test_selected_edge_count_runs_only_for_diagnostics(monkeypatch):
 
     monkeypatch.setattr(topology_kernels, "deterministic_selected_edge_count", counted)
     config = dict(components={"los", "diffraction"}, max_depth=1)
-    solve(wedge_diffraction_scene(), Config(**config), reference_frequency_hz=3.0e9)
+    solve(wedge_diffraction_scene(), Coherent(**config), reference_frequency_hz=3.0e9)
     assert calls == []
     result = solve(
-        wedge_diffraction_scene(), Config(**config, diagnostics=True), reference_frequency_hz=3.0e9
+        wedge_diffraction_scene(), Coherent(**config, diagnostics=True), reference_frequency_hz=3.0e9
     )
     assert len(calls) == 1
     assert result.diagnostics["selected_edge_count"] > 0

@@ -5,7 +5,7 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent as Config, solve
 from witwin.channel.path import Config as PathConfig
 from witwin.channel.path import solve as solve_paths
 

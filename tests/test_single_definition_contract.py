@@ -120,7 +120,7 @@ def test_a_signature_is_not_satisfied_by_ordinary_code(real_facts):
         (
             DEPTH,
             DEPTH_COPY,
-            "witwin.channel.deterministic.pipeline",
+            "witwin.channel.radiomap._coherent",
             "_interaction_budget",
         ),
         (
@@ -132,7 +132,7 @@ def test_a_signature_is_not_satisfied_by_ordinary_code(real_facts):
         (
             SYMBOL,
             SYMBOL_COPY,
-            "witwin.channel.deterministic.pipeline",
+            "witwin.channel.radiomap._coherent",
             "_fetch_kernel",
         ),
     ],
@@ -286,7 +286,7 @@ def test_cli_fails_on_a_duplicate_planted_in_a_mirror(tmp_path: Path, capsys):
         package_root,
         ignore=shutil.ignore_patterns("__pycache__", "*.pyd", "*.so"),
     )
-    target = package_root / "deterministic.py"
+    target = package_root / "radiomap" / "_coherent.py"
     target.write_text(
         target.read_text(encoding="utf-8") + DEPTH_COPY, encoding="utf-8"
     )

@@ -12,7 +12,7 @@ from tests.support.scenes import transmission_wall_structure
 from tests.support.core_world import make_receiver, make_transmitter
 from witwin.channel.kernels import materials as ops
 from witwin.channel.deployment import build_info
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 from witwin.core import MaterialLayer, PhysicalMaterial, Scene
 
 _FREQUENCY_HZ = 3.0e9
@@ -49,8 +49,8 @@ def _lossy_wall(name: str = "lossy-wall") -> PhysicalMaterial:
     )
 
 
-_TRANSMISSION = Config(components={"transmission"}, max_depth=1)
-_LOS = Config(components={"los"})
+_TRANSMISSION = Coherent(components={"transmission"}, max_depth=1)
+_LOS = Coherent(components={"los"})
 
 
 def _stack_t_te(material: PhysicalMaterial, cos_theta: float) -> complex:
@@ -161,7 +161,7 @@ def test_two_walls_transmission_is_the_product_of_single_wall_stacks():
     )
     both = solve(
         _scene([wall_a, wall_b], rx_position),
-        Config(components={"transmission"}, max_depth=2),
+        Coherent(components={"transmission"}, max_depth=2),
         reference_frequency_hz=_FREQUENCY_HZ,
     )
 
@@ -190,7 +190,7 @@ def test_max_depth_overflow_drops_the_two_wall_row_and_counts_it():
     assert torch.count_nonzero(shallow.component_power["transmission"]).item() == 0
     deep = solve(
         scene,
-        Config(components={"transmission"}, max_depth=2),
+        Coherent(components={"transmission"}, max_depth=2),
         reference_frequency_hz=_FREQUENCY_HZ,
     )
     assert deep.metadata["transmission"]["dropped_rows_over_max_depth"] == 0
@@ -201,7 +201,7 @@ def test_los_transmission_exclusivity():
     _require_rayd()
 
     rx_position = [5.0, 0.0, 0.0]
-    config = Config(components={"los", "transmission"}, max_depth=1, coherent=False)
+    config = Coherent(components={"los", "transmission"}, max_depth=1, combine="power")
 
     blocked = solve(
         _scene([transmission_wall_structure(2.5, _lossy_wall())], rx_position),

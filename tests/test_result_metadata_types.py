@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import importlib
 from typing import Any, get_args
 
 import pytest
@@ -13,12 +12,9 @@ from witwin.channel.capabilities import Combine, Estimator, Quantity, ResultSema
 from witwin.channel.components import DiscoveryMetadata
 from witwin.channel.runtime import KernelMetadata
 
-_SOLVERS = {
-    "path": "PathMetadata",
-    "deterministic": "Metadata",
-    "montecarlo.basic": "Metadata",
-    "montecarlo.bdpt": "Metadata",
-}
+from tests.support.solvers import solver as _solver
+
+_SOLVERS = ("deterministic", "montecarlo.basic", "montecarlo.bdpt", "path")
 _ALL_COMPONENTS = frozenset({"los", "reflection", "diffraction", "transmission", "scattering"})
 
 
@@ -36,7 +32,7 @@ def _assert_matches(metadata: dict[str, object], typed_dict: Any) -> None:
 
 @pytest.mark.parametrize("solver", sorted(_SOLVERS))
 def test_solver_metadata_types_carry_the_shared_blocks(solver):
-    metadata_type = getattr(importlib.import_module(f"witwin.channel.{solver}"), _SOLVERS[solver])
+    metadata_type = _solver(solver).Metadata
     _, declared = _declared(metadata_type)
     assert frozenset(ResultSemantics.__annotations__) <= declared
     assert "kernel" in declared
@@ -74,7 +70,7 @@ _CONFIGS = {
 @pytest.mark.parametrize("solver", sorted(_SOLVERS))
 @pytest.mark.parametrize("components", [frozenset({"los"}), _ALL_COMPONENTS], ids=["los", "all"])
 def test_solver_metadata_keys_are_declared(solver, components):
-    module = importlib.import_module(f"witwin.channel.{solver}")
+    module = _solver(solver)
     result = module.solve(
         _scene(),
         module.Config(components=components, **_CONFIGS[solver]),
@@ -82,7 +78,7 @@ def test_solver_metadata_keys_are_declared(solver, components):
     )
     metadata = result.metadata
     assert type(metadata) is dict
-    _assert_matches(metadata, getattr(module, _SOLVERS[solver]))
+    _assert_matches(metadata, module.Metadata)
     _assert_matches(metadata["kernel"], KernelMetadata)
     assert metadata["estimator"] in get_args(Estimator)
     assert metadata["combine"] in get_args(Combine)
@@ -90,4 +86,4 @@ def test_solver_metadata_keys_are_declared(solver, components):
     if "discovery" in metadata:
         _assert_matches(metadata["discovery"], DiscoveryMetadata)
     if solver == "path":
-        _assert_matches(result.filter_by_type(0).metadata, module.PathMetadata)
+        _assert_matches(result.filter_by_type(0).metadata, module.Metadata)

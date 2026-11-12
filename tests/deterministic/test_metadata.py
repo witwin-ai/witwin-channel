@@ -5,7 +5,7 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 
 
 def test_metadata_reports_deterministic_solver_decisions():
@@ -14,12 +14,14 @@ def test_metadata_reports_deterministic_solver_decisions():
 
     result = solve(
         empty_space_los_scene(),
-        Config(max_depth=0, components={"los"}, diagnostics=True),
+        Coherent(max_depth=0, components={"los"}, diagnostics=True),
         reference_frequency_hz=3.0e9,
     )
     metadata = result.metadata
 
-    assert metadata["coherent"] is True
+    assert "coherent" not in metadata
+    assert metadata["combine"] == "field"
+    assert metadata["requested_config"]["combine"] == "field"
     assert metadata["max_paths_scope"] == "global"
     assert metadata["accumulation_strategy"] == "coherent"
     assert metadata["components"]["los"] == "enabled"
@@ -44,10 +46,10 @@ def test_metadata_rejects_requested_components_that_depth_would_skip():
     with pytest.raises(RuntimeError, match="reflection requires max_depth"):
         solve(
             empty_space_los_scene(),
-            Config(
+            Coherent(
                 max_depth=0,
                 components={"los", "reflection", "diffraction"},
-                coherent=False,
+                combine="power",
             ),
             reference_frequency_hz=3.0e9,
         )
@@ -59,7 +61,7 @@ def test_diagnostics_report_native_launches_and_path_planning():
 
     result = solve(
         empty_space_los_scene(),
-        Config(max_depth=0, components={"los"}, diagnostics=True),
+        Coherent(max_depth=0, components={"los"}, diagnostics=True),
         reference_frequency_hz=3.0e9,
     )
 

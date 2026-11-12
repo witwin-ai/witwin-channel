@@ -29,7 +29,7 @@ from benchmarks.fullwave_validation.scenarios import (  # noqa: E402
     build_channel_scene,
     load_case,
 )
-from witwin.channel.deterministic import Config, solve  # noqa: E402
+from witwin.channel.radiomap import Coherent, solve  # noqa: E402
 
 
 COMPONENTS = frozenset({"los", "reflection", "diffraction", "transmission"})
@@ -58,10 +58,10 @@ def _export_path_table(paths, path: Path) -> None:
 
 
 def run(coupled: bool) -> dict[str, object]:
-    config = Config(
+    config = Coherent(
         components=COMPONENTS,
         max_depth=spec.max_depth,
-        coherent=True,
+        combine="field",
         return_field=True,
         export_paths=True,
         diagnostics=True,

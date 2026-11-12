@@ -81,7 +81,7 @@ class PathRow:
 def deterministic_rows(
     scene: Scene, components: set[str], max_depth: int = 1, frequency_hz: float = FREQ,
 ) -> list[PathRow]:
-    from witwin.channel.deterministic import Config, solve
+    from witwin.channel.radiomap import Coherent as Config, solve
 
     result = solve(scene, Config(components=components, max_depth=max_depth, export_paths=True),
                    reference_frequency_hz=frequency_hz)

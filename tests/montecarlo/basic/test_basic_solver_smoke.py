@@ -9,7 +9,7 @@ import torch
 from tests.support.core_world import make_receiver, make_transmitter
 from witwin.core import Scene
 from witwin.channel.deployment import build_info
-from witwin.channel.montecarlo.basic import Config, Result, solve
+from witwin.channel.radiomap import Stochastic, RadioMap, solve
 
 
 def _empty_space_scene() -> Scene:
@@ -28,11 +28,11 @@ def test_basic_solver_los_smoke_returns_cuda_result():
 
     result = solve(
         _empty_space_scene(),
-        Config(samples=128, seed=7, components={"los"}),
+        Stochastic(samples=128, seed=7, components={"los"}),
         reference_frequency_hz=3.0e9,
     )
 
-    assert isinstance(result, Result)
+    assert isinstance(result, RadioMap)
     assert result.path_gain.is_cuda
     assert result.path_gain.shape == (1, 1)
     assert torch.isfinite(result.path_gain).all()
@@ -52,7 +52,7 @@ def test_basic_point_receiver_los_is_occluded_by_wall():
     scene = single_wall_reflection_scene()
     result = solve(
         scene,
-        Config(samples=128, seed=7, components={"los"}),
+        Stochastic(samples=128, seed=7, components={"los"}),
         reference_frequency_hz=3.0e9,
     )
 
@@ -69,7 +69,7 @@ def test_basic_solver_does_not_import_python_rayd():
 
     solve(
         _empty_space_scene(),
-        Config(samples=16, components={"los"}),
+        Stochastic(samples=16, components={"los"}),
         reference_frequency_hz=3.0e9,
     )
 
@@ -83,7 +83,7 @@ def test_basic_solver_reflection_component_requires_native_capability():
     if build_info()["uses_rayd_native"]:
         result = solve(
             _empty_space_scene(),
-            Config(components={"reflection"}),
+            Stochastic(components={"reflection"}),
             reference_frequency_hz=3.0e9,
         )
         assert result.metadata["components"]["reflection"] == "enabled"
@@ -91,6 +91,6 @@ def test_basic_solver_reflection_component_requires_native_capability():
         with pytest.raises(RuntimeError, match="reflection.*RayD"):
             solve(
                 _empty_space_scene(),
-                Config(components={"reflection"}),
+                Stochastic(components={"reflection"}),
                 reference_frequency_hz=3.0e9,
             )

@@ -14,7 +14,7 @@ import torch
 from witwin.channel.kernels import fields
 from witwin.channel.kernels import scattering
 from witwin.channel.kernels import spec
-from witwin.channel.montecarlo import bdpt
+from witwin.channel.experimental import bdpt
 
 
 def _patch_ad_plumbing(monkeypatch, module) -> None:

@@ -27,7 +27,7 @@ from tests.support.core_world import (
     make_transmitter,
 )
 from witwin.core import MaterialLayer, PhysicalMaterial
-from witwin.channel.montecarlo.basic import Config, solve
+from witwin.channel.radiomap import Stochastic, solve
 from witwin.channel.scene import compile as compile_scene
 
 pytestmark = pytest.mark.skipif(
@@ -138,7 +138,7 @@ def _compile(scene: Scene):
 def _solve(scene: Scene, components: frozenset[str], ad_mode: str):
     return solve(
         scene,
-        Config(
+        Stochastic(
             samples=_SAMPLES,
             seed=_SEED,
             components=set(components),
@@ -403,7 +403,7 @@ def test_gradient_is_stable_across_seeds():
         for seed in (1, 2, 3, 4, 5):
             result = solve(
                 scene,
-                Config(
+                Stochastic(
                     samples=_SAMPLES,
                     seed=seed,
                     components=set(components),
@@ -471,7 +471,7 @@ def _solve_diffraction(
 ):
     return solve(
         scene,
-        Config(
+        Stochastic(
             samples=samples,
             seed=seed,
             components={"diffraction"},

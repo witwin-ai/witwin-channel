@@ -434,8 +434,8 @@ def test_forward_tangents_carry_the_source_amplitude(response: str) -> None:
 def test_path_fields_and_solver_results_keep_their_own_conventions() -> None:
     """Nothing outside the consumer moved, so no other reader double-counts."""
 
-    from witwin.channel.deterministic import Config as DeterministicConfig
-    from witwin.channel.deterministic import solve as deterministic_solve
+    from witwin.channel.radiomap import Coherent as DeterministicConfig
+    from witwin.channel.radiomap import solve as deterministic_solve
     from witwin.channel.path import Config as PathConfig
     from witwin.channel.path import solve as path_solve
 

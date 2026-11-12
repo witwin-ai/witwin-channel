@@ -3,15 +3,15 @@
 
 import pytest
 
-from witwin.channel.deterministic import Config
+from witwin.channel.radiomap import Coherent
 
 
 def test_config_defaults_match_public_contract():
-    config = Config()
+    config = Coherent()
 
     assert config.max_depth == 1
     assert config.components == frozenset({"los", "reflection", "diffraction"})
-    assert config.coherent is True
+    assert config.combine == "field"
     assert config.return_field is True
     assert config.export_paths is False
     assert config.max_paths is None
@@ -31,7 +31,7 @@ def test_config_defaults_match_public_contract():
 
 def test_isb_boundary_taper_accepts_width_bounds():
     for width in (0.25, 0.5, 1.0, 4.0):
-        config = Config(isb_boundary_taper=True, isb_boundary_taper_width=width)
+        config = Coherent(isb_boundary_taper=True, isb_boundary_taper_width=width)
         assert config.isb_boundary_taper is True
         assert config.isb_boundary_taper_width == width
 
@@ -49,17 +49,17 @@ def test_isb_boundary_taper_width_validation(width, message):
     # The width bound is validated regardless of the on/off flag so a bad width
     # is rejected at construction, not silently ignored while off.
     with pytest.raises(ValueError, match=message):
-        Config(isb_boundary_taper_width=width)
+        Coherent(isb_boundary_taper_width=width)
 
 
 def test_config_normalizes_component_iterables_to_frozenset():
-    config = Config(components=["los", "reflection"])
+    config = Coherent(components=["los", "reflection"])
 
     assert config.components == frozenset({"los", "reflection"})
 
 
 def test_coupled_paths_accepts_reflection_diffraction_depth_two():
-    config = Config(
+    config = Coherent(
         components={"los", "reflection", "diffraction"},
         max_depth=2,
         coupled_paths=True,
@@ -101,7 +101,7 @@ def test_coupled_paths_accepts_reflection_diffraction_depth_two():
 )
 def test_coupled_paths_config_validation(kwargs, message):
     with pytest.raises(ValueError, match=message):
-        Config(**kwargs)
+        Coherent(**kwargs)
 
 
 @pytest.mark.parametrize(
@@ -113,12 +113,12 @@ def test_coupled_paths_config_validation(kwargs, message):
         ({"max_paths": 0}, "max_paths must be None or a positive int, got 0"),
         ({"max_paths_scope": "receiver"}, "max_paths_scope must be"),
         ({"sort_key": "unstable"}, "sort_key must be one of"),
-        ({"ad_mode": "forward"}, "deterministic ad_mode must be one of"),
+        ({"ad_mode": "forward"}, r"radiomap\.Coherent ad_mode must be one of"),
     ],
 )
 def test_config_rejects_invalid_values(kwargs, message):
     with pytest.raises(ValueError, match=message):
-        Config(**kwargs)
+        Coherent(**kwargs)
 
 
 @pytest.mark.parametrize(
@@ -131,9 +131,25 @@ def test_config_rejects_invalid_values(kwargs, message):
 )
 def test_config_rejects_retired_capacity_fields(field):
     with pytest.raises(TypeError, match=rf"unexpected keyword argument '{field}'"):
-        Config(**{field: 1})
+        Coherent(**{field: 1})
 
 def test_config_has_no_diffraction_order_knob():
     # The 'diffraction' component is the only diffraction switch.
     with pytest.raises(TypeError, match="unexpected keyword argument 'max_diffraction_order'"):
-        Config(max_diffraction_order=1)
+        Coherent(max_diffraction_order=1)
+
+
+@pytest.mark.parametrize("combine", ["field", "power"])
+def test_combine_accepts_field_and_power(combine):
+    assert Coherent(combine=combine).combine == combine
+
+
+@pytest.mark.parametrize("combine", ["coherent", "incoherent", "none", ""])
+def test_combine_rejects_other_values(combine):
+    with pytest.raises(ValueError, match="combine must be one of"):
+        Coherent(combine=combine)
+
+
+def test_combine_replaces_the_coherent_flag():
+    with pytest.raises(TypeError, match="unexpected keyword argument 'coherent'"):
+        Coherent(coherent=False)  # type: ignore[call-arg]

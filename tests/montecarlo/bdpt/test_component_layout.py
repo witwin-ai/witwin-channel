@@ -7,7 +7,7 @@ import torch
 from witwin.core import ReceiverGrid, Scene
 from tests.support.core_world import make_receiver_grid
 from tests.support.scenes import single_wall_reflection_scene
-from witwin.channel.montecarlo.bdpt import Config, solve
+from witwin.channel.experimental.bdpt import Config, solve
 
 
 def _grid_at_x(x: float) -> ReceiverGrid:

@@ -9,8 +9,8 @@ import pytest
 
 from tests.support.scenes import empty_space_los_scene
 from witwin.channel.runtime import MemoryBudgetError
-from witwin.channel.montecarlo.basic import Config as BasicConfig
-from witwin.channel.montecarlo.bdpt import Config as BDPTConfig
+from witwin.channel.radiomap import Stochastic as BasicConfig
+from witwin.channel.experimental.bdpt import Config as BDPTConfig
 from witwin.channel.scene.compiler import compile as compile_scene
 
 
@@ -22,7 +22,7 @@ from witwin.channel.scene.compiler import compile as compile_scene
             BasicConfig(samples=1, components={"los"}, workspace_limit_bytes=0),
         ),
         (
-            "witwin.channel.montecarlo.bdpt",
+            "witwin.channel.experimental.bdpt",
             BDPTConfig(samples=1, components={"los"}, workspace_limit_bytes=0),
         ),
     ],

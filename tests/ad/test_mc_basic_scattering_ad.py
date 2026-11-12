@@ -22,7 +22,7 @@ from witwin.core import Mesh, ReceiverGrid, Scene, Structure
 from tests.support.core_world import make_receiver_grid, make_transmitter
 from witwin.channel.deployment import build_info
 from witwin.core import MaterialLayer, PhysicalMaterial, SurfaceRoughness
-from witwin.channel.montecarlo.basic import Config, solve
+from witwin.channel.radiomap import Stochastic, solve
 from witwin.channel.interactions.scattering import (
     rough_material_runtimes,
     scattering_map_matrix,
@@ -391,7 +391,7 @@ def test_scattering_ad_preserves_frozen_primal_map():
 def _solve(scene: Scene, ad_mode: str):
     return solve(
         scene,
-        Config(
+        Stochastic(
             samples=_SAMPLES,
             seed=_SEED,
             components={"scattering"},

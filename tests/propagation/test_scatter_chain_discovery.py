@@ -20,7 +20,7 @@ from witwin.channel.scene import compile as compile_scene
 from witwin.channel.scene.endpoints import bind_solver_scene
 from tests.support.scenes import rough_wall_structure
 from witwin.channel.interactions import scattering as scattering_mod
-from witwin.channel.deterministic import Config as DeterministicConfig
+from witwin.channel.radiomap import Coherent as DeterministicConfig
 from witwin.channel.path import Config as PathConfig
 
 # source consolidation gathered the single-bounce path, the coherent scattering chain
@@ -368,7 +368,7 @@ def test_discovery_depth_and_join_bounds():
 
 def test_solver_default_off_appends_no_chain_rows():
     _require_cuda_rayd()
-    from witwin.channel.deterministic import solve
+    from witwin.channel.radiomap import solve
 
     scene = _two_wall_scene()
     config = DeterministicConfig(
@@ -394,7 +394,7 @@ def test_solver_chain_enabled_end_to_end():
 
     if not hasattr(native_extension(), "scattering_chain_ensemble_eval"):
         pytest.skip("ADR-021 D2 Op A native symbol not built into this extension")
-    from witwin.channel.deterministic import solve
+    from witwin.channel.radiomap import solve
 
     scene = _two_wall_scene()
     config = DeterministicConfig(
@@ -421,7 +421,7 @@ def test_solver_chain_ad_mode_requires_companion():
     """Require the native scattering derivative companion for AD-mode chain solves."""
 
     _require_cuda_rayd()
-    from witwin.channel.deterministic import solve
+    from witwin.channel.radiomap import solve
 
     scene = _two_wall_scene()
     config = DeterministicConfig(

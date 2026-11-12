@@ -17,19 +17,19 @@ _METERS_TO_MICROMETERS = 1.0e6
 
 
 def solve_deterministic(spec: CaseSpec) -> FieldMap:
-    from witwin.channel.deterministic import Config, solve
+    from witwin.channel.radiomap import Coherent, solve
 
     result = solve(
         build_channel_scene(spec),
-        Config(
+        Coherent(
             components=_COMPONENTS,
             max_depth=spec.max_depth,
-            coherent=True,
+            combine="field",
             return_field=True,
             export_paths=True,
             diagnostics=True,
             # Full physics: the coupled reflection-diffraction compensator
-            # (coupled reflection and diffraction). "coupled" is not a Config component; it is enabled by
+            # (coupled reflection and diffraction). "coupled" is not a Coherent component; it is enabled by
             # this gate and exported as its own component map. Requires
             # max_depth >= 2 plus reflection + diffraction (both in
             # _COMPONENTS), so degenerate low-depth cases stay valid.

@@ -19,8 +19,9 @@ from witwin.core import (
     Structure,
 )
 from witwin.channel.deployment import build_info
-from witwin.channel.montecarlo.basic import Config, solve as solve_basic
-from witwin.channel.montecarlo import basic as mc_basic
+from witwin.channel.radiomap import Stochastic, solve as solve_basic
+from witwin.channel import radiomap
+from witwin.channel.radiomap import _stochastic as mc_basic
 from tests.reference.em_oracle import layer_stack_rt
 from witwin.channel.runtime import (
     CapacityError,
@@ -35,7 +36,7 @@ pytestmark = pytest.mark.skipif(
 _FREQUENCY = 3.0e9
 
 
-def _solve_basic(scene: Scene, config: Config):
+def _solve_basic(scene: Scene, config: Stochastic):
     return solve_basic(scene, config, reference_frequency_hz=_FREQUENCY)
 
 
@@ -92,7 +93,7 @@ def _scene(structures, *, grid_shape: tuple[int, int] = (4, 4)) -> Scene:
 def _solve(scene: Scene, components, *, max_depth: int = 2):
     return _solve_basic(
         scene,
-        Config(samples=64, seed=3, max_depth=max_depth, components=components),
+        Stochastic(samples=64, seed=3, max_depth=max_depth, components=components),
     )
 
 
@@ -216,7 +217,7 @@ def test_transmission_failure_bit_raises_capacity_error_without_a_result(
     monkeypatch: pytest.MonkeyPatch,
 ):
     _require_native()
-    original = mc_basic.straight_transmission_chains
+    original = radiomap._stochastic.straight_transmission_chains
 
     def failing(*args, failure_state, **kwargs):
         penetration = original(*args, failure_state=failure_state, **kwargs)
@@ -238,8 +239,8 @@ def test_transmission_solve_shares_exact_failure_state_through_final_terminal(
     monkeypatch: pytest.MonkeyPatch,
 ):
     _require_native()
-    original_component = mc_basic.transmission_component_map
-    original_sanitize = mc_basic.mc_capacity_failure_component_maps_sanitize
+    original_component = radiomap._stochastic.transmission_component_map
+    original_sanitize = radiomap._stochastic.mc_capacity_failure_component_maps_sanitize
     observed = {}
 
     def component(*args, failure_state, **kwargs):

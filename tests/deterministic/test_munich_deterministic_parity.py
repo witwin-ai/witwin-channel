@@ -17,7 +17,7 @@ from tests.support.bin.benchmark_munich_deterministic_native_vs_original import 
     _parser,
     run,
 )
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 
 
 def test_reduced_munich_deterministic_parity_emits_artifacts():
@@ -149,10 +149,10 @@ def test_reduced_munich_native_depth_one_through_three_exports_reflection_paths(
 
     result = solve(
         scene,
-        Config(
+        Coherent(
             max_depth=max_depth,
             components={"los", "reflection", "diffraction"},
-            coherent=False,
+            combine="power",
             return_field=False,
             export_paths=True,
             diagnostics=True,

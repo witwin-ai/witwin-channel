@@ -13,8 +13,8 @@ import torch
 
 from tests.ad import _tolerances
 from tests.support.scenes import same_side_wall_reflection_scene
-from witwin.channel.deterministic import Config as DeterministicConfig
-from witwin.channel.deterministic import solve as deterministic_solve
+from witwin.channel.radiomap import Coherent as DeterministicConfig
+from witwin.channel.radiomap import solve as deterministic_solve
 from witwin.channel.scene import compile as compile_scene
 
 pytestmark = pytest.mark.skipif(

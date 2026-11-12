@@ -3,7 +3,7 @@
 
 import pytest
 
-from witwin.channel.montecarlo.bdpt import Config
+from witwin.channel.experimental.bdpt import Config
 
 
 def test_bdpt_config_defaults_match_public_contract():
@@ -60,7 +60,7 @@ def test_bdpt_config_accepts_adr022_ad_modes(ad_mode):
     # BDPT AD wires native BDPT AD companions, so vjp/jvp are accepted AD modes
     # and the solver metadata reports the active mode as ad_status.
     from witwin.channel.runtime import AdLaunchLedger
-    from witwin.channel.montecarlo.bdpt import make_solver_metadata
+    from witwin.channel.experimental.bdpt import make_solver_metadata
 
     # components={"los"} keeps the metadata assembly free of a RayD capability
     # requirement so this stays a pure config/metadata contract check.

@@ -8,8 +8,8 @@ import torch
 
 from witwin.core import AntennaPattern, Scene
 from tests.support.core_world import make_receiver, make_transmitter
-from witwin.channel.montecarlo import bdpt as bdpt_solver
-from witwin.channel.montecarlo.bdpt import Config
+from witwin.channel.experimental import bdpt as bdpt_solver
+from witwin.channel.experimental.bdpt import Config
 
 
 def _scene(feature: str) -> Scene:

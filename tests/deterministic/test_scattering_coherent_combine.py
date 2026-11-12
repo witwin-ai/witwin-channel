@@ -11,7 +11,7 @@ from witwin.core import Scene
 from tests.support.core_world import make_receiver, make_transmitter
 from witwin.channel.deployment import build_info
 from witwin.core import PhaseScreen, SurfaceRoughness
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 from witwin.channel.scene.resources import (
     generate_gaussian_realization,
     realization_seed,
@@ -73,7 +73,7 @@ def _scene(structures) -> Scene:
     )
 
 
-def _config(**overrides) -> Config:
+def _config(**overrides) -> Coherent:
     settings = {
         "max_depth": 1,
         "components": {"reflection", "scattering"},
@@ -81,7 +81,7 @@ def _config(**overrides) -> Config:
         "scattering_max_paths_per_pair": 65536,
     }
     settings.update(overrides)
-    return Config(**settings)
+    return Coherent(**settings)
 
 
 # --- config-level validation (no CUDA solve needed) -----------------------
@@ -89,19 +89,19 @@ def _config(**overrides) -> Config:
 
 def test_config_refuses_coherent_without_scattering_component():
     with pytest.raises(ValueError, match="requires the 'scattering' component"):
-        Config(scattering_coherent=True, components={"reflection"})
+        Coherent(scattering_coherent=True, components={"reflection"})
 
 
 def test_config_default_components_refuse_coherent():
     # The default component set has no scattering; opting into the combine
     # without requesting scattering is a config-level error.
     with pytest.raises(ValueError, match="requires the 'scattering' component"):
-        Config(scattering_coherent=True)
+        Coherent(scattering_coherent=True)
 
 
 def test_config_default_flag_is_false():
-    assert Config().scattering_coherent is False
-    assert Config(scattering_coherent=False) == Config()
+    assert Coherent().scattering_coherent is False
+    assert Coherent(scattering_coherent=False) == Coherent()
 
 
 # --- default bitwise identity ---------------------------------------------

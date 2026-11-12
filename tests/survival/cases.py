@@ -113,7 +113,7 @@ def _solver(name: str) -> Any:
 
     return importlib.import_module({
         "det": "witwin.channel.deterministic", "path": "witwin.channel.path",
-        "mc": "witwin.channel.montecarlo.basic", "bdpt": "witwin.channel.montecarlo.bdpt",
+        "mc": "witwin.channel.montecarlo.basic", "bdpt": "witwin.channel.experimental.bdpt",
     }[name])
 
 

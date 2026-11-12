@@ -6,7 +6,7 @@ import torch
 
 from tests.support.reference_channel import los_path_gain_reference
 from tests.support.scenes import empty_space_los_scene, single_wall_reflection_scene
-from witwin.channel.montecarlo.basic import Config, solve
+from witwin.channel.radiomap import Stochastic, solve
 
 
 def test_basic_solver_matches_empty_space_los_reference():
@@ -16,7 +16,7 @@ def test_basic_solver_matches_empty_space_los_reference():
     scene = empty_space_los_scene()
     result = solve(
         scene,
-        Config(samples=256, seed=11, components={"los"}),
+        Stochastic(samples=256, seed=11, components={"los"}),
         reference_frequency_hz=3.0e9,
     )
     expected = los_path_gain_reference(
@@ -35,7 +35,7 @@ def test_single_wall_reflection_on_point_receivers_is_estimated():
 
     result = solve(
         single_wall_reflection_scene(),
-        Config(samples=256, seed=11, components={"reflection"}),
+        Stochastic(samples=256, seed=11, components={"reflection"}),
         reference_frequency_hz=3.0e9,
     )
     assert result.path_gain.shape == (1, 1)

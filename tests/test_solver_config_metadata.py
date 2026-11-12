@@ -9,17 +9,15 @@ import torch
 
 from tests.support.core_world import make_receiver_grid
 from witwin.core import Scene
-from witwin.channel.deterministic import Config as DeterministicConfig
-from witwin.channel.deterministic import _metadata as deterministic_metadata
-from witwin.channel.montecarlo.basic import Config as BasicConfig
-from witwin.channel.montecarlo.basic import (
-    make_solver_metadata as basic_metadata,
-)
-from witwin.channel.montecarlo.bdpt import Config as BdptConfig
-from witwin.channel.montecarlo.bdpt import (
+from witwin.channel.radiomap import Coherent as DeterministicConfig
+from witwin.channel.radiomap._coherent import _metadata as deterministic_metadata
+from witwin.channel.radiomap import Stochastic as BasicConfig
+from witwin.channel.radiomap._stochastic import make_solver_metadata as basic_metadata
+from witwin.channel.experimental.bdpt import Config as BdptConfig
+from witwin.channel.experimental.bdpt import (
     make_solver_metadata as bdpt_metadata,
 )
-from witwin.channel.montecarlo.bdpt import solve as bdpt_solve
+from witwin.channel.experimental.bdpt import solve as bdpt_solve
 
 
 def test_deterministic_metadata_reports_effective_component_depths():
@@ -100,7 +98,7 @@ def test_bdpt_rejects_grid_receiver_strategy_before_scene_build(monkeypatch):
 
     scene = Scene(endpoints=[grid])
     bdpt_solver_module = importlib.import_module(
-        "witwin.channel.montecarlo.bdpt"
+        "witwin.channel.experimental.bdpt"
     )
     monkeypatch.setattr(
         bdpt_solver_module,

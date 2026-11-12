@@ -5,7 +5,7 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel.montecarlo.basic import Config, solve
+from witwin.channel.radiomap import Stochastic, solve
 
 
 def test_basic_solver_fixed_seed_is_stable_for_counts_and_outputs():
@@ -13,7 +13,7 @@ def test_basic_solver_fixed_seed_is_stable_for_counts_and_outputs():
         pytest.skip("CUDA is required for MC basic seed stability")
 
     scene = empty_space_los_scene()
-    config = Config(samples=512, seed=2026)
+    config = Stochastic(samples=512, seed=2026)
 
     first = solve(scene, config, reference_frequency_hz=3.0e9)
     second = solve(scene, config, reference_frequency_hz=3.0e9)
@@ -32,7 +32,7 @@ def test_basic_solver_seed_is_reported_in_metadata():
 
     result = solve(
         empty_space_los_scene(),
-        Config(samples=64, seed=99),
+        Stochastic(samples=64, seed=99),
         reference_frequency_hz=3.0e9,
     )
 
