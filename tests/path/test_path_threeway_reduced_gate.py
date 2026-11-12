@@ -158,6 +158,7 @@ def test_provider_subprocess_preserves_negative_cfr_offsets(monkeypatch) -> None
     monkeypatch.setattr(benchmark.subprocess, "run", run)
     args = SimpleNamespace(
         scene="san_francisco",
+        scene_xml=None,
         sionna_source_root="sionna",
         channel_root="channel",
         frequency_hz=3.5e9,
