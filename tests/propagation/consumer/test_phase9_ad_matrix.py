@@ -449,7 +449,8 @@ def test_discovered_diffraction_rows_cannot_be_frozen_for_replay() -> None:
     sources, sinks = _wedge_endpoints()
     topology = evaluate(compiled, _wedge_request("none", sources, sinks)).paths.topology
     assert topology.row_count > 0
-    with pytest.raises(NotImplementedError, match="fixed-topology reevaluation does not support"):
+    # A diffraction row's interaction slot holds no face, so the padding check refuses it.
+    with pytest.raises(ValueError, match="frozen topology rows disagree with their interaction"):
         prepare_fixed_topology(topology)
 
 

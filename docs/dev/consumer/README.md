@@ -63,7 +63,8 @@ can be reevaluated into is `fixed_topology_components` crossed with
 operator are available. `fixed_topology_components` is `{"los", "reflection"}`:
 `evaluate` also discovers transmission and diffraction rows (diffraction at
 `ad_mode="none"` only), but `prepare_fixed_topology` refuses a topology that holds
-them with `NotImplementedError`, so `reevaluate`, slot batching and
+them (a diffraction row fails its interaction-padding check with `ValueError`
+before the component check is reached), so `reevaluate`, slot batching and
 `evaluate_time_varying` replay LoS and reflection rows only.
 
 ### What carries a derivative (ADR-043)

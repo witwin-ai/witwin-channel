@@ -706,11 +706,13 @@ print([(b.component, b.depth) for b in prepared.buckets])
 ```
 
 Only the components in `capabilities().fixed_topology_components` (`los` and
-`reflection`) can be frozen: a topology with transmission or diffraction rows
-raises `NotImplementedError`, so discover with
-`components=frozenset({"los", "reflection"})` when the rows will be replayed.
-Invalid padding or a malformed topology raises `ValueError`. Both happen before a
-usable handle is returned.
+`reflection`) can be frozen, so discover with
+`components=frozenset({"los", "reflection"})` when the rows will be replayed. A
+topology with other rows is refused before a usable handle is returned: a
+diffraction row fails the interaction-padding check with `ValueError` (its
+interaction slot holds no face), and any other component outside the set raises
+`NotImplementedError`. Invalid padding or a malformed topology raises
+`ValueError`.
 
 ### `reevaluate`
 
