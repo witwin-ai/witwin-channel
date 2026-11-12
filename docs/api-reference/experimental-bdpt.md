@@ -67,7 +67,7 @@ Config(
 | `diagnostics` | Publish additional diagnostics. |
 | `export_paths` | Export `BDPTPathSamples`. |
 | `max_exported_paths` | Optional positive exported-row limit. |
-| `ad_mode` | Must currently be `"none"`; BDPT AD is not public. |
+| `ad_mode` | `"none"`, `"jvp"` or `"vjp"`; material, frequency and transmitter-power derivatives. Endpoint-position and mesh-vertex gradients are refused before launch. |
 | `workspace_limit_bytes` | Native workspace budget or `None`. |
 
 ## `solve`

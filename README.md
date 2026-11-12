@@ -199,12 +199,13 @@ delays, angles, and interactions are required.
 
 ## Differentiation contract
 
-`path`, `radiomap.Coherent`, and `radiomap.Stochastic` accept
+`path`, `radiomap.Coherent`, `radiomap.Stochastic` and `experimental.bdpt` accept
 `ad_mode="none"`, `"jvp"`, or `"vjp"`. Derivatives are evaluated through the
 fixed topology selected by the primal solve. Visibility changes, path
 birth/death, and other discrete topology discontinuities are outside this
 contract. Unsupported solver/component/gradient combinations fail explicitly;
-BDPT currently supports primal evaluation only.
+BDPT differentiates material, frequency and transmitter-power parameters and
+refuses endpoint-position and mesh-vertex gradients.
 
 ## Runtime diagnostics
 
