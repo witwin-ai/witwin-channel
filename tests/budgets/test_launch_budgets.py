@@ -18,6 +18,7 @@ METRICS = tuple(BUDGETS["metrics"])
 
 def test_budget_file_names_real_cases_and_metrics():
     assert set(BUDGETS["cases"]) <= set(CASES)
+    assert set(BUDGETS.get("peak_alloc_mib", {})) <= set(BUDGETS["cases"])
     for name, bounds in BUDGETS["cases"].items():
         assert set(bounds) == set(METRICS), name
         assert all(isinstance(v, int) and v >= 0 for v in bounds.values()), name
@@ -32,4 +33,7 @@ def test_solve_stays_within_budget(name):
     counts = record["counts"]
     bounds = BUDGETS["cases"][name]
     over = {m: (counts[m], bounds[m]) for m in METRICS if counts[m] > bounds[m]}
+    peak_bound = BUDGETS.get("peak_alloc_mib", {}).get(name)
+    if peak_bound is not None and record["peak_alloc_mib"] > peak_bound:
+        over["peak_alloc_mib"] = (round(record["peak_alloc_mib"], 1), peak_bound)
     assert not over, f"{name} over budget (measured, bound): {over}"

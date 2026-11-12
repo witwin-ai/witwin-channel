@@ -64,6 +64,14 @@
       "d2h_count": 7,
       "d2h_bytes": 115
     },
+    "det.lrd.d3.g32.c4.coupled": {
+      "kernels": 6120,
+      "syncs": 313,
+      "h2d_count": 445,
+      "h2d_bytes": 94266,
+      "d2h_count": 233,
+      "d2h_bytes": 1158
+    },
     "mc.lr.d1.g128.s64k.c32": {
       "kernels": 11,
       "syncs": 1,
@@ -114,6 +122,10 @@
     }
   },
   "notes": {
-    "kernels": "tightened: the primal field stage is one canonical-row launch (fused LoS, reflection and diffraction projection); measured det 130 (g64) / 314 (g128.c32), path 149, bdpt 117-141; bound = measured + 10 %."
+    "kernels": "tightened: the primal field stage is one canonical-row launch (fused LoS, reflection and diffraction projection); measured det 130 (g64) / 314 (g128.c32), path 149, bdpt 117-141; bound = measured + 10 %.",
+    "det.lrd.d3.g32.c4.coupled": "depth-3 interaction chains and double diffraction on the small city; measured 5563 kernels, 284 syncs, 1903 MiB peak (the tree before the deepest receiver halves were tested unmaterialized: 28100 kernels, 1585 syncs, 4163 MiB); bound = measured + 10 %."
+  },
+  "peak_alloc_mib": {
+    "det.lrd.d3.g32.c4.coupled": 2093
   }
 }

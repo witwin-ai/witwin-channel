@@ -118,6 +118,10 @@ def _cases() -> dict[str, Case]:
                                 (16, 3, 4096, "4k", 3), (16, 3, 1 << 20, "1M", 3)):
         rows.append(Case(f"bdpt.lr.d{d}.g{n}.s{label}", "bdpt", "lr", d, f"g{n}", samples=s,
                          repeats=rep, tags=r21))
+    # Depth-3 interaction chains and double diffraction on the small city: the chain classes with
+    # max_depth reflections and the deepest receiver halves.
+    rows.append(Case("det.lrd.d3.g32.c4.coupled", "det", "lrd", 3, "g32", city=4, repeats=3,
+                     tags=("budget-coupled",), extra={"coupled_paths": True}))
     # Small / medium / large cities and their welded 4-way subdivisions, one case per solver. The
     # grid spacing must not be a divisor of the 40 m pitch that lands every cell centre inside a
     # building: 64 cells over 4x4 and 8x8 cities (2.5 m, 5 m), 128 over the 32x32 city (10 m).
@@ -528,11 +532,20 @@ def budgets(
     import math
 
     cases: dict[str, Any] = dict(existing["cases"]) if existing else {}
+    peaks: dict[str, int] = dict(existing.get("peak_alloc_mib", {})) if existing else {}
     raised = []
     for name, entry in result["cases"].items():
-        if "error" in entry or not {"budget-small", "budget-medium", "budget-large"} & set(
-                entry["spec"]["tags"]):
+        tags = set(entry.get("spec", {}).get("tags", ()))
+        if "error" in entry or not {"budget-small", "budget-medium", "budget-large", "budget-coupled"} & tags:
             continue
+        if "budget-coupled" in tags and entry.get("peak_alloc_mib") is not None:
+            # The coupled case also bounds the solve's device-memory high-water mark.
+            peak = int(math.ceil(entry["peak_alloc_mib"] * (1.0 + headroom)))
+            if name in peaks and entry["peak_alloc_mib"] > peaks[name]:
+                raised.append(f"{name}.peak_alloc_mib: measured {entry['peak_alloc_mib']:.0f} > bound {peaks[name]}")
+            elif name in peaks and not allow_raise:
+                peak = min(peak, peaks[name])
+            peaks[name] = peak
         bounds = {m: int(math.ceil(entry["counts"][m] * (1.0 + headroom))) for m in BUDGET_METRICS}
         old = cases.get(name)
         if old is not None:
@@ -544,9 +557,14 @@ def budgets(
         cases[name] = bounds
     if raised and not allow_raise:
         raise SystemExit("refusing to raise budgets:\n  " + "\n  ".join(raised))
-    return {"schema": "channel-launch-budgets.v1", "metrics": list(BUDGET_METRICS),
-            "headroom": headroom, "measured_on": {k: result["meta"].get(k) for k in (
-                "git_head", "gpu", "torch", "started")}, "cases": dict(sorted(cases.items()))}
+    document = {"schema": "channel-launch-budgets.v1", "metrics": list(BUDGET_METRICS),
+                "headroom": headroom, "measured_on": {k: result["meta"].get(k) for k in (
+                    "git_head", "gpu", "torch", "started")}, "cases": dict(sorted(cases.items()))}
+    if existing and "notes" in existing:
+        document["notes"] = existing["notes"]
+    if peaks:
+        document["peak_alloc_mib"] = dict(sorted(peaks.items()))
+    return document
 
 
 def merge(documents: list[dict[str, Any]]) -> dict[str, Any]:
