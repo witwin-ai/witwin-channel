@@ -225,7 +225,11 @@ def _build_face_material_field_bundle(
     def material_level(values: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
         return values.to(device=device, dtype=dtype).contiguous()
 
+    # The layer-store row the straight-through transmission paths cross each face with: thin-sheet
+    # materials only; any other face blocks those paths (-1).
+    thin_sheet = materials.geometry_mode_id.to(device=device).index_select(0, material_id) == 0
     return {
+        "transmission_row": torch.where(thin_sheet, material_id, -1).to(dtype=torch.int32).contiguous(),
         "eps_r": per_face(materials.eps_r),
         "sigma_e": per_face(sigma_e),
         "mu_r": per_face(materials.mu_r),

@@ -171,7 +171,7 @@ TOLERANCES: dict[tuple[str, int, str], tuple[float | None, float | None]] = {
     ("canyon_x_3g5", 0, "shadow"): (1.65, 1.030),
 }
 JUMP_TOLERANCES: dict[tuple[str, int, str], float] = {
-    ("canyon_z_3g5", 1, "ISB"): 2.45,
+    ("canyon_z_3g5", 1, "ISB"): 2.10,
     ("wall_column_z", 0, "RSB"): 1.75,
     ("wall_column_y", 0, "RSB"): 2.00,
     ("double_edge_z", 1, "RSB"): 1.00,
@@ -201,10 +201,10 @@ JUMP_TOLERANCES: dict[tuple[str, int, str], float] = {
     ("cube_x", 1, "RSB"): 1.05,
     ("three_cube_z", 0, "ISB"): 2.90,
     ("three_cube_z", 0, "RSB"): 2.30,
-    ("cube_dielectric_z", 0, "ISB"): 5.10,
+    ("cube_dielectric_z", 0, "ISB"): 0.65,
     ("cube_dielectric_z", 0, "RSB"): 0.90,
     ("cube_dielectric_z", 1, "RSB"): 1.20,
-    ("cube_concrete_z", 0, "ISB"): 1.20,
+    ("cube_concrete_z", 0, "ISB"): 1.10,
     ("cube_concrete_z", 0, "RSB"): 1.35,
     ("trihedral_z", 0, "ISB"): 1.25,
     ("trihedral_z", 0, "RSB"): 1.25,
@@ -218,7 +218,7 @@ JUMP_TOLERANCES: dict[tuple[str, int, str], float] = {
     ("double_edge_z", 1, "ISB"): 1.00,
     ("wall_column_z", 0, "ISB"): -0.55,
     ("wall_column_y", 0, "ISB"): -0.40,
-    ("cube_concrete_x", 0, "ISB"): 1.50,
+    ("cube_concrete_x", 0, "ISB"): 1.25,
     ("cube_concrete_x", 0, "RSB"): 1.35,
     ("canyon_x_3g5", 1, "ISB"): 1.95,
 }
@@ -230,23 +230,24 @@ JUMP_TOLERANCES: dict[tuple[str, int, str], float] = {
 _CANYON_RSB = ("not isolated: the worst edges are depth-2 and depth-3 reflection paths that another "
                "block's corner blocks; their reflection-diffraction chain is enumerated on both sides "
                "but steps by less than the reflection (second-order chain boundaries)")
-_BASE_CHAINS = ("the spurious block-base wedges' chains had filled the transmission and reflection "
-                "steps at the block bases; without them those steps are uncompensated (the excess is "
-                "at the 121 RSB edges that are also transmission-support edges, p95 excess 11.6 / "
-                "9.4 dB; the other 471 RSB edges have none)")
+_BASE_CHAINS = ("the excess sits at the 59 RSB edges that are transmission-support but not LoS "
+                "edges (p95 excess 14.6 / 13.6 dB): steps of the field transmitted through one block "
+                "at another block's edge, which only transmission-then-diffraction chains compensate "
+                "(an interaction class the solver does not have); the 471 RSB edges off transmission "
+                "support show none")
 _CANYON_ISB = ("the LoS steps are compensated to 1.4-2.3 % of the LoS (Channel-only probe, block "
                "interiors excluded); the excess comes from samples where the total is 15-20 dB below "
                "the LoS, which the dB jump magnifies")
 KNOWN_GAPS: dict[tuple[str, int, str, str], tuple[float, float, str]] = {
-    ("canyon_x_3g5", 0, "RSB", "jump"): (1.50, 3.27, _BASE_CHAINS),
+    ("canyon_x_3g5", 0, "RSB", "jump"): (1.50, 2.98, _BASE_CHAINS),
     ("double_edge_y", 1, "RSB", "jump"): (1.50, 2.82, "the RSB is continuous; an interference null "
                                           "next to the transmitter lies 2-3 mm from its full-wave "
                                           "position on the four worst edges"),
-    ("canyon_z_3g5", 0, "RSB", "jump"): (1.50, 3.84, _CANYON_RSB),
-    ("canyon_z_3g5", 1, "RSB", "jump"): (1.50, 4.93, _CANYON_RSB),
-    ("canyon_x_3g5", 1, "RSB", "jump"): (1.50, 2.76, _CANYON_RSB + "; plus " + _BASE_CHAINS),
-    ("canyon_z_3g5", 0, "ISB", "jump"): (1.50, 2.46, _CANYON_ISB),
-    ("canyon_x_3g5", 0, "ISB", "jump"): (1.50, 3.68, _CANYON_ISB),
+    ("canyon_z_3g5", 0, "RSB", "jump"): (1.50, 3.98, _CANYON_RSB),
+    ("canyon_z_3g5", 1, "RSB", "jump"): (1.50, 4.95, _CANYON_RSB),
+    ("canyon_x_3g5", 1, "RSB", "jump"): (1.50, 2.32, _CANYON_RSB + "; plus " + _BASE_CHAINS),
+    ("canyon_z_3g5", 0, "ISB", "jump"): (1.50, 2.25, _CANYON_ISB),
+    ("canyon_x_3g5", 0, "ISB", "jump"): (1.50, 3.24, _CANYON_ISB),
 }
 
 

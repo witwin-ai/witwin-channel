@@ -27,6 +27,7 @@ from witwin.channel.interactions.reflection import (
     _MULTIBOUNCE_PAIR_CHUNK_SIZE,
 )
 from witwin.channel.propagation.topology import _ensure_topology_fields
+from witwin.channel.kernels import fields as field_kernels
 from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel.kernels import topology as topology_kernels
 from witwin.channel.runtime import (
@@ -420,12 +421,14 @@ def _batched_diffraction_states(
 def _diffraction_topology_order1(
     scene: Scene, compiled: CompiledScene, tx_positions: torch.Tensor, tx_power: torch.Tensor,
     rx_positions: torch.Tensor, *, frequency_hz: float, isb_boundary_taper_width: float = 0.0,
-    tx_polarizations: torch.Tensor | None = None,
+    tx_polarizations: torch.Tensor | None = None, transmission_crossings: int = 0,
 ) -> tuple[dict[str, torch.Tensor], int]:
     """Order-1 diffraction topology for every transmitter and receiver.
 
     ``tx_polarizations`` carries explicit per-transmitter polarizations when the
-    caller binds endpoint batches instead of scene transmitters.
+    caller binds endpoint batches instead of scene transmitters. ``transmission_crossings`` is the
+    wall-crossing limit of the solve's straight-through transmission paths (0 when it has none);
+    the incident-boundary terms then compensate only the step those paths leave.
     """
 
 
@@ -464,6 +467,8 @@ def _diffraction_topology_order1(
         bundle["thickness"], bundle["material_id"], bundle["layer_offset"], bundle["layer_count"],
         bundle["layer_thickness_m"], bundle["layer_eps_r"], bundle["layer_sigma_e"],
         bundle["layer_mu_r"],
+        *field_kernels.wedge_transmission_layers(
+            bundle["transmission_row"], crossings=transmission_crossings),
     )
     # Per-transmitter polarization threaded into the RayD UTD op: the
     # incident field basis must use the real scene polarization, not a

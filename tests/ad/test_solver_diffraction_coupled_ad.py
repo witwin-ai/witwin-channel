@@ -78,18 +78,18 @@ def _coupled_scene(tx: torch.Tensor | None = None, rx: torch.Tensor | None = Non
 def _solve_wedge(
     scene: Scene, solver: str, ad_mode: str, *,
     reference_frequency_hz: float | torch.Tensor = _FREQUENCY_HZ,
+    components: frozenset[str] = frozenset({"diffraction"}), max_depth: int = 1,
 ):
-    components = frozenset({"diffraction"})
     if solver == "path":
         return path_solve(
             scene,
-            PathConfig(max_depth=1, components=components, ad_mode=ad_mode),
+            PathConfig(max_depth=max_depth, components=components, ad_mode=ad_mode),
             reference_frequency_hz=reference_frequency_hz,
         )
     return deterministic_solve(
         scene,
         DeterministicConfig(
-            max_depth=1,
+            max_depth=max_depth,
             components=components,
             export_paths=True,
             ad_mode=ad_mode,
@@ -284,6 +284,95 @@ def test_wedge_endpoint_position_grad_matches_fd(solver, endpoint):
 
     expected = central_difference_gradient(evaluate, base, FD_STEP_POSITION_PHASE)
     assert relative_error(leaf.grad, expected, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
+
+
+# A transmitter that lights one face of the dielectric wedge (the plane x = 2 from x < 2) with the
+# straight-through transmission paths on: the incident-boundary terms of every diffraction row carry the
+# (I - T) weighting of the two walls the incident ray continues through.
+_WEIGHTED_TX = (0.0, 1.0, 0.5)
+_WEIGHTED_RX = (3.0, -1.07, 0.5)
+_WEIGHTED_COMPONENTS = frozenset({"diffraction", "transmission"})
+
+
+def _weighted_scene(tx: torch.Tensor | None = None, rx: torch.Tensor | None = None) -> Scene:
+    return _wedge_scene(tx=torch.tensor(_WEIGHTED_TX) if tx is None else tx,
+                        rx=torch.tensor(_WEIGHTED_RX) if rx is None else rx)
+
+
+def _solve_weighted(
+    scene: Scene, solver: str, ad_mode: str, *,
+    reference_frequency_hz: float | torch.Tensor = _FREQUENCY_HZ,
+):
+    return _solve_wedge(scene, solver, ad_mode, reference_frequency_hz=reference_frequency_hz,
+                        components=_WEIGHTED_COMPONENTS, max_depth=2)
+
+
+@pytest.mark.parametrize("solver", _SOLVERS)
+def test_weighted_wedge_reevaluation_forward_parity(solver):
+    """With transmission paths the re-evaluated wedge applies the export's incident-term weighting."""
+
+    primal = _solve_weighted(_weighted_scene(), solver, "none")
+    reevaluated = _solve_weighted(_weighted_scene(), solver, "vjp")
+    a_primal = _coefficients(primal, solver)
+    assert int(a_primal.shape[0]) > 0
+    error = relative_error(_coefficients(reevaluated, solver).detach(), a_primal, abs_floor=ABS_TOL)
+    assert error <= 1.0e-3, f"weighted wedge re-evaluation drifted from the export: {error}"
+    # The weighting is active: the diffraction rows differ from the solve without transmission paths.
+    unweighted = _coefficients(_solve_wedge(_weighted_scene(), solver, "none", max_depth=2), solver)
+    weighted_sum = (a_primal.sum() - _coefficients(
+        _solve_wedge(_weighted_scene(), solver, "none", components=frozenset({"transmission"}), max_depth=2),
+        solver).sum())
+    assert relative_error(weighted_sum, unweighted.sum(), abs_floor=ABS_TOL) > 1.0e-2
+
+
+@pytest.mark.parametrize("solver", _SOLVERS)
+@pytest.mark.parametrize("endpoint", ("tx", "rx"))
+def test_weighted_wedge_endpoint_position_grad_matches_fd(solver, endpoint):
+    base = torch.tensor(_WEIGHTED_TX if endpoint == "tx" else _WEIGHTED_RX, dtype=torch.float32)
+    leaf = base.clone().cuda().requires_grad_(True)
+    _loss(_solve_weighted(_weighted_scene(**{endpoint: leaf}), solver, "vjp"), solver).backward()
+    assert leaf.grad is not None
+
+    def evaluate(values: torch.Tensor) -> torch.Tensor:
+        return _loss(_solve_weighted(_weighted_scene(**{endpoint: values.clone()}), solver, "none"),
+                     solver).detach()
+
+    expected = central_difference_gradient(evaluate, base, FD_STEP_POSITION_PHASE)
+    assert relative_error(leaf.grad, expected, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
+
+
+@pytest.mark.parametrize("solver", _SOLVERS)
+def test_weighted_wedge_frequency_grad_matches_fd(solver):
+    frequency = torch.tensor(_FREQUENCY_HZ, dtype=torch.float64, device="cuda", requires_grad=True)
+    _loss(_solve_weighted(_weighted_scene(), solver, "vjp", reference_frequency_hz=frequency),
+          solver).backward()
+    assert frequency.grad is not None
+
+    def evaluate(value: torch.Tensor) -> torch.Tensor:
+        return _loss(_solve_weighted(_weighted_scene(), solver, "none", reference_frequency_hz=float(value)),
+                     solver).detach()
+
+    fd_grad = central_difference_gradient(
+        evaluate, torch.tensor(_FREQUENCY_HZ, dtype=torch.float64), _FREQUENCY_HZ * FD_REL_STEP_FREQUENCY)
+    assert relative_error(frequency.grad.detach(), fd_grad, abs_floor=ABS_TOL) <= REL_TOL_GENERAL
+
+
+def test_weighted_wedge_forward_mode_matches_reverse():
+    """JVP-vs-VJP duality on a receiver-position tangent through the weighted incident terms."""
+
+    base = torch.tensor(_WEIGHTED_RX, dtype=torch.float32, device="cuda")
+    tangent = torch.tensor([0.3, -0.5, 0.2], device="cuda")
+    with torch.autograd.forward_ad.dual_level():
+        dual = torch.autograd.forward_ad.make_dual(base.clone(), tangent)
+        coefficient = _coefficients(_solve_weighted(_weighted_scene(rx=dual), "deterministic", "jvp"),
+                                    "deterministic")
+        tangent_out = torch.autograd.forward_ad.unpack_dual(coefficient).tangent
+    assert tangent_out is not None
+    jvp = tangent_out.real.sum() + 0.5 * tangent_out.imag.sum()
+    leaf = base.clone().requires_grad_(True)
+    _loss(_solve_weighted(_weighted_scene(rx=leaf), "deterministic", "vjp"), "deterministic").backward()
+    assert leaf.grad is not None
+    assert relative_error(jvp, (leaf.grad * tangent).sum(), abs_floor=ABS_TOL) <= REL_TOL_GENERAL
 
 
 # Single-structure wedge with a SHARED edge (vertices 0-1): the mesh-vertex

@@ -102,6 +102,15 @@ rayd::torch::TransmissionSequenceRequest transmission_sequence_request(
 
 std::optional<at::Tensor> optional_tensor(pybind11::handle value);
 
+// The wall-crossing limit of the solve's transmission paths, a host int64 scalar of the face-layer list.
+int64_t transmission_crossing_limit(const at::Tensor& limit) {
+    TORCH_CHECK(limit.device().is_cpu() && limit.scalar_type() == at::kLong && limit.numel() == 1,
+                "face_layers transmission crossing limit must be a host int64 scalar");
+    const int64_t value = limit.contiguous().data_ptr<int64_t>()[0];
+    TORCH_CHECK(value >= 0, "face_layers transmission crossing limit must be non-negative");
+    return value;
+}
+
 rayd::torch::DiffractionWedgeRequest diffraction_wedge_request(
     at::Tensor valid,
     at::Tensor source,
@@ -162,13 +171,22 @@ rayd::torch::DiffractionWedgeRequest diffraction_wedge_request(
     request.edge_boundary = optional_tensor(edge_boundary);
     request.isb_boundary_taper_width = isb_boundary_taper_width;
     if (!face_layers.is_none()) {
-        // (face0 thickness, face1 thickness, face0 layer row, face1 layer row, then the layer store).
+        // (face0 thickness, face1 thickness, face0 layer row, face1 layer row, then the layer store;
+        // with transmission paths also face0 / face1 transmission rows and the host crossing limit).
         const auto tables = pybind11::cast<std::vector<at::Tensor>>(face_layers);
-        TORCH_CHECK(tables.size() == 10, "face_layers must hold ten tensors");
+        TORCH_CHECK(tables.size() == 10 || tables.size() == 13,
+                    "face_layers must hold ten or thirteen tensors");
         request.face0_layers = rayd::torch::DiffractionFaceLayers{
             tables[0], tables[2], tables[4], tables[5], tables[6], tables[7], tables[8], tables[9]};
         request.face1_layers = rayd::torch::DiffractionFaceLayers{
             tables[1], tables[3], tables[4], tables[5], tables[6], tables[7], tables[8], tables[9]};
+        if (tables.size() == 13) {
+            const int64_t crossings = transmission_crossing_limit(tables[12]);
+            request.face0_layers->transmission_material = tables[10];
+            request.face0_layers->transmission_crossings = crossings;
+            request.face1_layers->transmission_material = tables[11];
+            request.face1_layers->transmission_crossings = crossings;
+        }
     }
     return request;
 }

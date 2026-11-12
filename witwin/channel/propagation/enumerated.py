@@ -584,6 +584,15 @@ def _finish_capacity_boundary(
     return evaluated, sidecars
 
 
+def _transmission_crossing_limit(config: Any, components: frozenset[str] | set[str]) -> int:
+    """Wall crossings of the solve's transmission paths (0 without them).
+
+    Order-1 diffraction compensates only the incident-boundary step those paths leave.
+    """
+
+    return int(config.max_depth) if "transmission" in components and config.max_depth >= 1 else 0
+
+
 def transmission_dropped_rows(sidecars: EvaluatedPathSidecars) -> int:
     """Return the transmission rows dropped for crossing more walls than ``max_depth``.
 
@@ -730,6 +739,7 @@ def evaluate_enumerated_paths(
         config
     )
     coupled_paths = bool(getattr(config, "coupled_paths", False))
+    transmission_crossings = _transmission_crossing_limit(config, components)
     sequence_width = max(int(config.max_depth), chain_depth_limit(config.max_depth) if coupled_paths else 0)
     blocks: list[dict[str, torch.Tensor]] = []
     launch_count = 0
@@ -789,6 +799,7 @@ def evaluate_enumerated_paths(
             frequency_hz=frequency_hz,
             isb_boundary_taper_width=isb_boundary_taper_width,
             tx_polarizations=diffraction_tx_polarizations,
+            transmission_crossings=transmission_crossings,
         )
         launch_count += diffraction_launches
         candidate_count += int(block["valid"].numel())
@@ -940,6 +951,7 @@ def evaluate_enumerated_paths(
         endpoint_tx_polarizations=endpoints.explicit_tx_polarizations,
         endpoint_rx_polarizations=rx_polarizations,
         explicit_endpoint_geometry=endpoints.explicit,
+        transmission_crossings=transmission_crossings,
     )
     sidecars = replace(sidecars, execution=execution)
     return _finish_capacity_boundary(

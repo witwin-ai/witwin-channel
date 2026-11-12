@@ -176,3 +176,22 @@ def test_diffraction_paths_match_for_vertically_polarized_sources(monkeypatch):
     cuda = _path_outputs(monkeypatch, "cuda", wedge_diffraction_scene(), {"diffraction"})
 
     _assert_parity(optix, cuda)
+
+
+def test_weighted_diffraction_paths_match_across_backends(monkeypatch):
+    """With transmission paths the incident terms of a dielectric wedge lit on one face are weighted alike."""
+
+    if not _optix_available():
+        pytest.skip("OptiX is needed as the parity reference")
+
+    def scene() -> Scene:
+        wedge = wedge_diffraction_scene(PhysicalMaterial(eps_r=4.0, sigma_e=0.02))
+        return Scene(structures=list(wedge.structures),
+                     endpoints=[make_transmitter(torch.tensor([0.0, 1.0, 0.5])),
+                                make_receiver(torch.tensor([3.0, -1.07, 0.5]))])
+
+    components = {"diffraction", "transmission"}
+    optix = _path_outputs(monkeypatch, "optix", scene(), components)
+    cuda = _path_outputs(monkeypatch, "cuda", scene(), components)
+    assert int(((optix.interaction_type == 2).any(dim=-1) & optix.valid).sum()) >= 1
+    _assert_parity(optix, cuda)

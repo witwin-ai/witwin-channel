@@ -132,6 +132,69 @@ def test_receiver_on_a_reflection_boundary_keeps_the_lit_total(material):
     np.testing.assert_array_less(np.abs(total[1:] - total[0]), 0.05 * scale)
 
 
+def _slab(thickness_m: float = 0.02) -> PhysicalMaterial:
+    from witwin.core import MaterialLayer
+
+    return PhysicalMaterial(layers=(MaterialLayer(thickness_m=thickness_m, eps_r=4.0, sigma_e=0.0),), name="slab")
+
+
+def _box_scene(
+    material: PhysicalMaterial, tx: tuple[float, float, float],
+    receivers: list[tuple[float, float, float]],
+) -> Scene:
+    """A box x in [-0.5, 0.5], y in [-3, 3], z in [-1, 0]: its edge (x = 0.5, z = 0) runs along y."""
+
+    vertices = torch.tensor([[x, y, z] for z in (-1.0, 0.0)
+                             for x, y in ((-0.5, -3.0), (0.5, -3.0), (0.5, 3.0), (-0.5, 3.0))])
+    mesh = Mesh(vertices, torch.tensor(rs._BOX_FACES, dtype=torch.int32), recenter=False, fill_mode="solid",
+                topology_diagnostics=False)
+    polarization = torch.tensor([0.0, 0.0, 1.0])
+    endpoints = [AntennaState(new_antenna_id(), "tx", torch.tensor(tx), polarization=polarization, power_w=1.0)]
+    endpoints += [AntennaState(new_antenna_id(), "rx", torch.tensor(point), polarization=polarization)
+                  for point in receivers]
+    return Scene(structures=[Structure(mesh, material, name="box", surface_id=1)], endpoints=endpoints)
+
+
+# Receiver offsets across an incident shadow boundary: negative is the shadow (transmitted) side.
+_ISB_OFFSETS = (-2.0e-4, -1.0e-4, 1.0e-4, 2.0e-4)
+
+
+def _isb_jump(scene: Scene, max_depth: int) -> tuple[float, float]:
+    """Step of the total field across the boundary and the transmitted field behind it, both over the LoS."""
+
+    result = solve(scene, Coherent(components=frozenset({"los", "diffraction", "transmission"}),
+                                   max_depth=max_depth, return_field=True, isb_boundary_taper=False),
+                   reference_frequency_hz=5.0e9)
+    total = result.field.reshape(-1).cpu().numpy()
+    los = np.abs(result.component_fields["los"].reshape(-1).cpu().numpy())
+    transmitted = np.abs(result.component_fields["transmission"].reshape(-1).cpu().numpy())
+    assert np.all(los[2:] > 0) and np.all(los[:2] == 0)
+    return float(np.abs(total[2] - total[1]) / los[2]), float(transmitted[1] / los[2])
+
+
+def test_a_penetrable_sheet_edge_compensates_only_the_blocked_field():
+    """Behind a dielectric sheet the transmission continues T of the LoS; the edge fills only (1 - T)."""
+
+    _require_native()
+    # Transmitter (-1, 0, -0.5): the edge's incident shadow boundary crosses x = 1 at z = 0.5.
+    receivers = [(1.0, 0.0, 0.5 + dz) for dz in _ISB_OFFSETS]
+    jump, transmitted = _isb_jump(_plate_scene(5.0, _slab(), (-1.0, 0.0, -0.5), receivers), 1)
+    assert transmitted > 0.5
+    assert jump < 0.05
+
+
+@pytest.mark.parametrize("max_depth", [1, 2])
+def test_a_penetrable_block_edge_compensates_only_the_blocked_field(max_depth):
+    """A ray past a block edge crosses two walls: weighted when the solve carries two crossings, else not."""
+
+    _require_native()
+    # Transmitter (-1, 0, 0.2) lights the top face; the boundary of the edge (0.5, y, 0) crosses x = 2 at z = -0.2.
+    receivers = [(2.0, 0.0, -0.2 + dz) for dz in _ISB_OFFSETS]
+    jump, transmitted = _isb_jump(_box_scene(_slab(), (-1.0, 0.0, 0.2), receivers), max_depth)
+    assert (transmitted > 0.3) if max_depth == 2 else (transmitted == 0.0)
+    assert jump < 0.05
+
+
 def _unit(v: torch.Tensor) -> torch.Tensor:
     return v / v.norm(dim=-1, keepdim=True).clamp_min(1.0e-30)
 

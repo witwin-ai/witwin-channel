@@ -732,7 +732,7 @@ def _evaluate_diffraction_fields(
     frequency: float | torch.Tensor, frequency_value: float | None, geometry_ad: bool,
     vertices: torch.Tensor | None, ledger: AdLaunchLedger | None,
     material: dict[str, torch.Tensor] | None, groups: PathRowGroups, outputs: _FieldOutputs,
-    launch_count: int,
+    launch_count: int, transmission_crossings: int = 0,
 ) -> tuple[dict[str, torch.Tensor] | None, int]:
     if groups.count(_DIFFRACTION_GROUP) > 0:
         diffraction_rows = groups.rows(_DIFFRACTION_GROUP)
@@ -826,7 +826,8 @@ def _evaluate_diffraction_fields(
             frequency=frequency,
             frequency_value=frequency_value,
             vertices=wedge_vertices,
-            face_layers=field_kernels.wedge_face_layers(material, face0_c, face1_c),
+            face_layers=field_kernels.wedge_face_layers(
+                material, face0_c, face1_c, transmission_crossings=transmission_crossings),
         )
         powered_xyz = evaluated["field_vector"]
         arrival = evaluated["direction"]
@@ -961,6 +962,7 @@ def _evaluate_differentiable_rows(
     reflection_field_op: Callable[..., dict[str, torch.Tensor]],
     transmission_field_op: Callable[..., dict[str, torch.Tensor]], ledger: AdLaunchLedger | None,
     outputs: _FieldOutputs, launch_count: int, isb_boundary_taper_width: float,
+    transmission_crossings: int = 0,
 ) -> int:
     """Evaluate every row group through its differentiable field Function."""
 
@@ -983,7 +985,7 @@ def _evaluate_differentiable_rows(
     material, launch_count = _evaluate_diffraction_fields(
         scene, compiled, topology, source, target, source_power, rx_pol, device, frequency,
         frequency_value, geometry_ad, vertices, ledger, material, row_groups, outputs,
-        launch_count,
+        launch_count, transmission_crossings,
     )
     _, launch_count = _evaluate_coupled_fields(
         scene, compiled, topology, geometry, source, target, source_power, tx_pol, rx_pol, device,
@@ -1067,8 +1069,13 @@ def evaluate_path_fields(
     ad_mode: str = "none", frequency_value: float | None = None,
     isb_boundary_taper_width: float = 0.0, endpoint_tx_polarizations: torch.Tensor | None = None,
     endpoint_rx_polarizations: torch.Tensor | None = None, explicit_endpoint_geometry: bool = False,
+    transmission_crossings: int = 0,
 ) -> tuple[EvaluatedPaths, PathExecutionStats]:
     """Evaluate selected canonical rows with the shared complex3 ABI.
+
+    ``transmission_crossings`` is the wall-crossing limit of the solve's straight-through
+    transmission paths (0 when it has none); the differentiable order-1 diffraction rows then use the
+    incident-boundary weighting the discovery export applied.
 
     ``ad_mode == "none"`` evaluates line-of-sight, reflection and diffraction rows in one
     native launch over the canonical rows (float frequency, no autograd graph); transmission
@@ -1185,6 +1192,7 @@ def evaluate_path_fields(
             components, device, frequency, frequency_value, geometry_ad,
             vertices if geometry_ad else None, los_field_op, reflection_field_op,
             transmission_field_op, ledger, outputs, launch_count, isb_boundary_taper_width,
+            transmission_crossings,
         )
     else:
         outputs, launch_count = _evaluate_canonical_rows(

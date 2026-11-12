@@ -645,11 +645,16 @@ and `-fw-d6-boundary-sample`; the RayD side is in RayD ADR-0047 and ADR-0048 ame
 
 A double-diffraction leg that runs along a sheet to a junction wedge is evaluated on the junction's side
 (`adr-0xx-fw-dd-sheet-side`): `trihedral_z` plane 0 shadow NMSE 0.462 -> 0.107 and `trihedral_x` plane 1 corner
-NMSE 0.633 -> 0.587, both now ordinary ceilings. Remaining strict xfails (measured / target): `double_edge_y` plane 1 RSB 2.82 / 1.5 dB (the RSB is
-continuous; an interference null next to the transmitter sits 2-3 mm off its full-wave position on the four
-worst edges); canyon RSB (3.84 / 4.93 dB on `canyon_z`,
-2.76 on `canyon_x` plane 1; second-order chain boundaries) and ISB (2.46 / 3.68 dB). One entry became a strict xfail with D5: `canyon_x` plane 0 RSB 3.27 / 1.5 dB (steps the spurious base
-wedges' chains had filled; the excess sits at the 121 RSB edges that are also transmission-support edges). The **unexplained canyon ISB** is resolved as a
+NMSE 0.633 -> 0.587, both now ordinary ceilings. A penetrable wedge's incident-boundary terms compensate only the
+step the transmission paths leave, `(I - T)` times the incident field (`adr-0xx-fw-penetrable-wedge`):
+`cube_dielectric_z` plane 0 ISB 4.45 -> -0.38 dB, canyon ISB 2.46 / 3.68 -> 2.25 / 3.24 dB (plane 0), `canyon_x` RSB
+3.27 / 2.76 -> 2.98 / 2.32 dB; no PEC case moves. Remaining strict xfails (measured / target): `double_edge_y`
+plane 1 RSB 2.82 / 1.5 dB (the RSB is continuous; an interference null next to the transmitter sits 2-3 mm off its
+full-wave position on the four worst edges); canyon RSB (3.98 / 4.95 dB on `canyon_z`, second-order chain
+boundaries; 2.98 / 2.32 dB on `canyon_x`, where the excess sits at the 59 RSB edges that are transmission-support
+but not LoS edges, 14.6 / 13.6 dB: the field transmitted through one block steps at another block's edge, which
+only transmission-then-diffraction chains, an interaction class the solver does not have, would compensate) and
+canyon ISB (2.25 / 3.24 dB, plane 0). The **unexplained canyon ISB** is resolved as a
 measurement effect: the probe that reported 25 % counted support edges at block faces (receivers inside the
 blocks); excluding the block interiors, the LoS steps are compensated to 1.4 % (y steps) and 2.3 % (x steps) of
 the LoS, and the ground-reflection steps that coincide with them to 0.0-0.5 %. The remaining ISB excess is at
