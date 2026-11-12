@@ -746,6 +746,152 @@ def _terminal_check_capacity(sidecars: EvaluatedPathSidecars) -> None:
         transaction.terminal_check()
 
 
+# A solve with interaction chains over more receivers than _RECEIVER_WINDOW runs in receiver
+# windows, so its path rows (about a hundred per receiver at depth 3 in a small city, about 1 KiB
+# of device memory each while they are evaluated) never all exist at once. The first window has
+# _FIRST_WINDOW receivers; each later one is sized from the previous window's rows per receiver to
+# hold about _WINDOW_ROWS rows, and at most doubles. Every row is the one a whole solve gives, and
+# each receiver's rows are accumulated in one window.
+_RECEIVER_WINDOW = 1 << 15
+_FIRST_WINDOW = 1 << 14
+_WINDOW_ROWS = 1 << 21
+
+
+def _windowed(config: Config, receiver_count: int) -> bool:
+    """Whether the solve accumulates in receiver windows: only when no output needs every row."""
+
+    return (
+        bool(config.coupled_paths)
+        and receiver_count > _RECEIVER_WINDOW
+        and config.ad_mode == "none"
+        and not config.export_paths
+        and config.max_paths is None
+        and "scattering" not in config.components
+    )
+
+
+def _coupled_counts(component_id: torch.Tensor) -> tuple[int, int]:
+    coupled = (
+        (component_id == 3) | (component_id == 4) | (component_id == 7)
+        | ((component_id > 8) & (component_id < 16))
+    )
+    return int(coupled.sum().item()), int((component_id == 7).sum().item())
+
+
+def _solve_receiver_windows(
+    scene: SolverScene, config: Config, layout: ReceiverLayout, frequency_hz: float,
+    native_info: dict[str, Any],
+) -> Result:
+    """The deterministic solve over receiver windows; the result is the whole solve's."""
+
+    receiver_count = layout.receiver_count
+    num_tx = len(scene.transmitters)
+    extra_components = tuple(name for name in _OPTIONAL_COMPONENTS if name in config.components)
+    extra_components = extra_components + ("coupled",)
+    totals: list[Any] | None = None
+    component_counts: dict[str, int] = {}
+    path_count = 0
+    launch_count = 0
+    dropped_rows = 0
+    candidate_count = 0
+    guardrail_count = 0
+    visibility_rejection_count = 0
+    first_execution = None
+    start = 0
+    size = min(_FIRST_WINDOW, _RECEIVER_WINDOW)
+    while start < receiver_count:
+        stop = min(receiver_count, start + size)
+        evaluated, sidecars = evaluate_enumerated_paths(
+            scene, config, frequency_value=frequency_hz, defer_capacity_terminal=True,
+            receiver_window=(start, stop),
+        )
+        evaluated, sidecars = sanitize_enumerated_capacity_transaction(evaluated, sidecars)
+        topology = evaluated.topology
+        counts = deterministic_component_counts(topology.component_id)
+        if "transmission" in config.components:
+            counts["transmission"] = int((topology.component_id == 5).sum().item())
+        counts["coupled"], counts["coupled_double_diffraction"] = _coupled_counts(topology.component_id)
+        for name, value in counts.items():
+            component_counts[name] = component_counts.get(name, 0) + int(value)
+        rows = evaluated.row_count
+        path_count += rows
+        window = accumulate_flat_components(
+            valid=topology.valid,
+            tx_id=topology.tx_id,
+            rx_id=topology.rx_id,
+            component_id=topology.component_id,
+            path_gain=evaluated.fields.path_gain,
+            path_field=evaluated.fields.path_field,
+            num_tx=num_tx,
+            num_rx=receiver_count,
+            coherent=config.coherent,
+            extra_components=extra_components,
+        )
+        del evaluated, topology
+        if totals is None:
+            totals = list(window)
+        else:
+            # A receiver's rows all lie in one window, so every other window adds exact zeros there.
+            totals[0] = totals[0] + window[0]
+            totals[1] = totals[1] + window[1]
+            for name in totals[2]:
+                totals[2][name] = totals[2][name] + window[2][name]
+                totals[3][name] = totals[3][name] + window[3][name]
+        execution = sidecars.execution
+        if first_execution is None:
+            first_execution = execution
+        launch_count += execution.launch_count
+        candidate_count += execution.candidate_count
+        guardrail_count += execution.guardrail_count
+        visibility_rejection_count += execution.visibility_rejection_count
+        dropped_rows += transmission_dropped_rows(sidecars)
+        _terminal_check_capacity(sidecars)
+        del sidecars, window
+        done = stop - start
+        start = stop
+        size = max(1, min(2 * done, (_WINDOW_ROWS * done) // max(rows, 1)))
+    if totals is None or first_execution is None:
+        raise RuntimeError("a windowed deterministic solve needs at least one receiver")
+    path_gain, field, component_power, component_fields = apply_layout_to_accumulation(
+        path_gain=totals[0], field=totals[1], component_power=totals[2],
+        component_fields=totals[3], layout=layout, return_field=config.return_field,
+    )
+    metadata = _metadata(
+        config=config,
+        native_info=native_info,
+        path_count=path_count,
+        component_counts=component_counts,
+        launch_count=launch_count,
+        transmission_dropped_rows=dropped_rows,
+        reflection_discovery=first_execution.reflection_discovery,
+    )
+    diagnostics = None
+    if config.diagnostics:
+        diagnostics = {
+            "path_gain_shape": tuple(path_gain.shape),
+            "field_shape": tuple(field.shape),
+            "path_count": path_count,
+            "component_counts": component_counts,
+            "coherent": config.coherent,
+            "accumulation_mode": "coherent" if config.coherent else "incoherent",
+            "native_launch_count": launch_count,
+            "diffraction_accumulation": "scalar_path_accumulation",
+            "visibility_rejection_count": visibility_rejection_count,
+            "selected_edge_count": first_execution.resolved_selected_edge_count(),
+            "path_planning": {
+                "max_paths": config.max_paths,
+                "max_paths_scope": config.max_paths_scope,
+                "candidate_count": candidate_count,
+                "guardrail_count": guardrail_count,
+                "truncated": False,
+            },
+        }
+    return Result(
+        path_gain=path_gain, field=field, component_power=component_power,
+        component_fields=component_fields, paths=None, metadata=metadata, diagnostics=diagnostics,
+    )
+
+
 def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
     validate_scalar_endpoint_features(
         scene.transmitters, scene.receivers, solver="deterministic"
@@ -786,6 +932,8 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
     # token must see the live value to stay correct under in-place
     # frequency mutation.
     frequency_hz = _frequency_scalar(scene)
+    if _windowed(config, layout.receiver_count):
+        return _solve_receiver_windows(scene, config, layout, frequency_hz, native_info)
     evaluated, sidecars = evaluate_enumerated_paths(
         scene,
         config,

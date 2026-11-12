@@ -663,12 +663,15 @@ def evaluate_enumerated_paths(
     scene: Scene, config: EnumeratedPathConfig, *, frequency_value: float | None = None,
     defer_capacity_terminal: bool = False,
     endpoint_tensors: EnumeratedEndpointTensors | None = None,
+    receiver_window: tuple[int, int] | None = None,
 ) -> tuple[EvaluatedPaths, EvaluatedPathSidecars]:
     """Discover, select, and evaluate canonical enumerated propagation rows.
 
     ``defer_capacity_terminal`` is reserved for Path and Deterministic outer
     solvers, which must sanitize scattering-appended rows and enqueue the one
     terminal observer only after their public result/array packing. the enumerated-path oracle callers keep the default and complete the transaction here.
+    ``receiver_window`` ``(start, stop)`` discovers rows for those receivers only; the rows keep
+    their receiver ids in the whole receiver set, and every row is the one a whole solve gives.
     """
 
     _require_defer_capacity_terminal(defer_capacity_terminal)
@@ -677,7 +680,15 @@ def evaluate_enumerated_paths(
     tx_positions = endpoints.tx_positions
     tx_power = endpoints.tx_power
     tx_polarizations = endpoints.tx_polarizations
-    rx_positions = endpoints.rx_positions
+    rx_all = endpoints.rx_positions
+    window_start = 0
+    if receiver_window is not None:
+        window_start, window_stop = (int(value) for value in receiver_window)
+        if not 0 <= window_start < window_stop <= int(rx_all.shape[0]):
+            raise ValueError(f"receiver_window {receiver_window} is outside the {int(rx_all.shape[0])} receivers")
+        rx_positions = rx_all[window_start:window_stop].contiguous()
+    else:
+        rx_positions = rx_all
     rx_polarizations = endpoints.rx_polarizations
     diffraction_tx_polarizations = endpoints.explicit_tx_polarizations
     field_tx_power = (
@@ -805,6 +816,10 @@ def evaluate_enumerated_paths(
         launch_count += coupled_launches
         candidate_count += coupled_candidates
         blocks.append(block)
+    if window_start > 0:
+        for block in blocks:
+            block["rx_id"] = block["rx_id"] + window_start
+    rx_positions = rx_all
     if len(blocks) == 1 and components == {"los"} and config.max_paths is None:
         evaluated, sidecars = evaluated_paths_from_result(
             SimpleNamespace(
