@@ -659,6 +659,30 @@ def explicit_endpoint_scene(compiled: CompiledScene) -> Scene:
     )
 
 
+def _windowed_receivers(
+    rx_positions: torch.Tensor, receiver_window: tuple[int, int] | None,
+) -> tuple[torch.Tensor, int]:
+    """The receivers whose rows a solve discovers, and the id of the first in the whole set."""
+
+    if receiver_window is None:
+        return rx_positions, 0
+    start, stop = (int(value) for value in receiver_window)
+    if not 0 <= start < stop <= int(rx_positions.shape[0]):
+        raise ValueError(
+            f"receiver_window {receiver_window} is outside the {int(rx_positions.shape[0])} receivers"
+        )
+    return rx_positions[start:stop].contiguous(), start
+
+
+def _offset_receiver_ids(blocks: list[dict[str, torch.Tensor]], start: int) -> None:
+    """Give window-local receiver ids their ids in the whole receiver set."""
+
+    if start == 0:
+        return
+    for block in blocks:
+        block["rx_id"] = block["rx_id"] + start
+
+
 def evaluate_enumerated_paths(
     scene: Scene, config: EnumeratedPathConfig, *, frequency_value: float | None = None,
     defer_capacity_terminal: bool = False,
@@ -681,14 +705,7 @@ def evaluate_enumerated_paths(
     tx_power = endpoints.tx_power
     tx_polarizations = endpoints.tx_polarizations
     rx_all = endpoints.rx_positions
-    window_start = 0
-    if receiver_window is not None:
-        window_start, window_stop = (int(value) for value in receiver_window)
-        if not 0 <= window_start < window_stop <= int(rx_all.shape[0]):
-            raise ValueError(f"receiver_window {receiver_window} is outside the {int(rx_all.shape[0])} receivers")
-        rx_positions = rx_all[window_start:window_stop].contiguous()
-    else:
-        rx_positions = rx_all
+    rx_positions, window_start = _windowed_receivers(rx_all, receiver_window)
     rx_polarizations = endpoints.rx_polarizations
     diffraction_tx_polarizations = endpoints.explicit_tx_polarizations
     field_tx_power = (
@@ -816,9 +833,7 @@ def evaluate_enumerated_paths(
         launch_count += coupled_launches
         candidate_count += coupled_candidates
         blocks.append(block)
-    if window_start > 0:
-        for block in blocks:
-            block["rx_id"] = block["rx_id"] + window_start
+    _offset_receiver_ids(blocks, window_start)
     rx_positions = rx_all
     if len(blocks) == 1 and components == {"los"} and config.max_paths is None:
         evaluated, sidecars = evaluated_paths_from_result(

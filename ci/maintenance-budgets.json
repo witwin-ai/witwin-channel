@@ -6,12 +6,6 @@
       "owner": "core maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
-    "witwin/channel/radiomap/_coherent.py::_solve_pipeline": {
-      "ceiling": 20,
-      "expires_on": "2027-01-31",
-      "owner": "radiomap maintainers",
-      "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
-    },
     "witwin/channel/radiomap/_stochastic.py::solve_pipeline": {
       "ceiling": 49,
       "expires_on": "2027-01-31",

@@ -886,6 +886,23 @@ def _solve_receiver_windows(
     )
 
 
+def _validate_solve_request(
+    scene: SolverScene, config: Coherent, native_info: dict[str, Any],
+) -> None:
+    """Refuse, before any native work, a request this build or receiver layout cannot serve."""
+
+    _validate_requested_components(config)
+    if "reflection" in config.components and not native_info["uses_rayd_native"]:
+        raise RuntimeError("deterministic reflection requires RayD native capability")
+    if "diffraction" in config.components and not native_info["uses_rayd_native"]:
+        raise RuntimeError("deterministic diffraction requires RayD native capability")
+    has_grid = any(
+        receiver.__class__.__name__ == "ReceiverGrid" for receiver in scene.receivers
+    )
+    if has_grid and len(scene.receivers) > 1 and not config.export_paths:
+        raise RuntimeError("mixed point/grid receivers require export_paths=True")
+
+
 def _solve_pipeline(scene: SolverScene, config: Coherent) -> CoherentRadioMap:
     validate_scalar_endpoint_features(
         scene.transmitters, scene.receivers, solver="deterministic"
@@ -907,16 +924,7 @@ def _solve_pipeline(scene: SolverScene, config: Coherent) -> CoherentRadioMap:
         peak_before = torch.cuda.max_memory_allocated()
 
     native_info = build_info()
-    _validate_requested_components(config)
-    if "reflection" in config.components and not native_info["uses_rayd_native"]:
-        raise RuntimeError("deterministic reflection requires RayD native capability")
-    if "diffraction" in config.components and not native_info["uses_rayd_native"]:
-        raise RuntimeError("deterministic diffraction requires RayD native capability")
-    has_grid = any(
-        receiver.__class__.__name__ == "ReceiverGrid" for receiver in scene.receivers
-    )
-    if has_grid and len(scene.receivers) > 1 and not config.export_paths:
-        raise RuntimeError("mixed point/grid receivers require export_paths=True")
+    _validate_solve_request(scene, config, native_info)
 
     device = torch.device("cuda")
     _, layout = receiver_positions_and_layout(scene, device=device)
