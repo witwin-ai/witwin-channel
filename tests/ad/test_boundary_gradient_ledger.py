@@ -11,8 +11,8 @@ import pytest
 import torch
 
 from tests.support.core_world import make_receiver, make_transmitter
-from witwin.channel.deterministic import Config as DeterministicConfig
-from witwin.channel.deterministic import solve as deterministic_solve
+from witwin.channel.radiomap import Coherent as DeterministicConfig
+from witwin.channel.radiomap import solve as deterministic_solve
 from witwin.channel.path import Config as PathConfig
 from witwin.channel.path import solve as path_solve
 from witwin.core import Mesh, PhysicalMaterial, Scene, Structure

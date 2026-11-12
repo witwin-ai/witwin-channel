@@ -416,8 +416,8 @@ def test_end_to_end_roughness_gradient_is_nonzero():
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native scene capability is not built")
     from tests.support.scenes import rough_wall_structure
-    from witwin.channel.deterministic import Config as DeterministicConfig
-    from witwin.channel.deterministic import solve as deterministic_solve
+    from witwin.channel.radiomap import Coherent as DeterministicConfig
+    from witwin.channel.radiomap import solve as deterministic_solve
 
     def make_scene():
         wall = rough_wall_structure(

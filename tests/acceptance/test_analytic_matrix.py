@@ -14,12 +14,12 @@ from tests.support.scenes import (
 from tests.support.core_world import make_receiver, make_receiver_grid, make_transmitter
 from witwin.channel.capabilities import capabilities
 from witwin.channel.deployment import build_info
-from witwin.channel.deterministic import Config as DeterministicConfig
-from witwin.channel.deterministic import solve as solve_deterministic
-from witwin.channel.montecarlo.basic import Config as BasicConfig
-from witwin.channel.montecarlo.basic import solve as solve_basic
-from witwin.channel.montecarlo.bdpt import Config as BdptConfig
-from witwin.channel.montecarlo.bdpt import solve as solve_bdpt
+from witwin.channel.radiomap import Coherent as DeterministicConfig
+from witwin.channel.radiomap import solve as solve_deterministic
+from witwin.channel.radiomap import Stochastic as BasicConfig
+from witwin.channel.radiomap import solve as solve_basic
+from witwin.channel.experimental.bdpt import Config as BdptConfig
+from witwin.channel.experimental.bdpt import solve as solve_bdpt
 from witwin.channel.path import Config as PathConfig
 from witwin.channel.path import solve as solve_paths
 from witwin.core import AntennaState, MaterialLayer, PhysicalMaterial, Scene
@@ -111,7 +111,7 @@ def test_path_and_deterministic_share_complex_field_geometry_and_delay(
         DeterministicConfig(
             components=components,
             max_depth=max_depth,
-            coherent=True,
+            combine="field",
             return_field=True,
             export_paths=True,
         ),

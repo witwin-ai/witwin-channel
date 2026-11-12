@@ -31,10 +31,10 @@ from tests.montecarlo.basic import test_basic_scattering as basic_scattering
 from tests.montecarlo.bdpt import test_transmission as bdpt_transmission
 from tests.support.scenes import wedge_diffraction_scene
 from witwin.core import PhysicalMaterial
-from witwin.channel.montecarlo.basic import Config as BasicConfig
-from witwin.channel.montecarlo.basic import solve as solve_basic
-from witwin.channel.montecarlo.bdpt import Config as BDPTConfig
-from witwin.channel.montecarlo.bdpt import solve as solve_bdpt
+from witwin.channel.radiomap import Stochastic as BasicConfig
+from witwin.channel.radiomap import solve as solve_basic
+from witwin.channel.experimental.bdpt import Config as BDPTConfig
+from witwin.channel.experimental.bdpt import solve as solve_bdpt
 
 
 _DEFAULT_GATE = _ROOT / "benchmarks" / "gates" / "phase_c_statistics.v1.json"

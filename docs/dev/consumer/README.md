@@ -19,7 +19,7 @@ observation, and no Torch gather; it reuses the ADR-032 native compact stage
 and reports what that stage cost under `PropagationDiagnostics`.
 
 The consumer is solver-neutral in both directions: it never imports `path`,
-`deterministic`, `montecarlo.basic`, or `montecarlo.bdpt`, and those solvers
+`radiomap`, or `experimental.bdpt`, and those solvers
 continue to use the internal contracts directly rather than routing through
 here.
 

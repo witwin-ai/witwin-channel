@@ -10,7 +10,7 @@ from tests.support.core_world import (
     make_transmitter,
 )
 from witwin.channel.deployment import build_info
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent as Config, solve
 from witwin.channel.kernels import fields as field_kernels
 from witwin.channel.interactions import reflection as topology
 from witwin.channel.propagation import geometry as topology_geometry
@@ -171,7 +171,7 @@ def test_two_bounce_reflection_exports_depth_two_fields():
     result = solve(
         scene,
         Config(
-            components={"reflection"}, max_depth=2, coherent=True, export_paths=True
+            components={"reflection"}, max_depth=2, combine="field", export_paths=True
         ),
         reference_frequency_hz=3.0e9,
     )
@@ -290,7 +290,7 @@ def test_three_bounce_reflection_mixes_depth_two_and_three_blocks():
     result = solve(
         parallel_wall_corridor_scene(),
         Config(
-            components={"reflection"}, max_depth=3, coherent=True, export_paths=True
+            components={"reflection"}, max_depth=3, combine="field", export_paths=True
         ),
         reference_frequency_hz=3.0e9,
     )
@@ -342,7 +342,7 @@ def test_two_bounce_reflection_uses_native_canonical_field_launch(monkeypatch):
     result = solve(
         two_wall_multibounce_scene(),
         Config(
-            components={"reflection"}, max_depth=2, coherent=True, export_paths=True
+            components={"reflection"}, max_depth=2, combine="field", export_paths=True
         ),
         reference_frequency_hz=3.0e9,
     )
@@ -362,7 +362,7 @@ def test_two_bounce_reflection_does_not_use_python_product():
     result = solve(
         two_wall_multibounce_scene(),
         Config(
-            components={"reflection"}, max_depth=2, coherent=True, export_paths=True
+            components={"reflection"}, max_depth=2, combine="field", export_paths=True
         ),
         reference_frequency_hz=3.0e9,
     )
@@ -390,7 +390,7 @@ def test_two_bounce_reflection_uses_rayd_epc_path_export(monkeypatch):
     result = solve(
         two_wall_multibounce_scene(),
         Config(
-            components={"reflection"}, max_depth=2, coherent=True, export_paths=True
+            components={"reflection"}, max_depth=2, combine="field", export_paths=True
         ),
         reference_frequency_hz=3.0e9,
     )
@@ -442,7 +442,7 @@ def test_two_bounce_reflection_respects_max_paths_before_candidate_guardrail():
         Config(
             components={"reflection"},
             max_depth=2,
-            coherent=True,
+            combine="field",
             export_paths=True,
             max_paths=1,
             diagnostics=True,
@@ -498,7 +498,7 @@ def test_two_bounce_reflection_plans_by_surface_groups_before_face_guardrail():
     result = solve(
         scene,
         Config(
-            components={"reflection"}, max_depth=2, coherent=True, export_paths=True
+            components={"reflection"}, max_depth=2, combine="field", export_paths=True
         ),
         reference_frequency_hz=3.0e9,
     )

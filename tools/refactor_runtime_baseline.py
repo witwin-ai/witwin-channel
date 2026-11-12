@@ -456,7 +456,7 @@ def _load_case(solver: str, scenario: str) -> tuple[object, object, Any]:
 
         config = Config(max_depth=max_depth, components=components)
     elif solver == "deterministic":
-        from witwin.channel.deterministic import Config, solve
+        from witwin.channel.radiomap import Coherent as Config, solve
 
         config = Config(
             max_depth=max_depth,
@@ -465,7 +465,7 @@ def _load_case(solver: str, scenario: str) -> tuple[object, object, Any]:
             diagnostics=True,
         )
     elif solver == "montecarlo-basic":
-        from witwin.channel.montecarlo.basic import Config, solve
+        from witwin.channel.radiomap import Stochastic as Config, solve
 
         config = Config(
             samples=samples,
@@ -475,7 +475,7 @@ def _load_case(solver: str, scenario: str) -> tuple[object, object, Any]:
             diagnostics=True,
         )
     else:
-        from witwin.channel.montecarlo.bdpt import Config, solve
+        from witwin.channel.experimental.bdpt import Config, solve
 
         config = Config(
             samples=samples,
@@ -935,7 +935,7 @@ def _extended_scene_and_config(solver: str, scenario: str):
     seed = _EXTENDED_MC_SEEDS.get(scenario, 0)
 
     def _mc_basic(components, *, max_depth, samples):
-        from witwin.channel.montecarlo.basic import Config, solve
+        from witwin.channel.radiomap import Stochastic as Config, solve
 
         return Config(
             samples=samples,
@@ -949,7 +949,7 @@ def _extended_scene_and_config(solver: str, scenario: str):
         components, *, max_depth, samples, receiver_strategy, coupled=False,
         accumulation_strategy="auto",
     ):
-        from witwin.channel.montecarlo.bdpt import Config, solve
+        from witwin.channel.experimental.bdpt import Config, solve
 
         return Config(
             samples=samples,
@@ -970,7 +970,7 @@ def _extended_scene_and_config(solver: str, scenario: str):
         ), solve
 
     def _deterministic(components, *, max_depth, **extra):
-        from witwin.channel.deterministic import Config, solve
+        from witwin.channel.radiomap import Coherent as Config, solve
 
         return Config(
             max_depth=max_depth,
@@ -1283,7 +1283,7 @@ def _extended_ad_scene_config(solver: str, scenario: str, ad_mode: str):
 
         config = Config(max_depth=max_depth, components=components, ad_mode=ad_mode)
     else:
-        from witwin.channel.deterministic import Config, solve
+        from witwin.channel.radiomap import Coherent as Config, solve
 
         config = Config(
             max_depth=max_depth,

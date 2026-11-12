@@ -189,13 +189,13 @@ def run_native_planar_benchmark(
 ) -> dict[str, Any]:
     sys.path.insert(0, str(_REPO_ROOT))
     import torch
-    from witwin.channel.montecarlo.basic import Config, solve
+    from witwin.channel.radiomap import Stochastic, solve
 
     if not torch.cuda.is_available():
         raise RuntimeError("native benchmark requires CUDA")
 
     scene = _native_scene()
-    config = Config(
+    config = Stochastic(
         samples=int(samples),
         max_depth=MAX_DEPTH,
         seed=0,

@@ -16,9 +16,9 @@ of truth and this document is stale — reconcile them.
 | Solver | `ad_mode` accepted | Field semantics under AD |
 |---|---|---|
 | `path` | `none`, `jvp`, `vjp` | complex path coefficients (magnitude, phase, delay) |
-| `deterministic` | `none`, `jvp`, `vjp` | complex path coefficients |
-| `montecarlo.basic` | `none`, `jvp`, `vjp` | real incoherent power map only |
-| `montecarlo.bdpt` | `none` only | — (AD refused by design) |
+| `radiomap.Coherent` | `none`, `jvp`, `vjp` | complex path coefficients |
+| `radiomap.Stochastic` | `none`, `jvp`, `vjp` | real incoherent power map only |
+| `experimental.bdpt` | `none` only | — (AD refused by design) |
 
 `jvp` is forward mode (directional derivative / tangent); `vjp` is reverse mode
 (`.backward()`). The two agree through the inner-product duality, which is
@@ -40,7 +40,7 @@ Forward mode: `torch.autograd.forward_ad.dual_level` (make the leaf a dual), or
 
 ### 2.1 Coverage matrix (plan 07 section 9.3, as delivered)
 
-D = deterministic, P = path, M = montecarlo.basic. A cell lists the solvers that
+D = radiomap.Coherent, P = path, M = radiomap.Stochastic. A cell lists the solvers that
 differentiate that (parameter x interaction). Blank = physically inapplicable.
 
 | parameter | LoS | 1 reflection | multi-reflection | transmission / multilayer | UTD diffraction | coupled R-D |
@@ -66,7 +66,7 @@ exactly zero, because the continuous dependence is genuinely zero. They are
 pinned by tests so they cannot silently become nonzero-but-wrong.
 
 - **LoS x mesh vertex**: a line-of-sight path touches no face, so no vertex moves it.
-- **montecarlo.basic reflection map x TX position**: the slab-reflection radiomap
+- **radiomap.Stochastic reflection map x TX position**: the slab-reflection radiomap
   deposit weight `|Gamma|^2 * solid_angle * (lambda/4pi)^2 / (A_cell * |cos|)`
   depends only on the frozen sampled direction, the face normal and the
   materials; the `1/d^2` spreading lives in the frozen ray density and the cell
@@ -78,7 +78,7 @@ pinned by tests so they cannot silently become nonzero-but-wrong.
 The contract forbids returning a misleading gradient, so these raise (with a
 named reason) instead of silently degrading:
 
-- **`montecarlo.bdpt` + any AD**: the coherent BDPT contribution and its
+- **`experimental.bdpt` + any AD**: the coherent BDPT contribution and its
   three-way discrete event sampling (reflect / transmit / scatter, probabilities
   that depend on material and frequency) are random topology, deferred to a
   future plan.

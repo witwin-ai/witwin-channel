@@ -209,7 +209,7 @@ def _solver_operation(scene: Any, spec: CaseSpec):
             reference_frequency_hz=reference_frequency_hz,
         )
     if spec.solver == "deterministic":
-        from witwin.channel.deterministic import Config, solve
+        from witwin.channel.radiomap import Coherent as Config, solve
 
         config = Config(max_depth=spec.depth, components=components)
         return lambda: solve(
@@ -218,7 +218,7 @@ def _solver_operation(scene: Any, spec: CaseSpec):
             reference_frequency_hz=reference_frequency_hz,
         )
     if spec.solver == "basic":
-        from witwin.channel.montecarlo.basic import Config, solve
+        from witwin.channel.radiomap import Stochastic as Config, solve
 
         config = Config(
             samples=int(spec.samples or 1_000),
@@ -232,7 +232,7 @@ def _solver_operation(scene: Any, spec: CaseSpec):
             reference_frequency_hz=reference_frequency_hz,
         )
     if spec.solver == "bdpt":
-        from witwin.channel.montecarlo.bdpt import Config, solve
+        from witwin.channel.experimental.bdpt import Config, solve
 
         config = Config(
             samples=int(spec.samples or 1_000),
@@ -436,8 +436,8 @@ def preflight_rows(
                     depth=depth,
                 )
             else:
-                from witwin.channel.montecarlo.bdpt import Config
-                from witwin.channel.montecarlo.bdpt import (
+                from witwin.channel.experimental.bdpt import Config
+                from witwin.channel.experimental.bdpt import (
                     _estimate_workspace_bytes,
                 )
 

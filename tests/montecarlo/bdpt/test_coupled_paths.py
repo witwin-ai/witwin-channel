@@ -7,7 +7,7 @@ import torch
 from tests.support.scenes import coupled_wall_wedge_scene
 from witwin.channel import capabilities
 from witwin.channel.deployment import build_info
-from witwin.channel.montecarlo.bdpt import Config, solve
+from witwin.channel.experimental.bdpt import Config, solve
 
 
 def test_bdpt_exports_coupled_paths_with_bidirectional_discrete_mass():

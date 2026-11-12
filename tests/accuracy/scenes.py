@@ -81,13 +81,15 @@ class PathRow:
 def deterministic_rows(
     scene: Scene, components: set[str], max_depth: int = 1, frequency_hz: float = FREQ,
 ) -> list[PathRow]:
-    from witwin.channel.deterministic import Config, solve
+    from witwin.channel.radiomap import Coherent as Config, solve
 
     result = solve(scene, Config(components=components, max_depth=max_depth, export_paths=True),
                    reference_frequency_hz=frequency_hz)
     paths = result.paths
     count = int(paths.valid.numel())
-    points = paths.interaction_position.reshape(count, -1).double().cpu().numpy() if count else []
+    first = paths.interaction_positions[:, 0] if paths.interaction_positions.shape[1] else (
+        torch.zeros((count, 3), device=paths.valid.device))
+    points = first.reshape(count, -1).double().cpu().numpy() if count else []
     return [PathRow(int(d), complex(c), float(length), np.asarray(points[i][:3]))
             for i, (d, c, length) in enumerate(zip(paths.depth.tolist(), paths.coefficient.tolist(),
                                                     paths.path_length_m.tolist()))]

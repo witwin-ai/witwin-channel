@@ -1446,7 +1446,7 @@ def _ad_launch_accounting(config: Config, ad_ledger: AdLaunchLedger | None) -> t
 
     ad_mode='none' wires no companions and retains no tape (bitwise default).
     Under jvp/vjp report the companion launches this solve registered in the
-    AdLaunchLedger, exactly as montecarlo.basic does."""
+    AdLaunchLedger, exactly as radiomap.Stochastic does."""
 
     ledger = ad_ledger if ad_ledger is not None else AdLaunchLedger()
     backward_launch_count = ledger.launches if config.ad_mode == "vjp" else 0
@@ -1466,7 +1466,7 @@ def make_solver_metadata(
     ) or ("diffraction" in config.components and diffraction_available)
     # BDPT AD: ad_mode='none' wires no companions and retains no tape (bitwise
     # default). Under jvp/vjp report the companion launches this solve
-    # registered in the AdLaunchLedger, exactly as montecarlo.basic does.
+    # registered in the AdLaunchLedger, exactly as radiomap.Stochastic does.
     ad_active = config.ad_mode != "none"
     backward_launch_count, jvp_launch_count, tape_bytes = _ad_launch_accounting(
         config, ad_ledger
@@ -1501,9 +1501,9 @@ def make_solver_metadata(
         # enumerated delta/UTD complex field per (tx, rx, component).
         "combine_domain": "coherent" if config.coherent else "power",
         **estimator_metadata(
-            estimator="sampled",
+            estimator="stochastic",
             quantity=component_quantities(config.components),
-            combine="coherent" if config.coherent else "incoherent",
+            combine="field" if config.coherent else "power",
             complete=False,
         ),
         "coherent": bool(config.coherent),
@@ -2182,10 +2182,10 @@ def _reject_live_geometry_through_sampler(scene: SolverScene, config: Config) ->
             live.append(f"structure[{index}].vertices")
     if live:
         raise NotImplementedError(
-            f"witwin.channel.montecarlo.bdpt ad_mode={config.ad_mode!r} differentiates "
+            f"witwin.channel.experimental.bdpt ad_mode={config.ad_mode!r} differentiates "
             "material, frequency and transmitter-power leaves only; "
             f"{', '.join(live)} carries a gradient or tangent. Detach it, or use "
-            "witwin.channel.deterministic or witwin.channel.path for geometry derivatives"
+            "witwin.channel.radiomap.Coherent or witwin.channel.path for geometry derivatives"
         )
 
 
@@ -2211,7 +2211,7 @@ def _prepare_workspace_and_capabilities(
     _check_workspace_guardrail(config, workspace_bytes)
 
     if not torch.cuda.is_available():
-        raise RuntimeError("witwin.channel.montecarlo.bdpt requires CUDA")
+        raise RuntimeError("witwin.channel.experimental.bdpt requires CUDA")
 
     info = build_info_fn()
     rayd = require_compiled(scene).rayd
@@ -2359,7 +2359,7 @@ def _reject_frozen_wavefront_leaves(materials: dict[str, torch.Tensor]) -> None:
         value = materials[name]
         if value.requires_grad or torch.autograd.forward_ad.unpack_dual(value).tangent is not None:
             raise NotImplementedError(
-                f"witwin.channel.montecarlo.bdpt does not differentiate {name}: the "
+                f"witwin.channel.experimental.bdpt does not differentiate {name}: the "
                 "permeability is a constant of the fixed-topology derivative; detach it"
             )
 
@@ -3048,7 +3048,7 @@ def _solve_pipeline(
     prep = _prepare_workspace_and_capabilities(
         scene, config, grid=grid, build_info_fn=build_info_fn
     )
-    # BDPT AD per-solve companion accounting (mirrors montecarlo.basic). Under
+    # BDPT AD per-solve companion accounting (mirrors radiomap.Stochastic). Under
     # ad_mode='none' no companion registers, so the ledger stays empty and the
     # metadata reports zero backward/jvp launches and zero tape.
     ledger = AdLaunchLedger()
@@ -3101,7 +3101,7 @@ def solve(
 ) -> Result:
     """Run the native CUDA/OptiX BDPT pipeline."""
 
-    require_config_type(config, Config, "witwin.channel.montecarlo.bdpt")
+    require_config_type(config, Config, "witwin.channel.experimental.bdpt")
     endpoint_views = _endpoint_views(scene)
     if (
         any(isinstance(view, ReceiverGrid) for view in endpoint_views)

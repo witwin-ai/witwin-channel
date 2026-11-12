@@ -4,7 +4,7 @@
 import pytest
 import torch
 
-import witwin.channel.montecarlo.bdpt as bdpt
+import witwin.channel.experimental.bdpt as bdpt
 from tests.support.core_world import (
     make_mesh_structure,
     make_receiver,

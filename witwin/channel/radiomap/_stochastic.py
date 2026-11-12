@@ -1,7 +1,7 @@
 # Copyright Xingyu Chen.
-# Monte Carlo basic primal solver.
+# Stochastic radiomap estimator: Monte Carlo ray tubes deposited per receiver.
 
-"""Monte Carlo basic primal solver."""
+"""Stochastic radiomap estimator: Monte Carlo ray tubes deposited per receiver."""
 
 from __future__ import annotations
 
@@ -125,7 +125,7 @@ if TYPE_CHECKING:
 # that require at least one bounce (max_depth >= 1).
 # Default component set is unchanged: the new components are strictly opt-in.
 @dataclass(frozen=True, slots=True)
-class Config:
+class Stochastic:
     samples: int = 4096
     max_depth: int = 1
     seed: int = 0
@@ -164,7 +164,7 @@ class Config:
                 f"{sorted(components - {'los'})}, got max_depth={self.max_depth}"
             ),
         )
-        validate_vocabulary("montecarlo_basic ad_mode", self.ad_mode, _VALID_AD_MODES)
+        validate_vocabulary("radiomap.Stochastic ad_mode", self.ad_mode, _VALID_AD_MODES)
         validate_workspace_limit_bytes(self.workspace_limit_bytes)
         object.__setattr__(self, "components", components)
 
@@ -175,7 +175,7 @@ class Config:
         return int(self.scattering_samples if self.scattering_samples is not None else self.samples)
 
 
-# --- Result ---------------------------------------------------------------
+# --- RadioMap ---------------------------------------------------------------
 
 
 class _MetadataKeys(ResultSemantics, ConfigMetadata):
@@ -192,8 +192,8 @@ class _MetadataKeys(ResultSemantics, ConfigMetadata):
     edge_policy: dict[str, Any]
 
 
-class Metadata(_MetadataKeys, total=False):
-    """The stable keys of ``Result.metadata``; a plain ``dict`` at run time."""
+class RadioMapMetadata(_MetadataKeys, total=False):
+    """The stable keys of ``RadioMap.metadata``; a plain ``dict`` at run time."""
 
     # Present when the transmission component was requested.
     transmission: dict[str, Any]
@@ -204,10 +204,10 @@ class Metadata(_MetadataKeys, total=False):
 
 
 @dataclass(frozen=True, slots=True)
-class Result:
+class RadioMap:
     path_gain: torch.Tensor
     component_power: dict[str, torch.Tensor]
-    metadata: Metadata
+    metadata: RadioMapMetadata
     diagnostics: dict[str, Any] | None = None
     component_maps: dict[str, torch.Tensor] | None = None
 
@@ -223,14 +223,14 @@ def make_cuda_generator(seed: int) -> torch.Generator:
 
 # --- Solver metadata ------------------------------------------------------
 
-# One AdLaunchLedger shape for every solver (diffraction AD): montecarlo.basic
+# One AdLaunchLedger shape for every solver (diffraction AD): radiomap.Stochastic
 # counts one companion per LoS matrix, per grid-map layout Function, per
 # transmitter for the reflection/diffraction accumulators. Straight
 # transmission registers one flattened RayD geometry companion, one native
 # wall-product companion, and one final capacity-map sanitizer companion; the
 # finalize sum registers no native companion (its cotangent is a view).
 def make_solver_metadata(
-    *, config: Config, path_count: int, contribution_capacity: int, reflection_available: bool,
+    *, config: Stochastic, path_count: int, contribution_capacity: int, reflection_available: bool,
     diffraction_available: bool, ad_ledger: AdLaunchLedger | None = None,
 ) -> dict[str, Any]:
     forward_launch_count = 1 if contribution_capacity else 0
@@ -278,13 +278,13 @@ def make_solver_metadata(
         },
         "kernel": kernel_metadata,
         **estimator_metadata(
-            estimator="sampled",
+            estimator="stochastic",
             # LoS and transmission are evaluated at the receiver; the ray estimators deposit
             # over the cell or the point receiver's capture sphere.
             quantity=component_quantities(
                 config.components, cell_average=("reflection", "diffraction", "scattering")
             ),
-            combine="incoherent",
+            combine="power",
             complete=False,
         ),
     }
@@ -394,7 +394,7 @@ class ReflectionComponentResult:
 
 
 # Point receivers capture reflected rays in a sphere of this fraction of their straight
-# transmitter distance unless Config.receiver_radius_m fixes the radius.
+# transmitter distance unless Stochastic.receiver_radius_m fixes the radius.
 _RELATIVE_POINT_RADIUS = 0.01
 
 # Per-face material tensors from the compiled store (one source for both
@@ -479,7 +479,7 @@ def los_component_map(
 
 
 def _transmission_capacity_metadata(
-    config: Config, capacity_transaction: SolveCapacityTransaction | None,
+    config: Stochastic, capacity_transaction: SolveCapacityTransaction | None,
 ) -> dict[str, Any]:
     """Observe the solve's failure record once and report the dropped transmission cells.
 
@@ -1542,7 +1542,7 @@ def diffraction_component_map(
 # --- Shared solve pipeline ------------------------------------------------
 
 
-def _validate_ad_config(config: Config) -> None:
+def _validate_ad_config(config: Stochastic) -> None:
     if config.ad_mode == "none":
         return
     if "reflection" in config.components:
@@ -1555,7 +1555,7 @@ def _validate_ad_config(config: Config) -> None:
             )
 
 
-def _reject_vertex_leaves(scene: SolverScene, config: Config) -> None:
+def _reject_vertex_leaves(scene: SolverScene, config: Stochastic) -> None:
     """Refuse mesh-vertex AD leaves for the blocks that do not differentiate them.
 
     Only the straight transmission chain carries mesh-vertex derivatives; the
@@ -1574,10 +1574,10 @@ def _reject_vertex_leaves(scene: SolverScene, config: Config) -> None:
     ]
     if live:
         raise NotImplementedError(
-            f"witwin.channel.montecarlo.basic ad_mode={config.ad_mode!r} does not "
+            f"witwin.channel.radiomap.Stochastic ad_mode={config.ad_mode!r} does not "
             f"differentiate mesh vertices through {blocks}; {', '.join(live)} carries "
             "a gradient or tangent. Detach it, restrict components to "
-            "{'los', 'transmission'}, or use witwin.channel.deterministic or "
+            "{'los', 'transmission'}, or use witwin.channel.radiomap.Coherent or "
             "witwin.channel.path for vertex derivatives"
         )
 
@@ -1591,7 +1591,7 @@ def _receiver_count(scene: SolverScene) -> int:
     )
 
 
-def _enforce_workspace_budget(scene: SolverScene, config: Config) -> None:
+def _enforce_workspace_budget(scene: SolverScene, config: Stochastic) -> None:
     if config.workspace_limit_bytes is None:
         return
     estimate = estimate_monte_carlo_memory(
@@ -1659,8 +1659,8 @@ def _face_material_tensors(
 
 
 def _mc_scattering_component(
-    scene: SolverScene, rayd: RayDSceneResource, grid: Any, config: Config, *, device: torch.device,
-    ad: bool, ledger: Any, zero_component_map: Any,
+    scene: SolverScene, rayd: RayDSceneResource, grid: Any, config: Stochastic, *,
+    device: torch.device, ad: bool, ledger: Any, zero_component_map: Any,
 ) -> tuple[torch.Tensor, dict[str, int] | None, int, int]:
     """Scattering component map and (path, capacity) row-count deltas.
 
@@ -1687,7 +1687,7 @@ def _mc_scattering_component(
 
 
 def _validate_native_component_capabilities(
-    config: Config, *, reflection_available: bool, diffraction_available: bool,
+    config: Stochastic, *, reflection_available: bool, diffraction_available: bool,
     transmission_available: bool, scattering_available: bool,
 ) -> None:
     if "reflection" in config.components and not reflection_available:
@@ -1701,7 +1701,7 @@ def _validate_native_component_capabilities(
 
 
 def _initial_los_state(
-    scene: SolverScene, config: Config, *, device: torch.device, rayd: RayDSceneResource,
+    scene: SolverScene, config: Stochastic, *, device: torch.device, rayd: RayDSceneResource,
     grid: ReceiverGrid | None, ad: bool, ledger: AdLaunchLedger,
 ) -> tuple[torch.Tensor, int, int]:
     if "los" in config.components:
@@ -1749,7 +1749,7 @@ def _layout_maps(columns: list[torch.Tensor]) -> torch.Tensor:
 
 
 def _layout_specular_maps(
-    scene: SolverScene, config: Config, blocks: tuple[ReceiverBlock, ...], *,
+    scene: SolverScene, config: Stochastic, blocks: tuple[ReceiverBlock, ...], *,
     rayd: RayDSceneResource, device: torch.device, ad: bool, ledger: AdLaunchLedger,
     available: bool,
 ) -> dict[str, torch.Tensor]:
@@ -1811,8 +1811,8 @@ def _layout_specular_maps(
 
 
 def _layout_scattering_map(
-    scene: SolverScene, config: Config, *, rayd: RayDSceneResource, device: torch.device, ad: bool,
-    ledger: AdLaunchLedger,
+    scene: SolverScene, config: Stochastic, *, rayd: RayDSceneResource, device: torch.device,
+    ad: bool, ledger: AdLaunchLedger,
 ) -> tuple[torch.Tensor, dict[str, int]]:
     if not rayd.available:
         raise RuntimeError("scattering requires RayD native scene capability")
@@ -1833,7 +1833,7 @@ def _layout_scattering_map(
 
 
 def _receiver_layout_component_maps(
-    scene: SolverScene, config: Config, *, rayd: RayDSceneResource, los: torch.Tensor,
+    scene: SolverScene, config: Stochastic, *, rayd: RayDSceneResource, los: torch.Tensor,
     device: torch.device, ad: bool, ledger: AdLaunchLedger, available: bool, path_count: int,
     contribution_capacity: int,
 ) -> tuple[dict[str, torch.Tensor], dict[str, int] | None, SolveCapacityTransaction | None, int, int]:
@@ -1891,17 +1891,17 @@ def _receiver_layout_component_maps(
 
 
 def solve_pipeline(
-    scene: SolverScene, config: Config, *, build_info_fn: Any=build_info,
+    scene: SolverScene, config: Stochastic, *, build_info_fn: Any=build_info,
     make_cuda_generator_fn: Any=make_cuda_generator,
     validate_scalar_endpoint_features_fn: Any=validate_scalar_endpoint_features,
     require_frequency_ad_constant_materials_fn: Any=_require_frequency_ad_constant_materials,
-) -> Result:
+) -> RadioMap:
     validate_scalar_endpoint_features_fn(
         scene.transmitters, scene.receivers, solver="Monte Carlo basic"
     )
     _enforce_workspace_budget(scene, config)
     if not torch.cuda.is_available():
-        raise RuntimeError("witwin.channel.montecarlo.basic requires CUDA")
+        raise RuntimeError("witwin.channel.radiomap requires CUDA")
     _validate_ad_config(config)
     _reject_vertex_leaves(scene, config)
     ad = config.ad_mode != "none"
@@ -2186,10 +2186,10 @@ def solve_pipeline(
                 else {key: tuple(value.shape) for key, value in component_maps.items()}
             ),
         }
-    result = Result(
+    result = RadioMap(
         path_gain=path_gain,
         component_power=component_power,
-        metadata=cast(Metadata, metadata),
+        metadata=cast(RadioMapMetadata, metadata),
         diagnostics=diagnostics,
         component_maps=component_maps,
     )
@@ -2200,11 +2200,12 @@ def solve_pipeline(
 
 
 def solve(
-    scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz: float | torch.Tensor,
-) -> Result:
+    scene: Scene | SceneSnapshot, config: Stochastic, *,
+    reference_frequency_hz: float | torch.Tensor,
+) -> RadioMap:
     """Run the Monte Carlo Basic solver pipeline."""
 
-    require_config_type(config, Config, "witwin.channel.montecarlo.basic")
+    require_config_type(config, Stochastic, "witwin.channel.radiomap")
     endpoint_views = _endpoint_views(scene)
     _validate_scalar_endpoint_boundary(endpoint_views)
     validate_scalar_endpoint_features(
@@ -2229,4 +2230,9 @@ def solve(
     return result
 
 
-__all__ = ["Config", "Metadata", "Result", "solve"]
+# The public home of these types is ``witwin.channel.radiomap``.
+Stochastic.__module__ = "witwin.channel.radiomap"
+RadioMap.__module__ = "witwin.channel.radiomap"
+RadioMapMetadata.__module__ = "witwin.channel.radiomap"
+
+__all__ = ["RadioMap", "RadioMapMetadata", "Stochastic", "solve"]

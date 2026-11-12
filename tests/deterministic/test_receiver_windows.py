@@ -6,7 +6,8 @@ from __future__ import annotations
 import pytest
 import torch
 
-import witwin.channel.deterministic as deterministic
+import witwin.channel.radiomap._coherent as coherent
+from witwin.channel import radiomap
 from tests.support.core_world import make_receiver_grid, make_transmitter
 from tests.support.scenes import coupled_wall_wedge_scene
 from witwin.channel.deployment import build_info
@@ -24,11 +25,11 @@ def _scene() -> Scene:
     return Scene(structures=base.structures, endpoints=[make_transmitter(torch.tensor([0.0, -2.0, 1.0])), grid])
 
 
-def _solve(scene: Scene, **overrides) -> deterministic.Result:
-    config = deterministic.Config(
+def _solve(scene: Scene, **overrides) -> radiomap.CoherentRadioMap:
+    config = radiomap.Coherent(
         components=frozenset({"los", "reflection", "diffraction", "transmission"}), max_depth=3,
         coupled_paths=True, **overrides)
-    return deterministic.solve(scene, config, reference_frequency_hz=3.0e9)
+    return radiomap.solve(scene, config, reference_frequency_hz=3.0e9)
 
 
 def test_windowed_coupled_solve_equals_the_whole_solve(monkeypatch):
@@ -38,8 +39,8 @@ def test_windowed_coupled_solve_equals_the_whole_solve(monkeypatch):
     whole = _solve(scene)
     assert int(whole.path_gain.numel()) == 48 * 40
     # Small windows: the first holds 300 receivers, later ones about 2000 rows each.
-    monkeypatch.setattr(deterministic, "_RECEIVER_WINDOW", 300)
-    monkeypatch.setattr(deterministic, "_WINDOW_ROWS", 2000)
+    monkeypatch.setattr(coherent, "_RECEIVER_WINDOW", 300)
+    monkeypatch.setattr(coherent, "_WINDOW_ROWS", 2000)
     windowed = _solve(scene)
     assert windowed.metadata["counts"]["path_count"] == whole.metadata["counts"]["path_count"]
     assert windowed.metadata["counts"] == whole.metadata["counts"]
@@ -56,12 +57,12 @@ def test_windowed_coupled_solve_equals_the_whole_solve(monkeypatch):
 
 
 def test_solves_that_need_every_row_are_not_windowed(monkeypatch):
-    monkeypatch.setattr(deterministic, "_RECEIVER_WINDOW", 4)
-    config = deterministic.Config(components=frozenset({"los", "reflection", "diffraction"}),
+    monkeypatch.setattr(coherent, "_RECEIVER_WINDOW", 4)
+    config = radiomap.Coherent(components=frozenset({"los", "reflection", "diffraction"}),
                                   max_depth=2, coupled_paths=True)
-    assert deterministic._windowed(config, 100)
-    assert not deterministic._windowed(config, 4)
+    assert coherent._windowed(config, 100)
+    assert not coherent._windowed(config, 4)
     for change in ({"export_paths": True}, {"max_paths": 10}, {"ad_mode": "jvp"}, {"coupled_paths": False}):
         fields = {"components": frozenset({"los", "reflection", "diffraction"}), "max_depth": 2,
                   "coupled_paths": True, **change}
-        assert not deterministic._windowed(deterministic.Config(**fields), 100), change
+        assert not coherent._windowed(radiomap.Coherent(**fields), 100), change

@@ -88,24 +88,23 @@ def _run(body: str) -> str:
 def test_over_depth_transmission_is_dropped_in_every_solver_and_the_consumer() -> None:
     stdout = _run(
         """
-        import witwin.channel.deterministic as det
+        from witwin.channel import radiomap
         import witwin.channel.path as path
-        import witwin.channel.montecarlo.basic as mc
-        import witwin.channel.montecarlo.bdpt as bdpt
+        import witwin.channel.experimental.bdpt as bdpt
         from witwin.channel.propagation.consumer import EndpointBatch, PropagationRequest, evaluate
         from witwin.channel.scene import compile as compile_scene
 
         structures, extent = city(4)
         for depth in (1, 3):
-            for name, module, receivers, extra in (
-                ("det", det, [grid(extent, 8)], {}),
-                ("path", path, points(extent, 8), {}),
-                ("mc", mc, [grid(extent, 8)], {"samples": 256}),
-                ("bdpt", bdpt, [grid(extent, 8)], {"samples": 256}),
+            for name, config_type, solve, receivers, extra in (
+                ("det", radiomap.Coherent, radiomap.solve, [grid(extent, 8)], {}),
+                ("path", path.Config, path.solve, points(extent, 8), {}),
+                ("mc", radiomap.Stochastic, radiomap.solve, [grid(extent, 8)], {"samples": 256}),
+                ("bdpt", bdpt.Config, bdpt.solve, [grid(extent, 8)], {"samples": 256}),
             ):
                 scene = Scene(structures=structures, endpoints=[transmitter(extent), *receivers])
-                config = module.Config(max_depth=depth, components={"los", "transmission"}, **extra)
-                result = module.solve(scene, config, reference_frequency_hz=FREQ)
+                config = config_type(max_depth=depth, components={"los", "transmission"}, **extra)
+                result = solve(scene, config, reference_frequency_hz=FREQ)
                 torch.cuda.synchronize()
                 dropped = result.metadata["transmission"]["dropped_rows_over_max_depth"]
                 assert isinstance(dropped, int) and dropped >= 0
@@ -150,7 +149,7 @@ def test_over_depth_transmission_is_dropped_in_every_solver_and_the_consumer() -
 def test_coupled_double_diffraction_city_grid_completes() -> None:
     stdout = _run(
         """
-        import witwin.channel.deterministic as det
+        from witwin.channel import radiomap
         import witwin.channel.path as path
 
         structures, extent = city(1)
@@ -162,9 +161,9 @@ def test_coupled_double_diffraction_city_grid_completes() -> None:
         usable()
         structures, extent = city(4)
         scene = Scene(structures=structures, endpoints=[transmitter(extent), grid(extent, 16)])
-        config = det.Config(max_depth=2, components={"los", "reflection", "diffraction"},
+        config = radiomap.Coherent(max_depth=2, components={"los", "reflection", "diffraction"},
                             coupled_paths=True)
-        result = det.solve(scene, config, reference_frequency_hz=FREQ)
+        result = radiomap.solve(scene, config, reference_frequency_hz=FREQ)
         torch.cuda.synchronize()
         assert torch.isfinite(result.path_gain).all()
         usable()

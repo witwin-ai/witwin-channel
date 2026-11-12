@@ -10,8 +10,8 @@ import torch
 
 from witwin.core import AntennaState, Scene
 from witwin.core.identity import new_antenna_id
-from witwin.channel.deterministic import Config as DeterministicConfig
-from witwin.channel.deterministic import solve as solve_deterministic
+from witwin.channel.radiomap import Coherent as DeterministicConfig
+from witwin.channel.radiomap import solve as solve_deterministic
 from witwin.channel.importers import load_mitsuba
 from witwin.channel.path import Config as PathConfig
 from witwin.channel.path import solve as solve_path

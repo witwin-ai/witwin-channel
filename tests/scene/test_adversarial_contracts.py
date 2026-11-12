@@ -18,8 +18,9 @@ from witwin.core import (
     Structure,
 )
 from witwin.channel.scene.endpoints import pattern_field_response
-from witwin.channel.montecarlo.basic import Config as MonteCarloBasicConfig
-from witwin.channel.montecarlo import basic as montecarlo_basic_solver
+from witwin.channel.radiomap import Stochastic as MonteCarloBasicConfig
+from witwin.channel import radiomap
+from witwin.channel.radiomap import _stochastic as montecarlo_basic_solver
 from witwin.channel.scene.endpoints import (
     _endpoint_views,
     _validate_scalar_endpoint_boundary,
@@ -246,7 +247,7 @@ def test_mc_basic_rejects_endpoint_array_before_scene_compile(monkeypatch):
     )
 
     with pytest.raises(ValueError, match="does not support antenna arrays"):
-        montecarlo_basic_solver.solve(
+        radiomap.solve(
             scene,
             MonteCarloBasicConfig(samples=1, components={"los"}),
             reference_frequency_hz=1.0e9,

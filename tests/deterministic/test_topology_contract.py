@@ -6,7 +6,7 @@ import torch
 
 from tests.support.scenes import empty_space_los_scene, same_side_wall_reflection_scene
 from witwin.channel.deployment import build_info
-from witwin.channel.deterministic import Config
+from witwin.channel.radiomap import Coherent
 from witwin.channel.propagation.enumerated import evaluate_enumerated_paths
 from witwin.channel.scene import compile as compile_scene
 from witwin.channel.scene.endpoints import bind_solver_scene
@@ -24,7 +24,7 @@ def test_topology_export_normalizes_los_columns():
 
     paths, _ = evaluate_enumerated_paths(
         _solver_scene(empty_space_los_scene()),
-        Config(max_depth=0, components={"los"}),
+        Coherent(max_depth=0, components={"los"}),
     )
     topology = paths.topology
     geometry = paths.geometry
@@ -49,11 +49,11 @@ def test_topology_applies_global_max_paths_after_stable_sort():
 
     full, _ = evaluate_enumerated_paths(
         _solver_scene(empty_space_los_scene()),
-        Config(max_depth=0, components={"los"}),
+        Coherent(max_depth=0, components={"los"}),
     )
     limited, _ = evaluate_enumerated_paths(
         _solver_scene(empty_space_los_scene()),
-        Config(max_depth=0, components={"los"}, max_paths=2),
+        Coherent(max_depth=0, components={"los"}, max_paths=2),
     )
 
     assert limited.topology.valid.numel() == 2
@@ -70,7 +70,7 @@ def test_topology_supports_explicit_per_pair_max_paths_scope():
 
     limited, _ = evaluate_enumerated_paths(
         _solver_scene(empty_space_los_scene()),
-        Config(
+        Coherent(
             max_depth=0,
             components={"los"},
             max_paths=1,
@@ -89,7 +89,7 @@ def test_reflection_topology_exports_interaction_metadata():
 
     paths, _ = evaluate_enumerated_paths(
         _solver_scene(same_side_wall_reflection_scene()),
-        Config(components={"reflection"}, coherent=False),
+        Coherent(components={"reflection"}, combine="power"),
     )
     topology = paths.topology
     geometry = paths.geometry

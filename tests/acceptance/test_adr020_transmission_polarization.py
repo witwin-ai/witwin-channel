@@ -14,9 +14,9 @@ from witwin.channel.deployment import build_info
 from tests.reference.em_oracle import layer_stack_rt
 from witwin.core import MaterialLayer, PhysicalMaterial, ReceiverGrid, Scene
 
-from witwin.channel.deterministic import Config as DetConfig, solve as det_solve
-from witwin.channel.montecarlo.basic import Config as McConfig, solve as mc_solve
-from witwin.channel.montecarlo.bdpt import Config as BdptConfig, solve as bdpt_solve
+from witwin.channel.radiomap import Coherent as DetConfig, solve as det_solve
+from witwin.channel.radiomap import Stochastic as McConfig, solve as mc_solve
+from witwin.channel.experimental.bdpt import Config as BdptConfig, solve as bdpt_solve
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA torch is required"

@@ -7,7 +7,7 @@ from witwin.core import Scene
 
 from tests.support.scenes import wedge_diffraction_scene
 from witwin.channel.deployment import build_info
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent as Config, solve
 from witwin.channel.path import Config as PathConfig
 from witwin.channel.path import solve as solve_paths
 
@@ -23,7 +23,7 @@ def test_single_wedge_diffraction_matches_path_reference():
         scene,
         Config(
             components={"diffraction"},
-            coherent=False,
+            combine="power",
             export_paths=True,
             return_field=False,
         ),
@@ -113,7 +113,7 @@ def test_vertical_only_edge_policy_filters_horizontal_edges():
         scene,
         Config(
             components={"diffraction"},
-            coherent=False,
+            combine="power",
             export_paths=True,
             return_field=False,
         ),
@@ -129,7 +129,7 @@ def test_vertical_only_edge_policy_filters_horizontal_edges():
         wedge_diffraction_scene(),
         Config(
             components={"diffraction"},
-            coherent=False,
+            combine="power",
             export_paths=True,
             return_field=False,
         ),
@@ -150,7 +150,7 @@ def test_diffraction_path_field_export_uses_native_complex_fields():
     scene = wedge_diffraction_scene()
     result = solve(
         scene,
-        Config(components={"diffraction"}, coherent=True, export_paths=True),
+        Config(components={"diffraction"}, combine="field", export_paths=True),
         reference_frequency_hz=3.0e9,
     )
     reference = solve_paths(
@@ -189,7 +189,7 @@ def test_shared_wedge_edge_diffracts_to_a_receiver_in_front_of_the_faces():
         scene,
         Config(
             components={"diffraction"},
-            coherent=False,
+            combine="power",
             export_paths=True,
             return_field=False,
         ),

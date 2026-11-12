@@ -51,17 +51,17 @@ def _child(solver: str) -> dict[str, Any]:
 
         config = Config(max_depth=1, components={"los", "reflection"})
     elif solver == "deterministic":
-        from witwin.channel.deterministic import Config, solve as solve_fn
+        from witwin.channel.radiomap import Coherent as Config, solve as solve_fn
 
         config = Config(max_depth=1, components={"los", "reflection"})
     elif solver == "basic":
-        from witwin.channel.montecarlo.basic import Config, solve as solve_fn
+        from witwin.channel.radiomap import Stochastic as Config, solve as solve_fn
 
         config = Config(
             samples=256, max_depth=1, components={"los", "reflection"}
         )
     elif solver == "bdpt":
-        from witwin.channel.montecarlo.bdpt import Config, solve as solve_fn
+        from witwin.channel.experimental.bdpt import Config, solve as solve_fn
 
         config = Config(
             samples=256, max_depth=1, components={"los", "reflection"}

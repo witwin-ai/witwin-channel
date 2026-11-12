@@ -7,7 +7,7 @@ from dataclasses import fields
 
 import pytest
 
-from witwin.channel import deterministic, path
+from witwin.channel import radiomap, path
 from witwin.channel.propagation import consumer
 from witwin.channel.propagation.enumerated import EnumeratedOptions
 
@@ -18,7 +18,7 @@ _SHARED = (
     "scattering_chain_max_rows", "isb_boundary_taper", "isb_boundary_taper_width", "discovery",
 )
 _DETERMINISTIC_TERMINAL = (
-    "coherent", "return_field", "export_paths", "sort_key", "diagnostics", "scattering_coherent",
+    "combine", "return_field", "export_paths", "sort_key", "diagnostics", "scattering_coherent",
 )
 
 
@@ -29,10 +29,10 @@ def _names(config_type: type) -> tuple[str, ...]:
 def test_shared_fields_have_one_owner():
     assert _names(EnumeratedOptions) == _SHARED
     assert issubclass(path.Config, EnumeratedOptions)
-    assert issubclass(deterministic.Config, EnumeratedOptions)
+    assert issubclass(radiomap.Coherent, EnumeratedOptions)
     assert _names(path.Config) == _SHARED
-    assert _names(deterministic.Config) == _SHARED + _DETERMINISTIC_TERMINAL
-    for config_type in (path.Config, deterministic.Config):
+    assert _names(radiomap.Coherent) == _SHARED + _DETERMINISTIC_TERMINAL
+    for config_type in (path.Config, radiomap.Coherent):
         own = {name for name in vars(config_type).get("__annotations__", {}) if not name.startswith("_")}
         # A subclass may only re-default max_paths_scope; every other shared field is inherited.
         assert own & set(_SHARED) <= {"max_paths_scope"}
@@ -40,14 +40,14 @@ def test_shared_fields_have_one_owner():
 
 def test_entries_keep_their_max_paths_scope_rules():
     assert EnumeratedOptions().max_paths_scope == "global"
-    assert deterministic.Config().max_paths_scope == "global"
+    assert radiomap.Coherent().max_paths_scope == "global"
     assert path.Config().max_paths_scope == "per_pair"
     with pytest.raises(ValueError, match="path max_paths_scope"):
         path.Config(max_paths_scope="global")
-    assert deterministic.Config(max_paths_scope="per_pair").max_paths_scope == "per_pair"
+    assert radiomap.Coherent(max_paths_scope="per_pair").max_paths_scope == "per_pair"
 
 
-@pytest.mark.parametrize("config_type", [EnumeratedOptions, path.Config, deterministic.Config])
+@pytest.mark.parametrize("config_type", [EnumeratedOptions, path.Config, radiomap.Coherent])
 def test_shared_validation_runs_for_every_entry(config_type):
     with pytest.raises(ValueError, match="max_depth must be in"):
         config_type(max_depth=6, components={"reflection"})

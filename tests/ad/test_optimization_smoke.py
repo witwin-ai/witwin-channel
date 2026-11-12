@@ -10,7 +10,7 @@ import torch
 
 from witwin.core import Scene
 from tests.support.core_world import make_receiver, make_transmitter
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 
 pytestmark = pytest.mark.skipif(
     not torch.cuda.is_available(), reason="CUDA is required for the optimization smoke"
@@ -45,7 +45,7 @@ def _scene(tx: torch.Tensor) -> Scene:
 def _delays(tx: torch.Tensor, ad_mode: str) -> torch.Tensor:
     result = solve(
         _scene(tx),
-        Config(
+        Coherent(
             max_depth=0,
             components={"los"},
             export_paths=True,

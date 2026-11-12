@@ -15,7 +15,7 @@ from tests.support.core_world import (
 )
 from witwin.channel.deployment import build_info
 from witwin.core import MaterialLayer, PhysicalMaterial
-from witwin.channel.montecarlo.bdpt import Config, solve
+from witwin.channel.experimental.bdpt import Config, solve
 from tests.reference.em_oracle import layer_stack_rt
 
 pytestmark = pytest.mark.skipif(

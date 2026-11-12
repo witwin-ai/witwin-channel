@@ -8,9 +8,10 @@ from tests.support.core_world import make_receiver_grid, make_transmitter
 from tests.support.scenes import single_wall_reflection_scene, wedge_diffraction_scene
 from witwin.core import ReceiverGrid, Scene
 from witwin.channel.deployment import build_info
-from witwin.channel.montecarlo.basic import Config, solve as solve_basic
+from witwin.channel.radiomap import Stochastic, solve as solve_basic
 from witwin.channel.scene import compile as compile_scene
-from witwin.channel.montecarlo import basic as mc_basic
+from witwin.channel import radiomap
+from witwin.channel.radiomap import _stochastic as mc_basic
 from witwin.channel.propagation.geometry import (
     diffraction_edge_geometry,
 )
@@ -19,7 +20,7 @@ _REFERENCE_EDGE_INFO_PLANE_TOL = 1.34e-5
 _FREQUENCY_HZ = 3.0e9
 
 
-def _solve(scene: Scene, config: Config):
+def _solve(scene: Scene, config: Stochastic):
     return solve_basic(scene, config, reference_frequency_hz=_FREQUENCY_HZ)
 
 
@@ -213,10 +214,10 @@ def test_basic_solver_emits_zero_maps_for_transmission_and_scattering():
         structures=[],
     )
 
-    baseline = _solve(scene, Config(samples=128, seed=3, components={"los"}))
+    baseline = _solve(scene, Stochastic(samples=128, seed=3, components={"los"}))
     result = _solve(
         scene,
-        Config(
+        Stochastic(
             samples=128,
             seed=3,
             components={"los", "transmission", "scattering"},
@@ -238,7 +239,7 @@ def test_basic_solver_emits_zero_maps_for_transmission_and_scattering():
 
 def test_basic_config_rejects_unknown_component():
     with pytest.raises(ValueError, match="components"):
-        Config(components={"los", "teleportation"})
+        Stochastic(components={"los", "teleportation"})
 
 
 def test_basic_solver_returns_los_component_map_for_receiver_grid():
@@ -252,7 +253,7 @@ def test_basic_solver_returns_los_component_map_for_receiver_grid():
         structures=[],
     )
 
-    result = _solve(scene, Config(samples=128, seed=3, components={"los"}))
+    result = _solve(scene, Stochastic(samples=128, seed=3, components={"los"}))
 
     assert result.component_maps is not None
     assert result.component_maps["los"].shape == (1, 4, 4)
@@ -272,7 +273,7 @@ def test_basic_solver_los_component_map_uses_public_yx_grid_layout():
         structures=[],
     )
 
-    result = _solve(scene, Config(samples=128, seed=3, components={"los"}))
+    result = _solve(scene, Stochastic(samples=128, seed=3, components={"los"}))
 
     assert result.component_maps is not None
     assert result.component_maps["los"].shape == (1, 2, 3)
@@ -325,7 +326,7 @@ def test_basic_solver_reuses_los_export_for_single_receiver_grid(monkeypatch):
         structures=[],
     )
     call_count = 0
-    original = mc_basic.path_los_export
+    original = radiomap._stochastic.path_los_export
 
     def counted(*args, **kwargs):
         nonlocal call_count
@@ -334,7 +335,7 @@ def test_basic_solver_reuses_los_export_for_single_receiver_grid(monkeypatch):
 
     monkeypatch.setattr(mc_basic, "path_los_export", counted)
 
-    _solve(scene, Config(samples=128, seed=3, components={"los"}))
+    _solve(scene, Stochastic(samples=128, seed=3, components={"los"}))
 
     assert call_count == 1
 
@@ -347,7 +348,7 @@ def test_basic_solver_returns_native_reflection_component_map_when_available():
 
     source = single_wall_reflection_scene()
     scene = _replace_receivers(source, _grid_at_x(5.0))
-    result = _solve(scene, Config(samples=2048, seed=5, components={"reflection"}))
+    result = _solve(scene, Stochastic(samples=2048, seed=5, components={"reflection"}))
 
     assert result.component_maps is not None
     assert result.component_maps["reflection"].is_cuda
@@ -375,7 +376,7 @@ def test_basic_solver_returns_native_diffraction_component_map_when_available():
 
     source = wedge_diffraction_scene()
     scene = _replace_receivers(source, _grid_at_x(3.0))
-    result = _solve(scene, Config(samples=512, seed=7, components={"diffraction"}))
+    result = _solve(scene, Stochastic(samples=512, seed=7, components={"diffraction"}))
 
     assert result.component_maps is not None
     assert result.component_maps["diffraction"].is_cuda
@@ -405,7 +406,7 @@ def test_basic_solver_reports_native_fused_schedule_for_rayd_components():
     scene = _replace_receivers(source, _grid_at_x(3.0))
     result = _solve(
         scene,
-        Config(samples=512, seed=7, components={"reflection", "diffraction"}),
+        Stochastic(samples=512, seed=7, components={"reflection", "diffraction"}),
     )
 
     kernel = result.metadata["kernel"]
@@ -452,7 +453,7 @@ def test_solver_diffraction_wedge_candidates_are_built_once_for_multiple_transmi
         ],
     )
     call_count = 0
-    original = mc_basic._native_surface_group_edge_candidates
+    original = radiomap._stochastic._native_surface_group_edge_candidates
 
     def counted(*args, **kwargs):
         nonlocal call_count
@@ -465,7 +466,7 @@ def test_solver_diffraction_wedge_candidates_are_built_once_for_multiple_transmi
 
     _solve(
         scene,
-        Config(samples=512, seed=7, components={"reflection", "diffraction"}),
+        Stochastic(samples=512, seed=7, components={"reflection", "diffraction"}),
     )
 
     assert call_count == 1
@@ -480,7 +481,7 @@ def test_solver_diffraction_wedge_candidates_are_cached_across_solves(monkeypatc
     source = wedge_diffraction_scene()
     scene = _replace_receivers(source, _grid_at_x(3.0))
     call_count = 0
-    original = mc_basic._native_surface_group_edge_candidates
+    original = radiomap._stochastic._native_surface_group_edge_candidates
 
     def counted(*args, **kwargs):
         nonlocal call_count
@@ -493,11 +494,11 @@ def test_solver_diffraction_wedge_candidates_are_cached_across_solves(monkeypatc
 
     _solve(
         scene,
-        Config(samples=512, seed=7, components={"reflection", "diffraction"}),
+        Stochastic(samples=512, seed=7, components={"reflection", "diffraction"}),
     )
     _solve(
         scene,
-        Config(samples=512, seed=7, components={"reflection", "diffraction"}),
+        Stochastic(samples=512, seed=7, components={"reflection", "diffraction"}),
     )
 
     assert call_count == 1

@@ -8,8 +8,8 @@ from tests.support.scenes import same_side_wall_reflection_scene
 from witwin.core import ReceiverGrid, Scene
 from tests.support.core_world import make_receiver_grid, make_transmitter
 from witwin.channel.deployment import build_info
-from witwin.channel.montecarlo.bdpt import Config, solve
-from witwin.channel.montecarlo import bdpt as bdpt_solver
+from witwin.channel.experimental.bdpt import Config, solve
+from witwin.channel.experimental import bdpt as bdpt_solver
 from witwin.channel.path import Config as PathConfig
 from witwin.channel.path import solve as solve_paths
 

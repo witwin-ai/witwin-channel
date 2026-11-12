@@ -3,23 +3,15 @@
 
 from __future__ import annotations
 
-import importlib
 import math
 
 import numpy as np
 import pytest
 from witwin.core import Scene
 
-SOLVERS = {
-    "deterministic": "witwin.channel.deterministic",
-    "path": "witwin.channel.path",
-    "montecarlo.basic": "witwin.channel.montecarlo.basic",
-    "montecarlo.bdpt": "witwin.channel.montecarlo.bdpt",
-}
+from tests.support.solvers import solver as _module
 
-
-def _module(name: str):
-    return importlib.import_module(SOLVERS[name])
+SOLVERS = ("deterministic", "path", "montecarlo.basic", "montecarlo.bdpt")
 
 
 def _float_fields(config_type: type) -> list[str]:
@@ -35,8 +27,9 @@ def _float_fields(config_type: type) -> list[str]:
 @pytest.mark.parametrize("solver", SOLVERS)
 @pytest.mark.parametrize("value", [1.5, True, "2", None, 2.0])
 def test_integer_field_rejects_non_integers_with_type_error(solver: str, value: object) -> None:
-    with pytest.raises(TypeError, match=r"Config\.max_depth must be an int, got"):
-        _module(solver).Config(max_depth=value)
+    config_type = _module(solver).Config
+    with pytest.raises(TypeError, match=rf"{config_type.__name__}\.max_depth must be an int, got"):
+        config_type(max_depth=value)
 
 
 @pytest.mark.parametrize("solver", SOLVERS)
@@ -54,15 +47,16 @@ def test_every_float_field_rejects_non_finite_values(solver: str, value: float) 
     if not names:
         pytest.skip("this solver has no float fields")
     for name in names:
-        with pytest.raises(ValueError, match=rf"Config\.{name} must be finite, got"):
+        with pytest.raises(ValueError, match=rf"{config_type.__name__}\.{name} must be finite, got"):
             config_type(**{name: value})
 
 
 @pytest.mark.parametrize("solver", SOLVERS)
 def test_bool_field_rejects_integers(solver: str) -> None:
     name = "diagnostics" if solver == "montecarlo.basic" else "coupled_paths"
-    with pytest.raises(TypeError, match=rf"Config\.{name} must be True or False, got 1"):
-        _module(solver).Config(**{name: 1})
+    config_type = _module(solver).Config
+    with pytest.raises(TypeError, match=rf"{config_type.__name__}\.{name} must be True or False, got 1"):
+        config_type(**{name: 1})
 
 
 @pytest.mark.parametrize("solver", SOLVERS)
@@ -84,14 +78,14 @@ def test_chain_depth_cap_names_the_solver_and_range(solver: str) -> None:
 
 
 def test_bdpt_power_heuristic_beta_must_be_finite() -> None:
-    from witwin.channel.montecarlo.bdpt import Config
+    from witwin.channel.experimental.bdpt import Config
 
     with pytest.raises(ValueError, match="power_heuristic_beta must be finite"):
         Config(power_heuristic_beta=math.inf)
 
 
 def test_nan_scattering_density_no_longer_silently_disables_scattering() -> None:
-    from witwin.channel.deterministic import Config
+    from witwin.channel.radiomap import Coherent as Config
 
     with pytest.raises(ValueError, match="scattering_samples_per_m2 must be finite"):
         Config(scattering_samples_per_m2=math.nan)
@@ -100,10 +94,11 @@ def test_nan_scattering_density_no_longer_silently_disables_scattering() -> None
 @pytest.mark.parametrize("solver", SOLVERS)
 @pytest.mark.parametrize("other", SOLVERS)
 def test_solve_refuses_another_solvers_config(solver: str, other: str) -> None:
-    if solver == other:
-        return
+    if solver == other or _module(solver).entry == _module(other).entry:
+        return  # radiomap.solve accepts both of its estimator configs
     wrong = _module(other).Config()
-    with pytest.raises(TypeError, match=rf"{SOLVERS[solver]}\.solve\(\) requires config to be"):
+    entry = _module(solver).entry.replace(".", r"\.")
+    with pytest.raises(TypeError, match=rf"{entry}\.solve\(\) requires config to be"):
         _module(solver).solve(Scene(), wrong, reference_frequency_hz=3.5e9)
 
 

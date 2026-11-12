@@ -15,7 +15,7 @@ from tests.support.bin.benchmark_munich_deterministic_native_vs_original import 
 )
 from witwin.core import Scene
 from tests.support.core_world import make_transmitter
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 from witwin.channel.scene import compile as compile_scene
 
 pytestmark = pytest.mark.skipif(
@@ -31,11 +31,11 @@ def _munich_scene() -> Scene:
     return _load_scene(args)
 
 
-def _config() -> Config:
-    return Config(
+def _config() -> Coherent:
+    return Coherent(
         max_depth=1,
         components={"los", "reflection"},
-        coherent=False,
+        combine="power",
         return_field=False,
         export_paths=False,
         ad_mode="vjp",

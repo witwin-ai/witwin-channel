@@ -10,7 +10,7 @@ from pathlib import Path
 
 import torch
 
-from witwin.channel.montecarlo.bdpt import Config, solve
+from witwin.channel.experimental.bdpt import Config, solve
 from witwin.core import (
     AntennaState,
     Mesh,

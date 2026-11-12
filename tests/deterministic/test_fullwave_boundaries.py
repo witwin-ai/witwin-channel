@@ -11,7 +11,7 @@ import torch
 
 from benchmarks.fullwave_validation import reference_set as rs
 from witwin.channel.deployment import build_info
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 from witwin.core import AntennaState, Mesh, PhysicalMaterial, Scene, Structure
 from witwin.core.identity import new_antenna_id
 
@@ -53,7 +53,7 @@ def test_reflection_support_ends_at_the_edge_of_a_large_face():
     offsets = offsets[np.abs(offsets) > 1.0e-6]
     receivers = [(-1.0, 0.0, -0.5 + float(dz)) for dz in offsets]
     scene = _plate_scene(20.0, PhysicalMaterial.perfect_conductor(name="pec"), (-1.0, 0.0, 0.5), receivers)
-    result = solve(scene, Config(components=frozenset({"reflection"}), max_depth=1, return_field=True),
+    result = solve(scene, Coherent(components=frozenset({"reflection"}), max_depth=1, return_field=True),
                    reference_frequency_hz=5.0e9)
     reflected = result.component_fields["reflection"].reshape(-1).abs().cpu().numpy() > 0
     np.testing.assert_array_equal(reflected, offsets < 0.0)
@@ -68,7 +68,7 @@ def _chain_rows(case_id: str, max_depth: int) -> tuple[object, np.ndarray]:
     plane["y"] = plane["y"][::4]
     plane["field"] = plane["field"][::4, ::4]
     plane["regions"] = plane["regions"][::4, ::4]
-    result = solve(rs.build_channel_scene(case, plane), Config(
+    result = solve(rs.build_channel_scene(case, plane), Coherent(
         components=frozenset({"los", "reflection", "diffraction"}), max_depth=max_depth,
         coupled_paths=True, export_paths=True, return_field=True), reference_frequency_hz=case.frequency_hz)
     paths = result.paths
@@ -123,7 +123,7 @@ def test_receiver_on_a_reflection_boundary_keeps_the_lit_total(material):
     offsets = (-1.0e-4, -1.0e-6, 0.0, 1.0e-6)
     receivers = [(-1.0, 0.0, -0.5 + dz) for dz in offsets]
     scene = _plate_scene(5.0, face, (-1.0, 0.0, 0.5), receivers)
-    result = solve(scene, Config(components=frozenset({"los", "reflection", "diffraction"}), max_depth=1,
+    result = solve(scene, Coherent(components=frozenset({"los", "reflection", "diffraction"}), max_depth=1,
                                  return_field=True), reference_frequency_hz=5.0e9)
     total = result.field.reshape(-1).cpu().numpy()
     reflected = result.component_fields["reflection"].reshape(-1).cpu().numpy()
@@ -179,7 +179,7 @@ def test_a_double_diffraction_leg_along_a_sheet_runs_on_the_junction_side():
 
     field_kernels.field_coupled_dd = capture
     try:
-        solve(rs.build_channel_scene(case, plane), Config(
+        solve(rs.build_channel_scene(case, plane), Coherent(
             components=frozenset({"los", "reflection", "diffraction"}), max_depth=3, coupled_paths=True),
             reference_frequency_hz=case.frequency_hz)
     finally:

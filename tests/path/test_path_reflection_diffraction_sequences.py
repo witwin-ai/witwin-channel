@@ -6,8 +6,8 @@ import torch
 
 from tests.support.scenes import coupled_wall_wedge_scene, wedge_diffraction_scene
 from witwin.channel.deployment import build_info
-from witwin.channel.deterministic import Config as DeterministicConfig
-from witwin.channel.deterministic import solve as solve_deterministic
+from witwin.channel.radiomap import Coherent as DeterministicConfig
+from witwin.channel.radiomap import solve as solve_deterministic
 from witwin.channel.path import Config, solve
 
 

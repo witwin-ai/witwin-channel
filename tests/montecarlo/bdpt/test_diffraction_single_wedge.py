@@ -12,8 +12,8 @@ from tests.support.core_world import (
 )
 from tests.support.scenes import wedge_diffraction_scene
 from witwin.channel.deployment import build_info
-from witwin.channel.montecarlo.bdpt import Config, solve
-from witwin.channel.montecarlo import bdpt as bdpt_solver
+from witwin.channel.experimental.bdpt import Config, solve
+from witwin.channel.experimental import bdpt as bdpt_solver
 
 
 def _grid() -> ReceiverGrid:
@@ -116,8 +116,8 @@ def test_bdpt_single_wedge_point_diffraction_matches_deterministic_reference():
     if not build_info()["uses_rayd_native"]:
         pytest.skip("RayD native diffraction is not built")
 
-    from witwin.channel.deterministic import Config as DeterministicConfig
-    from witwin.channel.deterministic import solve as deterministic_solve
+    from witwin.channel.radiomap import Coherent as DeterministicConfig
+    from witwin.channel.radiomap import solve as deterministic_solve
 
     scene = wedge_diffraction_scene()
     observed = (
@@ -143,7 +143,7 @@ def test_bdpt_single_wedge_point_diffraction_matches_deterministic_reference():
         deterministic_solve(
             scene,
             DeterministicConfig(
-                components={"diffraction"}, max_depth=1, coherent=False
+                components={"diffraction"}, max_depth=1, combine="power"
             ),
             reference_frequency_hz=3.0e9,
         )

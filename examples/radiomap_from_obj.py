@@ -14,7 +14,7 @@ import torch
 
 from witwin.core import AntennaState, ReceiverGrid
 from witwin.core.identity import new_antenna_id
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 from witwin.channel.importers import load_mesh, load_mitsuba
 from witwin.channel.presets import itu_material
 
@@ -86,7 +86,7 @@ def main() -> None:
     )
     tx = AntennaState(new_antenna_id(), "tx", torch.tensor(args.tx), power_w=1.0)
     scene = imported.to_scene(endpoints=[tx, grid])
-    config = Config(max_depth=2, components={"los", "reflection", "diffraction"})
+    config = Coherent(max_depth=2, components={"los", "reflection", "diffraction"})
 
     for label in ("first solve (compiles, warms caches)", "second solve"):
         torch.cuda.synchronize()

@@ -24,7 +24,7 @@ from tests.support.core_world import (  # noqa: E402
     make_receiver_grid,
     make_transmitter,
 )
-from witwin.channel.montecarlo.bdpt import Config, solve  # noqa: E402
+from witwin.channel.experimental.bdpt import Config, solve  # noqa: E402
 
 
 def _default_channel_root() -> pathlib.Path:

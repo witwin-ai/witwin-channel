@@ -26,12 +26,12 @@ from witwin.channel import (
     Transmitter,
     build_info,
 )
-from witwin.channel.deterministic import Config as DeterministicConfig
-from witwin.channel.deterministic import solve as solve_deterministic
-from witwin.channel.montecarlo.basic import Config as BasicConfig
-from witwin.channel.montecarlo.basic import solve as solve_basic
-from witwin.channel.montecarlo.bdpt import Config as BDPTConfig
-from witwin.channel.montecarlo.bdpt import solve as solve_bdpt
+from witwin.channel.radiomap import Coherent as DeterministicConfig
+from witwin.channel.radiomap import solve as solve_deterministic
+from witwin.channel.radiomap import Stochastic as BasicConfig
+from witwin.channel.radiomap import solve as solve_basic
+from witwin.channel.experimental.bdpt import Config as BDPTConfig
+from witwin.channel.experimental.bdpt import solve as solve_bdpt
 from witwin.channel.path import Config as PathConfig
 from witwin.channel.path import solve as solve_path
 
@@ -197,7 +197,7 @@ def _target(group: str, munich_xml: Path, sionna_root: Path) -> Callable[[], obj
     scene = _munich_scene(munich_xml, sionna_root)
     config = DeterministicConfig(
         max_depth=1, components={"diffraction"},
-        coherent=True, return_field=True, export_paths=True,
+        combine="field", return_field=True, export_paths=True,
     )
     return lambda: solve_deterministic(scene, config)
 

@@ -8,7 +8,7 @@ from tests.support.core_world import make_receiver, make_transmitter
 from witwin.core import Scene
 from witwin.channel.deployment import build_info
 from witwin.channel.runtime import validate_metadata
-from witwin.channel.montecarlo.basic import Config, solve
+from witwin.channel.radiomap import Stochastic, solve
 
 
 def _scene() -> Scene:
@@ -27,9 +27,9 @@ def test_basic_solver_metadata_reports_counts_and_capabilities():
 
     rayd_native = build_info()["uses_rayd_native"]
     config = (
-        Config(samples=32, seed=123, diagnostics=True)
+        Stochastic(samples=32, seed=123, diagnostics=True)
         if rayd_native
-        else Config(samples=32, seed=123, diagnostics=True, components={"los"})
+        else Stochastic(samples=32, seed=123, diagnostics=True, components={"los"})
     )
     result = solve(_scene(), config, reference_frequency_hz=3.0e9)
 

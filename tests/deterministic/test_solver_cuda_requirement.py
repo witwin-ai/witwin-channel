@@ -5,7 +5,7 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 
 
 def test_solve_requires_cuda_before_native_solver_work():
@@ -15,4 +15,4 @@ def test_solve_requires_cuda_before_native_solver_work():
     with pytest.raises(
         RuntimeError, match="witwin.channel.deterministic requires CUDA"
     ):
-        solve(empty_space_los_scene(), Config(), reference_frequency_hz=3.0e9)
+        solve(empty_space_los_scene(), Coherent(), reference_frequency_hz=3.0e9)

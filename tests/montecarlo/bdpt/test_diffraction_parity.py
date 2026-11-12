@@ -10,10 +10,10 @@ from tests.support.scenes import wedge_diffraction_scene
 from witwin.core import ReceiverGrid, Scene
 from tests.support.core_world import make_receiver_grid
 from witwin.channel.deployment import build_info
-from witwin.channel.deterministic import Config as DeterministicConfig
-from witwin.channel.deterministic import solve as deterministic_solve
-from witwin.channel.montecarlo.bdpt import Config as BDPTConfig
-from witwin.channel.montecarlo.bdpt import solve as bdpt_solve
+from witwin.channel.radiomap import Coherent as DeterministicConfig
+from witwin.channel.radiomap import solve as deterministic_solve
+from witwin.channel.experimental.bdpt import Config as BDPTConfig
+from witwin.channel.experimental.bdpt import solve as bdpt_solve
 
 
 _GATE_LOW = 0.5
@@ -55,7 +55,7 @@ def test_bdpt_grid_diffraction_within_2x_of_deterministic():
         deterministic_solve(
             scene,
             DeterministicConfig(
-                components={"diffraction"}, max_depth=1, coherent=False
+                components={"diffraction"}, max_depth=1, combine="power"
             ),
             reference_frequency_hz=3.0e9,
         )
@@ -84,7 +84,7 @@ def test_bdpt_point_diffraction_within_2x_of_deterministic():
         deterministic_solve(
             scene,
             DeterministicConfig(
-                components={"diffraction"}, max_depth=1, coherent=False
+                components={"diffraction"}, max_depth=1, combine="power"
             ),
             reference_frequency_hz=3.0e9,
         )

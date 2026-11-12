@@ -14,7 +14,7 @@ import torch
 
 from witwin.core import AntennaState, PhysicalMaterial
 from witwin.core.identity import new_antenna_id
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 from witwin.channel.importers import load_mesh
 
 import street_canyon
@@ -37,8 +37,8 @@ def _scene(obj: Path, eps_r: torch.Tensor):
 
 def _gain_db(scene, ad_mode: str) -> torch.Tensor:
     # Incoherent power sums give a smooth loss in eps_r; coherent fields also differentiate.
-    config = Config(
-        max_depth=2, components={"los", "reflection"}, coherent=False, ad_mode=ad_mode
+    config = Coherent(
+        max_depth=2, components={"los", "reflection"}, combine="power", ad_mode=ad_mode
     )
     result = solve(scene, config, reference_frequency_hz=FREQUENCY_HZ)
     return 10.0 * torch.log10(result.path_gain.reshape(-1))

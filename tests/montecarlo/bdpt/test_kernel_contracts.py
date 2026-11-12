@@ -11,9 +11,9 @@ import sys
 import pytest
 
 from witwin.core import scene as core_scene
-from witwin.channel.montecarlo import bdpt as bdpt_solver
+from witwin.channel.experimental import bdpt as bdpt_solver
 from witwin.channel.kernels import montecarlo
-from witwin.channel.montecarlo.bdpt import _BDPTTopologyOptions
+from witwin.channel.experimental.bdpt import _BDPTTopologyOptions
 from witwin.channel.propagation import geometry
 from witwin.channel.kernels import geometry as geometry_kernels
 from witwin.channel import runtime
@@ -108,11 +108,11 @@ def test_bdpt_public_solve_lazy_import_preserves_identity_and_pickle():
         "import importlib, pickle, sys; "
         "sys.meta_path=[finder for finder in sys.meta_path "
         "if '_witwin_channel_editable' not in type(finder).__module__]; "
-        "package=importlib.import_module('witwin.channel.montecarlo.bdpt'); "
-        "assert 'witwin.channel.montecarlo.bdpt.solver' not in sys.modules; "
-        "from witwin.channel.montecarlo.bdpt import solve; "
+        "package=importlib.import_module('witwin.channel.experimental.bdpt'); "
+        "assert 'witwin.channel.experimental.bdpt.solver' not in sys.modules; "
+        "from witwin.channel.experimental.bdpt import solve; "
         "assert package.solve is solve; "
-        "assert solve.__module__ == 'witwin.channel.montecarlo.bdpt'; "
+        "assert solve.__module__ == 'witwin.channel.experimental.bdpt'; "
         "assert pickle.loads(pickle.dumps(solve)) is solve"
     )
     environment = os.environ.copy()

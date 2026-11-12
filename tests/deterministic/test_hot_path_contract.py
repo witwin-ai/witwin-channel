@@ -7,7 +7,7 @@ import torch
 from tests.support.scenes import empty_space_los_scene
 from tests.support.scenes import wedge_diffraction_scene
 from witwin.channel.deployment import build_info
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 from witwin.channel.kernels import topology as topology_kernels
 import witwin.channel.path as path_package
 
@@ -27,7 +27,7 @@ def test_los_hot_path_uses_channel_kernel_facade(monkeypatch):
 
     solve(
         empty_space_los_scene(),
-        Config(max_depth=0, components={"los"}),
+        Coherent(max_depth=0, components={"los"}),
         reference_frequency_hz=3.0e9,
     )
 
@@ -51,7 +51,7 @@ def test_los_hot_path_uses_native_topology_facade(monkeypatch):
 
     solve(
         empty_space_los_scene(),
-        Config(max_depth=0, components={"los"}),
+        Coherent(max_depth=0, components={"los"}),
         reference_frequency_hz=3.0e9,
     )
 
@@ -77,7 +77,7 @@ def test_diffraction_hot_path_uses_native_topology_compact_facade(monkeypatch):
 
     solve(
         wedge_diffraction_scene(),
-        Config(max_depth=1, components={"diffraction"}),
+        Coherent(max_depth=1, components={"diffraction"}),
         reference_frequency_hz=3.0e9,
     )
 
@@ -97,6 +97,6 @@ def test_deterministic_solver_does_not_call_path_solver_orchestration(monkeypatc
 
     solve(
         empty_space_los_scene(),
-        Config(max_depth=0, components={"los"}),
+        Coherent(max_depth=0, components={"los"}),
         reference_frequency_hz=3.0e9,
     )

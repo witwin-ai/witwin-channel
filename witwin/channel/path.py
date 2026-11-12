@@ -1130,7 +1130,7 @@ def _metadata(
         "phase_convention": dict(UNIT_EXCITATION_PHASE_CONVENTION),
         "coefficient_semantics": "unit_excitation_dimensionless_receiver_projection",
         **estimator_metadata(
-            estimator="enumerated",
+            estimator="coherent",
             quantity=component_quantities(config.components),
             combine="none",
             complete=bool(discovery["complete"]),

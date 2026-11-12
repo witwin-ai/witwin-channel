@@ -43,14 +43,15 @@ def test_every_entry_point_exists():
 
 
 def test_the_entry_points_are_the_public_surface():
-    """The root, the four solver entries, the importer/preset modules and the doctor command."""
+    """The root, path, radiomap, experimental BDPT, importers/presets, doctor and removed paths."""
 
     assert set(orphan.ENTRY_POINTS) == {
         "witwin.channel",
         "witwin.channel.path",
+        "witwin.channel.radiomap",
+        "witwin.channel.experimental.bdpt",
         "witwin.channel.deterministic",
-        "witwin.channel.montecarlo.basic",
-        "witwin.channel.montecarlo.bdpt",
+        "witwin.channel.montecarlo",
         "witwin.channel.importers",
         "witwin.channel.presets",
         "witwin.channel.__main__",
@@ -131,11 +132,12 @@ def test_a_stale_entry_point_is_refused(tmp_path: Path):
     assert orphan.stale_entry_points(package_root) == [
         "witwin.channel.__main__",
         "witwin.channel.deterministic",
+        "witwin.channel.experimental.bdpt",
         "witwin.channel.importers",
-        "witwin.channel.montecarlo.basic",
-        "witwin.channel.montecarlo.bdpt",
+        "witwin.channel.montecarlo",
         "witwin.channel.path",
         "witwin.channel.presets",
+        "witwin.channel.radiomap",
     ]
 
 

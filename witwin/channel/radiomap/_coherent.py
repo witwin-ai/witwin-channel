@@ -1,13 +1,13 @@
 # Copyright Xingyu Chen.
-# Native deterministic RF solver public API.
+# Coherent radiomap estimator: enumerated paths combined per receiver.
 
-"""Native deterministic RF solver public API."""
+"""Coherent radiomap estimator: enumerated paths combined per receiver."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing import ClassVar, cast
+from typing import ClassVar, Literal, cast
 
 from witwin.channel.components import (
     DiscoveryMetadata,
@@ -86,6 +86,7 @@ if TYPE_CHECKING:
 # penetrations); scattering is single-bounce in v1.
 # Default component set is unchanged: the new components are strictly opt-in.
 _VALID_SORT_KEYS = frozenset({"receiver_transmitter_depth_component"})
+_COMBINES = frozenset({"field", "power"})
 
 
 def _validate_scattering_coherent(*, scattering_coherent: bool, components: frozenset[str]) -> None:
@@ -104,10 +105,12 @@ def _validate_scattering_coherent(*, scattering_coherent: bool, components: froz
 
 
 @dataclass(frozen=True, slots=True)
-class Config(EnumeratedOptions):
-    """Deterministic solver options: the shared enumerated options plus the terminal stage's."""
+class Coherent(EnumeratedOptions):
+    """Coherent radiomap options: the shared enumerated options plus the terminal stage's."""
 
-    coherent: bool = True
+    # How rows reach a receiver value: "field" sums the complex path fields per (tx, rx) and
+    # squares the sum; "power" sums the per-row powers.
+    combine: Literal["field", "power"] = "field"
     return_field: bool = True
     export_paths: bool = False
     sort_key: str = "receiver_transmitter_depth_component"
@@ -118,7 +121,7 @@ class Config(EnumeratedOptions):
     # phase-screen rows; an ensemble-only solve is refused. Requires 'scattering'.
     scattering_coherent: bool = False
 
-    _option_owner: ClassVar[str] = "deterministic"
+    _option_owner: ClassVar[str] = "radiomap.Coherent"
 
     def __post_init__(self) -> None:
         EnumeratedOptions.__post_init__(self)
@@ -127,6 +130,7 @@ class Config(EnumeratedOptions):
             components=frozenset(self.components),
         )
         validate_vocabulary("sort_key", self.sort_key, _VALID_SORT_KEYS)
+        validate_vocabulary("combine", self.combine, _COMBINES)
 
 
 # --- Results --------------------------------------------------------------
@@ -144,8 +148,6 @@ class PathTable:
     path_length_m: torch.Tensor
     delay_s: torch.Tensor
     path_gain: torch.Tensor
-    interaction_position: torch.Tensor
-    interaction_normal: torch.Tensor
     material_id: torch.Tensor
     primitive_sequence: torch.Tensor
     material_sequence: torch.Tensor
@@ -162,7 +164,6 @@ class PathTable:
 
 class _MetadataKeys(ResultSemantics, ConfigMetadata):
     max_depth: int
-    coherent: bool
     return_field: bool
     export_paths: bool
     max_paths: int | None
@@ -181,8 +182,8 @@ class _MetadataKeys(ResultSemantics, ConfigMetadata):
     semantic_capabilities: dict[str, Any]
 
 
-class Metadata(_MetadataKeys, total=False):
-    """The stable keys of ``Result.metadata``; a plain ``dict`` at run time."""
+class CoherentRadioMapMetadata(_MetadataKeys, total=False):
+    """The stable keys of ``CoherentRadioMap.metadata``; a plain ``dict`` at run time."""
 
     # Present when the transmission component was requested.
     transmission: dict[str, Any]
@@ -193,13 +194,13 @@ class Metadata(_MetadataKeys, total=False):
 
 
 @dataclass(frozen=True, slots=True)
-class Result:
+class CoherentRadioMap:
     path_gain: torch.Tensor
     field: torch.Tensor
     component_power: dict[str, torch.Tensor]
     component_fields: dict[str, torch.Tensor]
     paths: PathTable | None
-    metadata: Metadata
+    metadata: CoherentRadioMapMetadata
     diagnostics: dict[str, Any] | None = None
 
 
@@ -264,7 +265,7 @@ def accumulate_flat_components(
     if differentiable:
         # AD modes (the AD contract): the same native accumulator kernels run inside
         # a dispatch-only autograd.Function with native backward/jvp
-        # companions, so Result.path_gain / field / component_power carry
+        # companions, so CoherentRadioMap.path_gain / field / component_power carry
         # the complete graph of the per-path fields and powers.
         exported = accumulation_kernels.deterministic_accumulate_flat_ad(
             valid.contiguous(),
@@ -431,12 +432,6 @@ def build_path_table(
         path_length_m=geometry.path_length_m.to(dtype=torch.float32).contiguous(),
         delay_s=geometry.delay_s.to(dtype=torch.float32).contiguous(),
         path_gain=fields.path_gain.to(dtype=torch.float32).contiguous(),
-        interaction_position=geometry.interaction_position.to(
-            dtype=torch.float32
-        ).contiguous(),
-        interaction_normal=geometry.interaction_normal.to(
-            dtype=torch.float32
-        ).contiguous(),
         material_id=topology.material_id.to(dtype=torch.int32).contiguous(),
         primitive_sequence=topology.primitive_sequence.to(
             dtype=torch.int32
@@ -462,7 +457,7 @@ def build_path_table(
 
 
 def _link_zero_gradients(
-    config: Config, scene: SolverScene, path_gain: torch.Tensor, field: torch.Tensor,
+    config: Coherent, scene: SolverScene, path_gain: torch.Tensor, field: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Keep reverse-mode outputs on the graph when no surviving path depends on a live leaf."""
 
@@ -471,7 +466,7 @@ def _link_zero_gradients(
     return link_zero_gradient(path_gain, scene), link_zero_gradient(field, scene)
 
 
-def _validate_requested_components(config: Config) -> None:
+def _validate_requested_components(config: Coherent) -> None:
     if config.isb_boundary_taper and config.ad_mode != "none":
         # ISB boundary taper gate 3: the C1 clearance-factor AD
         # companion (d(tau)/d(endpoint)) is a documented follow-up. Until it
@@ -519,7 +514,7 @@ def _validate_scattering_coherent_mode(scattering_info: dict[str, Any] | None) -
 
 
 def _scattering_metadata(
-    scattering_info: dict[str, Any] | None, config: Config,
+    scattering_info: dict[str, Any] | None, config: Coherent,
 ) -> dict[str, Any] | None:
     """Scattering metadata sub-dict for the deterministic result.
 
@@ -539,7 +534,7 @@ def _scattering_metadata(
 
 
 def _coupled_paths_metadata(
-    config: Config, component_counts: dict[str, int] | None = None,
+    config: Coherent, component_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     """Coupled-paths metadata block: interaction chains plus double diffraction.
 
@@ -569,7 +564,7 @@ def _coupled_paths_metadata(
 
 
 def _register_coupled_component(
-    config: Config, topology: Any, component_counts: dict[str, int],
+    config: Coherent, topology: Any, component_counts: dict[str, int],
     extra_components: tuple[str, ...],
 ) -> tuple[str, ...]:
     """Record the coupled component count and export name.
@@ -597,7 +592,7 @@ def _register_coupled_component(
 
 
 def _append_scattering(
-    scene: SolverScene, config: Config, evaluated: Any, sidecars: Any,
+    scene: SolverScene, config: Coherent, evaluated: Any, sidecars: Any,
 ) -> tuple[Any, Any, dict[str, Any] | None]:
     """Append Kirchhoff scattering rows and gate the coherent combine.
 
@@ -621,12 +616,12 @@ def _append_scattering(
 
 
 def _metadata(
-    *, config: Config, native_info: dict[str, Any], path_count: int,
+    *, config: Coherent, native_info: dict[str, Any], path_count: int,
     component_counts: dict[str, int], launch_count: int, ad_companion_launches: int = 0,
     ad_tape_bytes: int = 0, forward_time_ms: float = 0.0, peak_memory_bytes: int = 0,
     scattering_info: dict[str, Any] | None = None, transmission_dropped_rows: int = 0,
     reflection_discovery: dict[str, Any] | None = None,
-) -> Metadata:
+) -> CoherentRadioMapMetadata:
     capability = {
         "rayd_native": bool(native_info["uses_rayd_native"]),
         "path_native": bool(native_info.get("uses_path_native", False)),
@@ -672,17 +667,16 @@ def _metadata(
     discovery = discovery_metadata(config.discovery, reflection_discovery)
     metadata: dict[str, Any] = {
         "max_depth": config.max_depth,
-        "coherent": config.coherent,
         "return_field": config.return_field,
         "export_paths": config.export_paths,
         "max_paths": config.max_paths,
         "max_paths_scope": config.max_paths_scope,
         "sort_key": config.sort_key,
-        "accumulation_strategy": "coherent" if config.coherent else "incoherent",
+        "accumulation_strategy": "coherent" if config.combine == "field" else "incoherent",
         **estimator_metadata(
-            estimator="enumerated",
+            estimator="coherent",
             quantity=component_quantities(config.components),
-            combine="coherent" if config.coherent else "incoherent",
+            combine=config.combine,
             complete=bool(discovery["complete"]),
         ),
         "components": components,
@@ -737,7 +731,7 @@ def _metadata(
         )
     )
     metadata["semantic_capabilities"] = solver_capabilities("deterministic")
-    return cast(Metadata, metadata)
+    return cast(CoherentRadioMapMetadata, metadata)
 
 
 def _terminal_check_capacity(sidecars: EvaluatedPathSidecars) -> None:
@@ -757,7 +751,7 @@ _FIRST_WINDOW = 1 << 14
 _WINDOW_ROWS = 1 << 21
 
 
-def _windowed(config: Config, receiver_count: int) -> bool:
+def _windowed(config: Coherent, receiver_count: int) -> bool:
     """Whether the solve accumulates in receiver windows: only when no output needs every row."""
 
     return (
@@ -779,9 +773,9 @@ def _coupled_counts(component_id: torch.Tensor) -> tuple[int, int]:
 
 
 def _solve_receiver_windows(
-    scene: SolverScene, config: Config, layout: ReceiverLayout, frequency_hz: float,
+    scene: SolverScene, config: Coherent, layout: ReceiverLayout, frequency_hz: float,
     native_info: dict[str, Any],
-) -> Result:
+) -> CoherentRadioMap:
     """The deterministic solve over receiver windows; the result is the whole solve's."""
 
     receiver_count = layout.receiver_count
@@ -824,7 +818,7 @@ def _solve_receiver_windows(
             path_field=evaluated.fields.path_field,
             num_tx=num_tx,
             num_rx=receiver_count,
-            coherent=config.coherent,
+            coherent=config.combine == "field",
             extra_components=extra_components,
         )
         del evaluated, topology
@@ -872,8 +866,8 @@ def _solve_receiver_windows(
             "field_shape": tuple(field.shape),
             "path_count": path_count,
             "component_counts": component_counts,
-            "coherent": config.coherent,
-            "accumulation_mode": "coherent" if config.coherent else "incoherent",
+            "combine": config.combine,
+            "accumulation_mode": "coherent" if config.combine == "field" else "incoherent",
             "native_launch_count": launch_count,
             "diffraction_accumulation": "scalar_path_accumulation",
             "visibility_rejection_count": visibility_rejection_count,
@@ -886,18 +880,18 @@ def _solve_receiver_windows(
                 "truncated": False,
             },
         }
-    return Result(
+    return CoherentRadioMap(
         path_gain=path_gain, field=field, component_power=component_power,
         component_fields=component_fields, paths=None, metadata=metadata, diagnostics=diagnostics,
     )
 
 
-def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
+def _solve_pipeline(scene: SolverScene, config: Coherent) -> CoherentRadioMap:
     validate_scalar_endpoint_features(
         scene.transmitters, scene.receivers, solver="deterministic"
     )
     if not torch.cuda.is_available():
-        raise RuntimeError("witwin.channel.deterministic requires CUDA")
+        raise RuntimeError("witwin.channel.radiomap requires CUDA")
     # Solve-level wall time and CUDA high-water-mark delta for the kernel
     # metadata (diffraction AD). This is AD instrumentation only: the leading
     # synchronize would stall the host on the caller's queued work and the
@@ -963,11 +957,11 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
         num_tx=len(scene.transmitters),
         num_rx=layout.receiver_count,
         layout=layout,
-        coherent=config.coherent,
+        coherent=config.combine == "field",
         return_field=config.return_field,
         extra_components=extra_components,
         # AD modes run the same native accumulator inside its dispatch-only
-        # autograd.Function so Result.path_gain/field/component_power carry
+        # autograd.Function so CoherentRadioMap.path_gain/field/component_power carry
         # the complete graph; none-mode keeps the bare zero-overhead kernel.
         differentiable=config.ad_mode != "none",
         # coherent scattering: opt-in coherent scattering combine (default OFF is
@@ -1005,8 +999,8 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
             "field_shape": tuple(field.shape),
             "path_count": path_count,
             "component_counts": component_counts,
-            "coherent": config.coherent,
-            "accumulation_mode": "coherent" if config.coherent else "incoherent",
+            "combine": config.combine,
+            "accumulation_mode": "coherent" if config.combine == "field" else "incoherent",
             "native_launch_count": sidecars.execution.launch_count,
             "diffraction_accumulation": "scalar_path_accumulation",
             "visibility_rejection_count": (
@@ -1022,7 +1016,7 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
                 and path_count < candidate_count,
             },
         }
-    result = Result(
+    result = CoherentRadioMap(
         path_gain=path_gain,
         field=field,
         component_power=component_power,
@@ -1052,11 +1046,11 @@ def _solve_pipeline(scene: SolverScene, config: Config) -> Result:
 # recorded contract hash. mypy only sees this function now that the solver is
 # one module, so the pre-existing shape is silenced here rather than changed.
 def solve(
-    scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz: float | torch.Tensor,
-) -> Result:
-    """Run the deterministic propagation pipeline."""
+    scene: Scene | SceneSnapshot, config: Coherent, *, reference_frequency_hz: float | torch.Tensor,
+) -> CoherentRadioMap:
+    """Run the Coherent radiomap estimator."""
 
-    require_config_type(config, Config, "witwin.channel.deterministic")
+    require_config_type(config, Coherent, "witwin.channel.radiomap")
     compiled = compile_scene(
         scene, reference_frequency_hz=reference_frequency_hz
     )
@@ -1064,4 +1058,10 @@ def solve(
     record_dropped_faces(result, compiled)
     return result
 
-__all__ = ["Config", "Metadata", "PathTable", "Result", "solve"]
+# The public home of these types is ``witwin.channel.radiomap``.
+Coherent.__module__ = "witwin.channel.radiomap"
+CoherentRadioMap.__module__ = "witwin.channel.radiomap"
+CoherentRadioMapMetadata.__module__ = "witwin.channel.radiomap"
+PathTable.__module__ = "witwin.channel.radiomap"
+
+__all__ = ["Coherent", "CoherentRadioMap", "CoherentRadioMapMetadata", "PathTable", "solve"]

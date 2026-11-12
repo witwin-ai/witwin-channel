@@ -92,7 +92,7 @@ _CAPABILITIES: dict[str, Any] = {
             # refused before any launch.
             "montecarlo_bdpt": list(_BDPT_AD_EXCLUDED),
         },
-        # Wired into the montecarlo.basic LoS Function since AD; the
+        # Wired into the radiomap.Stochastic LoS Function since AD; the
         # standalone facades remain available.
         "low_level_primitives": [
             "mc_los_path_gain_backward",
@@ -307,13 +307,13 @@ def config_metadata(
     }
 
 
-ESTIMATORS = frozenset({"enumerated", "sampled"})
+ESTIMATORS = frozenset({"coherent", "stochastic"})
 QUANTITIES = frozenset({"point_sample", "cell_average"})
-COMBINES = frozenset({"coherent", "incoherent", "none"})
+COMBINES = frozenset({"field", "power", "none"})
 
-Estimator = Literal["enumerated", "sampled"]
+Estimator = Literal["coherent", "stochastic"]
 Quantity = Literal["point_sample", "cell_average"]
-Combine = Literal["coherent", "incoherent", "none"]
+Combine = Literal["field", "power", "none"]
 
 
 class ResultSemantics(TypedDict):
@@ -330,10 +330,11 @@ def estimator_metadata(
 ) -> ResultSemantics:
     """The result-semantics keys every solver publishes in its metadata.
 
-    ``estimator`` is ``enumerated`` or ``sampled``; ``quantity`` maps each requested
-    component to ``point_sample`` (the value at the receiver position) or ``cell_average``
-    (averaged over the receiver's cell or capture region); ``combine`` is how rows reach a
-    receiver value (``none`` when rows are returned uncombined); ``complete`` is whether
+    ``estimator`` is ``coherent`` (enumerated paths) or ``stochastic`` (sampled paths);
+    ``quantity`` maps each requested component to ``point_sample`` (the value at the receiver
+    position) or ``cell_average`` (averaged over the receiver's cell or capture region);
+    ``combine`` is how rows reach a receiver value (``field``: complex sum, then squared;
+    ``power``: sum of row powers; ``none``: rows returned uncombined); ``complete`` is whether
     every path within the requested bounds was found, or ``None`` when the solve does not
     report it.
     """

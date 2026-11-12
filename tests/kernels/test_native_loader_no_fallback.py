@@ -203,8 +203,8 @@ def test_mc_bdpt_hot_paths_do_not_make_python_layout_copies():
     # Each solver is either a collapsed single module or a package directory;
     # a missing directory would make this gate pass vacuously.
     roots = (
-        repo / "witwin" / "channel" / "montecarlo" / "basic.py",
-        repo / "witwin" / "channel" / "montecarlo" / "bdpt.py",
+        repo / "witwin" / "channel" / "radiomap" / "_stochastic.py",
+        repo / "witwin" / "channel" / "experimental" / "bdpt.py",
     )
     forbidden = (".contiguous(", ".reshape(")
 
@@ -234,9 +234,8 @@ def test_path_solver_uses_the_typed_enumerated_engine():
 
 def test_mc_bdpt_hot_paths_do_not_make_python_empty_wedge_sentinels():
     repo = Path(__file__).resolve().parents[2]
-    montecarlo = repo / "witwin" / "channel" / "montecarlo"
-    basic = montecarlo / "basic.py"
-    bdpt = montecarlo / "bdpt.py"
+    basic = repo / "witwin" / "channel" / "radiomap" / "_stochastic.py"
+    bdpt = repo / "witwin" / "channel" / "experimental" / "bdpt.py"
     # Inspect only the endpoint-subpath and workspace definitions in the BDPT
     # module; other definitions legitimately build empty exported path samples.
     workspace_members = frozenset(
@@ -271,7 +270,7 @@ def test_mc_bdpt_hot_paths_do_not_make_python_empty_wedge_sentinels():
 
 
 def test_bdpt_pipeline_does_not_use_derived_variance_or_component_map_path_export():
-    from witwin.channel.montecarlo import bdpt as bdpt_pipeline
+    from witwin.channel.experimental import bdpt as bdpt_pipeline
 
     source = inspect.getsource(bdpt_pipeline)
 

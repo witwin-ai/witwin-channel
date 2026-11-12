@@ -25,7 +25,7 @@ FROZEN_DEBT_UNIVERSE = frozenset(
     {
         (
             "mc_enumerated_dependency",
-            "witwin.channel.montecarlo.bdpt",
+            "witwin.channel.experimental.bdpt",
             "witwin.channel.propagation.enumerated",
         ),
     }
@@ -38,22 +38,26 @@ _DEBT_GROUP_BY_RULE = {
     "solver_raw_extension": "existing_boundary",
     "mc_enumerated_dependency": "mc_enumerated_dependency",
 }
+# Each solver body. The two radiomap estimators are separate solvers, so the
+# solver-to-solver rule keeps ``radiomap._coherent`` and ``radiomap._stochastic`` from
+# importing each other; only their ``radiomap`` facade, which is not a solver, names both.
 _SOLVER_PREFIXES = (
     f"{PACKAGE}.path",
-    f"{PACKAGE}.deterministic",
-    f"{PACKAGE}.montecarlo.basic",
-    f"{PACKAGE}.montecarlo.bdpt",
+    f"{PACKAGE}.radiomap._coherent",
+    f"{PACKAGE}.radiomap._stochastic",
+    f"{PACKAGE}.experimental.bdpt",
 )
+_RADIOMAP_ESTIMATORS = (f"{PACKAGE}.radiomap._coherent", f"{PACKAGE}.radiomap._stochastic")
 # The rule these name is about a public *init*: a package ``__init__.py`` that
 # publishes a domain's surface must stay a re-export facade and may not reach
 # into kernels, runtime or propagation itself. It is therefore conditioned on
 # the source actually being a package init (``ImportEdge.source_is_package``).
-# A solver that has collapsed into a single module - ``deterministic.py`` rather
-# than ``deterministic/__init__.py`` - is the solver body, not a facade over it,
+# A solver that has collapsed into a single module - ``radiomap/_coherent.py`` rather
+# than ``radiomap/_coherent/__init__.py`` - is the solver body, not a facade over it,
 # so the facade rule cannot apply to it and does not. What that solver may
 # import is still bounded by the solver-to-solver, raw-extension and
 # propagation-ordering rules below, none of which is relaxed here.
-_PUBLIC_INIT_MODULES = frozenset({PACKAGE, *_SOLVER_PREFIXES})
+_PUBLIC_INIT_MODULES = frozenset({PACKAGE, f"{PACKAGE}.radiomap", *_SOLVER_PREFIXES})
 _RAW_EXTENSION_MODULES = frozenset({f"{PACKAGE}._channel"})
 # ``witwin.channel.runtime`` is a single module, so the raw accessor it exports
 # has no submodule of its own to name. The rule therefore names the symbol.
@@ -449,12 +453,25 @@ def _solver_boundary_violations(edge: ImportEdge) -> list[Violation]:
 
     if source_solver in {
         f"{PACKAGE}.path",
-        f"{PACKAGE}.deterministic",
-    } and _matches(edge.target, f"{PACKAGE}.montecarlo"):
+        f"{PACKAGE}.radiomap._coherent",
+    } and (
+        _matches(edge.target, f"{PACKAGE}.radiomap._stochastic")
+        or _matches(edge.target, f"{PACKAGE}.experimental")
+    ):
         violations.append(_violation(edge, "enumerated_pipeline_mc_internal"))
+    # A radiomap estimator never reaches the other one, directly or through the facade.
+    if source_solver in _RADIOMAP_ESTIMATORS and (
+        edge.target == f"{PACKAGE}.radiomap"
+        or any(
+            _matches(edge.target, other)
+            for other in _RADIOMAP_ESTIMATORS
+            if other != source_solver
+        )
+    ):
+        violations.append(_violation(edge, "radiomap_estimator_cross_import"))
     if source_solver in {
-        f"{PACKAGE}.montecarlo.basic",
-        f"{PACKAGE}.montecarlo.bdpt",
+        f"{PACKAGE}.radiomap._stochastic",
+        f"{PACKAGE}.experimental.bdpt",
     } and _matches(edge.target, f"{PACKAGE}.propagation.enumerated"):
         violations.append(_violation(edge, "mc_enumerated_dependency"))
     return violations
@@ -468,8 +485,8 @@ def _propagation_boundary_violations(edge: ImportEdge) -> list[Violation]:
 
     if _matches(source, f"{PACKAGE}.propagation.enumerated") and (
         target_solver is not None
-        or _matches(target, f"{PACKAGE}.montecarlo")
-        or _matches(target, f"{PACKAGE}.deterministic.accumulation")
+        or _matches(target, f"{PACKAGE}.radiomap")
+        or _matches(target, f"{PACKAGE}.experimental")
     ):
         violations.append(_violation(edge, "enumerated_forbidden_dependency"))
 

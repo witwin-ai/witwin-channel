@@ -15,7 +15,7 @@ from tests.support.core_world import (
     make_transmitter,
 )
 from witwin.channel.deployment import build_info
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 from witwin.core import PhysicalMaterial, Scene
 
 
@@ -126,10 +126,10 @@ def _solve_maps(
  """
     result = solve(
         _build_scene(x_values, y_values),
-        Config(
+        Coherent(
             components=components,
             max_depth=max_depth,
-            coherent=True,
+            combine="field",
             return_field=True,
             export_paths=True,
             diagnostics=True,

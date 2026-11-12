@@ -7,7 +7,7 @@ import torch
 from tests.support.reference_channel import los_path_gain_reference
 from witwin.core import Scene
 from tests.support.core_world import make_receiver_grid, make_transmitter
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 
 _REFERENCE_FREQUENCY_HZ = 3.0e9
 
@@ -42,7 +42,7 @@ def test_receiver_grid_uses_mc_basic_public_layout():
     grid = next(endpoint for endpoint in scene.endpoints if endpoint.role == "rx")
     result = solve(
         scene,
-        Config(max_depth=0, components={"los"}),
+        Coherent(max_depth=0, components={"los"}),
         reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
     )
     expected_flat = los_path_gain_reference(
@@ -68,7 +68,7 @@ def test_return_field_false_uses_zero_sized_complex_fields():
     scene = _grid_scene()
     result = solve(
         scene,
-        Config(max_depth=0, components={"los"}, return_field=False),
+        Coherent(max_depth=0, components={"los"}, return_field=False),
         reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
     )
 

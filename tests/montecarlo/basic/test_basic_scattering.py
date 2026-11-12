@@ -23,7 +23,7 @@ from witwin.core import (
     SurfaceRoughness,
 )
 from witwin.channel.deployment import build_info
-from witwin.channel.montecarlo.basic import Config, solve as solve_basic
+from witwin.channel.radiomap import Stochastic, solve as solve_basic
 from tests.reference.kirchhoff_lookup import eval_table as eval_bsdf
 from witwin.channel.scene.resources import build_kirchhoff_table
 
@@ -44,7 +44,7 @@ _TX = torch.tensor([0.0, 0.0, 0.0])
 _RX = torch.tensor([0.5, 1.0, 0.3])
 
 
-def _solve(scene: Scene, config: Config):
+def _solve(scene: Scene, config: Stochastic):
     return solve_basic(scene, config, reference_frequency_hz=_FREQUENCY)
 
 
@@ -158,7 +158,7 @@ def test_basic_scattering_map_matches_area_quadrature_reference():
     reference = _quadrature_reference_unpolarized()
     result = _solve(
         _grid_scene([_wall(_material(_roughness()))]),
-        Config(samples=65_536, seed=5, components={"scattering"}),
+        Stochastic(samples=65_536, seed=5, components={"scattering"}),
     )
     value = float(result.component_maps["scattering"][0, 0, 0])
     assert value > 0.0
@@ -188,7 +188,7 @@ def test_basic_smooth_limit_and_energy_bound():
  """
 
     _require_native()
-    scattering_config = Config(samples=32_768, seed=5, components={"scattering"})
+    scattering_config = Stochastic(samples=32_768, seed=5, components={"scattering"})
     rough_scattering = float(
         _solve(
             _grid_scene([_wall(_material(_roughness()))]), scattering_config
@@ -200,7 +200,7 @@ def test_basic_smooth_limit_and_energy_bound():
             scattering_config,
         ).component_power["scattering"]
     )
-    reflection_config = Config(samples=16_384, seed=5, components={"reflection"})
+    reflection_config = Stochastic(samples=16_384, seed=5, components={"reflection"})
     smooth_reflection = float(
         _solve(
             _grid_scene([_wall(_material(None))]), reflection_config
@@ -224,7 +224,7 @@ def test_basic_smooth_limit_and_energy_bound():
 def test_basic_scattering_is_seed_reproducible():
     _require_native()
     scene = _grid_scene([_wall(_material(_roughness()))])
-    config = Config(samples=8192, seed=11, components={"scattering"})
+    config = Stochastic(samples=8192, seed=11, components={"scattering"})
     first = _solve(scene, config)
     second = _solve(scene, config)
     torch.testing.assert_close(
@@ -233,7 +233,7 @@ def test_basic_scattering_is_seed_reproducible():
         rtol=0.0,
         atol=0.0,
     )
-    other = _solve(scene, Config(samples=8192, seed=12, components={"scattering"}))
+    other = _solve(scene, Stochastic(samples=8192, seed=12, components={"scattering"}))
     assert not torch.equal(
         first.component_maps["scattering"], other.component_maps["scattering"]
     )
@@ -254,7 +254,7 @@ def test_basic_results_unchanged_when_scattering_not_requested():
         shape=(4, 4),
         spacing=(2.0 / 3.0, 1.0 / 3.0),
     )
-    config = Config(samples=4096, seed=7, max_depth=2, components={"los", "reflection"})
+    config = Stochastic(samples=4096, seed=7, max_depth=2, components={"los", "reflection"})
     rough_scene = _grid_scene([_wall(_material(_roughness()))], grid)
     rough_run = _solve(rough_scene, config)
     rough_rerun = _solve(rough_scene, config)
@@ -291,7 +291,7 @@ def test_basic_scattering_requires_unobstructed_incident_segment():
     )
     result = _solve(
         _grid_scene([_wall(_material(_roughness())), blocker]),
-        Config(samples=8192, seed=5, components={"scattering"}),
+        Stochastic(samples=8192, seed=5, components={"scattering"}),
     )
     assert float(result.component_maps["scattering"].abs().max()) == 0.0
     assert result.metadata["scattering"]["tx_visible_samples"] == 0
@@ -303,9 +303,9 @@ def test_basic_point_receiver_scattering_equals_the_cell_center_value():
     structures = [_wall(_material(_roughness()))]
     point = _solve(
         Scene(structures=structures, endpoints=[make_transmitter(_TX), make_receiver(_RX)]),
-        Config(samples=1024, seed=5, components={"scattering"}),
+        Stochastic(samples=1024, seed=5, components={"scattering"}),
     )
-    cell = _solve(_grid_scene(structures), Config(samples=1024, seed=5, components={"scattering"}))
+    cell = _solve(_grid_scene(structures), Stochastic(samples=1024, seed=5, components={"scattering"}))
     assert point.component_maps["scattering"].shape == (1, 1)
     value = float(point.component_maps["scattering"][0, 0])
     assert value > 0.0

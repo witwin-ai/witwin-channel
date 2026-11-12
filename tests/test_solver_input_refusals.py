@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import importlib
 import math
 
 import pytest
@@ -12,15 +11,12 @@ from witwin.core import AntennaState, Mesh, PhysicalMaterial, ReceiverGrid, Scen
 from witwin.core.identity import new_antenna_id
 
 from tests.support.isolated import run_isolated
+from tests.support.solvers import solver as _entry
+
+SOLVERS = ("det", "path", "basic", "bdpt")
 
 pytestmark = pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
 
-MODULES = {
-    "det": "witwin.channel.deterministic",
-    "path": "witwin.channel.path",
-    "basic": "witwin.channel.montecarlo.basic",
-    "bdpt": "witwin.channel.montecarlo.bdpt",
-}
 WALL = [[2.5, -3.0, -1.0], [2.5, 3.0, -1.0], [2.5, -3.0, 2.4], [2.5, 3.0, 2.4]]
 
 
@@ -51,14 +47,14 @@ def _grid(origin=(0.5, -1.0, 0.5), shape=(4, 4), spacing=(0.5, 0.5)) -> Receiver
 
 
 def _solve(solver: str, scene: Scene, **config):
-    module = importlib.import_module(MODULES[solver])
+    entry = _entry(solver)
     if solver in ("basic", "bdpt"):
         config.setdefault("samples", 256)
-    return module.solve(scene, module.Config(**config), reference_frequency_hz=3.5e9)
+    return entry.solve(scene, entry.Config(**config), reference_frequency_hz=3.5e9)
 
 
 def _forbid_compile(monkeypatch, solver: str) -> None:
-    module = importlib.import_module(MODULES[solver])
+    module = _entry(solver).owner
 
     def fail(*_args, **_kwargs):
         raise AssertionError("the refusal must come before scene compilation")
@@ -161,7 +157,7 @@ def test_bdpt_without_structures_returns_los_like_the_other_solvers() -> None:
         solver: float(_solve(solver, scene, components={"los", "reflection"}).path_gain.sum())
         if solver != "path"
         else float(_solve(solver, scene, components={"los", "reflection"}).a.abs().sum())
-        for solver in MODULES
+        for solver in SOLVERS
         if solver != "basic"
     }
     assert all(value > 0.0 and math.isfinite(value) for value in values.values()), values
@@ -192,7 +188,7 @@ def test_non_finite_endpoints_are_refused_before_native_work_in_every_solver() -
         assert "must be finite" in message, (name, message)
 
 
-@pytest.mark.parametrize("solver", list(MODULES))
+@pytest.mark.parametrize("solver", SOLVERS)
 def test_receiver_at_the_transmitter_position_is_refused_in_every_solver(solver: str) -> None:
     scene = Scene(structures=[_wall()], endpoints=[_tx((0.0, -1.0, 0.5)), _rx((0.0, -1.0, 0.5))])
     with pytest.raises(ValueError, match=r"receiver \d+ at .* coincides with transmitter"):
@@ -203,7 +199,7 @@ def _radiomap_grid() -> ReceiverGrid:
     return _grid(origin=(-2.0, -2.0, 1.5), shape=(8, 8), spacing=(0.5, 0.5))
 
 
-@pytest.mark.parametrize("solver", list(MODULES))
+@pytest.mark.parametrize("solver", SOLVERS)
 @pytest.mark.parametrize("offset", [0.0, 1.0e-4], ids=["on_cell", "near_cell"])
 def test_grid_cell_at_a_transmitter_is_refused_by_cell_in_every_solver(
     solver: str, offset: float, monkeypatch,
@@ -223,7 +219,7 @@ def test_grid_cell_at_a_transmitter_is_refused_by_cell_in_every_solver(
         _solve(solver, scene, components={"los", "reflection"})
 
 
-@pytest.mark.parametrize("solver", list(MODULES))
+@pytest.mark.parametrize("solver", SOLVERS)
 def test_transmitter_between_grid_centres_is_solved_in_every_solver(solver: str) -> None:
     scene = Scene(structures=[_wall()], endpoints=[_tx((0.0, 0.25, 1.5)), _radiomap_grid()])
     result = _solve(solver, scene, components={"los", "reflection"})
@@ -237,7 +233,7 @@ def test_transmitter_between_grid_centres_is_solved_in_every_solver(solver: str)
         assert 0.0 < float(gain.max()) < 1.0
 
 
-@pytest.mark.parametrize("solver", list(MODULES))
+@pytest.mark.parametrize("solver", SOLVERS)
 def test_scene_built_under_inference_mode_gets_a_channel_message(solver: str) -> None:
     with torch.inference_mode():
         scene = Scene(structures=[_wall()], endpoints=[_tx(), _rx()])

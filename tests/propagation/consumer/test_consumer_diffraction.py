@@ -17,7 +17,7 @@ def test_consumer_diffraction_matches_the_deterministic_path_table(components) -
     from witwin.core import AntennaState, Scene
     from witwin.core.identity import new_antenna_id
 
-    from witwin.channel.deterministic import Config, solve
+    from witwin.channel.radiomap import Coherent, solve
     from witwin.channel.propagation import consumer
     from witwin.channel.scene import compile
     from tests.propagation.consumer.test_consumer_input_guards import _batch, _scene
@@ -44,7 +44,7 @@ def test_consumer_diffraction_matches_the_deterministic_path_table(components) -
     ]
     table = solve(
         Scene(structures=scene.structures, endpoints=endpoints),
-        Config(components=set(components), max_depth=1, export_paths=True),
+        Coherent(components=set(components), max_depth=1, export_paths=True),
         reference_frequency_hz=3.5e9,
     ).paths
     assert table is not None

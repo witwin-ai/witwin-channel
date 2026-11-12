@@ -1,23 +1,24 @@
-# `witwin.channel.deterministic`
+# `witwin.channel.radiomap.Coherent`
 
-The deterministic solver discovers propagation paths and coherently
-accumulates their complex fields. It is intended for repeatable links,
-radiomaps, and optional compact path-table export.
+The Coherent radiomap estimator enumerates propagation paths and combines their
+complex fields per receiver. It is intended for repeatable links, radiomaps,
+and optional compact path-table export. It is selected by passing a `Coherent`
+configuration to [`radiomap.solve`](radiomap.md); the Monte Carlo counterpart is
+[`Stochastic`](radiomap-stochastic.md).
 
 ```python
-from witwin.channel.deterministic import Config, PathTable, Result, solve
+from witwin.channel.radiomap import Coherent, CoherentRadioMap, PathTable, solve
 ```
 
-## `Config`
+## `Coherent`
 
 Frozen dataclass; values cannot be changed after construction. The first 16
 fields are the shared enumerated options, defined once and inherited by both
-`deterministic.Config` and `path.Config` (see "Shared enumerated options" in
-[`path`](path.md)); the last six are read only by the deterministic terminal
-stage.
+`radiomap.Coherent` and `path.Config` (see "Shared enumerated options" in
+[`path`](path.md)); the last six are read only by the Coherent terminal stage.
 
 ```text
-Config(
+Coherent(
     max_depth: int = 1,
     components = frozenset({"los", "reflection", "diffraction"}),
     max_paths: int | None = None,
@@ -34,7 +35,7 @@ Config(
     isb_boundary_taper: bool = False,
     isb_boundary_taper_width: float = 0.5,
     discovery: str = "auto",
-    coherent: bool = True,
+    combine: Literal["field", "power"] = "field",
     return_field: bool = True,
     export_paths: bool = False,
     sort_key: str = "receiver_transmitter_depth_component",
@@ -61,7 +62,7 @@ Config(
 | `isb_boundary_taper` | Enable the default-off ISB continuity taper. |
 | `isb_boundary_taper_width` | Fresnel-penumbra width multiplier; defaults to 0.5. |
 | `discovery` | Reflection candidate source: `"auto"` (complete image tree; a depth whose tree exceeds the cost budget, and every deeper one, uses ray discovery), `"exhaustive"` (every plane-group sequence; fails before work if it cannot fit in memory) or `"rays"` (ray discovery, never complete). `metadata["complete"]` is true only when every reflection depth came from a complete source; `metadata["discovery"]["sources"]` names the source per depth. |
-| `coherent` | Coherently combine deterministic complex-field contributions. |
+| `combine` | How rows reach a receiver value: `"field"` sums the complex path fields per (transmitter, receiver) and squares the sum; `"power"` sums the per-path powers. |
 | `return_field` | Preserve complex field output. |
 | `export_paths` | Produce a compact `PathTable`. |
 | `sort_key` | Stable path ordering policy. |
@@ -73,7 +74,7 @@ Invalid values or unsupported combinations raise `TypeError`, `ValueError`,
 preflight. Requested capabilities are never silently removed.
 
 ```python
-config = Config(
+config = Coherent(
     max_depth=2,
     components={"los", "reflection"},
     export_paths=True,
@@ -86,10 +87,10 @@ config = Config(
 ```text
 solve(
     scene: witwin.core.Scene | witwin.core.SceneSnapshot,
-    config: Config,
+    config: Coherent,
     *,
     reference_frequency_hz: float | torch.Tensor,
-) -> Result
+) -> CoherentRadioMap
 ```
 
 ### Parameters
@@ -97,18 +98,18 @@ solve(
 | Parameter | Description |
 | --- | --- |
 | `scene` | Core logical world or snapshot. |
-| `config` | A `witwin.channel.deterministic.Config`; another solver's config is rejected. |
+| `config` | A `witwin.channel.radiomap.Coherent`; `radiomap.solve` dispatches on it, and another solver's config is rejected. |
 | `reference_frequency_hz` | Positive reference frequency in hertz; may be a scalar CUDA tensor on supported AD routes. |
 
 ### Returns
 
-A `Result` containing total gain, coherent field, component breakdowns,
+A `CoherentRadioMap` containing total gain, field, component breakdowns,
 optional compact paths, metadata, and optional diagnostics.
 
 ```python
 result = solve(
     scene,
-    Config(max_depth=0, components={"los"}),
+    Coherent(max_depth=0, components={"los"}),
     reference_frequency_hz=3.5e9,
 )
 print(result.path_gain.shape)  # (T, R); one ReceiverGrid gives (T, rows, cols)
@@ -118,16 +119,16 @@ print(result.field.dtype)      # torch.complex64
 Missing CUDA, an incompatible extension, an unsupported component/AD
 combination, or a frequency/scene mismatch raises before a partial result.
 
-## `Result`
+## `CoherentRadioMap`
 
 ```text
-Result(
+CoherentRadioMap(
     path_gain: torch.Tensor,
     field: torch.Tensor,
     component_power: dict[str, torch.Tensor],
     component_fields: dict[str, torch.Tensor],
     paths: PathTable | None,
-    metadata: Metadata,
+    metadata: CoherentRadioMapMetadata,
     diagnostics: dict[str, Any] | None = None,
 )
 ```
@@ -135,21 +136,21 @@ Result(
 | Field | Description |
 | --- | --- |
 | `path_gain` | `float32` total power gain per link or radiomap cell. |
-| `field` | `complex64` coherent total field with the same logical layout. |
+| `field` | `complex64` total field with the same logical layout. |
 | `component_power` | Component-name to power tensor. |
 | `component_fields` | Component-name to complex-field tensor. |
 | `paths` | Compact `PathTable` when `export_paths=True`; otherwise `None`. |
-| `metadata` | `Metadata`: solver, component, phase, build, and execution records (see [`Metadata`](#metadata)). |
+| `metadata` | `CoherentRadioMapMetadata`: solver, component, phase, build, and execution records (see [`CoherentRadioMapMetadata`](#coherentradiomapmetadata)). |
 | `diagnostics` | Additional records when requested; otherwise normally `None`. |
 
-## `Metadata`
+## `CoherentRadioMapMetadata`
 
-A `TypedDict` naming the stable keys; at run time it is a plain `dict`, so key access, `in`, `.get` and JSON serialization are unchanged. Every solver publishes the result-semantics keys `estimator`, `quantity`, `combine` and `complete` (see the [index](index.md)), the `kernel` execution record, and the requested/effective configuration keys `requested_config`, `effective_config`, `requested_max_depth`, `effective_max_depth` and `component_max_depth`.
+A `TypedDict` naming the stable keys; at run time it is a plain `dict`, so key access, `in`, `.get` and JSON serialization are unchanged. Every solver publishes the result-semantics keys `estimator`, `quantity`, `combine` and `complete` (see the [index](index.md)); here `estimator` is `coherent` and `combine` is `Coherent.combine`, the `kernel` execution record, and the requested/effective configuration keys `requested_config`, `effective_config`, `requested_max_depth`, `effective_max_depth` and `component_max_depth`.
 
 | Key | Type | Meaning |
 | --- | --- | --- |
-| `max_depth`, `coherent`, `return_field`, `export_paths`, `max_paths`, `max_paths_scope`, `sort_key` | config values | The solve's options. |
-| `accumulation_strategy` | `str` | `coherent` or `incoherent`. |
+| `max_depth`, `return_field`, `export_paths`, `max_paths`, `max_paths_scope`, `sort_key` | config values | The solve's options (`combine` is the result-semantics key). |
+| `accumulation_strategy` | `str` | `coherent` (`combine="field"`) or `incoherent` (`combine="power"`). |
 | `components` | `dict[str, str]` | Status per component (`enabled`, `not_requested`, ...). |
 | `counts` | `dict` | `path_count`, `valid_path_count` and per-component counts. |
 | `capability` | `dict[str, bool]` | Native capability flags used by the solve. |
@@ -175,9 +176,8 @@ use interaction width `D`.
 | `component_id` | `(K,) int32` | Component code. |
 | `primitive_id`, `edge_id`, `material_id` | `(K,) int32` | First-interaction convenience columns. |
 | `path_length_m`, `delay_s`, `path_gain` | `(K,) float32` | Length, delay, and gain. |
-| `interaction_position`, `interaction_normal` | `(K, 3) float32` | First-interaction convenience views. |
 | `primitive_sequence`, `material_sequence` | `(K, D) int32` | Complete interaction sequences. |
-| `interaction_positions`, `interaction_normals` | `(K, D, 3) float32` | Complete interaction geometry. |
+| `interaction_positions`, `interaction_normals` | `(K, D, 3) float32` | Complete interaction geometry; `[:, 0]` is the first interaction (when `D > 0`). |
 | `field_real`, `field_imag` | `(K,) float32` | Real and imaginary path-field components. |
 | `coefficient` | `(K,) complex64` | Complex path coefficient. |
 | `field_xyz` | `(K, 3) complex64` | World-Cartesian complex field. |
@@ -188,7 +188,7 @@ use interaction width `D`.
 ```python
 result = solve(
     scene,
-    Config(export_paths=True, components={"los"}),
+    Coherent(export_paths=True, components={"los"}),
     reference_frequency_hz=3.5e9,
 )
 paths = result.paths

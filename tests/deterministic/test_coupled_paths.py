@@ -10,7 +10,7 @@ import torch
 
 from tests.support.scenes import coupled_wall_wedge_scene
 from witwin.channel.deployment import build_info
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 
 
 def _require_native() -> None:
@@ -36,12 +36,12 @@ def test_coupled_off_is_deterministic_and_omits_coupled():
     scene = coupled_wall_wedge_scene()
     default_result = solve(
         scene,
-        Config(components=_BASE_COMPONENTS, max_depth=2, export_paths=True),
+        Coherent(components=_BASE_COMPONENTS, max_depth=2, export_paths=True),
         reference_frequency_hz=3.0e9,
     )
     explicit_off = solve(
         scene,
-        Config(
+        Coherent(
             components=_BASE_COMPONENTS,
             max_depth=2,
             coupled_paths=False,
@@ -86,7 +86,7 @@ def test_coupled_on_exports_finite_nonzero_coupled_component():
     scene = coupled_wall_wedge_scene()
     result = solve(
         scene,
-        Config(
+        Coherent(
             components=_BASE_COMPONENTS,
             max_depth=2,
             coupled_paths=True,
@@ -136,7 +136,7 @@ def test_coupled_on_runs_under_ad_modes(ad_mode):
     scene = coupled_wall_wedge_scene()
     result = solve(
         scene,
-        Config(
+        Coherent(
             components=_BASE_COMPONENTS,
             max_depth=2,
             coupled_paths=True,
@@ -160,7 +160,7 @@ def test_coupled_candidate_limit_chunks_the_validator_without_capping():
     scene = coupled_wall_wedge_scene()
 
     def coupled_rows(limit: int) -> torch.Tensor:
-        config = Config(
+        config = Coherent(
             components=_BASE_COMPONENTS, max_depth=2, coupled_paths=True,
             coupled_candidate_limit=limit, export_paths=True,
         )
@@ -188,7 +188,7 @@ def test_coupled_on_double_diffraction_keeps_coupled_component_finite_nonzero():
     scene = coupled_wall_wedge_scene()
     result = solve(
         scene,
-        Config(
+        Coherent(
             components=_BASE_COMPONENTS,
             max_depth=2,
             coupled_paths=True,

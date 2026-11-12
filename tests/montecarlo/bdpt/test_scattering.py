@@ -17,7 +17,7 @@ from tests.support.core_world import (
 )
 from witwin.channel.deployment import build_info
 from witwin.core import MaterialLayer, PhysicalMaterial, SurfaceRoughness
-from witwin.channel.montecarlo.bdpt import Config, solve
+from witwin.channel.experimental.bdpt import Config, solve
 from tests.reference.kirchhoff_lookup import eval_table as eval_bsdf
 from witwin.channel.scene.resources import build_kirchhoff_table
 

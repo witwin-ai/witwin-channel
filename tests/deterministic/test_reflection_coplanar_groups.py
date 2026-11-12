@@ -12,7 +12,7 @@ from tests.support.core_world import (
     make_transmitter,
 )
 from witwin.channel.deployment import build_info
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 from witwin.core import PhysicalMaterial, Scene
 
 _REFERENCE_FREQUENCY_HZ = 3.0e9
@@ -70,7 +70,7 @@ def test_coplanar_subdivision_invariance():
     """Refining a wall triangulation must not change the reflected field."""
 
     _require_native()
-    config = Config(components={"reflection"}, coherent=True, export_paths=True)
+    config = Coherent(components={"reflection"}, combine="field", export_paths=True)
     coarse = solve(_wall_scene(1), config, reference_frequency_hz=3.0e9)
     fine = solve(_wall_scene(8), config, reference_frequency_hz=3.0e9)
 
@@ -119,8 +119,8 @@ def test_inner_corner_double_reflection_within_one_structure():
 
     result = solve(
         scene,
-        Config(
-            components={"reflection"}, max_depth=2, coherent=True, export_paths=True
+        Coherent(
+            components={"reflection"}, max_depth=2, combine="field", export_paths=True
         ),
         reference_frequency_hz=3.0e9,
     )
@@ -183,7 +183,7 @@ def test_conductor_skew_reflection_preserves_friis_amplitude():
 
     result = solve(
         scene,
-        Config(components={"reflection"}, coherent=True, export_paths=True),
+        Coherent(components={"reflection"}, combine="field", export_paths=True),
         reference_frequency_hz=3.0e9,
     )
 
@@ -240,7 +240,7 @@ def test_perfect_conductor_reflects_with_unit_magnitude():
 
     result = solve(
         scene,
-        Config(components={"reflection"}, coherent=True, export_paths=True),
+        Coherent(components={"reflection"}, combine="field", export_paths=True),
         reference_frequency_hz=3.0e9,
     )
 
@@ -294,12 +294,12 @@ def test_back_wall_reflection_is_blocked_by_front_wall():
 
     result = solve(
         scene,
-        Config(components={"reflection"}, coherent=True, export_paths=True),
+        Coherent(components={"reflection"}, combine="field", export_paths=True),
         reference_frequency_hz=3.0e9,
     )
 
     assert result.paths is not None
     # Only the front-wall specular path may survive; the back-wall path is occluded.
     assert int(result.paths.valid.numel()) == 1
-    hit_x = result.paths.interaction_position[:, 0]
+    hit_x = result.paths.interaction_positions[:, 0, 0]
     torch.testing.assert_close(hit_x, torch.full_like(hit_x, 2.5))

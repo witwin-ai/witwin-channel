@@ -4,10 +4,10 @@
   "overall_statement_minimum_percent": 85.0,
   "core_statement_minimum_percent": 90.0,
   "core_files": [
-    "witwin/channel/deterministic.py",
+    "witwin/channel/radiomap/_coherent.py",
     "witwin/channel/kernels/materials.py",
-    "witwin/channel/montecarlo/basic.py",
-    "witwin/channel/montecarlo/bdpt.py",
+    "witwin/channel/radiomap/_stochastic.py",
+    "witwin/channel/experimental/bdpt.py",
     "witwin/channel/path.py",
     "witwin/channel/kernels/fields.py",
     "witwin/channel/kernels/scattering.py"

@@ -26,7 +26,7 @@
         ["coeff_real", "torch::Tensor()"],
         ["coeff_imag", "torch::Tensor()"]
       ],
-      "python_owners": ["witwin.channel.kernels.montecarlo.bdpt_accumulate_connection_samples", "witwin.channel.montecarlo.bdpt.bdpt_accumulate_connection_samples_forward_ad"]
+      "python_owners": ["witwin.channel.experimental.bdpt.bdpt_accumulate_connection_samples_forward_ad", "witwin.channel.kernels.montecarlo.bdpt_accumulate_connection_samples"]
     },
     {
       "name": "bdpt_accumulate_connection_samples_backward",
@@ -58,7 +58,7 @@
         ["need_grad_coeff", "bool", null]
       ],
       "pybind_arguments": [],
-      "python_owners": ["witwin.channel.montecarlo.bdpt.bdpt_accumulate_connection_samples_backward"]
+      "python_owners": ["witwin.channel.experimental.bdpt.bdpt_accumulate_connection_samples_backward"]
     },
     {
       "name": "bdpt_accumulate_connection_samples_jvp",
@@ -85,7 +85,7 @@
         ["scattering_im", "pybind11::object", null]
       ],
       "pybind_arguments": [],
-      "python_owners": ["witwin.channel.montecarlo.bdpt.bdpt_accumulate_connection_samples_jvp"]
+      "python_owners": ["witwin.channel.experimental.bdpt.bdpt_accumulate_connection_samples_jvp"]
     },
     {
       "name": "bdpt_compact_connection_samples",
@@ -173,7 +173,7 @@
         ["need_grad_tx_power", "bool", null]
       ],
       "pybind_arguments": [],
-      "python_owners": ["witwin.channel.montecarlo.bdpt.bdpt_endpoint_connection_samples_backward"]
+      "python_owners": ["witwin.channel.experimental.bdpt.bdpt_endpoint_connection_samples_backward"]
     },
     {
       "name": "bdpt_endpoint_connection_samples_jvp",
@@ -197,7 +197,7 @@
         ["tangent_tx_power", "pybind11::object", null]
       ],
       "pybind_arguments": [],
-      "python_owners": ["witwin.channel.montecarlo.bdpt.bdpt_endpoint_connection_samples_jvp"]
+      "python_owners": ["witwin.channel.experimental.bdpt.bdpt_endpoint_connection_samples_jvp"]
     },
     {
       "name": "bdpt_endpoint_connection_visibility_inputs",

@@ -12,7 +12,7 @@ from tests.ad._fd import relative_error
 from tests.ad._tolerances import ABS_TOL
 from tests.reference import bdpt_ad_oracles as O
 from witwin.channel.kernels import montecarlo as M
-from witwin.channel.montecarlo import bdpt as PA
+from witwin.channel.experimental import bdpt as PA
 from witwin.channel import runtime
 
 pytestmark = pytest.mark.skipif(

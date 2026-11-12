@@ -5,7 +5,7 @@ import pytest
 import torch
 
 from tests.deterministic.test_component_layout import _grid_scene
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 
 
 def test_grid_radiomap_outputs_total_and_component_maps():
@@ -14,7 +14,7 @@ def test_grid_radiomap_outputs_total_and_component_maps():
 
     result = solve(
         _grid_scene(),
-        Config(max_depth=0, components={"los"}, diagnostics=True),
+        Coherent(max_depth=0, components={"los"}, diagnostics=True),
         reference_frequency_hz=3.0e9,
     )
 

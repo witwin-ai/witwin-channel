@@ -14,7 +14,7 @@ from witwin.core import Scene
 from tests.support.core_world import make_receiver, make_receiver_grid, make_transmitter
 from witwin.channel.deployment import build_info
 from witwin.core import PhaseScreen, SurfaceRoughness
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 from tests.reference.em_oracle import C0, layer_stack_rt
 from witwin.channel.scene.resources import (
     N_COS_THETA_O,
@@ -65,7 +65,7 @@ def _scene(
     )
 
 
-def _config(**overrides) -> Config:
+def _config(**overrides) -> Coherent:
     settings = {
         "max_depth": 1,
         "components": {"reflection", "scattering"},
@@ -73,7 +73,7 @@ def _config(**overrides) -> Config:
         "scattering_max_paths_per_pair": 65536,
     }
     settings.update(overrides)
-    return Config(**settings)
+    return Coherent(**settings)
 
 
 def _specular_cr2(rms_height_m: float) -> float:
@@ -84,7 +84,7 @@ def _specular_cr2(rms_height_m: float) -> float:
 def _smooth_reflection_power() -> float:
     result = solve(
         _scene(0.0),
-        Config(max_depth=1, components={"reflection"}),
+        Coherent(max_depth=1, components={"reflection"}),
         reference_frequency_hz=_FREQUENCY_HZ,
     )
     return float(result.component_power["reflection"])
@@ -131,7 +131,7 @@ def test_narrow_lobe_normalization_cross_check():
     )
     smooth_small = solve(
         _scene(0.0, 0.3, half_size=1.0),
-        Config(max_depth=1, components={"reflection"}),
+        Coherent(max_depth=1, components={"reflection"}),
         reference_frequency_hz=_FREQUENCY_HZ,
     )
     expected = (1.0 - _specular_cr2(0.004)) * float(
@@ -270,7 +270,7 @@ def test_realization_coherent_flat_screen_matches_smooth_reflection():
     _require_rayd()
     smooth = solve(
         _scene(0.0, half_size=1.0),
-        Config(max_depth=1, components={"reflection"}),
+        Coherent(max_depth=1, components={"reflection"}),
         reference_frequency_hz=_FREQUENCY_HZ,
     )
     flat = solve(

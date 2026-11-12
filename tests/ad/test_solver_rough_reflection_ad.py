@@ -13,8 +13,8 @@ from tests.ad._tolerances import ABS_TOL, FD_REL_STEP_FREQUENCY, REL_TOL_GENERAL
 from tests.support.scenes import rough_wall_structure
 from witwin.core import Scene
 from tests.support.core_world import make_receiver, make_transmitter
-from witwin.channel.deterministic import Config as DeterministicConfig
-from witwin.channel.deterministic import solve as deterministic_solve
+from witwin.channel.radiomap import Coherent as DeterministicConfig
+from witwin.channel.radiomap import solve as deterministic_solve
 from witwin.channel.path import Config as PathConfig
 from witwin.channel.path import solve as path_solve
 

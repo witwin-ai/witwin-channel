@@ -1,11 +1,16 @@
-# `witwin.channel.montecarlo.bdpt`
+# `witwin.channel.experimental.bdpt`
+
+> **Experimental tier.** This module is importable and tested but is not part of
+> the stable API snapshot: its names, options and results may change in any
+> release (see `docs/dev/standards/adr-0xx-experimental-api-tier.md`). It was
+> `witwin.channel.montecarlo.bdpt` before 0.6.0; its behaviour is unchanged.
 
 The bidirectional path tracing (BDPT) solver estimates received power with
 multiple importance sampling and can optionally export actual BDPT samples.
 Its current public contract is primal-only.
 
 ```python
-from witwin.channel.montecarlo.bdpt import (
+from witwin.channel.experimental.bdpt import (
     BDPTPathSamples,
     Config,
     Result,

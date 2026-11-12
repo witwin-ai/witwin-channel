@@ -38,13 +38,13 @@ def _ground(material: object) -> list:
 
 
 def _mc_mean_and_sem(structures, tx, component, origin, shape, spacing):
-    from witwin.channel.montecarlo import basic
+    from witwin.channel import radiomap
 
     scene = Scene(structures=structures, endpoints=[antenna("tx", tx), grid(origin, shape, spacing)])
     maps = torch.stack([
-        basic.solve(
+        radiomap.solve(
             scene,
-            basic.Config(components={component}, max_depth=1, samples=SAMPLES, seed=seed),
+            radiomap.Stochastic(components={component}, max_depth=1, samples=SAMPLES, seed=seed),
             reference_frequency_hz=FREQ,
         ).component_maps[component][0].double().cpu()
         for seed in range(SEEDS)
@@ -55,15 +55,15 @@ def _mc_mean_and_sem(structures, tx, component, origin, shape, spacing):
 def _deterministic(structures, tx, component, origin, shape, spacing, *, average: bool):
     """Incoherent deterministic power at each cell centre, or averaged over each cell."""
 
-    from witwin.channel import deterministic
+    from witwin.channel import radiomap
 
     n = SUBSAMPLES if average else 1
     sub = spacing / n
     start = (origin[0] - (spacing - sub) / 2, origin[1] - (spacing - sub) / 2, origin[2])
     scene = Scene(structures=structures,
                   endpoints=[antenna("tx", tx), grid(start, (shape[0] * n, shape[1] * n), sub)])
-    result = deterministic.solve(
-        scene, deterministic.Config(components={component}, max_depth=1, coherent=False),
+    result = radiomap.solve(
+        scene, radiomap.Coherent(components={component}, max_depth=1, combine="power"),
         reference_frequency_hz=FREQ,
     )
     values = result.path_gain[0].double().cpu()
@@ -133,10 +133,10 @@ def test_mc_basic_point_components_equal_deterministic_cell_centres(
 ):
     """MC Basic evaluates LoS and straight transmission analytically at each cell centre."""
 
-    from witwin.channel.montecarlo import basic
+    from witwin.channel import radiomap
 
     scene = Scene(structures=structures(), endpoints=[antenna("tx", tx), grid(origin, SHAPE, SPACING)])
-    mc = basic.solve(scene, basic.Config(components={component}, max_depth=1, samples=1 << 12),
+    mc = radiomap.solve(scene, radiomap.Stochastic(components={component}, max_depth=1, samples=1 << 12),
                      reference_frequency_hz=FREQ).component_maps[component][0].double().cpu()
     reference = _deterministic(structures(), tx, component, origin, SHAPE, SPACING, average=False)
     accuracy.check(component, float(((mc - reference).abs() / reference).max()), 1e-5)

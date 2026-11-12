@@ -3,11 +3,11 @@
 
 import pytest
 
-from witwin.channel.montecarlo.basic import Config
+from witwin.channel.radiomap import Stochastic
 
 
 def test_basic_config_defaults_are_explicit():
-    config = Config()
+    config = Stochastic()
 
     assert config.samples == 4096
     assert config.max_depth == 1
@@ -18,12 +18,12 @@ def test_basic_config_defaults_are_explicit():
 
 def test_basic_config_validates_samples_and_components():
     with pytest.raises(ValueError, match="samples"):
-        Config(samples=0)
+        Stochastic(samples=0)
 
     with pytest.raises(ValueError, match="components"):
-        Config(components={"scatter"})
+        Stochastic(components={"scatter"})
 
 
 def test_basic_config_rejects_negative_workspace_limit():
     with pytest.raises(ValueError, match="workspace_limit_bytes"):
-        Config(workspace_limit_bytes=-1)
+        Stochastic(workspace_limit_bytes=-1)

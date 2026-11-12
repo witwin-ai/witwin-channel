@@ -15,7 +15,7 @@ from tests.support.core_world import (
     make_receiver_grid,
     make_transmitter,
 )
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent, solve
 from witwin.core import PhysicalMaterial, Scene, Structure
 
 _REFERENCE_FREQUENCY_HZ = 5.0e9
@@ -111,12 +111,12 @@ def test_isb_boundary_taper_off_is_bit_identical():
     # path_gain flaked on exactly this noise despite a perfect OFF no-op).
     default_result = solve(
         scene,
-        Config(components=components, export_paths=True),
+        Coherent(components=components, export_paths=True),
         reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
     )
     explicit_off = solve(
         scene,
-        Config(components=components, isb_boundary_taper=False, export_paths=True),
+        Coherent(components=components, isb_boundary_taper=False, export_paths=True),
         reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
     )
 
@@ -160,12 +160,12 @@ def test_isb_boundary_taper_on_softens_los_shadow_boundary():
     components = {"los", "reflection", "diffraction"}
     off = solve(
         scene,
-        Config(components=components, isb_boundary_taper=False),
+        Coherent(components=components, isb_boundary_taper=False),
         reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
     )
     on = solve(
         scene,
-        Config(
+        Coherent(
             components=components,
             isb_boundary_taper=True,
             isb_boundary_taper_width=0.5,

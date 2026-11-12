@@ -8,7 +8,7 @@
     "enumerated_penetration": {
       "scenario": "penetration_enumerated",
       "target_timing_range": "witwin.channel:enumerated_penetration_discovery",
-      "solver_entrypoint": "witwin.channel.deterministic.solve",
+      "solver_entrypoint": "witwin.channel.radiomap.solve",
       "ncu_kernel_family_match": "case_sensitive_substring",
       "variants": {
         "baseline": {
@@ -58,7 +58,7 @@
     "montecarlo_penetration": {
       "scenario": "penetration_montecarlo_basic",
       "target_timing_range": "witwin.channel:montecarlo_basic_penetration_discovery",
-      "solver_entrypoint": "witwin.channel.montecarlo.basic.solve",
+      "solver_entrypoint": "witwin.channel.radiomap.solve",
       "ncu_kernel_family_match": "case_sensitive_substring",
       "variants": {
         "baseline": {
@@ -108,7 +108,7 @@
     "diffraction": {
       "scenario": "diffraction_munich",
       "target_timing_range": "witwin.channel:diffraction_total_stage",
-      "solver_entrypoint": "witwin.channel.deterministic.solve",
+      "solver_entrypoint": "witwin.channel.radiomap.solve",
       "ncu_kernel_family_match": "case_sensitive_substring",
       "variants": {
         "baseline": {

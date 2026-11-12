@@ -5,7 +5,7 @@ import pytest
 import torch
 
 from tests.support.scenes import empty_space_los_scene
-from witwin.channel.deterministic import Config, solve
+from witwin.channel.radiomap import Coherent as Config, solve
 from witwin.channel.path import Config as PathConfig
 from witwin.channel.path import solve as solve_paths
 
@@ -57,8 +57,8 @@ def test_export_paths_preserves_path_table_columns_and_field_values():
         * tx_power[result.paths.tx_id.to(torch.int64)]
     )
     torch.testing.assert_close(result.paths.path_gain, reference_gain)
-    assert result.paths.interaction_position.shape == (path_count, 3)
-    assert result.paths.interaction_normal.shape == (path_count, 3)
+    assert not hasattr(result.paths, "interaction_position")
+    assert not hasattr(result.paths, "interaction_normal")
     assert result.paths.material_id.shape == (path_count,)
     assert result.paths.primitive_sequence.shape == (path_count, 0)
     assert result.paths.material_sequence.shape == (path_count, 0)
