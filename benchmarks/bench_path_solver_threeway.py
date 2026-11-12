@@ -19,10 +19,17 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CHANNEL_ROOT = REPO_ROOT.parent / "channel"
-DEFAULT_SIONNA_ROOT = (
-    DEFAULT_CHANNEL_ROOT / "reference" / "sionna-rt-reference-2.0.1" / "src"
+sys.path.insert(0, str(REPO_ROOT))
+
+# The repository root must resolve before importing the shared benchmark inputs.
+from benchmarks.reference_inputs import (  # noqa: E402
+    ORIGINAL_CHANNEL_ROOT_ENV,
+    env_path,
+    require_city_xml,
 )
+
+# The archived Channel reference checkout: --channel-root or $WITWIN_CHANNEL_ORIGINAL_ROOT.
+DEFAULT_CHANNEL_ROOT = env_path(ORIGINAL_CHANNEL_ROOT_ENV)
 DEFAULT_SCENE = "san_francisco"
 DEFAULT_TX = ((0.0, 0.0, 180.0),)
 DEFAULT_RX = ((250.0, 0.0, 180.0), (-250.0, 120.0, 180.0))
@@ -87,7 +94,26 @@ def _mean(values: list[float]) -> float | None:
 
 
 def _scene_xml(args: argparse.Namespace) -> Path:
-    return Path(args.sionna_source_root) / "sionna" / "rt" / "scenes" / args.scene / f"{args.scene}.xml"
+    """--scene-xml, else the scene under --sionna-source-root, else under $WITWIN_CHANNEL_SCENE_ROOT."""
+
+    if args.scene_xml is None and args.sionna_source_root is not None:
+        return require_city_xml(
+            args.scene,
+            Path(args.sionna_source_root) / "sionna" / "rt" / "scenes" / args.scene / f"{args.scene}.xml",
+        )
+    return require_city_xml(args.scene, args.scene_xml)
+
+
+def _require_root(
+    value: Path | None, *, option: str, provider: str, env: str | None = None,
+) -> Path:
+    if value is None:
+        hint = f" or set {env}" if env is not None else ""
+        raise RuntimeError(f"the {provider} provider requires {option}{hint}")
+    root = Path(value).expanduser().resolve()
+    if not root.is_dir():
+        raise FileNotFoundError(f"{option} is not a directory: {root}")
+    return root
 
 
 def _time_repeated(
@@ -300,43 +326,44 @@ def _native_case_stats(
 def _run_native(args: argparse.Namespace) -> dict[str, Any]:
     import torch
 
-    sys.path.insert(0, str(REPO_ROOT))
-    from witwin.channel import ReceiverPoint, Transmitter, build_info
-    from witwin.core import Scene
-    from witwin.channel.scene.resources import EdgePolicy
+    from witwin.channel import build_info
+    from witwin.channel.importers import load_mitsuba
+    from witwin.channel.interactions.diffraction import selected_diffraction_edges
     from witwin.channel.path import Config, solve
+    from witwin.channel.scene import compile as compile_scene
+    from witwin.core import AntennaState, Scene
+    from witwin.core.identity import new_antenna_id
 
     tx_points = _parse_points(args.tx)
     rx_points = _parse_points(args.rx)
     xml = _scene_xml(args)
     started = time.perf_counter()
-    base_scene = Scene.load_mitsuba(
-        xml,
-        source_root=Path(args.sionna_source_root),
-        merge_shapes=True,
-        frequency=float(args.frequency_hz),
-        edge_selection_mode="all_edges",
-        boundary_edge_policy="half_plane",
-    )
+    imported = load_mitsuba(xml, frequency_hz=float(args.frequency_hz), merge_shapes=True)
     load_ms = (time.perf_counter() - started) * 1000.0
     scene = Scene(
-        structures=base_scene.structures,
-        transmitters=[
-            Transmitter(position=torch.tensor(point, dtype=torch.float32), power_w=1.0)
-            for point in tx_points
+        structures=list(imported.structures),
+        endpoints=[
+            *(
+                AntennaState(
+                    new_antenna_id(), "tx", torch.tensor(point, dtype=torch.float32), power_w=1.0
+                )
+                for point in tx_points
+            ),
+            *(
+                AntennaState(new_antenna_id(), "rx", torch.tensor(point, dtype=torch.float32))
+                for point in rx_points
+            ),
         ],
-        receivers=[
-            ReceiverPoint(position=torch.tensor(point, dtype=torch.float32))
-            for point in rx_points
-        ],
-        frequency=base_scene.frequency,
-        metadata=base_scene.metadata,
+        # The solvers keep a merged Mitsuba import's edge table as imported; the default edge
+        # policy (all edges, half-plane boundary edges) matches the reference loaders.
+        metadata={"mitsuba": {"merge_shapes": True, "source": str(xml)}},
     )
-    policy = EdgePolicy(edge_selection_mode="all_edges", boundary_edge_policy="half_plane")
+    compiled = compile_scene(scene, reference_frequency_hz=float(args.frequency_hz))
+    _, selected_edges = selected_diffraction_edges(compiled.rayd, preserve_imported_edges=True)
     scene_stats = {
         "structures": len(scene.structures),
-        "triangles": sum(int(s.faces.shape[0]) for s in scene.structures),
-        "diffraction_edges": scene.diffraction_edge_count(policy),
+        "triangles": sum(int(s.geometry.to_mesh()[1].shape[0]) for s in scene.structures),
+        "diffraction_edges": int(selected_edges.numel()),
     }
 
     configs = {
@@ -345,6 +372,7 @@ def _run_native(args: argparse.Namespace) -> dict[str, Any]:
         "diffraction": Config(components={"diffraction"}),
         "all": Config(components={"los", "reflection", "diffraction"}),
     }
+    frequency_hz = float(args.frequency_hz)
 
     def sync(result) -> None:
         for tensor in (
@@ -362,7 +390,7 @@ def _run_native(args: argparse.Namespace) -> dict[str, Any]:
         torch.cuda.reset_peak_memory_stats()
         allocated_before = int(torch.cuda.memory_allocated())
         result, cold_ms, times, memory = _time_repeated(
-            lambda config=config: solve(scene, config),
+            lambda config=config: solve(scene, config, reference_frequency_hz=frequency_hz),
             sync,
             warmup=args.warmup,
             repeats=args.repeats,
@@ -481,7 +509,10 @@ def _run_sionna(args: argparse.Namespace) -> dict[str, Any]:
 
     if not hasattr(inspect, "getargspec"):
         inspect.getargspec = inspect.getfullargspec  # type: ignore[attr-defined]
-    sys.path.insert(0, str(Path(args.sionna_source_root)))
+    sionna_root = _require_root(
+        args.sionna_source_root, option="--sionna-source-root", provider="sionna"
+    )
+    sys.path.insert(0, str(sionna_root))
     import drjit as dr
     import mitsuba as mi
     import numpy as np
@@ -677,9 +708,18 @@ def _run_original(args: argparse.Namespace) -> dict[str, Any]:
 
     if not hasattr(inspect, "getargspec"):
         inspect.getargspec = inspect.getfullargspec  # type: ignore[attr-defined]
+    channel_root = _require_root(
+        args.channel_root, option="--channel-root", provider="original",
+        env=ORIGINAL_CHANNEL_ROOT_ENV,
+    )
+    sionna_root = _require_root(
+        args.sionna_source_root, option="--sionna-source-root", provider="original"
+    )
     os.environ["WITWIN_DETERMINISTIC_NATIVE_PROBE"] = "1"
-    sys.path.insert(0, str(Path(args.channel_root)))
-    sys.path.insert(0, str(Path(args.sionna_source_root)))
+    # The archived checkout must shadow this repository's witwin package.
+    sys.path[:] = [entry for entry in sys.path if Path(entry or ".").resolve() != REPO_ROOT]
+    sys.path.insert(0, str(channel_root))
+    sys.path.insert(0, str(sionna_root))
     import drjit as dr
     import numpy as np
     import witwin.channel as wc
@@ -690,7 +730,7 @@ def _run_original(args: argparse.Namespace) -> dict[str, Any]:
     started = time.perf_counter()
     scene = wc.Scene.load_mitsuba(
         xml,
-        source_root=Path(args.sionna_source_root),
+        source_root=sionna_root,
         frequency=float(args.frequency_hz),
         merge_shapes=True,
         device="cuda",
@@ -1039,10 +1079,6 @@ def _run_provider_subprocess(
         provider,
         "--scene",
         args.scene,
-        "--sionna-source-root",
-        str(Path(args.sionna_source_root)),
-        "--channel-root",
-        str(Path(args.channel_root)),
         "--frequency-hz",
         str(args.frequency_hz),
         "--tx",
@@ -1065,6 +1101,13 @@ def _run_provider_subprocess(
         str(args.seed if seed is None else seed),
         f"--cfr-offsets-hz={args.cfr_offsets_hz}",
     ]
+    for option, value in (
+        ("--scene-xml", args.scene_xml),
+        ("--sionna-source-root", args.sionna_source_root),
+        ("--channel-root", args.channel_root),
+    ):
+        if value is not None:
+            cmd.extend([option, str(Path(value))])
     env = dict(os.environ)
     completed = subprocess.run(
         cmd,
@@ -1274,8 +1317,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--provider", choices=("native", "original", "sionna"), default=None)
     parser.add_argument("--scene", default=DEFAULT_SCENE)
-    parser.add_argument("--sionna-source-root", type=Path, default=DEFAULT_SIONNA_ROOT)
-    parser.add_argument("--channel-root", type=Path, default=DEFAULT_CHANNEL_ROOT)
+    parser.add_argument(
+        "--scene-xml", type=Path, default=None,
+        help="scene XML; default: --scene under --sionna-source-root, else under $WITWIN_CHANNEL_SCENE_ROOT",
+    )
+    parser.add_argument(
+        "--sionna-source-root", type=Path, default=None,
+        help="Sionna RT source tree, required by the sionna and original providers",
+    )
+    parser.add_argument(
+        "--channel-root", type=Path, default=DEFAULT_CHANNEL_ROOT,
+        help=f"archived original Channel checkout, required by the original provider; default: ${ORIGINAL_CHANNEL_ROOT_ENV}",
+    )
     parser.add_argument("--frequency-hz", type=float, default=3.5e9)
     parser.add_argument(
         "--tx",

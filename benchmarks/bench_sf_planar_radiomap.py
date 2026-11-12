@@ -16,10 +16,10 @@ import numpy as np
 
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
-_SIONNA_SOURCE_ROOT = pathlib.Path(
-    "E:/Code/witwin-platform/channel/reference/sionna-rt-reference-2.0.1/src"
-)
-_SIONNA_XML = _SIONNA_SOURCE_ROOT / "sionna/rt/scenes/san_francisco/san_francisco.xml"
+sys.path.insert(0, str(_REPO_ROOT))
+
+# The repository root must resolve before importing the shared benchmark inputs.
+from benchmarks.reference_inputs import require_city_xml  # noqa: E402
 
 TX = (468.0, 106.0, 70.0)
 BOUNDS = ((-520.0, 720.0), (-480.0, 470.0))
@@ -44,11 +44,20 @@ def _write_json(path: pathlib.Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
-def _sionna_scene() -> Any:
-    sys.path.insert(0, str(_SIONNA_SOURCE_ROOT))
+def _require_sionna_source_root(sionna_source_root: pathlib.Path | None) -> pathlib.Path:
+    if sionna_source_root is None:
+        raise RuntimeError("the sionna backend requires --sionna-source-root (a Sionna RT source tree)")
+    root = pathlib.Path(sionna_source_root).expanduser().resolve()
+    if not (root / "sionna" / "rt").is_dir():
+        raise FileNotFoundError(f"--sionna-source-root has no sionna/rt package: {root}")
+    return root
+
+
+def _sionna_scene(scene_xml: pathlib.Path, sionna_source_root: pathlib.Path) -> Any:
+    sys.path.insert(0, str(sionna_source_root))
     from sionna.rt import PlanarArray, Transmitter, load_scene
 
-    scene = load_scene(str(_SIONNA_XML))
+    scene = load_scene(str(scene_xml))
     scene.frequency = FREQUENCY
     scene.tx_array = PlanarArray(
         num_rows=1,
@@ -63,13 +72,15 @@ def _sionna_scene() -> Any:
 
 
 def run_sionna_planar_benchmark(
-    *, samples: int, repeats: int, components: set[str],
+    *, samples: int, repeats: int, components: set[str], scene_xml: pathlib.Path,
+    sionna_source_root: pathlib.Path | None,
 ) -> dict[str, Any]:
-    sys.path.insert(0, str(_SIONNA_SOURCE_ROOT))
+    root = _require_sionna_source_root(sionna_source_root)
+    sys.path.insert(0, str(root))
     import drjit as dr
     from sionna.rt import RadioMapSolver
 
-    scene = _sionna_scene()
+    scene = _sionna_scene(scene_xml, root)
     solver = RadioMapSolver()
     size = (
         BOUNDS[0][1] - BOUNDS[0][0],
@@ -127,7 +138,9 @@ def run_sionna_planar_benchmark(
 
 def _run_sionna_in_child(
     *, samples: int, repeats: int, json_path: pathlib.Path, components: set[str],
+    scene_xml: pathlib.Path, sionna_source_root: pathlib.Path | None,
 ) -> dict[str, Any]:
+    root = _require_sionna_source_root(sionna_source_root)
     child_json = json_path.with_name(f"{json_path.stem}.sionna_child{json_path.suffix}")
     if child_json.exists():
         child_json.unlink()
@@ -142,6 +155,10 @@ def _run_sionna_in_child(
         str(int(repeats)),
         "--components",
         *sorted(components),
+        "--scene-xml",
+        str(scene_xml),
+        "--sionna-source-root",
+        str(root),
         "--json",
         str(child_json),
         "--_sionna-child",
@@ -159,42 +176,41 @@ def _run_sionna_in_child(
     raise RuntimeError(f"Sionna child benchmark JSON did not contain a Sionna result: {child_json}")
 
 
-def _native_scene() -> Any:
-    sys.path.insert(0, str(_REPO_ROOT))
+def _native_scene(scene_xml: pathlib.Path) -> Any:
     import torch
-    from witwin.channel import Transmitter
-    from witwin.core import ReceiverGrid, Scene
+    from witwin.channel.importers import load_mitsuba
+    from witwin.core import AntennaState, ReceiverGrid, Scene
+    from witwin.core.identity import new_antenna_id
 
     dx = (BOUNDS[0][1] - BOUNDS[0][0]) / GRID[0]
     dy = (BOUNDS[1][1] - BOUNDS[1][0]) / GRID[1]
     grid = ReceiverGrid(
+        new_antenna_id(),
         origin=torch.tensor([BOUNDS[0][0] + 0.5 * dx, BOUNDS[1][0] + 0.5 * dy, PLANE_Z]),
         x_axis=torch.tensor([1.0, 0.0, 0.0]),
         y_axis=torch.tensor([0.0, 1.0, 0.0]),
         shape=GRID,
         spacing=(dx, dy),
     )
-    scene = Scene.load_mitsuba(str(_SIONNA_XML), source_root=_SIONNA_SOURCE_ROOT)
-    return type(scene)(
-        structures=scene.structures,
-        transmitters=[Transmitter(position=torch.tensor(TX))],
-        receivers=[grid],
-        frequency=FREQUENCY,
-        metadata=scene.metadata,
+    imported = load_mitsuba(scene_xml, frequency_hz=FREQUENCY, merge_shapes=True)
+    return Scene(
+        structures=list(imported.structures),
+        endpoints=[AntennaState(new_antenna_id(), "tx", torch.tensor(TX)), grid],
+        # The solvers keep a merged Mitsuba import's edge table as imported.
+        metadata={"mitsuba": {"merge_shapes": True, "source": str(scene_xml)}},
     )
 
 
 def run_native_planar_benchmark(
-    *, samples: int, repeats: int, components: set[str],
+    *, samples: int, repeats: int, components: set[str], scene_xml: pathlib.Path,
 ) -> dict[str, Any]:
-    sys.path.insert(0, str(_REPO_ROOT))
     import torch
     from witwin.channel.radiomap import Stochastic, solve
 
     if not torch.cuda.is_available():
         raise RuntimeError("native benchmark requires CUDA")
 
-    scene = _native_scene()
+    scene = _native_scene(scene_xml)
     config = Stochastic(
         samples=int(samples),
         max_depth=MAX_DEPTH,
@@ -215,7 +231,7 @@ def run_native_planar_benchmark(
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)
         start.record()
-        result = solve(scene, config)
+        result = solve(scene, config, reference_frequency_hz=FREQUENCY)
         end.record()
         torch.cuda.synchronize()
         elapsed_ms = float(start.elapsed_time(end))
@@ -254,15 +270,32 @@ def main() -> None:
         choices=("los", "reflection"),
         default=list(COMPONENTS),
     )
+    parser.add_argument(
+        "--scene-xml", type=pathlib.Path, default=None,
+        help="San Francisco XML; default: the Sionna layout under $WITWIN_CHANNEL_SCENE_ROOT",
+    )
+    parser.add_argument(
+        "--sionna-source-root", type=pathlib.Path, default=None,
+        help="Sionna RT source tree, required by the sionna backend",
+    )
     parser.add_argument("--json", type=pathlib.Path, default=pathlib.Path("artifacts/sf_planar_radiomap_benchmark.json"))
     parser.add_argument("--_sionna-child", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     components = set(args.components)
+    scene_xml = require_city_xml("san_francisco", args.scene_xml)
 
     results = []
     if args.backend in {"sionna", "both"}:
         if args._sionna_child:
-            results.append(run_sionna_planar_benchmark(samples=args.samples, repeats=args.repeats, components=components))
+            results.append(
+                run_sionna_planar_benchmark(
+                    samples=args.samples,
+                    repeats=args.repeats,
+                    components=components,
+                    scene_xml=scene_xml,
+                    sionna_source_root=args.sionna_source_root,
+                )
+            )
         else:
             results.append(
                 _run_sionna_in_child(
@@ -270,6 +303,8 @@ def main() -> None:
                     repeats=args.repeats,
                     json_path=args.json,
                     components=components,
+                    scene_xml=scene_xml,
+                    sionna_source_root=args.sionna_source_root,
                 )
             )
     if args.backend in {"native", "both"}:
@@ -278,13 +313,14 @@ def main() -> None:
                 samples=args.samples,
                 repeats=args.repeats,
                 components=components,
+                scene_xml=scene_xml,
             )
         )
     payload = {
         "benchmark": "sf_planar_radiomap",
         "config": {
-            "source_root": str(_SIONNA_SOURCE_ROOT),
-            "scene_xml": str(_SIONNA_XML),
+            "sionna_source_root": None if args.sionna_source_root is None else str(args.sionna_source_root),
+            "scene_xml": str(scene_xml),
             "tx": list(TX),
             "bounds": [list(BOUNDS[0]), list(BOUNDS[1])],
             "grid": list(GRID),
