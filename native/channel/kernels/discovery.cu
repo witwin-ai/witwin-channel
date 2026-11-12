@@ -229,6 +229,69 @@ __device__ bool macro_box(const GroupTables& tables, int group, int index, float
 // asinf/acosf pair, so a quick reject never drops what the per-cell tests would keep.
 constexpr float kQuickRejectSlack = 4.0e-3f;
 
+// sin and cos of asinf(fminf(1, ratio)), the half-angle of a cone around a sphere; the cosine from
+// (1 - s)(1 + s) stays within a few ulp even where s is close to 1.
+struct ConeHalfAngle {
+    float s;
+    float c;
+};
+
+__device__ __forceinline__ ConeHalfAngle cone_half_angle(float ratio) {
+    const float s = fminf(1.0f, ratio);
+    return {s, sqrtf(fmaxf(0.0f, (1.0f - s) * (1.0f + s)))};
+}
+
+// cos and sin of the slack the angular tests add to the two half-angles: 1e-3, or 1e-3 + kQuickRejectSlack.
+constexpr float kSlackCos = 0.9999995f;
+constexpr float kSlackSin = 9.9999981e-4f;
+constexpr float kQuickSlackCos = 0.9999875f;
+constexpr float kQuickSlackSin = 4.9999794e-3f;
+
+// The angular tests below ask whether acosf(cosine) <= asinf(a.s) + asinf(b.s) + slack. This decides it from the
+// cosine of the right-hand side, formed algebraically (no trigonometric call): +1 when the left side is below the
+// right by more than kConeDecisionMargin radians, -1 when it is above by more than that, 0 otherwise. The margin
+// exceeds the combined error of the float asinf / acosf evaluation (2 ulp each) and of this formula, so a decided
+// answer is the answer the trigonometric test gives; an undecided one is left to it.
+constexpr float kConeDecisionMargin = 1.0e-5f;
+
+__device__ __forceinline__ int cone_decision(float cosine, ConeHalfAngle a, ConeHalfAngle b,
+                                             float slack_cos, float slack_sin) {
+    const float sum_cos = a.c * b.c - a.s * b.s;
+    const float sum_sin = a.s * b.c + a.c * b.s;
+    const float limit_cos = sum_cos * slack_cos - sum_sin * slack_sin;
+    const float limit_sin = sum_sin * slack_cos + sum_cos * slack_sin;
+    if (!(limit_sin > 2.0f * kConeDecisionMargin)) {
+        return 0;
+    }
+    const float band =
+        kConeDecisionMargin * limit_sin + kConeDecisionMargin * kConeDecisionMargin + 4.0e-6f;
+    if (cosine >= limit_cos + band) {
+        return 1;
+    }
+    if (cosine <= limit_cos - band) {
+        return -1;
+    }
+    return 0;
+}
+
+// acosf(cosine) <= asinf(a.s) + asinf(b.s) + 1e-3, evaluated as the trigonometric test only when undecided.
+__device__ __forceinline__ bool cone_within(float cosine, ConeHalfAngle a, ConeHalfAngle b) {
+    const int decided = cone_decision(cosine, a, b, kSlackCos, kSlackSin);
+    if (decided != 0) {
+        return decided > 0;
+    }
+    return acosf(cosine) <= asinf(a.s) + asinf(b.s) + 1.0e-3f;
+}
+
+// acosf(cosine) > asinf(a.s) + asinf(b.s) + 1e-3 + kQuickRejectSlack, the quick-reject form of the same test.
+__device__ __forceinline__ bool cone_quick_beyond(float cosine, ConeHalfAngle a, ConeHalfAngle b) {
+    const int decided = cone_decision(cosine, a, b, kQuickSlackCos, kQuickSlackSin);
+    if (decided != 0) {
+        return decided < 0;
+    }
+    return acosf(cosine) > asinf(a.s) + asinf(b.s) + 1.0e-3f + kQuickRejectSlack;
+}
+
 // One sphere around the bounding spheres (inflated by `tolerance`) of all the macro cells of a group,
 // in closed form: a cell's centre lies within 3/4 of the group's in-plane half extents of the bounds
 // centre, and its own sphere spans a quarter of them plus the full extent along the dropped axis.
@@ -300,7 +363,9 @@ __device__ bool image_tree_keep(const GroupTables& tables, int last, float3 imag
     const float3 sphere_offset = cmath::sub(sphere_center, image);
     const float sphere_distance = cmath::length(sphere_offset);
     const bool sphere_outside = sphere_distance > sphere_radius;
-    const float sphere_spread = sphere_outside ? asinf(fminf(1.0f, sphere_radius / sphere_distance)) : 0.0f;
+    const ConeHalfAngle sphere_spread = sphere_outside
+                                            ? cone_half_angle(sphere_radius / sphere_distance)
+                                            : ConeHalfAngle{0.0f, 1.0f};
     if (sphere_outside) {
         // One cone around all of the last group's cells first.
         float3 last_center;
@@ -309,10 +374,10 @@ __device__ bool image_tree_keep(const GroupTables& tables, int last, float3 imag
         const float3 last_axis = cmath::sub(last_center, image);
         const float last_distance = cmath::length(last_axis);
         if (last_distance > last_radius) {
-            const float cone = asinf(fminf(1.0f, last_radius / last_distance));
             const float cosine = fmaxf(
                 -1.0f, fminf(1.0f, cmath::dot(last_axis, sphere_offset) / (last_distance * sphere_distance)));
-            if (acosf(cosine) > cone + sphere_spread + 1.0e-3f + kQuickRejectSlack) {
+            if (cone_quick_beyond(cosine, cone_half_angle(last_radius / last_distance),
+                                  sphere_spread)) {
                 return false;
             }
         }
@@ -328,11 +393,11 @@ __device__ bool image_tree_keep(const GroupTables& tables, int last, float3 imag
         if (axis_length <= cone_radius) {
             return true;
         }
-        const float cone = asinf(fminf(1.0f, cone_radius / axis_length));
+        const ConeHalfAngle cone = cone_half_angle(cone_radius / axis_length);
         if (sphere_outside) {
             const float cosine =
                 fmaxf(-1.0f, fminf(1.0f, cmath::dot(axis, sphere_offset) / (axis_length * sphere_distance)));
-            if (acosf(cosine) > cone + sphere_spread + 1.0e-3f + kQuickRejectSlack) {
+            if (cone_quick_beyond(cosine, cone, sphere_spread)) {
                 continue;
             }
         }
@@ -347,9 +412,8 @@ __device__ bool image_tree_keep(const GroupTables& tables, int last, float3 imag
             if (offset_length <= radius) {
                 return true;
             }
-            const float spread = asinf(fminf(1.0f, radius / offset_length));
             const float cosine = fmaxf(-1.0f, fminf(1.0f, cmath::dot(axis, offset) / (axis_length * offset_length)));
-            if (acosf(cosine) <= cone + spread + 1.0e-3f) {
+            if (cone_within(cosine, cone, cone_half_angle(radius / offset_length))) {
                 return true;
             }
         }
@@ -591,7 +655,8 @@ __device__ bool chain_edge_keep(const GroupTables& tables, int last, float3 imag
     const float3 edge_offset = cmath::sub(frame_point(frame, 0.5f * length), image);
     const float edge_distance = cmath::length(edge_offset);
     const bool edge_outside = edge_distance > edge_radius;
-    const float edge_spread = edge_outside ? asinf(fminf(1.0f, edge_radius / edge_distance)) : 0.0f;
+    const ConeHalfAngle edge_spread =
+        edge_outside ? cone_half_angle(edge_radius / edge_distance) : ConeHalfAngle{0.0f, 1.0f};
     if (edge_outside) {
         // One cone around all of the last group's cells first.
         float3 group_center;
@@ -600,10 +665,10 @@ __device__ bool chain_edge_keep(const GroupTables& tables, int last, float3 imag
         const float3 group_axis = cmath::sub(group_center, image);
         const float group_distance = cmath::length(group_axis);
         if (group_distance > group_radius) {
-            const float cone = asinf(fminf(1.0f, group_radius / group_distance));
             const float cosine = fmaxf(
                 -1.0f, fminf(1.0f, cmath::dot(group_axis, edge_offset) / (group_distance * edge_distance)));
-            if (acosf(cosine) > cone + edge_spread + 1.0e-3f + kQuickRejectSlack) {
+            if (cone_quick_beyond(cosine, cone_half_angle(group_radius / group_distance),
+                                  edge_spread)) {
                 return false;
             }
         }
@@ -619,11 +684,11 @@ __device__ bool chain_edge_keep(const GroupTables& tables, int last, float3 imag
         if (axis_length <= cone_radius) {
             return true;
         }
-        const float cone = asinf(fminf(1.0f, cone_radius / axis_length));
+        const ConeHalfAngle cone = cone_half_angle(cone_radius / axis_length);
         if (edge_outside) {
             const float cosine =
                 fmaxf(-1.0f, fminf(1.0f, cmath::dot(axis, edge_offset) / (axis_length * edge_distance)));
-            if (acosf(cosine) > cone + edge_spread + 1.0e-3f + kQuickRejectSlack) {
+            if (cone_quick_beyond(cosine, cone, edge_spread)) {
                 continue;
             }
         }
@@ -635,10 +700,9 @@ __device__ bool chain_edge_keep(const GroupTables& tables, int last, float3 imag
             if (offset_length <= radius) {
                 return true;
             }
-            const float spread = asinf(fminf(1.0f, radius / offset_length));
             const float cosine =
                 fmaxf(-1.0f, fminf(1.0f, cmath::dot(axis, offset) / (axis_length * offset_length)));
-            if (acosf(cosine) <= cone + spread + 1.0e-3f) {
+            if (cone_within(cosine, cone, cone_half_angle(radius / offset_length))) {
                 return true;
             }
         }
@@ -745,9 +809,9 @@ struct ChainCandidate {
 // leave it into the open region around the wedge. The leg towards a half points at that half's
 // image, so a chain whose leg would cross the solid behind the edge (a reflection reached from
 // inside a closed body) is rejected here.
-__device__ __forceinline__ bool chain_edge_point(const ChainEdges& edges, int edge, float3 a_image, float3 b_image,
-                                                 float edge_epsilon, float3& point) {
-    const EdgeFrame frame = edge_frame(edges, edge);
+__device__ __forceinline__ bool chain_edge_point_on(const EdgeFrame& frame, const ChainEdges& edges,
+                                                    int edge, float3 a_image, float3 b_image,
+                                                    float edge_epsilon, float3& point) {
     const float3 origin = frame.origin;
     const float3 direction = frame.direction;
     const float length = frame.length;
@@ -771,6 +835,13 @@ __device__ __forceinline__ bool chain_edge_point(const ChainEdges& edges, int ed
     const float3 to_b = cmath::sub(b_image, point);
     return utd::wedge_exterior_mask(utd::make_f3(to_a.x, to_a.y, to_a.z), axis, wn0, wn1) &&
            utd::wedge_exterior_mask(utd::make_f3(to_b.x, to_b.y, to_b.z), axis, wn0, wn1);
+}
+
+__device__ __forceinline__ bool chain_edge_point(const ChainEdges& edges, int edge, float3 a_image,
+                                                 float3 b_image, float edge_epsilon,
+                                                 float3& point) {
+    return chain_edge_point_on(edge_frame(edges, edge), edges, edge, a_image, b_image, edge_epsilon,
+                               point);
 }
 
 // The transmitter-side half of a chain back-traced from the diffraction point.
@@ -894,12 +965,13 @@ __device__ __forceinline__ LeafLane leaf_lane(const int64_t* lane_offsets, int64
     return {edge, a.edge_offsets[edge] + local / leaf.parent_count, local % leaf.parent_count};
 }
 
-// Mirrored chain of the leaf (parent sequence, then `group`) from its receiver, as half_chain forms it.
-__device__ void leaf_chain(const GroupTables& tables, const ChainLeaf& leaf, int64_t parent, int group,
-                           SequenceChain& chain) {
+// Mirrored chain of a lane's parent from its receiver, as half_chain forms it; leaf_child appends a child's bounce,
+// so the parent's bounces are formed once per lane rather than once per child.
+__device__ void leaf_parent_chain(const GroupTables& tables, const ChainLeaf& leaf, int64_t parent,
+                                  SequenceChain& chain) {
     chain.images[0] = cmath::load_vec3(leaf.receivers, leaf.parent_rx[parent]);
-    for (int bounce = 0; bounce <= leaf.width; ++bounce) {
-        const int g = bounce < leaf.width ? leaf.parent_sequences[parent * leaf.width + bounce] : group;
+    for (int bounce = 0; bounce < leaf.width; ++bounce) {
+        const int g = leaf.parent_sequences[parent * leaf.width + bounce];
         chain.groups[bounce] = g;
         chain.plane_point[bounce] = cmath::load_vec3(tables.plane_point, g);
         chain.plane_normal[bounce] = cmath::load_vec3(tables.plane_normal, g);
@@ -907,39 +979,60 @@ __device__ void leaf_chain(const GroupTables& tables, const ChainLeaf& leaf, int
     }
 }
 
+// The child's bounce (plane group `group`) after the parent chain, mirrored as half_chain mirrors it.
+__device__ __forceinline__ void leaf_child(const GroupTables& tables, const ChainLeaf& leaf,
+                                           int group, SequenceChain& chain) {
+    const int bounce = leaf.width;
+    chain.groups[bounce] = group;
+    chain.plane_point[bounce] = cmath::load_vec3(tables.plane_point, group);
+    chain.plane_normal[bounce] = cmath::load_vec3(tables.plane_normal, group);
+    chain.images[bounce + 1] =
+        mirror(chain.images[bounce], chain.plane_point[bounce], chain.plane_normal[bounce]);
+}
+
+// What a lane's children share: its transmitter-side entry, its parent (image, last group and mirrored chain) and
+// its edge's frame.
 struct LeafEntry {
     int tx;
     int a_node;
     float3 a_image;
     float3 parent_image;
     int last;
+    EdgeFrame frame;
+    SequenceChain chain;
 };
 
-__device__ __forceinline__ LeafEntry leaf_entry(const ChainHalf& a, const ChainLeaf& leaf, const LeafLane& lane) {
-    LeafEntry entry;
+__device__ __forceinline__ void leaf_entry(const GroupTables& tables, const ChainEdges& edges,
+                                           const ChainHalf& a, const ChainLeaf& leaf,
+                                           const LeafLane& lane, LeafEntry& entry) {
     half_entry(a, lane.a_entry, entry.tx, entry.a_node, entry.a_image);
     entry.parent_image = cmath::load_vec3(leaf.parent_images, lane.parent);
     entry.last = leaf.width > 0 ? leaf.parent_sequences[lane.parent * leaf.width + leaf.width - 1] : -1;
-    return entry;
+    entry.frame = edge_frame(edges, lane.edge);
+    leaf_parent_chain(tables, leaf, lane.parent, entry.chain);
 }
 
-__device__ bool chain_leaf_keep(const GroupTables& tables, const ChainEdges& edges, const ChainHalf& a,
-                                const ChainLeaf& leaf, const LeafLane& lane, const LeafEntry& entry, int group,
-                                const LeafTolerances& tol, float3& point) {
+// `entry.chain` holds the parent chain; the child's bounce is written after it.
+__device__ bool chain_leaf_keep(const GroupTables& tables, const ChainEdges& edges,
+                                const ChainHalf& a, const ChainLeaf& leaf, const LeafLane& lane,
+                                LeafEntry& entry, int group, const LeafTolerances& tol,
+                                float3& point) {
     if (group == entry.last) {
         return false;
     }
     const float3 image = mirror(entry.parent_image, cmath::load_vec3(tables.plane_point, group),
                                 cmath::load_vec3(tables.plane_normal, group));
-    if (!chain_edge_point(edges, lane.edge, entry.a_image, image, tol.edge_epsilon, point)) {
+    if (!chain_edge_point_on(entry.frame, edges, lane.edge, entry.a_image, image, tol.edge_epsilon,
+                             point)) {
         return false;
     }
-    SequenceChain chain;
-    if (!chain_a_side_keep(tables, a, entry.a_node, entry.tx, entry.a_image, point, tol.pair, chain)) {
+    SequenceChain a_chain;
+    if (!chain_a_side_keep(tables, a, entry.a_node, entry.tx, entry.a_image, point, tol.pair,
+                           a_chain)) {
         return false;
     }
-    leaf_chain(tables, leaf, lane.parent, group, chain);
-    if (!receiver_candidate(tables, chain, leaf.width + 1, point, tol.pair)) {
+    leaf_child(tables, leaf, group, entry.chain);
+    if (!receiver_candidate(tables, entry.chain, leaf.width + 1, point, tol.pair)) {
         return false;
     }
     return image_tree_keep(tables, entry.last, entry.parent_image, group, tol.tree) &&
@@ -957,7 +1050,8 @@ __global__ void chain_leaf_count_kernel(int64_t lane_start, int64_t lane_count, 
     for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x; index < lane_count;
          index += stride) {
         const LeafLane lane = leaf_lane(lane_offsets, edges.edge_count, a, leaf, lane_start + index);
-        const LeafEntry entry = leaf_entry(a, leaf, lane);
+        LeafEntry entry;
+        leaf_entry(tables, edges, a, leaf, lane, entry);
         int count = 0;
         unsigned int mask = 0u;
         for (int group = 0; group < tables.group_count; ++group) {
@@ -992,7 +1086,8 @@ __global__ void chain_leaf_write_kernel(int64_t lane_start, int64_t lane_count, 
             continue;
         }
         const LeafLane lane = leaf_lane(lane_offsets, edges.edge_count, a, leaf, lane_start + index);
-        const LeafEntry entry = leaf_entry(a, leaf, lane);
+        LeafEntry entry;
+        leaf_entry(tables, edges, a, leaf, lane, entry);
         // With a mask the kept groups are known; the point of each is recomputed by the same test.
         const unsigned int mask = masks != nullptr ? masks[index] : 0u;
         for (int group = 0; group < tables.group_count; ++group) {
