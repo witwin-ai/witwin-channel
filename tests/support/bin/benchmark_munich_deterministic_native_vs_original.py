@@ -21,18 +21,26 @@ sys.path.insert(0, str(_REPO_ROOT))
 
 # Local source must resolve from this checkout before importing the benchmark target.
 from witwin.core import Scene  # noqa: E402
+from benchmarks.reference_inputs import (  # noqa: E402
+    ORIGINAL_CHANNEL_ROOT_ENV,
+    default_city_xml,
+    env_path,
+    require_city_xml,
+    sionna_source_root_of,
+)
 from tests.support.core_world import (  # noqa: E402
     make_receiver_grid,
     make_transmitter,
 )
+from witwin.channel.importers import load_mitsuba  # noqa: E402
 from witwin.channel.radiomap import Coherent, solve  # noqa: E402
 
 
-DEFAULT_SIONNA_ROOT = pathlib.Path(
-    "E:/Code/witwin-platform/channel/reference/sionna-rt-reference-2.0.1/src"
-)
-DEFAULT_MUNICH_XML = DEFAULT_SIONNA_ROOT / "sionna" / "rt" / "scenes" / "munich" / "munich.xml"
-DEFAULT_CHANNEL_ROOT = pathlib.Path("E:/Code/witwin-platform/channel")
+# The Munich XML resolves from --scene-xml or $WITWIN_CHANNEL_SCENE_ROOT, and the archived
+# Channel reference checkout from --channel-root or $WITWIN_CHANNEL_ORIGINAL_ROOT; each default
+# is None when its source is unavailable.
+DEFAULT_MUNICH_XML = default_city_xml("munich")
+DEFAULT_CHANNEL_ROOT = env_path(ORIGINAL_CHANNEL_ROOT_ENV)
 COMPONENTS = ("los", "reflection", "diffraction")
 
 
@@ -68,14 +76,8 @@ def _db(values: torch.Tensor) -> torch.Tensor:
 
 
 def _load_scene(args: argparse.Namespace) -> Scene:
-    base = Scene.load_mitsuba(
-        pathlib.Path(args.scene_xml),
-        source_root=pathlib.Path(args.sionna_root),
-        merge_shapes=True,
-        frequency=float(args.frequency),
-        edge_selection_mode="all_edges",
-        boundary_edge_policy="half_plane",
-    )
+    scene_xml = require_city_xml("munich", args.scene_xml)
+    imported = load_mitsuba(scene_xml, frequency_hz=float(args.frequency), merge_shapes=True)
     xmin, xmax = args.bounds_x
     ymin, ymax = args.bounds_y
     grid_size = int(args.grid_size)
@@ -89,11 +91,14 @@ def _load_scene(args: argparse.Namespace) -> Scene:
         spacing=(spacing_x, spacing_y),
     )
     return Scene(
-        structures=base.structures,
-        transmitters=[make_transmitter(position=torch.tensor(args.tx, dtype=torch.float32), power_w=1.0)],
-        receivers=[grid],
-        frequency=base.frequency,
-        metadata=base.metadata,
+        structures=list(imported.structures),
+        endpoints=[
+            make_transmitter(position=torch.tensor(args.tx, dtype=torch.float32), power_w=1.0),
+            grid,
+        ],
+        # The solvers keep a merged Mitsuba import's edge table as imported; the default edge
+        # policy (all edges, half-plane boundary edges) matches the reference loader.
+        metadata={"mitsuba": {"merge_shapes": True, "source": str(scene_xml)}},
     )
 
 
@@ -138,8 +143,7 @@ def main() -> None:
     import drjit as dr
     from witwin.channel.core.scene import ReceiverGrid, Scene, Transmitter
     from witwin.channel.core.scene.edge_policy import EdgePolicy
-    from witwin.channel.radiomap import Coherent, solve
-    from witwin.channel.radiomap._coherent import Tuning
+    from witwin.channel.deterministic import Config, Tuning, solve
 
     scene = Scene.load_mitsuba(
         pathlib.Path(args.scene_xml),
@@ -148,9 +152,9 @@ def main() -> None:
         frequency=float(args.frequency),
         source_root=pathlib.Path(args.sionna_root),
     )
-    scene.add(make_transmitter("tx", tuple(float(v) for v in args.tx)))
+    scene.add(Transmitter("tx", tuple(float(v) for v in args.tx)))
     scene.add(
-        make_receiver_grid(
+        ReceiverGrid(
             "rm",
             axis="z",
             position=float(args.plane_z),
@@ -159,7 +163,7 @@ def main() -> None:
         )
     )
     max_bounces = max(0, int(args.max_depth))
-    config = Coherent(
+    config = Config(
         num_samples=1,
         max_bounces=max_bounces,
         max_diffraction_order=1,
@@ -209,9 +213,24 @@ if __name__ == "__main__":
 def _run_original(
     args: argparse.Namespace, artifact_dir: pathlib.Path,
 ) -> tuple[dict[str, Any], dict[str, torch.Tensor]]:
+    if args.channel_root is None:
+        return {
+            "available": False,
+            "reason": f"no original Channel checkout: pass --channel-root or set {ORIGINAL_CHANNEL_ROOT_ENV}",
+        }, {}
     channel_root = pathlib.Path(args.channel_root)
     if not channel_root.exists():
         return {"available": False, "reason": f"channel root not found: {channel_root}"}, {}
+    # run() resolves the scene XML before calling this; the worker reports a missing scene itself.
+    scene_xml = "" if args.scene_xml is None else str(args.scene_xml)
+    sionna_root = args.sionna_root
+    if sionna_root is None and scene_xml:
+        sionna_root = sionna_source_root_of(pathlib.Path(scene_xml))
+        if sionna_root is None:
+            return {
+                "available": False,
+                "reason": f"pass --sionna-root: {scene_xml} is not inside a sionna/rt/scenes source tree",
+            }, {}
     output_path = artifact_dir / "original_outputs.pt"
     command = [
         sys.executable,
@@ -220,9 +239,9 @@ def _run_original(
         "--channel-root",
         str(channel_root),
         "--scene-xml",
-        str(args.scene_xml),
+        scene_xml,
         "--sionna-root",
-        str(args.sionna_root),
+        "" if sionna_root is None else str(sionna_root),
         "--output",
         str(output_path),
         "--grid-size",
@@ -338,8 +357,7 @@ def _component_delta_metrics(
 def run(args: argparse.Namespace) -> dict[str, Any]:
     if not torch.cuda.is_available():
         raise RuntimeError("Munich deterministic parity requires CUDA")
-    if not pathlib.Path(args.scene_xml).exists():
-        raise FileNotFoundError(f"Munich scene is not available: {args.scene_xml}")
+    args.scene_xml = str(require_city_xml("munich", args.scene_xml))
 
     artifact_dir = pathlib.Path(args.artifact_dir).resolve()
     artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -357,11 +375,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         diagnostics=True,
     )
     for _ in range(max(0, int(args.warmup_runs))):
-        solve(scene, config)
+        solve(scene, config, reference_frequency_hz=float(args.frequency))
         torch.cuda.synchronize()
 
     start = time.perf_counter()
-    result = solve(scene, config)
+    result = solve(scene, config, reference_frequency_hz=float(args.frequency))
     torch.cuda.synchronize()
     native_solve_time_ms = (time.perf_counter() - start) * 1000.0
 
@@ -436,9 +454,18 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--artifact-dir", default=str(_REPO_ROOT / "artifacts" / "deterministic_munich"))
-    parser.add_argument("--scene-xml", default=str(DEFAULT_MUNICH_XML))
-    parser.add_argument("--sionna-root", default=str(DEFAULT_SIONNA_ROOT))
-    parser.add_argument("--channel-root", default=str(DEFAULT_CHANNEL_ROOT))
+    parser.add_argument(
+        "--scene-xml", default=None,
+        help="Munich XML; default: the Sionna layout under $WITWIN_CHANNEL_SCENE_ROOT",
+    )
+    parser.add_argument(
+        "--sionna-root", default=None,
+        help="Sionna source root for the original worker; default: derived from the scene XML",
+    )
+    parser.add_argument(
+        "--channel-root", default=None if DEFAULT_CHANNEL_ROOT is None else str(DEFAULT_CHANNEL_ROOT),
+        help=f"archived original Channel checkout (required); default: ${ORIGINAL_CHANNEL_ROOT_ENV}",
+    )
     parser.add_argument("--grid-size", type=int, default=32)
     parser.add_argument("--max-depth", type=int, default=2)
     parser.add_argument("--frequency", type=float, default=2.4e9)

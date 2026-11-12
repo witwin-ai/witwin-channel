@@ -23,6 +23,11 @@ def main() -> None:
     parser.add_argument("--original-timeout-seconds", type=float, default=600.0)
     parser.add_argument("--warmup-runs", type=int, default=1)
     parser.add_argument("--original-enable-rd-diffraction", action="store_true")
+    parser.add_argument("--scene-xml", default=None, help="default: under $WITWIN_CHANNEL_SCENE_ROOT")
+    parser.add_argument(
+        "--channel-root", default=None,
+        help="archived original Channel checkout; default: $WITWIN_CHANNEL_ORIGINAL_ROOT",
+    )
     args = parser.parse_args()
     parity_args = [
         "--artifact-dir",
@@ -38,6 +43,9 @@ def main() -> None:
     ]
     if bool(args.original_enable_rd_diffraction):
         parity_args.append("--original-enable-rd-diffraction")
+    for option, value in (("--scene-xml", args.scene_xml), ("--channel-root", args.channel_root)):
+        if value is not None:
+            parity_args.extend([option, str(value)])
     if args.json:
         parity_args.append("--json")
     parity_main(parity_args)

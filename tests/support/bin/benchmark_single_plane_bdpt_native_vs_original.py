@@ -19,20 +19,18 @@ _REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(_REPO_ROOT))
 
 # Local source must resolve from this checkout before importing the benchmark target.
-from witwin.core import PhysicalMaterial, Scene, Structure  # noqa: E402
+from witwin.core import PhysicalMaterial, Scene  # noqa: E402
+from benchmarks.reference_inputs import ORIGINAL_CHANNEL_ROOT_ENV, env_path  # noqa: E402
 from tests.support.core_world import (  # noqa: E402
+    make_mesh_structure,
     make_receiver_grid,
     make_transmitter,
 )
 from witwin.channel.experimental.bdpt import Config, solve  # noqa: E402
 
 
-def _default_channel_root() -> pathlib.Path:
-    candidates = tuple(parent / "channel" for parent in _REPO_ROOT.parents)
-    return next((path for path in candidates if path.is_dir()), candidates[0])
-
-
-DEFAULT_CHANNEL_ROOT = _default_channel_root()
+# The archived Channel reference checkout: --channel-root or $WITWIN_CHANNEL_ORIGINAL_ROOT, else None.
+DEFAULT_CHANNEL_ROOT = env_path(ORIGINAL_CHANNEL_ROOT_ENV)
 FREQUENCY_HZ = 3.0e9
 TX_POSITION = (0.0, -1.0, 0.5)
 GRID_BOUNDS = ((-1.0, 1.0), (0.0, 1.0))
@@ -61,7 +59,7 @@ def _native_scene(grid_size: int) -> Scene:
     spacing_z = (z_max - z_min) / float(grid_size)
     return Scene(
         structures=[
-            Structure(
+            make_mesh_structure(
                 vertices=vertices,
                 faces=faces,
                 material=PhysicalMaterial(eps_r=4.0, sigma_e=0.01),
@@ -69,17 +67,16 @@ def _native_scene(grid_size: int) -> Scene:
                 surface_id=11,
             )
         ],
-        transmitters=[make_transmitter(position=torch.tensor(TX_POSITION, dtype=torch.float32), power_w=1.0)],
-        receivers=[
+        endpoints=[
+            make_transmitter(position=torch.tensor(TX_POSITION, dtype=torch.float32), power_w=1.0),
             make_receiver_grid(
                 origin=torch.tensor([RECEIVER_PLANE_X, y_min + 0.5 * spacing_y, z_min + 0.5 * spacing_z]),
                 x_axis=torch.tensor([0.0, 1.0, 0.0]),
                 y_axis=torch.tensor([0.0, 0.0, 1.0]),
                 shape=(grid_size, grid_size),
                 spacing=(spacing_y, spacing_z),
-            )
+            ),
         ],
-        frequency=FREQUENCY_HZ,
     )
 
 
@@ -151,9 +148,9 @@ def main() -> None:
                 material=Material(eps_r=4.0, sigma_e=0.01),
             ),
         ],
-        transmitters=[make_transmitter("tx", (0.0, -1.0, 0.5), power=1.0)],
+        transmitters=[Transmitter("tx", (0.0, -1.0, 0.5), power=1.0)],
         receivers=[
-            make_receiver_grid(
+            ReceiverGrid(
                 "rm",
                 axis="x",
                 position=0.0,
@@ -230,9 +227,14 @@ def _timing_summary(timings: list[float]) -> dict[str, float]:
 
 
 def _run_original(
-    *, channel_root: pathlib.Path, artifact_dir: pathlib.Path, samples: int, grid_size: int,
+    *, channel_root: pathlib.Path | None, artifact_dir: pathlib.Path, samples: int, grid_size: int,
     seed: int, warmup_runs: int, repeats: int, timeout_seconds: float,
 ) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
+    if channel_root is None:
+        raise FileNotFoundError(
+            "original channel root not found: pass --channel-root or set "
+            f"{ORIGINAL_CHANNEL_ROOT_ENV} to the archived Channel checkout"
+        )
     if not channel_root.exists():
         raise FileNotFoundError(f"original channel root not found: {channel_root}")
     output_npz = artifact_dir / "original_outputs.npz"
@@ -347,7 +349,7 @@ def _run_native(
         diagnostics=True,
     )
     for _ in range(max(0, int(warmup_runs))):
-        solve(scene, config)
+        solve(scene, config, reference_frequency_hz=FREQUENCY_HZ)
         torch.cuda.synchronize()
 
     timings: list[float] = []
@@ -355,7 +357,7 @@ def _run_native(
     for _ in range(max(1, int(repeats))):
         torch.cuda.synchronize()
         start = time.perf_counter()
-        result = solve(scene, config)
+        result = solve(scene, config, reference_frequency_hz=FREQUENCY_HZ)
         torch.cuda.synchronize()
         timings.append(time.perf_counter() - start)
     assert result is not None
@@ -396,7 +398,7 @@ def _enforce_gates(gates: list[dict[str, object]]) -> None:
 
 
 def run_benchmark(
-    *, channel_root: str | pathlib.Path = DEFAULT_CHANNEL_ROOT,
+    *, channel_root: str | pathlib.Path | None = DEFAULT_CHANNEL_ROOT,
     artifact_dir: str | pathlib.Path = _REPO_ROOT / "artifacts" / "bdpt_single_plane_native_vs_original",
     samples: int = 256, grid_size: int = 8, seed: int = 7, warmup_runs: int = 1, repeats: int = 3,
     original_timeout_seconds: float = 180.0, min_speedup: float = 1.25,
@@ -408,7 +410,7 @@ def run_benchmark(
     artifact_path.mkdir(parents=True, exist_ok=True)
 
     original, original_arrays = _run_original(
-        channel_root=pathlib.Path(channel_root),
+        channel_root=None if channel_root is None else pathlib.Path(channel_root),
         artifact_dir=artifact_path,
         samples=int(samples),
         grid_size=int(grid_size),
@@ -494,7 +496,10 @@ def run_benchmark(
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--channel-root", default=str(DEFAULT_CHANNEL_ROOT))
+    parser.add_argument(
+        "--channel-root", default=None if DEFAULT_CHANNEL_ROOT is None else str(DEFAULT_CHANNEL_ROOT),
+        help=f"archived original Channel checkout (required); default: ${ORIGINAL_CHANNEL_ROOT_ENV}",
+    )
     parser.add_argument("--artifact-dir", default=str(_REPO_ROOT / "artifacts" / "bdpt_single_plane_native_vs_original"))
     parser.add_argument("--samples", type=int, default=256)
     parser.add_argument("--grid-size", type=int, default=8)

@@ -49,7 +49,7 @@ def _assert_live_gradient(grad: torch.Tensor) -> None:
 
 
 def test_munich_material_backward_is_finite_and_nonzero():
-    if not DEFAULT_MUNICH_XML.exists():
+    if DEFAULT_MUNICH_XML is None:
         pytest.skip("Munich reference scene is not available")
     scene = _munich_scene()
     leaf = compile_scene(
@@ -71,7 +71,7 @@ def test_munich_material_backward_is_finite_and_nonzero():
 
 
 def test_munich_transmitter_backward_is_finite_and_nonzero():
-    if not DEFAULT_MUNICH_XML.exists():
+    if DEFAULT_MUNICH_XML is None:
         pytest.skip("Munich reference scene is not available")
     base = _munich_scene()
     transmitter = next(endpoint for endpoint in base.endpoints if endpoint.role == "tx")
