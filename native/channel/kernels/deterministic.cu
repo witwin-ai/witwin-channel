@@ -134,6 +134,7 @@ pybind11::dict channel_deterministic_zero_field_phase(at::Tensor reference) {
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
 #include "scan.cuh"
+#include "fixed_sum.cuh"
 #include <thrust/sort.h>
 #include <thrust/unique.h>
 
@@ -144,6 +145,7 @@ pybind11::dict channel_deterministic_zero_field_phase(at::Tensor reference) {
 namespace {
 
 constexpr int kAccumBlockSize = 256;
+namespace fixed_sum = channel::fixed_sum;
 // Named component counts exported by channel_deterministic_component_counts
 // (los / reflection / diffraction only).
 constexpr int kComponentCount = 3;
@@ -197,7 +199,9 @@ __device__ __forceinline__ double accum_sqrt(double value) { return sqrt(value);
 __device__ __forceinline__ float accum_max_zero(float value) { return fmaxf(value, 0.0f); }
 __device__ __forceinline__ double accum_max_zero(double value) { return fmax(value, 0.0); }
 
-template <typename T>
+// One of the two passes of the order-independent cell sum: the observe pass records each
+// cell's largest magnitude per stream, the deposit pass adds the fixed-point terms.
+template <typename T, bool kDeposit>
 __global__ void deterministic_accumulate_paths_kernel(
     const bool *__restrict__ valid,
     const int *__restrict__ tx_id,
@@ -206,9 +210,9 @@ __global__ void deterministic_accumulate_paths_kernel(
     const T *__restrict__ path_gain,
     const T *__restrict__ field_real,
     const T *__restrict__ field_imag,
-    T *__restrict__ component_power,
-    T *__restrict__ component_field_real,
-    T *__restrict__ component_field_imag,
+    fixed_sum::Targets component_power,
+    fixed_sum::Targets component_field_real,
+    fixed_sum::Targets component_field_imag,
     int64_t path_count,
     int64_t num_tx,
     int64_t num_rx) {
@@ -228,17 +232,26 @@ __global__ void deterministic_accumulate_paths_kernel(
         }
         const int64_t cell = static_cast<int64_t>(tx) * num_rx + rx;
         const int64_t out = static_cast<int64_t>(slot) * cell_count + cell;
-        atomicAdd(component_power + out, path_gain[idx]);
-        atomicAdd(component_field_real + out, field_real[idx]);
-        atomicAdd(component_field_imag + out, field_imag[idx]);
+        if constexpr (kDeposit) {
+            fixed_sum::deposit(component_power, out, path_gain[idx]);
+            fixed_sum::deposit(component_field_real, out, field_real[idx]);
+            fixed_sum::deposit(component_field_imag, out, field_imag[idx]);
+        } else {
+            fixed_sum::observe(component_power, out, path_gain[idx]);
+            fixed_sum::observe(component_field_real, out, field_real[idx]);
+            fixed_sum::observe(component_field_imag, out, field_imag[idx]);
+        }
     }
 }
 
 template <typename T>
 __global__ void deterministic_finalize_accumulation_kernel(
+    fixed_sum::Targets power_sum_cells,
+    fixed_sum::Targets real_sum_cells,
+    fixed_sum::Targets imag_sum_cells,
     T *__restrict__ component_power,
-    const T *__restrict__ component_field_real,
-    const T *__restrict__ component_field_imag,
+    T *__restrict__ component_field_real,
+    T *__restrict__ component_field_imag,
     T *__restrict__ power_total,
     T *__restrict__ field_total_real,
     T *__restrict__ field_total_imag,
@@ -255,8 +268,12 @@ __global__ void deterministic_finalize_accumulation_kernel(
         T scattering_power = T(0);
         for (int slot = 0; slot < kAccumSlotCount; ++slot) {
             const int64_t out = static_cast<int64_t>(slot) * cell_count + cell;
-            const T real = component_field_real[out];
-            const T imag = component_field_imag[out];
+            const T real = fixed_sum::resolve<T>(real_sum_cells, out);
+            const T imag = fixed_sum::resolve<T>(imag_sum_cells, out);
+            const T gain_sum = fixed_sum::resolve<T>(power_sum_cells, out);
+            component_field_real[out] = real;
+            component_field_imag[out] = imag;
+            component_power[out] = gain_sum;
             if (coherent) {
                 if (slot == kScatteringSlot) {
                     if (scattering_coherent) {
@@ -275,7 +292,7 @@ __global__ void deterministic_finalize_accumulation_kernel(
                         // Power-domain slot: keep the scattered gains as the
                         // component power and fold them after the field
                         // square.
-                        scattering_power += component_power[out];
+                        scattering_power += gain_sum;
                     }
                     continue;
                 }
@@ -290,7 +307,7 @@ __global__ void deterministic_finalize_accumulation_kernel(
                     component_power[out] = coherent_power;
                     power_sum += coherent_power;
                 } else {
-                    power_sum += component_power[out];
+                    power_sum += gain_sum;
                 }
             }
             real_sum += real;
@@ -456,12 +473,12 @@ __global__ void deterministic_accumulate_backward_kernel(
     }
 }
 
-// JVP scatter: the same frozen-gate atomic scatter as the primal, with each
+// JVP scatter: the same frozen-gate order-independent scatter as the primal, with each
 // tangent stream optional so absent tangents stay exact zeros. Coherent
 // cells overwrite the tangent power of every field slot in the finalize, so
 // their gain tangents never scatter; the power-domain scattering slot keeps
 // its gain tangents in both modes.
-template <typename T>
+template <typename T, bool kDeposit>
 __global__ void deterministic_accumulate_tangent_scatter_kernel(
     const bool *__restrict__ valid,
     const int *__restrict__ tx_id,
@@ -470,9 +487,9 @@ __global__ void deterministic_accumulate_tangent_scatter_kernel(
     const T *__restrict__ tangent_path_gain,
     const T *__restrict__ tangent_field_real,
     const T *__restrict__ tangent_field_imag,
-    T *__restrict__ t_component_power,
-    T *__restrict__ t_component_field_real,
-    T *__restrict__ t_component_field_imag,
+    fixed_sum::Targets t_component_power,
+    fixed_sum::Targets t_component_field_real,
+    fixed_sum::Targets t_component_field_imag,
     int64_t path_count,
     int64_t num_tx,
     int64_t num_rx,
@@ -501,14 +518,21 @@ __global__ void deterministic_accumulate_tangent_scatter_kernel(
         const bool scatter_gain = (slot == kScatteringSlot)
                                       ? !scattering_coherent
                                       : !coherent;
+        const auto add = [&](const fixed_sum::Targets &targets, T value) {
+            if constexpr (kDeposit) {
+                fixed_sum::deposit(targets, out, value);
+            } else {
+                fixed_sum::observe(targets, out, value);
+            }
+        };
         if (tangent_path_gain != nullptr && scatter_gain) {
-            atomicAdd(t_component_power + out, tangent_path_gain[idx]);
+            add(t_component_power, tangent_path_gain[idx]);
         }
         if (tangent_field_real != nullptr) {
-            atomicAdd(t_component_field_real + out, tangent_field_real[idx]);
+            add(t_component_field_real, tangent_field_real[idx]);
         }
         if (tangent_field_imag != nullptr) {
-            atomicAdd(t_component_field_imag + out, tangent_field_imag[idx]);
+            add(t_component_field_imag, tangent_field_imag[idx]);
         }
     }
 }
@@ -522,9 +546,12 @@ __global__ void deterministic_accumulate_jvp_finalize_kernel(
     const T *__restrict__ component_field_real,
     const T *__restrict__ component_field_imag,
     const T *__restrict__ power_total,
+    fixed_sum::Targets t_power_cells,
+    fixed_sum::Targets t_real_cells,
+    fixed_sum::Targets t_imag_cells,
     T *__restrict__ t_component_power,
-    const T *__restrict__ t_component_field_real,
-    const T *__restrict__ t_component_field_imag,
+    T *__restrict__ t_component_field_real,
+    T *__restrict__ t_component_field_imag,
     T *__restrict__ t_power_total,
     T *__restrict__ t_field_total_real,
     T *__restrict__ t_field_total_imag,
@@ -543,8 +570,12 @@ __global__ void deterministic_accumulate_jvp_finalize_kernel(
         T t_scattering_power = T(0);
         for (int slot = 0; slot < kAccumSlotCount; ++slot) {
             const int64_t out = static_cast<int64_t>(slot) * cell_count + cell;
-            const T t_real = t_component_field_real[out];
-            const T t_imag = t_component_field_imag[out];
+            const T t_real = fixed_sum::resolve<T>(t_real_cells, out);
+            const T t_imag = fixed_sum::resolve<T>(t_imag_cells, out);
+            const T t_gain = fixed_sum::resolve<T>(t_power_cells, out);
+            t_component_field_real[out] = t_real;
+            t_component_field_imag[out] = t_imag;
+            t_component_power[out] = t_gain;
             if (coherent) {
                 if (slot == kScatteringSlot) {
                     if (scattering_coherent) {
@@ -562,7 +593,7 @@ __global__ void deterministic_accumulate_jvp_finalize_kernel(
                         // Power-domain slot: its tangent power is the
                         // scattered gain tangents and its field tangent
                         // reaches no total.
-                        t_scattering_power += t_component_power[out];
+                        t_scattering_power += t_gain;
                     }
                     continue;
                 }
@@ -579,7 +610,7 @@ __global__ void deterministic_accumulate_jvp_finalize_kernel(
                     t_component_power[out] = t_power;
                     t_power_sum += t_power;
                 } else {
-                    t_power_sum += t_component_power[out];
+                    t_power_sum += t_gain;
                 }
             }
             t_real_sum += t_real;
@@ -643,23 +674,6 @@ __global__ void deterministic_compact_edges_kernel(
         }
         compacted[offsets[idx]] = edge_id[idx];
     }
-}
-
-// Tangent accumulators must start at zero; allocate raw and memset on the
-// current stream (same pattern as field_transport_ad.cu) instead of ATen
-// zero-fill.
-at::Tensor zero_filled(at::IntArrayRef sizes, const at::TensorOptions &options) {
-    auto tensor = at::empty(sizes, options);
-    if (tensor.numel() > 0) {
-        cudaStream_t stream =
-            at::cuda::getCurrentCUDAStream(tensor.get_device()).stream();
-        C10_CUDA_CHECK(cudaMemsetAsync(
-            tensor.data_ptr(),
-            0,
-            static_cast<size_t>(tensor.numel()) * tensor.element_size(),
-            stream));
-    }
-    return tensor;
 }
 
 const at::Tensor *optional_grad(
@@ -748,44 +762,33 @@ pybind11::dict accumulate_flat_launch(
     const int64_t cell_count = num_tx * num_rx;
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(path_gain.get_device()).stream();
     const int64_t component_element_count = static_cast<int64_t>(kAccumSlotCount) * cell_count;
-    if (component_element_count > 0) {
-        C10_CUDA_CHECK(cudaMemsetAsync(
-            component_power.data_ptr<T>(),
-            0,
-            component_element_count * sizeof(T),
-            stream));
-        C10_CUDA_CHECK(cudaMemsetAsync(
-            component_field_real.data_ptr<T>(),
-            0,
-            component_element_count * sizeof(T),
-            stream));
-        C10_CUDA_CHECK(cudaMemsetAsync(
-            component_field_imag.data_ptr<T>(),
-            0,
-            component_element_count * sizeof(T),
-            stream));
-    }
+    // Three fixed-point streams (gain, field real, field imaginary) per slot and cell.
+    fixed_sum::Storage sums(3 * component_element_count, fopts, stream);
+    const int headroom = fixed_sum::headroom_for(path_count);
+    const fixed_sum::Targets power_cells = sums.targets(0, headroom);
+    const fixed_sum::Targets real_cells = sums.targets(component_element_count, headroom);
+    const fixed_sum::Targets imag_cells = sums.targets(2 * component_element_count, headroom);
     if (path_count > 0) {
-        deterministic_accumulate_paths_kernel<T>
-            <<<::channel::launch_blocks(path_count, kAccumBlockSize), kAccumBlockSize, 0, stream>>>(
-                valid.data_ptr<bool>(),
-                tx_id.data_ptr<int>(),
-                rx_id.data_ptr<int>(),
-                component_id.data_ptr<int>(),
-                path_gain.data_ptr<T>(),
-                field_real.data_ptr<T>(),
-                field_imag.data_ptr<T>(),
-                component_power.data_ptr<T>(),
-                component_field_real.data_ptr<T>(),
-                component_field_imag.data_ptr<T>(),
-                path_count,
-                num_tx,
-                num_rx);
+        const auto blocks = ::channel::launch_blocks(path_count, kAccumBlockSize);
+        deterministic_accumulate_paths_kernel<T, false><<<blocks, kAccumBlockSize, 0, stream>>>(
+            valid.data_ptr<bool>(), tx_id.data_ptr<int>(), rx_id.data_ptr<int>(),
+            component_id.data_ptr<int>(), path_gain.data_ptr<T>(), field_real.data_ptr<T>(),
+            field_imag.data_ptr<T>(), power_cells, real_cells, imag_cells, path_count, num_tx,
+            num_rx);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+        deterministic_accumulate_paths_kernel<T, true><<<blocks, kAccumBlockSize, 0, stream>>>(
+            valid.data_ptr<bool>(), tx_id.data_ptr<int>(), rx_id.data_ptr<int>(),
+            component_id.data_ptr<int>(), path_gain.data_ptr<T>(), field_real.data_ptr<T>(),
+            field_imag.data_ptr<T>(), power_cells, real_cells, imag_cells, path_count, num_tx,
+            num_rx);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     if (cell_count > 0) {
         deterministic_finalize_accumulation_kernel<T>
             <<<::channel::launch_blocks(cell_count, kAccumBlockSize), kAccumBlockSize, 0, stream>>>(
+                power_cells,
+                real_cells,
+                imag_cells,
                 component_power.data_ptr<T>(),
                 component_field_real.data_ptr<T>(),
                 component_field_imag.data_ptr<T>(),
@@ -1065,9 +1068,9 @@ pybind11::dict channel_deterministic_accumulate_flat_jvp(
         real_dtype, path_sizes, tx_id);
 
     auto fopts = component_field_real.options();
-    at::Tensor t_component_power = zero_filled({kAccumSlotCount, num_tx, num_rx}, fopts);
-    at::Tensor t_component_field_real = zero_filled({kAccumSlotCount, num_tx, num_rx}, fopts);
-    at::Tensor t_component_field_imag = zero_filled({kAccumSlotCount, num_tx, num_rx}, fopts);
+    at::Tensor t_component_power = at::empty({kAccumSlotCount, num_tx, num_rx}, fopts);
+    at::Tensor t_component_field_real = at::empty({kAccumSlotCount, num_tx, num_rx}, fopts);
+    at::Tensor t_component_field_imag = at::empty({kAccumSlotCount, num_tx, num_rx}, fopts);
     at::Tensor t_power_total = at::empty({num_tx, num_rx}, fopts);
     at::Tensor t_field_total_real = at::empty({num_tx, num_rx}, fopts);
     at::Tensor t_field_total_imag = at::empty({num_tx, num_rx}, fopts);
@@ -1076,48 +1079,32 @@ pybind11::dict channel_deterministic_accumulate_flat_jvp(
     const int64_t cell_count = num_tx * num_rx;
     cudaStream_t stream =
         at::cuda::getCurrentCUDAStream(tx_id.get_device()).stream();
+    const int64_t component_element_count = static_cast<int64_t>(kAccumSlotCount) * cell_count;
+    fixed_sum::Storage sums(3 * component_element_count, fopts, stream);
+    const int headroom = fixed_sum::headroom_for(path_count);
+    const fixed_sum::Targets power_cells = sums.targets(0, headroom);
+    const fixed_sum::Targets real_cells = sums.targets(component_element_count, headroom);
+    const fixed_sum::Targets imag_cells = sums.targets(2 * component_element_count, headroom);
     const bool any_tangent = tpg != nullptr || tfr != nullptr || tfi != nullptr;
     if (path_count > 0 && any_tangent) {
+        const auto blocks = ::channel::launch_blocks(path_count, kAccumBlockSize);
+        const auto scatter = [&](auto zero, auto deposit) {
+            using U = decltype(zero);
+            deterministic_accumulate_tangent_scatter_kernel<U, decltype(deposit)::value>
+                <<<blocks, kAccumBlockSize, 0, stream>>>(
+                    valid.data_ptr<bool>(), tx_id.data_ptr<int>(), rx_id.data_ptr<int>(),
+                    component_id.data_ptr<int>(), grad_ptr<U>(tpg), grad_ptr<U>(tfr),
+                    grad_ptr<U>(tfi), power_cells, real_cells, imag_cells, path_count, num_tx,
+                    num_rx, coherent ? 1 : 0, scattering_coherent);
+            C10_CUDA_KERNEL_LAUNCH_CHECK();
+        };
         if (real_dtype == at::kFloat) {
-            deterministic_accumulate_tangent_scatter_kernel<float>
-                <<<::channel::launch_blocks(path_count, kAccumBlockSize),
-                   kAccumBlockSize, 0, stream>>>(
-                    valid.data_ptr<bool>(),
-                    tx_id.data_ptr<int>(),
-                    rx_id.data_ptr<int>(),
-                    component_id.data_ptr<int>(),
-                    grad_ptr<float>(tpg),
-                    grad_ptr<float>(tfr),
-                    grad_ptr<float>(tfi),
-                    t_component_power.data_ptr<float>(),
-                    t_component_field_real.data_ptr<float>(),
-                    t_component_field_imag.data_ptr<float>(),
-                    path_count,
-                    num_tx,
-                    num_rx,
-                    coherent ? 1 : 0,
-                    scattering_coherent);
+            scatter(0.0f, std::false_type{});
+            scatter(0.0f, std::true_type{});
         } else {
-            deterministic_accumulate_tangent_scatter_kernel<double>
-                <<<::channel::launch_blocks(path_count, kAccumBlockSize),
-                   kAccumBlockSize, 0, stream>>>(
-                    valid.data_ptr<bool>(),
-                    tx_id.data_ptr<int>(),
-                    rx_id.data_ptr<int>(),
-                    component_id.data_ptr<int>(),
-                    grad_ptr<double>(tpg),
-                    grad_ptr<double>(tfr),
-                    grad_ptr<double>(tfi),
-                    t_component_power.data_ptr<double>(),
-                    t_component_field_real.data_ptr<double>(),
-                    t_component_field_imag.data_ptr<double>(),
-                    path_count,
-                    num_tx,
-                    num_rx,
-                    coherent ? 1 : 0,
-                    scattering_coherent);
+            scatter(0.0, std::false_type{});
+            scatter(0.0, std::true_type{});
         }
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     if (cell_count > 0) {
         if (real_dtype == at::kFloat) {
@@ -1127,6 +1114,9 @@ pybind11::dict channel_deterministic_accumulate_flat_jvp(
                     component_field_real.data_ptr<float>(),
                     component_field_imag.data_ptr<float>(),
                     power_total.data_ptr<float>(),
+                    power_cells,
+                    real_cells,
+                    imag_cells,
                     t_component_power.data_ptr<float>(),
                     t_component_field_real.data_ptr<float>(),
                     t_component_field_imag.data_ptr<float>(),
@@ -1143,6 +1133,9 @@ pybind11::dict channel_deterministic_accumulate_flat_jvp(
                     component_field_real.data_ptr<double>(),
                     component_field_imag.data_ptr<double>(),
                     power_total.data_ptr<double>(),
+                    power_cells,
+                    real_cells,
+                    imag_cells,
                     t_component_power.data_ptr<double>(),
                     t_component_field_real.data_ptr<double>(),
                     t_component_field_imag.data_ptr<double>(),
