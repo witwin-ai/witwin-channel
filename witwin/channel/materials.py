@@ -227,7 +227,8 @@ def _build_face_material_field_bundle(
 
     # The layer-store row the straight-through transmission paths cross each face with: thin-sheet
     # materials only; any other face blocks those paths (-1).
-    thin_sheet = materials.geometry_mode_id.to(device=device).index_select(0, material_id) == 0
+    geometry_mode_id = material_level(materials.geometry_mode_id, torch.int32)
+    thin_sheet = geometry_mode_id.index_select(0, material_id) == 0
     return {
         "transmission_row": torch.where(thin_sheet, material_id, -1).to(dtype=torch.int32).contiguous(),
         "eps_r": per_face(materials.eps_r),
@@ -252,7 +253,7 @@ def _build_face_material_field_bundle(
         "rough_corr_x_m": material_level(materials.rough_corr_x_m, torch.float32),
         "rough_corr_y_m": material_level(materials.rough_corr_y_m, torch.float32),
         "rough_axis_rad": material_level(materials.rough_axis_rad, torch.float32),
-        "geometry_mode_id": material_level(materials.geometry_mode_id, torch.int32),
+        "geometry_mode_id": geometry_mode_id,
         "scatter_model_id": material_level(materials.scatter_model_id, torch.int32),
     }
 
