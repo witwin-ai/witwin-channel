@@ -176,9 +176,8 @@ use interaction width `D`.
 | `component_id` | `(K,) int32` | Component code. |
 | `primitive_id`, `edge_id`, `material_id` | `(K,) int32` | First-interaction convenience columns. |
 | `path_length_m`, `delay_s`, `path_gain` | `(K,) float32` | Length, delay, and gain. |
-| `interaction_position`, `interaction_normal` | `(K, 3) float32` | First-interaction convenience views. |
 | `primitive_sequence`, `material_sequence` | `(K, D) int32` | Complete interaction sequences. |
-| `interaction_positions`, `interaction_normals` | `(K, D, 3) float32` | Complete interaction geometry. |
+| `interaction_positions`, `interaction_normals` | `(K, D, 3) float32` | Complete interaction geometry; `[:, 0]` is the first interaction (when `D > 0`). |
 | `field_real`, `field_imag` | `(K,) float32` | Real and imaginary path-field components. |
 | `coefficient` | `(K,) complex64` | Complex path coefficient. |
 | `field_xyz` | `(K, 3) complex64` | World-Cartesian complex field. |

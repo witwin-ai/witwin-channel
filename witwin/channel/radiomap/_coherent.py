@@ -148,8 +148,6 @@ class PathTable:
     path_length_m: torch.Tensor
     delay_s: torch.Tensor
     path_gain: torch.Tensor
-    interaction_position: torch.Tensor
-    interaction_normal: torch.Tensor
     material_id: torch.Tensor
     primitive_sequence: torch.Tensor
     material_sequence: torch.Tensor
@@ -434,12 +432,6 @@ def build_path_table(
         path_length_m=geometry.path_length_m.to(dtype=torch.float32).contiguous(),
         delay_s=geometry.delay_s.to(dtype=torch.float32).contiguous(),
         path_gain=fields.path_gain.to(dtype=torch.float32).contiguous(),
-        interaction_position=geometry.interaction_position.to(
-            dtype=torch.float32
-        ).contiguous(),
-        interaction_normal=geometry.interaction_normal.to(
-            dtype=torch.float32
-        ).contiguous(),
         material_id=topology.material_id.to(dtype=torch.int32).contiguous(),
         primitive_sequence=topology.primitive_sequence.to(
             dtype=torch.int32

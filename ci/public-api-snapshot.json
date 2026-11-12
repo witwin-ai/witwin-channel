@@ -113,7 +113,7 @@
           "name": "PathTable",
           "kind": "class",
           "target": "witwin.channel.radiomap.PathTable",
-          "contract_sha256": "c7062a093c4a2a89da11ddf8db7c68409af71bd569b75b45c79f846af8ae2bb1"
+          "contract_sha256": "1b2b2b06a4984d816280527f3678d53f67e754337f27e92c7d4e763286acba6d"
         },
         {
           "name": "RadioMap",

@@ -301,5 +301,5 @@ def test_back_wall_reflection_is_blocked_by_front_wall():
     assert result.paths is not None
     # Only the front-wall specular path may survive; the back-wall path is occluded.
     assert int(result.paths.valid.numel()) == 1
-    hit_x = result.paths.interaction_position[:, 0]
+    hit_x = result.paths.interaction_positions[:, 0, 0]
     torch.testing.assert_close(hit_x, torch.full_like(hit_x, 2.5))
