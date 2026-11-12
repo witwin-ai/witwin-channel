@@ -13,7 +13,7 @@
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
     "witwin/channel/radiomap/_stochastic.py::diffraction_component_map": {
-      "ceiling": 19,
+      "ceiling": 18,
       "expires_on": "2027-01-31",
       "owner": "radiomap maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
