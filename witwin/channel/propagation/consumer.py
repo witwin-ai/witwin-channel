@@ -1518,6 +1518,20 @@ def _fixed_topology_component_name(component_id: int) -> str:
     )
 
 
+def _require_supported_components(topology: PropagationTopology) -> None:
+    """Name an unsupported component before a padding error hides it."""
+
+    supported = torch.tensor(
+        [value for _, value in _FIXED_TOPOLOGY_COMPONENT_IDS],
+        device=topology.device,
+        dtype=torch.int64,
+    )
+    component = topology.component_id.to(dtype=torch.int64)
+    unsupported = component[~torch.isin(component, supported)]
+    if unsupported.numel() > 0:
+        _fixed_topology_component_name(int(unsupported[0].item()))
+
+
 def _require_bucket_depth(component: str, depth: int) -> None:
     if component == "los" and depth != 0:
         raise ValueError("a los row must have depth 0")
@@ -1567,6 +1581,7 @@ def prepare_fixed_topology(topology: PropagationTopology) -> PreparedFixedTopolo
         )
     width = int(topology.primitive_sequence.shape[1])
     if bool(_malformed_rows(topology, width).any().item()):
+        _require_supported_components(topology)
         raise ValueError(
             "frozen topology rows disagree with their interaction sequence "
             "padding; depth must be in [0, sequence width] and unused slots "
