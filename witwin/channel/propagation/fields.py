@@ -732,7 +732,7 @@ def _evaluate_diffraction_fields(
     frequency: float | torch.Tensor, frequency_value: float | None, geometry_ad: bool,
     vertices: torch.Tensor | None, ledger: AdLaunchLedger | None,
     material: dict[str, torch.Tensor] | None, groups: PathRowGroups, outputs: _FieldOutputs,
-    launch_count: int, transmission_crossings: int = 0,
+    transmission_crossings: int, launch_count: int,
 ) -> tuple[dict[str, torch.Tensor] | None, int]:
     if groups.count(_DIFFRACTION_GROUP) > 0:
         diffraction_rows = groups.rows(_DIFFRACTION_GROUP)
@@ -985,7 +985,7 @@ def _evaluate_differentiable_rows(
     material, launch_count = _evaluate_diffraction_fields(
         scene, compiled, topology, source, target, source_power, rx_pol, device, frequency,
         frequency_value, geometry_ad, vertices, ledger, material, row_groups, outputs,
-        launch_count, transmission_crossings,
+        transmission_crossings, launch_count,
     )
     _, launch_count = _evaluate_coupled_fields(
         scene, compiled, topology, geometry, source, target, source_power, tx_pol, rx_pol, device,

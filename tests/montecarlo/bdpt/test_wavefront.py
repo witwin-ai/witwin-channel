@@ -136,17 +136,23 @@ def test_enumerated_oracle_is_called_once(monkeypatch):
         reference_frequency_hz=_FREQUENCY,
     )
     assert calls == [frozenset(components)]
-    for component in sorted(components):
-        alone = bdpt.solve(
-            scene,
-            bdpt.Config(samples=256, max_depth=1, components={component}),
+
+    def power(subset: set[str], component: str) -> torch.Tensor:
+        return bdpt.solve(
+            scene, bdpt.Config(samples=256, max_depth=1, components=subset),
             reference_frequency_hz=_FREQUENCY,
-        )
+        ).component_power[component]
+
+    for component in sorted(components):
+        # With the transmission paths in the solve the diffraction's incident terms compensate only the
+        # step those paths leave (design record adr-0xx-fw-penetrable-wedge), so the diffraction of the
+        # joint solve equals the diffraction of a solve that also carries transmission.
+        subset = {"diffraction", "transmission"} if component == "diffraction" else {component}
         torch.testing.assert_close(
-            together.component_power[component],
-            alone.component_power[component],
-            rtol=1.0e-6,
-            atol=0.0,
+            together.component_power[component], power(subset, component), rtol=1.0e-6, atol=0.0
         )
+    # The weighting is active: diffraction alone, without transmission paths, differs.
+    alone = power({"diffraction"}, "diffraction")
+    assert not torch.allclose(together.component_power["diffraction"], alone, rtol=1.0e-3, atol=0.0)
 
 
