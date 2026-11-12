@@ -1238,7 +1238,7 @@ class AdLaunchLedger:
     one per registered differentiable Function. ``tape_bytes`` sums the
     tensors the reverse pass retains via ``save_for_backward``; forward mode
     retains nothing past the solve, so jvp reports zero tape. One ledger
-    shape for every solver (montecarlo.basic, deterministic, path).
+    shape for every solver (radiomap.Stochastic, radiomap.Coherent, path).
     """
 
     launches: int = 0

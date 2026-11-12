@@ -152,7 +152,7 @@ class EnumeratedPathConfig(Protocol):
 class EnumeratedOptions:
     """The options the enumerated engine reads; the single owner of every shared field.
 
-    ``path.Config`` and ``deterministic.Config`` derive from it and add only the fields
+    ``path.Config`` and ``radiomap.Coherent`` derive from it and add only the fields
     their terminal stage reads; the consumer builds one from its request.
     """
 

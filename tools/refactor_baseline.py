@@ -29,9 +29,8 @@ DEFAULT_PUBLIC_MODULES = (
     f"{PACKAGE}.capabilities",
     f"{PACKAGE}.propagation.consumer",
     f"{PACKAGE}.path",
-    f"{PACKAGE}.deterministic",
-    f"{PACKAGE}.montecarlo.basic",
-    f"{PACKAGE}.montecarlo.bdpt",
+    f"{PACKAGE}.radiomap",
+    f"{PACKAGE}.experimental.bdpt",
 )
 REQUIRED_RUNTIME_KINDS = ("solver-results", "launch-ledger", "performance")
 _SOURCE_SUFFIXES = frozenset({".cpp", ".cu", ".cuh", ".h", ".hpp"})
@@ -878,9 +877,9 @@ def _strongly_connected_components(
 def _solver_area(module: str) -> str | None:
     areas = {
         f"{PACKAGE}.path": "path",
-        f"{PACKAGE}.deterministic": "deterministic",
-        f"{PACKAGE}.montecarlo.basic": "montecarlo.basic",
-        f"{PACKAGE}.montecarlo.bdpt": "montecarlo.bdpt",
+        f"{PACKAGE}.radiomap._coherent": "radiomap._coherent",
+        f"{PACKAGE}.radiomap._stochastic": "radiomap._stochastic",
+        f"{PACKAGE}.experimental.bdpt": "experimental.bdpt",
     }
     for prefix, label in areas.items():
         if module == prefix or module.startswith(f"{prefix}."):

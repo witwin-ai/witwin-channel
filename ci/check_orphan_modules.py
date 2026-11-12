@@ -15,8 +15,9 @@ from pathlib import Path
 PACKAGE = "witwin.channel"
 DEFAULT_PACKAGE_PATH = Path("witwin/channel")
 
-# The stable public API, per CLAUDE.md: the package root, the four solver entry
-# points and the importer/preset modules. The root exports only what Channel
+# The stable public API, per CLAUDE.md: the package root, the path and radiomap
+# solver entry points and the importer/preset modules; the experimental tier; and the
+# removed 0.5 paths, which only raise ImportError. The root exports only what Channel
 # owns, so it does not reach a solver; each solver is a module a caller imports
 # directly.
 ENTRY_POINTS: dict[str, str] = {
@@ -25,9 +26,10 @@ ENTRY_POINTS: dict[str, str] = {
         "ci/public-api-snapshot.json"
     ),
     f"{PACKAGE}.path": "the Path solver entry point",
-    f"{PACKAGE}.deterministic": "the Deterministic solver entry point",
-    f"{PACKAGE}.montecarlo.basic": "the Monte Carlo Basic solver entry point",
-    f"{PACKAGE}.montecarlo.bdpt": "the Monte Carlo BDPT solver entry point",
+    f"{PACKAGE}.radiomap": "the radiomap entry point (Coherent and Stochastic estimators)",
+    f"{PACKAGE}.experimental.bdpt": "the experimental BDPT solver, outside the stable API",
+    f"{PACKAGE}.deterministic": "a removed path that raises ImportError naming radiomap",
+    f"{PACKAGE}.montecarlo": "a removed path that raises ImportError naming the new paths",
     f"{PACKAGE}.importers": "the scene importer entry point",
     f"{PACKAGE}.presets": "the material and antenna-pattern preset entry point",
     f"{PACKAGE}.__main__": "the `python -m witwin.channel doctor` command",

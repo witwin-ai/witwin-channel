@@ -52,14 +52,14 @@ def test_solver_and_deleted_module_boundaries_are_detected(tmp_path: Path):
             "__init__.py": "",
             "path/__init__.py": "",
             "path/pipeline.py": """
-import witwin.channel.deterministic.solver
-import witwin.channel.montecarlo.scattering_events
+import witwin.channel.radiomap._coherent.solver
+import witwin.channel.experimental.scattering_events
 from witwin.channel.core.kernels import ops
 from witwin.channel.runtime import native_extension
 import witwin.channel._channel
 """,
-            "deterministic/solver.py": "",
-            "montecarlo/scattering_events.py": "",
+            "radiomap/_coherent/solver.py": "",
+            "experimental/scattering_events.py": "",
             "runtime.py": "",
         },
     )
@@ -75,13 +75,58 @@ import witwin.channel._channel
     }
 
 
+def test_radiomap_estimators_never_import_each_other(tmp_path: Path):
+    """``_coherent`` and ``_stochastic`` stay independent; only the facade names both."""
+
+    package_root = _synthetic_package(
+        tmp_path,
+        {
+            "__init__.py": "",
+            "radiomap/__init__.py": (
+                "from witwin.channel.radiomap import _coherent, _stochastic\n"
+                "from witwin.channel.radiomap._coherent import Coherent\n"
+                "from witwin.channel.radiomap._stochastic import Stochastic\n"
+            ),
+            "radiomap/_coherent.py": (
+                "from witwin.channel.radiomap._stochastic import Stochastic\n"
+                "from witwin.channel import radiomap\n"
+            ),
+            "radiomap/_stochastic.py": (
+                "from witwin.channel.radiomap import Coherent\n"
+            ),
+        },
+    )
+
+    found = sorted(
+        (violation.rule, violation.source, violation.target)
+        for violation in graph.scan_package(package_root)
+    )
+    package = "witwin.channel.radiomap"
+    assert found == [
+        ("enumerated_pipeline_mc_internal", f"{package}._coherent", f"{package}._stochastic"),
+        ("radiomap_estimator_cross_import", f"{package}._coherent", package),
+        ("radiomap_estimator_cross_import", f"{package}._coherent", f"{package}._stochastic"),
+        ("radiomap_estimator_cross_import", f"{package}._stochastic", f"{package}._coherent"),
+        ("solver_to_solver", f"{package}._coherent", f"{package}._stochastic"),
+        ("solver_to_solver", f"{package}._stochastic", f"{package}._coherent"),
+    ]
+
+
+def test_the_real_radiomap_estimators_are_independent():
+    assert not [
+        violation
+        for violation in graph.scan_package(PACKAGE_ROOT)
+        if violation.rule in {"radiomap_estimator_cross_import", "solver_to_solver"}
+    ]
+
+
 def test_propagation_runtime_oracle_and_kernel_boundaries_are_detected(tmp_path: Path):
     package_root = _synthetic_package(
         tmp_path,
         {
             "__init__.py": "",
             "path/result.py": "",
-            "deterministic/solver.py": "",
+            "radiomap/_coherent/solver.py": "",
             "scene/__init__.py": "",
             "scattering/__init__.py": "",
             "propagation/enumerated.py": ("import witwin.channel.path.result\n"),
@@ -93,7 +138,7 @@ def test_propagation_runtime_oracle_and_kernel_boundaries_are_detected(tmp_path:
             "propagation/fields.py": "import witwin.channel.path.result\n",
             "runtime/state.py": "import witwin.channel.scene\n",
             "scene/kernels/private.py": """
-import witwin.channel.deterministic.solver
+import witwin.channel.radiomap._coherent.solver
 import witwin.channel.materials.kernels.private
 """,
             "materials/kernels/private.py": "",
@@ -251,7 +296,7 @@ def test_frozen_baseline_universe_cannot_change():
             "path": "witwin/channel/path.py",
             "rule": "solver_to_solver",
             "source": "witwin.channel.path",
-            "target": "witwin.channel.deterministic",
+            "target": "witwin.channel.radiomap._coherent",
         }
     )
 
@@ -283,8 +328,8 @@ def test_allowance_survives_moving_the_import(tmp_path: Path):
                 "__init__.py": "",
                 "propagation/__init__.py": "from .enumerated import evaluate_enumerated_paths\n",
                 "propagation/enumerated.py": "",
-                "montecarlo/__init__.py": "",
-                "montecarlo/bdpt.py": (
+                "experimental/__init__.py": "",
+                "experimental/bdpt.py": (
                     prefix + "from witwin.channel.propagation import evaluate_enumerated_paths\n"
                 ),
             },
@@ -351,15 +396,16 @@ def test_reexport_canonicalization_reveals_facade_dependency(tmp_path: Path):
             ),
             "propagation/topology/kernels/__init__.py": "",
             "propagation/topology/kernels/sampling.py": "",
-            "montecarlo/__init__.py": "",
-            "montecarlo/bdpt/__init__.py": "",
-            "montecarlo/bdpt/pipeline.py": (
+            "experimental/__init__.py": "",
+            "experimental/bdpt/__init__.py": "",
+            "experimental/bdpt/pipeline.py": (
                 "from witwin.channel.propagation import "
                 "EvaluatedPaths, evaluate_enumerated_paths\n"
             ),
-            "montecarlo/basic/__init__.py": "",
-            "montecarlo/basic/kernels/__init__.py": "",
-            "montecarlo/basic/kernels/sampling.py": (
+            "radiomap/__init__.py": "",
+            "radiomap/_stochastic/__init__.py": "",
+            "radiomap/_stochastic/kernels/__init__.py": "",
+            "radiomap/_stochastic/kernels/sampling.py": (
                 "from witwin.channel.propagation.topology "
                 "import mc_sample_directions\n"
             ),
@@ -386,9 +432,9 @@ def test_module_only_imports_are_not_canonicalized(tmp_path: Path):
             ),
             "propagation/enumerated/__init__.py": "",
             "propagation/enumerated/engine.py": "",
-            "montecarlo/__init__.py": "",
-            "montecarlo/bdpt/__init__.py": "",
-            "montecarlo/bdpt/pipeline.py": (
+            "experimental/__init__.py": "",
+            "experimental/bdpt/__init__.py": "",
+            "experimental/bdpt/pipeline.py": (
                 "import witwin.channel.propagation\n"
             ),
         },
@@ -414,7 +460,7 @@ def test_reexport_canonicalization_exposes_real_bdpt_enumerated_edge():
     # tests rely on ...
     raw = graph.collect_import_edges(PACKAGE_ROOT)
     assert any(
-        edge.source == f"{package}.montecarlo.bdpt"
+        edge.source == f"{package}.experimental.bdpt"
         and edge.target == f"{package}.propagation"
         and edge.imported_name == "evaluate_enumerated_paths"
         for edge in raw
@@ -432,9 +478,9 @@ def test_reexport_canonicalization_exposes_real_bdpt_enumerated_edge():
         for violation in enumerated
     ] == [
         (
-            "witwin/channel/montecarlo/bdpt.py",
+            "witwin/channel/experimental/bdpt.py",
             "mc_enumerated_dependency",
-            f"{package}.montecarlo.bdpt",
+            f"{package}.experimental.bdpt",
             f"{package}.propagation.enumerated",
         )
     ]
@@ -452,7 +498,7 @@ def test_bdpt_enumerated_allowlist_entry_is_exact_and_adr_bound():
     assert entry["rule"] == "mc_enumerated_dependency"
     # This is the only allowed Monte Carlo dependency on enumerated
     # propagation, and both canonical module names are exact.
-    assert entry["source"] == "witwin.channel.montecarlo.bdpt"
+    assert entry["source"] == "witwin.channel.experimental.bdpt"
     assert entry["target"] == "witwin.channel.propagation.enumerated"
     assert "ADR-008" in (entry.get("adr", "") + entry.get("justification", ""))
 
@@ -467,7 +513,7 @@ def test_bdpt_enumerated_allowlist_entry_is_exact_and_adr_bound():
         if violation.rule == "mc_enumerated_dependency"
     ]
     assert len(bound) == 1
-    assert bound[0].source == "witwin.channel.montecarlo.bdpt"
+    assert bound[0].source == "witwin.channel.experimental.bdpt"
 
 
 def test_public_init_forbids_every_internal_kernels_package(tmp_path: Path):
@@ -478,13 +524,13 @@ def test_public_init_forbids_every_internal_kernels_package(tmp_path: Path):
                 "from witwin.channel.materials.kernels import encoding\n"
                 "from witwin.channel.scattering.kernels import lobe\n"
                 "from witwin.channel.scene.kernels import handles\n"
-                "from witwin.channel.deterministic.kernels import accumulate\n"
+                "from witwin.channel.radiomap.kernels import accumulate\n"
                 "from witwin.channel.propagation.fields.kernels import transport\n"
             ),
             "materials/kernels/encoding.py": "",
             "scattering/kernels/lobe.py": "",
             "scene/kernels/handles.py": "",
-            "deterministic/kernels/accumulate.py": "",
+            "radiomap/kernels/accumulate.py": "",
             "propagation/fields/kernels/transport.py": "",
         },
     )

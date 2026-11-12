@@ -6,28 +6,28 @@
       "owner": "core maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
-    "witwin/channel/deterministic.py::_solve_pipeline": {
+    "witwin/channel/radiomap/_coherent.py::_solve_pipeline": {
       "ceiling": 20,
       "expires_on": "2027-01-31",
-      "owner": "deterministic maintainers",
+      "owner": "radiomap maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
-    "witwin/channel/montecarlo/basic.py::solve_pipeline": {
+    "witwin/channel/radiomap/_stochastic.py::solve_pipeline": {
       "ceiling": 49,
       "expires_on": "2027-01-31",
-      "owner": "montecarlo/basic maintainers",
+      "owner": "radiomap maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
-    "witwin/channel/montecarlo/basic.py::diffraction_component_map": {
+    "witwin/channel/radiomap/_stochastic.py::diffraction_component_map": {
       "ceiling": 19,
       "expires_on": "2027-01-31",
-      "owner": "montecarlo/basic maintainers",
+      "owner": "radiomap maintainers",
       "reason": "Existing control-flow debt is scheduled for decomposition without expanding its current surface."
     },
-    "witwin/channel/montecarlo/bdpt.py::_collect_connection_samples": {
+    "witwin/channel/experimental/bdpt.py::_collect_connection_samples": {
       "ceiling": 27,
       "expires_on": "2027-01-31",
-      "owner": "montecarlo/bdpt maintainers",
+      "owner": "experimental/bdpt maintainers",
       "reason": "Per-strategy connection-sample orchestration extracted verbatim from the former solve() monolith; each component branch stays inside this single stage."
     },
     "witwin/channel/path.py::PathResult.__post_init__": {

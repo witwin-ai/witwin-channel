@@ -89,104 +89,56 @@
       ]
     },
     {
-      "module": "witwin.channel.deterministic",
+      "module": "witwin.channel.radiomap",
       "exports": [
         {
-          "name": "Config",
+          "name": "Coherent",
           "kind": "class",
-          "target": "witwin.channel.deterministic.Config",
-          "contract_sha256": "6c4ef1cfbda91086c0ebcdb89e9eb1f9d7ae5e918274e526b2be346cf2b709d6"
+          "target": "witwin.channel.radiomap.Coherent",
+          "contract_sha256": "d53b22ccce4566ab62c9728fa1972024d9db39b6e9aec61c774f2dedbcea3b9b"
         },
         {
-          "name": "Metadata",
+          "name": "CoherentRadioMap",
           "kind": "class",
-          "target": "witwin.channel.deterministic.Metadata",
-          "contract_sha256": "0fd5eec1a0c853113853265207539a1d41d62fc3011fe8fac6adb1c1de9c8fe6"
+          "target": "witwin.channel.radiomap.CoherentRadioMap",
+          "contract_sha256": "f8bf9a9b4f48522af85baa83a085229ffe46db772f40c9fffab28cb6a82aba7c"
+        },
+        {
+          "name": "CoherentRadioMapMetadata",
+          "kind": "class",
+          "target": "witwin.channel.radiomap.CoherentRadioMapMetadata",
+          "contract_sha256": "1d8dbee5b1ed5bf240410eed1ac1c4d5e6c4ab0d9ed7e3bf0b5e7c16598965d9"
         },
         {
           "name": "PathTable",
           "kind": "class",
-          "target": "witwin.channel.deterministic.PathTable",
-          "contract_sha256": "b3d55198e6b29afdd747ae09e695769adcb4a9d40c83b83110e38209b2a6b5ab"
+          "target": "witwin.channel.radiomap.PathTable",
+          "contract_sha256": "c7062a093c4a2a89da11ddf8db7c68409af71bd569b75b45c79f846af8ae2bb1"
         },
         {
-          "name": "Result",
+          "name": "RadioMap",
           "kind": "class",
-          "target": "witwin.channel.deterministic.Result",
-          "contract_sha256": "da82078dfe210d25b6f872146abccefec88bbfab839a0f12b423578731daff66"
+          "target": "witwin.channel.radiomap.RadioMap",
+          "contract_sha256": "859758baf00a2c2e74b36218108696dac80638159d4e7653cd90b2cb6a423ca2"
+        },
+        {
+          "name": "RadioMapMetadata",
+          "kind": "class",
+          "target": "witwin.channel.radiomap.RadioMapMetadata",
+          "contract_sha256": "b3f7543e2b5449f5b7806c4cb56c3e18c23bdfbad3e99e5b3172281b7cdeda27"
+        },
+        {
+          "name": "Stochastic",
+          "kind": "class",
+          "target": "witwin.channel.radiomap.Stochastic",
+          "contract_sha256": "173c05f59aaa99247f334bc145e5d240f89b2837606e3849bbd0c68dd07ba165"
         },
         {
           "name": "solve",
           "kind": "function",
-          "target": "witwin.channel.deterministic.solve",
-          "contract_sha256": "e462205d55b7d3a6965a6b2cbf918a67820346ea65005d40fc009713edef0ac6",
-          "signature": "(scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz: float | torch.Tensor)"
-        }
-      ]
-    },
-    {
-      "module": "witwin.channel.montecarlo.basic",
-      "exports": [
-        {
-          "name": "Config",
-          "kind": "class",
-          "target": "witwin.channel.montecarlo.basic.Config",
-          "contract_sha256": "57702b0a1b40234fc5cc8f5a88ab6c195329ee58dbb5ed074b04d7b0fde0b95f"
-        },
-        {
-          "name": "Metadata",
-          "kind": "class",
-          "target": "witwin.channel.montecarlo.basic.Metadata",
-          "contract_sha256": "b9aa66bafc12ae823ac24800a72657822dcf3c92063f7b794b2defee8d4d18ec"
-        },
-        {
-          "name": "Result",
-          "kind": "class",
-          "target": "witwin.channel.montecarlo.basic.Result",
-          "contract_sha256": "5e1d9b861793b443e8fb42b9873256a14dfc1afda24813f8b474c014670588e9"
-        },
-        {
-          "name": "solve",
-          "kind": "function",
-          "target": "witwin.channel.montecarlo.basic.solve",
-          "contract_sha256": "4d950c78399e9b617a2c8b081e213fa827a067a586046b516305da65bd35a14f",
-          "signature": "(scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz: float | torch.Tensor)"
-        }
-      ]
-    },
-    {
-      "module": "witwin.channel.montecarlo.bdpt",
-      "exports": [
-        {
-          "name": "BDPTPathSamples",
-          "kind": "class",
-          "target": "witwin.channel.montecarlo.bdpt.BDPTPathSamples",
-          "contract_sha256": "b2be9b6999d33f082208a6978d4a233a51903818c98230126636be4daee6dec6"
-        },
-        {
-          "name": "Config",
-          "kind": "class",
-          "target": "witwin.channel.montecarlo.bdpt.Config",
-          "contract_sha256": "2373e516e1444532b6ae8d497d2d4c87e0b74d111d645bf883a396b2f5c737b8"
-        },
-        {
-          "name": "Metadata",
-          "kind": "class",
-          "target": "witwin.channel.montecarlo.bdpt.Metadata",
-          "contract_sha256": "2bb4d0c5feca4a95dfc52af8569c30fbca8acefd75b25f2f6d1058d03bd2bcea"
-        },
-        {
-          "name": "Result",
-          "kind": "class",
-          "target": "witwin.channel.montecarlo.bdpt.Result",
-          "contract_sha256": "2ce1ee773b7336d80ec31482685823ab35f1b8ef75e6e2b5b0d5051f89a38a2f"
-        },
-        {
-          "name": "solve",
-          "kind": "function",
-          "target": "witwin.channel.montecarlo.bdpt.solve",
-          "contract_sha256": "8d19af3ee0c5d75362ea1b640074740e1d28bf0dbe1be0e3d23f520fb9c86a52",
-          "signature": "(scene: Scene | SceneSnapshot, config: Config, *, reference_frequency_hz: float | torch.Tensor)"
+          "target": "witwin.channel.radiomap.solve",
+          "contract_sha256": "130d3a76b2df56489c16e9968fff3520c72a382f54239f9d404f9a0a531577ea",
+          "signature": "(scene: Scene | SceneSnapshot, config: Coherent | Stochastic, *, reference_frequency_hz: float | torch.Tensor)"
         }
       ]
     },

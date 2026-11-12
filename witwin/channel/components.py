@@ -210,7 +210,7 @@ def validate_config_fields(config: object) -> None:
         value = getattr(config, item.name)
         if item.name.startswith("_") or (value is None and "None" in kinds):
             continue
-        where = f"{solver_config} Config.{item.name}"
+        where = f"{solver_config} {type(config).__qualname__}.{item.name}"
         checked = value
         if kinds <= {"bool"}:
             checked = _require_bool(where, value)

@@ -726,14 +726,14 @@ def require_single_receiver_layout(
         raise ValueError(
             f"{solver} accepts either exactly one ReceiverGrid or only point receivers; "
             f"the scene has {grids} ReceiverGrid(s) and {points} point receiver(s). "
-            "Solve each grid separately, or use witwin.channel.deterministic"
+            "Solve each grid separately, or use witwin.channel.radiomap.Coherent"
         )
     if points and grid_only_components:
         raise ValueError(
             f"{solver} computes {sorted(grid_only_components)} only on a ReceiverGrid; "
             f"with point receivers request components={{'los'}} or use "
-            "witwin.channel.deterministic, witwin.channel.path or "
-            "witwin.channel.montecarlo.bdpt"
+            "witwin.channel.radiomap.Coherent, witwin.channel.path or "
+            "witwin.channel.experimental.bdpt"
         )
 
 
