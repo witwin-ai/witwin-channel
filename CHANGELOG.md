@@ -353,6 +353,19 @@ Launch, sync and copy counts are the evidence; timings are from a shared GPU.
   `radiomap.Coherent` it differs by 6-12 % at steep incidence and 19-33 % near
   the Brewster angle (strict xfails in
   `tests/accuracy/test_enumerated_sampled_consistency.py`).
+- `radiomap.Stochastic` LoS and reflection project the field onto the
+  transmitter polarization only, while `radiomap.Coherent`, `path` and
+  `experimental.bdpt` also project onto the receiver's polarization. Under a
+  raised transmitter, near its foot (large zenith angles), Stochastic is up to
+  about 12 dB brighter (strict xfail `los_steep` in
+  `tests/accuracy/test_enumerated_sampled_consistency.py`).
+- `radiomap.Stochastic` diffraction on a receiver grid counts Keller-cone rays
+  where they cross the grid plane. A vertical edge keeps its cone on the
+  incident elevation, so with the transmitter at or near the grid height the
+  shadow behind vertical edges receives little or no diffraction power (zero in
+  62 % of a three-cube grid at equal heights, against 6 % for Coherent). A
+  raised transmitter reduces but does not remove the gap (strict xfail
+  `test_mc_basic_diffraction_reaches_the_deep_shadow_of_a_vertical_edge`).
 - `experimental.bdpt` refuses reflection off multilayer materials, and its
   mixed reflection+transmission chains have no deterministic reference.
 - The propagation consumer discovers diffraction rows at `ad_mode="none"` only,

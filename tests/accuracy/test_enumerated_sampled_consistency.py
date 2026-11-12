@@ -127,6 +127,10 @@ def test_mc_basic_known_gaps_to_incoherent_deterministic(accuracy, name):
     pytest.param("los", list, (0.0, 0.0, 1.0), (4.0, -3.0, 1.0), id="los"),
     pytest.param("transmission", lambda: _wall(5.0, PhysicalMaterial(eps_r=4.0, sigma_e=0.01)),
                  (0.0, 0.0, 1.0), (8.0, -3.0, 1.0), id="transmission"),
+    pytest.param("los", list, (0.0, 0.0, 6.0), (-3.0, -3.0, 1.0), id="los_steep", marks=pytest.mark.xfail(
+        strict=True, reason="MC Basic LoS projects the field onto the transmitter polarization only; "
+        "deterministic also projects onto the receiver's z dipole (sin^4 against sin^2 of the "
+        "zenith angle). Up to 12 dB brighter near the transmitter's foot.")),
 ])
 def test_mc_basic_point_components_equal_deterministic_cell_centres(
     accuracy, component, structures, tx, origin,
@@ -140,3 +144,39 @@ def test_mc_basic_point_components_equal_deterministic_cell_centres(
                      reference_frequency_hz=FREQ).component_maps[component][0].double().cpu()
     reference = _deterministic(structures(), tx, component, origin, SHAPE, SPACING, average=False)
     accuracy.check(component, float(((mc - reference).abs() / reference).max()), 1e-5)
+
+
+def _cube(center: tuple[float, float, float], half: float, material: object) -> list:
+    cx, cy, cz = center
+    v = [[cx + x * half, cy + y * half, cz + z * half]
+         for z in (-1.0, 1.0) for y in (-1.0, 1.0) for x in (-1.0, 1.0)]
+    f = [[0, 2, 1], [1, 2, 3], [4, 5, 6], [5, 7, 6], [0, 1, 4], [1, 5, 4],
+         [2, 6, 3], [3, 6, 7], [0, 4, 2], [2, 4, 6], [1, 3, 5], [3, 7, 5]]
+    return [surface(v, f, material)]
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "MC Basic deposits a Keller-cone ray on a receiver grid where it crosses the grid plane. A "
+    "vertical edge sends its cone away from a plane at the transmitter's height, so the deep "
+    "shadow receives no diffraction power, where the UTD rows of deterministic do."))
+def test_mc_basic_diffraction_reaches_the_deep_shadow_of_a_vertical_edge():
+    """Support, not agreement: wherever deterministic diffraction is non-zero, MC Basic is too."""
+
+    from witwin.channel import radiomap
+
+    structures = _cube((4.0, 0.0, 1.0), 1.0, PhysicalMaterial(eps_r=4.0, sigma_e=0.01))
+    scene = Scene(structures=structures,
+                  endpoints=[antenna("tx", (0.0, 0.0, 1.5)), grid((7.0, -1.5, 1.5), (4, 4), 1.0)])
+    deterministic = radiomap.solve(
+        scene, radiomap.Coherent(components={"diffraction"}, max_depth=1, combine="power"),
+        reference_frequency_hz=FREQ,
+    ).path_gain[0].double().cpu()
+    mc = radiomap.solve(
+        scene, radiomap.Stochastic(components={"diffraction"}, max_depth=1, samples=1 << 22),
+        reference_frequency_hz=FREQ,
+    ).path_gain[0].double().cpu()
+    # The centre columns need a second diffraction at max_depth=1; the outer ones do not.
+    lit = deterministic > 0
+    assert int(lit.sum()) >= 8
+    missing = lit & ~(mc > 0)
+    assert not bool(missing.any()), f"{int(missing.sum())} of {int(lit.sum())} shadow cells hold no power"
