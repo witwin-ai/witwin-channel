@@ -67,10 +67,10 @@ def load_diagnostic_contract() -> dict[str, object]:
         raise EvidenceError("diagnostic contract group set is not canonical")
     expected_callables = {
         "enumerated_penetration": (
-            "witwin.channel.propagation.enumerated.transmission._transmission_topology"
+            "witwin.channel.interactions.transmission._transmission_topology"
         ),
         "montecarlo_penetration": (
-            "witwin.channel.montecarlo.events.transmission.straight_transmission_chains"
+            "witwin.channel.interactions.transmission.straight_transmission_chains"
         ),
         "diffraction": (
             "witwin.channel.interactions.diffraction._diffraction_topology_order1"
