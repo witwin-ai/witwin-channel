@@ -1643,6 +1643,9 @@ def _face_material_tensors(
         )
         if isinstance(value, torch.Tensor)
     ]
+    # An inference tensor has no version counter, so an in-place edit could not be seen.
+    if any(t.is_inference() for t in sources):
+        return build()
     key = (
         id(compiled.materials),
         str(device),

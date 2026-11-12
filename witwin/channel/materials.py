@@ -41,7 +41,8 @@ def _store_state(compiled: "CompiledScene") -> tuple[tuple[int, int], ...] | Non
 
     Reads tensor attributes only (identity, ``_version`` and autograd liveness): it launches
     nothing and never synchronizes. A store tensor that takes part in autograd disables the
-    cache so the leaf stays on the graph.
+    cache so the leaf stays on the graph; an inference tensor, which has no version counter,
+    disables it too.
     """
 
     state: list[tuple[int, int]] = []
@@ -49,7 +50,8 @@ def _store_state(compiled: "CompiledScene") -> tuple[tuple[int, int], ...] | Non
         for store_field in fields(store):
             value = getattr(store, store_field.name)
             if isinstance(value, torch.Tensor):
-                if _participates_in_ad(value):
+                # An inference tensor has no version counter, so its mutations cannot be seen.
+                if value.is_inference() or _participates_in_ad(value):
                     return None
                 state.append((id(value), int(value._version)))
     return tuple(state)
@@ -192,6 +194,8 @@ def face_geometry_id_table(
     target = torch.device(device)
     if target.type == "cuda" and target.index is None:
         target = torch.device("cuda", torch.cuda.current_device())
+    if source.is_inference():
+        return source.to(device=target, dtype=torch.int64).contiguous()
     key = (target, compiled.geometry.version, id(source), int(source._version))
     cached = compiled._material_table_cache.get(name)
     if cached is not None and cached[0] == key:
