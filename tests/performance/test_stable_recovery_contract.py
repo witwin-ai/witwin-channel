@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import ast
+import dataclasses
 import json
 from pathlib import Path
 import re
@@ -69,9 +70,9 @@ def test_live_reflection_and_diffraction_producers_remain_compact() -> None:
 
 def test_public_path_exports_retain_actual_row_compaction() -> None:
     path_relative = "witwin/channel/path.py"
-    deterministic_pipeline = _source("witwin/channel/deterministic.py")
+    deterministic_pipeline = _source("witwin/channel/radiomap/_coherent.py")
     path_result = _source("witwin/channel/path.py")
-    path_table = ast.parse(_source("witwin/channel/deterministic.py"))
+    path_table = ast.parse(_source("witwin/channel/radiomap/_coherent.py"))
 
     solve_calls = _function_calls(path_relative, "_pipeline_solve_base")
     assert max(solve_calls["sanitize_enumerated_capacity_transaction"]) < min(
@@ -105,17 +106,17 @@ def test_public_configs_do_not_expose_retired_capacity_controls() -> None:
         "diffraction_state_capacity",
         "reflection_candidate_capacity_per_pair",
     }
-    for relative in (
-        "witwin/channel/path.py",
-        "witwin/channel/deterministic.py",
-        "witwin/channel/montecarlo/basic.py",
-        "witwin/channel/montecarlo/bdpt.py",
+    for relative, config_name in (
+        ("witwin/channel/path.py", "Config"),
+        ("witwin/channel/radiomap/_coherent.py", "Coherent"),
+        ("witwin/channel/radiomap/_stochastic.py", "Stochastic"),
+        ("witwin/channel/experimental/bdpt.py", "Config"),
     ):
         tree = ast.parse(_source(relative), filename=relative)
         config = next(
             node
             for node in tree.body
-            if isinstance(node, ast.ClassDef) and node.name == "Config"
+            if isinstance(node, ast.ClassDef) and node.name == config_name
         )
         fields = {
             node.target.id
@@ -124,6 +125,14 @@ def test_public_configs_do_not_expose_retired_capacity_controls() -> None:
         }
         assert fields.isdisjoint(retired), relative
         assert "_validate_capacity_config" not in _source(relative), relative
+
+    from witwin.channel.experimental import bdpt
+    from witwin.channel import path, radiomap
+
+    # Inherited options count too: the AST check above only sees each class body.
+    for config_type in (path.Config, radiomap.Coherent, radiomap.Stochastic, bdpt.Config):
+        names = {field.name for field in dataclasses.fields(config_type)}
+        assert names.isdisjoint(retired), config_type.__qualname__
 
     worker = _source("benchmarks/phase13_phase12_worker.py")
     for field in retired:
