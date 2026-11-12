@@ -1204,20 +1204,42 @@ def _validate_wedge_valid(valid: torch.Tensor, source: torch.Tensor) -> None:
         raise ValueError("valid must have shape (N,) matching source rows")
 
 
+def wedge_transmission_layers(*rows: torch.Tensor, crossings: int) -> tuple[torch.Tensor, ...]:
+    """Transmission entries of a native ``face_layers`` table: none without transmission paths.
+
+    With ``crossings`` > 0 (the wall-crossing limit of the solve's straight-through transmission
+    paths) they are the per-row layer-store rows those paths cross the faces with, then the limit as
+    a host int64 scalar.
+    """
+
+    if crossings <= 0:
+        return ()
+    return (*(row.contiguous() for row in rows), torch.tensor(int(crossings), dtype=torch.int64))
+
+
 def wedge_face_layers(
-    material: dict[str, torch.Tensor], face0: torch.Tensor, face1: torch.Tensor,
+    material: dict[str, torch.Tensor], face0: torch.Tensor, face1: torch.Tensor, *,
+    transmission_crossings: int = 0,
 ) -> tuple[torch.Tensor, ...]:
     """Slab / layer-stack tables of wedge rows with faces ``face0``/``face1``, from the material bundle.
 
     The tuple is (face0 thickness, face1 thickness, face0 layer-store row, face1 layer-store row,
-    layer offset, count, thickness, eps_r, sigma_e, mu_r), the native ``face_layers`` argument.
+    layer offset, count, thickness, eps_r, sigma_e, mu_r), the native ``face_layers`` argument, and
+    with ``transmission_crossings`` > 0 the faces' transmission rows and the crossing limit
+    (:func:`wedge_transmission_layers`).
     """
 
+    transmission = (
+        wedge_transmission_layers(
+            material["transmission_row"][face0], material["transmission_row"][face1],
+            crossings=transmission_crossings)
+        if transmission_crossings > 0 else ()
+    )
     return (
         material["thickness"][face0].contiguous(), material["thickness"][face1].contiguous(),
         material["material_id"][face0].contiguous(), material["material_id"][face1].contiguous(),
         material["layer_offset"], material["layer_count"], material["layer_thickness_m"],
-        material["layer_eps_r"], material["layer_sigma_e"], material["layer_mu_r"],
+        material["layer_eps_r"], material["layer_sigma_e"], material["layer_mu_r"], *transmission,
     )
 
 

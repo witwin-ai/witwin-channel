@@ -30,6 +30,15 @@ pybind11::tuple diffraction_accumulation_tuple(
         result.tape_edge_u);
 }
 
+// The wall-crossing limit of the solve's transmission paths, a host int64 scalar of the face-layer list.
+int64_t transmission_crossing_limit(const torch::Tensor& limit) {
+    TORCH_CHECK(limit.device().is_cpu() && limit.scalar_type() == at::kLong && limit.numel() == 1,
+                "face_layers transmission crossing limit must be a host int64 scalar");
+    const int64_t value = limit.contiguous().data_ptr<int64_t>()[0];
+    TORCH_CHECK(value >= 0, "face_layers transmission crossing limit must be non-negative");
+    return value;
+}
+
 }  // namespace
 
 at::Tensor channel_diffraction_tx_visible_state_plan(
@@ -111,11 +120,17 @@ pybind11::tuple channel_rayd_diffraction_paths_order1_forward(
         rayd::torch::DiffractionPathLayout::Compact,
         state_source_index};
     if (face_layers.has_value()) {
-        // Per face: slab thickness and layer-store row; then the layer store.
+        // Per face: slab thickness and layer-store row; then the layer store; then, when the solve
+        // has transmission paths, each face's transmission row and the host crossing limit.
         const std::vector<torch::Tensor> &tables = *face_layers;
-        TORCH_CHECK(tables.size() == 8, "face_layers must hold eight tensors");
+        TORCH_CHECK(tables.size() == 8 || tables.size() == 10,
+                    "face_layers must hold eight or ten tensors");
         config.face_layers = rayd::torch::DiffractionFaceLayers{
             tables[0], tables[1], tables[2], tables[3], tables[4], tables[5], tables[6], tables[7]};
+        if (tables.size() == 10) {
+            config.face_layers->transmission_material = tables[8];
+            config.face_layers->transmission_crossings = transmission_crossing_limit(tables[9]);
+        }
     }
     return diffraction_path_tuple(
         rayd::torch::diffraction_paths_order1_forward(scene.resource(), config));
