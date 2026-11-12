@@ -145,8 +145,10 @@ def _rotate(v: torch.Tensor, axis: torch.Tensor, angle: torch.Tensor) -> torch.T
     return v * c + torch.cross(axis, v, dim=-1) * s + axis * (axis * v).sum(-1, keepdim=True) * (1.0 - c)
 
 
-def _tilted_toward(n0: torch.Tensor, n1: torch.Tensor, axis: torch.Tensor, leg: torch.Tensor,
-                   side: torch.Tensor, angle: float) -> tuple[torch.Tensor, torch.Tensor]:
+def _tilted_toward(
+    n0: torch.Tensor, n1: torch.Tensor, axis: torch.Tensor, leg: torch.Tensor, side: torch.Tensor,
+    angle: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
     """A sheet's faces turned about its edge so the leg runs just off it on the side ``side`` points to."""
 
     turn = torch.full((int(n0.shape[0]),), angle, device=n0.device)
