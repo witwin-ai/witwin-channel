@@ -176,8 +176,6 @@ def _munich_scene(scene_xml: Path, sionna_root: Path) -> Scene:
                 shape=(32, 32), spacing=(7.5, 8.125),
             ),
         ],
-        # The solvers keep a merged Mitsuba import's edge table as imported.
-        metadata={"mitsuba": {"merge_shapes": True, "source": str(scene_xml)}},
     )
 
 
