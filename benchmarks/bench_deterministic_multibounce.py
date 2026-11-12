@@ -16,7 +16,10 @@ _REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT))
 
 # Local source and test helpers must resolve from this checkout before importing them.
-from tests.deterministic.test_reflection_multibounce import two_wall_multibounce_scene  # noqa: E402
+from tests.deterministic.test_reflection_multibounce import (  # noqa: E402
+    _REFERENCE_FREQUENCY_HZ,
+    two_wall_multibounce_scene,
+)
 from witwin.channel.radiomap import Coherent, solve  # noqa: E402
 
 
@@ -26,7 +29,11 @@ def run_benchmark() -> dict[str, Any]:
     scene = two_wall_multibounce_scene()
     torch.cuda.synchronize()
     started = time.perf_counter()
-    result = solve(scene, Coherent(components={"reflection"}, max_depth=2, combine="field", export_paths=True))
+    result = solve(
+        scene,
+        Coherent(components={"reflection"}, max_depth=2, combine="field", export_paths=True),
+        reference_frequency_hz=_REFERENCE_FREQUENCY_HZ,
+    )
     torch.cuda.synchronize()
     elapsed_ms = (time.perf_counter() - started) * 1000.0
     depth_two = 0 if result.paths is None else int((result.paths.depth == 2).sum().detach().cpu().item())
@@ -37,7 +44,7 @@ def run_benchmark() -> dict[str, Any]:
         "launch_count": result.metadata["kernel"]["launch_count"],
         "path_count": result.metadata["counts"]["path_count"],
         "depth_two_path_count": depth_two,
-        "raydn_native": result.metadata["kernel"]["raydn_native"],
+        "rayd_native": result.metadata["kernel"]["rayd_native"],
         "accumulation_strategy": result.metadata["accumulation_strategy"],
     }
 

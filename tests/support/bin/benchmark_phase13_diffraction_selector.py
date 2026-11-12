@@ -28,6 +28,10 @@ from witwin.channel.path import Config, solve  # noqa: E402
 from witwin.channel.runtime import build_info  # noqa: E402
 
 
+# The wedge fixture's default frequency.
+FREQUENCY_HZ = 3.0e9
+
+
 def _result_hash(result: object) -> str:
     digest = hashlib.sha256()
     for name in ("valid", "a", "tau", "primitive_id"):
@@ -62,18 +66,18 @@ def main() -> None:
     config = Config(components={"diffraction"})
 
     first_start = time.perf_counter()
-    result = solve(scene, config)
+    result = solve(scene, config, reference_frequency_hz=FREQUENCY_HZ)
     torch.cuda.synchronize()
     first_wall_ms = (time.perf_counter() - first_start) * 1000.0
 
     for _ in range(max(0, args.warmup_runs)):
         for _ in range(args.solves_per_repeat):
-            result = solve(scene, config)
+            result = solve(scene, config, reference_frequency_hz=FREQUENCY_HZ)
         torch.cuda.synchronize()
 
     if args.profile_one:
         torch.cuda.cudart().cudaProfilerStart()
-        result = solve(scene, config)
+        result = solve(scene, config, reference_frequency_hz=FREQUENCY_HZ)
         torch.cuda.synchronize()
         torch.cuda.cudart().cudaProfilerStop()
 
@@ -86,7 +90,7 @@ def main() -> None:
         wall_start = time.perf_counter()
         start.record()
         for _ in range(args.solves_per_repeat):
-            result = solve(scene, config)
+            result = solve(scene, config, reference_frequency_hz=FREQUENCY_HZ)
         end.record()
         torch.cuda.synchronize()
         wall_ms.append(
