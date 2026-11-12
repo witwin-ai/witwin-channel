@@ -18,6 +18,7 @@ from witwin.channel.interactions.diffraction import (
     selected_diffraction_edges,
 )
 from witwin.channel.interactions.reflection import (
+    _TREE_RELATIVE,
     ReflectionPlaneGroups,
     _expand_image_tree,
     _image_tree_roots,
@@ -54,9 +55,12 @@ CHAIN_INTERIOR_COMPONENT_BASE = 8
 CHAIN_MAX_DEPTH = 8
 
 # Join lanes (edge-sharing half pairs) and node-edge beam tests per native launch.
-_CHAIN_LANES_PER_LAUNCH = 1 << 23
-_NODE_EDGE_TESTS_PER_LAUNCH = 1 << 24
-# Image-tree nodes of the receiver halves of one receiver chunk (bounds their edge lists).
+_CHAIN_LANES_PER_LAUNCH = 1 << 25
+_NODE_EDGE_TESTS_PER_LAUNCH = 1 << 25
+# Lanes and child tests (lanes x plane groups) per launch of the deepest receiver-side half.
+_LEAF_LANES_PER_LAUNCH = 1 << 24
+_LEAF_TESTS_PER_LAUNCH = 1 << 29
+# Image-tree nodes of the materialized receiver halves of one receiver chunk (bounds their edge lists).
 _RECEIVER_TREE_NODES = 1 << 22
 # Double-diffraction candidates per geometry launch.
 _DOUBLE_CANDIDATES_PER_LAUNCH = 1 << 20
@@ -351,10 +355,24 @@ class _HalfSource:
         self._frontier_depth = 0
         self.visible: torch.Tensor | None = None
 
+    @property
+    def endpoints(self) -> torch.Tensor:
+        return self._endpoints
+
     def visible_edges(self) -> torch.Tensor:
         if self.visible is None:
             self.visible = _visible_edges(self._context, self._endpoints)
         return self.visible
+
+    def frontier(self, depth: int) -> _ImageTreeFrontier:
+        """The image-tree nodes ``depth`` reflections from the endpoints."""
+
+        if depth < self._frontier_depth:
+            raise ValueError("the image tree has already grown past the requested depth")
+        while self._frontier_depth < depth:
+            self._frontier = _expand_image_tree(self._frontier, self._context.plane_groups, prune=True)
+            self._frontier_depth += 1
+        return self._frontier
 
     def half(self, depth: int) -> _ChainHalf:
         if depth not in self._halves:
@@ -367,12 +385,9 @@ class _HalfSource:
                 )
                 self._halves[0] = _direct_half(every, self._endpoints)
             else:
-                while self._frontier_depth < depth:
-                    self._frontier = _expand_image_tree(
-                        self._frontier, self._context.plane_groups, prune=True
-                    )
-                    self._frontier_depth += 1
-                self._halves[depth] = _reflected_half(self._context, self._frontier, self._endpoints)
+                self._halves[depth] = _reflected_half(
+                    self._context, self.frontier(depth), self._endpoints
+                )
         return self._halves[depth]
 
 
@@ -385,10 +400,18 @@ def _lane_offsets(a: _ChainHalf, b: _ChainHalf) -> tuple[torch.Tensor, int]:
     return offsets, int(offsets[-1].item())
 
 
+def _node_sequences(half: _ChainHalf, node: torch.Tensor) -> torch.Tensor:
+    """Plane-group sequence of each entry's node (``[N, 0]`` for a half without reflections)."""
+
+    if half.depth == 0:
+        return torch.empty((int(node.shape[0]), 0), device=node.device, dtype=torch.int32)
+    return half.node_sequences[node.to(dtype=torch.int64)]
+
+
 def _iter_chain_candidates(
     context: _ChainContext, a: _ChainHalf, b: _ChainHalf,
 ) -> Iterator[dict[str, torch.Tensor]]:
-    """Chain candidates (transmitter, receiver, edge, half nodes, diffraction point) of one class."""
+    """Chain candidates (transmitter, receiver, edge, half sequences, diffraction point) of one class."""
 
     offsets, total = _lane_offsets(a, b)
     groups = context.plane_groups
@@ -415,16 +438,65 @@ def _iter_chain_candidates(
             edge_epsilon=_EDGE_EPSILON,
         )
         if int(candidates["tx"].shape[0]) > 0:
+            candidates["a_sequence"] = _node_sequences(a, candidates["a_node"])
+            candidates["b_sequence"] = _node_sequences(b, candidates["b_node"])
             yield candidates
 
 
-def _half_planes(
-    context: _ChainContext, half: _ChainHalf, node: torch.Tensor,
+def _iter_leaf_candidates(
+    context: _ChainContext, a: _ChainHalf, parents: _ImageTreeFrontier, receivers: torch.Tensor,
+) -> Iterator[dict[str, torch.Tensor]]:
+    """Chain candidates whose receiver half is one reflection below ``parents``, never materialized.
+
+    They are the candidates ``_iter_chain_candidates`` gives for ``a`` and the receiver half of the
+    parents' children, in the same order, without building the children or their edge lists.
+    """
+
+    parent_count = int(parents.size)
+    lanes = a.counts() * parent_count
+    offsets = torch.zeros((int(lanes.shape[0]) + 1,), device=lanes.device, dtype=torch.int64)
+    torch.cumsum(lanes, dim=0, out=offsets[1:])
+    total = int(offsets[-1].item())
+    groups = context.plane_groups
+    per_launch = max(1, min(_LEAF_LANES_PER_LAUNCH, _LEAF_TESTS_PER_LAUNCH // max(1, groups.group_count)))
+    for start in range(0, total, per_launch):
+        candidates = topology_kernels.chain_leaf_candidates(
+            lane_offsets=offsets,
+            lane_start=start,
+            lane_end=min(start + per_launch, total),
+            plane_point=groups.plane_point,
+            plane_normal=groups.plane_normal,
+            bounds=groups.bounds,
+            occupancy=groups.occupancy,
+            edge_position=context.edge_position,
+            edge_direction=context.edge_direction,
+            edge_t_min=context.edge_t_min,
+            edge_t_max=context.edge_t_max,
+            edge_n0=context.edge_n0,
+            edge_n1=context.edge_n1,
+            a=(a.edge_offsets, a.endpoint, a.node, a.endpoints, a.node_sequences, a.node_images),
+            parent_rx=parents.node_tx.contiguous(),
+            parent_sequences=parents.node_sequences.contiguous(),
+            parent_images=parents.node_images.contiguous(),
+            receivers=receivers,
+            tree_tolerance=_TREE_RELATIVE * groups.scene_scale_m,
+            beam_tolerance=_BOUNDS_RELATIVE * groups.scene_scale_m,
+            box_tolerance=_BOUNDS_RELATIVE * groups.scene_scale_m,
+            segment_tolerance=_SEGMENT_PARAMETER_SLACK,
+            min_segment_length=0.5 * context.min_segment_length,
+            edge_epsilon=_EDGE_EPSILON,
+        )
+        if int(candidates["tx"].shape[0]) > 0:
+            candidates["a_sequence"] = _node_sequences(a, candidates["a_node"])
+            yield candidates
+
+
+def _sequence_planes(
+    context: _ChainContext, sequences: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Representative faces and plane tables of each candidate's half, in endpoint order."""
 
-    count = int(node.shape[0])
-    depth = half.depth
+    count, depth = int(sequences.shape[0]), int(sequences.shape[1])
     device = context.device
     if depth == 0:
         return (
@@ -433,7 +505,7 @@ def _half_planes(
             torch.empty((count, 0, 3), device=device, dtype=torch.float32),
         )
     groups = context.plane_groups
-    sequence = half.node_sequences[node.to(dtype=torch.int64)].to(dtype=torch.int64)
+    sequence = sequences.to(dtype=torch.int64)
     faces = groups.representative_faces[sequence].to(dtype=torch.int32).contiguous()
     return faces, groups.plane_point[sequence].contiguous(), groups.plane_normal[sequence].contiguous()
 
@@ -488,17 +560,17 @@ def _chain_block(
 
 
 def _chain_class_blocks(
-    context: _ChainContext, a: _ChainHalf, b: _ChainHalf, tx_positions: torch.Tensor,
-    rx_positions: torch.Tensor, validator_chunk: int,
+    context: _ChainContext, batches: Iterator[dict[str, torch.Tensor]], prefix_depth: int,
+    suffix_depth: int, tx_positions: torch.Tensor, rx_positions: torch.Tensor, validator_chunk: int,
 ) -> tuple[list[dict[str, torch.Tensor]], int, int]:
-    """Validated rows of one chain class (``a.depth`` reflections, the diffraction, ``b.depth``)."""
+    """Validated rows of one chain class (``prefix_depth`` reflections, the diffraction, ``suffix_depth``)."""
 
     blocks: list[dict[str, torch.Tensor]] = []
     launches = 0
     candidate_count = 0
     groups = context.coplanar_groups
     resource = context.rayd.require_resource()
-    for candidates in _iter_chain_candidates(context, a, b):
+    for candidates in batches:
         launches += 1
         total = int(candidates["tx"].shape[0])
         candidate_count += total
@@ -507,8 +579,8 @@ def _chain_class_blocks(
             tx = candidates["tx"][start:end]
             rx = candidates["rx"][start:end]
             edge_id = context.selected_edges[candidates["edge"][start:end].to(dtype=torch.int64)]
-            prefix = _half_planes(context, a, candidates["a_node"][start:end])
-            suffix = _half_planes(context, b, candidates["b_node"][start:end])
+            prefix = _sequence_planes(context, candidates["a_sequence"][start:end])
+            suffix = _sequence_planes(context, candidates["b_sequence"][start:end])
             exported = geometry_kernels.coupled_chain_geometry_forward(
                 resource,
                 tx_positions[tx.to(dtype=torch.int64)].contiguous(),
@@ -523,7 +595,7 @@ def _chain_class_blocks(
                 context.min_segment_length,
             )
             launches += 1
-            block = _chain_block(context, exported, tx, rx, edge_id, a.depth, b.depth)
+            block = _chain_block(context, exported, tx, rx, edge_id, prefix_depth, suffix_depth)
             if block is not None:
                 blocks.append(block)
     return blocks, launches, candidate_count
@@ -653,13 +725,16 @@ def coupled_reflection_diffraction_topology(
     if context is None:
         return _ensure_topology_fields(_empty_path_block(device)), 0, 0
     max_chain_depth = chain_depth_limit(max_depth)
+    max_reflections = max_chain_depth - 1
     tx_source = _HalfSource(context, tx_positions)
     blocks: list[dict[str, torch.Tensor]] = []
     launches = 0
     candidates = 0
-    # Receivers are taken in chunks whose image trees stay bounded: a receiver's tree holds up
-    # to group_count ** (max_chain_depth - 1) nodes at its deepest chain half.
-    tree_nodes = max(1, context.plane_groups.group_count) ** max(0, max_chain_depth - 1)
+    # Receivers are taken in chunks whose image trees stay bounded. The deepest receiver half
+    # (``max_reflections`` reflections, joined only with the bare transmitter) is tested as the
+    # children of the level above it and never materialized, so a receiver's tree holds up to
+    # group_count ** (max_reflections - 1) nodes.
+    tree_nodes = max(1, context.plane_groups.group_count) ** max(0, max_reflections - 1)
     rx_count = int(rx_positions.shape[0])
     rx_chunk = max(1, _RECEIVER_TREE_NODES // tree_nodes)
     for rx_start in range(0, rx_count, rx_chunk):
@@ -668,12 +743,16 @@ def coupled_reflection_diffraction_topology(
         chunk_blocks: list[dict[str, torch.Tensor]] = []
         for reflections in range(1, max_chain_depth):
             for prefix_depth in range(reflections, -1, -1):
+                suffix_depth = reflections - prefix_depth
+                a = tx_source.half(prefix_depth)
+                if suffix_depth == max_reflections:
+                    batches = _iter_leaf_candidates(
+                        context, a, rx_source.frontier(suffix_depth - 1), rx_source.endpoints
+                    )
+                else:
+                    batches = _iter_chain_candidates(context, a, rx_source.half(suffix_depth))
                 class_blocks, class_launches, class_candidates = _chain_class_blocks(
-                    context,
-                    tx_source.half(prefix_depth),
-                    rx_source.half(reflections - prefix_depth),
-                    tx_positions,
-                    chunk,
+                    context, batches, prefix_depth, suffix_depth, tx_positions, chunk,
                     int(candidate_limit),
                 )
                 chunk_blocks.extend(class_blocks)

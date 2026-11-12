@@ -48,3 +48,43 @@ def test_endpoint_edge_lists_are_csr_per_endpoint():
     )
     assert offsets.tolist() == [0, 2, 2, 4]
     assert edges.tolist() == [1, 2, 0, 2]
+
+
+def _canyon_chain_inputs():
+    import numpy as np
+
+    from benchmarks.fullwave_validation import reference_set as rs
+    from witwin.channel.propagation.geometry import receiver_positions_and_layout
+    from witwin.channel.scene.compiler import compile as compile_scene
+    from witwin.channel.scene.endpoints import bind_solver_scene
+
+    case = rs.load_reference_case("canyon_z_3g5")
+    planes, _ = rs.load_reference(case)
+    plane = dict(planes[0], x=np.linspace(-1.2, 1.2, 9), y=np.linspace(-1.1, 1.3, 7))
+    compiled = compile_scene(rs.build_channel_scene(case, plane), reference_frequency_hz=case.frequency_hz)
+    scene = bind_solver_scene(compiled)
+    device = torch.device("cuda")
+    tx = torch.tensor([case.tx_position], device=device, dtype=torch.float32)
+    rx, _ = receiver_positions_and_layout(scene, device=device)
+    return scene, compiled, tx, rx
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="chain discovery needs CUDA")
+@pytest.mark.parametrize("depth", [1, 2, 3])
+def test_unmaterialized_deepest_half_gives_the_materialized_join(depth):
+    """The deepest receiver half tested as children of the level above equals the full join."""
+
+    scene, compiled, tx, rx = _canyon_chain_inputs()
+    context = coupled._prepare_chain_context(scene, compiled, tx, rx)
+    assert context is not None
+    a = coupled._HalfSource(context, tx).half(0)
+    source = coupled._HalfSource(context, rx)
+    parents = source.frontier(depth - 1)
+    leaf = list(coupled._iter_leaf_candidates(context, a, parents, source.endpoints))
+    full = list(coupled._iter_chain_candidates(context, a, source.half(depth)))
+    assert full, "the scene must hold chain candidates of this depth"
+    for key in ("tx", "rx", "edge", "a_node", "point", "b_sequence"):
+        got = torch.cat([batch[key] for batch in leaf])
+        want = torch.cat([batch[key] for batch in full])
+        assert got.shape == want.shape, key
+        assert torch.equal(got, want), key

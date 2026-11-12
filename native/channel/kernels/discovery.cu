@@ -225,12 +225,35 @@ __device__ bool macro_box(const GroupTables& tables, int group, int index, float
     return true;
 }
 
+// Angular slack of the one-sphere quick rejects below, radians: far above the float error of the
+// asinf/acosf pair, so a quick reject never drops what the per-cell tests would keep.
+constexpr float kQuickRejectSlack = 4.0e-3f;
+
+// One sphere around the bounding spheres (inflated by `tolerance`) of all the macro cells of a group,
+// in closed form: a cell's centre lies within 3/4 of the group's in-plane half extents of the bounds
+// centre, and its own sphere spans a quarter of them plus the full extent along the dropped axis.
+__device__ void group_cell_sphere(const GroupTables& tables, int group, float tolerance, float3& center,
+                                  float& radius) {
+    const float* b = tables.bounds + static_cast<int64_t>(group) * 6;
+    int u, v;
+    plane_axes(tables.plane_normal, group, u, v);
+    const int w = 3 - u - v;
+    const float hu = 0.5f * (b[3 + u] - b[u]);
+    const float hv = 0.5f * (b[3 + v] - b[v]);
+    const float hw = 0.5f * (b[3 + w] - b[w]);
+    center = make_float3(0.5f * (b[0] + b[3]), 0.5f * (b[1] + b[4]), 0.5f * (b[2] + b[5]));
+    const float in_plane = hu * hu + hv * hv;
+    radius = (0.75f * sqrtf(in_plane) + sqrtf(0.0625f * in_plane + hw * hw) + tolerance) * 1.0001f + tolerance;
+}
+
 // True unless no specular path can continue from the node (image `image`, last plane group
 // `last`) onto plane group `group`. Every rejection is geometric and conservative: the rays
 // leaving the image through the last polygon form a beam that lies beyond the last plane and
 // inside the union of the cones from the image around the bounding spheres of the last group's
 // occupied macro cells, so a group none of whose occupied macro cells reaches beyond the last
-// plane and into one of those cones cannot host the next reflection point.
+// plane and into one of those cones cannot host the next reflection point. The target group's
+// cells that reach beyond the last plane are found once; one sphere around all their bounding
+// spheres rejects a whole cone of the last group before its cells are tested one by one.
 __device__ bool image_tree_keep(const GroupTables& tables, int last, float3 image, int group, float tolerance) {
     if (group == last) {
         return false;
@@ -245,6 +268,55 @@ __device__ bool image_tree_keep(const GroupTables& tables, int last, float3 imag
         return true;
     }
     const float sign = image_side > 0.0f ? 1.0f : -1.0f;
+    const float* group_bounds = tables.bounds + static_cast<int64_t>(group) * 6;
+    const float3 sphere_center = make_float3(0.5f * (group_bounds[0] + group_bounds[3]),
+                                             0.5f * (group_bounds[1] + group_bounds[4]),
+                                             0.5f * (group_bounds[2] + group_bounds[5]));
+    float sphere_radius = 0.0f;
+    unsigned int beyond_cells = 0u;
+    for (int c = 0; c < kMacroCells * kMacroCells; ++c) {
+        float3 lo, hi;
+        if (!macro_box(tables, group, c, lo, hi)) {
+            continue;
+        }
+        bool beyond = false;
+        for (int corner = 0; corner < 8 && !beyond; ++corner) {
+            const float3 p = make_float3((corner & 1) ? hi.x : lo.x, (corner & 2) ? hi.y : lo.y,
+                                         (corner & 4) ? hi.z : lo.z);
+            beyond = sign * cmath::dot(cmath::sub(p, last_point), last_normal) < tolerance;
+        }
+        if (!beyond) {
+            continue;
+        }
+        beyond_cells |= 1u << c;
+        const float3 center = cmath::scale(cmath::add(lo, hi), 0.5f);
+        const float radius = 0.5f * cmath::length(cmath::sub(hi, lo)) + tolerance;
+        sphere_radius = fmaxf(sphere_radius, cmath::length(cmath::sub(center, sphere_center)) + radius);
+    }
+    if (beyond_cells == 0u) {
+        return false;
+    }
+    sphere_radius = sphere_radius * 1.0001f + tolerance;
+    const float3 sphere_offset = cmath::sub(sphere_center, image);
+    const float sphere_distance = cmath::length(sphere_offset);
+    const bool sphere_outside = sphere_distance > sphere_radius;
+    const float sphere_spread = sphere_outside ? asinf(fminf(1.0f, sphere_radius / sphere_distance)) : 0.0f;
+    if (sphere_outside) {
+        // One cone around all of the last group's cells first.
+        float3 last_center;
+        float last_radius;
+        group_cell_sphere(tables, last, tolerance, last_center, last_radius);
+        const float3 last_axis = cmath::sub(last_center, image);
+        const float last_distance = cmath::length(last_axis);
+        if (last_distance > last_radius) {
+            const float cone = asinf(fminf(1.0f, last_radius / last_distance));
+            const float cosine = fmaxf(
+                -1.0f, fminf(1.0f, cmath::dot(last_axis, sphere_offset) / (last_distance * sphere_distance)));
+            if (acosf(cosine) > cone + sphere_spread + 1.0e-3f + kQuickRejectSlack) {
+                return false;
+            }
+        }
+    }
     for (int a = 0; a < kMacroCells * kMacroCells; ++a) {
         float3 alo, ahi;
         if (!macro_box(tables, last, a, alo, ahi)) {
@@ -253,24 +325,21 @@ __device__ bool image_tree_keep(const GroupTables& tables, int last, float3 imag
         const float3 axis = cmath::sub(cmath::scale(cmath::add(alo, ahi), 0.5f), image);
         const float axis_length = cmath::length(axis);
         const float cone_radius = 0.5f * cmath::length(cmath::sub(ahi, alo)) + tolerance;
-        const bool everywhere = axis_length <= cone_radius;
-        const float cone = everywhere ? 0.0f : asinf(fminf(1.0f, cone_radius / axis_length));
+        if (axis_length <= cone_radius) {
+            return true;
+        }
+        const float cone = asinf(fminf(1.0f, cone_radius / axis_length));
+        if (sphere_outside) {
+            const float cosine =
+                fmaxf(-1.0f, fminf(1.0f, cmath::dot(axis, sphere_offset) / (axis_length * sphere_distance)));
+            if (acosf(cosine) > cone + sphere_spread + 1.0e-3f + kQuickRejectSlack) {
+                continue;
+            }
+        }
         for (int c = 0; c < kMacroCells * kMacroCells; ++c) {
             float3 lo, hi;
-            if (!macro_box(tables, group, c, lo, hi)) {
+            if ((beyond_cells & (1u << c)) == 0u || !macro_box(tables, group, c, lo, hi)) {
                 continue;
-            }
-            bool beyond = false;
-            for (int corner = 0; corner < 8 && !beyond; ++corner) {
-                const float3 p = make_float3((corner & 1) ? hi.x : lo.x, (corner & 2) ? hi.y : lo.y,
-                                             (corner & 4) ? hi.z : lo.z);
-                beyond = sign * cmath::dot(cmath::sub(p, last_point), last_normal) < tolerance;
-            }
-            if (!beyond) {
-                continue;
-            }
-            if (everywhere) {
-                return true;
             }
             const float3 offset = cmath::sub(cmath::scale(cmath::add(lo, hi), 0.5f), image);
             const float offset_length = cmath::length(offset);
@@ -494,6 +563,8 @@ __device__ __forceinline__ float3 frame_point(const EdgeFrame& frame, float t) {
 // True unless no point of the edge can lie in the beam of the node (image `image`, last plane
 // group `last`): the beam lies beyond the last plane and inside the cones from the image around
 // the bounding spheres of the last group's occupied macro cells. Conservative, like image_tree_keep.
+// The sphere around the whole edge, which holds every piece's sphere, rejects a cone before its
+// pieces are tested one by one.
 __device__ bool chain_edge_keep(const GroupTables& tables, int last, float3 image, const ChainEdges& edges, int edge,
                                 float tolerance) {
     const EdgeFrame frame = edge_frame(edges, edge);
@@ -516,6 +587,27 @@ __device__ bool chain_edge_keep(const GroupTables& tables, int last, float3 imag
         return false;
     }
     const float piece = length / kChainEdgePieces;
+    const float edge_radius = (0.5f * length + tolerance) * 1.0001f + tolerance;
+    const float3 edge_offset = cmath::sub(frame_point(frame, 0.5f * length), image);
+    const float edge_distance = cmath::length(edge_offset);
+    const bool edge_outside = edge_distance > edge_radius;
+    const float edge_spread = edge_outside ? asinf(fminf(1.0f, edge_radius / edge_distance)) : 0.0f;
+    if (edge_outside) {
+        // One cone around all of the last group's cells first.
+        float3 group_center;
+        float group_radius;
+        group_cell_sphere(tables, last, tolerance, group_center, group_radius);
+        const float3 group_axis = cmath::sub(group_center, image);
+        const float group_distance = cmath::length(group_axis);
+        if (group_distance > group_radius) {
+            const float cone = asinf(fminf(1.0f, group_radius / group_distance));
+            const float cosine = fmaxf(
+                -1.0f, fminf(1.0f, cmath::dot(group_axis, edge_offset) / (group_distance * edge_distance)));
+            if (acosf(cosine) > cone + edge_spread + 1.0e-3f + kQuickRejectSlack) {
+                return false;
+            }
+        }
+    }
     for (int c = 0; c < kMacroCells * kMacroCells; ++c) {
         float3 alo, ahi;
         if (!macro_box(tables, last, c, alo, ahi)) {
@@ -528,6 +620,13 @@ __device__ bool chain_edge_keep(const GroupTables& tables, int last, float3 imag
             return true;
         }
         const float cone = asinf(fminf(1.0f, cone_radius / axis_length));
+        if (edge_outside) {
+            const float cosine =
+                fmaxf(-1.0f, fminf(1.0f, cmath::dot(axis, edge_offset) / (axis_length * edge_distance)));
+            if (acosf(cosine) > cone + edge_spread + 1.0e-3f + kQuickRejectSlack) {
+                continue;
+            }
+        }
         for (int p = 0; p < kChainEdgePieces; ++p) {
             const float3 center = frame_point(frame, piece * (p + 0.5f));
             const float3 offset = cmath::sub(center, image);
@@ -642,14 +741,13 @@ struct ChainCandidate {
     float3 point;
 };
 
-__device__ ChainCandidate chain_candidate(const GroupTables& tables, const ChainEdges& edges, const ChainHalf& a,
-                                          const ChainHalf& b, const ChainLane& lane, const PairTolerances& tol,
-                                          float edge_epsilon) {
-    ChainCandidate out{};
-    float3 a_image, b_image;
-    half_entry(a, lane.a_entry, out.tx, out.a_node, a_image);
-    half_entry(b, lane.b_entry, out.rx, out.b_node, b_image);
-    const EdgeFrame frame = edge_frame(edges, lane.edge);
+// The Keller point between the two half images on the edge interior, kept only when both legs
+// leave it into the open region around the wedge. The leg towards a half points at that half's
+// image, so a chain whose leg would cross the solid behind the edge (a reflection reached from
+// inside a closed body) is rejected here.
+__device__ __forceinline__ bool chain_edge_point(const ChainEdges& edges, int edge, float3 a_image, float3 b_image,
+                                                 float edge_epsilon, float3& point) {
+    const EdgeFrame frame = edge_frame(edges, edge);
     const float3 origin = frame.origin;
     const float3 direction = frame.direction;
     const float length = frame.length;
@@ -660,33 +758,44 @@ __device__ ChainCandidate chain_candidate(const GroupTables& tables, const Chain
         rayd::shared::diffraction::make_f3(direction.x, direction.y, direction.z));
     if (!(isfinite(length) && length > edge_epsilon && isfinite(parameter) && parameter > edge_epsilon &&
           parameter < length - edge_epsilon)) {
+        return false;
+    }
+    point = cmath::add(origin, cmath::scale(direction, parameter));
+    namespace utd = rayd::shared::diffraction;
+    const utd::float3a axis = utd::make_f3(direction.x, direction.y, direction.z);
+    const float3 n0 = cmath::load_vec3(edges.n0, edge);
+    const float3 n1 = cmath::load_vec3(edges.n1, edge);
+    const utd::float3a wn0 = utd::make_f3(n0.x, n0.y, n0.z);
+    const utd::float3a wn1 = utd::make_f3(n1.x, n1.y, n1.z);
+    const float3 to_a = cmath::sub(a_image, point);
+    const float3 to_b = cmath::sub(b_image, point);
+    return utd::wedge_exterior_mask(utd::make_f3(to_a.x, to_a.y, to_a.z), axis, wn0, wn1) &&
+           utd::wedge_exterior_mask(utd::make_f3(to_b.x, to_b.y, to_b.z), axis, wn0, wn1);
+}
+
+// The transmitter-side half of a chain back-traced from the diffraction point.
+__device__ __forceinline__ bool chain_a_side_keep(const GroupTables& tables, const ChainHalf& a, int a_node, int tx,
+                                                  float3 a_image, float3 point, const PairTolerances& tol,
+                                                  SequenceChain& chain) {
+    if (a.depth > 0) {
+        half_chain(tables, a, a_node, tx, chain);
+        return receiver_candidate(tables, chain, a.depth, point, tol);
+    }
+    return cmath::length(cmath::sub(point, a_image)) >= tol.min_segment;
+}
+
+__device__ ChainCandidate chain_candidate(const GroupTables& tables, const ChainEdges& edges, const ChainHalf& a,
+                                          const ChainHalf& b, const ChainLane& lane, const PairTolerances& tol,
+                                          float edge_epsilon) {
+    ChainCandidate out{};
+    float3 a_image, b_image;
+    half_entry(a, lane.a_entry, out.tx, out.a_node, a_image);
+    half_entry(b, lane.b_entry, out.rx, out.b_node, b_image);
+    if (!chain_edge_point(edges, lane.edge, a_image, b_image, edge_epsilon, out.point)) {
         return out;
     }
-    out.point = cmath::add(origin, cmath::scale(direction, parameter));
-    // Both legs leave the diffraction point into the open region around the wedge. The leg towards
-    // a half points at that half's image, so a chain whose leg would cross the solid behind the edge
-    // (a reflection reached from inside a closed body) is rejected here.
-    {
-        namespace utd = rayd::shared::diffraction;
-        const utd::float3a axis = utd::make_f3(direction.x, direction.y, direction.z);
-        const float3 n0 = cmath::load_vec3(edges.n0, lane.edge);
-        const float3 n1 = cmath::load_vec3(edges.n1, lane.edge);
-        const utd::float3a wn0 = utd::make_f3(n0.x, n0.y, n0.z);
-        const utd::float3a wn1 = utd::make_f3(n1.x, n1.y, n1.z);
-        const float3 to_a = cmath::sub(a_image, out.point);
-        const float3 to_b = cmath::sub(b_image, out.point);
-        if (!utd::wedge_exterior_mask(utd::make_f3(to_a.x, to_a.y, to_a.z), axis, wn0, wn1) ||
-            !utd::wedge_exterior_mask(utd::make_f3(to_b.x, to_b.y, to_b.z), axis, wn0, wn1)) {
-            return out;
-        }
-    }
     SequenceChain chain;
-    if (a.depth > 0) {
-        half_chain(tables, a, out.a_node, out.tx, chain);
-        if (!receiver_candidate(tables, chain, a.depth, out.point, tol)) {
-            return out;
-        }
-    } else if (cmath::length(cmath::sub(out.point, a_image)) < tol.min_segment) {
+    if (!chain_a_side_keep(tables, a, out.a_node, out.tx, a_image, out.point, tol, chain)) {
         return out;
     }
     if (b.depth > 0) {
@@ -736,6 +845,177 @@ __global__ void chain_candidate_write_kernel(int64_t lane_start, int64_t lane_co
         out_point[dst * 3] = candidate.point.x;
         out_point[dst * 3 + 1] = candidate.point.y;
         out_point[dst * 3 + 2] = candidate.point.z;
+    }
+}
+
+// The deepest receiver-side half of a chain class, tested without materializing it: its nodes
+// are the children (parent, group) of the frontier one reflection shallower, and a child is kept
+// for an edge exactly when the materialized half would hold the (child, edge) entry and the join
+// would keep the candidate. The cheap Keller point and back-trace tests run first; the image-tree
+// and beam tests of the child run only on the few children that pass them.
+struct ChainLeaf {
+    const int* parent_rx;         // [P] receiver of each parent node
+    const int* parent_sequences;  // [P, width]
+    const float* parent_images;   // [P, 3]
+    const float* receivers;       // [receiver count, 3]
+    int64_t parent_count;
+    int width;  // reflections of a parent; the leaf has width + 1
+};
+
+struct LeafTolerances {
+    PairTolerances pair;
+    float tree;  // image-tree pruning tolerance, metres
+    float beam;  // node-edge beam tolerance, metres
+    float edge_epsilon;
+};
+
+struct LeafLane {
+    int edge;
+    int64_t a_entry;
+    int64_t parent;
+};
+
+// Lane -> (edge, transmitter-side entry, parent) over the per-edge products; the child groups of
+// the parent are the lane's inner loop.
+__device__ __forceinline__ LeafLane leaf_lane(const int64_t* lane_offsets, int64_t edge_count, const ChainHalf& a,
+                                              const ChainLeaf& leaf, int64_t lane) {
+    int64_t lo = 0;
+    int64_t hi = edge_count;
+    while (hi - lo > 1) {
+        const int64_t mid = (lo + hi) / 2;
+        if (lane_offsets[mid] <= lane) {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    const int edge = static_cast<int>(lo);
+    const int64_t local = lane - lane_offsets[edge];
+    return {edge, a.edge_offsets[edge] + local / leaf.parent_count, local % leaf.parent_count};
+}
+
+// Mirrored chain of the leaf (parent sequence, then `group`) from its receiver, as half_chain forms it.
+__device__ void leaf_chain(const GroupTables& tables, const ChainLeaf& leaf, int64_t parent, int group,
+                           SequenceChain& chain) {
+    chain.images[0] = cmath::load_vec3(leaf.receivers, leaf.parent_rx[parent]);
+    for (int bounce = 0; bounce <= leaf.width; ++bounce) {
+        const int g = bounce < leaf.width ? leaf.parent_sequences[parent * leaf.width + bounce] : group;
+        chain.groups[bounce] = g;
+        chain.plane_point[bounce] = cmath::load_vec3(tables.plane_point, g);
+        chain.plane_normal[bounce] = cmath::load_vec3(tables.plane_normal, g);
+        chain.images[bounce + 1] = mirror(chain.images[bounce], chain.plane_point[bounce], chain.plane_normal[bounce]);
+    }
+}
+
+struct LeafEntry {
+    int tx;
+    int a_node;
+    float3 a_image;
+    float3 parent_image;
+    int last;
+};
+
+__device__ __forceinline__ LeafEntry leaf_entry(const ChainHalf& a, const ChainLeaf& leaf, const LeafLane& lane) {
+    LeafEntry entry;
+    half_entry(a, lane.a_entry, entry.tx, entry.a_node, entry.a_image);
+    entry.parent_image = cmath::load_vec3(leaf.parent_images, lane.parent);
+    entry.last = leaf.width > 0 ? leaf.parent_sequences[lane.parent * leaf.width + leaf.width - 1] : -1;
+    return entry;
+}
+
+__device__ bool chain_leaf_keep(const GroupTables& tables, const ChainEdges& edges, const ChainHalf& a,
+                                const ChainLeaf& leaf, const LeafLane& lane, const LeafEntry& entry, int group,
+                                const LeafTolerances& tol, float3& point) {
+    if (group == entry.last) {
+        return false;
+    }
+    const float3 image = mirror(entry.parent_image, cmath::load_vec3(tables.plane_point, group),
+                                cmath::load_vec3(tables.plane_normal, group));
+    if (!chain_edge_point(edges, lane.edge, entry.a_image, image, tol.edge_epsilon, point)) {
+        return false;
+    }
+    SequenceChain chain;
+    if (!chain_a_side_keep(tables, a, entry.a_node, entry.tx, entry.a_image, point, tol.pair, chain)) {
+        return false;
+    }
+    leaf_chain(tables, leaf, lane.parent, group, chain);
+    if (!receiver_candidate(tables, chain, leaf.width + 1, point, tol.pair)) {
+        return false;
+    }
+    return image_tree_keep(tables, entry.last, entry.parent_image, group, tol.tree) &&
+           chain_edge_keep(tables, group, image, edges, lane.edge, tol.beam);
+}
+
+// Plane groups whose kept children a lane records as a bit mask, so the write pass tests only those.
+constexpr int kLeafMaskGroups = 32;
+
+__global__ void chain_leaf_count_kernel(int64_t lane_start, int64_t lane_count, const int64_t* lane_offsets,
+                                        GroupTables tables, ChainEdges edges, ChainHalf a, ChainLeaf leaf,
+                                        LeafTolerances tol, int* __restrict__ counts,
+                                        unsigned int* __restrict__ masks) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x; index < lane_count;
+         index += stride) {
+        const LeafLane lane = leaf_lane(lane_offsets, edges.edge_count, a, leaf, lane_start + index);
+        const LeafEntry entry = leaf_entry(a, leaf, lane);
+        int count = 0;
+        unsigned int mask = 0u;
+        for (int group = 0; group < tables.group_count; ++group) {
+            float3 point;
+            if (chain_leaf_keep(tables, edges, a, leaf, lane, entry, group, tol, point)) {
+                ++count;
+                if (group < kLeafMaskGroups) {
+                    mask |= 1u << group;
+                }
+            }
+        }
+        counts[index] = count;
+        if (masks != nullptr) {
+            masks[index] = mask;
+        }
+    }
+}
+
+__global__ void chain_leaf_write_kernel(int64_t lane_start, int64_t lane_count, const int64_t* lane_offsets,
+                                        GroupTables tables, ChainEdges edges, ChainHalf a, ChainLeaf leaf,
+                                        LeafTolerances tol, const int* __restrict__ offsets,
+                                        const unsigned int* __restrict__ masks, int* __restrict__ out_tx,
+                                        int* __restrict__ out_rx, int* __restrict__ out_edge,
+                                        int* __restrict__ out_a_node, int* __restrict__ out_sequences,
+                                        float* __restrict__ out_point) {
+    const int64_t stride = static_cast<int64_t>(blockDim.x) * gridDim.x;
+    const int width = leaf.width + 1;
+    for (int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x; index < lane_count;
+         index += stride) {
+        int64_t dst = offsets[index];
+        if (offsets[index + 1] == dst) {
+            continue;
+        }
+        const LeafLane lane = leaf_lane(lane_offsets, edges.edge_count, a, leaf, lane_start + index);
+        const LeafEntry entry = leaf_entry(a, leaf, lane);
+        // With a mask the kept groups are known; the point of each is recomputed by the same test.
+        const unsigned int mask = masks != nullptr ? masks[index] : 0u;
+        for (int group = 0; group < tables.group_count; ++group) {
+            if (masks != nullptr && (mask & (1u << group)) == 0u) {
+                continue;
+            }
+            float3 point;
+            if (!chain_leaf_keep(tables, edges, a, leaf, lane, entry, group, tol, point)) {
+                continue;
+            }
+            out_tx[dst] = entry.tx;
+            out_rx[dst] = leaf.parent_rx[lane.parent];
+            out_edge[dst] = lane.edge;
+            out_a_node[dst] = entry.a_node;
+            for (int column = 0; column < leaf.width; ++column) {
+                out_sequences[dst * width + column] = leaf.parent_sequences[lane.parent * leaf.width + column];
+            }
+            out_sequences[dst * width + leaf.width] = group;
+            out_point[dst * 3] = point.x;
+            out_point[dst * 3 + 1] = point.y;
+            out_point[dst * 3 + 2] = point.z;
+            ++dst;
+        }
     }
 }
 
@@ -1124,6 +1404,98 @@ pybind11::dict channel_chain_candidates(
         pybind11::cast<at::Tensor>(out["edge"]).data_ptr<int>(),
         pybind11::cast<at::Tensor>(out["a_node"]).data_ptr<int>(),
         pybind11::cast<at::Tensor>(out["b_node"]).data_ptr<int>(),
+        pybind11::cast<at::Tensor>(out["point"]).data_ptr<float>());
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    return out;
+}
+
+pybind11::dict channel_chain_leaf_candidates(
+    at::Tensor lane_offsets, int64_t lane_start, int64_t lane_end, at::Tensor plane_point, at::Tensor plane_normal,
+    at::Tensor bounds, at::Tensor occupancy, at::Tensor edge_position, at::Tensor edge_direction,
+    at::Tensor edge_t_min, at::Tensor edge_t_max, at::Tensor edge_n0, at::Tensor edge_n1, at::Tensor a_edge_offsets,
+    at::Tensor a_endpoint, at::Tensor a_node, at::Tensor a_endpoints, at::Tensor a_node_sequences,
+    at::Tensor a_node_images, at::Tensor parent_rx, at::Tensor parent_sequences, at::Tensor parent_images,
+    at::Tensor receivers, double tree_tolerance, double beam_tolerance, double box_tolerance,
+    double segment_tolerance, double min_segment_length, double edge_epsilon) {
+    const GroupTables tables = group_tables(plane_point, plane_normal, bounds, occupancy);
+    ChainEdges edges = chain_edges(edge_position, edge_direction, edge_t_min, edge_t_max);
+    check_vec3_table(edge_n0, "edge_n0");
+    check_vec3_table(edge_n1, "edge_n1");
+    TORCH_CHECK(edge_n0.size(0) == edges.edge_count && edge_n1.size(0) == edges.edge_count,
+                "edge normal tables must have one row per edge");
+    edges.n0 = edge_n0.data_ptr<float>();
+    edges.n1 = edge_n1.data_ptr<float>();
+    check_tensor(lane_offsets, "lane_offsets", at::kLong, 1);
+    TORCH_CHECK(lane_offsets.size(0) == edges.edge_count + 1, "lane_offsets must have one row per edge plus one");
+    TORCH_CHECK(edges.edge_count > 0, "chain candidates need at least one edge");
+    const ChainHalf a = chain_half(a_edge_offsets, a_endpoint, a_node, a_endpoints, a_node_sequences, a_node_images,
+                                   edges.edge_count, "transmitter half");
+    check_tensor(parent_rx, "parent_rx", at::kInt, 1);
+    check_tensor(parent_sequences, "parent_sequences", at::kInt, 2);
+    check_vec3_table(parent_images, "parent_images");
+    check_vec3_table(receivers, "receivers");
+    const int64_t parent_count = parent_rx.size(0);
+    const int64_t width = parent_sequences.size(1);
+    TORCH_CHECK(parent_sequences.size(0) == parent_count && parent_images.size(0) == parent_count,
+                "parent tables must have one row per parent node");
+    TORCH_CHECK(width + 1 < kDiscoveryMaxDepth, "leaf depth exceeds the specular chain limit");
+    TORCH_CHECK(a.depth + width + 2 <= kDiscoveryMaxDepth, "chain depth exceeds the specular chain limit");
+    TORCH_CHECK(0 <= lane_start && lane_start <= lane_end, "lane range is out of range");
+    const int64_t lane_count = lane_end - lane_start;
+    TORCH_CHECK(lane_count < std::numeric_limits<int>::max() / tables.group_count,
+                "chain leaf chunk exceeds the int32 range");
+    TORCH_CHECK(lane_count == 0 || parent_count > 0, "chain leaf lanes need at least one parent node");
+    for (double value : {tree_tolerance, beam_tolerance, box_tolerance, segment_tolerance, min_segment_length,
+                         edge_epsilon}) {
+        TORCH_CHECK(std::isfinite(value) && value >= 0.0, "chain leaf tolerances must be finite and non-negative");
+    }
+    const int device = a_endpoint.get_device();
+    for (const at::Tensor* tensor : {&lane_offsets, &parent_rx, &parent_sequences, &parent_images, &receivers,
+                                     &plane_point, &edge_position}) {
+        TORCH_CHECK(tensor->get_device() == device, "chain leaf inputs must share one device");
+    }
+    auto int_options = a_endpoint.options();
+    auto allocate = [&](int64_t rows) {
+        pybind11::dict out;
+        out["tx"] = at::empty({rows}, int_options);
+        out["rx"] = at::empty({rows}, int_options);
+        out["edge"] = at::empty({rows}, int_options);
+        out["a_node"] = at::empty({rows}, int_options);
+        out["b_sequence"] = at::empty({rows, width + 1}, int_options);
+        out["point"] = at::empty({rows, 3}, edge_position.options());
+        return out;
+    };
+    if (lane_count == 0) {
+        return allocate(0);
+    }
+    const ChainLeaf leaf{parent_rx.data_ptr<int>(), parent_sequences.data_ptr<int>(), parent_images.data_ptr<float>(),
+                         receivers.data_ptr<float>(), parent_count, static_cast<int>(width)};
+    const LeafTolerances tol{{static_cast<float>(box_tolerance), static_cast<float>(segment_tolerance),
+                              static_cast<float>(min_segment_length)},
+                             static_cast<float>(tree_tolerance), static_cast<float>(beam_tolerance),
+                             static_cast<float>(edge_epsilon)};
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(device).stream();
+    auto counts = at::empty({lane_count}, int_options);
+    auto offsets = at::empty({lane_count + 1}, int_options);
+    const bool use_masks = tables.group_count <= kLeafMaskGroups;
+    auto masks = at::empty({use_masks ? lane_count : 0}, int_options);
+    unsigned int* mask_data = use_masks ? reinterpret_cast<unsigned int*>(masks.data_ptr<int>()) : nullptr;
+    chain_leaf_count_kernel<<<discovery_grid(lane_count), kDiscoveryBlock, 0, stream>>>(
+        lane_start, lane_count, lane_offsets.data_ptr<int64_t>(), tables, edges, a, leaf, tol,
+        counts.data_ptr<int>(), mask_data);
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    channel::scan::exclusive_flag_offsets(counts, offsets, lane_count, stream);
+    const int64_t count = observe_compact_count(offsets, lane_count, stream).count;
+    pybind11::dict out = allocate(count);
+    if (count == 0) {
+        return out;
+    }
+    chain_leaf_write_kernel<<<discovery_grid(lane_count), kDiscoveryBlock, 0, stream>>>(
+        lane_start, lane_count, lane_offsets.data_ptr<int64_t>(), tables, edges, a, leaf, tol, offsets.data_ptr<int>(),
+        mask_data, pybind11::cast<at::Tensor>(out["tx"]).data_ptr<int>(), pybind11::cast<at::Tensor>(out["rx"]).data_ptr<int>(),
+        pybind11::cast<at::Tensor>(out["edge"]).data_ptr<int>(),
+        pybind11::cast<at::Tensor>(out["a_node"]).data_ptr<int>(),
+        pybind11::cast<at::Tensor>(out["b_sequence"]).data_ptr<int>(),
         pybind11::cast<at::Tensor>(out["point"]).data_ptr<float>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     return out;

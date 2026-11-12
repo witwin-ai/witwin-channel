@@ -183,6 +183,36 @@ pybind11::dict channel_chain_candidates(
     double segment_tolerance,
     double min_segment_length,
     double edge_epsilon);
+pybind11::dict channel_chain_leaf_candidates(
+    torch::Tensor lane_offsets,
+    int64_t lane_start,
+    int64_t lane_end,
+    torch::Tensor plane_point,
+    torch::Tensor plane_normal,
+    torch::Tensor bounds,
+    torch::Tensor occupancy,
+    torch::Tensor edge_position,
+    torch::Tensor edge_direction,
+    torch::Tensor edge_t_min,
+    torch::Tensor edge_t_max,
+    torch::Tensor edge_n0,
+    torch::Tensor edge_n1,
+    torch::Tensor a_edge_offsets,
+    torch::Tensor a_endpoint,
+    torch::Tensor a_node,
+    torch::Tensor a_endpoints,
+    torch::Tensor a_node_sequences,
+    torch::Tensor a_node_images,
+    torch::Tensor parent_rx,
+    torch::Tensor parent_sequences,
+    torch::Tensor parent_images,
+    torch::Tensor receivers,
+    double tree_tolerance,
+    double beam_tolerance,
+    double box_tolerance,
+    double segment_tolerance,
+    double min_segment_length,
+    double edge_epsilon);
 pybind11::dict channel_chain_double_candidates(
     torch::Tensor pair_offsets,
     int64_t lane_start,
@@ -611,6 +641,10 @@ void register_path_deterministic(pybind11::module_ &module) {
         "chain_candidates",
         &channel_chain_candidates,
         "Join interaction-chain halves on shared edges and select candidates with native CUDA.");
+    module.def(
+        "chain_leaf_candidates",
+        &channel_chain_leaf_candidates,
+        "Select interaction-chain candidates of the deepest receiver-side half with native CUDA.");
     module.def(
         "chain_double_candidates",
         &channel_chain_double_candidates,

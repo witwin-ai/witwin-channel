@@ -42,6 +42,7 @@ __all__ = [
     "TransmissionTopologyCapacity",
     "chain_candidates",
     "chain_double_candidates",
+    "chain_leaf_candidates",
     "chain_node_edges",
     "core_pack_int2",
     "deterministic_component_counts",
@@ -93,6 +94,19 @@ _CHAIN_DOUBLE_CANDIDATES = _native.op(
     tensor_arg("pair_offsets"), opaque("lane_start"), opaque("lane_end"), opaque("rx_count"),
     tensor_arg("tx_offsets"), tensor_arg("tx_edges"), tensor_arg("rx_offsets"),
     tensor_arg("rx_edges"),
+)
+_CHAIN_LEAF_CANDIDATES = _native.op(
+    "chain_leaf_candidates",
+    tensor_arg("lane_offsets"), opaque("lane_start"), opaque("lane_end"), tensor_arg("plane_point"),
+    tensor_arg("plane_normal"), tensor_arg("bounds"), tensor_arg("occupancy"),
+    tensor_arg("edge_position"), tensor_arg("edge_direction"), tensor_arg("edge_t_min"),
+    tensor_arg("edge_t_max"), tensor_arg("edge_n0"), tensor_arg("edge_n1"),
+    tensor_arg("a_edge_offsets"), tensor_arg("a_endpoint"), tensor_arg("a_node"),
+    tensor_arg("a_endpoints"), tensor_arg("a_node_sequences"), tensor_arg("a_node_images"),
+    tensor_arg("parent_rx"), tensor_arg("parent_sequences"), tensor_arg("parent_images"),
+    tensor_arg("receivers"), opaque("tree_tolerance"), opaque("beam_tolerance"),
+    opaque("box_tolerance"), opaque("segment_tolerance"), opaque("min_segment_length"),
+    opaque("edge_epsilon"),
 )
 _CHAIN_NODE_EDGES = _native.op(
     "chain_node_edges",
@@ -1157,6 +1171,44 @@ def chain_candidates(
     )
     if not isinstance(exported, dict) or set(exported) != _CHAIN_CANDIDATE_FIELDS:
         raise TypeError("_channel.chain_candidates must return the chain candidate tables")
+    return exported
+
+
+_CHAIN_LEAF_CANDIDATE_FIELDS = frozenset({"tx", "rx", "edge", "a_node", "b_sequence", "point"})
+
+
+def chain_leaf_candidates(
+    *, lane_offsets: torch.Tensor, lane_start: int, lane_end: int, plane_point: torch.Tensor,
+    plane_normal: torch.Tensor, bounds: torch.Tensor, occupancy: torch.Tensor,
+    edge_position: torch.Tensor, edge_direction: torch.Tensor, edge_t_min: torch.Tensor,
+    edge_t_max: torch.Tensor, edge_n0: torch.Tensor, edge_n1: torch.Tensor,
+    a: tuple[torch.Tensor, ...], parent_rx: torch.Tensor, parent_sequences: torch.Tensor,
+    parent_images: torch.Tensor, receivers: torch.Tensor, tree_tolerance: float,
+    beam_tolerance: float, box_tolerance: float, segment_tolerance: float,
+    min_segment_length: float, edge_epsilon: float,
+) -> dict[str, torch.Tensor]:
+    """Chain candidates whose receiver half is one reflection deeper than the given parent nodes.
+
+    A lane is one ``(edge, transmitter-half entry, parent)`` and tests every child plane group of
+    the parent: the candidates are exactly those a materialized child half would give the join, in
+    ``(edge, entry, parent, group)`` order, each with its receiver-side plane-group sequence.
+    """
+
+    validate_cuda_tensor("lane_offsets", lane_offsets, dtype=torch.int64, ndim=1)
+    validate_cuda_tensor("parent_rx", parent_rx, dtype=torch.int32, ndim=1)
+    validate_cuda_tensor("parent_sequences", parent_sequences, dtype=torch.int32, ndim=2)
+    validate_cuda_tensor("parent_images", parent_images, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    validate_cuda_tensor("receivers", receivers, dtype=torch.float32, ndim=2, trailing_shape=(3,))
+    if len(a) != 6:
+        raise ValueError("the transmitter half must carry six tables")
+    exported = _CHAIN_LEAF_CANDIDATES(
+        lane_offsets, int(lane_start), int(lane_end), plane_point, plane_normal, bounds, occupancy,
+        edge_position, edge_direction, edge_t_min, edge_t_max, edge_n0, edge_n1, *a, parent_rx,
+        parent_sequences, parent_images, receivers, float(tree_tolerance), float(beam_tolerance),
+        float(box_tolerance), float(segment_tolerance), float(min_segment_length), float(edge_epsilon),
+    )
+    if not isinstance(exported, dict) or set(exported) != _CHAIN_LEAF_CANDIDATE_FIELDS:
+        raise TypeError("_channel.chain_leaf_candidates must return the chain candidate tables")
     return exported
 
 
