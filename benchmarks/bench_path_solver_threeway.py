@@ -354,12 +354,9 @@ def _run_native(args: argparse.Namespace) -> dict[str, Any]:
                 for point in rx_points
             ),
         ],
-        # The solvers keep a merged Mitsuba import's edge table as imported; the default edge
-        # policy (all edges, half-plane boundary edges) matches the reference loaders.
-        metadata={"mitsuba": {"merge_shapes": True, "source": str(xml)}},
     )
     compiled = compile_scene(scene, reference_frequency_hz=float(args.frequency_hz))
-    _, selected_edges = selected_diffraction_edges(compiled.rayd, preserve_imported_edges=True)
+    _, selected_edges = selected_diffraction_edges(compiled.rayd)
     scene_stats = {
         "structures": len(scene.structures),
         "triangles": sum(int(s.geometry.to_mesh()[1].shape[0]) for s in scene.structures),

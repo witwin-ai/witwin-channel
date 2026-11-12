@@ -86,8 +86,8 @@ sync and copy budgets do not see it.
   wherever the stationary point of a split edge used to fall on a segment end.
 - MC diffraction samples edges in proportion to their length; merged edges keep the total length, so
   the sampling density is unchanged, but the sampled edge set and its states change.
-- The mitsuba `merge_shapes` import path keeps its imported edge table unrefined (unchanged), so it
-  gets the orientation and concavity rules of the kernel but no merge.
+- Every scene, imported or built, uses the refined edge table. (The metadata-keyed exception that kept
+  a `merge_shapes` Mitsuba import's edge table unrefined is removed; see ADR-073.)
 - Boundary edges that rest on another surface (the open bottom of a box standing on a ground plane, a
   sheet ending on a wall) are not half-planes: at compile time two short visibility probes cross
   the edge line just past the edge, one on each side of the sheet, 1 mm off the sheet and 1 mm into

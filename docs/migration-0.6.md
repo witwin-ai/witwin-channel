@@ -68,6 +68,17 @@ radiomap.PathTable, and solve -> radiomap.solve. See docs/migration-0.6.md.
 (`Stochastic`) and `witwin.channel.experimental.bdpt`. These stub modules only raise; they
 re-export nothing.
 
+## Scene metadata no longer selects the edge table
+
+In 0.5, a scene whose metadata carried `{"mitsuba": {"merge_shapes": True}}` (which the
+removed `Scene.load_mitsuba` stamped) diffracted from RayD's raw imported edge table, where
+the coincident edges of different meshes are separate wedges. In 0.6.0 every scene
+diffracts from the merged coincident-edge wedges (`docs/dev/standards/adr-073-fw-d5-coincident-edges.md`),
+and the key is ignored. `importers.load_mitsuba` never sets it. A scene that still carries it,
+for example one rebuilt from a stored 0.5 metadata dictionary, gets different diffraction
+rows and values than in 0.5; drop the key, it has no effect. `load_mitsuba(...,
+merge_shapes=...)` is the importer's own shape-merging option and is unchanged.
+
 ## The experimental tier
 
 `witwin.channel.experimental.*` is importable and fully tested but is not part of the stable

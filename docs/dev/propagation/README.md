@@ -208,6 +208,13 @@ receiver chunk with a per-state transmitter index (incident polarization and
 `tx_id`). One native compaction per chunk writes topology rows carrying the UTD
 vector field as `field_xyz`; the field stage owns the scalar fields.
 
+Every diffraction consumer (order-1 discovery, coupled chains, double diffraction, the
+field stage and `radiomap.Stochastic`) reads one edge table,
+`propagation.geometry.cached_diffraction_edge_geometry`: RayD's edge records refined by
+`scene.resources.refine_edge_geometry`, so coincident edges of different structures are one
+wedge. No scene metadata selects another table; the imported-edge exception keyed on
+`metadata["mitsuba"]["merge_shapes"]` is removed.
+
 ## Public entry points
 
 `propagation.consumer` is the one public surface in this package: the stable,

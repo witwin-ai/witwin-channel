@@ -299,6 +299,15 @@ Launch, sync and copy counts are the evidence; timings are from a shared GPU.
   above apply (diffraction, coupled chains, multilayer and lossy faces), and
   the diffraction coefficient now depends on whether the solve carries the
   `transmission` component (ADR-076).
+- Scene metadata no longer selects the diffraction edge table (ADR-073). A
+  scene carrying `metadata["mitsuba"]["merge_shapes"]` (possible only by hand
+  since `Scene.load_mitsuba` was removed; `importers.load_mitsuba` never sets
+  it) used to diffract from RayD's raw imported edges, which count the
+  coincident edges of different meshes as separate wedges. It now diffracts
+  from the merged coincident-edge wedges like every other scene, so its
+  diffraction rows and values change in `path`, `radiomap.Coherent` and
+  `radiomap.Stochastic` (Munich, 32 x 32 grid: 45,429 -> 26,909 edges,
+  28,910 -> 19,162 depth-1 rows). The key is now ignored.
 - Error messages name the public solvers (`radiomap.Coherent`,
   `radiomap.Stochastic`, `experimental.bdpt`) instead of "deterministic",
   "Monte Carlo basic" or "MC basic"; for example "radiomap.Stochastic does not

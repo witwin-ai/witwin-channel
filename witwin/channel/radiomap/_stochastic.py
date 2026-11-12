@@ -1328,18 +1328,11 @@ def diffraction_component_map(
         )
     edge_geometry: tuple[torch.Tensor, ...] | None = None
     edge_candidates: tuple[torch.Tensor, torch.Tensor] | None = None
-    mitsuba_metadata = scene.metadata.get("mitsuba", {})
-    preserve_imported_edges = isinstance(mitsuba_metadata, dict) and bool(
-        mitsuba_metadata.get("merge_shapes", False)
-    )
 
     def get_edge_geometry() -> tuple[torch.Tensor, ...]:
         nonlocal edge_geometry
         if edge_geometry is None:
-            edge_geometry = _cached_diffraction_edge_geometry(
-                rayd,
-                preserve_imported_edges=preserve_imported_edges,
-            )
+            edge_geometry = _cached_diffraction_edge_geometry(rayd)
         return edge_geometry
 
     def get_edge_candidates(

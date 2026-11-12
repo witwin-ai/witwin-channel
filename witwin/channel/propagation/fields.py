@@ -49,7 +49,6 @@ from witwin.channel.propagation.rows import (
 from witwin.channel.scene import endpoints as scene_endpoints
 from witwin.channel.propagation.geometry import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
-    diffraction_edge_geometry as _diffraction_edge_geometry,
 )
 from witwin.channel.scene.endpoints import (
     receiver_polarization_rows,
@@ -744,15 +743,7 @@ def _evaluate_diffraction_fields(
         # topology.field_xyz is pinned by tests/ad.
         if material is None:
             material = face_material_field_bundle(compiled, device=device)
-        preserve_imported_edges = bool(
-            isinstance(scene.metadata.get("mitsuba", {}), dict)
-            and scene.metadata.get("mitsuba", {}).get("merge_shapes", False)
-        )
-        edge_geometry = (
-            _diffraction_edge_geometry(compiled.rayd.edge_records())
-            if preserve_imported_edges
-            else _cached_diffraction_edge_geometry(compiled.rayd)
-        )
+        edge_geometry = _cached_diffraction_edge_geometry(compiled.rayd)
         edge_id = _take(topology.edge_id, diffraction_rows).to(dtype=torch.int64)
         face0 = edge_geometry[8].to(dtype=torch.int64)[edge_id]
         face1 = edge_geometry[9].to(dtype=torch.int64)[edge_id]
@@ -860,16 +851,7 @@ def _evaluate_coupled_fields(
         if material is None:
             material = face_material_field_bundle(compiled, device=device)
         rayd = compiled.rayd
-        records = rayd.edge_records()
-        preserve_imported_edges = bool(
-            isinstance(scene.metadata.get("mitsuba", {}), dict)
-            and scene.metadata.get("mitsuba", {}).get("merge_shapes", False)
-        )
-        edge_geometry = (
-            _diffraction_edge_geometry(records)
-            if preserve_imported_edges
-            else _cached_diffraction_edge_geometry(rayd)
-        )
+        edge_geometry = _cached_diffraction_edge_geometry(rayd)
         edge_n0 = edge_geometry[6]
         edge_n1 = edge_geometry[7]
         edge_face0 = edge_geometry[8].to(dtype=torch.int64)

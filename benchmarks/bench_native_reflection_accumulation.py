@@ -58,8 +58,6 @@ def _build_scene(scene_xml: pathlib.Path, grid: tuple[int, int]) -> Any:
     return Scene(
         structures=list(imported.structures),
         endpoints=[AntennaState(new_antenna_id(), "tx", torch.tensor(TX)), receiver_grid],
-        # The solvers keep a merged Mitsuba import's edge table as imported.
-        metadata={"mitsuba": {"merge_shapes": True, "source": str(scene_xml)}},
     )
 
 

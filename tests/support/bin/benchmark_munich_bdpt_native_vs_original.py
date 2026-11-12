@@ -170,9 +170,6 @@ def _load_native_scene(args: argparse.Namespace) -> Scene:
             make_transmitter(position=torch.tensor(args.tx, dtype=torch.float32), power_w=1.0),
             grid,
         ],
-        # The solvers keep a merged Mitsuba import's edge table as imported; the default edge
-        # policy (all edges, half-plane boundary edges) matches the reference loader.
-        metadata={"mitsuba": {"merge_shapes": True, "source": str(scene_xml)}},
     )
 
 

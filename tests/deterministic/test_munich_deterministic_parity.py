@@ -80,7 +80,7 @@ def test_reduced_munich_deterministic_parity_emits_artifacts():
     assert saved["component_delta"]["diffraction"]["median_abs_delta_db"] < 4.0
     # The compact O(K) route has a pinned launch count; latency, memory,
     # throughput, and exactness remain independent performance gates.
-    assert saved["native"]["metadata"]["kernel"]["launch_count"] == 23
+    assert saved["native"]["metadata"]["kernel"]["launch_count"] == 13
     # Gross-regression guardrail, not an A/B race: on this 32x32 scene the
     # native and legacy-oracle times are both ~25 ms and dominated by launch
     # overhead, and the finite-edge mend legitimately adds ~2 ms of
@@ -134,7 +134,7 @@ def test_munich_benchmark_defaults_to_stage8_depth_two():
 
 
 @pytest.mark.parametrize(
-    ("max_depth", "expected_launch_count"), ((1, 20), (2, 23), (3, 25))
+    ("max_depth", "expected_launch_count"), ((1, 11), (2, 13), (3, 14))
 )
 def test_reduced_munich_native_depth_one_through_three_exports_reflection_paths(
     max_depth, expected_launch_count,

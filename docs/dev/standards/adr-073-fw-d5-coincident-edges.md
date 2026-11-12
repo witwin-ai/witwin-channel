@@ -100,6 +100,11 @@ step 3 drops), not runs of the proposed code.
   wedge (coincident edges of several structures) keep the first.
 - **Unchanged.** An edge that no other face meets keeps its record bit for bit; scenes without touching
   structures are unaffected.
+- **Every scene.** The imported-edge exception is removed (owner decision, 2026-11-12): a scene whose
+  metadata carries `{"mitsuba": {"merge_shapes": True}}` used to keep RayD's raw edge table, counting the
+  coincident edges of different meshes as separate wedges (Munich, 32 x 32 grid: 45,429 edges and 28,910
+  depth-1 rows with the key, 26,909 and 19,162 without); every scene now diffracts from this wedge union,
+  and no metadata selects another edge table.
 
 Limits: the gather probes the midpoint only, so a coincident edge that overlaps another only in part is
 not split (step 4 above is not implemented). The mesh-vertex AD path rebuilds a wedge's normals from the

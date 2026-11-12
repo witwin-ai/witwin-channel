@@ -17,7 +17,8 @@ owner of what it holds:
 | `scene.resources` | the typed RayD scene lifetime (`RayDSceneResource`, `build_scene_from_structures`, and their two native facades), the diffraction `EdgePolicy` and the scene-policy edge refinement, the lazy Kirchhoff and phase-screen resources, and the compile-time construction of the `KirchhoffTable` and `PhaseScreenRuntime` those resources are made of |
 
 The RayD lifecycle owner is exclusively `scene.resources` and has no
-compatibility re-export.
+compatibility re-export. The scene-policy edge refinement applies to every scene, imported
+or built: scene metadata does not select RayD's unrefined edge records.
 
 ## Public entry points
 
