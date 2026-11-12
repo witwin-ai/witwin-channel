@@ -73,7 +73,6 @@ def _fixture(monkeypatch, events, *, states_per_tx: int, tx_count: int = 2):
     rayd = SimpleNamespace(available=True, require_resource=lambda: 41)
     scene = SimpleNamespace(
         structures=[object()],
-        metadata={"mitsuba": {"merge_shapes": True}},
         transmitters=[SimpleNamespace(polarization=torch.tensor([0.0, 0.0, 1.0]))] * tx_count,
     )
     compiled = SimpleNamespace(rayd=rayd)

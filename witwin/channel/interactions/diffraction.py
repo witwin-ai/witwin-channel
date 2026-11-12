@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -18,7 +18,6 @@ from witwin.channel.scene.compiler import (
 )
 from witwin.channel.propagation.geometry import (
     cached_diffraction_edge_geometry as _cached_diffraction_edge_geometry,
-    diffraction_edge_geometry as _diffraction_edge_geometry,
 )
 from witwin.channel.propagation.topology import (
     concatenate_path_blocks,
@@ -46,7 +45,6 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class DiffractionOrder1Plan:
-    preserve_imported_edges: bool
     tx_count: int
     rx_count: int
 
@@ -58,18 +56,8 @@ class DiffractionRxChunkRequest:
     capacity: int
 
 
-def prepare_diffraction_order1_plan(
-    *, metadata: Mapping[str, object], tx_count: int, rx_count: int,
-) -> DiffractionOrder1Plan:
-    mitsuba_metadata = metadata.get("mitsuba", {})
-    # Channel's merge_shapes import keeps the selected boundary-edge table
-    # intact. The synthetic-scene path instead merges coincident structure
-    # boundaries into one physical wedge.
-    preserve_imported_edges = isinstance(mitsuba_metadata, dict) and bool(
-        mitsuba_metadata.get("merge_shapes", False)
-    )
+def prepare_diffraction_order1_plan(*, tx_count: int, rx_count: int) -> DiffractionOrder1Plan:
     return DiffractionOrder1Plan(
-        preserve_imported_edges=preserve_imported_edges,
         tx_count=int(tx_count),
         rx_count=int(rx_count),
     )
@@ -103,14 +91,10 @@ class DiffractionEdgeGeometry:
     exterior_angle: torch.Tensor
 
 
-def query_diffraction_edges(
-    rayd: RayDSceneResource, *, preserve_imported_edges: bool,
-) -> DiffractionEdgeGeometry:
-    raw = (
-        _diffraction_edge_geometry(rayd.edge_records())
-        if preserve_imported_edges
-        else _cached_diffraction_edge_geometry(rayd)
-    )
+def query_diffraction_edges(rayd: RayDSceneResource) -> DiffractionEdgeGeometry:
+    """The scene's wedge table: coincident boundary edges of every structure merged into one wedge."""
+
+    raw = _cached_diffraction_edge_geometry(rayd)
     return DiffractionEdgeGeometry(
         selected=raw[0],
         edge_position=raw[1],
@@ -127,11 +111,11 @@ def query_diffraction_edges(
 
 
 def selected_diffraction_edges(
-    rayd: RayDSceneResource, *, preserve_imported_edges: bool,
+    rayd: RayDSceneResource,
 ) -> tuple[DiffractionEdgeGeometry, torch.Tensor]:
     """The edge table and its selected edge indices, queried once for every transmitter."""
 
-    edges = query_diffraction_edges(rayd, preserve_imported_edges=preserve_imported_edges)
+    edges = query_diffraction_edges(rayd)
     return edges, topology_kernels.mc_selected_edge_indices(edges.selected)
 
 
@@ -332,13 +316,12 @@ def query_diffraction_order1(query: DiffractionOrder1Query) -> DiffractionOrder1
 
 def _deterministic_diffraction_states(
     rayd: RayDSceneResource, tx: torch.Tensor, tx_power: torch.Tensor, tx_index: int, *,
-    preserve_imported_edges: bool = False,
     edges: tuple[DiffractionEdgeGeometry, torch.Tensor] | None = None,
 ) -> tuple[torch.Tensor, ...]:
     """Per-transmitter diffraction states; ``edges`` reuses one solve's selected edge table."""
 
     if edges is None:
-        edges = selected_diffraction_edges(rayd, preserve_imported_edges=preserve_imported_edges)
+        edges = selected_diffraction_edges(rayd)
     edge_table, selected_indices = edges
     return topology_kernels.deterministic_diffraction_state_pack(
         selected_indices,
@@ -483,13 +466,10 @@ def _diffraction_topology_order1(
     launch_count = 0
     rx_count = int(rx_positions.shape[0])
     plan = prepare_diffraction_order1_plan(
-        metadata=scene.metadata,
         tx_count=int(tx_positions.shape[0]),
         rx_count=rx_count,
     )
-    edges = selected_diffraction_edges(
-        rayd, preserve_imported_edges=plan.preserve_imported_edges
-    )
+    edges = selected_diffraction_edges(rayd)
     # Every transmitter's states are packed, visibility-planned and exported together: each state
     # carries its own source and transmitter index, so one launch per stage serves every
     # transmitter, and receivers are chunked to bound the rx x state workspace.

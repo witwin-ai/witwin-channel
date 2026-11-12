@@ -34,7 +34,6 @@ def test_native_tx_visibility_plan_matches_frozen_four_sample_contract() -> None
         tx,
         torch.ones(1, device="cuda"),
         0,
-        preserve_imported_edges=True,
     )
     assert int(states[0].shape[0]) > 0
 
@@ -107,7 +106,7 @@ def test_batched_visibility_plan_matches_each_transmitter_plan() -> None:
         [[0.0, -1.0, 0.5], [2.5, 2.0, 0.4], [-1.0, 3.0, 1.5]], device="cuda"
     )
     power = torch.tensor([1.0, 2.0, 0.5], device="cuda")
-    edges = diffraction.selected_diffraction_edges(rayd, preserve_imported_edges=True)
+    edges = diffraction.selected_diffraction_edges(rayd)
     states, source_index = diffraction._batched_diffraction_states(edges, tx_positions, power)
     batched = diffraction.plan_tx_visible_diffraction_states(
         rayd, states, tx_positions[0], per_state_source=True

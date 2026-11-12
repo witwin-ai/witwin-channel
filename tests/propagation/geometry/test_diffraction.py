@@ -50,7 +50,7 @@ def _state_raw() -> tuple[torch.Tensor, ...]:
     )
 
 
-def test_edge_query_names_cached_and_imported_raw_geometry_without_copies(monkeypatch):
+def test_edge_query_names_the_merged_wedge_geometry_without_copies(monkeypatch):
     rayd = _Rayd()
     raw = _edge_raw()
     calls = []
@@ -59,28 +59,19 @@ def test_edge_query_names_cached_and_imported_raw_geometry_without_copies(monkey
         calls.append(("cached", actual_rayd))
         return raw
 
-    def fake_imported(records):
-        calls.append(("imported", records))
-        return raw
-
     monkeypatch.setattr(
         diffraction,
         "_cached_diffraction_edge_geometry",
         fake_cached,
     )
-    monkeypatch.setattr(diffraction, "_diffraction_edge_geometry", fake_imported)
 
-    cached = diffraction.query_diffraction_edges(
-        rayd,
-        preserve_imported_edges=False,
-    )
-    imported = diffraction.query_diffraction_edges(
-        rayd,
-        preserve_imported_edges=True,
-    )
+    cached = diffraction.query_diffraction_edges(rayd)
 
-    assert calls == [("cached", rayd), ("imported", rayd.records)]
-    assert rayd.edge_record_calls == 1
+    # One edge table for every scene: the refined wedge geometry, never RayD's raw records.
+    assert calls == [("cached", rayd)]
+    assert rayd.edge_record_calls == 0
+    assert list(inspect.signature(diffraction.query_diffraction_edges).parameters) == ["rayd"]
+    assert list(inspect.signature(diffraction.selected_diffraction_edges).parameters) == ["rayd"]
     assert [field.name for field in fields(cached)] == [
         "selected",
         "edge_position",
@@ -95,7 +86,6 @@ def test_edge_query_names_cached_and_imported_raw_geometry_without_copies(monkey
         "exterior_angle",
     ]
     assert cached.edge_direction is raw[2]
-    assert imported.edge_direction is raw[2]
     assert cached.edge_direction.stride() == raw[2].stride()
 
 

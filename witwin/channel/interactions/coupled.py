@@ -14,7 +14,6 @@ import torch
 from witwin.channel.interactions.diffraction import (
     _batched_diffraction_states,
     plan_tx_visible_diffraction_states,
-    prepare_diffraction_order1_plan,
     selected_diffraction_edges,
 )
 from witwin.channel.interactions.reflection import (
@@ -232,10 +231,7 @@ def _prepare_chain_context(
         rayd, tri_a, normals, face_geometry_id_table(compiled, "face_surface_id", device=device)
     )
     plane_groups = reflection_plane_groups(compiled, coplanar_groups, tri_a=tri_a, normals=normals)
-    plan = prepare_diffraction_order1_plan(
-        metadata=scene.metadata, tx_count=int(tx_positions.shape[0]), rx_count=int(rx_positions.shape[0])
-    )
-    edges = selected_diffraction_edges(rayd, preserve_imported_edges=plan.preserve_imported_edges)
+    edges = selected_diffraction_edges(rayd)
     geometry, selected = edges
     if plane_groups.group_count <= 0 or int(selected.shape[0]) == 0:
         return None

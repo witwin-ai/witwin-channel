@@ -50,21 +50,15 @@ def diffraction_edge_geometry(records: RayDEdgeRecords) -> tuple[torch.Tensor, .
     )
 
 
-def cached_diffraction_edge_geometry(
-    rayd: RayDSceneResource, *, preserve_imported_edges: bool = False,
-) -> tuple[torch.Tensor, ...]:
+def cached_diffraction_edge_geometry(rayd: RayDSceneResource) -> tuple[torch.Tensor, ...]:
+    """The refined wedge table, built once per RayD scene: coincident structure boundaries form one wedge."""
+
     cache = rayd.runtime_cache
-    cache_key = (
-        "mc_imported_diffraction_edge_geometry"
-        if preserve_imported_edges
-        else "mc_diffraction_edge_geometry"
-    )
+    cache_key = "mc_diffraction_edge_geometry"
     cached = cache.get(cache_key)
     if cached is not None:
         return cast("tuple[torch.Tensor, ...]", cached)
-    geometry = diffraction_edge_geometry(rayd.edge_records())
-    if not preserve_imported_edges:
-        geometry = refine_edge_geometry(rayd, geometry)
+    geometry = refine_edge_geometry(rayd, diffraction_edge_geometry(rayd.edge_records()))
     cache[cache_key] = geometry
     return geometry
 
