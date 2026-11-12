@@ -848,6 +848,11 @@ __device__ CoupledRowTangents coupled_dd_row_dual(
         field::dual_const3(in.e1_dir_raw), field::v3_const<Dual>(0.f, 0.f, 1.f));
     const DualV3 e2_axis = field::safe_normalize(
         field::dual_const3(in.e2_dir_raw), field::v3_const<Dual>(0.f, 0.f, 1.f));
+    // The legs' side hints, from the frozen primal geometry exactly as coupled_dd_field_kernel forms them.
+    const field::float3a e1_axis_value =
+        field::safe_normalize(in.e1_dir_raw, field::make_f3(0.0f, 0.0f, 1.0f));
+    const field::float3a e2_axis_value =
+        field::safe_normalize(in.e2_dir_raw, field::make_f3(0.0f, 0.0f, 1.0f));
 
     // --- Leg 1: direct-source diffraction at e1, observed at frozen Q2 ---
     const field::Basis3T<Dual> input_edge_basis1 = field::diffraction_edge_basis(
@@ -884,6 +889,8 @@ __device__ CoupledRowTangents coupled_dd_row_dual(
     faces1.frequency_hz = frequency;
     pair1.selectStationaryPoint = 1.0f;
     pair1.stationaryExternalIncident = 0.0f;
+    pair1.targetSide = field::dual_const3(
+        field::grazing_face_side(field::f3_sub(in.q1, in.q2), e2_axis_value, in.e2_n0, in.e2_n1));
     field::MaterialParamsT<Dual> material1{};
     // The face terms reflect with the wedge faces' slab coefficients; the direct incident
     // spherical wave uses the (frozen) transmitter polarization, exactly like coupled_dd_field_kernel.
@@ -931,6 +938,8 @@ __device__ CoupledRowTangents coupled_dd_row_dual(
     faces2.frequency_hz = frequency;
     pair2.selectStationaryPoint = 1.0f;
     pair2.stationaryExternalIncident = 1.0f;
+    pair2.sourceSide = field::dual_const3(
+        field::grazing_face_side(field::f3_sub(in.q2, in.q1), e1_axis_value, in.e1_n0, in.e1_n1));
     field::MaterialParamsT<Dual> material2{};
     material2.omega = Dual(-1.0f);
     const DualC3 value = field::compute_pair_vector_contribution_faces(

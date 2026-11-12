@@ -421,6 +421,11 @@ __global__ void coupled_dd_field_kernel(
         faces1.frequency_hz = frequency_hz;
         pair1.selectStationaryPoint = 1.0f;
         pair1.stationaryExternalIncident = 0.0f;
+        // A leg running along a face of one edge runs on that face's side: a sheet edge at its
+        // other end takes that side instead of telling its two faces apart by the angle alone.
+        pair1.targetSide = field::grazing_face_side(
+            field::f3_sub(q1, q2), e2_axis, channel::math::load_field_vec3(edge2_n0, index),
+            channel::math::load_field_vec3(edge2_n1, index));
         const field::float3a tx_pol = channel::math::load_field_vec3(tx_polarization, index);
         field::MaterialParams material1{};
         // The face terms reflect with the wedge faces' slab coefficients; the direct incident
@@ -470,6 +475,9 @@ __global__ void coupled_dd_field_kernel(
         faces2.frequency_hz = frequency_hz;
         pair2.selectStationaryPoint = 1.0f;
         pair2.stationaryExternalIncident = 1.0f;
+        pair2.sourceSide = field::grazing_face_side(
+            field::f3_sub(q2, q1), e1_axis, channel::math::load_field_vec3(edge1_n0, index),
+            channel::math::load_field_vec3(edge1_n1, index));
         field::MaterialParams material2{};
         material2.omega = -1.0f;
         // Single leg-2 coefficient call site (the transition-coefficient isolation swaps this for the

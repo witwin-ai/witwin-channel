@@ -58,6 +58,14 @@ the 28 s in a profile) and is linear in receivers. The receiver chunk was raised
 nodes (peak memory 3.9 GiB on the canyon plane, unchanged). The launch-budget cases are depth 1 and do not
 see the change.
 
+Since then (task `chainperf`, rows unchanged bit for bit): the deepest receiver halves are tested as the
+children of the level above inside the join (`chain_leaf_candidates`) instead of being materialized and
+beam-tested against every edge, so receiver chunks are sized by the deepest materialized level again; the
+image-tree and beam tests gain conservative one-sphere quick rejects. On the canyon plane (contended) the coupled
+launches went 2,444 -> 256 and the warm solve 15-22 s -> 2.9-4.3 s; a solve with interaction chains over more
+than 32,768 receivers accumulates in receiver windows of about 2M rows, so the canyon at 170k receivers peaks at
+3.4 GiB (104k receivers had run out of 8 GiB).
+
 ## Evidence
 
 Full-wave gate, before -> after. The exterior test and the chain depth were measured as separate builds:

@@ -115,7 +115,7 @@ TOLERANCES: dict[tuple[str, int, str], tuple[float | None, float | None]] = {
     ("cube_concrete_z", 1, "transition"): (1.15, 0.025),
     ("cube_concrete_z", 1, "corner"): (0.85, 0.020),
     ("trihedral_z", 0, "lit"): (0.95, 0.015),
-    ("trihedral_z", 0, "shadow"): (0.60, None),
+    ("trihedral_z", 0, "shadow"): (0.60, 0.130),
     ("trihedral_z", 0, "transition"): (0.70, 0.015),
     ("trihedral_z", 0, "corner"): (1.05, 0.020),
     ("trihedral_z", 1, "lit"): (1.00, 0.020),
@@ -166,7 +166,7 @@ TOLERANCES: dict[tuple[str, int, str], tuple[float | None, float | None]] = {
     ("double_edge_y", 1, "transition"): (1.30, 0.020),
     ("trihedral_x", 0, "shadow"): (1.95, 0.140),
     ("trihedral_x", 1, "shadow"): (2.15, 0.170),
-    ("trihedral_x", 1, "corner"): (2.40, None),
+    ("trihedral_x", 1, "corner"): (2.40, 0.600),
     ("canyon_z_3g5", 0, "shadow"): (2.95, 0.840),
     ("canyon_x_3g5", 0, "shadow"): (1.65, 1.030),
 }
@@ -227,27 +227,21 @@ JUMP_TOLERANCES: dict[tuple[str, int, str], float] = {
 # metric) -> (target, measured, diagnosis). Each runs as a strict xfail against its target, the error
 # the model class reaches once the named defect is removed (measured with that defect worked around,
 # or the matching single-object ceiling), so a fix shows up as an unexpected pass.
-_TRIHEDRAL_CORNER = ("the three plates' junctions are wedges built from both plates; the corner "
-                     "region left is near the triple junction, where the junction wedges end")
 _CANYON_RSB = ("not isolated: the worst edges are depth-2 and depth-3 reflection paths that another "
                "block's corner blocks; their reflection-diffraction chain is enumerated on both sides "
                "but steps by less than the reflection (second-order chain boundaries)")
-_SHEET_DD = ("double diffraction along a sheet into the junction wedges of joined sheets: the "
-             "grazing D-D rows on the plates' planes add the error (dropping them gives 0.161, "
-             "the value before the junctions were wedges)")
 _BASE_CHAINS = ("the spurious block-base wedges' chains had filled the transmission and reflection "
-                "steps at the block bases; without them those steps are uncompensated")
+                "steps at the block bases; without them those steps are uncompensated (the excess is "
+                "at the 121 RSB edges that are also transmission-support edges, p95 excess 11.6 / "
+                "9.4 dB; the other 471 RSB edges have none)")
 _CANYON_ISB = ("the LoS steps are compensated to 1.4-2.3 % of the LoS (Channel-only probe, block "
                "interiors excluded); the excess comes from samples where the total is 15-20 dB below "
                "the LoS, which the dB jump magnifies")
 KNOWN_GAPS: dict[tuple[str, int, str, str], tuple[float, float, str]] = {
-    ("trihedral_z", 0, "shadow", "nmse"): (0.195, 0.462, _SHEET_DD),
     ("canyon_x_3g5", 0, "RSB", "jump"): (1.50, 3.27, _BASE_CHAINS),
     ("double_edge_y", 1, "RSB", "jump"): (1.50, 2.82, "the RSB is continuous; an interference null "
                                           "next to the transmitter lies 2-3 mm from its full-wave "
                                           "position on the four worst edges"),
-    ("trihedral_x", 1, "corner", "nmse"): (0.60, 0.633, _TRIHEDRAL_CORNER + "; one welded mesh: "
-                                            "0.485"),
     ("canyon_z_3g5", 0, "RSB", "jump"): (1.50, 3.84, _CANYON_RSB),
     ("canyon_z_3g5", 1, "RSB", "jump"): (1.50, 4.93, _CANYON_RSB),
     ("canyon_x_3g5", 1, "RSB", "jump"): (1.50, 2.76, _CANYON_RSB + "; plus " + _BASE_CHAINS),

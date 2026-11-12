@@ -643,13 +643,13 @@ and `-fw-d6-boundary-sample`; the RayD side is in RayD ADR-0047 and ADR-0048 ame
 | D5 | each edge's wedge from every face that meets its line, across structures (compile time) | `trihedral_x` p0 shadow 3.04 / 0.908 -> 1.67 / 0.115; `canyon_z` p0 shadow 3.87 / 1.246 -> 2.65 / 0.697; regresses `trihedral_z` p0 shadow NMSE 0.161 -> 0.462 and `canyon_x` RSB (see the record) |
 | D6 | the pole term alone takes the one-sided limit, on the side the geometric tests choose; near-pole quantities from one small angle | on-boundary receiver: \|T\| 3.7e-5 -> 8.2e-4 (lit 8.2e-4) |
 
-Remaining strict xfails (measured / target): `double_edge_y` plane 1 RSB 2.82 / 1.5 dB (the RSB is
+A double-diffraction leg that runs along a sheet to a junction wedge is evaluated on the junction's side
+(`adr-0xx-fw-dd-sheet-side`): `trihedral_z` plane 0 shadow NMSE 0.462 -> 0.107 and `trihedral_x` plane 1 corner
+NMSE 0.633 -> 0.587, both now ordinary ceilings. Remaining strict xfails (measured / target): `double_edge_y` plane 1 RSB 2.82 / 1.5 dB (the RSB is
 continuous; an interference null next to the transmitter sits 2-3 mm off its full-wave position on the four
-worst edges); `trihedral_x` plane 1 corner NMSE 0.633 / 0.60; canyon RSB (3.84 / 4.93 dB on `canyon_z`,
-2.76 on `canyon_x` plane 1; second-order chain boundaries) and ISB (2.46 / 3.68 dB). Two entries became strict
-xfails with D5: `trihedral_z` plane 0 shadow NMSE 0.462 / 0.195 (double diffraction along the plates into
-the new junction wedges) and `canyon_x` plane 0 RSB 3.27 / 1.5 dB (steps the spurious base wedges' chains
-had filled). The **unexplained canyon ISB** is resolved as a
+worst edges); canyon RSB (3.84 / 4.93 dB on `canyon_z`,
+2.76 on `canyon_x` plane 1; second-order chain boundaries) and ISB (2.46 / 3.68 dB). One entry became a strict xfail with D5: `canyon_x` plane 0 RSB 3.27 / 1.5 dB (steps the spurious base
+wedges' chains had filled; the excess sits at the 121 RSB edges that are also transmission-support edges). The **unexplained canyon ISB** is resolved as a
 measurement effect: the probe that reported 25 % counted support edges at block faces (receivers inside the
 blocks); excluding the block interiors, the LoS steps are compensated to 1.4 % (y steps) and 2.3 % (x steps) of
 the LoS, and the ground-reflection steps that coincide with them to 0.0-0.5 %. The remaining ISB excess is at
