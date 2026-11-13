@@ -472,6 +472,7 @@ def test_epc_paths_ad_function_routes_reverse_and_forward_mode():
         group_members,
         case["depth"],
         1,
+        0.0,
     )
     assert bool(out["valid"].all())
     assert out["hit_positions"].requires_grad
@@ -540,6 +541,7 @@ def test_epc_paths_ad_function_routes_reverse_and_forward_mode():
             group_members,
             case["depth"],
             1,
+            0.0,
         )
         return result["hit_positions"], result["path_length"]
 

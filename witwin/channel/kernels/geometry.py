@@ -1195,7 +1195,7 @@ _EPC_PATHS_AD = AdInputs(
         for name in (
             "sequence", "plane_points", "plane_normals", "surface_group_id",
             "surface_group_size", "surface_group_members", "max_bounces",
-            "visibility_ignore_mode",
+            "visibility_ignore_mode", "min_segment_length",
         )
     ),
 )
@@ -1216,6 +1216,7 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
         scene_resource: Any, vertices: Any, source: Any, receiver: Any, sequence: Any,
         plane_points: Any, plane_normals: Any, surface_group_id: Any, surface_group_size: Any,
         surface_group_members: Any, max_bounces: Any, visibility_ignore_mode: Any,
+        min_segment_length: Any,
     ) -> Any:
         out = _RAYD_REFLECTION_EPC_PATHS_FORWARD(
             scene_resource,
@@ -1230,7 +1231,7 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
             surface_group_members,
             int(max_bounces),
             int(visibility_ignore_mode),
-            0.0,
+            float(min_segment_length),
             False,
         )
         return tuple(out)
@@ -1251,6 +1252,7 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
             _surface_group_members,
             max_bounces,
             _visibility_ignore_mode,
+            _min_segment_length,
         ) = inputs
         valid, _path_length, resolved_prim_ids, surface_group_ids = output[:4]
         vertices = torch.autograd.forward_ad.unpack_dual(vertices).primal
@@ -1403,6 +1405,7 @@ def rayd_reflection_epc_paths_ad(
     sequence: torch.Tensor, plane_points: torch.Tensor, plane_normals: torch.Tensor,
     surface_group_id: torch.Tensor, surface_group_size: torch.Tensor,
     surface_group_members: torch.Tensor, max_bounces: int, visibility_ignore_mode: int,
+    min_segment_length: float,
 ) -> dict[str, torch.Tensor]:
     """Differentiable RayD reflection EPC paths under the fixed-winner contract.
 
@@ -1411,7 +1414,8 @@ def rayd_reflection_epc_paths_ad(
     ``source`` and ``receiver``. ``sequence`` is the frozen winner face
     sequence and ``plane_points`` / ``plane_normals`` are its detached plane
     arrays (anchor + unit face normal, gathered per bounce); ``valid`` and
-    the resolved ids stay non-differentiable.
+    the resolved ids stay non-differentiable. ``valid`` applies the same
+    minimum segment between interactions as discovery.
     """
 
     validate_cuda_tensor(
@@ -1446,6 +1450,7 @@ def rayd_reflection_epc_paths_ad(
         surface_group_members,
         int(max_bounces),
         int(visibility_ignore_mode),
+        float(min_segment_length),
     )
     return dict(zip(_RAYD_REFLECTION_EPC_PATHS_AD_FIELDS, values, strict=True))
 

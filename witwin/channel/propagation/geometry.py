@@ -222,10 +222,11 @@ def reflection_epc_paths(
     consumed; RayD chains the plane cotangents to the winner triangle's
     vertices itself, so nothing geometric is re-derived here.
 
-    This is the single implementation of the re-solve. What a caller does with
-    ``valid`` is the caller's policy: the enumerated fixed-winner path below
-    requires every row to survive, while fixed-topology reevaluation publishes
-    the mask per row.
+    This is the single implementation of the re-solve. It applies discovery's
+    minimum segment between interactions, so a replayed row is valid exactly
+    when discovery would keep it. What a caller does with ``valid`` is the
+    caller's policy: the enumerated fixed-winner path below requires every row
+    to survive, while fixed-topology reevaluation publishes the mask per row.
     """
 
     rayd = compiled.rayd
@@ -257,6 +258,7 @@ def reflection_epc_paths(
         groups["surface_group_members"],
         depth,
         1,
+        REFLECTION_MIN_SEGMENT_RELATIVE * reflection_scene_scale_m(compiled),
     )
     return epc
 
