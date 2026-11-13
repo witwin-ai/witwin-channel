@@ -165,3 +165,25 @@ def test_reverse_mode_geometry_gradients_are_unchanged():
         batch["target"] - batch["source"]
     ).norm(dim=-1, keepdim=True)
     torch.testing.assert_close(target.grad, direction, rtol=1.0e-5, atol=1.0e-6)
+
+def test_compile_accepts_mesh_vertices_carrying_a_forward_tangent():
+    # RayD's finite-vertex check (aminmax) has no forward-AD formula; compile hands RayD the
+    # primal, as refit does, so a forward-dual mesh compiles and keeps its tangent.
+    from witwin.core import Mesh, PhysicalMaterial, Scene, Structure
+    from witwin.channel.scene import compile as compile_scene
+
+    primal = torch.tensor(
+        [[4.0, -1.2, -3.0], [4.0, 1.2, -3.0], [4.0, 1.2, 3.0], [4.0, -1.2, 3.0]]
+    )
+    with forward_ad.dual_level():
+        vertices = forward_ad.make_dual(primal, torch.tensor([[1.0, 0.0, 0.0]] * 4))
+        mesh = Mesh(
+            vertices=vertices, faces=torch.tensor([[0, 1, 2], [0, 2, 3]]), recenter=False,
+            fill_mode="surface", topology_diagnostics=False,
+        )
+        wall = Structure(
+            geometry=mesh, material=PhysicalMaterial(name="concrete", eps_r=5.24, sigma_e=0.0462),
+            structure_id=1, material_id=1, assignment_id=1, surface_id=1,
+        )
+        compile_scene(Scene(structures=(wall,)), reference_frequency_hz=77e9)
+        assert forward_ad.unpack_dual(mesh.vertices).tangent is not None

@@ -290,7 +290,9 @@ def build_scene_from_structures(
     keepalive: list[tuple[torch.Tensor, ...]] = []
 
     for structure, mesh_dynamic in zip(structures, dynamic_flags):
-        mesh_vertices = structure.vertices.to(
+        # RayD stores geometry, not autograd state (refit detaches the same way), so a
+        # forward-dual or grad-tracking vertex tensor reaches its finite check as a primal.
+        mesh_vertices = structure.vertices.detach().to(
             device=device, dtype=torch.float32
         ).contiguous()
         mesh_faces = structure.faces.to(device=device, dtype=torch.int32).contiguous()
