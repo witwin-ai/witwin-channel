@@ -532,6 +532,15 @@ def _audit_wheel_contents(path: Path) -> str:
     return native_extension
 
 
+def _wheel_python_dll(native_member: str) -> str:
+    """The CPython DLL the wheel's ``cpXY`` extension must link, e.g. ``python313.dll``."""
+
+    match = re.fullmatch(r"witwin/channel/_channel\.cp3(\d+)-win_amd64\.pyd", native_member)
+    if match is None:
+        raise ValueError(f"Windows extension member has no cpXY tag: {native_member!r}")
+    return audit_windows_pe.python_dll((3, int(match.group(1))))
+
+
 def _audit_wheel_pe(
     path: Path, native_member: str, *, dumpbin: str = "dumpbin",
 ) -> dict[str, object]:
@@ -540,7 +549,9 @@ def _audit_wheel_pe(
     with tempfile.TemporaryDirectory(prefix="channel-pe-audit-") as raw:
         extracted = Path(raw) / Path(native_member).name
         extracted.write_bytes(payload)
-        evidence = audit_windows_pe.audit_pe(extracted, dumpbin=dumpbin)
+        evidence = audit_windows_pe.audit_pe(
+            extracted, dumpbin=dumpbin, python_dll_name=_wheel_python_dll(native_member)
+        )
     evidence["wheel_member"] = native_member
     evidence.pop("path", None)
     return evidence

@@ -370,10 +370,11 @@ def test_wheel_pe_audit_extracts_only_owned_extension(tmp_path: Path, monkeypatc
     _write_wheel(wheel, name="witwin-channel", version="0.1.0")
     member = wheel_smoke._audit_wheel_contents(wheel)
 
-    def fake_audit(path: Path, *, dumpbin: str):
+    def fake_audit(path: Path, *, dumpbin: str, python_dll_name: str):
         assert path.name == "_channel.cp311-win_amd64.pyd"
         assert path.read_bytes() == b"native"
         assert dumpbin == "custom-dumpbin"
+        assert python_dll_name == "python311.dll"
         return {"schema_version": 1, "path": str(path), "dependencies": []}
 
     monkeypatch.setattr(wheel_smoke.audit_windows_pe, "audit_pe", fake_audit)
@@ -382,6 +383,12 @@ def test_wheel_pe_audit_extracts_only_owned_extension(tmp_path: Path, monkeypatc
 
     assert "path" not in evidence
     assert evidence["wheel_member"] == member
+
+
+@pytest.mark.parametrize("tag", ["cp310", "cp311", "cp312", "cp313"])
+def test_wheel_pe_audit_expects_the_python_dll_of_the_wheel_tag(tag: str):
+    member = f"witwin/channel/_channel.{tag}-win_amd64.pyd"
+    assert wheel_smoke._wheel_python_dll(member) == f"python3{tag[3:]}.dll"
 
 
 def _build_info() -> dict[str, object]:

@@ -41,7 +41,7 @@ Dump of file _channel.cp311-win_amd64.pyd
 
 
 def test_dumpbin_parsers_accept_only_declared_dependencies_and_exports():
-    assert audit_windows_pe.parse_dependents(_DEPENDENTS) == [
+    assert audit_windows_pe.parse_dependents(_DEPENDENTS, python_dll_name="python311.dll") == [
         "c10.dll",
         "c10_cuda.dll",
         "torch_python.dll",
@@ -54,6 +54,18 @@ def test_dumpbin_parsers_accept_only_declared_dependencies_and_exports():
         "?type@Future@ivalue@c10@@QEBA_NXZ",
         "PyInit__channel",
     ]
+
+
+@pytest.mark.parametrize("minor", [10, 11, 12, 13])
+def test_dependency_parser_requires_the_python_dll_of_the_wheel(minor: int):
+    output = _DEPENDENTS.replace("python311.dll", f"python3{minor}.dll")
+    expected = audit_windows_pe.python_dll((3, minor))
+    assert f"python3{minor}.dll" in audit_windows_pe.parse_dependents(
+        output, python_dll_name=expected
+    )
+    other = audit_windows_pe.python_dll((3, 11 if minor != 11 else 12))
+    with pytest.raises(audit_windows_pe.PEAuditError, match="outside the release allowlist"):
+        audit_windows_pe.parse_dependents(output, python_dll_name=other)
 
 
 @pytest.mark.parametrize(
@@ -69,7 +81,7 @@ def test_dumpbin_parsers_accept_only_declared_dependencies_and_exports():
 )
 def test_dependency_parser_fails_loudly(output: str, match: str):
     with pytest.raises(audit_windows_pe.PEAuditError, match=match):
-        audit_windows_pe.parse_dependents(output)
+        audit_windows_pe.parse_dependents(output, python_dll_name="python311.dll")
 
 
 @pytest.mark.parametrize(
@@ -108,7 +120,7 @@ def test_audit_pe_invokes_both_dumpbin_modes_and_records_identity(tmp_path: Path
 
     monkeypatch.setattr(audit_windows_pe.subprocess, "run", fake_run)
 
-    evidence = audit_windows_pe.audit_pe(pe)
+    evidence = audit_windows_pe.audit_pe(pe, python_dll_name="python311.dll")
 
     assert calls == ["/DEPENDENTS", "/EXPORTS"]
     assert evidence["schema_version"] == 1

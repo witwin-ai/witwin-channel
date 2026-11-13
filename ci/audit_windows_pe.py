@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import sys
 from typing import Any
 
 
@@ -29,7 +30,6 @@ _ALLOWED_DEPENDENCIES = frozenset(
         "kernel32.dll",
         "msvcp140.dll",
         "nvcuda.dll",
-        "python311.dll",
         "torch_cpu.dll",
         "torch_cuda.dll",
         "torch_python.dll",
@@ -43,11 +43,11 @@ _REQUIRED_DEPENDENCIES = frozenset(
         "c10_cuda.dll",
         "cudart64_12.dll",
         "nvcuda.dll",
-        "python311.dll",
         "torch_cuda.dll",
         "torch_python.dll",
     }
 )
+_PYTHON_DLL_PATTERN = re.compile(r"^python3\d+\.dll$")
 _DEPENDENCY_PATTERN = re.compile(r"^[A-Za-z0-9_.+-]+\.dll$", re.IGNORECASE)
 _EXPORT_PATTERN = re.compile(
     r"^\s*(?P<ordinal>\d+)\s+(?P<hint>[0-9A-Fa-f]+)\s+"
@@ -82,7 +82,14 @@ def _section(lines: list[str], start: str) -> list[str]:
     return lines[begin : summaries[0]]
 
 
-def parse_dependents(output: str) -> list[str]:
+def python_dll(version: tuple[int, int] | None = None) -> str:
+    """The CPython DLL an extension for ``version`` (default: this interpreter) links."""
+
+    major, minor = version if version is not None else sys.version_info[:2]
+    return f"python{major}{minor}.dll"
+
+
+def parse_dependents(output: str, *, python_dll_name: str | None = None) -> list[str]:
     section = _section(output.splitlines(), "Image has the following dependencies:")
     dependencies: list[str] = []
     for line in section:
@@ -97,9 +104,12 @@ def parse_dependents(output: str) -> list[str]:
     ):
         raise PEAuditError("dumpbin dependency list must be non-empty and unique")
 
+    interpreter = (python_dll_name or python_dll()).lower()
+    if _PYTHON_DLL_PATTERN.fullmatch(interpreter) is None:
+        raise PEAuditError(f"invalid CPython DLL name: {interpreter!r}")
     normalized = {item.lower() for item in dependencies}
-    unexpected = sorted(normalized - _ALLOWED_DEPENDENCIES)
-    missing = sorted(_REQUIRED_DEPENDENCIES - normalized)
+    unexpected = sorted(normalized - (_ALLOWED_DEPENDENCIES | {interpreter}))
+    missing = sorted((_REQUIRED_DEPENDENCIES | {interpreter}) - normalized)
     if unexpected:
         raise PEAuditError(
             f"PE has dependencies outside the release allowlist: {unexpected}"
@@ -179,13 +189,17 @@ def _dumpbin(path: Path, option: str, *, dumpbin: str) -> str:
     return result.stdout
 
 
-def audit_pe(path: Path, *, dumpbin: str = "dumpbin") -> dict[str, Any]:
+def audit_pe(
+    path: Path, *, dumpbin: str = "dumpbin", python_dll_name: str | None = None,
+) -> dict[str, Any]:
     path = path.resolve()
     if not path.is_file() or path.suffix.lower() not in {".pyd", ".dll"}:
         raise PEAuditError(
             f"Windows PE does not exist or has an invalid suffix: {path}"
         )
-    dependencies = parse_dependents(_dumpbin(path, "/DEPENDENTS", dumpbin=dumpbin))
+    dependencies = parse_dependents(
+        _dumpbin(path, "/DEPENDENTS", dumpbin=dumpbin), python_dll_name=python_dll_name
+    )
     exports = parse_exports(_dumpbin(path, "/EXPORTS", dumpbin=dumpbin))
     exports_digest = hashlib.sha256("\n".join(exports).encode("utf-8")).hexdigest()
     return {
@@ -205,10 +219,13 @@ def main() -> int:
     )
     parser.add_argument("pe", type=Path)
     parser.add_argument("--dumpbin", default="dumpbin")
+    parser.add_argument(
+        "--python-dll", default=python_dll(), help="CPython DLL the extension must link."
+    )
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     try:
-        evidence = audit_pe(args.pe, dumpbin=args.dumpbin)
+        evidence = audit_pe(args.pe, dumpbin=args.dumpbin, python_dll_name=args.python_dll)
     except (OSError, PEAuditError) as exc:
         parser.error(str(exc))
     encoded = json.dumps(evidence, indent=2, sort_keys=True) + "\n"
