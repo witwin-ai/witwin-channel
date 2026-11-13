@@ -29,7 +29,6 @@ _ALLOWED_DEPENDENCIES = frozenset(
         "cusolver64_11.dll",
         "kernel32.dll",
         "msvcp140.dll",
-        "nvcuda.dll",
         "torch_cpu.dll",
         "torch_cuda.dll",
         "torch_python.dll",
@@ -42,11 +41,12 @@ _REQUIRED_DEPENDENCIES = frozenset(
         "c10.dll",
         "c10_cuda.dll",
         "cudart64_12.dll",
-        "nvcuda.dll",
         "torch_cuda.dll",
         "torch_python.dll",
     }
 )
+# RayD's driver-independence contract: the extension reaches the CUDA driver only
+# through cudart, so a direct nvcuda.dll import is outside the allowlist.
 _PYTHON_DLL_PATTERN = re.compile(r"^python3\d+\.dll$")
 _DEPENDENCY_PATTERN = re.compile(r"^[A-Za-z0-9_.+-]+\.dll$", re.IGNORECASE)
 _EXPORT_PATTERN = re.compile(

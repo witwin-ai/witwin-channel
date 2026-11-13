@@ -264,6 +264,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           sccache --show-stats
 
+      - name: Keep a rejected Windows wheel for diagnosis
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rejected-windows-${{ matrix.channel }}-${{ matrix.python_tag }}-torch${{ matrix.torch }}
+          path: channel/dist/*.whl
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Upload Windows wheel
         uses: actions/upload-artifact@v4
         with:

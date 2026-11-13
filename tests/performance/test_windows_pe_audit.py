@@ -22,7 +22,7 @@ Dump of file _channel.cp311-win_amd64.pyd
     python311.dll
     torch_cuda.dll
     cudart64_12.dll
-    nvcuda.dll
+    cusolver64_11.dll
 
   Summary
 """
@@ -48,7 +48,7 @@ def test_dumpbin_parsers_accept_only_declared_dependencies_and_exports():
         "python311.dll",
         "torch_cuda.dll",
         "cudart64_12.dll",
-        "nvcuda.dll",
+        "cusolver64_11.dll",
     ]
     assert audit_windows_pe.parse_exports(_EXPORTS) == [
         "?type@Future@ivalue@c10@@QEBA_NXZ",
@@ -72,11 +72,15 @@ def test_dependency_parser_requires_the_python_dll_of_the_wheel(minor: int):
     ("output", "match"),
     [
         (
-            _DEPENDENTS.replace("nvcuda.dll", "rayd.dll"),
+            _DEPENDENTS.replace("cusolver64_11.dll", "rayd.dll"),
             "outside the release allowlist",
         ),
-        (_DEPENDENTS.replace("    nvcuda.dll\n", ""), "missing required"),
-        (_DEPENDENTS.replace("    nvcuda.dll", "    not a dependency"), "unparsed"),
+        (
+            _DEPENDENTS.replace("cusolver64_11.dll", "nvcuda.dll"),
+            "outside the release allowlist",
+        ),
+        (_DEPENDENTS.replace("    cudart64_12.dll\n", ""), "missing required"),
+        (_DEPENDENTS.replace("    cusolver64_11.dll", "    not a dependency"), "unparsed"),
     ],
 )
 def test_dependency_parser_fails_loudly(output: str, match: str):
