@@ -327,7 +327,7 @@ Launch, sync and copy counts are the evidence; timings are from a shared GPU.
 
 ### Dependencies
 
-- RayD 0.10.2, source-linked at the locked commit in
+- RayD 0.10.3, source-linked at the locked commit in
   `dependencies/rayd.lock.json` (was RayD 0.8.0). RayD is still not a runtime
   dependency.
 - Wheels for CPython 3.10 to 3.13 on `manylinux_2_28_x86_64` and `win_amd64`.
