@@ -18,7 +18,9 @@ from witwin.channel.kernels.topology import (
     mc_sample_directions,
 )
 from witwin.channel.propagation.geometry import (
+    REFLECTION_MIN_SEGMENT_RELATIVE,
     _cached_coplanar_face_groups,
+    reflection_scene_scale_m,
 )
 from witwin.channel.propagation.topology import (
     concatenate_path_blocks,
@@ -51,10 +53,9 @@ _RECEIVER_TEST_MIN_PAIRS = 1 << 20
 _DIRECT_GROUP_SIZE = 64
 # Share of free device memory the image-tree frontier of one depth may hold.
 _FRONTIER_MEMORY_SHARE = 8
-# Validity and pruning tolerances, relative to the scene diagonal. A path segment shorter than
-# _MIN_SEGMENT_RELATIVE is invalid; candidate pruning uses half of it and inflates plane-group
-# bounds by _BOUNDS_RELATIVE so it never rejects a path the validator accepts.
-_MIN_SEGMENT_RELATIVE = 1.0e-5
+# Pruning tolerances, relative to the scene diagonal. Candidate pruning uses half of the validity
+# minimum segment and inflates plane-group bounds by _BOUNDS_RELATIVE so it never rejects a path
+# the validator accepts.
 _BOUNDS_RELATIVE = 1.0e-4
 _TREE_RELATIVE = 1.0e-4
 # Slack on the back-trace intersection parameter; ten times the EPC solve's own slack.
@@ -159,7 +160,7 @@ def reflection_plane_groups(
     representative_faces = cast(torch.Tensor, groups["representative_faces"]).contiguous()
     face_group_id = cast(torch.Tensor, groups["face_group_id"]).to(dtype=torch.int32).contiguous()
     group_count = int(groups["group_count"])
-    scale = max(float(getattr(compiled, "enumerated_penetration_scene_diagonal_m", 0.0) or 0.0), 1.0e-3)
+    scale = reflection_scene_scale_m(compiled)
     tables = (
         topology_kernels.reflection_group_tables(
             vertices=records.vertices.detach().to(dtype=torch.float32).contiguous(),
@@ -199,9 +200,9 @@ def reflection_plane_groups(
 
 
 def reflection_min_segment_length(groups: ReflectionPlaneGroups) -> float:
-    """Shortest valid path segment, metres: a fixed fraction of the scene diagonal."""
+    """Shortest valid segment between two interactions, metres: a fixed fraction of the scene diagonal."""
 
-    return _MIN_SEGMENT_RELATIVE * groups.scene_scale_m
+    return REFLECTION_MIN_SEGMENT_RELATIVE * groups.scene_scale_m
 
 
 def prepare_reflection_discovery_plan(
@@ -587,8 +588,11 @@ class ReflectionEpcQuery:
     surface_group_members: torch.Tensor
     max_bounces: int
     visibility_ignore_mode: int
-    # Shortest valid path segment, metres; 0 accepts every segment length.
+    # Shortest valid segment between two interactions, metres; 0 accepts every segment length.
     min_segment_length: float = 0.0
+    # The receiver is an interaction (a scattering vertex on a surface) rather than an endpoint, so
+    # the minimum also covers the last segment.
+    receiver_is_interaction: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -616,6 +620,7 @@ def query_reflection_epc(query: ReflectionEpcQuery) -> ReflectionEpcGeometry:
         query.max_bounces,
         query.visibility_ignore_mode,
         float(query.min_segment_length),
+        bool(query.receiver_is_interaction),
     )
     return ReflectionEpcGeometry(
         visible=raw[0],

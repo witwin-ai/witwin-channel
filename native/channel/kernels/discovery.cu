@@ -500,9 +500,11 @@ __device__ void load_chain(const GroupTables& tables, const int* sequence, int d
 
 // True unless the image method proves the chain cannot connect its transmitter to `rx`: some
 // back-traced reflection point misses its segment, falls in no occupied cell of its group, or
-// leaves a segment shorter than the validity threshold. Conservative relative to the EPC solve.
+// leaves a segment between two interactions shorter than the validity threshold. The transmitter
+// is an endpoint, so its segment is exempt; so is the segment to `rx` unless `rx_is_interaction`
+// (a diffraction point rather than a receiver). Conservative relative to the EPC solve.
 __device__ bool receiver_candidate(const GroupTables& tables, const SequenceChain& chain, int depth, float3 rx,
-                                   const PairTolerances& tol) {
+                                   bool rx_is_interaction, const PairTolerances& tol) {
     float3 endpoint = rx;
     for (int bounce = depth - 1; bounce >= 0; --bounce) {
         const int group = chain.groups[bounce];
@@ -521,12 +523,13 @@ __device__ bool receiver_candidate(const GroupTables& tables, const SequenceChai
         if (!inside_bounds(tables, group, point, tol.box) || !occupied(tables, group, point, tol.box)) {
             return false;
         }
-        if (cmath::length(cmath::sub(endpoint, point)) < tol.min_segment) {
+        const bool interaction_segment = bounce < depth - 1 || rx_is_interaction;
+        if (interaction_segment && cmath::length(cmath::sub(endpoint, point)) < tol.min_segment) {
             return false;
         }
         endpoint = point;
     }
-    return cmath::length(cmath::sub(endpoint, chain.images[0])) >= tol.min_segment;
+    return true;
 }
 
 // One block covers one (sequence, receiver tile); tile t of sequence s is block s * tiles + t.
@@ -545,7 +548,8 @@ __global__ void receiver_candidate_count_kernel(int64_t tile_total, int64_t tile
                    cmath::load_vec3(tx_positions, sequence_tx[sequence]), chain);
         __syncthreads();
         const bool keep = rx < rx_count &&
-                          receiver_candidate(tables, chain, static_cast<int>(depth), cmath::load_vec3(rx_positions, rx), tol);
+                          receiver_candidate(tables, chain, static_cast<int>(depth), cmath::load_vec3(rx_positions, rx),
+                                             false, tol);
         const int count = __syncthreads_count(keep ? 1 : 0);
         if (threadIdx.x == 0) {
             tile_counts[tile] = count;
@@ -572,7 +576,8 @@ __global__ void receiver_candidate_write_kernel(int64_t tile_total, int64_t tile
                    cmath::load_vec3(tx_positions, sequence_tx[sequence]), chain);
         __syncthreads();
         const bool keep = rx < rx_count &&
-                          receiver_candidate(tables, chain, static_cast<int>(depth), cmath::load_vec3(rx_positions, rx), tol);
+                          receiver_candidate(tables, chain, static_cast<int>(depth), cmath::load_vec3(rx_positions, rx),
+                                             false, tol);
         int rank = 0;
         BlockScan(scan_storage).ExclusiveSum(keep ? 1 : 0, rank);
         if (keep) {
@@ -850,7 +855,7 @@ __device__ __forceinline__ bool chain_a_side_keep(const GroupTables& tables, con
                                                   SequenceChain& chain) {
     if (a.depth > 0) {
         half_chain(tables, a, a_node, tx, chain);
-        return receiver_candidate(tables, chain, a.depth, point, tol);
+        return receiver_candidate(tables, chain, a.depth, point, true, tol);
     }
     return cmath::length(cmath::sub(point, a_image)) >= tol.min_segment;
 }
@@ -871,7 +876,7 @@ __device__ ChainCandidate chain_candidate(const GroupTables& tables, const Chain
     }
     if (b.depth > 0) {
         half_chain(tables, b, out.b_node, out.rx, chain);
-        if (!receiver_candidate(tables, chain, b.depth, out.point, tol)) {
+        if (!receiver_candidate(tables, chain, b.depth, out.point, true, tol)) {
             return out;
         }
     } else if (cmath::length(cmath::sub(out.point, b_image)) < tol.min_segment) {
@@ -1032,7 +1037,7 @@ __device__ bool chain_leaf_keep(const GroupTables& tables, const ChainEdges& edg
         return false;
     }
     leaf_child(tables, leaf, group, entry.chain);
-    if (!receiver_candidate(tables, entry.chain, leaf.width + 1, point, tol.pair)) {
+    if (!receiver_candidate(tables, entry.chain, leaf.width + 1, point, true, tol.pair)) {
         return false;
     }
     return image_tree_keep(tables, entry.last, entry.parent_image, group, tol.tree) &&

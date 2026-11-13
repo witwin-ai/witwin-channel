@@ -467,6 +467,8 @@ ChainLeg trace_chain_leg(RayDSceneResource &scene, const at::Tensor &endpoint, c
     request.visibility_ignore_mode = 1;
     request.plane_tolerance = 1.0e-3;
     request.min_segment_length = min_segment_length;
+    // The leg ends at the diffraction point, an interaction, so the minimum covers its last segment too.
+    request.receiver_is_interaction = true;
     rayd::torch::ReflectionEpcResult epc = rayd::torch::reflection_epc_paths_forward(scene.resource(), request);
     leg.valid = epc.valid;
     leg.path_length = epc.path_length.contiguous();

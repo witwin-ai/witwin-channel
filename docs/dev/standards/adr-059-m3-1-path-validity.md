@@ -1,6 +1,6 @@
 # ADR-059: One definition of a valid specular reflection path
 
-- **Status:** Accepted.
+- **Status:** Accepted; rule 1 amended 2026-11-12 (endpoint segments, see the amendment).
 - **Date:** 2026-11-10.
 - **Decision ID:** `reflection-path-validity`.
 - **Scope:** every specular reflection row of the enumerated engine (Path, Deterministic, the
@@ -29,13 +29,17 @@ A candidate is a plane-group sequence `[g_1 .. g_d]` with a transmitter and a re
 specular path exactly when the RayD reflection EPC (image method plus segment visibility) accepts it
 under these rules, applied by the one validator whatever produced the candidate:
 
-1. **Minimum segment length.** Every segment (transmitter to the first point, between consecutive
-   points, last point to the receiver) is at least `1e-5` times the scene diagonal (the diagonal of
-   the axis-aligned bounds of the compiled geometry, `enumerated_penetration_scene_diagonal_m`;
-   2.3 mm on the 4x4 city). Shorter means two interactions, or an interaction and an endpoint,
-   coincide: the path is the edge-degenerate or repeated-plane artefact above, or a receiver lying on
-   the reflecting plane (where the reflected and direct paths are the same ray). RayD enforces it
-   in the EPC kernel through the new `ReflectionEpcRequest::min_segment_length` (RayD ADR-0048).
+1. **Minimum segment length between interactions.** Every segment between two consecutive
+   interactions is at least `1e-5` times the scene diagonal (the diagonal of the axis-aligned bounds
+   of the compiled geometry, `enumerated_penetration_scene_diagonal_m`; 2.3 mm on the 4x4 city).
+   Shorter means two interactions coincide: the path is the edge-degenerate or repeated-plane
+   artefact above. The segments from the transmitter and to the receiver are exempt, because an
+   endpoint is not an interaction: a receiver on a reflecting plane, or within the threshold of it,
+   keeps its reflection (see the amendment). Where one end of a specular chain is itself an
+   interaction (the diffraction point of a reflection-diffraction chain, or the scattering vertex of
+   a scatter-chain leg, which lies on its own surface), the segment to it is an interaction segment
+   and the rule covers it. RayD enforces the rule in the EPC kernel through
+   `ReflectionEpcRequest::min_segment_length` and `receiver_is_interaction` (RayD ADR-0048).
 2. **No repeated plane group.** Consecutive interactions are on different plane groups. Candidate
    generation never forms such a sequence (the image tree only appends a different group; traced
    chains with a repeat are dropped); a numerical repeat would also fail rule 1, because reflecting
@@ -60,12 +64,75 @@ under these rules, applied by the one validator whatever produced the candidate:
 - The C-1 scheme-equivalence tests of the accuracy suite pass (they were strict xfails). Together
   with the per-depth source choice of the candidate-generation record (M3-3 to M3-5), the rows of a
   depth no longer depend on `max_depth`.
-- Rows removed: the depth-3 `[g, g, g]` rows, the coincident-edge depth-2/3 rows, and reflections
-  whose receiver is closer than the threshold to the reflecting plane. Bit-level baselines that
-  contain such rows move.
+- Rows removed: the depth-3 `[g, g, g]` rows and the coincident-edge depth-2/3 rows. Bit-level
+  baselines that contain such rows move. (Reflections whose receiver is closer than the threshold
+  to the reflecting plane were also removed until the amendment restored them.)
 - Coupled R-D/D-R geometry still calls the EPC with `min_segment_length = 0`; whether the rule
   should cover it belongs to the coupled-path owner.
 
 ## Evidence
 
 See the candidate-generation record for the measured row counts before and after.
+
+## Amendment: endpoint segments are exempt (2026-11-12)
+
+**Context.** Rule 1 as first written covered every segment, including the transmitter and receiver
+segments, and called a receiver on the reflecting plane a degenerate double count. It is not
+(finding C-12). At an interface the total field is `(1 + Gamma) E_inc`, where the reflected ray is the
+limit of the image-method path whose reflection point slides onto the receiver: exactly zero for a
+PEC plane and the tangential field, the Fresnel transmitted value for a dielectric, and
+`|1 + Gamma exp(-2jk delta)|` times the incident field at a distance `delta` in front of the plane. The
+full-wave answer follows the image method. Radar measured the cost of the rule: a scatter site on a
+PEC wall, or 0.05 mm in front of one, kept only its line-of-sight row on 0.6.0 and echoed at the
+free-space level, 32 dB too strong at 0.05 mm and infinitely too strong on the wall, where 0.5.0
+(which had no rule) matched the image method.
+
+Fixed-topology replay disagreed with discovery in the other direction (finding C-16): `reevaluate`
+re-solved frozen reflection rows with no minimum segment at all, so a coincident-interaction row
+that discovery rejects stayed `row_valid=True` when replayed.
+
+**Decision.**
+- Rule 1 applies to segments between two interactions only. The transmitter and receiver segments
+  (TX, RX, a consumer source or sink, a Radar scatter site) are exempt; RayD 0.10.3 applies the
+  EPC minimum to segments `1 .. B - 1` (RayD ADR-0048 amendment). For an endpoint exactly on the
+  plane the reflection point is the endpoint, the zero-length segment adds 0 to the path length and
+  segment visibility treats it as unobstructed. The reflection field kernels (primal, VJP and JVP
+  in lockstep) take the reflected direction as the arrival direction of a receiver segment too
+  short to normalize (as before), and now take the departure from the first interaction mirrored in
+  its plane as the launch direction of such a source segment; it fell back to `+z`, which zeroed the
+  field of a source on the plane. The mirrored direction is held constant in the field derivatives,
+  which a zero-length segment leaves undefined. No NaN arises either way.
+- The candidate pruning applies the same split: the reflection receiver test no longer checks the
+  transmitter segment, and checks the receiver segment only when the receiver is an interaction.
+- Interaction ends keep the rule. The reflection halves of a reflection-diffraction chain end at
+  the diffraction point, so the chain validator sets `receiver_is_interaction` and the chain
+  pruning checks the segment to the diffraction point; their transmitter and receiver ends are
+  exempt. A scatter-chain leg ends at a sample drawn on a scatter face, a scattering interaction on
+  its own surface: its validator sets `receiver_is_interaction`, so the leg segment into the sample
+  keeps the rule. This also keeps out a reflection off the sample's own plane, whose reflection
+  point is the sample itself and which would count the surface's own response twice.
+- Diffraction endpoint distances are unchanged. A chain half without reflections still requires
+  the diffraction point to be at least the threshold away from the transmitter or receiver, as
+  does the coupled chain finalization: the UTD coefficient is singular at zero distance from the
+  edge, so there is no finite limit to keep.
+- Fixed-topology replay applies rule 1 exactly as discovery does: `reflection_epc_paths` passes
+  the same minimum segment (the same fraction of the same scene diagonal) to the EPC, so a replayed
+  row is valid exactly when fresh discovery at the same endpoints keeps it, in both directions.
+  The enumerated fixed-winner re-solve uses the same call.
+
+**Consequences.**
+- Rows restored: reflections whose transmitter or receiver lies on or within the threshold of a
+  reflecting plane (and the corresponding transmitter-side or receiver-side reflection halves of
+  reflection-diffraction chains). Rows that touch a scatter-chain sample or a diffraction point are
+  unchanged.
+- Coupled R-D/D-R rows built in `coupled.cu` keep their own distance tests, which concern
+  diffraction points only.
+
+**Evidence.** `tests/propagation/consumer/test_endpoint_on_reflecting_plane.py`: a receiver or a
+source on a PEC plane, and 0.05 mm in front of one, keeps its reflection row, and the total field
+equals the image method (zero on the plane; `|1 - exp(-2jk delta cos theta)|` at 0.05 mm); the two
+legs of a monostatic site 0.05 mm from the wall multiply to the squared one-way factor.
+`tests/propagation/consumer/test_replay_validity.py`: fresh discovery and fixed-topology replay
+agree on a receiver moved between 1 cm, 0.05 mm and 0 from a wall, and replay rejects, as discovery
+does, a corner chain whose two reflection points meet on the shared edge. The C-1 scheme-equivalence and brute-force completeness
+tests of the accuracy suite pass unchanged.

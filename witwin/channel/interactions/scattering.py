@@ -1827,6 +1827,9 @@ def _gather_leg_order1(
                 max_bounces=1,
                 visibility_ignore_mode=1,
                 min_segment_length=reflection_min_segment_length(plane_groups),
+                # A chain sample is a scattering vertex on its own surface, not an endpoint, so the
+                # minimum covers the last segment too and drops a reflection off the sample's plane.
+                receiver_is_interaction=True,
             )
         )
         selected = topology_kernels.deterministic_reflection_order1_compact(
@@ -1909,6 +1912,9 @@ def _gather_leg_multibounce(
                 max_bounces=depth,
                 visibility_ignore_mode=1,
                 min_segment_length=reflection_min_segment_length(plane_groups),
+                # A chain sample is a scattering vertex on its own surface, not an endpoint, so the
+                # minimum covers the last segment too and drops a reflection off the sample's plane.
+                receiver_is_interaction=True,
             )
         )
         selected = topology_kernels.deterministic_reflection_sequence_compact(

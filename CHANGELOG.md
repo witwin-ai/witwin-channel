@@ -201,9 +201,16 @@ its full-wave before/after evidence.
   disagreed by up to 2.47x. Diffraction now accumulates the same way for every
   receiver layout.
 - **Reflection path validity (ADR-059, ADR-060).** One rule set validates every
-  specular path (minimum segment length 1e-5 of the scene diagonal, no
-  repeated plane group); degenerate paths (two reflection points on a shared
-  edge, repeated reflections on one plane) are no longer reported.
+  specular path (minimum segment length 1e-5 of the scene diagonal between two
+  interactions, no repeated plane group); degenerate paths (two reflection
+  points on a shared edge, repeated reflections on one plane) are no longer
+  reported. The transmitter and receiver segments are exempt, so an endpoint
+  on a reflecting plane, or within the threshold of it, keeps its reflection
+  and gets the image-method field (zero on a PEC plane for the tangential
+  field); the rule still covers the segment into a diffraction point or a
+  scatter-chain vertex. Fixed-topology `reevaluate` applies the same rule as
+  discovery, so a replayed reflection row is `row_valid` exactly when fresh
+  discovery at the same endpoints keeps it.
 - **MC diffraction seed streams (ADR-066).** Nearby seeds no longer reuse one
   set of Keller-cone draws; the samplers hash the lane first.
 - `transmission` no longer destroys the CUDA context when a straight segment

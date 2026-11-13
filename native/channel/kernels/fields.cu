@@ -171,6 +171,18 @@ __device__ __forceinline__ field::float3a load_sequence3(
     return field::make_f3(values[base], values[base + 1], values[base + 2]);
 }
 
+// The launch direction a reflection row falls back on when its source lies on the first reflecting
+// plane, so the launch segment is too short to normalize: the departure from the first interaction
+// (towards `next`) mirrored in that plane. It is a constant of the row's geometry derivatives,
+// which a zero-length segment leaves undefined.
+__device__ __forceinline__ field::float3a reflection_launch_alternate(
+    field::float3a first_hit, field::float3a next, field::float3a normal) {
+    const field::float3a e_z = field::make_f3(0.0f, 0.0f, 1.0f);
+    const field::float3a departure = field::safe_normalize(field::f3_sub(next, first_hit), e_z);
+    const field::float3a unit_normal = field::safe_normalize(normal, e_z);
+    return field::f3_sub(departure, field::f3_mul(unit_normal, 2.0f * field::f3_dot(departure, unit_normal)));
+}
+
 // Every output of one reflection lane, computed before any is stored.
 struct ReflectionRow {
     field::Complex3 value;
@@ -196,7 +208,9 @@ __device__ __noinline__ void reflection_row(
     field::float3a previous = source_value;
     field::float3a first_hit = load_sequence3(positions, 0, 0, 1);
     field::float3a incident = field::safe_normalize(
-        field::f3_sub(first_hit, previous), field::make_f3(0.0f, 0.0f, 1.0f));
+        field::f3_sub(first_hit, previous),
+        reflection_launch_alternate(first_hit, depth > 1 ? load_sequence3(positions, 0, 1, 1) : target_value,
+                                    load_sequence3(normals, 0, 0, 1)));
     // unnormalized transverse projection of the transmit polarization
     // (short-dipole sin(theta) weight); the Jones s/p bases stay orthonormal.
     field::float3a tx_axis = field::project_to_wedge_plane(tx_pol, incident);
@@ -1688,6 +1702,16 @@ struct ReflectionChain {
     float amplitude_scale;
 };
 
+// reflection_launch_alternate for row `index` of (N, depth) interaction tables.
+__device__ __forceinline__ field::float3a reflection_launch_alternate_at(
+    const float* interaction_positions, const float* interaction_normals, const float* target, int64_t index,
+    int64_t depth) {
+    return reflection_launch_alternate(
+        load_sequence3f(interaction_positions, index, 0, depth),
+        depth > 1 ? load_sequence3f(interaction_positions, index, 1, depth) : load3f(target, index),
+        load_sequence3f(interaction_normals, index, 0, depth));
+}
+
 __device__ void reflection_chain_eval(
     int64_t index,
     int64_t depth,
@@ -1711,7 +1735,8 @@ __device__ void reflection_chain_eval(
     const field::float3a first_hit = load_sequence3f(
         interaction_positions, index, 0, depth);
     field::float3a incident = field::safe_normalize(
-        field::f3_sub(first_hit, previous), field::make_f3(0.0f, 0.0f, 1.0f));
+        field::f3_sub(first_hit, previous),
+        reflection_launch_alternate_at(interaction_positions, interaction_normals, target, index, depth));
     // unnormalized transverse projection of the transmit polarization.
     const field::float3a tx_axis = field::project_to_wedge_plane(
         load3f(tx_polarization, index), incident);
@@ -1865,7 +1890,8 @@ __global__ void reflection_sequence_backward_kernel(
         // cotangent, the cotangent flowing onto the `previous` endpoint of
         // the segment being processed, the alternate-branch cotangent on the
         // bounce's outgoing direction, and the final receive-segment terms.
-        const field::float3a e_z = field::make_f3(0.0f, 0.0f, 1.0f);
+        const field::float3a launch_alternate =
+            reflection_launch_alternate_at(interaction_positions, interaction_normals, target, index, depth);
         float g_length = 0.0f;
         field::float3a g_carry = field::f3_zero();
         field::float3a g_outgoing = field::f3_zero();
@@ -2026,7 +2052,7 @@ __global__ void reflection_sequence_backward_kernel(
                                      load_sequence3f(
                                          interaction_positions, index, 0, depth),
                                      load3f(source, index)),
-                                 e_z);
+                                 launch_alternate);
             const field::float3a incident_argument = field::safe_normalize(
                 segment, outgoing_previous);
             const field::float3a raw_normal = load_sequence3f(
@@ -2071,14 +2097,14 @@ __global__ void reflection_sequence_backward_kernel(
             continue;
 
         // Launch segment: value_0 = tx_axis * (1 + 0j) with tx_axis built on
-        // the pre-loop incident direction (alternate e_z); the bounce-0
+        // the pre-loop incident direction (alternate launch_alternate); the bounce-0
         // normalize falls back onto this same direction, so g_outgoing now
         // holds that branch's cotangent.
         const field::float3a source_value = load3f(source, index);
         const field::float3a first_hit = load_sequence3f(
             interaction_positions, index, 0, depth);
         const field::float3a segment_pre = field::f3_sub(first_hit, source_value);
-        const field::float3a incident_pre = field::safe_normalize(segment_pre, e_z);
+        const field::float3a incident_pre = field::safe_normalize(segment_pre, launch_alternate);
         field::float3a g_tx_axis = field::make_f3(
             g_chain.x.re, g_chain.y.re, g_chain.z.re);
         field::float3a g_incident_pre = g_outgoing;
@@ -2087,9 +2113,9 @@ __global__ void reflection_sequence_backward_kernel(
             incident_pre, load3f(tx_polarization, index), g_tx_axis,
             g_incident_pre, g_pol_dump);
         field::float3a g_segment_pre = field::f3_zero();
-        field::float3a g_ez_dump = field::f3_zero();
+        field::float3a g_alternate_dump = field::f3_zero();
         field::adj_safe_normalize(
-            segment_pre, e_z, g_incident_pre, g_segment_pre, g_ez_dump);
+            segment_pre, launch_alternate, g_incident_pre, g_segment_pre, g_alternate_dump);
         g_hit_first = field::f3_add(g_hit_first, g_segment_pre);
         const field::float3a g_source_total = field::f3_sub(
             g_carry, g_segment_pre);
@@ -2146,12 +2172,13 @@ __global__ void reflection_sequence_jvp_kernel(
         // replay the same utd formulas, so material/frequency-only seeds
         // reduce exactly to the AD tangent chain while geometry seeds move
         // the frames, the incidence cosines and the path length.
-        const ad::DualF3 e_z = ad::df3_const(field::make_f3(0.0f, 0.0f, 1.0f));
+        const ad::DualF3 launch_alternate = ad::df3_const(
+            reflection_launch_alternate_at(interaction_positions, interaction_normals, target, index, depth));
         ad::DualF3 previous = load_dual3f(source, tangent_source, index);
         const ad::DualF3 first_hit = load_dual_sequence3f(
             interaction_positions, tangent_positions, index, 0, depth);
         const ad::DualF3 incident_pre = ad::dual_safe_normalize(
-            ad::df3_sub(first_hit, previous), e_z);
+            ad::df3_sub(first_hit, previous), launch_alternate);
         const ad::DualF3 tx_axis = ad::dual_transverse_project(
             incident_pre, ad::df3_const(load3f(tx_polarization, index)));
         field::Complex3 value = field::cplx_scale_real(

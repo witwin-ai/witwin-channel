@@ -155,7 +155,7 @@ _RAYD_REFLECTION_EPC_PATHS_FORWARD = _native.op(
     tensor_arg("expected_prim_ids"), tensor_arg("direct_plane_points"),
     tensor_arg("direct_plane_normals"), tensor_arg("surface_group_id"),
     tensor_arg("surface_group_size"), tensor_arg("surface_group_members"), opaque("max_bounces"),
-    opaque("visibility_ignore_mode"), opaque("min_segment_length"),
+    opaque("visibility_ignore_mode"), opaque("min_segment_length"), opaque("receiver_is_interaction"),
 )
 _RAYD_REFLECTION_EPC_PATHS_JVP = _native.op(
     "rayd_reflection_epc_paths_jvp",
@@ -1231,6 +1231,7 @@ class _RaydReflectionEpcPathsAdFunction(torch.autograd.Function):
             int(max_bounces),
             int(visibility_ignore_mode),
             0.0,
+            False,
         )
         return tuple(out)
 

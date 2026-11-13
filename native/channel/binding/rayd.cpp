@@ -140,7 +140,8 @@ pybind11::tuple channel_rayd_reflection_epc_paths_forward(
     torch::Tensor surface_group_members,
     int64_t max_bounces,
     int64_t visibility_ignore_mode,
-    double min_segment_length);
+    double min_segment_length,
+    bool receiver_is_interaction);
 pybind11::tuple channel_rayd_reflection_epc_paths_backward(
     RayDSceneResource &scene,
     torch::Tensor source,

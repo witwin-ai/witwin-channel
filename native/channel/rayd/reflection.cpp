@@ -33,7 +33,8 @@ pybind11::tuple channel_rayd_reflection_epc_paths_forward(
     torch::Tensor surface_group_members,
     int64_t max_bounces,
     int64_t visibility_ignore_mode,
-    double min_segment_length) {
+    double min_segment_length,
+    bool receiver_is_interaction) {
     rayd::torch::ReflectionEpcRequest request;
     request.source = source;
     request.receiver = receiver;
@@ -48,6 +49,7 @@ pybind11::tuple channel_rayd_reflection_epc_paths_forward(
     request.visibility_ignore_mode = visibility_ignore_mode;
     request.plane_tolerance = 1.0e-3;
     request.min_segment_length = min_segment_length;
+    request.receiver_is_interaction = receiver_is_interaction;
     rayd::torch::ReflectionEpcResult out =
         rayd::torch::reflection_epc_paths_forward(scene.resource(), request);
     return pybind11::make_tuple(

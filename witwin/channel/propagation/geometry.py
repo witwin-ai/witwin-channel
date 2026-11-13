@@ -197,6 +197,17 @@ def _opposite_vertex_ids(
     return faces.gather(1, opposite_slot[:, None])[:, 0]
 
 
+# A reflection path whose segment between two interactions is shorter than this fraction of the
+# scene diagonal is invalid; the transmitter and receiver segments are exempt.
+REFLECTION_MIN_SEGMENT_RELATIVE = 1.0e-5
+
+
+def reflection_scene_scale_m(compiled: CompiledScene) -> float:
+    """The scene diagonal, metres, that reflection validity and pruning tolerances are fractions of."""
+
+    return max(float(getattr(compiled, "enumerated_penetration_scene_diagonal_m", 0.0) or 0.0), 1.0e-3)
+
+
 def reflection_epc_paths(
     compiled: CompiledScene, vertices: torch.Tensor, source: torch.Tensor, target: torch.Tensor,
     face_id: torch.Tensor, depth: int,

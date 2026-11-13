@@ -3937,7 +3937,8 @@
         ["surface_group_members", "torch::Tensor", null],
         ["max_bounces", "int64_t", null],
         ["visibility_ignore_mode", "int64_t", null],
-        ["min_segment_length", "double", null]
+        ["min_segment_length", "double", null],
+        ["receiver_is_interaction", "bool", null]
       ],
       "pybind_arguments": [],
       "python_owners": ["witwin.channel.kernels.geometry._RaydReflectionEpcPathsAdFunction", "witwin.channel.kernels.geometry.rayd_reflection_epc_paths_forward"]
