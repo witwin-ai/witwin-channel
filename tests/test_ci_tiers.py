@@ -223,6 +223,8 @@ def test_paid_wheel_workflow_is_hosted_complete_and_opt_in() -> None:
     assert "runs-on: windows-2022" in workflow
     assert "runs-on: ubuntu-22.04" in workflow
     assert "manylinux_2_28" in workflow
+    # The wheel matrix names exactly one platform tag; auditwheel must not add older ones.
+    assert "auditwheel repair --plat manylinux_2_28_x86_64 --only-plat" in workflow
 
     locked_rayd = "97f1b5f52eefcd2e0c2cec33621984ad7ff9891d"
     locked_core = "46c826d969654912461d2e18b6cb87df9cc3df8f"
