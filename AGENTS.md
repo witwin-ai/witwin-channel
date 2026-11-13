@@ -207,7 +207,8 @@ Plans are in `docs/dev/plans/` (the modular architecture is plan `08-*`); the st
   0.8 source boundary, 048 scene import and presets.
 - Ownership: 007 propagation data, 008 enumerated oracle, 009 native fusion, 023 direct RayD
   integration, 024 shared RF/transmission, 025 diffraction family, 026 RayD scattering runtime,
-  027 segment penetration, 044 native translation units, 065 fused field launch.
+  027 segment penetration, 044 native translation units, 065 fused field launch, 078 coupled
+  Blackwell codegen.
 - Device residency: 028 diffraction state selection, 032 compact cardinality (029, 030, 031 are
   Removed and superseded by 032), 035 trace backend selection, 077 order-independent reduction.
 - Physics and AD: 004 numerical duplication, 010 scattering kernels, 011/012/013 coupled and
