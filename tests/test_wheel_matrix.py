@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -35,6 +36,44 @@ def test_release_profile_matches_the_matrix():
         *(f"{sm}-real" for sm in matrix["sass"]),
         *(f"{sm}-virtual" for sm in matrix["ptx"]),
     ]
+
+
+def _split_gencode(flags: str, ceiling: int, tmp_path: Path) -> list[str]:
+    root = Path(__file__).resolve().parents[1]
+    script = tmp_path / "split.cmake"
+    script.write_text(
+        f'include("{(root / "cmake" / "gencode.cmake").as_posix()}")\n'
+        f'separate_arguments(options NATIVE_COMMAND "{flags}")\n'
+        f"channel_split_gencode_options(\"${{options}}\" {ceiling} kept above capped)\n"
+        'foreach(name IN ITEMS kept above capped)\n'
+        '    message("${name}=${${name}}")\n'
+        "endforeach()\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [shutil.which("cmake"), "-P", str(script)], capture_output=True, text=True, check=True
+    )
+    return result.stderr.splitlines()
+
+
+@pytest.mark.skipif(shutil.which("cmake") is None, reason="CMake is required")
+def test_capped_gencode_keeps_every_release_cubin_below_the_virtual_ceiling(tmp_path: Path):
+    profile = wheel_matrix.profile(wheel_matrix.load())
+
+    kept, above, capped = _split_gencode(profile["gencode"], 90, tmp_path)
+
+    assert kept.startswith("kept=") and above.startswith("above=")
+    assert all(int(sm) <= 90 for sm in re.findall(r"arch=compute_(\d+)", kept))
+    assert all(int(sm) > 90 for sm in re.findall(r"arch=compute_(\d+)", above))
+    assert capped == "capped=--generate-code=arch=compute_90,code=[sm_100,sm_120,compute_90]"
+    cubins = sorted(int(sm) for sm in re.findall(r"sm_(\d+)", kept + capped))
+    assert cubins == sorted(int(sm) for sm in re.findall(r"sm_(\d+)", profile["gencode"]))
+
+
+@pytest.mark.skipif(shutil.which("cmake") is None, reason="CMake is required")
+def test_capped_gencode_refuses_an_unparsed_option(tmp_path: Path):
+    with pytest.raises(subprocess.CalledProcessError):
+        _split_gencode("-gencode arch=compute_120,code=sm_120", 90, tmp_path)
 
 
 def test_build_matrix_has_one_row_per_python_and_torch():

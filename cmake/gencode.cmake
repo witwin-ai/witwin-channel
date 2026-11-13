@@ -1,0 +1,38 @@
+# Splits grouped `--generate-code=arch=compute_V,code=[...]` options at virtual architecture
+# `ceiling`: groups with V <= ceiling go to `kept_variable`, the others to `above_variable`.
+# `capped_variable` receives one group that builds every SASS target of the `above` groups from
+# compute_<ceiling>, with compute_<ceiling> PTX in place of their PTX targets.
+function(channel_split_gencode_options options ceiling kept_variable above_variable capped_variable)
+    set(kept "")
+    set(above "")
+    set(capped_codes "")
+    foreach(option IN LISTS options)
+        if(NOT option MATCHES "^--generate-code=arch=compute_([0-9]+),code=\\[?([a-z0-9_,]+)\\]?$")
+            message(FATAL_ERROR
+                "Unsupported Channel gencode option '${option}'; use "
+                "--generate-code=arch=compute_NN,code=[sm_NN,...].")
+        endif()
+        if(CMAKE_MATCH_1 LESS_EQUAL ceiling)
+            list(APPEND kept "${option}")
+            continue()
+        endif()
+        list(APPEND above "${option}")
+        string(REPLACE "," ";" codes "${CMAKE_MATCH_2}")
+        foreach(code IN LISTS codes)
+            if(code MATCHES "^compute_")
+                list(APPEND capped_codes "compute_${ceiling}")
+            else()
+                list(APPEND capped_codes "${code}")
+            endif()
+        endforeach()
+    endforeach()
+    set(capped "")
+    if(capped_codes)
+        list(REMOVE_DUPLICATES capped_codes)
+        list(JOIN capped_codes "," joined_codes)
+        set(capped "--generate-code=arch=compute_${ceiling},code=[${joined_codes}]")
+    endif()
+    set(${kept_variable} "${kept}" PARENT_SCOPE)
+    set(${above_variable} "${above}" PARENT_SCOPE)
+    set(${capped_variable} "${capped}" PARENT_SCOPE)
+endfunction()

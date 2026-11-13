@@ -7,6 +7,8 @@ function(channel_normalize_git_remote_url input_url output_variable)
     set(${output_variable} "${normalized_url}" PARENT_SCOPE)
 endfunction()
 
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/gencode.cmake")
+
 set(CHANNEL_ABI_VERSION 1)
 set(CHANNEL_RAYD_LOCK_FILE "${CMAKE_CURRENT_SOURCE_DIR}/dependencies/rayd.lock.json")
 if(NOT EXISTS "${CHANNEL_RAYD_LOCK_FILE}")
@@ -608,7 +610,13 @@ if(CHANNEL_CUDA_GENCODE_FLAGS STREQUAL "")
         PROPERTIES CUDA_ARCHITECTURES "${CHANNEL_CUDA_ARCHITECTURES}")
 else()
     set_target_properties(_channel PROPERTIES CUDA_ARCHITECTURES OFF)
-    foreach(CHANNEL_CUDA_GENCODE_OPTION IN LISTS CHANNEL_CUDA_GENCODE_OPTIONS)
+    channel_split_gencode_options(
+        "${CHANNEL_CUDA_GENCODE_OPTIONS}"
+        90
+        CHANNEL_CUDA_GENCODE_SHARED_OPTIONS
+        CHANNEL_CUDA_GENCODE_PER_SOURCE_OPTIONS
+        CHANNEL_CUDA_GENCODE_CEILING_OPTIONS)
+    foreach(CHANNEL_CUDA_GENCODE_OPTION IN LISTS CHANNEL_CUDA_GENCODE_SHARED_OPTIONS)
         target_compile_options(
             _channel
             PRIVATE
@@ -637,6 +645,29 @@ set_source_files_properties(
 set_source_files_properties(
     native/channel/kernels/mc_transmission.cu
     PROPERTIES COMPILE_OPTIONS "--fmad=false")
+# CUDA 12.8 optimizes compute_100 and newer with a newer NVVM whose straight-line strength
+# reduction needs memory quadratic in the precise sin/cos calls inlined into one function. The
+# dual wedge-pair rows of coupled.cu inline enough of them to need 33 GB per compile, so its
+# sm_100/sm_120 SASS and its PTX are built from compute_90, the NVVM that every other release
+# SASS target of this file already uses. These options follow the --fmad=false properties
+# above, which set rather than append.
+if(NOT CHANNEL_CUDA_GENCODE_FLAGS STREQUAL "" AND CHANNEL_CUDA_GENCODE_PER_SOURCE_OPTIONS)
+    get_target_property(CHANNEL_TARGET_SOURCES _channel SOURCES)
+    list(FILTER CHANNEL_TARGET_SOURCES INCLUDE REGEX "\\.cu$")
+    foreach(CHANNEL_CUDA_SOURCE IN LISTS CHANNEL_TARGET_SOURCES)
+        if(CHANNEL_CUDA_SOURCE STREQUAL "native/channel/kernels/coupled.cu")
+            set_property(
+                SOURCE "${CHANNEL_CUDA_SOURCE}"
+                APPEND PROPERTY COMPILE_OPTIONS "${CHANNEL_CUDA_GENCODE_CEILING_OPTIONS}")
+        else()
+            set_property(
+                SOURCE "${CHANNEL_CUDA_SOURCE}"
+                APPEND PROPERTY COMPILE_OPTIONS "${CHANNEL_CUDA_GENCODE_PER_SOURCE_OPTIONS}")
+        endif()
+    endforeach()
+    message(STATUS
+        "Channel coupled.cu builds its targets above compute_90 as: ${CHANNEL_CUDA_GENCODE_CEILING_OPTIONS}")
+endif()
 target_link_libraries(
     _channel
     PRIVATE
